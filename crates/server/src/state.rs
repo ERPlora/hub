@@ -94,8 +94,8 @@ impl HubConfig {
     /// Lee la configuración del entorno con defaults de desarrollo locales.
     pub fn from_env() -> Self {
         let hub_id = std::env::var("HUB_ID").unwrap_or_else(|_| DEV_HUB_ID.to_string());
-        let cloud_base_url =
-            std::env::var("HUB_CLOUD_API_URL").unwrap_or_else(|_| "https://erplora.com".to_string());
+        let cloud_base_url = std::env::var("HUB_CLOUD_API_URL")
+            .unwrap_or_else(|_| "https://erplora.com".to_string());
         let module_cache = std::env::var("HUB_MODULE_CACHE")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("erplora-modules"));
@@ -104,10 +104,13 @@ impl HubConfig {
             _ => AuthMode::Dev,
         };
         // Inyección directa de la clave (PEM) por entorno; si no, `main` la trae del Cloud.
-        let jwt_public_key = std::env::var("HUB_JWT_PUBLIC_KEY").ok().filter(|s| !s.trim().is_empty());
+        let jwt_public_key = std::env::var("HUB_JWT_PUBLIC_KEY")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
         // Token de máquina (ECS lo inyecta como `HUB_CLOUD_API_TOKEN`; Tauri lo setea tras enrolar).
-        let cloud_api_token =
-            std::env::var("HUB_CLOUD_API_TOKEN").ok().filter(|s| !s.trim().is_empty());
+        let cloud_api_token = std::env::var("HUB_CLOUD_API_TOKEN")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
         let device_trust_enforce =
             matches!(std::env::var("HUB_DEVICE_TRUST").as_deref(), Ok("enforce"));
         // Sector / tipo de negocio del hub (preset "Recomendado" del dashboard, ADR-0054). Vacío o
@@ -119,13 +122,18 @@ impl HubConfig {
         // Carpeta media por defecto: **co-localizada con la BD del hub** (`<dir de
         // HUB_SQLITE_PATH>/media`), no relativa al CWD del proceso (frágil). Así el path es estable
         // y predecible en local/Tauri (vive junto a `erplora.db`). Override explícito: `HUB_MEDIA_DIR`.
-        let media_dir = std::env::var("HUB_MEDIA_DIR").map(PathBuf::from).unwrap_or_else(|_| {
-            let db = std::env::var("HUB_SQLITE_PATH").unwrap_or_else(|_| "erplora.db".into());
-            match Path::new(&db).parent().filter(|p| !p.as_os_str().is_empty()) {
-                Some(dir) => dir.join("media"),
-                None => PathBuf::from("media"),
-            }
-        });
+        let media_dir = std::env::var("HUB_MEDIA_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                let db = std::env::var("HUB_SQLITE_PATH").unwrap_or_else(|_| "erplora.db".into());
+                match Path::new(&db)
+                    .parent()
+                    .filter(|p| !p.as_os_str().is_empty())
+                {
+                    Some(dir) => dir.join("media"),
+                    None => PathBuf::from("media"),
+                }
+            });
         Self {
             hub_id,
             cloud_base_url,
@@ -144,6 +152,11 @@ impl HubConfig {
 /// la actualiza tras enrolar/rotar y el runtime embebido toma el token nuevo **sin reiniciar la
 /// app** (`auth::machine_auth` la lee en cada petición). En ECS basta el valor inicial del env.
 pub type MachineToken = Arc<RwLock<Option<String>>>;
+
+/// `hub_id` vivo de la máquina. Durante el primer arranque Tauri nace con [`DEV_HUB_ID`] y, tras
+/// registrar el `device_id` en el Cloud, adopta el UUID real en la misma operación que el token.
+/// En Cloud ya viene fijado por el despliegue y la celda no cambia.
+pub type HubId = Arc<RwLock<String>>;
 
 /// Estado de la app Axum. El runtime no es `Sync` para mutación, así que va tras un `Mutex`;
 /// para 1–30 usuarios por hub (ARQUITECTURA.md §7.5) es más que suficiente.
@@ -164,6 +177,9 @@ pub struct AppState {
     /// Token de máquina **vivo** (hot-reload). Se siembra del `config.cloud_api_token` o de una
     /// celda externa (shell Tauri). Léelo con [`AppState::machine_token`].
     pub machine_token: MachineToken,
+    /// Identidad de Hub **viva**. Token e id se actualizan juntos al completar el registro de la
+    /// máquina, evitando firmar una llamada con el token nuevo y el UUID placeholder anterior.
+    pub hub_id: HubId,
     /// Cliente HTTP async (rustls) compartido para hablar con el Cloud (descargas + proxy SSE).
     pub http: reqwest::Client,
     /// Gateway multi-tenant (ADR-0005, hub#24). `None` = modo single-tenant actual (N=1); `Some` =
@@ -187,13 +203,30 @@ impl AppState {
     /// Variante con config explícita (tests / arranque controlado). Crea la celda del token de
     /// máquina sembrada con `config.cloud_api_token`.
     pub fn with_config(runtime: Runtime, config: HubConfig) -> Self {
-        let cell = Arc::new(RwLock::new(config.cloud_api_token.clone()));
-        Self::with_config_cell(runtime, config, cell)
+        let token = Arc::new(RwLock::new(config.cloud_api_token.clone()));
+        let hub_id = Arc::new(RwLock::new(config.hub_id.clone()));
+        Self::with_config_cells(runtime, config, token, hub_id)
     }
 
     /// Como [`with_config`](Self::with_config) pero con una **celda de token externa** compartida
     /// (el shell Tauri la conserva para actualizarla en caliente tras enrolar/rotar).
-    pub fn with_config_cell(mut runtime: Runtime, config: HubConfig, machine_token: MachineToken) -> Self {
+    pub fn with_config_cell(
+        runtime: Runtime,
+        config: HubConfig,
+        machine_token: MachineToken,
+    ) -> Self {
+        let hub_id = Arc::new(RwLock::new(config.hub_id.clone()));
+        Self::with_config_cells(runtime, config, machine_token, hub_id)
+    }
+
+    /// Variante completa para hosts embebidos: comparte tanto el token como el `hub_id` vivo.
+    /// El shell los adopta de forma atómica desde la perspectiva del flujo de bootstrap.
+    pub fn with_config_cells(
+        mut runtime: Runtime,
+        config: HubConfig,
+        machine_token: MachineToken,
+        hub_id: HubId,
+    ) -> Self {
         let (tx, _rx) = broadcast::channel::<WsEvent>(256);
         let sink = Arc::new(BroadcastSink { tx: tx.clone() });
         runtime.set_event_sink(sink);
@@ -202,6 +235,7 @@ impl AppState {
             events: tx,
             config,
             machine_token,
+            hub_id,
             http: reqwest::Client::new(),
             tenants: None,
             vector: None,
@@ -239,8 +273,50 @@ impl AppState {
     ) -> Result<Arc<Mutex<Runtime>>, crate::tenant::TenantError> {
         match &self.tenants {
             Some(router) => router.resolve_runtime(hub_id).await,
-            None => Ok(self.runtime.clone()),
+            None => {
+                // En single-tenant el primer login puede sustituir el placeholder de arranque por
+                // el UUID real. Sincronizamos el Runtime antes de devolverlo para que sus helpers
+                // internos (settings, perfil, instalación…) usen el mismo scope que la auth. La
+                // autoridad es la celda del host, NUNCA el argumento (que en query/command puede
+                // proceder de `X-Hub-Id` en modo dev).
+                let effective_hub_id = self.hub_id();
+                let mut runtime = self.runtime.lock().await;
+                if runtime.hub_id() != effective_hub_id {
+                    runtime.adopt_hub_id(effective_hub_id);
+                }
+                drop(runtime);
+                Ok(self.runtime.clone())
+            }
         }
+    }
+
+    /// Lee el `hub_id` vivo (clona). Si el lock estuviera envenenado, conserva el valor de
+    /// arranque; nunca acepta un id aportado por el navegador como autoridad.
+    pub fn hub_id(&self) -> String {
+        self.hub_id
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| self.config.hub_id.clone())
+    }
+
+    /// Copia de configuración para gates de auth con el `hub_id` vivo ya reconciliado. Mantiene el
+    /// resto de opciones inmutables y evita que un handler use accidentalmente el placeholder que
+    /// existía antes del registro de la máquina.
+    pub fn effective_config(&self) -> HubConfig {
+        let mut config = self.config.clone();
+        config.hub_id = self.hub_id();
+        config
+    }
+
+    /// Demo/Dev es la única excepción al registro de máquina obligatorio.
+    pub fn is_demo(&self) -> bool {
+        self.config.auth_mode == AuthMode::Dev && self.hub_id() == DEV_HUB_ID
+    }
+
+    /// Una máquina real está vinculada solo si posee las dos mitades de su identidad: UUID Cloud
+    /// y credencial secreta. Tener un JWT de usuario abierto no sustituye este estado.
+    pub fn machine_registered(&self) -> bool {
+        !self.is_demo() && self.hub_id() != DEV_HUB_ID && self.machine_token().is_some()
     }
 
     /// Lee el token de máquina vivo (clona). `None` si el hub no está enrolado.

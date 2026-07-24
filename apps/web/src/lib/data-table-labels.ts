@@ -1,11 +1,11 @@
 /**
- * Etiquetas en español para `ok-data-table` (prop `.labels`).
+ * Etiquetas del shell para `ok-data-table` (prop `.labels`).
  *
  * Se pasan imperativa­mente por JS (no como atributo) porque el objeto no es serializable
  * a atributo HTML. Uso:
  *
- *   import { DT_LABELS_ES } from '../lib/data-table-labels';
- *   el.labels = DT_LABELS_ES;
+ *   import { dataTableLabels } from '../lib/data-table-labels';
+ *   el.labels = dataTableLabels(locale.value);
  *
  * Los módulos WC tienen su propio i18n interno — estos labels son solo para las tablas
  * que viven en páginas Vue del shell (EmployeesPage, etc.).
@@ -46,3 +46,44 @@ export const DT_LABELS_ES = {
   recordSingular: 'registro',
   recordPlural: 'registros',
 } as const;
+
+export const DT_LABELS_EN = {
+  search: 'Search…',
+  empty: 'No results',
+  filters: 'Filters',
+  clear: 'Clear',
+  apply: 'Apply',
+  selected: '{n} selected',
+  importCsv: 'Import CSV',
+  exportCsv: 'Export CSV',
+  add: 'Add',
+  moreActions: 'More actions',
+  rowsPerPage: 'Rows per page',
+  perPageShort: '{n} / page',
+  viewList: 'List view',
+  viewCards: 'Card view',
+  columnsVisible: 'Visible columns',
+  columns: 'Columns',
+  actions: 'Actions',
+  close: 'Close',
+  newRecord: 'New',
+  form: 'Form',
+  filterPlaceholder: 'Filter…',
+  from: 'From',
+  to: 'To',
+  fromOf: '{label} from',
+  toOf: '{label} to',
+  gte: '≥',
+  lte: '≤',
+  noValues: 'No values',
+  selectAll: 'Select all',
+  selectRow: 'Select row',
+  select: 'Select',
+  showing: 'Showing {from}–{to} of',
+  recordSingular: 'record',
+  recordPlural: 'records',
+} as const;
+
+export function dataTableLabels(locale: string): Record<string, string> {
+  return locale.toLowerCase().startsWith('en') ? DT_LABELS_EN : DT_LABELS_ES;
+}

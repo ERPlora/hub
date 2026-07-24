@@ -47,7 +47,10 @@ fn esc(s: &str) -> String {
 }
 
 fn s(v: &Json, k: &str) -> String {
-    v.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string()
+    v.get(k)
+        .and_then(|x| x.as_str())
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn f(v: &Json, k: &str) -> f64 {
@@ -95,7 +98,11 @@ fn destinatarios(record: &Json) -> String {
     }
     let name = {
         let n = s(record, "recipient_name");
-        if n.is_empty() { nif.clone() } else { n }
+        if n.is_empty() {
+            nif.clone()
+        } else {
+            n
+        }
     };
     format!(
         "<sum1:Destinatarios><sum1:IDDestinatario>\
@@ -174,7 +181,11 @@ fn sistema_informatico(config: &Json, hub_id: &str) -> String {
 
 /// Devuelve `val` si no está vacío, si no `fallback`.
 fn nonempty(val: String, fallback: &str) -> String {
-    if val.is_empty() { fallback.to_string() } else { val }
+    if val.is_empty() {
+        fallback.to_string()
+    } else {
+        val
+    }
 }
 ///
 /// La AEAT admite varias líneas de desglose. Antes se emitía **una sola**, con el tipo **efectivo**
@@ -408,7 +419,11 @@ mod desglose_tests {
         let tb = r#"{"21.00":{"base":1000,"tax":210},"10.00":{"base":500,"tax":50}}"#;
         let xml = xml_de(&alta(tb, 1500.0, 260.0, 17.33));
 
-        assert_eq!(xml.matches("<sum1:DetalleDesglose>").count(), 2, "una línea por tipo");
+        assert_eq!(
+            xml.matches("<sum1:DetalleDesglose>").count(),
+            2,
+            "una línea por tipo"
+        );
         assert!(xml.contains("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>"));
         assert!(xml.contains("<sum1:TipoImpositivo>10.00</sum1:TipoImpositivo>"));
         assert!(
@@ -417,9 +432,13 @@ mod desglose_tests {
         );
 
         // Base y cuota POR LÍNEA, en euros (los céntimos se dividen en el límite AEAT).
-        assert!(xml.contains("<sum1:BaseImponibleOimporteNoSujeto>10.00</sum1:BaseImponibleOimporteNoSujeto>"));
+        assert!(xml.contains(
+            "<sum1:BaseImponibleOimporteNoSujeto>10.00</sum1:BaseImponibleOimporteNoSujeto>"
+        ));
         assert!(xml.contains("<sum1:CuotaRepercutida>2.10</sum1:CuotaRepercutida>"));
-        assert!(xml.contains("<sum1:BaseImponibleOimporteNoSujeto>5.00</sum1:BaseImponibleOimporteNoSujeto>"));
+        assert!(xml.contains(
+            "<sum1:BaseImponibleOimporteNoSujeto>5.00</sum1:BaseImponibleOimporteNoSujeto>"
+        ));
         assert!(xml.contains("<sum1:CuotaRepercutida>0.50</sum1:CuotaRepercutida>"));
 
         // Los totales NO cambian: son los que alimentan la huella (CuotaTotal + ImporteTotal), así
@@ -460,12 +479,19 @@ mod desglose_tests {
         let tb = r#"{"21.00":{"base":-1000,"tax":-210}}"#;
         let xml = xml_de(&alta(tb, -1000.0, -210.0, 21.0));
         assert!(xml.contains("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>"));
-        assert!(xml.contains("<sum1:BaseImponibleOimporteNoSujeto>-10.00</sum1:BaseImponibleOimporteNoSujeto>"));
+        assert!(xml.contains(
+            "<sum1:BaseImponibleOimporteNoSujeto>-10.00</sum1:BaseImponibleOimporteNoSujeto>"
+        ));
         assert!(xml.contains("<sum1:CuotaRepercutida>-2.10</sum1:CuotaRepercutida>"));
     }
 }
 
-pub fn build_consult_soap(issuer_nif: &str, issuer_name: &str, ejercicio: &str, periodo: &str) -> String {
+pub fn build_consult_soap(
+    issuer_nif: &str,
+    issuer_name: &str,
+    ejercicio: &str,
+    periodo: &str,
+) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
          <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \
@@ -510,7 +536,9 @@ fn xml_all(body: &str, tag: &str) -> Vec<String> {
             continue;
         }
         let after = &body[lt + 1..];
-        let name_end = after.find(['>', ' ', '/', '\t', '\n']).unwrap_or(after.len());
+        let name_end = after
+            .find(['>', ' ', '/', '\t', '\n'])
+            .unwrap_or(after.len());
         let raw_name = &after[..name_end];
         let local = raw_name.rsplit(':').next().unwrap_or(raw_name);
         if local == tag {
@@ -539,7 +567,11 @@ pub fn parse_consult_response(body: &str) -> Vec<ConsultRecord> {
     let csvs = xml_all(body, "CSV");
     let estados = {
         let e = xml_all(body, "EstadoRegistro");
-        if e.is_empty() { xml_all(body, "EstadoRegistroFactura") } else { e }
+        if e.is_empty() {
+            xml_all(body, "EstadoRegistroFactura")
+        } else {
+            e
+        }
     };
     let n = nums.len().max(huellas.len());
     (0..n)

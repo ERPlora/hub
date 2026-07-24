@@ -167,14 +167,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IonModal, IonHeader, IonFooter, IonToolbar, IonTitle, IonButtons, IonButton,
   IonContent, IonList, IonItem, IonInput, IonCheckbox, IonSpinner, alertController,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
-import { DT_LABELS_ES } from '../lib/data-table-labels';
+import { dataTableLabels } from '../lib/data-table-labels';
 import { toastError, toastSuccess } from '../lib/toast';
 import { listInstalledModules, type InstalledModule } from '../lib/runtime';
 import {
@@ -182,7 +182,7 @@ import {
   type ApiKey, type ApiKeyScopeEntry,
 } from '../lib/api-keys';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 // ── Tipos locales de ok-data-table (OutfitKit no emite .d.ts; mismos shapes que EmployeesPage). ──
 type Row = Record<string, unknown>;
@@ -467,9 +467,18 @@ const table = ref<HTMLElement | null>(null);
 function handlePrimary(): void { void openCreate(); }
 
 onMounted(() => {
-  if (table.value) (table.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+  if (table.value) {
+    (table.value as HTMLElement & { labels: Record<string, string> }).labels =
+      dataTableLabels(locale.value);
+  }
   table.value?.addEventListener('primaryAction', handlePrimary);
   void reloadKeys();
+});
+watch(locale, () => {
+  if (table.value) {
+    (table.value as HTMLElement & { labels: Record<string, string> }).labels =
+      dataTableLabels(locale.value);
+  }
 });
 onBeforeUnmount(() => {
   table.value?.removeEventListener('primaryAction', handlePrimary);

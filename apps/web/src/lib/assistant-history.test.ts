@@ -12,8 +12,14 @@ const SS_KEY = 'erplora.assistant.history';
 
 // logout() importa dinámicamente cloud/entitlement (revocación server-side + reset del
 // entitlement). Aquí solo interesa el contrato del historial: se mockean para no tocar red.
-vi.mock('./cloud', () => ({ runtimeLogout: vi.fn() }));
+vi.mock('./cloud', () => ({
+  runtimeLogout: vi.fn(),
+  clearTokens: vi.fn(),
+  getAccessToken: vi.fn(() => null),
+}));
 vi.mock('./entitlement', () => ({ resetEntitlement: vi.fn() }));
+vi.mock('./user-profile', () => ({ resetUserProfile: vi.fn() }));
+vi.mock('./theme', () => ({ resetUserThemePreferences: vi.fn() }));
 
 async function freshStore() {
   // Simula un reload: módulo nuevo → re-lee sessionStorage en el import.

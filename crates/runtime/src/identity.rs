@@ -80,7 +80,9 @@ pub(crate) fn verify_secret_argon2(stored: &str, secret: &str) -> bool {
         return false;
     }
     match PasswordHash::new(stored) {
-        Ok(parsed) => Argon2::default().verify_password(secret.as_bytes(), &parsed).is_ok(),
+        Ok(parsed) => Argon2::default()
+            .verify_password(secret.as_bytes(), &parsed)
+            .is_ok(),
         Err(_) => false,
     }
 }
@@ -102,7 +104,9 @@ fn check_pin(stored: &str, pin: &str) -> bool {
     }
     // 1) Hash PHC argon2id (formato canónico).
     if let Ok(parsed) = PasswordHash::new(stored) {
-        return Argon2::default().verify_password(pin.as_bytes(), &parsed).is_ok();
+        return Argon2::default()
+            .verify_password(pin.as_bytes(), &parsed)
+            .is_ok();
     }
     // 2) Fallback legacy `salt:sha256_hex("{salt}:{pin}")` (seed del demo). Solo si NO era un PHC.
     if let Some((salt, expected_hex)) = stored.split_once(':') {
@@ -155,6 +159,29 @@ pub async fn create_user(
     )
     .await?;
     Ok(id)
+}
+
+/// Asegura una identidad fija para `AuthMode::Dev`, donde el frontend es la autoridad de las
+/// cabeceras y puede traer un id demo ya persistido. No cambia una identidad existente.
+pub async fn ensure_dev_user(
+    db: &dyn DatabaseAdapter,
+    id: &str,
+    name: &str,
+    role: &str,
+) -> Result<()> {
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("name".into(), json!(name));
+    p.insert("role".into(), json!(role));
+    p.insert("now".into(), json!(now_rfc3339()));
+    db.execute(
+        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+         VALUES (:id, :name, '', :role, NULL, 1, :now) \
+         ON CONFLICT (id) DO NOTHING",
+        &p,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Fija (o cambia) el PIN de un usuario **existente** por id. Lo usa el alta de PIN tras el primer

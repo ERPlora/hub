@@ -5,8 +5,8 @@
 //   - PUT /api/settings { ...parcial } → objeto COMPLETO              (auth = owner/admin)
 //
 // Estos ajustes son del HUB (globales), no del usuario. La MONEDA es global (sin override por
-// usuario). El IDIOMA es el DEFAULT del hub; cada usuario puede tener su propio override local
-// (localStorage `erplora.locale`, ver i18n/index.ts) que prevalece — la reconciliación la hace
+// usuario). El IDIOMA es el DEFAULT del hub; cada usuario puede tener su propio override persistido
+// (`hub_user_pref`, ver user-profile.ts) que prevalece — la reconciliación la hace
 // `bootHubLanguage()` más abajo.
 //
 // Se llama con el MISMO fetch autenticado del resto de `/api/*` (runtimeHeaders → X-Hub-Session):
@@ -28,6 +28,10 @@ export interface HubSettings {
   language: string;
   /** ¿Está visible la documentación de la API (entrada de menú + página Swagger)? */
   api_docs_enabled: boolean;
+  /** País fiscal ISO-3166-1 alpha-2. Driver global para impuestos/compliance. */
+  country_code: string;
+  /** Subdivisión fiscal ISO-3166-2, o null si aplica el régimen general del país. */
+  region_code?: string | null;
   /** Identidad de NEGOCIO (FUENTE ÚNICA país-agnóstica, ADR-0061): identificador fiscal universal
    *  (NIF/CIF en ES, SIREN/SIRET en FR, VAT-ID…) del obligado tributario. La usan invoice (emisor),
    *  los módulos fiscales por país (verifactu…) y los documentos de venta. Vacío hasta configurarse. */
@@ -38,7 +42,7 @@ export interface HubSettings {
   business_address: string;
   /** Paleta de tema GLOBAL del hub (ADR-0138): valor de `data-ok-palette` de OutfitKit
    *  palettes.css; 'erplora' = marca por defecto. El override POR USUARIO vive en
-   *  localStorage (`erplora.palette`, ver lib/theme.ts) y gana a esta. */
+   *  `hub_user_pref` y gana a esta. */
   theme_palette: string;
 }
 
@@ -56,6 +60,14 @@ function setHubSettings(raw: unknown): HubSettings {
     currency: typeof r.currency === 'string' && r.currency.trim() ? r.currency.trim().toUpperCase() : 'EUR',
     language: typeof r.language === 'string' && r.language.trim() ? r.language.trim() : 'es',
     api_docs_enabled: r.api_docs_enabled === true,
+    country_code:
+      typeof r.country_code === 'string' && r.country_code.trim()
+        ? r.country_code.trim().toUpperCase()
+        : 'ES',
+    region_code:
+      typeof r.region_code === 'string' && r.region_code.trim()
+        ? r.region_code.trim().toUpperCase()
+        : null,
     business_tax_id: typeof r.business_tax_id === 'string' ? r.business_tax_id : '',
     business_legal_name: typeof r.business_legal_name === 'string' ? r.business_legal_name : '',
     business_address: typeof r.business_address === 'string' ? r.business_address : '',

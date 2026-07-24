@@ -4,7 +4,7 @@
 //
 // En producción esto NO existe: el runtime (crates/server) sirve los módulos descargados
 // del marketplace. Aquí es solo el puente para el shell web de desarrollo. ARQUITECTURA.md §4.
-import { mkdirSync, copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdirSync, copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,8 +20,8 @@ const PUBLIC_DST = join(HERE, 'public/modules');
 const MODULES = [
   'appointments', 'cart_checkout', 'cash_register', 'customers', 'inventory',
   'invoice', 'invoice_series', 'kitchen', 'online_booking',
-  'orders', 'payment_gateways', 'payments', 'pricing', 'reservations',
-  'sales', 'schedules', 'services', 'staff', 'tables',
+  'payment_gateways', 'payments', 'pricing', 'reservations',
+  'printing', 'sales', 'schedules', 'services', 'staff', 'tables',
   'tasks', 'taxes', 'tickets', 'verifactu', 'whatsapp_inbox',
 ];
 
@@ -69,5 +69,22 @@ for (const id of MODULES) {
       console.warn(`! módulo ${id}: settings.schema declara ${schemaRel} pero no existe`);
     }
   }
-  console.log(`✓ sync ${id}: module.json + ${entry}${iconsNote}${settingsNote} → public/modules/${id}/`);
+
+  // Catálogos del módulo (ADR-0055). El runtime traduce la navegación, pero el shell también
+  // consulta `/modules/<id>/locales/<lang>.json` para títulos de widgets y otros metadatos.
+  // Sin esta copia, el desarrollo local degradaba silenciosamente al inglés aunque el paquete
+  // instalado sí incluyera sus locales.
+  let localesNote = '';
+  const localesSrc = join(src, 'locales');
+  if (existsSync(localesSrc)) {
+    const localeFiles = readdirSync(localesSrc).filter((name) => name.endsWith('.json'));
+    if (localeFiles.length) {
+      mkdirSync(join(dstDir, 'locales'), { recursive: true });
+      for (const name of localeFiles) {
+        copyFileSync(join(localesSrc, name), join(dstDir, 'locales', name));
+      }
+      localesNote = ` + ${localeFiles.length} locale(s)`;
+    }
+  }
+  console.log(`✓ sync ${id}: module.json + ${entry}${iconsNote}${settingsNote}${localesNote} → public/modules/${id}/`);
 }

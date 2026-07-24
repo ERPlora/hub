@@ -112,8 +112,11 @@ pub const DEFAULT_MAX_ORG_POOLS: usize = 256;
 
 /// Fábrica de runtimes por org. Permite inyectar un constructor en tests (dos SQLite simulando dos
 /// orgs) sin tocar Postgres real. En producción el factory por defecto abre un [`PgAdapter`].
-pub type RuntimeFactory =
-    Arc<dyn Fn(&OrgDescriptor) -> futures_util::future::BoxFuture<'static, Result<Runtime, TenantError>> + Send + Sync>;
+pub type RuntimeFactory = Arc<
+    dyn Fn(&OrgDescriptor) -> futures_util::future::BoxFuture<'static, Result<Runtime, TenantError>>
+        + Send
+        + Sync,
+>;
 
 /// Mapa de runtimes por organización + resolución `hub_id → org → runtime`.
 ///
@@ -144,7 +147,12 @@ impl TenantRouter {
         factory: RuntimeFactory,
         max_pools: usize,
     ) -> Self {
-        Self { resolver, pools: RwLock::new(HashMap::new()), factory, max_pools }
+        Self {
+            resolver,
+            pools: RwLock::new(HashMap::new()),
+            factory,
+            max_pools,
+        }
     }
 
     /// Nº de pools (orgs) activos ahora mismo.
@@ -157,17 +165,19 @@ impl TenantRouter {
     /// `hub_id` no esté registrado jamás toca una BD. Como cada org tiene su propio runtime/pool, un
     /// `hub_id` de la org A solo puede resolver al runtime de A: el acceso cruzado es imposible por
     /// construcción (no hay ruta de A al pool de B).
-    pub async fn resolve_runtime(
-        &self,
-        hub_id: &str,
-    ) -> Result<Arc<Mutex<Runtime>>, TenantError> {
+    pub async fn resolve_runtime(&self, hub_id: &str) -> Result<Arc<Mutex<Runtime>>, TenantError> {
         let desc = self
             .resolver
             .resolve(hub_id)
             .ok_or_else(|| TenantError::UnknownOrg(hub_id.to_string()))?;
 
         // Camino rápido: el pool de la org ya existe (lectura compartida).
-        if let Some(rt) = self.pools.read().ok().and_then(|m| m.get(&desc.org_id).cloned()) {
+        if let Some(rt) = self
+            .pools
+            .read()
+            .ok()
+            .and_then(|m| m.get(&desc.org_id).cloned())
+        {
             return Ok(rt);
         }
 
@@ -237,11 +247,17 @@ mod tests {
         // hub-a1 pertenece a org-a; hub-b1 a org-b. El DSN es irrelevante para el factory SQLite.
         map.insert(
             "hub-a1".to_string(),
-            OrgDescriptor { org_id: OrgId("org-a".into()), dsn: "sqlite::memory:".into() },
+            OrgDescriptor {
+                org_id: OrgId("org-a".into()),
+                dsn: "sqlite::memory:".into(),
+            },
         );
         map.insert(
             "hub-b1".to_string(),
-            OrgDescriptor { org_id: OrgId("org-b".into()), dsn: "sqlite::memory:".into() },
+            OrgDescriptor {
+                org_id: OrgId("org-b".into()),
+                dsn: "sqlite::memory:".into(),
+            },
         );
         Arc::new(EnvOrgResolver::new(map))
     }
@@ -250,16 +266,21 @@ mod tests {
     async fn seed(rt: &Arc<Mutex<Runtime>>, hub_id: &str, marker: &str) {
         let rt = rt.lock().await;
         let db = rt.db_for_test();
-        db.execute_batch("CREATE TABLE IF NOT EXISTS t (id TEXT PRIMARY KEY, hub_id TEXT, marker TEXT);")
-            .await
-            .unwrap();
+        db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS t (id TEXT PRIMARY KEY, hub_id TEXT, marker TEXT);",
+        )
+        .await
+        .unwrap();
         let mut p = Map::new();
         p.insert("id".into(), json!(marker));
         p.insert("hub_id".into(), json!(hub_id));
         p.insert("marker".into(), json!(marker));
-        db.execute("INSERT INTO t (id, hub_id, marker) VALUES (:id, :hub_id, :marker)", &p)
-            .await
-            .unwrap();
+        db.execute(
+            "INSERT INTO t (id, hub_id, marker) VALUES (:id, :hub_id, :marker)",
+            &p,
+        )
+        .await
+        .unwrap();
     }
 
     async fn rows_for(rt: &Arc<Mutex<Runtime>>, hub_id: &str) -> Vec<String> {
@@ -271,7 +292,10 @@ mod tests {
             .query("SELECT marker FROM t WHERE hub_id = :hub_id", &p)
             .await
             .unwrap();
-        res.rows.iter().map(|r| r["marker"].as_str().unwrap().to_string()).collect()
+        res.rows
+            .iter()
+            .map(|r| r["marker"].as_str().unwrap().to_string())
+            .collect()
     }
 
     /// Criterio de aceptación 1: un `hub_id` de org A solo accede a la BD de A; un intento con un
@@ -290,10 +314,19 @@ mod tests {
         seed(&rt_b, "hub-b1", "dato-de-B").await;
 
         // La BD de A solo ve datos de A; la de B solo los de B. Pools independientes ⇒ aislamiento.
-        assert_eq!(rows_for(&rt_a, "hub-a1").await, vec!["dato-de-A".to_string()]);
-        assert_eq!(rows_for(&rt_b, "hub-b1").await, vec!["dato-de-B".to_string()]);
+        assert_eq!(
+            rows_for(&rt_a, "hub-a1").await,
+            vec!["dato-de-A".to_string()]
+        );
+        assert_eq!(
+            rows_for(&rt_b, "hub-b1").await,
+            vec!["dato-de-B".to_string()]
+        );
         // El dato de B NO existe en la BD de A (ni con su propio hub_id ni con el de B).
-        assert!(rows_for(&rt_a, "hub-b1").await.is_empty(), "A no debe ver filas de B");
+        assert!(
+            rows_for(&rt_a, "hub-b1").await.is_empty(),
+            "A no debe ver filas de B"
+        );
 
         // Un hub_id no registrado se rechaza: jamás llega a una BD.
         let cross = router.resolve_runtime("hub-desconocido").await;
@@ -329,11 +362,7 @@ mod tests {
     async fn request_context_scopes_to_resolved_org() {
         let router = TenantRouter::with_factory(two_org_resolver(), sqlite_factory(), 32);
         let rt_a = router.resolve_runtime("hub-a1").await.unwrap();
-        let ctx = RequestContext::new(
-            "hub-a1".to_string(),
-            "u1".to_string(),
-            Vec::<String>::new(),
-        );
+        let ctx = RequestContext::new("hub-a1".to_string(), "u1".to_string(), Vec::<String>::new());
         assert_eq!(ctx.hub_id, "hub-a1");
         // El runtime resuelto es el de la org A (su hub_id de despliegue).
         assert_eq!(rt_a.lock().await.hub_id(), "org-a");

@@ -31,12 +31,20 @@ pub struct CreateKeyReq {
 
 /// `401` para fallo de auth del admin (sin sesión / sesión inválida / rol insuficiente).
 fn admin_unauthorized(e: auth::AuthError) -> Response {
-    (StatusCode::UNAUTHORIZED, Json(json!({ "ok": false, "error": e.message() }))).into_response()
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({ "ok": false, "error": e.message() })),
+    )
+        .into_response()
 }
 
 /// Mapea un `RuntimeError` de la gestión de keys a una respuesta HTTP (mismo formato que el resto).
 fn key_err(e: erplora_runtime::RuntimeError) -> Response {
-    (StatusCode::BAD_REQUEST, Json(json!({ "ok": false, "error": e.to_string() }))).into_response()
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "ok": false, "error": e.to_string() })),
+    )
+        .into_response()
 }
 
 /// GET /api/keys — lista las keys del hub (sin secreto). Auth = sesión admin.
@@ -128,7 +136,11 @@ pub struct DataBody {
 
 /// `401` para fallo de auth de API key (token ausente/ inválido/ revocado).
 fn api_unauthorized(e: auth::AuthError) -> Response {
-    (StatusCode::UNAUTHORIZED, Json(json!({ "ok": false, "error": e.message() }))).into_response()
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({ "ok": false, "error": e.message() })),
+    )
+        .into_response()
 }
 
 /// `404` cuando la operación no existe, no pertenece al `{module}` de la ruta, o no está
@@ -157,7 +169,7 @@ pub async fn data_query(
     let body = body.map(|b| b.0).unwrap_or_default();
 
     // Enrutado multi-tenant (ADR-0005) por el `hub_id` del despliegue (la API key NO trae hub_id).
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -197,7 +209,7 @@ pub async fn data_command(
     let name = format!("{module}.{command}");
     let body = body.map(|b| b.0).unwrap_or_default();
 
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };

@@ -18,11 +18,11 @@
 //   tamaño BD          n/a (Aurora compartida por organización)    `PRAGMA page_count*page_size`
 //   conexiones BD      `pg_stat_activity` del pool (real)          pool SQLite (≈1)
 //   documentos         listado S3 `erplora-storage` del hub        listado del disco local
-//   copias             módulo backup → S3 (ADR-0040)               módulo backup → disco
 //
 // Mientras el endpoint no exista, `fetchSystemInfo` devuelve `null`: las tarjetas KPI se muestran
 // igualmente con valores a 0 (CPU/Memoria/Conexiones 0, BD sin tamaño) y las pestañas de datos
-// (Documentos/Copias/Registros) muestran su estado vacío propio — nunca números inventados.
+// (Documentos/Registros) muestran su estado vacío propio — nunca números inventados. Las copias,
+// importaciones y restauraciones se gestionan únicamente en Ajustes → Datos y copias.
 
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
@@ -66,14 +66,6 @@ export interface StorageDoc {
   url?: string | null;
 }
 
-/** Una copia de seguridad (objeto S3 del módulo backup en cloud, fichero local en Tauri). */
-export interface BackupEntry {
-  /** ISO 8601. */
-  when: string;
-  sizeLabel: string;
-  url?: string | null;
-}
-
 /** Una línea del registro de eventos del runtime. */
 export interface SystemLogEntry {
   /** ISO 8601 o "HH:MM:SS". */
@@ -97,7 +89,6 @@ export interface SystemInfo {
   /** Capacidad de almacenamiento formateada para la barra (p.ej. "2,1 GB / 8 GB"). */
   storageUsed?: UsageMetric | null;
   documents?: StorageDoc[];
-  backups?: BackupEntry[];
   logs?: SystemLogEntry[];
 }
 
@@ -111,9 +102,8 @@ interface Envelope<T> {
 /**
  * Obtiene el estado real del sistema del runtime (`GET /api/system`).
  *
- * NO lanza ni inventa datos: si el endpoint todavía no existe (404) o el runtime no responde,
- * devuelve `null` para que la UI muestre estados de carga/vacíos reales en vez de mock. La
- * pantalla de Sistema decide qué enseñar según `backend`/`shell` cuando sí hay datos.
+ * NO lanza ni inventa datos: si el endpoint no responde, devuelve `null` para que la UI muestre un
+ * error recuperable en vez de afirmar valores o estados que no ha podido comprobar.
  */
 export async function fetchSystemInfo(): Promise<SystemInfo | null> {
   try {

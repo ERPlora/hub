@@ -173,6 +173,9 @@ pub struct Registry {
     /// disponible (los eventos `backup.requested` se entregan a sus listeners de módulo, pero el
     /// listener-host no sube nada). Espejo de `notify_transport`. Ver `outbox.rs`.
     pub backup_transport: Option<std::sync::Arc<dyn crate::host_backup::BackupTransport>>,
+    /// Backend de `static_files` declarado por módulos. Lo inyecta el host y resuelve a disco
+    /// Local o Cloud→S3 sin exponer paths físicos al módulo.
+    pub module_storage: Option<std::sync::Arc<dyn crate::module_storage::ModuleStorage>>,
 }
 
 impl Registry {
@@ -192,17 +195,24 @@ impl Registry {
     /// Nº de módulos **activos**. Lo usa el router de tools (§9.2b) para decidir si vale la pena
     /// enrutar (con pocos módulos sale más barato mandar todos los tools al LLM).
     pub fn active_module_count(&self) -> usize {
-        self.status.values().filter(|s| matches!(s, ModuleStatus::Active)).count()
+        self.status
+            .values()
+            .filter(|s| matches!(s, ModuleStatus::Active))
+            .count()
     }
 
     /// Query registrada, **solo si su módulo está activo** (hot-plug).
     pub fn get_query(&self, name: &str) -> Option<&RegisteredQuery> {
-        self.queries.get(name).filter(|q| self.is_active(&q.module_id))
+        self.queries
+            .get(name)
+            .filter(|q| self.is_active(&q.module_id))
     }
 
     /// Command registrado, **solo si su módulo está activo**.
     pub fn get_command(&self, name: &str) -> Option<&RegisteredCommand> {
-        self.commands.get(name).filter(|c| self.is_active(&c.module_id))
+        self.commands
+            .get(name)
+            .filter(|c| self.is_active(&c.module_id))
     }
 
     /// Commands suscritos a un evento, **solo de módulos activos**.
@@ -212,7 +222,10 @@ impl Registry {
             .map(|cmds| {
                 cmds.iter()
                     .filter(|name| {
-                        self.commands.get(*name).map(|c| self.is_active(&c.module_id)).unwrap_or(false)
+                        self.commands
+                            .get(*name)
+                            .map(|c| self.is_active(&c.module_id))
+                            .unwrap_or(false)
                     })
                     .cloned()
                     .collect()
@@ -222,7 +235,10 @@ impl Registry {
 
     /// Menú dinámico: entradas de navegación **solo de módulos activos**.
     pub fn active_navigation(&self) -> Vec<&NavEntry> {
-        self.navigation.iter().filter(|n| self.is_active(&n.module_id)).collect()
+        self.navigation
+            .iter()
+            .filter(|n| self.is_active(&n.module_id))
+            .collect()
     }
 
     /// Registra las traducciones de un módulo (ADR-0055). Vacío = se olvida cualquier i18n previa.
@@ -279,7 +295,10 @@ impl Registry {
 
     /// Commands de un módulo **activo** marcados `expose_api` → `(nombre, &RegisteredCommand)`.
     /// Fuente de la "escritura" del scope de una API key y de los `path` POST del OpenAPI.
-    pub fn exposed_commands<'a>(&'a self, module_id: &str) -> Vec<(&'a str, &'a RegisteredCommand)> {
+    pub fn exposed_commands<'a>(
+        &'a self,
+        module_id: &str,
+    ) -> Vec<(&'a str, &'a RegisteredCommand)> {
         if !self.is_active(module_id) {
             return Vec::new();
         }

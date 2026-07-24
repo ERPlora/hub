@@ -62,7 +62,9 @@ pub(crate) async fn execute_at(
     // SIEMPRE que falte la identidad fiscal (la cascada con ctx ya enriquecido salta el get_all).
     let enriched_ctx;
     let ctx = if ctx.business_tax_id.is_empty() {
-        let f = crate::settings::get_all(db, &ctx.hub_id).await.unwrap_or(Json::Null);
+        let f = crate::settings::get_all(db, &ctx.hub_id)
+            .await
+            .unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
         let has_cert = crate::certificate::status(db, &ctx.hub_id)
             .await
@@ -105,7 +107,10 @@ pub(crate) async fn execute_at(
     let payload = if let Some(schema) = &cmd.schema {
         schema
             .validate(&Json::Object(payload.clone()))
-            .map_err(|detail| RuntimeError::InvalidPayload { name: name.to_string(), detail })?;
+            .map_err(|detail| RuntimeError::InvalidPayload {
+                name: name.to_string(),
+                detail,
+            })?;
         let mut p = payload.clone();
         schema.apply_defaults(&mut p);
         defaulted = p;
@@ -134,7 +139,9 @@ pub(crate) async fn execute_at(
     // ── Tier 0/1: SQL declarativo ───────────────────────────────────────────
     if cmd.sql.is_empty() {
         // Sin SQL ni WASM: no hay nada que ejecutar.
-        return Err(RuntimeError::NotImplemented("command sin SQL ni handler WASM"));
+        return Err(RuntimeError::NotImplemented(
+            "command sin SQL ni handler WASM",
+        ));
     }
 
     let bound = crate::system_params(payload, ctx);
@@ -143,8 +150,11 @@ pub(crate) async fn execute_at(
     // UNA transacción. Si commitea, los eventos quedan persistidos; si revierte, no hay evento.
     // (Decisión del humano #3: los commands `transaction:false` también se envuelven en tx para
     // garantizar la escritura atómica del outbox.)
-    let mut ops: Vec<(String, Params)> =
-        cmd.sql.iter().map(|sql| (sql.clone(), bound.clone())).collect();
+    let mut ops: Vec<(String, Params)> = cmd
+        .sql
+        .iter()
+        .map(|sql| (sql.clone(), bound.clone()))
+        .collect();
     for event in &cmd.def.emit {
         ops.push(outbox::insert_op(ctx, event, &bound, depth + 1));
     }
@@ -256,11 +266,10 @@ async fn execute_wasm(
     bytes: &[u8],
     extra_ops: &[(String, Params)],
 ) -> Result<Json> {
-    let handler = cmd
-        .def
-        .handler
-        .as_ref()
-        .ok_or_else(|| RuntimeError::Wasm("command con bytes wasm pero sin handler".to_string()))?;
+    let handler =
+        cmd.def.handler.as_ref().ok_or_else(|| {
+            RuntimeError::Wasm("command con bytes wasm pero sin handler".to_string())
+        })?;
 
     // Input del guest: { "payload": <params del caller con system_params>, "context": {...} }.
     // Reutilizamos system_params para inyectar hub_id/current_user_id/now/new_id, no falsificables.
@@ -296,7 +305,10 @@ async fn execute_wasm(
         .call(&handler.function, &input)
         .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
 
-    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids).await
+    persist_handler_output(
+        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
+    )
+    .await
 }
 
 /// Ejecuta un command de **plugin nativo first-party** (ADR-0009): mismo contrato de
@@ -312,9 +324,11 @@ async fn execute_native(
     depth: u32,
     extra_ops: &[(String, Params)],
 ) -> Result<Json> {
-    let handler = cmd.def.handler.as_ref().ok_or_else(|| {
-        RuntimeError::Native("command nativo sin bloque handler".to_string())
-    })?;
+    let handler = cmd
+        .def
+        .handler
+        .as_ref()
+        .ok_or_else(|| RuntimeError::Native("command nativo sin bloque handler".to_string()))?;
     let engine = registry.native.get(&cmd.module_id).ok_or_else(|| {
         RuntimeError::Native(format!(
             "plugin nativo del módulo `{}` no registrado en este runtime",
@@ -337,10 +351,25 @@ async fn execute_native(
         },
     });
 
-    let host = crate::native::DbHost { db };
+    let static_folder = registry
+        .installed
+        .iter()
+        .find(|module| module.id == cmd.module_id)
+        .and_then(|module| module.static_files.as_ref())
+        .map(|decl| decl.folder.as_str());
+    let host = crate::native::DbHost {
+        db,
+        storage: registry.module_storage.as_deref(),
+        hub_id: &ctx.hub_id,
+        module_id: &cmd.module_id,
+        static_folder,
+    };
     let output = engine.call(&handler.function, &input, &host).await?;
 
-    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids).await
+    persist_handler_output(
+        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
+    )
+    .await
 }
 
 /// Persiste el [`Output`] de un handler (WASM o nativo): valida cada intención contra los
@@ -477,7 +506,8 @@ mod tests {
 
     fn registry_with_command(module_id: &str, name: &str) -> Registry {
         let mut reg = Registry::new();
-        reg.status.insert(module_id.to_string(), ModuleStatus::Active);
+        reg.status
+            .insert(module_id.to_string(), ModuleStatus::Active);
         reg.commands.insert(
             name.to_string(),
             RegisteredCommand {
@@ -492,7 +522,11 @@ mod tests {
     }
 
     fn op(command: &str) -> Operation {
-        Operation { kind: "sql".to_string(), command: command.to_string(), params: Map::new() }
+        Operation {
+            kind: "sql".to_string(),
+            command: command.to_string(),
+            params: Map::new(),
+        }
     }
 
     #[test]
@@ -506,14 +540,20 @@ mod tests {
     fn validate_operation_rejects_other_module_command() {
         let reg = registry_with_command("inventory", "inventory.products.create");
         let err = validate_operation(&reg, "notes", &op("inventory.products.create")).unwrap_err();
-        assert!(matches!(err, RuntimeError::PermissionDenied(_)), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::PermissionDenied(_)),
+            "got {err:?}"
+        );
     }
 
     #[test]
     fn validate_operation_rejects_unknown_command() {
         let reg = registry_with_command("notes", "notes.create");
         let err = validate_operation(&reg, "notes", &op("notes.nope")).unwrap_err();
-        assert!(matches!(err, RuntimeError::CommandNotFound(_)), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::CommandNotFound(_)),
+            "got {err:?}"
+        );
     }
 
     #[test]
@@ -533,7 +573,8 @@ mod tests {
         // que una intención debe resolver a un comando SQL del propio módulo; lo que no cumpla
         // eso se RECHAZA con ruido, no se convierte en un no-op.
         let mut reg = Registry::new();
-        reg.status.insert("inventory".to_string(), ModuleStatus::Active);
+        reg.status
+            .insert("inventory".to_string(), ModuleStatus::Active);
         let mut def = cmd_def();
         def.sql = vec![]; // comando WASM: sin sentencias declarativas
         reg.commands.insert(
@@ -546,7 +587,11 @@ mod tests {
                 schema: None,
             },
         );
-        let err = validate_operation(&reg, "inventory", &op("inventory.stock.decrease")).unwrap_err();
-        assert!(matches!(err, RuntimeError::Wasm(_)), "debe rechazar, no aplicar 0 sentencias: {err:?}");
+        let err =
+            validate_operation(&reg, "inventory", &op("inventory.stock.decrease")).unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::Wasm(_)),
+            "debe rechazar, no aplicar 0 sentencias: {err:?}"
+        );
     }
 }

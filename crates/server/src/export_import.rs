@@ -49,12 +49,20 @@ const IMPORT_TMP_DIR: &str = "_import_tmp";
 /// `401` para fallo de auth (sin sesión / sesión inválida / rol insuficiente). Mismo envelope
 /// que `settings.rs`.
 fn unauthorized(e: auth::AuthError) -> Response {
-    (StatusCode::UNAUTHORIZED, Json(json!({ "ok": false, "error": e.message() }))).into_response()
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({ "ok": false, "error": e.message() })),
+    )
+        .into_response()
 }
 
 /// Error en el envelope estándar `{ ok:false, error:{ message } }` (patrón `media.rs`).
 fn err(code: StatusCode, msg: &str) -> Response {
-    (code, Json(json!({ "ok": false, "error": { "message": msg } }))).into_response()
+    (
+        code,
+        Json(json!({ "ok": false, "error": { "message": msg } })),
+    )
+        .into_response()
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -113,7 +121,10 @@ impl ExportSelectionReq {
             modules: self
                 .modules
                 .into_iter()
-                .map(|m| ModuleDataSelection { module_id: m.module_id, with_data: m.with_data })
+                .map(|m| ModuleDataSelection {
+                    module_id: m.module_id,
+                    with_data: m.with_data,
+                })
                 .collect(),
         }
     }
@@ -126,7 +137,8 @@ fn is_safe_name(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= 64
         && !s.starts_with('.')
-        && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 /// `true` si `s` parece un locale BCP-47 corto (`es`, `en`, `pt-BR`).
@@ -141,7 +153,7 @@ pub async fn export_blueprint(
     headers: HeaderMap,
     body: Option<Json<ExportReq>>,
 ) -> Response {
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -173,20 +185,29 @@ pub async fn export_blueprint(
     }
     let locale = req.locale.trim().to_string();
     if !is_safe_locale(&locale) {
-        return err(StatusCode::UNPROCESSABLE_ENTITY, "locale inválido (esperado p.ej. \"es\")");
+        return err(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "locale inválido (esperado p.ej. \"es\")",
+        );
     }
     let selection = req.selection.into_selection();
 
     // Motor del runtime (Fase 1): manifest + data/*.sql. `created_at` lo aporta esta capa
     // (el runtime no lee el reloj) en ISO-8601 UTC.
     let created_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let bundle =
-        match export::export_hub(&rt, &data_hub_id, &selection, &name, &locale, &created_at)
-            .await
-        {
-            Ok(b) => b,
-            Err(e) => return crate::err_response(e),
-        };
+    let bundle = match export::export_hub(
+        &rt,
+        &data_hub_id,
+        &selection,
+        &name,
+        &locale,
+        &created_at,
+    )
+    .await
+    {
+        Ok(b) => b,
+        Err(e) => return crate::err_response(e),
+    };
     let mut manifest = bundle.manifest;
     let mut files = bundle.files;
 
@@ -254,7 +275,10 @@ async fn read_certificate_p12(rt: &Runtime, hub_id: &str) -> Option<Vec<u8>> {
     p.insert("hub_id".into(), json!(hub_id));
     let res = rt
         .db()
-        .query("SELECT pkcs12_b64 FROM _hub_certificate WHERE hub_id = :hub_id LIMIT 1", &p)
+        .query(
+            "SELECT pkcs12_b64 FROM _hub_certificate WHERE hub_id = :hub_id LIMIT 1",
+            &p,
+        )
         .await
         .ok()?;
     let row = res.rows.into_iter().next()?;
@@ -262,7 +286,9 @@ async fn read_certificate_p12(rt: &Runtime, hub_id: &str) -> Option<Vec<u8>> {
     if b64.trim().is_empty() {
         return None;
     }
-    base64::engine::general_purpose::STANDARD.decode(b64.trim()).ok()
+    base64::engine::general_purpose::STANDARD
+        .decode(b64.trim())
+        .ok()
 }
 
 /// Recorre `media/` y devuelve `(ruta "media/<rel>", bytes)` por fichero. No sigue symlinks
@@ -279,7 +305,9 @@ fn walk_media(root: &Path, dir: &Path, depth: usize, out: &mut Vec<(String, Vec<
     if depth > MAX_DEPTH {
         return;
     }
-    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
     for e in rd.flatten() {
         let Ok(ft) = e.file_type() else { continue };
         if ft.is_symlink() {
@@ -316,7 +344,8 @@ fn build_zip(manifest_bytes: &[u8], files: &BTreeMap<String, Vec<u8>>) -> Result
     {
         let mut w = zip::ZipWriter::new(Cursor::new(&mut buf));
         let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
-        w.start_file("manifest.json", opts).map_err(|e| e.to_string())?;
+        w.start_file("manifest.json", opts)
+            .map_err(|e| e.to_string())?;
         w.write_all(manifest_bytes).map_err(|e| e.to_string())?;
         for (path, bytes) in files {
             w.start_file(path, opts).map_err(|e| e.to_string())?;
@@ -339,7 +368,7 @@ pub async fn import_inspect(
     body: Bytes,
 ) -> Response {
     {
-        let arc = match st.runtime_for(&st.config.hub_id).await {
+        let arc = match st.runtime_for(&st.hub_id()).await {
             Ok(rt) => rt,
             Err(e) => return crate::tenant_rejected(e),
         };
@@ -349,7 +378,10 @@ pub async fn import_inspect(
         }
     }
     if body.is_empty() {
-        return err(StatusCode::UNPROCESSABLE_ENTITY, "cuerpo vacío: se espera el zip del blueprint");
+        return err(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "cuerpo vacío: se espera el zip del blueprint",
+        );
     }
 
     // Validación en memoria (anti zip-slip incluido) — SOLO se lee el manifest.
@@ -367,7 +399,10 @@ pub async fn import_inspect(
         Err(e) => Err(e),
     };
     if let Err(e) = write {
-        return err(StatusCode::INTERNAL_SERVER_ERROR, &format!("no se pudo guardar el temporal: {e}"));
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("no se pudo guardar el temporal: {e}"),
+        );
     }
 
     let manifest_v = serde_json::to_value(&manifest).unwrap_or(Value::Null);
@@ -380,7 +415,9 @@ fn is_safe_entry(name: &str) -> bool {
     if name.contains('\\') || name.starts_with('/') {
         return false;
     }
-    Path::new(name).components().all(|c| matches!(c, Component::Normal(_)))
+    Path::new(name)
+        .components()
+        .all(|c| matches!(c, Component::Normal(_)))
 }
 
 /// Abre el zip en memoria, valida TODAS las rutas (anti zip-slip) y devuelve el
@@ -390,7 +427,9 @@ fn read_manifest(bytes: &[u8]) -> Result<export::BlueprintManifest, String> {
         zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("zip inválido: {e}"))?;
     // Anti zip-slip: se validan TODAS las entradas ANTES de leer nada.
     for i in 0..archive.len() {
-        let entry = archive.by_index(i).map_err(|e| format!("zip inválido: {e}"))?;
+        let entry = archive
+            .by_index(i)
+            .map_err(|e| format!("zip inválido: {e}"))?;
         let raw = entry.name().to_string();
         if !is_safe_entry(&raw) {
             return Err(format!("zip inseguro: ruta no permitida ({raw})"));
@@ -400,7 +439,8 @@ fn read_manifest(bytes: &[u8]) -> Result<export::BlueprintManifest, String> {
         .by_name("manifest.json")
         .map_err(|_| "el zip no contiene manifest.json".to_string())?;
     let mut s = String::new();
-    mf.read_to_string(&mut s).map_err(|e| format!("manifest.json ilegible: {e}"))?;
+    mf.read_to_string(&mut s)
+        .map_err(|e| format!("manifest.json ilegible: {e}"))?;
     let manifest: export::BlueprintManifest =
         serde_json::from_str(&s).map_err(|e| format!("manifest.json inválido: {e}"))?;
     if manifest.schema_version != export::SCHEMA_VERSION {
@@ -417,7 +457,10 @@ fn read_manifest(bytes: &[u8]) -> Result<export::BlueprintManifest, String> {
 /// por construcción, un único componente de ruta seguro (solo `[0-9a-f]`).
 fn new_upload_id(bytes: &[u8]) -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
     let mut h = Sha256::new();
     h.update(bytes);
     h.update(nanos.to_le_bytes());
@@ -481,7 +524,7 @@ pub async fn import_blueprint(
     // = el del contexto de cabecera — el import restaura donde el resto de la app lee/escribe.
     let data_hub_id;
     {
-        let arc = match st.runtime_for(&st.config.hub_id).await {
+        let arc = match st.runtime_for(&st.hub_id()).await {
             Ok(rt) => rt,
             Err(e) => return crate::tenant_rejected(e),
         };
@@ -502,19 +545,36 @@ pub async fn import_blueprint(
     };
     // El upload_id se usa como componente de ruta: formato estricto o 404 (ni se toca el FS).
     if !is_valid_upload_id(&req.upload_id) {
-        return err(StatusCode::NOT_FOUND, "upload no encontrado o caducado (repite el inspect)");
+        return err(
+            StatusCode::NOT_FOUND,
+            "upload no encontrado o caducado (repite el inspect)",
+        );
     }
-    let tmp_dir = st.config.module_cache.join(IMPORT_TMP_DIR).join(&req.upload_id);
+    let tmp_dir = st
+        .config
+        .module_cache
+        .join(IMPORT_TMP_DIR)
+        .join(&req.upload_id);
     let bytes = match tokio::fs::read(tmp_dir.join("blueprint.zip")).await {
         Ok(b) => b,
         Err(_) => {
-            return err(StatusCode::NOT_FOUND, "upload no encontrado o caducado (repite el inspect)")
+            return err(
+                StatusCode::NOT_FOUND,
+                "upload no encontrado o caducado (repite el inspect)",
+            )
         }
     };
 
     // A partir de aquí el temporal se borra SIEMPRE (también en error): el trabajo va en una
     // función aparte y el borrado ocurre antes de devolver la respuesta.
-    let result = run_import(&st, &headers, &bytes, req.selection.into_selection(), &data_hub_id).await;
+    let result = run_import(
+        &st,
+        &headers,
+        &bytes,
+        req.selection.into_selection(),
+        &data_hub_id,
+    )
+    .await;
     let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
     match result {
         Ok(report) => Json(json!({ "ok": true, "report": report })).into_response(),
@@ -532,8 +592,8 @@ async fn run_import(
     data_hub_id: &str,
 ) -> Result<Value, Response> {
     // (1) Re-extraer TODO en memoria (re-valida zip + rutas: el temporal pudo manipularse).
-    let (manifest, files) = extract_bundle(zip_bytes)
-        .map_err(|msg| err(StatusCode::UNPROCESSABLE_ENTITY, &msg))?;
+    let (manifest, files) =
+        extract_bundle(zip_bytes).map_err(|msg| err(StatusCode::UNPROCESSABLE_ENTITY, &msg))?;
 
     // (2) Integridad dura (ADR-0015): sha256 de TODOS los ficheros contra el manifest, en las
     //     dos direcciones. Cualquier discrepancia → 422 SIN efectos.
@@ -566,14 +626,15 @@ async fn run_import(
     if !manifest.modules.is_empty() {
         let cred = auth::hub_scoped_auth(headers, st);
         let arc = st
-            .runtime_for(&st.config.hub_id)
+            .runtime_for(&st.hub_id())
             .await
             .map_err(crate::tenant_rejected)?;
         let mut rt = arc.lock().await;
         for m in &manifest.modules {
             if rt.registry().is_installed(&m.id) {
-                installed_modules
-                    .push(json!({ "id": m.id, "version": m.version, "status": "already_installed" }));
+                installed_modules.push(
+                    json!({ "id": m.id, "version": m.version, "status": "already_installed" }),
+                );
                 continue;
             }
             let entry = match &cred {
@@ -607,7 +668,9 @@ async fn run_import(
                     .await
                     {
                         Ok(inst) => {
-                            st.broadcast(json!({ "type": "module.installed", "module_id": inst.module_id }));
+                            st.broadcast(
+                                json!({ "type": "module.installed", "module_id": inst.module_id }),
+                            );
                             json!({ "id": inst.module_id, "version": inst.version, "status": "installed" })
                         }
                         Err(e) => {
@@ -625,14 +688,17 @@ async fn run_import(
     //     Un Err del motor = rechazo duro (integridad/versión) → 422 sin efectos.
     let report = {
         let arc = st
-            .runtime_for(&st.config.hub_id)
+            .runtime_for(&st.hub_id())
             .await
             .map_err(crate::tenant_rejected)?;
         let mut rt = arc.lock().await;
         import::import_sections(&mut rt, &manifest, &files, &selection, data_hub_id)
             .await
             .map_err(|e| {
-                err(StatusCode::UNPROCESSABLE_ENTITY, &format!("import rechazado: {e}"))
+                err(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    &format!("import rechazado: {e}"),
+                )
             })?
     };
 
@@ -642,7 +708,9 @@ async fn run_import(
     let mut media_failed = 0u32;
     if selection.media {
         for (path, bytes) in &files {
-            let Some(rel) = path.strip_prefix("media/") else { continue };
+            let Some(rel) = path.strip_prefix("media/") else {
+                continue;
+            };
             let Some(target) = media::safe_join(&st.config.media_dir, rel) else {
                 media_failed += 1;
                 continue;
@@ -693,7 +761,9 @@ fn extract_bundle(
         zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("zip inválido: {e}"))?;
     let mut files = BTreeMap::new();
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i).map_err(|e| format!("zip inválido: {e}"))?;
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("zip inválido: {e}"))?;
         if entry.is_dir() {
             continue;
         }
@@ -702,7 +772,9 @@ fn extract_bundle(
             continue; // el manifest va aparte (fuente de verdad, no un "fichero de datos").
         }
         let mut buf = Vec::with_capacity(entry.size() as usize);
-        entry.read_to_end(&mut buf).map_err(|e| format!("zip ilegible ({name}): {e}"))?;
+        entry
+            .read_to_end(&mut buf)
+            .map_err(|e| format!("zip ilegible ({name}): {e}"))?;
         files.insert(name, buf);
     }
     Ok((manifest, files))

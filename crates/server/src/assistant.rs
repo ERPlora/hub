@@ -20,7 +20,8 @@ use serde_json::{json, Value};
 /// El permiso/schema se heredan de la operación (no se redeclaran): la tool que ve el LLM es
 /// el mismo `execute_query`/`execute_command` que la UI, con el mismo gate.
 pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
-    let permits = |required: &str| ctx.permissions.contains("*") || ctx.permissions.contains(required);
+    let permits =
+        |required: &str| ctx.permissions.contains("*") || ctx.permissions.contains(required);
     let mut tools = Vec::new();
 
     for (name, q) in &registry.queries {
@@ -55,7 +56,12 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
     }
 
     // Orden determinista (estabilidad del prompt + tests reproducibles).
-    tools.sort_by(|a, b| a["name"].as_str().unwrap_or("").cmp(b["name"].as_str().unwrap_or("")));
+    tools.sort_by(|a, b| {
+        a["name"]
+            .as_str()
+            .unwrap_or("")
+            .cmp(b["name"].as_str().unwrap_or(""))
+    });
     tools
 }
 
@@ -81,7 +87,10 @@ fn tool_def(name: &str, description: &str, kind: &str, module_id: &str) -> Value
 /// para coste/auditoría — NO para permisos (el gate es local + el coste se mide por hub). Permite
 /// que un cajero solo-local (sin cuenta cloud) use el asistente vía el token de máquina del hub.
 pub fn build_cloud_body(frontend: &Value, tools: Vec<Value>, user: Option<&str>) -> Value {
-    let messages = frontend.get("messages").cloned().unwrap_or_else(|| json!([]));
+    let messages = frontend
+        .get("messages")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
     let last_user = last_user_message(frontend);
 
     let mut body = json!({
@@ -177,7 +186,10 @@ mod tests {
 
     #[test]
     fn translate_done_and_tokens() {
-        assert_eq!(translate_sse_line("data: [DONE]"), Some(sse(&json!({"type":"done"}))));
+        assert_eq!(
+            translate_sse_line("data: [DONE]"),
+            Some(sse(&json!({"type":"done"})))
+        );
         assert_eq!(
             translate_sse_line("data: {\"text\":\"hi\"}"),
             Some(sse(&json!({"type":"token","text":"hi"})))

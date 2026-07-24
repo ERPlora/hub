@@ -32,6 +32,47 @@ export interface FormatMoneyOptions {
   maximumFractionDigits?: number;
 }
 
+// ── i18n del chrome compartido de tablas ──────────────────────────────────────────────────
+
+/** Etiquetas que los módulos pasan a `<ok-data-table .labels=...>`.
+ *
+ * OutfitKit conserva inglés como fallback para compatibilidad. El módulo, que sí conoce el
+ * idioma activo del shell, debe pasar este objeto para que buscador, columnas, paginación y
+ * acciones cambien a la vez que su contenido. Se mantiene aquí para que cada módulo instalable
+ * no copie y desincronice el mismo diccionario.
+ */
+const DATA_TABLE_LABELS_ES = {
+  search: 'Buscar…', empty: 'Sin resultados', filters: 'Filtros', clear: 'Limpiar',
+  apply: 'Aplicar', selected: '{n} seleccionados', importCsv: 'Importar CSV',
+  exportCsv: 'Exportar CSV', add: 'Añadir', moreActions: 'Más acciones',
+  rowsPerPage: 'Filas por página', perPageShort: '{n} / pág.', viewList: 'Vista lista',
+  viewCards: 'Vista tarjetas', columnsVisible: 'Columnas visibles', columns: 'Columnas',
+  actions: 'Acciones', close: 'Cerrar', newRecord: 'Nuevo', form: 'Formulario',
+  filterPlaceholder: 'Filtrar…', from: 'Desde', to: 'Hasta',
+  fromOf: '{label} desde', toOf: '{label} hasta', gte: '≥', lte: '≤',
+  noValues: 'Sin valores', selectAll: 'Seleccionar todo', selectRow: 'Seleccionar fila',
+  select: 'Seleccionar', showing: 'Mostrando {from}–{to} de',
+  recordSingular: 'registro', recordPlural: 'registros',
+} as const;
+
+const DATA_TABLE_LABELS_EN = {
+  search: 'Search…', empty: 'No results', filters: 'Filters', clear: 'Clear',
+  apply: 'Apply', selected: '{n} selected', importCsv: 'Import CSV',
+  exportCsv: 'Export CSV', add: 'Add', moreActions: 'More actions',
+  rowsPerPage: 'Rows per page', perPageShort: '{n} / page', viewList: 'List view',
+  viewCards: 'Card view', columnsVisible: 'Visible columns', columns: 'Columns',
+  actions: 'Actions', close: 'Close', newRecord: 'New', form: 'Form',
+  filterPlaceholder: 'Filter…', from: 'From', to: 'To',
+  fromOf: '{label} from', toOf: '{label} to', gte: '≥', lte: '≤',
+  noValues: 'No values', selectAll: 'Select all', selectRow: 'Select row',
+  select: 'Select', showing: 'Showing {from}–{to} of',
+  recordSingular: 'record', recordPlural: 'records',
+} as const;
+
+export function dataTableLabels(locale = 'es'): Record<string, string> {
+  return locale.toLowerCase().startsWith('en') ? DATA_TABLE_LABELS_EN : DATA_TABLE_LABELS_ES;
+}
+
 // ── Queries de lista (paginadas) — contrato del motor de listas del runtime (§4, §8.2) ──────
 
 /** Rango para un filtro `range` (números o fechas ISO). Campos vacíos = sin límite por ese lado. */

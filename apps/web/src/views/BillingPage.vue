@@ -108,6 +108,10 @@
         icon="card-outline"
         :message="t('billing.paymentsPortalNotice')"
       />
+      <ion-button size="small" @click="onOpenBillingPortal">
+        <HubIcon name="open-outline" slot="start" />
+        {{ t('billing.openBillingPortal') }}
+      </ion-button>
     </div>
 
     <!-- Tabs en footer -->
@@ -145,9 +149,10 @@ import {
 import { openExternal } from '../lib/open-external';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
-import { DT_LABELS_ES } from '../lib/data-table-labels';
+import { dataTableLabels } from '../lib/data-table-labels';
+import { toastError } from '../lib/toast';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 import {
   cloudInvoices, cloudSubscriptions, getAccessToken, hasIndependentLocalSession,
   type CloudInvoice, type CloudSubscription
@@ -202,7 +207,7 @@ async function onManagePlan(): Promise<void> {
   try {
     await openExternal(plansDeepLink());
   } catch {
-    console.error('No se pudo abrir la página de planes del SaaS');
+    await toastError(t('billing.managePlanError'));
   }
 }
 
@@ -210,7 +215,7 @@ async function onOpenBillingPortal(): Promise<void> {
   try {
     await openExternal(billingPortalLink());
   } catch {
-    console.error('No se pudo abrir la facturación de ERPlora');
+    await toastError(t('billing.portalError'));
   }
 }
 
@@ -267,7 +272,13 @@ function onTabChange(ev: Event): void {
 // --- Formatters ---
 function fmtDate(iso: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 // Formateo con la moneda DE LA FACTURA (las facturas del Cloud traen su propia divisa); sin divisa
@@ -342,9 +353,24 @@ const subColumns = computed<DataTableColumn[]>(() => [
 const invoicesTable = ref<HTMLElement | null>(null);
 const subsTable = ref<HTMLElement | null>(null);
 
+function applyTableLabels(): void {
+  if (invoicesTable.value) {
+    (invoicesTable.value as HTMLElement & { labels: Record<string, string> }).labels = {
+      ...dataTableLabels(locale.value),
+      empty: t('billing.noInvoices'),
+    };
+  }
+  if (subsTable.value) {
+    (subsTable.value as HTMLElement & { labels: Record<string, string> }).labels = {
+      ...dataTableLabels(locale.value),
+      empty: t('billing.noSubscriptions'),
+    };
+  }
+}
+
 function handleInvoiceAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
-  if (actionId === 'download') void downloadInvoice(Number((row as unknown as CloudInvoice).id));
+  if (actionId === 'download') void downloadInvoice(row as unknown as CloudInvoice);
 }
 
 // --- Fetch + labels ES al montar (refs vivos por v-show, aunque la tabla esté oculta) ---
@@ -364,16 +390,17 @@ onMounted(() => {
 
   if (invoicesTable.value) {
     const el = invoicesTable.value as HTMLElement & { labels: Record<string, string>; viewMode: string };
-    el.labels = { ...DT_LABELS_ES, empty: t('billing.noInvoices') };
+    el.labels = { ...dataTableLabels(locale.value), empty: t('billing.noInvoices') };
     el.viewMode = initialView;
     invoicesTable.value.addEventListener('rowAction', handleInvoiceAction);
   }
   if (subsTable.value) {
     const el = subsTable.value as HTMLElement & { labels: Record<string, string>; viewMode: string };
-    el.labels = { ...DT_LABELS_ES, empty: t('billing.noSubscriptions') };
+    el.labels = { ...dataTableLabels(locale.value), empty: t('billing.noSubscriptions') };
     el.viewMode = initialView;
   }
 });
+watch(locale, applyTableLabels);
 
 onBeforeUnmount(() => {
   invoicesTable.value?.removeEventListener('rowAction', handleInvoiceAction);
@@ -382,10 +409,10 @@ onBeforeUnmount(() => {
 });
 
 // --- Descarga PDF de factura (endpoint real del Cloud) ---
-async function downloadInvoice(id: number): Promise<void> {
+async function downloadInvoice(invoice: CloudInvoice): Promise<void> {
   const token = getAccessToken();
   try {
-    const res = await fetch(`${config.cloudApiUrl}/api/v1/billing/invoices/${id}/download/`, {
+    const res = await fetch(`${config.cloudApiUrl}/api/v1/billing/invoices/${invoice.id}/download/`, {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         'X-Client-Type': 'hub'
@@ -396,13 +423,14 @@ async function downloadInvoice(id: number): Promise<void> {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `factura-${id}.pdf`;
+    const safeNumber = String(invoice.number || invoice.id).replace(/[^a-zA-Z0-9._-]+/g, '-');
+    a.download = `factura-${safeNumber}.pdf`;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
-  } catch (e) {
-    console.error('No se pudo descargar la factura', e);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  } catch {
+    await toastError(t('billing.downloadError'));
   }
 }
 </script>
@@ -444,6 +472,10 @@ async function downloadInvoice(id: number): Promise<void> {
 /* Pestaña Pagos: aviso de portal externo centrado. Antes era un placeholder Tailwind. */
 .payments-notice {
   padding: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .billing-feedback {

@@ -7,6 +7,18 @@
     </div>
 
     <template v-else>
+      <ok-inline-feedback
+        v-if="loadFailed"
+        class="system-feedback"
+        tone="danger"
+        icon="cloud-offline-outline"
+        :heading="t('system.loadErrorTitle')"
+      >
+        {{ t('system.loadErrorBody') }}
+        <ion-button slot="actions" size="small" fill="outline" @click="loadSystemInfo">
+          {{ t('system.retry') }}
+        </ion-button>
+      </ok-inline-feedback>
 
       <!-- ── Tab: Recursos ──────────────────────────────────────── -->
       <template v-if="tab === 'resources'">
@@ -122,15 +134,14 @@
       <template v-else-if="tab === 'updates'">
         <ion-card class="ion-no-margin">
           <ion-card-content class="updates-center">
-            <HubIcon name="checkmark-circle-outline" class="updates-icon" />
-            <strong class="updates-title">{{ t('system.upToDate') }}</strong>
+            <HubIcon name="information-circle-outline" class="updates-icon" />
+            <strong class="updates-title">{{ t('system.updatesManaged') }}</strong>
             <p class="updates-meta">
-              Hub {{ info?.hubVersion ?? '—' }} · {{ t('system.checkedNow') }}
+              Hub {{ info?.hubVersion ?? '—' }}
             </p>
-            <ion-button fill="outline" @click="handleCheckUpdates">
-              <HubIcon slot="start" name="refresh-outline" />
-              {{ t('system.checkUpdates') }}
-            </ion-button>
+            <p class="muted-note updates-hint">
+              {{ info?.shell === 'tauri' ? t('system.updatesLocalHint') : t('system.updatesCloudHint') }}
+            </p>
           </ion-card-content>
         </ion-card>
       </template>
@@ -165,51 +176,6 @@
         </ion-card>
       </template>
 
-      <!-- ── Tab: Copias ────────────────────────────────────────── -->
-      <template v-else-if="tab === 'backups'">
-        <ion-card class="ion-no-margin">
-          <ion-card-content>
-            <div class="block-header">
-              <h3 class="block-header__title">{{ t('system.autoBackups') }}</h3>
-              <ion-button size="small" @click="handleBackupNow">
-                <HubIcon slot="start" name="cloud-upload-outline" />
-                {{ t('system.backupNow') }}
-              </ion-button>
-            </div>
-
-            <template v-if="info?.storageUsed">
-              <p class="muted-note storage-note">
-                {{ t('system.storageUsed') }} · {{ info.storageUsed.usedLabel }}<span v-if="info.storageUsed.limitLabel"> / {{ info.storageUsed.limitLabel }}</span>
-              </p>
-              <ion-progress-bar v-if="info.storageUsed.fraction != null" :value="info.storageUsed.fraction" class="storage-bar" />
-            </template>
-
-            <ok-empty-state
-              v-if="!backups.length"
-              icon="cloud-offline-outline"
-              :heading="t('system.noBackups')"
-              :message="t('system.noBackupsHint')"
-            />
-            <ion-list v-else :inset="false">
-              <ion-item
-                v-for="(backup, i) in backups"
-                :key="backup.when"
-                :lines="i === backups.length - 1 ? 'none' : 'inset'"
-              >
-                <HubIcon slot="start" name="server-outline" color="medium" />
-                <ion-label>
-                  <h2 class="backup-title">{{ t('system.backup') }}</h2>
-                  <ion-note class="backup-meta">{{ fmtDateTime(backup.when) }} · {{ backup.sizeLabel }}</ion-note>
-                </ion-label>
-                <ion-button v-if="backup.url" slot="end" fill="clear" :aria-label="t('system.download')" @click="openUrl(backup.url)">
-                  <HubIcon slot="icon-only" name="download-outline" />
-                </ion-button>
-              </ion-item>
-            </ion-list>
-          </ion-card-content>
-        </ion-card>
-      </template>
-
       <!-- ── Tab: Registros ─────────────────────────────────────── -->
       <template v-else-if="tab === 'logs'">
         <ion-card class="ion-no-margin">
@@ -223,6 +189,7 @@
             />
             <ok-data-table
               v-else
+              ref="logsTable"
               :columns="logColumns"
               :rows="logRows"
               :searchKeys="['message', 'meta']"
@@ -252,10 +219,6 @@
               <HubIcon name="folder-outline" />
               <ion-label>{{ t('system.tabDocuments') }}</ion-label>
             </ion-segment-button>
-            <ion-segment-button value="backups">
-              <HubIcon name="cloud-upload-outline" />
-              <ion-label>{{ t('system.tabBackups') }}</ion-label>
-            </ion-segment-button>
             <ion-segment-button value="logs">
               <HubIcon name="document-text-outline" />
               <ion-label>{{ t('system.tabLogs') }}</ion-label>
@@ -282,20 +245,23 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
-  IonGrid, IonRow, IonCol, IonProgressBar, IonBadge, IonButton,
-  IonList, IonItem, IonNote, IonToast, IonSpinner
+  IonGrid, IonRow, IonCol, IonBadge, IonButton, IonToast, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';
 import { fetchSystemInfo, type SystemInfo } from '../lib/system';
+import { dataTableLabels } from '../lib/data-table-labels';
+import { RUNTIME_URL, runtimeHeaders } from '../lib/runtime';
+import {
+  isLegacyBackupsHash,
+  resolveSystemTab,
+  type SystemTab as Tab,
+} from '../lib/system-tabs';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 // ── Types ────────────────────────────────────────────────────────
-
-type Tab = 'resources' | 'updates' | 'documents' | 'backups' | 'logs';
-const TABS: readonly Tab[] = ['resources', 'updates', 'documents', 'backups', 'logs'];
 
 interface BridgeOs {
   label: string;
@@ -316,26 +282,40 @@ interface DataTableColumn {
   format?: (row: Row) => string;
   render?: (row: Row) => Node | string;
 }
-interface DataTableAction { id: string; label: string; icon?: string; color?: string }
+interface DataTableAction {
+  id: string;
+  label: string;
+  icon?: string;
+  color?: string;
+  disabled?: (row: Row) => boolean;
+}
 
 // ── State ────────────────────────────────────────────────────────
 
-// Deep-link a una pestaña por HASH (/system#copias) — la ruta base no cambia, así Ionic no la
-// trata como página secundaria. Sincroniza tab ↔ hash.
+// Deep-link a una pestaña por HASH — la ruta base no cambia, así Ionic no la trata como página
+// secundaria. El hash legacy `#backups` redirige a Ajustes → Datos y copias.
 const route = useRoute();
 const router = useRouter();
-const tab = ref<Tab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'resources');
+if (isLegacyBackupsHash(route.hash)) {
+  void router.replace({ path: '/settings', hash: '#data' });
+}
+const tab = ref<Tab>(resolveSystemTab(route.hash));
 watch(tab, (value) => {
   if (value !== (route.hash.slice(1) || 'resources')) void router.replace({ hash: `#${value}` });
 });
 watch(() => route.hash, (h) => {
-  const next = TABS.find((v) => v === h.slice(1)) ?? 'resources';
+  if (isLegacyBackupsHash(h)) {
+    void router.replace({ path: '/settings', hash: '#data' });
+    return;
+  }
+  const next = resolveSystemTab(h);
   if (next !== tab.value) tab.value = next;
 });
 
 const toastMessage = ref('');
 const toastOpen = ref(false);
 const loading = ref(true);
+const loadFailed = ref(false);
 
 // Estado REAL del sistema (GET /api/system). null = endpoint aún no disponible → UI degrada.
 const info = ref<SystemInfo | null>(null);
@@ -417,7 +397,6 @@ const storageSourceLabel = computed<string>(() =>
 );
 
 const documents = computed<Row[]>(() => (info.value?.documents ?? []) as unknown as Row[]);
-const backups = computed(() => info.value?.backups ?? []);
 const logs = computed(() => info.value?.logs ?? []);
 const logRows = computed<Row[]>(() => logs.value as unknown as Row[]);
 
@@ -425,11 +404,17 @@ const logRows = computed<Row[]>(() => logs.value as unknown as Row[]);
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(
+    locale.value === 'en' ? 'en-GB' : 'es-ES',
+    { day: '2-digit', month: 'short', year: 'numeric' },
+  );
 }
 function fmtDateTime(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(
+    locale.value === 'en' ? 'en-GB' : 'es-ES',
+    { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' },
+  );
 }
 
 // Pill de nivel de log como nodo DOM (patrón de celda rica de ok-data-table desde Vue).
@@ -451,7 +436,12 @@ const docColumns = computed<DataTableColumn[]>(() => [
   { key: 'modified', header: t('system.colModified'), filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.modified)) },
 ]);
 const docActions = computed<DataTableAction[]>(() => [
-  { id: 'download', label: t('system.download'), icon: 'download' },
+  {
+    id: 'download',
+    label: t('system.download'),
+    icon: 'download',
+    disabled: (row) => !row.url,
+  },
 ]);
 
 const logColumns = computed<DataTableColumn[]>(() => [
@@ -467,8 +457,26 @@ function showToast(message: string): void {
   toastOpen.value = true;
 }
 
-function openUrl(url: string | null | undefined): void {
-  if (url) window.open(url, '_blank', 'noopener');
+async function openUrl(url: string | null | undefined, name = 'documento'): Promise<void> {
+  if (!url) return;
+  if (/^https?:\/\//.test(url)) {
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+  try {
+    const response = await fetch(`${RUNTIME_URL}${url}`, { headers: runtimeHeaders() });
+    if (!response.ok) throw new Error(String(response.status));
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+  } catch {
+    showToast(t('system.downloadError'));
+  }
 }
 
 function handleBridgeDownload(os: BridgeOs): void {
@@ -481,33 +489,51 @@ async function refreshBridge(): Promise<void> {
   bridge.value = await detectBridge();
 }
 
-function handleCheckUpdates(): void {
-  showToast(t('system.toastCheckingUpdates'));
-}
-
-function handleBackupNow(): void {
-  showToast(t('system.toastCreatingBackup'));
-}
-
 // `rowAction` es camelCase; Vue lo baja a minúsculas en plantilla → se engancha con ref + listener.
 const docsTable = ref<HTMLElement | null>(null);
+const logsTable = ref<HTMLElement | null>(null);
 function handleDocAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
-  if (actionId === 'download') openUrl(row.url as string | undefined);
+  if (actionId === 'download') void openUrl(row.url as string | undefined, String(row.name ?? 'documento'));
 }
 
-// La tabla de Documentos solo está en el DOM cuando su pestaña está activa (v-else-if). Al
-// activarla, esperamos al render y enganchamos el listener de `rowAction` (idempotente).
+function applyTableLabels(): void {
+  const labels = dataTableLabels(locale.value);
+  if (docsTable.value) {
+    (docsTable.value as HTMLElement & { labels: Record<string, string> }).labels = labels;
+  }
+  if (logsTable.value) {
+    (logsTable.value as HTMLElement & { labels: Record<string, string> }).labels = labels;
+  }
+}
+
+// Las tablas solo están en el DOM cuando su pestaña está activa (v-else-if). Tras el render
+// aplicamos el idioma activo y cableamos la acción de descarga de forma idempotente.
 watch(tab, async (value) => {
-  if (value !== 'documents') return;
   await nextTick();
-  docsTable.value?.addEventListener('rowAction', handleDocAction);
+  applyTableLabels();
+  if (value === 'documents') {
+    docsTable.value?.removeEventListener('rowAction', handleDocAction);
+    docsTable.value?.addEventListener('rowAction', handleDocAction);
+  }
+});
+watch(locale, async () => {
+  await nextTick();
+  applyTableLabels();
 });
 
-onMounted(async () => {
-  void refreshBridge();
+async function loadSystemInfo(): Promise<void> {
+  loading.value = true;
   info.value = await fetchSystemInfo();
+  loadFailed.value = info.value == null;
   loading.value = false;
+  await nextTick();
+  applyTableLabels();
+}
+
+onMounted(() => {
+  void refreshBridge();
+  void loadSystemInfo();
 });
 onBeforeUnmount(() => {
   docsTable.value?.removeEventListener('rowAction', handleDocAction);
@@ -643,7 +669,7 @@ onBeforeUnmount(() => {
 }
 .updates-icon {
   font-size: 48px;
-  color: var(--ion-color-success);
+  color: var(--ion-color-primary);
 }
 .updates-title {
   font-size: 1.125rem;
@@ -654,20 +680,13 @@ onBeforeUnmount(() => {
   font-family: monospace;
   font-size: 0.8125rem;
 }
+.updates-hint {
+  max-width: 36rem;
+  text-align: center;
+}
 
-/* ── Pestaña Copias ── */
-.storage-note {
-  margin-bottom: 4px;
-}
-.storage-bar {
-  margin-bottom: 16px;
-}
-.backup-title {
-  font-weight: 600;
-}
-.backup-meta {
-  font-family: monospace;
-  font-size: 0.75rem;
+.system-feedback {
+  margin: 0 0 12px;
 }
 
 /* ── Pestaña Registros ── */

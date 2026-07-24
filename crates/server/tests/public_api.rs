@@ -25,7 +25,8 @@ fn dev_config() -> HubConfig {
         module_cache: std::env::temp_dir().join("erplora-pubapi-cache"),
         auth_mode: AuthMode::Dev,
         jwt_public_key: None,
-        cloud_api_token: None,
+        // El fixture valida la API pública, no el alta inicial de la máquina.
+        cloud_api_token: Some("test-machine-token".into()),
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-pubapi-media"),
         sector: None,

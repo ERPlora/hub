@@ -15,7 +15,7 @@ import { addIcons } from 'ionicons';
 
 import { isModuleEntitled } from './entitlement';
 import { moduleIconRegistry } from './icons';
-import { RUNTIME_URL } from './runtime';
+import { RUNTIME_URL, runtimeHeaders } from './runtime';
 import { orderSlotFillers } from './slot-fillers';
 import type { SlotDef } from './slot-fillers';
 import { getLocale } from '../i18n';
@@ -57,7 +57,9 @@ const MODULES_BASE = '/modules';
  */
 async function fetchNavigation(): Promise<RuntimeNavItem[]> {
   // `?locale=` (ADR-0055): el runtime devuelve los labels ya traducidos (fallback locale→en→manifest).
-  const res = await fetch(`${RUNTIME_URL}/api/navigation?locale=${encodeURIComponent(getLocale())}`);
+  const res = await fetch(`${RUNTIME_URL}/api/navigation?locale=${encodeURIComponent(getLocale())}`, {
+    headers: runtimeHeaders(),
+  });
   if (!res.ok) throw new Error(`navigation → ${res.status}`);
   const env = (await res.json()) as { ok: boolean; data?: RuntimeNavItem[] };
   return env.ok && env.data ? env.data : [];

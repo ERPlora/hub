@@ -45,7 +45,11 @@ pub struct CloudEmbedder {
 
 impl CloudEmbedder {
     pub fn new(http: reqwest::Client, cloud_base_url: &str, auth: Auth) -> Self {
-        Self { http, cloud: CloudClient::new(cloud_base_url), auth }
+        Self {
+            http,
+            cloud: CloudClient::new(cloud_base_url),
+            auth,
+        }
     }
 }
 
@@ -61,9 +65,17 @@ impl Embedder for CloudEmbedder {
         for (k, v) in &req.headers {
             r = r.header(*k, v);
         }
-        let resp = r.send().await.map_err(|e| EmbedError::Cloud(e.to_string()))?;
-        let resp = resp.error_for_status().map_err(|e| EmbedError::Cloud(e.to_string()))?;
-        let text = resp.text().await.map_err(|e| EmbedError::Cloud(e.to_string()))?;
+        let resp = r
+            .send()
+            .await
+            .map_err(|e| EmbedError::Cloud(e.to_string()))?;
+        let resp = resp
+            .error_for_status()
+            .map_err(|e| EmbedError::Cloud(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| EmbedError::Cloud(e.to_string()))?;
         let parsed = EmbeddingsResponse::parse(&text)
             .map_err(|e| EmbedError::Cloud(format!("respuesta inválida: {e}")))?;
         Ok(parsed.embeddings)
@@ -94,7 +106,10 @@ pub async fn index_chunks<S: VectorStore + ?Sized>(
     let texts: Vec<String> = chunks.iter().map(|c| c.content.clone()).collect();
     let vectors = embedder.embed(&texts).await?;
     if vectors.len() != texts.len() {
-        return Err(EmbedError::CountMismatch { expected: texts.len(), got: vectors.len() });
+        return Err(EmbedError::CountMismatch {
+            expected: texts.len(),
+            got: vectors.len(),
+        });
     }
 
     let mut n = 0usize;
@@ -140,14 +155,19 @@ mod tests {
     }
     impl MockEmbedder {
         fn new() -> Self {
-            Self { seen: Mutex::new(Vec::new()) }
+            Self {
+                seen: Mutex::new(Vec::new()),
+            }
         }
     }
     #[async_trait]
     impl Embedder for MockEmbedder {
         async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbedError> {
             self.seen.lock().unwrap().push(texts.to_vec());
-            Ok(texts.iter().map(|t| vec![t.len() as f32, 1.0, 0.0]).collect())
+            Ok(texts
+                .iter()
+                .map(|t| vec![t.len() as f32, 1.0, 0.0])
+                .collect())
         }
     }
 
@@ -186,7 +206,9 @@ mod tests {
     async fn indexes_chunks_via_embedder() {
         let s = store().await;
         let emb = MockEmbedder::new();
-        let n = index_chunks(&emb, &s, "h1", "1.0.0", &chunks()).await.unwrap();
+        let n = index_chunks(&emb, &s, "h1", "1.0.0", &chunks())
+            .await
+            .unwrap();
         assert_eq!(n, 2);
 
         // Una sola llamada al Cloud, con ambos textos (un batch).
@@ -207,11 +229,19 @@ mod tests {
     async fn reindex_replaces_not_duplicates() {
         let s = store().await;
         let emb = MockEmbedder::new();
-        index_chunks(&emb, &s, "h1", "1.0.0", &chunks()).await.unwrap();
+        index_chunks(&emb, &s, "h1", "1.0.0", &chunks())
+            .await
+            .unwrap();
         // Re-instalar la misma versión → mismos ids → reemplaza (sin duplicar).
-        index_chunks(&emb, &s, "h1", "1.0.0", &chunks()).await.unwrap();
+        index_chunks(&emb, &s, "h1", "1.0.0", &chunks())
+            .await
+            .unwrap();
         let all = s.search("h1", &[1.0, 1.0, 0.0], 100, None).await.unwrap();
-        assert_eq!(all.len(), 2, "upsert por id estable, no duplica al reinstalar");
+        assert_eq!(
+            all.len(),
+            2,
+            "upsert por id estable, no duplica al reinstalar"
+        );
     }
 
     #[tokio::test]
@@ -220,21 +250,34 @@ mod tests {
         let emb = MockEmbedder::new();
         let n = index_chunks(&emb, &s, "h1", "1.0.0", &[]).await.unwrap();
         assert_eq!(n, 0);
-        assert!(emb.seen.lock().unwrap().is_empty(), "sin textos no se llama al Cloud");
+        assert!(
+            emb.seen.lock().unwrap().is_empty(),
+            "sin textos no se llama al Cloud"
+        );
     }
 
     #[tokio::test]
     async fn count_mismatch_is_error() {
         let s = store().await;
-        let err = index_chunks(&ShortEmbedder, &s, "h1", "1.0.0", &chunks()).await.unwrap_err();
-        assert!(matches!(err, EmbedError::CountMismatch { expected: 2, got: 1 }));
+        let err = index_chunks(&ShortEmbedder, &s, "h1", "1.0.0", &chunks())
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            EmbedError::CountMismatch {
+                expected: 2,
+                got: 1
+            }
+        ));
     }
 
     #[tokio::test]
     async fn drop_module_removes_chunks() {
         let s = store().await;
         let emb = MockEmbedder::new();
-        index_chunks(&emb, &s, "h1", "1.0.0", &chunks()).await.unwrap();
+        index_chunks(&emb, &s, "h1", "1.0.0", &chunks())
+            .await
+            .unwrap();
         let removed = drop_module(&s, "h1", "inventory").await.unwrap();
         assert_eq!(removed, 2);
         let all = s.search("h1", &[1.0, 1.0, 0.0], 100, None).await.unwrap();

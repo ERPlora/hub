@@ -23,7 +23,7 @@
             <img
               class="logo-img"
               :src="hubLogo"
-              alt="ERPlora"
+              :alt="t('login.logoAlt')"
               decoding="async"
               @error="onLogoError"
             />
@@ -63,6 +63,7 @@
                   label-placement="floating"
                   type="email"
                   autocomplete="username"
+                  required
                   fill="outline"
                   :placeholder="t('login.emailPlaceholder')"
                   @ion-input="emailVal = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
@@ -73,6 +74,7 @@
                   label-placement="floating"
                   type="password"
                   autocomplete="current-password"
+                  required
                   fill="outline"
                   placeholder="••••••••"
                   @ion-input="passwordVal = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
@@ -116,7 +118,13 @@
                   {{ emailError }}
                 </ion-note>
 
-                <ion-button type="submit" expand="block" :disabled="emailLoading">
+                <ion-button
+                  type="submit"
+                  expand="block"
+                  :disabled="emailLoading"
+                  :aria-label="t('login.signIn')"
+                  :aria-busy="emailLoading"
+                >
                   <ion-spinner v-if="emailLoading" name="crescent" />
                   <template v-else>
                     <HubIcon slot="start" name="log-in-outline" />
@@ -184,6 +192,7 @@
                       dots
                       :length="4"
                       :error="pinError"
+                      :aria-busy="pinLoading"
                       secondary-icon="arrow-back-outline"
                       :secondary-label="t('login.changeUser')"
                       @ok-input="onMainPinInput"
@@ -224,7 +233,7 @@
                 </div>
 
                 <ion-note v-if="setupError" color="danger" class="error-note">
-                  {{ t('login.setupMismatch') }}
+                  {{ setupErrorMessage }}
                 </ion-note>
               </div>
 
@@ -256,7 +265,13 @@ import { setUser, setHubSession, getHubSession } from '../lib/session';
 import { cloudLogin, setTokens, runtimeCloudSession, runtimePinLogin, runtimeSetPin } from '../lib/cloud';
 import { config } from '../lib/config';
 import { isTauri, invokeTauri } from '../lib/device';
-import { pinUsers } from '../lib/runtime';
+import {
+  bootHubContext,
+  hubContextReady,
+  machineRegistered,
+  machineRegistrationRequired,
+  pinUsers,
+} from '../lib/runtime';
 import { isDark, toggleTheme } from '../lib/theme';
 import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
 
@@ -330,9 +345,28 @@ const showTabs = computed(() => trusted.value && step.value !== 'setup');
 // (drift); ya no. El flujo de seguridad (§2.9) NO cambia: esto solo decide qué pestaña se muestra;
 // la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
 watch(
-  pinUsers,
-  (users) => {
-    if (!users.length || step.value === 'setup') return;
+  [pinUsers, hubContextReady, machineRegistrationRequired],
+  ([users, contextReady, registrationRequired]) => {
+    if (!contextReady || step.value === 'setup') return;
+    // Una máquina real sin vínculo no puede entrar por un PIN heredado/cacheado: primero debe
+    // acreditar una cuenta Cloud y completar el alta de ESTA instalación. Demo es la única
+    // excepción y el runtime ya la expresa con `registration_required=false`.
+    if (registrationRequired) {
+      trusted.value = false;
+      step.value = 'email';
+      return;
+    }
+    if (!users.length) {
+      // El runtime respondió y no reconoce ningún PIN: descartamos la cache visual obsoleta y
+      // volvemos al acceso online. Si el context no responde, en cambio, conservamos el modo
+      // offline; `hubContextReady` permanece false.
+      trustedUsers.value = [];
+      trusted.value = false;
+      saveTrustedUsers([]);
+      saveTrustedFlag(false);
+      step.value = 'email';
+      return;
+    }
     const cachedById = new Map(trustedUsers.value.map((u) => [u.id, u]));
     trustedUsers.value = users.map((u) => ({
       id: u.id,
@@ -340,6 +374,8 @@ watch(
       initials: initials(u.name),
       email: cachedById.get(u.id)?.email,
     }));
+    saveTrustedUsers(trustedUsers.value);
+    saveTrustedFlag(true);
     trusted.value = true;
     step.value = 'pin';
   },
@@ -356,6 +392,16 @@ const trust = ref<boolean>(true);
 const emailLoading = ref<boolean>(false);
 const emailError = ref<string>('');
 
+function redirectTarget(): string {
+  const raw = router.currentRoute.value.query.redirect;
+  return typeof raw === 'string'
+    && raw.startsWith('/')
+    && !raw.startsWith('//')
+    && !raw.startsWith('/login')
+    ? raw
+    : '/';
+}
+
 // Genera iniciales a partir del nombre completo
 function initials(name: string): string {
   return name
@@ -368,25 +414,53 @@ function initials(name: string): string {
 
 async function submitEmail(): Promise<void> {
   emailError.value = '';
+  const email = emailVal.value.trim().toLowerCase();
+  if (!email || !email.includes('@') || !passwordVal.value) {
+    emailError.value = t('login.requiredFields');
+    return;
+  }
   emailLoading.value = true;
+  let registrationFailed = false;
   try {
     // Login real contra el Cloud Portal (ARQUITECTURA.md §2.3: Bearer + X-Hub-Id).
-    const result = await cloudLogin(emailVal.value.trim().toLowerCase(), passwordVal.value);
+    const result = await cloudLogin(email, passwordVal.value);
 
     // Primer login = el Cloud crea/resuelve el Hub de ESTE dispositivo y devuelve su hub_id real
     // (ARQUITECTURA.md §2.9b). Lo adoptamos como X-Hub-Id ANTES de activar la sesión, para que el
     // gate de entitlement (App.vue → resolveEntitlement) deje de pegar contra el hub placeholder.
-    // En Tauri, además, ENROLAMOS el dispositivo: el shell pide el token de máquina al Cloud y
-    // persiste token + hub_id real en disco (hot-reload del runtime embebido), así el catálogo de
-    // Apps/entitlement firman con la identidad real sin depender de un JWT fresco. Best-effort: si el
-    // enroll falla, el JWT del usuario ya autoriza por IsHubMember.
-    if (result.hubId) {
+    // En Tauri el alta NO es best-effort: login, UUID real y credencial de máquina forman una
+    // única transacción de bootstrap. Si falla cualquiera, no se abre una sesión parcialmente
+    // vinculada (esa situación dejaba el catálogo vacío y datos bajo el hub placeholder).
+    if (isTauri()) {
+      registrationFailed = true;
+      if (!result.hubId) throw new Error('machine_registration_missing_hub');
       config.hubId = result.hubId;
-      if (isTauri()) {
-        await invokeTauri('enroll_device', {
-          hubId: result.hubId,
-          accessToken: result.access,
-        }).catch(() => null);
+      const enrolledHubId = await invokeTauri<string>('enroll_device', {
+        hubId: result.hubId,
+        accessToken: result.access,
+      });
+      if (!enrolledHubId || enrolledHubId !== result.hubId) {
+        throw new Error('machine_registration_failed');
+      }
+      // Barrera de consistencia: el runtime adopta `hub_id + token`, aplica sus migraciones scoped
+      // y solo entonces se crea el usuario/sesión local.
+      const refreshed = await bootHubContext();
+      if (
+        !refreshed
+        || refreshed.hub_id !== result.hubId
+        || !refreshed.machine_registered
+      ) {
+        throw new Error('machine_registration_not_applied');
+      }
+      registrationFailed = false;
+    } else {
+      // Hub Cloud llega ya provisionado con su UUID + token de máquina. También exige login de
+      // usuario, pero no crea otro Hub desde el navegador. Una instalación real no vinculada no
+      // puede continuar fingiendo ser Demo ni depender indefinidamente del JWT humano.
+      if (result.hubId) config.hubId = result.hubId;
+      if (machineRegistrationRequired.value && !machineRegistered.value) {
+        registrationFailed = true;
+        throw new Error('machine_registration_required');
       }
     }
 
@@ -394,28 +468,30 @@ async function submitEmail(): Promise<void> {
 
     // Abre la sesión LOCAL del runtime a partir del JWT (autoridad de permisos local, §2.9).
     // El `name` se reusa para el login por PIN (el runtime resuelve el usuario por nombre).
-    const sess = await runtimeCloudSession(result.access, result.user.name);
+    const sess = await runtimeCloudSession(result.access, result.user.name, result.user.email);
     setHubSession(sess.token);
 
     setUser({
-      id: result.user.id,
+      id: sess.user.id,
+      cloudUserId: result.user.id,
       name: result.user.name,
       email: result.user.email,
       avatarUrl: result.user.avatarUrl ?? null,
       // Rol LOCAL resuelto por el runtime (autoridad de permisos, §2.9) → gatea la UI admin.
-      role: sess.user.role
+      role: sess.user.role,
+      permissions: sess.permissions,
     });
 
     // Si el usuario eligió "Confiar en este dispositivo", registramos el usuario localmente y
     // vamos al alta de PIN (el PIN se fija en el runtime al confirmar — onSetupComplete).
     if (trust.value) {
       const userEntry: TrustedUser = {
-        id: result.user.id,
+        id: sess.user.id,
         name: result.user.name,
         email: result.user.email,
         initials: initials(result.user.name)
       };
-      const existing = trustedUsers.value.filter((u) => u.id !== result.user.id);
+      const existing = trustedUsers.value.filter((u) => u.id !== sess.user.id);
       trustedUsers.value = [userEntry, ...existing];
       saveTrustedUsers(trustedUsers.value);
       saveTrustedFlag(true);
@@ -424,32 +500,27 @@ async function submitEmail(): Promise<void> {
       return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
     }
 
-    const redirect = (router.currentRoute.value.query.redirect as string) || '/';
-    await router.replace(redirect);
+    await router.replace(redirectTarget());
   } catch {
     // Fallback demo SOLO con VITE_DEMO=1 (config.demo). En prod (sin la flag) el login falla
     // duro y mostramos el error real — nunca creamos una sesión ficticia.
     if (config.demo) {
-      setUser({ id: 'u1', name: emailVal.value || 'Demo Owner', email: emailVal.value || 'demo@erplora.com' });
-      if (trust.value) {
-        const userEntry: TrustedUser = {
-          id: 'u1',
-          name: emailVal.value || 'Demo Owner',
-          email: emailVal.value || 'demo@erplora.com',
-          initials: initials(emailVal.value || 'Demo Owner')
-        };
-        trustedUsers.value = [userEntry];
-        saveTrustedUsers(trustedUsers.value);
-        saveTrustedFlag(true);
-        trusted.value = true;
-        step.value = 'setup';
-        return;
-      }
-      const redirect = (router.currentRoute.value.query.redirect as string) || '/';
-      await router.replace(redirect);
+      // El fallback demo no inventa un PIN que el runtime nunca llegó a persistir. El acceso local
+      // por PIN solo se ofrece para `pin_users` reales de `/api/hub/context`.
+      setHubSession(null);
+      setUser({
+        id: 'u1',
+        name: emailVal.value || 'Demo Owner',
+        email: emailVal.value || 'demo@erplora.com',
+        role: 'owner',
+        permissions: ['*'],
+      });
+      await router.replace(redirectTarget());
       return;
     }
-    emailError.value = t('login.errorSignIn');
+    emailError.value = registrationFailed
+      ? t('login.errorMachineRegistration')
+      : t('login.errorSignIn');
   } finally {
     emailLoading.value = false;
   }
@@ -463,6 +534,7 @@ const pinUser = ref<TrustedUser | null>(
 );
 const pinValue = ref<string>('');
 const pinError = ref<boolean>(false);
+const pinLoading = ref(false);
 // Referencia al <ok-pinpad> del paso PIN (para limpiar su valor tras error / cambiar usuario).
 const mainPinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
 
@@ -497,21 +569,29 @@ function onPinToEmail(): void {
 }
 
 async function checkPin(pin: string): Promise<void> {
-  if (pin.length < 4 || !pinUser.value) return;
+  if (pin.length < 4 || !pinUser.value || pinLoading.value) return;
+  pinLoading.value = true;
   try {
     // Login local por PIN contra el runtime (§2.9): verifica el PIN y abre sesión server-side.
     const u = pinUser.value;
     const sess = await runtimePinLogin(u.name, pin);
     setHubSession(sess.token);
     // Rol LOCAL del runtime (mismo que el gate del backend) → gatea la UI admin (pestaña API keys).
-    setUser({ id: u.id, name: u.name, email: u.email ?? '', role: sess.user.role });
-    const redirect = (router.currentRoute.value.query.redirect as string) || '/';
-    await router.replace(redirect);
+    setUser({
+      id: sess.user.id,
+      name: u.name,
+      email: u.email ?? '',
+      role: sess.user.role,
+      permissions: sess.permissions,
+    });
+    await router.replace(redirectTarget());
   } catch {
     pinError.value = true;
     pinValue.value = '';
     // Limpia los círculos del ok-pinpad para reintentar.
     if (mainPinpadRef.value) mainPinpadRef.value.value = '';
+  } finally {
+    pinLoading.value = false;
   }
 }
 
@@ -522,6 +602,8 @@ type SetupPhase = 'first' | 'confirm';
 const setupPhase = ref<SetupPhase>('first');
 const setupFirst = ref<string>('');
 const setupError = ref<boolean>(false);
+const setupErrorMessage = ref('');
+const setupLoading = ref(false);
 // Referencia al <ok-pinpad> del alta de PIN (para limpiar entre fases / errores).
 const setupPinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
 
@@ -536,7 +618,9 @@ function onSetupPinComplete(ev: Event): void {
 }
 
 async function onSetupComplete(pin: string): Promise<void> {
+  if (setupLoading.value) return;
   setupError.value = false;
+  setupErrorMessage.value = '';
   if (setupPhase.value === 'first') {
     // Fase 1: guarda el primer PIN y pasa a confirmación (limpia el teclado).
     setupFirst.value = pin;
@@ -549,18 +633,23 @@ async function onSetupComplete(pin: string): Promise<void> {
     // Fija el PIN en el runtime para el usuario de la sesión actual (§2.9). Requiere la sesión
     // abierta en el login cloud previo (X-Hub-Session).
     const session = getHubSession();
+    setupLoading.value = true;
     try {
-      if (session) await runtimeSetPin(pin, session);
-      const redirect = (router.currentRoute.value.query.redirect as string) || '/';
-      await router.replace(redirect);
+      if (!session) throw new Error('missing runtime session');
+      await runtimeSetPin(pin, session);
+      await router.replace(redirectTarget());
     } catch {
       setupError.value = true;
+      setupErrorMessage.value = t('login.setupSaveError');
       setupFirst.value = '';
       setupPhase.value = 'first';
       clearSetupPinpad();
+    } finally {
+      setupLoading.value = false;
     }
   } else {
     setupError.value = true;
+    setupErrorMessage.value = t('login.setupMismatch');
     setupFirst.value = '';
     setupPhase.value = 'first';
     clearSetupPinpad();

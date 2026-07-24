@@ -1,8 +1,9 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
 import type { RouteRecordRaw } from 'vue-router';
-import { isAuthed } from '../lib/session';
+import { isAuthed, logout } from '../lib/session';
 import { isModuleEntitled, needsActivation } from '../lib/entitlement';
 import { apiDocsEnabled } from '../lib/api-docs';
+import { machineRegistrationRequired } from '../lib/runtime';
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
 // `/m/:moduleId` monta el Web Component (Lit) del módulo en runtime (ModuleView).
@@ -17,6 +18,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/employees/:id', name: 'employee-edit', component: () => import('../views/EmployeeFormPage.vue'), meta: { auth: true } },
   { path: '/employees', name: 'employees', component: () => import('../views/EmployeesPage.vue'), meta: { auth: true } },
   { path: '/files', name: 'files', component: () => import('../views/FilesPage.vue'), meta: { auth: true } },
+  // Perfil PERSONAL del usuario activo. No forma parte de /settings: los ajustes pertenecen al
+  // Hub/negocio actual, mientras que esta pantalla solo refleja identidad y preferencias propias.
+  { path: '/profile', name: 'profile', component: () => import('../views/ProfilePage.vue'), meta: { auth: true } },
   { path: '/billing', name: 'billing', component: () => import('../views/BillingPage.vue'), meta: { auth: true } },
   { path: '/apps', name: 'apps', component: () => import('../views/AppsPage.vue'), meta: { auth: true } },
   // Compat: la tienda se llamaba "Marketplace"; los enlaces/bookmarks viejos siguen funcionando.
@@ -53,6 +57,14 @@ router.beforeEach((to) => {
   const legacyTab = to.query.tab;
   if (typeof legacyTab === 'string' && legacyTab && !to.hash) {
     return { path: to.path, query: {}, hash: `#${legacyTab}` };
+  }
+  // Bootstrap obligatorio: una instalación real sin UUID+credencial Cloud no puede resucitar una
+  // sesión local persistida ni entrar por URL directa. Demo llega con este flag a false.
+  if (machineRegistrationRequired.value) {
+    if (isAuthed.value) logout();
+    if (to.name !== 'login') {
+      return { name: 'login', query: { redirect: to.fullPath } };
+    }
   }
   if (to.meta.auth && !isAuthed.value) {
     return { name: 'login', query: { redirect: to.fullPath } };

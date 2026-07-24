@@ -113,20 +113,13 @@ async fn inventory_crud_scoping_softdelete_parity() {
         .assert_rows(1);
 }
 
-// ── 2. inventory — stock decrease clamp (ANTES divergencia 42883: MAX(0,…) — AHORA paridad) ────
+// ── 2. inventory — rechazo atómico de stock insuficiente ──────────────────────────────────────
 //
-// `inventory/commands/stock_decrease.sql` usaba `MAX(0, stock - :qty)` como **scalar greatest** (clamp
-// a 0). SQLite tiene `MAX(a,b)` escalar; Postgres NO (ahí `MAX` es agregado y la forma escalar es
-// `GREATEST(a,b)`), y con el shim DDL `stock INTEGER`→`BIGINT` la firma `max(integer, bigint)` daba
-// SQLSTATE 42883 ("function does not exist") → el MISMO command funcionaba en Local y rompía en Cloud.
-//
-// ✅ ARREGLADO (2026-06-22) — el SQL del módulo se reescribió a una forma portable sin funciones
-// dialécticas: `CASE WHEN (stock - :qty) < 0 THEN 0 ELSE (stock - :qty) END`. Igual de legible, mismo
-// clamp a 0, y válido en ambos motores. Este test es ahora paridad normal: el clamp da el mismo
-// resultado en SQLite y Postgres.
+// El contrato actual no trunca silenciosamente a cero: con `allow_sell_without_stock=0` (default),
+// el `WHERE stock >= :qty` rechaza el descuento completo. Es la misma regla en Local y Cloud.
 
 #[tokio::test]
-async fn inventory_stock_decrease_clamp_parity() {
+async fn inventory_stock_decrease_rejects_insufficient_stock_parity() {
     let b = Backends::connect().await;
     b.migrate("inventory").await;
 
@@ -142,7 +135,7 @@ async fn inventory_stock_decrease_clamp_parity() {
     )
     .await;
 
-    // Descontar 5 de un stock de 3: el clamp deja stock en 0 (no negativo) idéntico en ambos motores.
+    // Descontar 5 de un stock de 3: no se modifica la fila.
     let dec = b.command_sql("inventory", "stock_decrease");
     b.exec_both(
         &dec,
@@ -150,7 +143,7 @@ async fn inventory_stock_decrease_clamp_parity() {
     )
     .await;
 
-    Case::new("inventory stock clamp (parity)")
+    Case::new("inventory insufficient stock rejection (parity)")
         .assert_parity(
             &b,
             "SELECT id, stock FROM inventory_product WHERE hub_id = :hub_id",
@@ -158,7 +151,7 @@ async fn inventory_stock_decrease_clamp_parity() {
         )
         .await
         .assert_rows(1)
-        .assert_cell(0, "stock", json!(0));
+        .assert_cell(0, "stock", json!(3));
 }
 
 // ── 3. taxes — REAL (tasa %) y filtros por vigencia ──────────────────────────────────────────
@@ -172,29 +165,29 @@ async fn taxes_rate_real_and_active_filter_parity() {
     let b = Backends::connect().await;
     b.migrate("taxes").await;
 
-    // Categoría + dos tipos (uno activo al 21%, otro inactivo al 10%).
+    // Categoría canónica + dos reglas fiscales con vigencias diferentes.
     let cat = b.command_sql("taxes", "category_create");
     b.exec_both(
         &cat,
         json!({
             "new_id": "cat-std", "hub_id": "h1", "current_user_id": "u1", "now": "2026-06-22T10:00:00Z",
-            "code": "STD", "name": "IVA general", "description": ""
+            "key": "product.standard", "name": "IVA general", "description": "", "is_system": 0
         }),
     )
     .await;
 
-    let rate = b.command_sql("taxes", "rate_create");
-    for (rid, code, pct, from, until) in [
-        ("r-21", "IVA21", 21.0, "2026-01-01", null_str()),
-        ("r-10", "IVA10", 10.5, "2025-01-01", Some("2025-12-31")),
+    let rule = b.command_sql("taxes", "rule_create");
+    for (rid, pct, from, until) in [
+        ("r-21", 21.0, "2026-01-01", null_str()),
+        ("r-10", 10.5, "2025-01-01", Some("2025-12-31")),
     ] {
         b.exec_both(
-            &rate,
+            &rule,
             json!({
                 "new_id": rid, "hub_id": "h1", "current_user_id": "u1", "now": "2026-06-22T10:00:00Z",
-                "code": code, "name": code, "category_id": "cat-std",
-                "country_code": "ES", "region_code": "", "rate_pct": pct, "tax_type": "vat",
-                "applies_from": from, "applies_until": until
+                "country_code": "ES", "region_code": null, "tax_category_key": "product.standard",
+                "rate_pct": pct, "tax_type": "vat", "parent_id": null, "component_label": null,
+                "valid_from": from, "valid_to": until
             }),
         )
         .await;
@@ -204,7 +197,7 @@ async fn taxes_rate_real_and_active_filter_parity() {
     Case::new("taxes rate_pct REAL roundtrip")
         .assert_parity(
             &b,
-            "SELECT code, rate_pct FROM taxes_rate WHERE hub_id = :hub_id ORDER BY code",
+            "SELECT id, rate_pct FROM taxes_rule WHERE hub_id = :hub_id ORDER BY rate_pct",
             json!({ "hub_id": "h1" }),
         )
         .await

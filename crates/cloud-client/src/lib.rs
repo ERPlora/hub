@@ -41,10 +41,16 @@ impl Auth {
                 vec![("X-Hub-Id", hub_id.clone()), ("X-Hub-Token", token.clone())]
             }
             Auth::UserJwt { hub_id, access } => {
-                vec![("X-Hub-Id", hub_id.clone()), ("Authorization", format!("Bearer {access}"))]
+                vec![
+                    ("X-Hub-Id", hub_id.clone()),
+                    ("Authorization", format!("Bearer {access}")),
+                ]
             }
             Auth::Webhook { hub_id, secret } => {
-                vec![("X-Hub-Id", hub_id.clone()), ("X-Webhook-Secret", secret.clone())]
+                vec![
+                    ("X-Hub-Id", hub_id.clone()),
+                    ("X-Webhook-Secret", secret.clone()),
+                ]
             }
         }
     }
@@ -75,20 +81,40 @@ impl CloudClient {
     }
 
     fn get(&self, path: &str, auth: &Auth) -> PreparedRequest {
-        PreparedRequest { method: "GET", url: format!("{}{}", self.base_url, path), headers: auth.headers() }
+        PreparedRequest {
+            method: "GET",
+            url: format!("{}{}", self.base_url, path),
+            headers: auth.headers(),
+        }
+    }
+
+    fn public_get(&self, path: &str) -> PreparedRequest {
+        PreparedRequest {
+            method: "GET",
+            url: format!("{}{}", self.base_url, path),
+            headers: Vec::new(),
+        }
     }
 
     /// Bootstrap del hub (config inicial), con el token de aplicación. §2.3.
     pub fn bootstrap(&self, hub_id: &str, token: &str) -> PreparedRequest {
         self.get(
             &format!("/api/hubs/{hub_id}/bootstrap/"),
-            &Auth::HubToken { hub_id: hub_id.to_string(), token: token.to_string() },
+            &Auth::HubToken {
+                hub_id: hub_id.to_string(),
+                token: token.to_string(),
+            },
         )
     }
 
     /// Lista de módulos del marketplace para el hub (con JWT de usuario). §2.2.
     pub fn marketplace_modules(&self, auth: &Auth) -> PreparedRequest {
         self.get("/api/v1/marketplace/modules/", auth)
+    }
+
+    /// Catálogo público de metadatos para Demo. No concede descarga, compra ni entitlement.
+    pub fn public_marketplace_modules(&self) -> PreparedRequest {
+        self.public_get("/api/v1/marketplace/catalog/")
     }
 
     /// **Gate de arranque de la app Tauri** — entitlement firmado de módulos del hub
@@ -122,7 +148,10 @@ impl CloudClient {
     /// URL y **verifica el sha256 ANTES de aplicar nada** (mismo contrato que el install de
     /// módulos: ruta inmutable + hash). [ADR-0121]
     pub fn blueprint_download(&self, slug: &str, auth: &Auth) -> PreparedRequest {
-        self.get(&format!("/api/v1/catalog/blueprints/{slug}/download/"), auth)
+        self.get(
+            &format!("/api/v1/catalog/blueprints/{slug}/download/"),
+            auth,
+        )
     }
 
     /// **Enrolamiento del dispositivo** — el runtime obtiene su credencial de máquina
@@ -189,7 +218,10 @@ impl CloudClient {
     /// (`ModuleVersionSerializer`): `version`, `changelog`, `is_active`, `file_size_bytes`,
     /// `created_at`. El `sha256` se parsea si el Cloud lo expone (ver `ModuleVersion`). §2.2.
     pub fn versions(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
-        self.get(&format!("/api/v1/marketplace/modules/{module_id}/versions/"), auth)
+        self.get(
+            &format!("/api/v1/marketplace/modules/{module_id}/versions/"),
+            auth,
+        )
     }
 
     /// **Flujo real de instalación, paso 2** — descarga el ZIP binario de una versión.
@@ -208,7 +240,10 @@ impl CloudClient {
     pub fn mark_installed(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
         PreparedRequest {
             method: "POST",
-            url: format!("{}/api/v1/marketplace/modules/{module_id}/mark_installed/", self.base_url),
+            url: format!(
+                "{}/api/v1/marketplace/modules/{module_id}/mark_installed/",
+                self.base_url
+            ),
             headers: auth.headers(),
         }
     }
@@ -303,7 +338,10 @@ impl CloudClient {
     /// stream binario del dump (en claro). TODO endpoint Django = humano.
     pub fn backup_download(&self, auth: &Auth, s3_key: &str) -> PreparedRequest {
         // El s3_key viaja en query; el llamador debe URL-encodearlo (contiene `/` y `:`).
-        self.get(&format!("/api/v1/hub/device/backup/download/?s3_key={s3_key}"), auth)
+        self.get(
+            &format!("/api/v1/hub/device/backup/download/?s3_key={s3_key}"),
+            auth,
+        )
     }
 
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
@@ -516,11 +554,24 @@ mod tests {
     #[test]
     fn user_jwt_headers() {
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::UserJwt { hub_id: "h1".into(), access: "abc".into() };
+        let auth = Auth::UserJwt {
+            hub_id: "h1".into(),
+            access: "abc".into(),
+        };
         let r = c.marketplace_modules(&auth);
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/modules/");
-        assert!(r.headers.contains(&("Authorization", "Bearer abc".to_string())));
+        assert!(r
+            .headers
+            .contains(&("Authorization", "Bearer abc".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn public_marketplace_catalog_has_no_hub_credentials() {
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.public_marketplace_modules();
+        assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/catalog/");
+        assert!(r.headers.is_empty());
     }
 
     /// ADR-0121: catálogo de blueprints (la «fuente nube» del import). Hub-scoped: el runtime
@@ -528,7 +579,10 @@ mod tests {
     #[test]
     fn blueprint_catalog_paths_are_hub_scoped() {
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::HubToken { hub_id: "h1".into(), token: "tok".into() };
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "tok".into(),
+        };
 
         let list = c.blueprints_catalog(&auth);
         assert_eq!(list.url, "https://erplora.com/api/v1/catalog/blueprints/");
@@ -536,30 +590,50 @@ mod tests {
         assert!(list.headers.contains(&("X-Hub-Id", "h1".to_string())));
 
         let dl = c.blueprint_download("barberia-basica", &auth);
-        assert_eq!(dl.url, "https://erplora.com/api/v1/catalog/blueprints/barberia-basica/download/");
+        assert_eq!(
+            dl.url,
+            "https://erplora.com/api/v1/catalog/blueprints/barberia-basica/download/"
+        );
         assert!(dl.headers.contains(&("X-Hub-Token", "tok".to_string())));
     }
 
     #[test]
     fn real_install_flow_paths() {
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::UserJwt { hub_id: "h1".into(), access: "abc".into() };
+        let auth = Auth::UserJwt {
+            hub_id: "h1".into(),
+            access: "abc".into(),
+        };
 
         let v = c.versions(&auth, "inventory");
         assert_eq!(v.method, "GET");
-        assert_eq!(v.url, "https://erplora.com/api/v1/marketplace/modules/inventory/versions/");
+        assert_eq!(
+            v.url,
+            "https://erplora.com/api/v1/marketplace/modules/inventory/versions/"
+        );
 
         let d = c.download(&auth, "inventory", "1.0.0");
-        assert_eq!(d.url, "https://erplora.com/api/v1/marketplace/modules/inventory/download/?version=1.0.0");
+        assert_eq!(
+            d.url,
+            "https://erplora.com/api/v1/marketplace/modules/inventory/download/?version=1.0.0"
+        );
 
         let m = c.mark_installed(&auth, "inventory");
         assert_eq!(m.method, "POST");
-        assert_eq!(m.url, "https://erplora.com/api/v1/marketplace/modules/inventory/mark_installed/");
+        assert_eq!(
+            m.url,
+            "https://erplora.com/api/v1/marketplace/modules/inventory/mark_installed/"
+        );
 
         let s = c.assistant_chat_stream(&auth);
         assert_eq!(s.method, "POST");
-        assert_eq!(s.url, "https://erplora.com/api/v1/hub/device/assistant/chat/stream/");
-        assert!(s.headers.contains(&("Authorization", "Bearer abc".to_string())));
+        assert_eq!(
+            s.url,
+            "https://erplora.com/api/v1/hub/device/assistant/chat/stream/"
+        );
+        assert!(s
+            .headers
+            .contains(&("Authorization", "Bearer abc".to_string())));
         assert!(s.headers.contains(&("X-Hub-Id", "h1".to_string())));
     }
 
@@ -568,11 +642,19 @@ mod tests {
         // La embebida en el lifecycle de install va con la credencial de MÁQUINA del hub
         // (X-Hub-Token): no hay usuario logueado al instalar (§9.6 + ADR-0003).
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
         let r = c.embeddings(&auth);
         assert_eq!(r.method, "POST");
-        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/assistant/embeddings/");
-        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/assistant/embeddings/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
     }
 
@@ -585,7 +667,10 @@ mod tests {
         assert!(body.get("model").is_none(), "model None no se serializa");
 
         // Con modelo explícito.
-        let req = EmbeddingsRequest { texts: vec!["x".into()], model: Some("custom".into()) };
+        let req = EmbeddingsRequest {
+            texts: vec!["x".into()],
+            model: Some("custom".into()),
+        };
         let body = serde_json::to_value(&req).unwrap();
         assert_eq!(body["model"], "custom");
     }
@@ -593,7 +678,8 @@ mod tests {
     #[test]
     fn embeddings_response_parses() {
         // El Cloud devuelve un vector por texto (mismo orden) + el modelo usado.
-        let body = r#"{"embeddings":[[0.1,0.2,0.3],[0.4,0.5,0.6]],"model":"text-embedding-3-small"}"#;
+        let body =
+            r#"{"embeddings":[[0.1,0.2,0.3],[0.4,0.5,0.6]],"model":"text-embedding-3-small"}"#;
         let resp = EmbeddingsResponse::parse(body).unwrap();
         assert_eq!(resp.embeddings.len(), 2);
         assert_eq!(resp.embeddings[0], vec![0.1, 0.2, 0.3]);
@@ -606,11 +692,19 @@ mod tests {
         // (X-Hub-Token), no con JWT de usuario: lo dispara una scheduled task / el relay del
         // outbox, sin usuario logueado (ADR-0012/ADR-0003).
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
         let r = c.notify_whatsapp(&auth);
         assert_eq!(r.method, "POST");
-        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/notify/whatsapp/");
-        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/notify/whatsapp/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
     }
 
@@ -620,11 +714,16 @@ mod tests {
         // JWT de usuario: el backup lo dispara una scheduled task / la UI, sin un JWT cloud fresco
         // (ADR-0040 opción B + ADR-0003, contexto hub-scoped sin usuario). El Cloud cifra (SSE).
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
         let r = c.backup_upload(&auth);
         assert_eq!(r.method, "POST");
         assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/backup/");
-        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
     }
 
@@ -633,11 +732,16 @@ mod tests {
         // El reporte de error lo dispara el runtime con la credencial de MÁQUINA del hub
         // (X-Hub-Token), sin usuario logueado (registro global de errores → Cloud).
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
         let r = c.report_error(&auth);
         assert_eq!(r.method, "POST");
         assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/error-report/");
-        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
     }
 
@@ -657,16 +761,24 @@ mod tests {
         // Listar las copias del usuario (posiblemente cross-hub) y descargarlas va con JWT de
         // usuario (opción B): el listado cross-org/hub no lo cubre el machine token (ADR-0040 §4).
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::UserJwt { hub_id: "h1".into(), access: "abc".into() };
+        let auth = Auth::UserJwt {
+            hub_id: "h1".into(),
+            access: "abc".into(),
+        };
 
         let l = c.backup_list(&auth);
         assert_eq!(l.method, "GET");
         assert_eq!(l.url, "https://erplora.com/api/v1/hub/device/backup/");
-        assert!(l.headers.contains(&("Authorization", "Bearer abc".to_string())));
+        assert!(l
+            .headers
+            .contains(&("Authorization", "Bearer abc".to_string())));
 
         let d = c.backup_download(&auth, "backups/local/h1/x.dump");
         assert_eq!(d.method, "GET");
-        assert_eq!(d.url, "https://erplora.com/api/v1/hub/device/backup/download/?s3_key=backups/local/h1/x.dump");
+        assert_eq!(
+            d.url,
+            "https://erplora.com/api/v1/hub/device/backup/download/?s3_key=backups/local/h1/x.dump"
+        );
 
         // La lista de copias parsea (array de BackupEntry).
         let body = r#"[{"s3_key":"backups/local/h1/x.dump","hub_id":"h1",
@@ -684,7 +796,10 @@ mod tests {
         let r = c.refresh();
         assert_eq!(r.method, "POST");
         assert_eq!(r.url, "https://erplora.com/api/v1/auth/refresh/");
-        assert!(r.headers.is_empty(), "refresh no lleva Authorization ni X-Hub-Id");
+        assert!(
+            r.headers.is_empty(),
+            "refresh no lleva Authorization ni X-Hub-Id"
+        );
 
         // La respuesta (access nuevo + refresh rotado) parsea.
         let g = RefreshGrant::parse(r#"{"access":"a2","refresh":"r2"}"#).unwrap();

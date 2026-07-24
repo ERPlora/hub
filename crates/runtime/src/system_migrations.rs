@@ -194,6 +194,34 @@ CREATE TABLE _hub_certificate (\
   uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id));",
     },
+    // ── v7 — perfil y preferencias PERSONALES, aislados por Hub + usuario ────────────────────
+    // Una preferencia vacía significa «heredar el valor del Hub». El frontend ya no usa
+    // localStorage como autoridad, evitando que dos usuarios del mismo dispositivo compartan tema
+    // o idioma. El perfil también queda hub-scoped: cada runtime solo conoce su propio negocio.
+    SystemMigration {
+        version: 7,
+        name: "hub_user_profile_preferences",
+        sqlite: "\
+CREATE TABLE hub_user_profile (\
+  hub_id TEXT NOT NULL, user_id TEXT NOT NULL, first_name TEXT NOT NULL DEFAULT '', \
+  last_name TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', \
+  avatar_path TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id, user_id));\
+CREATE TABLE hub_user_pref (\
+  hub_id TEXT NOT NULL, user_id TEXT NOT NULL, language TEXT NOT NULL DEFAULT '', \
+  theme_mode TEXT NOT NULL DEFAULT '', theme_palette TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, PRIMARY KEY (hub_id, user_id));",
+        postgres: "\
+CREATE TABLE hub_user_profile (\
+  hub_id TEXT NOT NULL, user_id TEXT NOT NULL, first_name TEXT NOT NULL DEFAULT '', \
+  last_name TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', \
+  avatar_path TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id, user_id));\
+CREATE TABLE hub_user_pref (\
+  hub_id TEXT NOT NULL, user_id TEXT NOT NULL, language TEXT NOT NULL DEFAULT '', \
+  theme_mode TEXT NOT NULL DEFAULT '', theme_palette TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, PRIMARY KEY (hub_id, user_id));",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -217,7 +245,11 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
     for m in MIGRATIONS {
         // Defensa: el slice debe ir en orden estrictamente creciente (detecta un duplicado o un
         // desorden al editar el catálogo embebido).
-        debug_assert!(m.version > prev, "migraciones de sistema desordenadas en v{}", m.version);
+        debug_assert!(
+            m.version > prev,
+            "migraciones de sistema desordenadas en v{}",
+            m.version
+        );
         prev = m.version;
 
         if m.version <= applied {
@@ -303,7 +335,9 @@ mod tests {
         use erplora_db::SqliteAdapter;
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         // El baseline v0 de identity/módulos no crea hub_trusted_device; la migración v2 sí.
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         apply(&db, "hub-test").await.unwrap();
 
         // La tabla existe (insert/select sin error) y la migración v2 quedó registrada.
@@ -313,7 +347,10 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(max_applied_version(&db).await.unwrap() >= 2, "v2 registrada");
+        assert!(
+            max_applied_version(&db).await.unwrap() >= 2,
+            "v2 registrada"
+        );
 
         // Re-aplicar es idempotente (no re-crea la tabla → no falla por 'table exists').
         apply(&db, "hub-test").await.unwrap();
@@ -323,7 +360,9 @@ mod tests {
     async fn apply_creates_hub_settings_table_v4() {
         use erplora_db::SqliteAdapter;
         let db = SqliteAdapter::open_in_memory().await.unwrap();
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         apply(&db, "hub-test").await.unwrap();
 
         // La tabla `hub_settings` existe (insert/select sin error) y la migración v4 quedó registrada.
@@ -333,9 +372,38 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(max_applied_version(&db).await.unwrap() >= 4, "v4 registrada");
+        assert!(
+            max_applied_version(&db).await.unwrap() >= 4,
+            "v4 registrada"
+        );
 
         // Re-aplicar es idempotente.
+        apply(&db, "hub-test").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn apply_creates_user_profile_tables_v7() {
+        use erplora_db::SqliteAdapter;
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
+        apply(&db, "hub-test").await.unwrap();
+
+        db.execute_batch(
+            "INSERT INTO hub_user_profile \
+             (hub_id, user_id, first_name, last_name, email, avatar_path, updated_at) \
+             VALUES ('hub-test', 'u1', 'Ada', 'Lovelace', 'ada@example.test', '', '2026-01-01');\
+             INSERT INTO hub_user_pref \
+             (hub_id, user_id, language, theme_mode, theme_palette, updated_at) \
+             VALUES ('hub-test', 'u1', 'en', 'dark', 'ocean', '2026-01-01');",
+        )
+        .await
+        .unwrap();
+        assert!(
+            max_applied_version(&db).await.unwrap() >= 7,
+            "v7 registrada"
+        );
         apply(&db, "hub-test").await.unwrap();
     }
 }

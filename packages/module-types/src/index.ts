@@ -13,6 +13,11 @@ export interface ModuleManifest {
   id: string;
   name: string;
   version: string;
+  /**
+   * Carpeta persistente privada del módulo. El Hub la resuelve bajo
+   * `media/modules/<folder>/` en disco local o en el almacenamiento Cloud/S3.
+   */
+  static_files?: { folder: string };
   depends_on?: string[];
   permissions?: string[];
   role_permissions?: Record<string, string[]>;

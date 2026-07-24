@@ -23,7 +23,8 @@ fn cfg(module_cache: PathBuf) -> HubConfig {
         module_cache,
         auth_mode: AuthMode::Dev,
         jwt_public_key: None,
-        cloud_api_token: None,
+        // El fixture valida el servido desde caché, no el alta inicial de la máquina.
+        cloud_api_token: Some("test-machine-token".into()),
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-test-media-assets"),
         sector: None,

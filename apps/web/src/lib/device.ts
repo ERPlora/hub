@@ -8,7 +8,17 @@
 
 export interface DeviceContext {
   id: string;
-  clientType: 'hub-desktop' | 'hub-local';
+  clientType: 'hub-desktop' | 'hub-local' | 'hub-cloud';
+  platform?: 'android' | 'windows' | 'macos' | 'linux' | 'cloud' | 'desktop';
+}
+
+// Contexto aportado por el runtime web/Cloud. Tauri siempre gana porque su `device.id` vive fuera
+// del webview y sobrevive a limpiezas de caché; en Cloud el UUID del deployment identifica la
+// máquina lógica ya provisionada.
+let runtimeDeviceContext: DeviceContext | null = null;
+
+export function setRuntimeDeviceContext(context: DeviceContext | null): void {
+  runtimeDeviceContext = context;
 }
 
 interface TauriCore {
@@ -41,10 +51,14 @@ export async function getDeviceContext(): Promise<DeviceContext | null> {
   const core = tauriCore();
   if (!core?.invoke) return null;
   try {
-    const ctx = (await core.invoke('device_context')) as { id?: string; client_type?: string };
+    const ctx = (await core.invoke('device_context')) as {
+      id?: string;
+      client_type?: string;
+      platform?: DeviceContext['platform'];
+    };
     if (ctx && typeof ctx.id === 'string' && ctx.id) {
       const clientType = ctx.client_type === 'hub-local' ? 'hub-local' : 'hub-desktop';
-      return { id: ctx.id, clientType };
+      return { id: ctx.id, clientType, platform: ctx.platform };
     }
   } catch {
     /* ignore — degradar a web */
@@ -58,7 +72,11 @@ export async function getDeviceContext(): Promise<DeviceContext | null> {
  * pura cae a `X-Client-Type: hub` (no dispara el registro por dispositivo).
  */
 export async function loginHeaders(): Promise<Record<string, string>> {
-  const dev = await getDeviceContext();
+  const dev = (await getDeviceContext()) ?? runtimeDeviceContext;
   if (!dev) return { 'X-Client-Type': 'hub' };
-  return { 'X-Client-Type': dev.clientType, 'X-Device-Id': dev.id };
+  return {
+    'X-Client-Type': dev.clientType,
+    'X-Device-Id': dev.id,
+    ...(dev.platform ? { 'X-Device-Platform': dev.platform } : {}),
+  };
 }

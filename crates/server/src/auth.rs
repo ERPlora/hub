@@ -95,9 +95,10 @@ pub async fn authenticate(
                 .await
                 .map_err(|e| AuthError::Invalid(e.to_string()))?
                 .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
-            // hub_id del despliegue (no spoofable); user_id + permisos de la identidad LOCAL.
+            // hub_id del runtime (no del header, no spoofable). Durante el primer bootstrap puede
+            // haber sido adoptado en caliente después de construir `HubConfig`.
             let perms = rt.permissions_for_role(&user.role);
-            Ok(RequestContext::new(config.hub_id.clone(), user.id, perms))
+            Ok(RequestContext::new(rt.hub_id().to_string(), user.id, perms))
         }
     }
 }
@@ -133,15 +134,15 @@ pub async fn require_user_session(
                 .map_err(|e| AuthError::Invalid(e.to_string()))?
                 .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
             let perms = rt.permissions_for_role(&user.role);
-            Ok(RequestContext::new(config.hub_id.clone(), user.id, perms))
+            Ok(RequestContext::new(rt.hub_id().to_string(), user.id, perms))
         }
     }
 }
 
-/// Resuelve la **sesión admin** (owner/admin) que gestiona las API keys (ADR-0057 §6/§7): las
-/// rutas de gestión de keys NO se autentican con una API key, sino con la **sesión local** del
-/// admin (`X-Hub-Session`), igual que el resto del dashboard. Devuelve el `HubUser` si la sesión es
-/// válida **y** su rol es owner/admin; si no, `Err`.
+/// Resuelve una **sesión admin** (owner/admin) para operaciones de gestión del Hub: API keys,
+/// settings, ficheros y ciclo de vida de módulos. Estas rutas NO se autentican con una API key ni
+/// con el token de máquina, sino con la **sesión local** del humano (`X-Hub-Session`). Devuelve el
+/// `HubUser` si la sesión es válida **y** su rol es owner/admin; si no, `Err`.
 ///
 /// En `AuthMode::Dev` (sin Cloud, sin sesiones) se concede al usuario de dev: el modo dev ya
 /// confía en el frontend (`X-Permissions=*` por defecto), así que no tiene sentido un gate de rol
@@ -172,7 +173,7 @@ pub async fn require_admin_session(
         Ok(user)
     } else {
         Err(AuthError::Invalid(format!(
-            "se requiere rol owner/admin para gestionar API keys (rol actual: {})",
+            "se requiere rol owner/admin para gestionar el Hub (rol actual: {})",
             user.role
         )))
     }
@@ -189,13 +190,21 @@ pub fn context_from_headers(headers: &HeaderMap) -> RequestContext {
     let hub = header(headers, "x-hub-id").unwrap_or_else(|| DEFAULT_HUB.to_string());
     let user = header(headers, "x-user-id").unwrap_or_else(|| DEFAULT_USER.to_string());
     let perms = header(headers, "x-permissions")
-        .map(|s| s.split(',').map(|p| p.trim().to_string()).filter(|p| !p.is_empty()).collect::<Vec<_>>())
+        .map(|s| {
+            s.split(',')
+                .map(|p| p.trim().to_string())
+                .filter(|p| !p.is_empty())
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_else(|| vec!["*".to_string()]); // dev: sin gateway, admin por defecto
     RequestContext::new(hub, user, perms)
 }
 
 fn header(headers: &HeaderMap, name: &str) -> Option<String> {
-    headers.get(name).and_then(|v| v.to_str().ok()).map(|s| s.to_string())
+    headers
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
 }
 
 /// Extrae el token Bearer del header `Authorization`, si existe.
@@ -213,27 +222,32 @@ pub fn hub_id(headers: &HeaderMap, fallback: &str) -> String {
 /// en nombre del usuario activo (ARQUITECTURA.md §2.3). `None` si no hay JWT en la petición.
 pub fn user_auth(headers: &HeaderMap, fallback_hub: &str) -> Option<cloud_client::Auth> {
     let access = bearer(headers)?;
-    Some(cloud_client::Auth::UserJwt { hub_id: hub_id(headers, fallback_hub), access })
+    Some(cloud_client::Auth::UserJwt {
+        hub_id: hub_id(headers, fallback_hub),
+        access,
+    })
 }
 
 /// Credencial de **máquina** del hub (`Auth::HubToken` = `X-Hub-Token` + `X-Hub-Id`), si el hub
 /// está enrolado. Lee el token **vivo** del [`AppState`] (`machine_token`), no la config estática,
 /// para que un enrol/rotación aplique sin reiniciar (§2.3, hot-reload). `None` si no hay token.
 pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
-    st.machine_token().map(|token| cloud_client::Auth::HubToken {
-        hub_id: st.config.hub_id.clone(),
-        token,
-    })
+    st.machine_token()
+        .map(|token| cloud_client::Auth::HubToken {
+            hub_id: st.hub_id(),
+            token,
+        })
 }
 
 /// Credencial para llamadas **hub-scoped** al Cloud (marketplace, entitlement, install, asistente):
-/// usa el **token de máquina** si el hub está enrolado; si no (dev/local sin enrolar), cae al JWT
-/// del usuario activo de la petición. `None` solo si no hay ninguna de las dos.
+/// usa la identidad de máquina. El JWT del usuario solo es fallback en Demo/Dev; en cualquier
+/// instalación real la ausencia de token significa que el bootstrap no terminó y se rechaza.
 ///
 /// Desacopla "el hub puede llegar al Cloud" de "qué usuario está activo": un cajero solo-local
 /// (sesión por PIN, sin JWT cloud) sigue pudiendo navegar el marketplace y refrescar el
 /// entitlement porque el hub se autentica a sí mismo. El secreto de máquina NO viaja al navegador:
 /// estas llamadas las hace el runtime (server-side).
 pub fn hub_scoped_auth(headers: &HeaderMap, st: &AppState) -> Option<cloud_client::Auth> {
-    machine_auth(st).or_else(|| user_auth(headers, &st.config.hub_id))
+    let hub_id = st.hub_id();
+    machine_auth(st).or_else(|| st.is_demo().then(|| user_auth(headers, &hub_id)).flatten())
 }

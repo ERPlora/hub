@@ -71,7 +71,10 @@ pub fn new_shared() -> SharedRevalidation {
 /// Un tier ausente/desconocido se trata como de pago — fail-closed SOLO en la rama (b), que ya
 /// exige `MAX_CONSECUTIVE_FAILURES` fallos consecutivos Y la gracia vencida.
 fn is_paid_tier(tier: &str) -> bool {
-    !matches!(tier.trim().to_ascii_lowercase().as_str(), "free" | "basic" | "essential")
+    !matches!(
+        tier.trim().to_ascii_lowercase().as_str(),
+        "free" | "basic" | "essential"
+    )
 }
 
 impl RevalidationState {
@@ -123,7 +126,11 @@ impl RevalidationState {
 
     /// Filtra de `installed` los módulos bloqueados a fecha `now` (para el proxy de entitlement).
     pub fn blocked_modules(&self, installed: &[String], now: i64) -> Vec<String> {
-        installed.iter().filter(|id| self.is_blocked(id, now)).cloned().collect()
+        installed
+            .iter()
+            .filter(|id| self.is_blocked(id, now))
+            .cloned()
+            .collect()
     }
 
     /// Bloque JSON **aditivo** `revalidation` que el proxy `/api/entitlement` añade a la
@@ -198,7 +205,10 @@ pub async fn fetch_verified_claims(
 }
 
 /// Ejecuta un GET de una `PreparedRequest` del `CloudClient` y devuelve el body si es 2xx.
-async fn exec_get(http: &reqwest::Client, req: cloud_client::PreparedRequest) -> Result<String, String> {
+async fn exec_get(
+    http: &reqwest::Client,
+    req: cloud_client::PreparedRequest,
+) -> Result<String, String> {
     let mut r = http.get(&req.url);
     for (k, v) in req.headers {
         r = r.header(k, v);
@@ -273,7 +283,12 @@ mod tests {
         let mut st = RevalidationState::default();
         st.apply_success(
             claims_tiered(
-                &[("pos", "premium"), ("caja", "basic"), ("agenda", "essential"), ("notas", "free")],
+                &[
+                    ("pos", "premium"),
+                    ("caja", "basic"),
+                    ("agenda", "essential"),
+                    ("notas", "free"),
+                ],
                 5_000,
             ),
             1_500,
@@ -315,12 +330,18 @@ mod tests {
         // El bloque `revalidation` del proxy hereda la regla: tras fallos+gracia solo
         // aparecen los de pago (rama b) y los fuera de claims (rama a); los free nunca.
         let mut st = RevalidationState::default();
-        st.apply_success(claims_tiered(&[("pos", "premium"), ("caja", "basic")], 5_000), 1_500);
+        st.apply_success(
+            claims_tiered(&[("pos", "premium"), ("caja", "basic")], 5_000),
+            1_500,
+        );
         for i in 0..3 {
             st.apply_failure(6_000 + i);
         }
-        let installed =
-            vec!["pos".to_string(), "caja".to_string(), "revocado".to_string()];
+        let installed = vec![
+            "pos".to_string(),
+            "caja".to_string(),
+            "revocado".to_string(),
+        ];
         assert_eq!(
             st.blocked_modules(&installed, 9_000),
             vec!["pos".to_string(), "revocado".to_string()]
@@ -385,7 +406,12 @@ mod tests {
         // aunque la gracia global siga vigente. Los tiers gratuitos siguen exentos de la rama (b).
         let mut st = RevalidationState::default();
         let mut c = claims_tiered(
-            &[("pos", "premium"), ("caja", "basic"), ("agenda", "essential"), ("notas", "free")],
+            &[
+                ("pos", "premium"),
+                ("caja", "basic"),
+                ("agenda", "essential"),
+                ("notas", "free"),
+            ],
             50_000,
         );
         c.paid_grace_until = Some(5_000);
@@ -465,7 +491,10 @@ mod tests {
         let mut st = RevalidationState::default();
         st.apply_success(claims(&["inventory"], 9_000), 1_500);
         let installed = vec!["inventory".to_string(), "pos".to_string()];
-        assert_eq!(st.blocked_modules(&installed, 2_000), vec!["pos".to_string()]);
+        assert_eq!(
+            st.blocked_modules(&installed, 2_000),
+            vec!["pos".to_string()]
+        );
     }
 
     #[test]

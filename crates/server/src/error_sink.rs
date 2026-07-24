@@ -12,14 +12,14 @@
 use cloud_client::{Auth, CloudClient};
 use erplora_runtime::error_registry::{ErrorEvent, ErrorSink};
 
-use crate::state::MachineToken;
+use crate::state::{HubId, MachineToken};
 
 /// Sink que reenvía los `ErrorEvent` del registro global al Cloud. Clonable y barato (todo `Arc`/
 /// valores cortos): vive tras un `Arc<dyn ErrorSink>` en el registro global del proceso.
 #[derive(Clone)]
 pub struct CloudErrorSink {
     cloud: CloudClient,
-    hub_id: String,
+    hub_id: HubId,
     /// Token de máquina **vivo** (hot-reload): `X-Hub-Token`. `None` = hub sin enrolar.
     machine_token: MachineToken,
     http: reqwest::Client,
@@ -30,7 +30,7 @@ pub struct CloudErrorSink {
 impl CloudErrorSink {
     pub fn new(
         cloud_base_url: &str,
-        hub_id: String,
+        hub_id: HubId,
         machine_token: MachineToken,
         http: reqwest::Client,
         hub_version: impl Into<String>,
@@ -82,7 +82,10 @@ impl ErrorSink for CloudErrorSink {
         let Some(token) = self.machine_token.read().ok().and_then(|g| g.clone()) else {
             return;
         };
-        let auth = Auth::HubToken { hub_id: self.hub_id.clone(), token };
+        let Some(hub_id) = self.hub_id.read().ok().map(|g| g.clone()) else {
+            return;
+        };
+        let auth = Auth::HubToken { hub_id, token };
         let req = self.cloud.report_error(&auth);
         let body = self.build_body(&event);
         let http = self.http.clone();
@@ -142,7 +145,7 @@ mod tests {
     fn sink() -> CloudErrorSink {
         CloudErrorSink::new(
             "https://erplora.com",
-            "h1".into(),
+            Arc::new(RwLock::new("h1".into())),
             Arc::new(RwLock::new(Some("tok".into()))),
             reqwest::Client::new(),
             "v1.2.3",

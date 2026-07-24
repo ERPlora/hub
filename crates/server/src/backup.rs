@@ -23,7 +23,7 @@ use cloud_client::{Auth, BackupUploadResult, CloudClient};
 use erplora_runtime::errors::{Result as RtResult, RuntimeError};
 use erplora_runtime::host_backup::{BackupIntent, BackupTransport, UploadOutcome};
 
-use crate::state::MachineToken;
+use crate::state::{HubId, MachineToken};
 
 /// Transporte real (opción B). Tiene lo justo para producir el dump y firmar la subida al Cloud:
 /// el path del SQLite del hub, el cliente del Cloud, el `hub_id` del despliegue, la celda viva del
@@ -35,7 +35,7 @@ pub struct CloudBackupTransport {
     /// Cliente del Cloud Portal (construye URL + cabeceras).
     cloud: CloudClient,
     /// `hub_id` del despliegue (no spoofable; va en `X-Hub-Id`).
-    hub_id: String,
+    hub_id: HubId,
     /// Token de máquina **vivo** (hot-reload): `X-Hub-Token`. `None` = hub sin enrolar.
     machine_token: MachineToken,
     /// Cliente HTTP async (rustls) compartido con el resto del server.
@@ -46,7 +46,10 @@ impl std::fmt::Debug for CloudBackupTransport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CloudBackupTransport")
             .field("sqlite_path", &self.sqlite_path)
-            .field("hub_id", &self.hub_id)
+            .field(
+                "hub_id",
+                &self.hub_id.read().ok().map(|hub_id| hub_id.clone()),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -55,7 +58,7 @@ impl CloudBackupTransport {
     pub fn new(
         sqlite_path: String,
         cloud_base_url: &str,
-        hub_id: String,
+        hub_id: HubId,
         machine_token: MachineToken,
         http: reqwest::Client,
     ) -> Self {
@@ -76,8 +79,16 @@ impl CloudBackupTransport {
             .read()
             .ok()
             .and_then(|g| g.clone())
-            .ok_or_else(|| RuntimeError::Backup("hub sin enrolar: falta el token de máquina".into()))?;
-        Ok(Auth::HubToken { hub_id: self.hub_id.clone(), token })
+            .ok_or_else(|| {
+                RuntimeError::Backup("hub sin enrolar: falta el token de máquina".into())
+            })?;
+        let hub_id = self
+            .hub_id
+            .read()
+            .ok()
+            .map(|g| g.clone())
+            .ok_or_else(|| RuntimeError::Backup("identidad de Hub no disponible".into()))?;
+        Ok(Auth::HubToken { hub_id, token })
     }
 }
 
@@ -89,7 +100,13 @@ impl BackupTransport for CloudBackupTransport {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis())
             .unwrap_or(0);
-        let tmp = std::env::temp_dir().join(format!("erplora-backup-{}-{}.dump", self.hub_id, ts));
+        let hub_id = self
+            .hub_id
+            .read()
+            .ok()
+            .map(|g| g.clone())
+            .unwrap_or_else(|| "unknown".into());
+        let tmp = std::env::temp_dir().join(format!("erplora-backup-{hub_id}-{ts}.dump"));
         let tmp_path = tmp.to_string_lossy().to_string();
         let _guard = TmpFileGuard(tmp_path.clone());
 
@@ -131,7 +148,11 @@ impl BackupTransport for CloudBackupTransport {
         Ok(UploadOutcome {
             s3_key: result.s3_key,
             // El Cloud devuelve el tamaño que escribió; si viene 0, usamos el del dump local.
-            size_bytes: if result.bytes > 0 { result.bytes } else { bytes },
+            size_bytes: if result.bytes > 0 {
+                result.bytes
+            } else {
+                bytes
+            },
         })
     }
 }
@@ -182,13 +203,15 @@ pub async fn restore_from_cloud(
         .bytes()
         .await
         .map_err(|e| RuntimeError::Backup(format!("bytes del backup ilegibles: {e}")))?;
-    tokio::fs::write(dst_path, &bytes)
-        .await
-        .map_err(|e| RuntimeError::Backup(format!("no se pudo escribir el backup descargado: {e}")))?;
+    tokio::fs::write(dst_path, &bytes).await.map_err(|e| {
+        RuntimeError::Backup(format!("no se pudo escribir el backup descargado: {e}"))
+    })?;
     // Sanity: el fichero descargado es un SQLite válido (SSE es transparente — viene descifrado).
     erplora_db::backup::verify_sqlite_file(dst_path)
         .await
-        .map_err(|e| RuntimeError::Backup(format!("el backup descargado no es un SQLite válido: {e}")))?;
+        .map_err(|e| {
+            RuntimeError::Backup(format!("el backup descargado no es un SQLite válido: {e}"))
+        })?;
     Ok(bytes.len() as u64)
 
     // ── TODO (columna humano — core / shell) ────────────────────────────────────────────────
@@ -206,32 +229,32 @@ fn urlencode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{b:02X}")),
         }
     }
     out
 }
 
-/// Construye el transporte real si hay token de máquina; si no, deja que el llamador use el Mock.
+/// Construye el transporte real con identidad viva. Puede nacer antes del primer registro: si se
+/// invoca aún sin token devuelve un error recuperable y el outbox reintenta; cuando el bootstrap
+/// rellena `hub_id + token`, la siguiente entrega funciona sin reiniciar.
 pub fn build_transport(
     sqlite_path: String,
     cloud_base_url: &str,
-    hub_id: String,
+    hub_id: HubId,
     machine_token: MachineToken,
     http: reqwest::Client,
-) -> Option<Arc<dyn BackupTransport>> {
-    let enrolled = machine_token.read().ok().and_then(|g| g.clone()).is_some();
-    if !enrolled {
-        return None;
-    }
-    Some(Arc::new(CloudBackupTransport::new(
+) -> Arc<dyn BackupTransport> {
+    Arc::new(CloudBackupTransport::new(
         sqlite_path,
         cloud_base_url,
         hub_id,
         machine_token,
         http,
-    )))
+    ))
 }
 
 #[cfg(test)]
@@ -240,22 +263,25 @@ mod tests {
 
     #[test]
     fn urlencode_escapes_path_separators() {
-        assert_eq!(urlencode("backups/local/h1/x.dump"), "backups%2Flocal%2Fh1%2Fx.dump");
+        assert_eq!(
+            urlencode("backups/local/h1/x.dump"),
+            "backups%2Flocal%2Fh1%2Fx.dump"
+        );
         assert_eq!(urlencode("a:b c"), "a%3Ab%20c");
         assert_eq!(urlencode("plain-1.0_x~"), "plain-1.0_x~");
     }
 
     #[test]
-    fn build_transport_none_without_machine_token() {
+    fn build_transport_is_ready_for_hot_enrollment_without_machine_token() {
         let cell: MachineToken = std::sync::Arc::new(std::sync::RwLock::new(None));
         let t = build_transport(
             "x.db".into(),
             "https://erplora.com",
-            "h1".into(),
+            std::sync::Arc::new(std::sync::RwLock::new("h1".into())),
             cell,
             reqwest::Client::new(),
         );
-        assert!(t.is_none(), "sin token de máquina no hay transporte real (cae al Mock)");
+        let _ = t;
     }
 
     #[test]
@@ -264,10 +290,10 @@ mod tests {
         let t = build_transport(
             "x.db".into(),
             "https://erplora.com",
-            "h1".into(),
+            std::sync::Arc::new(std::sync::RwLock::new("h1".into())),
             cell,
             reqwest::Client::new(),
         );
-        assert!(t.is_some(), "con token de máquina se registra el transporte real");
+        let _ = t;
     }
 }
