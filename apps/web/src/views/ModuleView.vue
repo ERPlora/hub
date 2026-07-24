@@ -57,12 +57,19 @@
     <template #footer>
       <ion-footer v-if="segmentTabs.length > 1" class="ion-no-border">
       <ion-toolbar>
-        <ion-segment class="ok-tabbar"
+        <ion-segment
+          class="ok-tabbar module-tabbar"
           ref="tabbar"
+          scrollable
           :value="activeNavId"
           @ion-change="onTabChange($event as CustomEvent<{ value: string }>)"
         >
-          <ion-segment-button v-for="tb in segmentTabs" :key="tb.id" :value="tb.id">
+          <ion-segment-button
+            v-for="tb in segmentTabs"
+            :key="tb.id"
+            :value="tb.id"
+            :aria-label="tb.label"
+          >
             <HubIcon :name="tb.iconSvg ?? tb.icon" />
             <ion-label>{{ tb.label }}</ion-label>
           </ion-segment-button>
@@ -315,6 +322,23 @@ onBeforeUnmount(() => {
      el outlet y sigue scrolleando vía `ion-content` (que es el scroller por defecto). */
 .outlet {
   height: 100%;
+}
+
+/* Las rutas de módulo usan nombres de producto, no abreviaturas automáticas. Un mínimo más ancho
+   fuerza scroll horizontal antes de que Ionic aplaste o trunque «Etiquetas», «Configuración», etc. */
+.module-tabbar {
+  --ok-tabbar-min: 116px;
+}
+
+.module-tabbar ion-segment-button {
+  min-width: var(--ok-tabbar-min);
+}
+
+.module-tabbar ion-label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.1;
 }
 
 /* Estados de carga/error al montar el WC del módulo. Antes usaban utilidades Tailwind

@@ -105,6 +105,12 @@ import HubIcon from './HubIcon.vue';
 import { getClient } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
 import { toastSuccess, toastError } from '../lib/toast';
+import {
+  settingControl,
+  settingValueForControl,
+  settingValueForStorage,
+  type ModuleSettingControl,
+} from '../lib/module-settings';
 
 const props = defineProps<{ moduleId: string; settings: ModuleSettingsDef }>();
 
@@ -125,7 +131,7 @@ interface Field {
   key: string;
   label: string;
   description?: string;
-  control: 'toggle' | 'select' | 'number' | 'text';
+  control: ModuleSettingControl;
   options?: (string | number)[];
   maxLength?: number;
 }
@@ -137,20 +143,13 @@ function humanize(key: string): string {
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function controlFor(prop: SettingsSchemaProperty): Field['control'] {
-  if (prop.type === 'boolean') return 'toggle';
-  if (prop.type === 'integer' || prop.type === 'number') return 'number';
-  if (prop.enum && prop.enum.length) return 'select';
-  return 'text';
-}
-
 /** Campos a renderizar, en el orden de `properties` del schema. */
 const fields = computed<Field[]>(() =>
   Object.entries(properties.value).map(([key, prop]) => ({
     key,
     label: prop.title || humanize(key),
     description: prop.description,
-    control: controlFor(prop),
+    control: settingControl(prop),
     options: prop.enum,
     maxLength: prop.maxLength,
   })),
@@ -194,12 +193,11 @@ async function boot(): Promise<void> {
     for (const [key, prop] of Object.entries(properties.value)) {
       const fromRow = current ? current[key] : undefined;
       if (fromRow !== undefined && fromRow !== null) {
-        // SQLite devuelve booleans como 0/1: normaliza a boolean para el toggle.
-        model[key] = prop.type === 'boolean' ? !!fromRow : fromRow;
+        model[key] = settingValueForControl(prop, fromRow);
       } else if (prop.default !== undefined) {
-        model[key] = prop.default;
+        model[key] = settingValueForControl(prop, prop.default);
       } else {
-        model[key] = prop.type === 'boolean' ? false : '';
+        model[key] = settingControl(prop) === 'toggle' ? false : '';
       }
     }
     status.value = 'ready';
@@ -215,7 +213,9 @@ async function save(): Promise<void> {
   try {
     // Snapshot completo: una clave por propiedad del schema (es un upsert, no un patch parcial).
     const snapshot: Record<string, unknown> = {};
-    for (const key of Object.keys(properties.value)) snapshot[key] = model[key];
+    for (const [key, prop] of Object.entries(properties.value)) {
+      snapshot[key] = settingValueForStorage(prop, model[key]);
+    }
     await client.command(props.settings.set, snapshot);
     await toastSuccess(t('moduleSettings.saved'));
   } catch {

@@ -20,4 +20,12 @@ describe('module host', () => {
     expect(host).toContain('@click="mount"');
     expect(host).toContain('router.replace(`/m/${moduleId}/${entry.nav.id}`)');
   });
+
+  it('preserves complete module labels and scrolls before shrinking mobile tabs', () => {
+    expect(host).toContain('class="ok-tabbar module-tabbar"');
+    expect(host).toContain('scrollable');
+    expect(host).toContain(':aria-label="tb.label"');
+    expect(host).toContain('--ok-tabbar-min: 116px');
+    expect(host).toContain('white-space: normal');
+  });
 });
