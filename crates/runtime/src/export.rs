@@ -349,13 +349,23 @@ async fn fetch_rows(
 }
 
 /// Fila de referencia PROPIEDAD DEL MÓDULO: la crea el propio módulo al instalarse (migración/
-/// bloque `seed`) y la RE-SIEMBRA en cada hub — categorías fiscales canónicas (`is_system=1`) y
-/// alias de fábrica (`source='shipped'`), ADR-0085. NO debe viajar en el bundle: al restaurar
-/// chocaría con la auto-siembra del módulo en sus claves únicas (`(hub_id,key)`/`(hub_id,alias)`)
-/// — es el `duplicate key ix_tax_cat_hub_key` que tumbaba la demo del SaaS (opción A). Los datos de
-/// USUARIO (categorías propias `is_system=0`, sin `source='shipped'`) sí viajan.
+/// bloque `seed`) y la RE-SIEMBRA en cada hub — categorías fiscales canónicas (`is_system=1`),
+/// alias de fábrica (`source='shipped'`) y reglas de IVA (`taxes_rule`), ADR-0085. NO debe viajar
+/// en el bundle: al restaurar sobre un hub que ya re-sembró las suyas, chocaría contra las claves
+/// únicas (`(hub_id,key)`/`(hub_id,alias)`) —el `duplicate key ix_tax_cat_hub_key` que tumbaba la
+/// demo del SaaS— o, en tablas SIN índice único de clave natural (`taxes_rule`), DUPLICARÍA en
+/// silencio (guard-por-`id` no la ve: el `id` embebe el hub ORIGEN) dejando el lookup de IVA
+/// ambiguo. Los datos de USUARIO sí viajan.
+///
+/// Marcadores: `is_system=1` y `source='shipped'` son específicos de `taxes_category`/alias;
+/// `created_by='system'` es UNIFORME —lo pone `apply_module_seed` en TODA fila que siembra un
+/// módulo, incluida `taxes_rule`— y distingue lo sembrado (system) de lo que crea un usuario (su
+/// id). Excluir por él es seguro para las secciones a nivel hub: `hub_settings`/`hub_user` no
+/// tienen columna `created_by`, así que nunca casan.
 fn is_module_seeded(row: &serde_json::Value) -> bool {
-    truthy(row.get("is_system")) || row.get("source").and_then(|v| v.as_str()) == Some("shipped")
+    truthy(row.get("is_system"))
+        || row.get("source").and_then(|v| v.as_str()) == Some("shipped")
+        || row.get("created_by").and_then(|v| v.as_str()) == Some("system")
 }
 
 fn truthy(v: Option<&serde_json::Value>) -> bool {
