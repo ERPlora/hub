@@ -252,6 +252,8 @@ mod tests {
             exp: 2_000,
             grace_until,
             paid_grace_until: None,
+            plan: None,
+            max_devices: 0,
         }
     }
 
@@ -272,6 +274,8 @@ mod tests {
             exp: 2_000,
             grace_until,
             paid_grace_until: None,
+            plan: None,
+            max_devices: 0,
         }
     }
 

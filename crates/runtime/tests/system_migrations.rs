@@ -83,6 +83,9 @@ async fn system_migration_reaches_existing_db_and_is_idempotent() {
     let hub_a = "hub-AAAA";
     {
         let db = open(&path).await;
+        // hub_session baseline (v0): la migración v8 (device_id, ADR-0154) lo ALTERa, como el
+        // boot real (`ensure_system_tables`) hace identity::ensure_tables antes de apply.
+        erplora_runtime::identity::ensure_tables(&db).await.unwrap();
         system_migrations::apply(&db, hub_a).await.unwrap();
 
         // La columna hub_id existe y la fila legacy quedó sellada con el hub_id del despliegue.
@@ -348,6 +351,8 @@ async fn system_migration_postgres_reaches_existing_table() {
     .unwrap();
 
     let hub = "hub-PG";
+    // hub_session baseline (v0): la migración v8 (device_id, ADR-0154) lo ALTERa.
+    erplora_runtime::identity::ensure_tables(&db).await.unwrap();
     system_migrations::apply(&db, hub).await.unwrap();
 
     let rows = db

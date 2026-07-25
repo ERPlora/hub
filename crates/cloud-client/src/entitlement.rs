@@ -63,6 +63,17 @@ pub struct EntitlementClaims {
     /// `grace_until`.
     #[serde(default)]
     pub paid_grace_until: Option<i64>,
+    /// Claim ADITIVO (saas#812, ADR-0154): nombre del **plan** contratado. Solo informativo del
+    /// lado del hub (la UI puede pintarlo); no gobierna ningún gate. Tokens antiguos no lo traen
+    /// → `None`.
+    #[serde(default)]
+    pub plan: Option<String>,
+    /// Claim ADITIVO (saas#812, ADR-0154): nº máximo de **dispositivos activos** simultáneos que
+    /// permite el plan. `0` = **ilimitado** (Hub Cloud multi-dispositivo, o token antiguo sin el
+    /// claim → default). Con `1`, el runtime aplica *single active device session* con desalojo
+    /// (takeover) al abrir sesión en un dispositivo nuevo (ver `identity::enforce_device_limit`).
+    #[serde(default)]
+    pub max_devices: u32,
 }
 
 impl EntitlementClaims {
@@ -187,6 +198,38 @@ nQIDAQAB
         let token = sign(2000, 9000);
         let claims = verify_entitlement(&token, PUB, 3000).unwrap();
         assert_eq!(claims.paid_grace_until, None);
+    }
+
+    #[test]
+    fn token_con_plan_y_max_devices_los_expone_en_las_claims() {
+        // Claims ADITIVOS del SaaS (saas#812, ADR-0154): `plan` (nombre del plan) y `max_devices`
+        // (límite de dispositivos activos; 0 = ilimitado). El parseo debe exponerlos verificados.
+        let claims_json = json!({
+            "hub_id": "h1",
+            "deployment_mode": "cloud",
+            "modules": [{"module_id": "pos", "tier": "premium", "version": "1.0.0"}],
+            "iat": 1000,
+            "exp": 2000,
+            "grace_until": 9000,
+            "plan": "restaurant",
+            "max_devices": 1,
+        });
+        let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
+        let token = encode(&Header::new(Algorithm::RS256), &claims_json, &key).unwrap();
+        let claims = verify_entitlement(&token, PUB, 3000).unwrap();
+        assert_eq!(claims.plan.as_deref(), Some("restaurant"));
+        assert_eq!(claims.max_devices, 1);
+    }
+
+    #[test]
+    fn token_antiguo_sin_plan_ni_max_devices_default_ilimitado() {
+        // Retrocompat (ADR-0154): un token que el SaaS emitió ANTES de saas#812 no trae `plan`
+        // ni `max_devices`; deben quedar en `None` / `0` (0 = ilimitado → sin takeover), sin
+        // romper la verificación (igual que `paid_grace_until`).
+        let token = sign(2000, 9000); // `sign` NO incluye plan/max_devices
+        let claims = verify_entitlement(&token, PUB, 3000).unwrap();
+        assert_eq!(claims.plan, None);
+        assert_eq!(claims.max_devices, 0);
     }
 
     #[test]

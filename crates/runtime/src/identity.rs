@@ -297,11 +297,16 @@ pub async fn get_or_link_cloud_user(
 // ── Sesiones ────────────────────────────────────────────────────────────────────────────────
 
 /// Abre una sesión para `user_id` y devuelve el token opaco (lo guarda el frontend y lo manda en
-/// cada petición). TTL en segundos.
+/// cada petición). TTL en segundos. `device_id` = identidad estable del dispositivo que aporta el
+/// host (Tauri = id de máquina; web-PWA = id persistido), o `None` si el login no la aporta; se
+/// persiste en la columna `hub_session.device_id` (migración de sistema v8, ADR-0154) y la usa el
+/// límite de dispositivos [`enforce_device_limit`]. NO desaloja por sí sola: el takeover es un
+/// paso aparte que el server ejecuta ANTES según el plan.
 pub async fn create_session(
     db: &dyn DatabaseAdapter,
     user_id: &str,
     ttl_secs: i64,
+    device_id: Option<&str>,
 ) -> Result<String> {
     let token = format!("{}{}", new_id(), new_id()).replace('-', "");
     let expires = (chrono::Utc::now() + chrono::Duration::seconds(ttl_secs)).to_rfc3339();
@@ -310,13 +315,49 @@ pub async fn create_session(
     p.insert("user_id".into(), json!(user_id));
     p.insert("now".into(), json!(now_rfc3339()));
     p.insert("expires".into(), json!(expires));
+    p.insert("device_id".into(), json!(device_id));
     db.execute(
-        "INSERT INTO hub_session (token, user_id, created_at, expires_at) \
-          VALUES (:token, :user_id, :now, :expires)",
+        "INSERT INTO hub_session (token, user_id, created_at, expires_at, device_id) \
+          VALUES (:token, :user_id, :now, :expires, :device_id)",
         &p,
     )
     .await?;
     Ok(token)
+}
+
+/// Aplica el **límite de dispositivos** del plan (ADR-0154) ANTES de abrir una sesión nueva.
+///
+/// *Single active device session*: con `max_devices == 1` y un `device_id` presente, el hub solo
+/// admite **un dispositivo activo** a la vez. Al abrir sesión en un dispositivo nuevo se
+/// **desalojan** (borran) todas las sesiones cuyo `device_id` **difiera** del nuevo —incluidas las
+/// `NULL` de logins que no aportaron device_id—; las del mismo dispositivo se conservan. El
+/// dispositivo desalojado deja de resolver su token → 401 en su siguiente petición (takeover).
+///
+/// Con `max_devices == 0` (**ilimitado**: Hub Cloud multi-dispositivo, o token de entitlement
+/// antiguo sin el claim) o sin `device_id` (login que no identifica el dispositivo) es un **no-op**
+/// (comportamiento actual: no se desaloja a nadie).
+///
+/// El borrado es *hub-wide* sobre `hub_session` a propósito: `max_devices` es un límite del plan,
+/// no del usuario, así que el segundo dispositivo desaloja al primero sea quien sea el operario.
+pub async fn enforce_device_limit(
+    db: &dyn DatabaseAdapter,
+    max_devices: u32,
+    device_id: Option<&str>,
+) -> Result<()> {
+    // Solo el plan de 1 dispositivo con un device_id conocido desaloja. 0 = ilimitado.
+    let (1, Some(device_id)) = (max_devices, device_id) else {
+        return Ok(());
+    };
+    let mut p = Params::new();
+    p.insert("device_id".into(), json!(device_id));
+    // `!=` no casa NULL en SQL (NULL != 'x' es NULL, no TRUE): expandimos a «NULL o distinto» para
+    // desalojar también las sesiones sin device_id. Portable SQLite/Postgres (sin `IS DISTINCT FROM`).
+    db.execute(
+        "DELETE FROM hub_session WHERE device_id IS NULL OR device_id != :device_id",
+        &p,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Resuelve una sesión válida (no caducada) a su `hub_user` activo. `None` si no existe/caducó.
@@ -426,10 +467,36 @@ mod tests {
     use super::*;
     use erplora_db::SqliteAdapter;
 
+    /// Prepara la identidad para los unit tests. La columna `hub_session.device_id` la añade la
+    /// **migración de sistema v8** (ADR-0154); en los unit tests de identidad la creamos a mano
+    /// tras el baseline, igual que `device_trust_gate` monta `hub_trusted_device` (v2) a mano.
+    async fn setup_identity(db: &SqliteAdapter) {
+        ensure_tables(db).await.unwrap();
+        db.execute_batch("ALTER TABLE hub_session ADD COLUMN device_id TEXT;")
+            .await
+            .unwrap();
+    }
+
+    /// `device_id` persistido en la sesión `token` (o `None` si la fila no existe / es NULL).
+    async fn session_device_id(db: &SqliteAdapter, token: &str) -> Option<String> {
+        let mut p = Params::new();
+        p.insert("token".into(), json!(token));
+        let res = db
+            .query(
+                "SELECT device_id FROM hub_session WHERE token = :token",
+                &p,
+            )
+            .await
+            .unwrap();
+        res.rows
+            .first()
+            .and_then(|r| r["device_id"].as_str().map(|s| s.to_string()))
+    }
+
     #[tokio::test]
     async fn pin_login_and_session_roundtrip() {
         let db = SqliteAdapter::open_in_memory().await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        setup_identity(&db).await;
 
         let uid = create_user(&db, "María", "1234", "manager", None)
             .await
@@ -442,14 +509,79 @@ mod tests {
         assert!(verify_pin(&db, "María", "0000").await.unwrap().is_none());
 
         // Sesión: crear → resolver → logout.
-        let token = create_session(&db, &uid, 3600).await.unwrap();
+        let token = create_session(&db, &uid, 3600, None).await.unwrap();
         assert_eq!(resolve_session(&db, &token).await.unwrap().unwrap().id, uid);
         delete_session(&db, &token).await.unwrap();
         assert!(resolve_session(&db, &token).await.unwrap().is_none());
 
         // Sesión caducada no resuelve.
-        let expired = create_session(&db, &uid, -10).await.unwrap();
+        let expired = create_session(&db, &uid, -10, None).await.unwrap();
         assert!(resolve_session(&db, &expired).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn create_session_persists_device_id() {
+        // ADR-0154: `create_session` guarda el `device_id` aportado por el host (Some) y lo deja
+        // NULL cuando el login no lo aporta (None).
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        setup_identity(&db).await;
+        let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
+
+        let with_dev = create_session(&db, &uid, 3600, Some("dev-A")).await.unwrap();
+        assert_eq!(session_device_id(&db, &with_dev).await.as_deref(), Some("dev-A"));
+
+        let without = create_session(&db, &uid, 3600, None).await.unwrap();
+        assert_eq!(session_device_id(&db, &without).await, None);
+
+        // Ambas resuelven al usuario (el device_id no cambia la resolución de la sesión).
+        assert_eq!(resolve_session(&db, &with_dev).await.unwrap().unwrap().id, uid);
+        assert_eq!(resolve_session(&db, &without).await.unwrap().unwrap().id, uid);
+    }
+
+    #[tokio::test]
+    async fn enforce_device_limit_one_evicts_other_devices_and_nulls() {
+        // ADR-0154 *single active device session*: con max_devices == 1 y un device_id nuevo,
+        // se desalojan (borran) TODAS las sesiones cuyo device_id difiera —incluidas las NULL de
+        // logins que no aportaron device_id—; las del MISMO dispositivo sobreviven.
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        setup_identity(&db).await;
+        let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
+
+        let tok_a = create_session(&db, &uid, 3600, Some("dev-A")).await.unwrap();
+        let tok_null = create_session(&db, &uid, 3600, None).await.unwrap();
+        let tok_a2 = create_session(&db, &uid, 3600, Some("dev-A")).await.unwrap();
+
+        // Llega un login del dispositivo B: desaloja A y la sesión sin device_id, no la de B aún.
+        enforce_device_limit(&db, 1, Some("dev-B")).await.unwrap();
+        assert!(resolve_session(&db, &tok_a).await.unwrap().is_none(), "A desalojado");
+        assert!(resolve_session(&db, &tok_null).await.unwrap().is_none(), "NULL desalojado");
+        assert!(resolve_session(&db, &tok_a2).await.unwrap().is_none(), "otra de A desalojada");
+
+        // Ahora abre B; una segunda sesión del MISMO dispositivo B no se auto-desaloja.
+        let tok_b = create_session(&db, &uid, 3600, Some("dev-B")).await.unwrap();
+        enforce_device_limit(&db, 1, Some("dev-B")).await.unwrap();
+        assert!(resolve_session(&db, &tok_b).await.unwrap().is_some(), "B (mismo device) sobrevive");
+    }
+
+    #[tokio::test]
+    async fn enforce_device_limit_unlimited_or_no_device_is_noop() {
+        // max_devices == 0 (ilimitado, p. ej. Hub Cloud) o sin device_id → no se desaloja a nadie.
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        setup_identity(&db).await;
+        let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
+
+        let tok_a = create_session(&db, &uid, 3600, Some("dev-A")).await.unwrap();
+        let tok_b = create_session(&db, &uid, 3600, Some("dev-B")).await.unwrap();
+
+        // Ilimitado: aunque llegue un device nuevo, nadie cae.
+        enforce_device_limit(&db, 0, Some("dev-C")).await.unwrap();
+        assert!(resolve_session(&db, &tok_a).await.unwrap().is_some());
+        assert!(resolve_session(&db, &tok_b).await.unwrap().is_some());
+
+        // max_devices == 1 pero SIN device_id (login que no identifica dispositivo): tampoco desaloja.
+        enforce_device_limit(&db, 1, None).await.unwrap();
+        assert!(resolve_session(&db, &tok_a).await.unwrap().is_some());
+        assert!(resolve_session(&db, &tok_b).await.unwrap().is_some());
     }
 
     #[tokio::test]
