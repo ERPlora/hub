@@ -140,7 +140,9 @@ macro_rules! build_query {
                 // (inferred-by-context), so the server coerces it to the target column's type
                 // (bigint, double precision, …) instead of fixing it to TEXT and raising 42804.
                 None | Some(Json::Null) => q.bind(DynNull),
-                Some(Json::Bool(b)) => q.bind(*b),
+                // Row contract: flags are INTEGER 0/1, never BOOLEAN — so bind bools as `i64` 0/1
+                // (kills the `bigint but expression is of type boolean` class, hub#208 / ADR-0154).
+                Some(Json::Bool(b)) => q.bind(if *b { 1_i64 } else { 0_i64 }),
                 Some(Json::Number(n)) => {
                     if let Some(i) = n.as_i64() {
                         q.bind(i)
@@ -935,11 +937,14 @@ mod tests {
         )
         .await
         .unwrap();
+        // `ok` se puebla con un literal SQL `true` (no por param): desde hub#208/ADR-0154 los bool
+        // se bindean como INTEGER 0/1, así que un bool-param a columna BOOLEAN ya no aplica. La
+        // columna BOOLEAN se mantiene aquí para seguir cubriendo el **decode** de lectura (pg_cell).
         let res = db
             .execute(
                 "INSERT INTO erplora_pg_test (id, name, ok, price) \
-                 VALUES (:id, :name, :ok, :price)",
-                &params(json!({"id": 1, "name": "alice", "ok": true, "price": 4.5})),
+                 VALUES (:id, :name, true, :price)",
+                &params(json!({"id": 1, "name": "alice", "price": 4.5})),
             )
             .await
             .unwrap();
@@ -997,6 +1002,68 @@ mod tests {
         assert_eq!(r["uid"], json!("00000000-0000-0000-0000-000000000001"));
         // JSONB → parsed value, verbatim.
         assert_eq!(r["meta"], json!({"a": 1}));
+    }
+
+    // ── JSON boolean → INTEGER 0/1 (hub#208 / ADR-0154) ───────────────────────────────────────
+
+    /// hub#208 — el contrato de filas de la casa usa **INTEGER 0/1** para los flags (ninguna
+    /// columna real de módulo es BOOLEAN). Un comando Tier-0 cuyo schema declara `boolean` y escribe
+    /// una columna INTEGER debe funcionar: `Json::Bool` se coacciona a `i64` 0/1 en el bind.
+    ///
+    /// (a) INSERT con param bool `true`/`false` a columna INTEGER guarda 1/0.
+    /// (b) round-trip: la query devuelve 1/0 **como número** (el decode de lectura no cambia: sigue
+    ///     siendo la rama INT8 → JSON number, nunca un booleano).
+    ///
+    /// Antes del fix (bind nativo PG `bool`) esto fallaba con:
+    /// `column "is_active" is of type bigint but expression is of type boolean`.
+    #[tokio::test]
+    async fn bool_param_binds_into_integer_flag_column() {
+        let db = fresh_db().await;
+        // INTEGER en el DDL portable → BIGINT en Postgres (shim_ddl_types): el tipo real de un flag.
+        db.execute_batch(
+            "CREATE TABLE flags (id TEXT PRIMARY KEY, is_active INTEGER, is_deleted INTEGER);",
+        )
+        .await
+        .unwrap();
+        // true → 1, false → 0, ambos por el path de params (Json::Bool).
+        db.execute(
+            "INSERT INTO flags (id, is_active, is_deleted) VALUES (:id, :active, :deleted)",
+            &params(json!({"id": "a", "active": true, "deleted": false})),
+        )
+        .await
+        .unwrap();
+        let q = db
+            .query(
+                "SELECT is_active, is_deleted FROM flags WHERE id = :id",
+                &params(json!({"id": "a"})),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows.len(), 1);
+        assert_eq!(q.rows[0]["is_active"], json!(1), "true debe guardarse/leerse como 1");
+        assert_eq!(q.rows[0]["is_deleted"], json!(0), "false debe guardarse/leerse como 0");
+    }
+
+    /// hub#208 (c) — un `WHERE columna_INTEGER = :flag` con un bool debe filtrar por 0/1: `:active`
+    /// = `true` se coacciona a 1 y matchea solo las filas con `is_active = 1`.
+    #[tokio::test]
+    async fn bool_param_in_where_matches_integer_flag() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE flags (id TEXT PRIMARY KEY, is_active INTEGER);")
+            .await
+            .unwrap();
+        db.execute("INSERT INTO flags (id, is_active) VALUES ('on', 1), ('off', 0)", &Params::new())
+            .await
+            .unwrap();
+        let q = db
+            .query(
+                "SELECT id FROM flags WHERE is_active = :active",
+                &params(json!({"active": true})),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows.len(), 1, "true debe matchear solo la fila con is_active = 1");
+        assert_eq!(q.rows[0]["id"], json!("on"));
     }
 
     // ── translator `:name` → `$n` (no DB) ─────────────────────────────────────────────────
