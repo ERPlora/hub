@@ -24,8 +24,8 @@ async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
         .create_user("Bob Roe", "2222", "employee", None)
         .await
         .unwrap();
-    let alice_token = rt.create_session(&alice, 3600).await.unwrap();
-    let bob_token = rt.create_session(&bob, 3600).await.unwrap();
+    let alice_token = rt.create_session(&alice, 3600, None).await.unwrap();
+    let bob_token = rt.create_session(&bob, 3600, None).await.unwrap();
     let media = std::env::temp_dir().join(format!(
         "erplora-profile-api-{}-{}",
         std::process::id(),

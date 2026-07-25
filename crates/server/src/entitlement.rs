@@ -118,6 +118,14 @@ impl RevalidationState {
         self.last_claims.as_ref().map(|c| c.grace_until)
     }
 
+    /// Nº máximo de **dispositivos activos** del plan según el último token válido (ADR-0154).
+    /// `0` = ilimitado, y también el default fail-open cuando aún no hubo refresh exitoso (la
+    /// autoridad del límite es el SaaS; sin claim conocido, el hub no aplica takeover local).
+    /// Lo lee `mint_session` para desalojar sesiones de otros dispositivos al abrir una nueva.
+    pub fn max_devices(&self) -> u32 {
+        self.last_claims.as_ref().map(|c| c.max_devices).unwrap_or(0)
+    }
+
     /// `paid_grace_until` del último token válido: gracia ESPECÍFICA de los módulos de pago
     /// (claim aditivo del SaaS). `None` = el token no la trae → aplica `grace_until`.
     pub fn paid_grace_until(&self) -> Option<i64> {
@@ -531,6 +539,21 @@ mod tests {
         assert_eq!(g.consecutive_failures, 1);
         assert_eq!(g.last_check_at, Some(2_000));
         assert!(g.last_claims.is_some()); // el fallo NO borra la última verdad conocida
+    }
+
+    #[test]
+    fn max_devices_viene_del_ultimo_token_o_cero_sin_estado() {
+        // ADR-0154: el límite de dispositivos lo aporta el claim `max_devices` del último token
+        // válido. Sin refresh exitoso previo → 0 (ilimitado, fail-open: sin takeover local, la
+        // autoridad es el SaaS).
+        let st = RevalidationState::default();
+        assert_eq!(st.max_devices(), 0);
+
+        let mut st2 = RevalidationState::default();
+        let mut c = claims(&["pos"], 9_000);
+        c.max_devices = 1;
+        st2.apply_success(c, 1_500);
+        assert_eq!(st2.max_devices(), 1);
     }
 
     #[test]

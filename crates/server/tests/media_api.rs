@@ -15,8 +15,8 @@ async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
         .create_user("Employee", "2222", "employee", None)
         .await
         .unwrap();
-    let admin = rt.create_session(&admin_id, 3600).await.unwrap();
-    let employee = rt.create_session(&employee_id, 3600).await.unwrap();
+    let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
+    let employee = rt.create_session(&employee_id, 3600, None).await.unwrap();
     let media = std::env::temp_dir().join(format!(
         "erplora-media-api-{}-{admin_id}",
         std::process::id()

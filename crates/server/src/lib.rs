@@ -44,7 +44,6 @@ pub mod module_storage;
 pub mod openapi;
 pub mod profile;
 pub mod router;
-pub mod session;
 pub mod settings;
 pub mod state;
 pub mod system;
@@ -1924,7 +1923,12 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
         }
     }
     match rt.verify_pin(&req.name, &req.pin).await {
-        Ok(Some(user)) => mint_session(&rt, user).await,
+        Ok(Some(user)) => {
+            // Límite de dispositivos del plan (ADR-0154): lo aporta el estado de entitlement del
+            // server (fail-open a 0 = ilimitado si el lock está envenenado o aún no hubo refresh).
+            let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
+            mint_session(&rt, user, req.device_id.as_deref(), max_devices).await
+        }
         Ok(None) => (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
@@ -2008,7 +2012,9 @@ async fn auth_cloud(
             if let Some(device_id) = device_id.as_deref() {
                 let _ = rt.trust_device(device_id, &name).await;
             }
-            mint_session(&rt, user).await
+            // Límite de dispositivos del plan (ADR-0154), como en el login por PIN.
+            let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
+            mint_session(&rt, user, device_id.as_deref(), max_devices).await
         }
         Err(e) => err_response(e),
     }
@@ -2056,14 +2062,26 @@ async fn auth_logout(State(st): State<AppState>, headers: HeaderMap) -> Response
 }
 
 /// Abre una sesión para `user` y devuelve `{ok, token, user}`.
+///
+/// `device_id` = identidad del dispositivo del login (o `None`); `max_devices` = límite del plan
+/// (ADR-0154), leído del estado de entitlement del server. Con `max_devices == 1` y `device_id`
+/// presente se aplica *single active device session*: se desalojan las sesiones de otros
+/// dispositivos ANTES de abrir la nueva (takeover; la sesión desalojada da 401 en su siguiente
+/// petición al no resolver). `0` = ilimitado / sin `device_id` = comportamiento actual.
 async fn mint_session(
     rt: &erplora_runtime::Runtime,
     user: erplora_runtime::identity::HubUser,
+    device_id: Option<&str>,
+    max_devices: u32,
 ) -> Response {
+    if let Err(e) = rt.enforce_device_limit(max_devices, device_id).await {
+        return err_response(e);
+    }
     match rt
         .create_session(
             &user.id,
             erplora_runtime::identity::DEFAULT_SESSION_TTL_SECS,
+            device_id,
         )
         .await
     {
