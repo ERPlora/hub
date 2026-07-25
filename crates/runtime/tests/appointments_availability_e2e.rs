@@ -36,6 +36,12 @@ fn mdir(n: &str) -> PathBuf {
         .join("../../../modules-workspace/modules")
         .join(n)
 }
+/// Los módulos reales viven en `modules-workspace/` (repos hermanos), ausentes en CI aislado. Si
+/// el handler no está presente, los tests que instalan módulos se OMITEN (mismo patrón que el
+/// resto de e2e: inventory/sales/cash_register…).
+fn wasm_present() -> bool {
+    mdir("appointments").join("dist/handler.wasm").exists()
+}
 fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
 }
@@ -182,6 +188,10 @@ async fn book(rt: &Runtime, ctx: &RequestContext, staff_id: &str, start: &str, d
 
 #[tokio::test]
 async fn install_registers_availability_engine() {
+    if !wasm_present() {
+        eprintln!("SKIP: modules-workspace not present (CI)");
+        return;
+    }
     let rt = rt_appts().await;
     let reg = rt.registry();
     assert!(reg.is_installed("appointments"));
@@ -192,6 +202,10 @@ async fn install_registers_availability_engine() {
 
 #[tokio::test]
 async fn overlap_same_staff_rejected_distinct_staff_ok() {
+    if !wasm_present() {
+        eprintln!("SKIP: modules-workspace not present (CI)");
+        return;
+    }
     let rt = rt_appts().await;
     let ctx = admin();
     set_overlap(&rt, &ctx, false).await; // OFF: solo si la profesional está libre
@@ -225,6 +239,10 @@ async fn overlap_same_staff_rejected_distinct_staff_ok() {
 
 #[tokio::test]
 async fn toggle_allow_overlapping_permits_double_booking() {
+    if !wasm_present() {
+        eprintln!("SKIP: modules-workspace not present (CI)");
+        return;
+    }
     let rt = rt_appts().await;
     let ctx = admin();
     set_overlap(&rt, &ctx, true).await; // ON: permite varias citas a la misma hora
@@ -242,6 +260,10 @@ async fn toggle_allow_overlapping_permits_double_booking() {
 
 #[tokio::test]
 async fn outside_working_schedule_rejected() {
+    if !wasm_present() {
+        eprintln!("SKIP: modules-workspace not present (CI)");
+        return;
+    }
     let rt = rt_appts().await;
     let ctx = admin();
     set_overlap(&rt, &ctx, false).await;

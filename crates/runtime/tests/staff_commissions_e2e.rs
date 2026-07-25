@@ -35,6 +35,9 @@ async fn create_member(rt: &Runtime, ctx: &RequestContext, first: &str, rate: f6
 
 #[tokio::test]
 async fn install_registers_commissions_query() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_staff().await;
     let reg = rt.registry();
     assert!(reg.is_installed("staff"));
@@ -44,6 +47,9 @@ async fn install_registers_commissions_query() {
 
 #[tokio::test]
 async fn commissions_summary_returns_rate_per_active_member() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_staff().await;
     let ctx = admin();
     create_member(&rt, &ctx, "Ana", 15.0, "active").await;
@@ -63,6 +69,9 @@ async fn commissions_summary_returns_rate_per_active_member() {
 
 #[tokio::test]
 async fn commission_amount_combines_with_sales_by_staff() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // Demuestra el SEAM del cierre del día: comisión = gross_total × commission_rate/100,
     // cruzando staff.commissions.summary (rate) con la fila simulada de sales.by_staff por
     // staff_id. (sales.by_staff se ejercita en sales_e2e; aquí validamos la aritmética del seam.)
