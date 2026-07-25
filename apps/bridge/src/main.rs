@@ -11,6 +11,7 @@
 
 mod auth;
 mod pairing;
+mod tray;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -122,6 +123,24 @@ async fn main() {
     spawn_queue_worker(state.clone());
     spawn_watchdog(state.clone());
     maybe_spawn_pairing(state.clone());
+
+    // Icono de la bandeja (solo con la feature `tray`; headless/CI no compila nada de esto). Se
+    // construye best-effort y el handle se conserva vivo durante `serve`; el pairing NO depende de
+    // él (ADR-0154). Ver `tray.rs` para la limitación del event-loop.
+    #[cfg(feature = "tray")]
+    let _tray = {
+        let current = state.pairing.read().ok().and_then(|g| (*g).clone());
+        match tray::build_tray(&tray::tray_model(current.as_ref())) {
+            Ok(handle) => {
+                tracing::info!("Bridge: icono de bandeja inicializado");
+                Some(handle)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Bridge: no se pudo inicializar el tray (degradado a logs)");
+                None
+            }
+        }
+    };
 
     let app = build_router(state);
 

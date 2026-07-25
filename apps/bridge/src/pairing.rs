@@ -65,7 +65,12 @@ pub struct Approval {
     pub hub_id: String,
     pub hub_name: String,
     pub hub_url: String,
+    /// JWT corto inicial que emite el SaaS al aprobar. El Bridge NO lo persiste (solo guarda el
+    /// `bridge_device_token`); los JWT frescos se re-mintan con [`refresh_bridge_jwt`]. Campo del
+    /// contrato conservado para el consumidor (WS/runtime); de ahí el `allow(dead_code)`.
+    #[allow(dead_code)]
     pub bridge_jwt: String,
+    #[allow(dead_code)]
     pub bridge_jwt_expires_in: u64,
     pub bridge_device_token: String,
     pub saas_public_key_url: Option<String>,
@@ -98,7 +103,9 @@ pub enum PollOutcome {
     Expired,
 }
 
-/// Respuesta de `POST token/` — un `bridge_jwt` corto re-minteado.
+/// Respuesta de `POST token/` — un `bridge_jwt` corto re-minteado. API pública consumida por los
+/// tests y el futuro cableado del runtime/WS (aún no invocada en producción) → `allow(dead_code)`.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct TokenResponse {
     pub token: String,
@@ -143,7 +150,9 @@ pub fn http_client() -> reqwest::Client {
         .unwrap_or_default()
 }
 
-/// `true` si hay un emparejamiento persistido y legible.
+/// `true` si hay un emparejamiento persistido y legible. Helper público (tests / arranque
+/// programático); en el runtime el estado vivo lo lleva `AppState.pairing` → `allow(dead_code)`.
+#[allow(dead_code)]
 pub fn is_paired(path: &Path) -> bool {
     load_pairing(path).is_some()
 }
@@ -171,6 +180,9 @@ pub fn save_pairing(path: &Path, pairing: &Pairing) -> Result<(), PairingError> 
 }
 
 /// Etiqueta de estado para el menú de la bandeja (ADR-0154). Pura para poder testearla sin GUI.
+/// La consume el modelo del tray (feature `tray`) y los tests; sin la feature no se cablea en el
+/// binario headless → `allow(dead_code)`.
+#[allow(dead_code)]
 pub fn status_label(pairing: Option<&Pairing>) -> String {
     match pairing {
         Some(p) => format!("Paired with {}", p.hub_name),
@@ -300,7 +312,10 @@ pub async fn pair_redeem(
     .await
 }
 
-/// `POST {saas}/api/v1/bridge/token/` con `X-Bridge-Token` → un `bridge_jwt` corto.
+/// `POST {saas}/api/v1/bridge/token/` con `X-Bridge-Token` → un `bridge_jwt` corto. API pública
+/// para el runtime/WS (re-minta el JWT bajo demanda con el `bridge_device_token` persistido); aún
+/// no invocada en producción → `allow(dead_code)` (consumida por tests).
+#[allow(dead_code)]
 pub async fn refresh_bridge_jwt(
     client: &reqwest::Client,
     saas_url: &str,
