@@ -1,8 +1,9 @@
 # hub
 
-Próxima generación del Hub de ERPlora: **Vue 3 + Ionic + Rust/Axum + Tauri + módulos
-declarativos (`module.json`) + WASM + SDK**, SQLite (local) / Postgres-Aurora (cloud).
-Reemplazará progresivamente al Hub actual (`../hub`).
+Próxima generación del Hub de ERPlora: **Vue 3 + Ionic + Rust/Axum + módulos
+declarativos (`module.json`) + WASM + SDK**, **PostgreSQL** per-org en cloud. **PWA/web shell +
+Bridge** para hardware (ADR-0154: Postgres-only y Cloud-only). Reemplazará progresivamente al Hub
+actual (`../hub`).
 
 > 📖 Diseño completo y decisiones: **[ARQUITECTURA.md](ARQUITECTURA.md)**.
 > Guía para Claude: [CLAUDE.md](CLAUDE.md).
@@ -36,27 +37,24 @@ ver más abajo):
 - **Contrato** ([schemas/](schemas)): `module.schema.json` + `envelope.schema.json`.
 
 - **Runtime Rust** ([crates/runtime](crates/runtime) + [crates/db](crates/db)): host genérico
-  (manifest → migraciones → queries/commands/eventos con scope `hub_id`) + adaptador SQLite.
-  Módulos de ejemplo viven hoy en `modules-workspace/modules/` (fuente), no en `hub/modules/`.
-  **Compila y pasa tests**: `cargo check --workspace` en verde y `cargo test --workspace` corre
-  cientos de tests en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri`. La suite de paridad
-  mantiene alineados los contratos actuales de Inventory y Taxes entre SQLite y Postgres. Ver
-  [crates/README.md](crates/README.md) y [REPASO-MOTOR-RUST.md](REPASO-MOTOR-RUST.md).
-
-`apps/tauri` es funcional (gate de entitlement + hardware sidecar), no un stub — ver
-[apps/tauri/README.md](apps/tauri/README.md).
+  (manifest → migraciones → queries/commands/eventos con scope `hub_id`) + adaptador PostgreSQL
+  (`PgAdapter`). Módulos de ejemplo viven hoy en `modules-workspace/modules/` (fuente), no en
+  `hub/modules/`. **Compila y pasa tests**: `cargo check --workspace` en verde y
+  `cargo test --workspace` corre cientos de tests en las crates + `apps/bridge`, contra un
+  **Postgres real** (schema efímero por test vía `erplora_db::testutil`; CI con service container
+  `postgres:18`). Ver [crates/README.md](crates/README.md) y
+  [REPASO-MOTOR-RUST.md](REPASO-MOTOR-RUST.md).
 
 ## Estructura
 
 ```
 apps/
   web/           Vue 3 + Ionic 8.8 + Vite + TS + Tailwind + Iconify (13 vistas)       [real]
-  tauri/         empaquetado desktop/móvil (gate entitlement + hardware sidecar)     [real]
+  bridge/        Bridge standalone (red-only): hardware POS por localhost HTTP/WS     [real]
 packages/
   ui/            (ejemplo, NO usado por apps/web) componentes React+Tailwind         [ejemplo]
   module-cli/    erplora module build|validate                                       [deprecado, ver DEPRECATED.md — usa @erplora/module-toolkit]
-  module-sdk/    SDK TS frontend (transport IPC/HTTP+WS)                             [interfaz]
-  module-sdk/    SDK TS frontend (transport HttpWsTransport, ambos productos)         [interfaz]
+  module-sdk/    SDK TS frontend (HttpWsTransport contra el runtime Axum)            [interfaz]
   module-types/  tipos del contrato (manifest/envelope)                             [parcial]
 modules/         módulos instalados en runtime (vacío de source; el source vive en
                  modules-workspace/modules/ en la raíz del monorepo)
@@ -69,7 +67,8 @@ docker/          Dockerfile.planned                                             
 
 - **Node 20+** (hay Node 24) + **pnpm 10+** (`corepack enable pnpm`).
 - **Google Chrome** para `snapshot`/`verify` (headless).
-- **Rust** para `crates/*` y `apps/tauri` (`cargo check --workspace` / `cargo test --workspace`).
+- **Rust** para `crates/*` y `apps/bridge` (`cargo check --workspace` / `cargo test --workspace`).
+- **PostgreSQL** (los tests corren contra un Postgres real; en CI, service container `postgres:18`).
 
 > El registry npm del repo es el público (`.npmrc`); el `~/.npmrc` global apunta a un
 > CodeArtifact privado de otro proyecto.
@@ -101,7 +100,7 @@ Ctrl-C (o que uno de los dos muera) baja a ambos. La salida va prefijada `[runti
 
 | Variable | Default | Qué es |
 | --- | --- | --- |
-| `HUB_SQLITE_PATH` | `/tmp/erplora-hub-dev.db` | BD local efímera (bórrala para empezar de cero) |
+| `HUB_DATABASE_URL` | — (**requerido**) | DSN de Postgres (`postgres://…`); el runtime **falla duro** sin él |
 | `HUB_MODULES_DIR` | `../modules-workspace/modules` | Fuente de módulos de dev (los mismos que el shell carga como WC) |
 | `HUB_BIND` | `127.0.0.1:8787` | Bind del runtime Axum |
 | `VITE_RUNTIME_URL` | `''` (proxy de Vite) | Cómo el shell alcanza el runtime |
@@ -115,11 +114,10 @@ pnpm -F @erplora/web typecheck                  # TS estricto
 
 ## Decisiones fijadas (ver §14–15 del doc)
 
-- **TypeScript** en todo · **Vue 3 + Ionic 8.8 + Tailwind + Iconify** (sin Capacitor; nativo = Tauri).
+- **TypeScript** en todo · **Vue 3 + Ionic 8.8 + Tailwind + Iconify** (sin Capacitor).
 - **Lit** para los Web Components de módulos · **pnpm** + Cargo workspaces (raíz compartida).
-- **Dos productos** (§1; ADR-0080): **Hub Local** (backend `single`/SQLite + shell `tauri`) y **Hub Cloud** (backend `cloud`/Aurora + shell `web-pwa`). `single ⟺ Hub Local`, `cloud ⟺ Hub Cloud`.
-- Transporte de datos **HTTP (RPC) + WS (eventos)** en **AMBOS productos** (ADR-0050; `invoke` solo para lo nativo/hardware, no para datos).
-- Transporte de datos **HTTP (RPC) + WS (eventos)** en **AMBOS productos** (ADR-0050); en Hub Local el runtime Axum corre embebido en loopback `127.0.0.1:8787`. `invoke` queda solo para lo nativo (keychain, hardware) — no para datos.
-- Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **shell Tauri** (Bridge como sidecar) en **Hub Local**, o **Bridge standalone opcional** en **Hub Cloud** (§2.7).
+- **Un solo Hub** (§1; ADR-0154): **Hub Cloud** — PWA/web shell + **PostgreSQL** per-org. Se retiró Hub Local (Tauri) y el backend SQLite; ya no hay ejes `single`/`cloud`.
+- Transporte de datos **HTTP (RPC) + WS (eventos)** contra el runtime Axum (ADR-0050; no hay `invoke`/IPC para datos).
+- Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **Bridge standalone (red-only)** por localhost HTTP/WS desde la web shell (§2.7).
 - Red de módulos: **`http.fetch` mediado** (Opción A). Migración **POS-first**, gradual.
 - Auth: email (1er login) → dispositivo de confianza → PIN; usuarios cloud y solo-locales.

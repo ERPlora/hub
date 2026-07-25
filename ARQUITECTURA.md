@@ -1,8 +1,12 @@
 # hub — Arquitectura
 
+> **ADR-0154 — el Hub es Postgres-only y Cloud-only (PWA + Bridge).** Se retiró el producto
+> Hub Local (Tauri desktop) y el backend SQLite. La historia queda en el decision-log del repo
+> `architecture`.
+>
 > **Documento de diseño.** Define el Hub de
-> ERPlora: **Vue 3 + Ionic + Rust/Axum + Tauri + módulos declarativos (module.json) +
-> WASM + SDK**, con **SQLite en local** y **PostgreSQL per-org en cloud** (Hetzner `db-a`; AWS: Aurora, fallback).
+> ERPlora: **Vue 3 + Ionic + Rust/Axum + módulos declarativos (module.json) +
+> WASM + SDK**, con **PostgreSQL per-org en cloud** (Hetzner `db-a`; AWS: Aurora, fallback).
 >
 > **hub ES el Hub de ERPlora.**
 >
@@ -31,7 +35,7 @@
 ## 0. Propósito
 
 Este documento describe **qué** queremos construir y **por qué**, reconciliando la
-visión técnica (Rust/Ionic/Tauri/module.json) con la **realidad de producción** de
+visión técnica (Rust/Ionic/module.json) con la **realidad de producción** de
 ERPlora (SaaS en Django, marketplace, billing Stripe, provisioning AWS,
 contrato S3 + SHA256, auth, asistente AI con RAG).
 
@@ -49,10 +53,10 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    (p. ej. `ok-data-table`). `apps/web` = Vue 3 + Ionic Vue + Vite. Rail colapsable por CSS. Dark por
    `.ion-palette-dark`. Detalle de UI en §3.1/§7.7. `[✓ verificado]`
 
-2. **Camino de datos (backend de datos) — local-first, config-driven** — `apps/web` habla con el runtime vía
+2. **Camino de datos (backend de datos) — Postgres-only** — `apps/web` habla con el runtime vía
    `ErploraClient` (`@erplora/module-sdk`, `HttpWsTransport`) → **`erplora-server` (Axum)** en
-   `VITE_RUNTIME_URL` (def `http://127.0.0.1:8787`) → **SQLite**; la misma config apunta luego al
-   modo `cloud` (Aurora) sin tocar módulos (§7.6). `ModuleView` **inyecta el cliente** en el Web
+   `VITE_RUNTIME_URL` (def `http://127.0.0.1:8787`) → **PostgreSQL** (`HUB_DATABASE_URL`, per-org
+   en cloud; el server falla duro sin él). `ModuleView` **inyecta el cliente** en el Web
    Component del módulo (`wc.client`) para que llame `client.query/command`. Endpoints del runtime:
    `POST /api/query`, `POST /api/command`, `GET /api/navigation`, `GET /api/modules`, `GET /ws`.
    `[✓ verificado: query/command ejecutan SQL real con scoping hub_id]`
@@ -98,56 +102,47 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 
 ---
 
-## 1. Visión: "un solo modelo mental" — dos productos
+## 1. Visión: "un solo modelo mental" — un solo Hub (Cloud, Postgres)
 
-hub es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime). Se entrega en
-**dos productos** con configuración fija — *no* en una matriz de ejes (framing retirado por
-[ADR-0080](../architecture/00-overview/decision-log.md)):
+hub es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime). Tras
+[ADR-0154](../architecture/00-overview/decision-log.md) se entrega como **un único producto**: el
+**Hub Cloud** — una **PWA/web shell** sobre **PostgreSQL** per-org, con el **Bridge** (standalone,
+red-only) para el hardware. Se retiró el producto **Hub Local** (Tauri desktop) y el backend
+**SQLite**; ya no hay dos productos ni una matriz de ejes `single`/`cloud` (framing previo retirado
+por [ADR-0080](../architecture/00-overview/decision-log.md) y consolidado por ADR-0154):
 
-> **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md), app unificada,
-> aceptada 2026-06-17):** **un solo runtime Axum en AMBOS productos**, **mismo transporte de datos**
-> = **HTTP (RPC) + WebSocket (solo eventos)**. Se **elimina** `invoke`/IPC **para datos**: en Hub Local,
-> el runtime Axum corre **embebido como servidor loopback** (`127.0.0.1:8787`) y la UI le habla por
-> HTTP+WS igual que la PWA shell. La **única diferencia** entre productos es el `DatabaseAdapter` (SQLite
-> Hub Local ↔ Postgres/Aurora Hub Cloud) y el almacenamiento de ficheros (disco local ↔ S3).
-> *(estado código 2026-06-30: data-IPC eliminado —SDK `IpcTransport` + handlers `invoke` de datos del shell `erplora_query`/`erplora_command`—; pendiente, columna core: en Hub Local el front y el runtime embebido deben compartir ORIGEN —el runtime sirve el `dist/` y la ventana Tauri carga de `127.0.0.1:8787`— para que `HttpWsTransport` alcance el loopback sin CORS.)*
+> **Transporte de datos ([ADR-0050](../architecture/00-overview/decision-log.md)):** un solo runtime
+> Axum, **mismo transporte de datos** = **HTTP (RPC) + WebSocket (solo eventos)**. No hay `invoke`/IPC
+> **para datos**. El único `DatabaseAdapter` es **`PgAdapter`** (PostgreSQL); el almacenamiento de
+> ficheros es **cloud-proxy** (Hub→Cloud→Object Storage), sin rama de disco local.
 
-- **Hub Local (Tauri)**: el shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal
-  que la PWA shell, reusando `crates/peripherals`) — **no** por handlers `invoke`. **El shell Tauri *es* el
-  bridge** — no hay proceso aparte ni segundo install.
-- **Hub Cloud**: el navegador **no puede** abrir TCP crudo (puerto 9100), USB ni
-  Bluetooth clásico. Si ese usuario necesita hardware físico, instala el **Bridge standalone**
-  (opcional); la PWA shell lo detecta por WebSocket en `localhost`. Si no lo necesita, imprime por
-  PDF/email o impresora **ePOS-HTTP** (alcanzable por navegador). *Pega conocida: una PWA
-  `https://` ↔ `ws://localhost` arrastra fricción de mixed-content/pairing — el bridge embebido del
-  shell Tauri (loopback) no la tiene.*
+- **Hub Cloud (PWA)**: el navegador **no puede** abrir TCP crudo (puerto 9100), USB ni
+  Bluetooth clásico. Si el usuario necesita hardware físico, instala el **Bridge standalone**
+  (red-only); la PWA shell lo detecta por HTTP/WebSocket en `localhost`. Si no lo necesita, imprime
+  por PDF/email o impresora **ePOS-HTTP** (alcanzable por navegador).
 
 **Transportes de impresora** — ✅ **Decidido: SOLO RED (TCP/IP ESC/POS, puerto 9100) — 100% LAN.**
 USB y Bluetooth **se descartan**: exigen drivers + mantenimiento por dispositivo/SO que no compensa.
-La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable; en **Hub Local
-(Tauri)** el runtime abre el socket al puerto 9100 directamente. El Bridge es **red-only por
-construcción**: el crate `crates/peripherals` no incluye USB ni Bluetooth. Consecuencia para **Hub
-Cloud**: como el navegador no abre TCP crudo, **imprimir requiere el Bridge** (sidecar Tauri o
-standalone) o una impresora **ePOS-HTTP**; no hay atajo WebUSB/WebBluetooth porque el hardware es
-de red.
+La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable. El Bridge es
+**red-only por construcción**: el crate `crates/peripherals` no incluye USB ni Bluetooth. Como el
+navegador no abre TCP crudo, **imprimir requiere el Bridge standalone** o una impresora **ePOS-HTTP**;
+no hay atajo WebUSB/WebBluetooth porque el hardware es de red.
 
-**Qué se conserva** (en el componente Bridge —sidecar/standalone— y/o el runtime Tauri, **no** en
-un proceso de instalación obligatoria):
+**Qué se conserva** (en el componente **Bridge standalone**, alcanzado por localhost HTTP/WS desde la
+web shell — **no** en un proceso de instalación obligatoria del propio Hub):
+
 - **Descubrimiento de dispositivos en red + watchdog** (NECESARIO): detectar impresoras en la
   LAN (escaneo de subred / mDNS), seguir su estado (online/offline) y **re-localizarlas si su
   IP cambia por DHCP**. Sin esto, el usuario tendría que configurar IPs a mano y se rompería la
-  impresión al renovar DHCP. → tarea async en el runtime/Tauri o en el Bridge.
+  impresión al renovar DHCP. → tarea async en el Bridge.
 - **Config de impresoras por terminal** (IP, rol recibo/cocina/barra), persistida.
 - **Cola de impresión + reintentos** (impresora apagada / sin papel).
 - **Enrutado por rol** (recibo vs cocina) cuando un terminal tiene varias configuradas.
 
-**Lo que sí cambia vs el análisis anterior**: ya no hay un *proceso Bridge separado de
-instalación obligatoria* — el hardware viaja **dentro** del shell Tauri (sidecar) y el Bridge
-standalone queda **opcional**, solo para **Hub Cloud**. El escáner por HID lo maneja el
-SO/navegador como teclado.
+El escáner por HID lo maneja el SO/navegador como teclado.
 
-> El escenario **Hub Cloud + hardware físico** ya **no** queda fuera de alcance: se cubre
-> con el **Bridge standalone opcional**. El POS en navegador es un producto de primera clase (§1),
+> El escenario **Hub Cloud + hardware físico** **no** queda fuera de alcance: se cubre
+> con el **Bridge standalone** (red-only). El POS en navegador es un producto de primera clase (§1),
 > no una excepción.
 
 #### 2.7.1 Estado de implementación (2026-06-09) — el Bridge ya es **Rust** (fuente de verdad)
@@ -159,17 +154,14 @@ SO/navegador como teclado.
   vive una sola vez en el crate compartido **`hub/crates/peripherals`** (red-only, ESC/POS sobre
   TCP:9100), con módulos `protocol · discovery · escpos · drawer · queue · registry`. *Por qué Rust:*
   la decisión **red-only** elimina lo único que hacía fuertes a Python/Kotlin (drivers USB/serial/HID);
-  con solo red, el Bridge es un socket TCP + un server WS, trivial en Rust, y se comparte con el shell
-  Tauri.
-- **Dos entregas, un crate:**
-  - **Standalone** `hub/apps/bridge` — binario **Axum** que expone `GET /status` + `WS /ws` en
-    `localhost:12321`. Es el de **Hub Cloud**.
-  - **Bridge embebido en Tauri** `hub/apps/tauri` — el shell **arranca el bridge embebido** (servidor
-    localhost, mismo canal HTTP/WS que la PWA shell, reusando el mismo crate), **no** por handlers `invoke`
-    (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md); `invoke` solo nativo).
-    Es el de **Hub Local (Tauri)**. *(estado código 2026-06-30: data-IPC eliminado —SDK `IpcTransport` + handlers `invoke` de datos del shell `erplora_query`/`erplora_command`—; pendiente, columna core: en Hub Local el front y el runtime embebido deben compartir ORIGEN —el runtime sirve el `dist/` y la ventana Tauri carga de `127.0.0.1:8787`— para que `HttpWsTransport` alcance el loopback sin CORS.)* |
-| DB local | **SQLite** | Offline-first, embebible en Tauri |
-| DB cloud | **PostgreSQL / Aurora** | Igual que hoy; soporta `pgvector` (clave para RAG, §9) |
+  con solo red, el Bridge es un socket TCP + un server WS, trivial en Rust.
+- **Una entrega, un crate:** **Standalone** `hub/apps/bridge` — binario **Axum** que expone
+  `GET /status` + `WS /ws` en `localhost:12321`. La web shell del Hub Cloud lo alcanza por localhost
+  HTTP/WS.
+
+| Pieza | Elección | Nota |
+|-------|----------|------|
+| DB | **PostgreSQL** (`PgAdapter`, per-org en cloud) | soporta `pgvector` (clave para RAG, §9) |
 | Lógica avanzada | **WASM (Extism)** | Sandbox + ABI lista; evita diseñar una ABI propia al inicio |
 | Empaquetado módulo | **module.zip** | manifest + SQL + schemas + UI + WASM + docs, firmado + SHA256 |
 
@@ -218,7 +210,7 @@ Crate `runtime` (submódulos): `manifest`, `loader`, `registry`, `installer`, `m
 4. Descomprimir en el store de módulos
 5. Leer y validar module.json
 6. Comprobar depends_on (orden topológico)
-7. Aplicar migrations (por dialecto: sqlite/postgres)
+7. Aplicar migrations (PostgreSQL; el dialecto `sqlite` quedó deprecado/ignorado tras ADR-0154)
 8. Registrar permisos, queries, commands, eventos/listeners
 9. Registrar UI (menú + entry WC)
 10. (RAG) Indexar README/ai_context del módulo a su versión (§9)
@@ -234,7 +226,7 @@ dead-letter: si un listener fallaba tras commitear (p.ej. `invoice.create_from_s
 
 **Decisión (implementada + verificada):** el bus de eventos pasa a **transactional outbox**, con
 entrega **100% asíncrona por relay** y garantía **at-least-once**. Tablas de sistema del runtime
-(SQLite + Postgres, las crea el runtime, no un módulo): `_event_outbox` y `_event_delivery`.
+(PostgreSQL, las crea el runtime, no un módulo): `_event_outbox` y `_event_delivery`.
 
 1. **Escritura atómica.** Al ejecutar un command, sus eventos `emit` (y, en Tier 2, los que devuelve
    el handler) se **INSERTAN en `_event_outbox` dentro de la MISMA transacción** que el SQL del
@@ -271,7 +263,7 @@ Declarativo para lo simple, **WASM para la lógica real**, y **SDK tipado** para
 inventory-1.2.0.module.zip
 ├─ module.json            # manifest declarativo (contrato del módulo)
 ├─ manifest.lock          # generado en build (hashes, versiones resueltas)
-├─ migrations/{sqlite,postgres}/001_init.sql
+├─ migrations/postgres/001_init.sql   # solo dialecto postgres (sqlite deprecado tras ADR-0154)
 ├─ queries/products_list.sql
 ├─ commands/stock_decrease.sql
 ├─ schemas/stock_decrease.json     # JSON Schema (validación en Rust)
@@ -294,8 +286,7 @@ inventory-1.2.0.module.zip
   "navigation": [
     { "id": "products", "label": "Products", "icon": "cube", "component": "erp-inventory-products" }
   ],
-  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"],
-                  "postgres": ["migrations/postgres/001_init.sql"] },
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
   "queries": {
     "inventory.products.list": {
       "permission": "inventory.products.read",
@@ -470,11 +461,9 @@ interface ErploraTransport {
   command(name: string, payload: unknown): Promise<unknown>;
   subscribe(event: string, cb: (e: unknown) => void): void;
 }
-// Modelo decidido (ADR-0050): el SDK ya NO tiene IpcTransport (eliminado); AMBOS productos
-// usan HTTP+WS contra el runtime Axum — embebido en loopback 127.0.0.1:8787 (Hub Local) o ECS (Hub Cloud).
-// HttpWsTransport → HTTP POST query/command + WebSocket solo para eventos          (Hub Local y Hub Cloud)
+// Modelo decidido (ADR-0050): el SDK usa HTTP+WS contra el runtime Axum (no hay IpcTransport).
+// HttpWsTransport → HTTP POST query/command + WebSocket solo para eventos.
 // (WsTransport — todo por un WS — queda como alternativa, no por defecto; §7.5)
-// (estado código 2026-06-30: data-IPC eliminado; pendiente —columna core—: en Hub Local el front y el runtime embebido comparten ORIGEN para que HttpWsTransport alcance el loopback.)
 ```
 
 > `hasPermission` en JS es **solo** para mostrar/ocultar UI. La seguridad real está siempre
@@ -518,28 +507,25 @@ erplora module publish <id>     # sube al marketplace del SaaS (§2.2)
 WS". WS-only obligaría a reimplementar el framing RPC (correlación de IDs, timeouts, replay) que
 HTTP da gratis.
 
-**Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** **AMBOS productos**
-usan el **mismo transporte de datos** (HTTP+WS) contra el runtime Axum; en **Hub Local** ese runtime
-corre **embebido como servidor loopback** (`127.0.0.1:8787`), en **Hub Cloud** en ECS. Se **eliminó**
-`invoke`/IPC para datos. La diferencia entre productos es **solo** el `DatabaseAdapter` (SQLite ↔
-Aurora) y los ficheros (disco ↔ S3). *(estado código 2026-06-30: data-IPC eliminado —SDK `IpcTransport` + handlers `invoke` de datos del shell `erplora_query`/`erplora_command`—; pendiente, columna core: en Hub Local el front y el runtime embebido deben compartir ORIGEN —el runtime sirve el `dist/` y la ventana Tauri carga de `127.0.0.1:8787`— para que `HttpWsTransport` alcance el loopback sin CORS.)*
+**Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** el shell web habla
+**HTTP+WS** contra el runtime Axum. Se **eliminó** `invoke`/IPC para datos. El backend es **PostgreSQL**
+(`PgAdapter`) y los ficheros van por **cloud-proxy** a Object Storage (Hub→Cloud), sin rama de disco
+local.
 
-| Qué | Hub Local — runtime Axum embebido (loopback) | Hub Cloud — Axum (ECS) |
-|-----|------------------------|------------------------|
-| `query` / `command` (RPC) | **HTTP POST** (`/api/query`, `/api/command`) | **HTTP POST** (`/api/query`, `/api/command`) |
-| Eventos / push | **WebSocket** (`/ws`, solo push) | **WebSocket** (`/ws`, solo push) |
-| App Ionic + assets | filesystem | **HTTP/CDN** |
-| Bundles UI de módulos | filesystem | **HTTP/CDN** |
-| Descarga `module.zip` | **HTTP** (S3) | **HTTP** (S3) |
-| Exports PDF/Excel | **HTTP** | **HTTP** |
-| SaaS (marketplace, billing, embeddings/LLM) | **HTTP REST** (user-JWT + `X-Hub-Id`) | **HTTP REST** |
+| Qué | Hub Cloud — Axum |
+|-----|------------------|
+| `query` / `command` (RPC) | **HTTP POST** (`/api/query`, `/api/command`) |
+| Eventos / push | **WebSocket** (`/ws`, solo push) |
+| App Ionic + assets | **HTTP/CDN** |
+| Bundles UI de módulos | **HTTP/CDN** |
+| Descarga `module.zip` | **HTTP** (Object Storage) |
+| Exports PDF/Excel | **HTTP** |
+| SaaS (marketplace, billing, embeddings/LLM) | **HTTP REST** (user-JWT + `X-Hub-Id`) |
 
 > **Canal de hardware (modelo decidido, [ADR-0050](../architecture/00-overview/decision-log.md)):**
-> el bridge usa el **mismo canal localhost (HTTP/WS) en los dos productos**. En **Hub Local (Tauri)** el
-> shell **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA shell, reusando
-> `crates/peripherals`) — **NO** por handlers `invoke`. En **Hub Cloud** ese canal lo aporta el
-> **Bridge standalone opcional** por `ws://localhost` (§2.7). `invoke` queda **solo** para lo nativo
-> sin equivalente HTTP (keychain, device_id, ciclo de vida), no para hardware.
+> el hardware lo aporta el **Bridge standalone** (red-only), alcanzado por `http://localhost` /
+> `ws://localhost` desde la web shell (§2.7). El navegador no abre TCP crudo (puerto 9100), USB ni
+> Bluetooth: por eso imprimir requiere el Bridge o una impresora **ePOS-HTTP**.
 
 **Escala**: un hub tiene **1–5 usuarios (máx ~30)**, con tolerancia a crecer. A esa escala
 el rendimiento **no decide**; deciden resiliencia y simplicidad:
@@ -548,31 +534,22 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
   por HTTP**; solo se pierden las actualizaciones en vivo. Con WS-only, si el socket falla, **todo** falla.
 - **Más simple**: HTTP no necesita framing RPC sobre WS. **Tooling estándar** (reintentos,
   idempotencia, `curl`, proxies/CDN). WebSocket queda **solo para push**.
-- **Mismo transporte en Hub Local y Hub Cloud** (modelo decidido, ADR-0050): HTTP (RPC) + WebSocket
-  (solo push) contra el runtime Axum, embebido en loopback en Hub Local. *(estado código 2026-06-30: data-IPC eliminado —SDK `IpcTransport` + handlers `invoke` de datos del shell `erplora_query`/`erplora_command`—; pendiente, columna core: en Hub Local el front y el runtime embebido deben compartir ORIGEN —el runtime sirve el `dist/` y la ventana Tauri carga de `127.0.0.1:8787`— para que `HttpWsTransport` alcance el loopback sin CORS.)*
 
-> **Decisión: ambos productos = HTTP (RPC) + WebSocket (solo eventos).** WS-only queda como
+> **Decisión: HTTP (RPC) + WebSocket (solo eventos).** WS-only queda como
 > alternativa (todo por un solo canal), pero no por defecto.
 
-### 7.6 Garantía: el mismo módulo corre en ambos productos sin trabajo adicional
+### 7.6 Garantía: el runtime Rust es la única autoridad de datos
 
-> **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** ambos productos
-> usan **HTTP+WS** contra el runtime Axum (embebido en loopback en Hub Local). El SDK ya **no** tiene
-> `IpcTransport`. *(estado código 2026-06-30: data-IPC eliminado —SDK `IpcTransport` + handlers `invoke` de datos del shell `erplora_query`/`erplora_command`—; pendiente, columna core: en Hub Local el front y el runtime embebido deben compartir ORIGEN —el runtime sirve el `dist/` y la ventana Tauri carga de `127.0.0.1:8787`— para que `HttpWsTransport` alcance el loopback sin CORS.)*
-- ✅ **Runtime Rust implementado, compila y pasa tests**: `crates/db` (SQLite vía
-  rusqlite) + `crates/runtime` (manifest → migraciones idempotentes → registry → permisos →
+> **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** el shell web usa
+> **HTTP+WS** contra el runtime Axum; no hay `IpcTransport` ni backend local.
+
+- ✅ **Runtime Rust implementado, compila y pasa tests**: `crates/db` (**PostgreSQL** vía `PgAdapter`,
+  traductor `:n`→`$n`) + `crates/runtime` (manifest → migraciones idempotentes → registry → permisos →
   queries/commands en transacción → bus de eventos), con **scope `hub_id`** e inyección de
   `:hub_id/:current_user_id/:now/:new_id`. Módulo `modules/inventory` con SQL real (migración,
-  query, 2 commands, listener). Ejemplo `walking_skeleton` + tests de integración. `cargo check
-  --workspace` está en verde y `cargo test --workspace` pasa en el grueso de las crates
-  (`cargo test -p <crate>` para el conteo vigente) — dos excepciones conocidas en `erplora-db`'s
-  `tests/parity.rs`: `taxes_rate_real_and_active_filter_parity` falla hoy (el payload del test no
-  lleva `key`, que `taxes/commands/category_create.sql` exige desde ADR-0085) e
-  `inventory_stock_decrease_clamp_parity` falla también (el clamp de stock no se aplica: la celda
-  `stock` queda en 3 en vez de 0); tratar "sin toolchain Rust en el entorno" como histórico, no
-  como estado actual.
-- Pendiente de la fase: `apps/tauri` (Axum embebido en loopback → mismo `runtime`, sin `invoke` para
-  datos; ADR-0050) y `crates/server` (Axum).
+  query, 2 commands, listener). Ejemplo `walking_skeleton` + tests de integración contra un
+  **Postgres real** (schema efímero por test vía `erplora_db::testutil`; CI con service container
+  `postgres:18`).
 
 ### Fase 2 — Núcleo declarativo
 commands/queries/permisos/migrations/eventos + validación por schema + topo-sort/lifecycle.
@@ -618,10 +595,10 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
   irá en un **módulo `warehouse` SEPARADO que DEPENDE de `inventory`**: llama sus contratos públicos
   (`inventory.products.*`) y escucha sus eventos, **nunca** toca el `product.stock` privado. No se
   implementa ahora; se construye cuando aparezca demanda real (manufactura/distribución).
-- **Reubicación del Bridge (§2.7)**: el `bridge/` **no** se retira — se convierte en componente de
-  hardware compartido (**sidecar** en Tauri/Hub Local | **standalone opcional** para Hub Cloud).
-  Migrar su lógica (registro/watchdog/cola/routing de impresión) al shell Tauri y empaquetarla
-  como sidecar; mantener el standalone para el combo navegador. Resolver multi-dispositivo (§2.7b).
+- **Bridge (§2.7)**: el `bridge/` **no** se retira — es el componente de hardware **standalone
+  (red-only)**, alcanzado por localhost HTTP/WS desde la web shell. Su lógica
+  (registro/watchdog/cola/routing de impresión) vive en `crates/peripherals`. Resolver
+  multi-dispositivo (§2.7b).
 - **Agrupación de módulos**: se conserva la misma clasificación/grupos del catálogo; la
   clasificación vive en el SaaS, no en el `module.json` (§2.4).
 - **Contrato marketplace intacto**: el SaaS descarga el zip + verifica SHA256; la ruta S3 y la
@@ -634,26 +611,26 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | Tema | Estado |
 |------|--------|
 | **Multi-tenancy** | ✅ **Decidido**: BD por **organización** compartida entre hubs; `hub_id` por fila, scope inyectado por el runtime (§2.5). No es `tenant_id`. |
-| **IDs de fila** | ✅ **Decidido (ADR-0035)**: **PK = UUID v4 (`TEXT`) en TODO** el dato de negocio (Aurora por-org + SQLite local), no autoincremental; `hub_id` (UUID) sigue siendo el discriminador de tenant. UUID globalmente único ⇒ **NO hay remapeo** al fusionar local↔cloud (§2.5). |
+| **IDs de fila** | ✅ **Decidido (ADR-0035)**: **PK = UUID v4 (`TEXT`) en TODO** el dato de negocio (PostgreSQL per-org), no autoincremental; `hub_id` (UUID) sigue siendo el discriminador de tenant. UUID globalmente único (§2.5). |
 | **Transporte cloud** | ✅ **Decidido**: HTTP (RPC) + canal de push dedicado (§7.5). WS-only descartado como default. |
 | **Canal de eventos (push)** | 🔶 **Abierto**: **WS (actual) vs SSE** para el push servidor→cliente. El push es **unidireccional** (los envíos van por HTTP) ⇒ SSE encaja: da **reconexión + Last-Event-ID gratis** (ayuda con el idle timeout del ALB), mantiene **HTTP estándar** (criterio §7.5) y es el formato natural para el **futuro streaming del assistant**. Plan: implementar **ambos** y elegir por situación; al hacerlo, **unificar la forma del JSON del evento** (`name` server vs `event` cliente — hoy desalineado) entre WS y SSE. |
 | **Entrega/fiabilidad de eventos** | ✅ **Decidido (2026-06-09)**: **transactional outbox** — escritura atómica en `_event_outbox`, **relay asíncrono** at-least-once con backoff + dead-letter, idempotencia vía `_event_delivery` (§4.1). Sustituye el dispatch inline. **Implementado + verificado** (`crates/runtime/src/outbox.rs` + relay en server). |
 | **Documentos de venta / POS** | ✅ **Decidido (2026-06-09)**: tiquet/factura = **FORMATO** de render (`ok-receipt` 80mm / `ok-invoice` A4 en OutfitKit), no módulo; `sales` = libro mayor; pantallas POS **seleccionables** por el negocio; impresión térmica por bridge ESC/POS (§15). |
 | **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
-| **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri/Hub Local \| standalone opcional para Hub Cloud), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
+| **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware **standalone (red-only)**, alcanzado por localhost HTTP/WS desde la web shell, §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
-| **Offline** | ✅ **Decidido (ADR-0040): dos productos, SIN sync.** **Hub Local** (SQLite local autoridad, gratis, 100% offline, un dispositivo) y **Hub Cloud** (ECS+Aurora, online-only, multi-dispositivo). Sin puente; respaldo del Hub Local = módulo `backup` (export cifrado a S3, no sync). Retira el motor de sync y el tier "Cloud DB" de ADR-0029/0031 (§2.8). |
+| **Offline** | ✅ **Decidido (ADR-0154): un solo Hub, Cloud/Postgres, online-only.** Se retiró el producto **Hub Local** (SQLite, offline) — ya no hay dos productos ni motor de sync (ADR-0040 «sin sync» sigue en pie). Los backups son responsabilidad del Cloud (pgBackRest/PITR), no del Hub. |
 | **Login de usuario** | ✅ **Decidido**: 1er login email+password online → dispositivo de confianza → PIN (offline a futuro); usuarios cloud y solo-locales (§2.9). |
-| **Reactividad UI** | ✅ **Decidido**: eventos WS/Tauri → el WC re-consulta (§7.7). Sustituye a LiveComponent. |
+| **Reactividad UI** | ✅ **Decidido**: eventos WS → el WC re-consulta (§7.7). Sustituye a LiveComponent. |
 | **ABI WASM** | Extism (recomendado) vs WASI vs propia. Validar en Fase 0. |
 | **Paridad de framework** | Abierto: slots, hooks/filters, scheduled tasks, i18n → equivalentes declarativos/WASM (§5.6). Multi-fase. |
 | **Entitlement en runtime** | Abierto: qué pasa con un módulo (y sus datos) si caduca su suscripción (desactivar / read-only). |
 | **Credencial de dispositivo de confianza** | Abierto: formato/rotación de la credencial que habilita el PIN offline (§2.9). |
-| **SQL portable** | SQLite↔Postgres: ¿dialecto canónico, capa de query, o migrations por dialecto? |
-| **RAG local** | A (embebido Rust, recomendado) vs B (BM25) vs C (solo cloud) (§9.5). |
+| **SQL portable** | ✅ **Resuelto (ADR-0154)**: Postgres-only; el dialecto `sqlite` quedó deprecado/ignorado. Sin capa de portabilidad. |
+| **RAG / vector** | Prod: pgvector es **follow-up** (hub#204 / pm#29); hoy el índice del asistente es `None` (degrada a "todas las tools"). `MemoryVectorStore` es solo referencia/test (§9.5). |
 | **UI de módulos (Lit vs Stencil)** | ✅ **Recomendado Lit** (§3.1, default 2026; no necesitamos wrappers multi-framework). Confirmar con PoC de ambos en Fase 0. |
 | **Guest WASM lenguaje** | Rust-only (recomendado, WASM pequeño/rápido) vs multi-lenguaje (JS/Go/Python vía Extism, baja la barrera de autoría). |
-| **Impresión / primary-satellite** | ✅ Impresoras de red por terminal; hardware vía shell Tauri (sidecar) o Bridge standalone opcional (§2.7). Abierto: descubrimiento primary↔satellite y promoción si cae el primario (§2.7b). |
+| **Impresión / primary-satellite** | ✅ Impresoras de red por terminal; hardware vía **Bridge standalone (red-only)** (§2.7). Abierto: descubrimiento primary↔satellite y promoción si cae el primario (§2.7b). |
 | **Agrupación de módulos** | ✅ Se conserva la clasificación/grupos del catálogo (vive en el SaaS, §2.4/§13). |
 | **Esfuerzo total** | Cambio de plataforma completo; plan de recursos/tiempo realista. |
 
@@ -734,19 +711,19 @@ con ella; viaja en `sale.completed` para que `invoice` emita F1/F2).
 module.json = contrato del módulo (lo técnico; la clasificación vive en el SaaS)
 WebComponent = pantalla del módulo (Lit; §3.1)
 Rust = autoridad / runtime genérico (execute_command / execute_query)
-SQLite (local) / Postgres-Aurora (cloud) = solo Rust accede; hub_id (UUID) por fila + PK = UUID v4 (TEXT)
+PostgreSQL (per-org en cloud) = solo Rust accede; hub_id (UUID) por fila + PK = UUID v4 (TEXT)
 WASM (Extism) = lógica avanzada y batch, en sandbox (sin red/BD libres)
-SDK TS = puente para la UI (HttpWsTransport en AMBOS productos; IpcTransport eliminado por ADR-0050; en Hub Local va contra el runtime Axum embebido en loopback 127.0.0.1:8787)
-Offline = dos productos SIN sync (ADR-0040): Hub Local (SQLite local autoridad, gratis, offline, un dispositivo) y Hub Cloud (ECS+Aurora, online-only, multi-dispositivo); sin puente. Respaldo del Hub Local = módulo `backup` (export cifrado a S3). Retira el motor de sync y el tier Cloud DB de ADR-0029/0031
+SDK TS = puente para la UI (HttpWsTransport contra el runtime Axum; sin IpcTransport, ADR-0050)
+Hub = un solo producto (ADR-0154): Cloud, PostgreSQL, online-only (PWA + Bridge). Sin Hub Local ni SQLite ni sync. Backups = responsabilidad del Cloud (pgBackRest/PITR)
 Login = email+password online (setup) → dispositivo de confianza → PIN (offline a futuro)
-Reactividad = evento (WS, mismo canal en ambos productos; ADR-0050) → el WC re-consulta (no server-render)
+Reactividad = evento (WS; ADR-0050) → el WC re-consulta (no server-render)
 Eventos = transactional outbox (escritura atómica + relay async at-least-once + _event_delivery); WS solo push UI (§4.1)
 Venta = sales (libro mayor) → sale.completed; tiquet/factura = FORMATO (ok-receipt/ok-invoice), no módulo; pantallas POS seleccionables (§15)
-RAG = solo conocimiento (docs); vector en cloud (pgvector), degradado en local
+RAG = solo conocimiento (docs); vector store pgvector = follow-up (hub#204); hoy índice None → todas las tools
 AI = embeddings + generación SIEMPRE por el proxy del SaaS (medido)
 Red de módulos = http.fetch mediado por el host (Opción A) / nativo para fiscal
-2 productos = Hub Local (single/SQLite, Tauri, offline, gratis) · Hub Cloud (cloud/Aurora, PWA, online, de pago) (§1)
-Impresión/hardware = Hub Local: Bridge como sidecar Tauri · Hub Cloud: Bridge standalone opcional; §2.7
+1 producto = Hub Cloud (PostgreSQL, PWA, online) — ADR-0154 retiró Hub Local/Tauri/SQLite (§1)
+Impresión/hardware = Bridge standalone (red-only) por localhost HTTP/WS desde la web shell; §2.7
 Primary/Satellite = varios terminales del mismo hub; cobrar/imprimir solo el primario
 Migración = gradual, POS-first, manteniendo la agrupación actual de módulos
 SaaS (Django) = marketplace + billing + provisioning + proxy AI (no cambia)
@@ -755,4 +732,4 @@ hub = el runtime del tenant
 
 > ERPlora no instala código backend arbitrario: instala **capacidades declarativas** (y
 > WASM en sandbox) que Rust valida, registra y ejecuta. Como WordPress, pero más seguro,
-> portable y eficiente — y con el mismo modelo en local y en cloud.
+> portable y eficiente.
