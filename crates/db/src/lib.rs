@@ -611,14 +611,17 @@ fn normalize_ddl_type(portable: &str) -> Option<&'static str> {
 /// [`normalize_ddl_type`]. Cualquier otra cosa se deja intacta (nombres de columna, `PRIMARY KEY`,
 /// `NOT NULL`, `DEFAULT …`, etc.). Se aplica en `execute_batch` (path de migraciones), no en cada query.
 pub fn shim_ddl_types(sql: &str) -> String {
+    // Reconstruye sobre BYTES (no `byte as char`): un `push(c as char)` reinterpretaría cada byte
+    // de una secuencia UTF-8 como Latin-1 → mojibake (`Café`→`CafÃ©`) en literales/comentarios del
+    // DDL+DML de seed/import. Se emiten bytes crudos y se decodifica UTF-8 al final.
     let bytes = sql.as_bytes();
-    let mut out = String::with_capacity(sql.len() + 16);
+    let mut out: Vec<u8> = Vec::with_capacity(sql.len() + 16);
     let mut i = 0;
     let mut in_string = false;
     while i < bytes.len() {
         let c = bytes[i];
         if in_string {
-            out.push(c as char);
+            out.push(c);
             if c == b'\'' {
                 in_string = false;
             }
@@ -627,7 +630,7 @@ pub fn shim_ddl_types(sql: &str) -> String {
         }
         if c == b'\'' {
             in_string = true;
-            out.push('\'');
+            out.push(b'\'');
             i += 1;
             continue;
         }
@@ -639,17 +642,17 @@ pub fn shim_ddl_types(sql: &str) -> String {
                     bytes.get(end).map(|b| b.is_ascii_alphanumeric() || *b == b'_').unwrap_or(false);
                 if !next_is_ident {
                     if let Some(native) = normalize_ddl_type(tok) {
-                        out.push_str(native);
+                        out.extend_from_slice(native.as_bytes());
                         i = end;
                         continue;
                     }
                 }
             }
         }
-        out.push(c as char);
+        out.push(c);
         i += 1;
     }
-    out
+    String::from_utf8(out).unwrap_or_else(|_| sql.to_string())
 }
 
 /// Lee un identificador ASCII (`[A-Za-z_][A-Za-z0-9_]*`) desde `i`; devuelve `(slice, fin)`.
@@ -722,7 +725,10 @@ pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
     let shimmed = shim_functions(sql);
     let sql = shimmed.as_str();
 
-    let mut out = String::with_capacity(sql.len());
+    // Reconstruye sobre BYTES (no `byte as char`): emitir un byte de una secuencia UTF-8 como
+    // `char` lo reinterpretaría como Latin-1 → mojibake en literales `'...'`. Los `c` de abajo son
+    // solo para COMPARAR (siempre ASCII: `'`, `-`, `/`, `*`, `:`); lo que se emite es el byte crudo.
+    let mut out: Vec<u8> = Vec::with_capacity(sql.len());
     let bytes = sql.as_bytes();
     let mut names: Vec<String> = Vec::new();
     let mut i = 0;
@@ -732,7 +738,7 @@ pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
         let c = bytes[i] as char;
 
         if in_string {
-            out.push(c);
+            out.push(bytes[i]);
             if c == '\'' {
                 in_string = false;
             }
@@ -742,7 +748,7 @@ pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
 
         if c == '\'' {
             in_string = true;
-            out.push(c);
+            out.push(bytes[i]);
             i += 1;
             continue;
         }
@@ -758,7 +764,7 @@ pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
             while i < bytes.len() && bytes[i] != b'\n' {
                 i += 1;
             }
-            out.push_str(&sql[start..i]);
+            out.extend_from_slice(sql[start..i].as_bytes());
             continue;
         }
         if c == '/' && bytes.get(i + 1) == Some(&b'*') {
@@ -768,14 +774,14 @@ pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
                 i += 1;
             }
             i = (i + 2).min(bytes.len()); // consume el `*/` de cierre
-            out.push_str(&sql[start..i]);
+            out.extend_from_slice(sql[start..i].as_bytes());
             continue;
         }
 
         if c == ':' {
             // `::` is the Postgres cast operator, not a parameter.
             if i + 1 < bytes.len() && bytes[i + 1] == b':' {
-                out.push_str("::");
+                out.extend_from_slice(b"::");
                 i += 2;
                 continue;
             }
@@ -794,18 +800,18 @@ pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
                         names.len()
                     }
                 };
-                out.push('$');
-                out.push_str(&idx.to_string());
+                out.push(b'$');
+                out.extend_from_slice(idx.to_string().as_bytes());
                 i = j;
                 continue;
             }
         }
 
-        out.push(c);
+        out.push(bytes[i]);
         i += 1;
     }
 
-    (out, names)
+    (String::from_utf8(out).unwrap_or_else(|_| sql.to_string()), names)
 }
 
 #[cfg(test)]
@@ -896,6 +902,29 @@ mod tests {
         assert_eq!(q.rows[0]["num"], json!("FAC-00042"));
         assert_eq!(q.rows[0]["amount_cents"], json!(12345));
         assert_eq!(q.rows[0]["paid"], json!(1));
+    }
+
+    /// Regresión (ADR-0154): `shim_ddl_types`/`translate` reconstruían el SQL byte-a-byte con
+    /// `push(byte as char)` → mojibake para no-ASCII (`Café`→`CafÃ©`) en TODO `execute_batch`/
+    /// `execute` (seed/import). Antes quedaba oculto porque en SQLite `shim_ddl_types` era la
+    /// identidad; en Postgres siempre corre. Round-trip por AMBOS caminos (batch y execute).
+    #[tokio::test]
+    async fn utf8_literal_roundtrip_batch_and_execute() {
+        let db = fresh_db().await;
+        // execute_batch → shim_ddl_types: DDL + INSERT con literal no-ASCII.
+        db.execute_batch(
+            "CREATE TABLE t (id TEXT PRIMARY KEY, name TEXT); \
+             INSERT INTO t (id, name) VALUES ('a', 'Café')",
+        )
+        .await
+        .unwrap();
+        // execute → translate: literal no-ASCII dentro de la sentencia (sin params).
+        db.execute("INSERT INTO t (id, name) VALUES ('b', 'Niño €')", &Params::new())
+            .await
+            .unwrap();
+        let q = db.query("SELECT id, name FROM t ORDER BY id", &Params::new()).await.unwrap();
+        assert_eq!(q.rows[0]["name"], json!("Café"), "shim_ddl_types no debe romper UTF-8");
+        assert_eq!(q.rows[1]["name"], json!("Niño €"), "translate no debe romper UTF-8");
     }
 
     #[tokio::test]
