@@ -25,6 +25,14 @@ use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
+/// Postgres decodifica `SUM(...)` sobre enteros como `NUMERIC` → JSON **string** (contrato de
+/// dinero, `pg_cell`), mientras que `COUNT(*)` es `INT8` → número. Lee un i64 en ambos casos.
+fn i64_of(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("valor entero/NUMERIC esperado, got {v}"))
+}
+
 fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
@@ -96,7 +104,7 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
     // El KPI refleja la venta real: 352 céntimos (3,52 €) y 1 ticket.
     let after = kpi_row(&rt, "sales.today", &ctx).await;
     assert_eq!(cents(&after["total"]), 352, "el KPI de ventas de hoy debe ser el total real");
-    assert_eq!(after["tickets"].as_i64().unwrap(), 1, "el KPI de tickets debe contar la venta real");
+    assert_eq!(i64_of(&after["tickets"]), 1, "el KPI de tickets debe contar la venta real");
 }
 
 // ── inventory: `inventory.products.stats` → stock bajo, valor, en stock ───────────────────────────
@@ -122,9 +130,9 @@ async fn inventory_stats_kpis_show_real_numbers() {
     .expect("products.create");
 
     let stats = kpi_row(&rt, "inventory.products.stats", &ctx).await;
-    assert_eq!(stats["products_low_stock"].as_i64().unwrap(), 1, "1 producto en stock bajo (real)");
-    assert_eq!(stats["products_in_stock"].as_i64().unwrap(), 1, "1 producto con existencias (real)");
-    assert_eq!(stats["total_inventory_value"].as_i64().unwrap(), 600, "valoración a COSTE: 200 × 3");
+    assert_eq!(i64_of(&stats["products_low_stock"]), 1, "1 producto en stock bajo (real)");
+    assert_eq!(i64_of(&stats["products_in_stock"]), 1, "1 producto con existencias (real)");
+    assert_eq!(i64_of(&stats["total_inventory_value"]), 600, "valoración a COSTE: 200 × 3");
 }
 
 // ── staff: `staff.members.stats` → empleados activos ─────────────────────────────────────────────
@@ -147,7 +155,7 @@ async fn staff_headcount_kpi_counts_active_members() {
     rt.execute_command("staff.members.create", &create("Caro", "terminated"), &ctx).await.unwrap();
 
     let stats = kpi_row(&rt, "staff.members.stats", &ctx).await;
-    assert_eq!(stats["active_members"].as_i64().unwrap(), 2, "el KPI cuenta SOLO los activos reales");
+    assert_eq!(i64_of(&stats["active_members"]), 2, "el KPI cuenta SOLO los activos reales");
 }
 
 // ── cash_register: `cash_register.current_session` → efectivo esperado en caja ─────────────────────
@@ -234,7 +242,7 @@ async fn verifactu_pending_kpi_counts_real_records() {
 
     let summary = kpi_row(&rt, "verifactu.stats.compliance_summary", &ctx).await;
     assert_eq!(
-        summary["pending_count"].as_i64().unwrap(),
+        i64_of(&summary["pending_count"]),
         1,
         "el KPI de pendientes debe contar el registro real recién creado"
     );

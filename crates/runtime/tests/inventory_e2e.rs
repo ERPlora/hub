@@ -10,6 +10,14 @@ use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
+/// Postgres decodifica `SUM(...)` sobre enteros como `NUMERIC` → JSON **string** (contrato de
+/// dinero, `pg_cell`), mientras que `COUNT(*)` es `INT8` → número. Lee un i64 en ambos casos.
+fn i64_of(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("valor entero/NUMERIC esperado, got {v}"))
+}
+
 fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
@@ -78,7 +86,7 @@ async fn product_crud_and_low_stock() {
     // El contrato completo (exclusiones, sin-coste, agotados) se fija en inventory_stats_e2e.rs.
     let stats = rt.execute_query("inventory.products.stats", &Params::new(), &ctx).await.unwrap();
     assert_eq!(stats[0]["total_products"], json!(1));
-    assert_eq!(stats[0]["total_inventory_value"].as_i64().unwrap(), 600);
+    assert_eq!(i64_of(&stats[0]["total_inventory_value"]), 600);
 
     // Otro hub no ve nada (scope hub_id).
     let other = RequestContext::new("h2", "u9", ["*".to_string()]);
