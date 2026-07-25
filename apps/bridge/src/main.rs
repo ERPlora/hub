@@ -10,6 +10,7 @@
 //! `invoke` en lugar de este servidor.
 
 mod auth;
+mod pairing;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,10 +19,11 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 
 use auth::{AuthOutcome, BridgeAuth};
+use pairing::Pairing;
 
 use erplora_peripherals::discovery::{self, parse_printer_id};
 use erplora_peripherals::drawer;
@@ -47,6 +49,16 @@ struct AppState {
     events: broadcast::Sender<Event>,
     /// Política de auth del handshake WS (allowlist de `Origin` + token de sesión). ADR-0050.
     auth: BridgeAuth,
+    /// Emparejamiento device-code actual (ADR-0154). `None` = sin emparejar. Lo actualiza el flujo
+    /// directo en segundo plano y la ruta `/pair/redeem` (flujo inverso). `/status` lo expone
+    /// SIN secretos (`paired` + `hub_id`).
+    pairing: std::sync::RwLock<Option<Pairing>>,
+    /// Ruta del fichero de emparejamiento persistido (0600).
+    pairing_path: PathBuf,
+    /// Base URL del SaaS contra el que se empareja (`BRIDGE_SAAS_URL` / `DEFAULT_SAAS_URL`).
+    saas_url: String,
+    /// Cliente HTTP compartido para el flujo de pairing (timeouts acotados).
+    http: reqwest::Client,
 }
 
 #[tokio::main]
@@ -72,16 +84,27 @@ async fn main() {
     // por `BRIDGE_SAAS_URL` (fork/self-host); `BRIDGE_JWT_PUBLIC_KEY` es el override offline. Exige
     // siempre `aud=erplora-bridge` (constante del protocolo). Si el SaaS no responde, degrada a la vía
     // simétrica (no aborta). Cero config por-hub.
+    // Base URL del SaaS: `BRIDGE_SAAS_URL` (fork/self-host) o el default horneado. Se usa tanto para
+    // pedir la clave pública JWT como para el flujo de pairing device-code (ADR-0154).
+    let saas_url = std::env::var(auth::ENV_SAAS_URL)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| auth::DEFAULT_SAAS_URL.to_string());
+
     let mut auth = BridgeAuth::from_env();
     if !auth.has_jwt() {
-        let saas_url = std::env::var(auth::ENV_SAAS_URL)
-            .ok()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| auth::DEFAULT_SAAS_URL.to_string());
         if let Some(v) = auth::jwt_verifier_from_saas(&saas_url).await {
             auth = auth.with_jwt(v);
         }
+    }
+
+    // Emparejamiento device-code (ADR-0154): carga el persistido (si lo hay) para reflejarlo en
+    // `/status` y decidir si arrancar el flujo directo.
+    let pairing_path = pairing::pairing_file_path();
+    let existing_pairing = pairing::load_pairing(&pairing_path);
+    if let Some(p) = &existing_pairing {
+        tracing::info!(hub_id = %p.hub_id, hub = %p.hub_name, "Bridge: emparejado con un hub");
     }
 
     let (events_tx, _) = broadcast::channel(EVENT_BUS_CAPACITY);
@@ -90,10 +113,15 @@ async fn main() {
         queue: PrintQueue::new(RetryPolicy::default()),
         events: events_tx,
         auth,
+        pairing: std::sync::RwLock::new(existing_pairing),
+        pairing_path,
+        saas_url,
+        http: pairing::http_client(),
     });
 
     spawn_queue_worker(state.clone());
     spawn_watchdog(state.clone());
+    maybe_spawn_pairing(state.clone());
 
     let app = build_router(state);
 
@@ -109,6 +137,10 @@ fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/status", get(status).options(preflight))
         .route("/ws", get(ws_upgrade).options(preflight))
+        // Flujo INVERSO de pairing (ADR-0154): la UI local del Bridge postea el `user_code` que el
+        // operador teclea. Solo loopback (mismas protecciones Host/Origin que el resto); nunca
+        // expone secretos en la respuesta.
+        .route("/pair/redeem", post(pair_redeem).options(preflight))
         .with_state(state)
 }
 
@@ -210,12 +242,22 @@ async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Respo
     if !state.auth.host_allowed(&headers) {
         return (StatusCode::FORBIDDEN, "bad host").into_response();
     }
+    // Estado de emparejamiento (ADR-0154), SIN secretos: solo `paired` + `hub_id` (informativo).
+    let (paired, hub_id) = match state.pairing.read() {
+        Ok(guard) => match guard.as_ref() {
+            Some(p) => (true, Some(p.hub_id.clone())),
+            None => (false, None),
+        },
+        Err(_) => (false, None),
+    };
     let mut resp = Json(serde_json::json!({
         "ok": true,
         "version": VERSION,
         "service": "erplora-bridge",
         "devices": state.registry.get_all().len(),
         "watchdog": true,
+        "paired": paired,
+        "hub_id": hub_id,
     }))
     .into_response();
     // ACAO reflejado para que el `fetch` de detección cross-origin (PWA del tenant) pueda leer la
@@ -255,6 +297,132 @@ async fn ws_upgrade(
                 "handshake WS del Bridge rechazado",
             );
             (rejected.status_code(), "bridge handshake rechazado").into_response()
+        }
+    }
+}
+
+/// Env var que DESACTIVA el arranque del flujo directo de pairing (tests/CI). Truthy ⇒ no se
+/// lanza el emparejamiento en segundo plano (el binario sigue sirviendo `/status` y `/ws`).
+const ENV_NO_PAIRING: &str = "BRIDGE_NO_PAIRING";
+
+/// Plataforma del host para el `pair_start` (informativa, la registra el SaaS).
+fn host_platform() -> &'static str {
+    std::env::consts::OS
+}
+
+/// Nombre del host (best-effort) para identificar el equipo en el portal del SaaS al emparejar.
+fn host_name() -> String {
+    std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME"))
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "erplora-bridge".to_string())
+}
+
+/// Arranca el flujo DIRECTO de pairing en segundo plano si procede: no hay emparejamiento persistido
+/// y `BRIDGE_NO_PAIRING` no está activo (ADR-0154). Al aprobar, persiste y refleja el emparejamiento
+/// en `AppState.pairing` (lo verá `/status`). No bloquea el arranque del servidor.
+fn maybe_spawn_pairing(state: Arc<AppState>) {
+    if is_truthy_env(ENV_NO_PAIRING) {
+        tracing::info!("{ENV_NO_PAIRING} activo: no se arranca el flujo de pairing");
+        return;
+    }
+    let already_paired = state.pairing.read().map(|g| g.is_some()).unwrap_or(false);
+    if already_paired {
+        return;
+    }
+    tracing::info!("Bridge: sin emparejar — arrancando el flujo device-code en segundo plano");
+    tokio::spawn(async move {
+        let result = pairing::run_direct_pairing(
+            &state.http,
+            &state.saas_url,
+            &state.pairing_path,
+            host_platform(),
+            VERSION,
+            &host_name(),
+            true, // abre el navegador del operador en verification_uri_complete
+        )
+        .await;
+        match result {
+            Ok(p) => {
+                tracing::info!(hub = %p.hub_name, "Bridge: emparejamiento completado");
+                if let Ok(mut guard) = state.pairing.write() {
+                    *guard = Some(p);
+                }
+            }
+            Err(e) => tracing::warn!(error = %e, "Bridge: el flujo de pairing no completó"),
+        }
+    });
+}
+
+/// `true` si una env var tiene un valor truthy (`1`/`true`/`yes`/`on`).
+fn is_truthy_env(name: &str) -> bool {
+    std::env::var(name)
+        .ok()
+        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+/// Cuerpo de `POST /pair/redeem` (flujo inverso): el `user_code` que teclea el operador.
+#[derive(serde::Deserialize)]
+struct RedeemBody {
+    user_code: String,
+}
+
+/// `POST /pair/redeem` (ADR-0154, flujo inverso) — solo loopback. Canjea el `user_code` contra el
+/// SaaS; al aprobar, persiste el emparejamiento (0600) y lo refleja en `AppState.pairing`. La
+/// respuesta NO incluye secretos: `{status, hub_id, hub_name}` en éxito. Mismas protecciones
+/// `Host`/`Origin` que `/ws` (anti DNS-rebinding + allowlist de origen).
+async fn pair_redeem(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Result<Json<RedeemBody>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    if !state.auth.host_allowed(&headers) {
+        return (StatusCode::FORBIDDEN, "bad host").into_response();
+    }
+    let origin = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok());
+    if !state.auth.origin_allowed(origin) {
+        return (StatusCode::FORBIDDEN, "forbidden origin").into_response();
+    }
+    let Json(body) = match body {
+        Ok(b) => b,
+        Err(_) => return (StatusCode::BAD_REQUEST, "invalid body").into_response(),
+    };
+    let user_code = body.user_code.trim();
+    if user_code.is_empty() {
+        return (StatusCode::BAD_REQUEST, "empty user_code").into_response();
+    }
+
+    match pairing::pair_redeem(&state.http, &state.saas_url, user_code).await {
+        Ok(pairing::PollOutcome::Approved(approval)) => {
+            let paired: Pairing = approval.into();
+            if let Err(e) = pairing::save_pairing(&state.pairing_path, &paired) {
+                tracing::warn!(error = %e, "Bridge: no pude persistir el emparejamiento (redeem)");
+                return (StatusCode::INTERNAL_SERVER_ERROR, "persist failed").into_response();
+            }
+            let resp = Json(serde_json::json!({
+                "status": "approved",
+                "hub_id": paired.hub_id,
+                "hub_name": paired.hub_name,
+            }));
+            if let Ok(mut guard) = state.pairing.write() {
+                *guard = Some(paired);
+            }
+            resp.into_response()
+        }
+        Ok(pairing::PollOutcome::Pending) => {
+            (StatusCode::ACCEPTED, Json(serde_json::json!({"status": "pending"}))).into_response()
+        }
+        Ok(pairing::PollOutcome::Denied) => {
+            (StatusCode::FORBIDDEN, Json(serde_json::json!({"status": "denied"}))).into_response()
+        }
+        Ok(pairing::PollOutcome::Expired | pairing::PollOutcome::SlowDown) => {
+            (StatusCode::GONE, Json(serde_json::json!({"status": "expired"}))).into_response()
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Bridge: redeem falló");
+            (StatusCode::BAD_GATEWAY, "pairing error").into_response()
         }
     }
 }
@@ -467,6 +635,12 @@ mod integration_tests {
     /// Estado mínimo para el router con una política de auth concreta (sin watchdog/cola worker;
     /// el handshake se rechaza/acepta antes de tocarlos).
     fn test_state(auth: BridgeAuth) -> Arc<AppState> {
+        test_state_with(auth, None, "https://saas.invalid")
+    }
+
+    /// Como `test_state` pero permite fijar el emparejamiento inicial y la URL del SaaS (para
+    /// ejercer `/status` emparejado y `/pair/redeem` contra un SaaS mock).
+    fn test_state_with(auth: BridgeAuth, pairing: Option<Pairing>, saas_url: &str) -> Arc<AppState> {
         let (events_tx, _) = broadcast::channel(EVENT_BUS_CAPACITY);
         Arc::new(AppState {
             registry: DeviceRegistry::load(PathBuf::from(
@@ -475,6 +649,11 @@ mod integration_tests {
             queue: PrintQueue::new(RetryPolicy::default()),
             events: events_tx,
             auth,
+            pairing: std::sync::RwLock::new(pairing),
+            pairing_path: std::env::temp_dir()
+                .join(format!("erplora-bridge-test-pairing-{}.json", uuid::Uuid::new_v4())),
+            saas_url: saas_url.to_string(),
+            http: pairing::http_client(),
         })
     }
 
@@ -714,5 +893,139 @@ mod integration_tests {
             resp.contains("access-control-allow-origin: https://erp.midominio.com"),
             "preflight debe reflejar el Origin, fue: {resp:?}"
         );
+    }
+
+    // ── ADR-0154: `/status` refleja `paired` + `/pair/redeem` (flujo inverso, loopback) ─────────
+
+    /// Arranca el router del Bridge con un `AppState` concreto y devuelve el puerto.
+    async fn spawn_server_state(state: Arc<AppState>) -> u16 {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = build_router(state);
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        port
+    }
+
+    /// Lee la respuesta COMPLETA (status line + cabeceras + cuerpo) hasta EOF (`Connection: close`).
+    async fn read_full(port: u16, request: &str) -> String {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        stream.write_all(request.as_bytes()).await.unwrap();
+        stream.flush().await.unwrap();
+        let mut buf = Vec::new();
+        let _ = tokio::time::timeout(Duration::from_secs(2), async {
+            let mut tmp = [0u8; 1024];
+            loop {
+                let n = stream.read(&mut tmp).await.unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+            }
+        })
+        .await;
+        String::from_utf8_lossy(&buf).to_string()
+    }
+
+    /// SaaS mock que aprueba un `pair/redeem` — incluye un `bridge_device_token` (secreto) para
+    /// verificar que el Bridge NO lo refleja hacia el cliente local.
+    async fn spawn_mock_saas_redeem_approved() -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let router = Router::new().route(
+            "/api/v1/bridge/pair/redeem/",
+            post(|| async {
+                Json(serde_json::json!({
+                    "status": "approved",
+                    "hub_id": "hub-9",
+                    "hub_name": "Bar Pepe",
+                    "hub_url": "https://hub-9.erplora.com",
+                    "bridge_jwt": "j",
+                    "bridge_jwt_expires_in": 900,
+                    "bridge_device_token": "secret-xyz",
+                    "saas_public_key_url": "https://erplora.com/api/v1/auth/public-key/"
+                }))
+            }),
+        );
+        tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        format!("http://127.0.0.1:{port}")
+    }
+
+    fn sample_pairing() -> Pairing {
+        Pairing {
+            hub_id: "hub-7".into(),
+            hub_name: "Sur Restaurante".into(),
+            hub_url: "https://hub-7.erplora.com".into(),
+            bridge_device_token: "top-secret".into(),
+            saas_public_key_url: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn status_reports_paired_true_with_hub_id_no_secret() {
+        let state = test_state_with(
+            BridgeAuth::new(Some("s3cr3t".into()), vec![]),
+            Some(sample_pairing()),
+            "https://saas.invalid",
+        );
+        let port = spawn_server_state(state).await;
+        let resp = read_full(
+            port,
+            &format!("GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"),
+        )
+        .await;
+        assert!(resp.contains("\"paired\":true"), "esperaba paired:true, fue: {resp}");
+        assert!(resp.contains("\"hub_id\":\"hub-7\""), "esperaba hub_id, fue: {resp}");
+        assert!(!resp.contains("top-secret"), "/status NO debe filtrar el token: {resp}");
+    }
+
+    #[tokio::test]
+    async fn status_reports_paired_false_when_unpaired() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let resp = read_full(
+            port,
+            &format!("GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"),
+        )
+        .await;
+        assert!(resp.contains("\"paired\":false"), "esperaba paired:false, fue: {resp}");
+    }
+
+    #[tokio::test]
+    async fn pair_redeem_rejected_with_rebinding_host() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let body = "{\"user_code\":\"WXYZ-1234\"}";
+        let req = format!(
+            "POST /pair/redeem HTTP/1.1\r\nHost: attacker.com\r\nContent-Type: application/json\r\n\
+             Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let status = send_request(port, &req).await;
+        assert!(status.contains("403"), "redeem con Host de rebinding debe ser 403, fue: {status}");
+    }
+
+    #[tokio::test]
+    async fn pair_redeem_approves_and_hides_secret() {
+        let saas = spawn_mock_saas_redeem_approved().await;
+        let state =
+            test_state_with(BridgeAuth::new(Some("s3cr3t".into()), vec![]), None, &saas);
+        let port = spawn_server_state(state).await;
+        let body = "{\"user_code\":\"WXYZ-1234\"}";
+        let req = format!(
+            "POST /pair/redeem HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://localhost:5173\r\n\
+             Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let resp = read_full(port, &req).await;
+        assert!(resp.contains("200"), "esperaba 200 OK, fue: {resp}");
+        assert!(resp.contains("\"status\":\"approved\""), "esperaba approved, fue: {resp}");
+        assert!(resp.contains("\"hub_id\":\"hub-9\""), "esperaba hub_id, fue: {resp}");
+        assert!(!resp.contains("secret-xyz"), "la respuesta NO debe filtrar el token: {resp}");
     }
 }
