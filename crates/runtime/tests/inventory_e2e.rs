@@ -6,7 +6,7 @@
 //! Si `dist/handler.wasm` no existe (no se compiló el guest), se salta con aviso.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -27,7 +27,7 @@ fn wasm_present() -> bool {
 }
 
 async fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     // inventory depende de taxes (ADR-0066): instalar taxes primero.
     rt.install_from_dir(&inventory_dir().parent().unwrap().join("taxes")).await.expect("instalar taxes");

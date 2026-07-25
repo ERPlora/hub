@@ -465,12 +465,12 @@ pub fn permissions_for_role(registry: &Registry, role: &str) -> HashSet<String> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::SqliteAdapter;
+    use erplora_db::{testutil::fresh_db, PgAdapter};
 
     /// Prepara la identidad para los unit tests. La columna `hub_session.device_id` la añade la
     /// **migración de sistema v8** (ADR-0154); en los unit tests de identidad la creamos a mano
     /// tras el baseline, igual que `device_trust_gate` monta `hub_trusted_device` (v2) a mano.
-    async fn setup_identity(db: &SqliteAdapter) {
+    async fn setup_identity(db: &PgAdapter) {
         ensure_tables(db).await.unwrap();
         db.execute_batch("ALTER TABLE hub_session ADD COLUMN device_id TEXT;")
             .await
@@ -478,7 +478,7 @@ mod tests {
     }
 
     /// `device_id` persistido en la sesión `token` (o `None` si la fila no existe / es NULL).
-    async fn session_device_id(db: &SqliteAdapter, token: &str) -> Option<String> {
+    async fn session_device_id(db: &PgAdapter, token: &str) -> Option<String> {
         let mut p = Params::new();
         p.insert("token".into(), json!(token));
         let res = db
@@ -495,7 +495,7 @@ mod tests {
 
     #[tokio::test]
     async fn pin_login_and_session_roundtrip() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         setup_identity(&db).await;
 
         let uid = create_user(&db, "María", "1234", "manager", None)
@@ -523,7 +523,7 @@ mod tests {
     async fn create_session_persists_device_id() {
         // ADR-0154: `create_session` guarda el `device_id` aportado por el host (Some) y lo deja
         // NULL cuando el login no lo aporta (None).
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         setup_identity(&db).await;
         let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
 
@@ -543,7 +543,7 @@ mod tests {
         // ADR-0154 *single active device session*: con max_devices == 1 y un device_id nuevo,
         // se desalojan (borran) TODAS las sesiones cuyo device_id difiera —incluidas las NULL de
         // logins que no aportaron device_id—; las del MISMO dispositivo sobreviven.
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         setup_identity(&db).await;
         let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
 
@@ -566,7 +566,7 @@ mod tests {
     #[tokio::test]
     async fn enforce_device_limit_unlimited_or_no_device_is_noop() {
         // max_devices == 0 (ilimitado, p. ej. Hub Cloud) o sin device_id → no se desaloja a nadie.
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         setup_identity(&db).await;
         let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
 
@@ -586,7 +586,7 @@ mod tests {
 
     #[tokio::test]
     async fn set_pin_enables_pin_login_for_existing_user() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
         // Cloud-linked user provisioned without a PIN (first online login).
         let user = get_or_link_cloud_user(&db, "7", "Ada", "admin")
@@ -615,7 +615,7 @@ mod tests {
 
     #[tokio::test]
     async fn cloud_user_link_is_idempotent() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
         let a = get_or_link_cloud_user(&db, "42", "Demo", "cashier")
             .await
@@ -633,7 +633,7 @@ mod tests {
     #[tokio::test]
     async fn new_pins_are_argon2id() {
         // create_user/set_pin escriben siempre argon2id (string PHC `$argon2id$...`).
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
         create_user(&db, "Eva", "1111", "cashier", None)
             .await
@@ -657,7 +657,7 @@ mod tests {
 
     #[tokio::test]
     async fn device_trust_gate() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
         // La tabla la crea la migración de sistema v2; en el test la creamos a mano (sin hub_id).
         db.execute_batch(

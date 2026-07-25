@@ -18,7 +18,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 
 fn mdir(name: &str) -> PathBuf {
@@ -30,7 +30,7 @@ fn admin() -> RequestContext {
 
 #[tokio::test]
 async fn instalar_taxes_siembra_sus_categorias_fiscales() {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
 
@@ -53,7 +53,7 @@ async fn instalar_taxes_siembra_sus_categorias_fiscales() {
 async fn la_semilla_es_idempotente_reinstalar_no_duplica() {
     // El seed es DML re-ejecutable (WHERE NOT EXISTS por la clave natural). Si no lo fuera, una
     // reinstalación —o un reintento del instalador— dejaría el catálogo fiscal duplicado.
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.expect("primera instalación");
     let antes = rt.execute_query("taxes.categories.list", &Params::new(), &admin()).await.unwrap();
@@ -67,7 +67,7 @@ async fn la_semilla_es_idempotente_reinstalar_no_duplica() {
 #[tokio::test]
 async fn un_modulo_sin_bloque_seed_se_instala_igual() {
     // La inmensa mayoría de los módulos no siembra nada: la ausencia del bloque no es un error.
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("customers")).await.expect("instalar un módulo sin seed");
 }

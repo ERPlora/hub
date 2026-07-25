@@ -8,7 +8,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use cloud_client::{EntitledModule, EntitlementClaims};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
@@ -18,7 +18,7 @@ use tower::ServiceExt; // oneshot
 /// App en modo `Session` con un usuario admin (PIN 1111). Devuelve también el `AppState` para
 /// sembrar la celda de revalidación (el `entitlement` es un `Arc` compartido con el router).
 async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-sess");
     rt.ensure_system_tables().await.unwrap();
     rt.create_user("Admin", "1111", "admin", None).await.unwrap();

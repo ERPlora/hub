@@ -10,7 +10,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_server::{app, AppState, AuthMode, HubConfig};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use http_body_util::BodyExt;
 use std::path::{Path, PathBuf};
@@ -63,7 +63,7 @@ async fn serves_installed_module_assets_from_cache() {
     let _ = std::fs::remove_dir_all(&cache);
     let dir = write_module(&cache, "demo", "9.9.9");
 
-    let mut rt = Runtime::new(Box::new(SqliteAdapter::open_in_memory().await.unwrap()));
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&dir).await.unwrap(); // registra demo@9.9.9 en el runtime
     let state = AppState::with_config(rt, cfg(cache.clone()));
 

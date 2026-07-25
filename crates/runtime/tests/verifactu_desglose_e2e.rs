@@ -13,7 +13,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::{json, Value};
 
@@ -34,7 +34,7 @@ fn wasm() -> bool {
 }
 
 async fn rt_invoice() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("invoice")).await.expect("instalar invoice");
     rt

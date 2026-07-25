@@ -1,35 +1,29 @@
-//! erplora-vector — embedded vector store for hub RAG.
+//! erplora-vector — vector store abstraction for hub RAG.
 //!
-//! In cloud the RAG corpus lives in Postgres/Aurora with pgvector (`embedding
-//! vector(1536)` + HNSW index, see ARQUITECTURA.md §9.4). Locally the hub runs on
-//! SQLite, which has no pgvector extension, so this crate implements **Option A**
-//! from §9.5: an embedded vector index in Rust.
+//! The RAG corpus (agent/tool descriptions embedded for routing, ARQUITECTURA.md §9.4)
+//! lives behind the [`VectorStore`] trait. Cosine similarity is computed by **brute
+//! force** in Rust ([`cosine_similarity`]); a hub's corpus is small (hundreds of chunks),
+//! so a linear scan is fast enough and needs no native index.
 //!
-//! Embeddings are persisted in a plain SQLite table (one row per knowledge chunk,
-//! per-hub and per-version) and cosine similarity is computed by **brute force** in
-//! Rust. The corpus per hub is small (hundreds of chunks), so a linear scan is fast
-//! enough and avoids any native index dependency.
+//! The former SQLite-backed local store was **removed** with ADR-0154 (the hub is now
+//! Postgres-only; there is no local SQLite database). The reference/test implementation
+//! is [`MemoryVectorStore`], a pure in-memory store with **no** database dependency.
 //!
-//! The intent (§9.5) is two implementations behind the [`VectorStore`] trait:
-//! [`SqliteVectorStore`] here for local, and a `PgVectorStore` in cloud — mirroring
-//! how [`erplora_db::DatabaseAdapter`] abstracts SQLite vs Postgres.
-//!
-//! ## Storage note
-//!
-//! [`erplora_db::DatabaseAdapter`] only binds JSON-compatible SQL values
-//! (text / number / null); it does **not** bind raw `BLOB` bytes (`json_to_sql`
-//! turns arrays/objects into JSON strings). To stay compatible with the adapter
-//! as-is, the embedding `Vec<f32>` is serialized as a **JSON array of numbers
-//! stored in a `TEXT` column**, not a little-endian f32 BLOB. In cloud/pgvector
-//! this same column would be a native `vector(N)`.
+//! The production store is a **Postgres/pgvector** implementation (`embedding vector(1536)`
+//! + HNSW index, ARQUITECTURA.md §9.4) tracked as a follow-up (hub#204 / pm#29). It will
+//! sit behind this same [`VectorStore`] trait and reuse [`VectorError::Db`] as its error
+//! contract.
 
 use async_trait::async_trait;
-use erplora_db::{DatabaseAdapter, DbError, Params};
-use serde_json::Value;
+use erplora_db::DbError;
+use std::sync::Mutex;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum VectorError {
+    /// Reserved for the Postgres/pgvector store (hub#204 / pm#29): the error contract for
+    /// the future `PgVectorStore`. `MemoryVectorStore` never fails, so it is unused today.
+    #[allow(dead_code)]
     #[error("db error: {0}")]
     Db(#[from] DbError),
     #[error("serialization error: {0}")]
@@ -86,69 +80,36 @@ pub trait VectorStore {
     async fn delete_by_ref(&self, hub_id: &str, ref_id: &str) -> Result<usize>;
 }
 
-// Re-export so callers can name the adapter trait without depending on erplora-db.
-pub use erplora_db::DatabaseAdapter as DbAdapter;
-
-/// SQLite-backed [`VectorStore`] (Option A, local/brute-force).
+/// In-memory [`VectorStore`] — the reference/test implementation.
 ///
-/// Generic over any [`DatabaseAdapter`] so tests can use an in-memory adapter and
-/// callers can pass an owned `SqliteAdapter`.
-pub struct SqliteVectorStore<A: DatabaseAdapter> {
-    db: A,
+/// Backed by a `Mutex<Vec<Chunk>>` with **no** database dependency. Retrieval is a
+/// brute-force cosine scan, honouring the same hub/ref filtering and scoring semantics
+/// the production pgvector store (hub#204 / pm#29) must reproduce.
+#[derive(Default)]
+pub struct MemoryVectorStore {
+    chunks: Mutex<Vec<Chunk>>,
 }
 
-impl<A: DatabaseAdapter> SqliteVectorStore<A> {
-    /// Build a store over the given adapter.
-    pub fn new(db: A) -> Self {
-        Self { db }
-    }
-
-    /// Borrow the underlying adapter.
-    pub fn adapter(&self) -> &A {
-        &self.db
+impl MemoryVectorStore {
+    /// Build an empty in-memory store.
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
 #[async_trait]
-impl<A: DatabaseAdapter> VectorStore for SqliteVectorStore<A> {
+impl VectorStore for MemoryVectorStore {
     async fn ensure_schema(&self) -> Result<()> {
-        self.db.execute_batch(
-            "CREATE TABLE IF NOT EXISTS knowledge_chunk (
-                id        TEXT PRIMARY KEY,
-                hub_id    TEXT NOT NULL,
-                ref_id    TEXT NOT NULL,
-                version   TEXT NOT NULL,
-                lang      TEXT NOT NULL,
-                source    TEXT NOT NULL,
-                content   TEXT NOT NULL,
-                embedding TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_knowledge_chunk_hub
-                ON knowledge_chunk (hub_id);
-            CREATE INDEX IF NOT EXISTS idx_knowledge_chunk_hub_ref
-                ON knowledge_chunk (hub_id, ref_id);",
-        ).await?;
+        // No backing schema for an in-memory store.
         Ok(())
     }
 
     async fn upsert(&self, chunk: &Chunk) -> Result<()> {
-        let embedding = serialize_embedding(&chunk.embedding)?;
-        let mut params = Params::new();
-        params.insert("id".into(), Value::String(chunk.id.clone()));
-        params.insert("hub_id".into(), Value::String(chunk.hub_id.clone()));
-        params.insert("ref_id".into(), Value::String(chunk.ref_id.clone()));
-        params.insert("version".into(), Value::String(chunk.version.clone()));
-        params.insert("lang".into(), Value::String(chunk.lang.clone()));
-        params.insert("source".into(), Value::String(chunk.source.clone()));
-        params.insert("content".into(), Value::String(chunk.content.clone()));
-        params.insert("embedding".into(), Value::String(embedding));
-        self.db.execute(
-            "INSERT OR REPLACE INTO knowledge_chunk
-                (id, hub_id, ref_id, version, lang, source, content, embedding)
-             VALUES
-                (:id, :hub_id, :ref_id, :version, :lang, :source, :content, :embedding)",
-            &params,
-        ).await?;
+        let mut chunks = self.chunks.lock().unwrap();
+        match chunks.iter_mut().find(|c| c.id == chunk.id) {
+            Some(existing) => *existing = chunk.clone(),
+            None => chunks.push(chunk.clone()),
+        }
         Ok(())
     }
 
@@ -159,38 +120,26 @@ impl<A: DatabaseAdapter> VectorStore for SqliteVectorStore<A> {
         top_k: usize,
         ref_ids: Option<&[String]>,
     ) -> Result<Vec<ScoredChunk>> {
-        let mut params = Params::new();
-        params.insert("hub_id".into(), Value::String(hub_id.to_string()));
-
-        // Build an optional `ref_id IN (...)` filter with named params.
-        let mut sql = String::from(
-            "SELECT id, hub_id, ref_id, version, lang, source, content, embedding
-             FROM knowledge_chunk WHERE hub_id = :hub_id",
-        );
+        // An empty allow-list matches nothing.
         if let Some(refs) = ref_ids {
             if refs.is_empty() {
-                // An empty allow-list matches nothing.
                 return Ok(Vec::new());
             }
-            let placeholders: Vec<String> =
-                refs.iter().enumerate().map(|(i, _)| format!(":ref{i}")).collect();
-            sql.push_str(&format!(" AND ref_id IN ({})", placeholders.join(", ")));
-            for (i, r) in refs.iter().enumerate() {
-                params.insert(format!("ref{i}"), Value::String(r.clone()));
-            }
         }
 
-        let rows = self.db.query(&sql, &params).await?.rows;
-
-        let mut scored: Vec<ScoredChunk> = Vec::with_capacity(rows.len());
-        for row in &rows {
-            let obj = row
-                .as_object()
-                .ok_or_else(|| VectorError::Embedding("row is not an object".into()))?;
-            let chunk = row_to_chunk(obj)?;
-            let score = cosine_similarity(query_embedding, &chunk.embedding);
-            scored.push(ScoredChunk { chunk, score });
-        }
+        let chunks = self.chunks.lock().unwrap();
+        let mut scored: Vec<ScoredChunk> = chunks
+            .iter()
+            .filter(|c| c.hub_id == hub_id)
+            .filter(|c| match ref_ids {
+                Some(refs) => refs.iter().any(|r| r == &c.ref_id),
+                None => true,
+            })
+            .map(|c| ScoredChunk {
+                score: cosine_similarity(query_embedding, &c.embedding),
+                chunk: c.clone(),
+            })
+            .collect();
 
         // Order by score descending; total_cmp gives a total order over f32.
         scored.sort_by(|a, b| b.score.total_cmp(&a.score));
@@ -199,14 +148,10 @@ impl<A: DatabaseAdapter> VectorStore for SqliteVectorStore<A> {
     }
 
     async fn delete_by_ref(&self, hub_id: &str, ref_id: &str) -> Result<usize> {
-        let mut params = Params::new();
-        params.insert("hub_id".into(), Value::String(hub_id.to_string()));
-        params.insert("ref_id".into(), Value::String(ref_id.to_string()));
-        let res = self.db.execute(
-            "DELETE FROM knowledge_chunk WHERE hub_id = :hub_id AND ref_id = :ref_id",
-            &params,
-        ).await?;
-        Ok(res.affected as usize)
+        let mut chunks = self.chunks.lock().unwrap();
+        let before = chunks.len();
+        chunks.retain(|c| !(c.hub_id == hub_id && c.ref_id == ref_id));
+        Ok(before - chunks.len())
     }
 }
 
@@ -230,44 +175,9 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     dot / (na.sqrt() * nb.sqrt())
 }
 
-/// Serialize an embedding as a JSON array of numbers (stored in a TEXT column).
-fn serialize_embedding(embedding: &[f32]) -> Result<String> {
-    serde_json::to_string(embedding).map_err(|e| VectorError::Serde(e.to_string()))
-}
-
-/// Parse an embedding from its JSON-array TEXT representation.
-fn deserialize_embedding(text: &str) -> Result<Vec<f32>> {
-    serde_json::from_str(text).map_err(|e| VectorError::Embedding(e.to_string()))
-}
-
-fn str_field(row: &serde_json::Map<String, Value>, key: &str) -> Result<String> {
-    match row.get(key) {
-        Some(Value::String(s)) => Ok(s.clone()),
-        Some(Value::Null) | None => {
-            Err(VectorError::Embedding(format!("missing column `{key}`")))
-        }
-        Some(other) => Ok(other.to_string()),
-    }
-}
-
-fn row_to_chunk(row: &serde_json::Map<String, Value>) -> Result<Chunk> {
-    let embedding = deserialize_embedding(&str_field(row, "embedding")?)?;
-    Ok(Chunk {
-        id: str_field(row, "id")?,
-        hub_id: str_field(row, "hub_id")?,
-        ref_id: str_field(row, "ref_id")?,
-        version: str_field(row, "version")?,
-        lang: str_field(row, "lang")?,
-        source: str_field(row, "source")?,
-        content: str_field(row, "content")?,
-        embedding,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::SqliteAdapter;
 
     fn chunk(id: &str, hub: &str, ref_id: &str, emb: Vec<f32>) -> Chunk {
         Chunk {
@@ -282,9 +192,8 @@ mod tests {
         }
     }
 
-    async fn store() -> SqliteVectorStore<SqliteAdapter> {
-        let db = SqliteAdapter::open_in_memory().await.expect("open in memory");
-        let s = SqliteVectorStore::new(db);
+    async fn store() -> MemoryVectorStore {
+        let s = MemoryVectorStore::new();
         s.ensure_schema().await.expect("schema");
         s
     }

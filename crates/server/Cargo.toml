@@ -50,6 +50,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 base64 = "0.22"
 
 [dev-dependencies]
+# `test-util` = helper de esquema Postgres efímero por test (ADR-0154): los tests del server
+# corren contra un Postgres real (aislamiento por esquema, en paralelo).
+erplora-db = { path = "../db", features = ["test-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 # Fixtures del test de progreso de instalación (`tests/install_progress.rs`): zips de módulo

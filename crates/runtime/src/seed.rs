@@ -98,7 +98,7 @@ fn split_statements(sql: &str) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::identity;
-    use erplora_db::SqliteAdapter;
+    use erplora_db::testutil::fresh_db;
 
     /// SQL de seed del **demo** (el que el terraform pasa inline por `HUB_SEED_SQL`). Es el mismo
     /// contenido versionado en `crates/server/seeds/demo.sql`; aquí lo embebemos para que el test
@@ -107,7 +107,7 @@ mod tests {
 
     #[tokio::test]
     async fn apply_runs_each_statement_and_is_idempotent() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         // Tres sentencias idempotentes (CREATE IF NOT EXISTS + dos inserts guardados).
         let sql = "\
 CREATE TABLE IF NOT EXISTS t (id TEXT PRIMARY KEY, v TEXT);\
@@ -139,7 +139,7 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
 
     #[tokio::test]
     async fn apply_reports_clear_error_on_bad_statement() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         let err = apply(&db, "SELECT * FROM no_such_table;").await.unwrap_err();
         assert!(format!("{err}").contains("seed:"), "error de seed claro: {err}");
     }
@@ -150,7 +150,7 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
     /// seguridad que pide hub#36.
     #[tokio::test]
     async fn demo_seed_enables_demo_pin_login_and_trusted_device() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         let runtime = crate::Runtime::new(Box::new(db));
         // Mismo orden que en el server: tablas de sistema primero, luego seed.
         runtime.ensure_system_tables().await.unwrap();

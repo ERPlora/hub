@@ -144,8 +144,7 @@ pub async fn drop_module<S: VectorStore + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::SqliteAdapter;
-    use erplora_vector::SqliteVectorStore;
+    use erplora_vector::MemoryVectorStore;
     use std::sync::Mutex;
 
     /// Mock determinista del proxy de embeddings del Cloud: cada texto → un vector fijo derivado
@@ -180,9 +179,8 @@ mod tests {
         }
     }
 
-    async fn store() -> SqliteVectorStore<SqliteAdapter> {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        let s = SqliteVectorStore::new(db);
+    async fn store() -> MemoryVectorStore {
+        let s = MemoryVectorStore::new();
         s.ensure_schema().await.unwrap();
         s
     }

@@ -16,7 +16,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::Runtime;
@@ -29,7 +29,7 @@ fn modules_root() -> PathBuf {
 /// producción. El test existente sembraba el destino bajo `h1` e importaba a `h2`, así que origen y
 /// destino nunca compartían `(hub_id, …)` y el choque no salía.
 async fn hub_con_taxes(hub_id: &str) -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
     rt.install_from_dir(&modules_root().join("taxes"))
         .await

@@ -307,7 +307,7 @@ mod tests {
     fn valid_module_zip() -> Vec<u8> {
         build_zip(&[
             ("module.json", br#"{"id":"inventory","version":"1.0.0"}"# as &[u8]),
-            ("migrations/sqlite/001_init.sql", b"CREATE TABLE t(id TEXT);"),
+            ("migrations/postgres/001_init.sql", b"CREATE TABLE t(id TEXT);"),
         ])
     }
 
@@ -332,7 +332,7 @@ mod tests {
 
         assert_eq!(path, store.path_for("inventory", "1.0.0"));
         assert!(path.join("module.json").is_file());
-        assert!(path.join("migrations/sqlite/001_init.sql").is_file());
+        assert!(path.join("migrations/postgres/001_init.sql").is_file());
         assert!(store.is_cached("inventory", "1.0.0"));
         assert_eq!(fetcher.calls.get(), 1);
     }

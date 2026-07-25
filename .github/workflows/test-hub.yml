@@ -1,0 +1,72 @@
+# ==============================================================================
+# ERPlora Hub (Rust) — Test suite (Postgres-only runtime, ADR-0154)
+# ==============================================================================
+#
+# Corre `cargo test --workspace` del Hub contra un **Postgres 18** real (service
+# container). Desde ADR-0154 el Hub es Postgres-only: los tests del runtime/server
+# usan el helper `erplora_db::testutil` (feature `test-util`), que crea un ESQUEMA
+# efímero por test sobre `DATABASE_URL` para aislar los tests en paralelo.
+#
+# Los e2e que instalan módulos reales (`postgres_install_e2e`, `sector_packs_pg_e2e`)
+# se auto-omiten si `modules-workspace/` (repos hermanos) no está presente — como en
+# este runner aislado — y corren en local, donde los módulos están al lado del hub.
+# ==============================================================================
+
+name: Hub tests (Rust · Postgres)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: test-hub-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: cargo test --workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: hub_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # El helper de test (erplora_db::testutil) usa este DSN; default idéntico si no se define.
+      DATABASE_URL: postgres://postgres:test@localhost:5433/hub_test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: cargo test --workspace
+        run: cargo test --workspace

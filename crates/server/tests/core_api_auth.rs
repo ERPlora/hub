@@ -1,13 +1,13 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use serde_json::json;
 use tower::ServiceExt;
 
 async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-auth");
     rt.ensure_system_tables().await.unwrap();
     let admin_id = rt

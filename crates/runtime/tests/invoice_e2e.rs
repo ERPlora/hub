@@ -3,7 +3,7 @@
 //! (R1 negada), e inmutabilidad. Incluye la cadena sale.completed → auto-F2.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -13,7 +13,7 @@ fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]
 fn wasm() -> bool { mdir("invoice").join("dist/handler.wasm").exists() }
 
 async fn rt_invoice() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("invoice")).await.expect("instalar invoice");
     rt
@@ -104,7 +104,7 @@ async fn rectify_creates_negated_and_cancels_original() {
 async fn auto_f2_on_sale_completed() {
     // Cadena cross-módulo: una venta (sales) auto-crea una factura F2 (invoice).
     if !mdir("sales").join("dist/handler.wasm").exists() || !wasm() { eprintln!("SKIP"); return; }
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
@@ -139,7 +139,7 @@ async fn auto_f2_propagates_business_issuer_via_outbox() {
     // invoice.create_from_sale, depth>0). Antes la enriquecedora del dispatcher solo corría a
     // depth==0, así que las facturas del relay salían con issuer_nif='' → VeriFactu no encadenaba.
     if !mdir("sales").join("dist/handler.wasm").exists() || !wasm() { eprintln!("SKIP"); return; }
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();

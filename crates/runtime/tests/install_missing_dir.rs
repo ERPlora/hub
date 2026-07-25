@@ -5,12 +5,12 @@
 //! runtime). `install_all_from_dir` debe tratar un dir ausente como "no hay módulos que instalar"
 //! (lote vacío), en vez de propagar `io: No such file or directory (os error 2)` — que ensuciaba
 //! TODOS los logs de arranque del hub demo (`✗ instalación de módulos: …`).
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 
 #[tokio::test]
 async fn install_all_from_missing_dir_is_ok_empty() {
-    let db = SqliteAdapter::open_in_memory().await.expect("sqlite en memoria");
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
 
     // Ruta que garantizadamente NO existe (nunca se crea). No debe ser un error.

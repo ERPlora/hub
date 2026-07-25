@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{
     app, AppState, EnvOrgResolver, OrgDescriptor, OrgId, RuntimeFactory, TenantRouter,
@@ -55,7 +55,7 @@ fn inventory_factory() -> RuntimeFactory {
     Arc::new(|desc: &OrgDescriptor| {
         let hub_id = desc.org_id.0.clone();
         Box::pin(async move {
-            let db = SqliteAdapter::open_in_memory().await?;
+            let db = fresh_db().await;
             let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
             rt.install_from_dir(&fixture()).await.expect("instala inventory");
             Ok(rt)
@@ -84,7 +84,7 @@ async fn shared_app() -> axum::Router {
 
     // El `runtime` single-tenant del AppState es un throwaway (no se usa en el camino de datos
     // cuando hay tenants): un SQLite vacío sirve de bootstrap.
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let base = AppState::new(Runtime::new(Box::new(db)));
     app(base.with_tenants(router))
 }

@@ -30,7 +30,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{EventSink, RequestContext, Runtime};
 use serde_json::json;
 
@@ -58,7 +58,7 @@ impl EventSink for Sink {
 
 /// Runtime con `taxes` + `inventory` + `customers` + `sales` (el conjunto que hace falta para cobrar).
 async fn rt_pos() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.set_event_sink(Arc::new(Sink::default()));
     for m in ["taxes", "inventory", "customers", "sales"] {

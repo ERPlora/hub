@@ -2,7 +2,7 @@
 //! Se registran en `_hub_migrations` para no reaplicarlas. ARQUITECTURA.md §8.
 use std::path::Path;
 
-use erplora_db::{DatabaseAdapter, Dialect, Params};
+use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 
 use crate::errors::Result;
@@ -29,10 +29,8 @@ pub async fn ensure_table(db: &dyn DatabaseAdapter) -> Result<()> {
 pub async fn apply(db: &dyn DatabaseAdapter, dir: &Path, manifest: &Manifest) -> Result<()> {
     ensure_table(db).await?;
 
-    let (declared, subdir) = match db.dialect() {
-        Dialect::Sqlite => (&manifest.migrations.sqlite, "sqlite"),
-        Dialect::Postgres => (&manifest.migrations.postgres, "postgres"),
-    };
+    // Hub Cloud es Postgres-only (ADR-0154): siempre el dialecto `postgres`.
+    let (declared, subdir) = (&manifest.migrations.postgres, "postgres");
     let mut files = declared.clone();
     if let Ok(entries) = std::fs::read_dir(dir.join("migrations").join(subdir)) {
         for entry in entries.flatten() {

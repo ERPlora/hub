@@ -15,7 +15,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::{RequestContext, Runtime};
@@ -41,7 +41,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 async fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1"); // ctx y runtime comparten hub (como en prod)
     rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
@@ -259,7 +259,7 @@ async fn module_data_for_uninstalled_module_fails_its_section_only() {
 
     // Destino SIN inventory (solo taxes): la sección de inventory falla con motivo claro,
     // la de taxes se aplica. (Instalar módulos que faltan es del server, no de este motor.)
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut b = Runtime::with_hub_id(Box::new(db), "h1");
     b.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
 

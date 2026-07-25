@@ -214,14 +214,10 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 
 /// Lista las tablas de usuario del backend activo (catálogo por dialecto).
 async fn list_tables(db: &dyn erplora_db::DatabaseAdapter) -> crate::Result<Vec<String>> {
-    let sql = match db.dialect() {
-        erplora_db::Dialect::Sqlite => {
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
-        }
-        erplora_db::Dialect::Postgres => {
-            "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = 'public'"
-        }
-    };
+    // Postgres-only (ADR-0154). `current_schema()` acota al esquema activo del hub (en prod
+    // `public`; en los tests, el esquema efímero por test).
+    let sql = "SELECT table_name AS name FROM information_schema.tables \
+               WHERE table_schema = current_schema()";
     let res = db.query(sql, &erplora_db::Params::new()).await.map_err(|e| crate::RuntimeError::Other(format!("export: catálogo de tablas: {e}")))?;
     Ok(res.rows.iter().filter_map(|r| r.get("name").and_then(|n| n.as_str()).map(str::to_string)).collect())
 }
@@ -246,13 +242,11 @@ async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str, col: &str
     if !safe_ident(table) {
         return false;
     }
-    let sql = match db.dialect() {
-        erplora_db::Dialect::Sqlite => format!("SELECT name FROM pragma_table_info('{table}')"),
-        erplora_db::Dialect::Postgres => format!(
-            "SELECT column_name AS name FROM information_schema.columns \
-             WHERE table_schema = 'public' AND table_name = '{table}'"
-        ),
-    };
+    // Postgres-only (ADR-0154), acotado al esquema activo (`current_schema()`).
+    let sql = format!(
+        "SELECT column_name AS name FROM information_schema.columns \
+         WHERE table_schema = current_schema() AND table_name = '{table}'"
+    );
     let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else { return false };
     res.rows
         .iter()
@@ -272,23 +266,18 @@ async fn foreign_keys(db: &dyn erplora_db::DatabaseAdapter, table: &str) -> Vec<
     if !safe_ident(table) {
         return Vec::new();
     }
-    let sql = match db.dialect() {
-        // `pragma_foreign_key_list` como tabla-función: columnas `from`/`to`/`table`.
-        erplora_db::Dialect::Sqlite => format!(
-            "SELECT \"from\" AS col_from, \"to\" AS col_to, \"table\" AS parent \
-             FROM pragma_foreign_key_list('{table}')"
-        ),
-        erplora_db::Dialect::Postgres => format!(
-            "SELECT kcu.column_name AS col_from, ccu.column_name AS col_to, \
-                    ccu.table_name AS parent \
-             FROM information_schema.table_constraints tc \
-             JOIN information_schema.key_column_usage kcu \
-               ON kcu.constraint_name = tc.constraint_name \
-             JOIN information_schema.constraint_column_usage ccu \
-               ON ccu.constraint_name = tc.constraint_name \
-             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = '{table}'"
-        ),
-    };
+    // Postgres-only (ADR-0154), acotado al esquema activo (`current_schema()`).
+    let sql = format!(
+        "SELECT kcu.column_name AS col_from, ccu.column_name AS col_to, \
+                ccu.table_name AS parent \
+         FROM information_schema.table_constraints tc \
+         JOIN information_schema.key_column_usage kcu \
+           ON kcu.constraint_name = tc.constraint_name \
+         JOIN information_schema.constraint_column_usage ccu \
+           ON ccu.constraint_name = tc.constraint_name \
+         WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = current_schema() \
+           AND tc.table_name = '{table}'"
+    );
     let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else { return Vec::new() };
     res.rows
         .iter()

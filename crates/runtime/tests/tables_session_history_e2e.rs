@@ -11,7 +11,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::Runtime;
 use serde_json::json;
 
@@ -24,7 +24,7 @@ fn mdir(name: &str) -> PathBuf {
 
 /// Runtime con `tables` instalado (no depende de nadie).
 async fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("tables")).await.expect("instalar tables");
     // Las mesas del ejemplo: `tables_session` tiene FK interna a `tables_table`.
@@ -159,7 +159,7 @@ async fn el_backfill_da_historial_a_las_sesiones_que_YA_existian() {
     sesion_legacy(&rt, "s-cerrada", "m8", "2026-07-19T18:00:00+00:00", Some("2026-07-19T19:30:00+00:00")).await;
 
     let backfill = std::fs::read_to_string(
-        mdir("tables").join("migrations/sqlite/005_session_assignment.sql"),
+        mdir("tables").join("migrations/postgres/005_session_assignment.sql"),
     )
     .expect("la migración 005");
     // Se queda solo con el INSERT del backfill: fuera los comentarios (van antes de la sentencia,
@@ -344,7 +344,7 @@ async fn transferir_cierra_un_tramo_y_abre_el_siguiente() {
 // abierto y la mesa NO debe liberarse. Por eso `tables` escucha el fin del PEDIDO, no el de la venta.
 
 async fn con_pos() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     for m in ["taxes", "inventory", "sales", "tables"] {
         rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));

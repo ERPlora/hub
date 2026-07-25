@@ -14,7 +14,7 @@
 //! relay del Outbox; las aserciones leen por las queries públicas reales.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -25,7 +25,7 @@ fn mdir(n: &str) -> PathBuf {
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 
 async fn full_stack() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.unwrap();

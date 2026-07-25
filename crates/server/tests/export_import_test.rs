@@ -11,7 +11,7 @@ use std::io::Write as _;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
@@ -39,7 +39,7 @@ fn test_config(auth_mode: AuthMode, tag: &str) -> HubConfig {
 }
 
 async fn make_app(auth_mode: AuthMode, tag: &str) -> axum::Router {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-test");
     app(AppState::with_config(rt, test_config(auth_mode, tag)))
 }

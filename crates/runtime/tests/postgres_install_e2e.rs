@@ -18,7 +18,8 @@
 //! (`--test-threads=1`: los tests comparten la BD y cada uno resetea las tablas de sistema.)
 use std::path::PathBuf;
 
-use erplora_db::{DatabaseAdapter, Params, PgAdapter};
+use erplora_db::testutil::fresh_db;
+use erplora_db::Params;
 use erplora_runtime::{RequestContext, Runtime, DEV_HUB_ID};
 use serde_json::json;
 
@@ -26,39 +27,16 @@ fn module_dir(id: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(id)
 }
 
-/// Tablas de sistema del runtime (registro de migraciones, estado, outbox, scheduler…):
-/// se borran para que cada test parta de una BD "hub nuevo" repetible.
-const CLEANUP_SYSTEM: &str = "\
-    DROP TABLE IF EXISTS _hub_migrations;\
-    DROP TABLE IF EXISTS _hub_system_migrations;\
-    DROP TABLE IF EXISTS hub_module;\
-    DROP TABLE IF EXISTS hub_trusted_device;\
-    DROP TABLE IF EXISTS hub_api_key;\
-    DROP TABLE IF EXISTS hub_settings;\
-    DROP TABLE IF EXISTS _module_capability_grants;\
-    DROP TABLE IF EXISTS _hub_certificate;\
-    DROP TABLE IF EXISTS _event_outbox;\
-    DROP TABLE IF EXISTS _event_delivery;\
-    DROP TABLE IF EXISTS _scheduled_tasks;";
-
-/// Tablas del módulo `customers` (su 001_init.sql).
-const CLEANUP_CUSTOMERS: &str = "\
-    DROP TABLE IF EXISTS customers_customer_tags CASCADE;\
-    DROP TABLE IF EXISTS customers_customer_groups CASCADE;\
-    DROP TABLE IF EXISTS customers_customernote CASCADE;\
-    DROP TABLE IF EXISTS customers_customeractivity CASCADE;\
-    DROP TABLE IF EXISTS customers_customerfieldvalue CASCADE;\
-    DROP TABLE IF EXISTS customers_customer CASCADE;\
-    DROP TABLE IF EXISTS customers_customerfield CASCADE;\
-    DROP TABLE IF EXISTS customers_customertag CASCADE;\
-    DROP TABLE IF EXISTS customers_customergroup CASCADE;";
-
 #[tokio::test]
-#[ignore = "requires a real Postgres via DATABASE_URL"]
 async fn install_on_postgres_applies_migrations_and_queries_work() {
-    let url = std::env::var("DATABASE_URL").expect("set DATABASE_URL");
-    let db = PgAdapter::connect(&url).await.expect("connect to postgres");
-    db.execute_batch(&format!("{CLEANUP_CUSTOMERS}{CLEANUP_SYSTEM}")).await.expect("cleanup inicial");
+    // Fixtures externas: los módulos viven en `modules-workspace/` (repos hermanos, no en el repo
+    // del hub). Si no están presentes (p. ej. CI del hub aislado), se omite; en local corre.
+    if !module_dir("customers").exists() {
+        eprintln!("skip: modules-workspace ausente (fixtures e2e externos)");
+        return;
+    }
+    // Esquema efímero por test (ADR-0154): "hub nuevo" aislado, sin cleanup manual.
+    let db = fresh_db().await;
 
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&module_dir("customers")).await.expect("instalar customers");
@@ -111,19 +89,13 @@ async fn install_on_postgres_applies_migrations_and_queries_work() {
 /// `001_init.sql`). Con la lista literal del manifest el install FALLABA en Postgres
 /// (ALTER sobre tabla inexistente); la unión manifest∪paquete aplica 001→002 en orden.
 #[tokio::test]
-#[ignore = "requires a real Postgres via DATABASE_URL"]
 async fn install_invoice_on_postgres_applies_partial_manifest_union() {
-    let url = std::env::var("DATABASE_URL").expect("set DATABASE_URL");
-    let db = PgAdapter::connect(&url).await.expect("connect to postgres");
-    db.execute_batch(
-        &format!(
-            "DROP TABLE IF EXISTS invoice_invoiceitem CASCADE;\
-             DROP TABLE IF EXISTS invoice_invoice CASCADE;\
-             DROP TABLE IF EXISTS invoice_invoiceseries CASCADE;{CLEANUP_SYSTEM}"
-        ),
-    )
-    .await
-    .expect("cleanup inicial");
+    if !module_dir("invoice").exists() {
+        eprintln!("skip: modules-workspace ausente (fixtures e2e externos)");
+        return;
+    }
+    // Esquema efímero por test (ADR-0154): "hub nuevo" aislado, sin cleanup manual.
+    let db = fresh_db().await;
 
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&module_dir("invoice")).await.expect("instalar invoice");

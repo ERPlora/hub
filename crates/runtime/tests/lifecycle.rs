@@ -2,7 +2,7 @@
 //! Verifica que el menú y las capacidades solo se exponen cuando el módulo está ACTIVO.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{ModuleStatus, RequestContext, Runtime, RuntimeError};
 use serde_json::json;
 
@@ -18,7 +18,7 @@ fn ctx() -> RequestContext {
 
 #[tokio::test]
 async fn install_activates_and_exposes() {
-    let mut rt = Runtime::new(Box::new(SqliteAdapter::open_in_memory().await.unwrap()));
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&fixture()).await.unwrap();
 
     // recién instalado → activo, con menú y query disponible
@@ -32,7 +32,7 @@ async fn install_activates_and_exposes() {
 
 #[tokio::test]
 async fn deactivate_hides_menu_and_blocks_capabilities() {
-    let mut rt = Runtime::new(Box::new(SqliteAdapter::open_in_memory().await.unwrap()));
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&fixture()).await.unwrap();
 
     rt.deactivate("inventory").await.unwrap();
@@ -60,7 +60,7 @@ async fn deactivate_hides_menu_and_blocks_capabilities() {
 
 #[tokio::test]
 async fn data_survives_deactivation() {
-    let mut rt = Runtime::new(Box::new(SqliteAdapter::open_in_memory().await.unwrap()));
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&fixture()).await.unwrap();
     rt.execute_command("inventory.products.create",
         &params(json!({"name":"Café","sku":"CAF","price":4.5,"stock":7})), &ctx()).await.unwrap();
@@ -76,7 +76,7 @@ async fn data_survives_deactivation() {
 
 #[tokio::test]
 async fn uninstall_removes_module() {
-    let mut rt = Runtime::new(Box::new(SqliteAdapter::open_in_memory().await.unwrap()));
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&fixture()).await.unwrap();
     rt.uninstall("inventory").await.unwrap();
 
@@ -94,7 +94,7 @@ async fn uninstall_removes_module() {
 #[tokio::test]
 async fn status_persisted_in_hub_module_table() {
     // misma BD compartida: instalar/desactivar deja rastro en hub_module
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     // probamos vía un segundo adapter NO es posible (in-memory es por conexión);
     // así que consultamos a través del propio runtime tras desactivar.
     let mut rt = Runtime::new(Box::new(db));

@@ -16,7 +16,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection, HUB_ID_PLACEHOLDER, SCHEMA_VERSION};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
@@ -35,7 +35,7 @@ fn ctx(hub: &str) -> RequestContext {
 
 /// Runtime con taxes + inventory reales instalados (inventory depende de taxes).
 async fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1"); // ctx y runtime comparten hub (como en prod)
     rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");

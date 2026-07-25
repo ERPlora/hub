@@ -1,6 +1,6 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
@@ -13,7 +13,7 @@ async fn body_json(response: axum::response::Response) -> Value {
 }
 
 async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-profile");
     rt.ensure_system_tables().await.unwrap();
     let alice = rt
@@ -166,7 +166,7 @@ async fn avatar_upload_is_private_and_persistent() {
 
 #[tokio::test]
 async fn dev_mode_materializes_the_header_user_without_a_fake_session() {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     rt.ensure_system_tables().await.unwrap();
     let router = app(AppState::new(rt));

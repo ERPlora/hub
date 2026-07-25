@@ -24,7 +24,7 @@
 use std::path::PathBuf;
 
 use chrono::{Datelike, Duration, Utc, Weekday};
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -41,7 +41,7 @@ fn admin() -> RequestContext {
 }
 
 async fn rt_appts() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     // appointments `depends_on` customers + services + staff (FK lógicas cross-módulo; staff por
     // ADR-0074, selector de profesional) y services `depends_on` taxes (ADR-0066); el installer

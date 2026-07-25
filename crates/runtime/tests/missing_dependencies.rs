@@ -11,7 +11,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use serde_json::json;
 
@@ -35,7 +35,7 @@ async fn missing_dependencies_lists_only_uninstalled_declared_deps() {
     let leaf = write_module(&tmp, "leaf", &[]);
     let dependent = write_module(&tmp, "dependent", &["leaf", "absent"]);
 
-    let mut rt = Runtime::new(Box::new(SqliteAdapter::open_in_memory().await.unwrap()));
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
 
     // Nada instalado → ambas deps declaradas faltan, en el orden del manifest.
     let missing = rt.missing_dependencies(&dependent).unwrap();

@@ -2,7 +2,7 @@
 //! Usa el bloque `list` real de `inventory.products.list` sobre SQLite en memoria.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -21,7 +21,7 @@ fn ctx() -> RequestContext {
 }
 
 async fn fresh_with_products(names_prices: &[(&str, f64)]) -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes"); // inventory depends_on taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.expect("instalar inventory");

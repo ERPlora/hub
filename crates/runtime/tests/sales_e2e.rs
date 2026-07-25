@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{EventSink, RequestContext, Runtime};
 use serde_json::json;
 
@@ -34,7 +34,7 @@ impl EventSink for Sink {
 
 /// Runtime con inventory + customers + sales (orden topológico de deps).
 async fn fresh() -> (Runtime, Arc<Sink>) {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
@@ -60,7 +60,7 @@ async fn install_with_deps() {
 #[tokio::test]
 async fn missing_dep_fails() {
     // sales sin sus deps (inventory/taxes) debe fallar: el orden topológico es del instalador.
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     let err = rt.install_from_dir(&mdir("sales")).await;
     assert!(err.is_err(), "sales sin deps debe fallar");

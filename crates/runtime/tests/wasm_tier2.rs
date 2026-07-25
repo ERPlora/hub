@@ -9,7 +9,7 @@
 //! El round-trip E2E real (handler que devuelve N operaciones `notes.create` →
 //! N filas) requiere un guest Extism compilado a wasm32; queda `#[ignore]` con
 //! instrucciones (ver `real_guest_bulk_create`).
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 
 fn notes_fixture() -> std::path::PathBuf {
@@ -18,7 +18,7 @@ fn notes_fixture() -> std::path::PathBuf {
 
 #[tokio::test]
 async fn installer_loads_wasm_bytes_into_registry() {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     let id = rt.install_from_dir(&notes_fixture()).await.unwrap();
     assert_eq!(id, "notes");
@@ -52,7 +52,7 @@ async fn installer_loads_wasm_bytes_into_registry() {
 async fn real_guest_bulk_create() {
     use erplora_db::Params;
     use erplora_runtime::RequestContext;
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&notes_fixture()).await.unwrap();
     let ctx = RequestContext::new("hub-1", "user-1", ["notes.write".to_string()]);

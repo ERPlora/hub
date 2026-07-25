@@ -21,7 +21,6 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_db::Dialect;
 use serde_json::{json, Map, Value};
 
 use crate::{auth, AppState};
@@ -47,30 +46,18 @@ pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Resp
         .filter(|s| !s.is_empty());
     let in_ecs = ecs_uri.is_some();
 
-    // BD + logs (mismo lock del runtime / SQLite del sistema, su outbox es el feed de eventos).
-    let (dialect, database, logs) = {
+    // BD + logs (mismo lock del runtime; su outbox es el feed de eventos).
+    let (database, logs) = {
         let rt = st.runtime.lock().await;
         let db = rt.db();
-        let dialect = db.dialect();
-        let database = collect_database(db, dialect).await;
+        let database = collect_database(db).await;
         let logs = collect_logs(db, &st.hub_id()).await;
-        (dialect, database, logs)
+        (database, logs)
     };
 
-    // Eje A (backend de datos) = por el dialecto real. Eje B (shell): no es detectable con certeza
-    // server-side; se aproxima por el despliegue (ECS o servir estático ⇒ web; si no ⇒ tauri local).
-    let backend = match dialect {
-        Dialect::Sqlite => "single",
-        Dialect::Postgres => "cloud",
-    };
-    let serves_static = std::env::var("HUB_WEB_DIR")
-        .map(|s| !s.is_empty())
-        .unwrap_or(false);
-    let shell = if in_ecs || serves_static {
-        "web"
-    } else {
-        "tauri"
-    };
+    // Hub Cloud es Postgres-only y PWA (ADR-0154): backend siempre "cloud", shell siempre "web".
+    let backend = "cloud";
+    let shell = "web";
 
     // CPU / memoria: ECS Task Metadata v4 (cloud) o `sysinfo` (local).
     let (cpu, memory) = match &ecs_uri {
@@ -117,64 +104,44 @@ pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Resp
 
 // ─────────────────────────── Base de datos ───────────────────────────
 
-/// Motor + tamaño + conexiones reales. SQLite: tamaño por `PRAGMA`, 1 conexión. Postgres: sin
-/// tamaño local (Aurora compartida por organización), conexiones por `pg_stat_activity`.
-async fn collect_database(db: &dyn erplora_db::DatabaseAdapter, dialect: Dialect) -> Value {
+/// Motor + conexiones reales (Postgres-only, ADR-0154). Sin "tamaño local" (BD Postgres compartida
+/// por organización); conexiones por `pg_stat_activity`.
+async fn collect_database(db: &dyn erplora_db::DatabaseAdapter) -> Value {
     let no_params = Map::new();
-    match dialect {
-        Dialect::Sqlite => {
-            let pages = scalar_i64(db, "PRAGMA page_count", &no_params).await;
-            let page_size = scalar_i64(db, "PRAGMA page_size", &no_params).await;
-            let size_label = match (pages, page_size) {
-                (Some(p), Some(s)) if p >= 0 && s >= 0 => {
-                    Some(human_bytes((p as u64) * (s as u64)))
-                }
-                _ => None,
-            };
-            json!({
-                "engine": "sqlite",
-                "sizeLabel": size_label,
-                "connections": 1,
-                "connectionsLimit": Value::Null,
-            })
-        }
-        Dialect::Postgres => {
-            let connections = scalar_i64(
+    let connections = scalar_i64(
+        db,
+        "SELECT count(*) AS n FROM pg_stat_activity WHERE datname = current_database()",
+        &no_params,
+    )
+    .await
+    .unwrap_or(0);
+    // Límite CONTRATADO = el CONNECTION LIMIT del rol del hub (lo fija Cloud al provisionar
+    // según el plan: `ALTER ROLE … CONNECTION LIMIT n`). `rolconnlimit = -1` ⇒ el rol no
+    // tiene tope propio → caemos al `max_connections` del cluster (tope físico del servidor).
+    let role_limit = scalar_i64(
+        db,
+        "SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user",
+        &no_params,
+    )
+    .await
+    .filter(|&n| n >= 0);
+    let limit = match role_limit {
+        Some(n) => Some(n),
+        None => {
+            scalar_i64(
                 db,
-                "SELECT count(*) AS n FROM pg_stat_activity WHERE datname = current_database()",
+                "SELECT current_setting('max_connections')::int AS n",
                 &no_params,
             )
             .await
-            .unwrap_or(0);
-            // Límite CONTRATADO = el CONNECTION LIMIT del rol del hub (lo fija Cloud al provisionar
-            // según el plan: `ALTER ROLE … CONNECTION LIMIT n`). `rolconnlimit = -1` ⇒ el rol no
-            // tiene tope propio → caemos al `max_connections` del cluster (tope físico de Aurora).
-            let role_limit = scalar_i64(
-                db,
-                "SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user",
-                &no_params,
-            )
-            .await
-            .filter(|&n| n >= 0);
-            let limit = match role_limit {
-                Some(n) => Some(n),
-                None => {
-                    scalar_i64(
-                        db,
-                        "SELECT current_setting('max_connections')::int AS n",
-                        &no_params,
-                    )
-                    .await
-                }
-            };
-            json!({
-                "engine": "postgres",
-                "sizeLabel": Value::Null,   // Aurora compartida por organización: sin "tamaño local"
-                "connections": connections,
-                "connectionsLimit": limit,
-            })
         }
-    }
+    };
+    json!({
+        "engine": "postgres",
+        "sizeLabel": Value::Null,   // BD Postgres compartida por organización: sin "tamaño local"
+        "connections": connections,
+        "connectionsLimit": limit,
+    })
 }
 
 /// Ejecuta una query escalar y devuelve el primer valor de la primera fila como `i64`

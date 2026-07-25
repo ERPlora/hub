@@ -1,6 +1,6 @@
 //! Estado compartido del server: el runtime (tras un lock), el canal de eventos para WS,
 //! y la configuración de despliegue (hub_id + Cloud Portal + cache de módulos).
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use erplora_runtime::{EventSink, Runtime};
@@ -119,21 +119,12 @@ impl HubConfig {
             .ok()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
-        // Carpeta media por defecto: **co-localizada con la BD del hub** (`<dir de
-        // HUB_SQLITE_PATH>/media`), no relativa al CWD del proceso (frágil). Así el path es estable
-        // y predecible en local/Tauri (vive junto a `erplora.db`). Override explícito: `HUB_MEDIA_DIR`.
+        // Carpeta media del hub (logs `_logs/`, perfiles, export/import…). Por defecto `./media`;
+        // el despliegue la fija explícitamente con `HUB_MEDIA_DIR`. En Hub Cloud (ADR-0154) los
+        // ficheros de módulos viven en Object Storage vía el Cloud; `media_dir` es scratch local.
         let media_dir = std::env::var("HUB_MEDIA_DIR")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| {
-                let db = std::env::var("HUB_SQLITE_PATH").unwrap_or_else(|_| "erplora.db".into());
-                match Path::new(&db)
-                    .parent()
-                    .filter(|p| !p.as_os_str().is_empty())
-                {
-                    Some(dir) => dir.join("media"),
-                    None => PathBuf::from("media"),
-                }
-            });
+            .unwrap_or_else(|_| PathBuf::from("media"));
         Self {
             hub_id,
             cloud_base_url,

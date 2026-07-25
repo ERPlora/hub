@@ -25,5 +25,5 @@ reqwest-transport = ["dep:reqwest", "source/reqwest-transport"]
 [dev-dependencies]
 tempfile = "3"
 zip = "2"
-erplora-db = { path = "../db" }
+erplora-db = { path = "../db", features = ["test-util"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

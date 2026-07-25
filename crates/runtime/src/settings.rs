@@ -396,7 +396,7 @@ pub async fn set_many(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::SqliteAdapter;
+    use erplora_db::{testutil::fresh_db, PgAdapter};
 
     // ── La MONEDA y sus DECIMALES (ADR-0123 §7) ─────────────────────────────────────────
     //
@@ -437,7 +437,7 @@ mod tests {
     }
 
     /// Crea la tabla `hub_settings` a mano (en prod la crea la migración de sistema v4).
-    async fn ensure_table(db: &SqliteAdapter) {
+    async fn ensure_table(db: &PgAdapter) {
         db.execute_batch(
             "CREATE TABLE hub_settings (\
               hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
@@ -473,7 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_all_returns_defaults_on_empty_hub() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
         let all = get_all(&db, "hub-1").await.unwrap();
         assert_eq!(all["currency"], json!("EUR"));
@@ -489,7 +489,7 @@ mod tests {
 
     #[tokio::test]
     async fn theme_palette_default_es_la_marca_erplora() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
         let all = get_all(&db, "hub-1").await.unwrap();
         assert_eq!(all["theme_palette"], json!("erplora"));
@@ -497,7 +497,7 @@ mod tests {
 
     #[tokio::test]
     async fn theme_palette_acepta_las_paletas_de_outfitkit_y_rechaza_el_resto() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
 
         // Las 6 paletas de palettes.css + 'erplora' (default) son válidas.
@@ -532,7 +532,7 @@ mod tests {
 
     #[tokio::test]
     async fn set_many_persists_and_normalizes() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
 
         let mut updates = serde_json::Map::new();
@@ -563,7 +563,7 @@ mod tests {
 
     #[tokio::test]
     async fn set_many_rejects_unknown_key() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
         let mut updates = serde_json::Map::new();
         updates.insert("not_a_setting".into(), json!("x"));
@@ -578,7 +578,7 @@ mod tests {
 
     #[tokio::test]
     async fn set_many_rejects_invalid_value_atomically() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
 
         // Lote con una clave válida (currency) y una inválida (language=fr): se rechaza TODO; ni
@@ -601,7 +601,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_all_degrades_corrupt_row_to_default() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
         // Inserta una fila con un valor que ya no valida (currency = "ZZZZ").
         db.execute_batch(
@@ -616,7 +616,7 @@ mod tests {
 
     #[tokio::test]
     async fn settings_are_hub_scoped() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("USD"));

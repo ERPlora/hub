@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, with_static_frontend, AppState};
 use http_body_util::BodyExt;
@@ -16,7 +16,7 @@ fn fixture() -> PathBuf {
 }
 
 async fn make_app() -> axum::Router {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture()).await.unwrap();
     app(AppState::new(rt))
@@ -205,7 +205,7 @@ async fn unknown_query_is_404() {
 #[tokio::test]
 async fn hub_context_returns_configured_hub_id() {
     use erplora_server::HubConfig;
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     let cfg = HubConfig {
         hub_id: "hub-xyz".into(),
@@ -247,7 +247,7 @@ async fn hub_context_adopts_machine_identity_without_restart() {
 
     use erplora_server::{AuthMode, HubConfig, HubId, MachineToken};
 
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     let cfg = HubConfig {
         hub_id: erplora_server::DEV_HUB_ID.into(),
@@ -333,7 +333,7 @@ async fn demo_catalog_uses_public_saas_metadata_without_hub_credentials() {
         axum::serve(listener, mock_cloud).await.unwrap();
     });
 
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     let cfg = HubConfig {
         hub_id: DEV_HUB_ID.into(),
@@ -403,7 +403,7 @@ async fn real_catalog_uses_private_saas_endpoint_with_machine_credentials() {
         axum::serve(listener, mock_cloud).await.unwrap();
     });
 
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "real-hub");
     let cfg = HubConfig {
         hub_id: "real-hub".into(),
@@ -439,7 +439,7 @@ async fn real_catalog_uses_private_saas_endpoint_with_machine_credentials() {
 async fn real_machine_cannot_use_business_api_before_registration() {
     use erplora_server::{AuthMode, HubConfig};
 
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "real-but-unregistered");
     rt.ensure_system_tables().await.unwrap();
     let cfg = HubConfig {

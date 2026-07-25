@@ -14,7 +14,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{ModuleStatus, RequestContext, Runtime, RuntimeError};
 
 fn mdir(name: &str) -> PathBuf {
@@ -28,7 +28,7 @@ fn admin() -> RequestContext {
 
 /// taxes ← inventory ← sales → customers (sales depende de los tres; inventory de taxes).
 async fn hub_pos() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     for m in ["taxes", "customers", "inventory", "sales"] {
         rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));

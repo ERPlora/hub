@@ -154,6 +154,8 @@
       "properties": {
         "sqlite": {
           "type": "array",
+          "deprecated": true,
+          "description": "DEPRECATED (ADR-0154): el Hub es Postgres-only; el runtime ignora este dialecto. Usa migrations/postgres. Se mantiene opcional solo por compatibilidad con manifests antiguos.",
           "items": {
             "type": "string"
           }
@@ -683,6 +685,8 @@
       "properties": {
         "sqlite": {
           "type": "array",
+          "deprecated": true,
+          "description": "DEPRECATED (ADR-0154): el Hub es Postgres-only; el runtime ignora este dialecto. Usa seed/postgres. Se mantiene opcional solo por compatibilidad con manifests antiguos.",
           "items": {
             "type": "string"
           }

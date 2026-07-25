@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{EventSink, RequestContext, Runtime};
 use serde_json::json;
 
@@ -26,7 +26,7 @@ fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]
 fn wasm() -> bool { mdir("cash_register").join("dist/handler.wasm").exists() }
 
 async fn rt_cr() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("cash_register")).await.expect("instalar cash_register");
     rt
@@ -119,7 +119,7 @@ async fn add_count_wasm_sums_denominations() {
 async fn sale_completed_records_cash_movement() {
     // Cadena cross-módulo completa: inventory+customers+invoice+sales+cash_register.
     if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
@@ -156,7 +156,7 @@ async fn sale_completed_records_cash_movement() {
 #[tokio::test]
 async fn movement_add_emits_movement_added() {
     // Path directo determinista: `movement.add` escribe un movimiento → debe emitir el evento.
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
@@ -181,7 +181,7 @@ async fn record_sale_emits_movement_added_after_relay() {
     // Path REAL del P1: venta → (relay) record_sale escribe el movimiento Y emite el evento, en el
     // mismo tx del outbox → cuando el widget lo recibe, el dato YA está en la BD.
     if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());

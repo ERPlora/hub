@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{EventSink, RequestContext, Runtime};
 use serde_json::json;
 
@@ -43,7 +43,7 @@ impl EventSink for Sink {
 /// Runtime con inventory + sales + kitchen. **Sin `tables` ni `customers`**: si cocina necesitara
 /// alguno de los dos para instalarse, seguiría sabiendo de ellos y este setup fallaría.
 async fn fresh() -> (Runtime, Arc<Sink>) {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());

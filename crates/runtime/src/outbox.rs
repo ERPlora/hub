@@ -333,7 +333,7 @@ mod tests {
     use super::*;
     use crate::manifest::CommandDef;
     use crate::registry::{ModuleStatus, RegisteredCommand};
-    use erplora_db::SqliteAdapter;
+    use erplora_db::{testutil::fresh_db, PgAdapter};
 
     fn cmd(module: &str, sql: &str, emit: Vec<String>) -> RegisteredCommand {
         RegisteredCommand {
@@ -355,7 +355,7 @@ mod tests {
         }
     }
 
-    async fn count(db: &SqliteAdapter, sql: &str) -> i64 {
+    async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
         r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
     }
@@ -364,7 +364,7 @@ mod tests {
     /// exactamente una vez y es idempotente al re-procesar (marcador `_event_delivery`).
     #[tokio::test]
     async fn outbox_async_delivery_is_exactly_once() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
         ensure_tables(&db).await.unwrap();
 
@@ -408,7 +408,7 @@ mod tests {
         use crate::host_notify::{Channel, MockTransport, Routing};
         use serde_json::json;
 
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
         ensure_tables(&db).await.unwrap();
 
@@ -457,7 +457,7 @@ mod tests {
         use crate::host_notify::MockTransport;
         use serde_json::json;
 
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
         ensure_tables(&db).await.unwrap();
 
@@ -503,7 +503,7 @@ mod tests {
     async fn backup_requested_event_delivers_to_backup_transport_once() {
         use crate::host_backup::MockTransport;
 
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
         ensure_tables(&db).await.unwrap();
 
@@ -547,7 +547,7 @@ mod tests {
     /// la capacidad no está disponible, pero el evento queda 'delivered' (no bloquea el outbox).
     #[tokio::test]
     async fn backup_requested_is_noop_without_transport() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
         ensure_tables(&db).await.unwrap();
 
@@ -575,7 +575,7 @@ mod tests {
     async fn failing_backup_transport_retries_then_dead_letters() {
         use crate::host_backup::MockTransport;
 
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
         ensure_tables(&db).await.unwrap();
 

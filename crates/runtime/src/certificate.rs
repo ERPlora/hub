@@ -229,10 +229,10 @@ mod asn1_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::SqliteAdapter;
+    use erplora_db::{testutil::fresh_db, PgAdapter};
 
-    async fn db_ready() -> SqliteAdapter {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+    async fn db_ready() -> PgAdapter {
+        let db = fresh_db().await;
         crate::installer::ensure_hub_module_table(&db).await.unwrap();
         // hub_session baseline (v0): la migración v8 (device_id, ADR-0154) lo ALTERa.
         crate::identity::ensure_tables(&db).await.unwrap();

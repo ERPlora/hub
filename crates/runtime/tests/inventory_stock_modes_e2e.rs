@@ -20,7 +20,7 @@
 //! del void es `sales.void` real + relay del Outbox, y las aserciones leen queries públicas.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -39,7 +39,7 @@ fn wasm_present() -> bool {
 }
 
 async fn stack() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes
     rt.install_from_dir(&mdir("inventory")).await.unwrap();

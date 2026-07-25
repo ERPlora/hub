@@ -44,7 +44,8 @@ openssl = { version = "0.10", features = ["vendored"] }
 [dev-dependencies]
 # Async test harness for the integration tests/example (db + runtime are async now).
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-# Para el test e2e de sync (PgAdapter contra Aurora por túnel) y construir payloads.
-erplora-db = { path = "../db" }
+# `test-util` = helper de esquema Postgres efímero por test (ADR-0154): todos los tests del
+# runtime corren contra un Postgres real (aislamiento por esquema, en paralelo).
+erplora-db = { path = "../db", features = ["test-util"] }
 erplora-guest-sdk = { path = "../guest-sdk" }
 serde_json = "1"

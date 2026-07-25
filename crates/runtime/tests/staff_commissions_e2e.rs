@@ -6,7 +6,7 @@
 //! terminados.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -17,7 +17,7 @@ fn mdir(n: &str) -> PathBuf {
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 
 async fn rt_staff() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("staff")).await.expect("instalar staff");
     rt

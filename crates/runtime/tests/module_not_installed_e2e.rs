@@ -10,7 +10,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime, RuntimeError};
 
 fn mdir(name: &str) -> PathBuf {
@@ -23,7 +23,7 @@ fn admin() -> RequestContext {
 }
 
 async fn hub_with_taxes() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt

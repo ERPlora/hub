@@ -33,10 +33,10 @@
 //! ## Forma de entrega (ops)
 //!
 //! Subcomando del binario del server: `erplora-server --backfill-money` (ver
-//! `crates/server/src/main.rs`). Abre el SQLite del hub (`HUB_SQLITE_PATH`), corre
+//! `crates/server/src/main.rs`). Conecta al Postgres del hub (`HUB_DATABASE_URL`), corre
 //! [`run`] y sale. SEGURO de re-ejecutar.
 
-use erplora_db::{DatabaseAdapter, Dialect, Params};
+use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 
 use crate::errors::Result;
@@ -148,13 +148,9 @@ async fn mark_cents(db: &dyn DatabaseAdapter) -> Result<()> {
     let mut p = Params::new();
     p.insert("key".into(), json!(MONEY_UNIT_KEY));
     p.insert("value".into(), json!(MONEY_UNIT_CENTS));
-    let sql = match db.dialect() {
-        // Ambos motores soportan ON CONFLICT (key) DO UPDATE; key es PK.
-        Dialect::Sqlite | Dialect::Postgres => {
-            "INSERT INTO _hub_meta (key, value) VALUES (:key, :value) \
-             ON CONFLICT (key) DO UPDATE SET value = :value"
-        }
-    };
+    // ON CONFLICT (key) DO UPDATE; key es PK (ADR-0154: Postgres-only).
+    let sql = "INSERT INTO _hub_meta (key, value) VALUES (:key, :value) \
+               ON CONFLICT (key) DO UPDATE SET value = :value";
     db.execute(sql, &p).await?;
     Ok(())
 }
@@ -166,32 +162,19 @@ async fn declared_type(
     table: &str,
     column: &str,
 ) -> Result<Option<String>> {
-    match db.dialect() {
-        Dialect::Sqlite => {
-            // PRAGMA no acepta parámetros bindeados; el nombre de tabla viene de la constante
-            // `MONEY_COLUMNS` (no input de usuario), así que interpolarlo es seguro.
-            let sql = format!("PRAGMA table_info({table})");
-            let res = db.query(&sql, &Params::new()).await?;
-            Ok(res
-                .rows
-                .iter()
-                .find(|r| r["name"].as_str() == Some(column))
-                .and_then(|r| r["type"].as_str().map(|s| s.to_string())))
-        }
-        Dialect::Postgres => {
-            let mut p = Params::new();
-            p.insert("t".into(), json!(table));
-            p.insert("c".into(), json!(column));
-            let res = db
-                .query(
-                    "SELECT data_type FROM information_schema.columns \
-                     WHERE table_name = :t AND column_name = :c",
-                    &p,
-                )
-                .await?;
-            Ok(res.rows.first().and_then(|r| r["data_type"].as_str().map(|s| s.to_string())))
-        }
-    }
+    // Postgres-only (ADR-0154). `current_schema()` acota al esquema activo del hub (en prod es
+    // `public`; en los tests, el esquema efímero) para no leer columnas de otro esquema homónimo.
+    let mut p = Params::new();
+    p.insert("t".into(), json!(table));
+    p.insert("c".into(), json!(column));
+    let res = db
+        .query(
+            "SELECT data_type FROM information_schema.columns \
+             WHERE table_schema = current_schema() AND table_name = :t AND column_name = :c",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.first().and_then(|r| r["data_type"].as_str().map(|s| s.to_string())))
 }
 
 /// `true` si el tipo declarado ya es **entero** (esquema en céntimos: el `001` nuevo declara
@@ -333,10 +316,10 @@ pub async fn run_logged(db: &dyn DatabaseAdapter) -> Result<BackfillReport> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::SqliteAdapter;
+    use erplora_db::{testutil::fresh_db, PgAdapter};
 
     /// Crea una tabla "estilo hub viejo": columnas de dinero en `NUMERIC` con datos en euros.
-    async fn old_hub_sales(db: &SqliteAdapter) {
+    async fn old_hub_sales(db: &PgAdapter) {
         db.execute_batch(
             "CREATE TABLE sales_sale (\
                 id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
@@ -361,7 +344,7 @@ mod tests {
     }
 
     /// Crea la misma tabla "estilo hub NUEVO": columnas de dinero en `INTEGER` (céntimos).
-    async fn new_hub_sales(db: &SqliteAdapter) {
+    async fn new_hub_sales(db: &PgAdapter) {
         db.execute_batch(
             "CREATE TABLE sales_sale (\
                 id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
@@ -385,14 +368,14 @@ mod tests {
         .unwrap();
     }
 
-    async fn read_total(db: &SqliteAdapter) -> i64 {
+    async fn read_total(db: &PgAdapter) -> i64 {
         let res = db
             .query("SELECT total FROM sales_sale WHERE id = 's1'", &Params::new())
             .await
             .unwrap();
         res.rows[0]["total"].as_i64().unwrap()
     }
-    async fn read_subtotal(db: &SqliteAdapter) -> i64 {
+    async fn read_subtotal(db: &PgAdapter) -> i64 {
         let res = db
             .query("SELECT subtotal FROM sales_sale WHERE id = 's1'", &Params::new())
             .await
@@ -402,7 +385,7 @@ mod tests {
 
     #[tokio::test]
     async fn old_hub_converts_euros_to_cents_then_marks() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         old_hub_sales(&db).await;
 
         let r = super::run(&db).await.unwrap();
@@ -435,7 +418,7 @@ mod tests {
 
     #[tokio::test]
     async fn rerun_on_converted_hub_is_noop() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         old_hub_sales(&db).await;
 
         super::run(&db).await.unwrap();
@@ -451,7 +434,7 @@ mod tests {
 
     #[tokio::test]
     async fn new_hub_is_never_converted() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         new_hub_sales(&db).await;
 
         // Instalación nueva (esquema INTEGER): el backfill NO toca datos, solo marca.
@@ -472,7 +455,7 @@ mod tests {
 
     #[tokio::test]
     async fn empty_db_without_money_modules_just_marks() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         // Ninguna tabla de dinero instalada.
         let r = super::run(&db).await.unwrap();
         assert!(r.schema_already_cents);
@@ -482,7 +465,7 @@ mod tests {
 
     #[tokio::test]
     async fn multi_table_old_hub_converts_only_present_tables() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         old_hub_sales(&db).await;
         // payments en euros también.
         db.execute_batch(
