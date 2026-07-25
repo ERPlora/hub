@@ -13,7 +13,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::{json, Value};
 
@@ -34,7 +34,7 @@ fn wasm() -> bool {
 }
 
 async fn rt_invoice() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("invoice")).await.expect("instalar invoice");
     rt
@@ -42,6 +42,9 @@ async fn rt_invoice() -> Runtime {
 
 #[tokio::test]
 async fn factura_mixta_produce_un_desglose_por_tipo_para_verifactu() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm() {
         eprintln!("SKIP: invoice handler.wasm ausente");
         return;

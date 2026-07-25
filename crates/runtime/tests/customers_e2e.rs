@@ -4,7 +4,7 @@
 //! el listener de sale.completed (record_purchase con transición de lifecycle).
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -21,7 +21,7 @@ fn wasm_present() -> bool {
     dir().join("dist/handler.wasm").exists()
 }
 async fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&dir()).await.expect("instalar customers");
     rt
@@ -45,6 +45,9 @@ async fn new_customer(rt: &Runtime, ctx: &RequestContext, name: &str, stage: &st
 
 #[tokio::test]
 async fn install_registers_capabilities() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let reg = rt.registry();
     assert!(reg.is_installed("customers"));
@@ -58,6 +61,9 @@ async fn install_registers_capabilities() {
 
 #[tokio::test]
 async fn customer_crud_and_stats() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let ctx = admin();
     new_customer(&rt, &ctx, "Bar Manolo", "lead").await;
@@ -78,6 +84,9 @@ async fn customer_crud_and_stats() {
 
 #[tokio::test]
 async fn record_purchase_transitions_lifecycle() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let ctx = admin();
     let id = new_customer(&rt, &ctx, "Lead X", "lead").await;
@@ -101,6 +110,9 @@ async fn record_purchase_transitions_lifecycle() {
 
 #[tokio::test]
 async fn bulk_create_wasm() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() { eprintln!("SKIP: handler.wasm ausente"); return; }
     let rt = fresh().await;
     let ctx = admin();
@@ -121,6 +133,9 @@ async fn bulk_create_wasm() {
 
 #[tokio::test]
 async fn set_groups_wasm_replaces_membership() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() { eprintln!("SKIP: handler.wasm ausente"); return; }
     let rt = fresh().await;
     let ctx = admin();
@@ -143,6 +158,9 @@ async fn set_groups_wasm_replaces_membership() {
 
 #[tokio::test]
 async fn note_and_activity_timeline() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let ctx = admin();
     let cid = new_customer(&rt, &ctx, "C", "active").await;

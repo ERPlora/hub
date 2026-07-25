@@ -145,8 +145,7 @@ mod tests {
     use crate::embed::{index_chunks, EmbedError};
     use crate::ingest::PendingChunk;
     use async_trait::async_trait;
-    use erplora_db::SqliteAdapter;
-    use erplora_vector::SqliteVectorStore;
+    use erplora_vector::MemoryVectorStore;
     use serde_json::json;
 
     /// Embedder de juguete: mapea texto → vector por palabras-clave, determinista y sin red. Cada
@@ -167,9 +166,8 @@ mod tests {
         }
     }
 
-    async fn indexed_store() -> SqliteVectorStore<SqliteAdapter> {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        let s = SqliteVectorStore::new(db);
+    async fn indexed_store() -> MemoryVectorStore {
+        let s = MemoryVectorStore::new();
         s.ensure_schema().await.unwrap();
         let modules = [
             ("inventory", "Manage products and stock levels"),
@@ -239,8 +237,7 @@ mod tests {
 
     #[tokio::test]
     async fn empty_index_degrades_to_none() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        let s = SqliteVectorStore::new(db);
+        let s = MemoryVectorStore::new();
         s.ensure_schema().await.unwrap();
         let cfg = RouterConfig {
             top_k: 5,

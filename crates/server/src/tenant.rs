@@ -225,7 +225,7 @@ fn default_pg_factory() -> RuntimeFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::SqliteAdapter;
+    use erplora_db::testutil::fresh_db;
     use erplora_runtime::RequestContext;
     use serde_json::{json, Map};
 
@@ -235,7 +235,7 @@ mod tests {
         Arc::new(|desc: &OrgDescriptor| {
             let hub_id = desc.org_id.0.clone();
             Box::pin(async move {
-                let db = SqliteAdapter::open_in_memory().await?;
+                let db = fresh_db().await;
                 let rt = Runtime::with_hub_id(Box::new(db), hub_id);
                 Ok(rt)
             })

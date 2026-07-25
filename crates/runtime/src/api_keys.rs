@@ -330,10 +330,10 @@ mod tests {
     use super::*;
     use crate::registry::{ModuleStatus, RegisteredCommand, RegisteredQuery};
     use crate::manifest::{CommandDef, Manifest, QueryDef};
-    use erplora_db::SqliteAdapter;
+    use erplora_db::{testutil::fresh_db, PgAdapter};
 
     /// Crea la tabla `hub_api_key` a mano (en prod la crea la migración de sistema v3).
-    async fn ensure_table(db: &SqliteAdapter) {
+    async fn ensure_table(db: &PgAdapter) {
         db.execute_batch(
             "CREATE TABLE hub_api_key (\
               id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
@@ -440,7 +440,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_verify_rotate_revoke_lifecycle() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_table(&db).await;
         let reg = registry_with_inventory();
         let hub = "hub-1";

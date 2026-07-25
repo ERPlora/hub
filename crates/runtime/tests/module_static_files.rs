@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::module_storage::ModuleStorage;
 use erplora_runtime::{Result, Runtime};
 
@@ -37,7 +37,7 @@ fn fixture(manifest: &str) -> std::path::PathBuf {
 
 #[tokio::test]
 async fn install_materializes_declared_static_files_folder() {
-    let db = SqliteAdapter::connect("sqlite::memory:").await.unwrap();
+    let db = fresh_db().await;
     let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-storage");
     runtime.ensure_system_tables().await.unwrap();
     let storage = Arc::new(RecordingStorage::default());
@@ -62,7 +62,7 @@ async fn install_materializes_declared_static_files_folder() {
 
 #[tokio::test]
 async fn install_rejects_static_files_path_traversal() {
-    let db = SqliteAdapter::connect("sqlite::memory:").await.unwrap();
+    let db = fresh_db().await;
     let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-storage");
     runtime.ensure_system_tables().await.unwrap();
     let dir = fixture(

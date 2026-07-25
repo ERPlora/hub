@@ -88,10 +88,8 @@ pub async fn install(
     // Esto llevaba declarado en `taxes` desde ADR-0085 sin que lo ejecutara nadie: el bloque no
     // estaba en `module.schema.json` ni había una línea de Rust que lo leyera, así que las
     // categorías fiscales canónicas y las reglas de IVA de España NO se sembraban al instalar.
-    let seed_files = match db.dialect() {
-        erplora_db::Dialect::Sqlite => &manifest.seed.sqlite,
-        erplora_db::Dialect::Postgres => &manifest.seed.postgres,
-    };
+    // Hub Cloud es Postgres-only (ADR-0154): siempre el seed del dialecto `postgres`.
+    let seed_files = &manifest.seed.postgres;
     if !seed_files.is_empty() {
         let now = crate::registry::now_rfc3339();
         for file in seed_files {

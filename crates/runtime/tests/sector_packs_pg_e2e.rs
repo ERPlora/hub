@@ -16,7 +16,8 @@
 //! ```
 use std::path::PathBuf;
 
-use erplora_db::{DatabaseAdapter, Params, PgAdapter};
+use erplora_db::testutil::fresh_db;
+use erplora_db::Params;
 use erplora_runtime::{RequestContext, Runtime};
 
 fn module_dir(id: &str) -> PathBuf {
@@ -48,14 +49,6 @@ const POS_MODULES_ORDERED: &[&str] = &[
     "verifactu",   // dep: invoice
     "online_booking", // dep: customers
 ];
-
-/// Reset total del esquema: parte de un "hub nuevo" repetible. El runtime recrea sus tablas
-/// de sistema en la primera instalación.
-async fn reset_schema(db: &dyn DatabaseAdapter) {
-    db.execute_batch("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
-        .await
-        .expect("reset schema public");
-}
 
 /// Instala el pack en orden de deps; devuelve la lista de fallos (INSTALL <id>: <err>).
 async fn install_pack(rt: &mut Runtime, failures: &mut Vec<String>) {
@@ -97,9 +90,14 @@ async fn apply_blueprint(rt: &Runtime, sector: &str, failures: &mut Vec<String>)
 }
 
 async fn run_sector(sector: &str) {
-    let url = std::env::var("DATABASE_URL").expect("set DATABASE_URL");
-    let db = PgAdapter::connect(&url).await.expect("connect to postgres");
-    reset_schema(&db).await;
+    // Fixtures externas: los módulos viven en `modules-workspace/` (repos hermanos, no en el repo
+    // del hub). Si no están presentes (CI del hub aislado), se omite; en local corre.
+    if !module_dir("taxes").exists() {
+        eprintln!("skip: modules-workspace ausente (fixtures e2e externos del pack '{sector}')");
+        return;
+    }
+    // Esquema efímero por test (ADR-0154): parte de un "hub nuevo" aislado, sin reset manual.
+    let db = fresh_db().await;
 
     let mut rt = Runtime::new(Box::new(db));
     // El server llama esto al arrancar: crea las tablas de sistema (incl. identidad `hub_user`)
@@ -121,13 +119,11 @@ async fn run_sector(sector: &str) {
 }
 
 #[tokio::test]
-#[ignore = "requires a real Postgres via DATABASE_URL"]
 async fn restaurant_pack_installs_and_seeds_on_postgres() {
     run_sector("restaurant").await;
 }
 
 #[tokio::test]
-#[ignore = "requires a real Postgres via DATABASE_URL"]
 async fn beauty_pack_installs_and_seeds_on_postgres() {
     run_sector("beauty").await;
 }

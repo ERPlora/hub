@@ -9,7 +9,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use cloud_client::{EntitledModule, EntitlementClaims};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
@@ -19,7 +19,7 @@ use tower::ServiceExt; // oneshot
 /// App en modo `Session` con un usuario admin (PIN 1111) y otro no-admin (cajero, PIN 2222).
 /// Devuelve también el `AppState` para sembrar la celda de revalidación.
 async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-metrics");
     rt.ensure_system_tables().await.unwrap();
     rt.create_user("Admin", "1111", "admin", None).await.unwrap();
@@ -112,7 +112,7 @@ async fn metrics_returns_plan_and_session_telemetry_for_admin() {
     assert_eq!(data["sessions"]["devices"], json!(1), "un dispositivo distinto (dev-A)");
 
     // Base de datos real: SQLite en el harness, con tamaño medido.
-    assert_eq!(data["database"]["engine"], json!("sqlite"));
+    assert_eq!(data["database"]["engine"], json!("postgres"));
     assert!(
         data["database"]["sizeBytes"].as_u64().is_some_and(|n| n > 0),
         "tamaño de BD medido: {:?}",

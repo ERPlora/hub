@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{EventSink, RequestContext, Runtime};
 use serde_json::json;
 
@@ -21,12 +21,19 @@ impl EventSink for Sink {
 }
 
 fn params(v: serde_json::Value) -> Params { v.as_object().cloned().unwrap_or_default() }
+/// Céntimos de un agregado: Postgres devuelve `SUM(bigint)` como NUMERIC → JSON **string**
+/// (`"5000"`), no número. Acepta ambas representaciones.
+fn cents(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("no es un importe numérico: {v:?}"))
+}
 fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(n) }
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 fn wasm() -> bool { mdir("cash_register").join("dist/handler.wasm").exists() }
 
 async fn rt_cr() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("cash_register")).await.expect("instalar cash_register");
     rt
@@ -43,6 +50,9 @@ async fn open_session(rt: &Runtime, ctx: &RequestContext, opening: i64) -> Strin
 
 #[tokio::test]
 async fn install_registers_capabilities() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_cr().await;
     let reg = rt.registry();
     assert!(reg.is_installed("cash_register"));
@@ -53,6 +63,9 @@ async fn install_registers_capabilities() {
 
 #[tokio::test]
 async fn open_movements_close_reconciles() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_cr().await;
     let ctx = admin();
     let sid = open_session(&rt, &ctx, 10000).await;
@@ -81,6 +94,9 @@ async fn open_movements_close_reconciles() {
 
 #[tokio::test]
 async fn session_summary_aggregates_by_type() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_cr().await;
     let ctx = admin();
     let sid = open_session(&rt, &ctx, 0).await;
@@ -91,15 +107,18 @@ async fn session_summary_aggregates_by_type() {
         })), &ctx).await.unwrap();
     }
     let sum = rt.execute_query("cash_register.session.summary", &params(json!({"session_id": sid})), &ctx).await.unwrap();
-    assert_eq!(sum[0]["total_sales"].as_i64().unwrap(), 5000);
+    assert_eq!(cents(&sum[0]["total_sales"]), 5000);
     // FIX SIGNO (QA 2026-06-25): el desglose se presenta como MAGNITUD POSITIVA — un refund
     // almacenado en -1000 se reporta como 1000 (la query niega el SUM de salidas).
-    assert_eq!(sum[0]["total_refunds"].as_i64().unwrap(), 1000);
+    assert_eq!(cents(&sum[0]["total_refunds"]), 1000);
     assert_eq!(sum[0]["movement_count"], json!(4));
 }
 
 #[tokio::test]
 async fn add_count_wasm_sums_denominations() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm() { eprintln!("SKIP: cash_register handler.wasm ausente"); return; }
     let rt = rt_cr().await;
     let ctx = admin();
@@ -117,9 +136,12 @@ async fn add_count_wasm_sums_denominations() {
 
 #[tokio::test]
 async fn sale_completed_records_cash_movement() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // Cadena cross-módulo completa: inventory+customers+invoice+sales+cash_register.
     if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
@@ -155,8 +177,11 @@ async fn sale_completed_records_cash_movement() {
 
 #[tokio::test]
 async fn movement_add_emits_movement_added() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // Path directo determinista: `movement.add` escribe un movimiento → debe emitir el evento.
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
@@ -178,10 +203,13 @@ async fn movement_add_emits_movement_added() {
 
 #[tokio::test]
 async fn record_sale_emits_movement_added_after_relay() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // Path REAL del P1: venta → (relay) record_sale escribe el movimiento Y emite el evento, en el
     // mismo tx del outbox → cuando el widget lo recibe, el dato YA está en la BD.
     if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());

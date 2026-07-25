@@ -15,7 +15,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::{RequestContext, Runtime};
@@ -41,7 +41,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 async fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1"); // ctx y runtime comparten hub (como en prod)
     rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
@@ -103,6 +103,9 @@ async fn exported_bundle() -> erplora_runtime::export::ExportBundle {
 
 #[tokio::test]
 async fn round_trip_restores_equivalent_state_under_target_hub_id() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let bundle = exported_bundle().await;
 
     // Hub destino B, tenant DISTINTO (h2), con los módulos ya instalados (paso del server).
@@ -136,6 +139,9 @@ async fn round_trip_restores_equivalent_state_under_target_hub_id() {
 /// no tiene ninguna columna reservada.
 #[tokio::test]
 async fn round_trip_survives_reserved_word_columns() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let a = fresh().await;
     a.execute_command(
         "inventory.categories.create",
@@ -177,6 +183,9 @@ async fn round_trip_survives_reserved_word_columns() {
 
 #[tokio::test]
 async fn unselected_sections_are_skipped() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let bundle = exported_bundle().await;
 
     let mut b = fresh().await;
@@ -205,6 +214,9 @@ async fn unselected_sections_are_skipped() {
 
 #[tokio::test]
 async fn best_effort_a_broken_section_does_not_abort_the_rest() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut bundle = exported_bundle().await;
 
     // Rompemos el SQL de taxes (sintaxis inválida) PERO con sha256 coherente: la integridad
@@ -229,6 +241,9 @@ async fn best_effort_a_broken_section_does_not_abort_the_rest() {
 
 #[tokio::test]
 async fn sha256_mismatch_rejects_the_import_without_effects() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut bundle = exported_bundle().await;
     // Manipulación del bundle: contenido cambiado sin actualizar el hash del manifest.
     bundle.files.insert("data/inventory.sql".into(), b"tampered".to_vec());
@@ -244,6 +259,9 @@ async fn sha256_mismatch_rejects_the_import_without_effects() {
 
 #[tokio::test]
 async fn unknown_schema_version_rejects_without_effects() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut bundle = exported_bundle().await;
     bundle.manifest.schema_version = 999;
 
@@ -255,11 +273,14 @@ async fn unknown_schema_version_rejects_without_effects() {
 
 #[tokio::test]
 async fn module_data_for_uninstalled_module_fails_its_section_only() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let bundle = exported_bundle().await;
 
     // Destino SIN inventory (solo taxes): la sección de inventory falla con motivo claro,
     // la de taxes se aplica. (Instalar módulos que faltan es del server, no de este motor.)
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut b = Runtime::with_hub_id(Box::new(db), "h1");
     b.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
 
@@ -289,6 +310,9 @@ async fn module_data_for_uninstalled_module_fails_its_section_only() {
 /// El guard tiene que ir por `id` SOLO: es la clave primaria, y si existe, existe.
 #[tokio::test]
 async fn una_fila_cuyo_id_ya_existe_no_rompe_la_seccion() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let bundle = exported_bundle().await;
 
     // Destino con los módulos instalados — y por tanto con su semilla ya aplicada.

@@ -27,7 +27,7 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_db::{DatabaseAdapter, Dialect, Params};
+use erplora_db::{DatabaseAdapter, Params};
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -221,40 +221,22 @@ fn sample_cgroup(r: &dyn CgroupReader) -> (MemoryMetric, CpuMetric) {
 
 // ─────────────────────────── Base de datos + sesiones (adapter) ───────────────────────────
 
-/// Tamaño real de la BD. Postgres: `pg_database_size(current_database())`. SQLite:
-/// `page_count * page_size`. El límite del plan (`limit_bytes`) queda `null`: el claim del
-/// entitlement (ADR-0154) NO trae hoy una cuota de BD → se anota como follow-up.
-async fn read_database(db: &dyn DatabaseAdapter, dialect: Dialect) -> DbMetric {
+/// Tamaño real de la BD (Postgres-only, ADR-0154): `pg_database_size(current_database())`. El
+/// límite del plan (`limit_bytes`) queda `null`: el claim del entitlement NO trae hoy una cuota de
+/// BD → se anota como follow-up.
+async fn read_database(db: &dyn DatabaseAdapter) -> DbMetric {
     let no_params = Params::new();
-    match dialect {
-        Dialect::Postgres => {
-            let size = scalar_u64(
-                db,
-                "SELECT pg_database_size(current_database()) AS n",
-                &no_params,
-            )
-            .await;
-            DbMetric {
-                engine: "postgres".into(),
-                size_bytes: size,
-                limit_bytes: None,
-                fraction: None,
-            }
-        }
-        Dialect::Sqlite => {
-            let pages = scalar_u64(db, "PRAGMA page_count", &no_params).await;
-            let page_size = scalar_u64(db, "PRAGMA page_size", &no_params).await;
-            let size = match (pages, page_size) {
-                (Some(p), Some(s)) => Some(p.saturating_mul(s)),
-                _ => None,
-            };
-            DbMetric {
-                engine: "sqlite".into(),
-                size_bytes: size,
-                limit_bytes: None,
-                fraction: None,
-            }
-        }
+    let size = scalar_u64(
+        db,
+        "SELECT pg_database_size(current_database()) AS n",
+        &no_params,
+    )
+    .await;
+    DbMetric {
+        engine: "postgres".into(),
+        size_bytes: size,
+        limit_bytes: None,
+        fraction: None,
     }
 }
 
@@ -337,9 +319,8 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
     let (database, sessions) = {
         let rt = st.runtime.lock().await;
         let db = rt.db();
-        let dialect = db.dialect();
         (
-            read_database(db, dialect).await,
+            read_database(db).await,
             read_sessions(db, max_devices, &now).await,
         )
     };

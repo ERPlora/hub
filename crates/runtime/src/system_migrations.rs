@@ -2,8 +2,8 @@
 //!
 //! Las tablas de sistema (`hub_module`, `hub_user`, `hub_session`, `_event_outbox`,
 //! `_event_delivery`, `_scheduled_tasks`, `_hub_migrations`…) se crean con `CREATE TABLE
-//! IF NOT EXISTS` (ensure-create) al arrancar. Eso **no altera** tablas que ya existen: una
-//! `erplora.db` que sobrevive a un update de Tauri no recibiría cambios de esquema de sistema.
+//! IF NOT EXISTS` (ensure-create) al arrancar. Eso **no altera** tablas que ya existen: una BD
+//! de un hub ya desplegado no recibiría cambios de esquema de sistema solo con el ensure-create.
 //!
 //! Este módulo es el espejo de [`crate::migrations`] (migraciones de **módulos**), pero para el
 //! esquema **interno** del runtime: el SQL va **embebido en el binario** y se aplica en orden,
@@ -13,12 +13,12 @@
 //!  - **v0 = baseline** = los `CREATE TABLE IF NOT EXISTS` actuales (outbox/scheduler/identity).
 //!    `ensure_system_tables` los asegura primero (cubre el hub vacío) y *no* se registra como
 //!    migración: es el suelo sobre el que corren las versiones ≥ 1.
-//!  - A partir de v1, cada cambio de esquema de sistema es una migración **versionada** con SQL
-//!    por dialecto (SQLite/Postgres), aplicada idempotentemente al arrancar dentro de su propia
-//!    transacción junto con el registro en `_hub_system_migrations`.
+//!  - A partir de v1, cada cambio de esquema de sistema es una migración **versionada** (SQL
+//!    Postgres, ADR-0154), aplicada idempotentemente al arrancar dentro de su propia transacción
+//!    junto con el registro en `_hub_system_migrations`.
 //!
 //! Idempotente: re-arrancar no reaplica (se comprueba la versión en la tabla de control).
-use erplora_db::{DatabaseAdapter, Dialect, Params};
+use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 
 use crate::errors::Result;
@@ -30,12 +30,11 @@ const ENSURE_CONTROL: &str = "CREATE TABLE IF NOT EXISTS _hub_system_migrations 
     version INTEGER NOT NULL, name TEXT NOT NULL, applied_at TEXT NOT NULL, \
     PRIMARY KEY (version));";
 
-/// Una migración de sistema: número de versión (orden), nombre legible y SQL por dialecto.
+/// Una migración de sistema: número de versión (orden), nombre legible y SQL Postgres (ADR-0154).
 /// El SQL puede ser un batch (varias sentencias separadas por `;`).
 struct SystemMigration {
     version: i64,
     name: &'static str,
-    sqlite: &'static str,
     postgres: &'static str,
 }
 
@@ -52,25 +51,10 @@ const MIGRATIONS: &[SystemMigration] = &[
     // que el set activo debe ser **por hub**: PK `(hub_id, module_id)`.
     //
     // Migración ADITIVA: a las filas existentes (que no tienen hub_id) se les asigna el `hub_id`
-    // del despliegue (`:hub_id`, inyectado por el runtime, no spoofable). En SQLite recomponer la
-    // PK exige recrear la tabla; en Postgres basta con ALTER.
+    // del despliegue (`:hub_id`, inyectado por el runtime, no spoofable).
     SystemMigration {
         version: 1,
         name: "hub_module_hub_scoped",
-        // SQLite: no permite añadir una columna a la PK ni redefinir la PK con ALTER → se recrea
-        // la tabla (CREATE new + INSERT SELECT con el hub_id del despliegue + DROP + RENAME).
-        // El `CREATE TABLE IF NOT EXISTS` baseline crea la tabla SIN hub_id; aquí migramos a la
-        // forma nueva. Si la BD es nueva, la tabla baseline está vacía y el INSERT SELECT no copia
-        // nada (igualmente correcto). Guard: solo recreamos si la columna `hub_id` aún no existe.
-        sqlite: "\
-CREATE TABLE hub_module_new (\
-  hub_id TEXT NOT NULL, module_id TEXT NOT NULL, version TEXT NOT NULL, status TEXT NOT NULL, \
-  installed_at TEXT NOT NULL, updated_at TEXT NOT NULL, \
-  PRIMARY KEY (hub_id, module_id));\
-INSERT INTO hub_module_new (hub_id, module_id, version, status, installed_at, updated_at) \
-  SELECT :hub_id, module_id, version, status, installed_at, updated_at FROM hub_module;\
-DROP TABLE hub_module;\
-ALTER TABLE hub_module_new RENAME TO hub_module;",
         // Postgres: añade la columna nullable, sella el hub_id del despliegue en las filas
         // existentes (UPDATE con `:hub_id`, bind seguro — no se mete un parámetro en un DEFAULT
         // de DDL, que Postgres rechazaría en sentencia preparada), luego la pone NOT NULL y
@@ -90,9 +74,6 @@ ALTER TABLE hub_module ADD PRIMARY KEY (hub_id, module_id);",
     SystemMigration {
         version: 2,
         name: "hub_trusted_device",
-        sqlite: "\
-CREATE TABLE hub_trusted_device (\
-  device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
         postgres: "\
 CREATE TABLE hub_trusted_device (\
   device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
@@ -111,14 +92,6 @@ CREATE TABLE hub_trusted_device (\
     SystemMigration {
         version: 3,
         name: "hub_api_key",
-        sqlite: "\
-CREATE TABLE hub_api_key (\
-  id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
-  secret_hash TEXT NOT NULL, scope_json TEXT NOT NULL DEFAULT '[]', \
-  status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, \
-  last_used_at TEXT, created_by TEXT NOT NULL DEFAULT '', \
-  PRIMARY KEY (id));\
-CREATE INDEX IF NOT EXISTS ix_hub_api_key_hub ON hub_api_key (hub_id);",
         postgres: "\
 CREATE TABLE hub_api_key (\
   id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
@@ -139,11 +112,6 @@ CREATE INDEX IF NOT EXISTS ix_hub_api_key_hub ON hub_api_key (hub_id);",
     SystemMigration {
         version: 4,
         name: "hub_settings",
-        sqlite: "\
-CREATE TABLE hub_settings (\
-  hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
-  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
-  PRIMARY KEY (hub_id, key));",
         postgres: "\
 CREATE TABLE hub_settings (\
   hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
@@ -161,11 +129,6 @@ CREATE TABLE hub_settings (\
     SystemMigration {
         version: 5,
         name: "module_capability_grants",
-        sqlite: "\
-CREATE TABLE _module_capability_grants (\
-  hub_id TEXT NOT NULL, module_id TEXT NOT NULL, capability TEXT NOT NULL, \
-  granted INTEGER NOT NULL DEFAULT 0, granted_at TEXT, granted_by TEXT NOT NULL DEFAULT '', \
-  PRIMARY KEY (hub_id, module_id, capability));",
         postgres: "\
 CREATE TABLE _module_capability_grants (\
   hub_id TEXT NOT NULL, module_id TEXT NOT NULL, capability TEXT NOT NULL, \
@@ -183,11 +146,6 @@ CREATE TABLE _module_capability_grants (\
     SystemMigration {
         version: 6,
         name: "hub_certificate",
-        sqlite: "\
-CREATE TABLE _hub_certificate (\
-  hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
-  uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
-  PRIMARY KEY (hub_id));",
         postgres: "\
 CREATE TABLE _hub_certificate (\
   hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
@@ -201,16 +159,6 @@ CREATE TABLE _hub_certificate (\
     SystemMigration {
         version: 7,
         name: "hub_user_profile_preferences",
-        sqlite: "\
-CREATE TABLE hub_user_profile (\
-  hub_id TEXT NOT NULL, user_id TEXT NOT NULL, first_name TEXT NOT NULL DEFAULT '', \
-  last_name TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', \
-  avatar_path TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, \
-  PRIMARY KEY (hub_id, user_id));\
-CREATE TABLE hub_user_pref (\
-  hub_id TEXT NOT NULL, user_id TEXT NOT NULL, language TEXT NOT NULL DEFAULT '', \
-  theme_mode TEXT NOT NULL DEFAULT '', theme_palette TEXT NOT NULL DEFAULT '', \
-  updated_at TEXT NOT NULL, PRIMARY KEY (hub_id, user_id));",
         postgres: "\
 CREATE TABLE hub_user_profile (\
   hub_id TEXT NOT NULL, user_id TEXT NOT NULL, first_name TEXT NOT NULL DEFAULT '', \
@@ -234,7 +182,6 @@ CREATE TABLE hub_user_pref (\
     SystemMigration {
         version: 8,
         name: "hub_session_device_id",
-        sqlite: "ALTER TABLE hub_session ADD COLUMN device_id TEXT;",
         postgres: "ALTER TABLE hub_session ADD COLUMN device_id TEXT;",
     },
 ];
@@ -271,10 +218,7 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
             continue; // ya aplicada en un arranque previo (idempotente).
         }
 
-        let sql = match db.dialect() {
-            Dialect::Sqlite => m.sqlite,
-            Dialect::Postgres => m.postgres,
-        };
+        let sql = m.postgres;
 
         // Migración + registro en la MISMA transacción. `execute_tx` aplica cada sentencia con los
         // mismos params (`:hub_id`); las sentencias sin `:hub_id` lo ignoran sin problema.
@@ -347,8 +291,8 @@ mod tests {
 
     #[tokio::test]
     async fn apply_creates_trusted_device_table_v2() {
-        use erplora_db::SqliteAdapter;
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
         // El baseline v0 de identity/módulos no crea hub_trusted_device; la migración v2 sí.
         crate::installer::ensure_hub_module_table(&db)
             .await
@@ -376,8 +320,8 @@ mod tests {
 
     #[tokio::test]
     async fn apply_creates_hub_settings_table_v4() {
-        use erplora_db::SqliteAdapter;
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
         crate::installer::ensure_hub_module_table(&db)
             .await
             .unwrap();
@@ -404,8 +348,8 @@ mod tests {
 
     #[tokio::test]
     async fn apply_adds_device_id_column_to_hub_session_v8() {
-        use erplora_db::SqliteAdapter;
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
         // Baseline v0: hub_module (necesaria para v1) + hub_session SIN device_id (identity v0).
         crate::installer::ensure_hub_module_table(&db).await.unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
@@ -457,8 +401,8 @@ mod tests {
 
     #[tokio::test]
     async fn apply_creates_user_profile_tables_v7() {
-        use erplora_db::SqliteAdapter;
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
         crate::installer::ensure_hub_module_table(&db)
             .await
             .unwrap();

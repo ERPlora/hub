@@ -243,7 +243,7 @@ mod tests {
     use std::path::Path;
 
     use cloud_client::integrity::sha256_hex;
-    use erplora_db::SqliteAdapter;
+    use erplora_db::testutil::fresh_db;
     use erplora_runtime::{ModuleStatus, RequestContext};
     use source::Result as SourceResult;
 
@@ -345,7 +345,7 @@ mod tests {
 
     async fn runtime() -> Runtime {
         let db: Box<dyn erplora_db::DatabaseAdapter> =
-            Box::new(SqliteAdapter::open_in_memory().await.unwrap());
+            Box::new(fresh_db().await);
         Runtime::new(db)
     }
 

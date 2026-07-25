@@ -21,12 +21,28 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
+/// Postgres decodifica `SUM(...)` sobre enteros como `NUMERIC` → JSON **string** (contrato de
+/// dinero, `pg_cell`), mientras que `COUNT(*)` es `INT8` → número. Lee un i64 en ambos casos.
+fn i64_of(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("valor entero/NUMERIC esperado, got {v}"))
+}
+
 fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
+}
+
+/// Céntimos de un agregado: Postgres devuelve `SUM(bigint)`/`opening + SUM(...)` como NUMERIC →
+/// JSON **string** (`"352"`), no número. Acepta ambas representaciones.
+fn cents(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("no es un importe numérico: {v:?}"))
 }
 
 fn mdir(n: &str) -> PathBuf {
@@ -40,7 +56,7 @@ fn admin() -> RequestContext {
 }
 
 async fn rt() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     Runtime::new(Box::new(db))
 }
 
@@ -57,6 +73,9 @@ async fn kpi_row(rt: &Runtime, query: &str, ctx: &RequestContext) -> serde_json:
 // ── sales: `sales.today` → total del día + nº de tickets ─────────────────────────────────────────
 #[tokio::test]
 async fn sales_today_kpi_shows_real_total_and_tickets() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     // sales depende de taxes (ADR-0066) + inventory + customers.
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
@@ -87,13 +106,16 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
 
     // El KPI refleja la venta real: 352 céntimos (3,52 €) y 1 ticket.
     let after = kpi_row(&rt, "sales.today", &ctx).await;
-    assert_eq!(after["total"].as_i64().unwrap(), 352, "el KPI de ventas de hoy debe ser el total real");
-    assert_eq!(after["tickets"].as_i64().unwrap(), 1, "el KPI de tickets debe contar la venta real");
+    assert_eq!(cents(&after["total"]), 352, "el KPI de ventas de hoy debe ser el total real");
+    assert_eq!(i64_of(&after["tickets"]), 1, "el KPI de tickets debe contar la venta real");
 }
 
 // ── inventory: `inventory.products.stats` → stock bajo, valor, en stock ───────────────────────────
 #[tokio::test]
 async fn inventory_stats_kpis_show_real_numbers() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
     rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
@@ -114,14 +136,17 @@ async fn inventory_stats_kpis_show_real_numbers() {
     .expect("products.create");
 
     let stats = kpi_row(&rt, "inventory.products.stats", &ctx).await;
-    assert_eq!(stats["products_low_stock"].as_i64().unwrap(), 1, "1 producto en stock bajo (real)");
-    assert_eq!(stats["products_in_stock"].as_i64().unwrap(), 1, "1 producto con existencias (real)");
-    assert_eq!(stats["total_inventory_value"].as_i64().unwrap(), 600, "valoración a COSTE: 200 × 3");
+    assert_eq!(i64_of(&stats["products_low_stock"]), 1, "1 producto en stock bajo (real)");
+    assert_eq!(i64_of(&stats["products_in_stock"]), 1, "1 producto con existencias (real)");
+    assert_eq!(i64_of(&stats["total_inventory_value"]), 600, "valoración a COSTE: 200 × 3");
 }
 
 // ── staff: `staff.members.stats` → empleados activos ─────────────────────────────────────────────
 #[tokio::test]
 async fn staff_headcount_kpi_counts_active_members() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     rt.install_from_dir(&mdir("staff")).await.expect("staff");
     let ctx = admin();
@@ -139,12 +164,15 @@ async fn staff_headcount_kpi_counts_active_members() {
     rt.execute_command("staff.members.create", &create("Caro", "terminated"), &ctx).await.unwrap();
 
     let stats = kpi_row(&rt, "staff.members.stats", &ctx).await;
-    assert_eq!(stats["active_members"].as_i64().unwrap(), 2, "el KPI cuenta SOLO los activos reales");
+    assert_eq!(i64_of(&stats["active_members"]), 2, "el KPI cuenta SOLO los activos reales");
 }
 
 // ── cash_register: `cash_register.current_session` → efectivo esperado en caja ─────────────────────
 #[tokio::test]
 async fn cash_register_current_session_kpi_shows_expected_total() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     rt.install_from_dir(&mdir("cash_register")).await.expect("cash_register");
     let ctx = admin();
@@ -183,7 +211,7 @@ async fn cash_register_current_session_kpi_shows_expected_total() {
     // Esperado en caja = apertura 10000 + venta 5000 = 15000 céntimos (150,00 €).
     let session = kpi_row(&rt, "cash_register.current_session", &ctx).await;
     assert_eq!(
-        session["expected_total"].as_i64().unwrap(),
+        cents(&session["expected_total"]),
         15000,
         "el KPI de efectivo esperado debe reflejar apertura + movimientos reales"
     );
@@ -192,6 +220,9 @@ async fn cash_register_current_session_kpi_shows_expected_total() {
 // ── verifactu: `verifactu.stats.compliance_summary` → registros pendientes de la AEAT ──────────────
 #[tokio::test]
 async fn verifactu_pending_kpi_counts_real_records() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     // verifactu depends_on invoice (que depende de taxes + customers).
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
@@ -226,7 +257,7 @@ async fn verifactu_pending_kpi_counts_real_records() {
 
     let summary = kpi_row(&rt, "verifactu.stats.compliance_summary", &ctx).await;
     assert_eq!(
-        summary["pending_count"].as_i64().unwrap(),
+        i64_of(&summary["pending_count"]),
         1,
         "el KPI de pendientes debe contar el registro real recién creado"
     );

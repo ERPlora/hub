@@ -5,7 +5,7 @@
 //! aislado (que ya cubre `spa_frontend.rs` con un router de API falso).
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{build_router, with_csp, AppState};
 use http_body_util::BodyExt;
@@ -25,7 +25,7 @@ fn temp_dist() -> std::path::PathBuf {
 /// `AppState` mínimo (SQLite en memoria, sin módulos): basta para `/healthz` + estático. Mismo patrón
 /// que `tests/http.rs::make_app`.
 async fn make_state() -> AppState {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     AppState::new(rt)
 }

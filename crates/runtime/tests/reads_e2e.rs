@@ -30,7 +30,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{EventSink, RequestContext, Runtime};
 use serde_json::json;
 
@@ -58,7 +58,7 @@ impl EventSink for Sink {
 
 /// Runtime con `taxes` + `inventory` + `customers` + `sales` (el conjunto que hace falta para cobrar).
 async fn rt_pos() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.set_event_sink(Arc::new(Sink::default()));
     for m in ["taxes", "inventory", "customers", "sales"] {
@@ -75,6 +75,9 @@ async fn rt_pos() -> Runtime {
 /// El servidor debe declarar **el 10 % del catálogo**, no el 0 % del cliente.
 #[tokio::test]
 async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_cliente() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_pos().await;
     let ctx = admin();
 
@@ -156,6 +159,9 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
 /// venta se completa igual (con la pista del cliente como último recurso) — pero se completa.
 #[tokio::test]
 async fn una_read_que_falla_no_impide_cobrar() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // Se instala el conjunto completo, pero SIN sembrar ninguna regla fiscal: el catálogo de
     // confianza llega VACÍO. Lo que se prueba es que la venta NO se cae por eso — cobrar es lo
     // último que puede fallar en un TPV.

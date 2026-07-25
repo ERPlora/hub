@@ -11,7 +11,7 @@
 //! REVIERTE la transacción si el consumo no se materializó (mismo patrón que reservations).
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -32,7 +32,7 @@ fn wasm_present() -> bool {
 }
 
 async fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&taxes_dir()).await.expect("instalar taxes");
     rt.install_from_dir(&services_dir()).await.expect("instalar services");
@@ -74,6 +74,9 @@ async fn create_package(
 
 #[tokio::test]
 async fn install_registers_redeem_capabilities() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let reg = rt.registry();
     assert!(reg.is_installed("services"));
@@ -92,6 +95,9 @@ async fn install_registers_redeem_capabilities() {
 
 #[tokio::test]
 async fn redeem_decrements_uses_and_blocks_over_max_uses() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: dist/handler.wasm ausente (paquetes se crean por WASM)");
         return;
@@ -144,6 +150,9 @@ async fn redeem_decrements_uses_and_blocks_over_max_uses() {
 
 #[tokio::test]
 async fn redeem_blocks_after_expiry() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: dist/handler.wasm ausente (paquetes se crean por WASM)");
         return;
@@ -201,6 +210,9 @@ async fn redeem_blocks_after_expiry() {
 
 #[tokio::test]
 async fn redeem_rejects_unknown_package() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let ctx = admin();
     let err = rt

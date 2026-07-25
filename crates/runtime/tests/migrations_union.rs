@@ -7,7 +7,7 @@
 //! módulos reales sobre un Postgres real vive en `postgres_install_e2e.rs`.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::Runtime;
 use serde_json::json;
 
@@ -35,13 +35,13 @@ async fn applied(rt: &Runtime, module_id: &str) -> Vec<String> {
 /// paquete (forma exacta de `customers` en Postgres): se aplica desde disco.
 #[tokio::test]
 async fn empty_manifest_list_applies_package_migrations() {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture("fixture_migunion_empty")).await.expect("instalar");
 
     assert_eq!(
         applied(&rt, "migunion_empty").await,
-        ["migrations/sqlite/001_init.sql"],
+        ["migrations/postgres/001_init.sql"],
         "la migración del paquete se aplica aunque el manifest no la liste"
     );
     // La tabla existe y es usable.
@@ -58,7 +58,7 @@ async fn empty_manifest_list_applies_package_migrations() {
 /// ambas en orden de nombre — 001 primero — y los ficheros no-.sql se ignoran.
 #[tokio::test]
 async fn partial_manifest_list_applies_union_in_name_order() {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture("fixture_migunion_partial"))
         .await
@@ -66,7 +66,7 @@ async fn partial_manifest_list_applies_union_in_name_order() {
 
     assert_eq!(
         applied(&rt, "migunion_partial").await,
-        ["migrations/sqlite/001_init.sql", "migrations/sqlite/002_add_note.sql"],
+        ["migrations/postgres/001_init.sql", "migrations/postgres/002_add_note.sql"],
         "unión manifest∪disco en orden de nombre; README.txt ignorado"
     );
     rt.db_for_test()
@@ -81,7 +81,7 @@ async fn partial_manifest_list_applies_union_in_name_order() {
 /// Reinstalar no reaplica: el dedupe por `_hub_migrations` cubre también las de la unión.
 #[tokio::test]
 async fn reinstall_does_not_reapply_union_migrations() {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture("fixture_migunion_partial")).await.unwrap();
     rt.install_from_dir(&fixture("fixture_migunion_partial")).await.expect("reinstalar");

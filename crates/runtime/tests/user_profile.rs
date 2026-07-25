@@ -1,9 +1,9 @@
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::user_profile::{UpdateUserProfile, UserPreferences};
 use erplora_runtime::Runtime;
 
 async fn runtime(hub_id: &str) -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), hub_id);
     rt.ensure_system_tables().await.unwrap();
     rt

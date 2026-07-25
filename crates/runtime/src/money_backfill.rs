@@ -20,7 +20,7 @@
 //!  - Si el marcador dice `cents` → el backfill **no hace nada** (ni en hub viejo ya convertido
 //!    ni en hub nuevo ya marcado).
 //!  - Si no está → el backfill mira **el tipo declarado** de las columnas de dinero
-//!    (`PRAGMA table_info` en SQLite / `information_schema` en Postgres) para distinguir:
+//!    (`information_schema.columns`) para distinguir:
 //!      - declarado `INTEGER` → esquema **ya en céntimos** (instalación nueva) → solo siembra el
 //!        marcador, **no toca datos**.
 //!      - declarado `NUMERIC`/`REAL`/decimal → esquema viejo en **euros** → convierte
@@ -33,10 +33,10 @@
 //! ## Forma de entrega (ops)
 //!
 //! Subcomando del binario del server: `erplora-server --backfill-money` (ver
-//! `crates/server/src/main.rs`). Abre el SQLite del hub (`HUB_SQLITE_PATH`), corre
+//! `crates/server/src/main.rs`). Conecta al Postgres del hub (`HUB_DATABASE_URL`), corre
 //! [`run`] y sale. SEGURO de re-ejecutar.
 
-use erplora_db::{DatabaseAdapter, Dialect, Params};
+use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 
 use crate::errors::Result;
@@ -148,50 +148,33 @@ async fn mark_cents(db: &dyn DatabaseAdapter) -> Result<()> {
     let mut p = Params::new();
     p.insert("key".into(), json!(MONEY_UNIT_KEY));
     p.insert("value".into(), json!(MONEY_UNIT_CENTS));
-    let sql = match db.dialect() {
-        // Ambos motores soportan ON CONFLICT (key) DO UPDATE; key es PK.
-        Dialect::Sqlite | Dialect::Postgres => {
-            "INSERT INTO _hub_meta (key, value) VALUES (:key, :value) \
-             ON CONFLICT (key) DO UPDATE SET value = :value"
-        }
-    };
+    // ON CONFLICT (key) DO UPDATE; key es PK (ADR-0154: Postgres-only).
+    let sql = "INSERT INTO _hub_meta (key, value) VALUES (:key, :value) \
+               ON CONFLICT (key) DO UPDATE SET value = :value";
     db.execute(sql, &p).await?;
     Ok(())
 }
 
 /// Tipo declarado de una columna, o `None` si la tabla/columna no existe (módulo no instalado).
-/// SQLite: `PRAGMA table_info`. Postgres: `information_schema.columns`.
+/// Postgres: `information_schema.columns` (ADR-0154).
 async fn declared_type(
     db: &dyn DatabaseAdapter,
     table: &str,
     column: &str,
 ) -> Result<Option<String>> {
-    match db.dialect() {
-        Dialect::Sqlite => {
-            // PRAGMA no acepta parámetros bindeados; el nombre de tabla viene de la constante
-            // `MONEY_COLUMNS` (no input de usuario), así que interpolarlo es seguro.
-            let sql = format!("PRAGMA table_info({table})");
-            let res = db.query(&sql, &Params::new()).await?;
-            Ok(res
-                .rows
-                .iter()
-                .find(|r| r["name"].as_str() == Some(column))
-                .and_then(|r| r["type"].as_str().map(|s| s.to_string())))
-        }
-        Dialect::Postgres => {
-            let mut p = Params::new();
-            p.insert("t".into(), json!(table));
-            p.insert("c".into(), json!(column));
-            let res = db
-                .query(
-                    "SELECT data_type FROM information_schema.columns \
-                     WHERE table_name = :t AND column_name = :c",
-                    &p,
-                )
-                .await?;
-            Ok(res.rows.first().and_then(|r| r["data_type"].as_str().map(|s| s.to_string())))
-        }
-    }
+    // Postgres-only (ADR-0154). `current_schema()` acota al esquema activo del hub (en prod es
+    // `public`; en los tests, el esquema efímero) para no leer columnas de otro esquema homónimo.
+    let mut p = Params::new();
+    p.insert("t".into(), json!(table));
+    p.insert("c".into(), json!(column));
+    let res = db
+        .query(
+            "SELECT data_type FROM information_schema.columns \
+             WHERE table_schema = current_schema() AND table_name = :t AND column_name = :c",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.first().and_then(|r| r["data_type"].as_str().map(|s| s.to_string())))
 }
 
 /// `true` si el tipo declarado ya es **entero** (esquema en céntimos: el `001` nuevo declara
@@ -333,10 +316,20 @@ pub async fn run_logged(db: &dyn DatabaseAdapter) -> Result<BackfillReport> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::SqliteAdapter;
+    use erplora_db::{testutil::fresh_db, PgAdapter};
+
+    /// Lee un valor numérico sea cual sea su representación JSON: Postgres decodifica `NUMERIC`
+    /// como **string** (contrato de precisión, `pg_cell`), y los enteros/reales como número. El
+    /// backfill mira las columnas `NUMERIC` (hub viejo), así que el test debe tolerar ambas.
+    fn num_i64(v: &serde_json::Value) -> i64 {
+        v.as_i64()
+            .or_else(|| v.as_f64().map(|f| f.round() as i64))
+            .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+            .expect("valor numérico (int, real o NUMERIC-string)")
+    }
 
     /// Crea una tabla "estilo hub viejo": columnas de dinero en `NUMERIC` con datos en euros.
-    async fn old_hub_sales(db: &SqliteAdapter) {
+    async fn old_hub_sales(db: &PgAdapter) {
         db.execute_batch(
             "CREATE TABLE sales_sale (\
                 id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
@@ -361,7 +354,7 @@ mod tests {
     }
 
     /// Crea la misma tabla "estilo hub NUEVO": columnas de dinero en `INTEGER` (céntimos).
-    async fn new_hub_sales(db: &SqliteAdapter) {
+    async fn new_hub_sales(db: &PgAdapter) {
         db.execute_batch(
             "CREATE TABLE sales_sale (\
                 id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
@@ -385,24 +378,24 @@ mod tests {
         .unwrap();
     }
 
-    async fn read_total(db: &SqliteAdapter) -> i64 {
+    async fn read_total(db: &PgAdapter) -> i64 {
         let res = db
             .query("SELECT total FROM sales_sale WHERE id = 's1'", &Params::new())
             .await
             .unwrap();
-        res.rows[0]["total"].as_i64().unwrap()
+        num_i64(&res.rows[0]["total"])
     }
-    async fn read_subtotal(db: &SqliteAdapter) -> i64 {
+    async fn read_subtotal(db: &PgAdapter) -> i64 {
         let res = db
             .query("SELECT subtotal FROM sales_sale WHERE id = 's1'", &Params::new())
             .await
             .unwrap();
-        res.rows[0]["subtotal"].as_i64().unwrap()
+        num_i64(&res.rows[0]["subtotal"])
     }
 
     #[tokio::test]
     async fn old_hub_converts_euros_to_cents_then_marks() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         old_hub_sales(&db).await;
 
         let r = super::run(&db).await.unwrap();
@@ -417,17 +410,15 @@ mod tests {
             .query("SELECT change_due FROM sales_sale WHERE id = 's1'", &Params::new())
             .await
             .unwrap();
-        assert_eq!(change.rows[0]["change_due"].as_i64().unwrap(), 507);
+        assert_eq!(num_i64(&change.rows[0]["change_due"]), 507);
 
         // discount_percent (NUMERIC, NO es dinero) NO debe convertirse → sigue 10, no 1000.
         let pct = db
             .query("SELECT discount_percent FROM sales_sale WHERE id = 's1'", &Params::new())
             .await
             .unwrap();
-        // Tras la conversión el valor sigue siendo 10 (no se tocó). Puede leerse como int o float.
-        let v = &pct.rows[0]["discount_percent"];
-        let as_num = v.as_i64().map(|i| i as f64).or_else(|| v.as_f64()).unwrap();
-        assert_eq!(as_num, 10.0, "discount_percent NO es dinero, no se convierte");
+        // Tras la conversión el valor sigue siendo 10 (no se tocó). NUMERIC → string en Postgres.
+        assert_eq!(num_i64(&pct.rows[0]["discount_percent"]), 10, "discount_percent NO es dinero, no se convierte");
 
         // El marcador quedó puesto.
         assert!(super::is_marked_cents(&db).await.unwrap());
@@ -435,7 +426,7 @@ mod tests {
 
     #[tokio::test]
     async fn rerun_on_converted_hub_is_noop() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         old_hub_sales(&db).await;
 
         super::run(&db).await.unwrap();
@@ -451,7 +442,7 @@ mod tests {
 
     #[tokio::test]
     async fn new_hub_is_never_converted() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         new_hub_sales(&db).await;
 
         // Instalación nueva (esquema INTEGER): el backfill NO toca datos, solo marca.
@@ -472,7 +463,7 @@ mod tests {
 
     #[tokio::test]
     async fn empty_db_without_money_modules_just_marks() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         // Ninguna tabla de dinero instalada.
         let r = super::run(&db).await.unwrap();
         assert!(r.schema_already_cents);
@@ -482,7 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn multi_table_old_hub_converts_only_present_tables() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         old_hub_sales(&db).await;
         // payments en euros también.
         db.execute_batch(
@@ -504,6 +495,6 @@ mod tests {
             .query("SELECT amount FROM payments_payment WHERE id = 'p1'", &Params::new())
             .await
             .unwrap();
-        assert_eq!(pay.rows[0]["amount"].as_i64().unwrap(), 999); // 9.99 € → 999 ¢
+        assert_eq!(num_i64(&pay.rows[0]["amount"]), 999); // 9.99 € → 999 ¢
     }
 }

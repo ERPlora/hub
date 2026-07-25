@@ -1,7 +1,7 @@
 //! Test de integración del walking skeleton (Fase 1, §12). `cargo test -p erplora-runtime`.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime, RuntimeError};
 use serde_json::json;
 
@@ -14,7 +14,7 @@ fn module_dir() -> PathBuf {
 }
 
 async fn fresh_runtime() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.expect("sqlite en memoria");
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&module_dir()).await.expect("instalar inventory");
     rt

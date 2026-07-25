@@ -15,7 +15,7 @@ use axum::extract::{Path, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use cloud_client::Auth;
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::install::install_from_cloud;
 use serde_json::json;
@@ -86,7 +86,7 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
     let auth = Auth::HubToken { hub_id: "hub-test".into(), token: "tok".into() };
     let cache = std::env::temp_dir().join(format!("erplora-install-progress-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&cache);
-    let mut rt = Runtime::new(Box::new(SqliteAdapter::open_in_memory().await.unwrap()));
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
 
     // Colector de fases: (module_id, fase) en orden de emisión.
     let seen: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));

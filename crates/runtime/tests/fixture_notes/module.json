@@ -3,7 +3,7 @@
   "name": "Notes",
   "version": "1.0.0",
   "permissions": ["notes.write"],
-  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
   "commands": {
     "notes.create": {
       "permission": "notes.write",

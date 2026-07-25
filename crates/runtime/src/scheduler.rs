@@ -401,7 +401,7 @@ mod tests {
     use super::*;
     use crate::manifest::CommandDef;
     use crate::registry::{ModuleStatus, RegisteredCommand};
-    use erplora_db::SqliteAdapter;
+    use erplora_db::{testutil::fresh_db, PgAdapter};
 
     fn cmd(module: &str, sql: &str) -> RegisteredCommand {
         RegisteredCommand {
@@ -433,7 +433,7 @@ mod tests {
         }
     }
 
-    async fn count(db: &SqliteAdapter, sql: &str) -> i64 {
+    async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
         r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
     }
@@ -442,7 +442,7 @@ mod tests {
     /// segundo barrido inmediato NO la vuelve a disparar (sin doble-disparo).
     #[tokio::test]
     async fn due_task_runs_once_and_reschedules() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
         crate::outbox::ensure_tables(&db).await.unwrap();
         ensure_tables(&db).await.unwrap();
@@ -479,7 +479,7 @@ mod tests {
     /// `seed_module_tasks` es idempotente: re-sembrar la misma tarea NO resetea `next_run`.
     #[tokio::test]
     async fn seed_is_idempotent_and_preserves_clock() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
         let tasks = vec![task("tick", "m.tick", "*/5 * * * *", CatchUp::Collapse)];
 
@@ -513,7 +513,7 @@ mod tests {
     /// reprograma.
     #[tokio::test]
     async fn boot_catch_up_collapse_vs_skip() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
         crate::outbox::ensure_tables(&db).await.unwrap();
         ensure_tables(&db).await.unwrap();

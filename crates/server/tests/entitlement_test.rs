@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use cloud_client::{EntitledModule, EntitlementClaims};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
@@ -22,7 +22,7 @@ fn fixture() -> PathBuf {
 /// App + estado: devolvemos también el `AppState` para manipular la celda de revalidación
 /// desde el test (es exactamente lo que hace el job de background en producción).
 async fn make_app() -> (axum::Router, AppState) {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture()).await.unwrap();
     let state = AppState::new(rt);
@@ -149,7 +149,7 @@ async fn proxy_entitlement_incluye_revalidation_aunque_el_cloud_no_responda() {
     // Cloud inalcanzable (puerto de descarte, conexión rechazada): el proxy sigue devolviendo su
     // error (502, contrato actual) pero con el bloque ADITIVO `revalidation`, para que la UI
     // pueda pintar «funcionará hasta {fecha}» incluso offline.
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture()).await.unwrap();
     let cfg = HubConfig {

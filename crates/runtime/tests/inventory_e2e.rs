@@ -6,9 +6,17 @@
 //! Si `dist/handler.wasm` no existe (no se compiló el guest), se salta con aviso.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
+
+/// Postgres decodifica `SUM(...)` sobre enteros como `NUMERIC` → JSON **string** (contrato de
+/// dinero, `pg_cell`), mientras que `COUNT(*)` es `INT8` → número. Lee un i64 en ambos casos.
+fn i64_of(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("valor entero/NUMERIC esperado, got {v}"))
+}
 
 fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
@@ -27,7 +35,7 @@ fn wasm_present() -> bool {
 }
 
 async fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     // inventory depende de taxes (ADR-0066): instalar taxes primero.
     rt.install_from_dir(&inventory_dir().parent().unwrap().join("taxes")).await.expect("instalar taxes");
@@ -37,6 +45,9 @@ async fn fresh() -> Runtime {
 
 #[tokio::test]
 async fn install_registers_capabilities() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let reg = rt.registry();
     assert!(reg.is_installed("inventory"));
@@ -51,6 +62,9 @@ async fn install_registers_capabilities() {
 
 #[tokio::test]
 async fn product_crud_and_low_stock() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let ctx = admin_ctx();
 
@@ -78,7 +92,7 @@ async fn product_crud_and_low_stock() {
     // El contrato completo (exclusiones, sin-coste, agotados) se fija en inventory_stats_e2e.rs.
     let stats = rt.execute_query("inventory.products.stats", &Params::new(), &ctx).await.unwrap();
     assert_eq!(stats[0]["total_products"], json!(1));
-    assert_eq!(stats[0]["total_inventory_value"].as_i64().unwrap(), 600);
+    assert_eq!(i64_of(&stats[0]["total_inventory_value"]), 600);
 
     // Otro hub no ve nada (scope hub_id).
     let other = RequestContext::new("h2", "u9", ["*".to_string()]);
@@ -91,6 +105,9 @@ async fn product_crud_and_low_stock() {
 /// ambigüedad que #7 elimina; el contrato completo del ledger vive en inventory_ledger_e2e.rs.
 #[tokio::test]
 async fn stock_adjust_is_absolute_count() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let ctx = admin_ctx();
     rt.execute_command(
@@ -112,6 +129,9 @@ async fn stock_adjust_is_absolute_count() {
 
 #[tokio::test]
 async fn bulk_create_wasm_inserts_with_generated_skus() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: modules/inventory/dist/handler.wasm no existe");
         return;
@@ -145,6 +165,9 @@ async fn bulk_create_wasm_inserts_with_generated_skus() {
 
 #[tokio::test]
 async fn receive_stock_wasm_increments_existing() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: handler.wasm no existe");
         return;
@@ -176,6 +199,9 @@ async fn receive_stock_wasm_increments_existing() {
 
 #[tokio::test]
 async fn category_crud() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let ctx = admin_ctx();
     rt.execute_command(
@@ -197,6 +223,9 @@ async fn category_crud() {
 /// hub del contexto (la tabla es un join puro, sin `hub_id` propio → la guarda la pone el SQL).
 #[tokio::test]
 async fn product_category_link_add_and_remove() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh().await;
     let ctx = admin_ctx();
 

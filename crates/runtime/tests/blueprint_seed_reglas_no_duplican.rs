@@ -16,7 +16,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::Runtime;
@@ -29,7 +29,7 @@ fn modules_root() -> PathBuf {
 /// producción. El test existente sembraba el destino bajo `h1` e importaba a `h2`, así que origen y
 /// destino nunca compartían `(hub_id, …)` y el choque no salía.
 async fn hub_con_taxes(hub_id: &str) -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
     rt.install_from_dir(&modules_root().join("taxes"))
         .await
@@ -49,6 +49,9 @@ async fn count(rt: &Runtime, sql: &str) -> i64 {
 /// Restaurar un blueprint sobre un hub que ya tiene su semilla NO duplica las reglas de IVA.
 #[tokio::test]
 async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // ORIGEN h1 → bundle con taxes (los `id` embeben 'h1'; created_by='system').
     let a = hub_con_taxes("h1").await;
     let selection = ExportSelection {

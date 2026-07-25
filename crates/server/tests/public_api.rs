@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::SqliteAdapter;
+use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
@@ -35,7 +35,7 @@ fn dev_config() -> HubConfig {
 
 /// App con el módulo `catalog` instalado + tablas de sistema (incluida `hub_api_key`).
 async fn make_app() -> axum::Router {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
     rt.install_from_dir(&fixture()).await.unwrap();
@@ -402,7 +402,7 @@ async fn settings_put_rejects_invalid_currency_and_language() {
 /// pasa). Se montan dos sesiones reales (admin + cajero) antes de construir la app y se prueban ambas.
 #[tokio::test]
 async fn settings_put_non_admin_is_403_in_session_mode() {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
     rt.install_from_dir(&fixture()).await.unwrap();
@@ -527,7 +527,7 @@ async fn openapi_rejects_api_key_principal() {
 /// nada (ADR-0057 §4 refinado + setting `api_docs_enabled`).
 #[tokio::test]
 async fn openapi_anonymous_in_session_mode_with_docs_off_is_404() {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
     rt.install_from_dir(&fixture()).await.unwrap();

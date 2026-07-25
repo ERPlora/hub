@@ -7,7 +7,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::Runtime;
 use serde_json::json;
 
@@ -28,7 +28,7 @@ async fn lists_installed_modules_missing_from_registry() {
     let _ = fs::remove_dir_all(&tmp);
     let alpha = write_module(&tmp, "alpha");
 
-    let mut rt = Runtime::new(Box::new(SqliteAdapter::open_in_memory().await.unwrap()));
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&alpha).await.unwrap(); // alpha: en hub_module Y en el registro
 
     // Todo lo instalado está registrado → nada que re-descargar.

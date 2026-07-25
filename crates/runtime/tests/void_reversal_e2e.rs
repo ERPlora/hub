@@ -14,7 +14,7 @@
 //! relay del Outbox; las aserciones leen por las queries públicas reales.
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -25,7 +25,7 @@ fn mdir(n: &str) -> PathBuf {
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 
 async fn full_stack() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
@@ -49,8 +49,13 @@ async fn open_cash_session(rt: &Runtime, ctx: &RequestContext, opening: i64) -> 
 /// asumiéndolos positivos, mientras que el resto del módulo los almacena negativos (ver SEAM en
 /// el changelog); por eso el ARQUEO post-void se mide con `arqueo()` (la reconciliación canónica).
 async fn expected_cash(rt: &Runtime, ctx: &RequestContext) -> i64 {
-    rt.execute_query("cash_register.current_session", &Params::new(), ctx).await.unwrap()[0]
-        ["expected_total"].as_i64().unwrap()
+    // Postgres devuelve `opening_balance + SUM(amount)` como NUMERIC → JSON string (`"13000"`),
+    // no número: aceptamos ambas representaciones.
+    let v = rt.execute_query("cash_register.current_session", &Params::new(), ctx).await.unwrap()[0]
+        ["expected_total"].clone();
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("expected_total no numérico: {v:?}"))
 }
 
 /// ARQUEO canónico de la sesión: cierra y devuelve `expected_balance` (= opening + Σ amount, la
@@ -132,6 +137,9 @@ async fn seed_stock_decrease(rt: &Runtime, ctx: &RequestContext, pid: &str, qty:
 /// Listeners de sale.voided registrados por ambos módulos.
 #[tokio::test]
 async fn install_registers_void_listeners() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = full_stack().await;
     let reg = rt.registry();
     let listeners = reg.listeners_for("sale.voided");
@@ -143,6 +151,9 @@ async fn install_registers_void_listeners() {
 /// stock restituido. Reentrega del evento no duplica.
 #[tokio::test]
 async fn cash_sale_void_reverts_cash_and_stock() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = full_stack().await;
     let ctx = admin();
 
@@ -190,6 +201,9 @@ async fn cash_sale_void_reverts_cash_and_stock() {
 /// así que su anulación es no-op en caja (no se postea refund), pero el stock SÍ se restituye.
 #[tokio::test]
 async fn card_sale_void_restocks_but_no_cash_refund() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = full_stack().await;
     let ctx = admin();
     let opening = 5_000;
@@ -218,6 +232,9 @@ async fn card_sale_void_restocks_but_no_cash_refund() {
 /// revirtiendo la caja, sin tocar ningún stock de producto.
 #[tokio::test]
 async fn service_line_void_reverts_cash_without_touching_stock() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = full_stack().await;
     let ctx = admin();
     let sid = open_cash_session(&rt, &ctx, 0).await;
