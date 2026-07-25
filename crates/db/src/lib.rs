@@ -1,13 +1,16 @@
 //! erplora-db — database abstraction for hub (ARQUITECTURA.md §8).
 //!
-//! Single engine **sqlx** with two pools behind the same [`DatabaseAdapter`] trait:
-//! - [`SqliteAdapter`] — `SqlitePool` (local / Tauri, single-user).
-//! - [`PgAdapter`]     — `PgPool`     (cloud / Aurora, multi-user).
+//! Single engine **sqlx** with a Postgres pool behind the [`DatabaseAdapter`] trait:
+//! - [`PgAdapter`] — `PgPool` (Hub Cloud, multi-user, per-org database).
+//!
+//! Since ADR-0154 the Hub is **Postgres-only** (no local/SQLite backend, no Tauri desktop app):
+//! the trait keeps a single implementation. It stays a trait so the runtime depends on the
+//! contract, not the concrete pool, and so tests can inject an ephemeral adapter.
 //!
 //! - **Dynamic SQL**: statements come from `module.json`/`queries/*.sql` at runtime,
 //!   not known at compile time ⇒ we use `sqlx::query(&str)` (not `query_as::<T>`).
-//! - Modules always write named parameters `:name`; [`translate`] lowers them to
-//!   `$n` (Postgres) or `?n` (SQLite). The module never sees the positional placeholder.
+//! - Modules always write named parameters `:name`; [`translate`] lowers them to `$n`
+//!   (Postgres). The module never sees the positional placeholder.
 //! - Rows are returned as `serde_json::Value` inside [`QueryResult`], ready for the SDK.
 
 use async_trait::async_trait;
@@ -16,21 +19,15 @@ use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::{Column, Encode, Row, Type, TypeInfo, ValueRef};
 
-/// Dump consistente del SQLite local (`VACUUM INTO`) para el módulo `backup` (ADR-0040/0041).
-pub mod backup;
-
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
+
+/// Helpers de test compartidos (esquema Postgres efímero por test). Compilados para los tests del
+/// propio crate y para quien active la feature `test-util`.
+#[cfg(any(test, feature = "test-util"))]
+pub mod testutil;
 
 /// Named parameters of a statement (`:key` → JSON value).
 pub type Params = Map<String, Json>;
-
-/// SQL dialect of the active backend.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Dialect {
-    Sqlite,
-    Postgres,
-}
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbError {
@@ -68,12 +65,10 @@ impl CommandResult {
     }
 }
 
-/// Common contract for all backends. The runtime only knows this trait; it does not know
-/// whether SQLite (local) or Postgres (cloud) sits underneath. Same contract, different impl.
+/// Common contract for the backend. The runtime only knows this trait; it does not know the
+/// concrete pool sitting underneath. One contract, one Postgres implementation (ADR-0154).
 #[async_trait]
 pub trait DatabaseAdapter: Send + Sync {
-    fn dialect(&self) -> Dialect;
-
     /// Runs a write. Returns affected rows.
     async fn execute(&self, sql: &str, params: &Params) -> Result<CommandResult, DbError>;
 
@@ -87,20 +82,18 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn execute_batch(&self, sql: &str) -> Result<(), DbError>;
 }
 
-// ── NULL binding (dialect-agnostic, context-inferred OID on Postgres) ──────────────────────
+// ── NULL binding (context-inferred OID on Postgres) ────────────────────────────────────────
 //
 // Binding a JSON `null` as `Option::<String>::None` sends a NULL **typed as TEXT** (OID 25).
-// SQLite (no static column types) accepts it anywhere, but Postgres rejects it against a column
-// of another type (`42804`: "column is of type bigint but expression is of type text"). The same
-// declarative command then works on Local (SQLite) and breaks on Cloud (Postgres) — e.g.
-// `cash_register/commands/close_session.sql` binding `:closing_balance` (INTEGER nullable) as NULL.
+// Postgres rejects it against a column of another type (`42804`: "column is of type bigint but
+// expression is of type text") — e.g. `cash_register/commands/close_session.sql` binding
+// `:closing_balance` (INTEGER nullable) as NULL.
 //
 // `DynNull` is a zero-sized marker for "SQL NULL of inferred type". The key is its `Encode<Postgres>`
 // impl: `produces()` returns `PgTypeInfo::with_oid(Oid(0))`, the Postgres **unknown/infer** OID. In
 // the Parse message that 0 tells Postgres "infer this parameter's type from context" (the target
-// column), so the NULL is coerced to whatever the column is (bigint, double precision, …). On
-// SQLite it is simply a NULL. The same value binds in the dialect-agnostic `build_query!` macro
-// because `DynNull` implements `Type`/`Encode` for **both** backends.
+// column), so the NULL is coerced to whatever the column is (bigint, double precision, …) instead of
+// being fixed to TEXT.
 #[derive(Debug, Clone, Copy)]
 struct DynNull;
 
@@ -129,31 +122,12 @@ impl<'q> Encode<'q, sqlx::Postgres> for DynNull {
     }
 }
 
-impl Type<sqlx::Sqlite> for DynNull {
-    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
-        <Option<String> as Type<sqlx::Sqlite>>::type_info()
-    }
-    fn compatible(_: &sqlx::sqlite::SqliteTypeInfo) -> bool {
-        true
-    }
-}
-
-impl<'q> Encode<'q, sqlx::Sqlite> for DynNull {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer,
-    ) -> Result<IsNull, BoxDynError> {
-        // SQLite is dynamically typed: a NULL is a NULL regardless of declared column type.
-        Encode::<sqlx::Sqlite>::encode_by_ref(&Option::<String>::None, buf)
-    }
-}
-
 // ── dynamic binding ──────────────────────────────────────────────────────────────────────
 //
 // SQL is dynamic, so we bind in a loop over `names` (the bind order returned by `translate`).
 // We use a macro instead of a helper fn to avoid spelling the type
-// `Query<'q, DB, DB::Arguments<'q>>` by hand: the macro expands in context and inference picks
-// Sqlite vs Postgres from the pool where `q` is executed. A single definition serves both adapters.
+// `Query<'q, Postgres, PgArguments>` by hand: the macro expands in context and inference picks the
+// Postgres pool where `q` is executed.
 macro_rules! build_query {
     ($tsql:expr, $names:expr, $params:expr) => {{
         // `AssertSqlSafe`: sqlx 0.9 requires `'static` SQL or an explicit assertion (anti-injection).
@@ -162,11 +136,9 @@ macro_rules! build_query {
         let mut q = sqlx::query(sqlx::AssertSqlSafe($tsql));
         for name in $names.iter() {
             q = match $params.get(name) {
-                // NULL — bound as `DynNull` (see its definition above): on Postgres it emits a NULL
-                // with OID 0 (inferred-by-context), so the server coerces it to the target column's
-                // type (bigint, double precision, …) instead of fixing it to TEXT and raising 42804.
-                // On SQLite it is a plain NULL. This makes the same declarative command behave
-                // identically on Local (SQLite) and Cloud (Postgres).
+                // NULL — bound as `DynNull` (see its definition above): emits a NULL with OID 0
+                // (inferred-by-context), so the server coerces it to the target column's type
+                // (bigint, double precision, …) instead of fixing it to TEXT and raising 42804.
                 None | Some(Json::Null) => q.bind(DynNull),
                 Some(Json::Bool(b)) => q.bind(*b),
                 Some(Json::Number(n)) => {
@@ -186,103 +158,7 @@ macro_rules! build_query {
     }};
 }
 
-// ── SQLite backend (local / Tauri) ───────────────────────────────────────────────────────
-
-/// SQLite backend over `SqlitePool`. Local is single-user, so the pool is small.
-pub struct SqliteAdapter {
-    pool: SqlitePool,
-}
-
-impl SqliteAdapter {
-    /// Opens (or creates) a SQLite DB. `url` in sqlx style: `sqlite:///path/hub.db` or
-    /// `sqlite::memory:`.
-    pub async fn connect(url: &str) -> Result<Self, DbError> {
-        let pool = SqlitePool::connect(url).await?;
-        Ok(Self { pool })
-    }
-
-    /// In-memory DB for tests. `max_connections(1)` is **mandatory**: with several
-    /// connections, each would open a separate in-memory DB and tests wouldn't see the table.
-    pub async fn open_in_memory() -> Result<Self, DbError> {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:")
-            .await?;
-        Ok(Self { pool })
-    }
-}
-
-#[async_trait]
-impl DatabaseAdapter for SqliteAdapter {
-    fn dialect(&self) -> Dialect {
-        Dialect::Sqlite
-    }
-
-    async fn execute(&self, sql: &str, params: &Params) -> Result<CommandResult, DbError> {
-        let (tsql, names) = translate(sql, Dialect::Sqlite);
-        let q = build_query!(tsql, names, params);
-        let res = q.execute(&self.pool).await?;
-        Ok(CommandResult::affected(res.rows_affected()))
-    }
-
-    async fn execute_tx(&self, ops: &[(String, Params)]) -> Result<CommandResult, DbError> {
-        let mut tx = self.pool.begin().await?;
-        let mut total = 0u64;
-        for (sql, params) in ops {
-            let (tsql, names) = translate(sql, Dialect::Sqlite);
-            let q = build_query!(tsql, names, params);
-            total += q.execute(&mut *tx).await?.rows_affected();
-        }
-        tx.commit().await?;
-        Ok(CommandResult::affected(total))
-    }
-
-    async fn query(&self, sql: &str, params: &Params) -> Result<QueryResult, DbError> {
-        let (tsql, names) = translate(sql, Dialect::Sqlite);
-        let q = build_query!(tsql, names, params);
-        let rows = q.fetch_all(&self.pool).await?;
-        let out = rows.iter().map(sqlite_row_to_json).collect();
-        Ok(QueryResult::new(out))
-    }
-
-    async fn execute_batch(&self, sql: &str) -> Result<(), DbError> {
-        // Migraciones: normaliza los tipos del `CREATE TABLE` al motor target (ADR-0007 §4b).
-        // En SQLite es la identidad, pero lo aplicamos por simetría con el adaptador Postgres.
-        let normalized = shim_ddl_types(sql, Dialect::Sqlite);
-        sqlx::raw_sql(sqlx::AssertSqlSafe(normalized)).execute(&self.pool).await?;
-        Ok(())
-    }
-}
-
-/// SQLite row → JSON object.
-fn sqlite_row_to_json(row: &SqliteRow) -> Json {
-    let mut obj = Map::new();
-    for col in row.columns() {
-        obj.insert(col.name().to_string(), sqlite_cell(row, col.ordinal()));
-    }
-    Json::Object(obj)
-}
-
-/// SQLite cell → JSON, driven by the **runtime storage class** (SQLite is dynamically typed,
-/// so the reliable type is the value's, not the declared column's).
-fn sqlite_cell(row: &SqliteRow, i: usize) -> Json {
-    // Read the raw value only to learn its type and discard NULL; then decode.
-    let ty = {
-        let Ok(raw) = row.try_get_raw(i) else { return Json::Null };
-        if raw.is_null() {
-            return Json::Null;
-        }
-        raw.type_info().name().to_string()
-    };
-    match ty.as_str() {
-        "INTEGER" | "BOOLEAN" => row.try_get::<i64, _>(i).map(Json::from).unwrap_or(Json::Null),
-        "REAL" => row.try_get::<f64, _>(i).map(Json::from).unwrap_or(Json::Null),
-        // TEXT, BLOB and everything else → string (BLOB is lost if not UTF-8: falls to null).
-        _ => row.try_get::<String, _>(i).map(Json::String).unwrap_or(Json::Null),
-    }
-}
-
-// ── Postgres backend (cloud / Aurora) ────────────────────────────────────────────────────
+// ── Postgres backend (Hub Cloud) ─────────────────────────────────────────────────────────
 
 /// Postgres backend over `PgPool`. `max_connections` is injected via environment at
 /// construction ([`PG_MAX_CONNECTIONS_ENV`], per plan, managed by the SaaS); the rest of the
@@ -340,7 +216,7 @@ impl PgAdapter {
     /// `max_connections` comes from [`PG_MAX_CONNECTIONS_ENV`] (per-hub cap injected by the
     /// SaaS at deploy time; absent/invalid → the sqlx default of 10 — ERPlora/saas#609).
     /// TODO §8: use `PgPoolOptions` with TLS require,
-    /// max_lifetime/idle_timeout to survive Aurora failovers.
+    /// max_lifetime/idle_timeout to survive failovers.
     pub async fn connect(dsn: &str) -> Result<Self, DbError> {
         let pool = PgPoolOptions::new()
             .max_connections(pg_max_connections_from_env())
@@ -348,16 +224,18 @@ impl PgAdapter {
             .await?;
         Ok(Self { pool })
     }
+
+    /// Build an adapter over an already-configured pool (used by the test helpers).
+    #[cfg(any(test, feature = "test-util"))]
+    pub(crate) fn from_pool(pool: PgPool) -> Self {
+        Self { pool }
+    }
 }
 
 #[async_trait]
 impl DatabaseAdapter for PgAdapter {
-    fn dialect(&self) -> Dialect {
-        Dialect::Postgres
-    }
-
     async fn execute(&self, sql: &str, params: &Params) -> Result<CommandResult, DbError> {
-        let (tsql, names) = translate(sql, Dialect::Postgres);
+        let (tsql, names) = translate(sql);
         let q = build_query!(tsql, names, params);
         let res = q.execute(&self.pool).await?;
         Ok(CommandResult::affected(res.rows_affected()))
@@ -367,7 +245,7 @@ impl DatabaseAdapter for PgAdapter {
         let mut tx = self.pool.begin().await?;
         let mut total = 0u64;
         for (sql, params) in ops {
-            let (tsql, names) = translate(sql, Dialect::Postgres);
+            let (tsql, names) = translate(sql);
             let q = build_query!(tsql, names, params);
             total += q.execute(&mut *tx).await?.rows_affected();
         }
@@ -376,7 +254,7 @@ impl DatabaseAdapter for PgAdapter {
     }
 
     async fn query(&self, sql: &str, params: &Params) -> Result<QueryResult, DbError> {
-        let (tsql, names) = translate(sql, Dialect::Postgres);
+        let (tsql, names) = translate(sql);
         let q = build_query!(tsql, names, params);
         let rows = q.fetch_all(&self.pool).await?;
         let out = rows.iter().map(pg_row_to_json).collect();
@@ -384,9 +262,9 @@ impl DatabaseAdapter for PgAdapter {
     }
 
     async fn execute_batch(&self, sql: &str) -> Result<(), DbError> {
-        // Migraciones: normaliza los tipos del `CREATE TABLE` al motor target (ADR-0007 §4b).
-        // En Postgres mapea TEXT→TEXT, INTEGER→BIGINT, REAL→DOUBLE PRECISION, BLOB→BYTEA.
-        let normalized = shim_ddl_types(sql, Dialect::Postgres);
+        // Migraciones: normaliza los tipos del `CREATE TABLE` al motor target (ADR-0007 §4b):
+        // TEXT→TEXT, INTEGER→BIGINT, REAL→DOUBLE PRECISION, BLOB→BYTEA.
+        let normalized = shim_ddl_types(sql);
         sqlx::raw_sql(sqlx::AssertSqlSafe(normalized)).execute(&self.pool).await?;
         Ok(())
     }
@@ -457,7 +335,7 @@ fn pg_cell(row: &PgRow, i: usize) -> Json {
     }
 }
 
-// ── shim de funciones-puente: ERPlora SQL → expresión nativa por dialecto (ADR-0007 §4a) ─────
+// ── shim de funciones-puente: ERPlora SQL → expresión nativa Postgres (ADR-0007 §4a) ─────────
 
 /// **Set fijo y cerrado** de funciones-puente `erp_*` que el shim sabe reescribir
 /// (ADR-0007 decisión 4a; ejemplos enumerados en `runtime-dispatcher.md §4bis`). Es cerrado a
@@ -490,26 +368,17 @@ pub const BRIDGE_FUNCTIONS: &[&str] = &[
     "erp_timefmt",
 ];
 
-/// Reescribe las **funciones-puente** del subconjunto portable a la expresión nativa del dialecto.
+/// Reescribe las **funciones-puente** del subconjunto portable a la expresión nativa de Postgres.
 /// Sustitución textual anclada con escaneo de paréntesis balanceados (NO es un parser AST),
 /// aplicada al traducir el SQL del módulo. UTF-8-safe. Recursiva: un argumento puede contener a
 /// su vez otra función-puente.
 ///
 /// Funciones cubiertas (ver [`BRIDGE_FUNCTIONS`]):
-/// - `erp_now()` → `CURRENT_TIMESTAMP` (SQLite) / `now()` (Postgres). Timestamp del servidor en el
-///   formato nativo del motor (ADR-0007 / runtime-dispatcher §4bis: fechas `TEXT` ISO-8601).
-/// - `erp_lpad(valor, ancho, relleno)` → relleno por la izquierda hasta `ancho` con la cadena
-///   `relleno`: `printf` no sirve para relleno arbitrario, así que se baja a la forma nativa:
-///   - SQLite:   `(substr(replace(hex(zeroblob(<ancho>)),'00',<relleno>),1,max(<ancho>-length(<valor>),0)) || <valor>)`
-///     no es portable de forma simple; SQLite **sí** trae `printf('%*s', ...)` para espacios, pero
-///     no para relleno arbitrario. Para el caso real (relleno de un solo carácter) usamos
-///     `printf` cuando el relleno es `'0'`, y en otro caso degradamos a concatenación.
-///   - Postgres: `lpad((<valor>)::text, <ancho>, <relleno>)` (nativo).
+/// - `erp_now()` → `now()`. Timestamp del servidor (ADR-0007: fechas `TEXT` ISO-8601).
+/// - `erp_lpad(valor, ancho, relleno)` → `lpad((<valor>)::text, <ancho>, <relleno>)`.
 /// - `erp_pad(valor, ancho)` = atajo de `erp_lpad(valor, ancho, '0')` para números de documento
-///   (factura `FAC-00042`, ticket `TCK-0042`), ya en uso por el equipo:
-///   - SQLite:   `printf('%0*d', <ancho>, <valor>)`   (printf admite `*` para tomar el ancho del arg)
-///   - Postgres: `lpad((<valor>)::text, <ancho>, '0')`
-fn shim_functions(sql: &str, dialect: Dialect) -> String {
+///   (factura `FAC-00042`, ticket `TCK-0042`) → `lpad((<valor>)::text, <ancho>, '0')`.
+fn shim_functions(sql: &str) -> String {
     // Atajo: si ningún nombre del set aparece, no hay nada que reescribir.
     let lower = sql.to_ascii_lowercase();
     if !BRIDGE_FUNCTIONS.iter().any(|f| lower.contains(f)) {
@@ -542,7 +411,7 @@ fn shim_functions(sql: &str, dialect: Dialect) -> String {
             if let Some((name, after_name)) = match_bridge_fn(bytes, i) {
                 if let Some((open, args, after)) = next_call(bytes, after_name) {
                     let _ = open;
-                    if let Some(repl) = render_bridge_fn(name, sql, &args, dialect) {
+                    if let Some(repl) = render_bridge_fn(name, sql, &args) {
                         out.extend_from_slice(repl.as_bytes());
                         i = after;
                         continue;
@@ -590,16 +459,11 @@ fn next_call(bytes: &[u8], after_name: usize) -> Option<(usize, Vec<(usize, usiz
     None
 }
 
-/// Renderiza una función-puente concreta a su expresión nativa. `None` = aridad incorrecta (se
-/// deja el texto intacto; el validador del toolkit debería haberlo atrapado en build).
-fn render_bridge_fn(
-    name: &str,
-    sql: &str,
-    args: &[(usize, usize)],
-    dialect: Dialect,
-) -> Option<String> {
+/// Renderiza una función-puente concreta a su expresión nativa Postgres. `None` = aridad
+/// incorrecta (se deja el texto intacto; el validador del toolkit debería haberlo atrapado en build).
+fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<String> {
     // Cada argumento puede a su vez contener funciones-puente → recursión.
-    let arg = |k: usize| shim_functions(sql[args[k].0..args[k].1].trim(), dialect);
+    let arg = |k: usize| shim_functions(sql[args[k].0..args[k].1].trim());
     match name {
         "erp_now" => {
             // `erp_now()` no toma argumentos (un único arg vacío es válido: `()`).
@@ -607,10 +471,7 @@ fn render_bridge_fn(
             if !(args.is_empty() || empty) {
                 return None;
             }
-            Some(match dialect {
-                Dialect::Sqlite => "CURRENT_TIMESTAMP".to_string(),
-                Dialect::Postgres => "now()".to_string(),
-            })
+            Some("now()".to_string())
         }
         "erp_pad" => {
             if args.len() != 2 {
@@ -618,10 +479,7 @@ fn render_bridge_fn(
             }
             let value = arg(0);
             let width = arg(1);
-            Some(match dialect {
-                Dialect::Sqlite => format!("printf('%0*d', {width}, {value})"),
-                Dialect::Postgres => format!("lpad(({value})::text, {width}, '0')"),
-            })
+            Some(format!("lpad(({value})::text, {width}, '0')"))
         }
         "erp_lpad" => {
             if args.len() != 3 {
@@ -630,41 +488,20 @@ fn render_bridge_fn(
             let value = arg(0);
             let width = arg(1);
             let fill = arg(2); // literal `'x'` o expresión
-            Some(match dialect {
-                // Caso común relleno='0' con valor numérico → printf con `*`. En otro caso, SQLite
-                // no tiene `lpad` nativo: degradamos a la forma con `substr(printf('%*s',...))` que
-                // sólo vale para espacios → para relleno arbitrario emitimos un equivalente
-                // portable que repite el carácter. Mantener simple: el caso real es '0'.
-                Dialect::Sqlite => {
-                    if fill == "'0'" {
-                        format!("printf('%0*d', {width}, {value})")
-                    } else {
-                        // substr(printf('%*s', ancho, ''), 1, max(ancho-len,0)) rellena con espacios;
-                        // replace cambia el espacio por el carácter de relleno.
-                        format!(
-                            "(replace(substr(printf('%*s', {width}, ''), 1, max({width} - length(({value})::text), 0)), ' ', {fill}) || ({value})::text)"
-                        )
-                    }
-                }
-                Dialect::Postgres => format!("lpad(({value})::text, {width}, {fill})"),
-            })
+            Some(format!("lpad(({value})::text, {width}, {fill})"))
         }
 
         // ── funciones-puente de fecha/hora ───────────────────────────────────────────────────
-        // Contrato (ADR-0007 §1): las fechas se guardan como **TEXT ISO-8601**. En SQLite las
-        // funciones `datetime()/date()/strftime()/julianday()` aceptan ese texto directamente; en
-        // Postgres hay que castear (`::timestamptz` / `::date`). Comparar dos `erp_dt(...)` entre
-        // sí es portable porque ambos lados quedan en el tipo nativo del motor.
+        // Contrato (ADR-0007 §1): las fechas se guardan como **TEXT ISO-8601**. En Postgres hay que
+        // castear (`::timestamptz` / `::date`). Comparar dos `erp_dt(...)` entre sí es portable
+        // porque ambos lados quedan en el tipo nativo del motor.
         "erp_dt" => {
             // erp_dt(x): normaliza un texto ISO a datetime comparable.
             if args.len() != 1 {
                 return None;
             }
             let x = arg(0);
-            Some(match dialect {
-                Dialect::Sqlite => format!("datetime({x})"),
-                Dialect::Postgres => format!("(({x})::timestamptz)"),
-            })
+            Some(format!("(({x})::timestamptz)"))
         }
         "erp_date" => {
             // erp_date(x): parte fecha (sin hora) de un texto ISO.
@@ -672,31 +509,19 @@ fn render_bridge_fn(
                 return None;
             }
             let x = arg(0);
-            Some(match dialect {
-                Dialect::Sqlite => format!("date({x})"),
-                Dialect::Postgres => format!("(({x})::date)"),
-            })
+            Some(format!("(({x})::date)"))
         }
         "erp_dateadd" => {
             // erp_dateadd(x, n, unit): suma `n` veces `unit` a `x`. `unit` es un literal
-            // ('minutes'|'hours'|'days'|'months'|…) compatible con los modificadores de SQLite y
-            // con los campos de `interval` de Postgres. `n` puede ser una expresión (columna).
+            // ('minutes'|'hours'|'days'|'months'|…) compatible con los campos de `interval` de
+            // Postgres. `n` puede ser una expresión (columna).
             if args.len() != 3 {
                 return None;
             }
             let x = arg(0);
             let n = arg(1);
             let unit = arg(2); // literal entre comillas: 'minutes'
-            Some(match dialect {
-                // SQLite: datetime(x, '+' || n || ' ' || 'minutes')
-                Dialect::Sqlite => {
-                    format!("datetime({x}, '+' || ({n}) || ' ' || {unit})")
-                }
-                // Postgres: (x::timestamptz + ((n) || ' ' || 'minutes')::interval)
-                Dialect::Postgres => {
-                    format!("(({x})::timestamptz + (({n}) || ' ' || {unit})::interval)")
-                }
-            })
+            Some(format!("(({x})::timestamptz + (({n}) || ' ' || {unit})::interval)"))
         }
         "erp_month_start" => {
             // erp_month_start(x): trunca al inicio del mes de `x`.
@@ -704,31 +529,20 @@ fn render_bridge_fn(
                 return None;
             }
             let x = arg(0);
-            Some(match dialect {
-                Dialect::Sqlite => format!("datetime({x}, 'start of month')"),
-                Dialect::Postgres => format!("date_trunc('month', ({x})::timestamptz)"),
-            })
+            Some(format!("date_trunc('month', ({x})::timestamptz)"))
         }
         "erp_dow_mon0" => {
             // erp_dow_mon0(x): día de la semana con 0=lunes … 6=domingo (convención de los
-            // módulos). SQLite `strftime('%w')` da 0=domingo … 6=sábado → (+6) % 7. En Postgres
-            // ISODOW da 1=lunes … 7=domingo → (ISODOW - 1).
+            // módulos). En Postgres ISODOW da 1=lunes … 7=domingo → (ISODOW - 1).
             if args.len() != 1 {
                 return None;
             }
             let x = arg(0);
-            Some(match dialect {
-                Dialect::Sqlite => {
-                    format!("((CAST(strftime('%w', {x}) AS INTEGER) + 6) % 7)")
-                }
-                Dialect::Postgres => {
-                    format!("((EXTRACT(ISODOW FROM ({x})::timestamptz)::int) - 1)")
-                }
-            })
+            Some(format!("((EXTRACT(ISODOW FROM ({x})::timestamptz)::int) - 1)"))
         }
         "erp_extract" => {
             // erp_extract(part, x): extrae un campo de `x` como INTEGER. `part` es un literal:
-            // 'hour' | 'minute' | 'second' | 'epoch'. Cubre los strftime('%H'/'%M'/'%S'/'%s').
+            // 'hour' | 'minute' | 'second' | 'epoch'.
             if args.len() != 2 {
                 return None;
             }
@@ -736,19 +550,14 @@ fn render_bridge_fn(
             let x = arg(1);
             // El literal debe ir entre comillas simples; tomamos su contenido en minúsculas.
             let part = part_raw.trim_matches('\'').to_ascii_lowercase();
-            let (sqlite_code, pg_field) = match part.as_str() {
-                "hour" => ("%H", "hour"),
-                "minute" => ("%M", "minute"),
-                "second" => ("%S", "second"),
-                "epoch" => ("%s", "epoch"),
+            let pg_field = match part.as_str() {
+                "hour" => "hour",
+                "minute" => "minute",
+                "second" => "second",
+                "epoch" => "epoch",
                 _ => return None, // parte no soportada → el validador debió atraparlo
             };
-            Some(match dialect {
-                Dialect::Sqlite => format!("CAST(strftime('{sqlite_code}', {x}) AS INTEGER)"),
-                Dialect::Postgres => {
-                    format!("(EXTRACT({pg_field} FROM ({x})::timestamptz)::bigint)")
-                }
-            })
+            Some(format!("(EXTRACT({pg_field} FROM ({x})::timestamptz)::bigint)"))
         }
         "erp_datediff_days" => {
             // erp_datediff_days(a, b): diferencia (a - b) en días, fraccionaria (REAL).
@@ -757,12 +566,9 @@ fn render_bridge_fn(
             }
             let a = arg(0);
             let b = arg(1);
-            Some(match dialect {
-                Dialect::Sqlite => format!("(julianday({a}) - julianday({b}))"),
-                Dialect::Postgres => format!(
-                    "(EXTRACT(EPOCH FROM (({a})::timestamptz - ({b})::timestamptz)) / 86400.0)"
-                ),
-            })
+            Some(format!(
+                "(EXTRACT(EPOCH FROM (({a})::timestamptz - ({b})::timestamptz)) / 86400.0)"
+            ))
         }
         "erp_timefmt" => {
             // erp_timefmt(h, m): formatea "HH:MM" a partir de dos enteros (horas, minutos).
@@ -771,69 +577,40 @@ fn render_bridge_fn(
             }
             let h = arg(0);
             let m = arg(1);
-            Some(match dialect {
-                Dialect::Sqlite => format!("printf('%02d:%02d', {h}, {m})"),
-                Dialect::Postgres => format!(
-                    "(lpad(({h})::text, 2, '0') || ':' || lpad(({m})::text, 2, '0'))"
-                ),
-            })
+            Some(format!(
+                "(lpad(({h})::text, 2, '0') || ':' || lpad(({m})::text, 2, '0'))"
+            ))
         }
         _ => None,
     }
 }
 
-// ── shim de normalización de tipos en DDL (ERPlora SQL → tipo nativo por dialecto) (ADR-0007 §4b) ─
+// ── shim de normalización de tipos en DDL (ERPlora SQL → tipo nativo Postgres) (ADR-0007 §4b) ─
 
-/// Tabla de equivalencias del **subconjunto portable de tipos** a su tipo nativo por motor
+/// Tabla de equivalencias del **subconjunto portable de tipos** a su tipo nativo Postgres
 /// (ADR-0007 / module-system §4bis: PK `TEXT`, fechas `TEXT` ISO-8601, booleanos y dinero
 /// `INTEGER`; `REAL`/`BLOB` para flotantes/binarios no monetarios).
 ///
-/// Para **SQLite** la normalización es la identidad (los tipos ya son los nativos / affinity), así
-/// que la tabla sólo mapea de verdad para **Postgres**. Devuelve `None` para un tipo que no esté
-/// en el subconjunto (se deja intacto: el validador del toolkit debe rechazar tipos no portables
-/// en build).
-///
-/// TODO (columna del humano): ADR-0007 nombra el subconjunto (`TEXT`/`INTEGER`/`REAL`/`BLOB`) pero
-/// no publica una tabla cerrada de equivalencias. Confirmar el mapeo Postgres definitivo
-/// (¿`INTEGER`→`BIGINT` siempre, o respetar `INTEGER` 32-bit cuando el módulo lo pida?).
-fn normalize_ddl_type(portable: &str, dialect: Dialect) -> Option<&'static str> {
-    let t = portable.to_ascii_uppercase();
-    match dialect {
-        // SQLite: identidad (affinity dinámica). Sólo validamos pertenencia al subconjunto.
-        Dialect::Sqlite => match t.as_str() {
-            "TEXT" => Some("TEXT"),
-            "INTEGER" => Some("INTEGER"),
-            "REAL" => Some("REAL"),
-            "BLOB" => Some("BLOB"),
-            _ => None,
-        },
-        // Postgres: tipo estático equivalente.
-        Dialect::Postgres => match t.as_str() {
-            "TEXT" => Some("TEXT"),
-            "INTEGER" => Some("BIGINT"), // dinero/booleanos/contadores en céntimos → 64-bit seguro
-            "REAL" => Some("DOUBLE PRECISION"),
-            "BLOB" => Some("BYTEA"),
-            _ => None,
-        },
+/// Devuelve `None` para un tipo que no esté en el subconjunto (se deja intacto: el validador del
+/// toolkit debe rechazar tipos no portables en build).
+fn normalize_ddl_type(portable: &str) -> Option<&'static str> {
+    match portable.to_ascii_uppercase().as_str() {
+        "TEXT" => Some("TEXT"),
+        "INTEGER" => Some("BIGINT"), // dinero/booleanos/contadores en céntimos → 64-bit seguro
+        "REAL" => Some("DOUBLE PRECISION"),
+        "BLOB" => Some("BYTEA"),
+        _ => None,
     }
 }
 
-/// Normaliza los **tipos de columna** de las sentencias `CREATE TABLE` del SQL al tipo nativo del
-/// motor target (ADR-0007 §4b). Sustitución textual anclada (NO parser AST):
+/// Normaliza los **tipos de columna** de las sentencias `CREATE TABLE` del SQL al tipo nativo de
+/// Postgres (ADR-0007 §4b). Sustitución textual anclada (NO parser AST):
 ///
-/// 1. Localiza cada `CREATE TABLE … ( … )` (con el escáner de paréntesis balanceados).
-/// 2. Dentro del bloque de columnas, para cada **token de tipo del subconjunto portable**
-///    (`TEXT`/`INTEGER`/`REAL`/`BLOB`, como palabra completa, fuera de literales) lo reemplaza por
-///    su equivalente nativo según [`normalize_ddl_type`].
-///
-/// Sólo toca tipos del subconjunto; cualquier otra cosa se deja intacta (nombres de columna,
-/// `PRIMARY KEY`, `NOT NULL`, `DEFAULT …`, etc.). Para SQLite es la identidad. Se aplica en
-/// `execute_batch` (path de migraciones), no en cada query.
-pub fn shim_ddl_types(sql: &str, dialect: Dialect) -> String {
-    // SQLite: identidad (la tabla mapea cada tipo a sí mismo). Evita reescribir sin necesidad.
-    if dialect == Dialect::Sqlite {
-        return sql.to_string();
-    }
+/// Para cada **token de tipo del subconjunto portable** (`TEXT`/`INTEGER`/`REAL`/`BLOB`, como
+/// palabra completa, fuera de literales) lo reemplaza por su equivalente nativo según
+/// [`normalize_ddl_type`]. Cualquier otra cosa se deja intacta (nombres de columna, `PRIMARY KEY`,
+/// `NOT NULL`, `DEFAULT …`, etc.). Se aplica en `execute_batch` (path de migraciones), no en cada query.
+pub fn shim_ddl_types(sql: &str) -> String {
     let bytes = sql.as_bytes();
     let mut out = String::with_capacity(sql.len() + 16);
     let mut i = 0;
@@ -861,7 +638,7 @@ pub fn shim_ddl_types(sql: &str, dialect: Dialect) -> String {
                 let next_is_ident =
                     bytes.get(end).map(|b| b.is_ascii_alphanumeric() || *b == b'_').unwrap_or(false);
                 if !next_is_ident {
-                    if let Some(native) = normalize_ddl_type(tok, dialect) {
+                    if let Some(native) = normalize_ddl_type(tok) {
                         out.push_str(native);
                         i = end;
                         continue;
@@ -926,29 +703,24 @@ fn scan_call_args(bytes: &[u8], open: usize) -> Option<(Vec<(usize, usize)>, usi
     None
 }
 
-// ── placeholder translator `:name` → `$n` (Postgres) / `?n` (SQLite) ──────────────────────
+// ── placeholder translator `:name` → `$n` (Postgres) ──────────────────────────────────────
 
-/// Translates named parameters `:name` (what modules write) into the dialect's positional
-/// placeholders: `$1,$2…` (Postgres) or `?1,?2…` (SQLite, via sqlx).
+/// Translates named parameters `:name` (what modules write) into Postgres positional
+/// placeholders `$1,$2…`.
 ///
 /// Rules:
-/// - `:ident` (alphanumeric/`_`) → `<prefix>n`, with `n` in order of first appearance; a
-///   repeated name **reuses** its index (so `names` lists each name only once).
+/// - `:ident` (alphanumeric/`_`) → `$n`, with `n` in order of first appearance; a repeated name
+///   **reuses** its index (so `names` lists each name only once).
 /// - `::` is the Postgres cast, never a parameter: emitted verbatim.
 /// - A `:` inside a `'...'` literal is left intact.
 ///
 /// Returns the rewritten SQL and the ordered (deduplicated) list of names, so the caller binds
-/// in that order. `names` is **identical** for both dialects: only the emitted SQL changes.
-pub(crate) fn translate(sql: &str, dialect: Dialect) -> (String, Vec<String>) {
-    // Funciones-puente ERPlora SQL → expresión nativa del dialecto (ADR-0007 §4a), antes de bajar
-    // los placeholders. Trabaja sobre el texto ya con `:name` (se traducen en el segundo paso).
-    let shimmed = shim_functions(sql, dialect);
+/// in that order.
+pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
+    // Funciones-puente ERPlora SQL → expresión nativa Postgres (ADR-0007 §4a), antes de bajar los
+    // placeholders. Trabaja sobre el texto ya con `:name` (se traducen en el segundo paso).
+    let shimmed = shim_functions(sql);
     let sql = shimmed.as_str();
-
-    let prefix = match dialect {
-        Dialect::Postgres => '$',
-        Dialect::Sqlite => '?',
-    };
 
     let mut out = String::with_capacity(sql.len());
     let bytes = sql.as_bytes();
@@ -1022,7 +794,7 @@ pub(crate) fn translate(sql: &str, dialect: Dialect) -> (String, Vec<String>) {
                         names.len()
                     }
                 };
-                out.push(prefix);
+                out.push('$');
                 out.push_str(&idx.to_string());
                 i = j;
                 continue;
@@ -1039,15 +811,18 @@ pub(crate) fn translate(sql: &str, dialect: Dialect) -> (String, Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testutil::fresh_db;
     use serde_json::json;
 
     fn params(v: Json) -> Params {
         v.as_object().cloned().unwrap_or_default()
     }
 
+    // ── DB roundtrips contra un Postgres real (test-util: esquema efímero por test) ───────────
+
     #[tokio::test]
     async fn create_insert_query_roundtrip() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch(
             "CREATE TABLE t (id TEXT PRIMARY KEY, hub_id TEXT, name TEXT, price REAL);",
         )
@@ -1077,7 +852,7 @@ mod tests {
 
     #[tokio::test]
     async fn tx_is_atomic() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (id TEXT PRIMARY KEY);").await.unwrap();
         let res = db
             .execute_tx(&[
@@ -1090,346 +865,11 @@ mod tests {
         assert_eq!(q.rows.len(), 0, "the transaction must roll back entirely");
     }
 
-    // ── translator `:name` → positional (no DB) ──────────────────────────────────────────
-
-    #[test]
-    fn pg_translate_basic() {
-        let (sql, names) = translate("SELECT * FROM t WHERE a = :a AND b = :b", Dialect::Postgres);
-        assert_eq!(sql, "SELECT * FROM t WHERE a = $1 AND b = $2");
-        assert_eq!(names, vec!["a", "b"]);
-    }
-
-    #[test]
-    fn pg_translate_ignores_params_inside_comments() {
-        // Un `:name` dentro de un comentario NO es un parámetro. Regresión: se traducía a `$N`,
-        // creando placeholders fantasma (bindeados pero ausentes del SQL parseado, que ignora los
-        // comentarios) → Postgres `could not determine data type of parameter $N`, rompiendo la
-        // lista de módulos (verifactu, taxes, staff…) cuyo SELECT documenta binds en comentarios.
-        let (sql, names) = translate(
-            "-- binds opcionales: :status y :record_type\nSELECT * FROM t WHERE hub_id = :hub_id /* :ghost */ AND is_deleted = 0",
-            Dialect::Postgres,
-        );
-        assert_eq!(names, vec!["hub_id"], "solo el bind real, no los de los comentarios");
-        assert!(
-            sql.contains(":status") && sql.contains(":record_type") && sql.contains(":ghost"),
-            "los comentarios se preservan verbatim: {sql}"
-        );
-        assert!(sql.contains("hub_id = $1"), "el bind real sí se traduce: {sql}");
-    }
-
-    #[test]
-    fn sqlite_translate_basic() {
-        // Same `names`, different SQL: SQLite uses `?n`.
-        let (sql, names) = translate("SELECT * FROM t WHERE a = :a AND b = :b", Dialect::Sqlite);
-        assert_eq!(sql, "SELECT * FROM t WHERE a = ?1 AND b = ?2");
-        assert_eq!(names, vec!["a", "b"]);
-    }
-
-    #[test]
-    fn pg_translate_repeated_reuses_index() {
-        let (sql, names) = translate("SELECT :x, :x, :y", Dialect::Postgres);
-        assert_eq!(sql, "SELECT $1, $1, $2");
-        assert_eq!(names, vec!["x", "y"]);
-    }
-
-    #[test]
-    fn pg_translate_keeps_cast_operator() {
-        let (sql, names) = translate("SELECT id::int FROM t WHERE id = :id", Dialect::Postgres);
-        assert_eq!(sql, "SELECT id::int FROM t WHERE id = $1");
-        assert_eq!(names, vec!["id"]);
-    }
-
-    #[test]
-    fn pg_translate_cast_right_after_param() {
-        let (sql, names) = translate("SELECT :amount::numeric", Dialect::Postgres);
-        assert_eq!(sql, "SELECT $1::numeric");
-        assert_eq!(names, vec!["amount"]);
-    }
-
-    #[test]
-    fn pg_translate_ignores_colon_in_string_literal() {
-        let (sql, names) = translate("SELECT ':notparam' AS s, :real AS r", Dialect::Postgres);
-        assert_eq!(sql, "SELECT ':notparam' AS s, $1 AS r");
-        assert_eq!(names, vec!["real"]);
-    }
-
-    #[test]
-    fn pg_translate_returns_name_order() {
-        let (sql, names) = translate("SELECT :b, :a, :b::text, ':c', :a", Dialect::Postgres);
-        assert_eq!(sql, "SELECT $1, $2, $1::text, ':c', $2");
-        assert_eq!(names, vec!["b", "a"]);
-    }
-
-    // ── shim de funciones-puente (ADR-0007 §4a): erp_pad → printf/lpad ───────────────────────
-
-    #[test]
-    fn shim_erp_pad_sqlite() {
-        let (sql, names) = translate("SELECT 'FAC-' || erp_pad(:n, 5)", Dialect::Sqlite);
-        assert_eq!(sql, "SELECT 'FAC-' || printf('%0*d', 5, ?1)");
-        assert_eq!(names, vec!["n"]);
-    }
-
-    #[test]
-    fn shim_erp_pad_postgres() {
-        let (sql, names) = translate("SELECT 'FAC-' || erp_pad(:n, 5)", Dialect::Postgres);
-        assert_eq!(sql, "SELECT 'FAC-' || lpad(($1)::text, 5, '0')");
-        assert_eq!(names, vec!["n"]);
-    }
-
-    #[test]
-    fn shim_erp_pad_nested_subquery() {
-        // El valor es una subconsulta con paréntesis anidados: el escáner balanceado la respeta.
-        let (sql, names) = translate(
-            "SELECT erp_pad((SELECT max(seq) + 1 FROM t WHERE hub_id = :h), 6)",
-            Dialect::Postgres,
-        );
-        assert_eq!(
-            sql,
-            "SELECT lpad(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text, 6, '0')"
-        );
-        assert_eq!(names, vec!["h"]);
-    }
-
-    #[test]
-    fn shim_ignores_erp_pad_inside_string_literal() {
-        let (sql, _) = translate("SELECT 'erp_pad(x, 5) literal'", Dialect::Postgres);
-        assert_eq!(sql, "SELECT 'erp_pad(x, 5) literal'");
-    }
-
-    #[test]
-    fn shim_does_not_match_partial_identifier() {
-        // `xerp_pad` no es la función-puente: se deja intacto.
-        let (sql, _) = translate("SELECT xerp_pad", Dialect::Postgres);
-        assert_eq!(sql, "SELECT xerp_pad");
-    }
-
-    // ── shim de funciones-puente: erp_now() (ADR-0007 §4a; runtime-dispatcher §4bis) ──────────
-
-    #[test]
-    fn shim_erp_now_sqlite() {
-        let (sql, _) = translate("INSERT INTO t (created_at) VALUES (erp_now())", Dialect::Sqlite);
-        assert_eq!(sql, "INSERT INTO t (created_at) VALUES (CURRENT_TIMESTAMP)");
-    }
-
-    #[test]
-    fn shim_erp_now_postgres() {
-        let (sql, _) = translate("INSERT INTO t (created_at) VALUES (erp_now())", Dialect::Postgres);
-        assert_eq!(sql, "INSERT INTO t (created_at) VALUES (now())");
-    }
-
-    // ── shim de funciones-puente: erp_lpad(valor, ancho, relleno) ─────────────────────────────
-
-    #[test]
-    fn shim_erp_lpad_postgres() {
-        let (sql, names) = translate("SELECT erp_lpad(:code, 8, '*')", Dialect::Postgres);
-        assert_eq!(sql, "SELECT lpad(($1)::text, 8, '*')");
-        assert_eq!(names, vec!["code"]);
-    }
-
-    #[test]
-    fn shim_erp_lpad_zero_fill_is_printf_in_sqlite() {
-        // relleno '0' → atajo con printf (mismo resultado que erp_pad).
-        let (sql, _) = translate("SELECT erp_lpad(:n, 5, '0')", Dialect::Sqlite);
-        assert_eq!(sql, "SELECT printf('%0*d', 5, ?1)");
-    }
-
-    #[test]
-    fn shim_erp_lpad_arbitrary_fill_sqlite() {
-        // relleno arbitrario → forma portable con substr/replace (espacios→relleno).
-        let (sql, _) = translate("SELECT erp_lpad(:code, 4, '*')", Dialect::Sqlite);
-        assert_eq!(
-            sql,
-            "SELECT (replace(substr(printf('%*s', 4, ''), 1, max(4 - length((?1)::text), 0)), ' ', '*') || (?1)::text)"
-        );
-    }
-
-    // ── shim de funciones-puente de fecha/hora (ADR-0007 §4a) ─────────────────────────────────
-
-    #[test]
-    fn shim_erp_dt() {
-        let (s, _) = translate("SELECT erp_dt(:x)", Dialect::Sqlite);
-        assert_eq!(s, "SELECT datetime(?1)");
-        let (p, _) = translate("SELECT erp_dt(:x)", Dialect::Postgres);
-        assert_eq!(p, "SELECT (($1)::timestamptz)");
-    }
-
-    #[test]
-    fn shim_erp_date() {
-        let (s, _) = translate("SELECT erp_date(:x)", Dialect::Sqlite);
-        assert_eq!(s, "SELECT date(?1)");
-        let (p, _) = translate("SELECT erp_date(:x)", Dialect::Postgres);
-        assert_eq!(p, "SELECT (($1)::date)");
-    }
-
-    #[test]
-    fn shim_erp_dateadd() {
-        let (s, _) = translate("SELECT erp_dateadd(:now, c.dur, 'minutes')", Dialect::Sqlite);
-        assert_eq!(s, "SELECT datetime(?1, '+' || (c.dur) || ' ' || 'minutes')");
-        let (p, _) = translate("SELECT erp_dateadd(:now, c.dur, 'minutes')", Dialect::Postgres);
-        assert_eq!(p, "SELECT (($1)::timestamptz + ((c.dur) || ' ' || 'minutes')::interval)");
-    }
-
-    #[test]
-    fn shim_erp_month_start() {
-        let (s, _) = translate("WHERE x >= erp_month_start(:now)", Dialect::Sqlite);
-        assert_eq!(s, "WHERE x >= datetime(?1, 'start of month')");
-        let (p, _) = translate("WHERE x >= erp_month_start(:now)", Dialect::Postgres);
-        assert_eq!(p, "WHERE x >= date_trunc('month', ($1)::timestamptz)");
-    }
-
-    #[test]
-    fn shim_erp_dow_mon0() {
-        let (s, _) = translate("SELECT erp_dow_mon0(:date)", Dialect::Sqlite);
-        assert_eq!(s, "SELECT ((CAST(strftime('%w', ?1) AS INTEGER) + 6) % 7)");
-        let (p, _) = translate("SELECT erp_dow_mon0(:date)", Dialect::Postgres);
-        assert_eq!(p, "SELECT ((EXTRACT(ISODOW FROM ($1)::timestamptz)::int) - 1)");
-    }
-
-    #[test]
-    fn shim_erp_extract() {
-        let (s, _) = translate("SELECT erp_extract('hour', :dt)", Dialect::Sqlite);
-        assert_eq!(s, "SELECT CAST(strftime('%H', ?1) AS INTEGER)");
-        let (p, _) = translate("SELECT erp_extract('minute', :dt)", Dialect::Postgres);
-        assert_eq!(p, "SELECT (EXTRACT(minute FROM ($1)::timestamptz)::bigint)");
-    }
-
-    #[test]
-    fn shim_erp_datediff_days() {
-        let (s, _) =
-            translate("WHERE erp_datediff_days(:date || ' ' || :time, :now) >= 1", Dialect::Sqlite);
-        assert_eq!(s, "WHERE (julianday(?1 || ' ' || ?2) - julianday(?3)) >= 1");
-        let (p, _) = translate("WHERE erp_datediff_days(:a, :b) >= 1", Dialect::Postgres);
-        assert_eq!(
-            p,
-            "WHERE (EXTRACT(EPOCH FROM (($1)::timestamptz - ($2)::timestamptz)) / 86400.0) >= 1"
-        );
-    }
-
-    #[test]
-    fn shim_erp_timefmt() {
-        let (s, _) = translate("SELECT erp_timefmt(m / 60, m % 60)", Dialect::Sqlite);
-        assert_eq!(s, "SELECT printf('%02d:%02d', m / 60, m % 60)");
-        let (p, _) = translate("SELECT erp_timefmt(m / 60, m % 60)", Dialect::Postgres);
-        assert_eq!(
-            p,
-            "SELECT (lpad((m / 60)::text, 2, '0') || ':' || lpad((m % 60)::text, 2, '0'))"
-        );
-    }
-
-    #[test]
-    fn shim_erp_date_funcs_distinguish_similar_prefixes() {
-        // erp_date / erp_dateadd / erp_datediff_days comparten prefijo: el guard `next_is_ident`
-        // garantiza que se elige el nombre correcto sin depender del orden del array.
-        let (s, _) = translate(
-            "SELECT erp_date(:x), erp_dateadd(:x, 1, 'days'), erp_datediff_days(:x, :y)",
-            Dialect::Sqlite,
-        );
-        assert_eq!(
-            s,
-            "SELECT date(?1), datetime(?1, '+' || (1) || ' ' || 'days'), (julianday(?1) - julianday(?2))"
-        );
-    }
-
+    /// DDL portable + función-puente `erp_pad` de extremo a extremo en Postgres real.
     #[tokio::test]
-    async fn availability_shape_roundtrip_sqlite() {
-        // Reproduce la forma real de appointments/availability_*: settings + cita + filtro de
-        // solape con erp_dt/erp_dateadd, día de semana con erp_dow_mon0 y formato con erp_timefmt.
-        // Verifica que el SQL migrado traduce a SQLite VÁLIDO y con la semántica esperada.
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        db.execute_batch(
-            "CREATE TABLE appt (id TEXT, hub_id TEXT, start_datetime TEXT, end_datetime TEXT, is_deleted INTEGER);",
-        )
-        .await
-        .unwrap();
-        // Cita 2026-06-15 (lunes) 10:00–11:00.
-        db.execute(
-            "INSERT INTO appt (id, hub_id, start_datetime, end_datetime, is_deleted) \
-             VALUES (:id, :h, :s, :e, 0)",
-            &params(json!({
-                "id":"a1","h":"h1",
-                "s":"2026-06-15T10:00:00","e":"2026-06-15T11:00:00"
-            })),
-        )
-        .await
-        .unwrap();
-        // Candidata 10:30–11:30 solapa; ventana de antelación 60 min desde :now.
-        let q = db
-            .query(
-                "SELECT erp_dow_mon0(:date) AS dow, \
-                        erp_timefmt(10, 30) AS t, \
-                        EXISTS ( \
-                          SELECT 1 FROM appt a \
-                          WHERE a.hub_id = :h AND a.is_deleted = 0 \
-                            AND erp_dt(a.start_datetime) < erp_dt(:cand_end) \
-                            AND erp_dt(a.end_datetime) > erp_dt(:cand_start) \
-                        ) AS overlaps, \
-                        (erp_dt(:cand_start) >= erp_dateadd(:now, 60, 'minutes')) AS notice_ok",
-                &params(json!({
-                    "date":"2026-06-15","h":"h1",
-                    "cand_start":"2026-06-15T10:30:00","cand_end":"2026-06-15T11:30:00",
-                    "now":"2026-06-15T08:00:00"
-                })),
-            )
-            .await
-            .unwrap();
-        assert_eq!(q.rows[0]["dow"], json!(0), "2026-06-15 es lunes → 0");
-        assert_eq!(q.rows[0]["t"], json!("10:30"));
-        assert_eq!(q.rows[0]["overlaps"], json!(1), "10:30–11:30 solapa con 10:00–11:00");
-        assert_eq!(q.rows[0]["notice_ok"], json!(1), "10:30 está ≥ 08:00+60min");
-    }
-
-    #[tokio::test]
-    async fn erp_dow_timefmt_roundtrip_sqlite() {
-        // Verifica de extremo a extremo en SQLite real: día de la semana 0=lunes y formato HH:MM.
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        // 2026-06-15 es lunes → erp_dow_mon0 = 0. 8*60+5 = 485 min → '08:05'.
-        let q = db
-            .query(
-                "SELECT erp_dow_mon0(:d) AS dow, erp_timefmt(485 / 60, 485 % 60) AS t",
-                &params(json!({ "d": "2026-06-15" })),
-            )
-            .await
-            .unwrap();
-        assert_eq!(q.rows[0]["dow"], json!(0));
-        assert_eq!(q.rows[0]["t"], json!("08:05"));
-    }
-
-    // ── shim de normalización de tipos en DDL (ADR-0007 §4b) ──────────────────────────────────
-
-    #[test]
-    fn ddl_types_sqlite_identity() {
-        let ddl = "CREATE TABLE t (id TEXT PRIMARY KEY, qty INTEGER, weight REAL, blob BLOB)";
-        assert_eq!(shim_ddl_types(ddl, Dialect::Sqlite), ddl);
-    }
-
-    #[test]
-    fn ddl_types_postgres_mapping() {
-        let ddl = "CREATE TABLE t (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, qty INTEGER, \
-                   amount_cents INTEGER, weight REAL, raw BLOB)";
-        let out = shim_ddl_types(ddl, Dialect::Postgres);
-        assert_eq!(
-            out,
-            "CREATE TABLE t (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, qty BIGINT, \
-             amount_cents BIGINT, weight DOUBLE PRECISION, raw BYTEA)"
-        );
-    }
-
-    #[test]
-    fn ddl_types_do_not_touch_column_names_or_literals() {
-        // Una columna llamada `text` (no tipo) ni un literal `'INTEGER'` deben tocarse: sólo el
-        // token de tipo en posición de tipo. Nuestro shim reescribe cualquier palabra-tipo fuera
-        // de literales; comprobamos que respeta literales y mayúsculas/minúsculas mixtas.
-        let ddl = "CREATE TABLE t (note TEXT DEFAULT 'an INTEGER value', flag integer)";
-        let out = shim_ddl_types(ddl, Dialect::Postgres);
-        assert_eq!(out, "CREATE TABLE t (note TEXT DEFAULT 'an INTEGER value', flag BIGINT)");
-    }
-
-    // ── roundtrip SQLite REAL con tipos portables + función-puente ────────────────────────────
-
-    #[tokio::test]
-    async fn portable_ddl_and_bridge_fn_roundtrip_sqlite() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        // DDL portable: TEXT/INTEGER (dinero en céntimos, booleano 0/1) → identidad en SQLite.
+    async fn portable_ddl_and_bridge_fn_roundtrip() {
+        let db = fresh_db().await;
+        // DDL portable: INTEGER (dinero en céntimos, booleano 0/1) → BIGINT en Postgres.
         db.execute_batch(
             "CREATE TABLE invoices (id TEXT PRIMARY KEY, hub_id TEXT, seq INTEGER, \
              amount_cents INTEGER, paid INTEGER);",
@@ -1458,94 +898,11 @@ mod tests {
         assert_eq!(q.rows[0]["paid"], json!(1));
     }
 
-    // ── selección de driver por target (conexión, no traducción) ──────────────────────────────
-
     #[tokio::test]
-    async fn dialect_selected_by_adapter() {
-        // El target lo decide el despliegue vía el adaptador (lite→SQLite). Postgres se cubre en
-        // los tests `#[ignore]` que requieren DATABASE_URL.
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        assert_eq!(db.dialect(), Dialect::Sqlite);
-    }
-
-    // ── tamaño del pool Postgres vía env `HUB_DB_MAX_CONNECTIONS` (§8; ERPlora/saas#609) ──────
-    //
-    // Contrato acordado con el SaaS: entero > 0. Ausente (o vacío, idioma del repo para
-    // "sin configurar") → default 10 (el default de sqlx: cero cambio para despliegues
-    // existentes) SIN warning. Valor inválido (basura, 0, negativo) → default 10 CON warning.
-    // Se testea la función pura `resolve_pg_max_connections` (no toca el env del proceso:
-    // los tests corren en paralelo).
-
-    #[test]
-    fn pg_max_connections_valid_value_is_used() {
-        assert_eq!(resolve_pg_max_connections(Some("5")), (5, None));
-        assert_eq!(resolve_pg_max_connections(Some("40")), (40, None));
-        // Tolerante a espacios alrededor (idioma del repo: `trim()` antes de decidir).
-        assert_eq!(resolve_pg_max_connections(Some(" 7 ")), (7, None));
-    }
-
-    #[test]
-    fn pg_max_connections_absent_defaults_silently() {
-        assert_eq!(resolve_pg_max_connections(None), (DEFAULT_PG_MAX_CONNECTIONS, None));
-    }
-
-    #[test]
-    fn pg_max_connections_empty_is_treated_as_absent() {
-        // Un env vacío significa "sin configurar" en los despliegues (mismo trato que
-        // `HUB_DATABASE_URL`/`HUB_MODULES_DIR` en el server): default sin warning.
-        assert_eq!(resolve_pg_max_connections(Some("")), (DEFAULT_PG_MAX_CONNECTIONS, None));
-        assert_eq!(resolve_pg_max_connections(Some("   ")), (DEFAULT_PG_MAX_CONNECTIONS, None));
-    }
-
-    #[test]
-    fn pg_max_connections_garbage_defaults_with_warning() {
-        let (n, warn) = resolve_pg_max_connections(Some("banana"));
-        assert_eq!(n, DEFAULT_PG_MAX_CONNECTIONS);
-        let warn = warn.expect("un valor inválido debe producir un warning");
-        assert!(warn.contains("HUB_DB_MAX_CONNECTIONS"), "el warning nombra el env: {warn}");
-        assert!(warn.contains("banana"), "el warning incluye el valor recibido: {warn}");
-    }
-
-    #[test]
-    fn pg_max_connections_zero_or_negative_is_invalid() {
-        // El contrato es entero > 0: un pool de 0 conexiones no puede servir peticiones.
-        let (n, warn) = resolve_pg_max_connections(Some("0"));
-        assert_eq!((n, warn.is_some()), (DEFAULT_PG_MAX_CONNECTIONS, true));
-        let (n, warn) = resolve_pg_max_connections(Some("-3"));
-        assert_eq!((n, warn.is_some()), (DEFAULT_PG_MAX_CONNECTIONS, true));
-    }
-
-    #[test]
-    fn pg_max_connections_default_matches_sqlx_default() {
-        // El default DEBE seguir siendo 10 (el de sqlx `PoolOptions`): cambiarlo cambiaría el
-        // comportamiento de todos los despliegues existentes sin el env.
-        assert_eq!(DEFAULT_PG_MAX_CONNECTIONS, 10);
-    }
-
-    // El mismo SQL portable normaliza distinto por dialecto: prueba textual emparejada (Postgres
-    // no necesita estar arrancado).
-    #[test]
-    fn same_portable_sql_normalizes_per_dialect() {
-        let sql = "INSERT INTO t (n, ts) VALUES (erp_pad(:seq, 4), erp_now())";
-        let (sqlite, _) = translate(sql, Dialect::Sqlite);
-        let (pg, _) = translate(sql, Dialect::Postgres);
-        assert_eq!(sqlite, "INSERT INTO t (n, ts) VALUES (printf('%0*d', 4, ?1), CURRENT_TIMESTAMP)");
-        assert_eq!(pg, "INSERT INTO t (n, ts) VALUES (lpad(($1)::text, 4, '0'), now())");
-    }
-
-    // ── Postgres integration (requires a real DB via DATABASE_URL, hence #[ignore]) ───────
-    //
-    //   DATABASE_URL=postgres://user:pass@localhost:5432/erplora_test \
-    //     cargo test -p erplora-db -- --ignored
-    #[tokio::test]
-    #[ignore = "requires a real Postgres via DATABASE_URL"]
     async fn pg_roundtrip() {
-        let url = std::env::var("DATABASE_URL").expect("set DATABASE_URL");
-        let db = PgAdapter::connect(&url).await.expect("connect to postgres");
-        assert_eq!(db.dialect(), Dialect::Postgres);
+        let db = fresh_db().await;
         db.execute_batch(
-            "DROP TABLE IF EXISTS erplora_pg_test; \
-             CREATE TABLE erplora_pg_test (id BIGINT, name TEXT, ok BOOLEAN, price FLOAT8)",
+            "CREATE TABLE erplora_pg_test (id BIGINT, name TEXT, ok BOOLEAN, price FLOAT8)",
         )
         .await
         .unwrap();
@@ -1572,17 +929,14 @@ mod tests {
         assert_eq!(q.rows[0]["price"], json!(4.5));
     }
 
-    // §8/§9 — decode of the fiscal/money Postgres types. Inserts literals (not the param
-    // path) so this isolates `pg_cell`'s decode arms. Requires a real Postgres.
+    /// §8/§9 — decode de los tipos fiscales/dinero de Postgres. Inserta literales (no el path de
+    /// params) para aislar los brazos de decode de `pg_cell`.
     #[tokio::test]
-    #[ignore = "requires a real Postgres via DATABASE_URL"]
     async fn pg_fiscal_types_roundtrip() {
-        let url = std::env::var("DATABASE_URL").expect("set DATABASE_URL");
-        let db = PgAdapter::connect(&url).await.expect("connect to postgres");
+        let db = fresh_db().await;
         db.execute_batch(
-            "DROP TABLE IF EXISTS erplora_pg_fiscal; \
-             CREATE TABLE erplora_pg_fiscal ( \
-                 amount NUMERIC, ts TIMESTAMPTZ, d DATE, uid UUID, meta JSONB \
+            "CREATE TABLE erplora_pg_fiscal ( \
+                 amount NUMERIC(10,2), ts TIMESTAMPTZ, d DATE, uid UUID, meta JSONB \
              ); \
              INSERT INTO erplora_pg_fiscal (amount, ts, d, uid, meta) VALUES ( \
                  12345.67, \
@@ -1603,13 +957,269 @@ mod tests {
             .unwrap();
         assert_eq!(q.rows.len(), 1);
         let r = &q.rows[0];
-        // NUMERIC keeps exact precision as a string (never f64).
-        assert_eq!(r["amount"], json!("12345.67"));
+        // NUMERIC decodes to a **string** (never f64), preserving exact precision. sqlx/bigdecimal
+        // may render trailing zeros (`12345.6700`), which is lossless — assert the value, not the
+        // exact rendering, and that it is a string (not a JSON number).
+        let amount = r["amount"].as_str().expect("NUMERIC debe decodificarse como string, no f64");
+        assert_eq!(amount.parse::<f64>().unwrap(), 12345.67);
         // TIMESTAMPTZ → RFC-3339 (UTC).
         assert_eq!(r["ts"], json!("2026-06-13T10:30:00+00:00"));
         assert_eq!(r["d"], json!("2026-06-13"));
         assert_eq!(r["uid"], json!("00000000-0000-0000-0000-000000000001"));
         // JSONB → parsed value, verbatim.
         assert_eq!(r["meta"], json!({"a": 1}));
+    }
+
+    // ── translator `:name` → `$n` (no DB) ─────────────────────────────────────────────────
+
+    #[test]
+    fn pg_translate_basic() {
+        let (sql, names) = translate("SELECT * FROM t WHERE a = :a AND b = :b");
+        assert_eq!(sql, "SELECT * FROM t WHERE a = $1 AND b = $2");
+        assert_eq!(names, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn pg_translate_ignores_params_inside_comments() {
+        // Un `:name` dentro de un comentario NO es un parámetro. Regresión: se traducía a `$N`,
+        // creando placeholders fantasma (bindeados pero ausentes del SQL parseado, que ignora los
+        // comentarios) → Postgres `could not determine data type of parameter $N`, rompiendo la
+        // lista de módulos (verifactu, taxes, staff…) cuyo SELECT documenta binds en comentarios.
+        let (sql, names) = translate(
+            "-- binds opcionales: :status y :record_type\nSELECT * FROM t WHERE hub_id = :hub_id /* :ghost */ AND is_deleted = 0",
+        );
+        assert_eq!(names, vec!["hub_id"], "solo el bind real, no los de los comentarios");
+        assert!(
+            sql.contains(":status") && sql.contains(":record_type") && sql.contains(":ghost"),
+            "los comentarios se preservan verbatim: {sql}"
+        );
+        assert!(sql.contains("hub_id = $1"), "el bind real sí se traduce: {sql}");
+    }
+
+    #[test]
+    fn pg_translate_repeated_reuses_index() {
+        let (sql, names) = translate("SELECT :x, :x, :y");
+        assert_eq!(sql, "SELECT $1, $1, $2");
+        assert_eq!(names, vec!["x", "y"]);
+    }
+
+    #[test]
+    fn pg_translate_keeps_cast_operator() {
+        let (sql, names) = translate("SELECT id::int FROM t WHERE id = :id");
+        assert_eq!(sql, "SELECT id::int FROM t WHERE id = $1");
+        assert_eq!(names, vec!["id"]);
+    }
+
+    #[test]
+    fn pg_translate_cast_right_after_param() {
+        let (sql, names) = translate("SELECT :amount::numeric");
+        assert_eq!(sql, "SELECT $1::numeric");
+        assert_eq!(names, vec!["amount"]);
+    }
+
+    #[test]
+    fn pg_translate_ignores_colon_in_string_literal() {
+        let (sql, names) = translate("SELECT ':notparam' AS s, :real AS r");
+        assert_eq!(sql, "SELECT ':notparam' AS s, $1 AS r");
+        assert_eq!(names, vec!["real"]);
+    }
+
+    #[test]
+    fn pg_translate_returns_name_order() {
+        let (sql, names) = translate("SELECT :b, :a, :b::text, ':c', :a");
+        assert_eq!(sql, "SELECT $1, $2, $1::text, ':c', $2");
+        assert_eq!(names, vec!["b", "a"]);
+    }
+
+    // ── shim de funciones-puente (ADR-0007 §4a): erp_pad → lpad ─────────────────────────────
+
+    #[test]
+    fn shim_erp_pad() {
+        let (sql, names) = translate("SELECT 'FAC-' || erp_pad(:n, 5)");
+        assert_eq!(sql, "SELECT 'FAC-' || lpad(($1)::text, 5, '0')");
+        assert_eq!(names, vec!["n"]);
+    }
+
+    #[test]
+    fn shim_erp_pad_nested_subquery() {
+        // El valor es una subconsulta con paréntesis anidados: el escáner balanceado la respeta.
+        let (sql, names) = translate(
+            "SELECT erp_pad((SELECT max(seq) + 1 FROM t WHERE hub_id = :h), 6)",
+        );
+        assert_eq!(
+            sql,
+            "SELECT lpad(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text, 6, '0')"
+        );
+        assert_eq!(names, vec!["h"]);
+    }
+
+    #[test]
+    fn shim_ignores_erp_pad_inside_string_literal() {
+        let (sql, _) = translate("SELECT 'erp_pad(x, 5) literal'");
+        assert_eq!(sql, "SELECT 'erp_pad(x, 5) literal'");
+    }
+
+    #[test]
+    fn shim_does_not_match_partial_identifier() {
+        // `xerp_pad` no es la función-puente: se deja intacto.
+        let (sql, _) = translate("SELECT xerp_pad");
+        assert_eq!(sql, "SELECT xerp_pad");
+    }
+
+    #[test]
+    fn shim_erp_now() {
+        let (sql, _) = translate("INSERT INTO t (created_at) VALUES (erp_now())");
+        assert_eq!(sql, "INSERT INTO t (created_at) VALUES (now())");
+    }
+
+    #[test]
+    fn shim_erp_lpad() {
+        let (sql, names) = translate("SELECT erp_lpad(:code, 8, '*')");
+        assert_eq!(sql, "SELECT lpad(($1)::text, 8, '*')");
+        assert_eq!(names, vec!["code"]);
+    }
+
+    #[test]
+    fn shim_erp_dt() {
+        let (p, _) = translate("SELECT erp_dt(:x)");
+        assert_eq!(p, "SELECT (($1)::timestamptz)");
+    }
+
+    #[test]
+    fn shim_erp_date() {
+        let (p, _) = translate("SELECT erp_date(:x)");
+        assert_eq!(p, "SELECT (($1)::date)");
+    }
+
+    #[test]
+    fn shim_erp_dateadd() {
+        let (p, _) = translate("SELECT erp_dateadd(:now, c.dur, 'minutes')");
+        assert_eq!(p, "SELECT (($1)::timestamptz + ((c.dur) || ' ' || 'minutes')::interval)");
+    }
+
+    #[test]
+    fn shim_erp_month_start() {
+        let (p, _) = translate("WHERE x >= erp_month_start(:now)");
+        assert_eq!(p, "WHERE x >= date_trunc('month', ($1)::timestamptz)");
+    }
+
+    #[test]
+    fn shim_erp_dow_mon0() {
+        let (p, _) = translate("SELECT erp_dow_mon0(:date)");
+        assert_eq!(p, "SELECT ((EXTRACT(ISODOW FROM ($1)::timestamptz)::int) - 1)");
+    }
+
+    #[test]
+    fn shim_erp_extract() {
+        let (p, _) = translate("SELECT erp_extract('minute', :dt)");
+        assert_eq!(p, "SELECT (EXTRACT(minute FROM ($1)::timestamptz)::bigint)");
+    }
+
+    #[test]
+    fn shim_erp_datediff_days() {
+        let (p, _) = translate("WHERE erp_datediff_days(:a, :b) >= 1");
+        assert_eq!(
+            p,
+            "WHERE (EXTRACT(EPOCH FROM (($1)::timestamptz - ($2)::timestamptz)) / 86400.0) >= 1"
+        );
+    }
+
+    #[test]
+    fn shim_erp_timefmt() {
+        let (p, _) = translate("SELECT erp_timefmt(m / 60, m % 60)");
+        assert_eq!(
+            p,
+            "SELECT (lpad((m / 60)::text, 2, '0') || ':' || lpad((m % 60)::text, 2, '0'))"
+        );
+    }
+
+    #[test]
+    fn shim_erp_date_funcs_distinguish_similar_prefixes() {
+        // erp_date / erp_dateadd / erp_datediff_days comparten prefijo: el guard `next_is_ident`
+        // garantiza que se elige el nombre correcto sin depender del orden del array.
+        let (p, _) = translate(
+            "SELECT erp_date(:x), erp_dateadd(:x, 1, 'days'), erp_datediff_days(:x, :y)",
+        );
+        assert_eq!(
+            p,
+            "SELECT (($1)::date), (($1)::timestamptz + ((1) || ' ' || 'days')::interval), \
+             (EXTRACT(EPOCH FROM (($1)::timestamptz - ($2)::timestamptz)) / 86400.0)"
+        );
+    }
+
+    // ── shim de normalización de tipos en DDL (ADR-0007 §4b) ──────────────────────────────────
+
+    #[test]
+    fn ddl_types_postgres_mapping() {
+        let ddl = "CREATE TABLE t (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, qty INTEGER, \
+                   amount_cents INTEGER, weight REAL, raw BLOB)";
+        let out = shim_ddl_types(ddl);
+        assert_eq!(
+            out,
+            "CREATE TABLE t (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, qty BIGINT, \
+             amount_cents BIGINT, weight DOUBLE PRECISION, raw BYTEA)"
+        );
+    }
+
+    #[test]
+    fn ddl_types_do_not_touch_column_names_or_literals() {
+        // Una columna llamada `text` (no tipo) ni un literal `'INTEGER'` deben tocarse: sólo el
+        // token de tipo en posición de tipo. Comprobamos que respeta literales y mayúsculas/minúsculas.
+        let ddl = "CREATE TABLE t (note TEXT DEFAULT 'an INTEGER value', flag integer)";
+        let out = shim_ddl_types(ddl);
+        assert_eq!(out, "CREATE TABLE t (note TEXT DEFAULT 'an INTEGER value', flag BIGINT)");
+    }
+
+    // ── tamaño del pool Postgres vía env `HUB_DB_MAX_CONNECTIONS` (§8; ERPlora/saas#609) ──────
+    //
+    // Contrato acordado con el SaaS: entero > 0. Ausente (o vacío) → default 10 SIN warning.
+    // Valor inválido (basura, 0, negativo) → default 10 CON warning. Se testea la función pura
+    // `resolve_pg_max_connections` (no toca el env del proceso: los tests corren en paralelo).
+
+    #[test]
+    fn pg_max_connections_valid_value_is_used() {
+        assert_eq!(resolve_pg_max_connections(Some("5")), (5, None));
+        assert_eq!(resolve_pg_max_connections(Some("40")), (40, None));
+        assert_eq!(resolve_pg_max_connections(Some(" 7 ")), (7, None));
+    }
+
+    #[test]
+    fn pg_max_connections_absent_defaults_silently() {
+        assert_eq!(resolve_pg_max_connections(None), (DEFAULT_PG_MAX_CONNECTIONS, None));
+    }
+
+    #[test]
+    fn pg_max_connections_empty_is_treated_as_absent() {
+        assert_eq!(resolve_pg_max_connections(Some("")), (DEFAULT_PG_MAX_CONNECTIONS, None));
+        assert_eq!(resolve_pg_max_connections(Some("   ")), (DEFAULT_PG_MAX_CONNECTIONS, None));
+    }
+
+    #[test]
+    fn pg_max_connections_garbage_defaults_with_warning() {
+        let (n, warn) = resolve_pg_max_connections(Some("banana"));
+        assert_eq!(n, DEFAULT_PG_MAX_CONNECTIONS);
+        let warn = warn.expect("un valor inválido debe producir un warning");
+        assert!(warn.contains("HUB_DB_MAX_CONNECTIONS"), "el warning nombra el env: {warn}");
+        assert!(warn.contains("banana"), "el warning incluye el valor recibido: {warn}");
+    }
+
+    #[test]
+    fn pg_max_connections_zero_or_negative_is_invalid() {
+        let (n, warn) = resolve_pg_max_connections(Some("0"));
+        assert_eq!((n, warn.is_some()), (DEFAULT_PG_MAX_CONNECTIONS, true));
+        let (n, warn) = resolve_pg_max_connections(Some("-3"));
+        assert_eq!((n, warn.is_some()), (DEFAULT_PG_MAX_CONNECTIONS, true));
+    }
+
+    #[test]
+    fn pg_max_connections_default_matches_sqlx_default() {
+        assert_eq!(DEFAULT_PG_MAX_CONNECTIONS, 10);
+    }
+
+    #[test]
+    fn portable_sql_normalizes_for_postgres() {
+        let sql = "INSERT INTO t (n, ts) VALUES (erp_pad(:seq, 4), erp_now())";
+        let (pg, _) = translate(sql);
+        assert_eq!(pg, "INSERT INTO t (n, ts) VALUES (lpad(($1)::text, 4, '0'), now())");
     }
 }
