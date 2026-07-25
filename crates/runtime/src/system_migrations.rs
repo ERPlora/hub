@@ -222,6 +222,21 @@ CREATE TABLE hub_user_pref (\
   theme_mode TEXT NOT NULL DEFAULT '', theme_palette TEXT NOT NULL DEFAULT '', \
   updated_at TEXT NOT NULL, PRIMARY KEY (hub_id, user_id));",
     },
+    // ── v8 — sesión única por dispositivo: `hub_session.device_id` (ADR-0154, hub#200) ──────────
+    // El baseline v0 de identity (`identity::ensure_tables`) crea `hub_session` SIN device_id; esta
+    // migración ADITIVA añade la columna (nullable) para que llegue también a una `erplora.db` ya
+    // existente (un `CREATE IF NOT EXISTS` no altera una tabla creada). El runtime persiste ahí el
+    // id del dispositivo del login y, con `max_devices == 1` (claim del entitlement), desaloja las
+    // sesiones de otros dispositivos al abrir una nueva (`identity::enforce_device_limit`). Añadir
+    // una columna nullable NO toca la PK, así que `ALTER TABLE ADD COLUMN` basta en ambos dialectos
+    // (a diferencia de v1, que recreaba la tabla por cambiar la PK). Va versionada (no CREATE IF NOT
+    // EXISTS) para no reeditar el baseline.
+    SystemMigration {
+        version: 8,
+        name: "hub_session_device_id",
+        sqlite: "ALTER TABLE hub_session ADD COLUMN device_id TEXT;",
+        postgres: "ALTER TABLE hub_session ADD COLUMN device_id TEXT;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -338,6 +353,9 @@ mod tests {
         crate::installer::ensure_hub_module_table(&db)
             .await
             .unwrap();
+        // hub_session baseline (v0): la migración v8 (device_id) lo ALTERa, como el boot real
+        // (`ensure_system_tables`) hace identity::ensure_tables antes de apply.
+        crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
         // La tabla existe (insert/select sin error) y la migración v2 quedó registrada.
@@ -363,6 +381,9 @@ mod tests {
         crate::installer::ensure_hub_module_table(&db)
             .await
             .unwrap();
+        // hub_session baseline (v0): la migración v8 (device_id) lo ALTERa, como el boot real
+        // (`ensure_system_tables`) hace identity::ensure_tables antes de apply.
+        crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
         // La tabla `hub_settings` existe (insert/select sin error) y la migración v4 quedó registrada.
@@ -382,12 +403,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn apply_adds_device_id_column_to_hub_session_v8() {
+        use erplora_db::SqliteAdapter;
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        // Baseline v0: hub_module (necesaria para v1) + hub_session SIN device_id (identity v0).
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        // Sesión legacy YA existente (BD que sobrevive a un update): sin la columna device_id.
+        db.execute_batch(
+            "INSERT INTO hub_session (token, user_id, created_at, expires_at) \
+             VALUES ('legacy', 'u1', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test").await.unwrap();
+        assert!(max_applied_version(&db).await.unwrap() >= 8, "v8 registrada");
+
+        // La fila legacy sobrevive con device_id = NULL (columna nullable, ADITIVA).
+        let legacy = db
+            .query(
+                "SELECT device_id FROM hub_session WHERE token = 'legacy'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(legacy.rows.len(), 1, "la sesión legacy sigue existiendo");
+        assert_eq!(
+            legacy.rows[0]["device_id"],
+            serde_json::Value::Null,
+            "device_id NULL en la legacy"
+        );
+
+        // Y una sesión nueva puede persistir device_id.
+        db.execute_batch(
+            "INSERT INTO hub_session (token, user_id, created_at, expires_at, device_id) \
+             VALUES ('t2', 'u1', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z', 'dev-A');",
+        )
+        .await
+        .unwrap();
+        let row = db
+            .query(
+                "SELECT device_id FROM hub_session WHERE token = 't2'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.rows[0]["device_id"], json!("dev-A"));
+
+        // Idempotente: re-aplicar NO re-ALTERa (no falla por 'duplicate column').
+        apply(&db, "hub-test").await.unwrap();
+    }
+
+    #[tokio::test]
     async fn apply_creates_user_profile_tables_v7() {
         use erplora_db::SqliteAdapter;
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         crate::installer::ensure_hub_module_table(&db)
             .await
             .unwrap();
+        // hub_session baseline (v0): la migración v8 (device_id) lo ALTERa, como el boot real
+        // (`ensure_system_tables`) hace identity::ensure_tables antes de apply.
+        crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
         db.execute_batch(

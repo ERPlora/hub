@@ -262,6 +262,10 @@ pub async fn installed_status(
     hub_id: &str,
 ) -> Result<Vec<(String, ModuleStatus)>> {
     ensure_hub_module_table(db).await?;
+    // Baseline identity (v0): la migración de sistema v8 (ADR-0154) ALTERa `hub_session`, así que
+    // debe existir antes de `apply`. Idempotente (CREATE IF NOT EXISTS); cubre instalar en un hub
+    // vacío antes de que `ensure_system_tables` corra, igual que ya se asegura `hub_module`.
+    crate::identity::ensure_tables(db).await?;
     crate::system_migrations::apply(db, hub_id).await?;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -292,6 +296,10 @@ pub async fn installed_status_versioned(
     hub_id: &str,
 ) -> Result<Vec<(String, String, ModuleStatus)>> {
     ensure_hub_module_table(db).await?;
+    // Baseline identity (v0): la migración de sistema v8 (ADR-0154) ALTERa `hub_session`, así que
+    // debe existir antes de `apply`. Idempotente (CREATE IF NOT EXISTS); cubre instalar en un hub
+    // vacío antes de que `ensure_system_tables` corra, igual que ya se asegura `hub_module`.
+    crate::identity::ensure_tables(db).await?;
     crate::system_migrations::apply(db, hub_id).await?;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -376,6 +384,10 @@ async fn persist_status(
     status: ModuleStatus,
 ) -> Result<()> {
     ensure_hub_module_table(db).await?;
+    // Baseline identity (v0): la migración de sistema v8 (ADR-0154) ALTERa `hub_session`, así que
+    // debe existir antes de `apply`. Idempotente (CREATE IF NOT EXISTS); cubre instalar en un hub
+    // vacío antes de que `ensure_system_tables` corra, igual que ya se asegura `hub_module`.
+    crate::identity::ensure_tables(db).await?;
     crate::system_migrations::apply(db, hub_id).await?;
     let status_str = match status {
         ModuleStatus::Active => "active",

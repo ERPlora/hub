@@ -623,9 +623,26 @@ impl Runtime {
         identity::set_pin(self.db.as_ref(), user_id, pin).await
     }
 
-    /// Abre una sesión server-side para `user_id`; devuelve el token opaco.
-    pub async fn create_session(&self, user_id: &str, ttl_secs: i64) -> Result<String> {
-        identity::create_session(self.db.as_ref(), user_id, ttl_secs).await
+    /// Abre una sesión server-side para `user_id`; devuelve el token opaco. `device_id` = identidad
+    /// del dispositivo del login (o `None`); se persiste para el límite de dispositivos (ADR-0154).
+    pub async fn create_session(
+        &self,
+        user_id: &str,
+        ttl_secs: i64,
+        device_id: Option<&str>,
+    ) -> Result<String> {
+        identity::create_session(self.db.as_ref(), user_id, ttl_secs, device_id).await
+    }
+
+    /// Aplica el límite de dispositivos del plan ANTES de abrir sesión (ADR-0154): con
+    /// `max_devices == 1` y `device_id` presente, desaloja las sesiones de otros dispositivos
+    /// (*single active device session* con takeover). `0` = ilimitado / sin `device_id` = no-op.
+    pub async fn enforce_device_limit(
+        &self,
+        max_devices: u32,
+        device_id: Option<&str>,
+    ) -> Result<()> {
+        identity::enforce_device_limit(self.db.as_ref(), max_devices, device_id).await
     }
 
     /// Resuelve una sesión válida a su `hub_user` activo (o `None`).

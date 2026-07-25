@@ -570,6 +570,9 @@ export default {
     signInWithEmail: 'Iniciar sesión con email',
     changeUser: 'Cambiar usuario',
     pinIncorrect: 'PIN incorrecto',
+    // ADR-0154: se muestra cuando la sesión de este dispositivo fue desalojada por un login en
+    // otro dispositivo (plan de un solo dispositivo activo). Requiere el interceptor 401 (ver PR).
+    sessionTakenOver: 'Sesión abierta en otro dispositivo',
     setupChoosePin: 'Elige un PIN de 4 dígitos',
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',

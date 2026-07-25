@@ -63,6 +63,8 @@ fn claims(modules: &[&str], grace_until: i64) -> EntitlementClaims {
         exp: 2_000,
         grace_until,
         paid_grace_until: None,
+        plan: None,
+        max_devices: 0,
     }
 }
 

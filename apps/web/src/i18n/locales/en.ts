@@ -569,6 +569,9 @@ export default {
     signInWithEmail: 'Sign in with email',
     changeUser: 'Change user',
     pinIncorrect: 'Incorrect PIN',
+    // ADR-0154: shown when this device's session was taken over by a sign-in on another device
+    // (single active device plan). Surfacing it needs the runtime-session-401 interceptor (see PR).
+    sessionTakenOver: 'Session opened on another device',
     setupChoosePin: 'Choose a 4-digit PIN',
     setupConfirmPin: 'Confirm your PIN',
     setupMismatch: 'The PINs do not match, please try again',

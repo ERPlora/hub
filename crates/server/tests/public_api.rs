@@ -409,8 +409,8 @@ async fn settings_put_non_admin_is_403_in_session_mode() {
     // Crea un cajero (rol no admin) + un admin y abre sesiones server-side reales.
     let cashier_id = rt.create_user("Caja", "", "cashier", None).await.unwrap();
     let admin_id = rt.create_user("Jefa", "", "admin", None).await.unwrap();
-    let cashier_token = rt.create_session(&cashier_id, 3600).await.unwrap();
-    let admin_token = rt.create_session(&admin_id, 3600).await.unwrap();
+    let cashier_token = rt.create_session(&cashier_id, 3600, None).await.unwrap();
+    let admin_token = rt.create_session(&admin_id, 3600, None).await.unwrap();
 
     let mut cfg = dev_config();
     cfg.auth_mode = AuthMode::Session;

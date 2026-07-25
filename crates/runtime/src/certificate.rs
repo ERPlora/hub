@@ -234,6 +234,8 @@ mod tests {
     async fn db_ready() -> SqliteAdapter {
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        // hub_session baseline (v0): la migración v8 (device_id, ADR-0154) lo ALTERa.
+        crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "hub-test").await.unwrap();
         db
     }
