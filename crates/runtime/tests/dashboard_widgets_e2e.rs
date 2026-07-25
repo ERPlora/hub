@@ -29,6 +29,14 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 
+/// Céntimos de un agregado: Postgres devuelve `SUM(bigint)`/`opening + SUM(...)` como NUMERIC →
+/// JSON **string** (`"352"`), no número. Acepta ambas representaciones.
+fn cents(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("no es un importe numérico: {v:?}"))
+}
+
 fn mdir(n: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../../modules-workspace/modules")
@@ -87,7 +95,7 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
 
     // El KPI refleja la venta real: 352 céntimos (3,52 €) y 1 ticket.
     let after = kpi_row(&rt, "sales.today", &ctx).await;
-    assert_eq!(after["total"].as_i64().unwrap(), 352, "el KPI de ventas de hoy debe ser el total real");
+    assert_eq!(cents(&after["total"]), 352, "el KPI de ventas de hoy debe ser el total real");
     assert_eq!(after["tickets"].as_i64().unwrap(), 1, "el KPI de tickets debe contar la venta real");
 }
 
@@ -183,7 +191,7 @@ async fn cash_register_current_session_kpi_shows_expected_total() {
     // Esperado en caja = apertura 10000 + venta 5000 = 15000 céntimos (150,00 €).
     let session = kpi_row(&rt, "cash_register.current_session", &ctx).await;
     assert_eq!(
-        session["expected_total"].as_i64().unwrap(),
+        cents(&session["expected_total"]),
         15000,
         "el KPI de efectivo esperado debe reflejar apertura + movimientos reales"
     );

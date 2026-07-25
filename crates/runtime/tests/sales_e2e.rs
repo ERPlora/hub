@@ -12,6 +12,13 @@ use serde_json::json;
 fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
+/// Céntimos de un agregado: Postgres devuelve `SUM(bigint)` como NUMERIC → JSON **string**
+/// (`"5000"`), no número. Acepta ambas representaciones (número directo o string numérico).
+fn cents(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("no es un importe numérico: {v:?}"))
+}
 fn mdir(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(name)
 }
@@ -165,9 +172,9 @@ async fn sale_persists_staff_id_and_breaks_down_by_staff() {
     assert_eq!(by_staff.len(), 2, "una fila por profesional: {by_staff:?}");
     let a = by_staff.iter().find(|r| r["staff_id"] == json!("staff-A")).unwrap();
     assert_eq!(a["sales_count"].as_i64().unwrap(), 2);
-    assert_eq!(a["gross_total"].as_i64().unwrap(), 5000); // 20€ + 30€ = 50.00€
+    assert_eq!(cents(&a["gross_total"]), 5000); // 20€ + 30€ = 50.00€
     let b = by_staff.iter().find(|r| r["staff_id"] == json!("staff-B")).unwrap();
-    assert_eq!(b["gross_total"].as_i64().unwrap(), 1000);
+    assert_eq!(cents(&b["gross_total"]), 1000);
 }
 
 #[tokio::test]
@@ -493,7 +500,7 @@ async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
 
     let res = rt.execute_command("sales.order.add_line", &params(json!({
         "order_id": oid, "product_id": null, "product_name": "Tortilla", "product_sku": "",
-        "quantity": 1_000_000, "unit_price": 750, "is_gift": false, "gift_reason": "",
+        "quantity": 1_000_000, "unit_price": 750, "is_gift": 0, "gift_reason": "",
         "tax_category_key": "", "cost": 0, "line_total": 750
     })), &ctx).await.expect("añadir línea");
 
@@ -505,7 +512,7 @@ async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
     // Y con ese id se puede subir la cantidad: es justo lo que el POS no podía hacer.
     rt.execute_command("sales.order.update_line", &params(json!({
         "order_id": oid, "line_id": line_id, "quantity": 5_000_000, "unit_price": 750,
-        "is_gift": false, "gift_reason": "", "line_total": 3750
+        "is_gift": 0, "gift_reason": "", "line_total": 3750
     })), &ctx).await.expect("actualizar la cantidad");
     let lineas = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     let tortilla = lineas.iter().find(|l| l["product_name"] == json!("Tortilla")).unwrap();

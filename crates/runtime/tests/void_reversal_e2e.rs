@@ -49,8 +49,13 @@ async fn open_cash_session(rt: &Runtime, ctx: &RequestContext, opening: i64) -> 
 /// asumiéndolos positivos, mientras que el resto del módulo los almacena negativos (ver SEAM en
 /// el changelog); por eso el ARQUEO post-void se mide con `arqueo()` (la reconciliación canónica).
 async fn expected_cash(rt: &Runtime, ctx: &RequestContext) -> i64 {
-    rt.execute_query("cash_register.current_session", &Params::new(), ctx).await.unwrap()[0]
-        ["expected_total"].as_i64().unwrap()
+    // Postgres devuelve `opening_balance + SUM(amount)` como NUMERIC → JSON string (`"13000"`),
+    // no número: aceptamos ambas representaciones.
+    let v = rt.execute_query("cash_register.current_session", &Params::new(), ctx).await.unwrap()[0]
+        ["expected_total"].clone();
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("expected_total no numérico: {v:?}"))
 }
 
 /// ARQUEO canónico de la sesión: cierra y devuelve `expected_balance` (= opening + Σ amount, la

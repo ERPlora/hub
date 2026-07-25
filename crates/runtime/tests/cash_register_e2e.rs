@@ -21,6 +21,13 @@ impl EventSink for Sink {
 }
 
 fn params(v: serde_json::Value) -> Params { v.as_object().cloned().unwrap_or_default() }
+/// Céntimos de un agregado: Postgres devuelve `SUM(bigint)` como NUMERIC → JSON **string**
+/// (`"5000"`), no número. Acepta ambas representaciones.
+fn cents(v: &serde_json::Value) -> i64 {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("no es un importe numérico: {v:?}"))
+}
 fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(n) }
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 fn wasm() -> bool { mdir("cash_register").join("dist/handler.wasm").exists() }
@@ -91,10 +98,10 @@ async fn session_summary_aggregates_by_type() {
         })), &ctx).await.unwrap();
     }
     let sum = rt.execute_query("cash_register.session.summary", &params(json!({"session_id": sid})), &ctx).await.unwrap();
-    assert_eq!(sum[0]["total_sales"].as_i64().unwrap(), 5000);
+    assert_eq!(cents(&sum[0]["total_sales"]), 5000);
     // FIX SIGNO (QA 2026-06-25): el desglose se presenta como MAGNITUD POSITIVA — un refund
     // almacenado en -1000 se reporta como 1000 (la query niega el SUM de salidas).
-    assert_eq!(sum[0]["total_refunds"].as_i64().unwrap(), 1000);
+    assert_eq!(cents(&sum[0]["total_refunds"]), 1000);
     assert_eq!(sum[0]["movement_count"], json!(4));
 }
 

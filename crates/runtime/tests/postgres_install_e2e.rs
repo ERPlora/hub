@@ -112,8 +112,13 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
     let names: Vec<&str> = applied.iter().map(|r| r["filename"].as_str().unwrap()).collect();
     assert_eq!(
         names,
-        ["migrations/postgres/001_init.sql", "migrations/postgres/002_tax_category_key.sql"],
-        "unión manifest∪paquete: 001 (no listada) + 002 (listada), en orden"
+        [
+            "migrations/postgres/001_init.sql",
+            "migrations/postgres/002_tax_category_key.sql",
+            "migrations/postgres/003_substitution.sql",
+            "migrations/postgres/004_quantity_fixed_point.sql"
+        ],
+        "unión manifest∪paquete: todas las migraciones Postgres del módulo, en orden"
     );
 
     let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
