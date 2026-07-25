@@ -47,6 +47,7 @@ pub mod router;
 pub mod settings;
 pub mod state;
 pub mod system;
+pub mod system_metrics;
 pub mod tenant;
 
 pub use state::{AppState, AuthMode, HubConfig, HubId, MachineToken, WsEvent, DEV_HUB_ID};
@@ -598,6 +599,8 @@ pub fn app(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
+        // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
+        .route("/api/system/metrics", get(system_metrics::system_metrics))
         // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
         // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
         .route(

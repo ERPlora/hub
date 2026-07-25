@@ -38,6 +38,7 @@ import logOutOutline from "~icons/ion/log-out-outline?raw";
 import mailOutline from "~icons/ion/mail-outline?raw";
 import peopleOutline from "~icons/ion/people-outline?raw";
 import personCircleOutline from "~icons/ion/person-circle-outline?raw";
+import phonePortraitOutline from "~icons/ion/phone-portrait-outline?raw";
 import pulseOutline from "~icons/ion/pulse-outline?raw";
 import readerOutline from "~icons/ion/reader-outline?raw";
 import receiptOutline from "~icons/ion/receipt-outline?raw";
@@ -188,6 +189,7 @@ const SVGS: Record<string, string> = {
   "mail-outline": mailOutline,
   "people-outline": peopleOutline,
   "person-circle-outline": personCircleOutline,
+  "phone-portrait-outline": phonePortraitOutline,
   "pulse-outline": pulseOutline,
   "reader-outline": readerOutline,
   "receipt-outline": receiptOutline,
