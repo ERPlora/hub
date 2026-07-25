@@ -224,7 +224,7 @@ async fn tramos(rt: &Runtime, session_id: &str) -> Vec<(String, String, bool)> {
         .db_for_test()
         .query(
             "SELECT table_id, assignment_reason, release_reason, released_at
-             FROM tables_session_assignment WHERE session_id = :sid ORDER BY assigned_at, rowid",
+             FROM tables_session_assignment WHERE session_id = :sid ORDER BY assigned_at, ctid",
             &params(json!({ "sid": session_id })),
         )
         .await
@@ -312,7 +312,7 @@ async fn transferir_cierra_un_tramo_y_abre_el_siguiente() {
         .db_for_test()
         .query(
             "SELECT table_id, assignment_reason, release_reason, released_at IS NULL AS vivo
-             FROM tables_session_assignment ORDER BY assigned_at, rowid",
+             FROM tables_session_assignment ORDER BY assigned_at, ctid",
             &Params::new(),
         )
         .await
