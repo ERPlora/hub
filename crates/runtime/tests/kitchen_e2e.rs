@@ -69,6 +69,9 @@ async fn open_order(rt: &Runtime, ctx: &RequestContext, product: &str) -> String
 
 #[tokio::test]
 async fn la_comanda_nace_del_pedido_y_no_hace_falta_ninguna_venta() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -99,6 +102,9 @@ async fn la_comanda_nace_del_pedido_y_no_hace_falta_ninguna_venta() {
 
 #[tokio::test]
 async fn cada_disparo_del_mismo_pedido_es_una_ronda() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -129,6 +135,9 @@ async fn cada_disparo_del_mismo_pedido_es_una_ronda() {
 
 #[tokio::test]
 async fn cocina_no_conoce_mesas_ni_clientes() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -151,6 +160,9 @@ async fn cocina_no_conoce_mesas_ni_clientes() {
 
 #[tokio::test]
 async fn cada_estacion_dice_a_donde_sale_su_comanda() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -237,6 +249,9 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
 
 #[tokio::test]
 async fn media_racion_llega_a_cocina_como_media_racion() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -286,6 +301,9 @@ async fn media_racion_llega_a_cocina_como_media_racion() {
 
 #[tokio::test]
 async fn una_ronda_vieja_se_reimprime_por_donde_salio_de_verdad() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -365,6 +383,9 @@ async fn una_ronda_vieja_se_reimprime_por_donde_salio_de_verdad() {
 
 #[tokio::test]
 async fn la_cabecera_de_la_comanda_trae_lo_que_hay_que_imprimir() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -407,6 +428,9 @@ async fn la_cabecera_de_la_comanda_trae_lo_que_hay_que_imprimir() {
 
 #[tokio::test]
 async fn una_estacion_sin_destino_configurado_imprime_y_se_muestra() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -428,6 +452,9 @@ async fn una_estacion_sin_destino_configurado_imprime_y_se_muestra() {
 
 #[tokio::test]
 async fn una_ronda_sin_etiqueta_hereda_la_del_pedido() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;

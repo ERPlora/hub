@@ -42,6 +42,9 @@ fn status_of(rt: &Runtime, id: &str) -> ModuleStatus {
 
 #[tokio::test]
 async fn desactivar_taxes_arrastra_a_sus_dependientes_activos() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = hub_pos().await;
     rt.deactivate("taxes").await.unwrap();
 
@@ -53,6 +56,9 @@ async fn desactivar_taxes_arrastra_a_sus_dependientes_activos() {
 
 #[tokio::test]
 async fn reactivar_devuelve_solo_lo_que_cayo_en_cascada() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = hub_pos().await;
     // ADR-0141: la cadena real es taxes → inventory → sales (dependencias FUNCIONALES: IVA y stock).
     // `customers` ya no está en ella — el pedido no sabe de clientes.
@@ -75,6 +81,9 @@ async fn reactivar_devuelve_solo_lo_que_cayo_en_cascada() {
 
 #[tokio::test]
 async fn activar_arrastra_hacia_arriba() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = hub_pos().await;
     rt.deactivate("inventory").await.unwrap();
     rt.deactivate("taxes").await.unwrap(); // → sales caído; inventory manual
@@ -89,6 +98,9 @@ async fn activar_arrastra_hacia_arriba() {
 
 #[tokio::test]
 async fn query_a_modulo_desactivado_es_module_inactive() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = hub_pos().await;
     rt.deactivate("taxes").await.unwrap();
 
@@ -112,6 +124,9 @@ async fn query_a_modulo_desactivado_es_module_inactive() {
 
 #[tokio::test]
 async fn modules_expone_depends_on_para_que_la_ui_avise_de_la_cascada() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // El toggle del shell debe LISTAR qué va a arrastrar ANTES de confirmar («desactivar taxes
     // también desactivará: inventory, sales…»). Para computar el grafo inverso en cliente, la
     // lista de módulos tiene que exponer las dependencias declaradas.

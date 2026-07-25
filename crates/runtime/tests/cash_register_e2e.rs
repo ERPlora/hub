@@ -50,6 +50,9 @@ async fn open_session(rt: &Runtime, ctx: &RequestContext, opening: i64) -> Strin
 
 #[tokio::test]
 async fn install_registers_capabilities() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_cr().await;
     let reg = rt.registry();
     assert!(reg.is_installed("cash_register"));
@@ -60,6 +63,9 @@ async fn install_registers_capabilities() {
 
 #[tokio::test]
 async fn open_movements_close_reconciles() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_cr().await;
     let ctx = admin();
     let sid = open_session(&rt, &ctx, 10000).await;
@@ -88,6 +94,9 @@ async fn open_movements_close_reconciles() {
 
 #[tokio::test]
 async fn session_summary_aggregates_by_type() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = rt_cr().await;
     let ctx = admin();
     let sid = open_session(&rt, &ctx, 0).await;
@@ -107,6 +116,9 @@ async fn session_summary_aggregates_by_type() {
 
 #[tokio::test]
 async fn add_count_wasm_sums_denominations() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     if !wasm() { eprintln!("SKIP: cash_register handler.wasm ausente"); return; }
     let rt = rt_cr().await;
     let ctx = admin();
@@ -124,6 +136,9 @@ async fn add_count_wasm_sums_denominations() {
 
 #[tokio::test]
 async fn sale_completed_records_cash_movement() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // Cadena cross-módulo completa: inventory+customers+invoice+sales+cash_register.
     if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
     let db = fresh_db().await;
@@ -162,6 +177,9 @@ async fn sale_completed_records_cash_movement() {
 
 #[tokio::test]
 async fn movement_add_emits_movement_added() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // Path directo determinista: `movement.add` escribe un movimiento → debe emitir el evento.
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
@@ -185,6 +203,9 @@ async fn movement_add_emits_movement_added() {
 
 #[tokio::test]
 async fn record_sale_emits_movement_added_after_relay() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     // Path REAL del P1: venta → (relay) record_sale escribe el movimiento Y emite el evento, en el
     // mismo tx del outbox → cuando el widget lo recibe, el dato YA está en la BD.
     if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }

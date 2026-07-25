@@ -73,6 +73,9 @@ async fn kpi_row(rt: &Runtime, query: &str, ctx: &RequestContext) -> serde_json:
 // ── sales: `sales.today` → total del día + nº de tickets ─────────────────────────────────────────
 #[tokio::test]
 async fn sales_today_kpi_shows_real_total_and_tickets() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     // sales depende de taxes (ADR-0066) + inventory + customers.
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
@@ -110,6 +113,9 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
 // ── inventory: `inventory.products.stats` → stock bajo, valor, en stock ───────────────────────────
 #[tokio::test]
 async fn inventory_stats_kpis_show_real_numbers() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
     rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
@@ -138,6 +144,9 @@ async fn inventory_stats_kpis_show_real_numbers() {
 // ── staff: `staff.members.stats` → empleados activos ─────────────────────────────────────────────
 #[tokio::test]
 async fn staff_headcount_kpi_counts_active_members() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     rt.install_from_dir(&mdir("staff")).await.expect("staff");
     let ctx = admin();
@@ -161,6 +170,9 @@ async fn staff_headcount_kpi_counts_active_members() {
 // ── cash_register: `cash_register.current_session` → efectivo esperado en caja ─────────────────────
 #[tokio::test]
 async fn cash_register_current_session_kpi_shows_expected_total() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     rt.install_from_dir(&mdir("cash_register")).await.expect("cash_register");
     let ctx = admin();
@@ -208,6 +220,9 @@ async fn cash_register_current_session_kpi_shows_expected_total() {
 // ── verifactu: `verifactu.stats.compliance_summary` → registros pendientes de la AEAT ──────────────
 #[tokio::test]
 async fn verifactu_pending_kpi_counts_real_records() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
     // verifactu depends_on invoice (que depende de taxes + customers).
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
