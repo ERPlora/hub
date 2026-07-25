@@ -5,7 +5,7 @@
 //!   cargo run -p erplora-runtime --example walking_skeleton
 use std::path::PathBuf;
 
-use erplora_db::{Params, SqliteAdapter};
+use erplora_db::{Params, testutil::fresh_db};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -16,7 +16,7 @@ fn params(v: serde_json::Value) -> Params {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // BD SQLite en memoria (en local sería app_data/erplora.db).
-    let db = SqliteAdapter::open_in_memory().await?;
+    let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
 
     // Instala el módulo de ejemplo desde su carpeta.
