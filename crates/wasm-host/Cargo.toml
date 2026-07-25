@@ -16,4 +16,10 @@ extism = { version = "1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
+tracing = "0.1"
 erplora-guest-sdk = { path = "../guest-sdk" }
+
+[dev-dependencies]
+# Compila los guests WAT de prueba (glotón / normal) a bytes wasm en el propio
+# test, sin depender de un `.wasm` externo (ver los tests de `memory_max`).
+wat = "1"
