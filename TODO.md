@@ -43,7 +43,7 @@
   (clave `erplora.assistant.open`) desde [apps/web/src/lib/shell.ts](apps/web/src/lib/shell.ts):
   el ref se inicializa desde localStorage y un `watch` escribe en cada cambio.
 - [x] [IA] **Verificación (directiva QA, 3 viewports):** `typecheck` + `build` VERDES y **QA visual con
-  Playwright HECHA** (Hub local `pnpm dev` :5173 + runtime :8787, viewports 1280/800/390): desktop
+  Playwright HECHA** (Hub en dev `pnpm dev` :5173 + runtime :8787, viewports 1280/800/390): desktop
   empuja real el contenido a 860 sin solape ni scrim; persiste al navegar (SPA→/billing) y al recargar
   (localStorage); tablet/móvil overlayan con scrim que cierra. **Se detectó y corrigió** que el push
   por `padding ion-app` no encogía el split-pane (ver nota arriba). Pendiente solo review/merge humano.

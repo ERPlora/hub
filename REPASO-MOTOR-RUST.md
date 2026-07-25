@@ -49,8 +49,9 @@ y al final la *lógica compleja* (WASM).
       `Manifest`, `QueryDef`, `CommandDef`, `Nav`, `WasmHandler`, `Events`. + repasar
       **cada línea** cruzándola con `modules/inventory/module.json`.
 - [ ] **A2.** `crates/db/src/lib.rs` (610) — trait `DatabaseAdapter` (`query`/`execute`/
-      `execute_tx`), `SqliteAdapter`, binding de `:params`, row contract (hub_id, soft-delete,
-      audit). Cruzar con `modules/inventory/migrations/sqlite/001_init.sql`.
+      `execute_tx`), `PgAdapter` (Postgres-only, ADR-0154; traductor `:n`→`$n`), binding de
+      `:params`, row contract (hub_id, soft-delete, audit). Cruzar con
+      `modules/inventory/migrations/postgres/001_init.sql`.
 
 ### Fase B — el corazón (registro + despacho)
 - [ ] **B3.** `crates/runtime/src/registry.rs` (167) — `Registry`, `ModuleStatus`
@@ -69,7 +70,7 @@ y al final la *lógica compleja* (WASM).
 
 ### Fase C — instalación / ciclo de vida (hot-plug)
 - [ ] **C9.** `crates/runtime/src/installer.rs` (138) — install / set_status / uninstall.
-- [ ] **C10.** `crates/runtime/src/migrations.rs` (63) — aplicar migraciones por dialecto.
+- [ ] **C10.** `crates/runtime/src/migrations.rs` (63) — aplicar migraciones (Postgres-only, ADR-0154).
 - [ ] **C11.** `crates/runtime/src/loader.rs` (10) — carga de SQL de disco.
 - [ ] **C11b.** `crates/runtime/src/ui.rs` (3) + `wasm.rs` (11) — stubs/punteros.
 
@@ -95,8 +96,7 @@ y al final la *lógica compleja* (WASM).
 
 ```bash
 cd /Users/ioan.beilic/workspace/code/ERPlora/hub
-rm -f /tmp/erplora-dev.db
-HUB_SQLITE_PATH=/tmp/erplora-dev.db \
+HUB_DATABASE_URL=postgres://localhost/erplora_hub_dev \
 HUB_MODULES_DIR=$PWD/modules \
 HUB_BIND=127.0.0.1:8787 \
 cargo run -p erplora-server

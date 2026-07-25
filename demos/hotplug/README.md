@@ -24,7 +24,7 @@ módulos): se instalan en caliente.
 
 ```sh
 # prueba por HTTP (rápida, sin navegador):
-HUB_SQLITE_PATH=/tmp/hub.db HUB_BIND=127.0.0.1:8801 cargo run -p erplora-server &
+HUB_DATABASE_URL=postgres://localhost/erplora_hub_dev HUB_BIND=127.0.0.1:8801 cargo run -p erplora-server &
 curl -s localhost:8801/api/modules
 curl -s -X POST localhost:8801/api/modules/install -H 'content-type: application/json' -d '{"dir":"modules/notes"}'
 curl -s localhost:8801/api/navigation

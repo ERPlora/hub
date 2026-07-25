@@ -1,8 +1,8 @@
 # Guía permanente de UI/UX y QA del Hub
 
 Esta guía fija los patrones aprobados para el shell, las páginas core y las vistas de módulos.
-Se aplica tanto al Hub Local como al Hub Cloud. Una excepción funcional debe quedar documentada;
-no se resuelve duplicando pantallas o inventando datos.
+Se aplica al Hub Cloud (PWA/web) — el único producto (ADR-0154). Una excepción funcional debe quedar
+documentada; no se resuelve duplicando pantallas o inventando datos.
 
 ## 1. Modelo de producto y navegación
 
@@ -57,8 +57,8 @@ catálogo privado y las operaciones autorizadas. La falta de red muestra reinten
   activan lista/tarjetas con un `cardTitle` significativo.
 - En móvil se valida la vista de tarjetas; una tabla ancha no puede ser la única representación.
 - Formularios y estados de módulos reutilizan OutfitKit/Ionic y los tokens del shell.
-- Si `module.json` declara `static_files.folder`, el runtime crea un espacio privado bajo
-  `media/modules/<folder>` en Local y usa el backend de objetos del Cloud en Cloud.
+- Si `module.json` declara `static_files.folder`, el runtime almacena los ficheros del módulo en el
+  backend de objetos del Cloud (bajo `modules/<folder>`).
 - Los archivos que deban sobrevivir a un fallo de red se persisten antes del envío. VeriFactu
   conserva el XML exacto para poder reintentarlo.
 
@@ -80,7 +80,7 @@ catálogo privado y las operaciones autorizadas. La falta de red muestra reinten
 
 ### Contextos
 
-- Hub Local y Hub Cloud.
+- Con y sin el Bridge de hardware conectado.
 - Usuario admin y usuario sin permisos suficientes.
 - Español e inglés.
 - Online, offline, respuesta lenta, error recuperable y sesión caducada.
