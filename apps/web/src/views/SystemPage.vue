@@ -130,6 +130,11 @@
         </ion-card>
       </template>
 
+      <!-- ── Tab: Plan y límites (ADR-0154) — telemetría vs cuota del plan + CTA de upgrade ─── -->
+      <template v-else-if="tab === 'plan'">
+        <PlanLimitsPanel />
+      </template>
+
       <!-- ── Tab: Actualizaciones ───────────────────────────────── -->
       <template v-else-if="tab === 'updates'">
         <ion-card class="ion-no-margin">
@@ -211,6 +216,10 @@
               <HubIcon name="pulse-outline" />
               <ion-label>{{ t('system.tabResources') }}</ion-label>
             </ion-segment-button>
+            <ion-segment-button value="plan">
+              <HubIcon name="trending-up-outline" />
+              <ion-label>{{ t('system.tabPlan') }}</ion-label>
+            </ion-segment-button>
             <ion-segment-button value="updates">
               <HubIcon name="refresh-outline" />
               <ion-label>{{ t('system.tabUpdates') }}</ion-label>
@@ -249,6 +258,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import PlanLimitsPanel from '../components/PlanLimitsPanel.vue';
 import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';
 import { fetchSystemInfo, type SystemInfo } from '../lib/system';
 import { dataTableLabels } from '../lib/data-table-labels';
