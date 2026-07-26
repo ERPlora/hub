@@ -490,6 +490,13 @@ impl Runtime {
             .unwrap_or(false)
     }
 
+    /// ¿Es `name` una **query pública** (ADR-0160): existe, de un módulo activo, marcada `public`?
+    /// Es la ÚNICA puerta del endpoint anónimo `POST /api/public/query` (sin usuario, el `permission`
+    /// no gatea). Un command nunca casa (solo mira queries).
+    pub fn is_query_public(&self, name: &str) -> bool {
+        self.registry.is_query_public(name)
+    }
+
     /// Ejecuta un command declarativo (solo si su módulo está activo). Los eventos emitidos se
     /// persisten en el outbox en la misma transacción; sus listeners los entrega el relay (§5.4).
     pub async fn execute_command(
@@ -806,6 +813,40 @@ impl Runtime {
         updated_by: &str,
     ) -> Result<Json> {
         settings::set_many(self.db.as_ref(), &self.hub_id, updates, updated_by).await
+    }
+
+    // ── Páginas de la presencia web PÚBLICA (ADR-0160) ──────────────────────────────────────────
+    //
+    // Decisión de almacenamiento (columna de Ioan): el JSON de bloques (Editor.js) de cada página
+    // pública se guarda en el **settings store existente** (`hub_settings`) bajo la clave
+    // `public.page.<path>` — la MISMA tabla que el flag `public.landing.visible` y la landing. Así no
+    // se inventa una tabla nueva (sin versionado ni subsistema de páginas: eso sería otra decisión).
+    // Como esa clave NO es un setting conocido, se accede por la puerta CRUDA `settings::get/set_raw`,
+    // aparte del allowlist de `get_settings`/`set_settings`.
+
+    /// Clave de `hub_settings` donde vive el JSON de bloques de la página pública `path`.
+    fn public_page_key(path: &str) -> String {
+        format!("public.page.{path}")
+    }
+
+    /// Lee el documento de bloques (JSON Editor.js) de la página pública `path`, o `None` si no hay
+    /// página guardada para esa ruta. `path` es el segmento capturado por `/p/<path>` (sin `/` inicial).
+    /// El renderer seguro (`erplora-server::public_render`) lo convierte a HTML.
+    pub async fn get_public_page(&self, path: &str) -> Result<Option<Json>> {
+        let key = Self::public_page_key(path);
+        match settings::get_raw(self.db.as_ref(), &self.hub_id, &key).await? {
+            // El valor persistido es el JSON serializado; un contenido corrupto degrada a `None`
+            // (una página rota nunca debe tumbar el árbol público) en vez de propagar el error.
+            Some(raw) => Ok(serde_json::from_str::<Json>(&raw).ok()),
+            None => Ok(None),
+        }
+    }
+
+    /// Guarda (upsert) el documento de bloques de la página pública `path`. Primitiva de
+    /// almacenamiento; el endpoint de autoría (con su gate de rol) es fase posterior. `by` audita.
+    pub async fn set_public_page(&self, path: &str, doc: &Json, by: &str) -> Result<()> {
+        let key = Self::public_page_key(path);
+        settings::set_raw(self.db.as_ref(), &self.hub_id, &key, &doc.to_string(), by).await
     }
 
     /// Capabilities DECLARADAS por un módulo con su estado de grant (ADR-0079). Para

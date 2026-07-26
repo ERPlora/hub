@@ -484,6 +484,59 @@ pub async fn set_many(
     get_all(db, hub_id).await
 }
 
+// ── Acceso CRUDO a `hub_settings` (fuera del allowlist de claves conocidas) ─────────────────────
+//
+// [`get_all`]/[`set_many`] son un contrato CERRADO: solo dejan pasar las claves de [`KNOWN`]. La
+// presencia web pública (ADR-0160) guarda el JSON de bloques de CADA página bajo una clave dinámica
+// `public.page.<path>` que NO es un setting conocido — así que necesita una puerta APARTE sobre la
+// MISMA tabla, sin inventar tabla nueva. Estos dos helpers son esa puerta: crudos, por clave exacta,
+// sin validación de allowlist. Úsalos SOLO para claves con espacio de nombres propio (`public.page.*`),
+// nunca para el contrato de settings (esas van por `get_all`/`set_many`, que sí validan).
+
+/// Lee el valor CRUDO (string tal cual está persistido) de una clave de `hub_settings`, o `None` si
+/// no hay fila. No mezcla defaults ni valida contra [`KNOWN`].
+pub async fn get_raw(db: &dyn DatabaseAdapter, hub_id: &str, key: &str) -> Result<Option<String>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("key".into(), json!(key));
+    let res = db
+        .query(
+            "SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = :key",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["value"].as_str().map(str::to_string)))
+}
+
+/// Upsert CRUDO de una clave de `hub_settings` (mismo SQL en SQLite y Postgres, ON CONFLICT sobre la
+/// PK compuesta). Sin validación de allowlist: el llamador es responsable del espacio de nombres.
+pub async fn set_raw(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    key: &str,
+    value: &str,
+    updated_by: &str,
+) -> Result<()> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("key".into(), json!(key));
+    p.insert("value".into(), json!(value));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("updated_by".into(), json!(updated_by));
+    db.execute(
+        "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+          VALUES (:hub_id, :key, :value, :now, :updated_by) \
+          ON CONFLICT (hub_id, key) DO UPDATE SET \
+            value = :value, updated_at = :now, updated_by = :updated_by",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

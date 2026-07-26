@@ -1,0 +1,27 @@
+{
+  "id": "menu",
+  "name": "Menu",
+  "version": "1.0.0",
+  "permissions": ["menu.read", "menu.write", "menu.secret"],
+  "role_permissions": { "admin": ["*"] },
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "seed": { "postgres": ["seed/postgres/001_seed.sql"] },
+  "queries": {
+    "menu.items.list": {
+      "permission": "menu.read",
+      "sql": "queries/items_list.sql",
+      "public": true
+    },
+    "menu.items.secret": {
+      "permission": "menu.secret",
+      "sql": "queries/items_list.sql"
+    }
+  },
+  "commands": {
+    "menu.item.create": {
+      "permission": "menu.write",
+      "transaction": true,
+      "sql": ["commands/item_create.sql"]
+    }
+  }
+}

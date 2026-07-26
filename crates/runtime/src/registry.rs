@@ -364,6 +364,18 @@ impl Registry {
             .unwrap_or(false)
     }
 
+    /// ¿Es `name` una **query pública** (ADR-0160): existe, pertenece a un módulo **activo** y está
+    /// marcada `public: true`? Es la ÚNICA puerta del endpoint anónimo `POST /api/public/query`
+    /// (no hay usuario, así que el `permission` no gatea; lo hace este flag). Gemelo de
+    /// [`is_query_exposed`] pero para la capa web pública. Un command NUNCA casa (solo mira queries),
+    /// así que ejecutar un command por esa vía es imposible por construcción.
+    ///
+    /// `get_query` ya filtra por módulo **activo** (hot-plug): una query de un módulo desactivado no
+    /// es pública aunque su manifest lo declarara.
+    pub fn is_query_public(&self, name: &str) -> bool {
+        self.get_query(name).map(|q| q.def.public).unwrap_or(false)
+    }
+
     /// Cambia el estado de un módulo instalado. Devuelve `false` si no existe.
     pub fn set_status(&mut self, module_id: &str, status: ModuleStatus) -> bool {
         if !self.is_installed(module_id) {

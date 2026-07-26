@@ -353,6 +353,7 @@ mod tests {
             list: None,
             ai: None,
             expose_api: expose,
+            public: false,
         }
     }
 

@@ -538,6 +538,15 @@ pub struct QueryDef {
     /// es accesible vía API key aunque la key tuviera el permiso. El gate del runtime no cambia.
     #[serde(default)]
     pub expose_api: bool,
+    /// Opt-in: expone esta query al endpoint **anónimo** `POST /api/public/query` de la presencia
+    /// web pública del Hub (ADR-0160). **Gemelo de [`expose_api`](Self::expose_api) pero para la
+    /// capa pública** e INDEPENDIENTE de él: `expose_api` gatea la API-key (con permiso de la key);
+    /// `public` gatea el visitante anónimo. Default-deny (`false`): una query solo es pública si el
+    /// autor la marca. Sin usuario, el `permission` NO es la puerta — la ÚNICA puerta es este flag;
+    /// el runtime inyecta el `hub_id` del despliegue igual que siempre (solo lectura). El gate de la
+    /// ejecución autenticada (`/api/query`) no cambia.
+    #[serde(default)]
+    pub public: bool,
 }
 
 /// Contrato declarativo de una query de lista (`list` en `module.json`). Espejo de
@@ -787,6 +796,31 @@ pub struct NavLocale {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// El flag `public` de una query (ADR-0160) se parsea como gemelo de `expose_api`: default
+    /// `false` (ausente ⇒ no pública) y `true` cuando el manifest lo declara. Es la ÚNICA puerta
+    /// del endpoint anónimo `POST /api/public/query`.
+    #[test]
+    fn parses_public_query_flag_default_false_and_true() {
+        let json = r#"{
+            "id": "menu",
+            "name": "Menu",
+            "version": "1.0.0",
+            "queries": {
+                "menu.items.list": { "permission": "menu.read", "sql": "q.sql", "public": true },
+                "menu.items.secret": { "permission": "menu.secret", "sql": "q.sql" }
+            }
+        }"#;
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        assert!(
+            manifest.queries.get("menu.items.list").unwrap().public,
+            "public: true debe parsearse"
+        );
+        assert!(
+            !manifest.queries.get("menu.items.secret").unwrap().public,
+            "public ausente ⇒ false (default-deny)"
+        );
+    }
 
     #[test]
     fn parses_module_static_files_folder() {
