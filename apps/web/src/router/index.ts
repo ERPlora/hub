@@ -10,6 +10,11 @@ import { machineRegistrationRequired } from '../lib/runtime';
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'login', component: () => import('../views/LoginPage.vue') },
+  // Callback del OAuth de Google del SaaS (ADR-0157 §8): el SaaS redirige aquí con un `?code=` de
+  // un solo uso; LoginPage lo canjea (`session-exchange`) y finaliza el login. Reusa LoginPage
+  // (mismo flujo de finalización); no lleva `meta.auth` (aún no hay sesión) y el gate de registro
+  // de máquina lo deja pasar igual que a `/login`.
+  { path: '/auth/google/callback', name: 'google-callback', component: () => import('../views/LoginPage.vue') },
   // La pestaña activa del tabbar secundario va en el HASH (#permisos) en vez de en el path:
   // así la ruta base NO cambia → Ionic no trata el cambio de pestaña como navegación a una
   // página secundaria (no se desmonta el tabbar ni aparece el botón back). Deep-link: /settings#permisos.
@@ -62,7 +67,9 @@ router.beforeEach((to) => {
   // sesión local persistida ni entrar por URL directa. Demo llega con este flag a false.
   if (machineRegistrationRequired.value) {
     if (isAuthed.value) logout();
-    if (to.name !== 'login') {
+    // El callback de Google (ADR-0157 §8) se trata como el login: debe poder canjear su `?code=`
+    // aunque el hub aún no esté registrado (Hub Cloud llega provisionado; el gate no aplica).
+    if (to.name !== 'login' && to.name !== 'google-callback') {
       return { name: 'login', query: { redirect: to.fullPath } };
     }
   }

@@ -263,6 +263,17 @@ pub async fn list_pin_users(db: &dyn DatabaseAdapter) -> Result<Vec<(String, Str
         .collect())
 }
 
+/// `true` si el hub tiene **al menos un** `hub_user` (activo o no). Predicado del **bootstrap**
+/// (ADR-0157 Enmienda 2 §3): un hub **vacío** (sin ningún usuario) provisiona a su **primer**
+/// usuario cloud como **owner** en vez de con el rol de mínimo privilegio. Cuenta CUALQUIER fila
+/// (incluidas las desactivadas): un hub que ya tuvo un usuario no vuelve a ser «nuevo».
+pub async fn has_any_user(db: &dyn DatabaseAdapter) -> Result<bool> {
+    let res = db
+        .query("SELECT id FROM hub_user LIMIT 1", &Params::new())
+        .await?;
+    Ok(!res.rows.is_empty())
+}
+
 /// Resuelve (o crea) el `hub_user` vinculado a una identidad cloud. Es el adaptador del **JWT de
 /// usuario**: tras verificar el token (server), se mapea su `user_id` a un usuario local. Si no
 /// existe, se **provisiona** (primer login online, §2.9) con `default_role`.
@@ -610,6 +621,27 @@ mod tests {
         assert!(
             verify_pin(&db, "Ada", "4242").await.unwrap().is_none(),
             "PIN cleared"
+        );
+    }
+
+    #[tokio::test]
+    async fn has_any_user_reflects_emptiness_for_bootstrap() {
+        // ADR-0157 Enmienda 2 (3): el bootstrap «primer usuario = owner» se decide preguntando si
+        // el hub está VACÍO. `has_any_user` es ese predicado: `false` en un hub sin usuarios,
+        // `true` en cuanto hay al menos uno (activo o no — un hub con un usuario desactivado ya no
+        // es «nuevo»).
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+        assert!(
+            !has_any_user(&db).await.unwrap(),
+            "hub nuevo: sin usuarios → vacío"
+        );
+        create_user(&db, "Ana", "", "owner", Some("1"))
+            .await
+            .unwrap();
+        assert!(
+            has_any_user(&db).await.unwrap(),
+            "con un usuario: ya no está vacío"
         );
     }
 

@@ -121,7 +121,7 @@
                 <ion-button
                   type="submit"
                   expand="block"
-                  :disabled="emailLoading"
+                  :disabled="emailLoading || googleLoading"
                   :aria-label="t('login.signIn')"
                   :aria-busy="emailLoading"
                 >
@@ -129,6 +129,25 @@
                   <template v-else>
                     <HubIcon slot="start" name="log-in-outline" />
                     {{ t('login.signIn') }}
+                  </template>
+                </ion-button>
+
+                <!-- Separador + «Continuar con Google» (paridad con el SaaS, ADR-0157 §8). El Hub
+                     NUNCA habla con Google: abre el OAuth del SaaS y canjea el código al volver. -->
+                <div class="or-sep"><span>{{ t('login.orSeparator') }}</span></div>
+                <ion-button
+                  type="button"
+                  expand="block"
+                  fill="outline"
+                  :disabled="emailLoading || googleLoading"
+                  :aria-label="t('login.continueWithGoogle')"
+                  :aria-busy="googleLoading"
+                  @click="startGoogleLogin"
+                >
+                  <ion-spinner v-if="googleLoading" name="crescent" />
+                  <template v-else>
+                    <HubIcon slot="start" name="logo-google" />
+                    {{ t('login.continueWithGoogle') }}
                   </template>
                 </ion-button>
 
@@ -252,7 +271,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -262,7 +281,11 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import { setUser, setHubSession, getHubSession } from '../lib/session';
-import { cloudLogin, setTokens, runtimeCloudSession, runtimePinLogin, runtimeSetPin } from '../lib/cloud';
+import type { LoginResult } from '../lib/cloud';
+import {
+  cloudLogin, setTokens, runtimeCloudSession, runtimePinLogin, runtimeSetPin,
+  googleLoginUrl, exchangeGoogleCode,
+} from '../lib/cloud';
 import { config } from '../lib/config';
 import { isTauri, invokeTauri } from '../lib/device';
 import {
@@ -390,6 +413,7 @@ const emailVal = ref<string>('');
 const passwordVal = ref<string>('');
 const trust = ref<boolean>(true);
 const emailLoading = ref<boolean>(false);
+const googleLoading = ref<boolean>(false);
 const emailError = ref<string>('');
 
 function redirectTarget(): string {
@@ -412,6 +436,85 @@ function initials(name: string): string {
     .join('');
 }
 
+/**
+ * Finaliza el login cloud a partir de un `LoginResult` — venga de email+password (`cloudLogin`) o
+ * de «Continuar con Google» (`exchangeGoogleCode`, ADR-0157 §8). Adopta el `hub_id`, abre la sesión
+ * LOCAL del runtime (autoridad de permisos, §2.9), fija el usuario y navega; si el usuario confió el
+ * dispositivo, va al alta de PIN. Es EXACTAMENTE el flujo actual de `cloudLogin`. Lanza
+ * `Error('machine_registration')` si el alta/enrol de máquina falla; deja subir el resto de errores
+ * (el llamador los mapea a su mensaje). No navega en el caso de alta de PIN (lo hace onSetupComplete).
+ */
+async function finalizeCloudLogin(result: LoginResult): Promise<void> {
+  // Primer login = el Cloud crea/resuelve el Hub de ESTE dispositivo y devuelve su hub_id real
+  // (ARQUITECTURA.md §2.9b). Lo adoptamos como X-Hub-Id ANTES de activar la sesión, para que el
+  // gate de entitlement (App.vue → resolveEntitlement) deje de pegar contra el hub placeholder.
+  // En Tauri el alta NO es best-effort: login, UUID real y credencial de máquina forman una única
+  // transacción de bootstrap. Si falla cualquiera, no se abre una sesión parcialmente vinculada.
+  if (isTauri()) {
+    if (!result.hubId) throw new Error('machine_registration');
+    config.hubId = result.hubId;
+    const enrolledHubId = await invokeTauri<string>('enroll_device', {
+      hubId: result.hubId,
+      accessToken: result.access,
+    });
+    if (!enrolledHubId || enrolledHubId !== result.hubId) {
+      throw new Error('machine_registration');
+    }
+    // Barrera de consistencia: el runtime adopta `hub_id + token`, aplica sus migraciones scoped
+    // y solo entonces se crea el usuario/sesión local.
+    const refreshed = await bootHubContext();
+    if (!refreshed || refreshed.hub_id !== result.hubId || !refreshed.machine_registered) {
+      throw new Error('machine_registration');
+    }
+  } else {
+    // Hub Cloud llega ya provisionado con su UUID + token de máquina. También exige login de
+    // usuario, pero no crea otro Hub desde el navegador. Una instalación real no vinculada no
+    // puede continuar fingiendo ser Demo ni depender indefinidamente del JWT humano.
+    if (result.hubId) config.hubId = result.hubId;
+    if (machineRegistrationRequired.value && !machineRegistered.value) {
+      throw new Error('machine_registration');
+    }
+  }
+
+  setTokens(result.access, result.refresh);
+
+  // Abre la sesión LOCAL del runtime a partir del JWT (autoridad de permisos local, §2.9).
+  // El `name` se reusa para el login por PIN (el runtime resuelve el usuario por nombre).
+  const sess = await runtimeCloudSession(result.access, result.user.name, result.user.email);
+  setHubSession(sess.token);
+
+  setUser({
+    id: sess.user.id,
+    cloudUserId: result.user.id,
+    name: result.user.name,
+    email: result.user.email,
+    avatarUrl: result.user.avatarUrl ?? null,
+    // Rol LOCAL resuelto por el runtime (autoridad de permisos, §2.9) → gatea la UI admin.
+    role: sess.user.role,
+    permissions: sess.permissions,
+  });
+
+  // Si el usuario eligió "Confiar en este dispositivo", registramos el usuario localmente y
+  // vamos al alta de PIN (el PIN se fija en el runtime al confirmar — onSetupComplete).
+  if (trust.value) {
+    const userEntry: TrustedUser = {
+      id: sess.user.id,
+      name: result.user.name,
+      email: result.user.email,
+      initials: initials(result.user.name)
+    };
+    const existing = trustedUsers.value.filter((u) => u.id !== sess.user.id);
+    trustedUsers.value = [userEntry, ...existing];
+    saveTrustedUsers(trustedUsers.value);
+    saveTrustedFlag(true);
+    trusted.value = true;
+    step.value = 'setup';
+    return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
+  }
+
+  await router.replace(redirectTarget());
+}
+
 async function submitEmail(): Promise<void> {
   emailError.value = '';
   const email = emailVal.value.trim().toLowerCase();
@@ -420,88 +523,11 @@ async function submitEmail(): Promise<void> {
     return;
   }
   emailLoading.value = true;
-  let registrationFailed = false;
   try {
     // Login real contra el Cloud Portal (ARQUITECTURA.md §2.3: Bearer + X-Hub-Id).
     const result = await cloudLogin(email, passwordVal.value);
-
-    // Primer login = el Cloud crea/resuelve el Hub de ESTE dispositivo y devuelve su hub_id real
-    // (ARQUITECTURA.md §2.9b). Lo adoptamos como X-Hub-Id ANTES de activar la sesión, para que el
-    // gate de entitlement (App.vue → resolveEntitlement) deje de pegar contra el hub placeholder.
-    // En Tauri el alta NO es best-effort: login, UUID real y credencial de máquina forman una
-    // única transacción de bootstrap. Si falla cualquiera, no se abre una sesión parcialmente
-    // vinculada (esa situación dejaba el catálogo vacío y datos bajo el hub placeholder).
-    if (isTauri()) {
-      registrationFailed = true;
-      if (!result.hubId) throw new Error('machine_registration_missing_hub');
-      config.hubId = result.hubId;
-      const enrolledHubId = await invokeTauri<string>('enroll_device', {
-        hubId: result.hubId,
-        accessToken: result.access,
-      });
-      if (!enrolledHubId || enrolledHubId !== result.hubId) {
-        throw new Error('machine_registration_failed');
-      }
-      // Barrera de consistencia: el runtime adopta `hub_id + token`, aplica sus migraciones scoped
-      // y solo entonces se crea el usuario/sesión local.
-      const refreshed = await bootHubContext();
-      if (
-        !refreshed
-        || refreshed.hub_id !== result.hubId
-        || !refreshed.machine_registered
-      ) {
-        throw new Error('machine_registration_not_applied');
-      }
-      registrationFailed = false;
-    } else {
-      // Hub Cloud llega ya provisionado con su UUID + token de máquina. También exige login de
-      // usuario, pero no crea otro Hub desde el navegador. Una instalación real no vinculada no
-      // puede continuar fingiendo ser Demo ni depender indefinidamente del JWT humano.
-      if (result.hubId) config.hubId = result.hubId;
-      if (machineRegistrationRequired.value && !machineRegistered.value) {
-        registrationFailed = true;
-        throw new Error('machine_registration_required');
-      }
-    }
-
-    setTokens(result.access, result.refresh);
-
-    // Abre la sesión LOCAL del runtime a partir del JWT (autoridad de permisos local, §2.9).
-    // El `name` se reusa para el login por PIN (el runtime resuelve el usuario por nombre).
-    const sess = await runtimeCloudSession(result.access, result.user.name, result.user.email);
-    setHubSession(sess.token);
-
-    setUser({
-      id: sess.user.id,
-      cloudUserId: result.user.id,
-      name: result.user.name,
-      email: result.user.email,
-      avatarUrl: result.user.avatarUrl ?? null,
-      // Rol LOCAL resuelto por el runtime (autoridad de permisos, §2.9) → gatea la UI admin.
-      role: sess.user.role,
-      permissions: sess.permissions,
-    });
-
-    // Si el usuario eligió "Confiar en este dispositivo", registramos el usuario localmente y
-    // vamos al alta de PIN (el PIN se fija en el runtime al confirmar — onSetupComplete).
-    if (trust.value) {
-      const userEntry: TrustedUser = {
-        id: sess.user.id,
-        name: result.user.name,
-        email: result.user.email,
-        initials: initials(result.user.name)
-      };
-      const existing = trustedUsers.value.filter((u) => u.id !== sess.user.id);
-      trustedUsers.value = [userEntry, ...existing];
-      saveTrustedUsers(trustedUsers.value);
-      saveTrustedFlag(true);
-      trusted.value = true;
-      step.value = 'setup';
-      return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
-    }
-
-    await router.replace(redirectTarget());
-  } catch {
+    await finalizeCloudLogin(result);
+  } catch (e) {
     // Fallback demo SOLO con VITE_DEMO=1 (config.demo). En prod (sin la flag) el login falla
     // duro y mostramos el error real — nunca creamos una sesión ficticia.
     if (config.demo) {
@@ -518,13 +544,53 @@ async function submitEmail(): Promise<void> {
       await router.replace(redirectTarget());
       return;
     }
-    emailError.value = registrationFailed
+    emailError.value = e instanceof Error && e.message === 'machine_registration'
       ? t('login.errorMachineRegistration')
       : t('login.errorSignIn');
   } finally {
     emailLoading.value = false;
   }
 }
+
+// --- «Continuar con Google» (ADR-0157 §8) ------------------------------------
+// El Hub NUNCA habla con Google: redirige el navegador al OAuth del SaaS con el callback del hub en
+// `next`. El SaaS autentica con Google y vuelve a `/auth/google/callback?code=…`; el Hub canjea el
+// código por tokens (`session-exchange`) y sigue EXACTAMENTE el flujo de finalización de arriba.
+const GOOGLE_CALLBACK_PATH = '/auth/google/callback';
+
+function startGoogleLogin(): void {
+  if (typeof window === 'undefined') return;
+  const callback = `${window.location.origin}${GOOGLE_CALLBACK_PATH}`;
+  window.location.assign(googleLoginUrl(callback));
+}
+
+/** Al volver del OAuth del SaaS (`?code=`), canjea el código y finaliza el login. Idempotente por
+ *  montaje: un código gastado simplemente falla y vuelve al formulario de email. */
+async function handleGoogleCallback(): Promise<void> {
+  const code = router.currentRoute.value.query.code;
+  if (typeof code !== 'string' || !code) return;
+  googleLoading.value = true;
+  emailError.value = '';
+  step.value = 'email';
+  try {
+    const result = await exchangeGoogleCode(code);
+    // Limpia el `?code` gastado de la URL (sin recargar) para que un refresh no lo reintente.
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    await finalizeCloudLogin(result);
+  } catch (e) {
+    emailError.value = e instanceof Error && e.message === 'machine_registration'
+      ? t('login.errorMachineRegistration')
+      : t('login.errorGoogle');
+  } finally {
+    googleLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  void handleGoogleCallback();
+});
 
 // ---------------------------------------------------------------------------
 // PinLogin state
@@ -753,6 +819,24 @@ async function onSetupComplete(pin: string): Promise<void> {
   line-height: 1.4;
   color: var(--ion-color-medium);
   margin: 0;
+}
+
+/* ---- Separador «o» (entre email y Google) ---- */
+.or-sep {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  color: var(--ion-color-medium);
+  font-size: 12px;
+  margin: 2px 0;
+}
+.or-sep::before,
+.or-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ion-color-step-150, rgba(0, 0, 0, 0.1));
 }
 
 /* ---- Error note ---- */

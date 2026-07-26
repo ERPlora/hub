@@ -39,6 +39,7 @@ pub mod ingest;
 pub mod install;
 pub mod logging;
 pub mod media;
+pub mod members;
 pub mod module_storage;
 pub mod openapi;
 pub mod profile;
@@ -1905,6 +1906,24 @@ async fn auth_cloud(
                 .into_response()
         }
     };
+    // ── Gate de presencia (ADR-0157 §5) ──────────────────────────────────────────────────────
+    // La autenticación (¿es un JWT válido del SaaS?) NO implica autorización (¿pertenece a ESTE
+    // hub?). El token lleva el claim *coarse* `hubs: [{id, org}]`; el Hub solo deja entrar si el
+    // `hub_id` de esta máquina figura ahí. Sustituye al viejo get-or-create como admin: cierra el
+    // hueco por el que cualquier usuario del SaaS con un JWT válido quedaba admin local. Un token
+    // sin el claim (SaaS legacy) trae `hubs` vacío → no es miembro → se rechaza (pide invitación).
+    let hub_id = st.hub_id();
+    if !claims.is_member_of_hub(&hub_id) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "ok": false,
+                "error": "no eres miembro de este hub: pide una invitación al administrador",
+                "code": "not_a_member",
+            })),
+        )
+            .into_response();
+    }
     let cloud_user_id = claims.user_id_str();
     let body = body.map(|b| b.0);
     let device_id = body.as_ref().and_then(|b| b.device_id.clone());
@@ -1913,12 +1932,27 @@ async fn auth_cloud(
         .as_ref()
         .and_then(|b| b.name.clone())
         .unwrap_or_else(|| format!("user:{cloud_user_id}"));
-    // Rol por defecto al provisionar un usuario cloud nuevo (bootstrap). Decisión de política —
-    // configurable por entorno; ajustable luego por un admin del hub.
-    let default_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "admin".into());
+    // Rol LOCAL por defecto al provisionar un miembro nuevo que aún no tiene `hub_user` (ADR-0157
+    // §6: los roles operativos del Hub son locales/custom, ortogonales al rol SaaS). Se elige el
+    // rol de **mínimo privilegio** (`employee`), NO `admin` a ciegas: el auto-admin era el hueco
+    // que este ADR cierra. El alta real con su rol Hub la hace el admin vía la API de miembros
+    // (`POST /api/v1/hub/device/members/`); este create es solo la red de seguridad para un
+    // miembro que pasa el gate sin fila local. Configurable por entorno (`HUB_DEFAULT_ROLE`).
+    let default_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "employee".into());
+    // **Bootstrap** (ADR-0157 Enmienda 2 §3): en un hub **vacío** (sin ningún `hub_user`) el
+    // **primer** usuario que pasa el gate se provisiona como **owner** (admin-total local), no como
+    // `employee`. Resuelve el gap del paso 2 (un hub recién creado necesita un primer admin que dé
+    // de alta al resto). Solo aplica a la creación inicial: en cuanto existe un usuario, los
+    // siguientes caen al rol de mínimo privilegio. Configurable por entorno (`HUB_BOOTSTRAP_ROLE`).
+    let bootstrap_role = std::env::var("HUB_BOOTSTRAP_ROLE").unwrap_or_else(|_| "owner".into());
     let rt = st.runtime.lock().await;
+    // El predicado se evalúa ANTES del get-or-create: en un hub vacío el primer provisioning usa el
+    // rol de bootstrap; el get-or-create nunca cambia el rol de un usuario ya existente, así que
+    // esto solo afecta a la primera fila. `false` (o error de BD) cae al rol por defecto (seguro).
+    let empty_hub = !rt.has_any_user().await.unwrap_or(false);
+    let provision_role = if empty_hub { &bootstrap_role } else { &default_role };
     match rt
-        .get_or_link_cloud_user(&cloud_user_id, &name, &default_role)
+        .get_or_link_cloud_user(&cloud_user_id, &name, provision_role)
         .await
     {
         Ok(user) => {

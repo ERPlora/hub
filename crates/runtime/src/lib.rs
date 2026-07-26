@@ -593,6 +593,12 @@ impl Runtime {
         identity::list_pin_users(self.db.as_ref()).await
     }
 
+    /// `true` si el hub ya tiene algún `hub_user` (predicado del bootstrap «primer usuario =
+    /// owner», ADR-0157 Enmienda 2 §3). Un hub vacío devuelve `false`.
+    pub async fn has_any_user(&self) -> Result<bool> {
+        identity::has_any_user(self.db.as_ref()).await
+    }
+
     /// Resuelve (o provisiona) el `hub_user` vinculado a una identidad cloud (mapeo del JWT).
     pub async fn get_or_link_cloud_user(
         &self,

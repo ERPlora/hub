@@ -106,6 +106,8 @@ import codeSlashOutline from "~icons/ion/code-slash-outline?raw";
 import logoWindows from "~icons/ion/logo-windows?raw";
 import logoTux from "~icons/ion/logo-tux?raw";
 import logoAndroid from "~icons/ion/logo-android?raw";
+// «Continuar con Google» del login (ADR-0157 §8).
+import logoGoogle from "~icons/ion/logo-google?raw";
 
 // Iconos que se pintan POR NOMBRE (`<ion-icon name="…">`) desde los ok-* de OutfitKit y desde los
 // Web Components de los módulos. Antes vivían en un `addIcons()` aparte, en main.ts, importados de
@@ -257,6 +259,7 @@ const SVGS: Record<string, string> = {
   "logo-windows": logoWindows,
   "logo-tux": logoTux,
   "logo-android": logoAndroid,
+  "logo-google": logoGoogle,
   "panel-left": panelLeft,
 
   // Pintados por nombre desde los ok-* (OutfitKit) y los WC de los módulos — ver el bloque de
