@@ -210,7 +210,9 @@ const CPU_SAMPLE_GAP_MS: u64 = 100;
 
 /// Muestrea memoria + CPU del cgroup de forma **bloqueante** (IO de disco + `sleep` de la segunda
 /// muestra de CPU). El llamador la envuelve en `spawn_blocking` para no parar el executor async.
-fn sample_cgroup(r: &dyn CgroupReader) -> (MemoryMetric, CpuMetric) {
+/// `pub(crate)`: la pestaña Recursos (`system.rs`) reusa ESTE sampler testeado — una sola lectura
+/// de cgroup en el crate, sin parsers duplicados.
+pub(crate) fn sample_cgroup(r: &dyn CgroupReader) -> (MemoryMetric, CpuMetric) {
     let memory = read_memory(r);
     let start = read_cpu_usage_usec(r);
     std::thread::sleep(std::time::Duration::from_millis(CPU_SAMPLE_GAP_MS));
