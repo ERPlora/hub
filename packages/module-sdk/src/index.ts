@@ -986,7 +986,7 @@ export { BridgeClient as WsBridgeTransport };
 
 /**
  * Transporte de hardware por Tauri **invoke** (combos Tauri). El shell Tauri delega en el crate
- * `erplora-peripherals` (apps/tauri/README §2.7.1); no hay servidor localhost ni WS. Mismos
+ * `erplora-peripherals` (ARQUITECTURA.md §2.7); no hay servidor localhost ni WS. Mismos
  * métodos que `WsBridgeTransport`, así que el módulo no distingue el transporte.
  */
 export class IpcBridgeTransport implements BridgeTransport {

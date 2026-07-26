@@ -347,17 +347,6 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             erplora_runtime::host_notify::MockTransport::new(),
         ));
 
-    // Transporte de `host.backup_upload`: en Hub Cloud (Postgres) el backup/restore lo gestiona el
-    // **Cloud** (snapshots de Postgres + PITR con cifrado de servidor a Object Storage), NO el
-    // runtime (ADR-0154): no hay dump local que subir. Se registra el MOCK para que la mecánica del
-    // Outbox (reintentos/dead-letter) del evento `host.backup_upload` siga siendo real.
-    {
-        eprintln!("backup: backend Postgres → backups gestionados por el Cloud (sin dump local)");
-        let transport: std::sync::Arc<dyn erplora_runtime::host_backup::BackupTransport> =
-            std::sync::Arc::new(erplora_runtime::host_backup::MockTransport::new());
-        state.runtime.lock().await.set_backup_transport(transport);
-    }
-
     // Registro GLOBAL de errores ("todo controlado", un único embudo): instala el sink que reenvía
     // al Cloud (`POST /api/v1/hub/device/error-report/`, X-Hub-Token) cada error del runtime
     // (core + módulos), del panic hook y de la ruta local del frontend. Best-effort (spawn detached);

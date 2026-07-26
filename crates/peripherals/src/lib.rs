@@ -2,9 +2,8 @@
 //! TCP, puerto 9100). ARQUITECTURA.md §2.7.
 //!
 //! Este crate concentra lo que era el Bridge Python (`bridge/ERPlora-Bridge-desktop`) en una
-//! librería sin I/O de UI ni servidor WebSocket — cada consumidor monta su propio transporte:
+//! librería sin I/O de UI ni servidor WebSocket — el consumidor monta su propio transporte:
 //!   - **`apps/bridge`** (standalone, combo `cloud + web-PWA`) → servidor Axum `GET /status` + `WS /ws`.
-//!   - **`apps/tauri`** (sidecar, combos Tauri) → handlers `invoke` (a futuro).
 //!
 //! Decisión red-only (§2.7): USB/Bluetooth se descartan; el escáner por HID lo maneja el
 //! SO/navegador como teclado. Por eso aquí **no** hay `usb`/`bluetooth`/`scanner`.

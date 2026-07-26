@@ -167,12 +167,6 @@ pub struct Registry {
     /// Cloud con `check_quota`, ADR-0006/ADR-0012). El `tier` vive en Cloud (ADR-0007), así que
     /// el host lo siembra; un módulo no listado usa WhatsApp del tenant (secreto local).
     pub premium_whatsapp_modules: HashSet<String>,
-    /// Transporte de `host.backup_upload` (ADR-0040): el cliente real que pide la credencial STS/
-    /// presignada al Cloud y sube el blob cifrado del backup a S3. Lo inyecta el host al arrancar
-    /// (`Runtime::set_backup_transport`). `None` = la capacidad `host.backup_upload` no está
-    /// disponible (los eventos `backup.requested` se entregan a sus listeners de módulo, pero el
-    /// listener-host no sube nada). Espejo de `notify_transport`. Ver `outbox.rs`.
-    pub backup_transport: Option<std::sync::Arc<dyn crate::host_backup::BackupTransport>>,
     /// Backend de `static_files` declarado por módulos. Lo inyecta el host y resuelve a disco
     /// Local o Cloud→S3 sin exponer paths físicos al módulo.
     pub module_storage: Option<std::sync::Arc<dyn crate::module_storage::ModuleStorage>>,

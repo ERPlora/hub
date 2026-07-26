@@ -1,26 +1,18 @@
 <#
 .SYNOPSIS
-  Empaqueta un build Windows como MSIX para Microsoft Store (ADR-0136 · hub#120).
+  Empaqueta el build Windows del Bridge como MSIX para Microsoft Store (ADR-0136 · hub#120).
 
 .DESCRIPTION
-  Paso POST-BUILD puro: no toca cómo compila Tauri/Cargo. Dos sabores (-Flavor):
+  Paso POST-BUILD puro: no toca cómo compila Cargo. Un solo sabor (-Flavor):
 
-    app    (default) — ERPlora Desktop (Tauri). Requiere `tauri build` previo
-           (exe en target/release + front en apps/web/dist).
-    bridge — ERPlora Bridge (apps/bridge, binario erplora-bridge). Requiere
+    bridge (default) — ERPlora Bridge (apps/bridge, binario erplora-bridge). Requiere
            `cargo build --release -p erplora-bridge`. Sin front que stagear.
 
-  1. Stage: exe (+ dist/ si app) + Assets/ (iconos que referencia el manifest).
+  1. Stage: exe + Assets/ (iconos que referencia el manifest).
   2. Patch: tokens __MSIX_*__ del Package.appxmanifest con la identidad real
-     de Partner Center (cada sabor tiene ficha e Identity Name PROPIOS; el
-     Publisher es el mismo — misma cuenta).
+     de Partner Center (Identity Name propio; el Publisher es el de la cuenta).
   3. Pack: `winapp pack` (CLI oficial: winget install microsoft.winappcli).
      SIN -Cert ⇒ MSIX sin firmar, que es lo que exige la submission (la Store firma).
-
-.EXAMPLE
-  pwsh scripts/pack-msix.ps1 -Version 0.2.0 `
-    -IdentityName "12345Erplora.ERPlora" -Publisher "CN=xxxx-..." `
-    -PublisherDisplay "Erplora" -OutDir dist-msix
 
 .EXAMPLE
   pwsh scripts/pack-msix.ps1 -Flavor bridge -Version 0.2.0 `
@@ -28,17 +20,16 @@
     -PublisherDisplay "Erplora" -OutDir dist-msix
 
 .NOTES
-  Solo Windows (winapp CLI). En CI corre en el leg windows de tauri-release.yml
-  (app) y bridge-release.yml (bridge). Para probar la INSTALACIÓN local (no la
-  submission) añade -Cert con un devcert: `winapp cert generate` + `winapp cert
-  install` (ver apps/tauri/MICROSOFT-STORE.md).
+  Solo Windows (winapp CLI). En CI corre en el leg windows de bridge-release.yml.
+  Para probar la INSTALACIÓN local (no la submission) añade -Cert con un devcert:
+  `winapp cert generate` + `winapp cert install`.
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Version,
   [Parameter(Mandatory = $true)][string]$IdentityName,
   [Parameter(Mandatory = $true)][string]$Publisher,
   [Parameter(Mandatory = $true)][string]$PublisherDisplay,
-  [ValidateSet("app", "bridge")][string]$Flavor = "app",
+  [ValidateSet("bridge")][string]$Flavor = "bridge",
   [string]$OutDir = "dist-msix",
   [string]$Cert = ""
 )
@@ -48,21 +39,12 @@ $repoRoot = Split-Path -Parent $PSScriptRoot   # hub/
 
 # --- Presets por sabor ---
 $presets = @{
-  app = @{
-    ExeCandidates = @("$repoRoot/target/release/ERPlora.exe", "$repoRoot/target/release/erplora-tauri.exe")
-    ExeName       = "ERPlora.exe"
-    Manifest      = "$repoRoot/apps/tauri/src-tauri/msix/Package.appxmanifest"
-    AssetsDir     = "$repoRoot/apps/tauri/src-tauri/icons"
-    OutName       = "erplora-app.msix"
-    StageWebDist  = $true
-  }
   bridge = @{
     ExeCandidates = @("$repoRoot/target/release/erplora-bridge.exe")
     ExeName       = "erplora-bridge.exe"
     Manifest      = "$repoRoot/apps/bridge/msix/Package.appxmanifest"
     AssetsDir     = "$repoRoot/apps/bridge/msix/Assets"
     OutName       = "erplora-bridge.msix"
-    StageWebDist  = $false
   }
 }
 $p = $presets[$Flavor]
@@ -76,17 +58,11 @@ if ($v -match '^\d+\.\d+\.\d+$') { $v = "$v.0" }
 $exe = $p.ExeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $exe) { throw "No hay exe en target/release/ para el sabor '$Flavor' — corre antes su build." }
 
-# --- Stage: mismo layout que instala NSIS ($INSTDIR): exe [+ dist/ en app]. ---
+# --- Stage: mismo layout que instala NSIS ($INSTDIR): exe + Assets/. ---
 $stage = "$repoRoot/target/msix-stage-$Flavor"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path "$stage/Assets" | Out-Null
 Copy-Item $exe "$stage/$($p.ExeName)"
-
-if ($p.StageWebDist) {
-  $webDist = "$repoRoot/apps/web/dist"
-  if (-not (Test-Path "$webDist/index.html")) { throw "Falta apps/web/dist — corre `pnpm -F @erplora/web build`." }
-  Copy-Item $webDist "$stage/dist" -Recurse
-}
 
 foreach ($i in "Square44x44Logo.png", "Square150x150Logo.png", "StoreLogo.png") {
   Copy-Item "$($p.AssetsDir)/$i" "$stage/Assets/$i"

@@ -149,8 +149,8 @@ impl<'a> Installer<'a> {
 //    de `Auth`: `Authorization: Bearer …` + `X-Hub-Id`, etc.).
 //  - `fetch(url)` (heredado de `source::Fetcher`) → descarga el zip binario desde S3.
 //
-// Esta es la pieza que inyectan los **binarios de producción** (`erplora-server` y, en el
-// futuro, `apps/tauri`): construyen el transporte una vez y se lo pasan a `Installer::install`.
+// Esta es la pieza que inyecta el **binario de producción** (`erplora-server`): construye el
+// transporte una vez y se lo pasa a `Installer::install`.
 // Los tests siguen usando `MockTransport` en memoria, de modo que el build por defecto del
 // workspace NO arrastra reqwest (queda detrás de la feature `reqwest-transport`). El diseño
 // es **blocking** a propósito: encaja con los traits síncronos sin requerir tokio.
