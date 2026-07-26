@@ -349,6 +349,10 @@ pub struct AppState {
     /// y viaja al Cloud en el heartbeat de `daily_usage`. Es el reloj con el que el Cloud apaga
     /// (60d) y acaba borrando (120d) los hubs free en los que nadie entra. Ver `crate::activity`.
     pub activity: Arc<crate::activity::ActivityState>,
+    /// Snapshot de los settings PÚBLICOS del hub (ADR-0160 F0): flag `public.landing.visible` +
+    /// datos de negocio para la landing. Lo carga `serve()` UNA vez al arrancar; el gate y las rutas
+    /// públicas lo leen sin pegar a `hub_settings`. Por defecto = capa pública CERRADA (flag false).
+    pub public: Arc<crate::public::PublicSnapshot>,
 }
 
 impl AppState {
@@ -398,6 +402,9 @@ impl AppState {
             vector: None,
             entitlement: crate::entitlement::new_shared(),
             activity: Arc::new(crate::activity::ActivityState::new()),
+            // Capa pública CERRADA por defecto (ADR-0160 F0). `serve()` la reemplaza con el snapshot
+            // real leído de `hub_settings` al arrancar; los tests la inyectan con `with_public_snapshot`.
+            public: Arc::new(crate::public::PublicSnapshot::default()),
         }
     }
 
@@ -405,6 +412,14 @@ impl AppState {
     /// degrada a "todos los tools" (§9.5).
     pub fn with_vector(mut self, store: SharedVectorStore) -> Self {
         self.vector = Some(store);
+        self
+    }
+
+    /// Fija el snapshot de settings públicos (ADR-0160 F0). Lo usa `serve()` tras leer `hub_settings`
+    /// al arrancar, y los tests para sembrar el flag/datos sin persistir. Sin hot-reload: cambiar el
+    /// flag en la BD requiere reiniciar el proceso para que el gate/landing lo vean.
+    pub fn with_public_snapshot(mut self, snapshot: crate::public::PublicSnapshot) -> Self {
+        self.public = Arc::new(snapshot);
         self
     }
 

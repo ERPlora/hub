@@ -135,6 +135,16 @@ const KNOWN: &[Setting] = &[
         validate: validate_text,
         parse_stored: |s| json!(s),
     },
+    // Interruptor de la capa web PÚBLICA del hub (ADR-0160, F0). Con `false` (default) NO existe
+    // parte pública: `/`, `/p/*` y `/api/public/*` se comportan como hoy. El dueño la activa desde
+    // Ajustes (`PUT /api/settings`); el runtime la lee al arrancar (snapshot cacheado). Cambiarla en
+    // caliente requiere reiniciar el proceso (aceptable en F0; sin hot-reload por diseño).
+    Setting {
+        key: "public.landing.visible",
+        default: || json!(false),
+        validate: validate_bool,
+        parse_stored: |s| json!(s == "true"),
+    },
 ];
 
 /// Locales soportados por el hub (espejo del contrato del frontend, ADR-0055).
@@ -578,6 +588,38 @@ mod tests {
     // `theme_palette` es la paleta DEFAULT del hub (data-ok-palette de OutfitKit palettes.css,
     // compartida con Cloud). El override vive en `hub_user_pref`; esta clave es lo que ve quien no
     // ha elegido nada.
+
+    // ── Capa web PÚBLICA (ADR-0160, F0) ────────────────────────────────────────────────
+    //
+    // `public.landing.visible` es el interruptor de la parte pública. Debe existir como setting
+    // conocido para poder leerse (`get_all` → snapshot) y activarse desde Ajustes (`set_many`); y su
+    // default DEBE ser `false` (la capa pública está cerrada mientras el dueño no la abra).
+    #[tokio::test]
+    async fn public_landing_visible_default_false_and_roundtrips() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(
+            all["public.landing.visible"],
+            json!(false),
+            "la capa pública está CERRADA por defecto"
+        );
+
+        // Se activa desde Ajustes y persiste como bool.
+        let mut updates = serde_json::Map::new();
+        updates.insert("public.landing.visible".into(), json!(true));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1").await.unwrap();
+        assert_eq!(result["public.landing.visible"], json!(true));
+
+        // Solo acepta booleanos (no "true" string ni números).
+        let mut bad = serde_json::Map::new();
+        bad.insert("public.landing.visible".into(), json!("true"));
+        assert!(matches!(
+            set_many(&db, "hub-1", &bad, "hub_user:1").await.unwrap_err(),
+            RuntimeError::InvalidPayload { .. }
+        ));
+    }
 
     #[tokio::test]
     async fn theme_palette_default_es_la_marca_erplora() {

@@ -49,6 +49,8 @@ pub mod members;
 pub mod module_storage;
 pub mod openapi;
 pub mod profile;
+/// Capa web PÚBLICA del hub (ADR-0160, F0): frontera del gate + landing server-side + CSP estricta.
+pub mod public;
 pub mod router;
 pub mod settings;
 pub mod state;
@@ -502,6 +504,19 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     if let Some(dir) = cfg.web_dir.as_deref() {
         eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
     }
+    // Snapshot de la capa web PÚBLICA (ADR-0160 F0): lee el flag `public.landing.visible` + los datos
+    // de negocio de `hub_settings` UNA sola vez, tras aplicar el seed. El gate y las rutas públicas
+    // leen ESTE snapshot cacheado (no la BD) en cada request. Sin hot-reload: cambiar el flag en la
+    // BD requiere reiniciar el proceso para que la capa pública se abra/cierre (aceptable en F0).
+    let public_snapshot = {
+        let rt = state.runtime.lock().await;
+        let settings = rt.get_settings().await.unwrap_or_else(|_| json!({}));
+        public::PublicSnapshot::from_settings(&settings)
+    };
+    if public_snapshot.landing_visible {
+        eprintln!("capa web pública ACTIVA (public.landing.visible=true): sirviendo / y /p/* anónimos");
+    }
+    state = state.with_public_snapshot(public_snapshot);
     let mut router = build_router(state, cfg.web_dir.as_deref());
     // CSP (ADR-0050): con el doc servido por Axum, la CSP de `tauri.conf` no aplica → la emitimos aquí.
     if let Some(csp) = cfg.csp.as_deref() {
@@ -602,7 +617,11 @@ async fn shutdown_signal() {
 pub fn app(state: AppState) -> Router {
     let registration_state = state.clone();
     let activity_state = state.activity.clone();
-    Router::new()
+    // Capa web PÚBLICA (ADR-0160 F0): se monta SOLO si el snapshot de arranque trae el flag
+    // `public.landing.visible` activo. Con el flag desactivado (default) NO existen `/` ni `/p/*`
+    // como rutas → caen al comportamiento de hoy (gate 428 / fallback SPA→login), intacto.
+    let landing_visible = state.public.landing_visible;
+    let router = Router::new()
         .route("/healthz", get(healthz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
@@ -732,7 +751,16 @@ pub fn app(state: AppState) -> Router {
         // `AppState.events` (broadcast, N suscriptores), así que no duplica el fan-out. Da gratis
         // reconexión del navegador (EventSource) + keep-alive (idle timeout del ALB). Nombre de
         // ruta = decisión del humano (`/api/events` por defecto).
-        .route("/api/events", get(sse_events))
+        .route("/api/events", get(sse_events));
+    // Rutas públicas montadas ANTES del fallback SPA (ADR-0160 F0): `/` (landing server-side) +
+    // `/p/*` (placeholder de página). Son rutas EXPLÍCITAS → ganan al `index.html` del `ServeDir`.
+    // Llevan su CSP estricta propia (SOLO ellas, ver `public::routes`). Merge condicional al flag.
+    let router = if landing_visible {
+        router.merge(public::routes())
+    } else {
+        router
+    };
+    router
         // Log de cada request (método/ruta/estado/latencia) a INFO → consola + `media/_logs/`
         // (ADR-0047): la primera población real de la carpeta media. La respuesta se loguea a INFO;
         // los fallos del propio servidor a ERROR.
@@ -795,7 +823,16 @@ async fn require_machine_registration(
     next: Next,
 ) -> Response {
     let path = request.uri().path();
-    if matches!(path, "/healthz" | "/api/hub/context") || st.is_demo() || st.machine_registered() {
+    // ADR-0160 F0: con la capa pública ACTIVA (`public.landing.visible`, del snapshot cacheado en el
+    // AppState — NO se lee `hub_settings` en cada request), el árbol público (`/`, `/p/*`,
+    // `/api/public/*`) pasa SIN 428. Con el flag desactivado (default) el gate se comporta
+    // EXACTAMENTE como antes: la capa pública no existe.
+    let public_pass = st.public.landing_visible && public::is_public_path(path);
+    if matches!(path, "/healthz" | "/api/hub/context")
+        || st.is_demo()
+        || st.machine_registered()
+        || public_pass
+    {
         return next.run(request).await;
     }
     (
@@ -826,6 +863,12 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
 /// aplica al doc (solo la inyecta el protocolo de assets de Tauri), así que el runtime debe emitirla.
 /// En las respuestas de API el header es inocuo. El valor lo decide el llamador (es columna de
 /// seguridad/humano): en Tauri lo fija `embedded_serve_config`; en ECS sale de `HUB_CSP` (o `None`).
+///
+/// **`if_not_present`** (ADR-0160 F0): es una CSP de FALLBACK — se emite salvo que la respuesta ya
+/// traiga una. Así el árbol público (`public::routes`) puede fijar su CSP MÁS estricta en un layer
+/// interno y esta global NO la pisa. Para la app autenticada el efecto es idéntico al de antes: ningún
+/// handler emite CSP propia, así que todas reciben esta global (antes con `overriding`, ahora como
+/// fallback → mismo resultado). No se cambia el VALOR de la CSP global.
 pub fn with_csp(router: Router, csp: &str) -> Router {
     use axum::http::header::CONTENT_SECURITY_POLICY;
     use axum::http::HeaderValue;
@@ -833,10 +876,12 @@ pub fn with_csp(router: Router, csp: &str) -> Router {
     // byte no-ASCII): se loguea y se sigue SIN header en vez de panicar. En Tauri el input es la const
     // `LOOPBACK_CSP` (siempre válida); este guard protege el camino ECS (`HUB_CSP` del entorno).
     match HeaderValue::from_str(csp) {
-        Ok(value) => router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
-            CONTENT_SECURITY_POLICY,
-            value,
-        )),
+        Ok(value) => router.layer(
+            tower_http::set_header::SetResponseHeaderLayer::if_not_present(
+                CONTENT_SECURITY_POLICY,
+                value,
+            ),
+        ),
         Err(e) => {
             eprintln!("CSP inválida ignorada (no se emite header Content-Security-Policy): {e}");
             router
