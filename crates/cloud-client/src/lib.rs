@@ -297,53 +297,6 @@ impl CloudClient {
         }
     }
 
-    /// **Subida (stream) del backup local → Cloud** (ADR-0040, **opción B** 2026-06-13). La app
-    /// **Local (free)** NO habla con S3 ni guarda credenciales AWS: **streamea el dump** (bytes en
-    /// claro sobre TLS) a un endpoint del Cloud, que lo escribe a S3 con **cifrado de servidor (SSE)**.
-    /// `POST /api/v1/hub/device/backup/` con la credencial de **máquina** del hub (`X-Hub-Token` +
-    /// `X-Hub-Id`, contexto hub-scoped sin usuario: el backup lo dispara una scheduled task / la UI,
-    /// no un JWT cloud fresco). El Cloud valida entitlement del módulo `backup`, streamea a S3
-    /// (`erplora-storage`, key inmutable `backups/local/{hub}/{ts}.dump`) y responde con un
-    /// [`BackupUploadResult`] (`s3_key`, `bytes`, ...).
-    ///
-    /// El **body es el dump** (stream binario, en claro); el cifrado lo hace el Cloud (SSE), **no**
-    /// el hub. Metadatos opcionales (tamaño, sha256, versión de esquema, timestamp del cliente) van
-    /// en cabeceras. El cuerpo lo aporta el llamador (server/runtime) desde el dump del SQLite.
-    /// Espejo del estilo de [`assistant_chat_stream`]/[`notify_whatsapp`]: aquí solo se construye la
-    /// petición (método/URL/cabeceras); el I/O del stream lo hace el cliente HTTP del llamador.
-    ///
-    /// TODO (columna humano, otra capa): el endpoint Django del Cloud no existe aún — lo crea el
-    /// humano (`cloud/apps/dashboard/hubs/main/api/hub_api.py`). Contrato fijado aquí.
-    pub fn backup_upload(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/backup/", self.base_url),
-            headers: auth.headers(),
-        }
-    }
-
-    /// **Restore, paso 1 — lista las copias del usuario** (ADR-0040, opción B). Mostrar las copias
-    /// de las orgs/hubs del usuario (también para "mover a otro equipo") requiere **JWT de usuario**
-    /// (no el machine token, que es de un solo hub): `GET /api/v1/hub/device/backup/` con
-    /// `Authorization: Bearer …` + `X-Hub-Id`. La respuesta es un array de [`BackupEntry`]
-    /// (`s3_key`, `created_at`, `bytes`, `hub_id`, ...). TODO endpoint Django = humano.
-    pub fn backup_list(&self, auth: &Auth) -> PreparedRequest {
-        self.get("/api/v1/hub/device/backup/", auth)
-    }
-
-    /// **Restore, paso 2 — descarga los bytes de una copia** (ADR-0040, opción B). El Cloud sirve el
-    /// dump (SSE es transparente: el Cloud lo lee descifrado de S3); el hub lo aplica (reemplaza el
-    /// SQLite + reinicia). `GET /api/v1/hub/device/backup/download/?s3_key={s3_key}` con
-    /// `Authorization: Bearer …` + `X-Hub-Id` (flujo de usuario, posiblemente cross-hub). Respuesta =
-    /// stream binario del dump (en claro). TODO endpoint Django = humano.
-    pub fn backup_download(&self, auth: &Auth, s3_key: &str) -> PreparedRequest {
-        // El s3_key viaja en query; el llamador debe URL-encodearlo (contiene `/` y `:`).
-        self.get(
-            &format!("/api/v1/hub/device/backup/download/?s3_key={s3_key}"),
-            auth,
-        )
-    }
-
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
     /// registro del Hub reenvía aquí TODO error (core, módulos, panics, frontend), best-effort.
     /// `POST /api/v1/hub/device/error-report/` con la credencial de **máquina** del hub
@@ -352,8 +305,8 @@ impl CloudClient {
     /// `{ source, module_id, error_code, message, stack, severity, context, occurred_at }`, lo
     /// construye el llamador (server) a partir de su `ErrorEvent`. La respuesta
     /// (`{ ok, report_id, fingerprint, count, deduped, issue_queued }`) se ignora: cualquier 2xx
-    /// es éxito. Espejo del estilo de [`backup_upload`]/[`notify_whatsapp`]: aquí solo se construye
-    /// la petición (método/URL/cabeceras); el I/O del POST lo hace el cliente HTTP del llamador.
+    /// es éxito. Espejo del estilo de [`notify_whatsapp`]: aquí solo se construye la petición
+    /// (método/URL/cabeceras); el I/O del POST lo hace el cliente HTTP del llamador.
     pub fn report_error(&self, auth: &Auth) -> PreparedRequest {
         PreparedRequest {
             method: "POST",
@@ -486,52 +439,6 @@ pub struct EmbeddingsResponse {
 
 impl EmbeddingsResponse {
     pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-}
-
-/// Respuesta de [`CloudClient::backup_upload`] (ADR-0040, **opción B**): el resultado de subir
-/// (stream) el dump al Cloud, que lo guardó en S3 con **cifrado de servidor (SSE)**. El hub **no**
-/// recibe credenciales AWS ni URLs S3: solo dónde quedó la copia y su tamaño, para reflejarlo en
-/// `backup_log`. La ruta S3 la fija el Cloud (inmutable/create-only `backups/local/{hub}/{ts}.dump`).
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct BackupUploadResult {
-    /// Clave S3 donde quedó el blob (la fija el Cloud).
-    pub s3_key: String,
-    /// Tamaño en bytes del dump subido (en claro; el cifrado es SSE en reposo, transparente).
-    #[serde(default)]
-    pub bytes: u64,
-    /// SHA256 hex que calculó el Cloud al recibir el stream (opcional, para verificación).
-    #[serde(default)]
-    pub sha256: Option<String>,
-}
-
-impl BackupUploadResult {
-    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-}
-
-/// Una copia de seguridad tal como la lista [`CloudClient::backup_list`] (restore, opción B). El
-/// Cloud devuelve las copias de las orgs/hubs del usuario (también sirve para "mover a otro equipo").
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct BackupEntry {
-    /// Clave S3 de la copia (lo que se pasa a [`CloudClient::backup_download`]).
-    pub s3_key: String,
-    /// Hub al que pertenece la copia (puede no ser el hub actual: restore cross-hub/migración).
-    #[serde(default)]
-    pub hub_id: String,
-    /// Instante de creación (RFC3339).
-    #[serde(default)]
-    pub created_at: String,
-    /// Tamaño en bytes de la copia.
-    #[serde(default)]
-    pub bytes: u64,
-}
-
-impl BackupEntry {
-    /// Parsea la lista JSON del endpoint `backup_list`.
-    pub fn parse_list(json: &str) -> Result<Vec<BackupEntry>, serde_json::Error> {
         serde_json::from_str(json)
     }
 }
@@ -709,25 +616,6 @@ mod tests {
     }
 
     #[test]
-    fn backup_upload_uses_machine_token() {
-        // El stream del backup lo sube el hub con su credencial de MÁQUINA (X-Hub-Token), no con
-        // JWT de usuario: el backup lo dispara una scheduled task / la UI, sin un JWT cloud fresco
-        // (ADR-0040 opción B + ADR-0003, contexto hub-scoped sin usuario). El Cloud cifra (SSE).
-        let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::HubToken {
-            hub_id: "h1".into(),
-            token: "machine-tok".into(),
-        };
-        let r = c.backup_upload(&auth);
-        assert_eq!(r.method, "POST");
-        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/backup/");
-        assert!(r
-            .headers
-            .contains(&("X-Hub-Token", "machine-tok".to_string())));
-        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
-    }
-
-    #[test]
     fn report_error_uses_machine_token() {
         // El reporte de error lo dispara el runtime con la credencial de MÁQUINA del hub
         // (X-Hub-Token), sin usuario logueado (registro global de errores → Cloud).
@@ -743,50 +631,6 @@ mod tests {
             .headers
             .contains(&("X-Hub-Token", "machine-tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
-    }
-
-    #[test]
-    fn backup_upload_result_parses() {
-        // El Cloud responde con dónde quedó la copia (s3_key) + tamaño/sha (sin URLs ni credenciales).
-        let body = r#"{"s3_key":"backups/local/h1/2026-06-13T10:00:00Z.dump",
-            "bytes":12345,"sha256":"deadbeef"}"#;
-        let g = BackupUploadResult::parse(body).unwrap();
-        assert_eq!(g.s3_key, "backups/local/h1/2026-06-13T10:00:00Z.dump");
-        assert_eq!(g.bytes, 12345);
-        assert_eq!(g.sha256.as_deref(), Some("deadbeef"));
-    }
-
-    #[test]
-    fn backup_restore_list_and_download_use_user_jwt() {
-        // Listar las copias del usuario (posiblemente cross-hub) y descargarlas va con JWT de
-        // usuario (opción B): el listado cross-org/hub no lo cubre el machine token (ADR-0040 §4).
-        let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::UserJwt {
-            hub_id: "h1".into(),
-            access: "abc".into(),
-        };
-
-        let l = c.backup_list(&auth);
-        assert_eq!(l.method, "GET");
-        assert_eq!(l.url, "https://erplora.com/api/v1/hub/device/backup/");
-        assert!(l
-            .headers
-            .contains(&("Authorization", "Bearer abc".to_string())));
-
-        let d = c.backup_download(&auth, "backups/local/h1/x.dump");
-        assert_eq!(d.method, "GET");
-        assert_eq!(
-            d.url,
-            "https://erplora.com/api/v1/hub/device/backup/download/?s3_key=backups/local/h1/x.dump"
-        );
-
-        // La lista de copias parsea (array de BackupEntry).
-        let body = r#"[{"s3_key":"backups/local/h1/x.dump","hub_id":"h1",
-            "created_at":"2026-06-13T10:00:00Z","bytes":999}]"#;
-        let entries = BackupEntry::parse_list(body).unwrap();
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].hub_id, "h1");
-        assert_eq!(entries[0].bytes, 999);
     }
 
     #[test]

@@ -51,7 +51,6 @@ impl EntitlementResponse {
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct EntitlementClaims {
     pub hub_id: String,
-    pub deployment_mode: String,
     pub modules: Vec<EntitledModule>,
     pub iat: i64,
     pub exp: i64,
@@ -170,7 +169,6 @@ nQIDAQAB
     fn sign(exp: i64, grace_until: i64) -> String {
         let claims = json!({
             "hub_id": "h1",
-            "deployment_mode": "desktop",
             "modules": [{"module_id": "pos", "tier": "basic", "version": "1.0.0"}],
             "iat": 1000,
             "exp": exp,
@@ -186,7 +184,6 @@ nQIDAQAB
         let token = sign(2000, 9000);
         let claims = verify_entitlement(&token, PUB, 3000).unwrap();
         assert_eq!(claims.hub_id, "h1");
-        assert_eq!(claims.deployment_mode, "desktop");
         assert!(claims.allows("pos"));
         assert!(!claims.allows("not-installed"));
     }
@@ -201,12 +198,31 @@ nQIDAQAB
     }
 
     #[test]
+    fn token_legacy_con_deployment_mode_se_ignora_sin_romper() {
+        // LOCKSTEP con saas: el claim `deployment_mode` se retiró del token (ADR-0154). El Hub
+        // ya no lo lee, pero un SaaS antiguo puede seguir emitiéndolo un tiempo. Sin
+        // `deny_unknown_fields`, serde debe IGNORARLO en silencio y verificar igual (tolerancia).
+        let claims_json = json!({
+            "hub_id": "h1",
+            "deployment_mode": "cloud",
+            "modules": [{"module_id": "pos", "tier": "basic", "version": "1.0.0"}],
+            "iat": 1000,
+            "exp": 2000,
+            "grace_until": 9000,
+        });
+        let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
+        let token = encode(&Header::new(Algorithm::RS256), &claims_json, &key).unwrap();
+        let claims = verify_entitlement(&token, PUB, 3000).unwrap();
+        assert_eq!(claims.hub_id, "h1");
+        assert!(claims.allows("pos"));
+    }
+
+    #[test]
     fn token_con_plan_y_max_devices_los_expone_en_las_claims() {
         // Claims ADITIVOS del SaaS (saas#812, ADR-0154): `plan` (nombre del plan) y `max_devices`
         // (límite de dispositivos activos; 0 = ilimitado). El parseo debe exponerlos verificados.
         let claims_json = json!({
             "hub_id": "h1",
-            "deployment_mode": "cloud",
             "modules": [{"module_id": "pos", "tier": "premium", "version": "1.0.0"}],
             "iat": 1000,
             "exp": 2000,
@@ -236,7 +252,6 @@ nQIDAQAB
     fn token_con_paid_grace_until_lo_expone_en_las_claims() {
         let claims_json = json!({
             "hub_id": "h1",
-            "deployment_mode": "desktop",
             "modules": [{"module_id": "pos", "tier": "premium", "version": "1.0.0"}],
             "iat": 1000,
             "exp": 2000,

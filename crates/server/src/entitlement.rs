@@ -247,7 +247,6 @@ mod tests {
     fn claims(modules: &[&str], grace_until: i64) -> EntitlementClaims {
         EntitlementClaims {
             hub_id: "h1".into(),
-            deployment_mode: "cloud".into(),
             modules: modules
                 .iter()
                 .map(|id| EntitledModule {
@@ -269,7 +268,6 @@ mod tests {
     fn claims_tiered(modules: &[(&str, &str)], grace_until: i64) -> EntitlementClaims {
         EntitlementClaims {
             hub_id: "h1".into(),
-            deployment_mode: "cloud".into(),
             modules: modules
                 .iter()
                 .map(|(id, tier)| EntitledModule {

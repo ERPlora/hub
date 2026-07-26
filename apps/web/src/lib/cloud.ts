@@ -326,7 +326,7 @@ export interface EntitledModuleInfo {
   version: string;
 }
 
-/** Lista de módulos que ESTE hub puede montar (según deployment_mode + compras de la org).
+/** Lista de módulos que ESTE hub puede montar (según las compras/entitlement de la org).
  *  Vía el runtime local (firma con el token de máquina del hub). */
 export async function cloudEntitlement(): Promise<{ modules: EntitledModuleInfo[]; blockedModules: string[] }> {
   const data = await runtimeGet<{

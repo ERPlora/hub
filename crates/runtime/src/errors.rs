@@ -58,12 +58,6 @@ pub enum RuntimeError {
     /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.
     #[error("host.notify: {0}")]
     Notify(String),
-    /// Fallo de la capacidad de host `host.backup_upload` (ADR-0040): el transporte de backup
-    /// (cifrado + petición de credencial al Cloud + subida a S3) no pudo completar. El relay del
-    /// outbox lo trata como un listener fallido → reintento con backoff y, tras `MAX_ATTEMPTS`,
-    /// dead-letter — exactamente como `host.notify`.
-    #[error("host.backup: {0}")]
-    Backup(String),
     /// Fallo al materializar o escribir la carpeta persistente declarada por un módulo.
     #[error("host.module_storage: {0}")]
     Storage(String),
