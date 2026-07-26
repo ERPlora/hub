@@ -1,23 +1,19 @@
 // Cliente de la pantalla /system — contrato `GET /api/system` del runtime del Hub.
 //
-// La pantalla de Sistema muestra DATOS REALES, no demo. Pero la fuente cambia según los dos ejes
-// de la arquitectura (hub/ARQUITECTURA.md §1, hub/CLAUDE.md):
+// La pantalla de Sistema muestra DATOS REALES, no demo. Tras ADR-0154 el Hub es Postgres-only, PWA
+// y cloud-only: `backend` es SIEMPRE `'cloud'`, `shell` SIEMPRE `'web'` y `storageSource` SIEMPRE
+// `'s3'` (ya no existen SQLite/single, Tauri/desktop ni disco local). El runtime Rust es la
+// AUTORIDAD: mide las métricas y reporta la BD (nada se infiere en el navegador). Lo único que
+// cambia con el despliegue es la FUENTE de CPU/memoria:
 //
-//   • Eje A — backend de datos:  'single' (SQLite embebido)  | 'cloud' (Aurora/Postgres, 1 ECS/hub)
-//   • Eje B — shell:             'tauri' (acceso a SO/disco) | 'web' (navegador, sin hardware)
+//   métrica       ECS/Fargate (AWS de reserva)        Docker (Hetzner/Swarm, activo)   dev local
+//   ───────────   ─────────────────────────────────   ──────────────────────────────   ──────────
+//   CPU/memoria   ECS Task Metadata v4 `/task/stats`   cgroup v2 `/sys/fs/cgroup/*`      (null)
+//   BD            Postgres (sin "tamaño local")        Postgres                         Postgres
+//   documentos    S3 vía el Cloud                      S3 vía el Cloud                  S3 vía el Cloud
 //
-// El runtime Rust es la AUTORIDAD: sabe su adaptador de DB y bajo qué shell corre, así que es él
-// quien reporta `backend`/`shell` y mide las métricas (no se infieren en el navegador). La fuente
-// recomendada de cada métrica está documentada en `architecture/hub/system-info.md` (contrato
-// que implementa el humano en `crates/server`). Resumen:
-//
-//   métrica            cloud (ECS Fargate)                         single (Tauri/desktop)
-//   ─────────────────  ──────────────────────────────────────────  ───────────────────────────────
-//   CPU / memoria      ECS Task Metadata v4 `/task/stats` (cgroup   crate `sysinfo` (uso real del SO)
-//                      real, respeta el límite del task, sin IAM)
-//   tamaño BD          n/a (Aurora compartida por organización)    `PRAGMA page_count*page_size`
-//   conexiones BD      `pg_stat_activity` del pool (real)          pool SQLite (≈1)
-//   documentos         listado S3 `erplora-storage` del hub        listado del disco local
+// (Detalle de fuentes en `architecture/hub/system-info.md`, contrato que implementa el humano en
+// `crates/server`.) Los documentos SIEMPRE salen del Cloud: el Hub no tiene credenciales S3.
 //
 // Mientras el endpoint no exista, `fetchSystemInfo` devuelve `null`: las tarjetas KPI se muestran
 // igualmente con valores a 0 (CPU/Memoria/Conexiones 0, BD sin tamaño) y las pestañas de datos
@@ -26,10 +22,10 @@
 
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
-/** Eje A — backend de datos del hub. Lo reporta el runtime (sabe su adaptador). */
-export type DataBackend = 'cloud' | 'single';
-/** Eje B — shell bajo el que corre el runtime. */
-export type ShellKind = 'tauri' | 'web';
+/** Backend de datos del hub. Postgres-only (ADR-0154): el runtime siempre reporta `'cloud'`. */
+export type DataBackend = 'cloud';
+/** Shell bajo el que corre el runtime. PWA (ADR-0154): el runtime siempre reporta `'web'`. */
+export type ShellKind = 'web';
 
 /** Una métrica de uso (CPU, memoria). Valores ya formateados por el runtime para mostrar. */
 export interface UsageMetric {
@@ -45,8 +41,9 @@ export interface UsageMetric {
 
 /** Estado de la base de datos del hub. */
 export interface DatabaseInfo {
-  /** Motor real: 'sqlite' (single) | 'postgres' | 'aurora' (cloud). */
-  engine: 'sqlite' | 'postgres' | 'aurora' | string;
+  /** Motor real. Postgres-only (ADR-0154): siempre `'postgres'` (`'aurora'` reservado por si se
+   *  activa el proveedor AWS de reserva, que expone la misma etiqueta Postgres-compatible). */
+  engine: 'postgres' | 'aurora';
   /** Tamaño formateado, p.ej. "8,6 MB". `null` cuando no es medible (Aurora compartida). */
   sizeLabel?: string | null;
   /** Conexiones activas reales (pool / pg_stat_activity). */
@@ -55,14 +52,14 @@ export interface DatabaseInfo {
   connectionsLimit?: number | null;
 }
 
-/** Un documento de almacenamiento (objeto S3 en cloud, fichero del disco en Tauri). */
+/** Un documento de almacenamiento (objeto S3 del hub, servido vía el Cloud). */
 export interface StorageDoc {
   name: string;
   sizeLabel: string;
   /** ISO 8601. */
   modified: string;
   kind?: string | null;
-  /** URL firmada S3 (cloud) o ruta local (Tauri); `null` si no descargable. */
+  /** URL firmada S3 (vía el Cloud); `null` si no descargable. */
   url?: string | null;
 }
 
@@ -84,8 +81,9 @@ export interface SystemInfo {
   cpu?: UsageMetric | null;
   memory?: UsageMetric | null;
   database: DatabaseInfo;
-  /** Origen del almacenamiento de documentos: 's3' (cloud) | 'disk' (Tauri). */
-  storageSource?: 's3' | 'disk' | null;
+  /** Origen del almacenamiento de documentos. Cloud-only (ADR-0154): siempre `'s3'` (vía el Cloud;
+   *  el Hub no tiene credenciales S3 ni lee del disco). */
+  storageSource?: 's3' | null;
   /** Capacidad de almacenamiento formateada para la barra (p.ej. "2,1 GB / 8 GB"). */
   storageUsed?: UsageMetric | null;
   documents?: StorageDoc[];
