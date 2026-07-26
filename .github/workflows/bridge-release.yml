@@ -89,7 +89,7 @@ jobs:
       # Bridge», MSIX SIN FIRMAR (la Store re-firma). Post-build sobre el exe que este
       # mismo leg acaba de compilar (0 builds nuevos). Gate: Variables BRIDGE_MSIX_* —
       # inerte hasta que Ioan reserve la ficha (hub#123). Publisher/Display se
-      # REUTILIZAN de la app (misma cuenta). Runbook: apps/tauri/MICROSOFT-STORE.md.
+      # REUTILIZAN de la misma cuenta de Partner Center.
       # SOLO en tag: el bridge no tiene versión propia (version.workspace = 0.0.0),
       # así que en dispatch no hay versión MSIX que valga — y la Store solo consume
       # releases etiquetadas (hub#123). El dispatch queda para refrescar S3 `latest/`.

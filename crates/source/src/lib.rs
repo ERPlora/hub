@@ -183,8 +183,8 @@ impl ModuleStore {
 // S3 firmada del grant usando un cliente HTTP de verdad (`reqwest::blocking`, sobre
 // rustls — sin OpenSSL del sistema).
 //
-// Esta es la pieza que inyectan los **binarios de producción** (`erplora-server` y, en
-// el futuro, `apps/tauri`): en runtime construyen un `ReqwestFetcher` y se lo pasan a
+// Esta es la pieza que inyecta el **binario de producción** (`erplora-server`): en runtime
+// construye un `ReqwestFetcher` y se lo pasa a
 // `ModuleStore::install`. Los tests del crate siguen usando el `MockFetcher` en memoria,
 // así que el build por defecto del workspace NO arrastra reqwest (queda detrás de la
 // feature `reqwest-transport`). El diseño es **síncrono/blocking** a propósito: encaja con

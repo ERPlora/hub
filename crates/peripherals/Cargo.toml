@@ -1,5 +1,5 @@
 # erplora-peripherals — lógica de hardware POS reutilizable (red-only, ESC/POS sobre TCP:9100).
-# Consumido por el bridge standalone (apps/bridge) y, a futuro, por el sidecar Tauri (apps/tauri).
+# Consumido por el bridge standalone (apps/bridge).
 # ARQUITECTURA.md §2.7. Esqueleto: tipos + firmas; la implementación real es fase siguiente.
 [package]
 name = "erplora-peripherals"

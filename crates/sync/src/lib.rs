@@ -200,8 +200,8 @@ pub fn run_with_reconnect(
 // Implementación concreta de [`EventStream`] sobre una conexión WebSocket de verdad
 // (`tungstenite`, sobre rustls con raíces webpki — sin OpenSSL del sistema).
 //
-// Esta es la pieza que inyectan los **binarios de producción** (`erplora-server` y, en el
-// futuro, `apps/tauri`): en arranque llaman a [`connect_ws`] para abrir el socket `/ws` y
+// Esta es la pieza que inyecta el **binario de producción** (`erplora-server`): en arranque
+// llama a [`connect_ws`] para abrir el socket `/ws` y
 // pasan el resultado como `connect` a [`run_with_reconnect`], que reconecta con backoff si
 // el stream muere. Los tests siguen usando el `MockStream` en memoria, así que el build por
 // defecto del workspace NO arrastra tungstenite (queda detrás de la feature `ws`). El diseño

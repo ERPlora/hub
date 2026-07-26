@@ -20,7 +20,6 @@ pub mod error_registry;
 pub mod errors;
 pub mod events;
 pub mod export;
-pub mod host_backup;
 pub mod host_notify;
 pub mod identity;
 pub mod import;
@@ -421,14 +420,6 @@ impl Runtime {
     /// se entregan a sus listeners de módulo pero el envío externo es no-op.
     pub fn set_notify_transport(&mut self, transport: Arc<dyn host_notify::NotifyTransport>) {
         self.registry.notify_transport = Some(transport);
-    }
-
-    /// Registra el **transporte de `host.backup_upload`** (ADR-0040): el cliente real que empaqueta
-    /// el dump del SQLite, lo cifra en cliente, pide la credencial STS/presignada al Cloud y sube el
-    /// blob a S3. Lo pone el host (server/Tauri) al arrancar. Sin él, los eventos `backup.requested`
-    /// se entregan a sus listeners de módulo pero la subida es no-op (capacidad no disponible).
-    pub fn set_backup_transport(&mut self, transport: Arc<dyn host_backup::BackupTransport>) {
-        self.registry.backup_transport = Some(transport);
     }
 
     /// Registra el backend persistente de módulos. El server lo resuelve a disco (Local) o al
