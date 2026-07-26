@@ -184,6 +184,23 @@ CREATE TABLE hub_user_pref (\
         name: "hub_session_device_id",
         postgres: "ALTER TABLE hub_session ADD COLUMN device_id TEXT;",
     },
+    // ── v9 — identidad por EMAIL: `hub_user.email` (ADR-0157, corrección owner sembrado) ─────────
+    // El owner del hub es el CREADOR, sembrado por el provisioning del SaaS (`HUB_OWNER_EMAIL`)
+    // ANTES del primer login; el alta de miembros del admin (ADR-0157 §7) también identifica por
+    // email. El baseline v0 de identity (`identity::ensure_tables`) crea `hub_user` SIN email; esta
+    // migración ADITIVA añade la columna (`NOT NULL DEFAULT ''`, así las filas existentes reciben ''
+    // sin romper) + un índice para el lookup por email (enlace del JWT→hub_user por email cuando el
+    // `cloud_user_id` aún no está vinculado). Añadir una columna con default NO toca la PK, así que
+    // `ALTER TABLE ADD COLUMN` basta (como v8). Va versionada (no CREATE IF NOT EXISTS) para llegar
+    // también a una BD ya desplegada. El índice NO es único: la unicidad por email la garantiza el
+    // código (SELECT-then-write), igual que `ix_hub_user_cloud` con `cloud_user_id`.
+    SystemMigration {
+        version: 9,
+        name: "hub_user_email",
+        postgres: "\
+ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';\
+CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -394,6 +411,55 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(row.rows[0]["device_id"], json!("dev-A"));
+
+        // Idempotente: re-aplicar NO re-ALTERa (no falla por 'duplicate column').
+        apply(&db, "hub-test").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn apply_adds_email_column_to_hub_user_v9() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        // Baseline v0: hub_module (necesaria para v1) + hub_user SIN email (identity v0).
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        // Usuario legacy YA existente (BD que sobrevive a un update): sin la columna email.
+        db.execute_batch(
+            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-legacy', 'Ada', '', 'owner', 'cloud-1', 1, '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test").await.unwrap();
+        assert!(max_applied_version(&db).await.unwrap() >= 9, "v9 registrada");
+
+        // La fila legacy sobrevive con email = '' (columna con default, ADITIVA).
+        let legacy = db
+            .query(
+                "SELECT email FROM hub_user WHERE id = 'u-legacy'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(legacy.rows.len(), 1, "el usuario legacy sigue existiendo");
+        assert_eq!(legacy.rows[0]["email"], json!(""), "email '' en el legacy");
+
+        // Y una fila nueva puede persistir + buscarse por email (lookup del enlace JWT→hub_user).
+        db.execute_batch(
+            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+             VALUES ('u2', 'Beto', '', 'employee', NULL, 1, '2026-01-01T00:00:00Z', 'beto@bar.com');",
+        )
+        .await
+        .unwrap();
+        let row = db
+            .query(
+                "SELECT id FROM hub_user WHERE email = 'beto@bar.com'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.rows[0]["id"], json!("u2"));
 
         // Idempotente: re-aplicar NO re-ALTERa (no falla por 'duplicate column').
         apply(&db, "hub-test").await.unwrap();
