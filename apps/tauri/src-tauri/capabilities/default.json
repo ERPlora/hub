@@ -1,19 +1,19 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permisos base de la ventana 'main'. El documento se sirve desde el runtime Axum embebido en loopback (mismo origen, ADR-0050), por eso 127.0.0.1:8787 (prod) y :5173 (Vite dev) se declaran como origen REMOTO: sin esto el ACL de Tauri rechaza los invoke (device_context + enroll/rotate/forget + erplora_bridge_* de hardware) desde un origen remoto. local:true mantiene autorizado tauri:// (cualquier arranque transitorio).",
+  "description": "Permisos base de la ventana 'main' (ADR-0159, cliente fino). La webview carga ORÍGENES REMOTOS: la PWA del hub cloud (https://*.erplora.com) y, en dev, la PWA local (Vite :5173 o el runtime :8787). Sin estos remote.urls el ACL de Tauri rechaza los invoke (device_context/forget_hub + erplora_* de hardware) desde la PWA. El SaaS (onboarding) no invoca comandos, no necesita entrada. Dominios CUSTOM de hub quedan sin hardware v1 (no se pueden enumerar aquí — ver ADR-0159). local:true mantiene autorizado tauri:// (arranques transitorios / página degradada).",
   "local": true,
   "remote": {
-    "urls": ["http://127.0.0.1:8787/*", "http://127.0.0.1:5173/*"]
+    "urls": [
+      "https://*.erplora.com/*",
+      "http://127.0.0.1:8787/*",
+      "http://127.0.0.1:5173/*"
+    ]
   },
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default",
-    "allow-validate-entitlement",
     "allow-device-context",
-    "allow-enroll-device",
-    "allow-rotate-machine-token",
     "allow-forget-hub",
     "allow-erplora-bridge-status",
     "allow-erplora-discover-printers",

@@ -1,18 +1,16 @@
 fn main() {
-    // ADR-0050 (mismo origen): la ventana carga el runtime Axum embebido (127.0.0.1:8787), que es un
-    // **origen remoto** para Tauri. El ACL solo permite un `invoke` desde un origen remoto si el
-    // comando tiene un permiso `allow-<cmd>` concedido por una capability con `remote.urls`. Sin un
-    // `AppManifest::commands(...)`, esos permisos NO existen y el ACL rechaza TODOS los comandos de la
-    // app en el bundle (dev lo enmascara: origen local sin app-manifest desactiva el gate). Declaramos
-    // aquí los comandos para que `tauri-build` autogenere `allow-<cmd>`; la capability los concede.
-    // Mantener en sync con `generate_handler![...]` en `lib.rs`.
+    // ADR-0159 (cliente fino): la ventana carga ORÍGENES REMOTOS (el SaaS para el onboarding y la
+    // PWA del hub cloud en `https://<sub>.erplora.com`). El ACL de Tauri solo permite un `invoke`
+    // desde un origen remoto si el comando tiene un permiso `allow-<cmd>` concedido por una
+    // capability con `remote.urls`. Sin un `AppManifest::commands(...)`, esos permisos NO existen y
+    // el ACL rechaza TODOS los comandos de la app en el bundle (dev lo enmascara: origen local sin
+    // app-manifest desactiva el gate). Declaramos aquí los comandos para que `tauri-build`
+    // autogenere `allow-<cmd>`; la capability los concede. Mantener en sync con
+    // `generate_handler![...]` en `lib.rs`.
     tauri_build::try_build(
         tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
-            // Gate de entitlement + identidad/enrol (nativo).
-            "validate_entitlement",
+            // Identidad de dispositivo (X-Device-Id, sesión única ADR-0154) + olvido del hub.
             "device_context",
-            "enroll_device",
-            "rotate_machine_token",
             "forget_hub",
             // Hardware (el shell ES el bridge, §2.7).
             "erplora_bridge_status",

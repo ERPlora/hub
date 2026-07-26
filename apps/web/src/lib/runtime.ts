@@ -13,11 +13,11 @@
 //   - bootHubContext() — se llama una vez en main.ts; resuelve hub_id y lo guarda en config
 import type { InjectionKey } from 'vue';
 import { ref } from 'vue';
-import { ErploraClient, HttpWsTransport, BridgeClient } from '@erplora/module-sdk';
+import { ErploraClient, HttpWsTransport } from '@erplora/module-sdk';
 import { toast, type ToastColor } from './toast';
 import { config } from './config';
 import { getAccessToken } from './cloud';
-import { getBridgeToken } from './bridge-client';
+import { makeBridgeTransport } from './bridge-transport';
 import { getHubSession, user } from './session';
 import { beginRequest, endRequest } from './shell';
 import { getLocale, bootHubLanguage } from '../i18n';
@@ -136,12 +136,11 @@ export function getClient(): ErploraClient {
     // (`globalThis.erplora.currency` / `formatMoney` / `formatAmount`). Misma fuente que el shell
     // (money.ts → hubCurrency, de /api/hub/context); así módulos y dashboard formatean igual.
     //
-    // Bridge de hardware (web-PWA, §2.7): el transporte de periféricos que consumen los módulos
-    // (`erplora.peripherals`, p.ej. el módulo printing) debe presentar el TOKEN DE EMPAREJAMIENTO
-    // del Bridge en el WS (fail-closed). Se inyecta como getter para releer el token que el usuario
-    // introduce en Ajustes → Bridge sin recrear el cliente. En Tauri el shell inyectará su propio
-    // BridgeTransport (IpcBridgeTransport); aquí es siempre el WS a localhost:12321.
-    const bridge = new BridgeClient(undefined, { token: getBridgeToken });
+    // Bridge de hardware (§2.7, ADR-0159): el transporte de periféricos que consumen los módulos
+    // (`erplora.peripherals`, p.ej. el módulo printing) se elige por entorno en
+    // `makeBridgeTransport()` — WS a localhost:12321 en web/WebView (con el token de
+    // emparejamiento fail-closed) o `invoke` in-process dentro del shell Tauri.
+    const bridge = makeBridgeTransport();
     // `notifier`: el canal de AVISOS de los módulos. El SDK ya exponía `erplora.notify()`, pero
     // nadie le pasaba a dónde llevarlo, así que era un **no-op silencioso** — y cada módulo acababa
     // colando sus mensajes de éxito por su hueco de ERROR (rojo). El Hub ya tiene toast global:

@@ -15,9 +15,12 @@ vi.mock('./cloud', () => ({
   triggerHubGone: vi.fn(),
 }));
 
+const { invokeTauriSpy } = vi.hoisted(() => ({ invokeTauriSpy: vi.fn(async () => null) }));
+
 vi.mock('./device', () => ({
-  // No estamos en Tauri: el gate cae al camino web (cloudEntitlement).
-  invokeTauri: vi.fn(async () => null),
+  // ADR-0159: el gate es SIEMPRE el camino web (cloudEntitlement); el comando Tauri
+  // `validate_entitlement` fue retirado con el producto local (ADR-0154).
+  invokeTauri: invokeTauriSpy,
 }));
 
 vi.mock('./config', () => ({
@@ -49,5 +52,11 @@ describe('entitlement: bloqueo por revalidación', () => {
     await resolveEntitlement();
     resetEntitlement();
     expect(isModuleBlocked('whatsapp_inbox')).toBe(false);
+  });
+
+  it('ADR-0159: el gate ya no invoca al shell (validate_entitlement retirado)', async () => {
+    invokeTauriSpy.mockClear();
+    await resolveEntitlement();
+    expect(invokeTauriSpy).not.toHaveBeenCalled();
   });
 });

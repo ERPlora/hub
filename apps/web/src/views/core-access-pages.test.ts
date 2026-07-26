@@ -28,10 +28,10 @@ describe('core access and account pages', () => {
     const login = source('LoginPage.vue');
     expect(login).toContain('hubContextReady');
     expect(login).toContain('machineRegistrationRequired');
-    expect(login).toContain("invokeTauri<string>('enroll_device'");
-    expect(login).toContain('refreshed.machine_registered');
-    expect(login).not.toContain("invokeTauri('enroll_device', {");
-    expect(login).not.toContain('enroll falla, el JWT');
+    // ADR-0159 (cliente fino): dentro del shell el login es EL MISMO que en el navegador —
+    // la rama Tauri de enrol de máquina (producto local, ADR-0154) se retiró.
+    expect(login).not.toContain('enroll_device');
+    expect(login).not.toContain('isTauri()');
     expect(login).toContain('saveTrustedUsers([])');
     expect(login).toContain("role: 'owner'");
     expect(login).toContain('permissions: sess.permissions');

@@ -91,14 +91,19 @@ describe('refresh-on-401 según el plano de sesión', () => {
     expect(sessionExpired).toHaveBeenCalledOnce();
   });
 
-  it('conserva una sesión Hub Local Tauri aunque el dispositivo tenga un hub_id real', async () => {
+  // CONTRATO CAMBIADO por ADR-0159 (antes: «conserva una sesión Hub Local Tauri aunque el
+  // dispositivo tenga un hub_id real»). Ese comportamiento era del producto Hub Local (Tauri +
+  // SQLite), retirado por ADR-0154: hoy el shell Tauri es un CLIENTE FINO de la misma PWA cloud,
+  // así que un refresh fallido con hub_id real expira la sesión exactamente igual que en el
+  // navegador. El plano "independiente" queda solo para el runtime local/dev (DEV_HUB_ID).
+  it('ADR-0159: dentro del shell Tauri, un hub cloud real expira la sesión como en el navegador', async () => {
     config.hubId = '22222222-2222-4222-8222-222222222222';
     tauriMode.value = true;
     setTokens('access-caducado', '');
 
     await expect(cloudInvoices()).rejects.toThrow('cloud /api/v1/billing/invoices/ → 401');
 
-    expect(sessionExpired).not.toHaveBeenCalled();
+    expect(sessionExpired).toHaveBeenCalledOnce();
     expect(getAccessToken()).toBeNull();
   });
 });
