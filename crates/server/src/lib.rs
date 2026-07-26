@@ -268,6 +268,24 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
+    // **Owner sembrado del env** (ADR-0157, corrección de Ioan): el owner es el CREADOR del hub y el
+    // despliegue lo trae ya inyectado por el provisioning del SaaS como `HUB_OWNER_EMAIL`. Se siembra
+    // un `hub_user` role=owner (cloud_user_id NULL, sin PIN) tras las tablas de sistema; en su primer
+    // login `auth_cloud` lo enlaza por email. **Idempotente** (no duplica ni pisa un owner existente),
+    // así que es seguro en cada arranque. Sin el env (dev/local) es un no-op silencioso. Sustituye al
+    // bootstrap «primer login = owner» (retirado): el owner ya no depende de quién entre primero.
+    if let Some(owner_email) = std::env::var("HUB_OWNER_EMAIL")
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        match state.runtime.lock().await.seed_owner(&owner_email).await {
+            Ok(true) => eprintln!("auth: owner sembrado del env (HUB_OWNER_EMAIL={owner_email})"),
+            Ok(false) => {} // ya existía: idempotente.
+            Err(e) => eprintln!("✗ seed del owner (HUB_OWNER_EMAIL={owner_email}): {e}"),
+        }
+    }
+
     // Re-hidrata el Registry tras un reinicio: re-registra los módulos ya instalados de este hub
     // desde la caché de descargas (`module_cache/<id>/<version>/`). Sin esto, un runtime con
     // `modules_dir: None` (el caso descarga-desde-marketplace, p. ej. el shell Tauri) arrancaría
@@ -628,6 +646,18 @@ pub fn app(state: AppState) -> Router {
         .route("/api/auth/set-pin", post(auth_set_pin))
         .route("/api/auth/cloud", post(auth_cloud))
         .route("/api/auth/logout", post(auth_logout))
+        // ── Gestión de usuarios-login del Hub (identidad, ADR-0157 §7 / checklist core #2) ──────
+        // Alta/baja/listado de quién puede ENTRAR en el hub. Gate owner/admin (sesión, NO api key).
+        // Cada alta/baja crea/desactiva el `hub_user` local Y notifica al SaaS (`members`). NO es
+        // `staff.*` (negocio): es identidad.
+        .route(
+            "/api/members",
+            get(members::list_members).post(members::add_member),
+        )
+        .route(
+            "/api/members/:email",
+            axum::routing::delete(members::remove_member),
+        )
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
         .route("/ws", get(ws_upgrade))
         // SSE: alternativa a /ws para el MISMO canal de eventos (hub#19). Se suscribe al mismo
@@ -1935,24 +1965,23 @@ async fn auth_cloud(
     // Rol LOCAL por defecto al provisionar un miembro nuevo que aún no tiene `hub_user` (ADR-0157
     // §6: los roles operativos del Hub son locales/custom, ortogonales al rol SaaS). Se elige el
     // rol de **mínimo privilegio** (`employee`), NO `admin` a ciegas: el auto-admin era el hueco
-    // que este ADR cierra. El alta real con su rol Hub la hace el admin vía la API de miembros
-    // (`POST /api/v1/hub/device/members/`); este create es solo la red de seguridad para un
-    // miembro que pasa el gate sin fila local. Configurable por entorno (`HUB_DEFAULT_ROLE`).
+    // que este ADR cierra. Configurable por entorno (`HUB_DEFAULT_ROLE`).
     let default_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "employee".into());
-    // **Bootstrap** (ADR-0157 Enmienda 2 §3): en un hub **vacío** (sin ningún `hub_user`) el
-    // **primer** usuario que pasa el gate se provisiona como **owner** (admin-total local), no como
-    // `employee`. Resuelve el gap del paso 2 (un hub recién creado necesita un primer admin que dé
-    // de alta al resto). Solo aplica a la creación inicial: en cuanto existe un usuario, los
-    // siguientes caen al rol de mínimo privilegio. Configurable por entorno (`HUB_BOOTSTRAP_ROLE`).
-    let bootstrap_role = std::env::var("HUB_BOOTSTRAP_ROLE").unwrap_or_else(|_| "owner".into());
+    // **Owner sembrado del env, NO «primer login = owner»** (ADR-0157, corrección de Ioan): el owner
+    // es el CREADOR del hub, sembrado por el provisioning del SaaS (`HUB_OWNER_EMAIL`) ANTES del
+    // primer login (ver `serve()`). El **enlace** del login con ese owner (y con cualquier usuario
+    // **invitado** por el admin) se hace por **email**: `get_or_link_cloud_user` resuelve primero por
+    // `cloud_user_id`, luego por email (fila pre-provisionada sin `cloud_user_id`, conservando su
+    // rol), y solo si no hay coincidencia crea una fila con el rol de mínimo privilegio. Preferimos
+    // el email del **token** (autenticado) sobre el del body (cliente).
+    let login_email = if !claims.email.trim().is_empty() {
+        Some(claims.email.clone())
+    } else {
+        email.clone()
+    };
     let rt = st.runtime.lock().await;
-    // El predicado se evalúa ANTES del get-or-create: en un hub vacío el primer provisioning usa el
-    // rol de bootstrap; el get-or-create nunca cambia el rol de un usuario ya existente, así que
-    // esto solo afecta a la primera fila. `false` (o error de BD) cae al rol por defecto (seguro).
-    let empty_hub = !rt.has_any_user().await.unwrap_or(false);
-    let provision_role = if empty_hub { &bootstrap_role } else { &default_role };
     match rt
-        .get_or_link_cloud_user(&cloud_user_id, &name, provision_role)
+        .get_or_link_cloud_user(&cloud_user_id, &name, &default_role, login_email.as_deref())
         .await
     {
         Ok(user) => {
