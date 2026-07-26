@@ -82,13 +82,12 @@
 - [ ] Hub A (Session/PIN): configurar → exportar `barberia_es.blueprint.zip`.
 - [ ] Hub B vacío: importar → módulos instalados desde el marketplace (versiones del manifest),
       datos bajo el `hub_id` de B, imágenes servidas desde su media.
-- [ ] Cross-dialecto: export de hub SQLite (Local) importado en Hub Cloud (Postgres).
 - [ ] Auth: sin sesión admin → 401 en los tres endpoints (`/api/hub/export`, `…/import/inspect`,
       `…/import`).
 
 ## 📋 Decisiones abiertas que quedaron aplicadas por recomendación (revertibles en review)
 
-- SQL portable único (no por-dialecto) · propiedad de tablas por prefijo `<module>_*` (dueño =
+- SQL Postgres-only (ADR-0154; sin capa por-dialecto) · propiedad de tablas por prefijo `<module>_*` (dueño =
   id más largo) · contraseña del `.p12` NO viaja (se re-teclea en destino) · import v1 pensado
   para hub vacío (re-import idempotente por guard `NOT EXISTS (id, hub_id)`; merge real = futuro)
   · «Desde la nube» deshabilitado hasta que exista el registro/galería en el SaaS ·

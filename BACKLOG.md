@@ -32,7 +32,6 @@ este fichero se actualiza desde él. Plan completo en `ARQUITECTURA.md` + el pla
 
 ## Workstream D — CI/CD & artefactos
 - [ ] `P1` `[IA]` **Docker real** (`docker/Dockerfile`) + workflow `build→ECR` (`erplora-hub:latest`).
-- [ ] `P1` `[IA]` CI **ejecutables Tauri → S3 privado** (confirmar bucket) — requiere `apps/tauri`.
 - [ ] `P1` `[IA]` CI **zips de módulos → S3 marketplace** (por repo de módulo; usa `pack`+`sign`).
 
 ## Workstream E — Módulos POS
@@ -46,7 +45,6 @@ este fichero se actualiza desde él. Plan completo en `ARQUITECTURA.md` + el pla
       → router (embed query → búsqueda vectorial → top módulos).
 - [ ] `P1` `[TÚ·IA guía]` **cloud-client AI**: `embeddings` + `chat`/tool-call loop + auth (§9.3).
 - [ ] `P1` `[TÚ·IA guía]` Registro de embeddings de `agent.description` al instalar (§9.6).
-- [ ] `P1` `[TÚ·IA guía]` **`apps/tauri`** (ADR-0050: datos por HTTP+WS al runtime embebido — runtime sirve el `dist/` + ventana carga de `127.0.0.1:8787`, mismo origen, sin CORS; `invoke` solo nativo + hardware `IpcBridgeTransport`).
 
 ## Fuera de Fase 1 (`fase:later`)
 ~90 módulos no-POS · RAG de docs (`ai_context`) · `PgVectorStore` · firma asimétrica de módulos ·
@@ -54,6 +52,5 @@ migración legacy (§13) · Bridge/periféricos multi-dispositivo.
 
 ## Decisiones pendientes (humano)
 1. Distribución de `guest-sdk`/`module-stencil` para repos por módulo.
-2. Bucket exacto para los ejecutables Tauri ("S3 privado para comercialización").
-3. Lista exacta del set POS.
-4. Endpoint vendor de subida en el SaaS: `POST /dashboard/developer/modules/upload/` (`saas/apps/dashboard/developer`, vista `upload_module`, con gating `vendor_required` y tests) — pendiente decidir su integración con `pack`/`sign` del CLI.
+2. Lista exacta del set POS.
+3. Endpoint vendor de subida en el SaaS: `POST /dashboard/developer/modules/upload/` (`saas/apps/dashboard/developer`, vista `upload_module`, con gating `vendor_required` y tests) — pendiente decidir su integración con `pack`/`sign` del CLI.

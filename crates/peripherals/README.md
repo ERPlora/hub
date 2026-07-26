@@ -1,19 +1,16 @@
 # erplora-peripherals
 
 Lógica de hardware POS reutilizable, **solo red** (ESC/POS sobre TCP, puerto 9100).
-Diseño en [architecture/hub/apps/bridge.md](../../../architecture/hub/apps/bridge.md) (reubicado desde `ARQUITECTURA.md §2.7`, ver H6). Es el reemplazo en Rust del Bridge Python
 Diseño en [architecture/hub/apps/bridge.md](../../../architecture/hub/apps/bridge.md) (reubicado desde `ARQUITECTURA.md §2.7`). Es el reemplazo en Rust del Bridge Python
 (`bridge/ERPlora-Bridge-desktop`), empaquetado como **librería** sin servidor ni UI.
 
 ## Consumidores
 
-- **`apps/bridge`** — bridge standalone (producto **Hub Cloud**): servidor Axum
-  `GET /status` + `WS /ws` que envuelve este crate.
-- **`apps/tauri`** — sidecar (producto **Hub Local**): handlers `invoke` que llaman a este crate
-  (implementado — `erplora_discover_printers`/`erplora_print`/`erplora_test_print`/
-  `erplora_open_drawer`/`erplora_get_devices`; ver tabla de `invoke` en `apps/tauri/README.md`).
+- **`apps/bridge`** — el **Bridge standalone (red-only)**, la única app instalable (ADR-0154):
+  servidor Axum `GET /status` + `WS /ws` que envuelve este crate. La web shell del Hub Cloud lo
+  alcanza por localhost HTTP/WS.
 
-Ambos hablan el **mismo protocolo JSON** que `hub/static/js/bridge.js` ya consume.
+Habla el **mismo protocolo JSON** que la web shell del Hub consume.
 
 ## Decisión red-only (§2.7)
 

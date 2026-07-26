@@ -3,8 +3,8 @@
 ## Qué es
 
 `hub` es la nueva generación del Hub de ERPlora. La UI es una shell
-**Vue 3 + Ionic 8 + Vite + TypeScript + Tailwind v4**, sin Capacitor. La misma shell
-debe servir para Hub Cloud y para Hub Local (Tauri). Los módulos se cargan en runtime como Web
+**Vue 3 + Ionic 8 + Vite + TypeScript + Tailwind v4**, sin Capacitor. Es la shell del
+**Hub Cloud** (PWA/web) — el único producto (ADR-0154). Los módulos se cargan en runtime como Web
 Components, actualmente con **Lit**.
 
 El producto que representa ERPlora es un ERP modular para pymes y autonomos:
@@ -56,29 +56,20 @@ tenant que sustituira progresivamente al hub actual.
   `hub_id` y payload en cada query/command.
 - Los modulos declaran contrato tecnico en `module.json`. La clasificacion de
   marketplace vive en el SaaS, no en el modulo.
-- Dos productos (ARQUITECTURA.md §1; ADR-0080, `../architecture/00-overview/decision-log.md`):
-  **Hub Local** (backend `single`/SQLite + shell `tauri`) y **Hub Cloud** (backend `cloud`/Aurora +
-  PWA shell). `single ⟺ Hub Local`, `cloud ⟺ Hub Cloud`. (El combo `cloud + Tauri`
-  quedó RETIRADO — ADR-0080.)
-- Transport de datos (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md), app
-  unificada): **AMBOS** productos usan **HTTP (query/command) + WebSocket (solo eventos)** contra el
-  runtime Axum — embebido en loopback `127.0.0.1:8787` en **Hub Local**, en ECS en **Hub Cloud**. Se
-  **elimina** `invoke`/IPC para datos; el SDK ya no tiene `IpcTransport`. La única diferencia entre
-  productos es el `DatabaseAdapter` (SQLite ↔ Aurora) y los ficheros (disco ↔ S3). En **Hub Local**, el
-  shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA shell, reusando
-  `crates/peripherals`), **no** por `invoke`; `invoke` queda **solo** para lo nativo (keychain,
-  device_id, ciclo de vida). *(estado código 2026-06-30: data-IPC eliminado —SDK `IpcTransport` + handlers `invoke` de datos del shell `erplora_query`/`erplora_command`—; pendiente, columna core: en Hub Local el front y el runtime embebido deben compartir ORIGEN —el runtime sirve el `dist/` y la ventana Tauri carga de `127.0.0.1:8787`— para que `HttpWsTransport` alcance el loopback sin CORS.)*
-- **Dos productos, SIN sync ni Cloud DB remota** (ADR-0040, 2026-06-13; supera el
-  "local-first + sync" de ADR-0031 y el tier "Cloud DB" de ADR-0030, ambos RETIRADOS):
-  - **Hub Local** (gratis): backend `single`, **SQLite local autoritativo**, un dispositivo,
-    100% offline. El respaldo a la nube (cifrado a S3, manual o programado) lo da el módulo
-    **`backup`** premium — no hay base de datos remota intermedia ni motor de sincronización.
-  - **Hub Cloud** (online): backend `cloud`, **Aurora por organización** + 1 contenedor ECS por hub,
-    multi-dispositivo / web, *online-only*.
-  - No existe migración Hub Local→Hub Cloud, ni RDS Proxy/NLB, ni crate `datasync`. El crate `sync`
-    que sigue vivo es **solo** el cliente WebSocket de eventos en vivo, NO un motor de datos.
-- El `bridge/` no se elimina: sidecar de hardware en **Hub Local** (Tauri), o standalone opcional
-  para **Hub Cloud** (§2.7).
+- Un solo producto (ARQUITECTURA.md §1; [ADR-0154](../architecture/00-overview/decision-log.md)):
+  el **Hub Cloud** — PWA/web shell + **PostgreSQL** per-org, online-only. No hay Hub Local, ni shell
+  Tauri, ni backend SQLite, ni ejes `single`/`cloud`.
+- Transporte de datos (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md)):
+  **HTTP (query/command) + WebSocket (solo eventos)** contra el runtime Axum. No hay `invoke`/IPC
+  para datos; el SDK no tiene `IpcTransport`. El único `DatabaseAdapter` es **`PgAdapter`**
+  (PostgreSQL); los ficheros van al **backend de objetos del Cloud** (sin rama de disco local).
+- **Online-only, SIN sync ni Cloud DB intermedia** (ADR-0154; ADR-0040 «sin sync» sigue en pie):
+  **PostgreSQL por organización** + 1 contenedor por hub, multi-dispositivo / web. No existe motor
+  de sincronización ni crate `datasync`. El crate `sync` que sigue vivo es **solo** el cliente
+  WebSocket de eventos en vivo, NO un motor de datos. Los backups son responsabilidad del Cloud
+  (pgBackRest/PITR), no del Hub.
+- El `bridge/` no se elimina: es el **Bridge standalone (red-only)**, la única app instalable, que la
+  web shell alcanza por localhost HTTP/WS (§2.7).
 - AI y embeddings siempre pasan por el proxy del SaaS, no directo desde
   hub.
 
