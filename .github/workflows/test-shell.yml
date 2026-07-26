@@ -1,0 +1,62 @@
+# ==============================================================================
+# ERPlora Shell (apps/tauri) — tests del cliente fino de escritorio (ADR-0159)
+# ==============================================================================
+#
+# El shell está EXCLUIDO de `cargo test --workspace` en test-hub.yml: compilar
+# tauri/wry exige system-libs GTK/webkit2gtk que el job principal no instala (y
+# su target desbordaría el disco del runner). Este workflow las instala y corre
+# `cargo test -p erplora-tauri`, pero SOLO cuando cambia el shell — así los PRs
+# que no lo tocan no pagan los ~minutos de compilar el stack Tauri.
+# ==============================================================================
+
+name: Shell tests (Tauri thin client)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/tauri/**"
+      - ".github/workflows/test-shell.yml"
+  pull_request:
+    paths:
+      - "apps/tauri/**"
+      - ".github/workflows/test-shell.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: test-shell-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: cargo test -p erplora-tauri
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      RUSTFLAGS: "-C debuginfo=0"
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Deps de sistema de tauri v2 en Linux (webview + GTK). Sin appindicator/librsvg:
+      # el shell no usa tray y aquí no se bundlea.
+      - name: System deps (webkit2gtk + GTK)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev pkg-config
+
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup show
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo test -p erplora-tauri
+        run: cargo test -p erplora-tauri
