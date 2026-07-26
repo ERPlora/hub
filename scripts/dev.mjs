@@ -4,7 +4,7 @@
 // extra (orquestador a mano sobre child_process); pensado para QA/UI E2E del POS.
 //
 // Qué hace:
-//   1. Fija defaults de entorno sensatos para dev (DB en /tmp, módulos del workspace de dev,
+//   1. Fija defaults de entorno sensatos para dev (Postgres local, módulos del workspace de dev,
 //      bind 127.0.0.1:8787) — todo sobreescribible exportando la variable antes de invocar.
 //   2. Lanza `cargo run -p erplora-server` (runtime + API + WS en :8787; instala los módulos de
 //      HUB_MODULES_DIR al arrancar, topo-ordenando depends_on).
@@ -27,8 +27,9 @@ const MONOREPO_ROOT = join(HUB_ROOT, '..');
 
 // Defaults de dev (sobreescribibles: si la variable ya está exportada, se respeta).
 const DEFAULTS = {
-  // BD local efímera en /tmp (no contamina el repo; bórrala para empezar de cero).
-  HUB_SQLITE_PATH: '/tmp/erplora-hub-dev.db',
+  // Postgres-only (ADR-0154): el runtime falla duro sin DSN. Default local para `pnpm dev`
+  // (crea la BD con `createdb erplora_hub_dev`); sobreescribible exportando HUB_DATABASE_URL.
+  HUB_DATABASE_URL: 'postgres://localhost/erplora_hub_dev',
   // Fuente de módulos de dev = el workspace del toolkit en el root del monorepo. El runtime los
   // instala al arrancar (los mismos que apps/web carga como WebComponents vía sync-modules.mjs).
   HUB_MODULES_DIR: join(MONOREPO_ROOT, 'modules-workspace', 'modules'),
@@ -109,7 +110,7 @@ function shutdown(reason) {
   setTimeout(() => process.exit(reason ? 1 : 0), 1500);
 }
 
-log('dev', '\x1b[32m', `HUB_SQLITE_PATH=${env.HUB_SQLITE_PATH}`);
+log('dev', '\x1b[32m', `HUB_DATABASE_URL=${env.HUB_DATABASE_URL}`);
 log('dev', '\x1b[32m', `HUB_MODULES_DIR=${env.HUB_MODULES_DIR}`);
 log('dev', '\x1b[32m', `HUB_BIND=${env.HUB_BIND}  VITE_RUNTIME_URL='${env.VITE_RUNTIME_URL}'`);
 log('dev', '\x1b[32m', 'runtime → http://127.0.0.1:8787   web → http://localhost:5173');

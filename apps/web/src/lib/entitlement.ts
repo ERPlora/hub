@@ -19,7 +19,6 @@ export type EntitlementStatus = 'unknown' | 'unlocked' | 'needs_activation';
 interface GateOutcome {
   state: 'unlocked' | 'needs_activation' | 'hub_gone';
   modules?: Array<{ module_id: string; tier: string; version: string }>;
-  deployment_mode?: string;
   offline?: boolean;
   reason?: string;
 }

@@ -50,7 +50,6 @@ fn post(uri: &str, body: Value) -> Request<Body> {
 fn claims(modules: &[&str], grace_until: i64) -> EntitlementClaims {
     EntitlementClaims {
         hub_id: "h1".into(),
-        deployment_mode: "cloud".into(),
         modules: modules
             .iter()
             .map(|id| EntitledModule {

@@ -44,7 +44,6 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
 fn claims(plan: &str, max_devices: u32) -> EntitlementClaims {
     EntitlementClaims {
         hub_id: "hub-metrics".into(),
-        deployment_mode: "cloud".into(),
         modules: vec![EntitledModule {
             module_id: "pos".into(),
             tier: "basic".into(),

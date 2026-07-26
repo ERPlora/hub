@@ -15,11 +15,11 @@ const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const SHOTS = join(HERE, 'snapshots');
 await mkdir(SHOTS, { recursive: true });
 
-// 1) server Rust
-const db = '/tmp/erplora-hotplug-demo.db';
-await rm(db);
+// 1) server Rust (Postgres-only, ADR-0154). BD de demo dedicada; créala con
+//    `createdb erplora_hotplug_demo` o exporta HUB_DATABASE_URL apuntando a otra.
+const DB_URL = process.env.HUB_DATABASE_URL || 'postgres://localhost/erplora_hotplug_demo';
 const srv = spawn('cargo', ['run', '-q', '-p', 'erplora-server'], {
-  cwd: ROOT, env: { ...process.env, HUB_SQLITE_PATH: db, HUB_BIND: `127.0.0.1:${API_PORT}` },
+  cwd: ROOT, env: { ...process.env, HUB_DATABASE_URL: DB_URL, HUB_BIND: `127.0.0.1:${API_PORT}` },
   stdio: 'ignore',
 });
 const apiBase = `http://127.0.0.1:${API_PORT}`;
@@ -56,7 +56,7 @@ await new Promise((r) => web.listen(WEB_PORT, r));
 const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${DBG}`, '--no-first-run',
   '--window-size=1100,820', '--user-data-dir=/tmp/erplora-hotplug-chrome', 'about:blank']);
 
-const cleanup = async () => { try{chrome.kill()}catch{} try{web.close()}catch{} try{srv.kill()}catch{} await rm(db); };
+const cleanup = async () => { try{chrome.kill()}catch{} try{web.close()}catch{} try{srv.kill()}catch{} };
 try {
   let ws;
   for (let i=0;i<40;i++){ await sleep(150); try{ const ts=await(await fetch(`http://localhost:${DBG}/json`)).json(); const pg=ts.find(t=>t.type==='page'&&t.webSocketDebuggerUrl); if(pg){ws=pg.webSocketDebuggerUrl;break;} }catch{} }
@@ -81,4 +81,3 @@ try {
 async function waitHealth(base){ for(let i=0;i<60;i++){ await sleep(300); try{ if((await fetch(base+'/healthz')).ok) return; }catch{} } throw new Error('server no arrancó'); }
 async function post(url,body){ return fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); }
 function readBody(req){ return new Promise(r=>{let d='';req.on('data',c=>d+=c);req.on('end',()=>r(d))}); }
-async function rm(f){ try{ const {unlink}=await import('node:fs/promises'); await unlink(f);}catch{} }

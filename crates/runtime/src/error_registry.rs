@@ -267,7 +267,6 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::InvalidPayload { .. } => "invalid_payload",
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
-        E::Backup(_) => "backup",
         E::Storage(_) => "module_storage",
         E::Certificate(_) => "certificate",
         E::Other(_) => "other",

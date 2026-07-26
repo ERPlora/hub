@@ -4,7 +4,7 @@
 // `window.__TAURI__.core.invoke`, sin necesidad de la dependencia npm `@tauri-apps/api`).
 // Devuelve un id estable por instalación (persistido en `app_data_dir` por el shell) + el
 // `client_type`. En una web-pwa pura no hay Tauri → `null`, y el login va como cliente `hub`
-// genérico (comportamiento legacy: un hub por `deployment_mode`).
+// genérico.
 
 export interface DeviceContext {
   id: string;
