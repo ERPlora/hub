@@ -22,11 +22,11 @@
 
       <!-- ── Tab: Recursos ──────────────────────────────────────── -->
       <template v-if="tab === 'resources'">
-        <!-- ── Bloque Recursos del sistema — SIEMPRE visible; la FUENTE cambia con el despliegue ──
-             "Lo local se ve en local y lo de la nube en la nube" (ARQUITECTURA.md §1): en cloud
-             CPU/Memoria/Conexiones vienen del proveedor (cgroups/metadata del contenedor + Postgres); en local, del propio
-             equipo (sysinfo + SQLite). El tamaño de BD solo existe en local (SQLite) → N/A en cloud.
-             La pill indica la fuente (Nube / Local). CPU/Memoria/Conexiones = ok-gauge; BD = stat. -->
+        <!-- ── Bloque Recursos del sistema — SIEMPRE visible ──
+             Postgres-only (ADR-0154): CPU/Memoria/Conexiones las mide el runtime según el despliegue
+             (ECS Task Metadata / cgroup v2 del contenedor / sysinfo en dev) + Postgres. La BD es
+             compartida por organización → sin "tamaño local": N/A.
+             La pill indica la fuente. CPU/Memoria/Conexiones = ok-gauge; BD = stat. -->
         <div class="block-header">
           <h3 class="block-header__title">{{ resourcesTitle }}</h3>
           <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
@@ -51,8 +51,8 @@
               </ion-card>
             </ion-col>
 
-            <!-- Base de datos: el tamaño solo existe en 'single' (SQLite). En 'cloud' es Aurora
-                 compartida por organización → sin tamaño local: N/A. El motor va en la subetiqueta. -->
+            <!-- Base de datos: Postgres compartida por organización (ADR-0154) → sin "tamaño local":
+                 N/A. El motor (PostgreSQL) va en la subetiqueta. -->
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
                 <ion-card-content class="metric-card__content metric-stat">
@@ -145,13 +145,13 @@
               Hub {{ info?.hubVersion ?? '—' }}
             </p>
             <p class="muted-note updates-hint">
-              {{ info?.shell === 'tauri' ? t('system.updatesLocalHint') : t('system.updatesCloudHint') }}
+              {{ t('system.updatesCloudHint') }}
             </p>
           </ion-card-content>
         </ion-card>
       </template>
 
-      <!-- ── Tab: Documentos (S3 en cloud / disco en Tauri) ─────────── -->
+      <!-- ── Tab: Documentos (S3 en cloud / disco local en Docker/dev) ─────────── -->
       <template v-else-if="tab === 'documents'">
         <ion-card class="ion-no-margin">
           <ion-card-content>
@@ -347,35 +347,32 @@ const BRIDGE_OS: BridgeOs[] = [
   { label: 'Android', icon: 'logo-android', platform: 'android', fill: 'outline' },
 ];
 
-// ── Derivados (axis-aware) ───────────────────────────────────────
+// ── Derivados ────────────────────────────────────────────────────
 
-// Pestaña Recursos = dos bloques (ARQUITECTURA.md §1):
-//   • Recursos del sistema — SIEMPRE visible; la FUENTE cambia con el despliegue: en cloud los datos
-//     vienen de AWS (ECS + Aurora); en local, del propio equipo (sysinfo + SQLite). Así "lo local se
-//     ve en local y lo de la nube en la nube"; el tamaño SQLite solo existe (y se ve) en local.
+// Pestaña Recursos = dos bloques:
+//   • Recursos del sistema — SIEMPRE visible; el `backend` es siempre `'cloud'` (Postgres-only,
+//     ADR-0154). La FUENTE de las métricas cambia con el despliegue (ECS / cgroup v2 / sysinfo),
+//     pero eso lo resuelve el runtime; aquí solo mostramos los valores.
 //   • Bridge — hardware local → siempre EXCEPTO cloud-sin-bridge (caso "solo PWA": solo métricas).
-//     Con `info` sin cargar (null) NO es cloud ⇒ mostramos Bridge (nunca dejamos Recursos vacío).
+//     Con `info` sin cargar (null) todavía no sabemos ⇒ mostramos Bridge (nunca dejamos Recursos vacío).
 const resourcesTitle = computed<string>(() =>
-  info.value?.backend === 'cloud' ? t('system.resourcesCloud')
-    : info.value?.backend === 'single' ? t('system.resourcesLocal')
-      : t('system.resourcesSystem')
+  info.value?.backend === 'cloud' ? t('system.resourcesCloud') : t('system.resourcesSystem')
 );
 const resourcesSource = computed<string | null>(() =>
-  info.value?.backend === 'cloud' ? t('system.sourceCloud') : info.value?.backend === 'single' ? t('system.sourceLocal') : null
+  info.value?.backend === 'cloud' ? t('system.sourceCloud') : null
 );
 const showBridgeBlock = computed<boolean>(() => bridge.value.online || info.value?.backend !== 'cloud');
 
 const dbEngineLabel = computed<string>(() => {
   const e = info.value?.database.engine ?? '';
-  if (e === 'sqlite') return t('system.sqliteLocal');
   if (e === 'aurora') return 'Aurora';
   if (e === 'postgres') return 'PostgreSQL';
   return e || '—';
 });
 
 // Métricas con defaults a 0: las tarjetas KPI SIEMPRE se muestran (aunque no haya datos del runtime
-// todavía), con valores neutros. La fuente cambia con el despliegue: cloud = ECS, local = sysinfo
-// del SO (el Bridge es ajeno a estas métricas).
+// todavía), con valores neutros. La fuente la resuelve el runtime según el despliegue (ECS Task
+// Metadata / cgroup v2 / sysinfo); el Bridge es ajeno a estas métricas.
 const cpu = computed(() => info.value?.cpu ?? null);
 const memory = computed(() => info.value?.memory ?? null);
 
@@ -390,8 +387,8 @@ const usageThresholds = [
   { to: 100, color: 'var(--ion-color-danger)' },
 ];
 
-// Tamaño = headline. Solo existe en local (SQLite); en cloud (Aurora) no hay tamaño local → "N/A".
-// El motor (SQLite local / Aurora / PostgreSQL) va en la subetiqueta.
+// Tamaño = headline. La BD Postgres es compartida por organización → sin "tamaño local": "N/A".
+// El motor (PostgreSQL) va en la subetiqueta.
 const dbValue = computed<string>(() => info.value?.database?.sizeLabel ?? 'N/A');
 const dbSub = computed<string>(() => (info.value?.database ? dbEngineLabel.value : '—'));
 const dbConnections = computed<number>(() => info.value?.database?.connections ?? 0);

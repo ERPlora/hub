@@ -1,19 +1,24 @@
-//! `GET /api/system` — estado REAL del sistema, axis-aware (ARQUITECTURA.md §1).
+//! `GET /api/system` — estado REAL del sistema (Postgres-only, ADR-0154).
 //!
-//! Dos ejes determinan de dónde salen los datos:
-//!   • backend de datos: SQLite (`single`) vs Postgres/Aurora (`cloud`) → por el DIALECTO real del
-//!     adaptador (`Runtime::db().dialect()`), la autoridad es el runtime, no el navegador.
-//!   • métricas/almacenamiento: si corremos en **ECS** (existe `ECS_CONTAINER_METADATA_URI_V4`)
-//!     leemos el **ECS Task Metadata Endpoint v4** (`/task/stats` + `/task`); si no, somos LOCAL
-//!     (Tauri/desktop) y leemos el SO con `sysinfo`.
+//! Tras ADR-0154 el Hub es Postgres-only y PWA: `backend` es SIEMPRE `"cloud"` y `shell` SIEMPRE
+//! `"web"` (ya no hay SQLite/single ni Tauri/desktop, ni detección por dialecto). El runtime es la
+//! autoridad: mide las métricas y reporta la BD, nada se infiere en el navegador. Lo que cambia es
+//! la FUENTE de CPU/memoria según el despliegue:
+//!   • **ECS Task Metadata Endpoint v4** (`/task/stats` + `/task`) si corremos en un task de
+//!     ECS/Fargate (proveedor AWS de reserva; existe `ECS_CONTAINER_METADATA_URI_V4`).
+//!   • **cgroup v2** (`/sys/fs/cgroup/*`) si corremos en un contenedor Docker (Hetzner/Swarm, infra
+//!     activa) — respeta el límite del contenedor, no `/proc` (que vería la RAM del host).
+//!   • **`sysinfo`** (uso del SO) como último recurso en desarrollo local (ni ECS ni cgroup v2).
 //!
 //! Por qué Task Metadata y no CloudWatch (decisión ADR-0046): es la contabilidad **cgroup del
 //! propio task** (lo que CloudWatch agrega) pero en **tiempo real, sin IAM/coste/SDK** y respeta el
 //! límite del Fargate. Evita el error de leer `/proc` y ver la RAM del host.
 //!
-//! Documentos/almacenamiento: en local desde el disco (`media/`); en cloud vía el Cloud
-//! (`GET /api/v1/hub/device/storage/`, el Hub no tiene credenciales S3). Logs = outbox de eventos.
-//! Las copias, importaciones y restauraciones pertenecen a Ajustes → Datos y copias, no a Sistema.
+//! Documentos/almacenamiento (gateado por `in_ecs`, no por el dialecto): en cloud (ECS) vía el Cloud
+//! (`GET /api/v1/hub/device/storage/`, el Hub no tiene credenciales S3); en el resto (Docker/dev),
+//! del disco local (`media/`) → por eso `storageSource` es `"s3"` en ECS y `"disk"` en Docker/dev.
+//! Logs = outbox de eventos. Las copias, importaciones y restauraciones pertenecen a Ajustes → Datos
+//! y copias, no a Sistema.
 //!
 //! Contrato (camelCase) consumido por `hub/apps/web/src/lib/system.ts`.
 
@@ -473,10 +478,11 @@ async fn fetch_json(http: &reqwest::Client, url: &str) -> Option<Value> {
     resp.json::<Value>().await.ok()
 }
 
-// ─────────────────────────── Métricas: LOCAL (Tauri/desktop) ───────────────────────────
+// ─────────────────────────── Métricas: LOCAL (desarrollo, sysinfo) ───────────────────────────
 
-/// CPU/memoria del SO con `sysinfo`. La medición de CPU necesita dos refrescos separados por un
-/// intervalo mínimo → se hace en un hilo bloqueante para no parar el executor async.
+/// CPU/memoria del SO con `sysinfo`. Fallback de desarrollo local (ni ECS ni cgroup v2). La medición
+/// de CPU necesita dos refrescos separados por un intervalo mínimo → se hace en un hilo bloqueante
+/// para no parar el executor async.
 async fn local_metrics() -> (Value, Value) {
     let res = tokio::task::spawn_blocking(|| {
         use sysinfo::System;
