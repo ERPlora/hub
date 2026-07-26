@@ -18,7 +18,6 @@ tenant que sustituira progresivamente al hub actual.
 - `README.md`: estado real del repo y comandos.
 - `ARQUITECTURA.md`: decisiones de arquitectura. Si hay conflicto, gana este
   documento frente a docs antiguas.
-- `apps/web/README.md`: validacion de la shell web, CSP y Web Components.
 - Reglas de UI vigentes: **Ionic primero** (ver "Reglas de UI actuales" abajo).
 
 ## Reglas de UI actuales
