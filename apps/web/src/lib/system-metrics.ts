@@ -80,10 +80,13 @@ export function formatBytes(bytes: number | null | undefined): string {
   const KB = 1024;
   const MB = KB * 1024;
   const GB = MB * 1024;
-  if (bytes >= GB) return `${(bytes / GB).toFixed(1)} GB`;
+  // Un decimal, recortando el «.0» sobrante — mismo contrato que `human_bytes`/`fmt_decimal` del
+  // runtime Rust: un límite exacto se lee «96 MB», nunca «96.0 MB» (confundible con el uso).
+  const d1 = (n: number) => n.toFixed(1).replace(/\.0$/, '');
+  if (bytes >= GB) return `${d1(bytes / GB)} GB`;
   if (bytes >= MB) {
     const mb = bytes / MB;
-    return `${mb >= 100 ? Math.round(mb) : mb.toFixed(1)} MB`;
+    return `${mb >= 100 ? Math.round(mb) : d1(mb)} MB`;
   }
   if (bytes >= KB) return `${Math.round(bytes / KB)} KB`;
   return `${bytes} B`;

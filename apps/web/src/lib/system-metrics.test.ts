@@ -22,13 +22,23 @@ function metrics(over: Partial<SystemMetrics> = {}): SystemMetrics {
 
 describe('formatBytes', () => {
   it('humaniza en KB/MB/GB (base 1024) y protege el caso nulo', () => {
-    expect(formatBytes(10_485_760)).toBe('10.0 MB');
+    // Contrato corregido (hub#207 diagnóstico): los enteros exactos van SIN «.0», como hace
+    // `human_bytes` en el runtime Rust (fmt_decimal recorta el cero sobrante). Antes «10.0 MB».
+    expect(formatBytes(10_485_760)).toBe('10 MB');
     expect(formatBytes(1_610_612_736)).toBe('1.5 GB');
     expect(formatBytes(157_286_400)).toBe('150 MB'); // ≥100 MB → sin decimales
     expect(formatBytes(2048)).toBe('2 KB');
     expect(formatBytes(512)).toBe('512 B');
     expect(formatBytes(null)).toBe('—');
     expect(formatBytes(undefined)).toBe('—');
+  });
+
+  it('el límite del free tier (96 MiB del cgroup) se muestra como «96 MB», no «96.0 MB»', () => {
+    // Valor REAL de prod: memory.max=100663296. «96.0 MB» invita a confundir el límite con el
+    // uso («6.4 MB») — la cifra limpia elimina el ruido y queda igual que la del runtime.
+    expect(formatBytes(100_663_296)).toBe('96 MB');
+    expect(formatBytes(1_073_741_824)).toBe('1 GB');
+    expect(formatBytes(6_710_886)).toBe('6.4 MB'); // el uso conserva su decimal significativo
   });
 });
 
