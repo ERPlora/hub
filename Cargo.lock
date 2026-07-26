@@ -1332,6 +1332,7 @@ dependencies = [
  "erplora-verifactu",
  "futures-util",
  "http-body-util",
+ "jsonwebtoken",
  "reqwest",
  "serde",
  "serde_json",

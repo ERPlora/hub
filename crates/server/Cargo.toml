@@ -59,3 +59,6 @@ http-body-util = "0.1"
 # reales en memoria + su SHA256 (la verificación ADR-0015 es obligatoria, el mock no la salta).
 zip = "2"
 sha2 = "0.10"
+# Firma de JWT RS256 de prueba para el gate de presencia de `auth_cloud` (ADR-0157,
+# `tests/auth_cloud_presence.rs`): el test emula al SaaS emitiendo el claim `hubs`.
+jsonwebtoken = "9"

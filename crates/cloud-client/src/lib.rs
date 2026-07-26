@@ -20,7 +20,7 @@ pub use entitlement::{
     verify_entitlement, EntitledModule, EntitlementClaims, EntitlementError, EntitlementResponse,
 };
 pub use integrity::{verify_sha256, IntegrityError};
-pub use user_jwt::{verify_user_jwt, UserClaims, UserJwtError};
+pub use user_jwt::{verify_user_jwt, HubMembership, UserClaims, UserJwtError};
 
 /// Credenciales con las que firmar una petición al Cloud.
 #[derive(Debug, Clone)]
