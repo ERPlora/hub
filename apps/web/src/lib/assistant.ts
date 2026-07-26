@@ -105,6 +105,13 @@ export interface StreamCallbacks {
   onDone?: () => void;
   /** Error de transporte o evento de error del backend. */
   onError?: (err: unknown) => void;
+  /**
+   * Pide confirmación antes de ejecutar una ESCRITURA (una tool `command`, que muta datos):
+   * el drawer muestra una tarjeta con la acción y sus argumentos. Devuelve `true` para
+   * ejecutar, `false` para cancelar. Si no se provee, las escrituras se **cancelan** (seguro
+   * por defecto: nunca se muta sin confirmación). Las LECTURAS (`query`) no la usan.
+   */
+  onConfirm?: (call: { name: string; arguments: string; kind: string }) => Promise<boolean>;
 }
 
 /** A tool call the model asked for (forwarded by the runtime from the Cloud). */
@@ -112,6 +119,7 @@ interface FunctionCall {
   name: string;
   call_id: string;
   arguments: string; // JSON string of the arguments
+  kind?: string; // 'query' (read, auto) | 'command' (write, needs confirm), tagged by the runtime
 }
 
 /** OpenAI-style tool_call, as the Cloud expects it back on the assistant message. */
@@ -166,7 +174,9 @@ export function streamAssistant(messages: ChatMessage[], cb: StreamCallbacks): (
         }
         // Reconstruye el mensaje assistant que llevaba los tool_calls, ejecuta cada tool
         // con la sesión del usuario y añade su resultado — el Cloud continúa el turno.
-        const results = await Promise.all(round.functionCalls.map(runToolCall));
+        // (El Cloud emite una tool call por ronda — parallel_tool_calls=False — así que no
+        // hay confirmaciones concurrentes.)
+        const results = await Promise.all(round.functionCalls.map((fc) => runToolCall(fc, cb)));
         convo = [
           ...convo,
           {
@@ -252,11 +262,12 @@ async function streamRound(
         text += t;
         cb.onToken(t);
       } else if (evt.type === 'function_call') {
-        const fc = evt as { name?: string; call_id?: string; arguments?: string };
+        const fc = evt as { name?: string; call_id?: string; arguments?: string; kind?: string };
         functionCalls.push({
           name: fc.name ?? '',
           call_id: fc.call_id ?? '',
           arguments: typeof fc.arguments === 'string' ? fc.arguments : '{}',
+          kind: typeof fc.kind === 'string' ? fc.kind : undefined,
         });
       } else if (evt.type === 'done') {
         return { functionCalls, text, errored: false };
@@ -271,17 +282,52 @@ async function streamRound(
 }
 
 /** Ejecuta una tool call con la sesión del usuario y la envuelve como mensaje `tool`.
- *  Paso 1: solo LECTURA — se corre como query (el runtime aplica el mismo gate de
- *  permisos que la UI). Cualquier fallo (incl. una op de escritura, que no es query)
- *  degrada a una nota de error para que el modelo se lo diga al usuario. */
-async function runToolCall(fc: FunctionCall): Promise<WireMessage> {
-  let output: string;
-  try {
-    const params = fc.arguments ? (JSON.parse(fc.arguments) as Record<string, unknown>) : {};
-    const data = await getClient().query(fc.name, params);
-    output = JSON.stringify(data ?? null);
-  } catch (err) {
-    output = JSON.stringify({ error: (err as { message?: string })?.message ?? 'tool failed' });
+ *
+ *  - LECTURA (`query`, o kind ausente): se corre directo (sin efectos), con el mismo gate
+ *    de permisos que la UI (`getClient().query`).
+ *  - ESCRITURA (`command`): pide confirmación con `onConfirm`; solo tras el `true` se
+ *    ejecuta (`getClient().command`). Sin handler o si se cancela → NO se muta y se devuelve
+ *    una nota `cancelled` para que el modelo se lo diga al usuario (seguro por defecto).
+ *
+ *  Cualquier fallo degrada a una nota de error (nunca lanza): el turno sigue. */
+async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireMessage> {
+  const params = safeParseArgs(fc.arguments);
+
+  if (fc.kind === 'command') {
+    const approved = cb.onConfirm
+      ? await cb.onConfirm({ name: fc.name, arguments: fc.arguments, kind: 'command' })
+      : false;
+    if (!approved) {
+      return toolMessage(fc.call_id, { status: 'cancelled', message: 'Action was not confirmed.' });
+    }
+    try {
+      const data = await getClient().command(fc.name, params);
+      return toolMessage(fc.call_id, data ?? null);
+    } catch (err) {
+      return toolMessage(fc.call_id, { error: errMessage(err) });
+    }
   }
-  return { role: 'tool', tool_call_id: fc.call_id, content: output };
+
+  try {
+    const data = await getClient().query(fc.name, params);
+    return toolMessage(fc.call_id, data ?? null);
+  } catch (err) {
+    return toolMessage(fc.call_id, { error: errMessage(err) });
+  }
+}
+
+function safeParseArgs(s: string): Record<string, unknown> {
+  try {
+    return s ? (JSON.parse(s) as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function toolMessage(callId: string, content: unknown): WireMessage {
+  return { role: 'tool', tool_call_id: callId, content: JSON.stringify(content) };
+}
+
+function errMessage(err: unknown): string {
+  return (err as { message?: string })?.message ?? 'tool failed';
 }

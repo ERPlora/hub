@@ -6,9 +6,12 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
+const { queryMock, commandMock } = vi.hoisted(() => ({ queryMock: vi.fn(), commandMock: vi.fn() }));
 
-vi.mock('./runtime', () => ({ RUNTIME_URL: '', getClient: () => ({ query: queryMock }) }));
+vi.mock('./runtime', () => ({
+  RUNTIME_URL: '',
+  getClient: () => ({ query: queryMock, command: commandMock }),
+}));
 vi.mock('./config', () => ({ config: { hubId: 'h1' } }));
 vi.mock('./cloud', () => ({ getAccessToken: () => 'tok' }));
 
@@ -40,13 +43,17 @@ function mockFetchRounds(rounds: string[][]): { bodies: Array<{ messages: unknow
   return { bodies };
 }
 
-function run(messages: { role: string; content: string }[]) {
+function run(
+  messages: { role: string; content: string }[],
+  onConfirm?: (call: { name: string; arguments: string; kind: string }) => Promise<boolean>,
+) {
   const tokens: string[] = [];
   return new Promise<{ tokens: string[]; error?: unknown }>((resolve) => {
     streamAssistant(messages as never, {
       onToken: (t) => tokens.push(t),
       onDone: () => resolve({ tokens }),
       onError: (error) => resolve({ tokens, error }),
+      onConfirm,
     });
   });
 }
@@ -54,6 +61,7 @@ function run(messages: { role: string; content: string }[]) {
 describe('streamAssistant tool round-trip', () => {
   beforeEach(() => {
     queryMock.mockReset();
+    commandMock.mockReset();
     vi.unstubAllGlobals();
   });
 
@@ -114,5 +122,62 @@ describe('streamAssistant tool round-trip', () => {
     const { tokens } = await run([{ role: 'user', content: 'hola' }]);
     expect(tokens.join('')).toBe('Hola.');
     expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('a write tool (command) runs only after onConfirm approves', async () => {
+    commandMock.mockResolvedValue({ id: 42 });
+    const { bodies } = mockFetchRounds([
+      [
+        sseLine({
+          type: 'function_call',
+          name: 'pos.sale.create',
+          call_id: 'w1',
+          arguments: JSON.stringify({ total: 9 }),
+          kind: 'command',
+        }),
+        sseLine({ type: 'done' }),
+      ],
+      [sseLine({ type: 'token', text: 'Venta creada.' }), sseLine({ type: 'done' })],
+    ]);
+    const confirm = vi.fn().mockResolvedValue(true);
+
+    const { tokens } = await run([{ role: 'user', content: 'crea una venta de 9' }], confirm);
+
+    expect(confirm).toHaveBeenCalledWith({
+      name: 'pos.sale.create',
+      arguments: JSON.stringify({ total: 9 }),
+      kind: 'command',
+    });
+    expect(commandMock).toHaveBeenCalledWith('pos.sale.create', { total: 9 });
+    expect(queryMock).not.toHaveBeenCalled(); // a write must NOT go through the read path
+    expect(tokens.join('')).toBe('Venta creada.');
+    const tool = (bodies[1].messages as Array<Record<string, unknown>>).find((m) => m.role === 'tool') as {
+      content: string;
+    };
+    expect(tool.content).toContain('42');
+  });
+
+  it('a write tool is NOT executed when onConfirm declines', async () => {
+    const { bodies } = mockFetchRounds([
+      [sseLine({ type: 'function_call', name: 'pos.sale.void', call_id: 'w2', arguments: '{}', kind: 'command' }), sseLine({ type: 'done' })],
+      [sseLine({ type: 'token', text: 'Cancelado.' }), sseLine({ type: 'done' })],
+    ]);
+
+    await run([{ role: 'user', content: 'anula la venta' }], vi.fn().mockResolvedValue(false));
+
+    expect(commandMock).not.toHaveBeenCalled();
+    const tool = (bodies[1].messages as Array<Record<string, unknown>>).find((m) => m.role === 'tool') as {
+      content: string;
+    };
+    expect(tool.content).toContain('cancelled');
+  });
+
+  it('a write tool is NOT executed without a confirm handler (safe default)', async () => {
+    mockFetchRounds([
+      [sseLine({ type: 'function_call', name: 'pos.sale.void', call_id: 'w3', arguments: '{}', kind: 'command' }), sseLine({ type: 'done' })],
+      [sseLine({ type: 'token', text: 'ok' }), sseLine({ type: 'done' })],
+    ]);
+    await run([{ role: 'user', content: 'anula la venta' }]); // no onConfirm provided
+    expect(commandMock).not.toHaveBeenCalled();
   });
 });

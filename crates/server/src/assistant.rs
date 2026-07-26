@@ -152,7 +152,7 @@ pub fn last_user_message(frontend: &Value) -> String {
 /// Devuelve `Some(frame)` con la línea SSE ya formateada (incluye `\n\n`), o `None` si la línea
 /// no aporta contenido (comentarios, keep-alives). El terminador `[DONE]` del Cloud se traduce a
 /// `{"type":"done"}`.
-pub fn translate_sse_line(line: &str) -> Option<String> {
+pub fn translate_sse_line(line: &str, kinds: &std::collections::HashMap<String, String>) -> Option<String> {
     let payload = line.strip_prefix("data:")?.trim();
     if payload.is_empty() {
         return None;
@@ -162,30 +162,39 @@ pub fn translate_sse_line(line: &str) -> Option<String> {
     }
 
     // El Cloud emite eventos JSON del orquestador. Extraemos el texto incremental para el
-    // frame `token` del frontend; los eventos sin texto se reenvían tal cual bajo `passthrough`.
+    // frame `token` del frontend; `error`/`function_call` se reenvían; el resto se ignora.
     let ev: Value = match serde_json::from_str(payload) {
         Ok(v) => v,
         Err(_) => return Some(sse(&json!({ "type": "token", "text": payload }))),
     };
 
-    let text = ev
+    if let Some(t) = ev
         .get("text")
         .or_else(|| ev.get("delta"))
         .or_else(|| ev.get("content"))
-        .and_then(Value::as_str);
-
-    match text {
-        Some(t) if !t.is_empty() => Some(sse(&json!({ "type": "token", "text": t }))),
-        _ => {
-            // `error` y `function_call` se reenvían tal cual: el frontend actúa sobre
-            // ellos. En `function_call`, el bucle de function-calling del web app ejecuta
-            // la query/command con la sesión del usuario (§9.2) y continúa el turno con el
-            // resultado. Los demás eventos del orquestador (p. ej. `response`) se ignoran.
-            match ev.get("type").and_then(Value::as_str) {
-                Some("error") | Some("function_call") => Some(sse(&ev)),
-                _ => None,
-            }
+        .and_then(Value::as_str)
+    {
+        if !t.is_empty() {
+            return Some(sse(&json!({ "type": "token", "text": t })));
         }
+    }
+
+    match ev.get("type").and_then(Value::as_str) {
+        Some("error") => Some(sse(&ev)),
+        // `function_call`: el bucle del web app ejecuta la op con la sesión del usuario
+        // (§9.2). Se anota su `kind` (query/command) desde el catálogo ensamblado, para que
+        // el web app sepa si es LECTURA (auto) o ESCRITURA (pide confirmación antes).
+        Some("function_call") => {
+            let mut out = ev;
+            let name = out.get("name").and_then(Value::as_str).map(str::to_string);
+            if let Some(kind) = name.and_then(|n| kinds.get(&n)) {
+                if let Some(obj) = out.as_object_mut() {
+                    obj.insert("kind".to_string(), json!(kind));
+                }
+            }
+            Some(sse(&out))
+        }
+        _ => None,
     }
 }
 
@@ -245,30 +254,31 @@ mod tests {
 
     #[test]
     fn translate_done_and_tokens() {
+        let k = std::collections::HashMap::new();
         assert_eq!(
-            translate_sse_line("data: [DONE]"),
+            translate_sse_line("data: [DONE]", &k),
             Some(sse(&json!({"type":"done"})))
         );
         assert_eq!(
-            translate_sse_line("data: {\"text\":\"hi\"}"),
+            translate_sse_line("data: {\"text\":\"hi\"}", &k),
             Some(sse(&json!({"type":"token","text":"hi"})))
         );
         // delta key
         assert_eq!(
-            translate_sse_line("data: {\"delta\":\"x\"}"),
+            translate_sse_line("data: {\"delta\":\"x\"}", &k),
             Some(sse(&json!({"type":"token","text":"x"})))
         );
         // comment / empty → None
-        assert_eq!(translate_sse_line(": keep-alive"), None);
-        assert_eq!(translate_sse_line("data:"), None);
+        assert_eq!(translate_sse_line(": keep-alive", &k), None);
+        assert_eq!(translate_sse_line("data:", &k), None);
         // non-JSON payload → token passthrough
         assert_eq!(
-            translate_sse_line("data: plain"),
+            translate_sse_line("data: plain", &k),
             Some(sse(&json!({"type":"token","text":"plain"})))
         );
         // error event forwarded
         assert_eq!(
-            translate_sse_line("data: {\"type\":\"error\",\"error\":\"boom\"}"),
+            translate_sse_line("data: {\"type\":\"error\",\"error\":\"boom\"}", &k),
             Some(sse(&json!({"type":"error","error":"boom"})))
         );
     }
@@ -278,11 +288,27 @@ mod tests {
         // The model asking to call a module tool MUST reach the web app: it runs the
         // query/command with the user's session and continues the turn. Previously
         // this event was dropped (§9.2 keystone).
+        let kinds = std::collections::HashMap::new();
         let line = r#"data: {"type":"function_call","name":"inventory.products.list","call_id":"c1","arguments":"{}"}"#;
-        let out = translate_sse_line(line).expect("function_call must be forwarded, not dropped");
+        let out = translate_sse_line(line, &kinds).expect("function_call must be forwarded, not dropped");
         assert!(out.contains("function_call"));
         assert!(out.contains("inventory.products.list"));
         assert!(out.contains("c1"));
+    }
+
+    #[test]
+    fn translate_annotates_function_call_kind() {
+        // The web app auto-runs reads (query) but must CONFIRM writes (command); the
+        // runtime tags each function_call with its kind from the assembled catalog.
+        let mut kinds = std::collections::HashMap::new();
+        kinds.insert("pos.sale.create".to_string(), "command".to_string());
+        let line = r#"data: {"type":"function_call","name":"pos.sale.create","call_id":"c9","arguments":"{}"}"#;
+        let out = translate_sse_line(line, &kinds).expect("forwarded");
+        assert!(out.contains("\"kind\":\"command\""));
+        // An unknown tool (not in the map) is forwarded without a kind → treated as read.
+        let line2 = r#"data: {"type":"function_call","name":"who.knows","call_id":"c0","arguments":"{}"}"#;
+        let out2 = translate_sse_line(line2, &kinds).expect("forwarded");
+        assert!(!out2.contains("\"kind\""));
     }
 
     #[test]
