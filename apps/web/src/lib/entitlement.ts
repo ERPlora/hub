@@ -1,7 +1,8 @@
 // Gate de entitlement del shell (ARQUITECTURA.md §2.10): decide qué módulos puede MONTAR el
-// hub. En Tauri usa el comando `validate_entitlement` (token firmado cacheado + gracia
-// offline); en web-pwa llama directo al endpoint del Cloud (online). Hasta resolver, es
-// PERMISIVO (no rompe el dev/web mientras se resuelve el hub_id).
+// hub, llamando al endpoint del Cloud (online). Hasta resolver, es PERMISIVO (no rompe el
+// dev/web mientras se resuelve el hub_id). ADR-0159: el camino Tauri (`validate_entitlement`,
+// caché offline + gracia) se retiró con el producto local (ADR-0154) — dentro del shell fino el
+// gate es EXACTAMENTE el mismo que en el navegador.
 //
 // Consumido por:
 //  - lib/module-loader (filtra los módulos instalados a los entitled),
@@ -9,19 +10,9 @@
 //  - router (guard de /m/:moduleId y de /activation).
 import { computed, ref } from 'vue';
 
-import { cloudEntitlement, getAccessToken, triggerHubGone } from './cloud';
-import { config } from './config';
-import { invokeTauri } from './device';
+import { cloudEntitlement, getAccessToken } from './cloud';
 
 export type EntitlementStatus = 'unknown' | 'unlocked' | 'needs_activation';
-
-/** Resultado del comando Tauri `validate_entitlement` (serde tag="state", snake_case). */
-interface GateOutcome {
-  state: 'unlocked' | 'needs_activation' | 'hub_gone';
-  modules?: Array<{ module_id: string; tier: string; version: string }>;
-  offline?: boolean;
-  reason?: string;
-}
 
 // `null` = aún sin resolver → permisivo. Un Set (aunque vacío) = resuelto → filtro estricto.
 const _ids = ref<Set<string> | null>(null);
@@ -59,25 +50,11 @@ export function resetEntitlement(): void {
   _blocked.value = new Set();
 }
 
-function applyOutcome(o: GateOutcome): void {
-  if (o.state === 'unlocked') {
-    _ids.value = new Set((o.modules ?? []).map((m) => m.module_id).filter(Boolean));
-    _status.value = 'unlocked';
-    _offline.value = Boolean(o.offline);
-    _reason.value = '';
-  } else {
-    _ids.value = new Set(); // nada montable hasta activar
-    _status.value = 'needs_activation';
-    _offline.value = Boolean(o.offline);
-    _reason.value = o.reason ?? '';
-  }
-}
-
 /**
- * Resuelve el entitlement del hub activo. Idempotente: se puede llamar en boot y tras login.
- * - Tauri: `validate_entitlement` (offline-capable). Su `needs_activation` SÍ bloquea.
- * - Web: endpoint del Cloud. Si falla (p. ej. hub_id aún sin resolver), queda PERMISIVO — en
- *   web el shell es online y no tiene sentido bloquearlo por un fallo transitorio de red.
+ * Resuelve el entitlement del hub activo contra el endpoint del Cloud. Idempotente: se puede
+ * llamar en boot y tras login. Si falla (p. ej. hub_id aún sin resolver), queda PERMISIVO — el
+ * hub es online y no tiene sentido bloquearlo por un fallo transitorio de red. Un 410
+ * `hub_not_found` lo maneja la capa de fetch del Cloud (`triggerHubGone`), no este gate.
  */
 export async function resolveEntitlement(): Promise<void> {
   const token = getAccessToken();
@@ -85,26 +62,6 @@ export async function resolveEntitlement(): Promise<void> {
     resetEntitlement();
     return;
   }
-
-  // Camino Tauri (devuelve null si no estamos en Tauri).
-  const outcome = await invokeTauri<GateOutcome>('validate_entitlement', {
-    hubId: config.hubId,
-    accessToken: token,
-  }).catch(() => null);
-  if (outcome) {
-    if (outcome.state === 'hub_gone') {
-      // El Cloud dice que el hub fue borrado/revocado (410 hub_not_found): olvidamos la identidad
-      // local y salimos a /login. El siguiente login re-registra por X-Device-Id (§2.9b). NO
-      // mostramos la pantalla de activación (no es un problema de licencia, el hub ya no existe).
-      resetEntitlement();
-      triggerHubGone();
-      return;
-    }
-    applyOutcome(outcome);
-    return;
-  }
-
-  // Camino web (online).
   try {
     const { modules, blockedModules } = await cloudEntitlement();
     _ids.value = new Set(modules.map((m) => m.moduleId).filter(Boolean));

@@ -75,5 +75,9 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
 
+      # `--exclude erplora-tauri`: el shell de escritorio (ADR-0159) arrastra tauri/wry → GTK/
+      # webkit2gtk, system-libs que este runner no tiene y que inflarían el target (el disco ya
+      # iba justo: ver "Free disk space"). Sus tests corren en `test-shell.yml`, que instala las
+      # deps GTK y se dispara SOLO cuando cambia `apps/tauri/**` (filtro por paths).
       - name: cargo test --workspace
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude erplora-tauri

@@ -2,7 +2,7 @@
 // billing van por aquí (ARQUITECTURA.md §2.1–2.3). Si el Cloud no es accesible (sandbox),
 // las llamadas lanzan y la capa de auth degrada a modo demo.
 import { config, isLocalHub } from './config';
-import { isTauri, loginHeaders } from './device';
+import { loginHeaders } from './device';
 import { getLocale } from '../i18n';
 import { beginRequest, endRequest } from './shell';
 import { getHubSession } from './session';
@@ -66,11 +66,13 @@ function getRefreshToken(): string | null {
 }
 
 /**
- * El Hub Local mantiene una sesión Runtime/PIN independiente del JWT Cloud. Incluye Tauri
- * enrolado (hub_id real) y el runtime local/dev sin enrolar (hub_id vacío o DEV_HUB_ID).
+ * El runtime local/dev (hub_id vacío o DEV_HUB_ID) mantiene una sesión Runtime/PIN independiente
+ * del JWT Cloud. ADR-0159: correr dentro del shell Tauri ya NO cuenta — el shell es un cliente
+ * fino de la MISMA PWA cloud, así que la expiración de sesión se comporta igual que en el
+ * navegador (la rama "Tauri enrolado" era del producto Hub Local, retirado por ADR-0154).
  */
 export function hasIndependentLocalSession(): boolean {
-  return isLocalHub() || isTauri();
+  return isLocalHub();
 }
 
 // --- Refresh-on-401 (rotación de tokens del usuario activo) ------------------
@@ -175,10 +177,9 @@ async function authedFetch(path: string, init: RequestInit, timeoutMs = 8000): P
       if (fresh) {
         res = await doFetch(fresh); // reintento único con el token rotado
       } else if (hasIndependentLocalSession()) {
-        // Un JWT Cloud ausente/caducado NO invalida la sesión local del runtime. Billing y otras
-        // superficies atribuidas al usuario degradan a su estado "cuenta Cloud requerida", pero el
-        // usuario conserva el shell, sus permisos locales y el contexto de trabajo. `isTauri`
-        // cubre Hub Local ya enrolado, cuyo hub_id es un UUID Cloud real (no el DEV_HUB_ID).
+        // Un JWT Cloud ausente/caducado NO invalida la sesión local del runtime dev. Billing y
+        // otras superficies atribuidas al usuario degradan a su estado "cuenta Cloud requerida",
+        // pero el usuario conserva el shell, sus permisos locales y el contexto de trabajo.
         clearTokens();
       } else {
         expireSession();

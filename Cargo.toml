@@ -17,6 +17,7 @@ members = [
     "crates/vector",
     "crates/peripherals",
     "apps/bridge",
+    "apps/tauri/src-tauri",
 ]
 
 [workspace.package]

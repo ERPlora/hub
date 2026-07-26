@@ -1,0 +1,28 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permisos base de la ventana 'main' (ADR-0159, cliente fino). La webview carga ORÍGENES REMOTOS: la PWA del hub cloud (https://*.erplora.com) y, en dev, la PWA local (Vite :5173 o el runtime :8787). Sin estos remote.urls el ACL de Tauri rechaza los invoke (device_context/forget_hub + erplora_* de hardware) desde la PWA. El SaaS (onboarding) no invoca comandos, no necesita entrada. Dominios CUSTOM de hub quedan sin hardware v1 (no se pueden enumerar aquí — ver ADR-0159). local:true mantiene autorizado tauri:// (arranques transitorios / página degradada).",
+  "local": true,
+  "remote": {
+    "urls": [
+      "https://*.erplora.com/*",
+      "http://127.0.0.1:8787/*",
+      "http://127.0.0.1:5173/*"
+    ]
+  },
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-device-context",
+    "allow-forget-hub",
+    "allow-erplora-bridge-status",
+    "allow-erplora-discover-printers",
+    "allow-erplora-get-devices",
+    "allow-erplora-print",
+    "allow-erplora-test-print",
+    "allow-erplora-open-drawer",
+    "allow-erplora-set-device-role",
+    "allow-erplora-set-device-name",
+    "allow-erplora-remove-device"
+  ]
+}
