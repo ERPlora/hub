@@ -437,6 +437,27 @@ mod tests {
     }
 
     #[test]
+    fn free_tier_prod_fixture_limit_from_cgroup_not_from_plan() {
+        // Fixture REAL del free tier en prod (hub#207 diagnóstico 2026-07-27): el task de Swarm
+        // corre con Limits.MemoryBytes=100663296 (96 MiB) y NanoCPUs=100000000 (0,1 vCPU →
+        // cpu.max "10000 100000"). El LÍMITE mostrado sale SIEMPRE de `memory.max` del cgroup —
+        // el claim del entitlement no trae cuota de memoria (solo `plan` + `max_devices`).
+        let r = FakeCgroup::new(&[
+            ("memory.current", "11534336\n"), // 11 MiB
+            ("memory.stat", "anon 7340032\ninactive_file 4194304\nfile 4194304\n"), // 4 MiB caché
+            ("memory.max", "100663296\n"),    // 96 MiB (NUNCA 64: eso sería otro contenedor)
+            ("cpu.max", "10000 100000"),      // 0,1 vCPU
+        ]);
+        let m = read_memory(&r);
+        assert_eq!(m.limit_bytes, Some(100_663_296));
+        assert_eq!(m.used_bytes, Some(7_340_032)); // 11 MiB − 4 MiB caché = 7 MiB
+        // 7 MiB de 96 MiB ≈ 7% — el «7% de RAM» observado en prod es coherente con estos valores.
+        let pct = (m.fraction.expect("fracción con límite") * 100.0).round();
+        assert_eq!(pct, 7.0);
+        assert_eq!(read_cpu_limit_cores(&r), Some(0.1));
+    }
+
+    #[test]
     fn cpu_readers_through_the_trait() {
         let r = FakeCgroup::new(&[
             ("cpu.stat", "usage_usec 12345\nuser_usec 1\n"),
