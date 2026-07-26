@@ -11,9 +11,84 @@ import { getAccessToken } from './cloud';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
+/** Content parts (used when a turn carries attachments). Mirrors the shape the
+ *  Cloud orchestrator understands: `text`, `image_url` (vision), `input_file`
+ *  (base64 document the Cloud extracts text from). ADR-0156. */
+export interface ChatTextPart {
+  type: 'text';
+  text: string;
+}
+export interface ChatImagePart {
+  type: 'image_url';
+  image_url: { url: string };
+}
+export interface ChatFilePart {
+  type: 'input_file';
+  data: string;
+  mime_type: string;
+  filename: string;
+}
+export type ChatContentPart = ChatTextPart | ChatImagePart | ChatFilePart;
+
+/** A message's content: plain text, or a list of parts when it has attachments. */
+export type ChatContent = string | ChatContentPart[];
+
 export interface ChatMessage {
   role: ChatRole;
-  content: string;
+  content: ChatContent;
+}
+
+/** Keep well under the Cloud's per-attachment cap (base64 grows ~1.33×). */
+export const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Turn a picked File into a chat content part: images become a vision
+ * `image_url` data URI; everything else an `input_file` (base64) whose text the
+ * Cloud extracts (ADR-0156). Throws if the file is too large.
+ */
+export async function fileToContentPart(file: File): Promise<ChatContentPart> {
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error('attachment too large');
+  }
+  const dataUri = await readAsDataURL(file);
+  if (file.type.startsWith('image/')) {
+    return { type: 'image_url', image_url: { url: dataUri } };
+  }
+  return {
+    type: 'input_file',
+    data: dataUri, // the Cloud accepts a `data:` prefix or raw base64
+    mime_type: file.type || 'application/octet-stream',
+    filename: file.name,
+  };
+}
+
+function readAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error ?? new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+/** Plain-text view of a message's content (display + route extraction). */
+export function messageText(content: ChatContent): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((p): p is ChatTextPart => p.type === 'text')
+    .map((p) => p.text)
+    .join(' ');
+}
+
+/** Attachment descriptors of a message, for rendering chips. */
+export function messageAttachments(content: ChatContent): { kind: 'image' | 'file'; name: string }[] {
+  if (typeof content === 'string') return [];
+  const out: { kind: 'image' | 'file'; name: string }[] = [];
+  for (const p of content) {
+    if (p.type === 'image_url') out.push({ kind: 'image', name: 'image' });
+    else if (p.type === 'input_file') out.push({ kind: 'file', name: p.filename });
+  }
+  return out;
 }
 
 /** Eventos que emite el stream del asistente (SSE `data:` JSON). */

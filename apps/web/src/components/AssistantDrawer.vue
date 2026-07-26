@@ -52,16 +52,22 @@
         >
           <div class="chat-msg">
             <div class="chat-bubble" :class="m.role === 'user' ? 'bubble-user' : 'bubble-assistant'">
-              <span v-if="m.content">{{ m.content }}</span>
-              <ion-spinner v-else name="dots" class="chat-typing" />
+              <div v-if="messageAttachments(m.content).length" class="chat-attachments">
+                <span v-for="(a, ai) in messageAttachments(m.content)" :key="ai" class="chat-attach-chip">
+                  <HubIcon :name="chipIcon(a.kind)" />
+                  {{ a.name }}
+                </span>
+              </div>
+              <span v-if="messageText(m.content)">{{ messageText(m.content) }}</span>
+              <ion-spinner v-else-if="m.role === 'assistant'" name="dots" class="chat-typing" />
             </div>
             <!-- Botones de navegación: si la respuesta del asistente menciona rutas internas del
                  shell (/m/…, /settings#…, /apps#…, …), se extraen y se ofrecen como CTAs clicables
                  que navegan vía router.push. Así el asistente puede llevar al usuario a la pantalla
                  exacta sin depender de markdown/links embebidos (las burbujas son texto plano). -->
-            <div v-if="m.role === 'assistant' && m.content" class="chat-actions">
+            <div v-if="m.role === 'assistant' && messageText(m.content)" class="chat-actions">
               <ion-button
-                v-for="r in extractRoutes(m.content)"
+                v-for="r in extractRoutes(messageText(m.content))"
                 :key="r.url"
                 size="small"
                 fill="outline"
@@ -77,27 +83,63 @@
       </div>
 
       <footer class="assistant-foot">
-        <ion-textarea
-          v-model="draft"
-          class="chat-input"
-          :placeholder="t('assistant.placeholder')"
-          :auto-grow="true"
-          :rows="1"
-          :disabled="streaming"
-          @keydown="onKeydown"
-        />
-        <ion-button
-          v-if="!streaming"
-          fill="solid"
-          :disabled="!draft.trim()"
-          :aria-label="t('assistant.send')"
-          @click="send"
-        >
-          <HubIcon slot="icon-only" name="send" />
-        </ion-button>
-        <ion-button v-else fill="clear" :aria-label="t('assistant.stop')" @click="stop">
-          <HubIcon slot="icon-only" name="stop-circle-outline" />
-        </ion-button>
+        <!-- Bandeja de adjuntos pendientes (antes de enviar). -->
+        <div v-if="pendingAttachments.length || attachError" class="attach-tray">
+          <span v-for="(p, pi) in pendingAttachments" :key="pi" class="attach-chip">
+            <HubIcon :name="partIcon(p)" />
+            <span class="attach-name">{{ attachName(p) }}</span>
+            <button
+              class="attach-remove"
+              type="button"
+              :aria-label="t('assistant.attachRemove')"
+              @click="removeAttachment(pi)"
+            >
+              <HubIcon name="close-outline" />
+            </button>
+          </span>
+          <span v-if="attachError" class="attach-error">{{ attachError }}</span>
+        </div>
+
+        <div class="assistant-foot-row">
+          <input
+            ref="fileInput"
+            type="file"
+            class="attach-input"
+            multiple
+            accept="image/*,application/pdf,.doc,.docx,.txt,.csv,.md"
+            @change="onFilesSelected"
+          />
+          <ion-button
+            fill="clear"
+            size="small"
+            :disabled="streaming"
+            :aria-label="t('assistant.attach')"
+            @click="openAttach"
+          >
+            <HubIcon slot="icon-only" name="attach-outline" />
+          </ion-button>
+          <ion-textarea
+            v-model="draft"
+            class="chat-input"
+            :placeholder="t('assistant.placeholder')"
+            :auto-grow="true"
+            :rows="1"
+            :disabled="streaming"
+            @keydown="onKeydown"
+          />
+          <ion-button
+            v-if="!streaming"
+            fill="solid"
+            :disabled="!draft.trim() && pendingAttachments.length === 0"
+            :aria-label="t('assistant.send')"
+            @click="send"
+          >
+            <HubIcon slot="icon-only" name="send" />
+          </ion-button>
+          <ion-button v-else fill="clear" :aria-label="t('assistant.stop')" @click="stop">
+            <HubIcon slot="icon-only" name="stop-circle-outline" />
+          </ion-button>
+        </div>
       </footer>
     </aside>
   </div>
@@ -110,7 +152,15 @@ import { useRouter } from 'vue-router';
 import { IonButton, IonTextarea, IonSpinner } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { assistantOpen, closeAssistant, assistantSeed } from '../lib/shell';
-import { streamAssistant, type ChatMessage } from '../lib/assistant';
+import {
+  streamAssistant,
+  fileToContentPart,
+  messageText,
+  messageAttachments,
+  type ChatMessage,
+  type ChatContent,
+  type ChatContentPart,
+} from '../lib/assistant';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
 import { pendingSetups } from '../lib/setup-status';
 
@@ -171,6 +221,46 @@ const streaming = ref(false);
 const threadEl = ref<HTMLElement | null>(null);
 let abort: (() => void) | null = null;
 
+// Adjuntos pendientes (aún sin enviar): foto/PDF/doc leídos a base64 (ADR-0156).
+const fileInput = ref<HTMLInputElement | null>(null);
+const pendingAttachments = ref<ChatContentPart[]>([]);
+const attachError = ref('');
+
+function openAttach(): void {
+  fileInput.value?.click();
+}
+
+async function onFilesSelected(ev: Event): Promise<void> {
+  const input = ev.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = ''; // permitir volver a elegir el mismo fichero
+  for (const f of files) {
+    try {
+      pendingAttachments.value.push(await fileToContentPart(f));
+    } catch {
+      attachError.value = t('assistant.attachTooLarge');
+      window.setTimeout(() => (attachError.value = ''), 4000);
+    }
+  }
+}
+
+function removeAttachment(i: number): void {
+  pendingAttachments.value.splice(i, 1);
+}
+
+function attachName(p: ChatContentPart): string {
+  return p.type === 'input_file' ? p.filename : t('assistant.attachImage');
+}
+
+// Iconos de chip resueltos en el script (no literales en el template: el guard de
+// iconos escanea `:name` y tomaría 'image' del ternario como un icono inexistente).
+function partIcon(p: ChatContentPart): string {
+  return p.type === 'input_file' ? 'document-text-outline' : 'image-outline';
+}
+function chipIcon(kind: 'image' | 'file'): string {
+  return kind === 'file' ? 'document-text-outline' : 'image-outline';
+}
+
 async function scrollToBottom(): Promise<void> {
   await nextTick();
   const el = threadEl.value;
@@ -186,10 +276,17 @@ function onKeydown(ev: KeyboardEvent): void {
 
 async function send(): Promise<void> {
   const text = draft.value.trim();
-  if (!text || streaming.value) return;
+  const atts = pendingAttachments.value;
+  if ((!text && atts.length === 0) || streaming.value) return;
   draft.value = '';
 
-  messages.value.push({ role: 'user', content: text });
+  // Con adjuntos el content es una lista de parts (texto + image_url/input_file);
+  // sin adjuntos, se mantiene como string (turno de solo texto).
+  const content: ChatContent =
+    atts.length > 0 ? [...(text ? [{ type: 'text', text } as ChatContentPart] : []), ...atts] : text;
+  pendingAttachments.value = [];
+
+  messages.value.push({ role: 'user', content });
   const assistantMsg = ref<ChatMessage>({ role: 'assistant', content: '' });
   messages.value.push(assistantMsg.value);
   streaming.value = true;
@@ -208,19 +305,21 @@ async function send(): Promise<void> {
 
   abort = streamAssistant(history, {
     onToken: (tok) => {
-      assistantMsg.value.content += tok;
+      // La respuesta del asistente siempre es texto (string); acumula tokens.
+      const cur = assistantMsg.value.content;
+      assistantMsg.value.content = (typeof cur === 'string' ? cur : '') + tok;
       void scrollToBottom();
     },
     onDone: () => {
       streaming.value = false;
       abort = null;
-      if (!assistantMsg.value.content) assistantMsg.value.content = t('assistant.noReply');
+      if (!messageText(assistantMsg.value.content)) assistantMsg.value.content = t('assistant.noReply');
       saveAssistantHistory();
     },
     onError: () => {
       streaming.value = false;
       abort = null;
-      assistantMsg.value.content = assistantMsg.value.content || t('assistant.error');
+      if (!messageText(assistantMsg.value.content)) assistantMsg.value.content = t('assistant.error');
       saveAssistantHistory();
     },
   });
@@ -417,11 +516,78 @@ onBeforeUnmount(() => {
 
 .assistant-foot {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   gap: 0.4rem;
   padding: 0.5rem;
   flex: none;
   border-top: 1px solid var(--ion-border-color, #ececec);
+}
+.assistant-foot-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+/* Input de fichero nativo oculto (se dispara desde el botón adjuntar). */
+.attach-input {
+  display: none;
+}
+/* Bandeja de adjuntos pendientes (chips) antes de enviar. */
+.attach-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 0.25rem;
+}
+.attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  padding: 0.25rem 0.4rem 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: var(--ion-color-light);
+  color: var(--ion-color-dark);
+  font-size: 0.8rem;
+}
+.attach-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 12rem;
+}
+.attach-remove {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  color: var(--ion-color-medium);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+}
+.attach-remove:hover {
+  color: var(--ion-color-danger, #c00);
+}
+.attach-error {
+  color: var(--ion-color-danger, #c00);
+  font-size: 0.8rem;
+  align-self: center;
+}
+/* Chips de adjunto dentro de la burbuja (mensaje ya enviado). */
+.chat-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.35rem;
+}
+.chat-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 0.78rem;
 }
 .chat-input {
   flex: 1;

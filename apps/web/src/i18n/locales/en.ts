@@ -65,6 +65,10 @@ export default {
     close: 'Close',
     noReply: '(no reply)',
     error: 'Could not reach the assistant.',
+    attach: 'Attach file',
+    attachRemove: 'Remove attachment',
+    attachImage: 'image',
+    attachTooLarge: 'The file is too large.',
   },
   files: {
     title: 'Files',

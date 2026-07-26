@@ -66,6 +66,10 @@ export default {
     close: 'Cerrar',
     noReply: '(sin respuesta)',
     error: 'No se pudo contactar con el asistente.',
+    attach: 'Adjuntar archivo',
+    attachRemove: 'Quitar adjunto',
+    attachImage: 'imagen',
+    attachTooLarge: 'El archivo es demasiado grande.',
   },
   files: {
     title: 'Archivos',

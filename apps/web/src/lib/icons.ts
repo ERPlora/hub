@@ -30,6 +30,7 @@ import extensionPuzzleOutline from "~icons/ion/extension-puzzle-outline?raw";
 import globeOutline from "~icons/ion/globe-outline?raw";
 import gridOutline from "~icons/ion/grid-outline?raw";
 import hardwareChipOutline from "~icons/ion/hardware-chip-outline?raw";
+import imageOutline from "~icons/ion/image-outline?raw";
 import informationCircleOutline from "~icons/ion/information-circle-outline?raw";
 import keypadOutline from "~icons/ion/keypad-outline?raw";
 import languageOutline from "~icons/ion/language-outline?raw";
@@ -124,6 +125,7 @@ import chevronExpandOutline from "~icons/ion/chevron-expand-outline?raw";
 import close from "~icons/ion/close?raw";
 import cloudDownloadOutline from "~icons/ion/cloud-download-outline?raw";
 import cloudOfflineOutline from "~icons/ion/cloud-offline-outline?raw";
+import attachOutline from "~icons/ion/attach-outline?raw";
 import contractOutline from "~icons/ion/contract-outline?raw";
 import createOutline from "~icons/ion/create-outline?raw";
 import documentAttachOutline from "~icons/ion/document-attach-outline?raw";
@@ -181,6 +183,7 @@ const SVGS: Record<string, string> = {
   "globe-outline": globeOutline,
   "grid-outline": gridOutline,
   "hardware-chip-outline": hardwareChipOutline,
+  "image-outline": imageOutline,
   "information-circle-outline": informationCircleOutline,
   "keypad-outline": keypadOutline,
   "language-outline": languageOutline,
@@ -272,6 +275,7 @@ const SVGS: Record<string, string> = {
   close,
   "cloud-download-outline": cloudDownloadOutline,
   "cloud-offline-outline": cloudOfflineOutline,
+  "attach-outline": attachOutline,
   "contract-outline": contractOutline,
   "create-outline": createOutline,
   "document-attach-outline": documentAttachOutline,
