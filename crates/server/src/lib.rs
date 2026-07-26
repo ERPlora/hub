@@ -1375,6 +1375,18 @@ async fn assistant_chat_stream(
         None => all_tools,
     };
 
+    // Mapa name→kind (query/command) del catálogo ofrecido, para anotar los eventos
+    // `function_call` que reenviamos: el web app auto-ejecuta las LECTURAS (query) y pide
+    // confirmación antes de una ESCRITURA (command). §9.2.
+    let tool_kinds: std::collections::HashMap<String, String> = tools
+        .iter()
+        .filter_map(|t| {
+            let name = t.get("name").and_then(|v| v.as_str())?;
+            let kind = t.get("kind").and_then(|v| v.as_str())?;
+            Some((name.to_string(), kind.to_string()))
+        })
+        .collect();
+
     let body = assistant::build_cloud_body(&frontend, tools, Some(&active_user));
 
     // Construye la petición al Cloud (POST, Bearer + X-Hub-Id) y abre el stream.
@@ -1406,7 +1418,7 @@ async fn assistant_chat_stream(
             if let Some(idx) = buf.find('\n') {
                 let line: String = buf.drain(..=idx).collect();
                 let line = line.trim_end_matches(['\r', '\n']);
-                if let Some(frame) = assistant::translate_sse_line(line) {
+                if let Some(frame) = assistant::translate_sse_line(line, &tool_kinds) {
                     return Poll::Ready(Some(Ok::<_, std::io::Error>(bytes_from(frame))));
                 }
                 continue;
@@ -1424,7 +1436,7 @@ async fn assistant_chat_stream(
                     // Fin del stream del Cloud: procesa cualquier resto + cierra.
                     if !buf.is_empty() {
                         let rest = std::mem::take(&mut buf);
-                        if let Some(frame) = assistant::translate_sse_line(rest.trim()) {
+                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_kinds) {
                             return Poll::Ready(Some(Ok(bytes_from(frame))));
                         }
                     }
