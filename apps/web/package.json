@@ -22,7 +22,6 @@
     "@ionic/core": "^8.8.8",
     "@ionic/vue": "^8.8.8",
     "@ionic/vue-router": "^8.8.8",
-    "@tauri-apps/plugin-opener": "^2.5.4",
     "ionicons": "^8.0.13",
     "swagger-ui-dist": "^5.17.14",
     "vue": "^3.5.13",
