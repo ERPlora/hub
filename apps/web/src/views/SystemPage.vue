@@ -151,7 +151,7 @@
         </ion-card>
       </template>
 
-      <!-- ── Tab: Documentos (S3 en cloud / disco local en Docker/dev) ─────────── -->
+      <!-- ── Tab: Documentos (S3, siempre vía el Cloud) ─────────── -->
       <template v-else-if="tab === 'documents'">
         <ion-card class="ion-no-margin">
           <ion-card-content>
@@ -163,7 +163,7 @@
               v-if="!documents.length"
               icon="folder-open-outline"
               :heading="t('system.noDocuments')"
-              :message="info?.storageSource === 'disk' ? t('system.noDocumentsDisk') : t('system.noDocumentsBucket')"
+              :message="t('system.noDocumentsBucket')"
             />
             <ok-data-table
               v-else
@@ -399,9 +399,8 @@ const connectionsLimitLabel = computed<string>(() =>
     : t('system.connectionsActive')
 );
 
-const storageSourceLabel = computed<string>(() =>
-  info.value?.storageSource === 'disk' ? t('system.storageDisk') : t('system.storageS3')
-);
+// Cloud-only (ADR-0154): el almacenamiento SIEMPRE es S3 vía el Cloud.
+const storageSourceLabel = computed<string>(() => t('system.storageS3'));
 
 const documents = computed<Row[]>(() => (info.value?.documents ?? []) as unknown as Row[]);
 const logs = computed(() => info.value?.logs ?? []);

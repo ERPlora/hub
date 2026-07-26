@@ -1,18 +1,19 @@
 // Cliente de la pantalla /system — contrato `GET /api/system` del runtime del Hub.
 //
-// La pantalla de Sistema muestra DATOS REALES, no demo. Tras ADR-0154 el Hub es Postgres-only y
-// PWA: `backend` es SIEMPRE `'cloud'` y `shell` SIEMPRE `'web'` (ya no existen SQLite/single ni
-// Tauri/desktop). El runtime Rust es la AUTORIDAD: mide las métricas y reporta la BD (nada se
-// infiere en el navegador). La FUENTE de cada métrica cambia según el despliegue:
+// La pantalla de Sistema muestra DATOS REALES, no demo. Tras ADR-0154 el Hub es Postgres-only, PWA
+// y cloud-only: `backend` es SIEMPRE `'cloud'`, `shell` SIEMPRE `'web'` y `storageSource` SIEMPRE
+// `'s3'` (ya no existen SQLite/single, Tauri/desktop ni disco local). El runtime Rust es la
+// AUTORIDAD: mide las métricas y reporta la BD (nada se infiere en el navegador). Lo único que
+// cambia con el despliegue es la FUENTE de CPU/memoria:
 //
 //   métrica       ECS/Fargate (AWS de reserva)        Docker (Hetzner/Swarm, activo)   dev local
 //   ───────────   ─────────────────────────────────   ──────────────────────────────   ──────────
-//   CPU/memoria   ECS Task Metadata v4 `/task/stats`   cgroup v2 `/sys/fs/cgroup/*`      `sysinfo`
+//   CPU/memoria   ECS Task Metadata v4 `/task/stats`   cgroup v2 `/sys/fs/cgroup/*`      (null)
 //   BD            Postgres (sin "tamaño local")        Postgres                         Postgres
-//   documentos    listado S3 vía el Cloud              disco local (`media/`)           disco local
+//   documentos    S3 vía el Cloud                      S3 vía el Cloud                  S3 vía el Cloud
 //
 // (Detalle de fuentes en `architecture/hub/system-info.md`, contrato que implementa el humano en
-// `crates/server`.) Por eso `storageSource` es `'s3'` en ECS y `'disk'` en Docker/dev.
+// `crates/server`.) Los documentos SIEMPRE salen del Cloud: el Hub no tiene credenciales S3.
 //
 // Mientras el endpoint no exista, `fetchSystemInfo` devuelve `null`: las tarjetas KPI se muestran
 // igualmente con valores a 0 (CPU/Memoria/Conexiones 0, BD sin tamaño) y las pestañas de datos
@@ -51,14 +52,14 @@ export interface DatabaseInfo {
   connectionsLimit?: number | null;
 }
 
-/** Un documento de almacenamiento (objeto S3 en ECS/cloud, fichero del disco en Docker/dev). */
+/** Un documento de almacenamiento (objeto S3 del hub, servido vía el Cloud). */
 export interface StorageDoc {
   name: string;
   sizeLabel: string;
   /** ISO 8601. */
   modified: string;
   kind?: string | null;
-  /** URL firmada S3 (cloud) o ruta local (`media/`); `null` si no descargable. */
+  /** URL firmada S3 (vía el Cloud); `null` si no descargable. */
   url?: string | null;
 }
 
@@ -80,9 +81,9 @@ export interface SystemInfo {
   cpu?: UsageMetric | null;
   memory?: UsageMetric | null;
   database: DatabaseInfo;
-  /** Origen del almacenamiento de documentos: 's3' (ECS/cloud, vía el Cloud) | 'disk' (Docker/dev,
-   *  disco local `media/`). El runtime lo gatea por ECS, no por el dialecto. */
-  storageSource?: 's3' | 'disk' | null;
+  /** Origen del almacenamiento de documentos. Cloud-only (ADR-0154): siempre `'s3'` (vía el Cloud;
+   *  el Hub no tiene credenciales S3 ni lee del disco). */
+  storageSource?: 's3' | null;
   /** Capacidad de almacenamiento formateada para la barra (p.ej. "2,1 GB / 8 GB"). */
   storageUsed?: UsageMetric | null;
   documents?: StorageDoc[];

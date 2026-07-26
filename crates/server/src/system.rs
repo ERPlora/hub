@@ -1,24 +1,23 @@
 //! `GET /api/system` — estado REAL del sistema (Postgres-only, ADR-0154).
 //!
-//! Tras ADR-0154 el Hub es Postgres-only y PWA: `backend` es SIEMPRE `"cloud"` y `shell` SIEMPRE
-//! `"web"` (ya no hay SQLite/single ni Tauri/desktop, ni detección por dialecto). El runtime es la
-//! autoridad: mide las métricas y reporta la BD, nada se infiere en el navegador. Lo que cambia es
-//! la FUENTE de CPU/memoria según el despliegue:
+//! Tras ADR-0154 el Hub es Postgres-only, PWA y cloud-only: `backend` es SIEMPRE `"cloud"`, `shell`
+//! SIEMPRE `"web"` y `storageSource` SIEMPRE `"s3"` (ya no hay SQLite/single, Tauri/desktop ni disco
+//! local — todo eso murió con ADR-0154). El runtime es la autoridad: mide las métricas y reporta la
+//! BD, nada se infiere en el navegador. Lo que cambia es la FUENTE de CPU/memoria según el despliegue:
 //!   • **ECS Task Metadata Endpoint v4** (`/task/stats` + `/task`) si corremos en un task de
 //!     ECS/Fargate (proveedor AWS de reserva; existe `ECS_CONTAINER_METADATA_URI_V4`).
 //!   • **cgroup v2** (`/sys/fs/cgroup/*`) si corremos en un contenedor Docker (Hetzner/Swarm, infra
 //!     activa) — respeta el límite del contenedor, no `/proc` (que vería la RAM del host).
-//!   • **`sysinfo`** (uso del SO) como último recurso en desarrollo local (ni ECS ni cgroup v2).
+//!   • En **desarrollo local** (ni ECS ni cgroup v2) no hay métricas de host → `cpu`/`memory` = null.
 //!
 //! Por qué Task Metadata y no CloudWatch (decisión ADR-0046): es la contabilidad **cgroup del
 //! propio task** (lo que CloudWatch agrega) pero en **tiempo real, sin IAM/coste/SDK** y respeta el
 //! límite del Fargate. Evita el error de leer `/proc` y ver la RAM del host.
 //!
-//! Documentos/almacenamiento (gateado por `in_ecs`, no por el dialecto): en cloud (ECS) vía el Cloud
-//! (`GET /api/v1/hub/device/storage/`, el Hub no tiene credenciales S3); en el resto (Docker/dev),
-//! del disco local (`media/`) → por eso `storageSource` es `"s3"` en ECS y `"disk"` en Docker/dev.
-//! Logs = outbox de eventos. Las copias, importaciones y restauraciones pertenecen a Ajustes → Datos
-//! y copias, no a Sistema.
+//! Documentos/almacenamiento: SIEMPRE vía el Cloud (`GET /api/v1/hub/device/storage/`, `X-Hub-Token`
+//! + `X-Hub-Id`) — el Hub no tiene credenciales S3, así que nunca lee del disco. Logs = outbox de
+//! eventos. Las copias, importaciones y restauraciones pertenecen a Ajustes → Datos y copias, no a
+//! Sistema.
 //!
 //! Contrato (camelCase) consumido por `hub/apps/web/src/lib/system.ts`.
 
@@ -45,11 +44,11 @@ pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Resp
         }
     }
 
-    // ¿Estamos en ECS? El endpoint de metadata solo existe dentro de un task de ECS/Fargate.
+    // ¿Estamos en ECS? El Task Metadata Endpoint solo existe dentro de un task de ECS/Fargate
+    // (proveedor AWS de reserva). En Hetzner/Docker (infra activa) no existe → cgroup v2.
     let ecs_uri = std::env::var("ECS_CONTAINER_METADATA_URI_V4")
         .ok()
         .filter(|s| !s.is_empty());
-    let in_ecs = ecs_uri.is_some();
 
     // BD + logs (mismo lock del runtime; su outbox es el feed de eventos).
     let (database, logs) = {
@@ -64,30 +63,23 @@ pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Resp
     let backend = "cloud";
     let shell = "web";
 
-    // CPU / memoria: ECS Task Metadata v4 (cloud) o `sysinfo` (local).
+    // CPU / memoria según el despliegue: ECS Task Metadata v4 (AWS de reserva) o cgroup v2
+    // (Hetzner/Docker, activo). En desarrollo local (ni ECS ni cgroup) no hay métricas de host.
     let (cpu, memory) = match &ecs_uri {
         Some(uri) => ecs_metrics(&st.http, uri).await,
         None if in_cgroup_v2() => docker_metrics().await,
-        None => local_metrics().await,
+        None => (Value::Null, Value::Null),
     };
 
-    // Documentos / almacenamiento usado. Se gatea por `in_ecs` (no por el dialecto): en
-    // cloud va vía Cloud (el Hub no tiene credenciales S3); en local se lee del disco.
-    let (documents, storage_used) = if in_ecs {
-        cloud_storage(
-            &st.http,
-            &st.config.cloud_base_url,
-            &st.hub_id(),
-            st.machine_token(),
-        )
-        .await
-    } else {
-        // Carpeta media del hub, resuelta del entorno (igual que el arranque): HUB_MEDIA_DIR o `media`.
-        let media_dir = std::env::var("HUB_MEDIA_DIR")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| std::path::PathBuf::from("media"));
-        local_storage(&media_dir).await
-    };
+    // Documentos / almacenamiento SIEMPRE vía el Cloud (Postgres-only, ADR-0154): el Hub no tiene
+    // credenciales S3, así que firma hacia `GET /api/v1/hub/device/storage/` con su token de máquina.
+    let (documents, storage_used) = cloud_storage(
+        &st.http,
+        &st.config.cloud_base_url,
+        &st.hub_id(),
+        st.machine_token(),
+    )
+    .await;
 
     Json(json!({
         "ok": true,
@@ -98,7 +90,7 @@ pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Resp
             "cpu": cpu,
             "memory": memory,
             "database": database,
-            "storageSource": if in_ecs { "s3" } else { "disk" },
+            "storageSource": "s3",
             "storageUsed": storage_used,
             "documents": documents,
             "logs": logs,
@@ -203,96 +195,6 @@ async fn collect_logs(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str) -> Val
         })
         .collect();
     Value::Array(logs)
-}
-
-// ─────────────────────────── Almacenamiento: LOCAL (disco) ───────────────────────────
-
-/// Documentos (raíz de `media/`) y uso de disco — todo del disco local.
-async fn local_storage(media_dir: &std::path::Path) -> (Value, Value) {
-    let documents = list_dir(media_dir);
-    let storage_used = disk_usage(media_dir).await;
-    (documents, storage_used)
-}
-
-/// Lista ficheros (no dirs ni ocultos) de `dir`, recientes primero (máx 100).
-fn list_dir(dir: &std::path::Path) -> Value {
-    let rd = match std::fs::read_dir(dir) {
-        Ok(rd) => rd,
-        Err(_) => return Value::Array(vec![]),
-    };
-    let mut entries: Vec<(String, u64, std::time::SystemTime)> = rd
-        .flatten()
-        .filter_map(|e| {
-            let path = e.path();
-            if !path.is_file() {
-                return None;
-            }
-            let name = path.file_name()?.to_string_lossy().to_string();
-            if name.starts_with('.') {
-                return None; // .DS_Store y similares
-            }
-            let meta = std::fs::metadata(&path).ok()?;
-            let mtime = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
-            Some((name, meta.len(), mtime))
-        })
-        .collect();
-    entries.sort_by(|a, b| b.2.cmp(&a.2));
-    entries.truncate(100);
-    let items: Vec<Value> = entries
-        .into_iter()
-        .map(|(name, size, mtime)| {
-            let when = fmt_iso(mtime);
-            json!({
-                "name": name,
-                "sizeLabel": human_bytes(size),
-                "modified": when,
-                "kind": ext_of(&name),
-                "url": format!("/api/media/raw?path={}", pct_encode(&name)),
-            })
-        })
-        .collect();
-    Value::Array(items)
-}
-
-/// Uso del disco que contiene `path` (punto de montaje con el prefijo más largo); si no se
-/// identifica, el de mayor capacidad. `null` si no hay datos.
-async fn disk_usage(path: &std::path::Path) -> Value {
-    let path = path.to_path_buf();
-    let res = tokio::task::spawn_blocking(move || {
-        use sysinfo::Disks;
-        let abs = std::fs::canonicalize(&path).unwrap_or(path);
-        let disks = Disks::new_with_refreshed_list();
-        let mut best: Option<(usize, u64, u64)> = None; // (len_montaje, total, disponible)
-        let mut fallback: Option<(u64, u64)> = None; // (total, disponible) del de mayor total
-        for d in disks.iter() {
-            let (total, avail) = (d.total_space(), d.available_space());
-            if fallback.map(|(t, _)| total > t).unwrap_or(true) {
-                fallback = Some((total, avail));
-            }
-            let mp = d.mount_point();
-            if abs.starts_with(mp) {
-                let len = mp.as_os_str().len();
-                if best.map(|(l, _, _)| len > l).unwrap_or(true) {
-                    best = Some((len, total, avail));
-                }
-            }
-        }
-        best.map(|(_, t, a)| (t, a)).or(fallback)
-    })
-    .await
-    .ok()
-    .flatten();
-    match res {
-        Some((total, avail)) if total > 0 => {
-            let used = total.saturating_sub(avail);
-            json!({
-                "usedLabel": human_bytes(used),
-                "limitLabel": human_bytes(total),
-                "fraction": (used as f64 / total as f64).clamp(0.0, 1.0),
-            })
-        }
-        _ => Value::Null,
-    }
 }
 
 // ─────────────────────────── Almacenamiento: CLOUD (proxy a Cloud) ───────────────────────────
@@ -478,45 +380,6 @@ async fn fetch_json(http: &reqwest::Client, url: &str) -> Option<Value> {
     resp.json::<Value>().await.ok()
 }
 
-// ─────────────────────────── Métricas: LOCAL (desarrollo, sysinfo) ───────────────────────────
-
-/// CPU/memoria del SO con `sysinfo`. Fallback de desarrollo local (ni ECS ni cgroup v2). La medición
-/// de CPU necesita dos refrescos separados por un intervalo mínimo → se hace en un hilo bloqueante
-/// para no parar el executor async.
-async fn local_metrics() -> (Value, Value) {
-    let res = tokio::task::spawn_blocking(|| {
-        use sysinfo::System;
-        let mut sys = System::new();
-        sys.refresh_cpu_usage();
-        std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-        sys.refresh_cpu_usage();
-        sys.refresh_memory();
-        let cores = sys.cpus().len().max(1) as f64;
-        let cpu_pct = sys.global_cpu_usage() as f64; // media 0..100 de todos los núcleos
-        let used = sys.used_memory(); // bytes
-        let total = sys.total_memory(); // bytes
-        (cpu_pct, cores, used, total)
-    })
-    .await;
-
-    let Ok((cpu_pct, cores, used, total)) = res else {
-        return (Value::Null, Value::Null);
-    };
-
-    let used_cores = (cpu_pct / 100.0) * cores;
-    let cpu = json!({
-        "usedLabel": format!("{} cores", fmt_decimal(used_cores, 2)),
-        "limitLabel": format!("{} núcleos", cores as u64),
-        "fraction": (cpu_pct / 100.0).clamp(0.0, 1.0),
-    });
-    let memory = json!({
-        "usedLabel": human_bytes(used),
-        "limitLabel": human_bytes(total),
-        "fraction": if total > 0 { Some((used as f64 / total as f64).clamp(0.0, 1.0)) } else { None },
-    });
-    (cpu, memory)
-}
-
 // ─────────────────────────── Métricas: DOCKER (Hetzner, cgroup v2) ───────────────────────────
 
 /// ¿Contenedor con cgroup v2? (Docker en Hetzner). El fichero solo existe dentro del contenedor.
@@ -679,49 +542,4 @@ fn fmt_decimal(value: f64, decimals: usize) -> String {
         s
     };
     s.replace('.', ",")
-}
-
-/// Extensión en minúsculas sin punto (`""` si no hay).
-fn ext_of(name: &str) -> String {
-    name.rsplit_once('.')
-        .map(|(_, e)| e.to_lowercase())
-        .filter(|e| !e.is_empty() && e.len() <= 8)
-        .unwrap_or_default()
-}
-
-/// Percent-encode mínimo (RFC 3986 unreserved) para el querystring de `/api/media/raw?path=`.
-fn pct_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char)
-            }
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
-
-/// `SystemTime` → ISO 8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`). Algoritmo civil de Howard Hinnant
-/// (sin dependencias de fecha). El front lo parsea con `new Date(iso)`.
-fn fmt_iso(t: std::time::SystemTime) -> String {
-    let secs = t
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0) as i64;
-    let days = secs.div_euclid(86_400);
-    let rem = secs.rem_euclid(86_400);
-    let (hh, mm, ss) = (rem / 3600, (rem % 3600) / 60, rem % 60);
-    let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-    format!("{y:04}-{m:02}-{d:02}T{hh:02}:{mm:02}:{ss:02}Z")
 }
