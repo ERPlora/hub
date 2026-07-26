@@ -736,6 +736,9 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     // La paleta global tampoco viaja en el context: la trae el GET completo (que además
     // la refleja en el shell vía theme.ts). Aquí solo se preserva la cache.
     theme_palette: hubSettings.value?.theme_palette ?? 'erplora',
+    // La presencia web pública (ADR-0160) tampoco viaja en el context: la trae el GET completo de
+    // /api/settings. Preservamos la cache o degradamos a OFF (default seguro).
+    'public.landing.visible': hubSettings.value?.['public.landing.visible'] ?? false,
   };
   // Publica la moneda a `globalThis.__erploraCurrency` para los Web Components de módulo (ADR-0059):
   // el SDK la lee de ahí como fallback cuando el shell no inyecta el getter (mirror de cómo `locale`

@@ -44,6 +44,10 @@ export interface HubSettings {
    *  palettes.css; 'erplora' = marca por defecto. El override POR USUARIO vive en
    *  `hub_user_pref` y gana a esta. */
   theme_palette: string;
+  /** ¿Está activa la PRESENCIA WEB PÚBLICA del hub (landing + páginas públicas)? (ADR-0160).
+   *  Clave core plana `public.landing.visible` del store k/v; `false` = el hub no tiene parte
+   *  pública. La escribe un admin desde Ajustes; el runtime es la autoridad (PUT owner/admin). */
+  'public.landing.visible': boolean;
 }
 
 /**
@@ -72,6 +76,7 @@ function setHubSettings(raw: unknown): HubSettings {
     business_legal_name: typeof r.business_legal_name === 'string' ? r.business_legal_name : '',
     business_address: typeof r.business_address === 'string' ? r.business_address : '',
     theme_palette: typeof r.theme_palette === 'string' && r.theme_palette.trim() ? r.theme_palette.trim() : 'erplora',
+    'public.landing.visible': r['public.landing.visible'] === true,
   };
   hubSettings.value = next;
   // La paleta global se refleja en el shell al momento (theme.ts decide si hay override local).

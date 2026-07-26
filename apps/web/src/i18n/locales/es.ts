@@ -232,6 +232,8 @@ export default {
     saveChanges: 'Guardar cambios',
     showApiDocs: 'Mostrar documentación de la API',
     showApiDocsDesc: 'Añade una página interna con la API pública del Hub (Swagger) para integraciones',
+    publicPresence: 'Presencia web pública',
+    publicPresenceDesc: 'Publica una landing y páginas públicas para este hub. Si está desactivado, el hub no tiene web pública.',
     hardware: 'Hardware',
     bridgeDesc: 'Impresoras, cajón, escáner y conexión de hardware periférico',
     disabled: 'Desactivado',

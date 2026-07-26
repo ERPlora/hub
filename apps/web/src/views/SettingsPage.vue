@@ -145,6 +145,10 @@
           </ion-card-content>
         </ion-card>
 
+        <!-- Presencia web pública del hub (ADR-0160): toggle server-side `public.landing.visible`.
+             Mismo patrón que el de doc de la API; el panel encapsula lectura/persistencia. -->
+        <PublicPresencePanel class="mt-3" />
+
         <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('settings.hardware') }}</h2>
 
         <!-- ERPlora Bridge -->
@@ -422,6 +426,7 @@ import {
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import DataPanel from '../components/DataPanel.vue';
+import PublicPresencePanel from '../components/PublicPresencePanel.vue';
 import { bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';

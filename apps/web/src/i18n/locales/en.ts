@@ -231,6 +231,8 @@ export default {
     saveChanges: 'Save changes',
     showApiDocs: 'Show API documentation',
     showApiDocsDesc: 'Adds an internal page with the Hub public API (Swagger) for integrations',
+    publicPresence: 'Public web presence',
+    publicPresenceDesc: 'Publish a public landing and pages for this hub. When off, the hub has no public site.',
     hardware: 'Hardware',
     bridgeDesc: 'Printers, cash drawer, scanner and peripheral hardware connection',
     disabled: 'Disabled',
