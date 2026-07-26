@@ -617,6 +617,10 @@ export default {
     errorMachineRegistration:
       'La cuenta es válida, pero no se pudo registrar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
     requiredFields: 'Introduce un email válido y tu contraseña.',
+    // ADR-0157 §8: entra con la misma cuenta de Google que usas en el portal Cloud.
+    orSeparator: 'o',
+    continueWithGoogle: 'Continuar con Google',
+    errorGoogle: 'No se pudo iniciar sesión con Google. Inténtalo de nuevo.',
   },
   activation: {
     title: 'Activación requerida',

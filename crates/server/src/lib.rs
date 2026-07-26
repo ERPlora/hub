@@ -39,6 +39,7 @@ pub mod ingest;
 pub mod install;
 pub mod logging;
 pub mod media;
+pub mod members;
 pub mod module_storage;
 pub mod openapi;
 pub mod profile;
@@ -1937,12 +1938,21 @@ async fn auth_cloud(
     // que este ADR cierra. El alta real con su rol Hub la hace el admin vía la API de miembros
     // (`POST /api/v1/hub/device/members/`); este create es solo la red de seguridad para un
     // miembro que pasa el gate sin fila local. Configurable por entorno (`HUB_DEFAULT_ROLE`).
-    // NOTA(bootstrap): no hay excepción para el "primer owner de un hub vacío" en el código actual
-    // (no se inventa aquí, ADR-0157). Si hiciera falta, es una pieza de core aparte para Ioan.
     let default_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "employee".into());
+    // **Bootstrap** (ADR-0157 Enmienda 2 §3): en un hub **vacío** (sin ningún `hub_user`) el
+    // **primer** usuario que pasa el gate se provisiona como **owner** (admin-total local), no como
+    // `employee`. Resuelve el gap del paso 2 (un hub recién creado necesita un primer admin que dé
+    // de alta al resto). Solo aplica a la creación inicial: en cuanto existe un usuario, los
+    // siguientes caen al rol de mínimo privilegio. Configurable por entorno (`HUB_BOOTSTRAP_ROLE`).
+    let bootstrap_role = std::env::var("HUB_BOOTSTRAP_ROLE").unwrap_or_else(|_| "owner".into());
     let rt = st.runtime.lock().await;
+    // El predicado se evalúa ANTES del get-or-create: en un hub vacío el primer provisioning usa el
+    // rol de bootstrap; el get-or-create nunca cambia el rol de un usuario ya existente, así que
+    // esto solo afecta a la primera fila. `false` (o error de BD) cae al rol por defecto (seguro).
+    let empty_hub = !rt.has_any_user().await.unwrap_or(false);
+    let provision_role = if empty_hub { &bootstrap_role } else { &default_role };
     match rt
-        .get_or_link_cloud_user(&cloud_user_id, &name, &default_role)
+        .get_or_link_cloud_user(&cloud_user_id, &name, provision_role)
         .await
     {
         Ok(user) => {

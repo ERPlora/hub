@@ -64,6 +64,23 @@ pub struct PreparedRequest {
     pub headers: Vec<(&'static str, String)>,
 }
 
+/// Percent-encode de un valor que va en **un segmento de path** (RFC 3986). Deja intacto el
+/// conjunto *unreserved* (`A-Z a-z 0-9 - . _ ~`) y codifica el resto como `%XX`. Sin dependencias
+/// (el crate no arrastra `url`/`percent-encoding`). Lo usa `members_remove` para poner el email en
+/// el path: `ana+x@bar.com` → `ana%2Bx%40bar.com` (el `.` del dominio se preserva por legibilidad).
+fn encode_path_segment(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for &b in s.as_bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
 /// Construye peticiones contra un Cloud Portal concreto.
 #[derive(Debug, Clone)]
 pub struct CloudClient {
@@ -184,6 +201,40 @@ impl CloudClient {
         PreparedRequest {
             method: "DELETE",
             url: format!("{}/api/v1/hub/device/enroll/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Alta de un miembro del hub** (ADR-0157 §7) — `POST /api/v1/hub/device/members/` con la
+    /// credencial de **máquina** (`X-Hub-Token`). Cuando un admin del hub da de alta a un usuario
+    /// local (con su rol Hub), el runtime avisa al SaaS: éste crea/enlaza la identidad **por email**
+    /// + una membresía (pending) + la **invitación**. El SaaS es la fuente de verdad del acceso; el
+    /// Hub solo la administra vía esta API. Se usa el token de máquina (no el JWT de usuario) porque
+    /// el día a día del POS es sesión local/PIN: casi nunca hay un JWT del SaaS fresco. El body
+    /// `{email, role}` lo construye el llamador (server). Ver `members_remove` para la baja.
+    pub fn members_add(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/members/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Baja de un miembro del hub** (ADR-0157 §7, *simetría obligatoria* del deprovisioning) —
+    /// `DELETE /api/v1/hub/device/members/{email}/` con `X-Hub-Token`. Revoca la membresía: el
+    /// usuario sigue autenticándose en el SaaS, pero este hub/org **desaparece de su payload** (y el
+    /// gate de presencia del Hub deja de dejarle entrar; ventana ≤1 h hasta que caduque su access,
+    /// ADR-0157 §9). El `email` va en el path **percent-encoded** (un email lleva `@`/`+`, que no
+    /// son seguros en un segmento crudo). El deprovisioning es el fallo típico del invitation flow:
+    /// esta baja es su contrapartida obligatoria del alta.
+    pub fn members_remove(&self, auth: &Auth, email: &str) -> PreparedRequest {
+        PreparedRequest {
+            method: "DELETE",
+            url: format!(
+                "{}/api/v1/hub/device/members/{}/",
+                self.base_url,
+                encode_path_segment(email)
+            ),
             headers: auth.headers(),
         }
     }
@@ -563,6 +614,46 @@ mod tests {
         assert!(r
             .headers
             .contains(&("Authorization", "Bearer abc".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    /// ADR-0157 §7: alta de un miembro del hub. `POST /api/v1/hub/device/members/` firmado con la
+    /// credencial de MÁQUINA (`X-Hub-Token`) — el alta la dispara el runtime, no un usuario con JWT
+    /// fresco. El body `{email, role}` lo construye el llamador (server); aquí solo la petición.
+    #[test]
+    fn members_add_is_machine_token_post() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "tok".into(),
+        };
+        let r = c.members_add(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/members/");
+        assert!(r.headers.contains(&("X-Hub-Token", "tok".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        // Nunca lleva el JWT del usuario: es el HUB quien se autentica a sí mismo.
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+    }
+
+    /// ADR-0157 §7 (simetría obligatoria del deprovisioning): baja de un miembro por email.
+    /// `DELETE /api/v1/hub/device/members/{email}/` con `X-Hub-Token`. El email va en el path
+    /// **percent-encoded** (`@`, `+`… no son seguros en un segmento crudo).
+    #[test]
+    fn members_remove_is_machine_token_delete_with_encoded_email() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "tok".into(),
+        };
+        let r = c.members_remove(&auth, "ana+x@bar.com");
+        assert_eq!(r.method, "DELETE");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/members/ana%2Bx%40bar.com/",
+            "el email va percent-encoded en el path (@→%40, +→%2B); el punto se preserva"
+        );
+        assert!(r.headers.contains(&("X-Hub-Token", "tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
     }
 

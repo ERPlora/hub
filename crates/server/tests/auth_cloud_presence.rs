@@ -124,18 +124,37 @@ async fn json_body(resp: axum::response::Response) -> Value {
 
 /// ¿Existe un `hub_user` vinculado a `cloud_user_id`? Introspección directa de la BD del runtime.
 async fn cloud_user_exists(state: &AppState, cloud_user_id: &str) -> bool {
+    cloud_user_role(state, cloud_user_id).await.is_some()
+}
+
+/// Rol LOCAL del `hub_user` vinculado a `cloud_user_id` (o `None` si no existe). Introspección
+/// directa de la BD del runtime para verificar el bootstrap «primer usuario = owner».
+async fn cloud_user_role(state: &AppState, cloud_user_id: &str) -> Option<String> {
     let rt = state.runtime.lock().await;
     let mut p = erplora_db::Params::new();
     p.insert("cuid".to_string(), json!(cloud_user_id));
     let res = rt
         .db_for_test()
         .query(
-            "SELECT id FROM hub_user WHERE cloud_user_id = :cuid",
+            "SELECT role FROM hub_user WHERE cloud_user_id = :cuid",
             &p,
         )
         .await
         .unwrap();
-    !res.rows.is_empty()
+    res.rows
+        .first()
+        .map(|r| r["role"].as_str().unwrap_or_default().to_string())
+}
+
+/// Login cloud con un `name` explícito (para provisionar varios usuarios distintos en un test).
+fn cloud_login_named(bearer: &str, name: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri("/api/auth/cloud")
+        .header("authorization", format!("Bearer {bearer}"))
+        .header("content-type", "application/json")
+        .body(Body::from(json!({ "name": name }).to_string()))
+        .unwrap()
 }
 
 #[tokio::test]
@@ -153,6 +172,43 @@ async fn member_present_in_hubs_claim_links_and_opens_session() {
     assert!(
         cloud_user_exists(&state, "123").await,
         "el usuario miembro se provisiona en hub_user"
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn first_user_of_empty_hub_is_bootstrapped_as_owner() {
+    // ADR-0157 Enmienda 2 §3: en un hub VACÍO, el PRIMER usuario que pasa el gate se provisiona
+    // como `owner` (admin-total local) para poder dar de alta al resto; los SIGUIENTES caen al rol
+    // de mínimo privilegio (`employee`).
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    // Primer usuario en un hub vacío → owner.
+    let first = sign_user_jwt(1, member.clone());
+    let resp = router
+        .clone()
+        .oneshot(cloud_login_named(&first, "Ana"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "1").await.as_deref(),
+        Some("owner"),
+        "primer usuario de un hub vacío → owner (bootstrap)"
+    );
+
+    // Segundo usuario (el hub ya no está vacío) → employee (mínimo privilegio).
+    let second = sign_user_jwt(2, member);
+    let resp = router
+        .oneshot(cloud_login_named(&second, "Beto"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "2").await.as_deref(),
+        Some("employee"),
+        "el segundo usuario NO hereda owner → rol por defecto"
     );
     std::fs::remove_dir_all(temp).ok();
 }

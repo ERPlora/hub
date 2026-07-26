@@ -446,6 +446,32 @@ export async function cloudLogin(email: string, password: string): Promise<Login
   return { access: tokens.access, refresh: tokens.refresh, user: me, hubId: tokens.hub_id };
 }
 
+// --- «Continuar con Google» (ADR-0157 §8) ----------------------------------
+// El Hub NUNCA habla con Google. Abre el OAuth del SaaS (`/auth/google/login/?next=<callback>`);
+// el SaaS autentica con Google y redirige al `next` del hub con un **código de un solo uso**. El
+// Hub lo canjea (`session-exchange`) por `{access, refresh}` y a partir de ahí sigue EXACTAMENTE el
+// flujo de `cloudLogin` (mint de sesión local, etc.). Mantiene la paridad Cloud↔Hub del login.
+
+/** URL del OAuth de Google DEL SaaS con el callback del hub en `next`. El Hub redirige aquí (no a
+ *  Google). `callbackUrl` es la ruta de retorno del hub (absoluta) que recibirá el `code`. */
+export function googleLoginUrl(callbackUrl: string): string {
+  return `${config.cloudApiUrl}/auth/google/login/?next=${encodeURIComponent(callbackUrl)}`;
+}
+
+/** Canjea el **código de un solo uso** del retorno OAuth por tokens de sesión (ADR-0157 §8):
+ *  `POST /api/v1/auth/session-exchange/ {code}` → `{access, refresh}`. Devuelve un [`LoginResult`]
+ *  con la MISMA forma que [`cloudLogin`], para reusar tal cual el flujo de finalización de login. */
+export async function exchangeGoogleCode(code: string): Promise<LoginResult> {
+  const tokens = await post<{ access: string; refresh: string; hub_id?: string }>(
+    '/api/v1/auth/session-exchange/',
+    { code },
+    8000,
+    await loginHeaders(),
+  );
+  const me = await meRequest(tokens.access);
+  return { access: tokens.access, refresh: tokens.refresh, user: me, hubId: tokens.hub_id };
+}
+
 function positiveDecimal(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
   const amount = Number(value);
