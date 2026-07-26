@@ -26,6 +26,12 @@ pub struct UserClaims {
     #[serde(default)]
     pub token_type: String,
     pub exp: i64,
+    /// Email del usuario (claim del payload SaaS, ADR-0157). El Hub lo usa para **enlazar** el login
+    /// con el `hub_user` **sembrado** (owner del env) o **invitado** por el admin, cuando ese
+    /// `hub_user` aún no tiene `cloud_user_id`. **`#[serde(default)]`**: un token sin el claim →
+    /// cadena vacía (el enlace por email se salta y se cae al provisioning por rol por defecto).
+    #[serde(default)]
+    pub email: String,
     /// Hubs a los que pertenece el usuario (claim *coarse* `hubs: [{id, org}]`, ADR-0157). El Hub
     /// lo usa para el gate de presencia. **`#[serde(default)]`**: los tokens emitidos por un SaaS
     /// previo a ADR-0157 no lo traen → lista vacía (no es miembro de nada → el gate rechaza).
@@ -153,6 +159,31 @@ nQIDAQAB
             !claims.is_member_of_hub("hub-x"),
             "hub-x NO está en el payload"
         );
+    }
+
+    /// ADR-0157 (corrección owner): el JWT lleva el `email` del usuario (payload de ejemplo del
+    /// ADR: `{"sub":…,"email":"ana@bar.com",…}`). El Hub lo usa para ENLAZAR el login con el
+    /// `hub_user` sembrado/invitado por email. Un token sin `email` parsea a cadena vacía.
+    #[test]
+    fn email_claim_parses_and_defaults_empty() {
+        let token = sign(json!({
+            "user_id": 123,
+            "email": "ana@bar.com",
+            "token_type": "access",
+            "exp": 9_999_999_999_i64,
+            "hubs": [{"id": "hub-1", "org": "org-A"}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert_eq!(claims.email, "ana@bar.com", "el email del payload se parsea");
+
+        // Sin claim `email` → cadena vacía (retrocompat).
+        let no_email = sign(json!({
+            "user_id": 7,
+            "token_type": "access",
+            "exp": 9_999_999_999_i64,
+        }));
+        let claims = verify_user_jwt(&no_email, PUB).unwrap();
+        assert!(claims.email.is_empty(), "sin `email` → cadena vacía");
     }
 
     /// Retrocompat: un token viejo (SaaS previo a ADR-0157) NO trae `hubs`. Debe parsear igual

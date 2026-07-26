@@ -593,26 +593,44 @@ impl Runtime {
         identity::list_pin_users(self.db.as_ref()).await
     }
 
-    /// `true` si el hub ya tiene algún `hub_user` (predicado del bootstrap «primer usuario =
-    /// owner», ADR-0157 Enmienda 2 §3). Un hub vacío devuelve `false`.
-    pub async fn has_any_user(&self) -> Result<bool> {
-        identity::has_any_user(self.db.as_ref()).await
+    /// **Siembra el owner del hub** desde el env del provisioning (`HUB_OWNER_EMAIL`, ADR-0157): el
+    /// owner es el CREADOR del hub. Idempotente (no duplica ni cambia si ya existe). `true` si sembró.
+    pub async fn seed_owner(&self, email: &str) -> Result<bool> {
+        identity::seed_owner(self.db.as_ref(), email).await
     }
 
-    /// Resuelve (o provisiona) el `hub_user` vinculado a una identidad cloud (mapeo del JWT).
+    /// Resuelve (o enlaza/provisiona) el `hub_user` de una identidad cloud (mapeo del JWT). Enlaza
+    /// por `cloud_user_id`, si no por `email` (owner sembrado / invitado), si no crea con el rol dado.
     pub async fn get_or_link_cloud_user(
         &self,
         cloud_user_id: &str,
         default_name: &str,
         default_role: &str,
+        email: Option<&str>,
     ) -> Result<identity::HubUser> {
         identity::get_or_link_cloud_user(
             self.db.as_ref(),
             cloud_user_id,
             default_name,
             default_role,
+            email,
         )
         .await
+    }
+
+    /// **Alta** de un usuario-login por email + rol (flujo admin, ADR-0157 §7). Upsert por email.
+    pub async fn create_login_user(&self, email: &str, role: &str) -> Result<identity::HubUser> {
+        identity::create_login_user(self.db.as_ref(), email, role).await
+    }
+
+    /// **Baja** de un usuario-login por email (flujo admin, ADR-0157 §7). Desactiva; `true` si afectó.
+    pub async fn deactivate_login_user(&self, email: &str) -> Result<bool> {
+        identity::deactivate_login_user(self.db.as_ref(), email).await
+    }
+
+    /// Lista los usuarios-login del hub (los `hub_user` con email) para el panel admin.
+    pub async fn list_login_users(&self) -> Result<Vec<identity::LoginUser>> {
+        identity::list_login_users(self.db.as_ref()).await
     }
 
     /// Fija (o cambia) el PIN de un usuario existente por id (alta de PIN tras login cloud).

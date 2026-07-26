@@ -46,6 +46,18 @@ pub struct HubUser {
     pub is_active: bool,
 }
 
+/// Fila del panel admin de **usuarios-login** del hub (ADR-0157 §7): los `hub_user` con una cuenta
+/// cloud (email no vacío), que el owner/admin da de alta/baja. A diferencia de [`HubUser`] lleva el
+/// `email` (la clave por la que el admin los administra y por la que el login los enlaza).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct LoginUser {
+    pub id: String,
+    pub email: String,
+    pub name: String,
+    pub role: String,
+    pub is_active: bool,
+}
+
 // ── PIN ─────────────────────────────────────────────────────────────────────────────────────
 // **argon2id** con string PHC estándar (`$argon2id$v=19$...`), decisión humano hub#15. NOTA: el PIN
 // es corto (4 dígitos), así que la seguridad real depende de que el dispositivo sea de confianza
@@ -263,26 +275,74 @@ pub async fn list_pin_users(db: &dyn DatabaseAdapter) -> Result<Vec<(String, Str
         .collect())
 }
 
-/// `true` si el hub tiene **al menos un** `hub_user` (activo o no). Predicado del **bootstrap**
-/// (ADR-0157 Enmienda 2 §3): un hub **vacío** (sin ningún usuario) provisiona a su **primer**
-/// usuario cloud como **owner** en vez de con el rol de mínimo privilegio. Cuenta CUALQUIER fila
-/// (incluidas las desactivadas): un hub que ya tuvo un usuario no vuelve a ser «nuevo».
-pub async fn has_any_user(db: &dyn DatabaseAdapter) -> Result<bool> {
-    let res = db
-        .query("SELECT id FROM hub_user LIMIT 1", &Params::new())
-        .await?;
-    Ok(!res.rows.is_empty())
+/// Nombre legible por defecto derivado de un email (la parte local antes de `@`). Para dar un
+/// `name` mostrable al `hub_user` sembrado/invitado por email antes de su primer login (el usuario
+/// puede editarlo luego en su Perfil). `""` → `"owner"`/lo que pase el llamador.
+fn name_from_email(email: &str) -> String {
+    email
+        .split('@')
+        .next()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(email)
+        .to_string()
 }
 
-/// Resuelve (o crea) el `hub_user` vinculado a una identidad cloud. Es el adaptador del **JWT de
-/// usuario**: tras verificar el token (server), se mapea su `user_id` a un usuario local. Si no
-/// existe, se **provisiona** (primer login online, §2.9) con `default_role`.
+/// **Siembra el owner del hub** desde el env del provisioning del SaaS (ADR-0157, corrección de
+/// Ioan 2026-07-26): el owner es el **CREADOR** del hub y el despliegue lo trae ya inyectado como
+/// `HUB_OWNER_EMAIL`. Crea un `hub_user` con rol `owner`, ese `email` y `cloud_user_id = NULL`
+/// (aún no ha hecho login: al primer login `get_or_link_cloud_user` lo enlaza por email). Sin PIN.
+///
+/// **Idempotente**: si ya existe un `hub_user` con ese email, **no hace nada** (no duplica ni pisa
+/// un rol/estado existente). Devuelve `true` si sembró una fila nueva, `false` si ya existía.
+/// Sustituye al bootstrap «primer login = owner» (retirado): el owner ya no depende de quién entre
+/// primero, sino de quién creó el hub.
+pub async fn seed_owner(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
+    let email = email.trim();
+    if email.is_empty() {
+        return Ok(false);
+    }
+    let mut p = Params::new();
+    p.insert("email".into(), json!(email));
+    let existing = db
+        .query("SELECT id FROM hub_user WHERE email = :email", &p)
+        .await?;
+    if !existing.rows.is_empty() {
+        return Ok(false); // ya sembrado: idempotente, no cambia nada.
+    }
+    let id = new_id();
+    let mut ins = Params::new();
+    ins.insert("id".into(), json!(id));
+    ins.insert("name".into(), json!(name_from_email(email)));
+    ins.insert("email".into(), json!(email));
+    ins.insert("now".into(), json!(now_rfc3339()));
+    db.execute(
+        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+          VALUES (:id, :name, '', 'owner', NULL, 1, :now, :email)",
+        &ins,
+    )
+    .await?;
+    Ok(true)
+}
+
+/// Resuelve (o crea/enlaza) el `hub_user` vinculado a una identidad cloud. Adaptador del **JWT de
+/// usuario**: tras verificar el token (server), se mapea a un usuario local. La resolución es en
+/// dos pasos (ADR-0157):
+///  1. Por **`cloud_user_id`** (usuario ya enlazado en un login previo).
+///  2. Por **`email`** (si viene y no está vacío): una fila **pre-provisionada sin `cloud_user_id`**
+///     — el **owner sembrado** (`seed_owner`) o un usuario **invitado** por el admin (`create_login_user`).
+///     Se **enlaza** (fija `cloud_user_id`) conservando su rol (owner / rol de la invitación) y su
+///     email. Así el owner mantiene `owner` (no cae a `employee`) en su primer login.
+///  3. Si no hay coincidencia → se **provisiona** con `default_role` (red de seguridad para un
+///     miembro que pasa el gate de presencia sin fila local; rol de mínimo privilegio).
 pub async fn get_or_link_cloud_user(
     db: &dyn DatabaseAdapter,
     cloud_user_id: &str,
     default_name: &str,
     default_role: &str,
+    email: Option<&str>,
 ) -> Result<HubUser> {
+    // 1) Por cloud_user_id (ya enlazado).
     let mut p = Params::new();
     p.insert("cuid".into(), json!(cloud_user_id));
     let res = db
@@ -295,7 +355,36 @@ pub async fn get_or_link_cloud_user(
     if let Some(row) = res.rows.first() {
         return Ok(row_to_user(row));
     }
-    let id = create_user(db, default_name, "", default_role, Some(cloud_user_id)).await?;
+    // 2) Por email: fila pre-provisionada (owner sembrado / invitado) sin cloud_user_id → enlazar.
+    if let Some(email) = email.map(str::trim).filter(|s| !s.is_empty()) {
+        let mut pe = Params::new();
+        pe.insert("email".into(), json!(email));
+        let by_email = db
+            .query(
+                "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
+                  WHERE email = :email AND cloud_user_id IS NULL AND is_active = 1",
+                &pe,
+            )
+            .await?;
+        if let Some(row) = by_email.rows.first() {
+            let user = row_to_user(row);
+            let mut up = Params::new();
+            up.insert("id".into(), json!(user.id));
+            up.insert("cuid".into(), json!(cloud_user_id));
+            db.execute(
+                "UPDATE hub_user SET cloud_user_id = :cuid WHERE id = :id",
+                &up,
+            )
+            .await?;
+            return Ok(HubUser {
+                cloud_user_id: Some(cloud_user_id.to_string()),
+                ..user
+            });
+        }
+    }
+    // 3) Provisiona una fila nueva (rol de mínimo privilegio) con su email si vino.
+    let email = email.map(str::trim).unwrap_or("");
+    let id = create_login_user_row(db, &new_id(), default_name, "", default_role, Some(cloud_user_id), email).await?;
     Ok(HubUser {
         id,
         name: default_name.to_string(),
@@ -303,6 +392,126 @@ pub async fn get_or_link_cloud_user(
         cloud_user_id: Some(cloud_user_id.to_string()),
         is_active: true,
     })
+}
+
+/// INSERT de bajo nivel de un `hub_user` con `email` explícito (lo comparten el provisioning por
+/// email y el enlace-o-crea del login). No comprueba duplicados (los llamadores lo hacen).
+async fn create_login_user_row(
+    db: &dyn DatabaseAdapter,
+    id: &str,
+    name: &str,
+    pin: &str,
+    role: &str,
+    cloud_user_id: Option<&str>,
+    email: &str,
+) -> Result<String> {
+    let pin_hash = if pin.is_empty() {
+        String::new()
+    } else {
+        hash_pin_argon2(pin)?
+    };
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("name".into(), json!(name));
+    p.insert("pin_hash".into(), json!(pin_hash));
+    p.insert("role".into(), json!(role));
+    p.insert("cloud_user_id".into(), json!(cloud_user_id));
+    p.insert("email".into(), json!(email));
+    p.insert("now".into(), json!(now_rfc3339()));
+    db.execute(
+        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+          VALUES (:id, :name, :pin_hash, :role, :cloud_user_id, 1, :now, :email)",
+        &p,
+    )
+    .await?;
+    Ok(id.to_string())
+}
+
+/// **Alta de un usuario-login** por email + rol (flujo admin del Hub, ADR-0157 §7). Es identidad
+/// (quién puede ENTRAR), **no** el módulo `staff.*` (negocio). **Upsert por email**: si ya existe
+/// una fila con ese email la **reactiva** y le fija el rol nuevo (re-invitación); si no, crea una
+/// fila nueva sin PIN y sin `cloud_user_id` (se enlaza en su primer login, `get_or_link_cloud_user`).
+/// Devuelve el `hub_user` resultante. La notificación al SaaS (`members_add`) la hace el server.
+pub async fn create_login_user(
+    db: &dyn DatabaseAdapter,
+    email: &str,
+    role: &str,
+) -> Result<HubUser> {
+    let email = email.trim();
+    let mut p = Params::new();
+    p.insert("email".into(), json!(email));
+    let existing = db
+        .query(
+            "SELECT id, name, role, cloud_user_id, is_active FROM hub_user WHERE email = :email",
+            &p,
+        )
+        .await?;
+    if let Some(row) = existing.rows.first() {
+        let user = row_to_user(row);
+        let mut up = Params::new();
+        up.insert("id".into(), json!(user.id));
+        up.insert("role".into(), json!(role));
+        db.execute(
+            "UPDATE hub_user SET role = :role, is_active = 1 WHERE id = :id",
+            &up,
+        )
+        .await?;
+        return Ok(HubUser {
+            role: role.to_string(),
+            is_active: true,
+            ..user
+        });
+    }
+    let id = new_id();
+    create_login_user_row(db, &id, &name_from_email(email), "", role, None, email).await?;
+    Ok(HubUser {
+        id,
+        name: name_from_email(email),
+        role: role.to_string(),
+        cloud_user_id: None,
+        is_active: true,
+    })
+}
+
+/// **Baja de un usuario-login** por email (flujo admin, ADR-0157 §7 — la simetría del alta). Marca
+/// `is_active = 0` (no borra: audit + posible re-alta); una sesión abierta deja de resolver
+/// (`resolve_session` filtra `is_active = 1`). Idempotente. Devuelve `true` si afectó a alguna fila
+/// activa. La revocación de la membresía en el SaaS (`members_remove`) la hace el server.
+pub async fn deactivate_login_user(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
+    let email = email.trim();
+    let mut p = Params::new();
+    p.insert("email".into(), json!(email));
+    let res = db
+        .execute(
+            "UPDATE hub_user SET is_active = 0 WHERE email = :email AND is_active = 1",
+            &p,
+        )
+        .await?;
+    Ok(res.affected > 0)
+}
+
+/// Lista los **usuarios-login** del hub (los `hub_user` con email = cuenta cloud) para el panel
+/// admin. Incluye los desactivados (`is_active = 0`) para que el admin los vea y pueda re-activar.
+/// Ordenados por email.
+pub async fn list_login_users(db: &dyn DatabaseAdapter) -> Result<Vec<LoginUser>> {
+    let res = db
+        .query(
+            "SELECT id, email, name, role, is_active FROM hub_user \
+              WHERE email IS NOT NULL AND email != '' ORDER BY email",
+            &Params::new(),
+        )
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .map(|r| LoginUser {
+            id: r["id"].as_str().unwrap_or_default().to_string(),
+            email: r["email"].as_str().unwrap_or_default().to_string(),
+            name: r["name"].as_str().unwrap_or_default().to_string(),
+            role: r["role"].as_str().unwrap_or_default().to_string(),
+            is_active: r["is_active"].as_i64().unwrap_or(0) != 0,
+        })
+        .collect())
 }
 
 // ── Sesiones ────────────────────────────────────────────────────────────────────────────────
@@ -488,6 +697,16 @@ mod tests {
             .unwrap();
     }
 
+    /// `ensure_tables` + la columna `hub_user.email` (**migración de sistema v9**, ADR-0157),
+    /// montada a mano — igual que `setup_identity` monta el `device_id` (v8). Para los tests del
+    /// owner sembrado / enlace por email / alta-baja de usuarios-login, sin pasar por el boot real.
+    async fn ensure_identity_email(db: &PgAdapter) {
+        ensure_tables(db).await.unwrap();
+        db.execute_batch("ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';")
+            .await
+            .unwrap();
+    }
+
     /// `device_id` persistido en la sesión `token` (o `None` si la fila no existe / es NULL).
     async fn session_device_id(db: &PgAdapter, token: &str) -> Option<String> {
         let mut p = Params::new();
@@ -598,9 +817,9 @@ mod tests {
     #[tokio::test]
     async fn set_pin_enables_pin_login_for_existing_user() {
         let db = fresh_db().await;
-        ensure_tables(&db).await.unwrap();
+        ensure_identity_email(&db).await;
         // Cloud-linked user provisioned without a PIN (first online login).
-        let user = get_or_link_cloud_user(&db, "7", "Ada", "admin")
+        let user = get_or_link_cloud_user(&db, "7", "Ada", "admin", None)
             .await
             .unwrap();
         assert!(
@@ -625,34 +844,90 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn has_any_user_reflects_emptiness_for_bootstrap() {
-        // ADR-0157 Enmienda 2 (3): el bootstrap «primer usuario = owner» se decide preguntando si
-        // el hub está VACÍO. `has_any_user` es ese predicado: `false` en un hub sin usuarios,
-        // `true` en cuanto hay al menos uno (activo o no — un hub con un usuario desactivado ya no
-        // es «nuevo»).
+    async fn seed_owner_is_idempotent_and_creates_owner() {
+        // ADR-0157 (corrección Ioan): el owner es el CREADOR, sembrado del env `HUB_OWNER_EMAIL`.
+        // `seed_owner` crea un `hub_user` role=owner con ese email y cloud_user_id NULL; re-sembrar
+        // (mismo email) es no-op (no duplica ni cambia).
         let db = fresh_db().await;
-        ensure_tables(&db).await.unwrap();
+        ensure_identity_email(&db).await;
+
         assert!(
-            !has_any_user(&db).await.unwrap(),
-            "hub nuevo: sin usuarios → vacío"
+            seed_owner(&db, "boss@bar.com").await.unwrap(),
+            "primera siembra → true (fila nueva)"
         );
-        create_user(&db, "Ana", "", "owner", Some("1"))
+        let users = list_login_users(&db).await.unwrap();
+        assert_eq!(users.len(), 1, "un único owner sembrado");
+        assert_eq!(users[0].email, "boss@bar.com");
+        assert_eq!(users[0].role, "owner", "sembrado como owner");
+
+        // Idempotente: re-sembrar el MISMO email no duplica ni cambia.
+        assert!(
+            !seed_owner(&db, "boss@bar.com").await.unwrap(),
+            "segunda siembra → false (ya existía)"
+        );
+        assert_eq!(
+            list_login_users(&db).await.unwrap().len(),
+            1,
+            "sigue habiendo un solo owner (no duplica)"
+        );
+
+        // Email vacío = no-op (no siembra nada).
+        assert!(!seed_owner(&db, "  ").await.unwrap());
+        assert_eq!(list_login_users(&db).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn login_links_seeded_owner_by_email_keeping_owner_role() {
+        // El owner sembrado (cloud_user_id NULL) se ENLAZA en su primer login por email,
+        // conservando role=owner (NO cae a `employee`). Un segundo login usa el cloud_user_id.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        seed_owner(&db, "boss@bar.com").await.unwrap();
+
+        // Primer login: enlaza por email → owner.
+        let user = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"))
             .await
             .unwrap();
-        assert!(
-            has_any_user(&db).await.unwrap(),
-            "con un usuario: ya no está vacío"
+        assert_eq!(user.role, "owner", "el owner sembrado conserva su rol");
+        assert_eq!(user.cloud_user_id.as_deref(), Some("99"), "queda enlazado");
+        assert_eq!(
+            list_login_users(&db).await.unwrap().len(),
+            1,
+            "NO crea una segunda fila: reusa el owner sembrado"
         );
+
+        // Segundo login (ya enlazado): resuelve por cloud_user_id, mismo usuario/rol.
+        let again = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"))
+            .await
+            .unwrap();
+        assert_eq!(again.id, user.id);
+        assert_eq!(again.role, "owner");
+    }
+
+    #[tokio::test]
+    async fn login_without_matching_seed_provisions_default_role() {
+        // Un miembro que pasa el gate de presencia SIN fila pre-sembrada → rol de mínimo privilegio
+        // (red de seguridad), con su email persistido.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+
+        let user = get_or_link_cloud_user(&db, "5", "Nuevo", "employee", Some("nuevo@bar.com"))
+            .await
+            .unwrap();
+        assert_eq!(user.role, "employee");
+        let listed = list_login_users(&db).await.unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].email, "nuevo@bar.com", "email persistido");
     }
 
     #[tokio::test]
     async fn cloud_user_link_is_idempotent() {
         let db = fresh_db().await;
-        ensure_tables(&db).await.unwrap();
-        let a = get_or_link_cloud_user(&db, "42", "Demo", "cashier")
+        ensure_identity_email(&db).await;
+        let a = get_or_link_cloud_user(&db, "42", "Demo", "cashier", None)
             .await
             .unwrap();
-        let b = get_or_link_cloud_user(&db, "42", "OtroNombre", "admin")
+        let b = get_or_link_cloud_user(&db, "42", "OtroNombre", "admin", None)
             .await
             .unwrap();
         assert_eq!(a.id, b.id, "el mismo cloud_user_id reusa el hub_user");
@@ -660,6 +935,39 @@ mod tests {
             b.role, "cashier",
             "no re-provisiona ni cambia el rol existente"
         );
+    }
+
+    #[tokio::test]
+    async fn create_login_user_upserts_by_email_and_deactivate_is_symmetric() {
+        // ADR-0157 §7: alta/baja de usuarios-login por email (flujo admin). Alta = upsert por email
+        // (crea o reactiva+re-rol); baja = desactiva (simétrica, idempotente).
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+
+        // Alta nueva.
+        let u = create_login_user(&db, "ana@bar.com", "manager").await.unwrap();
+        assert_eq!(u.role, "manager");
+        assert!(u.cloud_user_id.is_none(), "aún sin login → sin cloud_user_id");
+        assert!(u.is_active);
+
+        // Re-alta (mismo email, rol nuevo) = upsert: misma fila, rol actualizado.
+        let u2 = create_login_user(&db, "ana@bar.com", "admin").await.unwrap();
+        assert_eq!(u2.id, u.id, "reusa la fila del email (no duplica)");
+        assert_eq!(u2.role, "admin", "actualiza el rol");
+        assert_eq!(list_login_users(&db).await.unwrap().len(), 1);
+
+        // Baja: desactiva (true la primera vez, false si ya estaba inactiva = idempotente).
+        assert!(deactivate_login_user(&db, "ana@bar.com").await.unwrap());
+        assert!(!deactivate_login_user(&db, "ana@bar.com").await.unwrap());
+        let listed = list_login_users(&db).await.unwrap();
+        assert_eq!(listed.len(), 1, "sigue listada (audit), pero inactiva");
+        assert!(!listed[0].is_active);
+
+        // Re-alta reactiva la misma fila.
+        let u3 = create_login_user(&db, "ana@bar.com", "employee").await.unwrap();
+        assert_eq!(u3.id, u.id);
+        assert!(u3.is_active, "el alta reactiva");
+        assert_eq!(u3.role, "employee");
     }
 
     #[tokio::test]

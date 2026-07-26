@@ -16,14 +16,23 @@
 //! con `reqwest` + el token de máquina **vivo** del [`AppState`] (mismo patrón que los proxies del
 //! marketplace/entitlement). El secreto de máquina NO viaja al navegador: esto corre server-side.
 //!
-//! NOTA(core — columna del humano): hoy el Hub **no** expone todavía un flujo de administración de
-//! usuarios-login (dar de alta un `hub_user` por email + rol lo hace hoy, implícitamente, el gate de
-//! `auth_cloud` al pasar la presencia). El **endpoint/handler admin** que INVOQUE estas funciones —
-//! con su gate de permisos (owner/admin) y el alta/baja del `hub_user` local— toca el modelo de
-//! permisos/comandos, que es columna del humano (ADR-0157: «la IA implementa alrededor»). Estas
-//! funciones son la pieza «el runtime llama al SaaS» ya lista para engancharse cuando ese flujo
-//! exista; ver el informe de la tarea para el estado abierto.
+//! **Flujo admin de gestión de usuarios-login** (ADR-0157, checklist de core #2). Los handlers
+//! `add_member`/`remove_member`/`list_members` exponen el alta/baja/listado de usuarios-login del
+//! Hub a un **owner/admin** (gate `require_admin_session`). Cada alta/baja hace **dos** cosas: (1)
+//! crea/desactiva el `hub_user` **local** (identidad, `identity::{create_login_user,
+//! deactivate_login_user}`) y (2) **notifica al SaaS** (`notify_member_added/removed`, que es la
+//! fuente de verdad del ACCESO). Es identidad (quién puede ENTRAR), **no** el módulo `staff.*`
+//! (negocio). El orden es local→SaaS: si el SaaS falla, el alta local persiste (idempotente por
+//! email) y el admin reintenta; devolvemos un status honesto para que lo sepa.
 
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::Json;
+use serde::Deserialize;
+use serde_json::json;
+
+use crate::auth;
 use crate::state::AppState;
 
 /// Body del **alta** (`POST members/`): identifica al usuario por **email** + su **rol Hub**. El rol
@@ -116,4 +125,112 @@ pub async fn notify_member_removed(st: &AppState, email: &str) -> Result<(), Mem
     let auth = crate::auth::machine_auth(st).ok_or(MembersError::NoMachineToken)?;
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     send(st, cloud.members_remove(&auth, email), None).await
+}
+
+// ── Handlers HTTP del panel admin (ADR-0157 checklist core #2) ────────────────────────────────
+
+/// Body del alta admin (`POST /api/members`): email del usuario-login + su **rol Hub** (local).
+#[derive(Deserialize)]
+pub struct AddMemberReq {
+    pub email: String,
+    pub role: String,
+}
+
+/// Mapea un [`MembersError`] a la respuesta HTTP del handler admin. El alta/baja **local** ya se
+/// aplicó (idempotente); esto reporta que la parte SaaS falló, con un status honesto.
+fn members_error_response(e: MembersError) -> Response {
+    let (code, kind) = match &e {
+        // Bootstrap incompleto: el hub no está enrolado → no puede administrar el acceso en el SaaS.
+        MembersError::NoMachineToken => (StatusCode::CONFLICT, "not_enrolled"),
+        MembersError::Transport(_) => (StatusCode::BAD_GATEWAY, "cloud_unreachable"),
+        // Reenvía un 4xx del SaaS como 4xx (p. ej. email ya invitado); cualquier otro → 502.
+        MembersError::Cloud(status, _) => (
+            StatusCode::from_u16(*status)
+                .ok()
+                .filter(StatusCode::is_client_error)
+                .unwrap_or(StatusCode::BAD_GATEWAY),
+            "cloud_rejected",
+        ),
+    };
+    (
+        code,
+        Json(json!({ "ok": false, "code": kind, "error": e.to_string() })),
+    )
+        .into_response()
+}
+
+/// `POST /api/members` — **alta** de un usuario-login (email + rol). Gate **owner/admin**
+/// (`require_admin_session`). Crea/reactiva el `hub_user` local Y notifica el alta al SaaS. Es
+/// identidad, NO `staff.*`. → `{ok, user}` (403 sin rol admin; 400 body inválido; 4xx/5xx si el
+/// SaaS rechaza/no responde — el alta local ya se aplicó, idempotente por email).
+pub async fn add_member(
+    State(st): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(req): Json<AddMemberReq>,
+) -> Response {
+    let email = req.email.trim().to_string();
+    let role = req.role.trim().to_string();
+    if email.is_empty() || role.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "ok": false, "error": "email y role son obligatorios" })),
+        )
+            .into_response();
+    }
+    // Gate admin + alta local bajo el MISMO lock; se suelta ANTES de la I/O de red al SaaS.
+    let user = {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return crate::unauthorized(e);
+        }
+        match rt.create_login_user(&email, &role).await {
+            Ok(user) => user,
+            Err(e) => return crate::err_response(e),
+        }
+    };
+    // Notifica el alta al SaaS (fuente de verdad del acceso). Si falla, el alta local persiste.
+    if let Err(e) = notify_member_added(&st, &email, &role).await {
+        return members_error_response(e);
+    }
+    Json(json!({ "ok": true, "user": user })).into_response()
+}
+
+/// `DELETE /api/members/:email` — **baja** de un usuario-login. Gate **owner/admin**. Desactiva el
+/// `hub_user` local (una sesión abierta deja de resolver) Y revoca la membresía en el SaaS
+/// (simetría del alta). → `{ok}` (403 sin rol admin; 4xx/5xx si el SaaS rechaza/no responde).
+pub async fn remove_member(
+    State(st): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(email): Path<String>,
+) -> Response {
+    let email = email.trim().to_string();
+    let existed = {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return crate::unauthorized(e);
+        }
+        match rt.deactivate_login_user(&email).await {
+            Ok(existed) => existed,
+            Err(e) => return crate::err_response(e),
+        }
+    };
+    if let Err(e) = notify_member_removed(&st, &email).await {
+        return members_error_response(e);
+    }
+    Json(json!({ "ok": true, "deactivated": existed })).into_response()
+}
+
+/// `GET /api/members` — lista los usuarios-login del hub para el panel admin. Gate **owner/admin**.
+pub async fn list_members(
+    State(st): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    let rt = st.runtime.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return crate::unauthorized(e);
+    }
+    match rt.list_login_users().await {
+        Ok(users) => Json(json!({ "ok": true, "members": users })).into_response(),
+        Err(e) => crate::err_response(e),
+    }
 }

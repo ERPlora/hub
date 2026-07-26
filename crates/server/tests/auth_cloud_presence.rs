@@ -96,6 +96,32 @@ fn sign_user_jwt(user_id: i64, hubs: Value) -> String {
     encode(&Header::new(Algorithm::RS256), &claims, &key).unwrap()
 }
 
+/// JWT de usuario firmado con un `email` explícito (ADR-0157: el Hub enlaza el login con el
+/// `hub_user` sembrado/invitado por email). `hubs` = claim *coarse* de presencia.
+fn sign_user_jwt_email(user_id: i64, email: &str, hubs: Value) -> String {
+    let claims = json!({
+        "user_id": user_id,
+        "email": email,
+        "token_type": "access",
+        "exp": 9_999_999_999_i64,
+        "organizations": [{"id": "org-A", "role": "owner"}],
+        "hubs": hubs,
+    });
+    let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
+    encode(&Header::new(Algorithm::RS256), &claims, &key).unwrap()
+}
+
+/// Login cloud con un `bearer` dado (sin `name` ni `email` en el body: el email lo trae el token).
+fn cloud_login_bare(bearer: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri("/api/auth/cloud")
+        .header("authorization", format!("Bearer {bearer}"))
+        .header("content-type", "application/json")
+        .body(Body::from(json!({}).to_string()))
+        .unwrap()
+}
+
 /// JWT sin el claim `hubs` (SaaS legacy, previo a ADR-0157).
 fn sign_legacy_jwt(user_id: i64) -> String {
     let claims = json!({
@@ -146,17 +172,6 @@ async fn cloud_user_role(state: &AppState, cloud_user_id: &str) -> Option<String
         .map(|r| r["role"].as_str().unwrap_or_default().to_string())
 }
 
-/// Login cloud con un `name` explícito (para provisionar varios usuarios distintos en un test).
-fn cloud_login_named(bearer: &str, name: &str) -> Request<Body> {
-    Request::builder()
-        .method("POST")
-        .uri("/api/auth/cloud")
-        .header("authorization", format!("Bearer {bearer}"))
-        .header("content-type", "application/json")
-        .body(Body::from(json!({ "name": name }).to_string()))
-        .unwrap()
-}
-
 #[tokio::test]
 async fn member_present_in_hubs_claim_links_and_opens_session() {
     // El hub de esta máquina (HUB_ID) figura en `hubs[]` → el usuario ENTRA y se provisiona local.
@@ -177,38 +192,45 @@ async fn member_present_in_hubs_claim_links_and_opens_session() {
 }
 
 #[tokio::test]
-async fn first_user_of_empty_hub_is_bootstrapped_as_owner() {
-    // ADR-0157 Enmienda 2 §3: en un hub VACÍO, el PRIMER usuario que pasa el gate se provisiona
-    // como `owner` (admin-total local) para poder dar de alta al resto; los SIGUIENTES caen al rol
-    // de mínimo privilegio (`employee`).
+async fn seeded_owner_is_linked_by_email_keeping_owner_role() {
+    // ADR-0157 (corrección Ioan): el owner es el CREADOR, **sembrado del env** (`HUB_OWNER_EMAIL`)
+    // ANTES del primer login — NO «el primero que entra». En su primer login se ENLAZA por email
+    // (el token trae `email`), conservando role=owner. `auth_cloud` ya NO decide el owner.
     let (router, state, temp) = fixture().await;
-    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
-
-    // Primer usuario en un hub vacío → owner.
-    let first = sign_user_jwt(1, member.clone());
-    let resp = router
-        .clone()
-        .oneshot(cloud_login_named(&first, "Ana"))
+    // El provisioning del SaaS sembró al owner (aquí lo simulamos con el mismo seam que usa `serve`).
+    state
+        .runtime
+        .lock()
+        .await
+        .seed_owner("boss@bar.com")
         .await
         .unwrap();
+
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+    let owner = sign_user_jwt_email(1, "boss@bar.com", member);
+    let resp = router.oneshot(cloud_login_bare(&owner)).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
         cloud_user_role(&state, "1").await.as_deref(),
         Some("owner"),
-        "primer usuario de un hub vacío → owner (bootstrap)"
+        "el owner sembrado se enlaza por email conservando su rol"
     );
+    std::fs::remove_dir_all(temp).ok();
+}
 
-    // Segundo usuario (el hub ya no está vacío) → employee (mínimo privilegio).
-    let second = sign_user_jwt(2, member);
-    let resp = router
-        .oneshot(cloud_login_named(&second, "Beto"))
-        .await
-        .unwrap();
+#[tokio::test]
+async fn member_without_seed_is_provisioned_as_employee_not_owner() {
+    // Un miembro que pasa el gate SIN fila pre-sembrada (ni owner ni invitación) → rol de mínimo
+    // privilegio (`employee`), NUNCA owner. Cierra el auto-admin/auto-owner: el owner es del env.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+    let user = sign_user_jwt_email(2, "nuevo@bar.com", member);
+    let resp = router.oneshot(cloud_login_bare(&user)).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
         cloud_user_role(&state, "2").await.as_deref(),
         Some("employee"),
-        "el segundo usuario NO hereda owner → rol por defecto"
+        "sin seed → mínimo privilegio, no owner"
     );
     std::fs::remove_dir_all(temp).ok();
 }
