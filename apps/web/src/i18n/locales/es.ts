@@ -53,6 +53,10 @@ export default {
     iosHint: 'En iPhone/iPad: toca Compartir (el cuadrado con la flecha) y elige «Añadir a pantalla de inicio».',
     browserHint: 'En el menú de tu navegador, elige «Instalar aplicación» (o «Añadir a pantalla de inicio»).',
   },
+  // Editor de páginas públicas (PageEditor.vue, ADR-0160). Editor por bloques para páginas públicas.
+  pageEditor: {
+    placeholder: 'Escribe aquí tu página…',
+  },
   assistant: {
     title: 'Asistente',
     empty: 'Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.',
