@@ -5,7 +5,7 @@
 // Contrato backend:
 //   POST /api/assistant/chat/stream  {messages:[{role,content}]}
 //   -> SSE: líneas `data: {"type":"token","text":"…"}` … `data: {"type":"done"}`
-import { RUNTIME_URL } from './runtime';
+import { RUNTIME_URL, getClient } from './runtime';
 import { config } from './config';
 import { getAccessToken } from './cloud';
 
@@ -107,74 +107,80 @@ export interface StreamCallbacks {
   onError?: (err: unknown) => void;
 }
 
+/** A tool call the model asked for (forwarded by the runtime from the Cloud). */
+interface FunctionCall {
+  name: string;
+  call_id: string;
+  arguments: string; // JSON string of the arguments
+}
+
+/** OpenAI-style tool_call, as the Cloud expects it back on the assistant message. */
+interface ToolCallWire {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+/** Wire message — a ChatMessage plus the tool-round shapes the Cloud understands:
+ *  an assistant message carrying `tool_calls`, and a `tool` result message. */
+interface WireMessage {
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: ChatContent;
+  tool_calls?: ToolCallWire[];
+  tool_call_id?: string;
+}
+
+/** Safety cap on tool round-trips per turn (mirrors the Cloud's own cap). Never
+ *  limits a plain answer — only bounds a runaway call/answer loop. */
+const MAX_TOOL_ITERS = 6;
+
 /**
- * Abre el stream del asistente y va invocando `onToken` por cada token. Devuelve un `abort()`
- * para cancelar (el usuario navega o manda otro mensaje). Parsea SSE a mano sobre el
- * ReadableStream del fetch (no EventSource: necesitamos POST + cabeceras de auth).
+ * Abre el turno del asistente y va invocando `onToken` por cada token. Si el modelo pide
+ * **ejecutar una función de módulo** (§9.2), el runtime nos reenvía un evento
+ * `function_call`: ejecutamos la operación con la **sesión del usuario**
+ * (`getClient().query` → mismo gate de permisos que la UI), añadimos el resultado al array
+ * y **continuamos el turno** hasta que el modelo responde en texto. Devuelve un `abort()`
+ * para cancelar. SSE parseado a mano sobre el ReadableStream (POST + cabeceras de auth).
+ *
+ * Paso 1 — solo LECTURA: toda función se ejecuta como **query** (lectura, sin efectos). Una
+ * función de escritura (command) falla aquí como "query desconocida" y degrada a una nota
+ * para el modelo; las mutaciones con tarjeta de confirmación llegan en el paso 2.
  */
 export function streamAssistant(messages: ChatMessage[], cb: StreamCallbacks): () => void {
   const ctrl = new AbortController();
 
   void (async () => {
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      };
-      if (config.hubId) headers['X-Hub-Id'] = config.hubId;
-      const token = getAccessToken();
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      let convo: WireMessage[] = messages.map((m) => ({ role: m.role, content: m.content }));
 
-      const res = await fetch(`${RUNTIME_URL}/api/assistant/chat/stream`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ messages }),
-        signal: ctrl.signal,
-      });
-      if (!res.ok || !res.body) {
-        cb.onError?.(new Error(`assistant stream → ${res.status}`));
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-
-      // SSE: eventos separados por línea en blanco; cada evento trae 1+ líneas `data: …`.
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-
-        let sep: number;
-        while ((sep = buf.indexOf('\n\n')) !== -1) {
-          const rawEvent = buf.slice(0, sep);
-          buf = buf.slice(sep + 2);
-          const data = rawEvent
-            .split('\n')
-            .filter((l) => l.startsWith('data:'))
-            .map((l) => l.slice(5).trim())
-            .join('\n');
-          if (!data) continue;
-
-          let evt: AssistantEvent;
-          try {
-            evt = JSON.parse(data) as AssistantEvent;
-          } catch {
-            continue; // línea no-JSON (keepalive/comentario)
-          }
-          if (evt.type === 'token' && typeof (evt as { text?: unknown }).text === 'string') {
-            cb.onToken((evt as { text: string }).text);
-          } else if (evt.type === 'done') {
-            cb.onDone?.();
-            return;
-          } else if (evt.type === 'error') {
-            cb.onError?.(new Error((evt as { message?: string }).message ?? 'assistant error'));
-            return;
-          }
+      for (let iter = 0; ; iter++) {
+        const round = await streamRound(convo, cb, ctrl.signal);
+        if (round.errored) return; // streamRound ya llamó a onError
+        if (round.functionCalls.length === 0) {
+          cb.onDone?.();
+          return;
         }
+        if (iter >= MAX_TOOL_ITERS) {
+          cb.onError?.(new Error('assistant: too many tool calls'));
+          return;
+        }
+        // Reconstruye el mensaje assistant que llevaba los tool_calls, ejecuta cada tool
+        // con la sesión del usuario y añade su resultado — el Cloud continúa el turno.
+        const results = await Promise.all(round.functionCalls.map(runToolCall));
+        convo = [
+          ...convo,
+          {
+            role: 'assistant',
+            content: round.text,
+            tool_calls: round.functionCalls.map((fc) => ({
+              id: fc.call_id,
+              type: 'function',
+              function: { name: fc.name, arguments: fc.arguments },
+            })),
+          },
+          ...results,
+        ];
       }
-      cb.onDone?.();
     } catch (err) {
       if ((err as { name?: string }).name === 'AbortError') return;
       cb.onError?.(err);
@@ -182,4 +188,100 @@ export function streamAssistant(messages: ChatMessage[], cb: StreamCallbacks): (
   })();
 
   return () => ctrl.abort();
+}
+
+/** Un pase del stream: emite tokens a `onToken`, y devuelve las tool calls que pidió el
+ *  modelo + el texto que produjo antes de ellas. `errored` = ya se llamó a onError
+ *  (error de transporte/backend) y el llamador debe parar. */
+async function streamRound(
+  convo: WireMessage[],
+  cb: StreamCallbacks,
+  signal: AbortSignal,
+): Promise<{ functionCalls: FunctionCall[]; text: string; errored: boolean }> {
+  const functionCalls: FunctionCall[] = [];
+  let text = '';
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  };
+  if (config.hubId) headers['X-Hub-Id'] = config.hubId;
+  const token = getAccessToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${RUNTIME_URL}/api/assistant/chat/stream`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ messages: convo }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    cb.onError?.(new Error(`assistant stream → ${res.status}`));
+    return { functionCalls, text, errored: true };
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+
+  // SSE: eventos separados por línea en blanco; cada evento trae 1+ líneas `data: …`.
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+
+    let sep: number;
+    while ((sep = buf.indexOf('\n\n')) !== -1) {
+      const rawEvent = buf.slice(0, sep);
+      buf = buf.slice(sep + 2);
+      const data = rawEvent
+        .split('\n')
+        .filter((l) => l.startsWith('data:'))
+        .map((l) => l.slice(5).trim())
+        .join('\n');
+      if (!data) continue;
+
+      let evt: AssistantEvent;
+      try {
+        evt = JSON.parse(data) as AssistantEvent;
+      } catch {
+        continue; // línea no-JSON (keepalive/comentario)
+      }
+      if (evt.type === 'token' && typeof (evt as { text?: unknown }).text === 'string') {
+        const t = (evt as { text: string }).text;
+        text += t;
+        cb.onToken(t);
+      } else if (evt.type === 'function_call') {
+        const fc = evt as { name?: string; call_id?: string; arguments?: string };
+        functionCalls.push({
+          name: fc.name ?? '',
+          call_id: fc.call_id ?? '',
+          arguments: typeof fc.arguments === 'string' ? fc.arguments : '{}',
+        });
+      } else if (evt.type === 'done') {
+        return { functionCalls, text, errored: false };
+      } else if (evt.type === 'error') {
+        cb.onError?.(new Error((evt as { message?: string }).message ?? 'assistant error'));
+        return { functionCalls, text, errored: true };
+      }
+    }
+  }
+  // El cuerpo terminó sin un `done` explícito: fin de este pase.
+  return { functionCalls, text, errored: false };
+}
+
+/** Ejecuta una tool call con la sesión del usuario y la envuelve como mensaje `tool`.
+ *  Paso 1: solo LECTURA — se corre como query (el runtime aplica el mismo gate de
+ *  permisos que la UI). Cualquier fallo (incl. una op de escritura, que no es query)
+ *  degrada a una nota de error para que el modelo se lo diga al usuario. */
+async function runToolCall(fc: FunctionCall): Promise<WireMessage> {
+  let output: string;
+  try {
+    const params = fc.arguments ? (JSON.parse(fc.arguments) as Record<string, unknown>) : {};
+    const data = await getClient().query(fc.name, params);
+    output = JSON.stringify(data ?? null);
+  } catch (err) {
+    output = JSON.stringify({ error: (err as { message?: string })?.message ?? 'tool failed' });
+  }
+  return { role: 'tool', tool_call_id: fc.call_id, content: output };
 }

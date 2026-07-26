@@ -35,6 +35,7 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
                     &ai.description,
                     "query",
                     &q.module_id,
+                    q.def.schema.as_deref(),
                 ));
             }
         }
@@ -50,6 +51,7 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
                     &ai.description,
                     "command",
                     &c.module_id,
+                    c.def.schema.as_deref(),
                 ));
             }
         }
@@ -68,12 +70,20 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
 /// Construye la tool-spec de una operación. `module_id` lo usa el router vectorial (§9.2b) para
 /// prefiltrar por módulo ([`crate::router::filter_tools_by_modules`]); el Cloud lo ignora si no lo
 /// necesita (ya recibe `kind` de la misma forma).
-fn tool_def(name: &str, description: &str, kind: &str, module_id: &str) -> Value {
+fn tool_def(name: &str, description: &str, kind: &str, module_id: &str, schema: Option<&str>) -> Value {
+    // The operation's input schema (a JSON-Schema string) becomes the tool's
+    // `parameters`, so the model calls with valid arguments. The Cloud reads it
+    // as `fn.parameters` (orchestrator `_tools_from_hub`). Absent or unparseable
+    // → an empty object (a no-arg tool).
+    let parameters = schema
+        .and_then(|s| serde_json::from_str::<Value>(s).ok())
+        .unwrap_or_else(|| json!({ "type": "object", "properties": {} }));
     json!({
         "name": name,
         "description": description,
         "kind": kind,
         "module_id": module_id,
+        "parameters": parameters,
     })
 }
 
@@ -167,11 +177,13 @@ pub fn translate_sse_line(line: &str) -> Option<String> {
     match text {
         Some(t) if !t.is_empty() => Some(sse(&json!({ "type": "token", "text": t }))),
         _ => {
-            // error u otros eventos del orquestador: reenvía para que el frontend decida.
-            if ev.get("type").and_then(Value::as_str) == Some("error") {
-                Some(sse(&ev))
-            } else {
-                None
+            // `error` y `function_call` se reenvían tal cual: el frontend actúa sobre
+            // ellos. En `function_call`, el bucle de function-calling del web app ejecuta
+            // la query/command con la sesión del usuario (§9.2) y continúa el turno con el
+            // resultado. Los demás eventos del orquestador (p. ej. `response`) se ignoran.
+            match ev.get("type").and_then(Value::as_str) {
+                Some("error") | Some("function_call") => Some(sse(&ev)),
+                _ => None,
             }
         }
     }
@@ -259,5 +271,37 @@ mod tests {
             translate_sse_line("data: {\"type\":\"error\",\"error\":\"boom\"}"),
             Some(sse(&json!({"type":"error","error":"boom"})))
         );
+    }
+
+    #[test]
+    fn translate_forwards_function_call() {
+        // The model asking to call a module tool MUST reach the web app: it runs the
+        // query/command with the user's session and continues the turn. Previously
+        // this event was dropped (§9.2 keystone).
+        let line = r#"data: {"type":"function_call","name":"inventory.products.list","call_id":"c1","arguments":"{}"}"#;
+        let out = translate_sse_line(line).expect("function_call must be forwarded, not dropped");
+        assert!(out.contains("function_call"));
+        assert!(out.contains("inventory.products.list"));
+        assert!(out.contains("c1"));
+    }
+
+    #[test]
+    fn tool_def_carries_params_schema() {
+        // The op's input schema becomes the tool's `parameters` so the model calls
+        // with valid arguments (the Cloud reads `fn.parameters`).
+        let schema = r#"{"type":"object","properties":{"since":{"type":"string"}},"required":["since"]}"#;
+        let t = tool_def("sales.list", "List sales", "query", "sales", Some(schema));
+        assert_eq!(t["parameters"]["properties"]["since"]["type"], "string");
+        assert_eq!(t["parameters"]["required"][0], "since");
+    }
+
+    #[test]
+    fn tool_def_defaults_params_when_no_schema() {
+        let t = tool_def("x.y", "d", "query", "x", None);
+        assert_eq!(t["parameters"]["type"], "object");
+        assert_eq!(t["parameters"]["properties"], json!({}));
+        // An unparseable schema also degrades to the empty object (never panics).
+        let bad = tool_def("x.y", "d", "query", "x", Some("{not json"));
+        assert_eq!(bad["parameters"]["properties"], json!({}));
     }
 }
