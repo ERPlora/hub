@@ -48,6 +48,9 @@ zip = "2"
 sha2 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 base64 = "0.22"
+# Presencia web pública del Hub (ADR-0160): saneado del HTML inline (allowlist) del renderer de
+# bloques (Editor.js → HTML). Auditada, basada en html5ever; NUNCA se ejecuta JS del usuario.
+ammonia = "4"
 
 [dev-dependencies]
 # `test-util` = helper de esquema Postgres efímero por test (ADR-0154): los tests del server

@@ -158,6 +158,41 @@
         "$ref": "#/$defs/slotProvision"
       }
     },
+    "public_pages": {
+      "type": "array",
+      "default": [],
+      "description": "Páginas de la PRESENCIA WEB PÚBLICA del Hub que aporta este módulo (ADR-0160): rutas anónimas (sin usuario ni sesión) servidas por el runtime a partir de bloques (formato Editor.js) renderizados a HTML seguro, alimentadas por queries marcadas `public`. Cada página declara su `path` + `title`; opcionalmente las `reads` (queries public que la nutren) y un `slot` que aporta una sección a la home vía slots (ADR-0043). El runtime NUNCA ejecuta JS del usuario: el JSON de bloques se sanea al renderizar.",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "title"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Ruta pública de la página bajo la presencia web del Hub (p. ej. `/menu`, `/servicios`). Debe ser única entre las páginas públicas del hub."
+          },
+          "title": {
+            "type": "string",
+            "description": "Título user-facing de la página (usado en el `<title>` y la navegación pública). SIEMPRE en INGLÉS canónico; la app lo traduce en runtime."
+          },
+          "reads": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "description": "Queries marcadas `public` (del propio módulo o de sus depends_on) cuyas filas alimentan esta página. Referencia por NOMBRE namespaced (p. ej. `catalog.products.list`), igual que `widgets`/`setup`."
+          },
+          "slot": {
+            "type": "string",
+            "description": "Opcional. Nombre del slot de la HOME pública al que esta página aporta una sección (ADR-0043). Acoplamiento por nombre de slot, nunca por import de código."
+          }
+        }
+      }
+    },
     "migrations": {
       "type": "object",
       "additionalProperties": false,
@@ -205,6 +240,11 @@
             "type": "boolean",
             "default": false,
             "description": "Opt-in: expone esta query en la API pública REST/OpenAPI por módulo (ADR-0057, `architecture/hub/public-api.md`). Doble puerta: además de estar marcada, la API key debe tener el `permission` de la query (lectura del módulo). Por defecto false → la query NO es accesible vía API key aunque la key tuviera el permiso. Espejo del flag `external` de los hooks de salida (ADR-0049)."
+          },
+          "public": {
+            "type": "boolean",
+            "default": false,
+            "description": "Opt-in: expone esta query al endpoint anónimo `POST /api/public/query` (ADR-0160). Default-deny e INDEPENDIENTE de `expose_api` (API-key). Una query pública solo lee; el runtime inyecta `hub_id` igual que siempre. Gemelo de `expose_api`, pero para la presencia web pública del Hub (sin usuario ni API key)."
           }
         }
       }

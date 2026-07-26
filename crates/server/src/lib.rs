@@ -51,6 +51,7 @@ pub mod openapi;
 pub mod profile;
 /// Capa web PÚBLICA del hub (ADR-0160, F0): frontera del gate + landing server-side + CSP estricta.
 pub mod public;
+pub mod public_render;
 pub mod router;
 pub mod settings;
 pub mod state;
