@@ -142,6 +142,18 @@ impl CloudClient {
         self.get("/api/v1/hub/device/entitlement/", auth)
     }
 
+    /// **Heartbeat de uso/liveness** del Hub hacia el Cloud (hub#199 / saas#806).
+    /// `POST /api/v1/hub/device/heartbeat/` con la credencial de máquina; el body
+    /// (`orders_today`, `last_sale_at`, `terminals`) lo construye el server desde
+    /// la base de datos local. Se ejecuta en el mismo tick que el entitlement.
+    pub fn heartbeat(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/heartbeat/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// **Token del Bridge local** — el SaaS emite un JWT dedicado (`aud=erplora-bridge` + `hub_id`,
     /// exp corto) para autorizar el daemon de hardware. `GET /api/v1/hub/device/bridge-token/`. El
     /// runtime lo proxya a la app (el `cloud_api_token` nunca llega al navegador); la app lo presenta
@@ -671,6 +683,22 @@ mod tests {
         };
         let body = serde_json::to_value(&req).unwrap();
         assert_eq!(body["model"], "custom");
+    }
+
+    #[test]
+    fn heartbeat_uses_machine_token_and_canonical_path() {
+        let c = CloudClient::new("https://erplora.com/");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
+        let r = c.heartbeat(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/heartbeat/");
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
     }
 
     #[test]

@@ -31,6 +31,7 @@ use serde_json::{json, Map, Value};
 pub mod api_keys;
 pub mod assistant;
 pub mod auth;
+pub mod daily_usage;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
@@ -427,15 +428,33 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let Some(auth) = auth::machine_auth(&st) else {
                     continue;
                 };
+                // Same 24h tick, no second scheduler: report canonical daily business usage.
+                // Collection happens before network I/O, then both Cloud calls run independently:
+                // an entitlement failure must not suppress business-usage retention (or vice versa).
                 let now = entitlement::now_unix();
-                let outcome = entitlement::fetch_verified_claims(
+                let now_iso = chrono::Utc::now().to_rfc3339();
+                let usage = {
+                    let runtime = st.runtime.lock().await;
+                    daily_usage::collect_daily_usage(runtime.db(), runtime.hub_id(), &now_iso).await
+                };
+                let entitlement_request = entitlement::fetch_verified_claims(
                     &st.http,
                     &st.config.cloud_base_url,
                     &auth,
                     now,
-                )
-                .await;
+                );
+                let heartbeat_request = daily_usage::send_heartbeat(
+                    &st.http,
+                    &st.config.cloud_base_url,
+                    &auth,
+                    &usage,
+                );
+                let (outcome, heartbeat_result) =
+                    tokio::join!(entitlement_request, heartbeat_request);
                 entitlement::record_outcome(&st.entitlement, outcome, now);
+                if let Err(error) = heartbeat_result {
+                    tracing::warn!(%error, "daily usage heartbeat failed");
+                }
             }
         });
     }
