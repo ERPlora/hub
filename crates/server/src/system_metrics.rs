@@ -223,10 +223,24 @@ pub(crate) fn sample_cgroup(r: &dyn CgroupReader) -> (MemoryMetric, CpuMetric) {
 
 // ─────────────────────────── Base de datos + sesiones (adapter) ───────────────────────────
 
-/// Tamaño real de la BD (Postgres-only, ADR-0154): `pg_database_size(current_database())`. El
-/// límite del plan (`limit_bytes`) queda `null`: el claim del entitlement NO trae hoy una cuota de
-/// BD → se anota como follow-up.
-async fn read_database(db: &dyn DatabaseAdapter) -> DbMetric {
+/// Un GiB en bytes. El contrato SaaS expresa `max_database_size_gb` en GiB, igual que el modelo
+/// `Plan`; el endpoint System expone bytes para compartir formato con RAM y el cliente web.
+const BYTES_PER_GIB: u64 = 1024 * 1024 * 1024;
+
+/// Convierte la cuota del entitlement a bytes. El widening `u32 -> u64` antes de multiplicar hace
+/// segura incluso la cuota máxima representable; `0` conserva la semántica ilimitada/autoscaling.
+fn database_limit_bytes(max_database_size_gb: u32) -> Option<u64> {
+    if max_database_size_gb == 0 {
+        None
+    } else {
+        Some(u64::from(max_database_size_gb) * BYTES_PER_GIB)
+    }
+}
+
+/// Tamaño real de la BD (Postgres-only, ADR-0154): `pg_database_size(current_database())`, frente
+/// a la cuota firmada del plan. Sin cuota conocida (token antiguo o `0` ilimitado), límite y
+/// fracción quedan `null` para que la UI no invente un techo.
+async fn read_database(db: &dyn DatabaseAdapter, limit_bytes: Option<u64>) -> DbMetric {
     let no_params = Params::new();
     let size = scalar_u64(
         db,
@@ -237,8 +251,9 @@ async fn read_database(db: &dyn DatabaseAdapter) -> DbMetric {
     DbMetric {
         engine: "postgres".into(),
         size_bytes: size,
-        limit_bytes: None,
-        fraction: None,
+        limit_bytes,
+        fraction: size
+            .and_then(|used| fraction(used as f64, limit_bytes.map(|limit| limit as f64))),
     }
 }
 
@@ -301,15 +316,17 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
         }
     }
 
-    // Plan + límite de dispositivos del último entitlement verificado. Fail-open: sin claim
-    // conocido, `plan = null` y `max_devices = 0` (ilimitado), como el resto del gate.
-    let (plan, max_devices) = match st.entitlement.read() {
+    // Plan + límites del último entitlement verificado. Fail-open: sin claim conocido, plan
+    // nulo y límites a 0 (ilimitados), como el resto del gate.
+    let (plan, max_devices, max_database_size_gb) = match st.entitlement.read() {
         Ok(g) => (
             g.last_claims.as_ref().and_then(|c| c.plan.clone()),
             g.max_devices(),
+            g.max_database_size_gb(),
         ),
-        Err(_) => (None, 0),
+        Err(_) => (None, 0, 0),
     };
+    let database_limit = database_limit_bytes(max_database_size_gb);
 
     // Memoria/CPU del cgroup v2 en un hilo bloqueante (IO de `/sys` + `sleep` del muestreo de CPU).
     let (memory, cpu) = tokio::task::spawn_blocking(|| sample_cgroup(&SysCgroupReader))
@@ -322,7 +339,7 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
         let rt = st.runtime.lock().await;
         let db = rt.db();
         (
-            read_database(db).await,
+            read_database(db, database_limit).await,
             read_sessions(db, max_devices, &now).await,
         )
     };
@@ -439,11 +456,23 @@ mod tests {
     }
 
     #[test]
+    fn database_quota_converts_gib_to_bytes_and_zero_is_unlimited() {
+        assert_eq!(database_limit_bytes(0), None);
+        assert_eq!(database_limit_bytes(1), Some(1_073_741_824));
+        assert_eq!(database_limit_bytes(5), Some(5_368_709_120));
+        assert_eq!(
+            database_limit_bytes(u32::MAX),
+            Some(u64::from(u32::MAX) * BYTES_PER_GIB)
+        );
+    }
+
+    #[test]
     fn free_tier_prod_fixture_limit_from_cgroup_not_from_plan() {
         // Fixture REAL del free tier en prod (hub#207 diagnóstico 2026-07-27): el task de Swarm
         // corre con Limits.MemoryBytes=100663296 (96 MiB) y NanoCPUs=100000000 (0,1 vCPU →
         // cpu.max "10000 100000"). El LÍMITE mostrado sale SIEMPRE de `memory.max` del cgroup —
-        // el claim del entitlement no trae cuota de memoria (solo `plan` + `max_devices`).
+        // la cuota de memoria viene del cgroup; no del entitlement (que aporta plan, dispositivos
+        // y cuota de BD).
         let r = FakeCgroup::new(&[
             ("memory.current", "11534336\n"), // 11 MiB
             ("memory.stat", "anon 7340032\ninactive_file 4194304\nfile 4194304\n"), // 4 MiB caché

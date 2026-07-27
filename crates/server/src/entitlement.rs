@@ -126,6 +126,16 @@ impl RevalidationState {
         self.last_claims.as_ref().map(|c| c.max_devices).unwrap_or(0)
     }
 
+    /// Cuota de base de datos del plan en GiB según el último token válido (saas#817).
+    /// `0` = ilimitado/autoscaling y también el default fail-open para tokens antiguos o cuando
+    /// aún no hubo un refresh exitoso.
+    pub fn max_database_size_gb(&self) -> u32 {
+        self.last_claims
+            .as_ref()
+            .map(|c| c.max_database_size_gb)
+            .unwrap_or(0)
+    }
+
     /// `paid_grace_until` del último token válido: gracia ESPECÍFICA de los módulos de pago
     /// (claim aditivo del SaaS). `None` = el token no la trae → aplica `grace_until`.
     pub fn paid_grace_until(&self) -> Option<i64> {
@@ -261,6 +271,7 @@ mod tests {
             paid_grace_until: None,
             plan: None,
             max_devices: 0,
+            max_database_size_gb: 0,
         }
     }
 
@@ -282,6 +293,7 @@ mod tests {
             paid_grace_until: None,
             plan: None,
             max_devices: 0,
+            max_database_size_gb: 0,
         }
     }
 
@@ -552,6 +564,18 @@ mod tests {
         c.max_devices = 1;
         st2.apply_success(c, 1_500);
         assert_eq!(st2.max_devices(), 1);
+    }
+
+    #[test]
+    fn cuota_bd_viene_del_ultimo_token_o_cero_sin_estado() {
+        let st = RevalidationState::default();
+        assert_eq!(st.max_database_size_gb(), 0);
+
+        let mut st2 = RevalidationState::default();
+        let mut c = claims(&["pos"], 9_000);
+        c.max_database_size_gb = 5;
+        st2.apply_success(c, 1_500);
+        assert_eq!(st2.max_database_size_gb(), 5);
     }
 
     #[test]

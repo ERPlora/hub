@@ -57,6 +57,7 @@ fn claims_with_max_devices(n: u32) -> EntitlementClaims {
         paid_grace_until: None,
         plan: Some("restaurant".into()),
         max_devices: n,
+        max_database_size_gb: 0,
     }
 }
 

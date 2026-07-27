@@ -97,7 +97,8 @@
               </ion-card>
             </ion-col>
 
-            <!-- Base de datos: tamaño real (la cuota del plan aún no la trae el claim → sin barra). -->
+            <!-- Base de datos: tamaño real frente a la cuota firmada del plan; sin barra cuando
+                 el plan es ilimitado o el token es anterior al claim. -->
             <ion-col size="12" size-md="6">
               <ion-card class="ion-no-margin pl-card">
                 <ion-card-content>

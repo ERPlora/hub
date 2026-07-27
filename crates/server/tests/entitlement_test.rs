@@ -64,6 +64,7 @@ fn claims(modules: &[&str], grace_until: i64) -> EntitlementClaims {
         paid_grace_until: None,
         plan: None,
         max_devices: 0,
+        max_database_size_gb: 0,
     }
 }
 
