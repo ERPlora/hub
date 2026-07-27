@@ -260,6 +260,12 @@ export interface HubSessionResult {
   permissions: string[];
 }
 
+export interface CourierSessionResult extends HubSessionResult {
+  access: string;
+  refresh: string;
+  cloud_user: CloudUser;
+}
+
 async function runtimePost<T>(path: string, body: unknown, headers: Record<string, string>): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
@@ -293,6 +299,19 @@ export async function runtimeCloudSession(
     '/api/auth/cloud',
     { name, email },
     { Authorization: `Bearer ${access}` },
+  );
+}
+
+/** Redeems the short-lived shell courier through the same-origin runtime.  The runtime binds the
+ * code to its machine identity and performs the Cloud exchange server-to-server. */
+export async function runtimeCourierSession(
+  code: string,
+  deviceId?: string,
+): Promise<CourierSessionResult> {
+  return runtimePost<CourierSessionResult>(
+    '/api/auth/courier',
+    { code, ...(deviceId ? { device_id: deviceId } : {}) },
+    {},
   );
 }
 

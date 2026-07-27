@@ -664,6 +664,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/auth/pin", post(auth_pin))
         .route("/api/auth/set-pin", post(auth_set_pin))
         .route("/api/auth/cloud", post(auth_cloud))
+        .route("/api/auth/courier", post(auth_courier))
         .route("/api/auth/logout", post(auth_logout))
         // ── Gestión de usuarios-login del Hub (identidad, ADR-0157 §7 / checklist core #2) ──────
         // Alta/baja/listado de quién puede ENTRAR en el hub. Gate owner/admin (sesión, NO api key).
@@ -1950,6 +1951,18 @@ async fn auth_cloud(
         )
             .into_response();
     };
+    open_cloud_session(&st, &token, body.map(|value| value.0), None).await
+}
+
+/// Shared implementation for ordinary Cloud login and the shell courier.  Keeping the JWT gate,
+/// membership check and local user linking in one function ensures the courier cannot create a
+/// more privileged path than `POST /api/auth/cloud`.
+async fn open_cloud_session(
+    st: &AppState,
+    token: &str,
+    body: Option<CloudLoginReq>,
+    cloud_tokens: Option<Value>,
+) -> Response {
     let Some(pem) = st.config.jwt_public_key.as_deref() else {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -1986,7 +1999,6 @@ async fn auth_cloud(
             .into_response();
     }
     let cloud_user_id = claims.user_id_str();
-    let body = body.map(|b| b.0);
     let device_id = body.as_ref().and_then(|b| b.device_id.clone());
     let email = body.as_ref().and_then(|b| b.email.clone());
     let name = body
@@ -2043,10 +2055,113 @@ async fn auth_cloud(
             }
             // Límite de dispositivos del plan (ADR-0154), como en el login por PIN.
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
-            mint_session(&rt, user, device_id.as_deref(), max_devices).await
+            mint_session_with_extra(
+                &rt,
+                user,
+                device_id.as_deref(),
+                max_devices,
+                cloud_tokens,
+            )
+            .await
         }
         Err(e) => err_response(e),
     }
+}
+
+#[derive(serde::Deserialize)]
+struct CourierReq {
+    code: String,
+    #[serde(default)]
+    device_id: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct CourierGrantUser {
+    id: String,
+    name: String,
+    email: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CourierGrant {
+    access: String,
+    refresh: String,
+    user: CourierGrantUser,
+}
+
+/// Boot courier for the native shell.  The browser submits only the opaque code to its same-origin
+/// runtime.  The runtime redeems it server-to-server with its machine credential, then feeds the
+/// access JWT through the exact same `/api/auth/cloud` implementation.  JWTs never appear in a URL.
+async fn auth_courier(State(st): State<AppState>, Json(req): Json<CourierReq>) -> Response {
+    let code = req.code.trim();
+    if code.is_empty() || code.len() > 128 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "ok": false, "error": "código courier inválido" })),
+        )
+            .into_response();
+    }
+    let Some(machine_auth) = auth::machine_auth(&st) else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "ok": false, "error": "hub sin credencial de máquina" })),
+        )
+            .into_response();
+    };
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let prepared = cloud.session_courier(&machine_auth);
+    let mut upstream = st.http.post(&prepared.url).json(&json!({ "code": code }));
+    for (name, value) in prepared.headers {
+        upstream = upstream.header(name, value);
+    }
+    let response = match upstream.send().await {
+        Ok(response) => response,
+        Err(error) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "ok": false, "error": format!("courier no disponible: {error}") })),
+            )
+                .into_response()
+        }
+    };
+    if !response.status().is_success() {
+        let status = if response.status().as_u16() == 400 {
+            StatusCode::BAD_REQUEST
+        } else {
+            StatusCode::BAD_GATEWAY
+        };
+        return (
+            status,
+            Json(json!({ "ok": false, "error": "código courier inválido o caducado" })),
+        )
+            .into_response();
+    }
+    let grant = match response.json::<CourierGrant>().await {
+        Ok(grant) if !grant.access.is_empty() && !grant.refresh.is_empty() => grant,
+        _ => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "ok": false, "error": "respuesta courier inválida" })),
+            )
+                .into_response()
+        }
+    };
+    let cloud_tokens = json!({
+        "access": grant.access,
+        "refresh": grant.refresh,
+        "cloud_user": {
+            "id": grant.user.id,
+            "name": grant.user.name,
+            "email": grant.user.email,
+        }
+    });
+    let access = cloud_tokens["access"].as_str().unwrap_or_default().to_string();
+    let login = CloudLoginReq {
+        name: cloud_tokens["cloud_user"]["name"].as_str().map(str::to_string),
+        email: cloud_tokens["cloud_user"]["email"].as_str().map(str::to_string),
+        device_id: req.device_id,
+    };
+    open_cloud_session(&st, &access, Some(login), Some(cloud_tokens)).await
 }
 
 #[derive(serde::Deserialize)]
@@ -2103,6 +2218,16 @@ async fn mint_session(
     device_id: Option<&str>,
     max_devices: u32,
 ) -> Response {
+    mint_session_with_extra(rt, user, device_id, max_devices, None).await
+}
+
+async fn mint_session_with_extra(
+    rt: &erplora_runtime::Runtime,
+    user: erplora_runtime::identity::HubUser,
+    device_id: Option<&str>,
+    max_devices: u32,
+    extra: Option<Value>,
+) -> Response {
     if let Err(e) = rt.enforce_device_limit(max_devices, device_id).await {
         return err_response(e);
     }
@@ -2116,13 +2241,19 @@ async fn mint_session(
     {
         Ok(token) => {
             let permissions = rt.permissions_for_role(&user.role);
-            Json(json!({
+            let mut payload = json!({
                 "ok": true,
                 "token": token,
                 "user": user,
                 "permissions": permissions,
-            }))
-            .into_response()
+            });
+            if let (Some(target), Some(source)) = (
+                payload.as_object_mut(),
+                extra.and_then(|value| value.as_object().cloned()),
+            ) {
+                target.extend(source);
+            }
+            Json(payload).into_response()
         }
         Err(e) => err_response(e),
     }

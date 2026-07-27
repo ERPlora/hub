@@ -163,6 +163,17 @@ impl CloudClient {
         self.get("/api/v1/hub/device/bridge-token/", auth)
     }
 
+    /// Redeems the native-shell one-time courier code.  This request is made by the Hub runtime
+    /// with its machine credential, never by browser JavaScript, so the SaaS can bind redemption
+    /// to the exact destination Hub.  The body (`{"code":"…"}`) is supplied by the caller.
+    pub fn session_courier(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/session-courier/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// **Catálogo de blueprints** — plantillas de hub publicadas en el vendor portal del SaaS
     /// ([ADR-0121]). `GET /api/v1/catalog/blueprints/`. Es la **«fuente nube»** del panel de
     /// import (Ajustes → Datos). Hub-scoped: el runtime se autentica **a sí mismo**
@@ -553,6 +564,25 @@ mod tests {
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
         // Nunca lleva el JWT del usuario: es el HUB quien se autentica a sí mismo.
         assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+    }
+
+    #[test]
+    fn session_courier_is_a_machine_authenticated_post() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.session_courier(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/session-courier/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
     }
 
     /// ADR-0157 §7 (simetría obligatoria del deprovisioning): baja de un miembro por email.

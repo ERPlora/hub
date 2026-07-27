@@ -19,6 +19,11 @@ import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { bootActionFeedback, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
+import { bootCourier, takeCourierCode } from './lib/courier';
+
+// Scrub the bearer-like one-time code before registering workers, reporting errors or making any
+// boot request.  It remains only in memory until the Hub context is ready for the exchange.
+const shellCourierCode = takeCourierCode();
 
 // Los ok-* de OutfitKit y los Web Components de los módulos pintan sus iconos POR NOMBRE
 // (`<ion-icon name="trash-outline">`): son WC ajenos, no pueden llamar a `resolveIcon()`. ion-icon
@@ -168,7 +173,15 @@ setOnHubGone(() => {
 // Resuelve el hub_id desde el runtime (`GET /api/hub/context`) ANTES de montar, para que
 // X-Hub-Id esté disponible en la primera llamada. No bloquea si el runtime no responde
 // (deja el fallback VITE_HUB_ID). Decisión del humano (2): hub_id inyectado, sin picker.
-void bootHubContext().finally(() => {
+void bootHubContext().finally(async () => {
+  // ADR-0159: if the SaaS sent a one-time shell courier, consume it before router mount so the
+  // first protected route sees an authenticated local session.  The fragment is scrubbed before
+  // this network call; failure falls through to the ordinary login page without logging the code.
+  try {
+    await bootCourier(shellCourierCode);
+  } catch {
+    // Login remains available and the one-time credential has already been removed from the URL.
+  }
   // Con el hub_id ya resuelto, mantén fresco el token dedicado del Bridge (hardware local): el
   // runtime lo emite firmado por el SaaS y el `BridgeClient` del SDK lo presenta. Degrada solo si
   // el hub no está enrolado (no hay hardware), sin romper el arranque. ADR-0050 §2.7.
