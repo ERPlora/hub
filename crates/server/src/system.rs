@@ -387,128 +387,119 @@ fn in_cgroup_v2() -> bool {
     std::path::Path::new("/sys/fs/cgroup/memory.current").exists()
 }
 
-fn read_str(path: &str) -> Option<String> {
-    std::fs::read_to_string(path).ok()
-}
-
-/// `memory.max`: número (bytes) o `"max"` (sin límite → None).
-fn parse_mem_max(s: &str) -> Option<u64> {
-    let s = s.trim();
-    if s == "max" {
-        None
-    } else {
-        s.parse().ok()
-    }
-}
-
-/// `inactive_file` de `memory.stat` = caché de página a restar (como `docker stats` en cgroup v2).
-fn parse_mem_inactive_file(stat: &str) -> u64 {
-    stat.lines()
-        .find_map(|l| {
-            l.strip_prefix("inactive_file ")
-                .and_then(|v| v.trim().parse().ok())
-        })
-        .unwrap_or(0)
-}
-
-/// `usage_usec` acumulado de `cpu.stat` (μs de CPU consumidos).
-fn parse_cpu_usage_usec(stat: &str) -> Option<u64> {
-    stat.lines().find_map(|l| {
-        l.strip_prefix("usage_usec ")
-            .and_then(|v| v.trim().parse().ok())
-    })
-}
-
-/// `cpu.max` = `"<quota> <period>"`; `"max <period>"` = sin límite → None. Devuelve cores (quota/period).
-fn parse_cpu_max_cores(s: &str) -> Option<f64> {
-    let mut it = s.split_whitespace();
-    let quota = it.next()?;
-    let period: f64 = it.next()?.parse().ok()?;
-    if quota == "max" {
-        None
-    } else {
-        Some(quota.parse::<f64>().ok()? / period)
-    }
+/// Contrato de la pestaña Recursos: SOLO `{ "fraction": f64|null }` por gauge (la UI pinta %; los
+/// absolutos viven en `/api/system/metrics`). `null` = no medible («n/a») — un fallo parcial de
+/// muestreo NUNCA se disfraza de 0% o 100%. Devuelve `(cpu, memory)`.
+fn fractions_json(
+    memory: &crate::system_metrics::MemoryMetric,
+    cpu: &crate::system_metrics::CpuMetric,
+) -> (Value, Value) {
+    (
+        json!({ "fraction": cpu.fraction }),
+        json!({ "fraction": memory.fraction }),
+    )
 }
 
 /// CPU/memoria del CONTENEDOR vía cgroup v2 — respeta el límite que el SaaS asigna según el plan
-/// (no `/proc/meminfo`, que ve el host). La UI muestra solo el `%`, así que devolvemos solo `fraction`.
+/// (no `/proc/meminfo`, que ve el host). Mismo lector/sampler testeado que `/api/system/metrics`
+/// (`system_metrics::sample_cgroup` tras el trait `CgroupReader`): una sola implementación en el
+/// crate; ambos endpoints no pueden divergir.
 async fn docker_metrics() -> (Value, Value) {
-    let res = tokio::task::spawn_blocking(|| {
-        let mem_used = read_str("/sys/fs/cgroup/memory.current")
-            .and_then(|s| s.trim().parse::<u64>().ok())
-            .unwrap_or(0)
-            .saturating_sub(
-                read_str("/sys/fs/cgroup/memory.stat")
-                    .map(|s| parse_mem_inactive_file(&s))
-                    .unwrap_or(0),
-            );
-        let mem_limit = read_str("/sys/fs/cgroup/memory.max").and_then(|s| parse_mem_max(&s));
-
-        let usec_1 = read_str("/sys/fs/cgroup/cpu.stat")
-            .and_then(|s| parse_cpu_usage_usec(&s))
-            .unwrap_or(0);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        let usec_2 = read_str("/sys/fs/cgroup/cpu.stat")
-            .and_then(|s| parse_cpu_usage_usec(&s))
-            .unwrap_or(0);
-        let cores_used = usec_2.saturating_sub(usec_1) as f64 / 100_000.0; // 100 ms = 100_000 μs
-        let cpu_limit = read_str("/sys/fs/cgroup/cpu.max").and_then(|s| parse_cpu_max_cores(&s));
-
-        (mem_used, mem_limit, cores_used, cpu_limit)
+    let sampled = tokio::task::spawn_blocking(|| {
+        crate::system_metrics::sample_cgroup(&crate::system_metrics::SysCgroupReader)
     })
     .await;
-
-    let Ok((mem_used, mem_limit, cores_used, cpu_limit)) = res else {
+    let Ok((memory, cpu)) = sampled else {
         return (Value::Null, Value::Null);
     };
-
-    let cpu = json!({
-        "fraction": cpu_limit
-            .filter(|l| *l > 0.0)
-            .map(|l| (cores_used / l).clamp(0.0, 1.0)),
-    });
-    let memory = json!({
-        "fraction": mem_limit
-            .filter(|l| *l > 0)
-            .map(|l| (mem_used as f64 / l as f64).clamp(0.0, 1.0)),
-    });
-    (cpu, memory)
+    fractions_json(&memory, &cpu)
 }
 
 #[cfg(test)]
-mod cgroup_tests {
-    use super::{
-        parse_cpu_max_cores, parse_cpu_usage_usec, parse_mem_inactive_file, parse_mem_max,
-    };
+mod resources_tests {
+    //! Pestaña Recursos (hub#207/#203, ADR-0154 §8: telemetría REAL): las fracciones de los gauges
+    //! salen del MISMO lector de cgroup v2 testeado que `/api/system/metrics` (`CgroupReader`),
+    //! nunca de una copia paralela de parsers. Fallo parcial de muestreo = `null` («n/a»), no un
+    //! 0%/100% inventado.
+    use super::fractions_json;
+    use crate::system_metrics::{cpu_metric, read_cpu_limit_cores, read_memory, CgroupReader};
+    use serde_json::json;
+    use std::collections::HashMap;
 
-    #[test]
-    fn mem_max_numero_o_max() {
-        assert_eq!(parse_mem_max("134217728\n"), Some(134_217_728)); // 128 MiB
-        assert_eq!(parse_mem_max("max\n"), None); // sin límite
+    struct FakeCgroup(HashMap<String, String>);
+
+    impl FakeCgroup {
+        fn new(pairs: &[(&str, &str)]) -> Self {
+            Self(
+                pairs
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+            )
+        }
+    }
+
+    impl CgroupReader for FakeCgroup {
+        fn read(&self, file: &str) -> Option<String> {
+            self.0.get(file).cloned()
+        }
     }
 
     #[test]
-    fn cpu_usage_usec() {
-        let stat = "usage_usec 1234567\nuser_usec 1\nsystem_usec 2\n";
-        assert_eq!(parse_cpu_usage_usec(stat), Some(1_234_567));
-        assert_eq!(parse_cpu_usage_usec("nr_throttled 0\n"), None);
-    }
-
-    #[test]
-    fn cpu_max_cores() {
-        assert_eq!(parse_cpu_max_cores("100000 100000"), Some(1.0)); // 1 vCPU
-        assert_eq!(parse_cpu_max_cores("50000 100000"), Some(0.5));
-        assert_eq!(parse_cpu_max_cores("max 100000"), None); // sin límite
-    }
-
-    #[test]
-    fn mem_inactive_file() {
-        assert_eq!(
-            parse_mem_inactive_file("anon 10\ninactive_file 4096\nfile 8192\n"),
-            4096
+    fn recursos_fracciones_con_la_config_real_del_free_prod() {
+        // Config REAL del contenedor free en prod (hub-ioanbeilicshell2, 2026-07-27):
+        // memory.max = 100663296 (96 MiB, ADR-0154: el free subió de 64 a 96) y
+        // cpu.max = "10000 100000" (cpuLimit 0.10). El gauge de RAM debe salir del cgroup
+        // DEL CONTENEDOR: 7 340 032 B usados / 96 MiB ≈ 7%.
+        let r = FakeCgroup::new(&[
+            ("memory.current", "7647232\n"), // 7 340 032 anon + 307 200 de caché
+            ("memory.stat", "anon 7340032\ninactive_file 307200\n"),
+            ("memory.max", "100663296\n"),
+            ("cpu.max", "10000 100000\n"),
+        ]);
+        let memory = read_memory(&r);
+        // 20 000 μs de CPU en 200 000 μs = 0.1 cores = 100% del límite 0.10.
+        let cpu = cpu_metric(
+            Some(1_000_000),
+            Some(1_020_000),
+            200_000,
+            read_cpu_limit_cores(&r),
         );
-        assert_eq!(parse_mem_inactive_file("anon 10\n"), 0);
+
+        let (cpu_json, mem_json) = fractions_json(&memory, &cpu);
+        // Contrato de la pestaña Recursos: SOLO la fracción (la UI pinta %; sin absolutos).
+        let mf = mem_json["fraction"].as_f64().expect("fracción de memoria");
+        assert!((mf - 7_340_032.0 / 100_663_296.0).abs() < 1e-9);
+        assert_eq!(mem_json.as_object().unwrap().len(), 1);
+        let cf = cpu_json["fraction"].as_f64().expect("fracción de cpu");
+        assert!((cf - 1.0).abs() < 1e-9);
+        assert_eq!(cpu_json.as_object().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn recursos_sin_muestra_de_cpu_es_na_no_un_cero_inventado() {
+        // Si falta una muestra de `cpu.stat` la fracción es `null` («n/a») — antes el muestreo
+        // hacía `unwrap_or(0)` y un fallo parcial podía pintar 0% o clavarse en 100%.
+        let r = FakeCgroup::new(&[
+            ("memory.current", "7647232\n"),
+            ("memory.max", "100663296\n"),
+        ]);
+        let memory = read_memory(&r);
+        let cpu = cpu_metric(None, Some(1_000), 200_000, None);
+        let (cpu_json, mem_json) = fractions_json(&memory, &cpu);
+        assert_eq!(cpu_json, json!({ "fraction": null }));
+        assert!(mem_json["fraction"].as_f64().is_some());
+    }
+
+    #[test]
+    fn recursos_fuera_de_contenedor_todo_na() {
+        // Sin cgroup (dev/Mac): memoria y CPU en `null`, jamás un 0% que parezca medido.
+        let empty = FakeCgroup::new(&[]);
+        let memory = read_memory(&empty);
+        let cpu = cpu_metric(None, None, 200_000, None); // sin muestras = no disponible
+        let (cpu_json, mem_json) = fractions_json(&memory, &cpu);
+        assert_eq!(cpu_json, json!({ "fraction": null }));
+        assert_eq!(mem_json, json!({ "fraction": null }));
     }
 }
 
