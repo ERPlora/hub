@@ -73,6 +73,10 @@ pub struct EntitlementClaims {
     /// (takeover) al abrir sesión en un dispositivo nuevo (ver `identity::enforce_device_limit`).
     #[serde(default)]
     pub max_devices: u32,
+    /// Claim ADITIVO (saas#817, ADR-0154): cuota de base de datos del plan en GiB.
+    /// `0` = ilimitado/autoscaling, y también el fallback retrocompatible para tokens antiguos.
+    #[serde(default)]
+    pub max_database_size_gb: u32,
 }
 
 impl EntitlementClaims {
@@ -218,9 +222,9 @@ nQIDAQAB
     }
 
     #[test]
-    fn token_con_plan_y_max_devices_los_expone_en_las_claims() {
-        // Claims ADITIVOS del SaaS (saas#812, ADR-0154): `plan` (nombre del plan) y `max_devices`
-        // (límite de dispositivos activos; 0 = ilimitado). El parseo debe exponerlos verificados.
+    fn token_con_limites_del_plan_los_expone_en_las_claims() {
+        // Claims ADITIVOS del SaaS (saas#812/#817, ADR-0154): plan, dispositivos y cuota de BD.
+        // El parseo debe exponerlos solo después de verificar la firma.
         let claims_json = json!({
             "hub_id": "h1",
             "modules": [{"module_id": "pos", "tier": "premium", "version": "1.0.0"}],
@@ -229,23 +233,25 @@ nQIDAQAB
             "grace_until": 9000,
             "plan": "restaurant",
             "max_devices": 1,
+            "max_database_size_gb": 5,
         });
         let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
         let token = encode(&Header::new(Algorithm::RS256), &claims_json, &key).unwrap();
         let claims = verify_entitlement(&token, PUB, 3000).unwrap();
         assert_eq!(claims.plan.as_deref(), Some("restaurant"));
         assert_eq!(claims.max_devices, 1);
+        assert_eq!(claims.max_database_size_gb, 5);
     }
 
     #[test]
-    fn token_antiguo_sin_plan_ni_max_devices_default_ilimitado() {
-        // Retrocompat (ADR-0154): un token que el SaaS emitió ANTES de saas#812 no trae `plan`
-        // ni `max_devices`; deben quedar en `None` / `0` (0 = ilimitado → sin takeover), sin
-        // romper la verificación (igual que `paid_grace_until`).
-        let token = sign(2000, 9000); // `sign` NO incluye plan/max_devices
+    fn token_antiguo_sin_limites_del_plan_usa_defaults_ilimitados() {
+        // Retrocompat: un token anterior a saas#812/#817 no trae plan ni límites. Deben quedar
+        // en `None` / `0` sin romper la verificación (0 = ilimitado/fail-open).
+        let token = sign(2000, 9000); // `sign` NO incluye los claims aditivos del plan.
         let claims = verify_entitlement(&token, PUB, 3000).unwrap();
         assert_eq!(claims.plan, None);
         assert_eq!(claims.max_devices, 0);
+        assert_eq!(claims.max_database_size_gb, 0);
     }
 
     #[test]

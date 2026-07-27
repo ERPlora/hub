@@ -25,7 +25,7 @@ export interface CpuMetric {
   fraction: number | null;
 }
 
-/** Base de datos: tamaño real + cuota del plan (hoy `null`: el claim no la trae — follow-up). */
+/** Base de datos: tamaño real + cuota del plan; `null` para plan ilimitado o token antiguo. */
 export interface DbMetric {
   engine: string;
   sizeBytes: number | null;

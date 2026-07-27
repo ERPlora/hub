@@ -1,7 +1,7 @@
 //! E2E del server: `GET /api/system/metrics` — telemetría de recursos vs límites del plan
 //! (ADR-0154, hub#203). Verifica el contrato JSON, la autorización de **sesión admin** y que
-//! plan/`max_devices`/sesiones salen del entitlement + la BD del hub. El estado de entitlement se
-//! siembra como en producción lo hace el job de revalidación (`state.entitlement`); no hay red.
+//! plan/límites/sesiones salen del entitlement + la BD del hub. El estado de entitlement se siembra
+//! como en producción lo hace el job de revalidación (`state.entitlement`); no hay red.
 //!
 //! Memoria/CPU salen del cgroup v2 y NO se asertan a un valor: dentro de un contenedor Linux traen
 //! números; fuera (Mac dev, CI sin cgroup) traen `null` («n/a»). El test solo comprueba que el
@@ -40,8 +40,8 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
     (app(state.clone()), state, temp)
 }
 
-/// Claims verificadas de prueba con `plan` + `max_devices` dados.
-fn claims(plan: &str, max_devices: u32) -> EntitlementClaims {
+/// Claims verificadas de prueba con los límites del plan dados.
+fn claims(plan: &str, max_devices: u32, max_database_size_gb: u32) -> EntitlementClaims {
     EntitlementClaims {
         hub_id: "hub-metrics".into(),
         modules: vec![EntitledModule {
@@ -55,6 +55,7 @@ fn claims(plan: &str, max_devices: u32) -> EntitlementClaims {
         paid_grace_until: None,
         plan: Some(plan.into()),
         max_devices,
+        max_database_size_gb,
     }
 }
 
@@ -93,7 +94,11 @@ async fn json_body(resp: axum::response::Response) -> Value {
 async fn metrics_returns_plan_and_session_telemetry_for_admin() {
     let (router, state, temp) = fixture().await;
     // Plan free con 1 dispositivo (lo publica el job de revalidación; aquí lo sembramos igual).
-    state.entitlement.write().unwrap().apply_success(claims("free", 1), 1_500);
+    state
+        .entitlement
+        .write()
+        .unwrap()
+        .apply_success(claims("free", 1, 1), 1_500);
 
     let tok = session_token(router.clone().oneshot(pin_login("Admin", "1111", "dev-A")).await.unwrap()).await;
     let resp = router.clone().oneshot(get_metrics(Some(&tok))).await.unwrap();
@@ -110,14 +115,18 @@ async fn metrics_returns_plan_and_session_telemetry_for_admin() {
     assert_eq!(data["sessions"]["active"], json!(1), "una sesión activa (el propio admin)");
     assert_eq!(data["sessions"]["devices"], json!(1), "un dispositivo distinto (dev-A)");
 
-    // Base de datos real: SQLite en el harness, con tamaño medido.
+    // Base de datos Postgres aislada del harness, con tamaño real medido y cuota firmada de 1 GiB.
     assert_eq!(data["database"]["engine"], json!("postgres"));
     assert!(
         data["database"]["sizeBytes"].as_u64().is_some_and(|n| n > 0),
         "tamaño de BD medido: {:?}",
         data["database"]["sizeBytes"]
     );
-    assert!(data["database"]["limitBytes"].is_null(), "cuota de BD no conocible por el claim → null");
+    assert_eq!(data["database"]["limitBytes"], json!(1_073_741_824));
+    let db_fraction = data["database"]["fraction"]
+        .as_f64()
+        .expect("fracción frente a cuota de BD");
+    assert!(db_fraction > 0.0 && db_fraction <= 1.0);
 
     // Memoria/CPU: objeto presente con sus claves (valor null fuera de contenedor).
     for metric in ["memory", "cpu"] {
@@ -144,7 +153,11 @@ async fn metrics_requires_a_session() {
 async fn metrics_rejects_non_admin_session() {
     let (router, state, temp) = fixture().await;
     // Plan ilimitado para no desalojar sesiones entre logins (irrelevante para el gate de rol).
-    state.entitlement.write().unwrap().apply_success(claims("free", 0), 1_500);
+    state
+        .entitlement
+        .write()
+        .unwrap()
+        .apply_success(claims("free", 0, 0), 1_500);
 
     let tok = session_token(router.clone().oneshot(pin_login("Cajero", "2222", "dev-C")).await.unwrap()).await;
     let resp = router.clone().oneshot(get_metrics(Some(&tok))).await.unwrap();

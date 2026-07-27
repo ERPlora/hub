@@ -25,6 +25,13 @@ describe('PlanLimitsPanel', () => {
     expect(source).toContain('maxDevices');
   });
 
+  it('pinta la BD frente a la cuota del entitlement y conserva el estado sin límite', () => {
+    expect(source).toContain('metrics.database.fraction');
+    expect(source).toContain('metrics.database.limitBytes');
+    expect(source).toContain('usageLabel(metrics.database.sizeBytes, metrics.database.limitBytes)');
+    expect(source).toContain("t('planLimits.dbNoQuota')");
+  });
+
   it('ofrece el CTA de upgrade (gated) con deep-link externo al SaaS', () => {
     expect(source).toMatch(/shouldPromptUpgrade|upgradeReason/);
     expect(source).toContain('upgradeLink');
