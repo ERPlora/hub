@@ -467,15 +467,18 @@ export async function cloudLogin(email: string, password: string): Promise<Login
 }
 
 // --- «Continuar con Google» (ADR-0157 §8) ----------------------------------
-// El Hub NUNCA habla con Google. Abre el OAuth del SaaS (`/auth/google/login/?next=<callback>`);
-// el SaaS autentica con Google y redirige al `next` del hub con un **código de un solo uso**. El
-// Hub lo canjea (`session-exchange`) por `{access, refresh}` y a partir de ahí sigue EXACTAMENTE el
-// flujo de `cloudLogin` (mint de sesión local, etc.). Mantiene la paridad Cloud↔Hub del login.
+// El Hub NUNCA habla con Google. Abre el OAuth del SaaS con
+// `next=/auth/hub-bridge/?callback=<callback-del-hub>`: allauth solo redirige a rutas del PROPIO
+// SaaS (un `next` cross-host se descarta y caería a /dashboard/), y es `/auth/hub-bridge/` quien
+// emite el **código de un solo uso** y redirige al hub como `<callback>?code=` (validando el host
+// contra su allowlist). El Hub lo canjea (`session-exchange`) por `{access, refresh}` y sigue
+// EXACTAMENTE el flujo de `cloudLogin` (mint de sesión local, etc.).
 
-/** URL del OAuth de Google DEL SaaS con el callback del hub en `next`. El Hub redirige aquí (no a
- *  Google). `callbackUrl` es la ruta de retorno del hub (absoluta) que recibirá el `code`. */
+/** URL del OAuth de Google DEL SaaS. `callbackUrl` es la ruta de retorno del hub (absoluta) que
+ *  recibirá el `code`; viaja dentro del `next` (bridge del SaaS), doblemente encodeada. */
 export function googleLoginUrl(callbackUrl: string): string {
-  return `${config.cloudApiUrl}/auth/google/login/?next=${encodeURIComponent(callbackUrl)}`;
+  const bridge = `/auth/hub-bridge/?callback=${encodeURIComponent(callbackUrl)}`;
+  return `${config.cloudApiUrl}/auth/google/login/?next=${encodeURIComponent(bridge)}`;
 }
 
 /** Canjea el **código de un solo uso** del retorno OAuth por tokens de sesión (ADR-0157 §8):

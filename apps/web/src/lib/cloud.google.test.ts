@@ -31,10 +31,16 @@ describe('login con Google (ADR-0157 §8)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('construye la URL del OAuth de Google DEL SaaS con el callback del hub en next', () => {
-    // El Hub abre esta URL del SaaS (no de Google); `next` es la ruta de retorno del hub, encodeada.
-    expect(googleLoginUrl('https://hub.test/login')).toBe(
-      'https://cloud.test/auth/google/login/?next=https%3A%2F%2Fhub.test%2Flogin',
+  it('construye la URL del OAuth del SaaS con next=/auth/hub-bridge/?callback=<hub>', () => {
+    // El `next` NO es el callback del hub directo: allauth solo redirige a rutas del PROPIO SaaS
+    // (un next cross-host se descarta → caía a /dashboard/) y el código de un solo uso lo emite
+    // exclusivamente `/auth/hub-bridge/` (ADR-0157 §8). El callback del hub viaja dentro, doblemente
+    // encodeado, y el bridge lo valida contra su allowlist antes de redirigir con `?code=`.
+    expect(googleLoginUrl('https://hub.test/auth/google/callback')).toBe(
+      'https://cloud.test/auth/google/login/?next=' +
+        encodeURIComponent(
+          '/auth/hub-bridge/?callback=' + encodeURIComponent('https://hub.test/auth/google/callback'),
+        ),
     );
   });
 
