@@ -118,7 +118,7 @@ La submission va sin firmar, pero para **instalarlo tú** localmente hace falta 
 winget install microsoft.winappcli
 winapp cert generate --if-exists skip     # el Publisher debe coincidir con el manifest parcheado
 winapp cert install .\devcert.pfx         # como admin, una vez
-pwsh scripts/pack-msix.ps1 -Version 0.1.0 -IdentityName "…" -Publisher "CN=…" -PublisherDisplay "…" -Cert .\devcert.pfx
+pwsh scripts/pack-msix.ps1 -Version 1.0.0 -IdentityName "…" -Publisher "CN=…" -PublisherDisplay "…" -Cert .\devcert.pfx
 Add-AppxPackage dist-msix\erplora-app.msix
 ```
 

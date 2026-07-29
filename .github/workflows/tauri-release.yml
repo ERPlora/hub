@@ -18,16 +18,14 @@
 #   │   └── erplora-app.deb         (Linux x86_64, Debian/Ubuntu)
 #   └── v{version}/...
 #
-# NO se construye aquí (decisión 2026-06-22):
-#   - macOS  → build local (`cargo tauri build`); no hay cert Apple Developer ID.
-#   - Android → diferido: la app Tauri aún no tiene `gen/android` (`tauri android init`) ni se
-#     ha cableado el job; cuando se haga, se firma con el keystore de Android (único cert
-#     disponible hoy, el mismo del bridge-android).
-#
-# Android (decisión 2026-07-16, plan tiendas Fase 1): el canal CLIENTE es Google Play (AAB,
-# job `publish-play`, Play App Signing con la keystore como upload key); el APK de S3 queda
-# SOLO como artefacto de QA interno (la landing ya no lo ofrece — redirect 302 a Play en el
-# SaaS). Runbook: apps/tauri/GOOGLE-PLAY.md.
+# NO se construye aquí:
+#   - macOS  → build local (`cargo tauri build`); no hay cert Apple Developer ID (decisión 2026-06-22).
+#   - Android → RETIRADO de este repo (ADR-0160, 2026-07-29): una sola app instalable por
+#     plataforma bajo la identidad única `com.erplora.app`. La app Android es la Kotlin
+#     (shell webview ADR-0159 + bridge Ktor) y vive SOLO en el repo `ERPlora-Bridge-android`
+#     (su `build.yml` construye y publica en Google Play). Los jobs `check-secrets`,
+#     `build-android` y `publish-play` de este workflow se eliminaron; la Variable
+#     `PLAY_PACKAGE_NAME_APP` muere con ellos. Runbook: apps/tauri/GOOGLE-PLAY.md.
 #
 # Firma Windows (ADR-0136, 2026-07-16): el canal PRINCIPAL de Windows es Microsoft Store —
 # MSIX sin firmar que la Store re-firma con su cert tras certificación (0€, sin SmartScreen,
@@ -228,171 +226,11 @@ jobs:
         shell: pwsh
         run: msstore publish "${{ github.workspace }}/artifacts/erplora-app.msix" -id "${{ vars.MICROSOFT_STORE_PRODUCT_ID }}"
 
-  # Gate: solo intentamos Android si el repo tiene el keystore configurado (los secrets no se
-  # pueden leer en un `if` de job, así que se comprueba aquí y se expone como output).
-  check-secrets:
-    name: Check Android keystore
-    runs-on: ubuntu-latest
-    outputs:
-      has_keystore: ${{ steps.c.outputs.has_keystore }}
-    steps:
-      - id: c
-        env:
-          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$KS" ]; then
-            echo "has_keystore=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::ANDROID_KEYSTORE_BASE64 no configurado en este repo — se omite el build de Android."
-          fi
-
-  build-android:
-    name: Build android (APK)
-    needs: check-secrets
-    if: needs.check-secrets.outputs.has_keystore == 'true'
-    runs-on: ubuntu-latest
-    env:
-      NDK_VERSION: "27.1.12297006"
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Java (JDK 17)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - name: Install JS deps
-        run: pnpm install --frozen-lockfile
-
-      # Solo arm64 (arm64-v8a): cubre ~todos los móviles modernos y mantiene el build viable en CI
-      # (cada ABI = una compilación release completa del workspace; 4 ABIs en frío = +60 min).
-      # Añadir armv7-linux-androideabi si hace falta soporte de 32-bit antiguos.
-      - name: Install Rust toolchain + Android target
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: . -> target
-
-      - name: Setup Android SDK + NDK
-        uses: android-actions/setup-android@v3
-      - name: Install NDK
-        run: |
-          # android-36: Google Play exige targetSdk 36 para apps nuevas/updates desde el 31-ago-2026.
-          sdkmanager --install "ndk;${NDK_VERSION}" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-          echo "NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
-
-      # CLI nativo vía cargo (NO el npm global): con el npm global, el task gradle rustBuild invoca
-      # `node .../tauri` con una ruta mal resuelta ("Cannot find module .../src-tauri/tauri").
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
-
-      - name: Set version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          V="${GITHUB_REF_NAME#v}"
-          node -e "const f='apps/tauri/src-tauri/tauri.conf.json';const c=require('./'+f);c.version='${V}';require('fs').writeFileSync(f, JSON.stringify(c,null,2)+'\n')"
-
-      - name: Build Android app (APK + AAB)
-        working-directory: apps/tauri
-        run: |
-          cargo tauri android init
-          # Play exige targetSdk 36 (31-ago-2026). gen/android se regenera en cada run, así que
-          # este patch es idempotente: si el CLI de Tauri ya emite 36, el sed no cambia nada.
-          sed -i -E 's/compileSdk = [0-9]+/compileSdk = 36/; s/targetSdk = [0-9]+/targetSdk = 36/' \
-            src-tauri/gen/android/app/build.gradle.kts
-          # --aab = Google Play (canal cliente); --apk = SOLO QA interno en S3 (decisión 2026-07-16:
-          # Android de cara al cliente va únicamente por Play). Un solo build produce ambos.
-          cargo tauri android build --apk --aab --target aarch64
-
-      - name: Sign APK + AAB
-        env:
-          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          set -euo pipefail
-          printf '%s' "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          BT=$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -type d | sort -V | tail -1)
-          UNSIGNED=$(find apps/tauri -path '*/outputs/apk/*release*' -name '*.apk' | grep -i 'unsigned\|release' | head -1)
-          echo "APK sin firmar: $UNSIGNED"
-          "$BT/zipalign" -p -f 4 "$UNSIGNED" "$RUNNER_TEMP/aligned.apk"
-          mkdir -p dist
-          "$BT/apksigner" sign \
-            --ks "$RUNNER_TEMP/release.keystore" \
-            --ks-pass "pass:${KS_PASS}" \
-            --ks-key-alias erplora \
-            --key-pass "pass:${KS_PASS}" \
-            --out dist/erplora-app.apk \
-            "$RUNNER_TEMP/aligned.apk"
-          "$BT/apksigner" verify --print-certs dist/erplora-app.apk
-          # AAB para Google Play: los bundles se firman con jarsigner (jar signing), no apksigner.
-          # Con Play App Signing esta keystore actúa de UPLOAD key; Google re-firma al distribuir.
-          # El dir del bundle varía según targets (universalRelease vs aarch64Release) → glob.
-          AAB=$(find apps/tauri -path '*/outputs/bundle/*' -name '*.aab' | head -1)
-          echo "AAB: $AAB"
-          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore "$RUNNER_TEMP/release.keystore" \
-            -storepass "${KS_PASS}" -keypass "${KS_PASS}" \
-            "$AAB" erplora
-          jarsigner -verify "$AAB"
-          cp "$AAB" dist/erplora-app.aab
-          ls -la dist/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-android
-          path: dist/*
-          if-no-files-found: error
-
-  # Publica el AAB en Google Play vía el service account (soportado solo para productos
-  # GRATUITOS — nuestro caso). Requisitos previos (manuales, hub#125/#128/#129): cuenta de
-  # ORGANIZACIÓN, app creada en Play Console con la PRIMERA subida hecha a mano, SA con
-  # permisos por-app. Gate por Variable PLAY_PACKAGE_NAME_APP (vacía = job saltado).
-  # Track por Variable PLAY_TRACK (default internal; production cuando haya confianza).
-  publish-play:
-    name: Publish to Google Play
-    needs: build-android
-    if: startsWith(github.ref, 'refs/tags/v') && vars.PLAY_PACKAGE_NAME_APP != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Download Android artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-android
-          path: artifacts
-
-      - name: Upload to Google Play
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ vars.PLAY_PACKAGE_NAME_APP }}
-          releaseFiles: artifacts/erplora-app.aab
-          track: ${{ vars.PLAY_TRACK || 'internal' }}
-          status: completed
-
   upload-s3:
     name: Upload to Object Storage
-    # Espera a desktop + Android, pero NO bloquea si Android se salta (sin keystore) o falla:
-    # `always()` + exigir solo que el desktop (`build`) haya ido bien.
-    needs: [build, build-android]
+    needs: build
     # tag v* → sube a v{version}/ + latest/ ; dispatch manual → refresca latest/.
-    if: |
-      always() &&
-      needs.build.result == 'success' &&
-      (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     # Un `aws s3 cp` colgado (red/endpoint) no debe quedarse horas ocupando el run: mejor fallar
     # rápido y re-lanzar solo este job (`gh run rerun --failed`, los artifacts persisten). Visto
@@ -421,7 +259,7 @@ jobs:
             VERSION="latest"
           fi
 
-          FILES="erplora-app-setup.exe erplora-app.msi erplora-app.AppImage erplora-app.deb erplora-app.apk"
+          FILES="erplora-app-setup.exe erplora-app.msi erplora-app.AppImage erplora-app.deb"
           for f in $FILES; do
             if [ -f "artifacts/$f" ]; then
               aws s3 cp "artifacts/$f" "s3://erplora-saas/downloads/app/${VERSION}/$f" \
