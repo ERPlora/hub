@@ -15,6 +15,9 @@ automatización con GitHub Actions está soportada **solo para productos gratuit
 exactamente nuestro modelo (app gratis + suscripción/módulos en erplora.com, Stripe propio,
 0% comisión de Microsoft en apps no-juego con pasarela propia).
 
+**Una sola ficha por tienda (ADR-0160, 2026-07-29):** «ERPlora» (`com.erplora.app`). El
+bridge headless NO tiene ficha de Store — ver la última sección.
+
 ## Cómo se empaqueta (ya cableado)
 
 - [`src-tauri/msix/Package.appxmanifest`](src-tauri/msix/Package.appxmanifest) — manifest con
@@ -86,29 +89,29 @@ parece descarga propia pero firma/updates son de la Store) y ponerla en la pági
 descargas junto a macOS/Linux (que siguen sirviéndose de `downloads/` en Object Storage).
 Enlace a ficha: `https://apps.microsoft.com/detail/<STORE_ID>`.
 
-## Segunda app: ERPlora Bridge (hub#120–#124)
+## Bridge headless: canal S3, SIN ficha de Store (ADR-0160, 2026-07-29)
 
-El bridge Windows (`apps/bridge`, binario `erplora-bridge`) se publica como **segunda ficha**
-de la misma cuenta. Las apps background/tray sin ventana están permitidas en la Store
-(precedente: TranslucentTB); la consola con el **pairing code** es la superficie visible del
-first-run. Piezas:
+**Decisión (Ioan, ADR-0160):** NO hay segunda ficha en ninguna tienda. Una sola ficha
+**«ERPlora»** (`com.erplora.app`) por tienda: la app es el antiguo bridge con interfaz de
+configuración rápida y, al abrirse, abre la PWA del Hub. La antigua «segunda ficha ERPlora
+Bridge» (hub#120–#124) queda **descartada**.
 
-- Manifest propio: [`../bridge/msix/Package.appxmanifest`](../bridge/msix/Package.appxmanifest)
-  (Identity PROPIA, mismo publisher; `startupTask` de auto-arranque desactivable por el usuario;
-  capabilities red-only). Assets en `apps/bridge/msix/Assets/` (generados con
-  `gen-tauri-icon.py --out … --store-assets-only`; arte definitivo del bridge = decisión de Ioan).
-- Empaquetado: `scripts/pack-msix.ps1 -Flavor bridge` (sin stage de front).
-- CI: [`bridge-release.yml`](../../.github/workflows/bridge-release.yml) — pack en el leg
-  Windows + job `publish-store`, gates `BRIDGE_MSIX_IDENTITY_NAME` /
-  `BRIDGE_MICROSOFT_STORE_PRODUCT_ID`. **Mismos 4 secrets** (la app Entra es de cuenta).
-- ⚠️ Pre-requisito de la primera submission: hub#121 (devices.json → LocalAppData; bajo MSIX
-  el install-dir es de solo lectura) — YA implementado, validar persistencia en el smoke test.
-- Manual (hub#123): reservar «ERPlora Bridge» (gratuito) → `BRIDGE_MSIX_IDENTITY_NAME` → tag →
-  WACK + devcert → submission manual → live → `BRIDGE_MICROSOFT_STORE_PRODUCT_ID`.
+El binario headless `apps/bridge` (`erplora-bridge`) **sigue existiendo**, pero SOLO como
+descarga de S3 (`downloads/bridge/`, CI
+[`bridge-release.yml`](../../.github/workflows/bridge-release.yml)); nunca pasa por
+Partner Center.
 
-Enlaces de descarga: el switch vive en el SaaS (saas#707) — `bridge:download/windows/` hace
-302 al Web Installer Direct cuando `MICROSOFT_STORE_BRIDGE_ID` está configurado; el Hub UI no
-cambia de URL.
+Notas operativas que siguen vigentes (heredadas de la sección retirada):
+
+- **hub#121** (devices.json → LocalAppData) está implementado en el binario y sigue siendo
+  válido con independencia del canal (persistencia fuera del directorio de instalación).
+- El cableado MSIX del bridge que quedó en el repo (manifest `apps/bridge/msix/`,
+  `pack-msix.ps1 -Flavor bridge`, gates `BRIDGE_MSIX_IDENTITY_NAME` /
+  `BRIDGE_MICROSOFT_STORE_PRODUCT_ID` en `bridge-release.yml`) queda **inerte por gates
+  vacíos** — esas Variables NO se configuran nunca; su retirada física es follow-up aparte.
+- El switch del SaaS (saas#707, `MICROSOFT_STORE_BRIDGE_ID`) queda **obsoleto**: sin
+  configurar, `bridge:download/windows/` sigue sirviendo la descarga de S3 — exactamente
+  el canal del headless.
 
 ## Prueba local del MSIX (opcional, en Windows)
 
