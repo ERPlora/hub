@@ -1,77 +1,79 @@
 # ERPlora → Google Play (canal Android único de cliente)
 
-**Decisión (2026-07-16, plan tiendas Fase 1):** Android de cara al cliente se distribuye
-**SOLO por Google Play** (UE; confianza; todos los terminales objetivo tienen Play). El APK
-firmado sigue subiéndose a S3 como **artefacto interno de QA** — la landing ya no lo ofrece:
-el endpoint de descarga hace **redirect 302** a Play cuando `GOOGLE_PLAY_*_ID` está
-configurado en el SaaS (saas#707).
+**Decisión (ADR-0160, 2026-07-29):** una sola app instalable por plataforma bajo la
+identidad única **`com.erplora.app`**. En Android esa app es la **Kotlin** (shell webview
+ADR-0159 + bridge Ktor) y vive **SOLO** en el repo
+[`ERPlora-Bridge-android`](https://github.com/ERPlora/ERPlora-Bridge-android) — el
+Tauri-Android de este repo se **retiró** (los jobs `check-secrets`/`build-android`/
+`publish-play` de [`tauri-release.yml`](../../.github/workflows/tauri-release.yml) se
+eliminaron; la Variable `PLAY_PACKAGE_NAME_APP` murió con ellos).
 
-Aplica a las DOS apps: **ERPlora** (`com.erplora.hub`, este repo, job `build-android` de
-[`tauri-release.yml`](../../.github/workflows/tauri-release.yml)) y **ERPlora Bridge**
-(`com.erplora.bridge`, repo [`ERPlora-Bridge-android`](https://github.com/ERPlora/ERPlora-Bridge-android)).
+Sigue vigente la decisión de canal (2026-07-16): Android de cara al cliente se distribuye
+**SOLO por Google Play** (UE; confianza; todos los terminales objetivo tienen Play). La
+landing no ofrece APK: el endpoint de descarga del SaaS hace **redirect 302** a Play
+(saas#707).
+
+**Fichas previas:** los 2 drafts anteriores en Play Console (`com.erplora.hub` y
+`com.erplora.bridge`, ambos con **0 releases**) los borra **Ioan** en la consola. No hay
+usuarios ni migración.
 
 ## Requisitos verificados (julio 2026)
 
-- **Cuenta de ORGANIZACIÓN** ($25 one-time): exige **D-U-N-S** — ✅ **ya disponible**
-  (2026-07-16: `COMPANY_DUNS` en el `.env` raíz del workspace, bloque «Datos de empresa»);
-  hub#125 queda en crear la cuenta + verificaciones. Las cuentas org están **EXENTAS** del
-  requisito de closed testing (12 testers/14 días, solo cuentas personales) → producción directa.
-- **AAB obligatorio + Play App Signing**: Google custodia la app signing key; nuestra keystore
-  (alias `erplora`, compartida app↔bridge — ADR-0053) actúa de **upload key** de ambas apps
-  (permitido; registro por-app; reseteable vía soporte). Verificar expiración
-  (`keytool -list -v`, > 22-oct-2033) + copia fuera de GitHub.
-- **Target API 36** desde el 31-ago-2026 (apps nuevas y updates). El CI ya instala
-  `platforms;android-36` y parchea el gradle generado por `tauri android init` (idempotente).
-- **La PRIMERA subida de cada app es MANUAL** en Play Console (requisito de Google); después,
-  el job `publish-play` publica cada tag `v*` automáticamente.
-- **versionCode monotónico**: `major*1e6 + minor*1e3 + patch` — Tauri lo deriva de la versión
-  (que el workflow fija desde el tag); el bridge Kotlin lo recibe por `-PversionCode`.
-- **FGS del bridge** (`connectedDevice`): exige declaración en Play Console con **vídeo demo**.
+- **Cuenta de ORGANIZACIÓN verificada** — ✅ hecha (hub#125 cerrado 2026-07-29). Las cuentas
+  org están **EXENTAS** del requisito de closed testing (12 testers/14 días, solo cuentas
+  personales) → **producción directa**.
+- **AAB obligatorio + Play App Signing**: Google custodia la app signing key; nuestra
+  keystore (alias `erplora`, ADR-0053 — antes compartida app↔bridge, ahora upload key de la
+  **única** app) actúa de **upload key** (registro por-app; reseteable vía soporte).
+  Verificar expiración (`keytool -list -v`, > 22-oct-2033) + copia fuera de GitHub.
+- **Target API 36** desde el 31-ago-2026 (apps nuevas y updates) — responsabilidad del CI
+  del repo Kotlin.
+- **La PRIMERA subida del AAB es MANUAL** en Play Console (requisito de Google) y es la que
+  **registra la upload key**; después, el CI del repo Kotlin publica cada release
+  automáticamente.
+- **versionCode monotónico**: `major*1e6 + minor*1e3 + patch` → **1.0.0 = 1000000** (la
+  serie arranca en 1.0.0, ADR-0160); el build Kotlin lo recibe por `-PversionCode`.
+- **FGS** (`connectedDevice`, el bridge Ktor embebido): exige declaración en Play Console
+  con **vídeo demo**.
 
-## Cableado (ya hecho, inerte por gates)
+## Cableado
 
 | Pieza | Dónde | Gate |
 | --- | --- | --- |
-| Build AAB + firma jarsigner (upload key) | `tauri-release.yml` job `build-android` | siempre (artefacto extra) |
-| Publicación app | `tauri-release.yml` job `publish-play` | Variable `PLAY_PACKAGE_NAME_APP` |
-| Publicación bridge | `ERPlora-Bridge-android/.github/workflows/build.yml` job `publish-play` | Variable `PLAY_PACKAGE_NAME` |
-| Track | ambos | Variable `PLAY_TRACK` (default `internal`) |
-| Redirect 302 a Play | SaaS `apps/public/downloads.py::store_url_for` | settings `GOOGLE_PLAY_APP_ID` / `GOOGLE_PLAY_BRIDGE_ID` |
+| Build AAB + publicación | `ERPlora-Bridge-android/.github/workflows/build.yml` job `publish-play` | Variable `PLAY_PACKAGE_NAME=com.erplora.app` |
+| Track | ídem | Variable `PLAY_TRACK` (default `internal`) |
+| Redirect 302 a Play | SaaS `apps/public/downloads.py::store_url_for` | settings `GOOGLE_PLAY_APP_ID=com.erplora.app` (Dokploy, saas-web); `GOOGLE_PLAY_BRIDGE_ID` queda obsoleto (limpieza SaaS-side) |
+
+En este repo (`hub`) **no queda cableado Android**.
 
 ## Pasos manuales (Ioan) — en orden
 
-1. **hub#125** — crear la cuenta Play Console de organización con el D-U-N-S del `.env` raíz
-   (`COMPANY_DUNS`) → verificaciones de identidad/empresa. Keystore: verificar expiración + backup.
-2. **hub#128** — crear las 2 apps → subir a mano el AAB de cada una (artifact del CI de un tag)
-   al track `internal` (esto registra la upload key y activa Play App Signing) → formularios:
-   Data safety · content rating IARC · privacy policy URL · **declaración FGS + vídeo** (bridge)
-   · screenshots (mín. 2) + feature graphic 1024×500 + icono 512×512.
-3. **hub#129** — GCP: proyecto + Google Play Android Developer API + service account con key
-   JSON → secret org-level `PLAY_SERVICE_ACCOUNT_JSON`; invitar la SA en Play Console con
-   permisos mínimos por-app («Release to testing tracks»); Variables `PLAY_PACKAGE_NAME_APP`
-   (repo hub) y `PLAY_PACKAGE_NAME` (repo bridge-android).
-4. Promoción `internal` → `production` manual en consola; cuando haya confianza,
-   `PLAY_TRACK=production`.
-5. Con las fichas LIVE: settings `GOOGLE_PLAY_APP_ID=com.erplora.hub` y
-   `GOOGLE_PLAY_BRIDGE_ID=com.erplora.bridge` en Dokploy (saas-web) → la landing y el Hub
-   redirigen solos a Play.
+1. **Play Console**: borrar los 2 drafts previos (`com.erplora.hub`, `com.erplora.bridge`,
+   0 releases) y crear la ficha única **`com.erplora.app`**.
+2. Subir **a mano** el primer AAB (artifact del CI del repo Kotlin) al track `internal` —
+   esto registra la upload key (keystore ADR-0053) y activa Play App Signing. Formularios:
+   Data safety · content rating IARC · privacy policy URL · **declaración FGS + vídeo** ·
+   screenshots (mín. 2) + feature graphic 1024×500 + icono 512×512.
+3. Service account (Google Play Android Developer API) con permisos por-app → secret
+   `PLAY_SERVICE_ACCOUNT_JSON` + Variable `PLAY_PACKAGE_NAME=com.erplora.app` en el repo
+   `ERPlora-Bridge-android`.
+4. Promoción `internal` → `production` manual en consola (cuenta org = sin closed testing
+   obligatorio); cuando haya confianza, `PLAY_TRACK=production`.
+5. Con la ficha LIVE: setting `GOOGLE_PLAY_APP_ID=com.erplora.app` en Dokploy (saas-web) →
+   la landing y el Hub redirigen solos a Play.
 
 ## Verificación
 
-- Tag de prueba → artifacts `erplora-app.aab` + `erplora-bridge.aab`; `jarsigner -verify`;
-  `bundletool build-apks --mode=universal` + instalar en dispositivo real (app hasta el
-  EntitlementGate; bridge imprime test TCP:9100).
-- Tag real con Variables puestas → release en el track `internal` sin intervención y sin
-  builds duplicados (solo `build-android` compila; `publish-play` consume el artifact).
-- Producción: instalar ambas desde Play en dispositivo limpio; el siguiente tag llega como
+- Release del repo Kotlin → AAB firmado; `jarsigner -verify`; `bundletool build-apks
+  --mode=universal` + instalar en dispositivo real (shell webview carga el Hub; el bridge
+  Ktor imprime test TCP:9100).
+- Release con Variables puestas → publicación en el track `internal` sin intervención.
+- Producción: instalar desde Play en dispositivo limpio; la siguiente release llega como
   update OTA de Play.
 
 ## Riesgos conocidos
 
-- El targetSdk que emite `tauri android init` puede ir por detrás — el patch `sed` del workflow
-  lo cubre; re-verificar tras el 31-ago-2026.
-- El dir del bundle varía (`universalRelease` vs `aarch64Release`) — el staging usa glob.
-- La primera revisión del bridge (FGS + Bluetooth) suele llevar revisión humana de Google —
-  el vídeo demo es la clave.
+- La primera revisión (FGS + Bluetooth) suele llevar revisión humana de Google — el vídeo
+  demo es la clave.
 - Sin `ACCESS_FINE_LOCATION`, el discovery BT clásico en API 26–30 no devuelve resultados
   (solo bonded devices) — decisión minSdk pendiente: bridge-android#4.

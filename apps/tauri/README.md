@@ -21,6 +21,25 @@ SQLite en `app_data_dir`. Sin red salvo marketplace/AI/primer-login (§2.8).
    [`branding/README.md`](branding/README.md). (`cargo tauri icon` sigue valiendo como
    alternativa, pero genera un recorte plano sin composición de app.)
 
+## Accesos de lanzamiento por canal (escritorio)
+
+Qué acceso directo ve el usuario tras instalar, según el canal de distribución. No se
+configura nada extra en `tauri.conf.json`: es el comportamiento por defecto de cada
+empaquetador (no inventamos claves de config; si algún default no se cumple, se ajusta
+entonces con la clave documentada que corresponda).
+
+| Canal | Artefacto | Acceso de lanzamiento |
+| --- | --- | --- |
+| Windows NSIS (S3, canal secundario) | `erplora-app-setup.exe` | Acceso directo en **Escritorio + Menú Inicio** (default del template NSIS de Tauri v2) |
+| Windows Microsoft Store (canal principal, ADR-0136) | MSIX | Entrada en **Menú Inicio** (convención Store; sin icono de escritorio) |
+| Linux `.deb` (S3) | `erplora-app.deb` | Entrada en el **menú de aplicaciones** (fichero `.desktop` autogenerado por el bundler) |
+| Linux AppImage (S3, canal de QA) | `erplora-app.AppImage` | **Portable**: no instala nada ni crea accesos; se ejecuta directamente |
+| macOS (build local) | `.app`/`.dmg` | Arrastrar a `/Applications` (convención macOS; sin instalador) |
+
+> ⚠️ **Validación pendiente en el primer build real de CI (tag `v1.0.0`)**: confirmar en
+> máquina limpia que NSIS crea ambos accesos, que el MSIX solo aparece en Menú Inicio y que
+> el `.deb` registra la entrada de menú.
+
 ## Gate de arranque por entitlement (la app Tauri es GRATIS)
 
 Ya scaffoldeado en `src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/lib.rs`). La app de
