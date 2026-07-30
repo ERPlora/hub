@@ -152,7 +152,7 @@ SO/navegador como teclado.
 
 #### 2.7.1 Estado de implementación (2026-06-09) — el Bridge ya es **Rust** (fuente de verdad)
 
-> ✅ **Decisiones finales** (columna del humano: lenguaje, estructura, naming, empaquetado, CI).
+> ✅ **Decisiones finales** (ya tomadas: lenguaje, estructura, naming, empaquetado, CI).
 > Esta sub-sección es lo que debe consultar cualquiera para saber cómo funciona el Bridge hoy.
 
 - **Lenguaje y código único.** El Bridge se reescribió de Python/Kotlin/Ionic a **Rust**. La lógica

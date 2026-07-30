@@ -107,7 +107,7 @@ jobs:
           echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
 
 # ==============================================================================
-# Pendiente de columna del humano (provisioning es core):
+# Pendiente (requiere credenciales/acceso reales que hoy solo tiene Ioan, no una decisión de diseño):
 #   - El provisioning del Cloud/Dokploy debe apuntar la task/servicio del hub a
 #     `ghcr.io/erplora/hub:latest` (antes era el URI de ECR) y hacer login en GHCR con un PAT
 #     `read:packages` (el paquete es PRIVADO). Alternativa: hacer el paquete público.
