@@ -367,6 +367,7 @@ mod tests {
             handler: None,
             ai: None,
             expose_api: expose,
+            internal: false,
         }
     }
 

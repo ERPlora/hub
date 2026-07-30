@@ -289,6 +289,11 @@ impl Registry {
 
     /// Commands de un módulo **activo** marcados `expose_api` → `(nombre, &RegisteredCommand)`.
     /// Fuente de la "escritura" del scope de una API key y de los `path` POST del OpenAPI.
+    ///
+    /// Excluye SIEMPRE los commands **internos** (prefijo `_` en el último segmento, o
+    /// `internal: true`) — hub#131, hub#145 — incluso si un manifest los marcara `expose_api` por
+    /// error: defensa en profundidad, el runtime nunca ANUNCIA (OpenAPI, doble puerta de API key)
+    /// lo que luego rechazaría en `execute_at` con `internal_command`.
     pub fn exposed_commands<'a>(
         &'a self,
         module_id: &str,
@@ -298,7 +303,9 @@ impl Registry {
         }
         self.commands
             .iter()
-            .filter(|(_, c)| c.module_id == module_id && c.def.expose_api)
+            .filter(|(name, c)| {
+                c.module_id == module_id && c.def.expose_api && !c.def.is_internal(name)
+            })
             .map(|(name, c)| (name.as_str(), c))
             .collect()
     }
@@ -349,10 +356,11 @@ impl Registry {
             .unwrap_or(false)
     }
 
-    /// Espejo de [`is_query_exposed`] para commands (`POST /api/v1/{module}/c/{command}`).
+    /// Espejo de [`is_query_exposed`] para commands (`POST /api/v1/{module}/c/{command}`). Un
+    /// command INTERNO (hub#131, hub#145) nunca pasa esta puerta, aunque `expose_api` fuera `true`.
     pub fn is_command_exposed(&self, module_id: &str, name: &str) -> bool {
         self.get_command(name)
-            .map(|c| c.module_id == module_id && c.def.expose_api)
+            .map(|c| c.module_id == module_id && c.def.expose_api && !c.def.is_internal(name))
             .unwrap_or(false)
     }
 
@@ -482,4 +490,75 @@ pub(crate) fn now_rfc3339() -> String {
 /// Id nuevo (uuid v4) para `:new_id`.
 pub(crate) fn new_id() -> String {
     uuid::Uuid::new_v4().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cmd_def(expose_api: bool, internal: bool) -> CommandDef {
+        CommandDef {
+            permission: "m.write".to_string(),
+            reads: Vec::new(),
+            transaction: false,
+            sql: vec![],
+            schema: None,
+            emit: vec![],
+            handler: None,
+            ai: None,
+            expose_api,
+            internal,
+        }
+    }
+
+    fn registry_with(name: &str, expose_api: bool, internal: bool) -> Registry {
+        let mut reg = Registry::new();
+        reg.status.insert("pricing".to_string(), ModuleStatus::Active);
+        reg.commands.insert(
+            name.to_string(),
+            RegisteredCommand {
+                module_id: "pricing".to_string(),
+                def: cmd_def(expose_api, internal),
+                sql: vec![],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg
+    }
+
+    /// (d) hub#131/#145 — un command "privado por convención" (último segmento con `_`, estilo
+    /// `pricing._insert_price_list`) NUNCA aparece en `exposed_commands`/`is_command_exposed`
+    /// —las fuentes que alimentan tanto el generador OpenAPI (`openapi::build_spec`) como la
+    /// doble puerta de la API pública (`api_keys::data_command`)— NI SIQUIERA si el manifest lo
+    /// marca (por error) `expose_api: true`.
+    #[test]
+    fn exposed_commands_excludes_underscore_command_even_with_expose_api_true() {
+        let reg = registry_with("pricing._insert_price_list", true, false);
+        assert!(
+            reg.exposed_commands("pricing").is_empty(),
+            "un command `_` con expose_api=true NO debe listarse"
+        );
+        assert!(!reg.is_command_exposed("pricing", "pricing._insert_price_list"));
+    }
+
+    /// Espejo con `internal: true` explícito (sin prefijo `_`): tampoco se anuncia.
+    #[test]
+    fn exposed_commands_excludes_manifest_flagged_internal_even_with_expose_api_true() {
+        let reg = registry_with("pricing.reindex_catalog", true, true);
+        assert!(
+            reg.exposed_commands("pricing").is_empty(),
+            "internal:true con expose_api=true NO debe listarse"
+        );
+        assert!(!reg.is_command_exposed("pricing", "pricing.reindex_catalog"));
+    }
+
+    /// Control: un command público normal (sin `_`, sin `internal:true`) marcado `expose_api`
+    /// SÍ se lista — el filtro no bloquea de más.
+    #[test]
+    fn exposed_commands_includes_a_normal_public_command() {
+        let reg = registry_with("pricing.set_default", true, false);
+        assert_eq!(reg.exposed_commands("pricing").len(), 1);
+        assert!(reg.is_command_exposed("pricing", "pricing.set_default"));
+    }
 }

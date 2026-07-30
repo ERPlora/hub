@@ -1540,6 +1540,10 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     let (status, code) = match &e {
         E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied"),
         E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
+        // hub#131, hub#145: un command interno (prefijo `_`/`internal:true`) invocado desde un
+        // origen EXTERNO. `403` (como `permission_denied`): el command EXISTE, pero esta puerta
+        // no es la suya — nunca `404`, que sugeriría que ni siquiera está registrado.
+        E::InternalCommand(_) => (StatusCode::FORBIDDEN, "internal_command"),
         // ADR-0127: `queryOptional` del SDK devuelve `undefined` SOLO con este código; un
         // `not_found` normal (contrato roto contra un módulo presente) sigue siendo un error.
         E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed"),

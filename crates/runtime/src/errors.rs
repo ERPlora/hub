@@ -27,6 +27,13 @@ pub enum RuntimeError {
     ModuleInactive { module: String, operation: String },
     #[error("command no encontrado: {0}")]
     CommandNotFound(String),
+    /// El command existe y su módulo está activo, pero está marcado INTERNO (prefijo `_` en su
+    /// último segmento, o `internal: true` en el manifest) y la invocación viene de un origen
+    /// EXTERNO (HTTP, API pública, asistente) — hub#131, hub#145. Solo el propio runtime (relay
+    /// del Outbox, scheduler) puede invocarlo. Distinto de `CommandNotFound`: aquí el nombre SÍ
+    /// resuelve, pero el caller no tiene permitido usarlo por esta puerta.
+    #[error("command interno: `{0}` no es invocable desde fuera del runtime")]
+    InternalCommand(String),
     #[error("permiso denegado: requiere `{0}`")]
     PermissionDenied(String),
     /// El módulo necesita una **capability** (ADR-0079: red/certificado/impresora/notify) que el

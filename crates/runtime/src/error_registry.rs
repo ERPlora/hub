@@ -240,6 +240,7 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         | E::PermissionDenied(_)
         | E::CommandNotFound(_)
         | E::QueryNotFound(_)
+        | E::InternalCommand(_)
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -256,6 +257,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::ModuleNotInstalled { .. } => "module_not_installed",
         E::ModuleInactive { .. } => "module_inactive",
         E::CommandNotFound(_) => "command_not_found",
+        E::InternalCommand(_) => "internal_command",
         E::PermissionDenied(_) => "permission_denied",
         E::CapabilityDenied { .. } => "capability_denied",
         E::MissingDependency { .. } => "missing_dependency",
