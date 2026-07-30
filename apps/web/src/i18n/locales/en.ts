@@ -498,6 +498,7 @@ export default {
     resourcesCloud: 'Cloud resources',
     resourcesSystem: 'System resources',
     sourceCloud: 'Cloud',
+    databaseShared: 'Shared database',
     storageS3: 'S3 storage',
     colName: 'Name',
     colType: 'Type',

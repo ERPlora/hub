@@ -499,6 +499,7 @@ export default {
     resourcesCloud: 'Recursos en la nube',
     resourcesSystem: 'Recursos del sistema',
     sourceCloud: 'Nube',
+    databaseShared: 'Base de datos compartida',
     storageS3: 'Almacenamiento S3',
     colName: 'Nombre',
     colType: 'Tipo',

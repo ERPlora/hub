@@ -6,9 +6,22 @@ import Icons from 'unplugin-icons/vite';
 import { readFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { execSync } from 'node:child_process';
 
 // Versión de la app, horneada en build → la lee el footer del sidebar vía `__APP_VERSION__`.
+// Orden de prioridad: env APP_VERSION (CI) > git tag más reciente > package.json.
+// package.json es "0.0.0" a propósito (monorepo); la versión real viene de los tags git.
 const APP_VERSION = (() => {
+  // 1. Env var inyectada por CI (build-hub.yml en tags v*).
+  if (process.env.APP_VERSION) return process.env.APP_VERSION;
+  // 2. Último tag git (p.ej. "v0.1.20" → "0.1.20"). Funciona en local y en CI.
+  try {
+    const tag = execSync('git describe --tags --abbrev=0 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
+    if (tag) return tag.replace(/^v/, '');
+  } catch {
+    // git no disponible (p.ej. Docker sin .git) → sigue al fallback
+  }
+  // 3. Fallback: package.json (0.0.0).
   try {
     return JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8')).version || '0.0.0';
   } catch {

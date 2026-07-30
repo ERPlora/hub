@@ -387,10 +387,23 @@ const usageThresholds = [
   { to: 100, color: 'var(--ion-color-danger)' },
 ];
 
-// Tamaño = headline. La BD Postgres es compartida por organización → sin "tamaño local": "N/A".
-// El motor (PostgreSQL) va en la subetiqueta.
-const dbValue = computed<string>(() => info.value?.database?.sizeLabel ?? 'N/A');
-const dbSub = computed<string>(() => (info.value?.database ? dbEngineLabel.value : '—'));
+// Tamaño = headline. La BD Postgres es compartida por organización → sin "tamaño local".
+// Cuando no hay sizeLabel (cloud/backend compartido), mostramos el motor como headline
+// en vez de "N/A" (que se lee como un error/placeholder). La subetiqueta describe el tenancy.
+const dbValue = computed<string>(() => {
+  const db = info.value?.database;
+  if (db?.sizeLabel) return db.sizeLabel;
+  // Sin tamaño local: el motor es lo más informativo que podemos mostrar.
+  if (db?.engine) return dbEngineLabel.value;
+  return '—';
+});
+const dbSub = computed<string>(() => {
+  const db = info.value?.database;
+  if (!db) return '—';
+  // Si ya mostramos el motor como headline, la subetiqueta describe el tenancy compartido.
+  if (!db.sizeLabel) return t('system.databaseShared');
+  return dbEngineLabel.value;
+});
 const dbConnections = computed<number>(() => info.value?.database?.connections ?? 0);
 const connectionsMax = computed<number>(() => info.value?.database?.connectionsLimit ?? 100);
 const connectionsLimitLabel = computed<string>(() =>
