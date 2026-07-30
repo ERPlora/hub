@@ -58,6 +58,11 @@ ARG OUTFITKIT_CACHEBUST=local
 # coge SIEMPRE la última OutfitKit, incluso sin cambios de source.
 RUN echo "outfitkit cachebust=${OUTFITKIT_CACHEBUST}" \
  && pnpm --filter @erplora/web add @erplora/outfitkit@latest
+# Versión de la app para el footer (vite.config.ts la lee de APP_VERSION o git tag).
+# En CI (build-hub.yml) se pasa desde el tag git; en dev local, vite.config.ts hace
+# fallback a `git describe` o package.json. Default "0.0.0" solo si no hay ni tag ni env.
+ARG APP_VERSION=0.0.0
+ENV APP_VERSION=${APP_VERSION}
 # Build de producción del shell (vue-tsc + vite build → apps/web/dist).
 # prebuild (sync-modules.mjs) busca módulos en un workspace externo ausente aquí: warn+skip (ok).
 RUN pnpm -F @erplora/web build
