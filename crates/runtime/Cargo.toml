@@ -22,6 +22,11 @@ sha2 = "0.10"
 argon2 = "0.5"
 # (ADR-0040, opción B 2026-06-13) El backup ya NO cifra en cliente: el cifrado es SSE en el Cloud,
 # así que se quitó `aes-gcm` (no hay master key ni AES-GCM en el hub). Ver `host_backup.rs`.
+# Cifrado at-rest de secretos del Hub (ERPlora/hub#114, `secret_box.rs`): `_hub_certificate`
+# (.p12 fiscal + password) ya NO se guarda en claro. `ring` (AES-256-GCM) ya estaba resuelto en
+# `Cargo.lock` de forma transitiva (rustls/reqwest más abajo) — se declara directo en vez de sumar
+# una dependencia de cripto nueva al árbol (p.ej. `aes-gcm`/`fernet`).
+ring = "0.17"
 # Validación del payload contra el JSON Schema declarado por cada query/command (§5.2).
 # Sin resolución de $ref externos (offline): los schemas de módulo son autocontenidos.
 jsonschema = { version = "0.33", default-features = false }
