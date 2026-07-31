@@ -1,5 +1,5 @@
 <template>
-  <AppPage :title="t('profile.title')" back-href="/dashboard">
+  <AppPage :title="t('profile.title')" back-href="/dashboard" content-layout="detail">
     <main class="profile-page">
       <section class="profile-hero" aria-labelledby="profile-name">
         <ok-avatar
@@ -363,8 +363,6 @@ onMounted(async () => {
 
 <style scoped>
 .profile-page {
-  width: min(100%, 1040px);
-  margin: 0 auto;
   padding: 4px 0 28px;
   container-type: inline-size;
 }
