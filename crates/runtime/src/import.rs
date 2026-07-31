@@ -104,6 +104,11 @@ pub async fn import_sections(
     }
 
     // ── Aplicación sección a sección, BEST-EFFORT (decisión Ioan) ───────────
+    // Cada sección valida su SQL contra el subconjunto permitido ANTES de ejecutar nada de ella
+    // (`import_sql`, hub#239): DDL o un INSERT en tablas de otra sección dejan la sección entera
+    // en `Failed` sin tocar la BD. NO se aborta el import: el best-effort es la decisión de
+    // producto (una sección rota no rompe el resto) y la garantía de seguridad —que ese SQL no se
+    // ejecute— se cumple igual.
     let mut report = ImportReport::default();
     for section in &manifest.sections {
         let status = apply_section(rt, section, files, selection, target_hub_id).await;
@@ -158,7 +163,13 @@ async fn apply_section(
     if sql.trim().is_empty() {
         return SectionStatus::Applied; // sección presente pero sin filas: nada que hacer
     }
-    match crate::seed::apply(rt.db(), &sql).await {
+    // Subconjunto SQL del import (hub#239): la sección se valida ENTERA antes de ejecutar su
+    // primera fila (solo `INSERT INTO` en sus propias tablas). Validar y ejecutar viven en la
+    // misma función para que lo validado sea EXACTAMENTE lo ejecutado (mismo troceo).
+    let Some(scope) = crate::import_sql::scope_for_data_file(&path) else {
+        return SectionStatus::Failed(format!("{path} no corresponde a ninguna sección conocida"));
+    };
+    match crate::import_sql::apply(rt.db(), &sql, &scope).await {
         Ok(_) => SectionStatus::Applied,
         Err(e) => SectionStatus::Failed(e.to_string()),
     }
