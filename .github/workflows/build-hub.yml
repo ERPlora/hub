@@ -98,12 +98,15 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.tags }}
-          build-args: |
-            APP_VERSION=${{ steps.version.outputs.version }}
+          # UN SOLO `build-args`: son claves de un mapa YAML, así que declararlo dos veces
+          # invalida el workflow entero (Actions lo rechaza al procesarlo: 0 jobs, 0 s, sin
+          # minutos facturados) y ningún build llega a ejecutarse.
+          #
           # OUTFITKIT_CACHEBUST único por run → invalida la capa `pnpm add @erplora/outfitkit@latest`
           # del Dockerfile en CADA build, forzando que la imagen coja SIEMPRE la última OutfitKit
           # publicada (el tag npm `latest` lo mueve la GH action de release de outfitkit).
           build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
             OUTFITKIT_CACHEBUST=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
