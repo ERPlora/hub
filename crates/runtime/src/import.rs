@@ -109,9 +109,15 @@ pub async fn import_sections(
     // en `Failed` sin tocar la BD. NO se aborta el import: el best-effort es la decisión de
     // producto (una sección rota no rompe el resto) y la garantía de seguridad —que ese SQL no se
     // ejecute— se cumple igual.
+    // Un lote por importación, con el nombre del blueprint: es la unidad que el usuario
+    // reconoce y deshace («quitar la demo del restaurante»). Si el registro del lote falla, el
+    // import NO se aborta — se pierde la trazabilidad, no los datos.
+    let batch_id = crate::reset::begin_batch(rt, target_hub_id, &manifest.name).await.ok();
+
     let mut report = ImportReport::default();
     for section in &manifest.sections {
-        let status = apply_section(rt, section, files, selection, target_hub_id).await;
+        let status =
+            apply_section(rt, section, files, selection, target_hub_id, batch_id.as_deref()).await;
         report.sections.push(SectionResult { section: section.clone(), status });
     }
     Ok(report)
@@ -124,6 +130,7 @@ async fn apply_section(
     files: &BTreeMap<String, Vec<u8>>,
     selection: &ImportSelection,
     target_hub_id: &str,
+    batch_id: Option<&str>,
 ) -> SectionStatus {
     // ¿Está marcada en el formulario de import?
     let (selected, path): (bool, Option<String>) = match section {
@@ -169,7 +176,16 @@ async fn apply_section(
     let Some(scope) = crate::import_sql::scope_for_data_file(&path) else {
         return SectionStatus::Failed(format!("{path} no corresponde a ninguna sección conocida"));
     };
-    match crate::import_sql::apply(rt.db(), &sql, &scope).await {
+    // Con lote abierto, el import REGISTRA qué filas inserta (ADR-0170): así esta importación
+    // se puede deshacer después sin tocar lo que el usuario cree más tarde. Sin lote (llamadas
+    // heredadas), se aplica igual que siempre. Ambas rutas pasan por la MISMA validación.
+    let applied = match batch_id {
+        Some(batch) => crate::reset::apply_tracked_into(rt, batch, target_hub_id, &sql, &scope)
+            .await
+            .map(|n| n as usize),
+        None => crate::import_sql::apply(rt.db(), &sql, &scope).await,
+    };
+    match applied {
         Ok(_) => SectionStatus::Applied,
         Err(e) => SectionStatus::Failed(e.to_string()),
     }
