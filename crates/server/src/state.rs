@@ -211,7 +211,7 @@ impl HubConfig {
 }
 
 #[cfg(test)]
-mod tests {
+mod staging_tests {
     use super::*;
 
     fn config(dev_mode: bool) -> HubConfig {
