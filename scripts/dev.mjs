@@ -36,8 +36,11 @@ const DEFAULTS = {
   // Bind del runtime Axum.
   HUB_BIND: '127.0.0.1:8787',
   // Auth en modo sesión server-side (el ÚNICO flujo del frontend: login cloud/PIN → X-Hub-Session).
-  // En modo `dev` (sin esto) el runtime no descarga la clave pública del Cloud y `/api/auth/cloud`
+  // Con `HUB_AUTH=dev` el runtime no descarga la clave pública del Cloud y `/api/auth/cloud`
   // devuelve 503 ("login cloud no disponible (sin clave pública)") → la pantalla de login no funciona.
+  // Desde hub#241 `session` es además el DEFAULT del runtime (fail-closed): el modo permisivo
+  // (`dev`, que se cree las cabeceras X-User-Id/X-Permissions del navegador) hay que pedirlo
+  // explícitamente con `HUB_AUTH=dev`. Aquí se deja fijado para que quede a la vista.
   HUB_AUTH: 'session',
   // Seed de dev: usuario "Demo" (PIN 0000) + dispositivo de confianza, para que el login local por
   // PIN funcione sin enrolar online (ADR-0065). Sin esto un arranque fresco no tiene usuario con PIN

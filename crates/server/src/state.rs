@@ -37,11 +37,37 @@ impl EventSink for BroadcastSink {
 ///  - `Dev`: confía en cabeceras `X-User-Id`/`X-Permissions` (desarrollo local, sin Cloud).
 ///  - `Session`: identidad LOCAL real. El login (PIN o JWT cloud) abre una **sesión server-side**
 ///    (`hub_session`); cada petición lleva `X-Hub-Session` y el runtime resuelve el `hub_user` y
-///    sus permisos por rol. Se activa con `HUB_AUTH=session`.
+///    sus permisos por rol. Es el modo de **producción** y el **default** (fail-closed).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AuthMode {
     Dev,
     Session,
+}
+
+/// Variable de entorno que selecciona el [`AuthMode`].
+pub const AUTH_MODE_ENV: &str = "HUB_AUTH";
+
+/// Resuelve el [`AuthMode`] desde el valor crudo de `HUB_AUTH` (**fail-closed**, hub#241).
+///
+/// El default era `Dev`: un despliegue que olvidara la variable arrancaba **sin autenticación**
+/// (el navegador dictaba `X-User-Id`/`X-Permissions`) y nadie se enteraba, porque todo "funcionaba".
+/// Un fallo de configuración no puede abrir el hub: sin variable → [`AuthMode::Session`]
+/// (producción/Cloud). El modo de desarrollo se pide **explícitamente** con `HUB_AUTH=dev`.
+///
+/// Un valor desconocido también cae a `Session` con un aviso: un typo (`HUB_AUTH=develop`) no
+/// puede degradar la seguridad del hub.
+pub fn parse_auth_mode(raw: Option<&str>) -> AuthMode {
+    match raw.map(str::trim) {
+        Some("dev") => AuthMode::Dev,
+        Some("session") | None => AuthMode::Session,
+        Some(other) => {
+            eprintln!(
+                "auth: {AUTH_MODE_ENV}=`{other}` no es un modo conocido (`dev`|`session`) → \
+                 se usa `session` (fail-closed)"
+            );
+            AuthMode::Session
+        }
+    }
 }
 
 /// Configuración de despliegue del hub (ARQUITECTURA.md §2.3; decisiones del humano):
@@ -91,18 +117,25 @@ pub struct HubConfig {
 pub const DEV_HUB_ID: &str = "00000000-0000-0000-0000-000000000001";
 
 impl HubConfig {
-    /// Lee la configuración del entorno con defaults de desarrollo locales.
+    /// Lee la configuración del entorno. El [`AuthMode`] sale de `HUB_AUTH` **fail-closed**
+    /// (sin variable → `Session`, ver [`parse_auth_mode`]).
     pub fn from_env() -> Self {
+        // Fail-closed (hub#241): sin `HUB_AUTH` se arranca en modo producción (`Session`).
+        let raw_auth = std::env::var(AUTH_MODE_ENV).ok();
+        Self::from_env_with_auth(parse_auth_mode(raw_auth.as_deref()))
+    }
+
+    /// Como [`from_env`](Self::from_env) pero con el [`AuthMode`] **explícito**. Es la vía por la
+    /// que un test (o un arranque controlado) pide el modo `Dev` sin depender de una variable de
+    /// proceso compartida: desde hub#241 el default del entorno es `Session` (fail-closed), así
+    /// que el modo permisivo hay que pedirlo a propósito, también en los tests.
+    pub fn from_env_with_auth(auth_mode: AuthMode) -> Self {
         let hub_id = std::env::var("HUB_ID").unwrap_or_else(|_| DEV_HUB_ID.to_string());
         let cloud_base_url = std::env::var("HUB_CLOUD_API_URL")
             .unwrap_or_else(|_| "https://erplora.com".to_string());
         let module_cache = std::env::var("HUB_MODULE_CACHE")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("erplora-modules"));
-        let auth_mode = match std::env::var("HUB_AUTH").as_deref() {
-            Ok("session") => AuthMode::Session,
-            _ => AuthMode::Dev,
-        };
         // Inyección directa de la clave (PEM) por entorno; si no, `main` la trae del Cloud.
         let jwt_public_key = std::env::var("HUB_JWT_PUBLIC_KEY")
             .ok()
@@ -318,5 +351,43 @@ impl AppState {
     /// Publica un frame WS crudo (lo usa el flujo de instalación → `module.installed`).
     pub fn broadcast(&self, frame: Json) {
         let _ = self.events.send(frame);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// **Fail-closed (hub#241).** Sin `HUB_AUTH` el hub NO puede arrancar sin autenticación: el
+    /// default es producción (`Session`). Antes era `Dev` y un despliegue que olvidara la variable
+    /// aceptaba la identidad y los permisos que dictase el navegador (`X-User-Id`/`X-Permissions`).
+    #[test]
+    fn missing_env_defaults_to_session_not_dev() {
+        assert_eq!(parse_auth_mode(None), AuthMode::Session);
+        assert_ne!(parse_auth_mode(None), AuthMode::Dev);
+    }
+
+    /// El modo de desarrollo se pide EXPLÍCITAMENTE.
+    #[test]
+    fn dev_mode_must_be_requested_explicitly() {
+        assert_eq!(parse_auth_mode(Some("dev")), AuthMode::Dev);
+        assert_eq!(parse_auth_mode(Some(" dev ")), AuthMode::Dev);
+    }
+
+    #[test]
+    fn session_is_accepted_verbatim() {
+        assert_eq!(parse_auth_mode(Some("session")), AuthMode::Session);
+    }
+
+    /// Un typo (`develop`, `DEV`, vacío) NO degrada la seguridad: cae a `Session`.
+    #[test]
+    fn unknown_or_empty_value_falls_back_to_session() {
+        for raw in ["develop", "DEV", "Dev", "", "true", "1"] {
+            assert_eq!(
+                parse_auth_mode(Some(raw)),
+                AuthMode::Session,
+                "`{raw}` no debe abrir el hub"
+            );
+        }
     }
 }
