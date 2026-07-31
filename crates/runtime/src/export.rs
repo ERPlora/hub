@@ -116,7 +116,14 @@ pub async fn export_hub(
     // ── Secciones a nivel hub ────────────────────────────────────────────────
     if selection.users {
         // `hub_user` NO lleva hub_id (identidad por despliegue, identity.rs): se vuelca entera.
-        let rows = fetch_rows(db, "hub_user", None).await.unwrap_or_default();
+        let mut rows = fetch_rows(db, "hub_user", None).await.unwrap_or_default();
+        // …pero SIN los ligados a una cuenta Cloud. Ese usuario es la identidad de una PERSONA
+        // del SaaS, no plantilla: el que dispara el export acabaría dentro del bundle y, si el
+        // bundle se publica como blueprint, cada hub que lo importe se lo lleva como usuario
+        // suyo —con su rol— y el login cloud casa por `cloud_user_id` y entra. Pasó de verdad:
+        // los blueprints regenerados el 2026-07-31 llevaban a support@erplora.com como `owner`.
+        // Los usuarios LOCALES (PIN) sí son plantilla y viajan.
+        rows.retain(|r| r.get("cloud_user_id").map(|v| v.is_null()).unwrap_or(true));
         files.insert("data/hub_users.sql".into(), rows_to_sql("hub_user", &rows, hub_id).into_bytes());
         sections.push("hub_users".into());
     }
@@ -156,9 +163,23 @@ pub async fn export_hub(
             continue; // checkbox «módulo» sin «datos»: solo va al manifest (se instalará, vacío)
         }
 
+        // Las tablas del módulo, ORDENADAS por dependencia: el padre antes que quien lo
+        // referencia (ver `order_by_dependency`). Sin esto el volcado sale en el orden de
+        // `information_schema` y el import se cae por FK, perdiendo la sección entera.
+        let mut mine: Vec<String> = all_tables
+            .iter()
+            .filter(|t| table_owner(t, &installed_ids).as_deref() == Some(m.module_id.as_str()))
+            .cloned()
+            .collect();
+        order_by_dependency(db, &mut mine).await;
+
         let mut sql = String::new();
-        for table in &all_tables {
-            if table_owner(table, &installed_ids).as_deref() != Some(m.module_id.as_str()) {
+        for table in &mine {
+            // La identidad fiscal del NEGOCIO (NIF y nombre del emisor, entorno, auto_transmit,
+            // certificado) solo viaja si se marca `fiscal` —la sección que ya mueve el `.p12`—.
+            // Iba como una tabla más del módulo, así que el blueprint publicado sembraba el NIF
+            // del hub demo y `auto_transmit=1` en el hub de cada cliente que lo importaba.
+            if table == "verifactu_config" && !selection.fiscal {
                 continue;
             }
             // La mayoría de tablas llevan `hub_id` (contrato de fila §2.5) → se acotan por él.
@@ -220,6 +241,57 @@ async fn list_tables(db: &dyn erplora_db::DatabaseAdapter) -> crate::Result<Vec<
                WHERE table_schema = current_schema()";
     let res = db.query(sql, &erplora_db::Params::new()).await.map_err(|e| crate::RuntimeError::Other(format!("export: catálogo de tablas: {e}")))?;
     Ok(res.rows.iter().filter_map(|r| r.get("name").and_then(|n| n.as_str()).map(str::to_string)).collect())
+}
+
+/// Ordena `tables` para que una tabla vaya SIEMPRE detrás de aquellas a las que referencia.
+///
+/// El volcado se aplica al importar en el orden del fichero, así que si el hijo va primero el
+/// INSERT revienta por FK y **se pierde la sección entera** (el módulo se aplica en bloque).
+/// `list_tables` devuelve el orden de `information_schema`, que no garantiza nada: en un hub
+/// real `inventory_category` salió DESPUÉS de `inventory_product_categories` y el import murió
+/// con `violates foreign key constraint …_category_id_fkey` tirando 280 productos + 19
+/// categorías. Los blueprints publicados en julio colaban por casualidad.
+///
+/// Las dependencias salen de las FK DECLARADAS (catálogo de la BD), no de adivinar por el
+/// nombre. Orden estable y a prueba de ciclos: una FK a sí misma (`parent_id`) o un ciclo entre
+/// tablas no cuelga ni descarta nada — lo que no se puede ordenar conserva su posición.
+async fn order_by_dependency(db: &dyn erplora_db::DatabaseAdapter, tables: &mut Vec<String>) {
+    let mut deps: Vec<std::collections::HashSet<String>> = Vec::with_capacity(tables.len());
+    for t in tables.iter() {
+        let padres = foreign_keys(db, t)
+            .await
+            .into_iter()
+            .map(|fk| fk.parent)
+            .filter(|p| p != t && tables.contains(p))
+            .collect();
+        deps.push(padres);
+    }
+
+    // Kahn estable: de las que ya no esperan a nadie sale siempre la de índice más bajo.
+    let mut salida: Vec<String> = Vec::with_capacity(tables.len());
+    let mut colocadas: std::collections::HashSet<String> = std::collections::HashSet::new();
+    while salida.len() < tables.len() {
+        let siguiente = tables.iter().enumerate().position(|(i, t)| {
+            !colocadas.contains(t) && deps[i].iter().all(|p| colocadas.contains(p))
+        });
+        match siguiente {
+            Some(i) => {
+                colocadas.insert(tables[i].clone());
+                salida.push(tables[i].clone());
+            }
+            // Ciclo: nada más se puede colocar. El resto va en su orden original (no se pierde
+            // ninguna tabla; un ciclo real de FK no lo puede resolver ningún orden).
+            None => {
+                for t in tables.iter() {
+                    if !colocadas.contains(t) {
+                        colocadas.insert(t.clone());
+                        salida.push(t.clone());
+                    }
+                }
+            }
+        }
+    }
+    *tables = salida;
 }
 
 /// Módulo instalado dueño de `table` por prefijo más largo (`<id>_*` o nombre exacto).
