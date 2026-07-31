@@ -35,6 +35,7 @@ pub mod outbox;
 pub mod permissions;
 pub mod queries;
 pub mod registry;
+pub mod reset;
 pub mod scheduler;
 pub mod secret_box;
 pub mod seed;
