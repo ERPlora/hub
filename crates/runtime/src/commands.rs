@@ -60,6 +60,7 @@ pub async fn execute(
 /// transacción del command y con el [`Origin`] explícito de la llamada. El relay usa `extra_ops`
 /// para insertar el marcador de entrega (`_event_delivery`) atómicamente con los efectos del
 /// listener (idempotencia, §5.4).
+#[allow(clippy::too_many_arguments)] // mismo trato que persist_handler_output: firma interna del dispatcher
 pub(crate) async fn execute_at(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
