@@ -635,6 +635,10 @@ pub fn app(state: AppState) -> Router {
         // (facturas remitidas a la AEAT) lo aplica el MOTOR, no esta capa.
         .route("/api/hub/reset/plan", post(reset::reset_plan))
         .route("/api/hub/reset", post(reset::reset_hub))
+        // Lotes de importación (ADR-0170): listar qué trajo cada blueprint y deshacer uno sin
+        // tocar lo que el usuario creó después.
+        .route("/api/hub/import/batches", get(reset::import_batches))
+        .route("/api/hub/import/undo", post(reset::undo_import_batch))
         // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
         .route(
             "/api/media",

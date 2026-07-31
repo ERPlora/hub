@@ -19,7 +19,9 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
 
-use erplora_runtime::reset::{execute_reset, plan_reset, ResetSelection};
+use erplora_runtime::reset::{
+    execute_reset, list_import_batches, plan_reset, undo_import, ResetSelection,
+};
 
 use crate::auth;
 use crate::state::AppState;
@@ -137,5 +139,78 @@ pub async fn reset_hub(
         // El motor rechaza aquí lo bloqueado por el límite fiscal: 409 (conflicto con el estado
         // del hub), no 500 — no es un fallo, es una regla. El mensaje ya explica el motivo legal.
         Err(e) => err(StatusCode::CONFLICT, &e.to_string()),
+    }
+}
+
+// ── Lotes de importación: listar y deshacer (ADR-0170) ──────────────────────────────────
+
+/// Body de `POST /api/hub/import/undo`.
+#[derive(Deserialize)]
+pub struct UndoReq {
+    batch_id: String,
+}
+
+/// GET /api/hub/import/batches — importaciones del hub, de la más reciente a la más antigua.
+///
+/// Alimenta el panel «deshacer esta importación». Va tras el gate admin: enumera qué blueprints
+/// se han cargado y cuántas filas trajo cada uno.
+pub async fn import_batches(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let data_hub_id = match auth::authenticate(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx.hub_id,
+        Err(e) => return unauthorized(e),
+    };
+    match list_import_batches(&rt, &data_hub_id).await {
+        Ok(batches) => {
+            (StatusCode::OK, Json(json!({ "ok": true, "batches": batches }))).into_response()
+        }
+        Err(e) => err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("no se pudieron listar las importaciones: {e}"),
+        ),
+    }
+}
+
+/// POST /api/hub/import/undo — deshace una importación: borra EXACTAMENTE las filas que trajo,
+/// sin tocar lo que el usuario haya creado después.
+///
+/// Un lote desconocido (o de otro hub) es un **no-op 200**, no un error: el usuario puede pulsar
+/// dos veces o reintentar tras una red mala, y eso no debe parecer un fallo.
+pub async fn undo_import_batch(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<UndoReq>>,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let data_hub_id = match auth::authenticate(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx.hub_id,
+        Err(e) => return unauthorized(e),
+    };
+    let Some(Json(req)) = body else {
+        return err(StatusCode::UNPROCESSABLE_ENTITY, "falta el body JSON { batch_id }");
+    };
+    if req.batch_id.trim().is_empty() {
+        return err(StatusCode::UNPROCESSABLE_ENTITY, "batch_id vacío");
+    }
+
+    match undo_import(&rt, &data_hub_id, req.batch_id.trim()).await {
+        Ok(report) => {
+            (StatusCode::OK, Json(json!({ "ok": true, "report": report }))).into_response()
+        }
+        Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     }
 }
