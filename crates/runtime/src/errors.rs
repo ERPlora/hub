@@ -47,6 +47,11 @@ pub enum RuntimeError {
     DependencyCycle { module: String },
     #[error("ciclo de eventos demasiado profundo (posible bucle de listeners)")]
     EventLoop,
+    /// Un handler (WASM/nativo) devolvió un evento que su `module.json` NO declara (hub#240).
+    /// El evento **no se encola**: el command falla entero, porque un nombre de evento es un
+    /// contrato cross-módulo (y `*.reminder.due` llega a `host.notify`), no un dato del handler.
+    #[error("el módulo `{module}` no declara el evento `{event}` (decláralo en `events.emits` de su module.json)")]
+    EventNotDeclared { module: String, event: String },
     #[error("característica no implementada: {0}")]
     NotImplemented(&'static str),
     #[error("error de handler WASM: {0}")]

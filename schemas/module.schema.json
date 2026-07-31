@@ -321,6 +321,14 @@
               }
             }
           }
+        },
+        "emits": {
+          "type": "array",
+          "description": "Eventos que el módulo emite DESDE SUS HANDLERS (WASM/nativo). Es el allowlist que el runtime comprueba antes de encolar en el outbox un evento devuelto por un handler (hub#240): `emit` declara los de un command declarativo, y estos son los que decide el handler. Declararlo pone al módulo en MODO ESTRICTO (solo estos nombres + los `emit` de sus commands pueden salir de sus handlers). Reglas duras que aplican siempre: no emitir en el namespace de otro módulo instalado, y no emitir `*.reminder.due` (disparador de `host.notify`) sin la capability `notify` declarada y concedida.",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

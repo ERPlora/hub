@@ -16,7 +16,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
 use crate::commands::{self, MAX_EVENT_DEPTH};
-use crate::errors::Result;
+use crate::errors::{Result, RuntimeError};
 use crate::host_notify::{self, NotifyIntent};
 use crate::registry::{new_id, now_rfc3339, Registry, RequestContext};
 
@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS _event_outbox (\
   permissions TEXT NOT NULL, event_name TEXT NOT NULL, payload TEXT NOT NULL, \
   depth INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', \
   attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, \
-  last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT);\
+  last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT, \
+  module_id TEXT NOT NULL DEFAULT '');\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS module_id TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_at);\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
@@ -56,7 +58,17 @@ pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
 /// Se añade a la MISMA transacción que el SQL del command (escritura atómica). Guarda el
 /// contexto (hub_id/user_id/permissions) para que el relay reconstruya el `RequestContext`
 /// exacto del emisor — preserva la semántica de permisos del modelo síncrono.
-pub(crate) fn insert_op(ctx: &RequestContext, event: &str, payload: &Params, depth: u32) -> (String, Params) {
+///
+/// `module_id` = **módulo emisor**. Se persiste porque el relay necesita saber a quién exigirle la
+/// capability al ejercer un primitivo de host (`*.reminder.due` → `host.notify`): sin atribución,
+/// el envío externo se hacía "en nombre del hub" y cualquier módulo llegaba a él (hub#240).
+pub(crate) fn insert_op(
+    ctx: &RequestContext,
+    module_id: &str,
+    event: &str,
+    payload: &Params,
+    depth: u32,
+) -> (String, Params) {
     let perms: Vec<&String> = ctx.permissions.iter().collect();
     let now = now_rfc3339();
     let mut p = Params::new();
@@ -65,6 +77,7 @@ pub(crate) fn insert_op(ctx: &RequestContext, event: &str, payload: &Params, dep
     p.insert("user_id".into(), json!(ctx.user_id));
     p.insert("permissions".into(), json!(serde_json::to_string(&perms).unwrap_or_else(|_| "[]".into())));
     p.insert("event_name".into(), json!(event));
+    p.insert("module_id".into(), json!(module_id));
     p.insert(
         "payload".into(),
         json!(serde_json::to_string(&Json::Object(payload.clone())).unwrap_or_else(|_| "{}".into())),
@@ -72,8 +85,8 @@ pub(crate) fn insert_op(ctx: &RequestContext, event: &str, payload: &Params, dep
     p.insert("depth".into(), json!(depth));
     p.insert("now".into(), json!(now));
     let sql = "INSERT INTO _event_outbox \
-        (id, hub_id, user_id, permissions, event_name, payload, depth, status, attempts, next_attempt_at, last_error, created_at) \
-        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :payload, :depth, 'pending', 0, :now, '', :now)";
+        (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, status, attempts, next_attempt_at, last_error, created_at) \
+        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, 'pending', 0, :now, '', :now)";
     (sql.to_string(), p)
 }
 
@@ -105,7 +118,7 @@ pub async fn process_once(db: &dyn DatabaseAdapter, registry: &Registry) -> Resu
     q.insert("lim".into(), json!(BATCH));
     let due = db
         .query(
-            "SELECT id, hub_id, user_id, permissions, event_name, payload, depth, attempts \
+            "SELECT id, hub_id, user_id, permissions, event_name, module_id, payload, depth, attempts \
              FROM _event_outbox WHERE status = 'pending' AND next_attempt_at <= :now \
              ORDER BY created_at LIMIT :lim",
             &q,
@@ -182,7 +195,9 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // transporte del runtime. Reusa la MISMA infra del outbox: idempotencia por `_event_delivery`
     // (listener sintético `host.notify`) y, si el transporte falla, reintento/backoff/dead-letter.
     if event_name.ends_with(REMINDER_DUE_SUFFIX) {
-        if let Err(e) = deliver_host_notify(db, registry, &id, &payload).await {
+        let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
+        if let Err(e) = deliver_host_notify(db, registry, &id, &module_id, &ctx.hub_id, &payload).await
+        {
             return defer_or_dead(db, &id, attempts, &format!("{HOST_NOTIFY_LISTENER}: {e}")).await;
         }
     }
@@ -194,10 +209,19 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
 /// por `_event_delivery` (listener sintético [`HOST_NOTIFY_LISTENER`]). Sin transporte configurado
 /// es no-op (la capacidad no está disponible en este host). El marcador de entrega se escribe SOLO
 /// tras un envío con éxito → un fallo deja la fila para reintento (no marca entregado).
+///
+/// **Tres puertas antes de que salga nada del hub** (hub#240 — antes no había ninguna):
+///  1. el módulo emisor tiene la capability `notify` **declarada y concedida**
+///     ([`crate::capabilities::require`], default-deny);
+///  2. el canal es uno de los que ese módulo **declara** en `capabilities.notify.channels`;
+///  3. el destinatario **se resuelve desde datos del hub** — nunca una dirección libre del payload
+///     ([`host_notify::assert_recipient_allowed`]).
 async fn deliver_host_notify(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     event_id: &str,
+    module_id: &str,
+    hub_id: &str,
     payload: &Params,
 ) -> Result<()> {
     let Some(transport) = &registry.notify_transport else {
@@ -206,7 +230,30 @@ async fn deliver_host_notify(
     if delivery_exists(db, event_id, HOST_NOTIFY_LISTENER).await? {
         return Ok(()); // ya enviado en un intento previo (idempotencia)
     }
+    // Puerta 1 — capability del MÓDULO emisor (no del hub): sin `notify` concedida, no hay envío.
+    // Sin `module_id` (filas anteriores a la atribución) tampoco: no se puede autorizar a nadie.
+    if module_id.trim().is_empty() {
+        return Err(RuntimeError::Notify(
+            "evento de notificación sin módulo emisor atribuido: no se puede comprobar la \
+             capability `notify` → no se envía"
+                .to_string(),
+        ));
+    }
+    crate::capabilities::require(
+        db,
+        registry,
+        module_id,
+        hub_id,
+        crate::manifest::CapabilityKind::Notify,
+    )
+    .await?;
+
     let intent = NotifyIntent::from_event_payload(payload)?;
+    // Puerta 2 — el canal tiene que estar declarado por el módulo emisor.
+    host_notify::assert_channel_declared(registry, module_id, intent.channel)?;
+    // Puerta 3 — el destinatario sale de los datos del hub, no del payload del handler.
+    host_notify::assert_recipient_allowed(db, hub_id, &intent).await?;
+
     // ¿WhatsApp premium de ERPlora? → proxy Cloud con cuota; si no, secreto local del tenant.
     let premium = !registry.premium_whatsapp_modules.is_empty();
     let routing = host_notify::route_channel(intent.channel, premium);
@@ -404,37 +451,83 @@ mod tests {
         );
     }
 
-    /// Un evento `*.reminder.due` dispara el **listener-host** de `host.notify` (ADR-0012) por el
-    /// relay: el transporte recibe la intención exactamente una vez y queda marcado en
-    /// `_event_delivery` (idempotente al re-drenar). Es el camino que pasa por el Outbox.
-    #[tokio::test]
-    async fn reminder_due_event_delivers_to_notify_transport_once() {
-        use crate::host_notify::{Channel, MockTransport, Routing};
-        use serde_json::json;
-
+    /// Base de un hub con las tablas de sistema (grants de capability, settings, usuarios) +
+    /// el outbox. Necesaria desde hub#240: `host.notify` consulta grants y ajustes del hub.
+    async fn db_for_notify() -> PgAdapter {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        crate::system_migrations::apply(&db, "h1").await.unwrap();
         ensure_tables(&db).await.unwrap();
+        db
+    }
 
-        // Módulo "appt" activo: "appt.remind" emite "appt.reminder.due" con la intención.
+    /// Registry con el módulo `appt` instalado, su command emisor y (opcionalmente) la capability
+    /// `notify` declarada con el canal `email`.
+    fn registry_for_notify(declares_notify: bool) -> Registry {
+        let manifest_json = if declares_notify {
+            r#"{"id":"appt","name":"Appointments","version":"1.0.0",
+                "capabilities":{"notify":{"channels":["email"]}}}"#
+        } else {
+            r#"{"id":"appt","name":"Appointments","version":"1.0.0"}"#
+        };
         let mut reg = Registry::new();
         reg.status.insert("appt".into(), ModuleStatus::Active);
+        reg.installed
+            .push(serde_json::from_str(manifest_json).unwrap());
         reg.commands.insert(
             "appt.remind".into(),
             cmd("appt", "INSERT INTO t (n) VALUES (1);", vec!["appt.reminder.due".into()]),
         );
-        let transport = std::sync::Arc::new(MockTransport::new());
-        reg.notify_transport = Some(transport.clone());
+        reg
+    }
 
-        // La intención viaja en el payload del command (que el outbox guarda como payload del evento).
+    fn reminder_payload(to: &str) -> Params {
         let mut payload = Params::new();
         payload.insert("channel".into(), json!("email"));
-        payload.insert("to".into(), json!("cliente@x.com"));
+        payload.insert("to".into(), json!(to));
         payload.insert("template".into(), json!("appointment_reminder"));
         payload.insert("vars".into(), json!({ "when": "10:00" }));
+        payload
+    }
+
+    /// Autoriza a `appt` a notificar: concede la capability y mete al destinatario en la
+    /// allowlist del hub (`hub_settings`).
+    async fn authorize_notify(db: &PgAdapter, reg: &Registry, to: &str) {
+        crate::capabilities::set_grant(db, reg, "h1", "appt", "notify", true, "hub_user:admin")
+            .await
+            .unwrap();
+        let mut s = Params::new();
+        s.insert(
+            crate::host_notify::ALLOWED_RECIPIENTS_SETTING.into(),
+            json!(to),
+        );
+        crate::settings::set_many(db, "h1", &s, "hub_user:admin")
+            .await
+            .unwrap();
+    }
+
+    /// Un evento `*.reminder.due` dispara el **listener-host** de `host.notify` (ADR-0012) por el
+    /// relay: el transporte recibe la intención exactamente una vez y queda marcado en
+    /// `_event_delivery` (idempotente al re-drenar). Es el camino que pasa por el Outbox.
+    ///
+    /// Desde hub#240 el camino exige las tres puertas: capability `notify` CONCEDIDA, canal
+    /// declarado por el módulo y destinatario resuelto desde datos del hub.
+    #[tokio::test]
+    async fn reminder_due_event_delivers_to_notify_transport_once() {
+        use crate::host_notify::{Channel, MockTransport, Routing};
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+        authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &payload, &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
+            .await
+            .unwrap();
         assert!(transport.sent().is_empty(), "no se envía inline; va por el relay");
 
         // Relay: entrega el evento → el transporte recibe la intención una vez.
@@ -454,32 +547,85 @@ mod tests {
         assert_eq!(transport.sent().len(), 1, "idempotente (marcador host.notify)");
     }
 
+    /// **hub#240 — el agujero.** Un módulo SIN la capability `notify` concedida emite su
+    /// `*.reminder.due` igual (el evento existe), pero el listener-host **no envía nada**: el
+    /// transporte no llega a ver la intención.
+    #[tokio::test]
+    async fn reminder_due_without_granted_notify_capability_sends_nothing() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        // Declara la capability, pero NADIE se la concede (default-deny).
+        let mut reg = registry_for_notify(true);
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert!(
+            transport.sent().is_empty(),
+            "sin grant de `notify` no puede salir NADA del hub"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'").await,
+            0,
+            "no hay entrega que marcar"
+        );
+    }
+
+    /// **hub#240 — destinatario arbitrario.** Con la capability concedida, un destinatario que NO
+    /// se resuelve desde datos del hub (ni allowlist ni usuario del hub) tampoco sale: es la vía
+    /// de exfiltración que abría el `to` libre del payload.
+    #[tokio::test]
+    async fn reminder_due_to_an_unknown_recipient_is_not_sent() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+        // Se autoriza al cliente legítimo… y el módulo intenta escribir a otro sitio.
+        authorize_notify(&db, &reg, "cliente@x.com").await;
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("atacante@evil.com"),
+            &ctx,
+        )
+        .await
+        .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert!(
+            transport.sent().is_empty(),
+            "el destinatario tiene que resolverse desde datos del hub"
+        );
+    }
+
     /// Un transporte que falla deja el evento `*.reminder.due` para reintento (backoff) y, tras
     /// `MAX_ATTEMPTS`, lo manda a dead-letter — reusa la misma máquina del Outbox (sin código nuevo).
     #[tokio::test]
     async fn failing_notify_transport_retries_then_dead_letters() {
         use crate::host_notify::MockTransport;
-        use serde_json::json;
 
-        let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
-
-        let mut reg = Registry::new();
-        reg.status.insert("appt".into(), ModuleStatus::Active);
-        reg.commands.insert(
-            "appt.remind".into(),
-            cmd("appt", "INSERT INTO t (n) VALUES (1);", vec!["appt.reminder.due".into()]),
-        );
+        let db = db_for_notify().await;
+        // Módulo autorizado de verdad (capability concedida + destinatario del hub): lo que falla
+        // aquí es el TRANSPORTE, no una de las puertas de seguridad.
+        let mut reg = registry_for_notify(true);
         reg.notify_transport = Some(std::sync::Arc::new(MockTransport::failing()));
-
-        let mut payload = Params::new();
-        payload.insert("channel".into(), json!("sms"));
-        payload.insert("to".into(), json!("+34600000000"));
-        payload.insert("template".into(), json!("reminder"));
+        authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &payload, &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
+            .await
+            .unwrap();
 
         // Primer ciclo: el envío falla → la fila se difiere (sigue 'pending', attempts=1, no 'dead').
         process_once(&db, &reg).await.unwrap();

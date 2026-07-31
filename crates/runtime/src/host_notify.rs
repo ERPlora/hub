@@ -17,6 +17,20 @@
 //! reqwest…). Aquí se define el TRAIT [`NotifyTransport`] + un [`MockTransport`] que registra los
 //! envíos en memoria, de modo que la mecánica Outbox (reintentos/dead-letter) queda real y
 //! testeada. La integración real del transporte queda como TODO (ver más abajo).
+//!
+//! ## Las tres puertas antes de que salga nada del hub (hub#240)
+//!
+//! El listener-host se disparaba con **solo** ver un evento acabado en `.reminder.due`: ni
+//! capability, ni canal, ni control del destinatario. Cualquier módulo con un handler alcanzaba
+//! así email/SMS/WhatsApp con el `to` que quisiera (exfiltración + gasto). Hoy, `outbox.rs` exige
+//! antes de llamar al transporte:
+//!
+//! 1. **Capability del módulo emisor** — `notify` declarada **y concedida**
+//!    (`capabilities::require`, default-deny). El emisor se persiste por fila de outbox
+//!    (`_event_outbox.module_id`): sin atribución no se autoriza a nadie.
+//! 2. **Canal declarado** — [`assert_channel_declared`]: declarar `email` no habilita WhatsApp.
+//! 3. **Destinatario resuelto desde datos del HUB** — [`assert_recipient_allowed`]: allowlist de
+//!    `hub_settings` o email de un usuario del hub. Nunca una dirección libre del payload.
 use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
@@ -72,6 +86,173 @@ impl NotifyIntent {
             }
         })
     }
+}
+
+/// Clave de `hub_settings` con la **allowlist de destinatarios** que el dueño del hub autoriza
+/// para `host.notify`. Lista separada por comas / saltos de línea. Es dato del HUB, no del módulo.
+pub const ALLOWED_RECIPIENTS_SETTING: &str = "notify_allowed_recipients";
+
+/// Longitud máxima de un destinatario (RFC 5321 para email; de sobra para E.164).
+const MAX_RECIPIENT_LEN: usize = 254;
+
+/// Valida la **forma** del destinatario para el canal (hub#240).
+///
+/// No autoriza nada por sí sola — solo corta lo que nunca puede ser un destinatario legítimo:
+/// vacío, saltos de línea (inyección de cabeceras SMTP), varios destinatarios en un mismo `to`,
+/// o un teléfono que no es E.164. La autorización real la da [`assert_recipient_allowed`].
+fn check_recipient_syntax(channel: Channel, to: &str) -> Result<()> {
+    let bad = |why: &str| {
+        Err(RuntimeError::Notify(format!(
+            "destinatario inválido para el canal {channel:?}: {why}"
+        )))
+    };
+    let t = to.trim();
+    if t.is_empty() {
+        return bad("vacío");
+    }
+    if t.len() > MAX_RECIPIENT_LEN {
+        return bad("demasiado largo");
+    }
+    if t.chars().any(|c| c.is_control()) {
+        return bad("contiene caracteres de control (inyección de cabeceras)");
+    }
+    if t.contains(',') || t.contains(';') {
+        return bad("solo se admite UN destinatario por notificación");
+    }
+    match channel {
+        Channel::Email => {
+            // Comprobación deliberadamente conservadora: un solo `@`, parte local no vacía y
+            // dominio con punto. No pretende ser un parser de RFC 5322.
+            let mut parts = t.split('@');
+            let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next())
+            else {
+                return bad("no es una dirección de email");
+            };
+            if local.is_empty() || !domain.contains('.') || domain.starts_with('.') || domain.ends_with('.') {
+                return bad("no es una dirección de email");
+            }
+            if t.chars().any(char::is_whitespace) {
+                return bad("no es una dirección de email");
+            }
+        }
+        Channel::Sms | Channel::Whatsapp => {
+            // E.164: `+` seguido de 8..15 dígitos, sin separadores.
+            let Some(digits) = t.strip_prefix('+') else {
+                return bad("el teléfono debe ir en formato E.164 (`+34600000000`)");
+            };
+            if !(8..=15).contains(&digits.len()) || !digits.chars().all(|c| c.is_ascii_digit()) {
+                return bad("el teléfono debe ir en formato E.164 (`+34600000000`)");
+            }
+        }
+    }
+    Ok(())
+}
+
+/// ¿Está `to` en la allowlist del hub? Comparación normalizada (trim + minúsculas) y separadores
+/// flexibles (coma, punto y coma, espacios, saltos de línea): la lista la escribe una persona.
+fn allowlist_contains(raw: &str, to: &str) -> bool {
+    let needle = to.trim().to_ascii_lowercase();
+    raw.split(|c: char| c == ',' || c == ';' || c.is_whitespace())
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty())
+        .any(|s| s == needle)
+}
+
+/// Exige que el **canal** esté declarado por el módulo emisor en `capabilities.notify.channels`
+/// (o en el bloque `notify` deprecado). Declarar `email` no habilita mandar WhatsApp — que además
+/// puede salir por el proxy de Cloud con cuota de pago. Default-deny: sin canales declarados, nada.
+pub fn assert_channel_declared(
+    registry: &crate::registry::Registry,
+    module_id: &str,
+    channel: Channel,
+) -> Result<()> {
+    let declared = registry
+        .installed
+        .iter()
+        .find(|m| m.id == module_id)
+        .map(|m| {
+            let blocks = [m.capabilities.notify.as_ref(), m.notify.as_ref()];
+            blocks
+                .into_iter()
+                .flatten()
+                .flat_map(|n| n.channels.iter())
+                .any(|c| Channel::parse(c.trim()) == Some(channel))
+        })
+        .unwrap_or(false);
+    if declared {
+        return Ok(());
+    }
+    Err(RuntimeError::CapabilityDenied {
+        module: module_id.to_string(),
+        capability: format!("notify:{}", channel_name(channel)),
+    })
+}
+
+/// Nombre canónico del canal (para mensajes de error / UI).
+fn channel_name(channel: Channel) -> &'static str {
+    match channel {
+        Channel::Email => "email",
+        Channel::Sms => "sms",
+        Channel::Whatsapp => "whatsapp",
+    }
+}
+
+/// Exige que el destinatario **se resuelva desde datos del propio hub** (hub#240).
+///
+/// # Por qué
+///
+/// `to` llegaba tal cual desde el payload del handler: un módulo podía mandar "el recordatorio de
+/// su cliente" a cualquier dirección del mundo. Con un transporte real conectado, eso es
+/// exfiltración de datos del hub y gasto sin techo. El destinatario deja de ser un dato del módulo
+/// y pasa a tener que existir en el hub:
+///
+///  1. estar en la **allowlist del dueño del hub** ([`ALLOWED_RECIPIENTS_SETTING`]), o
+///  2. (canal email) ser el email de un **usuario del hub activo** (`hub_user`).
+///
+/// Cualquier otra cosa se rechaza. **Pendiente de decisión de producto**: cómo se autoriza el
+/// contacto de un CLIENTE (los clientes viven en la tabla de un módulo, no en el core), que es lo
+/// que hace falta para los recordatorios de cita reales. Hasta entonces, el operador los autoriza
+/// explícitamente en la allowlist.
+pub async fn assert_recipient_allowed(
+    db: &dyn erplora_db::DatabaseAdapter,
+    hub_id: &str,
+    intent: &NotifyIntent,
+) -> Result<()> {
+    check_recipient_syntax(intent.channel, &intent.to)?;
+    let to = intent.to.trim();
+
+    // 1) Allowlist explícita del hub.
+    let settings = crate::settings::get_all(db, hub_id)
+        .await
+        .unwrap_or(Json::Null);
+    let raw = settings
+        .get(ALLOWED_RECIPIENTS_SETTING)
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    if allowlist_contains(raw, to) {
+        return Ok(());
+    }
+
+    // 2) Email de un usuario del hub activo.
+    if intent.channel == Channel::Email {
+        let mut p = erplora_db::Params::new();
+        p.insert("email".into(), serde_json::json!(to.to_ascii_lowercase()));
+        let res = db
+            .query(
+                "SELECT id FROM hub_user WHERE LOWER(email) = :email AND is_active = 1",
+                &p,
+            )
+            .await?;
+        if !res.rows.is_empty() {
+            return Ok(());
+        }
+    }
+
+    Err(RuntimeError::Notify(format!(
+        "destinatario `{to}` no resuelto desde datos del hub: añádelo a `{ALLOWED_RECIPIENTS_SETTING}` \
+         en los ajustes del hub o usa el contacto de un usuario del hub (host.notify no acepta \
+         destinatarios libres del payload de un módulo)"
+    )))
 }
 
 /// De dónde sale el secreto/transporte de un canal (ADR-0012). Lo decide el host por canal y por
@@ -198,6 +379,100 @@ mod tests {
         assert_eq!(route_channel(Channel::Whatsapp, false), Routing::Tenant);
         assert_eq!(route_channel(Channel::Email, true), Routing::Tenant);
         assert_eq!(route_channel(Channel::Sms, true), Routing::Tenant);
+    }
+
+    // ── Destinatario y canal (hub#240) ───────────────────────────────────────────────────────
+    //
+    // `to` venía TAL CUAL del payload del handler: un módulo podía mandar el recordatorio de
+    // "su" cliente a cualquier dirección/teléfono del mundo. Con `host.notify` conectado a un
+    // transporte real eso es exfiltración de datos del hub + gasto sin techo. Ahora el
+    // destinatario tiene que **resolverse desde datos del hub** y el canal tiene que estar
+    // declarado por el módulo emisor.
+
+    fn intent(channel: Channel, to: &str) -> NotifyIntent {
+        NotifyIntent {
+            channel,
+            to: to.to_string(),
+            template: "t".into(),
+            vars: json!({}),
+        }
+    }
+
+    #[test]
+    fn recipient_syntax_rejects_injection_and_multiple_addresses() {
+        // Salto de línea = inyección de cabeceras SMTP.
+        assert!(check_recipient_syntax(Channel::Email, "a@b.com\r\nbcc: x@y.com").is_err());
+        // Varios destinatarios en un solo `to`.
+        assert!(check_recipient_syntax(Channel::Email, "a@b.com,c@d.com").is_err());
+        assert!(check_recipient_syntax(Channel::Email, "a@b.com; c@d.com").is_err());
+        // Vacío / sin arroba / sin dominio.
+        assert!(check_recipient_syntax(Channel::Email, "").is_err());
+        assert!(check_recipient_syntax(Channel::Email, "not-an-email").is_err());
+        assert!(check_recipient_syntax(Channel::Email, "a@localhost").is_err());
+        // Válido.
+        check_recipient_syntax(Channel::Email, "cliente@ejemplo.com").unwrap();
+    }
+
+    #[test]
+    fn phone_channels_require_e164() {
+        check_recipient_syntax(Channel::Sms, "+34600000000").unwrap();
+        check_recipient_syntax(Channel::Whatsapp, "+34600000000").unwrap();
+        assert!(check_recipient_syntax(Channel::Sms, "600000000").is_err()); // sin prefijo
+        assert!(check_recipient_syntax(Channel::Sms, "+34-600-000-000").is_err());
+        assert!(check_recipient_syntax(Channel::Sms, "+1").is_err()); // demasiado corto
+    }
+
+    /// La allowlist del hub (`hub_settings.notify_allowed_recipients`) es texto libre del
+    /// **dueño del hub**, no del módulo: separadores flexibles y comparación normalizada.
+    #[test]
+    fn allowlist_matching_is_normalized() {
+        let list = "  Cliente@Ejemplo.com , +34600000000\n otro@x.es ";
+        assert!(allowlist_contains(list, "cliente@ejemplo.com"));
+        assert!(allowlist_contains(list, "+34600000000"));
+        assert!(allowlist_contains(list, "OTRO@X.ES"));
+        assert!(!allowlist_contains(list, "atacante@evil.com"));
+        assert!(!allowlist_contains("", "cliente@ejemplo.com"));
+    }
+
+    /// El canal tiene que estar declarado por el módulo emisor: declarar `email` no habilita
+    /// mandar WhatsApp (que además puede ir con cuota de pago).
+    #[test]
+    fn channel_must_be_declared_by_the_emitting_module() {
+        use crate::registry::Registry;
+        let mut reg = Registry::new();
+        reg.installed.push(
+            serde_json::from_str(
+                r#"{"id":"appt","name":"Appointments","version":"1.0.0",
+                    "capabilities":{"notify":{"channels":["email"]}}}"#,
+            )
+            .unwrap(),
+        );
+        assert_channel_declared(&reg, "appt", Channel::Email).unwrap();
+        assert!(assert_channel_declared(&reg, "appt", Channel::Whatsapp).is_err());
+        // Módulo que ni siquiera está instalado.
+        assert!(assert_channel_declared(&reg, "otro", Channel::Email).is_err());
+    }
+
+    /// Un módulo que declara `notify` **sin** lista de canales no obtiene todos: sin canales
+    /// declarados no puede enviar por ninguno (default-deny).
+    #[test]
+    fn notify_without_channels_declares_nothing() {
+        use crate::registry::Registry;
+        let mut reg = Registry::new();
+        reg.installed.push(
+            serde_json::from_str(
+                r#"{"id":"appt","name":"Appointments","version":"1.0.0",
+                    "capabilities":{"notify":{}}}"#,
+            )
+            .unwrap(),
+        );
+        assert!(assert_channel_declared(&reg, "appt", Channel::Email).is_err());
+    }
+
+    #[test]
+    fn intent_helper_builds_expected_shape() {
+        let i = intent(Channel::Email, "a@b.com");
+        assert_eq!(i.to, "a@b.com");
     }
 
     #[tokio::test]

@@ -192,7 +192,13 @@ pub(crate) async fn execute_at(
         .map(|sql| (sql.clone(), bound.clone()))
         .collect();
     for event in &cmd.def.emit {
-        ops.push(outbox::insert_op(ctx, event, &bound, depth + 1));
+        ops.push(outbox::insert_op(
+            ctx,
+            &cmd.module_id,
+            event,
+            &bound,
+            depth + 1,
+        ));
     }
     ops.extend_from_slice(extra_ops);
     db.execute_tx(&ops).await?;
@@ -336,15 +342,59 @@ async fn execute_wasm(
         },
     });
 
-    let mut host = WasmHost::from_bytes(bytes).map_err(|e| RuntimeError::Wasm(e.to_string()))?;
-    let output = host
-        .call(&handler.function, &input)
-        .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
+    let output = call_wasm_off_thread(bytes, &handler.function, input).await?;
 
     persist_handler_output(
         db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
     )
     .await
+}
+
+/// Margen (ms) que el host espera POR ENCIMA del timeout interno del guest antes de rendirse.
+///
+/// El corte real lo da wasmtime (interrupción por epoch dentro de `WasmHost`). Este margen cubre
+/// el arranque/compilación del plugin y la (de)serialización, y actúa de red por si la
+/// interrupción no llegara: el command devuelve error en vez de esperar para siempre.
+const WASM_CALL_GRACE_MS: u64 = 2_000;
+
+/// Invoca el handler WASM **fuera del worker async** y con tope de tiempo (hub#241).
+///
+/// # Por qué
+///
+/// `WasmHost::call` es una llamada **bloqueante** a wasmtime. Se hacía directamente dentro del
+/// worker de Tokio que atendía la petición: un handler que no terminaba (`while(1){}`, o
+/// simplemente lento) se quedaba con ese worker y el runtime del TPV dejaba de responder hasta
+/// reiniciar el proceso. Ahora:
+///
+///  1. la llamada va en `spawn_blocking` (pool de hilos bloqueantes: no toca los workers async);
+///  2. el guest lleva sus propios topes de fuel/memoria/reloj (ver `erplora_wasm_host`);
+///  3. y el host además espera con `timeout` (tope del guest + [`WASM_CALL_GRACE_MS`]), así que el
+///     command **siempre** vuelve, con `Ok` o con error.
+async fn call_wasm_off_thread(bytes: &[u8], function: &str, input: Json) -> Result<Output> {
+    let limits = erplora_wasm_host::WasmLimits::from_env();
+    let wasm = bytes.to_vec();
+    let func = function.to_string();
+
+    let join = tokio::task::spawn_blocking(move || {
+        let mut host = WasmHost::from_bytes_with_limits(&wasm, limits)?;
+        host.call(&func, &input)
+    });
+
+    let wait = std::time::Duration::from_millis(limits.timeout_ms.saturating_add(WASM_CALL_GRACE_MS));
+    match tokio::time::timeout(wait, join).await {
+        Ok(Ok(Ok(output))) => Ok(output),
+        Ok(Ok(Err(e))) => Err(RuntimeError::Wasm(e.to_string())),
+        // El hilo bloqueante murió (panic del guest host-side): no se propaga el panic al server.
+        Ok(Err(join_err)) => Err(RuntimeError::Wasm(format!(
+            "el handler `{function}` abortó: {join_err}"
+        ))),
+        // La interrupción interna no llegó a tiempo: se abandona la espera (el hilo bloqueante
+        // acabará solo cuando wasmtime lo interrumpa) y el command falla con un error claro.
+        Err(_) => Err(RuntimeError::Wasm(format!(
+            "el handler `{function}` no respondió en {} ms: se aborta el command",
+            wait.as_millis()
+        ))),
+    }
 }
 
 /// Ejecuta un command de **plugin nativo first-party** (ADR-0009): mismo contrato de
@@ -440,25 +490,49 @@ async fn persist_handler_output(
     // devueltos por el handler) + `extra_ops` (marcador de entrega del relay) → UNA transacción.
     let declared_payload = crate::system_params(payload, ctx);
     for event in &cmd.def.emit {
-        tx_ops.push(outbox::insert_op(ctx, event, &declared_payload, depth + 1));
+        tx_ops.push(outbox::insert_op(
+            ctx,
+            &cmd.module_id,
+            event,
+            &declared_payload,
+            depth + 1,
+        ));
     }
-    let handler_events: Vec<(String, Params)> = output
-        .events
-        .iter()
-        .map(|ev| {
-            let payload = match &ev.payload {
-                Json::Object(map) => map.clone(),
-                other => {
-                    let mut m = Params::new();
-                    m.insert("value".into(), other.clone());
-                    m
-                }
-            };
-            (ev.name.clone(), payload)
-        })
-        .collect();
+    // Los eventos que devuelve el handler se validan contra el `module.json` ANTES de encolarlos
+    // (hub#240): un nombre no declarado hace fallar el command entero — no se encola en silencio.
+    let mut handler_events: Vec<(String, Params)> = Vec::with_capacity(output.events.len());
+    for ev in &output.events {
+        validate_handler_event(registry, &cmd.module_id, &ev.name)?;
+        // `*.reminder.due` llega al listener-host de `host.notify`: además de declarada, la
+        // capability tiene que estar CONCEDIDA por el usuario (default-deny, ADR-0079).
+        if ev.name.trim().ends_with(outbox::REMINDER_DUE_SUFFIX) {
+            crate::capabilities::require(
+                db,
+                registry,
+                &cmd.module_id,
+                &ctx.hub_id,
+                crate::manifest::CapabilityKind::Notify,
+            )
+            .await?;
+        }
+        let payload = match &ev.payload {
+            Json::Object(map) => map.clone(),
+            other => {
+                let mut m = Params::new();
+                m.insert("value".into(), other.clone());
+                m
+            }
+        };
+        handler_events.push((ev.name.clone(), payload));
+    }
     for (name, payload) in &handler_events {
-        tx_ops.push(outbox::insert_op(ctx, name, payload, depth + 1));
+        tx_ops.push(outbox::insert_op(
+            ctx,
+            &cmd.module_id,
+            name,
+            payload,
+            depth + 1,
+        ));
     }
     tx_ops.extend_from_slice(extra_ops);
     db.execute_tx(&tx_ops).await?;
@@ -472,6 +546,103 @@ async fn persist_handler_output(
     }
 
     Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))
+}
+
+/// Valida el **nombre de un evento devuelto por un handler** contra lo declarado en el
+/// `module.json` del módulo, ANTES de encolarlo en el outbox (hub#240).
+///
+/// # Por qué existe
+///
+/// Los eventos del `Output` de un handler se encolaban tal cual: el handler ponía el nombre y el
+/// relay se lo entregaba a los listeners de **otros** módulos y —si acababa en `.reminder.due`— al
+/// **listener-host de `host.notify`**, que envía email/SMS/WhatsApp. Es decir: un módulo alcanzaba
+/// un primitivo de envío externo (coste real, datos del cliente saliendo del hub) sin declarar la
+/// capability ni pasar por `capabilities::enforce`, que es justo lo que `module-capabilities.md`
+/// dice que nunca puede ocurrir: *una capability solo significa algo si se comprueba en Rust*.
+///
+/// # Reglas
+///
+/// 1. **Declarado** en `events.emits` del manifest o en el `emit` de cualquier command del propio
+///    módulo → permitido.
+/// 2. **`*.reminder.due`** (el disparador de `host.notify`) → el módulo DEBE declarar la capability
+///    `notify`. El *grant* del usuario se comprueba aparte, contra la BD
+///    ([`crate::capabilities::require`]), tanto al encolar como al entregar.
+/// 3. **Namespace ajeno**: el primer segmento no puede ser el id de OTRO módulo instalado — un
+///    módulo del marketplace no emite `verifactu.record.transmitted` en nombre de nadie.
+/// 4. Si el módulo **declara** `events.emits`, queda en **modo estricto**: cualquier nombre fuera de
+///    la lista se rechaza. Si no la declara (todos los manifests publicados hoy), se tolera su
+///    propio namespace y los namespaces de nadie, con un aviso — la migración a estricto es una
+///    decisión del humano, no un corte silencioso del TPV.
+pub(crate) fn validate_handler_event(
+    registry: &Registry,
+    handler_module_id: &str,
+    event: &str,
+) -> Result<()> {
+    let name = event.trim();
+    if name.is_empty() {
+        return Err(RuntimeError::EventNotDeclared {
+            module: handler_module_id.to_string(),
+            event: event.to_string(),
+        });
+    }
+    let denied = || RuntimeError::EventNotDeclared {
+        module: handler_module_id.to_string(),
+        event: name.to_string(),
+    };
+
+    let manifest = registry
+        .installed
+        .iter()
+        .find(|m| m.id == handler_module_id);
+
+    // Regla 2 — el disparador de `host.notify` exige la capability declarada, pase lo que pase.
+    if name.ends_with(crate::outbox::REMINDER_DUE_SUFFIX) {
+        let declares_notify = manifest
+            .map(|m| m.requests_capability(crate::manifest::CapabilityKind::Notify))
+            .unwrap_or(false);
+        if !declares_notify {
+            return Err(RuntimeError::CapabilityDenied {
+                module: handler_module_id.to_string(),
+                capability: crate::manifest::CapabilityKind::Notify.as_str().to_string(),
+            });
+        }
+    }
+
+    // Regla 1 — declarado (manifest `events.emits` o `emit` de un command del módulo).
+    let declared_in_manifest = manifest
+        .map(|m| m.events.emits.iter().any(|e| e == name))
+        .unwrap_or(false);
+    let declared_in_commands = registry
+        .commands
+        .values()
+        .filter(|c| c.module_id == handler_module_id)
+        .any(|c| c.def.emit.iter().any(|e| e == name));
+    if declared_in_manifest || declared_in_commands {
+        return Ok(());
+    }
+
+    // Regla 3 — no suplantar el namespace de otro módulo instalado.
+    let namespace = name.split('.').next().unwrap_or_default();
+    let owned_by_other = registry
+        .installed
+        .iter()
+        .any(|m| m.id == namespace && m.id != handler_module_id);
+    if owned_by_other {
+        return Err(denied());
+    }
+
+    // Regla 4 — modo estricto si el módulo declaró sus eventos; si no, compat + aviso.
+    let strict = manifest.map(|m| !m.events.emits.is_empty()).unwrap_or(false);
+    if strict {
+        return Err(denied());
+    }
+    if namespace != handler_module_id {
+        eprintln!(
+            "⚠ eventos: el módulo `{handler_module_id}` emite `{name}` fuera de su namespace y \
+             sin declararlo en `events.emits` — decláralo (hub#240)"
+        );
+    }
+    Ok(())
 }
 
 /// Valida una intención del handler y la resuelve a su(s) SQL.
@@ -600,6 +771,253 @@ mod tests {
         o.kind = "http".to_string();
         let err = validate_operation(&reg, "notes", &o).unwrap_err();
         assert!(matches!(err, RuntimeError::Wasm(_)), "got {err:?}");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Eventos devueltos por un handler (hub#240).
+    //
+    // Los eventos del `Output` de un handler se encolaban en el outbox SIN mirar el
+    // `module.json`: el handler elegía el nombre y el relay se lo entregaba a los listeners
+    // de otros módulos… y, si acababa en `.reminder.due`, al **listener-host de
+    // `host.notify`** (email/SMS/WhatsApp). O sea: un módulo con un handler alcanzaba un
+    // primitivo de envío externo sin declarar ni que le concedieran la capability.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// Registry con un módulo instalado (manifest) y un command suyo.
+    fn registry_with_module(manifest_json: &str, command: &str) -> Registry {
+        let m: crate::manifest::Manifest = serde_json::from_str(manifest_json).unwrap();
+        let module_id = m.id.clone();
+        let mut reg = registry_with_command(&module_id, command);
+        reg.installed.push(m);
+        reg
+    }
+
+    /// Un evento declarado en el `emit` de un command del módulo se acepta (comportamiento
+    /// de siempre: es el contrato que otros módulos escuchan).
+    #[test]
+    fn handler_event_declared_in_command_emit_is_allowed() {
+        let mut reg = registry_with_module(
+            r#"{"id":"notes","name":"Notes","version":"1.0.0"}"#,
+            "notes.create",
+        );
+        reg.commands.get_mut("notes.create").unwrap().def.emit = vec!["notes.note.created".into()];
+        validate_handler_event(&reg, "notes", "notes.note.created").unwrap();
+    }
+
+    /// Un módulo puede declarar en `events.emits` los eventos que emiten sus **handlers**
+    /// (los que no salen de un `emit` de command).
+    #[test]
+    fn handler_event_declared_in_events_emits_is_allowed() {
+        let reg = registry_with_module(
+            r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                "events":{"emits":["sale.completed"]}}"#,
+            "sales.complete_sale",
+        );
+        validate_handler_event(&reg, "sales", "sale.completed").unwrap();
+    }
+
+    /// **El test de regresión de hub#240.** Un módulo que SÍ declara sus eventos queda en
+    /// modo estricto: cualquier otro nombre se rechaza y el command falla (no se encola nada
+    /// en silencio).
+    #[test]
+    fn handler_event_not_declared_is_rejected_when_module_declares_its_events() {
+        let reg = registry_with_module(
+            r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                "events":{"emits":["sale.completed"]}}"#,
+            "sales.complete_sale",
+        );
+        let err = validate_handler_event(&reg, "sales", "sales.order.opened").unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::EventNotDeclared { .. }),
+            "got {err:?}"
+        );
+    }
+
+    /// **Suplantación cross-módulo.** Ni siquiera en modo compatible (manifest sin
+    /// `events.emits`) un handler puede emitir en el namespace de OTRO módulo instalado:
+    /// así un módulo del marketplace no dispara `verifactu.record.transmitted` ni
+    /// `invoice.created` en nombre ajeno.
+    #[test]
+    fn handler_event_in_another_installed_modules_namespace_is_rejected() {
+        let mut reg = registry_with_module(
+            r#"{"id":"notes","name":"Notes","version":"1.0.0"}"#,
+            "notes.create",
+        );
+        reg.installed.push(
+            serde_json::from_str(r#"{"id":"verifactu","name":"VeriFactu","version":"1.0.0"}"#)
+                .unwrap(),
+        );
+        let err =
+            validate_handler_event(&reg, "notes", "verifactu.record.transmitted").unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::EventNotDeclared { .. }),
+            "got {err:?}"
+        );
+    }
+
+    /// **El vector de hub#240.** `*.reminder.due` es lo que dispara el listener-host de
+    /// `host.notify` (email/SMS/WhatsApp): un módulo que no declara la capability `notify`
+    /// no puede emitirlo, ni siquiera dentro de su propio namespace.
+    #[test]
+    fn reminder_due_event_requires_the_notify_capability_to_be_declared() {
+        let reg = registry_with_module(
+            r#"{"id":"appt","name":"Appointments","version":"1.0.0"}"#,
+            "appt.remind",
+        );
+        let err = validate_handler_event(&reg, "appt", "appt.reminder.due").unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::CapabilityDenied { capability, .. } if capability == "notify"),
+            "got {err:?}"
+        );
+    }
+
+    /// Declarando la capability, el evento de recordatorio es legítimo (el **grant** del
+    /// usuario se comprueba aparte, contra la BD, antes de encolar y antes de enviar).
+    #[test]
+    fn reminder_due_event_is_allowed_when_notify_is_declared() {
+        let reg = registry_with_module(
+            r#"{"id":"appt","name":"Appointments","version":"1.0.0",
+                "capabilities":{"notify":{"channels":["email"]}}}"#,
+            "appt.remind",
+        );
+        validate_handler_event(&reg, "appt", "appt.reminder.due").unwrap();
+    }
+
+    /// Modo compatible: un manifest sin `events.emits` (todos los publicados hoy) sigue
+    /// pudiendo emitir en su propio namespace y en namespaces de nadie — pero se avisa.
+    #[test]
+    fn legacy_manifest_without_declared_events_still_emits_its_own_namespace() {
+        let reg = registry_with_module(
+            r#"{"id":"tasks","name":"Tasks","version":"1.0.0"}"#,
+            "tasks.create",
+        );
+        validate_handler_event(&reg, "tasks", "tasks.task.created").unwrap();
+        // `sale.*` no es de nadie (no hay módulo `sale` instalado) → tolerado.
+        validate_handler_event(&reg, "tasks", "sale.completed").unwrap();
+    }
+
+    /// Un nombre de evento vacío o con forma rara no se encola.
+    #[test]
+    fn empty_event_name_is_rejected() {
+        let reg = registry_with_module(
+            r#"{"id":"notes","name":"Notes","version":"1.0.0"}"#,
+            "notes.create",
+        );
+        assert!(validate_handler_event(&reg, "notes", "").is_err());
+        assert!(validate_handler_event(&reg, "notes", "   ").is_err());
+    }
+
+    // ── Regresión END-TO-END (hub#240) ────────────────────────────────────────────────────
+    //
+    // No basta con probar el validador: hay que probar que el CAMINO REAL
+    // (handler → persist_handler_output → outbox) rechaza y no encola. Se usa un handler
+    // **nativo** porque comparte exactamente ese camino con el WASM (`persist_handler_output`)
+    // y no necesita un `.wasm` compilado.
+
+    /// Handler de prueba que devuelve el evento que se le diga, sin operaciones.
+    #[derive(Debug)]
+    struct EmittingHandler(&'static str);
+
+    #[async_trait::async_trait]
+    impl crate::native::NativeHandler for EmittingHandler {
+        async fn call(
+            &self,
+            _function: &str,
+            _input: &Json,
+            _host: &dyn crate::native::NativeHost,
+        ) -> Result<Output> {
+            Ok(Output {
+                operations: vec![],
+                events: vec![erplora_wasm_host::Event {
+                    name: self.0.to_string(),
+                    payload: json!({}),
+                }],
+            })
+        }
+    }
+
+    /// Registry con un módulo `sales` que **declara** sus eventos y un command con handler nativo.
+    fn registry_with_native_handler(emitted: &'static str) -> Registry {
+        let mut reg = Registry::new();
+        reg.status.insert("sales".into(), ModuleStatus::Active);
+        reg.installed.push(
+            serde_json::from_str(
+                r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                    "events":{"emits":["sale.completed"]}}"#,
+            )
+            .unwrap(),
+        );
+        let mut def = cmd_def();
+        def.sql = vec![];
+        def.handler = Some(crate::manifest::HandlerRef {
+            kind: "native".to_string(),
+            file: None,
+            function: "handle".to_string(),
+        });
+        reg.commands.insert(
+            "sales.complete_sale".into(),
+            RegisteredCommand {
+                module_id: "sales".into(),
+                def,
+                sql: vec![],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg.native
+            .insert("sales".into(), std::sync::Arc::new(EmittingHandler(emitted)));
+        reg
+    }
+
+    /// **La regresión de hub#240.** Un handler que devuelve un evento NO declarado hace fallar el
+    /// command entero: el evento **no** llega al outbox (antes se encolaba en silencio y el relay
+    /// se lo entregaba a los listeners de otros módulos… y a `host.notify`).
+    #[tokio::test]
+    async fn handler_emitting_an_undeclared_event_fails_the_command_and_queues_nothing() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_native_handler("sales.exfiltrate");
+
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        let err = execute(&db, &reg, "sales.complete_sale", &Params::new(), &ctx)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::EventNotDeclared { .. }),
+            "got {err:?}"
+        );
+
+        let rows = db
+            .query("SELECT COUNT(*) AS c FROM _event_outbox", &Params::new())
+            .await
+            .unwrap();
+        let c = rows.rows[0]["c"].as_i64().unwrap_or(-1);
+        assert_eq!(c, 0, "un evento no declarado NO puede quedar encolado");
+    }
+
+    /// El camino feliz sigue funcionando: un evento declarado se encola como siempre.
+    #[tokio::test]
+    async fn handler_emitting_a_declared_event_still_reaches_the_outbox() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_native_handler("sale.completed");
+
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        execute(&db, &reg, "sales.complete_sale", &Params::new(), &ctx)
+            .await
+            .unwrap();
+
+        let rows = db
+            .query(
+                "SELECT event_name, module_id FROM _event_outbox",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1);
+        assert_eq!(rows.rows[0]["event_name"], json!("sale.completed"));
+        // La fila guarda el módulo emisor: es lo que permite exigirle la capability al entregar.
+        assert_eq!(rows.rows[0]["module_id"], json!("sales"));
     }
 
     #[test]
