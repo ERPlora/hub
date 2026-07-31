@@ -80,7 +80,7 @@ pub async fn apply_module_seed(
 /// humano y suele llevar comentarios `--`, que pueden contener `;` y romperían el split ingenuo;
 /// por eso primero se **descartan las líneas de comentario `--`**. El seed es DDL/DML simple sin
 /// literales con `;` embebidos. Cada sentencia se ejecuta por separado vía `execute_batch`.
-fn split_statements(sql: &str) -> Vec<String> {
+pub(crate) fn split_statements(sql: &str) -> Vec<String> {
     let without_comments: String = sql
         .lines()
         .filter(|line| !line.trim_start().starts_with("--"))

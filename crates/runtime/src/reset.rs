@@ -459,3 +459,216 @@ mod tests {
         assert!(sel.modules.is_empty());
     }
 }
+
+// ── Deshacer una importación (ADR-0166 Fase 3) ──────────────────────────────────────────
+//
+// El camino que motiva el ADR: importo la demo → la miro → la quito limpiamente → cargo lo mío.
+// El reset por secciones no sirve aquí, porque para entonces el usuario ya ha creado cosas suyas
+// y borrar «el módulo entero» se las llevaría por delante.
+//
+// La clave es `RETURNING id`: los INSERT del bundle llevan guard `WHERE NOT EXISTS`, así que
+// devuelven fila SOLO cuando de verdad insertan. Re-importar el mismo blueprint no apunta nada,
+// y por tanto deshacer ese segundo lote no puede borrar lo que trajo el primero.
+
+/// Un lote de importación: lo que trajo un blueprint concreto, para poder deshacerlo.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ImportBatch {
+    pub id: String,
+    /// Nombre del blueprint importado (`restaurante_es`), para que el usuario lo reconozca.
+    pub name: String,
+    /// Filas que ESTE lote insertó realmente.
+    pub rows: i64,
+    pub created_at: String,
+}
+
+const ENSURE_BATCH_TABLES: &str = "\
+CREATE TABLE IF NOT EXISTS _hub_import_batch (\
+ id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL);\
+CREATE TABLE IF NOT EXISTS _hub_import_row (\
+ batch_id TEXT NOT NULL, table_name TEXT NOT NULL, row_id TEXT NOT NULL);";
+
+/// Crea las tablas de trazabilidad de lotes si faltan (idempotente).
+async fn ensure_batch_tables(db: &dyn erplora_db::DatabaseAdapter) -> crate::Result<()> {
+    db.execute_batch(ENSURE_BATCH_TABLES)
+        .await
+        .map_err(|e| crate::RuntimeError::Other(format!("reset: tablas de lote de import: {e}")))
+}
+
+/// Aplica el SQL de un blueprint REGISTRANDO qué filas inserta, y devuelve el `batch_id`.
+///
+/// Sustituye el placeholder de tenant por el `hub_id` destino (patrón ADR-0072) igual que el
+/// import, y añade `RETURNING id` a cada sentencia para apuntar solo lo realmente insertado.
+/// Las tablas sin columna `id` (vínculos M2M) no se registran: se van con su padre.
+pub async fn apply_tracked(
+    rt: &Runtime,
+    hub_id: &str,
+    name: &str,
+    sql: &str,
+) -> crate::Result<String> {
+    let db = rt.db();
+    ensure_batch_tables(db).await?;
+
+    let batch_id = crate::registry::new_id();
+    let mut p = erplora_db::Params::new();
+    p.insert("id".into(), serde_json::json!(batch_id));
+    p.insert("hub_id".into(), serde_json::json!(hub_id));
+    p.insert("name".into(), serde_json::json!(name));
+    p.insert("now".into(), serde_json::json!(crate::registry::now_rfc3339()));
+    db.execute(
+        "INSERT INTO _hub_import_batch (id, hub_id, name, created_at) \
+         VALUES (:id, :hub_id, :name, :now)",
+        &p,
+    )
+    .await
+    .map_err(|e| crate::RuntimeError::Other(format!("reset: registrar el lote: {e}")))?;
+
+    for stmt in crate::seed::split_statements(sql) {
+        let stmt = stmt.replace(crate::export::HUB_ID_PLACEHOLDER, hub_id);
+        let table = insert_target(&stmt);
+        let Some(table) = table else {
+            // No es un INSERT reconocible: se aplica tal cual, sin registrar.
+            db.execute_batch(&stmt).await.map_err(|e| {
+                crate::RuntimeError::Other(format!("reset: aplicar sentencia del blueprint: {e}"))
+            })?;
+            continue;
+        };
+        // `RETURNING id` sobre el `;` final. Solo devuelve filas si el guard NOT EXISTS pasó.
+        let returning = format!("{} RETURNING id", stmt.trim_end().trim_end_matches(';'));
+        let res = match db.query(&returning, &erplora_db::Params::new()).await {
+            Ok(r) => r,
+            // Tabla sin `id` (vínculo M2M) u otra forma no soportada: se aplica sin registrar.
+            Err(_) => {
+                db.execute_batch(&stmt).await.map_err(|e| {
+                    crate::RuntimeError::Other(format!("reset: aplicar sentencia: {e}"))
+                })?;
+                continue;
+            }
+        };
+        for row in &res.rows {
+            let Some(row_id) = row.get("id").and_then(|v| v.as_str()) else { continue };
+            let mut rp = erplora_db::Params::new();
+            rp.insert("batch_id".into(), serde_json::json!(batch_id));
+            rp.insert("table_name".into(), serde_json::json!(table));
+            rp.insert("row_id".into(), serde_json::json!(row_id));
+            db.execute(
+                "INSERT INTO _hub_import_row (batch_id, table_name, row_id) \
+                 VALUES (:batch_id, :table_name, :row_id)",
+                &rp,
+            )
+            .await
+            .map_err(|e| crate::RuntimeError::Other(format!("reset: registrar fila del lote: {e}")))?;
+        }
+    }
+    Ok(batch_id)
+}
+
+/// Tabla destino de un `INSERT INTO <tabla> …`, o `None` si la sentencia no lo es.
+fn insert_target(stmt: &str) -> Option<String> {
+    let rest = stmt.trim_start().strip_prefix("INSERT INTO ")?;
+    let table = rest.split_whitespace().next()?.split('(').next()?;
+    safe_ident(table).then(|| table.to_string())
+}
+
+/// Lotes de importación del hub, del más reciente al más antiguo.
+pub async fn list_import_batches(rt: &Runtime, hub_id: &str) -> crate::Result<Vec<ImportBatch>> {
+    let db = rt.db();
+    ensure_batch_tables(db).await?;
+    let res = db
+        .query(
+            "SELECT b.id AS id, b.name AS name, b.created_at AS created_at, \
+                    (SELECT count(*) FROM _hub_import_row r WHERE r.batch_id = b.id) AS rows \
+             FROM _hub_import_batch b WHERE b.hub_id = :hub_id ORDER BY b.created_at DESC",
+            &hub_params(hub_id),
+        )
+        .await
+        .map_err(|e| crate::RuntimeError::Other(format!("reset: listar lotes: {e}")))?;
+    Ok(res
+        .rows
+        .iter()
+        .map(|r| ImportBatch {
+            id: r["id"].as_str().unwrap_or_default().to_string(),
+            name: r["name"].as_str().unwrap_or_default().to_string(),
+            rows: r["rows"].as_i64().unwrap_or(0),
+            created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
+        })
+        .collect())
+}
+
+/// Deshace una importación: borra EXACTAMENTE las filas que ese lote insertó, nada más.
+///
+/// Acotado por `hub_id` (el lote pertenece a un hub) e **idempotente**: deshacer dos veces no
+/// falla ni borra de más — el registro del lote se consume al aplicarlo.
+pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::Result<ResetReport> {
+    let db = rt.db();
+    ensure_batch_tables(db).await?;
+
+    // El lote debe ser DE ESTE HUB: sin esta comprobación, un batch_id de otro tenant borraría
+    // sus filas (misma BD compartida por organización).
+    let mut p = hub_params(hub_id);
+    p.insert("batch".into(), serde_json::json!(batch_id));
+    let owned = db
+        .query(
+            "SELECT id FROM _hub_import_batch WHERE id = :batch AND hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .map_err(|e| crate::RuntimeError::Other(format!("reset: leer el lote: {e}")))?;
+    if owned.rows.is_empty() {
+        // Ya deshecho (o de otro hub): no es un error, es idempotencia.
+        return Ok(ResetReport::default());
+    }
+
+    let rows = db
+        .query(
+            "SELECT table_name, row_id FROM _hub_import_row WHERE batch_id = :batch",
+            &p,
+        )
+        .await
+        .map_err(|e| crate::RuntimeError::Other(format!("reset: leer filas del lote: {e}")))?;
+
+    // Agrupado por tabla, y las tablas en orden inverso de FK (igual que el reset por secciones).
+    let mut by_table: Vec<(String, Vec<String>)> = Vec::new();
+    for r in &rows.rows {
+        let (Some(t), Some(id)) = (r["table_name"].as_str(), r["row_id"].as_str()) else { continue };
+        if !safe_ident(t) {
+            continue;
+        }
+        match by_table.iter_mut().find(|(name, _)| name == t) {
+            Some((_, ids)) => ids.push(id.to_string()),
+            None => by_table.push((t.to_string(), vec![id.to_string()])),
+        }
+    }
+    let order = delete_order(db, by_table.iter().map(|(t, _)| t.clone()).collect()).await;
+    by_table.sort_by_key(|(t, _)| order.iter().position(|o| o == t).unwrap_or(usize::MAX));
+
+    let mut ops: Vec<(String, erplora_db::Params)> = Vec::new();
+    let mut outcomes: Vec<SectionOutcome> = Vec::new();
+    for (table, ids) in &by_table {
+        // Literales seguros: los ids salen de nuestro propio registro y se escapan igual.
+        let list = ids
+            .iter()
+            .map(|id| format!("'{}'", id.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        ops.push((
+            format!("DELETE FROM {table} WHERE id IN ({list})"),
+            erplora_db::Params::new(),
+        ));
+        outcomes.push(SectionOutcome { section: table.clone(), rows_deleted: ids.len() as i64 });
+    }
+    // El registro del lote se consume en la MISMA transacción: si el borrado revierte, el lote
+    // sigue ahí y se puede reintentar (y si no, deshacer otra vez es un no-op limpio).
+    ops.push((
+        "DELETE FROM _hub_import_row WHERE batch_id = :batch".into(),
+        p.clone(),
+    ));
+    ops.push((
+        "DELETE FROM _hub_import_batch WHERE id = :batch AND hub_id = :hub_id".into(),
+        p.clone(),
+    ));
+
+    db.execute_tx(&ops).await.map_err(|e| {
+        crate::RuntimeError::Other(format!("reset: deshacer el import falló, nada se borró: {e}"))
+    })?;
+    Ok(ResetReport { sections: outcomes })
+}
