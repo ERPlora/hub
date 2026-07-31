@@ -43,7 +43,7 @@
     <ion-spinner v-if="loading" />
 
     <ion-list v-else>
-      <ion-item v-for="s in sections" :key="s.section" :disabled="!!s.blocked_by">
+      <ion-item v-for="s in visibleSections" :key="s.section" :disabled="!!s.blocked_by">
         <ion-checkbox
           :data-testid="`reset-section-${s.section}`"
           :disabled="!!s.blocked_by"
@@ -133,6 +133,15 @@ const sections = ref<ResetSectionPlan[]>([]);
 const selected = ref<Set<string>>(new Set());
 const report = ref<ResetReport | null>(null);
 const batches = ref<ImportBatch[]>([]);
+
+/**
+ * Lo que se pinta: secciones CON filas, más las bloqueadas (aunque estén a cero, explican por
+ * qué no se pueden tocar). Un hub con muchos módulos instalados devuelve casi todas a cero
+ * —en QA real, 23 de 25— y listarlas sería ruido puro: no hay nada que borrar en ellas.
+ */
+const visibleSections = computed(() =>
+  sections.value.filter((s) => s.rows > 0 || s.blocked_by),
+);
 
 /** Solo lo que de verdad se puede borrar: lo bloqueado nunca entra en la selección efectiva. */
 const selectable = computed(() =>

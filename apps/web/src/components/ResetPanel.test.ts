@@ -68,6 +68,10 @@ const i18n = createI18n({
 
 const PLAN = {
   sections: [
+    // Secciones VACÍAS: un hub con 27 módulos instalados devuelve casi todas a cero (visto en
+    // QA real: 25 secciones, 23 a cero). No hay nada que borrar en ellas → no se listan.
+    { section: 'modules/vacio_a', rows: 0, blocked_by: null },
+    { section: 'modules/vacio_b', rows: 0, blocked_by: null },
     { section: 'modules/inventory', rows: 124, blocked_by: null },
     { section: 'modules/customers', rows: 38, blocked_by: null },
     {
@@ -126,6 +130,24 @@ describe('ResetPanel', () => {
     expect(blocked.attributes('disabled')).toBeDefined();
     // El motivo se lee en pantalla: un bloqueo mudo se interpreta como un fallo del producto.
     expect(w.html()).toContain('AEAT');
+  });
+
+  it('no lista las secciones vacías: no hay nada que borrar en ellas', async () => {
+    const w = mountPanel();
+    await flush(w);
+
+    expect(w.find('[data-testid="reset-section-modules/vacio_a"]').exists()).toBe(false);
+    expect(w.find('[data-testid="reset-section-modules/inventory"]').exists()).toBe(true);
+  });
+
+  it('una sección vacía PERO bloqueada sí se muestra: explica por qué no se puede', async () => {
+    fetchResetPlan.mockResolvedValue({
+      sections: [{ section: 'modules/verifactu', rows: 0, blocked_by: '3 facturas remitidas a la AEAT' }],
+    });
+    const w = mountPanel();
+    await flush(w);
+
+    expect(w.find('[data-testid="reset-section-modules/verifactu"]').exists()).toBe(true);
   });
 
   it('sin nada seleccionado, el botón de restablecer está deshabilitado', async () => {
