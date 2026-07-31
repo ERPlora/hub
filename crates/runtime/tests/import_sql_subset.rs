@@ -196,6 +196,70 @@ async fn una_seccion_no_puede_escribir_en_otra_tabla() {
     assert!(reason.contains("hub_user"), "{reason}");
 }
 
+/// EXFILTRACIÓN entre secciones: un `INSERT` en la tabla PERMITIDA cuya FUENTE es otra tabla
+/// (`SELECT … FROM hub_user`) es léxicamente un INSERT legal en `hub_settings`, así que un filtro
+/// que solo mire el prefijo lo deja pasar — y copia los hashes de PIN a una tabla que cualquier
+/// módulo lee luego. El subconjunto solo admite LITERALES como fuente.
+#[tokio::test]
+async fn un_insert_que_lee_de_otra_tabla_no_exfiltra() {
+    let mut rt = fresh().await;
+    // Un usuario real en el hub destino, con su secreto.
+    rt.db()
+        .execute_batch(
+            "INSERT INTO hub_user (id, name, role, pin_hash, is_active, created_at) \
+             VALUES ('u1', 'Ioan', 'owner', 'hash-secreto', 1, '2026-07-31T00:00:00Z');",
+        )
+        .await
+        .expect("usuario de partida");
+
+    let sql = "INSERT INTO hub_settings (\"hub_id\", \"key\", \"value\") \
+               SELECT '__HUB_ID__', 'robado', pin_hash FROM hub_user;";
+    let (manifest, files) = bundle(sql);
+    let report = import_sections(&mut rt, &manifest, &files, &only_settings(), "h2")
+        .await
+        .expect("best-effort: el import no aborta");
+
+    let reason = failure_reason(&report, "hub_settings");
+    assert!(reason.contains("literales"), "el motivo explica el subconjunto: {reason}");
+    assert_eq!(
+        setting_value(&rt, "h2", "robado").await,
+        None,
+        "el secreto de otra tabla NO se copia"
+    );
+}
+
+/// CTE que MODIFICA dentro del INSERT (`INSERT INTO … WITH x AS (DELETE …) SELECT …`, válido en
+/// Postgres): borra filas de otra sección pasando por un prefijo `INSERT INTO` impecable.
+#[tokio::test]
+async fn un_cte_que_borra_no_se_ejecuta() {
+    let mut rt = fresh().await;
+    rt.db()
+        .execute_batch(
+            "INSERT INTO hub_user (id, name, role, pin_hash, is_active, created_at) \
+             VALUES ('u1', 'Ioan', 'owner', 'hash', 1, '2026-07-31T00:00:00Z');",
+        )
+        .await
+        .expect("usuario de partida");
+
+    let sql = "INSERT INTO hub_settings (\"key\") \
+               WITH victima AS (DELETE FROM hub_user RETURNING id) SELECT id FROM victima;";
+    let (manifest, files) = bundle(sql);
+    let report = import_sections(&mut rt, &manifest, &files, &only_settings(), "h2")
+        .await
+        .expect("best-effort: el import no aborta");
+    let _ = failure_reason(&report, "hub_settings");
+
+    let users = rt
+        .db()
+        .query("SELECT COUNT(*) AS c FROM hub_user", &Params::new())
+        .await
+        .expect("conteo de usuarios");
+    let count = users.rows[0]["c"].as_i64().or_else(|| {
+        users.rows[0]["c"].as_str().and_then(|s| s.parse().ok())
+    });
+    assert_eq!(count, Some(1), "el DELETE del CTE no se ejecutó");
+}
+
 /// Un `data/*.sql` que ninguna sección del manifest referencia NO se ejecuta jamás: el bundle no
 /// puede colar SQL «suelto» aunque su sha256 case.
 #[tokio::test]
