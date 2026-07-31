@@ -168,14 +168,19 @@ pub async fn execute_reset(
     // (sección, tabla, sentencia) — se acumulan TODAS y se aplican en UNA transacción.
     let mut ops: Vec<(String, String, String)> = Vec::new();
 
-    if selection.settings {
+    // Solo se emiten sentencias sobre tablas que EXISTEN: una tabla ausente es un no-op, no un
+    // motivo para tumbar el reset entero (la transacción es all-or-nothing y un `DELETE` sobre
+    // una tabla inexistente abortaría también las secciones que sí se podían borrar).
+    let existing = list_tables(db).await.unwrap_or_default();
+
+    if selection.settings && existing.iter().any(|t| t == "hub_settings") {
         ops.push((
             "hub_settings".into(),
             "hub_settings".into(),
             "DELETE FROM hub_settings WHERE hub_id = :hub_id".into(),
         ));
     }
-    if selection.users {
+    if selection.users && existing.iter().any(|t| t == "hub_user") {
         // Nunca al actor: un owner no puede quedarse fuera de su propio hub con un clic.
         // `hub_user` no lleva `hub_id` (identidad por despliegue), así que NO se acota por él.
         ops.push((
