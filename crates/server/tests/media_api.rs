@@ -227,6 +227,8 @@ async fn fixture_with_module(user_actions: &str) -> (axum::Router, String, Captu
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-media-policy-scratch"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     (app(AppState::with_config(rt, cfg)), admin, captured)
 }
@@ -441,6 +443,8 @@ async fn the_listing_serves_files_through_the_runtime_not_a_signed_object_storag
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-media-url-scratch"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     let router = app(AppState::with_config(rt, cfg));
 
@@ -531,6 +535,8 @@ async fn raw_downloads_the_file_server_side_and_never_leaks_the_hub_token_to_sto
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-media-raw-scratch"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     let router = app(AppState::with_config(rt, cfg));
 
