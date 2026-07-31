@@ -353,8 +353,8 @@ async fn execute_wasm(
 /// Margen (ms) que el host espera POR ENCIMA del timeout interno del guest antes de rendirse.
 ///
 /// El corte real lo da wasmtime (interrupción por epoch dentro de `WasmHost`). Este margen cubre
-/// el arranque/compilación del plugin y la (de)serialización, y actúa de red por si la
-/// interrupción no llegara: el command devuelve error en vez de esperar para siempre.
+/// la (de)serialización y el arranque de la llamada, y actúa de red por si la interrupción no
+/// llegara: el command devuelve error en vez de esperar para siempre.
 const WASM_CALL_GRACE_MS: u64 = 2_000;
 
 /// Invoca el handler WASM **fuera del worker async** y con tope de tiempo (hub#241).
@@ -366,19 +366,38 @@ const WASM_CALL_GRACE_MS: u64 = 2_000;
 /// simplemente lento) se quedaba con ese worker y el runtime del TPV dejaba de responder hasta
 /// reiniciar el proceso. Ahora:
 ///
-///  1. la llamada va en `spawn_blocking` (pool de hilos bloqueantes: no toca los workers async);
+///  1. compilación y llamada van en `spawn_blocking` (pool de hilos bloqueantes: no tocan los
+///     workers async);
 ///  2. el guest lleva sus propios topes de fuel/memoria/reloj (ver `erplora_wasm_host`);
-///  3. y el host además espera con `timeout` (tope del guest + [`WASM_CALL_GRACE_MS`]), así que el
-///     command **siempre** vuelve, con `Ok` o con error.
+///  3. y el host además espera la LLAMADA con `timeout` (tope del guest + [`WASM_CALL_GRACE_MS`]),
+///     así que el command **siempre** vuelve, con `Ok` o con error.
+///
+/// # El reloj del host solo corre durante la llamada
+///
+/// La **compilación** del plugin (fase 1) queda FUERA del `timeout`: es código del host
+/// (wasmtime/cranelift), termina por construcción y su duración depende de la carga de la
+/// máquina, no del guest. Cuando compartía presupuesto con la llamada, bajo carga (varios
+/// commands WASM concurrentes, cada uno recompilando su módulo) la compilación se comía el
+/// margen entero y handlers legítimos fallaban con "no respondió" sin haber ejecutado ni una
+/// instrucción del guest. El anti-cuelgue de hub#241 no lo necesita: el guest no ejecuta nada
+/// durante la compilación (fuel + epoch acotan la fase 2, que es la única que un módulo
+/// malicioso puede alargar a voluntad).
 async fn call_wasm_off_thread(bytes: &[u8], function: &str, input: Json) -> Result<Output> {
     let limits = erplora_wasm_host::WasmLimits::from_env();
     let wasm = bytes.to_vec();
-    let func = function.to_string();
 
-    let join = tokio::task::spawn_blocking(move || {
-        let mut host = WasmHost::from_bytes_with_limits(&wasm, limits)?;
-        host.call(&func, &input)
-    });
+    // Fase 1 — compilar (sin reloj del guest). `extism::Plugin` es Send: puede cruzar de un
+    // hilo bloqueante a otro.
+    let mut host = tokio::task::spawn_blocking(move || WasmHost::from_bytes_with_limits(&wasm, limits))
+        .await
+        .map_err(|join_err| {
+            RuntimeError::Wasm(format!("el handler `{function}` abortó al cargar: {join_err}"))
+        })?
+        .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
+
+    // Fase 2 — llamar, con tope.
+    let func = function.to_string();
+    let join = tokio::task::spawn_blocking(move || host.call(&func, &input));
 
     let wait = std::time::Duration::from_millis(limits.timeout_ms.saturating_add(WASM_CALL_GRACE_MS));
     match tokio::time::timeout(wait, join).await {
