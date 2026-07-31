@@ -595,6 +595,31 @@ pub struct CommandDef {
     /// no es accesible vía API key aunque la key tuviera el permiso. El gate del runtime no cambia.
     #[serde(default)]
     pub expose_api: bool,
+    /// Marca este command como **INTERNO** (hub#131, hub#145): solo lo puede invocar el propio
+    /// runtime (un listener del outbox entregado por el relay, una scheduled task del mismo
+    /// módulo) — nunca un caller EXTERNO (HTTP `/api/command`, API pública de API keys,
+    /// asistente/SDK). Aditivo al convenio legacy de prefijo `_` en el último segmento del nombre
+    /// (`cash_register._reverse_sale`): un command internal puede DEMÁS no llevar `_`, para
+    /// módulos que prefieren blindarlo explícitamente sin ese prefijo. Ver [`CommandDef::is_internal`].
+    #[serde(default)]
+    pub internal: bool,
+}
+
+impl CommandDef {
+    /// ¿Es `self` (registrado bajo `name`, el nombre namespaced completo) un command INTERNO?
+    /// Dos señales, aditivas — cualquiera de las dos basta (hub#131, hub#145):
+    ///  1. `internal: true` explícito en el manifest.
+    ///  2. El **último segmento** de `name` (tras el último `.`) empieza por `_` — el convenio
+    ///     legacy que ya usan los listeners cross-módulo (`cash_register._reverse_sale`,
+    ///     `inventory._restock_on_void`) sin tener que migrar manifests existentes.
+    pub fn is_internal(&self, name: &str) -> bool {
+        self.internal
+            || name
+                .rsplit('.')
+                .next()
+                .map(|last| last.starts_with('_'))
+                .unwrap_or(false)
+    }
 }
 
 /// Referencia al handler de un command. ARQUITECTURA.md §5.3, §9.2.
@@ -791,6 +816,67 @@ mod tests {
         assert_eq!(
             serde_json::to_value(WidgetKind::BarList).unwrap(),
             serde_json::Value::String("bar-list".to_string())
+        );
+    }
+
+    /// hub#131/#145: `internal: true` parsea (aditivo, opcional) y `is_internal()` lo detecta
+    /// aunque el nombre del command NO lleve prefijo `_`.
+    #[test]
+    fn command_internal_flag_parses_and_is_internal_true_without_underscore() {
+        let json = r#"{
+            "id": "pricing",
+            "name": "Pricing",
+            "version": "1.0.0",
+            "commands": {
+                "pricing.reindex_catalog": {
+                    "permission": "pricing.write",
+                    "sql": ["UPDATE x SET y = 1"],
+                    "internal": true
+                }
+            }
+        }"#;
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        let cmd = &manifest.commands["pricing.reindex_catalog"];
+        assert!(cmd.internal, "`internal: true` debe parsear a true");
+        assert!(
+            cmd.is_internal("pricing.reindex_catalog"),
+            "internal:true → is_internal() aunque el nombre no lleve `_`"
+        );
+    }
+
+    /// Un manifest legacy que NO declara `internal` sigue considerando interno un command cuyo
+    /// ÚLTIMO segmento namespaced empieza por `_` (convenio ya en uso: `cash_register._reverse_sale`),
+    /// y NO interno el resto — el campo por defecto es `false` (aditivo, no rompe manifests viejos).
+    #[test]
+    fn command_internal_defaults_false_and_underscore_suffix_is_internal_by_convention() {
+        let json = r#"{
+            "id": "cash_register",
+            "name": "Cash register",
+            "version": "1.0.0",
+            "commands": {
+                "cash_register._reverse_sale": {
+                    "permission": "cash_register.write",
+                    "sql": ["UPDATE x SET y = 1"]
+                },
+                "cash_register.movement.add": {
+                    "permission": "cash_register.write",
+                    "sql": ["INSERT INTO x VALUES (1)"]
+                }
+            }
+        }"#;
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+
+        let internal_cmd = &manifest.commands["cash_register._reverse_sale"];
+        assert!(!internal_cmd.internal, "el campo `internal` no se declaró: default false");
+        assert!(
+            internal_cmd.is_internal("cash_register._reverse_sale"),
+            "el último segmento empieza por `_` → interno por convención, sin migrar el manifest"
+        );
+
+        let public_cmd = &manifest.commands["cash_register.movement.add"];
+        assert!(
+            !public_cmd.is_internal("cash_register.movement.add"),
+            "sin prefijo `_` ni `internal:true` → NO es interno"
         );
     }
 }

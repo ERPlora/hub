@@ -200,7 +200,22 @@ async fn run_task(
         // de ESTA tarea en UNA transacción → idempotencia estructural (sin doble-disparo): si el
         // command commitea, `next_run` avanza sí o sí; si revierte, la tarea se reintenta.
         let advance = advance_op(&module_id, &name, &next_run, now);
-        commands::execute_at(db, registry, &command, &payload, &ctx, 0, &[advance]).await?;
+        // Origin::Internal (hub#131, hub#145): la tarea corre sin usuario, disparada por el
+        // propio Hub (§4.2). El `runnable` de arriba YA exige que `command` pertenezca al MISMO
+        // `module_id` que declaró la scheduled task en su manifest — así que aunque el command sea
+        // `internal`/`_`-prefijado, esto NO abre una puerta cruzada: sigue siendo "el módulo se
+        // dispara a sí mismo", el mismo aislamiento que ya tenía el handler WASM (§5.3).
+        commands::execute_at(
+            db,
+            registry,
+            &command,
+            &payload,
+            &ctx,
+            0,
+            &[advance],
+            commands::Origin::Internal,
+        )
+        .await?;
         Ok(true)
     } else {
         // No se ejecuta (skip en arranque, o command no resoluble): solo reprograma `next_run`.
@@ -416,6 +431,7 @@ mod tests {
                 ai: None,
                 schema: None,
                 expose_api: false,
+                internal: false,
             },
             sql: vec![sql.to_string()],
             wasm: None,
@@ -436,6 +452,42 @@ mod tests {
     async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
         r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
+    }
+
+    /// hub#131/#145: el `command` de una scheduled task puede ser interno (prefijo `_`, como
+    /// `verifactu._check_certificate_expiry`) — la tarea la dispara el propio Hub sin usuario
+    /// (§4.2), así que corre con `Origin::Internal` y el gate no la bloquea.
+    #[tokio::test]
+    async fn due_task_with_internal_command_runs_via_origin_internal() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("verifactu".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "verifactu._check_certificate_expiry".into(),
+            cmd("verifactu", "INSERT INTO t (n) VALUES (1);"),
+        );
+
+        let mut p = Params::new();
+        p.insert("module_id".into(), json!("verifactu"));
+        p.insert("name".into(), json!("check_cert"));
+        p.insert("command".into(), json!("verifactu._check_certificate_expiry"));
+        p.insert("cron".into(), json!("*/5 * * * *"));
+        p.insert("next_run".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute(
+            "INSERT INTO _scheduled_tasks (module_id, name, command, cron, payload, catch_up, next_run) \
+             VALUES (:module_id, :name, :command, :cron, '{}', 'collapse', :next_run)",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        let ran = process_once(&db, &reg, "h1").await.unwrap();
+        assert_eq!(ran, 1, "el gate de origen NO bloquea una scheduled task interna");
+        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1);
     }
 
     /// Una tarea vencida ejecuta su command y avanza `next_run` al futuro en la misma tx; un

@@ -499,6 +499,40 @@ impl Runtime {
         r
     }
 
+    /// Como [`Runtime::execute_command`] pero con **origen INTERNO** (hub#131, hub#145): ejecuta
+    /// también commands marcados internos (prefijo `_` en el último segmento, o `internal: true`),
+    /// con el mismo `Origin::Internal` que el relay del Outbox y el scheduler.
+    ///
+    /// SOLO para el **host embebedor** del runtime (código Rust de confianza que ya tiene [`Runtime::db`]
+    /// con acceso crudo): siembras de tests e2e que suplen un handler nativo/WASM no enlazado con la
+    /// intención declarativa exacta que ese motor emitiría (`verifactu._insert_record`,
+    /// `appointments._insert_appointment`). NINGUNA superficie externa (rutas HTTP, API pública de
+    /// API keys, asistente/SDK) debe enrutar por aquí: esas pasan por [`Runtime::execute_command`],
+    /// que gatea los internos con `internal_command`.
+    #[doc(hidden)]
+    pub async fn execute_command_internal(
+        &self,
+        name: &str,
+        payload: &Params,
+        ctx: &RequestContext,
+    ) -> Result<Json> {
+        let r = commands::execute_at(
+            self.db.as_ref(),
+            &self.registry,
+            name,
+            payload,
+            ctx,
+            0,
+            &[],
+            commands::Origin::Internal,
+        )
+        .await;
+        if let Err(e) = &r {
+            self.report_dispatch_error(e, "command", name, payload);
+        }
+        r
+    }
+
     /// **Embudo único** de errores del dispatcher (§ error-registry). Reporta el `RuntimeError` de un
     /// `execute_command`/`execute_query` al registro global, etiquetándolo con `source="module"` +
     /// `module_id` cuando el nombre resuelve a un módulo registrado, o `source="hub"` si no (core /
@@ -887,4 +921,82 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
         Json::from(if ctx.has_certificate { 1 } else { 0 }),
     );
     p
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::{ModuleStatus, RegisteredCommand, RequestContext};
+    use erplora_db::testutil::fresh_db;
+
+    fn underscore_cmd(module: &str, sql: &str) -> RegisteredCommand {
+        RegisteredCommand {
+            module_id: module.to_string(),
+            def: manifest::CommandDef {
+                permission: format!("{module}.write"),
+                reads: Vec::new(),
+                transaction: false,
+                sql: vec![],
+                schema: None,
+                emit: vec![],
+                handler: None,
+                ai: None,
+                expose_api: false,
+                internal: false,
+            },
+            sql: vec![sql.to_string()],
+            wasm: None,
+            schema: None,
+        }
+    }
+
+    /// hub#131/#145: [`Runtime::execute_command`] (la puerta PÚBLICA del embedder, la única que
+    /// exponen las rutas HTTP/API keys) rechaza un command interno `_` con `InternalCommand`;
+    /// [`Runtime::execute_command_internal`] (host embebedor de confianza: siembras de e2e que
+    /// suplen un handler nativo/WASM no enlazado) SÍ lo ejecuta — mismo `Origin::Internal` que el
+    /// relay del Outbox y el scheduler — y el SQL declarativo del command corre de verdad.
+    #[tokio::test]
+    async fn public_gate_rejects_underscore_but_internal_entrypoint_runs_it() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+
+        let mut rt = Runtime::new(Box::new(db));
+        rt.registry
+            .status
+            .insert("appointments".to_string(), ModuleStatus::Active);
+        rt.registry.commands.insert(
+            "appointments._insert_appointment".to_string(),
+            underscore_cmd("appointments", "INSERT INTO t (n) VALUES (1);"),
+        );
+        // Identidad de negocio ya rellena → `execute_at` no re-lee `hub_settings` (mismo patrón
+        // que `ctx_admin()` en los tests del gate de `commands.rs`).
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]).with_business(
+            "B00000000",
+            "ACME Test",
+            "Calle Falsa 123",
+        );
+
+        let err = rt
+            .execute_command("appointments._insert_appointment", &Params::new(), &ctx)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::InternalCommand(_)),
+            "la puerta pública del embedder debe rechazar el command `_`: {err:?}"
+        );
+
+        rt.execute_command_internal("appointments._insert_appointment", &Params::new(), &ctx)
+            .await
+            .expect("la puerta interna del embedder debe ejecutar el command `_`");
+        let r = rt
+            .db()
+            .query("SELECT COUNT(*) AS c FROM t WHERE n = 1", &Params::new())
+            .await
+            .unwrap();
+        let c = r.rows[0]["c"]
+            .as_i64()
+            .or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64))
+            .unwrap_or(-1);
+        assert_eq!(c, 1, "el SQL del command interno debe haberse ejecutado");
+    }
 }

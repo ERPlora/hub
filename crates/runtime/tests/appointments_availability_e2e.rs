@@ -161,14 +161,17 @@ async fn book(rt: &Runtime, ctx: &RequestContext, staff_id: &str, start: &str, d
         let end = (chrono::DateTime::parse_from_rfc3339(start).unwrap()
             + Duration::minutes(dur))
         .to_rfc3339();
-        rt.execute_command(
+        // `execute_command_internal`: los sub-commands `_` son INTERNOS (hub#131/#145) y la puerta
+        // pública (`execute_command`) los rechaza; aquí el test actúa como host embebedor
+        // sembrando la intención exacta que el handler emitiría.
+        rt.execute_command_internal(
             "appointments._bump_counter",
             &params(json!({ "day": "20990101" })),
             ctx,
         )
         .await
         .ok();
-        rt.execute_command(
+        rt.execute_command_internal(
             "appointments._insert_appointment",
             &params(json!({
                 "appointment_id": null, "day": "20990101",

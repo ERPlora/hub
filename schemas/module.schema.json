@@ -254,6 +254,11 @@
             "default": false,
             "description": "Opt-in: expone este command en la API pública REST/OpenAPI por módulo (ADR-0057, `architecture/hub/public-api.md`). Doble puerta: además de estar marcado, la API key debe tener el `permission` del command (escritura del módulo). Por defecto false → el command NO es accesible vía API key aunque la key tuviera el permiso. Espejo del flag `external` de los hooks de salida (ADR-0049)."
           },
+          "internal": {
+            "type": "boolean",
+            "default": false,
+            "description": "Marca este command como INTERNO (hub#131, hub#145): solo lo invoca el propio runtime (un listener del outbox entregado por el relay, una scheduled task del mismo módulo) — nunca un caller EXTERNO (HTTP `/api/command`, API pública de API keys, asistente/SDK). Aditivo al convenio legacy de prefijo `_` en el último segmento del nombre (p. ej. `cash_register._reverse_sale`), que ya se trata como interno sin necesidad de este campo; úsalo para blindar un command interno que no lleva ese prefijo. Un command interno nunca aparece en el OpenAPI ni en las tools del asistente, aunque se marcara `expose_api`/`ai` por error."
+          },
           "handler": {
             "type": "object",
             "required": [

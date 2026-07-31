@@ -158,7 +158,21 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         }
         // Efectos del listener + sus eventos en cascada + el marcador de entrega → UNA transacción.
         let extra = [delivery_op(&id, listener)];
-        if let Err(e) = commands::execute_at(db, registry, listener, &payload, &ctx, depth, &extra).await {
+        // Origin::Internal (hub#131, hub#145): el relay es el propio runtime entregando un
+        // listener de evento — nunca un caller externo — así que un listener `_`-prefijado o
+        // `internal:true` DEBE ejecutar aquí igual que uno público.
+        if let Err(e) = commands::execute_at(
+            db,
+            registry,
+            listener,
+            &payload,
+            &ctx,
+            depth,
+            &extra,
+            commands::Origin::Internal,
+        )
+        .await
+        {
             return defer_or_dead(db, &id, attempts, &format!("{listener}: {e}")).await;
         }
     }
@@ -301,6 +315,7 @@ mod tests {
                 ai: None,
                 schema: None,
                 expose_api: false,
+                internal: false,
             },
             sql: vec![sql.to_string()],
             wasm: None,
@@ -351,6 +366,42 @@ mod tests {
         // Idempotencia: re-drenar no re-ejecuta el listener.
         drain(&db, &reg).await.unwrap();
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1, "idempotente");
+    }
+
+    /// hub#131/#145: un listener marcado INTERNO por convención (último segmento `_`, estilo real
+    /// `cash_register._reverse_sale`) SE ENTREGA con normalidad por el relay — el gate de origen
+    /// (hub#131/#145) solo bloquea el camino EXTERNO (`Runtime::execute_command`); el relay del
+    /// Outbox es el propio runtime, así que invoca con `Origin::Internal` y no se ve afectado.
+    #[tokio::test]
+    async fn relay_delivers_to_an_underscore_prefixed_internal_listener() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        // "sales.void" emite "sale.voided"; "cash_register._reverse_sale" (interno, sin
+        // `expose_api`) es su listener, como en el caso real (void_reversal_e2e.rs).
+        let mut reg = Registry::new();
+        reg.status.insert("sales".into(), ModuleStatus::Active);
+        reg.status.insert("cash_register".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "cash_register._reverse_sale".into(),
+            cmd("cash_register", "INSERT INTO t (n) VALUES (1);", vec![]),
+        );
+        reg.commands.insert(
+            "sales.void".into(),
+            cmd("sales", "INSERT INTO t (n) VALUES (99);", vec!["sale.voided".into()]),
+        );
+        reg.listeners.insert("sale.voided".into(), vec!["cash_register._reverse_sale".into()]);
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx).await.unwrap();
+
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            1,
+            "el listener interno `_reverse_sale` SÍ corre entregado por el relay (Origin::Internal)"
+        );
     }
 
     /// Un evento `*.reminder.due` dispara el **listener-host** de `host.notify` (ADR-0012) por el

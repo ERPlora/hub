@@ -224,9 +224,12 @@ async fn verifactu_pending_kpi_counts_real_records() {
         .join("../../../modules-workspace/modules").exists()
     { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let mut rt = rt().await;
-    // verifactu depends_on invoice (que depende de taxes + customers).
+    // verifactu depends_on invoice → sales → inventory + taxes (manifests actuales; customers lo
+    // pide el propio flujo de facturación).
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
+    rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
     rt.install_from_dir(&mdir("customers")).await.expect("customers");
+    rt.install_from_dir(&mdir("sales")).await.expect("sales");
     rt.install_from_dir(&mdir("invoice")).await.expect("invoice");
     rt.install_from_dir(&mdir("verifactu")).await.expect("verifactu");
     let ctx = admin();
@@ -239,7 +242,9 @@ async fn verifactu_pending_kpi_counts_real_records() {
     // PLUGIN NATIVO first-party (ADR-0009, compliance-critical), que no se enlaza en este runtime
     // headless; sembramos con el comando interno declarativo `_insert_record` (Tier-0 SQL) — la
     // INTENCIÓN exacta que el motor nativo emite: una fila verifactu_record real con status pending.
-    rt.execute_command(
+    // `execute_command_internal`: `_insert_record` es INTERNO (hub#131/#145) y la puerta pública
+    // (`execute_command`) lo rechaza; el test siembra como host embebedor.
+    rt.execute_command_internal(
         "verifactu._insert_record",
         &params(json!({
             "record_id": "rec-1", "record_type": "alta", "sequence_number": 1, "invoice_id": null,

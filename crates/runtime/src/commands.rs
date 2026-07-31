@@ -20,9 +20,32 @@ pub(crate) const MAX_EVENT_DEPTH: u32 = 16;
 /// dividir la operación. ARQUITECTURA.md §5.3.
 pub(crate) const NEW_IDS_BATCH: usize = 256;
 
+/// Origen de una invocación de [`execute_at`] (hub#131, hub#145).
+///
+/// Distingue el camino EXTERNO — todo lo que entra por `Runtime::execute_command` (HTTP
+/// `POST /api/command`, la API pública `POST /api/v1/{module}/c/{command}` de API keys, el
+/// asistente/SDK) — del camino INTERNO: el propio runtime invocándose a sí mismo (el relay del
+/// Outbox entregando un listener, el scheduler disparando una scheduled task del mismo módulo).
+///
+/// Solo el origen EXTERNO se gatea contra los commands marcados `internal` (o con el último
+/// segmento del nombre prefijado `_`): un caller externo nunca debe poder invocar directamente lo
+/// que un módulo emite como implementación (`module._helper`), saltándose la validación,
+/// orquestación y atomicidad del command público que normalmente lo dispara.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Origin {
+    External,
+    Internal,
+}
+
 /// Ejecuta `name(payload)` con el contexto dado. Aplica permiso, ejecuta el SQL **y persiste
 /// los eventos emitidos en el outbox dentro de la MISMA transacción** (entrega at-least-once
 /// asíncrona; los listeners los corre el relay, ver `outbox.rs`). ARQUITECTURA.md §4/§5.4.
+///
+/// Es el ÚNICO punto de entrada público del dispatcher de commands — lo llama
+/// `Runtime::execute_command`, que a su vez es lo único que exponen las rutas HTTP (`/api/command`,
+/// `/api/v1/{module}/c/{command}`). Por eso el origen es SIEMPRE [`Origin::External`] aquí: un
+/// caller interno legítimo (outbox, scheduler) usa [`execute_at`] directamente con
+/// [`Origin::Internal`], no esta función.
 pub async fn execute(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
@@ -30,12 +53,14 @@ pub async fn execute(
     payload: &Params,
     ctx: &RequestContext,
 ) -> Result<Json> {
-    execute_at(db, registry, name, payload, ctx, 0, &[]).await
+    execute_at(db, registry, name, payload, ctx, 0, &[], Origin::External).await
 }
 
-/// Como [`execute`] pero a profundidad `depth` (cascada) y con `extra_ops` añadidos a la
-/// transacción del command. El relay usa `extra_ops` para insertar el marcador de entrega
-/// (`_event_delivery`) atómicamente con los efectos del listener (idempotencia, §5.4).
+/// Como [`execute`] pero a profundidad `depth` (cascada), con `extra_ops` añadidos a la
+/// transacción del command y con el [`Origin`] explícito de la llamada. El relay usa `extra_ops`
+/// para insertar el marcador de entrega (`_event_delivery`) atómicamente con los efectos del
+/// listener (idempotencia, §5.4).
+#[allow(clippy::too_many_arguments)] // mismo trato que persist_handler_output: firma interna del dispatcher
 pub(crate) async fn execute_at(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
@@ -44,6 +69,7 @@ pub(crate) async fn execute_at(
     ctx: &RequestContext,
     depth: u32,
     extra_ops: &[(String, Params)],
+    origin: Origin,
 ) -> Result<Json> {
     if depth > MAX_EVENT_DEPTH {
         return Err(RuntimeError::EventLoop);
@@ -91,6 +117,16 @@ pub(crate) async fn execute_at(
     let cmd = registry
         .get_command(name)
         .ok_or_else(|| RuntimeError::CommandNotFound(name.to_string()))?;
+
+    // Gate de ORIGEN (hub#131, hub#145): un command interno (prefijo `_` en su último segmento,
+    // o `internal: true` en el manifest) es invisible para un caller EXTERNO — ni el permiso ni
+    // el schema del command importan, se rechaza ANTES de comprobarlos. Solo el propio runtime
+    // (relay del Outbox, scheduler) lo invoca, siempre con `Origin::Internal`. Sin esto, un
+    // `module._helper` "privado" solo por convención era invocable tal cual desde
+    // `POST /api/command`, saltándose la orquestación/atomicidad del command público que lo emite.
+    if origin == Origin::External && cmd.def.is_internal(name) {
+        return Err(RuntimeError::InternalCommand(name.to_string()));
+    }
 
     // El handler corre bajo el permiso del command que lo invoca (no re-eleva).
     permissions::check(ctx, &cmd.def.permission)?;
@@ -501,6 +537,7 @@ mod tests {
             ai: None,
             schema: None,
             expose_api: false,
+            internal: false,
         }
     }
 
@@ -593,5 +630,214 @@ mod tests {
             matches!(err, RuntimeError::Wasm(_)),
             "debe rechazar, no aplicar 0 sentencias: {err:?}"
         );
+    }
+
+    // ── Gate de origen: comandos internos (hub#131, hub#145) ────────────────────────────────
+
+    /// Como [`registry_with_command`] pero permite marcar el command `internal: true` en el
+    /// manifest (independiente del prefijo `_` en `name`).
+    fn registry_with_command_flagged(module_id: &str, name: &str, internal: bool) -> Registry {
+        let mut reg = Registry::new();
+        reg.status
+            .insert(module_id.to_string(), ModuleStatus::Active);
+        let mut def = cmd_def();
+        def.internal = internal;
+        reg.commands.insert(
+            name.to_string(),
+            RegisteredCommand {
+                module_id: module_id.to_string(),
+                def,
+                sql: vec!["INSERT INTO x VALUES (1);".to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg
+    }
+
+    /// Contexto admin con la identidad de negocio ya rellena: evita que `execute_at` dispare
+    /// `settings::get_all` (lectura de `hub_settings`) antes de llegar al gate de origen, así los
+    /// tests de este bloque pueden usar un `DatabaseAdapter` que PANIC-ea ante cualquier consulta
+    /// y probar de verdad que el rechazo ocurre "ANTES DE TOCAR LA BD".
+    fn ctx_admin() -> RequestContext {
+        RequestContext::new("h1", "u1", ["*".to_string()]).with_business(
+            "B00000000",
+            "ACME Test",
+            "Calle Falsa 123",
+        )
+    }
+
+    /// Doble de test que PANIC-ea ante cualquier operación de BD. Sirve para demostrar que el
+    /// gate de origen corta ANTES de tocar la base de datos (no solo que devuelve el error
+    /// correcto, sino que ni siquiera llega a `db.execute_tx`/`db.query`).
+    struct DenyDb;
+
+    #[async_trait::async_trait]
+    impl DatabaseAdapter for DenyDb {
+        async fn execute(
+            &self,
+            _sql: &str,
+            _params: &Params,
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            panic!("DenyDb::execute no debía llamarse — el gate de origen debe cortar antes");
+        }
+        async fn execute_tx(
+            &self,
+            _ops: &[(String, Params)],
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            panic!("DenyDb::execute_tx no debía llamarse — el gate de origen debe cortar antes");
+        }
+        async fn query(
+            &self,
+            _sql: &str,
+            _params: &Params,
+        ) -> std::result::Result<erplora_db::QueryResult, erplora_db::DbError> {
+            panic!("DenyDb::query no debía llamarse — el gate de origen debe cortar antes");
+        }
+        async fn execute_batch(&self, _sql: &str) -> std::result::Result<(), erplora_db::DbError> {
+            panic!("DenyDb::execute_batch no debía llamarse");
+        }
+    }
+
+    /// Doble de test que ACEPTA trivialmente cualquier operación de BD (sin Postgres real). Sirve
+    /// para probar que una invocación INTERNA (Origin::Internal) sí atraviesa el gate y llega a
+    /// ejecutar el SQL del command.
+    struct FakeDb;
+
+    #[async_trait::async_trait]
+    impl DatabaseAdapter for FakeDb {
+        async fn execute(
+            &self,
+            _sql: &str,
+            _params: &Params,
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            Ok(erplora_db::CommandResult::affected(0))
+        }
+        async fn execute_tx(
+            &self,
+            ops: &[(String, Params)],
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            Ok(erplora_db::CommandResult::affected(ops.len() as u64))
+        }
+        async fn query(
+            &self,
+            _sql: &str,
+            _params: &Params,
+        ) -> std::result::Result<erplora_db::QueryResult, erplora_db::DbError> {
+            Ok(erplora_db::QueryResult::new(Vec::new()))
+        }
+        async fn execute_batch(&self, _sql: &str) -> std::result::Result<(), erplora_db::DbError> {
+            Ok(())
+        }
+    }
+
+    /// (a) hub#131/#145 — el camino EXTERNO real (`execute`, lo único que llaman las rutas HTTP
+    /// vía `Runtime::execute_command`) rechaza un command "privado por convención"
+    /// (`cash_register._reverse_sale`-style: último segmento con `_`) con `InternalCommand`, SIN
+    /// tocar la BD (`DenyDb` habría hecho panic si se hubiera llegado a `execute_tx`/`query`).
+    #[tokio::test]
+    async fn execute_rejects_underscore_command_from_the_public_entrypoint() {
+        let reg = registry_with_command("cash_register", "cash_register._reverse_sale");
+        let ctx = ctx_admin();
+        let err = execute(
+            &DenyDb,
+            &reg,
+            "cash_register._reverse_sale",
+            &Params::new(),
+            &ctx,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::InternalCommand(ref n) if n == "cash_register._reverse_sale"),
+            "got {err:?}"
+        );
+    }
+
+    /// (a bis) Mismo rechazo a nivel de `execute_at` con `Origin::External` explícito — la doble
+    /// puerta de la API pública (`api_keys::data_command`) llega aquí por el mismo camino.
+    #[tokio::test]
+    async fn execute_at_external_rejects_underscore_command_before_touching_db() {
+        let reg = registry_with_command("inventory", "inventory._restock_on_void");
+        let ctx = ctx_admin();
+        let err = execute_at(
+            &DenyDb,
+            &reg,
+            "inventory._restock_on_void",
+            &Params::new(),
+            &ctx,
+            0,
+            &[],
+            Origin::External,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, RuntimeError::InternalCommand(_)), "got {err:?}");
+    }
+
+    /// (b) Una invocación INTERNA legítima (el relay del Outbox entregando un listener, o el
+    /// scheduler) del MISMO command `_` SÍ se ejecuta: llega hasta `db.execute_tx` (con `FakeDb`,
+    /// sin necesitar Postgres real) y devuelve `{ok: true, ...}`.
+    #[tokio::test]
+    async fn execute_at_internal_origin_runs_the_underscore_command() {
+        let reg = registry_with_command("cash_register", "cash_register._reverse_sale");
+        let ctx = ctx_admin();
+        let out = execute_at(
+            &FakeDb,
+            &reg,
+            "cash_register._reverse_sale",
+            &Params::new(),
+            &ctx,
+            0,
+            &[],
+            Origin::Internal,
+        )
+        .await
+        .expect("una invocación INTERNA sí debe ejecutar el comando `_`");
+        assert_eq!(out["ok"], serde_json::json!(true));
+    }
+
+    /// (c) `internal: true` explícito en el manifest, SIN prefijo `_` en el nombre, también se
+    /// bloquea desde el origen EXTERNO — el flag es aditivo al convenio del prefijo, no un
+    /// sustituto.
+    #[tokio::test]
+    async fn execute_at_external_rejects_manifest_flagged_internal_without_underscore() {
+        let reg =
+            registry_with_command_flagged("pricing", "pricing.insert_special_price_list", true);
+        let ctx = ctx_admin();
+        let err = execute_at(
+            &DenyDb,
+            &reg,
+            "pricing.insert_special_price_list",
+            &Params::new(),
+            &ctx,
+            0,
+            &[],
+            Origin::External,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, RuntimeError::InternalCommand(_)), "got {err:?}");
+    }
+
+    /// Control: un command PÚBLICO normal (sin `_`, sin `internal: true`) sigue funcionando desde
+    /// el origen EXTERNO — el gate no bloquea de más.
+    #[tokio::test]
+    async fn execute_at_external_allows_a_public_command() {
+        let reg = registry_with_command("inventory", "inventory.products.create");
+        let ctx = ctx_admin();
+        let out = execute_at(
+            &FakeDb,
+            &reg,
+            "inventory.products.create",
+            &Params::new(),
+            &ctx,
+            0,
+            &[],
+            Origin::External,
+        )
+        .await
+        .unwrap();
+        assert_eq!(out["ok"], serde_json::json!(true));
     }
 }

@@ -44,6 +44,12 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
         if !registry.is_active(&c.module_id) {
             continue;
         }
+        // Defensa en profundidad (hub#131, hub#145): un command interno NUNCA se ofrece como
+        // tool del asistente, aunque un manifest (por error) le hubiera puesto un bloque `ai:`
+        // — la tool que ve el LLM comparte gate con `execute_command`, que ya lo rechazaría.
+        if c.def.is_internal(name) {
+            continue;
+        }
         if let Some(ai) = &c.def.ai {
             if permits(&c.def.permission) {
                 tools.push(tool_def(
@@ -319,6 +325,65 @@ mod tests {
         let t = tool_def("sales.list", "List sales", "query", "sales", Some(schema));
         assert_eq!(t["parameters"]["properties"]["since"]["type"], "string");
         assert_eq!(t["parameters"]["required"][0], "since");
+    }
+
+    /// hub#131/#145: `assemble_tools` (la fuente del catálogo del asistente) nunca ofrece un
+    /// command interno como tool — ni el prefijo `_` en el nombre ni un `internal:true` explícito
+    /// se cuelan, aunque el manifest le pusiera (por error) un bloque `ai:`.
+    #[test]
+    fn assemble_tools_excludes_internal_commands_even_with_ai_block() {
+        use erplora_runtime::manifest::{AiTool, CommandDef};
+        use erplora_runtime::registry::{ModuleStatus, RegisteredCommand};
+
+        fn ai_cmd(internal: bool) -> CommandDef {
+            CommandDef {
+                permission: "cash_register.write".to_string(),
+                reads: Vec::new(),
+                transaction: true,
+                sql: vec!["UPDATE x SET y=1".to_string()],
+                schema: None,
+                emit: vec![],
+                handler: None,
+                ai: Some(AiTool {
+                    description: "Revierte el efecto en caja de una venta anulada".to_string(),
+                    name: None,
+                }),
+                expose_api: false,
+                internal,
+            }
+        }
+
+        let mut reg = Registry::new();
+        reg.status.insert("cash_register".to_string(), ModuleStatus::Active);
+        // Interno por CONVENCIÓN (prefijo `_`), sin declarar `internal:true`.
+        reg.commands.insert(
+            "cash_register._reverse_sale".to_string(),
+            RegisteredCommand {
+                module_id: "cash_register".to_string(),
+                def: ai_cmd(false),
+                sql: vec!["UPDATE x SET y=1".to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+        // Interno por FLAG explícito, sin prefijo `_`.
+        reg.commands.insert(
+            "cash_register.reindex_ledger".to_string(),
+            RegisteredCommand {
+                module_id: "cash_register".to_string(),
+                def: ai_cmd(true),
+                sql: vec!["UPDATE x SET y=1".to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&reg, &ctx);
+        assert!(
+            tools.is_empty(),
+            "ningún command interno debe exponerse como tool: {tools:?}"
+        );
     }
 
     #[test]
