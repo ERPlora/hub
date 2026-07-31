@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
-// Contrato del paso «elegir fuente» del ImportPanel tras la simplificación (decisión humano
-// 2026-07-17): el «descargar de la nube» dejaba de ser un botón que despliega una lista. Ahora
-// el catálogo de la nube se carga solo al entrar y se pinta como UNA CARD por blueprint, más una
-// card secundaria «subir desde archivo». Así el usuario SIEMPRE ve qué puede cargar.
+// Contrato del paso «elegir fuente»: el catálogo se carga al entrar y se presenta con el
+// ok-data-table reutilizable (tarjetas por defecto + tabla), mientras que el fichero local sigue
+// siendo una acción explícita separada.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -45,7 +44,7 @@ beforeEach(() => {
 });
 
 describe('ImportPanel · paso pick', () => {
-  it('carga el catálogo de la nube al montar y pinta una card por blueprint', async () => {
+  it('carga el catálogo de la nube al montar y lo entrega al data-table reutilizable', async () => {
     fetchBlueprintCatalog.mockResolvedValue([
       { slug: 'rest', name: 'Restaurante', description: 'TPV', locale: 'es', latest_version: '1.0.0' },
       { slug: 'beauty', name: 'Peluquería', description: '', locale: 'es', latest_version: '2.1.0' },
@@ -53,17 +52,18 @@ describe('ImportPanel · paso pick', () => {
     const w = mountPanel();
     await flushPromises();
     expect(fetchBlueprintCatalog).toHaveBeenCalledTimes(1);
-    expect(w.find('[data-testid="import-cloud-item-rest"]').exists()).toBe(true);
-    expect(w.find('[data-testid="import-cloud-item-beauty"]').exists()).toBe(true);
+    const table = w.get('[data-testid="import-blueprint-table"]');
+    expect(table.attributes('default-view')).toBe('cards');
+    expect(table.attributes('row-key-field')).toBe('slug');
   });
 
-  it('SIEMPRE ofrece la card «subir desde archivo», haya o no blueprints', async () => {
+  it('SIEMPRE ofrece «subir desde archivo», haya o no blueprints', async () => {
     fetchBlueprintCatalog.mockResolvedValue([]);
     const w = mountPanel();
     await flushPromises();
     expect(w.find('[data-testid="import-upload-local"]').exists()).toBe(true);
-    // Sin blueprints en la nube: nota de catálogo vacío, pero la card de subir sigue ahí.
-    expect(w.find('[data-testid="import-cloud-empty"]').exists()).toBe(true);
+    // Sin blueprints en la nube: el data-table conserva su empty-state y la subida sigue visible.
+    expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(true);
   });
 
   it('si el catálogo falla (hub sin credencial cloud) DEGRADA en silencio, sin banner de error', async () => {
@@ -74,7 +74,7 @@ describe('ImportPanel · paso pick', () => {
     await flushPromises();
     // NO hay banner de error (ese se reserva a fallos de inspección de un fichero elegido).
     expect(w.find('[data-testid="import-error"]').exists()).toBe(false);
-    // La card de subir sigue disponible: es el fallback cuando no hay nube.
+    // La subida sigue disponible: es el fallback cuando no hay nube.
     expect(w.find('[data-testid="import-upload-local"]').exists()).toBe(true);
   });
 });

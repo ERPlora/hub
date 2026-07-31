@@ -3,18 +3,34 @@
     <p class="page-lead" data-testid="import-lead">{{ t('importPage.lead') }}</p>
     <p v-if="!isAdmin" class="page-lead admin-note">{{ t('importPage.adminOnly') }}</p>
 
-    <!-- ── Paso 1: elegir fuente — SIEMPRE a la vista qué se puede cargar ──
-         Rediseño 2026-07-17 (decisión humano): «descargar de la nube» ya no es un botón que
-         despliega una lista (nadie descubría qué había). Ahora el catálogo de la nube se carga
-         solo al entrar y se pinta como UNA CARD por blueprint, más una card secundaria para subir
-         un fichero local. El usuario ve de un vistazo lo que tiene disponible. -->
+    <!-- ── Paso 1: elegir fuente — catálogo visible con tarjetas por defecto ──
+         `ok-data-table` aporta búsqueda, tabla y tarjetas sin duplicar otro selector. Subir un
+         archivo sigue siendo una acción distinta: no fingimos que un fichero local es una fila. -->
     <template v-if="step === 'pick'">
-      <ion-label class="page-lead-block">
-        <h2>{{ t('importPage.pickTitle') }}</h2>
-        <p>{{ t('importPage.pickDesc') }}</p>
-      </ion-label>
+      <div class="source-heading">
+        <ion-label class="page-lead-block">
+          <h2>{{ t('importPage.pickTitle') }}</h2>
+          <p>{{ t('importPage.pickDesc') }}</p>
+        </ion-label>
 
-      <!-- Selector de fichero oculto disparado por la card (patrón CSP-safe del cert). -->
+        <ion-button
+          fill="outline"
+          size="small"
+          :disabled="!isAdmin || inspecting"
+          data-testid="import-upload-local"
+          @click="triggerFilePicker"
+        >
+          <ion-spinner
+            v-if="inspecting && activeSource === 'local'"
+            slot="start"
+            name="crescent"
+          />
+          <HubIcon v-else slot="start" name="cloud-upload-outline" />
+          {{ t('importPage.fromLocal') }}
+        </ion-button>
+      </div>
+
+      <!-- Selector de fichero oculto disparado por el botón (patrón CSP-safe del cert). -->
       <input
         ref="fileInput"
         data-testid="import-file-input"
@@ -29,51 +45,26 @@
         <span>{{ t('importPage.loadingCatalog') }}</span>
       </div>
 
-      <div v-else class="cloud-grid">
-        <!-- Un blueprint publicado en la nube (ADR-0121). El runtime lo descarga con su
-             X-Hub-Token y VERIFICA el sha256 antes de dárnoslo; de ahí en adelante el flujo es
-             idéntico al de un fichero local. -->
-        <ion-card
-          v-for="bp in catalog"
-          :key="bp.slug"
-          button
-          class="source-card"
-          :disabled="!isAdmin || inspecting"
-          :data-testid="`import-cloud-item-${bp.slug}`"
-          @click="pickFromCloud(bp)"
-        >
-          <ion-card-content>
-            <HubIcon name="cube-outline" class="source-card-icon" />
-            <h3>{{ bp.name }}</h3>
-            <p>{{ bp.description || bp.slug }}</p>
-            <ion-note>{{ bp.locale }} · v{{ bp.latest_version }}</ion-note>
-          </ion-card-content>
-        </ion-card>
-
-        <!-- Card secundaria: subir un .blueprint.zip desde el equipo (otro hub / un backup). -->
-        <ion-card
-          button
-          class="source-card source-card--add"
-          :disabled="!isAdmin || inspecting"
-          data-testid="import-upload-local"
-          @click="triggerFilePicker"
-        >
-          <ion-card-content>
-            <ion-spinner v-if="inspecting" name="crescent" class="source-card-icon" />
-            <HubIcon v-else name="add-outline" class="source-card-icon" />
-            <h3>{{ t('importPage.fromLocal') }}</h3>
-            <p>{{ inspecting ? t('importPage.inspecting') : t('importPage.fromLocalDesc') }}</p>
-          </ion-card-content>
-        </ion-card>
-      </div>
-
-      <ion-note
-        v-if="!loadingCatalog && !catalog.length"
-        data-testid="import-cloud-empty"
-        class="soon-note"
-      >
-        {{ t('importPage.catalogEmpty') }}
-      </ion-note>
+      <!-- OutfitKit centraliza búsqueda, paginación y conmutador tabla/tarjetas. Tarjetas es la
+           vista inicial; la tabla queda disponible cuando el catálogo crezca. -->
+      <ok-data-table
+        v-else
+        ref="blueprintTable"
+        data-testid="import-blueprint-table"
+        row-key-field="slug"
+        :columns="blueprintColumns"
+        :rows="blueprintRows"
+        :views="['cards', 'table']"
+        default-view="cards"
+        :searchKeys="['name', 'description', 'locale', 'country']"
+        :actions="blueprintActions"
+        :cardTitle="blueprintCardTitle"
+        :renderCard="renderBlueprintCard"
+        :labels="tableLabels"
+        :search-placeholder="t('importPage.searchTemplates')"
+        :empty-message="t('importPage.catalogEmpty')"
+        page-size="24"
+      ></ok-data-table>
 
       <ion-note v-if="error" data-testid="import-error" color="danger" class="error-note">
         {{ t('importPage.inspectErrorTitle') }}: {{ error }}
@@ -259,7 +250,7 @@
 // resumen del manifest + checkboxes de las secciones DETECTADAS → (3) import en orden «migrate»
 // con INFORME final por sección (Applied ✓ / Skipped — / Failed ✗ con motivo, best-effort).
 // El gate real es del runtime (solo owner/admin); el `:disabled` de aquí es cosmético.
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -274,6 +265,7 @@ import {
   IonSpinner,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
+import { dataTableLabels } from '../lib/data-table-labels';
 import { isAdmin } from '../lib/session';
 import { refreshModuleNav } from '../lib/nav';
 import {
@@ -287,7 +279,7 @@ import {
   type ImportReport,
 } from '../lib/runtime';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const router = useRouter();
 
 type Step = 'pick' | 'review' | 'importing' | 'report';
@@ -297,8 +289,37 @@ const error = ref<string>('');
 // ── Paso 1: fichero local → inspect ──
 const fileInput = ref<HTMLInputElement | null>(null);
 const inspecting = ref<boolean>(false);
+const activeSource = ref<string>('');
 const uploadId = ref<string>('');
 const manifest = ref<BlueprintManifest | null>(null);
+
+type BlueprintRow = CatalogBlueprint & Record<string, unknown>;
+type TableRow = Record<string, unknown>;
+
+interface DataTableColumn {
+  key: string;
+  header: string;
+  width?: string;
+  sortable?: boolean;
+  format?: (row: TableRow) => string;
+}
+
+interface DataTableAction {
+  id: string;
+  label: string;
+  color?: string;
+  disabled?: (row: TableRow) => boolean;
+  loading?: (row: TableRow) => boolean;
+}
+
+type BlueprintTableElement = HTMLElement & {
+  labels: Record<string, string>;
+  columnPicker: boolean;
+  pageSizeOptions: number[];
+};
+
+const blueprintTable = ref<BlueprintTableElement | null>(null);
+const tableLabels = computed(() => dataTableLabels(locale.value));
 
 function triggerFilePicker(): void {
   fileInput.value?.click();
@@ -308,8 +329,13 @@ async function onFileChange(e: Event): Promise<void> {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
-  await inspectAndReview(file);
-  input.value = ''; // permite re-elegir el mismo fichero tras un error
+  activeSource.value = 'local';
+  try {
+    await inspectAndReview(file);
+  } finally {
+    activeSource.value = '';
+    input.value = ''; // permite re-elegir el mismo fichero tras un error
+  }
 }
 
 /** Paso común: un zip (local o de la nube) → inspect → pantalla de revisión. */
@@ -336,6 +362,143 @@ async function inspectAndReview(zip: Blob): Promise<void> {
 // blueprints puede cargar. Solo admin puede importar, así que solo admin dispara la carga.
 const loadingCatalog = ref<boolean>(false);
 const catalog = ref<CatalogBlueprint[]>([]);
+const blueprintRows = computed<BlueprintRow[]>(() =>
+  catalog.value.map((blueprint) => ({ ...blueprint })),
+);
+
+function formatSize(sizeBytes: number): string {
+  if (sizeBytes <= 0) return '—';
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${Math.round(sizeBytes / 1024)} KB`;
+  const megabytes = sizeBytes / (1024 * 1024);
+  return `${megabytes >= 10 ? Math.round(megabytes) : megabytes.toFixed(1)} MB`;
+}
+
+const blueprintColumns = computed<DataTableColumn[]>(() => [
+  { key: 'name', header: t('importPage.colTemplate'), width: '9rem' },
+  {
+    key: 'description',
+    header: t('importPage.colDescription'),
+    width: '22rem',
+    sortable: false,
+  },
+  {
+    key: 'locale',
+    header: t('importPage.colLanguage'),
+    width: '4.5rem',
+    format: (row) => String(row.locale ?? '').toUpperCase(),
+  },
+  {
+    key: 'latest_version',
+    header: t('importPage.colVersion'),
+    width: '5.5rem',
+    format: (row) => `v${String(row.latest_version ?? '')}`,
+  },
+  {
+    key: 'downloads',
+    header: t('importPage.colDownloads'),
+    width: '6rem',
+    format: (row) => new Intl.NumberFormat(locale.value).format(Number(row.downloads ?? 0)),
+  },
+  {
+    key: 'size_bytes',
+    header: t('importPage.colSize'),
+    width: '5rem',
+    format: (row) => formatSize(Number(row.size_bytes ?? 0)),
+  },
+]);
+
+const blueprintActions = computed<DataTableAction[]>(() => [
+  {
+    id: 'use',
+    label: t('importPage.useTemplate'),
+    color: 'primary',
+    disabled: () => !isAdmin.value || inspecting.value,
+    loading: (row) => inspecting.value && activeSource.value === String(row.slug),
+  },
+]);
+
+function blueprintCardTitle(row: TableRow): Node {
+  const title = document.createElement('span');
+  title.textContent = String(row.name ?? row.slug ?? '');
+  title.style.cssText = 'display:block;width:100%;text-align:left;font-size:1rem;color:var(--color)';
+  return title;
+}
+
+function addCardRow(root: HTMLElement, label: string, value: string): void {
+  const row = document.createElement('div');
+  row.className = 'rrow';
+  const key = document.createElement('span');
+  key.className = 'rk';
+  key.textContent = label;
+  const content = document.createElement('span');
+  content.className = 'rv';
+  content.textContent = value;
+  row.append(key, content);
+  root.append(row);
+}
+
+/** Cuerpo de tarjeta para `ok-data-table`; usa sus clases internas `rrow/rk/rv`. */
+function renderBlueprintCard(row: TableRow): Node {
+  const root = document.createElement('div');
+  const description = document.createElement('p');
+  description.textContent = String(row.description || row.slug || '');
+  description.style.cssText = [
+    'display:-webkit-box',
+    'min-height:3.8rem',
+    'margin:0 0 .45rem',
+    'overflow:hidden',
+    'color:var(--color-muted)',
+    'font-size:.82rem',
+    'line-height:1.48',
+    '-webkit-box-orient:vertical',
+    '-webkit-line-clamp:3',
+  ].join(';');
+  root.append(description);
+
+  const language = String(row.locale ?? '').toUpperCase() || '—';
+  const country = String(row.country ?? '').toUpperCase();
+  addCardRow(
+    root,
+    t('importPage.colLanguage'),
+    country && country.toLowerCase() !== language.toLowerCase()
+      ? `${language} · ${country}`
+      : language,
+  );
+  addCardRow(root, t('importPage.colVersion'), `v${String(row.latest_version ?? '')}`);
+  addCardRow(
+    root,
+    t('importPage.colDownloads'),
+    new Intl.NumberFormat(locale.value).format(Number(row.downloads ?? 0)),
+  );
+  addCardRow(root, t('importPage.colSize'), formatSize(Number(row.size_bytes ?? 0)));
+  return root;
+}
+
+function handleBlueprintAction(event: Event): void {
+  const detail = (event as CustomEvent<{ actionId: string; row: BlueprintRow }>).detail;
+  if (detail.actionId === 'use') void pickFromCloud(detail.row);
+}
+
+function wireBlueprintTable(element: BlueprintTableElement | null): void {
+  if (!element) return;
+  element.labels = dataTableLabels(locale.value);
+  element.columnPicker = false;
+  element.pageSizeOptions = [];
+  element.removeEventListener('rowAction', handleBlueprintAction);
+  element.addEventListener('rowAction', handleBlueprintAction);
+}
+
+watch(
+  blueprintTable,
+  (element, previous) => {
+    previous?.removeEventListener('rowAction', handleBlueprintAction);
+    void nextTick(() => wireBlueprintTable(element));
+  },
+  { immediate: true },
+);
+
+watch(locale, () => wireBlueprintTable(blueprintTable.value));
 
 async function loadCatalog(): Promise<void> {
   loadingCatalog.value = true;
@@ -356,6 +519,10 @@ onMounted(() => {
   if (isAdmin.value) void loadCatalog();
 });
 
+onBeforeUnmount(() => {
+  blueprintTable.value?.removeEventListener('rowAction', handleBlueprintAction);
+});
+
 /**
  * Elegir un blueprint de la nube. El runtime lo descarga de Object Storage y **verifica su
  * sha256** antes de entregárnoslo; si no casa, `downloadBlueprint` lanza y no se importa nada.
@@ -364,6 +531,7 @@ onMounted(() => {
 async function pickFromCloud(bp: CatalogBlueprint): Promise<void> {
   error.value = '';
   inspecting.value = true;
+  activeSource.value = bp.slug;
   try {
     const zip = await downloadBlueprint(bp.slug);
     await inspectAndReview(zip);
@@ -371,6 +539,7 @@ async function pickFromCloud(bp: CatalogBlueprint): Promise<void> {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {
     inspecting.value = false;
+    activeSource.value = '';
   }
 }
 
@@ -552,15 +721,21 @@ ion-checkbox::part(label) {
   font-size: 0.875rem;
   color: var(--ion-color-medium);
 }
-.soon-note {
-  display: block;
-  margin-top: 0.35rem;
-  font-size: 0.8rem;
+/* Encabezado del catálogo + acción secundaria de fichero local. */
+.source-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
 }
-/* Encabezado del paso «elegir fuente». */
+.source-heading ion-button {
+  flex: 0 0 auto;
+  margin: 0;
+}
 .page-lead-block {
   display: block;
-  margin-bottom: 0.75rem;
+  min-width: 0;
 }
 .page-lead-block h2 {
   font-size: 1.1rem;
@@ -571,40 +746,8 @@ ion-checkbox::part(label) {
   color: var(--ion-color-medium);
   margin: 0.2rem 0 0;
 }
-/* Rejilla de fuentes de importación: una card por blueprint de la nube + la card de subir. */
-.cloud-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-  gap: 0.75rem;
-}
-.source-card {
-  margin: 0;
-  cursor: pointer;
-}
-.source-card ion-card-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-.source-card-icon {
-  font-size: 1.75rem;
-  margin-bottom: 0.35rem;
-  color: var(--ion-color-primary);
-}
-.source-card h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0;
-}
-.source-card p {
-  color: var(--ion-color-medium);
-  margin: 0;
-  font-size: 0.875rem;
-}
-/* La card de subir desde archivo: borde punteado para leerla como acción «añadir». */
-.source-card--add {
-  border: 1px dashed var(--ion-border-color);
-  box-shadow: none;
+ok-data-table {
+  display: block;
 }
 .cloud-loading {
   display: flex;
@@ -619,5 +762,16 @@ ion-checkbox::part(label) {
 }
 .fail-reason {
   color: var(--ion-color-danger);
+}
+
+@media (max-width: 36rem) {
+  .source-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .source-heading ion-button {
+    align-self: flex-start;
+  }
 }
 </style>
