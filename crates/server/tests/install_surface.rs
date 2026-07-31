@@ -166,6 +166,92 @@ async fn instalar_desde_carpeta_fuera_del_staging_se_rechaza() {
     let _ = std::fs::remove_dir_all(&base);
 }
 
+/// El camino REAL de producción (marketplace) NO pasa por el guardarraíl: `request-install`
+/// descarga del SaaS, **verifica el SHA256** (ADR-0015) y extrae en la caché antes de instalar.
+/// Este test lo fija: con `dev_mode = false` (producción) una instalación desde el marketplace
+/// sigue funcionando — el cierre de `install {dir}` no puede llevarse por delante la vía por la
+/// que un hub real instala módulos.
+#[tokio::test]
+async fn instalar_desde_el_marketplace_funciona_en_produccion() {
+    let base = tree("marketplace");
+    let cloud = spawn_mock_cloud(module_zip("notes")).await;
+
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-install");
+    rt.ensure_system_tables().await.unwrap();
+    let mut cfg = config(&base, false); // producción: sin HUB_DEV_MODE
+    cfg.cloud_base_url = cloud;
+    let router = app(AppState::with_config(rt, cfg));
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/modules/request-install")
+        .header("content-type", "application/json")
+        .header("x-permissions", "*")
+        .body(Body::from(json!({ "module_id": "notes" }).to_string()))
+        .unwrap();
+    let resp = router.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "el marketplace debe seguir instalando en prod");
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(true), "{body}");
+
+    assert!(
+        installed_ids(&router).await.contains(&"notes".to_string()),
+        "el módulo del marketplace queda instalado"
+    );
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// `module.zip` mínimo publicable (mismo patrón que `tests/install_progress.rs`).
+fn module_zip(id: &str) -> Vec<u8> {
+    let manifest = json!({ "id": id, "name": id, "version": "1.0.0" });
+    let mut buf = Vec::new();
+    {
+        let mut w = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+        let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        w.start_file("module.json", opts).unwrap();
+        std::io::Write::write_all(&mut w, manifest.to_string().as_bytes()).unwrap();
+        w.finish().unwrap();
+    }
+    buf
+}
+
+/// Mini-SaaS con las tres rutas que consume `CloudClient` (versions/download/mark_installed),
+/// sirviendo el zip con su SHA256 REAL: la verificación de integridad se ejercita de verdad.
+async fn spawn_mock_cloud(zip_bytes: Vec<u8>) -> String {
+    use axum::extract::State;
+    use axum::routing::{get, post};
+    use axum::{Json, Router};
+    use sha2::{Digest, Sha256};
+
+    let sha: String = Sha256::digest(&zip_bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    type Pkg = std::sync::Arc<(Vec<u8>, String)>;
+    let pkg: Pkg = std::sync::Arc::new((zip_bytes, sha));
+
+    async fn versions(State(pkg): State<Pkg>) -> Json<Value> {
+        json!([{ "version": "1.0.0", "is_active": true, "sha256": pkg.1 }]).into()
+    }
+    async fn download(State(pkg): State<Pkg>) -> Vec<u8> {
+        pkg.0.clone()
+    }
+    async fn mark_installed() -> Json<Value> {
+        json!({ "ok": true }).into()
+    }
+
+    let app = Router::new()
+        .route("/api/v1/marketplace/modules/:id/versions/", get(versions))
+        .route("/api/v1/marketplace/modules/:id/download/", get(download))
+        .route("/api/v1/marketplace/modules/:id/mark_installed/", post(mark_installed))
+        .with_state(pkg);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    format!("http://{addr}")
+}
+
 /// (c) Modo desarrollo + `dir` dentro del staging (la caché de descargas) = flujo de siempre.
 #[tokio::test]
 async fn instalar_desde_carpeta_dentro_del_staging_en_dev_funciona() {
