@@ -117,13 +117,22 @@ pub async fn export_hub(
     if selection.users {
         // `hub_user` NO lleva hub_id (identidad por despliegue, identity.rs): se vuelca entera.
         let mut rows = fetch_rows(db, "hub_user", None).await.unwrap_or_default();
-        // …pero SIN los ligados a una cuenta Cloud. Ese usuario es la identidad de una PERSONA
-        // del SaaS, no plantilla: el que dispara el export acabaría dentro del bundle y, si el
-        // bundle se publica como blueprint, cada hub que lo importe se lo lleva como usuario
-        // suyo —con su rol— y el login cloud casa por `cloud_user_id` y entra. Pasó de verdad:
-        // los blueprints regenerados el 2026-07-31 llevaban a support@erplora.com como `owner`.
-        // Los usuarios LOCALES (PIN) sí son plantilla y viajan.
-        rows.retain(|r| r.get("cloud_user_id").map(|v| v.is_null()).unwrap_or(true));
+        // …pero DESVINCULADA de las cuentas Cloud. `cloud_user_id` es la identidad de una
+        // PERSONA del SaaS: el usuario que dispara el export acaba dentro del bundle y, si se
+        // publica como blueprint, cada hub que lo importe se lo lleva como usuario suyo —con su
+        // rol— y el login cloud casa por ese id y entra. Pasó de verdad: los blueprints
+        // regenerados el 2026-07-31 llevaban a support@erplora.com como `owner`.
+        //
+        // Se corta el VÍNCULO, no la fila. `export_hub` es también el motor del backup y de la
+        // migración de un hub entre despliegues (ADR-0113 §1): tirar la fila perdería el rol de
+        // cada usuario Cloud, y al restaurar los recrearía `get_or_link_cloud_user` con
+        // `HUB_DEFAULT_ROLE` (por defecto `admin`) — un `employee` volvería como ADMIN. Con el
+        // id a NULL viajan nombre, rol y PIN, y no viaja la cuenta del SaaS.
+        for r in rows.iter_mut() {
+            if let Some(v) = r.get_mut("cloud_user_id") {
+                *v = serde_json::Value::Null;
+            }
+        }
         files.insert("data/hub_users.sql".into(), rows_to_sql("hub_user", &rows, hub_id).into_bytes());
         sections.push("hub_users".into());
     }
@@ -197,6 +206,11 @@ pub async fn export_hub(
                     None => continue,
                 }
             };
+            // Ordenar las tablas entre sí no basta: una tabla con FK a SÍ MISMA
+            // (`services_category.parent_id`, `taxes_rule.parent_id`) puede devolver la fila
+            // hija antes que la padre —`fetch_rows` no ordena y el orden físico manda—, y el
+            // INSERT revienta por FK igual, un nivel más abajo.
+            let rows = order_rows_parent_first(db, table, rows).await;
             sql.push_str(&rows_to_sql(table, &rows, hub_id));
         }
         files.insert(format!("data/{}.sql", m.module_id), sql.into_bytes());
@@ -271,9 +285,8 @@ async fn order_by_dependency(db: &dyn erplora_db::DatabaseAdapter, tables: &mut 
     let mut salida: Vec<String> = Vec::with_capacity(tables.len());
     let mut colocadas: std::collections::HashSet<String> = std::collections::HashSet::new();
     while salida.len() < tables.len() {
-        let siguiente = tables.iter().enumerate().position(|(i, t)| {
-            !colocadas.contains(t) && deps[i].iter().all(|p| colocadas.contains(p))
-        });
+        let siguiente = (0..tables.len())
+            .find(|&i| !colocadas.contains(&tables[i]) && deps[i].iter().all(|p| colocadas.contains(p)));
         match siguiente {
             Some(i) => {
                 colocadas.insert(tables[i].clone());
@@ -292,6 +305,70 @@ async fn order_by_dependency(db: &dyn erplora_db::DatabaseAdapter, tables: &mut 
         }
     }
     *tables = salida;
+}
+
+/// Ordena las FILAS de `table` para que un padre vaya antes que quien lo referencia, cuando la
+/// tabla tiene una FK a **sí misma** (`services_category.parent_id`, `taxes_rule.parent_id`).
+///
+/// [`order_by_dependency`] resuelve el orden ENTRE tablas; esto resuelve el de DENTRO. Sin ello
+/// el mismo fallo salta un nivel más abajo: `fetch_rows` no ordena, así que las filas salen en
+/// orden físico y basta un `UPDATE` de la fila padre (que la reescribe al final del heap) para
+/// que la hija se vuelque primero y el import muera por FK, perdiendo la sección entera.
+///
+/// Si la tabla no se autorreferencia, devuelve las filas tal cual (coste cero). Estable y a
+/// prueba de ciclos: lo que no se puede colocar conserva su orden original.
+async fn order_rows_parent_first(
+    db: &dyn erplora_db::DatabaseAdapter,
+    table: &str,
+    rows: Vec<serde_json::Value>,
+) -> Vec<serde_json::Value> {
+    let self_fks: Vec<String> = foreign_keys(db, table)
+        .await
+        .into_iter()
+        .filter(|fk| fk.parent == table && fk.to == "id")
+        .map(|fk| fk.from)
+        .collect();
+    if self_fks.is_empty() || rows.len() < 2 {
+        return rows;
+    }
+
+    let id_de = |r: &serde_json::Value| r.get("id").and_then(|v| v.as_str()).map(str::to_string);
+    let pendiente_de = |r: &serde_json::Value| -> Option<String> {
+        // El padre al que apunta esta fila (por cualquiera de sus FK a sí misma), si lo hay.
+        self_fks
+            .iter()
+            .filter_map(|c| r.get(c).and_then(|v| v.as_str()).map(str::to_string))
+            .next()
+    };
+
+    let mut salida: Vec<serde_json::Value> = Vec::with_capacity(rows.len());
+    let mut colocados: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut restantes: Vec<serde_json::Value> = rows;
+    while !restantes.is_empty() {
+        // Colocables: las que no esperan padre, o cuyo padre ya salió (o no está en el lote:
+        // apunta a una fila filtrada —soft-deleted, sembrada— y el guard NOT EXISTS lo cubre).
+        let ids_restantes: std::collections::HashSet<String> =
+            restantes.iter().filter_map(id_de).collect();
+        let (listas, esperando): (Vec<_>, Vec<_>) = restantes.into_iter().partition(|r| {
+            match pendiente_de(r) {
+                None => true,
+                Some(p) => colocados.contains(&p) || !ids_restantes.contains(&p),
+            }
+        });
+        if listas.is_empty() {
+            // Ciclo entre filas: se emiten tal cual (ningún orden lo resuelve) y no se pierde nada.
+            salida.extend(esperando);
+            break;
+        }
+        for r in listas {
+            if let Some(id) = id_de(&r) {
+                colocados.insert(id);
+            }
+            salida.push(r);
+        }
+        restantes = esperando;
+    }
+    salida
 }
 
 /// Módulo instalado dueño de `table` por prefijo más largo (`<id>_*` o nombre exacto).

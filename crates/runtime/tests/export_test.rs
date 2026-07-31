@@ -422,9 +422,15 @@ async fn export_vuelca_las_tablas_en_orden_de_dependencia() {
 /// `hub_user` se vuelca entero (no lleva `hub_id`: es identidad por despliegue), así que el
 /// usuario que dispara el export viaja DENTRO del bundle. Publicando eso como blueprint, cada
 /// hub de cliente que lo importe se lleva esa cuenta Cloud como usuario suyo — con su rol — y
-/// el login cloud casa por `cloud_user_id` y entra. Los usuarios LOCALES (PIN) sí son plantilla.
+/// el login cloud casa por `cloud_user_id` y entra.
+///
+/// Se corta el VÍNCULO, no la fila: `export_hub` es también el motor del backup y de la
+/// migración de un hub entre despliegues (ADR-0113 §1), y tirar la fila perdería el rol de
+/// cada usuario Cloud — al restaurar los recrea `get_or_link_cloud_user` con
+/// `HUB_DEFAULT_ROLE` (por defecto `admin`), así que un `employee` volvería como ADMIN.
+/// Con `cloud_user_id = NULL` viajan nombre, rol y PIN, y no viaja la cuenta del SaaS.
 #[tokio::test]
-async fn export_no_incluye_usuarios_ligados_a_una_cuenta_cloud() {
+async fn export_desvincula_los_usuarios_de_su_cuenta_cloud_sin_perder_su_rol() {
     let rt = fresh().await;
     erplora_runtime::identity::create_user(rt.db(), "Manager", "1234", "manager", None)
         .await
@@ -440,8 +446,13 @@ async fn export_no_incluye_usuarios_ligados_a_una_cuenta_cloud() {
 
     assert!(sql.contains("Manager"), "el usuario local es plantilla y debe viajar:\n{sql}");
     assert!(
-        !sql.contains("support"),
-        "un hub_user con cloud_user_id NO puede viajar en el bundle:\n{sql}"
+        sql.contains("support") && sql.contains("owner"),
+        "el usuario Cloud debe viajar CON su rol (es backup, no solo blueprint):\n{sql}"
+    );
+    assert!(
+        !sql.contains("'4'"),
+        "…pero SIN el vínculo a la cuenta Cloud (cloud_user_id): eso es lo que repartiría \
+         nuestra cuenta a cada hub que importe el blueprint:\n{sql}"
     );
 }
 
@@ -502,5 +513,75 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
     assert!(
         sql_con.contains("B12345678"),
         "marcando «fiscal» (backup/migración de hub) SÍ debe viajar:\n{sql_con}"
+    );
+}
+
+// ── Orden DENTRO de una tabla: el padre antes que el hijo (FK a sí misma) ────────────────────
+
+/// Ordenar las TABLAS entre sí no basta: `services_category` y `taxes_rule` tienen una FK a sí
+/// mismas (`parent_id`), y `fetch_rows` hace `SELECT *` sin `ORDER BY`, así que las filas salen
+/// en el orden físico de la tabla. Si el hijo sale antes que su padre, el INSERT revienta por FK
+/// y se pierde la sección entera — el mismo fallo que el orden de tablas, un nivel más abajo.
+#[tokio::test]
+async fn export_ordena_las_filas_padre_antes_que_hija_en_tablas_autorreferenciadas() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
+    for m in ["taxes", "services"] {
+        rt.install_from_dir(&modules_root().join(m))
+            .await
+            .unwrap_or_else(|e| panic!("instalar {m}: {e}"));
+    }
+    rt.execute_command(
+        "services.categories.create",
+        &params(json!({ "name": "Padre", "slug": "padre", "description": "",
+                        "parent_id": null, "icon": "", "color": "", "sort_order": 0 })),
+        &ctx("h1"),
+    )
+    .await
+    .expect("crear categoría padre");
+    let cats = rt
+        .execute_query("services.categories.list", &params(json!({})), &ctx("h1"))
+        .await
+        .expect("listar categorías");
+    let padre_id = cats[0]["id"].as_str().expect("id del padre").to_string();
+    rt.execute_command(
+        "services.categories.create",
+        &params(json!({ "name": "Hija", "slug": "hija", "description": "",
+                        "parent_id": padre_id, "icon": "", "color": "", "sort_order": 1 })),
+        &ctx("h1"),
+    )
+    .await
+    .expect("crear categoría hija");
+    // Reescribe la fila del PADRE tocando una columna INDEXADA (`slug`, índice único): eso
+    // fuerza un update no-HOT, la fila nueva se escribe al final del heap y el `SELECT *` la
+    // devuelve DESPUÉS de la hija — que es justo el orden que revienta al importar.
+    rt.execute_command(
+        "services.categories.update",
+        &params(json!({ "category_id": padre_id, "name": "Padre (renombrado)", "slug": "padre-renombrado",
+                        "description": "", "parent_id": null, "icon": "", "color": "",
+                        "sort_order": 0, "is_active": 1 })),
+        &ctx("h1"),
+    )
+    .await
+    .expect("renombrar el padre");
+
+    let seleccion = ExportSelection {
+        users: false,
+        settings: false,
+        settings_items: None,
+        fiscal: false,
+        media: false,
+        modules: vec![ModuleDataSelection { module_id: "services".into(), with_data: true }],
+    };
+    let bundle = export_hub(&rt, "h1", &seleccion, "t", "es", "2026-07-31T00:00:00Z")
+        .await
+        .expect("export");
+    let sql = String::from_utf8(bundle.files["data/services.sql"].clone()).unwrap();
+
+    let pos_padre = sql.find("Padre (renombrado)").expect("volcó el padre");
+    let pos_hija = sql.find("Hija").expect("volcó la hija");
+    assert!(
+        pos_padre < pos_hija,
+        "la fila padre debe ir ANTES de la hija que la referencia por parent_id:\n{sql}"
     );
 }
