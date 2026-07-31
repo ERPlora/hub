@@ -163,7 +163,7 @@ async fn only_admin_can_modify_media() {
     );
 }
 
-// ─────────────── Permisos por módulo sobre sus ficheros (ADR-0166) ───────────────
+// ─────────────── Permisos por módulo sobre sus ficheros (ADR-0172) ───────────────
 
 /// Storage de módulo no-op: el fixture solo necesita que instalar un manifest con `static_files`
 /// no falle; lo que se prueba aquí es la política, no la materialización de la carpeta.

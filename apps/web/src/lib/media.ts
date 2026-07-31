@@ -73,7 +73,7 @@ export interface MediaQuota {
 }
 
 /**
- * Qué puede hacer el usuario en la carpeta pedida (ADR-0166). La decide el módulo dueño de esa
+ * Qué puede hacer el usuario en la carpeta pedida (ADR-0172). La decide el módulo dueño de esa
  * carpeta; el runtime la calcula y la manda para que la UI no pinte botones que darán 403.
  * **No es la barrera**: cada endpoint la revalida. Ausente = runtime antiguo → sin restricciones.
  */
@@ -93,7 +93,7 @@ export interface MediaListing {
   path: MediaCrumb[];
   /** Medidor de espacio (opcional). */
   quota?: MediaQuota;
-  /** Acciones permitidas en esta carpeta (ausente en runtimes anteriores al ADR-0166). */
+  /** Acciones permitidas en esta carpeta (ausente en runtimes anteriores al ADR-0172). */
   policy?: MediaPolicy;
 }
 
@@ -185,7 +185,7 @@ export async function fetchMediaBytes(file: MediaFile): Promise<ArrayBuffer | nu
 }
 
 /**
- * Renombra un fichero o una carpeta vía `POST /api/media/rename` (ADR-0166).
+ * Renombra un fichero o una carpeta vía `POST /api/media/rename` (ADR-0172).
  * `name` es un NOMBRE, no una ruta: renombrar nunca mueve nada de sitio.
  * Devuelve `true` si el runtime lo aceptó; `false` si lo rechazó (p. ej. carpeta de solo lectura).
  */

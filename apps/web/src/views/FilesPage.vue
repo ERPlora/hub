@@ -26,7 +26,7 @@
 
     <ok-file-manager ref="fmEl" searchable :uploadable="isAdmin"></ok-file-manager>
 
-    <!-- «Abrir» previsualiza aquí dentro (ADR-0165); «Descargar» sigue bajando el fichero. -->
+    <!-- «Abrir» previsualiza aquí dentro (ADR-0171); «Descargar» sigue bajando el fichero. -->
     <FilePreviewModal
       :file="previewFile"
       :open="previewOpen"
@@ -86,7 +86,7 @@ let folders: MediaFolder[] = [];
 let allFiles: MediaFile[] = [];
 let path: MediaCrumb[] = [];
 let quota: MediaQuota | undefined;
-// Lo que el runtime dice que se puede hacer en la carpeta actual (ADR-0166). Solo adorna la UI:
+// Lo que el runtime dice que se puede hacer en la carpeta actual (ADR-0172). Solo adorna la UI:
 // el servidor revalida en cada endpoint, así que aquí no hay barrera que saltarse.
 let policy: MediaPolicy | undefined;
 let selected = '';
@@ -157,7 +157,7 @@ async function load(folder = ''): Promise<void> {
   applyState();
 }
 
-// ---- Visor (ADR-0165) ----
+// ---- Visor (ADR-0171) ----
 // «Abrir» ya no lanza el fichero a una pestaña del navegador: lo previsualiza en el modal, que
 // es lo único que funciona igual en los dos productos (en Hub Local/Tauri no hay pestañas).
 const previewFile = ref<MediaFile | null>(null);

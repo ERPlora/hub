@@ -1,5 +1,5 @@
 <!--
-  FilePreviewModal — visor de ficheros de `/files` (ADR-0165).
+  FilePreviewModal — visor de ficheros de `/files` (ADR-0171).
 
   Antes, «abrir» un fichero lo descargaba y lo lanzaba a una pestaña del navegador: se salía del
   Hub y en Hub Local (Tauri) ni siquiera hay pestañas. Ahora se previsualiza DENTRO, en un modal

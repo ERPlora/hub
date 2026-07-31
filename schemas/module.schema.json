@@ -105,7 +105,7 @@
             "type": "string",
             "enum": ["upload", "rename", "delete"]
           },
-          "description": "Qué puede hacer el USUARIO con estos ficheros desde la pantalla /files (ADR-0166). Ver y descargar son siempre posibles y no se declaran. Ausente o vacío = solo lectura, que es el default deliberado: lo que genera un módulo suele ser evidencia (los XML de VeriFactu son inalterables por ley). No limita al módulo, que sigue escribiendo por ModuleStorage: distingue «el módulo guarda su XML» de «el cajero puede borrarlo». No hay override de administrador."
+          "description": "Qué puede hacer el USUARIO con estos ficheros desde la pantalla /files (ADR-0172). Ver y descargar son siempre posibles y no se declaran. Ausente o vacío = solo lectura, que es el default deliberado: lo que genera un módulo suele ser evidencia (los XML de VeriFactu son inalterables por ley). No limita al módulo, que sigue escribiendo por ModuleStorage: distingue «el módulo guarda su XML» de «el cajero puede borrarlo». No hay override de administrador."
         }
       }
     },

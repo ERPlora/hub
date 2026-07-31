@@ -15,7 +15,7 @@ export interface ModuleManifest {
   version: string;
   /**
    * Carpeta privada del módulo bajo `media/modules/` (ADR-0151) y qué puede hacer el USUARIO con
-   * esos ficheros desde /files (ADR-0166). `user_actions` ausente o vacío = solo ver y descargar.
+   * esos ficheros desde /files (ADR-0172). `user_actions` ausente o vacío = solo ver y descargar.
    * No limita al módulo, que sigue escribiendo por `ModuleStorage`.
    */
   static_files?: { folder: string; user_actions?: ('upload' | 'rename' | 'delete')[] };

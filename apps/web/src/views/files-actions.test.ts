@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Contrato de renombrar/borrar en `/files` (ADR-0166): la pantalla obedece la política que le
+// Contrato de renombrar/borrar en `/files` (ADR-0172): la pantalla obedece la política que le
 // manda el runtime y distingue borrar un fichero de borrar una carpeta (que se lleva su contenido
 // y deja al usuario sin carpeta donde está).
 import { describe, it, expect, vi, beforeEach } from 'vitest';

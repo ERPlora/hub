@@ -6,7 +6,7 @@
 //
 // Nada de esto se renderiza en un `<iframe>`/`<object>`: la CSP del Hub Local los prohíbe
 // (`frame-src 'none'; object-src 'none'`), así que el PDF se pinta en `<canvas>` y el .docx se
-// convierte a HTML y se sanea. Ver ADR-0165.
+// convierte a HTML y se sanea. Ver ADR-0171.
 import { decodeText, extensionOf, parseDelimited, sanitizeDocumentHtml } from './file-preview';
 
 /** Una hoja del libro (o el fichero entero, si es un delimitado). */
