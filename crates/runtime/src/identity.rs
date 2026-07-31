@@ -667,7 +667,18 @@ pub async fn untrust_device(db: &dyn DatabaseAdapter, device_id: &str) -> Result
 
 /// Permisos efectivos de un `role`: unión de `role_permissions[role]` de **todos los módulos
 /// activos** (ARQUITECTURA.md §2.5/§9.2). Si algún módulo concede `*` al rol, el usuario tiene `*`.
+///
+/// `owner` se resuelve como `admin`: el provisioning siembra al creador del hub con ese rol
+/// ([`seed_owner`], ADR-0157) y `auth.rs` ya lo trata como admin para el gate FUERTE (ajustes,
+/// certificado, import/export), pero **ningún** módulo del catálogo declara
+/// `role_permissions.owner` —los 24 solo conocen `admin`/`manager`/`employee`—, así que el
+/// PROPIETARIO del hub se quedaba con el conjunto VACÍO y toda query de módulo le respondía
+/// `permission_denied`. Verificado por pantalla el 2026-07-31: tras importar el blueprint de
+/// restaurante (280 productos, 26 mesas), el dueño veía el hub vacío, los KPIs en «No
+/// disponible» y ni una sección de módulo en el menú. No amplía privilegios: es estrictamente
+/// menos de lo que ya le concede el gate admin.
 pub fn permissions_for_role(registry: &Registry, role: &str) -> HashSet<String> {
+    let role = if role.eq_ignore_ascii_case("owner") { "admin" } else { role };
     let mut perms = HashSet::new();
     for m in &registry.installed {
         if !registry.is_active(&m.id) {
@@ -721,6 +732,58 @@ mod tests {
         res.rows
             .first()
             .and_then(|r| r["device_id"].as_str().map(|s| s.to_string()))
+    }
+
+    /// Manifiesto como los 24 reales: conceden permisos a `admin`/`manager`/`employee`,
+    /// NINGUNO declara `owner`.
+    fn modulo_con_roles_habituales() -> Registry {
+        let manifest: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory",
+            "name": "Inventory",
+            "version": "1.0.0",
+            "role_permissions": {
+                "admin": ["inventory.view_product", "inventory.add_product"],
+                "manager": ["inventory.view_product"],
+                "employee": ["inventory.view_product"],
+            },
+        }))
+        .expect("manifiesto de prueba");
+        let mut reg = Registry::new();
+        reg.status.insert("inventory".into(), crate::registry::ModuleStatus::Active);
+        reg.installed.push(manifest);
+        reg
+    }
+
+    /// 🔴 El PROPIETARIO del hub se quedaba sin un solo permiso de módulo.
+    ///
+    /// El provisioning siembra al creador con rol `owner` (ADR-0157) y `auth.rs` ya lo trata
+    /// como admin para el gate fuerte (ajustes, certificado, import/export). Pero ningún módulo
+    /// declara `role_permissions.owner`, así que `permissions_for_role("owner")` devolvía vacío
+    /// y TODA query de módulo respondía `permission_denied`: tras importar un blueprint con 280
+    /// productos, el dueño veía el hub vacío y los KPIs en «No disponible» (verificado por
+    /// pantalla el 2026-07-31 en un hub recién creado).
+    #[test]
+    fn el_owner_hereda_los_permisos_de_admin() {
+        let reg = modulo_con_roles_habituales();
+
+        let de_admin = permissions_for_role(&reg, "admin");
+        let de_owner = permissions_for_role(&reg, "owner");
+
+        assert!(!de_admin.is_empty(), "el fixture debe conceder permisos a admin");
+        assert_eq!(de_owner, de_admin, "el owner debe ver al menos lo que ve un admin");
+    }
+
+    /// El resto de roles no cambia: `owner` es el único alias, no una barra libre.
+    #[test]
+    fn los_demas_roles_siguen_igual() {
+        let reg = modulo_con_roles_habituales();
+
+        assert_eq!(permissions_for_role(&reg, "manager").len(), 1);
+        assert!(permissions_for_role(&reg, "employee").contains("inventory.view_product"));
+        assert!(
+            permissions_for_role(&reg, "cajero").is_empty(),
+            "un rol que ningún módulo declara no recibe permisos"
+        );
     }
 
     #[tokio::test]
