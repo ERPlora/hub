@@ -1,7 +1,9 @@
 <template>
   <ion-page>
-    <!-- Sin ion-header en login (no hay menú ni barra de título). -->
-    <ion-content>
+    <!-- Sin ion-header en login (no hay menú ni barra de título).
+         ion-padding aplica el padding estándar de Ionic (respeta safe-area en móvil):
+         evita que el pinpad y los controles toquen o rebasen los bordes en Android (hub#264). -->
+    <ion-content class="ion-padding">
 
       <!-- Botón de tema: esquina superior derecha -->
       <ion-button
@@ -822,8 +824,11 @@ async function onSetupComplete(pin: string): Promise<void> {
 .login-wrap {
   display: grid;
   place-items: center;
+  /* El padding estándar lo aporta `ion-padding` del <ion-content> (respeta la safe-area en
+     móvil). Aquí solo añadimos separación vertical coherente y dejamos respirar al pinpad sin
+     que toque los bordes (hub#264). */
   min-height: 100%;
-  padding: 40px 16px;
+  padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom);
 }
 .login-box {
   width: min(92vw, 400px);
@@ -1003,6 +1008,10 @@ async function onSetupComplete(pin: string): Promise<void> {
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  /* Cota superior al ancho del teclado para que las teclas mantengan tamaño uniforme y no se
+     sobredimensionen en Android (hub#264). Coincide con el ancho de login-box. */
+  width: 100%;
+  max-width: min(72vw, 340px);
 }
 
 /* ---- Setup hint ---- */

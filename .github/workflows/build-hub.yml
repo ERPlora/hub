@@ -30,9 +30,13 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# En `main` cada push debe PUBLICAR su imagen (16-19 min de build). Como la flota mergea cada
+# ~10 min, `cancel-in-progress: true` cancelaba el build anterior antes de terminar → cero
+# imágenes publicadas (hub#265). En `main` se deja correr hasta el final para no perder la
+# publicación; el resto de ramas sí se cancelan para ahorrar minutos.
 concurrency:
   group: build-hub-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
