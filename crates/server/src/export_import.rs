@@ -25,7 +25,6 @@ use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use base64::Engine as _;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -268,27 +267,13 @@ fn ensure_section(sections: &mut Vec<String>, section: &str) {
     }
 }
 
-/// Bytes del PKCS#12 del negocio (`_hub_certificate.pkcs12_b64`, ADR-0079) del hub, o `None` si
-/// no hay certificado (o la tabla no existe aún). La contraseña NO se lee: no viaja (decisión d).
+/// Bytes DEScifrados del PKCS#12 del negocio (`_hub_certificate.pkcs12_b64`, ADR-0079/ADR-0016)
+/// del hub, o `None` si no hay certificado (o falla el descifrado/no hay master key). La
+/// contraseña NO se lee: no viaja (decisión d). Desde ERPlora/hub#114 la columna va cifrada
+/// at-rest — pasa por `erplora_runtime::certificate::der_bytes` en vez de leer/decodificar el
+/// base64 crudo de la fila.
 async fn read_certificate_p12(rt: &Runtime, hub_id: &str) -> Option<Vec<u8>> {
-    let mut p = erplora_db::Params::new();
-    p.insert("hub_id".into(), json!(hub_id));
-    let res = rt
-        .db()
-        .query(
-            "SELECT pkcs12_b64 FROM _hub_certificate WHERE hub_id = :hub_id LIMIT 1",
-            &p,
-        )
-        .await
-        .ok()?;
-    let row = res.rows.into_iter().next()?;
-    let b64 = row.get("pkcs12_b64")?.as_str()?;
-    if b64.trim().is_empty() {
-        return None;
-    }
-    base64::engine::general_purpose::STANDARD
-        .decode(b64.trim())
-        .ok()
+    erplora_runtime::certificate::der_bytes(rt.db(), hub_id).await.ok().flatten()
 }
 
 /// Recorre `media/` y devuelve `(ruta "media/<rel>", bytes)` por fichero. No sigue symlinks

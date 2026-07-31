@@ -35,6 +35,7 @@ pub mod permissions;
 pub mod queries;
 pub mod registry;
 pub mod scheduler;
+pub mod secret_box;
 pub mod seed;
 pub mod settings;
 pub mod system_migrations;
