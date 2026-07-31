@@ -86,14 +86,54 @@ pub async fn plan_reset(rt: &Runtime, hub_id: &str) -> crate::Result<ResetPlan> 
         blocked_by: None,
     });
 
+    // Límite fiscal: se calcula UNA vez y se aplica a todas las secciones que lo sostienen.
+    let remitted = remitted_invoices(rt, hub_id).await;
+
     for module_id in module_ids(rt) {
         let mut rows = 0;
         for table in module_tables(rt, db, &module_id).await {
             rows += count_raw(rt, &table.count_sql(), hub_id).await;
         }
-        sections.push(SectionPlan { section: format!("modules/{module_id}"), rows, blocked_by: None });
+        sections.push(SectionPlan {
+            section: format!("modules/{module_id}"),
+            rows,
+            blocked_by: fiscal_block(&module_id, remitted),
+        });
     }
     Ok(ResetPlan { sections })
+}
+
+// ── Límite fiscal (RD 1007/2023) ────────────────────────────────────────────────────────
+
+/// Módulos cuyos datos **sostienen** los registros de facturación remitidos: borrarlos dejaría
+/// la cadena VeriFactu apuntando a facturas que ya no existen.
+const FISCAL_SECTIONS: [&str; 3] = ["verifactu", "invoice", "sales"];
+
+/// Facturas del hub **ya remitidas a la AEAT**: `status` transmitido/aceptado o con CSV de la
+/// AEAT. Son **inalterables** (RD 1007/2023). 0 si el módulo `verifactu` no está instalado (la
+/// consulta falla y `count_raw` devuelve 0), que es justo el caso «hub sin fiscal».
+///
+/// El criterio es EXACTO, no heurístico: los datos de demo se quedan en `pending` y sin CSV, así
+/// que el caso que motiva el ADR-0166 —probar la demo y borrarla— nunca se bloquea.
+async fn remitted_invoices(rt: &Runtime, hub_id: &str) -> i64 {
+    count_raw(
+        rt,
+        "SELECT count(*) AS n FROM verifactu_record WHERE hub_id = :hub_id \
+         AND (status IN ('transmitted', 'accepted') OR aeat_csv <> '')",
+        hub_id,
+    )
+    .await
+}
+
+/// Motivo del bloqueo de una sección, o `None` si no aplica. El texto lleva la CIFRA y nombra a
+/// la AEAT: un bloqueo sin explicación se lee como un fallo del producto, no como la ley.
+fn fiscal_block(module_id: &str, remitted: i64) -> Option<String> {
+    (remitted > 0 && FISCAL_SECTIONS.contains(&module_id)).then(|| {
+        format!(
+            "{remitted} facturas remitidas a la AEAT: inalterables por RD 1007/2023, \
+             no se pueden borrar"
+        )
+    })
 }
 
 /// Borra las secciones seleccionadas del hub `hub_id`, en una sola transacción y en orden
@@ -105,6 +145,26 @@ pub async fn execute_reset(
     actor_user_id: &str,
 ) -> crate::Result<ResetReport> {
     let db = rt.db();
+
+    // ── Límite fiscal ANTES de tocar nada (el cliente puede venir manipulado) ────────────
+    // La UI ya pinta estas secciones deshabilitadas, pero la autoridad es el servidor: un
+    // `fetch` a mano no puede saltarse el RD 1007/2023.
+    let remitted = remitted_invoices(rt, hub_id).await;
+    if remitted > 0 {
+        let bloqueada = selection
+            .modules
+            .iter()
+            .find(|m| FISCAL_SECTIONS.contains(&m.as_str()))
+            .map(|m| format!("modules/{m}"))
+            .or_else(|| selection.fiscal.then(|| "fiscal".to_string()));
+        if let Some(section) = bloqueada {
+            return Err(crate::RuntimeError::Other(format!(
+                "reset: la sección {section} está bloqueada — {}. No se ha borrado nada.",
+                fiscal_block("verifactu", remitted).unwrap_or_default()
+            )));
+        }
+    }
+
     // (sección, tabla, sentencia) — se acumulan TODAS y se aplican en UNA transacción.
     let mut ops: Vec<(String, String, String)> = Vec::new();
 

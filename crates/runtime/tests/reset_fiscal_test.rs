@@ -55,10 +55,13 @@ async fn fresh_fiscal() -> Runtime {
 
 /// Inserta un registro VeriFactu real en la tabla del módulo. `status`/`csv` deciden si cuenta
 /// como REMITIDO a la AEAT.
-async fn insert_record(rt: &Runtime, hub: &str, num: &str, status: &str, csv: &str) {
+/// `seq` va explícito: la cadena VeriFactu tiene un único `(hub_id, issuer_nif,
+/// sequence_number)`, así que dos registros del mismo hub no pueden compartir número.
+async fn insert_record(rt: &Runtime, hub: &str, seq: i64, num: &str, status: &str, csv: &str) {
     let mut p = Params::new();
     p.insert("id".into(), json!(format!("rec-{hub}-{num}")));
     p.insert("hub_id".into(), json!(hub));
+    p.insert("seq".into(), json!(seq));
     p.insert("num".into(), json!(num));
     p.insert("status".into(), json!(status));
     p.insert("csv".into(), json!(csv));
@@ -67,7 +70,7 @@ async fn insert_record(rt: &Runtime, hub: &str, num: &str, status: &str, csv: &s
             "INSERT INTO verifactu_record (id, hub_id, record_type, sequence_number, issuer_nif, \
              issuer_name, invoice_number, invoice_date, invoice_type, generation_timestamp, \
              status, aeat_csv, created_at) \
-             VALUES (:id, :hub_id, 'alta', 1, 'B12345678', 'Demo SL', :num, '2026-07-31', 'F1', \
+             VALUES (:id, :hub_id, 'alta', :seq, 'B12345678', 'Demo SL', :num, '2026-07-31', 'F1', \
              '2026-07-31T10:00:00+02:00', :status, :csv, '2026-07-31T10:00:00Z')",
             &p,
         )
@@ -96,8 +99,8 @@ fn blocked(plan: &erplora_runtime::reset::ResetPlan, section: &str) -> Option<St
 async fn plan_bloquea_las_secciones_fiscales_si_hay_facturas_remitidas() {
     if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh_fiscal().await;
-    insert_record(&rt, "h1", "FAC-001", "accepted", "CSV-AEAT-001").await;
-    insert_record(&rt, "h1", "FAC-002", "transmitted", "").await;
+    insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
+    insert_record(&rt, "h1", 2, "FAC-002", "transmitted", "").await;
 
     let plan = plan_reset(&rt, "h1").await.expect("plan");
 
@@ -121,8 +124,8 @@ async fn plan_bloquea_las_secciones_fiscales_si_hay_facturas_remitidas() {
 async fn plan_no_bloquea_nada_si_las_facturas_no_se_han_remitido() {
     if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh_fiscal().await;
-    insert_record(&rt, "h1", "FAC-001", "pending", "").await;
-    insert_record(&rt, "h1", "FAC-002", "error", "").await;
+    insert_record(&rt, "h1", 1, "FAC-001", "pending", "").await;
+    insert_record(&rt, "h1", 2, "FAC-002", "error", "").await;
 
     let plan = plan_reset(&rt, "h1").await.expect("plan");
 
@@ -140,7 +143,7 @@ async fn plan_no_bloquea_nada_si_las_facturas_no_se_han_remitido() {
 async fn plan_no_se_bloquea_por_las_facturas_de_otro_hub() {
     if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh_fiscal().await;
-    insert_record(&rt, "h2", "FAC-VECINO", "accepted", "CSV-VECINO").await;
+    insert_record(&rt, "h2", 1, "FAC-VECINO", "accepted", "CSV-VECINO").await;
 
     let plan = plan_reset(&rt, "h1").await.expect("plan");
 
@@ -156,7 +159,7 @@ async fn plan_no_se_bloquea_por_las_facturas_de_otro_hub() {
 async fn execute_rechaza_la_seccion_bloqueada_y_no_borra_nada() {
     if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh_fiscal().await;
-    insert_record(&rt, "h1", "FAC-001", "accepted", "CSV-AEAT-001").await;
+    insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     let antes = count(&rt, "verifactu_record", "h1").await;
 
     // Un cliente manipulado pide borrar lo fiscal pese al bloqueo.
@@ -182,7 +185,7 @@ async fn execute_rechaza_la_seccion_bloqueada_y_no_borra_nada() {
 async fn execute_deja_resetear_lo_no_fiscal_aunque_haya_facturas_remitidas() {
     if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
     let rt = fresh_fiscal().await;
-    insert_record(&rt, "h1", "FAC-001", "accepted", "CSV-AEAT-001").await;
+    insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     rt.execute_command(
         "inventory.products.create",
         &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10 })),
