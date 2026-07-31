@@ -26,6 +26,7 @@ import cubeOutline from "~icons/ion/cube-outline?raw";
 import documentTextOutline from "~icons/ion/document-text-outline?raw";
 import downloadOutline from "~icons/ion/download-outline?raw";
 import ellipse from "~icons/ion/ellipse?raw";
+import removeOutline from "~icons/ion/remove-outline?raw";
 import extensionPuzzleOutline from "~icons/ion/extension-puzzle-outline?raw";
 import globeOutline from "~icons/ion/globe-outline?raw";
 import gridOutline from "~icons/ion/grid-outline?raw";
@@ -181,6 +182,7 @@ const SVGS: Record<string, string> = {
   "document-text-outline": documentTextOutline,
   "download-outline": downloadOutline,
   "ellipse": ellipse,
+  "remove-outline": removeOutline,
   "extension-puzzle-outline": extensionPuzzleOutline,
   "globe-outline": globeOutline,
   "grid-outline": gridOutline,

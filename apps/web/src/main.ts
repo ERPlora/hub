@@ -72,6 +72,10 @@ import '@erplora/outfitkit/ok-timeline';
 import '@erplora/outfitkit/ok-chart';
 // Gestor de archivos (Drive-like) de la carpeta media del Hub — pantalla /files.
 import '@erplora/outfitkit/ok-file-manager';
+// Visor de ficheros de /files (ADR-0164): texto/logs/código y JSON. La hoja de cálculo reutiliza
+// el ok-data-table de arriba; PDF/imagen/Word no necesitan Web Component.
+import '@erplora/outfitkit/ok-code';
+import '@erplora/outfitkit/ok-json-viewer';
 // Login (LoginPage): teclado PIN (con pantalla de círculos + tecla «cambiar usuario») y avatares.
 import '@erplora/outfitkit/ok-pinpad';
 import '@erplora/outfitkit/ok-avatar';

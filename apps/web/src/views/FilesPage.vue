@@ -26,6 +26,14 @@
 
     <ok-file-manager ref="fmEl" searchable :uploadable="isAdmin"></ok-file-manager>
 
+    <!-- «Abrir» previsualiza aquí dentro (ADR-0164); «Descargar» sigue bajando el fichero. -->
+    <FilePreviewModal
+      :file="previewFile"
+      :open="previewOpen"
+      @close="closePreview"
+      @download="downloadPreviewed"
+    />
+
     <ion-toast
       :is-open="toastOpen"
       :message="toastMessage"
@@ -41,6 +49,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IonButton, IonToast, alertController } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
+import FilePreviewModal from '../components/FilePreviewModal.vue';
 import { RUNTIME_URL, runtimeHeaders } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
 import {
@@ -139,8 +148,34 @@ async function load(folder = ''): Promise<void> {
   applyState();
 }
 
-// Abre/descarga un fichero por su URL (raw autenticado del runtime en local, URL firmada en cloud).
-async function openFile(id: string, download = false): Promise<void> {
+// ---- Visor (ADR-0164) ----
+// «Abrir» ya no lanza el fichero a una pestaña del navegador: lo previsualiza en el modal, que
+// es lo único que funciona igual en los dos productos (en Hub Local/Tauri no hay pestañas).
+const previewFile = ref<MediaFile | null>(null);
+const previewOpen = ref(false);
+
+function openPreview(id: string): void {
+  const file = allFiles.find((f) => f.id === id);
+  if (!file) {
+    toast(t('files.empty'));
+    return;
+  }
+  previewFile.value = file;
+  previewOpen.value = true;
+}
+
+function closePreview(): void {
+  previewOpen.value = false;
+  previewFile.value = null;
+}
+
+/** Descarga desde el botón del propio visor, sobre el fichero que se está viendo. */
+function downloadPreviewed(): void {
+  if (previewFile.value) void downloadFile(previewFile.value.id);
+}
+
+// Descarga un fichero por su URL (raw autenticado del runtime en local, URL firmada en cloud).
+async function downloadFile(id: string): Promise<void> {
   const file = allFiles.find((f) => f.id === id);
   if (!file?.url) {
     toast(t('files.empty'));
@@ -158,11 +193,7 @@ async function openFile(id: string, download = false): Promise<void> {
     const objectUrl = URL.createObjectURL(await response.blob());
     const anchor = document.createElement('a');
     anchor.href = objectUrl;
-    if (download) anchor.download = file.name;
-    else {
-      anchor.target = '_blank';
-      anchor.rel = 'noopener';
-    }
+    anchor.download = file.name;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -181,10 +212,10 @@ function onSearch(e: Event): void {
   applyState();
 }
 function onOpen(e: Event): void {
-  void openFile((e as CustomEvent<{ id: string }>).detail.id);
+  openPreview((e as CustomEvent<{ id: string }>).detail.id);
 }
 function onDownload(e: Event): void {
-  void openFile((e as CustomEvent<{ id: string }>).detail.id, true);
+  void downloadFile((e as CustomEvent<{ id: string }>).detail.id);
 }
 async function onUpload(e: Event): Promise<void> {
   if (!isAdmin.value) {

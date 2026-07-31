@@ -147,6 +147,31 @@ export async function deleteMedia(id: string): Promise<boolean> {
 }
 
 /**
+ * Contenido de un fichero de media, para el visor del modal (`FilePreviewModal`).
+ *
+ * La URL relativa la sirve el runtime (`/api/media/raw`) y lleva la sesión del hub: es la vía
+ * normal en LOS DOS productos, porque el runtime es quien lee el disco (single) o pide los bytes
+ * al Cloud (cloud). Una URL absoluta solo aparece si el listado viene de un runtime antiguo que
+ * aún devolvía la URL firmada de S3: se pide tal cual y SIN la cabecera de sesión (es un secreto
+ * del hub, no viaja a un tercero); si el bucket no tiene CORS, fallará y el modal avisará.
+ *
+ * `null` = no hay bytes que enseñar (sin URL, error de red o respuesta no OK).
+ */
+export async function fetchMediaBytes(file: MediaFile): Promise<ArrayBuffer | null> {
+  if (!file.url) return null;
+  const absolute = /^https?:\/\//.test(file.url);
+  try {
+    const res = absolute
+      ? await fetch(file.url)
+      : await fetch(`${RUNTIME_URL}${file.url}`, { headers: runtimeHeaders() });
+    if (!res.ok) return null;
+    return await res.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Crea una sub-carpeta dentro de `parent` vía `POST /api/media/folder`.
  * Devuelve `true` si el runtime la creó. Degrada a `false` si el endpoint no existe.
  */
