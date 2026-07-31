@@ -469,10 +469,45 @@ mod tests {
         assert!(assert_channel_declared(&reg, "appt", Channel::Email).is_err());
     }
 
-    #[test]
-    fn intent_helper_builds_expected_shape() {
-        let i = intent(Channel::Email, "a@b.com");
-        assert_eq!(i.to, "a@b.com");
+    /// Puerta 3, camino 2: un email de un **usuario del hub activo** se resuelve desde datos
+    /// del hub sin pasar por la allowlist (comparación insensible a mayúsculas); desactivar al
+    /// usuario vuelve a cerrar la puerta, y un email de fuera nunca resuelve.
+    #[tokio::test]
+    async fn recipient_resolves_from_an_active_hub_user_email() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        crate::system_migrations::apply(&db, "h1").await.unwrap();
+
+        crate::identity::create_login_user(&db, "empleado@hub.com", "employee")
+            .await
+            .unwrap();
+        assert_recipient_allowed(&db, "h1", &intent(Channel::Email, "Empleado@Hub.com"))
+            .await
+            .unwrap();
+
+        // Un email que no es de nadie en el hub no resuelve (ni allowlist ni hub_user).
+        assert!(
+            assert_recipient_allowed(&db, "h1", &intent(Channel::Email, "atacante@evil.com"))
+                .await
+                .is_err()
+        );
+        // El mismo destinatario por SMS tampoco: el camino hub_user es SOLO email.
+        assert!(
+            assert_recipient_allowed(&db, "h1", &intent(Channel::Sms, "+34600000000"))
+                .await
+                .is_err()
+        );
+
+        // Baja del usuario → la puerta se cierra.
+        crate::identity::deactivate_login_user(&db, "empleado@hub.com")
+            .await
+            .unwrap();
+        assert!(
+            assert_recipient_allowed(&db, "h1", &intent(Channel::Email, "empleado@hub.com"))
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
