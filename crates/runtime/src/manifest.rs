@@ -85,6 +85,35 @@ pub struct Manifest {
     pub capabilities: Capabilities,
 }
 
+/// Acción que un **usuario** puede intentar sobre un fichero o carpeta desde la pantalla `/files`.
+///
+/// Ver y descargar NO están aquí: son siempre posibles (con sesión y permiso de lectura). Esta
+/// enumeración cubre solo lo que **modifica** el contenido, que es lo que un módulo debe conceder
+/// explícitamente (ADR-0172).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserFileAction {
+    /// Subir ficheros o crear subcarpetas dentro de la carpeta del módulo.
+    Upload,
+    /// Renombrar un fichero o una subcarpeta.
+    Rename,
+    /// Borrar un fichero o una subcarpeta.
+    Delete,
+}
+
+impl UserFileAction {
+    /// Nombre declarativo tal y como aparece en `module.json`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Upload => "upload",
+            Self::Rename => "rename",
+            Self::Delete => "delete",
+        }
+    }
+
+    /// Todas las acciones, para construir la política de una carpeta sin módulo dueño.
+    pub const ALL: [Self; 3] = [Self::Upload, Self::Rename, Self::Delete];
+}
+
 /// Almacenamiento persistente declarado por un módulo.
 ///
 /// El nombre se valida también en el toolkit y en el runtime porque el manifest instalado es una
@@ -92,6 +121,15 @@ pub struct Manifest {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct StaticFilesDef {
     pub folder: String,
+    /// Qué puede hacer el **usuario** con estos ficheros desde `/files`. Ausente o vacío =
+    /// **solo ver y descargar**, que es el default deliberado: los documentos que genera un
+    /// módulo suelen ser evidencia (los XML de VeriFactu son inalterables por ley) y borrarlos a
+    /// mano desde un gestor de archivos no puede ser el camino fácil.
+    ///
+    /// No limita al módulo: este sigue escribiendo por `ModuleStorage`/`NativeHost`. Es la
+    /// diferencia entre "el módulo guarda su XML" y "el cajero puede borrarlo".
+    #[serde(default)]
+    pub user_actions: Vec<String>,
 }
 
 impl StaticFilesDef {
@@ -101,6 +139,13 @@ impl StaticFilesDef {
         matches!(chars.next(), Some(c) if c.is_ascii_lowercase())
             && self.folder.len() <= 64
             && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+    }
+
+    /// `true` si el módulo concedió esa acción. Una acción que el host no conoce simplemente no
+    /// concede nada (compatibilidad hacia adelante: un manifest más nuevo no rompe un hub viejo,
+    /// y tampoco le abre una puerta que no entiende).
+    pub fn allows(&self, action: UserFileAction) -> bool {
+        self.user_actions.iter().any(|a| a == action.as_str())
     }
 }
 
@@ -737,6 +782,60 @@ mod tests {
         let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
         let storage = manifest.static_files.expect("static_files present");
         assert_eq!(storage.folder, "verifactu");
+    }
+
+    /// Lo que el USUARIO puede hacer desde `/files` con los ficheros de un módulo (ADR-0172).
+    /// Por defecto: solo ver y descargar. El módulo tiene que pedir explícitamente lo demás.
+    /// (El propio módulo sigue escribiendo por `ModuleStorage`: esto no le limita a él.)
+    #[test]
+    fn static_files_are_read_only_for_the_user_unless_the_module_opts_in() {
+        let json = r#"{
+            "id": "verifactu",
+            "name": "VeriFactu",
+            "version": "1.2.3",
+            "static_files": { "folder": "verifactu" }
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        let storage = manifest.static_files.expect("static_files present");
+        assert!(storage.user_actions.is_empty(), "el default es solo-lectura");
+        assert!(!storage.allows(UserFileAction::Delete));
+        assert!(!storage.allows(UserFileAction::Rename));
+        assert!(!storage.allows(UserFileAction::Upload));
+    }
+
+    #[test]
+    fn a_module_can_open_up_its_folder_action_by_action() {
+        let json = r#"{
+            "id": "scans",
+            "name": "Scans",
+            "version": "1.0.0",
+            "static_files": { "folder": "scans", "user_actions": ["upload", "delete"] }
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        let storage = manifest.static_files.expect("static_files present");
+        assert!(storage.allows(UserFileAction::Upload));
+        assert!(storage.allows(UserFileAction::Delete));
+        // Lo que no se pide, no se concede.
+        assert!(!storage.allows(UserFileAction::Rename));
+    }
+
+    /// Un manifest con una acción desconocida no debe "colar" como si fuese válida ni tumbar la
+    /// instalación entera: se ignora lo que el host no entiende (compatibilidad hacia adelante).
+    #[test]
+    fn unknown_user_actions_are_ignored_not_granted() {
+        let json = r#"{
+            "id": "scans",
+            "name": "Scans",
+            "version": "1.0.0",
+            "static_files": { "folder": "scans", "user_actions": ["delete", "encrypt"] }
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        let storage = manifest.static_files.expect("static_files present");
+        assert!(storage.allows(UserFileAction::Delete));
+        assert!(!storage.allows(UserFileAction::Rename));
     }
 
     /// Parsea un manifest con un bloque `widgets` (uno por la vía declarativa `kind`+`query` y

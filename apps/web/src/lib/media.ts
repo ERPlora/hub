@@ -72,6 +72,17 @@ export interface MediaQuota {
   fraction: number;
 }
 
+/**
+ * Qué puede hacer el usuario en la carpeta pedida (ADR-0172). La decide el módulo dueño de esa
+ * carpeta; el runtime la calcula y la manda para que la UI no pinte botones que darán 403.
+ * **No es la barrera**: cada endpoint la revalida. Ausente = runtime antiguo → sin restricciones.
+ */
+export interface MediaPolicy {
+  upload: boolean;
+  rename: boolean;
+  delete: boolean;
+}
+
 /** Respuesta de `GET /api/media` (campo `data` del envelope del runtime). */
 export interface MediaListing {
   /** Árbol completo de carpetas (panel lateral). */
@@ -82,6 +93,8 @@ export interface MediaListing {
   path: MediaCrumb[];
   /** Medidor de espacio (opcional). */
   quota?: MediaQuota;
+  /** Acciones permitidas en esta carpeta (ausente en runtimes anteriores al ADR-0172). */
+  policy?: MediaPolicy;
 }
 
 /** Envelope estándar del runtime (`{ ok, data }`). */
@@ -139,6 +152,49 @@ export async function deleteMedia(id: string): Promise<boolean> {
     const res = await fetch(`${RUNTIME_URL}/api/media?path=${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: runtimeHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Contenido de un fichero de media, para el visor del modal (`FilePreviewModal`).
+ *
+ * La URL relativa la sirve el runtime (`/api/media/raw`) y lleva la sesión del hub: es la vía
+ * normal en LOS DOS productos, porque el runtime es quien lee el disco (single) o pide los bytes
+ * al Cloud (cloud). Una URL absoluta solo aparece si el listado viene de un runtime antiguo que
+ * aún devolvía la URL firmada de S3: se pide tal cual y SIN la cabecera de sesión (es un secreto
+ * del hub, no viaja a un tercero); si el bucket no tiene CORS, fallará y el modal avisará.
+ *
+ * `null` = no hay bytes que enseñar (sin URL, error de red o respuesta no OK).
+ */
+export async function fetchMediaBytes(file: MediaFile): Promise<ArrayBuffer | null> {
+  if (!file.url) return null;
+  const absolute = /^https?:\/\//.test(file.url);
+  try {
+    const res = absolute
+      ? await fetch(file.url)
+      : await fetch(`${RUNTIME_URL}${file.url}`, { headers: runtimeHeaders() });
+    if (!res.ok) return null;
+    return await res.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Renombra un fichero o una carpeta vía `POST /api/media/rename` (ADR-0172).
+ * `name` es un NOMBRE, no una ruta: renombrar nunca mueve nada de sitio.
+ * Devuelve `true` si el runtime lo aceptó; `false` si lo rechazó (p. ej. carpeta de solo lectura).
+ */
+export async function renameMedia(path: string, name: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/media/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ path, name }),
     });
     return res.ok;
   } catch {

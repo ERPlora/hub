@@ -15,11 +15,18 @@
 //! (anti path-traversal) la hace el Cloud, dueño del almacenamiento.
 //!
 //! Endpoints (contrato consumido por `lib/media.ts`):
-//!   GET    /api/media?folder=<rel>      → { ok, data: { folders[], files[], path[] } }
-//!   GET    /api/media/raw?path=<rel>    → bytes del fichero (inline)
+//!   GET    /api/media?folder=<rel>      → { ok, data: { folders[], files[], path[], quota, policy } }
+//!   GET    /api/media/raw?path=<rel>    → bytes del fichero (inline). El Cloud devuelve una URL
+//!                                         firmada y la descarga la hace ESTE runtime: los buckets
+//!                                         no tienen CORS, así que el navegador no puede leerla, y
+//!                                         es lo que necesita el visor (ADR-0171).
 //!   POST   /api/media/upload            → multipart `folder` + `files`
-//!   DELETE /api/media?path=<rel>        → borra un fichero
+//!   DELETE /api/media?path=<rel>        → borra un fichero o una carpeta (con su contenido)
 //!   POST   /api/media/folder            → json { parent, name } crea sub-carpeta
+//!   POST   /api/media/rename            → json { path, name } renombra fichero o carpeta
+//!
+//! Qué puede hacer el USUARIO con cada ruta lo decide el módulo dueño de la carpeta
+//! (`static_files.user_actions`, ADR-0172): por defecto solo ver y descargar. Ver `policy_for`.
 
 use axum::body::Body;
 use axum::extract::{Multipart, Query, State};
@@ -29,6 +36,8 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::{Component, Path, PathBuf};
+
+use erplora_runtime::manifest::{StaticFilesDef, UserFileAction};
 
 use crate::{auth, AppState};
 
@@ -133,13 +142,17 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
                         .and_then(Value::as_str)
                         .map(fmt_iso)
                         .unwrap_or_default();
+                    // La URL que ve el navegador es SIEMPRE la del runtime, nunca la firmada de
+                    // Object Storage: los buckets no tienen CORS (el visor no podría leerla) y
+                    // la firma caduca. El runtime es la autoridad del almacenamiento (ADR-0047).
+                    let path = f.get("path").and_then(Value::as_str).unwrap_or_default();
                     json!({
-                        "id": f.get("path").cloned().unwrap_or(Value::Null),
+                        "id": path,
                         "name": f.get("name").cloned().unwrap_or(Value::Null),
                         "ext": f.get("ext").cloned().unwrap_or(Value::Null),
                         "sizeLabel": human_bytes(bytes),
                         "modified": modified,
-                        "url": f.get("url").cloned().unwrap_or(Value::Null),
+                        "url": format!("/api/media/raw?path={}", pct_encode(path)),
                     })
                 })
                 .collect()
@@ -150,12 +163,16 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
         .pointer("/usage/used_bytes")
         .and_then(Value::as_u64)
         .unwrap_or(0);
+    // Política de la carpeta pedida: la UI pinta solo las acciones posibles (ADR-0172). No es la
+    // autoridad — cada endpoint la revalida —, pero evita ofrecer un botón que va a dar 403.
+    let policy = resolve_policy(st, folder).await;
     let data = json!({
         "folders": raw.get("folders").cloned().unwrap_or_else(|| json!([])),
         "files": files,
         "path": raw.get("path").cloned().unwrap_or_else(|| json!([])),
         // Bucket por hub sin cuota dura (ADR-0047): solo lo usado, sin barra.
         "quota": { "usedLabel": human_bytes(used), "unlimited": true },
+        "policy": { "upload": policy.upload, "rename": policy.rename, "delete": policy.delete },
     });
     Json(json!({ "ok": true, "data": data })).into_response()
 }
@@ -165,13 +182,13 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
     let Some(headers) = cloud_headers(st) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
-    let mut form = reqwest::multipart::Form::new();
-    let mut has_file = false;
+    // El multipart se recoge ENTERO antes de decidir: el orden de los campos no está garantizado
+    // y la política depende de `folder`, así que no se puede empezar a reenviar y comprobar luego.
+    let mut folder = String::new();
+    let mut files: Vec<(String, Vec<u8>)> = Vec::new();
     while let Ok(Some(field)) = mp.next_field().await {
         match field.name() {
-            Some("folder") => {
-                form = form.text("folder", field.text().await.unwrap_or_default());
-            }
+            Some("folder") => folder = field.text().await.unwrap_or_default(),
             Some("files") => {
                 let fname = field
                     .file_name()
@@ -180,15 +197,23 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
                 let Ok(data) = field.bytes().await else {
                     continue;
                 };
-                let part = reqwest::multipart::Part::bytes(data.to_vec()).file_name(fname);
-                form = form.part("files", part);
-                has_file = true;
+                files.push((fname, data.to_vec()));
             }
             _ => {}
         }
     }
-    if !has_file {
+    if let Err(response) = require_action(st, &folder, UserFileAction::Upload).await {
+        return response;
+    }
+    if files.is_empty() {
         return err(StatusCode::BAD_REQUEST, "no se enviaron ficheros");
+    }
+    let mut form = reqwest::multipart::Form::new().text("folder", folder);
+    for (fname, data) in files {
+        form = form.part(
+            "files",
+            reqwest::multipart::Part::bytes(data).file_name(fname),
+        );
     }
     let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
     let mut r = st.http.post(&url).multipart(form);
@@ -221,6 +246,26 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
         Ok(resp) => err(
             StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
             "el Cloud no pudo borrar",
+        ),
+        Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
+    }
+}
+
+/// `POST …/media/rename/` en el Cloud (que hace el copy+delete sobre Object Storage).
+async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
+    let Some(headers) = cloud_headers(st) else {
+        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+    };
+    let url = format!("{}/api/v1/hub/device/media/rename/", cloud_base(st));
+    let mut r = st.http.post(&url).json(&json!({ "path": path, "name": name }));
+    for (k, v) in headers {
+        r = r.header(k, v);
+    }
+    match r.send().await {
+        Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
+        Ok(resp) => err(
+            StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
+            "el Cloud no pudo renombrar",
         ),
         Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
     }
@@ -269,7 +314,23 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     if !resp.status().is_success() {
         return err(StatusCode::NOT_FOUND, "fichero no encontrado");
     }
-    let bytes = match resp.bytes().await {
+    // El Cloud responde `{ url }` con una firma temporal de Object Storage. La descarga la hace
+    // el runtime, no el navegador: los buckets no tienen CORS (un `fetch` desde el visor se cae) y
+    // la firma caduca. Se pide con un cliente LIMPIO —sin las cabeceras de máquina del hub—:
+    // `X-Hub-Token` es un secreto del hub y no puede viajar a un tercero (ADR-0003).
+    let signed = match resp.json::<Value>().await {
+        Ok(v) => v.get("url").and_then(Value::as_str).unwrap_or_default().to_string(),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+    };
+    if signed.is_empty() {
+        return err(StatusCode::BAD_GATEWAY, "el Cloud no devolvió la URL del fichero");
+    }
+    let object = match st.http.get(&signed).send().await {
+        Ok(o) if o.status().is_success() => o,
+        Ok(_) => return err(StatusCode::NOT_FOUND, "fichero no encontrado"),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+    };
+    let bytes = match object.bytes().await {
         Ok(b) => b,
         Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
     };
@@ -349,6 +410,9 @@ pub async fn media_delete(
     if let Err(response) = require_admin(&st, &headers).await {
         return response;
     }
+    if let Err(response) = require_action(&st, &q.path, UserFileAction::Delete).await {
+        return response;
+    }
     cloud_delete(&st, &q.path).await
 }
 
@@ -370,7 +434,60 @@ pub async fn media_create_folder(
     if let Err(response) = require_admin(&st, &headers).await {
         return response;
     }
+    // Crear una subcarpeta es escribir dentro del padre → misma acción que subir.
+    if let Err(response) = require_action(&st, &req.parent, UserFileAction::Upload).await {
+        return response;
+    }
     cloud_create_folder(&st, &req.parent, &req.name).await
+}
+
+// ─────────────────────────── POST /api/media/rename ───────────────────────────
+
+#[derive(Deserialize)]
+pub struct RenameReq {
+    /// Ruta relativa (a `media/`) del fichero o carpeta a renombrar.
+    path: String,
+    /// **Nombre** nuevo, no una ruta: renombrar no mueve nada de sitio.
+    name: String,
+}
+
+/// `true` si `name` es un nombre de un solo segmento utilizable en disco y en Object Storage.
+///
+/// Deliberadamente NO acepta rutas: si `name` pudiera contener `/` o `..`, se podría sacar un
+/// fichero de una carpeta bloqueada (VeriFactu) a una libre y borrarlo allí, saltándose la
+/// política entera. Renombrar cambia el nombre, nunca el sitio.
+fn valid_file_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 255
+        && name != "."
+        && name != ".."
+        && !name.contains('/')
+        && !name.contains('\\')
+        && !name.chars().any(char::is_control)
+}
+
+/// Renombra un fichero o una carpeta dentro de `media/` (ADR-0172), proxyando al Cloud.
+pub async fn media_rename(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RenameReq>,
+) -> Response {
+    if let Err(response) = require_admin(&st, &headers).await {
+        return response;
+    }
+    if !valid_file_name(&req.name) {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "el nombre nuevo no es válido (debe ser un nombre, no una ruta)",
+        );
+    }
+    if req.path.trim_matches('/').is_empty() {
+        return err(StatusCode::BAD_REQUEST, "falta la ruta a renombrar");
+    }
+    if let Err(response) = require_action(&st, &req.path, UserFileAction::Rename).await {
+        return response;
+    }
+    cloud_rename(&st, &req.path, &req.name).await
 }
 
 // ─────────────────────────── Helpers ───────────────────────────
@@ -474,4 +591,183 @@ fn err(code: StatusCode, msg: &str) -> Response {
         Json(json!({ "ok": false, "error": { "message": msg } })),
     )
         .into_response()
+}
+
+// ─────────────────────────── Política de acciones del usuario (ADR-0172) ───────────────────────────
+//
+// Ver y descargar es siempre posible con sesión. Lo que MODIFICA (subir, renombrar, borrar) depende
+// de quién sea el dueño de la carpeta:
+//
+//   `_logs/`, `_system/`      → solo lectura. Son el rastro del propio Hub y tienen retención
+//                               automática; borrarlos a mano solo serviría para taparlo.
+//   `modules/<folder>/…`      → lo que declare ESE módulo en `static_files.user_actions`.
+//                               Ausente = solo lectura (el default deliberado: los XML de
+//                               VeriFactu son inalterables por ley). No hay override de admin.
+//   `modules/` (la raíz)      → solo lectura: borrarla se llevaría los ficheros de todos.
+//   cualquier otra            → gestión completa (es la carpeta de una persona).
+//
+// El módulo NO queda limitado por esto: sigue escribiendo por `ModuleStorage`. La política habla
+// de lo que puede hacer una PERSONA desde `/files`.
+
+/// Raíz común de las carpetas privadas de módulo dentro de `media/` (ADR-0151).
+const MODULES_ROOT: &str = "modules";
+
+/// Carpetas del propio Hub: se ven y se descargan, no se tocan.
+const RESERVED_ROOTS: [&str; 2] = ["_logs", "_system"];
+
+/// Qué puede hacer el usuario sobre una ruta de `media/`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MediaPolicy {
+    pub upload: bool,
+    pub rename: bool,
+    pub delete: bool,
+}
+
+impl MediaPolicy {
+    pub const FULL: Self = Self { upload: true, rename: true, delete: true };
+    pub const READ_ONLY: Self = Self { upload: false, rename: false, delete: false };
+
+    fn allows(&self, action: UserFileAction) -> bool {
+        match action {
+            UserFileAction::Upload => self.upload,
+            UserFileAction::Rename => self.rename,
+            UserFileAction::Delete => self.delete,
+        }
+    }
+}
+
+impl From<&StaticFilesDef> for MediaPolicy {
+    fn from(def: &StaticFilesDef) -> Self {
+        Self {
+            upload: def.allows(UserFileAction::Upload),
+            rename: def.allows(UserFileAction::Rename),
+            delete: def.allows(UserFileAction::Delete),
+        }
+    }
+}
+
+/// Primer segmento de la ruta relativa (`""` si está vacía).
+fn first_segment(rel: &str) -> &str {
+    rel.trim_matches('/').split('/').next().unwrap_or("")
+}
+
+/// Nombre de la carpeta de módulo dueña de la ruta, si vive bajo `modules/<folder>/…`.
+/// `modules` a secas no pertenece a ningún módulo.
+pub fn module_folder_of(rel: &str) -> Option<&str> {
+    let trimmed = rel.trim_matches('/');
+    let rest = trimmed.strip_prefix(MODULES_ROOT)?.strip_prefix('/')?;
+    let folder = rest.split('/').next().unwrap_or("");
+    (!folder.is_empty()).then_some(folder)
+}
+
+/// Política de la ruta. `owner` es el `static_files` del módulo dueño (lo resuelve el llamante
+/// contra el registro de módulos instalados); `None` cuando no hay módulo dueño instalado.
+pub fn policy_for(rel: &str, owner: Option<&StaticFilesDef>) -> MediaPolicy {
+    if RESERVED_ROOTS.contains(&first_segment(rel)) {
+        return MediaPolicy::READ_ONLY;
+    }
+    if first_segment(rel) == MODULES_ROOT {
+        // Dentro del árbol de módulos manda el manifest; sin manifest (raíz o módulo
+        // desinstalado) nadie ha autorizado nada.
+        return owner.map(MediaPolicy::from).unwrap_or(MediaPolicy::READ_ONLY);
+    }
+    MediaPolicy::FULL
+}
+
+/// Resuelve la política de una ruta consultando el registro de módulos instalados.
+async fn resolve_policy(st: &AppState, rel: &str) -> MediaPolicy {
+    let Some(folder) = module_folder_of(rel) else {
+        return policy_for(rel, None);
+    };
+    let rt = st.runtime.lock().await;
+    let owner = rt
+        .registry()
+        .installed
+        .iter()
+        .find_map(|m| m.static_files.as_ref().filter(|s| s.folder == folder))
+        .cloned();
+    policy_for(rel, owner.as_ref())
+}
+
+/// Corta la petición con 403 si la política de `rel` no concede `action`.
+async fn require_action(st: &AppState, rel: &str, action: UserFileAction) -> Result<(), Response> {
+    if resolve_policy(st, rel).await.allows(action) {
+        return Ok(());
+    }
+    Err(err(
+        StatusCode::FORBIDDEN,
+        "esta carpeta es de solo lectura: su módulo no permite esa acción",
+    ))
+}
+
+#[cfg(test)]
+mod policy_tests {
+    use super::*;
+    use erplora_runtime::manifest::StaticFilesDef;
+
+    fn declaring(actions: &[&str]) -> StaticFilesDef {
+        StaticFilesDef {
+            folder: "verifactu".into(),
+            user_actions: actions.iter().map(|s| (*s).to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn a_folder_of_the_user_stays_fully_manageable() {
+        // Lo que sube una persona a su carpeta es suyo: sin módulo dueño no hay candado.
+        assert_eq!(policy_for("", None), MediaPolicy::FULL);
+        assert_eq!(policy_for("facturas", None), MediaPolicy::FULL);
+        assert_eq!(policy_for("facturas/2026/a.pdf", None), MediaPolicy::FULL);
+    }
+
+    #[test]
+    fn the_hubs_own_folders_are_read_only_even_for_an_admin() {
+        // `_logs` ya tiene retención automática; borrarlos a mano solo sirve para tapar el rastro.
+        for path in ["_logs", "_logs/hub.2026-07-31", "_system", "_system/activity.json"] {
+            assert_eq!(policy_for(path, None), MediaPolicy::READ_ONLY, "{path}");
+        }
+    }
+
+    #[test]
+    fn a_module_folder_is_read_only_unless_the_module_says_otherwise() {
+        let def = declaring(&[]);
+        assert_eq!(
+            policy_for("modules/verifactu/xml/rec-1.xml", Some(&def)),
+            MediaPolicy::READ_ONLY,
+        );
+    }
+
+    #[test]
+    fn a_module_grants_exactly_what_it_declared() {
+        let def = declaring(&["upload", "delete"]);
+        let policy = policy_for("modules/verifactu/xml/rec-1.xml", Some(&def));
+        assert!(policy.upload);
+        assert!(policy.delete);
+        assert!(!policy.rename, "rename no se declaró → no se concede");
+    }
+
+    #[test]
+    fn an_orphan_module_folder_is_read_only() {
+        // Desinstalar un módulo NO borra sus ficheros (ADR-0151). Sin manifest que hable por
+        // ellos, nadie ha autorizado tocarlos.
+        assert_eq!(
+            policy_for("modules/desaparecido/x.pdf", None),
+            MediaPolicy::READ_ONLY,
+        );
+    }
+
+    #[test]
+    fn the_modules_root_itself_cannot_be_renamed_or_deleted() {
+        // Borrar `modules/` se llevaría por delante los ficheros de TODOS los módulos.
+        assert_eq!(policy_for("modules", None), MediaPolicy::READ_ONLY);
+    }
+
+    #[test]
+    fn identifies_the_owning_module_folder() {
+        assert_eq!(module_folder_of("modules/verifactu/xml/a.xml"), Some("verifactu"));
+        assert_eq!(module_folder_of("modules/verifactu"), Some("verifactu"));
+        assert_eq!(module_folder_of("modules"), None);
+        assert_eq!(module_folder_of("facturas/modules/x"), None);
+        assert_eq!(module_folder_of(""), None);
+    }
 }
