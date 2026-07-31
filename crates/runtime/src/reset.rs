@@ -1,8 +1,9 @@
 //! Reset del hub — volver el hub a cero (ADR-0166).
 //!
-//! **Espejo del export**: reutiliza su mismo inventario de tablas (`table_owner` por prefijo más
-//! largo, FKs leídas del catálogo) recorrido al revés. Así lo que el hub sabe exportar es
-//! exactamente lo que sabe borrar, y un módulo nuevo no hay que darlo de alta en dos sitios.
+//! **Espejo del export**: reutiliza su mismo inventario de tablas (`list_tables`, `table_owner`
+//! por prefijo más largo, `foreign_keys` del catálogo) recorrido al revés. Así lo que el hub sabe
+//! exportar es exactamente lo que sabe borrar, y un módulo nuevo no hay que darlo de alta en dos
+//! sitios.
 //!
 //! Reglas duras (fijadas por los e2e `tests/reset_test.rs`):
 //!   - `DELETE ... WHERE hub_id = :hub_id` SIEMPRE. Nunca `TRUNCATE`, nunca `DROP`: la BD es
@@ -13,11 +14,12 @@
 //!   - **Una sola transacción** (`execute_tx`): al revés que el import, que es best-effort a
 //!     propósito, un reset a medias no deja ni seguir ni volver.
 //!   - **Las filas propiedad del módulo sobreviven** (mismo criterio que `is_module_seeded` del
-//!     export): las siembra el módulo al instalarse y no las re-siembra.
+//!     export, aquí como predicado SQL): las siembra el módulo al instalarse y no las re-siembra.
 //!   - **Nadie se auto-expulsa**: el usuario que ejecuta el reset nunca se borra.
 
 use serde::{Deserialize, Serialize};
 
+use crate::export::{foreign_keys, has_column, list_tables, safe_ident, table_owner};
 use crate::Runtime;
 
 /// Qué secciones se borran. Todo `false`/vacío por defecto: el reset nunca hace de más.
@@ -68,17 +70,327 @@ pub struct ResetReport {
 
 /// **Dry-run**: inventaría las secciones del hub con el número de filas que se borrarían y los
 /// bloqueos aplicables. No escribe nada — se ejecuta con solo abrir el panel.
-pub async fn plan_reset(_rt: &Runtime, _hub_id: &str) -> crate::Result<ResetPlan> {
-    unimplemented!("ADR-0166 Fase 1: plan_reset")
+pub async fn plan_reset(rt: &Runtime, hub_id: &str) -> crate::Result<ResetPlan> {
+    let db = rt.db();
+    let mut sections = Vec::new();
+
+    sections.push(SectionPlan {
+        section: "hub_settings".into(),
+        rows: count_where(rt, "hub_settings", "TRUE", hub_id).await,
+        blocked_by: None,
+    });
+    // `hub_user` NO lleva `hub_id` (identidad por despliegue, `identity.rs`): se cuenta entera.
+    sections.push(SectionPlan {
+        section: "hub_users".into(),
+        rows: count_raw(rt, "SELECT count(*) AS n FROM hub_user", hub_id).await,
+        blocked_by: None,
+    });
+
+    for module_id in module_ids(rt) {
+        let mut rows = 0;
+        for table in module_tables(rt, db, &module_id).await {
+            rows += count_raw(rt, &table.count_sql(), hub_id).await;
+        }
+        sections.push(SectionPlan { section: format!("modules/{module_id}"), rows, blocked_by: None });
+    }
+    Ok(ResetPlan { sections })
 }
 
 /// Borra las secciones seleccionadas del hub `hub_id`, en una sola transacción y en orden
 /// topológico inverso de FK. `actor_user_id` nunca se borra (no te puedes auto-expulsar).
 pub async fn execute_reset(
-    _rt: &Runtime,
-    _hub_id: &str,
-    _selection: &ResetSelection,
-    _actor_user_id: &str,
+    rt: &Runtime,
+    hub_id: &str,
+    selection: &ResetSelection,
+    actor_user_id: &str,
 ) -> crate::Result<ResetReport> {
-    unimplemented!("ADR-0166 Fase 1: execute_reset")
+    let db = rt.db();
+    // (sección, tabla, sentencia) — se acumulan TODAS y se aplican en UNA transacción.
+    let mut ops: Vec<(String, String, String)> = Vec::new();
+
+    if selection.settings {
+        ops.push((
+            "hub_settings".into(),
+            "hub_settings".into(),
+            "DELETE FROM hub_settings WHERE hub_id = :hub_id".into(),
+        ));
+    }
+    if selection.users {
+        // Nunca al actor: un owner no puede quedarse fuera de su propio hub con un clic.
+        // `hub_user` no lleva `hub_id` (identidad por despliegue), así que NO se acota por él.
+        ops.push((
+            "hub_users".into(),
+            "hub_user".into(),
+            "DELETE FROM hub_user WHERE id <> :actor".into(),
+        ));
+    }
+
+    for module_id in &selection.modules {
+        if !rt.registry().is_installed(module_id) {
+            continue; // no instalado → no hay tablas suyas que barrer
+        }
+        let section = format!("modules/{module_id}");
+        for table in module_tables(rt, db, module_id).await {
+            ops.push((section.clone(), table.name.clone(), table.delete_sql()));
+        }
+    }
+    if ops.is_empty() {
+        return Ok(ResetReport::default());
+    }
+
+    // Informe POR SECCIÓN: se cuenta con el MISMO `WHERE` antes de borrar (después ya no hay
+    // filas que contar, y `execute_tx` solo devuelve el total agregado).
+    let mut planned: Vec<(String, i64)> = Vec::new();
+    for (section, _, sql) in &ops {
+        let n = count_raw(rt, &count_of(sql), hub_id).await;
+        match planned.iter_mut().find(|(s, _)| s == section) {
+            Some((_, acc)) => *acc += n,
+            None => planned.push((section.clone(), n)),
+        }
+    }
+
+    // Orden topológico INVERSO de FK: una tabla se borra ANTES que las que referencia, o el
+    // DELETE choca contra la constraint (`inventory_product_categories` → `inventory_product`).
+    let order = delete_order(db, ops.iter().map(|(_, t, _)| t.clone()).collect()).await;
+    ops.sort_by_key(|(_, t, _)| order.iter().position(|o| o == t).unwrap_or(usize::MAX));
+
+    let mut p = hub_params(hub_id);
+    p.insert("actor".into(), serde_json::json!(actor_user_id));
+    let tx: Vec<(String, erplora_db::Params)> =
+        ops.iter().map(|(_, _, sql)| (sql.clone(), p.clone())).collect();
+    db.execute_tx(&tx).await.map_err(|e| {
+        crate::RuntimeError::Other(format!("reset: la transacción falló, nada se borró: {e}"))
+    })?;
+
+    Ok(ResetReport {
+        sections: planned
+            .into_iter()
+            .map(|(section, rows_deleted)| SectionOutcome { section, rows_deleted })
+            .collect(),
+    })
+}
+
+// ── Inventario (espejo del export) ──────────────────────────────────────────────────────
+
+/// Una tabla del hub a barrer, con el `WHERE` que la acota al tenant y a los datos de USUARIO.
+struct ResetTable {
+    name: String,
+    /// Predicado que deja fuera las filas propiedad del módulo (`is_module_seeded` en SQL).
+    user_rows: String,
+    /// Acotación al tenant: por `hub_id` propio, o por el padre a través de la FK declarada.
+    scope: String,
+}
+
+impl ResetTable {
+    fn delete_sql(&self) -> String {
+        format!("DELETE FROM {} WHERE {} AND {}", self.name, self.scope, self.user_rows)
+    }
+    fn count_sql(&self) -> String {
+        format!("SELECT count(*) AS n FROM {} WHERE {} AND {}", self.name, self.scope, self.user_rows)
+    }
+}
+
+fn module_ids(rt: &Runtime) -> Vec<String> {
+    rt.registry().installed.iter().map(|m| m.id.clone()).collect()
+}
+
+/// Tablas propiedad de `module_id` (prefijo más largo, igual que el export), cada una con su
+/// acotación de tenant y su predicado de datos de usuario ya resueltos contra el catálogo.
+async fn module_tables(
+    rt: &Runtime,
+    db: &dyn erplora_db::DatabaseAdapter,
+    module_id: &str,
+) -> Vec<ResetTable> {
+    let installed = module_ids(rt);
+    let all = list_tables(db).await.unwrap_or_default();
+    let mut out = Vec::new();
+    for name in all {
+        if table_owner(&name, &installed).as_deref() != Some(module_id) || !safe_ident(&name) {
+            continue;
+        }
+        let user_rows = user_rows_predicate(db, &name, "").await;
+        let scope = match tenant_scope(db, &name).await {
+            Some(s) => s,
+            // Sin `hub_id` y sin FK a un padre que lo tenga no hay forma de acotar el tenant:
+            // NO se toca (borrarla entera se llevaría filas de otros hubs de la org).
+            None => continue,
+        };
+        out.push(ResetTable { name, user_rows, scope });
+    }
+    out
+}
+
+/// Acotación al tenant de una tabla: su propio `hub_id`, o —en los vínculos M2M que no lo
+/// llevan— la pertenencia de su PADRE a través de la FK DECLARADA (no se adivinan nombres).
+/// Réplica del criterio de `fetch_join_rows` del export.
+async fn tenant_scope(db: &dyn erplora_db::DatabaseAdapter, table: &str) -> Option<String> {
+    if has_column(db, table, "hub_id").await {
+        return Some("hub_id = :hub_id".into());
+    }
+    for fk in foreign_keys(db, table).await {
+        if fk.parent == table || !has_column(db, &fk.parent, "hub_id").await {
+            continue; // self-FK o padre sin tenant: no sirve para acotar
+        }
+        // Solo los vínculos cuyo PADRE se va a borrar: si el padre sobrevive (fila del módulo),
+        // su vínculo tampoco puede desaparecer.
+        let parent_user_rows = user_rows_predicate(db, &fk.parent, "p.").await;
+        let (parent, to, from) = (&fk.parent, &fk.to, &fk.from);
+        return Some(format!(
+            "EXISTS (SELECT 1 FROM {parent} p WHERE p.{to} = {table}.{from} \
+             AND p.hub_id = :hub_id AND {parent_user_rows})"
+        ));
+    }
+    None
+}
+
+/// `is_module_seeded` como predicado SQL: deja fuera las filas que siembra el MÓDULO al
+/// instalarse (`is_system=1` · `source='shipped'` · `created_by='system'`) y que no vuelve a
+/// sembrar. Solo se añade la condición de las columnas que la tabla realmente tiene. `prefix`
+/// cualifica las columnas cuando el predicado va dentro de un subquery (`p.`).
+async fn user_rows_predicate(
+    db: &dyn erplora_db::DatabaseAdapter,
+    table: &str,
+    prefix: &str,
+) -> String {
+    let mut conds: Vec<String> = Vec::new();
+    if has_column(db, table, "is_system").await {
+        conds.push(format!("({prefix}is_system IS NULL OR {prefix}is_system = 0)"));
+    }
+    if has_column(db, table, "source").await {
+        conds.push(format!("({prefix}source IS NULL OR {prefix}source <> 'shipped')"));
+    }
+    if has_column(db, table, "created_by").await {
+        conds.push(format!("({prefix}created_by IS NULL OR {prefix}created_by <> 'system')"));
+    }
+    if conds.is_empty() {
+        "TRUE".into()
+    } else {
+        conds.join(" AND ")
+    }
+}
+
+// ── Orden de borrado ────────────────────────────────────────────────────────────────────
+
+/// Orden topológico INVERSO de FK: una tabla va ANTES que todas las que referencia. Kahn sobre
+/// el grafo «A referencia a B» ⇒ A se borra antes que B. Las self-FK se ignoran (una tabla no
+/// se bloquea a sí misma) y un ciclo residual se emite tal cual: el DELETE fallaría y la
+/// transacción revertiría entera, que es la semántica deseada (nunca a medias).
+async fn delete_order(db: &dyn erplora_db::DatabaseAdapter, tables: Vec<String>) -> Vec<String> {
+    let mut uniq: Vec<String> = Vec::new();
+    for t in tables {
+        if !uniq.contains(&t) {
+            uniq.push(t);
+        }
+    }
+    let mut edges: Vec<(String, String)> = Vec::new(); // (A referencia a B) ⇒ A antes que B
+    for t in &uniq {
+        for fk in foreign_keys(db, t).await {
+            if fk.parent != *t && uniq.contains(&fk.parent) {
+                edges.push((t.clone(), fk.parent.clone()));
+            }
+        }
+    }
+    // blockers[B] = cuántas tablas del conjunto referencian a B (deben borrarse antes).
+    let mut blockers: Vec<(String, usize)> = uniq
+        .iter()
+        .map(|t| (t.clone(), edges.iter().filter(|(_, b)| b == t).count()))
+        .collect();
+
+    let mut out: Vec<String> = Vec::new();
+    while let Some(idx) = blockers.iter().position(|(_, n)| *n == 0) {
+        let (t, _) = blockers.remove(idx);
+        for (_, b) in edges.iter().filter(|(a, _)| *a == t) {
+            if let Some(e) = blockers.iter_mut().find(|(name, _)| name == b) {
+                e.1 = e.1.saturating_sub(1);
+            }
+        }
+        out.push(t);
+    }
+    // Restos (ciclo): en cualquier orden — la transacción es all-or-nothing.
+    out.extend(blockers.into_iter().map(|(t, _)| t));
+    out
+}
+
+// ── Utilidades ──────────────────────────────────────────────────────────────────────────
+
+fn hub_params(hub_id: &str) -> erplora_db::Params {
+    let mut p = erplora_db::Params::new();
+    p.insert("hub_id".into(), serde_json::json!(hub_id));
+    p
+}
+
+/// `SELECT count(*)` equivalente a un `DELETE FROM … WHERE …` construido aquí: es lo que el
+/// informe muestra por sección (contado ANTES de borrar).
+fn count_of(delete_sql: &str) -> String {
+    match delete_sql.strip_prefix("DELETE FROM ") {
+        Some(rest) => format!("SELECT count(*) AS n FROM {rest}"),
+        None => "SELECT 0 AS n".into(),
+    }
+}
+
+/// Ejecuta un `count(*)` ya construido; 0 si la tabla no existe o el SQL falla.
+async fn count_raw(rt: &Runtime, sql: &str, hub_id: &str) -> i64 {
+    let mut p = hub_params(hub_id);
+    // El `:actor` solo aparece en el conteo de `hub_user`; sobra inofensivamente en el resto.
+    p.insert("actor".into(), serde_json::json!(""));
+    rt.db()
+        .query(sql, &p)
+        .await
+        .ok()
+        .and_then(|r| r.rows.first().and_then(|row| row["n"].as_i64()))
+        .unwrap_or(0)
+}
+
+/// `count(*)` de `table` acotado al tenant y a un predicado extra (0 si no se puede acotar).
+async fn count_where(rt: &Runtime, table: &str, extra: &str, hub_id: &str) -> i64 {
+    if !safe_ident(table) {
+        return 0;
+    }
+    let Some(scope) = tenant_scope(rt.db(), table).await else { return 0 };
+    count_raw(rt, &format!("SELECT count(*) AS n FROM {table} WHERE {scope} AND {extra}"), hub_id).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// El plan y el informe son el contrato JSON que la UI pinta: round-trip sin perder campos.
+    #[test]
+    fn plan_and_report_serde_round_trip() {
+        let plan = ResetPlan {
+            sections: vec![SectionPlan {
+                section: "modules/inventory".into(),
+                rows: 124,
+                blocked_by: Some("12 facturas remitidas a la AEAT".into()),
+            }],
+        };
+        let back: ResetPlan = serde_json::from_str(&serde_json::to_string(&plan).unwrap()).unwrap();
+        assert_eq!(plan, back);
+
+        let report = ResetReport {
+            sections: vec![SectionOutcome { section: "hub_settings".into(), rows_deleted: 7 }],
+        };
+        let back: ResetReport =
+            serde_json::from_str(&serde_json::to_string(&report).unwrap()).unwrap();
+        assert_eq!(report, back);
+    }
+
+    /// El conteo del informe se deriva del MISMO `WHERE` del DELETE: si divergieran, la UI
+    /// mostraría una cifra que no es la que se borra.
+    #[test]
+    fn count_of_mirrors_the_delete_predicate() {
+        assert_eq!(
+            count_of("DELETE FROM inventory_product WHERE hub_id = :hub_id AND TRUE"),
+            "SELECT count(*) AS n FROM inventory_product WHERE hub_id = :hub_id AND TRUE"
+        );
+        assert_eq!(count_of("no es un delete"), "SELECT 0 AS n");
+    }
+
+    /// Una selección vacía no genera ni una sentencia: el reset nunca hace de más.
+    #[test]
+    fn default_selection_is_empty() {
+        let sel = ResetSelection::default();
+        assert!(!sel.settings && !sel.users && !sel.media && !sel.fiscal);
+        assert!(sel.modules.is_empty());
+    }
 }

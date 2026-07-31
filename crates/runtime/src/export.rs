@@ -213,7 +213,7 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Lista las tablas de usuario del backend activo (catálogo por dialecto).
-async fn list_tables(db: &dyn erplora_db::DatabaseAdapter) -> crate::Result<Vec<String>> {
+pub(crate) async fn list_tables(db: &dyn erplora_db::DatabaseAdapter) -> crate::Result<Vec<String>> {
     // Postgres-only (ADR-0154). `current_schema()` acota al esquema activo del hub (en prod
     // `public`; en los tests, el esquema efímero por test).
     let sql = "SELECT table_name AS name FROM information_schema.tables \
@@ -223,7 +223,7 @@ async fn list_tables(db: &dyn erplora_db::DatabaseAdapter) -> crate::Result<Vec<
 }
 
 /// Módulo instalado dueño de `table` por prefijo más largo (`<id>_*` o nombre exacto).
-fn table_owner(table: &str, installed_ids: &[String]) -> Option<String> {
+pub(crate) fn table_owner(table: &str, installed_ids: &[String]) -> Option<String> {
     installed_ids
         .iter()
         .filter(|id| table == id.as_str() || table.starts_with(&format!("{id}_")))
@@ -233,12 +233,12 @@ fn table_owner(table: &str, installed_ids: &[String]) -> Option<String> {
 
 /// Nombre de tabla/columna seguro para interpolar (vienen del CATÁLOGO de la BD, no del usuario;
 /// el guardarraíl es defensivo por si un módulo declara algo raro).
-fn safe_ident(s: &str) -> bool {
+pub(crate) fn safe_ident(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// ¿`table` tiene la columna `col`? (catálogo por dialecto).
-async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str, col: &str) -> bool {
+pub(crate) async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str, col: &str) -> bool {
     if !safe_ident(table) {
         return false;
     }
@@ -255,14 +255,14 @@ async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str, col: &str
 }
 
 /// Una FK declarada por la tabla: `from` (columna local) → `parent`.`to`.
-struct ForeignKey {
-    from: String,
-    parent: String,
-    to: String,
+pub(crate) struct ForeignKey {
+    pub(crate) from: String,
+    pub(crate) parent: String,
+    pub(crate) to: String,
 }
 
 /// FKs declaradas de `table`, leídas del catálogo de la BD (no se infieren por nombre).
-async fn foreign_keys(db: &dyn erplora_db::DatabaseAdapter, table: &str) -> Vec<ForeignKey> {
+pub(crate) async fn foreign_keys(db: &dyn erplora_db::DatabaseAdapter, table: &str) -> Vec<ForeignKey> {
     if !safe_ident(table) {
         return Vec::new();
     }
@@ -351,7 +351,7 @@ async fn fetch_rows(
 /// módulo, incluida `taxes_rule`— y distingue lo sembrado (system) de lo que crea un usuario (su
 /// id). Excluir por él es seguro para las secciones a nivel hub: `hub_settings`/`hub_user` no
 /// tienen columna `created_by`, así que nunca casan.
-fn is_module_seeded(row: &serde_json::Value) -> bool {
+pub(crate) fn is_module_seeded(row: &serde_json::Value) -> bool {
     truthy(row.get("is_system"))
         || row.get("source").and_then(|v| v.as_str()) == Some("shipped")
         || row.get("created_by").and_then(|v| v.as_str()) == Some("system")
