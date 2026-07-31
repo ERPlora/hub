@@ -35,6 +35,8 @@ fn test_config(auth_mode: AuthMode, tag: &str) -> HubConfig {
         device_trust_enforce: false,
         media_dir: base.join("media"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     }
 }
 
@@ -261,6 +263,26 @@ async fn inspect_rejects_path_traversal_zip() {
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let j = body_json(resp).await;
     assert_eq!(j["ok"], json!(false));
+}
+
+/// Zip-slip DENTRO de `media/` (`media/../../evil`, hub#239): los `media/**` son las únicas
+/// entradas del bundle que aterrizan en DISCO, así que la travesía se rechaza en el inspect —
+/// antes de guardar el temporal y mucho antes de copiar nada.
+#[tokio::test]
+async fn inspect_rejects_media_path_traversal_zip() {
+    let app = make_app(AuthMode::Dev, "inspect_media_slip").await;
+    let zip = build_zip(&[
+        ("manifest.json", manifest_json(1, json!({})).as_bytes()),
+        ("media/../../evil", b"pwned"),
+    ]);
+    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let j = body_json(resp).await;
+    assert_eq!(j["ok"], json!(false));
+    assert!(
+        j["error"]["message"].as_str().unwrap_or_default().contains("zip inseguro"),
+        "el motivo nombra la ruta insegura: {j}"
+    );
 }
 
 /// Zip con ruta absoluta (`/etc/evil`) → rechazado (anti zip-slip).
