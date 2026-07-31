@@ -884,6 +884,27 @@ mod tests {
         let _ = std::fs::remove_dir_all(&outside);
     }
 
+    /// PRIMER import de un hub: `media/` todavía no existe (creación perezosa) → se crea la raíz y
+    /// el destino cae dentro. Sin esto el primer bundle con imágenes perdería TODAS sus medias.
+    #[test]
+    fn con_la_raiz_de_media_sin_crear_el_primer_import_funciona() {
+        let root = media_root("lazy");
+        std::fs::remove_dir_all(&root).unwrap(); // la raíz NO existe
+        let target = prepare_media_target(&root, "logo.png").expect("la raíz se crea al vuelo");
+        assert!(target.starts_with(std::fs::canonicalize(&root).unwrap()));
+        std::fs::write(&target, b"x").unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Entradas del zip que no nombran un fichero (`media/`, `media/sub/`) no producen destino.
+    #[test]
+    fn una_entrada_sin_nombre_de_fichero_no_produce_destino() {
+        let root = media_root("empty");
+        assert_eq!(prepare_media_target(&root, ""), None);
+        assert_eq!(prepare_media_target(&root, "."), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// `safe_join` sigue descartando lo evidente (por si el bundle llegara por otra vía).
     #[test]
     fn traversal_y_rutas_absolutas_no_producen_destino() {

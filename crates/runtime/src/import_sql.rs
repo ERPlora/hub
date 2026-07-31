@@ -738,6 +738,17 @@ mod tests {
         }
     }
 
+    /// Los caracteres «peligrosos» DENTRO de un literal son datos legítimos y no deben tumbar la
+    /// sección: precios en dólares (`5$`), guiones dobles de un nombre, `/*` en una descripción.
+    #[test]
+    fn los_caracteres_especiales_dentro_del_literal_son_datos() {
+        let scope = TableScope::Module("inventory".into());
+        let sql = "INSERT INTO inventory_product (\"name\", \"note\") \
+                   SELECT 'Menú 5$ -- oferta', 'usa /* y ; sin problema';";
+        let stmts = validate(sql, &scope).expect("son datos, no sintaxis");
+        assert_eq!(stmts.len(), 1, "{stmts:?}");
+    }
+
     /// La forma legítima con `VALUES` (bundles no generados por el export) también se admite,
     /// siempre que los valores sean literales.
     #[test]
