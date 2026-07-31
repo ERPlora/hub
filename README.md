@@ -101,7 +101,8 @@ Ctrl-C (o que uno de los dos muera) baja a ambos. La salida va prefijada `[runti
 | Variable | Default | Qué es |
 | --- | --- | --- |
 | `HUB_DATABASE_URL` | — (**requerido**) | DSN de Postgres (`postgres://…`); el runtime **falla duro** sin él |
-| `HUB_MODULES_DIR` | `../modules-workspace/modules` | Fuente de módulos de dev (los mismos que el shell carga como WC) |
+| `HUB_MODULES_DIR` | `../modules-workspace/modules` | Fuente de módulos de dev (los mismos que el shell carga como WC). **Solo se escanea con `HUB_DEV_MODE`** |
+| `HUB_DEV_MODE` | `1` (solo en `pnpm dev`) | **Modo desarrollo explícito** (hub#239): habilita las vías de carga de código LOCAL — escaneo de `HUB_MODULES_DIR` al arrancar y `POST /api/modules/install {dir}` (confinado al staging). El provisioning **nunca** lo inyecta: en producción esas vías están apagadas y los módulos vienen del marketplace con su SHA256 verificado (ADR-0015) |
 | `HUB_BIND` | `127.0.0.1:8787` | Bind del runtime Axum |
 | `VITE_RUNTIME_URL` | `''` (proxy de Vite) | Cómo el shell alcanza el runtime |
 

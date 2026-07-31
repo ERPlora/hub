@@ -26,6 +26,8 @@ async fn state_with_token(token: Option<&str>) -> AppState {
         device_trust_enforce: false,
         media_dir: temp,
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     AppState::with_config(rt, cfg)
 }
@@ -136,6 +138,8 @@ async fn admin_state(cloud_base_url: &str) -> AppState {
         device_trust_enforce: false,
         media_dir: temp,
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     AppState::with_config(rt, cfg)
 }

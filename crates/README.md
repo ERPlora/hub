@@ -35,8 +35,11 @@ recuento de tests vigente, corre `cargo test -p <crate>`:
 cargo test  --workspace                                   # ver conteo real al ejecutar (no lo congeles)
 cargo run   -p erplora-runtime --example walking_skeleton # demo runtime end-to-end
 
-# server real (HTTP) + hot-plug (requiere Postgres — HUB_DATABASE_URL):
-HUB_DATABASE_URL=postgres://localhost/erplora_hub_dev HUB_BIND=127.0.0.1:8799 cargo run -p erplora-server &
+# server real (HTTP) + hot-plug (requiere Postgres — HUB_DATABASE_URL).
+# `HUB_DEV_MODE=1` + `HUB_MODULES_DIR`: instalar desde CARPETA es una vía de desarrollo,
+# confinada a ese staging y APAGADA en producción (allí: marketplace + SHA256, hub#239).
+HUB_DATABASE_URL=postgres://localhost/erplora_hub_dev HUB_BIND=127.0.0.1:8799 \
+  HUB_DEV_MODE=1 HUB_MODULES_DIR="$PWD/modules" cargo run -p erplora-server &
 curl -s localhost:8799/api/modules
 curl -s -X POST localhost:8799/api/modules/install -H 'content-type: application/json' -d '{"dir":"modules/notes"}'
 curl -s localhost:8799/api/navigation

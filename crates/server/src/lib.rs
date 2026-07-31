@@ -7,7 +7,9 @@
 //!   GET  /healthz
 //!   GET  /api/navigation                     menú de módulos ACTIVOS
 //!   GET  /api/modules                        módulos instalados + estado
-//!   POST /api/modules/install   {dir}        instala desde carpeta (extraída por erplora-source)
+//!   POST /api/modules/install   {dir}        instala desde carpeta (extraída por erplora-source).
+//!                                            **Solo dev** (`HUB_DEV_MODE`) y confinado al staging
+//!                                            del hub — ver `install_guard` (hub#239).
 //!   POST /api/modules/:id/activate
 //!   POST /api/modules/:id/deactivate
 //!   POST /api/modules/:id/uninstall
@@ -38,6 +40,7 @@ pub mod error_sink;
 pub mod export_import;
 pub mod ingest;
 pub mod install;
+pub mod install_guard;
 pub mod logging;
 pub mod media;
 pub mod members;
@@ -89,13 +92,17 @@ impl ServeConfig {
     /// Igual que el binario: `HUB_DATABASE_URL` (obligatorio) / `HUB_BIND` / `HUB_MODULES_DIR` +
     /// [`HubConfig::from_env`].
     pub fn from_env() -> Self {
+        let hub = HubConfig::from_env();
         Self {
             database_url: std::env::var("HUB_DATABASE_URL").unwrap_or_default(),
             bind: std::env::var("HUB_BIND").unwrap_or_else(|_| "127.0.0.1:8787".into()),
-            modules_dir: std::env::var("HUB_MODULES_DIR")
-                .ok()
-                .filter(|s| !s.is_empty()),
-            hub: HubConfig::from_env(),
+            // Una sola lectura de `HUB_MODULES_DIR` (la de `HubConfig`): el mismo valor gobierna el
+            // escaneo de arranque y el staging admitido por `/api/modules/install` (hub#239).
+            modules_dir: hub
+                .dev_modules_dir
+                .as_ref()
+                .map(|p| p.to_string_lossy().into_owned()),
+            hub,
             machine_token_cell: None,
             hub_id_cell: None,
             // ECS/binario: el `dist/` se sirve de disco por `HUB_WEB_DIR` (paridad Hub Cloud).
@@ -232,16 +239,31 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         std::sync::Arc::new(erplora_verifactu::VerifactuEngine),
     );
 
-    if let Some(dir) = &cfg.modules_dir {
-        // Instala los módulos del dir resolviendo el orden de `depends_on` por topo-sort (hub#16):
-        // una dependencia se instala antes que quien la declara, sin depender del orden del FS.
-        // `install_all_from_dir` es tolerante (loguea ✓/✗ por módulo y salta los rotos); aquí solo
-        // registramos un error externo (read_dir fallido o ciclo de dependencias del conjunto).
-        if let Err(e) = runtime
-            .install_all_from_dir(std::path::Path::new(dir))
-            .await
-        {
-            eprintln!("✗ instalación de módulos: {e}");
+    // Escaneo de `HUB_MODULES_DIR` al arrancar: SOLO en modo desarrollo explícito (hub#239). En
+    // producción ese dir es `/tmp/modules` (contenedor stateless) y se instalaba todo subdirectorio
+    // con un `module.json` sin verificar nada — un dir escribible convertido en cargador de código.
+    // Los módulos de un hub real vienen del marketplace (grant + SHA256, ADR-0015).
+    match install_guard::boot_scan_dir(cfg.hub.dev_mode, cfg.modules_dir.as_deref()) {
+        Some(dir) => {
+            // Instala los módulos del dir resolviendo el orden de `depends_on` por topo-sort (hub#16):
+            // una dependencia se instala antes que quien la declara, sin depender del orden del FS.
+            // `install_all_from_dir` es tolerante (loguea ✓/✗ por módulo y salta los rotos); aquí solo
+            // registramos un error externo (read_dir fallido o ciclo de dependencias del conjunto).
+            eprintln!("dev: instalando módulos de HUB_MODULES_DIR={dir} (modo desarrollo)");
+            if let Err(e) = runtime
+                .install_all_from_dir(std::path::Path::new(dir))
+                .await
+            {
+                eprintln!("✗ instalación de módulos: {e}");
+            }
+        }
+        None => {
+            if let Some(ignored) = &cfg.modules_dir {
+                eprintln!(
+                    "módulos: HUB_MODULES_DIR={ignored} IGNORADO (sin HUB_DEV_MODE): en producción \
+                     los módulos se instalan desde el marketplace, con SHA256 verificado"
+                );
+            }
         }
     }
 
@@ -1685,6 +1707,12 @@ async fn list_modules(
     Json(json!({ "ok": true, "data": items })).into_response()
 }
 
+/// `POST /api/modules/install {dir}` — instala un módulo desde una carpeta YA extraída.
+///
+/// Vía de **desarrollo**: esquiva el pipeline del marketplace (grant + SHA256 obligatorio,
+/// ADR-0015), así que va doblemente gateada (hub#239, ver [`install_guard`]): modo desarrollo
+/// explícito + `dir` confinado en el staging del hub. La sesión admin sigue siendo necesaria,
+/// pero **no basta**: el agujero no era de auth, era de superficie.
 async fn install_module(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -1694,10 +1722,39 @@ async fn install_module(
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
-    match rt.install_from_dir(std::path::Path::new(&req.dir)).await {
+    let dir = match install_guard::resolve_install_dir(
+        st.config.dev_mode,
+        &st.config.install_staging_roots(),
+        &req.dir,
+    ) {
+        Ok(dir) => dir,
+        Err(rejection) => return install_dir_rejected(&req.dir, rejection),
+    };
+    match rt.install_from_dir(&dir).await {
         Ok(id) => Json(json!({ "ok": true, "data": { "module_id": id } })).into_response(),
         Err(e) => err_response(e),
     }
+}
+
+/// Respuesta estable a un `dir` de instalación rechazado (hub#239). `403` cuando la vía está
+/// cerrada por política (producción / fuera del staging), `422` cuando la ruta simplemente no
+/// sirve. Se registra a WARN: un intento fuera del staging es señal de abuso, no ruido.
+fn install_dir_rejected(requested: &str, rejection: install_guard::InstallDirRejection) -> Response {
+    use install_guard::InstallDirRejection as R;
+    let status = match rejection {
+        R::DevModeRequired | R::OutsideStaging => StatusCode::FORBIDDEN,
+        R::NotFound | R::NotADirectory => StatusCode::UNPROCESSABLE_ENTITY,
+    };
+    tracing::warn!(
+        dir = %requested,
+        code = rejection.code(),
+        "instalación desde carpeta rechazada"
+    );
+    let body = json!({
+        "ok": false,
+        "error": { "code": rejection.code(), "message": rejection.message() },
+    });
+    (status, Json(body)).into_response()
 }
 
 async fn activate_module(

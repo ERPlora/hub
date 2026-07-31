@@ -28,6 +28,8 @@ fn cfg(module_cache: PathBuf) -> HubConfig {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-test-media-assets"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     }
 }
 

@@ -34,6 +34,8 @@ async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
         device_trust_enforce: false,
         media_dir: temp.clone(),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     (app(AppState::with_config(rt, cfg)), admin, employee, temp)
 }

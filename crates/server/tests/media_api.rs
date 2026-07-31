@@ -67,6 +67,8 @@ async fn fixture() -> (axum::Router, String, String, Captured) {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-media-api-scratch"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     (app(AppState::with_config(rt, cfg)), admin, employee, captured)
 }

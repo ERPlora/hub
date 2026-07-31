@@ -217,6 +217,8 @@ async fn hub_context_returns_configured_hub_id() {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-test-media"),
         sector: Some("hosteleria".into()),
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app
@@ -259,6 +261,8 @@ async fn hub_context_adopts_machine_identity_without_restart() {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-live-identity-media"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     let token: MachineToken = Arc::new(RwLock::new(None));
     let hub_id: HubId = Arc::new(RwLock::new(erplora_server::DEV_HUB_ID.into()));
@@ -345,6 +349,8 @@ async fn demo_catalog_uses_public_saas_metadata_without_hub_credentials() {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-demo-catalog-media"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
 
     let response = app(AppState::with_config(rt, cfg))
@@ -415,6 +421,8 @@ async fn real_catalog_uses_private_saas_endpoint_with_machine_credentials() {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-real-catalog-media"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
 
     let response = app(AppState::with_config(rt, cfg))
@@ -452,6 +460,8 @@ async fn real_machine_cannot_use_business_api_before_registration() {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-unregistered-media"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
 
     let resp = app(AppState::with_config(rt, cfg))

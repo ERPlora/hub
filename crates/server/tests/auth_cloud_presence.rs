@@ -78,6 +78,8 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
         device_trust_enforce: false,
         media_dir: temp.clone(),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     let state = AppState::with_config(rt, cfg);
     (app(state.clone()), state, temp)
