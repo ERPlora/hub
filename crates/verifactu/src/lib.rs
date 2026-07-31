@@ -362,12 +362,19 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     };
 
     // NIF del emisor (obligado tributario): viene de la factura, que a su vez lo toma de la
-    // identidad fiscal GLOBAL del hub (hub_settings, vía _insert_invoice). Si está vacío, la
-    // identidad fiscal no está configurada → no se crea registro (no usar el NIF del PRODUCTOR del
-    // software, que sería incorrecto ante la AEAT).
+    // identidad fiscal GLOBAL del hub (hub_settings, vía _insert_invoice). La AEAT lo exige no
+    // vacío (es el ancla de la cadena de hash) y el resto del módulo lo rechaza así (create_record).
+    // Antes este punto devolvía OK/0-operaciones en silencio (verifactu#109): la factura→VeriFactu
+    // aparentaba éxito y no generaba registro, hash ni cola fiscal — falsa sensación de cumplimiento.
+    // Ahora rechaza con un error claro para que el operario vea que falta configurar la identidad
+    // fiscal global del hub.
     let issuer_nif = str_field(&inv, "issuer_nif");
     if issuer_nif.is_empty() {
-        return Ok(Output::new()); // sin emisor (identidad fiscal global sin configurar) → no se encadena
+        return Err(VerifactuError::Payload(
+            "missing_issuer_nif: falta el NIF del emisor (identidad fiscal global del hub sin configurar); \
+             no se puede encadenar el registro VeriFactu".into(),
+        )
+        .into());
     }
 
     let invoice_type = {
@@ -1754,6 +1761,47 @@ mod cert_source_tests {
         assert!(
             cfg.get("certificate_password").is_none(),
             "la contraseña del cert NO debe entrar en la config del módulo (ADR-0079)"
+        );
+    }
+}
+
+#[cfg(test)]
+mod ingest_tests {
+    use super::*;
+
+    /// Host que devuelve UNA factura con `issuer_nif` vacío (identidad fiscal global sin configurar).
+    struct NoIssuerHost;
+    #[async_trait::async_trait]
+    impl NativeHost for NoIssuerHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            if sql.contains("FROM invoice_invoice") {
+                Ok(vec![json!({
+                    "invoice_type": "F2", "number": "TICKET-2026-000001",
+                    "issue_date": "2026-07-31", "issuer_nif": "", "issuer_name": "",
+                    "customer_tax_id": "", "customer_name": "Cliente",
+                    "description": "Venta", "base_amount": 100, "tax_amount": 21, "total_amount": 121,
+                    "tax_breakdown": "", "substitutes_number": "", "substitutes_date": "",
+                    "substitutes_nif": ""
+                })])
+            } else {
+                Ok(vec![])
+            }
+        }
+    }
+
+    /// verifactu#109: una factura SIN issuer_nif debe RECHAZAR (antes devolvía OK/0-operaciones en
+    /// silencio y no generaba registro fiscal — falsa sensación de cumplimiento).
+    #[tokio::test]
+    async fn ingest_invoice_rejects_missing_issuer_nif() {
+        let input = json!({
+            "payload": { "invoice_id": "inv-1" },
+            "context": { "hub_id": "h1", "now": "2026-07-31T10:00:00Z", "current_user_id": "u1" }
+        });
+        let res = ingest_invoice(&input, &NoIssuerHost).await;
+        let err = res.unwrap_err().to_string();
+        assert!(
+            err.contains("missing_issuer_nif"),
+            "esperaba rechazo por issuer_nif vacío, llegó: {err}"
         );
     }
 }
