@@ -5,7 +5,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::{app, with_static_frontend, AppState};
+use erplora_server::{app, with_static_frontend, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt; // oneshot
@@ -19,7 +19,7 @@ async fn make_app() -> axum::Router {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture()).await.unwrap();
-    app(AppState::new(rt))
+    app(AppState::with_config(rt, HubConfig::from_env_with_auth(AuthMode::Dev)))
 }
 
 async fn body_json(resp: axum::response::Response) -> Value {

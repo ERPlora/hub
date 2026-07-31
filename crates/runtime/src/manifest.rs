@@ -644,6 +644,21 @@ pub struct HandlerRef {
 pub struct Events {
     #[serde(default)]
     pub listen: HashMap<String, Listener>,
+    /// Eventos que el módulo **emite desde sus handlers** (WASM/nativo). Es el allowlist que el
+    /// runtime comprueba antes de encolar en el outbox un evento devuelto por un handler (hub#240).
+    ///
+    /// Por qué existe: `emit` declara los eventos de un command **declarativo**; los que devuelve
+    /// un handler no tenían dónde declararse, así que no se validaban contra nada — el handler
+    /// elegía el nombre y el relay se lo entregaba a los listeners de otros módulos y al
+    /// **listener-host de `host.notify`** (`*.reminder.due` → email/SMS/WhatsApp).
+    ///
+    /// Declarar esta lista pone al módulo en **modo estricto**: solo estos nombres (más los `emit`
+    /// de sus commands) pueden salir de sus handlers. Un manifest que no la declara mantiene la
+    /// compatibilidad con lo ya publicado, pero sigue sujeto a las dos reglas duras: no emitir en
+    /// el namespace de otro módulo instalado y no emitir `*.reminder.due` sin la capability
+    /// `notify`. Ver `commands::validate_handler_event`.
+    #[serde(default)]
+    pub emits: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

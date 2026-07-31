@@ -54,6 +54,25 @@ pub enum WasmError {
         reason: String,
     },
 
+    /// El guest agotó su presupuesto de **instrucciones** (fuel). Es el corte determinista
+    /// contra un handler que no termina (`while(1){}`) — hub#241.
+    #[error("wasm call to `{function}` exceeded its instruction budget ({fuel} fuel)")]
+    OutOfFuel {
+        /// Nombre de la función exportada que se intentó invocar.
+        function: String,
+        /// Presupuesto de instrucciones que se agotó.
+        fuel: u64,
+    },
+
+    /// El guest superó su **tiempo de reloj** máximo y wasmtime lo interrumpió (epoch).
+    #[error("wasm call to `{function}` timed out after {timeout_ms} ms")]
+    Timeout {
+        /// Nombre de la función exportada que se intentó invocar.
+        function: String,
+        /// Tope de reloj aplicado, en milisegundos.
+        timeout_ms: u64,
+    },
+
     /// El JSON intercambiado con el guest no se pudo (de)serializar.
     #[error("failed to decode wasm contract payload: {0}")]
     Decode(String),
@@ -89,6 +108,68 @@ const DEFAULT_WASM_MEMORY_MAX_MB: u32 = 32;
 #[cfg_attr(not(feature = "extism"), allow(dead_code))]
 const WASM_MEMORY_MAX_ENV: &str = "HUB_WASM_MEMORY_MAX_MB";
 
+/// Presupuesto de **instrucciones** (fuel de wasmtime) por llamada, cuando no se
+/// configura otra cosa. Es el corte **determinista** (no depende de lo rápida que
+/// sea la máquina) contra un handler que no termina.
+///
+/// 200 M de instrucciones son ~3 órdenes de magnitud más de lo que consume un
+/// handler real (un ticket de 256 líneas resuelve en decenas de miles), y aun así
+/// un `while(1){}` se queda sin fuel en una fracción de segundo. hub#241.
+#[cfg_attr(not(feature = "extism"), allow(dead_code))]
+const DEFAULT_WASM_FUEL: u64 = 200_000_000;
+
+/// Variable de entorno para sobreescribir [`DEFAULT_WASM_FUEL`]. `0`/inválido ⇒ default.
+#[cfg_attr(not(feature = "extism"), allow(dead_code))]
+const WASM_FUEL_ENV: &str = "HUB_WASM_FUEL";
+
+/// Tope de **reloj** por llamada (ms) cuando no se configura otra cosa. Complementa al fuel:
+/// el fuel cuenta instrucciones del guest; el reloj cubre el resto (y es lo que el operador
+/// entiende). 5 s es holgadísimo para un handler puro y muy por debajo de lo que un cajero
+/// aguanta mirando el TPV. hub#241.
+#[cfg_attr(not(feature = "extism"), allow(dead_code))]
+const DEFAULT_WASM_TIMEOUT_MS: u64 = 5_000;
+
+/// Variable de entorno para sobreescribir [`DEFAULT_WASM_TIMEOUT_MS`]. `0`/inválido ⇒ default
+/// (`0` **no** significa «sin timeout»: sería reabrir el agujero).
+#[cfg_attr(not(feature = "extism"), allow(dead_code))]
+const WASM_TIMEOUT_MS_ENV: &str = "HUB_WASM_TIMEOUT_MS";
+
+/// Topes del sandbox aplicados a **cada** plugin WASM (hub#204 + hub#241).
+///
+/// Los tres son fail-closed: un valor ausente o inválido cae al default, y `0` nunca
+/// significa «ilimitado». Se resuelven una vez por carga con [`WasmLimits::from_env`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WasmLimits {
+    /// Tope de memoria lineal del guest, en MB.
+    pub memory_max_mb: u32,
+    /// Presupuesto de instrucciones por llamada (fuel de wasmtime).
+    pub fuel: u64,
+    /// Tope de reloj por llamada, en milisegundos (epoch interruption).
+    pub timeout_ms: u64,
+}
+
+impl Default for WasmLimits {
+    fn default() -> Self {
+        WasmLimits {
+            memory_max_mb: DEFAULT_WASM_MEMORY_MAX_MB,
+            fuel: DEFAULT_WASM_FUEL,
+            timeout_ms: DEFAULT_WASM_TIMEOUT_MS,
+        }
+    }
+}
+
+impl WasmLimits {
+    /// Resuelve los topes desde el entorno (`HUB_WASM_MEMORY_MAX_MB`, `HUB_WASM_FUEL`,
+    /// `HUB_WASM_TIMEOUT_MS`), cayendo a los defaults ante ausencia o valor inválido.
+    pub fn from_env() -> Self {
+        WasmLimits {
+            memory_max_mb: resolved_memory_max_mb(),
+            fuel: resolved_env_u64(WASM_FUEL_ENV, DEFAULT_WASM_FUEL),
+            timeout_ms: resolved_env_u64(WASM_TIMEOUT_MS_ENV, DEFAULT_WASM_TIMEOUT_MS),
+        }
+    }
+}
+
 /// Interpreta el valor crudo de [`WASM_MEMORY_MAX_ENV`] como MB.
 ///
 /// Parse robusto: vacío / no numérico / `0` ⇒ [`DEFAULT_WASM_MEMORY_MAX_MB`] y un
@@ -110,12 +191,40 @@ fn parse_memory_max_mb(raw: &str) -> u32 {
     }
 }
 
+/// Parse robusto de un tope `u64` (fuel / timeout): vacío, no numérico o `0` ⇒ `default`
+/// con un warning. Nunca devuelve `0` — desactivar un tope no puede ser un accidente
+/// de configuración.
+fn parse_u64_limit(raw: &str, default: u64, var: &str) -> u64 {
+    match raw.trim().parse::<u64>() {
+        Ok(v) if v > 0 => v,
+        _ => {
+            tracing::warn!(
+                target: "erplora_wasm_host",
+                value = %raw,
+                var = %var,
+                default,
+                "límite del sandbox WASM inválido (0 NO significa ilimitado); \
+                 usando el tope por defecto"
+            );
+            default
+        }
+    }
+}
+
 /// Resuelve el tope de memoria por plugin (MB): env si está fijado, si no el default.
 #[cfg_attr(not(feature = "extism"), allow(dead_code))]
 fn resolved_memory_max_mb() -> u32 {
     match std::env::var(WASM_MEMORY_MAX_ENV) {
         Ok(raw) => parse_memory_max_mb(&raw),
         Err(_) => DEFAULT_WASM_MEMORY_MAX_MB,
+    }
+}
+
+/// Resuelve un tope `u64` desde el entorno, cayendo a `default` si no está fijado.
+fn resolved_env_u64(var: &str, default: u64) -> u64 {
+    match std::env::var(var) {
+        Ok(raw) => parse_u64_limit(&raw, default, var),
+        Err(_) => default,
     }
 }
 
@@ -137,38 +246,60 @@ fn decode_output(bytes: &[u8]) -> Result<Output, WasmError> {
 #[cfg(feature = "extism")]
 pub struct WasmHost {
     plugin: extism::Plugin,
-    /// Tope de memoria aplicado a este plugin (MB) — solo para el mensaje de error.
-    memory_max_mb: u32,
+    /// Topes aplicados a este plugin — se conservan para poder explicarlos en el error.
+    limits: WasmLimits,
 }
 
 #[cfg(feature = "extism")]
 impl WasmHost {
     /// Carga un módulo WASM desde sus bytes (`.wasm` o WAT ya compilado).
     ///
-    /// El módulo corre sin WASI y sin host-functions extra: es un sandbox puro,
-    /// con un **tope de memoria lineal** de [`DEFAULT_WASM_MEMORY_MAX_MB`] MB
-    /// (sobreescribible por [`WASM_MEMORY_MAX_ENV`]). Así un handler glotón se
-    /// queda dentro de su sandbox en vez de disparar el OOM-killer del contenedor
-    /// y tumbar el hub entero (hub#204).
+    /// El módulo corre **sin WASI y sin host-functions extra** (sandbox puro) y con los tres
+    /// topes de [`WasmLimits::from_env`]:
+    ///
+    /// * **memoria** — un handler glotón se queda dentro de su sandbox en vez de disparar el
+    ///   OOM-killer del contenedor y tumbar el hub entero (hub#204);
+    /// * **fuel** — un handler que no termina agota su presupuesto de instrucciones;
+    /// * **timeout** — y, si el fuel no lo cortara, lo corta el reloj (hub#241).
+    ///
+    /// Sin los dos últimos, un `while(1){}` en un módulo de terceros colgaba el runtime del TPV
+    /// hasta reiniciar el proceso.
     pub fn from_bytes(wasm: &[u8]) -> Result<Self, WasmError> {
-        Self::from_bytes_with_memory_max_mb(wasm, resolved_memory_max_mb())
+        Self::from_bytes_with_limits(wasm, WasmLimits::from_env())
     }
 
-    /// Igual que [`from_bytes`](Self::from_bytes) pero con el tope de memoria
-    /// **explícito** en MB — determinista, sin leer el entorno. Se usa desde los
-    /// tests para no depender de una variable de proceso compartida.
-    fn from_bytes_with_memory_max_mb(wasm: &[u8], memory_max_mb: u32) -> Result<Self, WasmError> {
+    /// Igual que [`from_bytes`](Self::from_bytes) pero con los topes **explícitos** —
+    /// determinista, sin leer el entorno. Lo usan los tests (y cualquier host que quiera
+    /// fijar sus propios límites) para no depender de una variable de proceso compartida.
+    pub fn from_bytes_with_limits(wasm: &[u8], limits: WasmLimits) -> Result<Self, WasmError> {
         let wasm_owned = extism::Wasm::data(wasm.to_vec());
         // `with_memory_max` fija `memory.max_pages`; el `ResourceLimiter` de Extism
-        // atrapa (OOM) cualquier `memory.grow` que supere el tope.
+        // atrapa (OOM) cualquier `memory.grow` que supere el tope. `with_timeout` arma la
+        // interrupción por epoch de wasmtime: el guest se para aunque no haga syscalls.
         let manifest = extism::Manifest::new([wasm_owned])
-            .with_memory_max(memory_max_mb.saturating_mul(PAGES_PER_MB));
-        let plugin = extism::Plugin::new(&manifest, [], false)
+            .with_memory_max(limits.memory_max_mb.saturating_mul(PAGES_PER_MB))
+            .with_timeout(std::time::Duration::from_millis(limits.timeout_ms));
+        // `with_wasi(false)` + sin host functions: se mantiene el sandbox cerrado (el guest no
+        // tiene reloj, ni ficheros, ni red). `with_fuel_limit` activa `consume_fuel` en wasmtime.
+        let plugin = extism::PluginBuilder::new(&manifest)
+            .with_wasi(false)
+            .with_fuel_limit(limits.fuel)
+            .build()
             .map_err(|e| WasmError::Load(e.to_string()))?;
-        Ok(WasmHost {
-            plugin,
-            memory_max_mb,
-        })
+        Ok(WasmHost { plugin, limits })
+    }
+
+    /// Igual que [`from_bytes`](Self::from_bytes) pero con el tope de memoria explícito
+    /// (el resto, defaults). Se conserva para los tests de memoria de hub#204.
+    #[cfg(test)]
+    fn from_bytes_with_memory_max_mb(wasm: &[u8], memory_max_mb: u32) -> Result<Self, WasmError> {
+        Self::from_bytes_with_limits(
+            wasm,
+            WasmLimits {
+                memory_max_mb,
+                ..WasmLimits::default()
+            },
+        )
     }
 
     /// Invoca la función exportada `function`, pasándole `input` como JSON, y
@@ -183,32 +314,47 @@ impl WasmHost {
         input: &serde_json::Value,
     ) -> Result<Output, WasmError> {
         let payload = encode_input(input)?;
-        let memory_max_mb = self.memory_max_mb;
+        let limits = self.limits;
         let raw: &[u8] = self
             .plugin
             .call::<&[u8], &[u8]>(function, &payload)
-            .map_err(|e| map_call_error(function, memory_max_mb, e))?;
+            .map_err(|e| map_call_error(function, limits, e))?;
         decode_output(raw)
+    }
+
+    /// Topes efectivos de este plugin (memoria/fuel/timeout). El runtime los usa para dar
+    /// un margen de gracia al esperar la llamada desde su hilo bloqueante.
+    pub fn limits(&self) -> WasmLimits {
+        self.limits
     }
 }
 
 /// Traduce el error crudo de Extism al [`WasmError`] del host.
 ///
-/// Cuando el guest supera el tope de memoria, Extism/wasmtime propagan un error
-/// cuya causa raíz es `"oom"`. Lo mapeamos a un mensaje claro con el tope en MB,
-/// **sin** exponer internals del runtime; cualquier otro fallo mantiene la causa
-/// subyacente.
+/// Extism/wasmtime señalan los tres cortes del sandbox con causas raíz reconocibles:
+/// `"oom"` (memoria), `"plugin ran out of fuel"` (instrucciones) y `"timeout"` (reloj,
+/// interrupción por epoch). Se mapean a variantes propias con el tope aplicado, **sin**
+/// exponer internals del runtime; cualquier otro fallo mantiene la causa subyacente.
 #[cfg(feature = "extism")]
-fn map_call_error(function: &str, memory_max_mb: u32, err: extism::Error) -> WasmError {
-    if err
-        .root_cause()
-        .to_string()
-        .to_ascii_lowercase()
-        .contains("oom")
-    {
+fn map_call_error(function: &str, limits: WasmLimits, err: extism::Error) -> WasmError {
+    let root = err.root_cause().to_string().to_ascii_lowercase();
+    if root.contains("out of fuel") {
+        WasmError::OutOfFuel {
+            function: function.to_string(),
+            fuel: limits.fuel,
+        }
+    } else if root.contains("timeout") {
+        WasmError::Timeout {
+            function: function.to_string(),
+            timeout_ms: limits.timeout_ms,
+        }
+    } else if root.contains("oom") {
         WasmError::Call {
             function: function.to_string(),
-            reason: format!("wasm handler exceeded memory limit ({memory_max_mb} MB)"),
+            reason: format!(
+                "wasm handler exceeded memory limit ({} MB)",
+                limits.memory_max_mb
+            ),
         }
     } else {
         WasmError::call(function, err)
@@ -242,6 +388,11 @@ impl WasmHost {
         Err(WasmError::Load(
             "wasm execution disabled: build erplora-wasm-host with the `extism` feature".to_string(),
         ))
+    }
+
+    /// Topes del sandbox (los del entorno; sin runtime WASM no se aplican a nada).
+    pub fn limits(&self) -> WasmLimits {
+        WasmLimits::from_env()
     }
 }
 
@@ -432,7 +583,111 @@ mod tests {
         assert!(out.events.is_empty());
     }
 
-    // -- Parse del override por entorno (puro, determinista, sin tocar el env). --
+    // ---------------------------------------------------------------------
+    // Reloj y fuel: un handler que no termina NO puede colgar el runtime (hub#241).
+    //
+    // Sin fuel ni timeout, un `while(1){}` en un handler de módulo se comía un
+    // worker de Tokio para siempre: el TPV dejaba de responder y solo se
+    // recuperaba reiniciando el proceso. Los dos topes son complementarios:
+    // el **fuel** acota el número de instrucciones (determinista, independiente
+    // de la máquina) y el **timeout** acota el reloj (cubre lo que el fuel no
+    // ve, p. ej. una llamada al host que tarda).
+    // ---------------------------------------------------------------------
+
+    /// Guest que no termina nunca: bucle vacío.
+    #[cfg(feature = "extism")]
+    const SPINNING_GUEST_WAT: &str = r#"
+        (module
+          (memory 1)
+          (func (export "handle") (result i32)
+            (loop $forever (br $forever))
+            (i32.const 0)))
+    "#;
+
+    /// Un handler que no termina se queda **sin fuel** y devuelve un error controlado.
+    /// Sin este tope el `call` no volvía jamás.
+    #[cfg(feature = "extism")]
+    #[test]
+    fn spinning_guest_runs_out_of_fuel() {
+        let wasm = compile_wat(SPINNING_GUEST_WAT);
+        // Fuel pequeño y timeout enorme: así el que corta es el fuel, no el reloj.
+        let limits = WasmLimits {
+            memory_max_mb: 32,
+            fuel: 1_000_000,
+            timeout_ms: 60_000,
+        };
+        let mut host = WasmHost::from_bytes_with_limits(&wasm, limits).expect("cargar guest");
+        match host.call("handle", &json!({})) {
+            Ok(_) => panic!("un bucle infinito no puede devolver Ok"),
+            Err(WasmError::OutOfFuel { fuel, .. }) => assert_eq!(fuel, 1_000_000),
+            Err(other) => panic!("esperaba OutOfFuel; got: {other:?}"),
+        }
+    }
+
+    /// Con fuel de sobra, el que corta es el **reloj**: el guest se interrumpe al vencer
+    /// `timeout_ms` y el host devuelve `Timeout` (no se cuelga).
+    #[cfg(feature = "extism")]
+    #[test]
+    fn spinning_guest_is_interrupted_by_timeout() {
+        let wasm = compile_wat(SPINNING_GUEST_WAT);
+        let limits = WasmLimits {
+            memory_max_mb: 32,
+            fuel: u64::MAX / 2, // fuel "infinito" a efectos prácticos
+            timeout_ms: 200,
+        };
+        let mut host = WasmHost::from_bytes_with_limits(&wasm, limits).expect("cargar guest");
+        let started = std::time::Instant::now();
+        match host.call("handle", &json!({})) {
+            Ok(_) => panic!("un bucle infinito no puede devolver Ok"),
+            Err(WasmError::Timeout { timeout_ms, .. }) => assert_eq!(timeout_ms, 200),
+            Err(other) => panic!("esperaba Timeout; got: {other:?}"),
+        }
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(10),
+            "el timeout debe cortar en ~200ms, no dejar correr el guest"
+        );
+    }
+
+    /// Un handler normal (poquísimas instrucciones) NO se ve afectado por los topes por defecto.
+    #[cfg(feature = "extism")]
+    #[test]
+    fn normal_guest_is_unaffected_by_default_limits() {
+        let wasm = compile_wat(NORMAL_GUEST_WAT);
+        let mut host =
+            WasmHost::from_bytes_with_limits(&wasm, WasmLimits::default()).expect("cargar guest");
+        let out = host.call("handle", &json!({})).expect("handler normal en verde");
+        assert!(out.operations.is_empty());
+    }
+
+    // -- Parse de los overrides por entorno (puro, determinista, sin tocar el env). --
+
+    #[test]
+    fn default_limits_are_sane() {
+        let d = WasmLimits::default();
+        assert_eq!(d.memory_max_mb, DEFAULT_WASM_MEMORY_MAX_MB);
+        assert_eq!(d.fuel, DEFAULT_WASM_FUEL);
+        assert_eq!(d.timeout_ms, DEFAULT_WASM_TIMEOUT_MS);
+        assert!(d.timeout_ms > 0, "0 NO puede significar «sin timeout»");
+        assert!(d.fuel > 0, "0 NO puede significar «fuel ilimitado»");
+    }
+
+    #[test]
+    fn parse_timeout_ms_valid_value_is_used() {
+        assert_eq!(parse_u64_limit("2500", DEFAULT_WASM_TIMEOUT_MS, "x"), 2500);
+        assert_eq!(parse_u64_limit(" 750 ", DEFAULT_WASM_TIMEOUT_MS, "x"), 750);
+    }
+
+    /// `0` NO desactiva el tope (sería reabrir el agujero): cae al default.
+    #[test]
+    fn parse_u64_limit_zero_or_invalid_falls_back_to_default() {
+        for raw in ["0", "", "abc", "-5", "1.5"] {
+            assert_eq!(
+                parse_u64_limit(raw, DEFAULT_WASM_TIMEOUT_MS, "x"),
+                DEFAULT_WASM_TIMEOUT_MS,
+                "`{raw}` no puede desactivar el tope"
+            );
+        }
+    }
 
     #[test]
     fn parse_memory_max_mb_valid_value_is_used() {

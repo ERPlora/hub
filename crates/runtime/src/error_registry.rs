@@ -263,6 +263,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::MissingDependency { .. } => "missing_dependency",
         E::DependencyCycle { .. } => "dependency_cycle",
         E::EventLoop => "event_loop",
+        E::EventNotDeclared { .. } => "event_not_declared",
         E::NotImplemented(_) => "not_implemented",
         E::Wasm(_) => "wasm",
         E::Native(_) => "native",

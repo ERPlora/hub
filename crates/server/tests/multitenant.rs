@@ -20,7 +20,8 @@ use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{
-    app, AppState, EnvOrgResolver, OrgDescriptor, OrgId, RuntimeFactory, TenantRouter,
+    app, AppState, AuthMode, EnvOrgResolver, HubConfig, OrgDescriptor, OrgId, RuntimeFactory,
+    TenantRouter,
 };
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -85,7 +86,7 @@ async fn shared_app() -> axum::Router {
     // El `runtime` single-tenant del AppState es un throwaway (no se usa en el camino de datos
     // cuando hay tenants): un SQLite vacío sirve de bootstrap.
     let db = fresh_db().await;
-    let base = AppState::new(Runtime::new(Box::new(db)));
+    let base = AppState::with_config(Runtime::new(Box::new(db)), HubConfig::from_env_with_auth(AuthMode::Dev));
     app(base.with_tenants(router))
 }
 

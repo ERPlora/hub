@@ -89,6 +89,16 @@ const KNOWN: &[Setting] = &[
         validate: validate_bool,
         parse_stored: |s| json!(s == "true"),
     },
+    // ALLOWLIST DE DESTINATARIOS de `host.notify` (hub#240). Lista (coma / salto de línea) de
+    // emails y teléfonos E.164 a los que el hub autoriza enviar recordatorios. Vacía por defecto:
+    // el destinatario de una notificación ya NO puede venir libre en el payload de un módulo —
+    // tiene que resolverse desde datos del hub (esta lista o un usuario del hub).
+    Setting {
+        key: crate::host_notify::ALLOWED_RECIPIENTS_SETTING,
+        default: || json!(""),
+        validate: validate_recipient_list,
+        parse_stored: |s| json!(s),
+    },
     // Paleta de tema DEFAULT del hub (ADR-0138): valor de `data-ok-palette` (OutfitKit
     // palettes.css, compartido con Cloud). 'erplora' = marca por defecto (sin atributo).
     // El override POR USUARIO no vive aquí: está en `hub_user_pref`, aislado por hub + usuario.
@@ -293,6 +303,36 @@ fn validate_bool(v: &Value) -> std::result::Result<String, String> {
         Some(b) => Ok(if b { "true".into() } else { "false".into() }),
         None => Err("debe ser un booleano (true/false)".into()),
     }
+}
+
+/// Allowlist de destinatarios de `host.notify`: string separado por comas/saltos de línea o array
+/// de strings. Se normaliza a `"a@b.com,+34600000000"`. Rechaza entradas con caracteres de control
+/// (esta lista acaba en un `to` de email/SMS: un `\r\n` sería inyección de cabeceras).
+fn validate_recipient_list(v: &Value) -> std::result::Result<String, String> {
+    let raw: Vec<String> = match v {
+        Value::String(s) => s
+            .split(|c: char| c == ',' || c == ';' || c == '\n' || c == '\r')
+            .map(|s| s.trim().to_string())
+            .collect(),
+        Value::Array(items) => items
+            .iter()
+            .map(|i| {
+                i.as_str()
+                    .map(|s| s.trim().to_string())
+                    .ok_or_else(|| "cada destinatario debe ser un string".to_string())
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()?,
+        Value::Null => vec![],
+        _ => return Err("debe ser una lista de destinatarios (string o array)".into()),
+    };
+    let mut out = Vec::new();
+    for entry in raw.into_iter().filter(|s| !s.is_empty()) {
+        if entry.chars().any(|c| c.is_control()) || entry.len() > 254 {
+            return Err(format!("destinatario inválido: `{entry}`"));
+        }
+        out.push(entry);
+    }
+    Ok(out.join(","))
 }
 
 /// Lee TODOS los settings conocidos de `hub_id`: las filas persistidas mezcladas sobre los defaults

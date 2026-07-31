@@ -25,7 +25,7 @@ async fn make_app() -> (axum::Router, AppState) {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture()).await.unwrap();
-    let state = AppState::new(rt);
+    let state = AppState::with_config(rt, HubConfig::from_env_with_auth(AuthMode::Dev));
     (app(state.clone()), state)
 }
 

@@ -78,6 +78,35 @@ pub async fn enforce(
     Ok(())
 }
 
+/// **Gate de UNA capability concreta** (default-deny): el módulo tiene que **declararla** en su
+/// `module.json` **y** tenerla **concedida**. Es el gate que se aplica en el punto donde el host
+/// ejerce el primitivo, no donde arranca el módulo.
+///
+/// Existe por hub#240: `enforce` exige *todas* las capabilities declaradas y solo se llamaba antes
+/// de un handler **nativo**, así que el camino `handler WASM → evento `*.reminder.due` → outbox →
+/// listener-host de `host.notify`` llegaba a mandar email/SMS/WhatsApp sin pasar por ningún gate.
+/// Con esto, emitir un recordatorio (y entregarlo) exige `notify` declarada + concedida.
+pub async fn require(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    module_id: &str,
+    hub_id: &str,
+    kind: CapabilityKind,
+) -> Result<()> {
+    let denied = || RuntimeError::CapabilityDenied {
+        module: module_id.to_string(),
+        capability: kind.as_str().to_string(),
+    };
+    if !requested(registry, module_id).contains(&kind) {
+        // No la declara: no se le puede conceder, luego no puede ejercerla.
+        return Err(denied());
+    }
+    if !granted_set(db, hub_id, module_id).await?.contains(kind.as_str()) {
+        return Err(denied());
+    }
+    Ok(())
+}
+
 /// Capabilities **declaradas** por un módulo con su estado de grant (para
 /// `GET /api/modules/{id}/capabilities`). Cada entrada: `(capability_canónica, granted)`.
 pub async fn list_for_module(
@@ -207,6 +236,45 @@ mod tests {
         let reg = registry_with(manifest(r#"{"id":"sales","name":"Sales","version":"1.0.0"}"#));
         enforce(&db, &reg, "sales", "hub-test").await.unwrap();
         assert!(list_for_module(&db, &reg, "hub-test", "sales").await.unwrap().is_empty());
+    }
+
+    /// `require` gatea UNA capability: hace falta declararla Y tenerla concedida. Un módulo con
+    /// otras capabilities concedidas no cuela (hub#240: el camino a `host.notify`).
+    #[tokio::test]
+    async fn require_needs_the_capability_declared_and_granted() {
+        let db = db_with_migrations().await;
+        let reg = registry_with(manifest(
+            r#"{"id":"appt","name":"Appointments","version":"1.0.0",
+                "capabilities":{"notify":{"channels":["email"]},"network":{"allow":["https://x"]}}}"#,
+        ));
+        let (hub, mid) = ("hub-test", "appt");
+
+        // Declarada pero sin conceder → denegada.
+        assert!(matches!(
+            require(&db, &reg, mid, hub, CapabilityKind::Notify).await.unwrap_err(),
+            RuntimeError::CapabilityDenied { capability, .. } if capability == "notify"
+        ));
+
+        // Conceder OTRA capability no abre `notify`.
+        set_grant(&db, &reg, hub, mid, "network", true, "hub_user:admin").await.unwrap();
+        assert!(require(&db, &reg, mid, hub, CapabilityKind::Notify).await.is_err());
+
+        // Concedida → pasa. Y revocarla vuelve a cerrar.
+        set_grant(&db, &reg, hub, mid, "notify", true, "hub_user:admin").await.unwrap();
+        require(&db, &reg, mid, hub, CapabilityKind::Notify).await.unwrap();
+        set_grant(&db, &reg, hub, mid, "notify", false, "hub_user:admin").await.unwrap();
+        assert!(require(&db, &reg, mid, hub, CapabilityKind::Notify).await.is_err());
+    }
+
+    /// Un módulo que NO declara la capability no puede ejercerla (no hay grant que conceder).
+    #[tokio::test]
+    async fn require_rejects_undeclared_capability() {
+        let db = db_with_migrations().await;
+        let reg = registry_with(manifest(r#"{"id":"notes","name":"Notes","version":"1.0.0"}"#));
+        assert!(matches!(
+            require(&db, &reg, "notes", "hub-test", CapabilityKind::Notify).await.unwrap_err(),
+            RuntimeError::CapabilityDenied { .. }
+        ));
     }
 
     #[tokio::test]

@@ -7,7 +7,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::{build_router, with_csp, AppState};
+use erplora_server::{build_router, with_csp, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
 use tower::ServiceExt; // oneshot
 
@@ -27,7 +27,7 @@ fn temp_dist() -> std::path::PathBuf {
 async fn make_state() -> AppState {
     let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
-    AppState::new(rt)
+    AppState::with_config(rt, HubConfig::from_env_with_auth(AuthMode::Dev))
 }
 
 async fn body(resp: axum::response::Response) -> Vec<u8> {
