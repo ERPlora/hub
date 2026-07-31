@@ -17,7 +17,12 @@ export interface ModuleManifest {
    * Carpeta persistente privada del módulo. El Hub la resuelve bajo
    * `media/modules/<folder>/` en disco local o en el almacenamiento Cloud/S3.
    */
-  static_files?: { folder: string };
+  /**
+   * Carpeta privada del módulo bajo `media/modules/` (ADR-0151) y qué puede hacer el USUARIO con
+   * esos ficheros desde /files (ADR-0165). `user_actions` ausente o vacío = solo ver y descargar.
+   * No limita al módulo, que sigue escribiendo por `ModuleStorage`.
+   */
+  static_files?: { folder: string; user_actions?: ('upload' | 'rename' | 'delete')[] };
   depends_on?: string[];
   permissions?: string[];
   role_permissions?: Record<string, string[]>;
