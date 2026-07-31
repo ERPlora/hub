@@ -12,31 +12,40 @@ fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 fn wasm() -> bool { mdir("invoice").join("dist/handler.wasm").exists() }
 
+/// Runtime con la cadena completa de dependencias de `invoice`.
+///
+/// `invoice` declara `depends_on: ["sales"]` (necesario para la `read` de `sales.get` que valida
+/// la existencia de la venta en `create_from_sale`, hub#108), y `sales` a su vez depende de
+/// `inventory`+`taxes`. Sin instalar toda la cadena, `invoice` no se instala y la read no resuelve.
 async fn rt_invoice() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&mdir("invoice")).await.expect("instalar invoice");
+    for m in ["taxes", "inventory", "customers", "sales", "invoice"] {
+        rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));
+    }
     rt
 }
 
 #[tokio::test]
 async fn install_registers_capabilities() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = rt_invoice().await;
     let reg = rt.registry();
     assert!(reg.is_installed("invoice"));
     assert!(reg.get_command("invoice.create").is_some());
     assert!(reg.get_command("invoice.rectify").is_some());
-    assert_eq!(reg.listeners_for("sale.completed"), ["invoice.create_from_sale"]);
+    // Al instalar toda la cadena de dependencias de invoice, otros módulos también escuchan
+    // sale.completed (inventory, customers). Lo que importa es que invoice SÍ está suscrito.
+    let listeners = reg.listeners_for("sale.completed");
+    assert!(
+        listeners.iter().any(|l| l == "invoice.create_from_sale"),
+        "invoice.create_from_sale debe escuchar sale.completed; listeners reales: {listeners:?}"
+    );
 }
 
 #[tokio::test]
 async fn create_invoice_with_lines_and_numbering() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm() { eprintln!("SKIP: invoice handler.wasm ausente"); return; }
     let rt = rt_invoice().await;
     let ctx = admin();
@@ -66,9 +75,7 @@ async fn create_invoice_with_lines_and_numbering() {
 
 #[tokio::test]
 async fn second_invoice_increments_series() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm() { eprintln!("SKIP"); return; }
     let rt = rt_invoice().await;
     let ctx = admin();
@@ -84,9 +91,7 @@ async fn second_invoice_increments_series() {
 
 #[tokio::test]
 async fn rectify_creates_negated_and_cancels_original() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm() { eprintln!("SKIP"); return; }
     let rt = rt_invoice().await;
     let ctx = admin();
@@ -114,9 +119,7 @@ async fn rectify_creates_negated_and_cancels_original() {
 
 #[tokio::test]
 async fn auto_f2_on_sale_completed() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Cadena cross-módulo: una venta (sales) auto-crea una factura F2 (invoice).
     if !mdir("sales").join("dist/handler.wasm").exists() || !wasm() { eprintln!("SKIP"); return; }
     let db = fresh_db().await;
@@ -124,8 +127,10 @@ async fn auto_f2_on_sale_completed() {
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap();
-    rt.install_from_dir(&mdir("invoice")).await.unwrap();
+    // invoice depende de sales (depends_on), así que sales va PRIMERO; si no, la instalación de
+    // invoice falla con MissingDependency. (La read sales.get de create_from_sale, hub#108.)
     rt.install_from_dir(&mdir("sales")).await.unwrap();
+    rt.install_from_dir(&mdir("invoice")).await.unwrap();
     let ctx = admin();
 
     rt.execute_command("sales.complete_sale", &params(json!({
@@ -149,9 +154,7 @@ async fn auto_f2_on_sale_completed() {
 
 #[tokio::test]
 async fn auto_f2_propagates_business_issuer_via_outbox() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // REGRESIÓN QA (2026-06-25): la identidad fiscal del hub (hub_settings, ADR-0061) debe llegar a
     // la factura F2 que se crea de forma ASÍNCRONA por el relay del Outbox (sale.completed →
     // invoice.create_from_sale, depth>0). Antes la enriquecedora del dispatcher solo corría a
@@ -162,8 +165,9 @@ async fn auto_f2_propagates_business_issuer_via_outbox() {
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap();
-    rt.install_from_dir(&mdir("invoice")).await.unwrap();
+    // invoice depende de sales (depends_on) → sales PRIMERO (ver auto_f2_on_sale_completed).
     rt.install_from_dir(&mdir("sales")).await.unwrap();
+    rt.install_from_dir(&mdir("invoice")).await.unwrap();
     // El ctx debe compartir hub_id con el Runtime (DEV_HUB_ID) para que set_settings y la
     // enriquecedora lean la MISMA fila de hub_settings.
     let ctx = RequestContext::new(erplora_runtime::DEV_HUB_ID, "u1", ["*".to_string()]);
@@ -191,4 +195,107 @@ async fn auto_f2_propagates_business_issuer_via_outbox() {
         "B12345674",
         "la factura auto-F2 del relay debe llevar el NIF emisor de hub_settings"
     );
+}
+
+// ── hub#108: create_from_sale con sale_id inexistente debe FALLAR, no facturar cero ───────────────
+//
+// Regresión fiscal (P0): un `invoice.create_from_sale` directo con un `sale_id` que no existe
+// generaba una factura cero (source_id inexistente, NIF vacío, total 0), consumiendo numeración y
+// contaminando totales/trazabilidad. El handler ahora valida la existencia de la venta contra la
+// `read` de confianza `sales.get` (el host la pre-carga en `context.reads`) y rechaza si la venta
+// no está. El rechazo es un trap WASM → el runtime NO persiste nada (ni factura ni numeración).
+
+/// Un `sale_id` inexistente: el command falla, no se crea ninguna factura y la numeración de la
+/// serie TICKET NO se consume (la primera factura válida posterior sale con `-000001`).
+#[tokio::test]
+async fn create_from_sale_nonexistent_sale_id_fails_and_creates_no_invoice() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !wasm() { eprintln!("SKIP: invoice handler.wasm ausente"); return; }
+    let rt = rt_invoice().await;
+    let ctx = admin();
+
+    // sale_id que NO existe en el hub → la read `sales.get` devuelve 0 filas → el handler rechaza.
+    let err = rt.execute_command("invoice.create_from_sale", &params(json!({
+        "sale_id": "__missing_sale__",
+        "customer_name": "Nadie",
+        "items": [{ "product_name": "Café", "quantity": 1_000_000, "unit_price": 100, "tax_rate": 21.0 }]
+    })), &ctx).await.unwrap_err();
+    // Error estable (no un panic opaco): el handler emite `sale_not_found: …`.
+    let msg = err.to_string();
+    assert!(
+        msg.contains("sale_not_found"),
+        "esperaba rechazo sale_not_found para una venta inexistente; llegó: {msg}"
+    );
+
+    // Ninguna factura se creó (antes quedaba una factura cero con source inexistente).
+    let invs = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap();
+    assert!(invs.is_empty(), "una venta inexistente NO debe generar factura; list: {invs:?}");
+
+    // Y la numeración NO se consumió: la primera factura válida posterior sale con -000001.
+    // (El rechazo ocurre ANTES de persistir → el contador de serie no se incrementa.)
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "customer_name": "Bar Real", "tax_included": false,
+        "items": [{ "product_name": "Café", "price": 100, "quantity": 1_000_000, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("crear una venta real");
+    rt.drain_outbox().await.unwrap();
+    let invs = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(invs.len(), 1, "la venta real auto-crea exactamente 1 factura");
+    assert!(
+        invs[0]["number"].as_str().unwrap().ends_with("-000001"),
+        "el primer número debe ser 000001 (el intento fallido no consumió numeración): {}",
+        invs[0]["number"]
+    );
+}
+
+/// Un `sale_id` REAL: la read `sales.get` encuentra la venta → el handler emite la factura F2
+/// correcta, enlazada al source y con los importes de la venta.
+#[tokio::test]
+async fn create_from_sale_with_real_sale_creates_correct_invoice() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !wasm() { eprintln!("SKIP: invoice handler.wasm ausente"); return; }
+    let rt = rt_invoice().await;
+    let ctx = admin();
+
+    // Creamos una venta real y obtenemos su id. NO drenamos el outbox todavía: así el relay
+    // (sale.completed → create_from_sale) aún NO ha creado la F2, y la invocación DIRECTA que
+    // sigue es la PRIMERA factura para esa venta (el camino del issue: la API externa llama a
+    // create_from_sale con un sale_id).
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "customer_name": "Bar Manolo", "tax_included": false,
+        "items": [{ "product_name": "Café", "price": 200, "quantity": 2_000_000, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("crear la venta");
+    let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    let sale_id = ventas[0]["id"].as_str().unwrap().to_string();
+
+    // Invocación DIRECTA con un sale_id real. La read sales.get resuelve la venta → la factura se
+    // emite (no se rechaza). El handler devuelve 4 intenciones para 1 línea (ensure + bump + invoice
+    // + 1 línea), como create_invoice con una línea.
+    let res = rt.execute_command("invoice.create_from_sale", &params(json!({
+        "sale_id": sale_id,
+        "customer_name": "Bar Manolo",
+        "items": [{ "product_name": "Café", "quantity": 2_000_000, "unit_price": 200, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("una venta real debe poder facturarse");
+    assert_eq!(res["operations"], json!(4), "operaciones esperadas para 1 línea: {res}");
+
+    // Exactamente 1 factura (la directa), correcta y enlazada al source.
+    let invs = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(invs.len(), 1, "la invocación directa crea 1 factura: {invs:?}");
+    let inv = &invs[0];
+    assert_eq!(inv["invoice_type"], json!("F2"), "de venta → simplificada F2");
+    assert_eq!(inv["series"], json!("TICKET"));
+    assert_eq!(inv["source_type"], json!("sale"), "origen = venta");
+    // céntimos: base 2×200 = 400, tax 21 % = 84, total 484.
+    assert_eq!(inv["base_amount"].as_i64().unwrap(), 400, "base = 2 × 2,00 €");
+    assert_eq!(inv["tax_amount"].as_i64().unwrap(), 84, "21 % de 4,00 €");
+    assert_eq!(inv["total_amount"].as_i64().unwrap(), 484);
+
+    // Idempotencia D2 (1 factura por venta, sin huecos de numeración): al drenar el outbox el relay
+    // vuelve a intentar create_from_sale para la misma venta, pero ya existe → no se duplica.
+    rt.drain_outbox().await.unwrap();
+    let invs = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(invs.len(), 1, "idempotencia: el relay no duplica la factura de la venta");
 }

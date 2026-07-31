@@ -104,6 +104,9 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
         "dependent",
         "latest",
         &on_progress,
+        // El mock cloud de este test no firma los zips (prueba las fases de progreso, no la
+        // autenticidad — esa va en install_surface). DevTrust admite sin firma.
+        &erplora_server::install::dev_signature_policy(),
     )
     .await
     .expect("instalación con dep anidada debe funcionar");

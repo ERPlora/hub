@@ -2,7 +2,7 @@
 //!
 //! Dado un [`InstallGrant`] del Cloud Portal (URL de descarga + sha256 esperado), este crate:
 //!  1. descarga el `module.zip` (vía un [`Fetcher`] inyectable → testeable sin red),
-//!  2. **verifica el SHA256** (reusa `erplora-cloud-client`),
+//!  2. **verifica la firma ed25519** (autenticidad, hub#239) y el **SHA256** (integridad),
 //!  3. lo **descomprime** de forma segura (rechaza zip-slip) en un cache local
 //!     (`root/<module_id>/<version>/`),
 //!
@@ -14,17 +14,23 @@ use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-pub use cloud_client::{InstallGrant, IntegrityError};
+pub use cloud_client::{
+    InstallGrant, IntegrityError, ModuleSignature, SignatureError, SignaturePolicy,
+};
 
 /// Errores de adquisición de artefactos.
 #[derive(Debug, thiserror::Error)]
 pub enum SourceError {
-    /// La descarga (responsabilidad del `Fetcher` inyectado) falló.
+    /// La descarga (responsabilidad del `Fetcher` inyectable) falló.
     #[error("fallo de descarga: {0}")]
     Fetch(String),
     /// El SHA256 del zip no coincide con el esperado en el grant.
     #[error(transparent)]
     Integrity(#[from] IntegrityError),
+    /// La firma ed25519 del módulo falta o no valida (hub#239). DEFAULT DENY: bajo la política
+    /// `Enforce` un módulo sin firma válida no se descomprime ni instala.
+    #[error(transparent)]
+    BadSignature(#[from] SignatureError),
     /// El grant no trae `sha256`: sin hash esperado no hay verificación de integridad
     /// posible. ADR-0015: SHA256 **obligatorio y no-saltable** — se aborta ANTES de
     /// descargar/descomprimir nada.
@@ -75,13 +81,24 @@ impl ModuleStore {
     /// Adquiere e instala el módulo del `grant` en el cache; devuelve el directorio listo
     /// para `install_from_dir`.
     ///
-    /// Si ya está cacheado, devuelve el path sin descargar. Si no: descarga → verifica SHA256
-    /// → descomprime → valida que existe `module.json`. Ante cualquier fallo limpia el dir
-    /// parcial para no dejar basura.
+    /// Si ya está cacheado, devuelve el path sin descargar. Si no: descarga → **verifica firma
+    /// ed25519 + SHA256** → descomprime → valida que existe `module.json`. Ante cualquier fallo
+    /// limpia el dir parcial para no dejar basura.
     ///
     /// La verificación SHA256 es **obligatoria y no-saltable** (ADR-0015): un grant sin
     /// `sha256` se rechaza con [`SourceError::MissingSha256`] **antes** de descargar.
-    pub fn install(&self, fetcher: &dyn Fetcher, grant: &InstallGrant) -> Result<PathBuf> {
+    ///
+    /// La verificación de **firma** (hub#239) sigue `policy`: bajo `Enforce` el grant debe traer
+    /// una firma ed25519 válida contra el anillo de claves de confianza — sin firma o firma
+    /// inválida el módulo se rechaza con [`SourceError::BadSignature`] **antes** de descomprimir.
+    /// Bajo `DevTrust` (escape hatch de desarrollo explícito) se acepta un módulo sin firmar.
+    /// El DEFAULT es deny: el llamador de producción construye `Enforce(keyring)`.
+    pub fn install(
+        &self,
+        fetcher: &dyn Fetcher,
+        grant: &InstallGrant,
+        policy: &SignaturePolicy,
+    ) -> Result<PathBuf> {
         let dest = self.path_for(&grant.module_id, &grant.version);
         if self.is_cached(&grant.module_id, &grant.version) {
             return Ok(dest);
@@ -96,6 +113,9 @@ impl ModuleStore {
 
         let bytes = fetcher.fetch(&grant.download_url)?;
         grant.verify(&bytes)?;
+        // Autenticidad (hub#239): cubre los MISMOS bytes que el SHA256 (el zip entero). Falla
+        // cerrado bajo Enforce: sin firma válida no se descomprime nada.
+        grant.verify_signature(&bytes, policy)?;
 
         // Descomprime a un dir temporal hermano; promoción atómica al final.
         let staging = self.staging_dir(&grant.module_id, &grant.version);
@@ -328,7 +348,11 @@ mod tests {
         let fetcher = MockFetcher::new(zip);
 
         assert!(!store.is_cached("inventory", "1.0.0"));
-        let path = store.install(&fetcher, &grant).unwrap();
+        // DevTrust: los tests de adquisición existentes no firman (comprueban sha/zip/cache,
+        // no autenticidad — esa va en sus propios tests abajo).
+        let path = store
+            .install(&fetcher, &grant, &SignaturePolicy::DevTrust)
+            .unwrap();
 
         assert_eq!(path, store.path_for("inventory", "1.0.0"));
         assert!(path.join("module.json").is_file());
@@ -347,7 +371,9 @@ mod tests {
         grant.sha256 = cloud_client::integrity::sha256_hex(b"otros");
         let fetcher = MockFetcher::new(zip);
 
-        let err = store.install(&fetcher, &grant).unwrap_err();
+        let err = store
+            .install(&fetcher, &grant, &SignaturePolicy::DevTrust)
+            .unwrap_err();
         assert!(matches!(err, SourceError::Integrity(_)));
         assert!(!store.is_cached("inventory", "1.0.0"));
         // El dir de versión no debe quedar con contenido.
@@ -363,10 +389,10 @@ mod tests {
         let grant = grant_for(&zip, "inventory", "1.0.0");
         let fetcher = MockFetcher::new(zip);
 
-        store.install(&fetcher, &grant).unwrap();
+        store.install(&fetcher, &grant, &SignaturePolicy::DevTrust).unwrap();
         assert_eq!(fetcher.calls.get(), 1);
         // Segunda vez: cache hit, sin fetch.
-        store.install(&fetcher, &grant).unwrap();
+        store.install(&fetcher, &grant, &SignaturePolicy::DevTrust).unwrap();
         assert_eq!(fetcher.calls.get(), 1);
     }
 
@@ -382,7 +408,9 @@ mod tests {
         let grant = grant_for(&zip, "x", "1");
         let fetcher = MockFetcher::new(zip);
 
-        let err = store.install(&fetcher, &grant).unwrap_err();
+        let err = store
+            .install(&fetcher, &grant, &SignaturePolicy::DevTrust)
+            .unwrap_err();
         assert!(matches!(err, SourceError::Zip(_)));
         // No debe haber escrito nada fuera del root.
         assert!(!tmp.path().parent().unwrap().join("evil.txt").exists());
@@ -397,9 +425,90 @@ mod tests {
         let grant = grant_for(&zip, "x", "1");
         let fetcher = MockFetcher::new(zip);
 
-        let err = store.install(&fetcher, &grant).unwrap_err();
+        let err = store
+            .install(&fetcher, &grant, &SignaturePolicy::DevTrust)
+            .unwrap_err();
         assert!(matches!(err, SourceError::MissingManifest));
         assert!(!store.is_cached("x", "1"));
+    }
+
+    // ── hub#239: verificación de firma ed25519 en la adquisición ───────────────
+    //
+    // DEFAULT DENY: bajo `Enforce`, un módulo sin firma (o con firma inválida) NO se descomprime
+    // ni instala. `DevTrust` es el escape hatch explícito. Estos tests cubren los 4 contratos del
+    // fix: unsigned rechazado, tampered rechazado, signed aceptado, dev-override solo con flag.
+
+    /// Genera un par ed25519 efímero y su `TrustedKeyRing` de un solo elemento.
+    fn signer_and_keyring() -> (cloud_client::Signer, SignaturePolicy) {
+        let rng = ring::rand::SystemRandom::new();
+        let (signer, _) = cloud_client::Signer::generate(&rng);
+        let mut ring = cloud_client::TrustedKeyRing::empty();
+        ring.add_bytes("marketplace", &signer.public_key()).unwrap();
+        (signer, SignaturePolicy::Enforce(ring))
+    }
+
+    #[test]
+    fn enforce_rechaza_modulo_sin_firma() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = ModuleStore::new(tmp.path());
+        let zip = valid_module_zip();
+        let grant = grant_for(&zip, "inventory", "1.0.0"); // sin `signature`
+        let fetcher = MockFetcher::new(zip);
+        let (_signer, policy) = signer_and_keyring();
+
+        let err = store.install(&fetcher, &grant, &policy).unwrap_err();
+        assert!(matches!(err, SourceError::BadSignature(SignatureError::Missing)), "{err:?}");
+        assert!(!store.is_cached("inventory", "1.0.0"));
+    }
+
+    #[test]
+    fn enforce_rechaza_firma_sobre_bytes_distintos_tampering() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = ModuleStore::new(tmp.path());
+        let (signer, policy) = signer_and_keyring();
+        // Firmamos OTRO zip (contenido distinto) y lo adjuntamos al grant del zip real → la firma
+        // no casa con los bytes que se descargan (simula tampering entre la firma y el zip real).
+        let real_zip = valid_module_zip();
+        let other_zip = build_zip(&[
+            ("module.json", br#"{"id":"inventory","version":"1.0.0","name":"otro"}"# as &[u8]),
+        ]);
+        let sig = signer.sign("marketplace", &other_zip);
+        let mut grant = grant_for(&real_zip, "inventory", "1.0.0");
+        grant.signature = Some(sig);
+        let fetcher = MockFetcher::new(real_zip);
+
+        let err = store.install(&fetcher, &grant, &policy).unwrap_err();
+        assert!(matches!(err, SourceError::BadSignature(SignatureError::Invalid)), "{err:?}");
+        assert!(!store.is_cached("inventory", "1.0.0"));
+    }
+
+    #[test]
+    fn enforce_acepta_modulo_correctamente_firmado() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = ModuleStore::new(tmp.path());
+        let (signer, policy) = signer_and_keyring();
+        let zip = valid_module_zip();
+        let sig = signer.sign("marketplace", &zip);
+        let mut grant = grant_for(&zip, "inventory", "1.0.0");
+        grant.signature = Some(sig);
+        let fetcher = MockFetcher::new(zip);
+
+        let path = store.install(&fetcher, &grant, &policy).unwrap();
+        assert!(path.join("module.json").is_file());
+        assert!(store.is_cached("inventory", "1.0.0"));
+    }
+
+    #[test]
+    fn devtrust_instala_sin_firma_solo_con_el_flag() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = ModuleStore::new(tmp.path());
+        let zip = valid_module_zip();
+        let grant = grant_for(&zip, "inventory", "1.0.0"); // sin firma
+        let fetcher = MockFetcher::new(zip);
+
+        // El mismo grant que `Enforce` rechaza, `DevTrust` lo admite (escape hatch explícito).
+        let path = store.install(&fetcher, &grant, &SignaturePolicy::DevTrust).unwrap();
+        assert!(path.join("module.json").is_file());
     }
 
     #[test]
@@ -410,7 +519,7 @@ mod tests {
         let grant = grant_for(&zip, "inventory", "1.0.0");
         let fetcher = MockFetcher::new(zip);
 
-        store.install(&fetcher, &grant).unwrap();
+        store.install(&fetcher, &grant, &SignaturePolicy::DevTrust).unwrap();
         assert!(store.is_cached("inventory", "1.0.0"));
         store.remove("inventory", "1.0.0").unwrap();
         assert!(!store.is_cached("inventory", "1.0.0"));

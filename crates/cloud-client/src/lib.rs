@@ -14,12 +14,17 @@ use serde::Deserialize;
 
 pub mod entitlement;
 pub mod integrity;
+pub mod signature;
 pub mod user_jwt;
 
 pub use entitlement::{
     verify_entitlement, EntitledModule, EntitlementClaims, EntitlementError, EntitlementResponse,
 };
 pub use integrity::{verify_sha256, IntegrityError};
+pub use signature::{
+    ModuleSignature, SignatureError, SignaturePolicy, Signer, TrustedKeyRing,
+    PUBLIC_KEY_LEN, SIGNATURE_LEN,
+};
 pub use user_jwt::{verify_user_jwt, HubMembership, UserClaims, UserJwtError};
 
 /// Credenciales con las que firmar una petición al Cloud.
@@ -419,6 +424,11 @@ pub struct ModuleVersion {
     /// SHA256 hex esperado del ZIP. `None` si el Cloud no lo expone en este endpoint.
     #[serde(default)]
     pub sha256: Option<String>,
+    /// Firma ed25519 detached del ZIP (autenticidad, hub#239). `None` si el Cloud aún no la
+    /// expone o el publicador no firmó. Bajo `SignaturePolicy::Enforce` un `None` aquí aborta la
+    /// instalación (DEFAULT deny); TODO: el serializer del Cloud debe exponerla siempre.
+    #[serde(default)]
+    pub signature: Option<ModuleSignature>,
 }
 
 impl ModuleVersion {
@@ -437,6 +447,11 @@ pub struct InstallGrant {
     pub download_url: String,
     /// SHA256 hex esperado del zip (integridad, §2.2).
     pub sha256: String,
+    /// Firma ed25519 detached del `module.zip` (autenticidad, hub#239). Opcional: el Cloud la
+    /// expone cuando el publicador firmó; si falta y la política es `Enforce`, la instalación se
+    /// rechaza (`SignatureError::Missing`). Acepta ausencia en el JSON para compat hacia atrás.
+    #[serde(default)]
+    pub signature: Option<ModuleSignature>,
 }
 
 impl InstallGrant {
@@ -447,6 +462,17 @@ impl InstallGrant {
     /// Verifica que `bytes` (el zip descargado) coincide con el `sha256` esperado.
     pub fn verify(&self, bytes: &[u8]) -> Result<(), IntegrityError> {
         verify_sha256(bytes, &self.sha256)
+    }
+
+    /// Verifica la **firma** ed25519 de `bytes` bajo `policy` (hub#239). Bajo `Enforce`, exige
+    /// firma presente y válida contra el anillo; bajo `DevTrust`, acepta todo. Devuelve el
+    /// `key_id` verificado bajo `Enforce` (`None` bajo `DevTrust`).
+    pub fn verify_signature(
+        &self,
+        bytes: &[u8],
+        policy: &SignaturePolicy,
+    ) -> Result<Option<String>, SignatureError> {
+        policy.check(self.signature.as_ref(), bytes)
     }
 }
 

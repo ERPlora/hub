@@ -241,6 +241,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         | E::CommandNotFound(_)
         | E::QueryNotFound(_)
         | E::InternalCommand(_)
+        // hub#140: un `min_affected_rows` incumplido es un error esperable del llamador (recurso
+        // inexistente / transición no aplicable), no un fallo inesperado del Hub.
+        | E::MinAffectedRows { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -258,6 +261,10 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::ModuleInactive { .. } => "module_inactive",
         E::CommandNotFound(_) => "command_not_found",
         E::InternalCommand(_) => "internal_command",
+        // hub#140: el código estable refleja el `kind` (not_found vs conflict/invalid_transition),
+        // no la variante genérica — es lo que el SDK y los listeners programan. `as_str` es la
+        // única fuente de verdad del nombre, así que la regla vive en `AffectedKind`.
+        E::MinAffectedRows { kind, .. } => kind.as_str(),
         E::PermissionDenied(_) => "permission_denied",
         E::CapabilityDenied { .. } => "capability_denied",
         E::MissingDependency { .. } => "missing_dependency",

@@ -42,9 +42,7 @@ async fn rt_invoice() -> Runtime {
 
 #[tokio::test]
 async fn factura_mixta_produce_un_desglose_por_tipo_para_verifactu() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm() {
         eprintln!("SKIP: invoice handler.wasm ausente");
         return;

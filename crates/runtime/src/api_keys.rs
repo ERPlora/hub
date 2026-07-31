@@ -364,6 +364,7 @@ mod tests {
             sql: vec![],
             schema: None,
             emit: vec![],
+            min_affected_rows: None,
             handler: None,
             ai: None,
             expose_api: expose,

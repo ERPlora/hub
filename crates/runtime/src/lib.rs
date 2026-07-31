@@ -16,6 +16,7 @@ pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
 pub mod commands;
+pub mod e2e_support;
 pub mod error_registry;
 pub mod errors;
 pub mod events;
@@ -49,6 +50,9 @@ pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{Result, RuntimeError};
 pub use manifest::Manifest;
 pub use registry::{EventSink, ModuleStatus, NavEntry, Registry, RequestContext};
+// Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
+// `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
+pub use e2e_support::require_modules_workspace;
 
 /// Descripción de un módulo instalado (para `/api/modules`).
 #[derive(Debug, Clone, serde::Serialize)]
@@ -941,6 +945,7 @@ mod tests {
                 sql: vec![],
                 schema: None,
                 emit: vec![],
+                min_affected_rows: None,
                 handler: None,
                 ai: None,
                 expose_api: false,

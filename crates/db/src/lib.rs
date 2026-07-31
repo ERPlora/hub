@@ -65,6 +65,20 @@ impl CommandResult {
     }
 }
 
+/// Outcome of [`DatabaseAdapter::execute_tx_gated`] (hub#140). The tx is over either way; this
+/// only tells the runtime WHICH end it reached so it can either emit (committed) or raise the
+/// stable `MinAffectedRows` error (rolled back). The per-op counts of the **mutation** statements
+/// are carried in both branches for diagnostics and error construction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TxGatedOutcome {
+    /// The gate passed; the tx committed with these per-statement affected counts (SQL mutation +
+    /// outbox inserts + `extra_ops`, in the order they were passed).
+    Committed { per_op: Vec<u64> },
+    /// The gate failed; the tx **rolled back** (no mutation, no outbox). `sql_counts` holds the
+    /// affected counts of just the mutation statements, so the runtime can report the real number.
+    RolledBack { sql_counts: Vec<u64> },
+}
+
 /// Common contract for the backend. The runtime only knows this trait; it does not know the
 /// concrete pool sitting underneath. One contract, one Postgres implementation (ADR-0154).
 #[async_trait]
@@ -74,6 +88,40 @@ pub trait DatabaseAdapter: Send + Sync {
 
     /// Runs several statements in a **transaction** (all-or-nothing).
     async fn execute_tx(&self, ops: &[(String, Params)]) -> Result<CommandResult, DbError>;
+
+    /// Runs several statements in a **transaction** (all-or-nothing), but lets the caller **gate
+    /// the commit** on the per-statement affected-row counts (hub#140).
+    ///
+    /// # Por qué existe
+    ///
+    /// A declarative command batches its mutation SQL + its `_event_outbox` INSERTs into ONE tx so
+    /// that events are written iff the mutation commits (escritura atómica, ARQUITECTURA §5.4).
+    /// hub#140 adds a second invariant: if the mutation affected fewer rows than the manifest
+    /// demanded (`min_affected_rows`), the **whole** tx must roll back — neither the mutation nor
+    /// the outbox may land — because the declared fact never happened. That check must run
+    /// **inside** the tx to stay atomic: running the SQL, seeing 0 rows, and *then* trying to skip
+    /// the outbox would already have committed the outbox inserts in the same batch.
+    ///
+    /// - `sql_op_count`: the leading ops are the command's mutation statements; the rest are outbox
+    ///   inserts (and `extra_ops`). The gate runs over the per-op counts of the FIRST
+    ///   `sql_op_count` ops only — outbox INSERTs always affect exactly 1 and must not feed the gate
+    ///   (otherwise a "confirm" over a missing appointment would mutate 0 rows but still pass once
+    ///   its outbox INSERT is counted).
+    /// - `min_affected_rows`: the required total across those `sql_op_count` statements. `None`
+    ///   disables the gate (legacy behavior — commit unconditionally, like [`execute_tx`]).
+    ///
+    /// On commit returns [`TxGatedOutcome::Committed`] with every per-op count (diagnostics);
+    /// on a gate failure returns [`TxGatedOutcome::RolledBack`] with the SQL counts so the runtime
+    /// can build the stable `MinAffectedRows` error. A real DB error propagates as `Err` (the tx
+    /// has already rolled back). `execute_tx` stays as the total-only path for callers that don't
+    /// care (reset, migrations, user_profile): changing its return type would be a wider blast
+    /// radius for no gain.
+    async fn execute_tx_gated(
+        &self,
+        ops: &[(String, Params)],
+        sql_op_count: usize,
+        min_affected_rows: Option<u64>,
+    ) -> Result<TxGatedOutcome, DbError>;
 
     /// Runs a query and returns the rows as JSON objects.
     async fn query(&self, sql: &str, params: &Params) -> Result<QueryResult, DbError>;
@@ -253,6 +301,38 @@ impl DatabaseAdapter for PgAdapter {
         }
         tx.commit().await?;
         Ok(CommandResult::affected(total))
+    }
+
+    async fn execute_tx_gated(
+        &self,
+        ops: &[(String, Params)],
+        sql_op_count: usize,
+        min_affected_rows: Option<u64>,
+    ) -> Result<TxGatedOutcome, DbError> {
+        let mut tx = self.pool.begin().await?;
+        let mut per_op = Vec::with_capacity(ops.len());
+        for (sql, params) in ops {
+            let (tsql, names) = translate(sql);
+            let q = build_query!(tsql, names, params);
+            per_op.push(q.execute(&mut *tx).await?.rows_affected());
+        }
+        // La gate se evalúa SOLO sobre las sentencias de mutación (las primeras `sql_op_count`):
+        // los INSERT del outbox siempre afectan 1 y NO deben entrar en el recuento (un "confirmar"
+        // sobre una cita inexistente muta 0 filas, aunque luego inserte un evento — si el evento
+        // contara, la gate pasaría siempre y el bug del issue seguiría vivo).
+        if let Some(min) = min_affected_rows {
+            let n = sql_op_count.min(per_op.len());
+            let affected: u64 = per_op[..n].iter().sum();
+            if affected < min {
+                // Rollback explícito: el default-drop de sqlx haría lo mismo al caer del scope,
+                // pero dejarlo tácito es justo el tipo de "OK silencioso" que hub#140 elimina.
+                tx.rollback().await?;
+                let sql_counts = per_op[..n].to_vec();
+                return Ok(TxGatedOutcome::RolledBack { sql_counts });
+            }
+        }
+        tx.commit().await?;
+        Ok(TxGatedOutcome::Committed { per_op })
     }
 
     async fn query(&self, sql: &str, params: &Params) -> Result<QueryResult, DbError> {

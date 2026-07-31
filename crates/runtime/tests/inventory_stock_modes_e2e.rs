@@ -170,9 +170,7 @@ async fn void_sale(rt: &Runtime, ctx: &RequestContext, sale_id: &str) {
 /// (Bug original: `CASE WHEN <0 THEN 0` truncaba a cero en silencio.)
 #[tokio::test]
 async fn insufficient_decrease_is_rejected_atomically() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
     let pid = create_product(&rt, &ctx, "Café", "CAF", 5, Some(5)).await;
@@ -185,9 +183,7 @@ async fn insufficient_decrease_is_rejected_atomically() {
 /// Con stock suficiente el descuento sigue funcionando (regresión).
 #[tokio::test]
 async fn sufficient_decrease_still_decreases() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
     let pid = create_product(&rt, &ctx, "Té", "TE", 5, Some(5)).await;
@@ -203,9 +199,7 @@ async fn sufficient_decrease_still_decreases() {
 /// representa tal cual — NEGATIVO, nunca truncado a cero en silencio.
 #[tokio::test]
 async fn oversell_allowed_represents_negative_stock() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
     set_settings(&rt, &ctx, 1, 1, 10).await;
@@ -221,9 +215,7 @@ async fn oversell_allowed_represents_negative_stock() {
 /// El descuento directo es no-op: no se crean movimientos con el tracking desactivado.
 #[tokio::test]
 async fn track_off_direct_decrease_is_noop() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
     set_settings(&rt, &ctx, 0, 0, 10).await;
@@ -239,9 +231,7 @@ async fn track_off_direct_decrease_is_noop() {
 /// «revertir una venta solo cuando la operación original haya generado movimientos».
 #[tokio::test]
 async fn track_off_sale_makes_no_movements_and_void_does_not_restock() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("⚠ dist/handler.wasm no compilado — test saltado");
         return;
@@ -267,9 +257,7 @@ async fn track_off_sale_makes_no_movements_and_void_does_not_restock() {
 /// exactamente (el marcador de #6 no debe romper ADR-0075).
 #[tokio::test]
 async fn track_on_sale_decreases_and_void_restocks() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("⚠ dist/handler.wasm no compilado — test saltado");
         return;
@@ -293,9 +281,7 @@ async fn track_on_sale_decreases_and_void_restocks() {
 /// el umbral por producto siempre manda; el global es su default de creación.
 #[tokio::test]
 async fn low_stock_threshold_seeds_from_global_settings() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
     set_settings(&rt, &ctx, 1, 0, 25).await;
@@ -312,9 +298,7 @@ async fn low_stock_threshold_seeds_from_global_settings() {
 /// El umbral explícito del caller sigue mandando sobre el global (regresión).
 #[tokio::test]
 async fn explicit_low_stock_threshold_wins_over_global() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
     set_settings(&rt, &ctx, 1, 0, 25).await;

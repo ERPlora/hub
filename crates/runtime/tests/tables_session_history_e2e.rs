@@ -89,9 +89,7 @@ async fn contar(rt: &Runtime, sql: &str) -> i64 {
 
 #[tokio::test]
 async fn la_tabla_de_historial_existe_y_admite_un_tramo() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     sesion_legacy(&rt, "s1", "m12", "2026-07-19T20:00:00+00:00", None).await;
     asignacion(&rt, "a1", "s1", "m12", "op-1", None).await.expect("un tramo vivo");
@@ -100,9 +98,7 @@ async fn la_tabla_de_historial_existe_y_admite_un_tramo() {
 
 #[tokio::test]
 async fn una_sesion_no_puede_tener_dos_tramos_vivos_a_la_vez() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Es LA invariante: una cuenta está en una mesa, no en dos. Sin esto volveríamos al fallo que
     // motivó el ADR — tres mesas ocupadas por el mismo pedido y ninguna liberándose.
     let rt = fresh().await;
@@ -127,9 +123,7 @@ async fn una_sesion_no_puede_tener_dos_tramos_vivos_a_la_vez() {
 
 #[tokio::test]
 async fn el_mismo_operation_id_no_se_escribe_dos_veces() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Idempotencia: el relay puede reentregar y el camarero puede tocar dos veces. Un `operation_id`
     // repetido es la MISMA operación, no dos tramos.
     let rt = fresh().await;
@@ -142,9 +136,7 @@ async fn el_mismo_operation_id_no_se_escribe_dos_veces() {
 
 #[tokio::test]
 async fn un_motivo_inventado_se_rechaza() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // El motivo lo deriva el handler de un juego cerrado (ADR-0146). Si alguien escribe cualquier
     // cosa, el historial queda contado pero no explicado.
     let rt = fresh().await;
@@ -164,9 +156,7 @@ async fn un_motivo_inventado_se_rechaza() {
 
 #[tokio::test]
 async fn el_backfill_da_historial_a_las_sesiones_que_YA_existian() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Los hubs en marcha tienen sesiones sin historial. La migración les crea su primer tramo, o
     // esas mesas quedarían fuera de las estadísticas para siempre.
     let rt = fresh().await;
@@ -275,9 +265,7 @@ async fn abrir(rt: &mut Runtime, table_id: &str) -> String {
 
 #[tokio::test]
 async fn abrir_una_sesion_estrena_su_tramo() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let mut rt = fresh().await;
     let sid = abrir(&mut rt, "m12").await;
     assert_eq!(
@@ -289,9 +277,7 @@ async fn abrir_una_sesion_estrena_su_tramo() {
 
 #[tokio::test]
 async fn cerrar_la_sesion_cierra_su_tramo() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Al cobrar se cierra la sesión: el tramo tiene que cerrarse CON ella, o la mesa quedaría
     // ocupada para siempre en las estadísticas.
     let mut rt = fresh().await;
@@ -316,9 +302,7 @@ async fn cerrar_la_sesion_cierra_su_tramo() {
 
 #[tokio::test]
 async fn transferir_cierra_un_tramo_y_abre_el_siguiente() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Mover una cuenta de la 12 a la 8 es exactamente esto: el historial conserva AMBOS tramos, que
     // es lo que una columna `table_id` sola no puede dar.
     let mut rt = fresh().await;
@@ -395,9 +379,7 @@ async fn estado_mesa(rt: &Runtime, id: &str) -> String {
 
 #[tokio::test]
 async fn cobrar_el_pedido_libera_la_mesa_y_cierra_su_tramo() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
     let mut rt = con_pos().await;
     let ctx = admin();
@@ -440,9 +422,7 @@ async fn cobrar_el_pedido_libera_la_mesa_y_cierra_su_tramo() {
 
 #[tokio::test]
 async fn un_cobro_PARCIAL_no_libera_la_mesa() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Split-bill: uno de la mesa paga lo suyo y los demás siguen sentados. Si esto liberase la mesa,
     // el resto de la cuenta se quedaría huérfana.
     if !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
@@ -486,9 +466,7 @@ async fn un_cobro_PARCIAL_no_libera_la_mesa() {
 
 #[tokio::test]
 async fn aparcar_suelta_la_mesa_y_cierra_el_tramo_sin_cerrar_la_sesion() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Aparcar NO abre un tramo nuevo: cierra el vivo con motivo `parked`. Así el periodo aparcado
     // no tiene que inventarse una asignación a ninguna mesa (ADR-0146).
     let mut rt = fresh().await;
@@ -535,9 +513,7 @@ async fn aparcar_suelta_la_mesa_y_cierra_el_tramo_sin_cerrar_la_sesion() {
 
 #[tokio::test]
 async fn restaurar_una_cuenta_aparcada_estrena_tramo_en_la_mesa_nueva() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // La recuperas en otra mesa: el historial encadena 12 → (aparcada) → 8, sin fingir que estuvo
     // en ninguna mesa mientras esperaba.
     let mut rt = fresh().await;
@@ -563,9 +539,7 @@ async fn restaurar_una_cuenta_aparcada_estrena_tramo_en_la_mesa_nueva() {
 
 #[tokio::test]
 async fn una_cuenta_aparcada_no_ocupa_ninguna_mesa() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Invariante de sala: mientras está aparcada, ninguna mesa la está esperando.
     let mut rt = fresh().await;
     let sid = abrir(&mut rt, "m12").await;
@@ -584,9 +558,7 @@ async fn una_cuenta_aparcada_no_ocupa_ninguna_mesa() {
 
 #[tokio::test]
 async fn la_reconstruccion_de_la_tabla_no_se_lleva_el_historial() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // La migración 006 reconstruye `tables_session` para que `table_id` admita NULL. La trampa: el
     // historial colgaba de ella con una FK ON DELETE CASCADE, así que el DROP implícito del rebuild
     // habría BORRADO el historial entero — la fuente de verdad que este ADR acaba de construir.

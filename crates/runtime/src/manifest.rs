@@ -625,6 +625,24 @@ pub struct CommandDef {
     pub reads: Vec<ReadDef>,
     #[serde(default)]
     pub emit: Vec<String>,
+    /// **Contrato de mutación** (hub#140): mínimo de filas que la(s) sentencia(s) `sql` del
+    /// command DEBEN afectar para que el command se considere exitoso y se emitan sus `emit`.
+    /// Si el recuento real queda por debajo, la transacción se revierte entera y NO se escribe
+    /// ningún evento en el outbox (ni notificación al WS) — porque el hecho declarado nunca ocurrió.
+    ///
+    /// - `None` (default, opt-in): la gate está **desactivada**. Comportamiento de siempre: el
+    ///   command emite sus eventos tanto si muta 1 fila como 0. Así no rompemos los módulos ya
+    ///   publicados ni los commands genuinamente idempotentes (`UPDATE … WHERE NOT EXISTS`).
+    /// - `Some(n)`: exige `>= n` filas afectadas en TOTAL por las sentencias `sql` del command
+    ///   (no cuenta los INSERT del outbox). `Some(1)` es el caso habitual de un command de
+    ///   transición: "confirmar" / "anular" / "cerrar" que NO debe emitir su evento si el `WHERE`
+    ///   no casa (recurso inexistente o ya en el estado destino). `Some(0)` declararía
+    ///   explícitamente un no-op idempotente permitido que igual emite.
+    ///
+    /// Ver [`crate::commands`] para el gate y
+    /// [`crate::errors::RuntimeError::MinAffectedRows`].
+    #[serde(default)]
+    pub min_affected_rows: Option<u64>,
     /// Handler de lógica: Tier 2 (WASM sandbox) o **plugin nativo first-party**
     /// (ADR-0009, crate horneado en el runtime). Si está presente, el command ejecuta
     /// el handler en vez de su `sql` directo. ARQUITECTURA.md §5.3.

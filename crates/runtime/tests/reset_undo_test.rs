@@ -30,10 +30,6 @@ fn modules_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
 }
 
-fn have_modules() -> bool {
-    modules_root().exists()
-}
-
 fn ctx(hub: &str) -> RequestContext {
     RequestContext::new(hub, "u1", ["*".to_string()])
 }
@@ -88,7 +84,7 @@ async fn import_demo(rt: &Runtime, hub: &str, name: &str) -> String {
 
 #[tokio::test]
 async fn deshacer_una_importacion_borra_solo_lo_que_trajo() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let batch = import_demo(&rt, "h1", "restaurante_es").await;
     assert_eq!(count(&rt, "inventory_product", "h1").await, 2, "precondición: la demo entró");
@@ -124,7 +120,7 @@ async fn deshacer_una_importacion_borra_solo_lo_que_trajo() {
 /// veces, o reintentar tras un error de red.
 #[tokio::test]
 async fn deshacer_dos_veces_es_idempotente() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let batch = import_demo(&rt, "h1", "restaurante_es").await;
 
@@ -137,7 +133,7 @@ async fn deshacer_dos_veces_es_idempotente() {
 /// El lote pertenece a un hub: deshacer el de h1 no puede tocar las filas de h2 (misma BD).
 #[tokio::test]
 async fn deshacer_un_lote_no_toca_otro_hub() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let batch_h1 = import_demo(&rt, "h1", "restaurante_es").await;
     rt.execute_command(
@@ -157,7 +153,7 @@ async fn deshacer_un_lote_no_toca_otro_hub() {
 /// El panel lista las importaciones para que el usuario elija cuál deshacer.
 #[tokio::test]
 async fn las_importaciones_se_listan_por_hub() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     import_demo(&rt, "h1", "restaurante_es").await;
     import_demo(&rt, "h2", "barberia_es").await;
@@ -173,7 +169,7 @@ async fn las_importaciones_se_listan_por_hub() {
 /// puede apuntarse filas que no insertó — si lo hiciera, deshacerlo borraría las del primero.
 #[tokio::test]
 async fn un_lote_solo_registra_las_filas_que_realmente_inserto() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let primero = import_demo(&rt, "h1", "restaurante_es").await;
     let segundo = import_demo(&rt, "h1", "restaurante_es_otra_vez").await;
@@ -197,7 +193,7 @@ async fn un_lote_solo_registra_las_filas_que_realmente_inserto() {
 /// es la diferencia entre «implementado» y «disponible».
 #[tokio::test]
 async fn el_import_real_registra_un_lote_deshacible() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Hub A con datos → bundle.
     let a = fresh().await;
     for (name, sku) in [("Café", "CAF"), ("Té verde", "TEV")] {

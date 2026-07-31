@@ -1,0 +1,27 @@
+{
+  "id": "w140",
+  "name": "W140 Fixture",
+  "version": "1.0.0",
+  "permissions": ["w140.item.read", "w140.item.update", "w140.item.transition"],
+  "role_permissions": { "admin": ["*"], "employee": ["w140.item.read"] },
+  "navigation": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "w140.items.list": { "permission": "w140.item.read", "sql": "queries/items_list.sql" }
+  },
+  "commands": {
+    "w140.items.create": {
+      "permission": "w140.item.update", "transaction": true,
+      "sql": ["commands/items_create.sql"], "emit": ["w140.item.created"]
+    },
+    "w140.items.confirm": {
+      "permission": "w140.item.transition", "transaction": true,
+      "sql": ["commands/items_confirm.sql"], "emit": ["w140.item.confirmed"],
+      "min_affected_rows": 1
+    },
+    "w140.items.legacy_touch": {
+      "permission": "w140.item.update", "transaction": true,
+      "sql": ["commands/items_touch.sql"], "emit": ["w140.item.touched"]
+    }
+  }
+}

@@ -74,9 +74,7 @@ async fn create_package(
 
 #[tokio::test]
 async fn install_registers_redeem_capabilities() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let reg = rt.registry();
     assert!(reg.is_installed("services"));
@@ -95,9 +93,7 @@ async fn install_registers_redeem_capabilities() {
 
 #[tokio::test]
 async fn redeem_decrements_uses_and_blocks_over_max_uses() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: dist/handler.wasm ausente (paquetes se crean por WASM)");
         return;
@@ -150,9 +146,7 @@ async fn redeem_decrements_uses_and_blocks_over_max_uses() {
 
 #[tokio::test]
 async fn redeem_blocks_after_expiry() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: dist/handler.wasm ausente (paquetes se crean por WASM)");
         return;
@@ -210,9 +204,7 @@ async fn redeem_blocks_after_expiry() {
 
 #[tokio::test]
 async fn redeem_rejects_unknown_package() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let ctx = admin();
     let err = rt

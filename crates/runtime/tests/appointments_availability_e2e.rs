@@ -191,8 +191,11 @@ async fn book(rt: &Runtime, ctx: &RequestContext, staff_id: &str, start: &str, d
 
 #[tokio::test]
 async fn install_registers_availability_engine() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     if !wasm_present() {
-        eprintln!("SKIP: modules-workspace not present (CI)");
+        eprintln!("⚠ sin handler.wasm (appointments) — saltado");
         return;
     }
     let rt = rt_appts().await;
@@ -205,8 +208,11 @@ async fn install_registers_availability_engine() {
 
 #[tokio::test]
 async fn overlap_same_staff_rejected_distinct_staff_ok() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     if !wasm_present() {
-        eprintln!("SKIP: modules-workspace not present (CI)");
+        eprintln!("⚠ sin handler.wasm (appointments) — saltado");
         return;
     }
     let rt = rt_appts().await;
@@ -242,8 +248,11 @@ async fn overlap_same_staff_rejected_distinct_staff_ok() {
 
 #[tokio::test]
 async fn toggle_allow_overlapping_permits_double_booking() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     if !wasm_present() {
-        eprintln!("SKIP: modules-workspace not present (CI)");
+        eprintln!("⚠ sin handler.wasm (appointments) — saltado");
         return;
     }
     let rt = rt_appts().await;
@@ -263,8 +272,11 @@ async fn toggle_allow_overlapping_permits_double_booking() {
 
 #[tokio::test]
 async fn outside_working_schedule_rejected() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     if !wasm_present() {
-        eprintln!("SKIP: modules-workspace not present (CI)");
+        eprintln!("⚠ sin handler.wasm (appointments) — saltado");
         return;
     }
     let rt = rt_appts().await;
@@ -283,4 +295,89 @@ async fn outside_working_schedule_rejected() {
     let (avail_out, reason_out) = check(&rt, &ctx, &before, 30, Some("P1")).await;
     assert_eq!(avail_out, 0, "08:00 está fuera del horario de trabajo");
     assert_eq!(reason_out, "outside_schedule", "el motivo debe ser fuera de horario");
+}
+
+/// Reproducción directa de hub#110 (P0): el command público `appointments.appointments.create`
+/// debe RECHAZAR una 2ª cita solapada para la MISMA profesional cuando `allow_overlapping=false`
+/// (no basta con que `availability.check` lo detecte — el create mismo lo impide), Y
+/// `appointments.appointments.list` debe seguir funcionando justo después de crear una cita
+/// (antes rompía con SQLITE_MISMATCH code 20 por `NULL = ''` en el filtro opcional).
+///
+/// Antes del fix el create aceptaba el solape porque su handler WASM no recibía las citas
+/// existentes (no declaraba `reads`); y el list cascaba por el bind NULL del filtro opcional.
+#[tokio::test]
+async fn create_rejects_overlap_and_list_works_after_creation() {
+    if !wasm_present() {
+        eprintln!("SKIP: modules-workspace not present (CI)");
+        return;
+    }
+    let rt = rt_appts().await;
+    let ctx = admin();
+    set_overlap(&rt, &ctx, false).await; // allow_overlapping=false
+    let day = next_wednesday();
+    let start = format!("{day}T12:00:00+00:00");
+    let dur = 30;
+
+    // 1ª cita de P1 @ 12:00 → debe crearse OK.
+    rt.execute_command(
+        "appointments.appointments.create",
+        &params(json!({
+            "customer_name": "Cliente 1", "staff_id": "P1", "staff_name": "P1",
+            "service_name": "Peinado/Lavado", "start_datetime": start, "duration_minutes": dur
+        })),
+        &ctx,
+    )
+    .await
+    .expect("1ª cita debe crearse");
+
+    // Bug (b) de #110: appointments.list justo después de crear. Pasamos solo day_start/day_end
+    // y limit, OMITIENDO status/staff_id (el runtime los inyecta como NULL → antes SQLITE_MISMATCH).
+    let day_start = format!("{day}T00:00:00+00:00");
+    let day_end = format!("{day}T23:59:59+00:00");
+    let rows = rt
+        .execute_query(
+            "appointments.appointments.list",
+            &params(json!({ "day_start": day_start, "day_end": day_end, "limit": 100 })),
+            &ctx,
+        )
+        .await
+        .expect("appointments.list no debe romper tras crear (hub#110)");
+    assert_eq!(rows.len(), 1, "tras 1 cita creada, el listado debe devolver 1 fila");
+    assert_eq!(rows[0]["staff_name"].as_str(), Some("P1"));
+
+    // Bug (a) de #110: 2ª cita SOLAPADA (12:15, misma P1) → el command create debe RECHAZARLA.
+    // El runtime precarga `appointments.appointments.conflicting` (reads) y el handler lo detecta.
+    let overlap_start = format!("{day}T12:15:00+00:00");
+    let err = rt
+        .execute_command(
+            "appointments.appointments.create",
+            &params(json!({
+                "customer_name": "Cliente 2", "staff_id": "P1", "staff_name": "P1",
+                "service_name": "Peinado/Lavado", "start_datetime": overlap_start,
+                "duration_minutes": dur
+            })),
+            &ctx,
+        )
+        .await
+        .expect_err("2ª cita solapada del mismo staff debe rechazarse (hub#110)");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("overlap"),
+        "el rechazo debe ser por solape, no otro error. llegó: {msg}"
+    );
+
+    // El listado sigue intacto (la cita rechazada no se materializó).
+    let rows_after = rt
+        .execute_query(
+            "appointments.appointments.list",
+            &params(json!({ "day_start": day_start, "day_end": day_end, "limit": 100 })),
+            &ctx,
+        )
+        .await
+        .expect("appointments.list sigue funcionando");
+    assert_eq!(
+        rows_after.len(),
+        1,
+        "la cita solapada rechazada no debe aparecer en el listado"
+    );
 }

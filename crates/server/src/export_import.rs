@@ -649,6 +649,7 @@ async fn run_import(
                         &m.id,
                         &m.version,
                         &on_progress,
+                        &st.config.signature_policy(),
                     )
                     .await
                     {

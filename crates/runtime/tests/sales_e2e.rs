@@ -54,9 +54,7 @@ async fn fresh() -> (Runtime, Arc<Sink>) {
 
 #[tokio::test]
 async fn install_with_deps() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let (rt, _) = fresh().await;
     let reg = rt.registry();
     assert!(reg.is_installed("sales"));
@@ -69,9 +67,7 @@ async fn install_with_deps() {
 
 #[tokio::test]
 async fn missing_dep_fails() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // sales sin sus deps (inventory/taxes) debe fallar: el orden topológico es del instalador.
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
@@ -81,9 +77,7 @@ async fn missing_dep_fails() {
 
 #[tokio::test]
 async fn complete_sale_creates_header_and_lines() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
     let (rt, sink) = fresh().await;
     let ctx = admin();
@@ -116,9 +110,7 @@ async fn complete_sale_creates_header_and_lines() {
 
 #[tokio::test]
 async fn second_sale_increments_number() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
@@ -133,9 +125,7 @@ async fn second_sale_increments_number() {
 
 #[tokio::test]
 async fn sale_decrements_stock_via_event() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
@@ -161,9 +151,7 @@ async fn sale_decrements_stock_via_event() {
 
 #[tokio::test]
 async fn sale_persists_staff_id_and_breaks_down_by_staff() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Atribución por profesional: la venta guarda staff_id (≠ employee_id), lo expone en
     // sales.get/list, y sales.by_staff lo agrega por profesional para el cierre del día.
     if !wasm_present() { eprintln!("SKIP"); return; }
@@ -197,9 +185,7 @@ async fn sale_persists_staff_id_and_breaks_down_by_staff() {
 
 #[tokio::test]
 async fn by_staff_respects_date_range_and_excludes_unattributed() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Ventas sin staff_id NO aparecen en by_staff; el rango de fechas acota.
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
@@ -229,9 +215,7 @@ async fn by_staff_respects_date_range_and_excludes_unattributed() {
 
 #[tokio::test]
 async fn create_from_appointment_tags_sale_and_emits_conversion() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Cita→venta: pasar appointment_id construye una venta atribuida al profesional de la cita
     // y EMITE sales.sale.created_from_appointment (traza para que appointments la marque
     // convertida en SU listener — sales no toca appointments).
@@ -261,9 +245,7 @@ async fn create_from_appointment_tags_sale_and_emits_conversion() {
 
 #[tokio::test]
 async fn sale_records_customer_purchase_via_event() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
@@ -293,9 +275,7 @@ async fn sale_records_customer_purchase_via_event() {
 
 #[tokio::test]
 async fn open_order_persists_open_order_with_lines() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0141 Gate 2: `sales.order.open` abre un `order` MUTABLE (status=open) con sus líneas
     // materializadas TEMPRANO (filas reales sales_order/sales_order_item). Invariante del ADR:
     // `sales` es AGNÓSTICO de la mesa — el payload no lleva table_id (la asociación mesa↔pedido la
@@ -330,9 +310,7 @@ async fn open_order_persists_open_order_with_lines() {
 
 #[tokio::test]
 async fn command_response_returns_created_ids() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0141 Gate 6: la UI necesita el id de lo que acaba de crear — el POS abre un pedido y debe
     // saber su `order_id` para añadirle líneas. El runtime es la AUTORIDAD de ids (context.new_ids),
     // pero la respuesta solo traía {ok, operations} y el id se perdía: el cliente no podía
@@ -353,9 +331,7 @@ async fn command_response_returns_created_ids() {
 
 #[tokio::test]
 async fn mutate_open_order_recomputes_provisional_total() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0141 Gate 3: un pedido abierto es MUTABLE. add/update/remove línea recomputan el total
     // provisional; void lo cancela. Reemplaza el blob `sales_active_cart` por filas reales.
     if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
@@ -403,9 +379,7 @@ async fn mutate_open_order_recomputes_provisional_total() {
 
 #[tokio::test]
 async fn checkout_order_marks_it_completed_and_links_sale() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0141 Gate 4: cobrar un pedido (complete_sale con order_id) congela una venta INMUTABLE
     // ligada al pedido y lo marca completado (open → completed). El POS envía los items del pedido.
     if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
@@ -435,9 +409,7 @@ async fn checkout_order_marks_it_completed_and_links_sale() {
 
 #[tokio::test]
 async fn split_bill_one_order_produces_two_sales() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0141 Gate 4: split-bill = 1 order → N sale. Dos cobros parciales (keep_order_open) del
     // mismo pedido producen dos ventas inmutables; el pedido se completa en el cobro FINAL.
     if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
@@ -479,9 +451,7 @@ async fn split_bill_one_order_produces_two_sales() {
 
 #[tokio::test]
 async fn el_pedido_no_sabe_de_clientes_la_junction_la_owna_customers() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0141: el pedido NO guarda `customer_id` —una tienda de alimentación vende sin cliente—.
     // La asociación cliente↔pedido la OWNea `customers` en su junction. El pedido es ajeno a ella.
     if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
@@ -527,9 +497,7 @@ async fn el_pedido_no_sabe_de_clientes_la_junction_la_owna_customers() {
 
 #[tokio::test]
 async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Encontrado en el navegador (ADR-0141/0144): el camarero toca 5 veces la tortilla, la pantalla
     // marca 5 y la BD guarda 1. Causa: `sales.order.add_line` es Tier-0 (SQL puro) y ese camino
     // respondía `{ok:true}` a secas, sin el id de la fila. El POS se queda sin `line_id`, y cada
@@ -569,9 +537,7 @@ async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
 
 #[tokio::test]
 async fn split_bill_cada_uno_paga_lo_suyo() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0146 etapa 5: dos comensales, una cuenta. El primero paga SU línea; la otra sigue
     // pendiente y el pedido abierto. Al cobrar la segunda, el pedido se cierra.
     //
@@ -621,9 +587,7 @@ async fn split_bill_cada_uno_paga_lo_suyo() {
 
 #[tokio::test]
 async fn media_racion_de_gambas_descuenta_medio_kilo_y_cobra_la_mitad() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0147 de punta a punta por el PAR sales↔inventory: el caso que abrió todo esto.
     // Antes: `quantity: 0.5` viajaba como f64 → inventory `as_i64(0.5)` = 0 → `qty <= 0 →
     // continue` → vender al peso NO descontaba stock, en silencio. Ahora la cantidad es punto
@@ -672,9 +636,7 @@ async fn media_racion_de_gambas_descuenta_medio_kilo_y_cobra_la_mitad() {
 
 #[tokio::test]
 async fn una_cantidad_fuera_de_la_rejilla_no_crea_venta_ni_toca_stock() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ADR-0147 §2.2: el incremento VALIDA, no redondea. Medio gramo con escalón de gramo →
     // el comando se RECHAZA entero: ni venta, ni líneas, ni evento, ni stock movido.
     if !wasm_present() { eprintln!("SKIP"); return; }

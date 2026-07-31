@@ -30,9 +30,7 @@ fn admin() -> RequestContext {
 
 #[tokio::test]
 async fn instalar_taxes_siembra_sus_categorias_fiscales() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
@@ -54,9 +52,7 @@ async fn instalar_taxes_siembra_sus_categorias_fiscales() {
 
 #[tokio::test]
 async fn la_semilla_es_idempotente_reinstalar_no_duplica() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // El seed es DML re-ejecutable (WHERE NOT EXISTS por la clave natural). Si no lo fuera, una
     // reinstalación —o un reintento del instalador— dejaría el catálogo fiscal duplicado.
     let db = fresh_db().await;
@@ -72,9 +68,7 @@ async fn la_semilla_es_idempotente_reinstalar_no_duplica() {
 
 #[tokio::test]
 async fn un_modulo_sin_bloque_seed_se_instala_igual() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // La inmensa mayoría de los módulos no siembra nada: la ausencia del bloque no es un error.
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");

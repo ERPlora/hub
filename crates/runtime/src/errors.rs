@@ -34,6 +34,23 @@ pub enum RuntimeError {
     /// resuelve, pero el caller no tiene permitido usarlo por esta puerta.
     #[error("command interno: `{0}` no es invocable desde fuera del runtime")]
     InternalCommand(String),
+    /// Un command declarativo declaró [`min_affected_rows`](crate::manifest::CommandDef) y la
+    /// sentencia de mutación afectó **menos** filas de las exigidas (hub#140). Es el error
+    /// **estable** que sustituye al "OK silencioso" de un `UPDATE … WHERE` que no casa: la
+    /// transacción se revierte entera y NO se escribe ningún evento en el outbox (ni notificación
+    /// al WS), porque el hecho declarado nunca ocurrió.
+    ///
+    /// `kind` distingue los dos casos que pide el issue: [`AffectedKind::NotFound`] (0 filas — el
+    /// recurso no existe / la transición no aplica → `not_found`) y [`AffectedKind::TooFew`] (>0
+    /// pero por debajo del mínimo exigido, p. ej. un batch que esperaba N y mutó menos →
+    /// `conflict`). El campo `affected` lleva el conteo real para diagnóstico.
+    #[error("el command `{command}` exigía {required} fila(s) afectada(s) pero mutó {affected} ({kind})")]
+    MinAffectedRows {
+        command: String,
+        required: u64,
+        affected: u64,
+        kind: AffectedKind,
+    },
     #[error("permiso denegado: requiere `{0}`")]
     PermissionDenied(String),
     /// El módulo necesita una **capability** (ADR-0079: red/certificado/impresora/notify) que el
@@ -86,3 +103,51 @@ pub enum RuntimeError {
 }
 
 pub type Result<T> = std::result::Result<T, RuntimeError>;
+
+/// Por qué no se cumplió [`RuntimeError::MinAffectedRows`] (hub#140). Determina el error estable
+/// que ve el caller (`not_found` vs `conflict`) para que el SDK pueda reaccionar — no es un detalle
+/// de diagnóstico, es parte del contrato de la gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AffectedKind {
+    /// 0 filas afectadas: el recurso no existe, o la transición ya no aplica (p. ej. confirmar una
+    /// cita ya confirmada). Corresponde al error `not_found` del issue.
+    NotFound,
+    /// >0 filas pero por debajo del mínimo exigido (p. ej. un batch que esperaba N y mutó menos).
+    /// Corresponde a `conflict` / `invalid_transition`.
+    TooFew,
+}
+
+impl std::fmt::Display for AffectedKind {
+    // thiserror `{kind}` exige `Display`; delega en el nombre estable para que el mensaje humano y
+    // el `code` de máquina coincidan siempre (una sola fuente de verdad: `as_str`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl AffectedKind {
+    /// Nombre estable del error, listo para el `code` del envelope de error del SDK (`§7.6`):
+    /// `not_found` / `conflict`. El caller programa contra esto, no contra el mensaje libre.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AffectedKind::NotFound => "not_found",
+            AffectedKind::TooFew => "conflict",
+        }
+    }
+}
+
+/// Clasifica el fallo de la gate de `min_affected_rows` (hub#140) a partir del conteo real. Es la
+/// única autoridad para mapear `affected` → [`AffectedKind`], así que vive junto al enum y todo
+/// gate la usa (no se duplica la regla en cada call site).
+///
+/// - `0` filas → [`AffectedKind::NotFound`] (el recurso no existe / la transición no aplica).
+/// - `>0` pero `< min` → [`AffectedKind::TooFew`] (mutó algo, pero no lo exigido — batch parcial).
+pub fn affected_kind(affected: u64, min: u64) -> AffectedKind {
+    if affected == 0 {
+        AffectedKind::NotFound
+    } else {
+        // El caller ya garantiza `affected < min` (la gate falló); aquí solo se decide la forma.
+        let _ = min;
+        AffectedKind::TooFew
+    }
+}

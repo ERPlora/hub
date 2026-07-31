@@ -26,6 +26,41 @@ export interface LoginResult {
   hubId?: string;
 }
 
+// --- Login 2-pasos (2FA por OTP de email, ERPlora/saas#994) -------------------
+// El SaaS cambió `POST /api/v1/auth/login/` a 2 pasos:
+//   · Paso 1: 401 con body {two_factor_required: true, ticket, method: 'email', expires_in}.
+//   · Paso 2: POST {ticket, code} a /api/v1/auth/login/2fa/ → {access, refresh, hub_id}.
+// Un código erróneo responde 401 con un ticket NUEVO (single-use) en el body: el cliente DEBE
+// adoptar ese ticket para reintentar, nunca reusar el anterior ya consumido. El `ticket` vive
+// SOLO en memoria del componente (nunca en localStorage): es transitorio y monouso.
+export interface TwoFactorChallenge {
+  /** Ticket monouso emitido por el Cloud; viaja al /2fa/ en el paso 2. */
+  ticket: string;
+  /** Canal del OTP (hoy siempre 'email'). */
+  method: string;
+  /** TTL del challenge en segundos. */
+  expiresIn: number;
+}
+
+/**
+ * Lanzado por [`cloudLogin`] y [`cloudLogin2fa`] cuando el Cloud exige 2FA (401 con
+ * `two_factor_required`). El llamador muestra la pantalla de OTP y, al tener el código, llama a
+ * [`cloudLogin2fa`] con el `ticket` del challenge. Un código erróneo lanza DE NUEVO este error,
+ * esta vez con el ticket RENOVADO del Cloud: el reintentador debe usar el nuevo `ticket`.
+ */
+export class TwoFactorRequiredError extends Error {
+  readonly ticket: string;
+  readonly method: string;
+  readonly expiresIn: number;
+  constructor(challenge: TwoFactorChallenge) {
+    super('two_factor_required');
+    this.name = 'TwoFactorRequiredError';
+    this.ticket = challenge.ticket;
+    this.method = challenge.method;
+    this.expiresIn = challenge.expiresIn;
+  }
+}
+
 export interface CloudMarketplaceModule {
   id: string;
   name: string;
@@ -452,18 +487,87 @@ async function post<T>(
   }
 }
 
-/** Login email+password contra el Cloud (primer setup / dispositivo no confiable). */
+/** Login email+password contra el Cloud (primer setup / dispositivo no confiable).
+ *
+ *  Login 2-pasos (ERPlora/saas#994): si el Cloud exige 2FA, el `POST /auth/login/` responde
+ *  `401 {two_factor_required, ticket, method, expires_in}`. Esta función lee ese body (que el
+ *  `post()` genérico descarta) y lanza [`TwoFactorRequiredError`] con el `ticket`. El llamador
+ *  pide entonces el OTP y completa con [`cloudLogin2fa`]. Cualquier otro error (credenciales,
+ *  red) sube como `Error` normal — el llamador lo mapea a su mensaje. */
 export async function cloudLogin(email: string, password: string): Promise<LoginResult> {
   // En Tauri esto añade X-Client-Type: hub-desktop|hub-local + X-Device-Id para que el Cloud
   // cree/resuelva el hub de ESTE dispositivo (ARQUITECTURA.md §2.9b). En web pura va como 'hub'.
-  const tokens = await post<{ access: string; refresh: string; hub_id?: string }>(
-    '/api/v1/auth/login/',
-    { email, password },
-    8000,
-    await loginHeaders(),
-  );
+  const headers = await loginHeaders();
+  const res = await loginRequest('/api/v1/auth/login/', { email, password }, headers);
+  const challenge = await twoFactorChallengeIfPresent(res);
+  if (challenge) throw new TwoFactorRequiredError(challenge);
+  if (!res.ok) throw new Error(`cloud /api/v1/auth/login/ → ${res.status}`);
+  const tokens = (await res.json()) as { access: string; refresh: string; hub_id?: string };
   const me = await meRequest(tokens.access);
   return { access: tokens.access, refresh: tokens.refresh, user: me, hubId: tokens.hub_id };
+}
+
+/** Paso 2 del login 2-pasos (ERPlora/saas#994): `POST /api/v1/auth/login/2fa/ {ticket, code}`
+ *  → `{access, refresh, hub_id}`. Devuelve un [`LoginResult`] con la MISMA forma que
+ *  [`cloudLogin`], para reusar el flujo de finalización de login.
+ *
+ *  Reintento: un código erróneo responde `401` con un ticket NUEVO (single-use) en el body; esta
+ *  función lo lanza como [`TwoFactorRequiredError`] con el ticket renovado, de modo que el
+ *  llamador debe adoptar `error.ticket` para reintentar (nunca reusar el anterior ya gastado). */
+export async function cloudLogin2fa(ticket: string, code: string): Promise<LoginResult> {
+  const headers = await loginHeaders();
+  const res = await loginRequest('/api/v1/auth/login/2fa/', { ticket, code }, headers);
+  const challenge = await twoFactorChallengeIfPresent(res);
+  if (challenge) throw new TwoFactorRequiredError(challenge);
+  if (!res.ok) throw new Error(`cloud /api/v1/auth/login/2fa/ → ${res.status}`);
+  const tokens = (await res.json()) as { access: string; refresh: string; hub_id?: string };
+  const me = await meRequest(tokens.access);
+  return { access: tokens.access, refresh: tokens.refresh, user: me, hubId: tokens.hub_id };
+}
+
+// `post()` genérico descarta el body en un non-2xx; el login 2-pasos necesita leer el 401 (para
+// detectar `two_factor_required` y el ticket renovado). Este helper hace el mismo POST pero
+// devuelve el `Response` sin lanzar, dejando al llamador interpretar status + body.
+async function loginRequest(
+  path: string,
+  body: unknown,
+  extraHeaders: Record<string, string>,
+  timeoutMs = 8000,
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  beginRequest();
+  try {
+    return await fetch(`${config.cloudApiUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub', ...extraHeaders },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } finally {
+    clearTimeout(t);
+    endRequest();
+  }
+}
+
+/** Lee el body de un 401 y, si trae `two_factor_required: true`, devuelve el challenge con el
+ *  ticket. Para cualquier otra respuesta (2xx, 401 sin 2FA, etc.) devuelve `null`. Best-effort:
+ *  si el body no es JSON válido se trata como ausencia de challenge. */
+async function twoFactorChallengeIfPresent(res: Response): Promise<TwoFactorChallenge | null> {
+  if (res.status !== 401) return null;
+  // Clonamos antes de leer para no consumir el stream si el llamador quiere el body de un 2xx.
+  let raw: Record<string, unknown>;
+  try {
+    raw = (await res.clone().json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (raw.two_factor_required === true && typeof raw.ticket === 'string' && raw.ticket) {
+    const method = typeof raw.method === 'string' && raw.method ? raw.method : 'email';
+    const expiresIn = Number.isFinite(raw.expires_in) ? Number(raw.expires_in) : 300;
+    return { ticket: raw.ticket, method, expiresIn };
+  }
+  return null;
 }
 
 // --- «Continuar con Google» (ADR-0157 §8) ----------------------------------

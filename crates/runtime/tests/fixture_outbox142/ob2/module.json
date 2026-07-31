@@ -1,0 +1,18 @@
+{
+  "id": "ob2",
+  "name": "Outbox142Sibling",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "ob2.good": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/good_listener.sql"]
+    }
+  },
+  "events": {
+    "listen": {
+      "ob.e": { "command": "ob2.good" }
+    }
+  }
+}

@@ -15,7 +15,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{Params, testutil::{fresh_db, TestDb}};
 use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::{RequestContext, Runtime};
@@ -103,9 +103,7 @@ async fn exported_bundle() -> erplora_runtime::export::ExportBundle {
 
 #[tokio::test]
 async fn round_trip_restores_equivalent_state_under_target_hub_id() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let bundle = exported_bundle().await;
 
     // Hub destino B, tenant DISTINTO (h2), con los módulos ya instalados (paso del server).
@@ -139,9 +137,7 @@ async fn round_trip_restores_equivalent_state_under_target_hub_id() {
 /// no tiene ninguna columna reservada.
 #[tokio::test]
 async fn round_trip_survives_reserved_word_columns() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let a = fresh().await;
     a.execute_command(
         "inventory.categories.create",
@@ -183,9 +179,7 @@ async fn round_trip_survives_reserved_word_columns() {
 
 #[tokio::test]
 async fn unselected_sections_are_skipped() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let bundle = exported_bundle().await;
 
     let mut b = fresh().await;
@@ -214,9 +208,7 @@ async fn unselected_sections_are_skipped() {
 
 #[tokio::test]
 async fn best_effort_a_broken_section_does_not_abort_the_rest() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let mut bundle = exported_bundle().await;
 
     // Rompemos el SQL de taxes (sintaxis inválida) PERO con sha256 coherente: la integridad
@@ -241,9 +233,7 @@ async fn best_effort_a_broken_section_does_not_abort_the_rest() {
 
 #[tokio::test]
 async fn sha256_mismatch_rejects_the_import_without_effects() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let mut bundle = exported_bundle().await;
     // Manipulación del bundle: contenido cambiado sin actualizar el hash del manifest.
     bundle.files.insert("data/inventory.sql".into(), b"tampered".to_vec());
@@ -259,9 +249,7 @@ async fn sha256_mismatch_rejects_the_import_without_effects() {
 
 #[tokio::test]
 async fn unknown_schema_version_rejects_without_effects() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let mut bundle = exported_bundle().await;
     bundle.manifest.schema_version = 999;
 
@@ -273,9 +261,7 @@ async fn unknown_schema_version_rejects_without_effects() {
 
 #[tokio::test]
 async fn module_data_for_uninstalled_module_fails_its_section_only() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let bundle = exported_bundle().await;
 
     // Destino SIN inventory (solo taxes): la sección de inventory falla con motivo claro,
@@ -310,9 +296,7 @@ async fn module_data_for_uninstalled_module_fails_its_section_only() {
 /// El guard tiene que ir por `id` SOLO: es la clave primaria, y si existe, existe.
 #[tokio::test]
 async fn una_fila_cuyo_id_ya_existe_no_rompe_la_seccion() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let bundle = exported_bundle().await;
 
     // Destino con los módulos instalados — y por tanto con su semilla ya aplicada.
@@ -338,4 +322,174 @@ async fn una_fila_cuyo_id_ya_existe_no_rompe_la_seccion() {
             r.status
         );
     }
+}
+
+// ── BD COMPARTIDA: importar en OTRO hub de la MISMA BD (hub#260) ────────────────────────────
+
+/// Instala taxes + inventory sobre un adaptador nuevo del MISMO esquema y devuelve el runtime con
+/// ese hub. Cada llamada abre su propio pool sobre el esquema compartido (como dos hubs de una org
+/// en prod), pero las tablas y los datos son los mismos.
+async fn fresh_over(db: &TestDb, hub: &str) -> Runtime {
+    let mut rt = Runtime::with_hub_id(Box::new(db.adapter().await), hub);
+    rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
+    rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
+    rt
+}
+
+/// Crea en `hub` un producto + una categoría y los liga (vínculo M2M). Devuelve (sku, nombre).
+async fn product_with_category(rt: &Runtime, hub: &str, name: &str, sku: &str, cat: &str) {
+    create_product(rt, hub, name, sku).await;
+    rt.execute_command(
+        "inventory.categories.create",
+        &params(json!({ "name": cat, "slug": cat, "icon": "cube-outline",
+                        "color": "#3880ff", "description": "", "order": 0 })),
+        &ctx(hub),
+    )
+    .await
+    .unwrap();
+    let prods = rt.execute_query("inventory.products.list", &Params::new(), &ctx(hub)).await.unwrap();
+    let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx(hub)).await.unwrap();
+    rt.execute_command(
+        "inventory.products.add_category",
+        &params(json!({
+            "product_id": prods[0]["id"].as_str().unwrap(),
+            "category_id": cats[0]["id"].as_str().unwrap(),
+        })),
+        &ctx(hub),
+    )
+    .await
+    .unwrap();
+}
+
+/// El caso real del bug (hub#260): un hub A exporta un blueprint y un hub B que COMPARTE la misma
+/// base de datos (misma org, mismo esquema Postgres) lo importa. La PK de `inventory_product` es
+/// `id TEXT PRIMARY KEY` GLOBAL (no `(hub_id, id)`), así que los `id` del bundle son los del hub
+/// ORIGEN y en la BD compartida YA EXISTEN (bajo el hub hermano).
+///
+/// Antes del fix: el guard `WHERE NOT EXISTS (… WHERE id = 'src-id')` evaluaba a falso (la fila
+/// existe bajo el hub A) → 0 INSERTs, y la sección se reportaba `Applied` (fallo silencioso). Vaciar
+/// el hub de origen hacía funcionar el mismo bundle, demostrando que la causa era la colisión de ids.
+///
+/// Tras el fix: el import regenera cada `id` por el hub DESTINO y acota el guard por `(hub_id, id)`,
+/// así el hub B obtiene sus propias filas con ids nuevos, las FK internas (incluido el vínculo M2M
+/// `inventory_product_categories`) se remapean, y una re-importación sobre B no duplica.
+#[tokio::test]
+async fn importar_en_otro_hub_de_la_misma_bd_inserta_sus_filas_con_ids_nuevos() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+
+    // UN esquema Postgres compartido entre los dos hubs (como en prod: una BD por organización).
+    let shared = TestDb::new().await;
+
+    // Hub A (origen) sobre ese esquema, con dos productos + un vínculo producto↔categoría.
+    let a = fresh_over(&shared, "h1").await;
+    create_product(&a, "h1", "Café", "CAF").await;
+    product_with_category(&a, "h1", "Té verde", "TEV", "Tés").await;
+    let bundle = export_hub(&a, "h1", &full_selection(), "barberia", "es", CREATED_AT)
+        .await
+        .expect("export A");
+
+    // Hub B (destino) sobre el MISMO esquema, con los módulos ya instalados (paso del server).
+    let mut b = fresh_over(&shared, "h2").await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("import en B (misma BD que A)");
+
+    // La sección de inventory se aplica de verdad (antes mentía `Applied` con 0 filas).
+    let inv = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .expect("inventory en informe");
+    assert!(
+        matches!(inv.status, SectionStatus::Applied),
+        "modules/inventory debe aplicarse en el hub destino de la misma BD: {:?}",
+        inv.status
+    );
+
+    // El hub B VE los productos BAJO su propio hub_id — con ids NUEVOS (los del origen siguen
+    // perteneciendo a A, no se duplican ni se le roban a A).
+    let names_b = product_names(&b, "h2").await;
+    assert!(
+        names_b.contains(&"Café".to_string()) && names_b.contains(&"Té verde".to_string()),
+        "B no recibió los productos en una BD compartida: {names_b:?}"
+    );
+
+    // El hub A sigue viendo EXACTAMENTE sus dos productos (no se corrompió ni se le añadió nada).
+    let names_a = product_names(&a, "h1").await;
+    assert_eq!(names_a.len(), 2, "el hub origen cambió tras importar en el hermano: {names_a:?}");
+
+    // La FK interna del bundle se remapeó: el producto importado en B conserva su categoría.
+    // (Sin remapeo, `inventory_product_categories` apuntaría a un id de A y la FK no casaría.)
+    let tev_rows = b
+        .execute_query("inventory.products.list", &params(json!({})), &ctx("h2"))
+        .await
+        .expect("listar productos de B");
+    let tev = tev_rows.iter().find(|p| p["name"] == "Té verde").expect("Té verde en B");
+    let tev_id = tev["id"].as_str().expect("id del Té verde en B");
+    // El id de B es DISTINTO del del origen (que siguen siendo los de A): no reutiliza el bundle.
+    let tev_a = a
+        .execute_query("inventory.products.list", &params(json!({})), &ctx("h1"))
+        .await
+        .expect("listar productos de A")
+        .into_iter()
+        .find(|p| p["name"] == "Té verde")
+        .expect("Té verde en A");
+    assert_ne!(
+        tev_id, tev_a["id"].as_str().unwrap(),
+        "el id importado en B debe ser NUEVO, no el del hub origen (PK global)"
+    );
+
+    // Re-importar el MISMO bundle en B es idempotente: no duplica ni falla (guard por (hub_id, id)).
+    let report2 = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("re-import idempotente en B");
+    let inv2 = report2
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .unwrap();
+    assert!(
+        matches!(inv2.status, SectionStatus::Applied),
+        "re-importar el bundle en el mismo hub no debe fallar: {:?}",
+        inv2.status
+    );
+    let names_b2 = product_names(&b, "h2").await;
+    assert_eq!(
+        names_b2.len(),
+        2,
+        "re-import duplicó filas en el hub destino (guard no idempotente): {names_b2:?}"
+    );
+}
+
+/// En una BD COMPARTIDA, el `Applied` no puede ser una mentira: si la sección trae sentencias pero
+/// ninguna inserta (p.ej. por una colisión de guard mal resuelta), el informe debe seguir siendo
+/// honesto. Con el fix del guard por (hub_id, id), el cross-hub SÍ inserta, así que `Applied` es
+/// verdad y B ve las filas. Este test clava ese contrato sobre el escenario real del bug.
+#[tokio::test]
+async fn cross_hub_en_bd_compartida_applied_implica_filas_reales_bajo_el_destino() {
+    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules").exists()
+    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    let shared = TestDb::new().await;
+    let a = fresh_over(&shared, "h1").await;
+    create_product(&a, "h1", "Café", "CAF").await;
+    let bundle = export_hub(&a, "h1", &full_selection(), "barberia", "es", CREATED_AT)
+        .await
+        .expect("export A");
+
+    let mut b = fresh_over(&shared, "h2").await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("import en B");
+
+    let inv = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .unwrap();
+    assert!(matches!(inv.status, SectionStatus::Applied), "debe Applied: {:?}", inv.status);
+    // `Applied` solo es cierto si B realmente tiene la fila bajo su hub_id (antes era 0 filas).
+    assert_eq!(product_names(&b, "h2").await, vec!["Café".to_string()]);
 }

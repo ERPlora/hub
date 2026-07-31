@@ -1,0 +1,40 @@
+{
+  "id": "ob",
+  "name": "Outbox142",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "ob.fire": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/fire.sql"],
+      "emit": ["ob.e"]
+    },
+    "ob.bad": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/bad_listener.sql"]
+    },
+    "ob.emit_handler": {
+      "permission": "",
+      "transaction": true,
+      "handler": {
+        "type": "native",
+        "function": "emit_event"
+      }
+    },
+    "ob.handler_listener": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/handler_listener.sql"]
+    }
+  },
+  "events": {
+    "listen": {
+      "ob.e": { "command": "ob.bad" },
+      "ob.from_handler": { "command": "ob.handler_listener" }
+    },
+    "emits": ["ob.from_handler"]
+  }
+}

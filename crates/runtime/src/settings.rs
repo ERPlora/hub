@@ -379,6 +379,45 @@ pub async fn get_all(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
     Ok(Value::Object(out))
 }
 
+/// Resuelve SOLO el `country_code` de `hub_id` (identidad fiscal del hub, ADR-0085): la fila
+/// persistida si valida, si no su default (`"ES"`). Es la lectura barata (una sola clave) que usa
+/// el instalador para decidir si aplica el seed suplementario de IVA España (hub#107) al instalar
+/// `taxes`: sin traer todo el mapa de settings. Tolerante — si la tabla aún no existe (un hub
+/// vacío antes de `ensure_system_tables`), degrada al default.
+pub async fn country_code_of(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<String> {
+    let setting = find("country_code").expect("country_code es un setting conocido");
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    // Tolerante: si la tabla/consulta aún no existe (hub vacío antes de ensure_system_tables) o no
+    // hay fila, degrada al default (igual que get_all hace con `None`). Una fila corrupta también.
+    let stored = match db
+        .query(
+            "SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = 'country_code'",
+            &p,
+        )
+        .await
+    {
+        Ok(res) => res
+            .rows
+            .first()
+            .and_then(|r| r["value"].as_str())
+            .map(|s| s.to_string()),
+        Err(_) => None,
+    };
+    let value = match stored {
+        Some(raw) => {
+            let parsed = (setting.parse_stored)(&raw);
+            if (setting.validate)(&parsed).is_ok() {
+                parsed
+            } else {
+                (setting.default)()
+            }
+        }
+        None => (setting.default)(),
+    };
+    Ok(value.as_str().unwrap_or("ES").to_string())
+}
+
 /// Aplica un mapa parcial de settings para `hub_id` (upsert por clave) tras **validar cada clave**:
 ///  - una clave **desconocida** → `InvalidPayload` (no se persiste nada),
 ///  - un valor **inválido** para su clave → `InvalidPayload` (no se persiste nada),

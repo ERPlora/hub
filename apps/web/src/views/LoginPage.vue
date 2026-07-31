@@ -30,6 +30,7 @@
             <p class="logo-sub">
               <template v-if="step === 'setup'">{{ t('login.subtitleSetup') }}</template>
               <template v-else-if="step === 'pin'">{{ t('login.subtitlePin') }}</template>
+              <template v-else-if="step === 'twoFactor'">{{ t('login.twoFactorSubtitle') }}</template>
               <template v-else>{{ t('login.subtitleEmail') }}</template>
             </p>
           </div>
@@ -161,6 +162,55 @@
                 </ion-button>
               </form>
 
+              <!-- Paso: verificación 2FA (OTP por email, ERPlora/saas#994). El `ticket` vive
+                   SOLO en memoria (nunca localStorage): es monouso y transitorio. Un código
+                   erróneo devuelve un ticket NUEVO desde el Cloud; lo adoptamos y dejamos
+                   reintentar sin pedir de nuevo la contraseña. -->
+              <form v-else-if="step === 'twoFactor'" class="step-form" @submit.prevent="submitTwoFactor">
+                <ion-text color="medium" class="setup-hint">
+                  <p>{{ t('login.twoFactorHint') }}</p>
+                </ion-text>
+
+                <ion-input
+                  v-model="twoFactorCode"
+                  :label="t('login.twoFactorCodeLabel')"
+                  label-placement="floating"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  required
+                  fill="outline"
+                  :placeholder="t('login.twoFactorCodePlaceholder')"
+                  @ion-input="twoFactorCode = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
+                />
+
+                <ion-note v-if="twoFactorError" color="danger" class="error-note">
+                  {{ twoFactorError }}
+                </ion-note>
+
+                <ion-button
+                  type="submit"
+                  expand="block"
+                  :disabled="twoFactorLoading"
+                  :aria-label="t('login.twoFactorVerify')"
+                  :aria-busy="twoFactorLoading"
+                >
+                  <ion-spinner v-if="twoFactorLoading" name="crescent" />
+                  <template v-else>
+                    <HubIcon slot="start" name="shield-checkmark-outline" />
+                    {{ t('login.twoFactorVerify') }}
+                  </template>
+                </ion-button>
+
+                <ion-button
+                  fill="clear"
+                  size="small"
+                  @click="cancelTwoFactor"
+                >
+                  {{ t('login.twoFactorBack') }}
+                </ion-button>
+              </form>
+
               <!-- Paso: login por PIN -->
               <div v-else-if="step === 'pin'" class="step-form">
 
@@ -283,7 +333,8 @@ import HubIcon from '../components/HubIcon.vue';
 import { setUser, setHubSession, getHubSession } from '../lib/session';
 import type { LoginResult } from '../lib/cloud';
 import {
-  cloudLogin, setTokens, runtimeCloudSession, runtimePinLogin, runtimeSetPin,
+  cloudLogin, cloudLogin2fa, TwoFactorRequiredError, setTokens,
+  runtimeCloudSession, runtimePinLogin, runtimeSetPin,
   googleLoginUrl, exchangeGoogleCode,
 } from '../lib/cloud';
 import { config } from '../lib/config';
@@ -299,7 +350,7 @@ import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
 // ---------------------------------------------------------------------------
 // Tipos
 // ---------------------------------------------------------------------------
-type Step = 'pin' | 'email' | 'setup';
+type Step = 'pin' | 'email' | 'twoFactor' | 'setup';
 
 const { t } = useI18n();
 
@@ -357,7 +408,7 @@ const trustedUsers = ref<TrustedUser[]>(readTrustedUsers());
 // Flujo de pasos
 // ---------------------------------------------------------------------------
 const step = ref<Step>(trusted.value ? 'pin' : 'email');
-const showTabs = computed(() => trusted.value && step.value !== 'setup');
+const showTabs = computed(() => trusted.value && step.value !== 'setup' && step.value !== 'twoFactor');
 
 // El RUNTIME (`GET /api/hub/context` → pin_users) es la AUTORIDAD de quién puede hacer login local
 // por PIN. localStorage NO añade usuarios: solo **decora** con email/iniciales (hub_user no guarda
@@ -368,7 +419,7 @@ const showTabs = computed(() => trusted.value && step.value !== 'setup');
 watch(
   [pinUsers, hubContextReady, machineRegistrationRequired],
   ([users, contextReady, registrationRequired]) => {
-    if (!contextReady || step.value === 'setup') return;
+    if (!contextReady || step.value === 'setup' || step.value === 'twoFactor') return;
     // Una máquina real sin vínculo no puede entrar por un PIN heredado/cacheado: primero debe
     // acreditar una cuenta Cloud y completar el alta de ESTA instalación. Demo es la única
     // excepción y el runtime ya la expresa con `registration_required=false`.
@@ -413,6 +464,19 @@ const trust = ref<boolean>(true);
 const emailLoading = ref<boolean>(false);
 const googleLoading = ref<boolean>(false);
 const emailError = ref<string>('');
+
+// ---------------------------------------------------------------------------
+// TwoFactor state (login 2-pasos, ERPlora/saas#994)
+// El `ticket` del challenge vive SOLO en memoria — es monouso y transitorio; NUNCA
+// se persiste en localStorage. Se setea al detectar el 401 `two_factor_required`
+// (tanto en submitEmail como tras un código erróneo, que renueva el ticket).
+// El canal (`.method`, hoy siempre 'email') llega en el error; la UI siempre habla
+// de email, así que no se guarda por separado.
+// ---------------------------------------------------------------------------
+const twoFactorTicket = ref<string>('');
+const twoFactorCode = ref<string>('');
+const twoFactorError = ref<string>('');
+const twoFactorLoading = ref<boolean>(false);
 
 function redirectTarget(): string {
   const raw = router.currentRoute.value.query.redirect;
@@ -504,6 +568,16 @@ async function submitEmail(): Promise<void> {
     const result = await cloudLogin(email, passwordVal.value);
     await finalizeCloudLogin(result);
   } catch (e) {
+    // Login 2-pasos (ERPlora/saas#994): el Cloud responde 401 con `two_factor_required` + ticket.
+    // Tiene preferencia sobre el fallback demo y el mensaje genérico: el usuario existe y debe
+    // meter el OTP. El `ticket` vive SOLO en memoria (monouso, transitorio).
+    if (e instanceof TwoFactorRequiredError) {
+      twoFactorTicket.value = e.ticket;
+      twoFactorCode.value = '';
+      twoFactorError.value = '';
+      step.value = 'twoFactor';
+      return;
+    }
     // Fallback demo SOLO con VITE_DEMO=1 (config.demo). En prod (sin la flag) el login falla
     // duro y mostramos el error real — nunca creamos una sesión ficticia.
     if (config.demo) {
@@ -526,6 +600,50 @@ async function submitEmail(): Promise<void> {
   } finally {
     emailLoading.value = false;
   }
+}
+
+/**
+ * Paso 2 del login 2FA (ERPlora/saas#994): POST {ticket, code} a /api/v1/auth/login/2fa/. Mantiene
+ * el `ticket` en memoria. Un código erróneo responde 401 con un ticket NUEVO (single-use): se
+ * adopta `error.ticket` y se deja reintentar al usuario, sin pedir de nuevo la contraseña. Un
+ * éxito sigue EXACTAMENTE el flujo de finalización de login (`finalizeCloudLogin`).
+ */
+async function submitTwoFactor(): Promise<void> {
+  twoFactorError.value = '';
+  const code = twoFactorCode.value.trim();
+  if (!code || !twoFactorTicket.value) {
+    twoFactorError.value = t('login.twoFactorRequired');
+    return;
+  }
+  twoFactorLoading.value = true;
+  try {
+    const result = await cloudLogin2fa(twoFactorTicket.value, code);
+    // Login completo: limpia el challenge transitorio antes de finalizar.
+    twoFactorTicket.value = '';
+    twoFactorCode.value = '';
+    await finalizeCloudLogin(result);
+  } catch (e) {
+    if (e instanceof TwoFactorRequiredError) {
+      // Código erróneo/caducado → el Cloud emitió un ticket NUEVO. Lo adoptamos para el reintento.
+      twoFactorTicket.value = e.ticket;
+      twoFactorCode.value = '';
+      twoFactorError.value = t('login.twoFactorIncorrect');
+      return;
+    }
+    twoFactorError.value = e instanceof Error && e.message === 'machine_registration'
+      ? t('login.errorMachineRegistration')
+      : t('login.twoFactorError');
+  } finally {
+    twoFactorLoading.value = false;
+  }
+}
+
+/** Vuelve del paso 2FA al formulario de email, descartando el ticket transitorio en memoria. */
+function cancelTwoFactor(): void {
+  twoFactorTicket.value = '';
+  twoFactorCode.value = '';
+  twoFactorError.value = '';
+  step.value = 'email';
 }
 
 // --- «Continuar con Google» (ADR-0157 §8) ------------------------------------

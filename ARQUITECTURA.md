@@ -206,7 +206,7 @@ Crate `runtime` (submódulos): `manifest`, `loader`, `registry`, `installer`, `m
 ```
 1. Portal valida compra/entitlement → URL S3 firmada + versión + sha256
 2. Descargar module.zip de S3
-3. Verificar firma + SHA256
+3. Verificar firma ed25519 (autenticidad, hub#239) + SHA256 (integridad)
 4. Descomprimir en el store de módulos
 5. Leer y validar module.json
 6. Comprobar depends_on (orden topológico)

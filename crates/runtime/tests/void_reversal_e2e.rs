@@ -137,9 +137,7 @@ async fn seed_stock_decrease(rt: &Runtime, ctx: &RequestContext, pid: &str, qty:
 /// Listeners de sale.voided registrados por ambos módulos.
 #[tokio::test]
 async fn install_registers_void_listeners() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = full_stack().await;
     let reg = rt.registry();
     let listeners = reg.listeners_for("sale.voided");
@@ -151,9 +149,7 @@ async fn install_registers_void_listeners() {
 /// stock restituido. Reentrega del evento no duplica.
 #[tokio::test]
 async fn cash_sale_void_reverts_cash_and_stock() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = full_stack().await;
     let ctx = admin();
 
@@ -201,9 +197,7 @@ async fn cash_sale_void_reverts_cash_and_stock() {
 /// así que su anulación es no-op en caja (no se postea refund), pero el stock SÍ se restituye.
 #[tokio::test]
 async fn card_sale_void_restocks_but_no_cash_refund() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = full_stack().await;
     let ctx = admin();
     let opening = 5_000;
@@ -232,9 +226,7 @@ async fn card_sale_void_restocks_but_no_cash_refund() {
 /// revirtiendo la caja, sin tocar ningún stock de producto.
 #[tokio::test]
 async fn service_line_void_reverts_cash_without_touching_stock() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = full_stack().await;
     let ctx = admin();
     let sid = open_cash_session(&rt, &ctx, 0).await;

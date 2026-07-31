@@ -32,6 +32,7 @@ fn test_config(auth_mode: AuthMode, tag: &str) -> HubConfig {
         // producción — dev OFF.
         dev_mode: false,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     }
 }
 

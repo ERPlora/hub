@@ -49,9 +49,7 @@ async fn count(rt: &Runtime, sql: &str) -> i64 {
 /// Restaurar un blueprint sobre un hub que ya tiene su semilla NO duplica las reglas de IVA.
 #[tokio::test]
 async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // ORIGEN h1 → bundle con taxes (los `id` embeben 'h1'; created_by='system').
     let a = hub_con_taxes("h1").await;
     let selection = ExportSelection {

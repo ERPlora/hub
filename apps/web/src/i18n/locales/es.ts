@@ -653,6 +653,16 @@ export default {
     orSeparator: 'o',
     continueWithGoogle: 'Continuar con Google',
     errorGoogle: 'No se pudo iniciar sesión con Google. Inténtalo de nuevo.',
+    // Login 2-pasos (2FA por OTP de email, ERPlora/saas#994): pantalla de introducción del código.
+    twoFactorSubtitle: 'Verifica que eres tú',
+    twoFactorHint: 'Hemos enviado un código de un solo uso a tu email. Introdúcelo para continuar.',
+    twoFactorCodeLabel: 'Código de verificación',
+    twoFactorCodePlaceholder: 'Código de 6 dígitos',
+    twoFactorVerify: 'Verificar',
+    twoFactorBack: 'Volver',
+    twoFactorRequired: 'Introduce el código que enviamos a tu email.',
+    twoFactorIncorrect: 'Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.',
+    twoFactorError: 'No se pudo verificar el código. Inténtalo de nuevo.',
   },
   activation: {
     title: 'Activación requerida',

@@ -70,6 +70,12 @@ pub struct Installed {
     pub dir: PathBuf,
 }
 
+/// Política de firma para **tests**: admite módulos sin firmar (los mocks del Cloud de los tests
+/// no firman). Equivale al escape hatch de dev — nunca debe usarse en código de producción.
+pub fn dev_signature_policy() -> cloud_client::SignaturePolicy {
+    cloud_client::SignaturePolicy::DevTrust
+}
+
 /// Resuelve la versión a instalar contra `versions/`: la pedida si se indica, o la última
 /// activa. Devuelve la entrada completa (incluye `sha256` si el Cloud lo expone).
 async fn resolve_version(
@@ -150,25 +156,30 @@ fn method(req: &cloud_client::PreparedRequest) -> reqwest::Method {
 /// Descarga + verifica + descomprime el módulo en el cache local, devolviendo su carpeta.
 ///
 /// `sha` es el SHA256 esperado del zip (ya validado como presente por el llamador, ADR-0015);
-/// `ModuleStore::install` verifica integridad y aborta sin tocar nada si no casa.
+/// `ModuleStore::install` verifica integridad (SHA256) y autenticidad (firma ed25519, hub#239)
+/// y aborta sin tocar nada si no casa. La firma se exige según `policy` (DEFAULT deny: en
+/// producción el llamador pasa `Enforce(keyring)`).
 fn acquire(
     store: &ModuleStore,
     module_id: &str,
     version: &ModuleVersion,
     sha: &str,
+    signature: Option<cloud_client::ModuleSignature>,
     zip_bytes: Vec<u8>,
+    policy: &cloud_client::SignaturePolicy,
 ) -> Result<PathBuf, InstallError> {
     let grant = InstallGrant {
         module_id: module_id.to_string(),
         version: version.version.clone(),
         download_url: format!("mem://{module_id}/{}", version.version),
         sha256: sha.to_string(),
+        signature,
     };
 
     let fetcher = InMemoryFetcher {
         bytes: RefCell::new(Some(zip_bytes)),
     };
-    let dir = store.install(&fetcher, &grant)?;
+    let dir = store.install(&fetcher, &grant, policy)?;
     Ok(dir)
 }
 
@@ -194,6 +205,7 @@ pub async fn install_from_cloud(
     module_id: &str,
     requested_version: &str,
     on_progress: OnProgress<'_>,
+    signature_policy: &cloud_client::SignaturePolicy,
 ) -> Result<Installed, InstallError> {
     let mut installing: std::collections::HashSet<String> = std::collections::HashSet::new();
     install_recursive(
@@ -206,6 +218,7 @@ pub async fn install_from_cloud(
         requested_version.to_string(),
         &mut installing,
         on_progress,
+        signature_policy,
     )
     .await
 }
@@ -225,6 +238,7 @@ fn install_recursive<'a>(
     requested_version: String,
     installing: &'a mut std::collections::HashSet<String>,
     on_progress: OnProgress<'a>,
+    signature_policy: &'a cloud_client::SignaturePolicy,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Installed, InstallError>> + Send + 'a>>
 {
     Box::pin(async move {
@@ -250,10 +264,19 @@ fn install_recursive<'a>(
         let dl_req = cloud.download(auth, &module_id, &version.version);
         let zip_bytes = send_bytes(http, &dl_req).await?;
 
-        // (3) Verificar SHA256 (obligatorio) + descomprimir de forma segura + cachear.
+        // (3) Verificar firma ed25519 (hub#239, DEFAULT deny según policy) + SHA256 + descomprimir
+        //     de forma segura + cachear.
         on_progress(&module_id, "verifying");
         let store = ModuleStore::new(cache_root);
-        let dir = acquire(&store, &module_id, &version, &sha, zip_bytes)?;
+        let dir = acquire(
+            &store,
+            &module_id,
+            &version,
+            &sha,
+            version.signature.clone(),
+            zip_bytes,
+            signature_policy,
+        )?;
 
         // (4) INSTALACIÓN ANIDADA: instala las dependencias declaradas que falten ANTES del módulo.
         //     El runtime exige que las deps estén registradas al instalar (installer.rs::install);
@@ -277,6 +300,7 @@ fn install_recursive<'a>(
                 "latest".to_string(),
                 &mut *installing,
                 on_progress,
+                signature_policy,
             )
             .await?;
         }

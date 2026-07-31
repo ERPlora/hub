@@ -71,9 +71,7 @@ const CREATED_AT: &str = "2026-07-11T18:00:00Z";
 
 #[tokio::test]
 async fn full_export_produces_manifest_and_data_files() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h1", "Té verde", "TEV").await;
@@ -123,9 +121,7 @@ async fn full_export_produces_manifest_and_data_files() {
 
 #[tokio::test]
 async fn export_omits_module_owned_seed_rows_that_collide_on_restore() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // La demo del SaaS fallaba en `taxes` al restaurar un blueprint (duplicate key
     // ix_tax_cat_hub_key): el módulo AUTO-SIEMBRA al instalarse sus categorías canónicas
     // (is_system=1) y sus alias de fábrica (source='shipped'); si el bundle ADEMÁS los trae como
@@ -159,9 +155,7 @@ async fn export_omits_module_owned_seed_rows_that_collide_on_restore() {
 
 #[tokio::test]
 async fn exported_sql_uses_hub_id_placeholder_never_the_literal() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
@@ -181,9 +175,7 @@ async fn exported_sql_uses_hub_id_placeholder_never_the_literal() {
 
 #[tokio::test]
 async fn tenant_isolation_other_hub_rows_excluded() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h2", "Secreto Ajeno", "SEC").await;
@@ -199,9 +191,7 @@ async fn tenant_isolation_other_hub_rows_excluded() {
 
 #[tokio::test]
 async fn soft_deleted_rows_are_not_exported() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Vivo", "VIV").await;
     create_product(&rt, "h1", "Borrado", "BOR").await;
@@ -232,9 +222,7 @@ async fn soft_deleted_rows_are_not_exported() {
 
 #[tokio::test]
 async fn module_without_data_is_listed_but_not_dumped() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
@@ -260,9 +248,7 @@ async fn module_without_data_is_listed_but_not_dumped() {
 
 #[tokio::test]
 async fn deselected_sections_are_absent() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
 
     let sel = ExportSelection {
@@ -290,9 +276,7 @@ async fn deselected_sections_are_absent() {
 /// lleva `hub_id`) — no por adivinar nombres de columna.
 #[tokio::test]
 async fn join_tables_without_hub_id_are_exported_scoped_by_their_parent() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
 
     // Dos hubs con su propia categoría + producto ligados entre sí.
@@ -340,9 +324,7 @@ async fn join_tables_without_hub_id_are_exported_scoped_by_their_parent() {
 
 #[tokio::test]
 async fn sha256_covers_exactly_the_bundle_files() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
@@ -374,9 +356,7 @@ async fn sha256_covers_exactly_the_bundle_files() {
 /// CASUALIDAD, porque aquel hub devolvió las tablas en un orden que sí colaba.
 #[tokio::test]
 async fn export_vuelca_las_tablas_en_orden_de_dependencia() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     rt.execute_command(
         "inventory.categories.create",
@@ -434,9 +414,7 @@ async fn export_vuelca_las_tablas_en_orden_de_dependencia() {
 /// Con `cloud_user_id = NULL` viajan nombre, rol y PIN, y no viaja la cuenta del SaaS.
 #[tokio::test]
 async fn export_desvincula_los_usuarios_de_su_cuenta_cloud_sin_perder_su_rol() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     erplora_runtime::identity::create_user(rt.db(), "Manager", "1234", "manager", None)
         .await
@@ -474,9 +452,7 @@ async fn export_desvincula_los_usuarios_de_su_cuenta_cloud_sin_perder_su_rol() {
 /// explícitamente la sección `fiscal` (que es la que ya mueve el certificado, ADR-0113 §2).
 #[tokio::test]
 async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     for m in ["taxes", "inventory", "sales", "invoice", "verifactu"] {
@@ -533,9 +509,7 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
 /// y se pierde la sección entera — el mismo fallo que el orden de tablas, un nivel más abajo.
 #[tokio::test]
 async fn export_ordena_las_filas_padre_antes_que_hija_en_tablas_autorreferenciadas() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     for m in ["taxes", "services"] {

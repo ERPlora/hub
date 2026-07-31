@@ -67,6 +67,7 @@ fn config(base: &Path, dev_mode: bool) -> HubConfig {
         sector: None,
         dev_mode,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     }
 }
 
@@ -166,21 +167,37 @@ async fn instalar_desde_carpeta_fuera_del_staging_se_rechaza() {
     let _ = std::fs::remove_dir_all(&base);
 }
 
-/// El camino REAL de producción (marketplace) NO pasa por el guardarraíl: `request-install`
-/// descarga del SaaS, **verifica el SHA256** (ADR-0015) y extrae en la caché antes de instalar.
-/// Este test lo fija: con `dev_mode = false` (producción) una instalación desde el marketplace
-/// sigue funcionando — el cierre de `install {dir}` no puede llevarse por delante la vía por la
-/// que un hub real instala módulos.
+/// El camino REAL de producción (marketplace) NO pasa por el guardarraíl de `install {dir}`:
+/// descarga del SaaS, **verifica firma ed25519 + SHA256** (hub#239, ADR-0015) y extrae en la
+/// caché antes de instalar. Este test lo fija: con `dev_mode = false` (producción) una
+/// instalación desde el marketplace de un módulo **correctamente firmado por una clave de
+/// confianza** funciona — el cierre de `install {dir}` y la exigencia de firma no pueden llevarse
+/// por delante la vía por la que un hub real instala módulos.
 #[tokio::test]
-async fn instalar_desde_el_marketplace_funciona_en_produccion() {
-    let base = tree("marketplace");
-    let cloud = spawn_mock_cloud(module_zip("notes")).await;
+async fn instalar_del_marketplace_firmado_funciona_en_produccion() {
+    let base = std::env::temp_dir().join(format!(
+        "erplora-install-surface-market-{tag}",
+        tag = std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&base);
+    // Cache LIMPIO: el marketplace debe descargar, verificar firma Y sha, y descomprimir. Si
+    // pre-poblamos el cache (como `tree()`), el short-circuit de cache-hit saltaría la verifica.
+    std::fs::create_dir_all(base.join("module_cache")).unwrap();
+
+    let zip = module_zip("notes");
+    // Firmante del marketplace + su clave pública (hex) para el anillo de confianza del hub.
+    let rng = ring::rand::SystemRandom::new();
+    let (signer, _) = cloud_client::Signer::generate(&rng);
+    let sig = signer.sign("marketplace", &zip);
+    let trusted_pk_hex = hex::encode(signer.public_key());
+    let cloud = spawn_mock_cloud(zip, Some(sig)).await;
 
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-install");
     rt.ensure_system_tables().await.unwrap();
     let mut cfg = config(&base, false); // producción: sin HUB_DEV_MODE
     cfg.cloud_base_url = cloud;
+    cfg.module_trusted_keys = vec![format!("marketplace={trusted_pk_hex}")];
     let router = app(AppState::with_config(rt, cfg));
 
     let req = Request::builder()
@@ -191,13 +208,62 @@ async fn instalar_desde_el_marketplace_funciona_en_produccion() {
         .body(Body::from(json!({ "module_id": "notes" }).to_string()))
         .unwrap();
     let resp = router.clone().oneshot(req).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "el marketplace debe seguir instalando en prod");
+    assert_eq!(resp.status(), StatusCode::OK, "el marketplace debe instalar un módulo firmado");
     let body = body_json(resp).await;
     assert_eq!(body["ok"], json!(true), "{body}");
 
     assert!(
         installed_ids(&router).await.contains(&"notes".to_string()),
-        "el módulo del marketplace queda instalado"
+        "el módulo firmado del marketplace queda instalado"
+    );
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// hub#239: en producción un módulo del marketplace **SIN firma** se rechaza (DEFAULT deny). El
+/// `request-install` baja a error y el módulo NO queda instalado — aunque el SHA256 del zip
+/// cuadre. Es el cierre del agujero: la integridad de transporte (SHA256) ya estaba; falta la
+/// autenticidad (firma), y sin ella no se instala.
+#[tokio::test]
+async fn instalar_del_marketplace_sin_firma_se_rechaza_en_produccion() {
+    let base = std::env::temp_dir().join(format!(
+        "erplora-install-surface-unsigned-{tag}",
+        tag = std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(base.join("module_cache")).unwrap();
+
+    let zip = module_zip("notes");
+    // El mock cloud NO firma (como el serializer del Cloud actual, que aún no expone signature).
+    let cloud = spawn_mock_cloud(zip, None).await;
+
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-install");
+    rt.ensure_system_tables().await.unwrap();
+    let mut cfg = config(&base, false); // producción, anillo de confianza VACÍO ⇒ deny-all
+    cfg.cloud_base_url = cloud;
+    // module_trusted_keys queda vacío: deny-all. Aunque tuviera claves, un módulo sin firma igual
+    // se rechaza (SignatureError::Missing).
+    let router = app(AppState::with_config(rt, cfg));
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/modules/request-install")
+        .header("content-type", "application/json")
+        .header("x-permissions", "*")
+        .body(Body::from(json!({ "module_id": "notes" }).to_string()))
+        .unwrap();
+    let resp = router.clone().oneshot(req).await.unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "un módulo sin firma no se instala en producción (403, rechazo de seguridad)"
+    );
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(false), "{body}");
+
+    assert!(
+        !installed_ids(&router).await.contains(&"notes".to_string()),
+        "el módulo sin firma NO debe quedar instalado"
     );
     let _ = std::fs::remove_dir_all(&base);
 }
@@ -217,8 +283,9 @@ fn module_zip(id: &str) -> Vec<u8> {
 }
 
 /// Mini-SaaS con las tres rutas que consume `CloudClient` (versions/download/mark_installed),
-/// sirviendo el zip con su SHA256 REAL: la verificación de integridad se ejercita de verdad.
-async fn spawn_mock_cloud(zip_bytes: Vec<u8>) -> String {
+/// sirviendo el zip con su SHA256 REAL y, opcionalmente, su **firma ed25519** (hub#239). La
+/// verificación de integridad Y autenticidad se ejercita de verdad.
+async fn spawn_mock_cloud(zip_bytes: Vec<u8>, signature: Option<cloud_client::ModuleSignature>) -> String {
     use axum::extract::State;
     use axum::routing::{get, post};
     use axum::{Json, Router};
@@ -228,11 +295,17 @@ async fn spawn_mock_cloud(zip_bytes: Vec<u8>) -> String {
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
-    type Pkg = std::sync::Arc<(Vec<u8>, String)>;
-    let pkg: Pkg = std::sync::Arc::new((zip_bytes, sha));
+    type Pkg = std::sync::Arc<(Vec<u8>, String, Option<cloud_client::ModuleSignature>)>;
+    let pkg: Pkg = std::sync::Arc::new((zip_bytes, sha, signature));
 
     async fn versions(State(pkg): State<Pkg>) -> Json<Value> {
-        json!([{ "version": "1.0.0", "is_active": true, "sha256": pkg.1 }]).into()
+        // Expone sha256 (integridad) y, si la hay, signature (autenticidad). El serializer del
+        // Cloud real aún no expone `signature` (TODO); el mock sí para ejercitar la verificación.
+        let mut entry = json!({ "version": "1.0.0", "is_active": true, "sha256": pkg.1 });
+        if let Some(sig) = &pkg.2 {
+            entry["signature"] = serde_json::to_value(sig).unwrap();
+        }
+        json!([entry]).into()
     }
     async fn download(State(pkg): State<Pkg>) -> Vec<u8> {
         pkg.0.clone()

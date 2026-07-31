@@ -24,3 +24,6 @@ reqwest-transport = ["dep:reqwest"]
 [dev-dependencies]
 tempfile = "3"
 zip = "2"
+# Firma ed25519 de prueba para los tests de verificación de firma (hub#239): generan un par
+# efímero y firman el zip del módulo para ejercitar Enforce/DevTrust.
+ring = "0.17"

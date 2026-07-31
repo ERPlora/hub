@@ -15,7 +15,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "v5"] }
 sha2 = "0.10"
 # PIN hashing con argon2id + string PHC estándar (`$argon2id$v=19$...`). Decisión humano hub#15:
 # se mantiene `sha2` para verificar (y rehashear perezosamente) los PINs viejos `salt:hash`.

@@ -111,6 +111,16 @@ fn backoff_seconds(attempts: i64) -> i64 {
 /// (0 = nada vencido). Las filas que fallan quedan diferidas (`next_attempt_at` futuro), así que
 /// no se vuelven a tomar en este `now`; los eventos en cascada que generen las entregas con éxito
 /// quedan `pending` y se toman en el siguiente ciclo.
+///
+/// **Cada fila es independiente (hub#142):** un error al procesar UNA fila (p.ej. un listener que
+/// revienta, o un `UPDATE` del propio relay que falla) NUNCA aborta la entrega del resto del lote.
+/// Antes este bucle propagaba el error con `?`, así que una sola fila "venenosa" —ordenada antes
+/// por `created_at`— bloqueaba la entrega de todos los eventos posteriores del mismo ciclo. Como
+/// esa fila se reintentaba ciclo tras ciclo con el mismo fallo, los eventos que llegaban después
+/// se morían de hambre (starvation): `sale.voided` marcado `delivered` a medias y 25 min después
+/// sin reverso de caja/stock. El síntoma era no determinista y dependía del orden/carrera del
+/// relay por hub: en algunos hubs la fila venenosa no existía o llegaba al final del lote. Ahora
+/// se captura el error por fila, se difiere/dead-lettera esa fila concretay el bucle sigue.
 pub async fn process_once(db: &dyn DatabaseAdapter, registry: &Registry) -> Result<usize> {
     let now = now_rfc3339();
     let mut q = Params::new();
@@ -127,7 +137,14 @@ pub async fn process_once(db: &dyn DatabaseAdapter, registry: &Registry) -> Resu
 
     let count = due.rows.len();
     for row in &due.rows {
-        process_row(db, registry, row).await?;
+        // Aislar cada fila: un fallo aquí difiere/dead-lettera SOLO esta fila (en `process_row`)
+        // y el resto del lote sigue entregándose. No propagamos el error al bucle del server,
+        // que solo haría `eprintln!` y dejaría todo el lote sin procesar este ciclo (hub#142).
+        if let Err(e) = process_row(db, registry, row).await {
+            // `process_row` ya intentó defer/dead; si hasta eso falla (p.ej. la BD se cayó),
+            // lo dejamos para el próximo ciclo del relay y seguimos con las filas sanas.
+            eprintln!("relay outbox: fila {}: {e}", row["id"].as_str().unwrap_or("?"));
+        }
     }
     Ok(count)
 }
@@ -164,7 +181,17 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     let payload = parse_payload(row);
 
     // Listeners actuales (solo módulos activos). Si no hay, la entrega es trivialmente completa.
+    //
+    // **Cada listener es independiente (hub#142):** antes, un listener que fallaba hacía
+    // `return defer_or_dead(...)` → se saltaba a los demás listeners del MISMO evento. En el caso
+    // real, si `cash_register._reverse_sale` reventaba, `inventory._restock_on_void` NUNCA corría
+    // (ni ese ciclo ni hasta que el primero tuviera éxito en su reintento) → el evento aparecía
+    // "sin llegar" a la mitad de los listeners. Ahora registramos el primer fallo, entregamos al
+    // resto y, al final, diferimos/dead-letteramos la fila una sola vez. Los listeners que sí
+    // entregaron dejan su marcador en `_event_delivery`, así que en el reintento solo corre el
+    // que falló (idempotencia). El contrato at-least-once + idempotencia por listener se mantiene.
     let listeners = registry.listeners_for(&event_name);
+    let mut first_err: Option<String> = None;
     for listener in &listeners {
         if delivery_exists(db, &id, listener).await? {
             continue; // ya entregado en un intento previo (idempotencia)
@@ -186,7 +213,11 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         )
         .await
         {
-            return defer_or_dead(db, &id, attempts, &format!("{listener}: {e}")).await;
+            // Registras el fallo y SIGUES: los hermanos se entregan igual este ciclo. El difierido
+            // de la fila (backoff/dead-letter) se hace una vez al final, con el primer error.
+            if first_err.is_none() {
+                first_err = Some(format!("{listener}: {e}"));
+            }
         }
     }
 
@@ -198,8 +229,16 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
         if let Err(e) = deliver_host_notify(db, registry, &id, &module_id, &ctx.hub_id, &payload).await
         {
-            return defer_or_dead(db, &id, attempts, &format!("{HOST_NOTIFY_LISTENER}: {e}")).await;
+            if first_err.is_none() {
+                first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {e}"));
+            }
         }
+    }
+
+    // Si algún listener falló, la fila se difiere/dead-lettera (NO se marca entregada): el/los
+    // listeners fallidos se reintentarán; los que sí se entregaron ya tienen su marcador.
+    if let Some(err) = first_err {
+        return defer_or_dead(db, &id, attempts, &err).await;
     }
 
     mark_delivered(db, &id).await
@@ -358,6 +397,7 @@ mod tests {
                 transaction: true,
                 sql: vec![sql.to_string()],
                 emit,
+                min_affected_rows: None,
                 handler: None,
                 ai: None,
                 schema: None,
@@ -644,5 +684,156 @@ mod tests {
         .unwrap();
         process_once(&db, &reg).await.unwrap();
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await, 1, "dead-letter");
+    }
+
+    /// **hub#142 — un listener que falla NO bloquea a sus hermanos.** Antes, `process_row`
+    /// hacía `return defer_or_dead(...)` al primer fallo: si `cash_register._reverse_sale`
+    /// reventaba, `inventory._restock_on_void` (otro listener del MISMO `sale.voided`) no corría
+    /// ni ese ciclo ni hasta que el primero tuviera éxito en su reintento. Ahora cada listener es
+    /// independiente: el que falla se difiere (backoff) y los demás se entregan igual.
+    #[tokio::test]
+    async fn one_failing_listener_does_not_block_sibling_listeners() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        // "sales.void" emite "sale.voided"; dos listeners: "bad" (revienta: columna inexistente)
+        // y "good" (inserta n=1). El orden del registro pone "bad" PRIMERO: si el bug siguiera
+        // vivo, "good" nunca correría y n=1 nunca aparecería.
+        let mut reg = Registry::new();
+        reg.status.insert("sales".into(), ModuleStatus::Active);
+        reg.status.insert("bad".into(), ModuleStatus::Active);
+        reg.status.insert("good".into(), ModuleStatus::Active);
+        // Listener que FALLA: referencia una columna que no existe → error de BD en execute_at.
+        reg.commands.insert(
+            "bad.listener".into(),
+            cmd("bad", "INSERT INTO t (no_such_column) VALUES (1);", vec![]),
+        );
+        reg.commands.insert(
+            "good.listener".into(),
+            cmd("good", "INSERT INTO t (n) VALUES (1);", vec![]),
+        );
+        reg.commands.insert(
+            "sales.void".into(),
+            cmd("sales", "INSERT INTO t (n) VALUES (99);", vec!["sale.voided".into()]),
+        );
+        reg.listeners.insert(
+            "sale.voided".into(),
+            vec!["bad.listener".into(), "good.listener".into()],
+        );
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx).await.unwrap();
+
+        // Un solo ciclo del relay: "good.listener" se entrega AUNQUE "bad.listener" falla antes.
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            1,
+            "el listener bueno corre aunque su hermano falle (hub#142)"
+        );
+        // La entrega del bueno queda marcada (idempotente); la del malo, no.
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='good.listener'").await,
+            1,
+            "el listener bueno quedó marcado como entregado"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='bad.listener'").await,
+            0,
+            "el listener malo NO se marcó (falló) → se reintenta"
+        );
+        // La fila NO se marca 'delivered' (un listener falló): queda diferida para reintento.
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await,
+            1,
+            "la fila se difiere (no delivered) porque un listener falló"
+        );
+        assert_eq!(
+            count(&db, "SELECT attempts AS c FROM _event_outbox").await,
+            1,
+            "1 intento fallido registrado"
+        );
+
+        // Reintento: "bad.listener" vuelve a fallar, pero "good.listener" NO se re-ejecuta
+        // (marcador de idempotencia). El contrato at-least-once + idempotencia por listener se mantiene.
+        let mut p = Params::new();
+        p.insert("a".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute("UPDATE _event_outbox SET next_attempt_at = :a", &p).await.unwrap();
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            1,
+            "reentrega no duplica el listener bueno (idempotente)"
+        );
+    }
+
+    /// **hub#142 — una fila venenosa NO bloquea el resto del lote (batch starvation).** Antes,
+    /// `process_once` propagaba el error de `process_row` con `?`: una fila que fallaba al
+    /// procesarse (ordenada ANTES por `created_at`) abortaba la entrega de TODAS las filas
+    /// posteriores del mismo ciclo. Como esa fila se reintentaba ciclo tras ciclo con el mismo
+    /// fallo, los eventos que caían después en el lote morían de hambre → `sale.voided` "sin
+    /// llegar". El síntoma era no determinista (dependía del orden/carrera del relay por hub).
+    /// Ahora cada fila es independiente: la venenosa se difiere y las sanas se entregan igual.
+    #[tokio::test]
+    async fn one_failing_row_does_not_starve_later_rows_in_the_batch() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        // "poison.fire" emite "poison.e" cuyo ÚNICO listener revienta (columna inexistente).
+        // "ok.fire" emite "ok.e" cuyo listener inserta n=1. Disparamos "poison" ANTES para que su
+        // fila quede ORDENADA PRIMERO por created_at → si el bug siguiera vivo, "ok.e" no se entregaría.
+        let mut reg = Registry::new();
+        for m in ["poison", "ok"] {
+            reg.status.insert(m.into(), ModuleStatus::Active);
+        }
+        reg.commands.insert(
+            "poison.listener".into(),
+            cmd("poison", "INSERT INTO t (no_such_column) VALUES (1);", vec![]),
+        );
+        reg.commands.insert(
+            "ok.listener".into(),
+            cmd("ok", "INSERT INTO t (n) VALUES (1);", vec![]),
+        );
+        reg.commands.insert(
+            "poison.fire".into(),
+            cmd("poison", "INSERT INTO t (n) VALUES (99);", vec!["poison.e".into()]),
+        );
+        reg.commands.insert(
+            "ok.fire".into(),
+            cmd("ok", "INSERT INTO t (n) VALUES (99);", vec!["ok.e".into()]),
+        );
+        reg.listeners.insert("poison.e".into(), vec!["poison.listener".into()]);
+        reg.listeners.insert("ok.e".into(), vec!["ok.listener".into()]);
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "poison.fire", &Params::new(), &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "ok.fire", &Params::new(), &ctx).await.unwrap();
+
+        // Un solo ciclo del relay procesa AMBAS filas (BATCH=50). La venenosa falla y se difiere;
+        // la sana se entrega igual. Sin el fix, "ok.listener" no correría (n=1 sería 0 aquí).
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            1,
+            "la fila sana se entrega aunque la venenosa (anterior en el lote) falle (hub#142)"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='ok.listener'").await,
+            1,
+            "la entrega de la fila sana queda marcada"
+        );
+        // La fila venenosa quedó diferida (no delivered ni muerta): pendiente de reintento.
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE event_name='poison.e' AND status='pending'").await,
+            1,
+            "la fila venenosa sigue pendiente (diferida para reintento)"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE event_name='ok.e' AND status='delivered'").await,
+            1,
+            "la fila sana quedó entregada"
+        );
     }
 }

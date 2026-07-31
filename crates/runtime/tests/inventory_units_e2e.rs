@@ -64,9 +64,7 @@ async fn stock_de(rt: &Runtime, ctx: &RequestContext, id: &str) -> i64 {
 // ── El registro de unidades ─────────────────────────────────────────────────────────────
 #[tokio::test]
 async fn el_hub_trae_un_registro_de_unidades_sembrado() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -96,9 +94,7 @@ async fn el_hub_trae_un_registro_de_unidades_sembrado() {
 
 #[tokio::test]
 async fn el_producto_declara_su_unidad_base_y_sin_declararla_es_ud() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -125,9 +121,7 @@ async fn el_producto_declara_su_unidad_base_y_sin_declararla_es_ud() {
 // ── Cantidades en escala 10⁶ ────────────────────────────────────────────────────────────
 #[tokio::test]
 async fn media_racion_de_gambas_si_descuenta_stock() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -159,9 +153,7 @@ async fn media_racion_de_gambas_si_descuenta_stock() {
 
 #[tokio::test]
 async fn el_libro_de_movimientos_va_en_la_misma_escala() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -191,9 +183,7 @@ async fn el_libro_de_movimientos_va_en_la_misma_escala() {
 // ── El incremento se VALIDA, no se redondea ─────────────────────────────────────────────
 #[tokio::test]
 async fn una_cantidad_fuera_de_la_rejilla_se_rechaza() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -225,9 +215,7 @@ async fn una_cantidad_fuera_de_la_rejilla_se_rechaza() {
 // ── La unidad maestra se puede cambiar (y no se pierde) por update ──────────────────────
 #[tokio::test]
 async fn la_unidad_maestra_se_puede_cambiar_por_update() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -281,9 +269,7 @@ async fn la_unidad_maestra_se_puede_cambiar_por_update() {
 // ── Precio: importe entero por cantidad de precio (KPEIN) ───────────────────────────────
 #[tokio::test]
 async fn un_precio_sub_centimo_se_guarda_como_importe_por_cien_unidades() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -316,9 +302,7 @@ async fn un_precio_sub_centimo_se_guarda_como_importe_por_cien_unidades() {
 
 #[tokio::test]
 async fn por_defecto_el_precio_es_por_una_unidad() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;

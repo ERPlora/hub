@@ -164,6 +164,7 @@ async fn proxy_entitlement_incluye_revalidation_aunque_el_cloud_no_responda() {
         sector: None,
         dev_mode: false,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     };
     let state = AppState::with_config(rt, cfg);
     // Estado sembrado por el job: último token válido con gracia 9_000, sin bloqueos.

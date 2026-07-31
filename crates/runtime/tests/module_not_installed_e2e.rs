@@ -31,9 +31,7 @@ async fn hub_with_taxes() -> Runtime {
 
 #[tokio::test]
 async fn query_de_un_modulo_no_instalado_es_module_not_installed() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = hub_with_taxes().await;
     let err = rt
         .execute_query_page("verifactu.records.by_invoice", &Params::new(), &admin())
@@ -47,9 +45,7 @@ async fn query_de_un_modulo_no_instalado_es_module_not_installed() {
 
 #[tokio::test]
 async fn query_inexistente_de_un_modulo_instalado_sigue_siendo_query_not_found() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = hub_with_taxes().await;
     let err = rt
         .execute_query_page("taxes.rates.list", &Params::new(), &admin()) // rates: retirado por ADR-0085

@@ -344,6 +344,7 @@ mod tests {
                 schema: None,
                 emit: vec![],
                 handler: None,
+                min_affected_rows: None,
                 ai: Some(AiTool {
                     description: "Revierte el efecto en caja de una venta anulada".to_string(),
                     name: None,

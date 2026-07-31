@@ -95,9 +95,7 @@ async fn seed_sale(rt: &Runtime, sale_id: &str, lines: &[(&str, i64, f64)]) {
 
 #[tokio::test]
 async fn receive_creates_reception_movement_with_location_and_cost() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() { eprintln!("⚠ sin handler.wasm — saltado"); return; }
     let rt = stack().await;
     let ctx = admin();
@@ -121,9 +119,7 @@ async fn receive_creates_reception_movement_with_location_and_cost() {
 
 #[tokio::test]
 async fn adjust_is_absolute_count_with_mandatory_reason() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
     let pid = create_product(&rt, &ctx, "CNT", 10).await;
@@ -158,9 +154,7 @@ async fn adjust_is_absolute_count_with_mandatory_reason() {
 
 #[tokio::test]
 async fn sale_with_decimal_quantity_moves_ledger_and_void_reverses_it() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() { eprintln!("⚠ sin handler.wasm — saltado"); return; }
     let rt = stack().await;
     let ctx = admin();
@@ -202,9 +196,7 @@ async fn sale_with_decimal_quantity_moves_ledger_and_void_reverses_it() {
 
 #[tokio::test]
 async fn rejected_or_untracked_decreases_leave_no_movement() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
 
@@ -228,9 +220,7 @@ async fn rejected_or_untracked_decreases_leave_no_movement() {
 
 #[tokio::test]
 async fn movements_query_filters_by_type_and_reference() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() { eprintln!("⚠ sin handler.wasm — saltado"); return; }
     let rt = stack().await;
     let ctx = admin();
@@ -257,9 +247,7 @@ async fn movements_query_filters_by_type_and_reference() {
 
 #[tokio::test]
 async fn stock_permissions_are_separate_from_product_editing() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
     let pid = create_product(&rt, &ctx, "PRM", 10).await;

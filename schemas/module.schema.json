@@ -309,6 +309,11 @@
               "type": "string"
             }
           },
+          "min_affected_rows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Contrato de mutación (hub#140): mínimo de filas que las sentencias `sql` del command DEBEN afectar (en total) para que el command se considere exitoso y se emitan sus `emit`. Si el recuento real queda por debajo, la transacción se revierte ENTERA y NO se escribe ningún evento en el outbox (ni notificación al WS) — porque el hecho declarado nunca ocurrió. Es OPT-IN: ausente = comportamiento de siempre (emite haya o no mutado), para no romper los módulos publicados ni los commands genuinamente idempotentes. `1` es el caso habitual de un command de transición (confirmar/anular/cerrar) que NO debe emitir si el `WHERE` no casa; `0` declararía explícitamente un no-op idempotente permitido que sí emite. El error estable distingue `not_found` (0 filas) de `conflict` (>0 pero por debajo del mínimo)."
+          },
           "ai": {
             "$ref": "#/$defs/aiTool"
           }

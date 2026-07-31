@@ -1,7 +1,7 @@
 //! Ejecución de commands declarativos (mutaciones) + emisión de eventos. ARQUITECTURA.md §4.
 //! Tier 0/1 (SQL declarativo), Tier 2 (handler WASM vía `erplora-wasm-host`, §5.3 / §9.2)
 //! y plugins **nativos first-party** (ADR-0009, `native.rs`).
-use erplora_db::{DatabaseAdapter, Params};
+use erplora_db::{DatabaseAdapter, Params, TxGatedOutcome};
 use erplora_wasm_host::{Operation, Output, WasmHost};
 use serde_json::{json, Value as Json};
 
@@ -186,6 +186,7 @@ pub(crate) async fn execute_at(
     // UNA transacción. Si commitea, los eventos quedan persistidos; si revierte, no hay evento.
     // (Decisión del humano #3: los commands `transaction:false` también se envuelven en tx para
     // garantizar la escritura atómica del outbox.)
+    let sql_op_count = cmd.sql.len();
     let mut ops: Vec<(String, Params)> = cmd
         .sql
         .iter()
@@ -201,7 +202,27 @@ pub(crate) async fn execute_at(
         ));
     }
     ops.extend_from_slice(extra_ops);
-    db.execute_tx(&ops).await?;
+
+    // Gate de filas afectadas (hub#140). `min_affected_rows` es OPT-IN: `None` mantiene el
+    // comportamiento de siempre (emite haya o no mutado). `Some(n)` exige que la suma de filas
+    // afectadas por las sentencias `sql` del command sea `>= n` — contadas sobre las primeras
+    // `sql_op_count` ops, NUNCA sobre los INSERT del outbox (que siempre afectan 1 y harían
+    // inútil la gate). Se evalúa DENTRO de la tx vía `execute_tx_gated`: si no se cumple, la tx
+    // entera revierte (ni mutación ni outbox) y devolvemos el error estable, SIN notificar al WS.
+    let min = cmd.def.min_affected_rows;
+    match db.execute_tx_gated(&ops, sql_op_count, min).await? {
+        TxGatedOutcome::RolledBack { sql_counts } => {
+            let min = min.expect("la gate sólo revierte con Some(min)");
+            let affected: u64 = sql_counts.iter().sum();
+            return Err(RuntimeError::MinAffectedRows {
+                command: name.to_string(),
+                required: min,
+                affected,
+                kind: crate::errors::affected_kind(affected, min),
+            });
+        }
+        TxGatedOutcome::Committed { .. } => {}
+    }
 
     // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
     // durable a listeners la hace el relay desde el outbox.
@@ -723,6 +744,7 @@ mod tests {
             transaction: true,
             sql: vec!["INSERT INTO x VALUES (1);".to_string()],
             emit: vec![],
+            min_affected_rows: None,
             handler: None,
             ai: None,
             schema: None,
@@ -1124,6 +1146,14 @@ mod tests {
         ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
             panic!("DenyDb::execute_tx no debía llamarse — el gate de origen debe cortar antes");
         }
+        async fn execute_tx_gated(
+            &self,
+            _ops: &[(String, Params)],
+            _sql_op_count: usize,
+            _min_affected_rows: Option<u64>,
+        ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
+            panic!("DenyDb::execute_tx_gated no debía llamarse — el gate de origen debe cortar antes");
+        }
         async fn query(
             &self,
             _sql: &str,
@@ -1155,6 +1185,26 @@ mod tests {
             ops: &[(String, Params)],
         ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
             Ok(erplora_db::CommandResult::affected(ops.len() as u64))
+        }
+        async fn execute_tx_gated(
+            &self,
+            ops: &[(String, Params)],
+            sql_op_count: usize,
+            min_affected_rows: Option<u64>,
+        ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
+            // Por defecto cada op "muta" 1 fila: simula un INSERT/UPDATE que casa. Si el caller
+            // exige un mínimo y la suma de las `sql_op_count` primeras lo cubre, commitea; si no,
+            // revierte. Los tests de hub#140 construyen su propio doble cuando necesitan 0 filas.
+            let counts = vec![1u64; ops.len()];
+            let n = sql_op_count.min(counts.len());
+            let sql_counts: Vec<u64> = counts[..n].to_vec();
+            let affected: u64 = sql_counts.iter().sum();
+            let ok = min_affected_rows.map_or(true, |min| affected >= min);
+            if ok {
+                Ok(erplora_db::TxGatedOutcome::Committed { per_op: counts })
+            } else {
+                Ok(erplora_db::TxGatedOutcome::RolledBack { sql_counts })
+            }
         }
         async fn query(
             &self,

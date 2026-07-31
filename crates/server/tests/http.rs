@@ -219,6 +219,7 @@ async fn hub_context_returns_configured_hub_id() {
         sector: Some("hosteleria".into()),
         dev_mode: false,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app
@@ -263,6 +264,7 @@ async fn hub_context_adopts_machine_identity_without_restart() {
         sector: None,
         dev_mode: false,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     };
     let token: MachineToken = Arc::new(RwLock::new(None));
     let hub_id: HubId = Arc::new(RwLock::new(erplora_server::DEV_HUB_ID.into()));
@@ -351,6 +353,7 @@ async fn demo_catalog_uses_public_saas_metadata_without_hub_credentials() {
         sector: None,
         dev_mode: false,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     };
 
     let response = app(AppState::with_config(rt, cfg))
@@ -423,6 +426,7 @@ async fn real_catalog_uses_private_saas_endpoint_with_machine_credentials() {
         sector: None,
         dev_mode: false,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     };
 
     let response = app(AppState::with_config(rt, cfg))
@@ -462,6 +466,7 @@ async fn real_machine_cannot_use_business_api_before_registration() {
         sector: None,
         dev_mode: false,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     };
 
     let resp = app(AppState::with_config(rt, cfg))

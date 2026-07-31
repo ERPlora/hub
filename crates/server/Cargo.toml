@@ -62,3 +62,7 @@ sha2 = "0.10"
 # Firma de JWT RS256 de prueba para el gate de presencia de `auth_cloud` (ADR-0157,
 # `tests/auth_cloud_presence.rs`): el test emula al SaaS emitiendo el claim `hubs`.
 jsonwebtoken = "9"
+# Firma ed25519 de prueba para el flujo del marketplace firmado (hub#239,
+# `tests/install_surface.rs`): el test genera un par efímero y firma el zip del mock cloud.
+ring = "0.17"
+hex = "0.4"

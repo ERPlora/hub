@@ -354,7 +354,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     for (id, version) in missing {
                         let mut rt = state.runtime.lock().await;
                         // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
-                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}).await {
+                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await {
                             Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{version}"),
                             Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
                         }
@@ -953,6 +953,7 @@ async fn request_install(
         &req.module_id,
         &req.version,
         &on_progress,
+        &st.config.signature_policy(),
     )
     .await;
 
@@ -1018,6 +1019,11 @@ async fn request_install(
             let code = match &e {
                 install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
                 install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
+                // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
+                // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
+                install::InstallError::Source(source::SourceError::BadSignature(_)) => {
+                    StatusCode::FORBIDDEN
+                }
                 install::InstallError::Cloud(_)
                 | install::InstallError::Source(_)
                 | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,

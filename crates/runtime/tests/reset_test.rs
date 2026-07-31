@@ -34,10 +34,6 @@ fn modules_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
 }
 
-fn have_modules() -> bool {
-    modules_root().exists()
-}
-
 fn ctx(hub: &str) -> RequestContext {
     RequestContext::new(hub, "u1", ["*".to_string()])
 }
@@ -100,7 +96,7 @@ const ACTOR: &str = "u1";
 
 #[tokio::test]
 async fn reset_borra_los_datos_de_usuario_del_hub() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h1", "Té verde", "TEV").await;
@@ -126,7 +122,7 @@ async fn reset_borra_los_datos_de_usuario_del_hub() {
 /// rompería los índices únicos `(hub_id, sku)` al reimportar el catálogo.
 #[tokio::test]
 async fn reset_borra_de_verdad_no_marca_is_deleted() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
@@ -145,7 +141,7 @@ async fn reset_borra_de_verdad_no_marca_is_deleted() {
 /// datos de los hubs hermanos. Este test es el que impide que eso llegue a producción.
 #[tokio::test]
 async fn reset_no_toca_ni_una_fila_de_otro_hub_de_la_misma_org() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h2", "Secreto Ajeno", "SEC").await;
@@ -184,7 +180,7 @@ async fn reset_no_toca_ni_una_fila_de_otro_hub_de_la_misma_org() {
 /// IVA y sin forma de recuperarlo salvo reinstalando el módulo. El reset borra datos de USUARIO.
 #[tokio::test]
 async fn reset_conserva_las_filas_sembradas_por_el_modulo() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     rt.execute_command(
         "taxes.categories.create",
@@ -222,7 +218,7 @@ async fn reset_conserva_las_filas_sembradas_por_el_modulo() {
 /// FK y el reset entero falla. Debe recorrerse en orden topológico inverso (hijos primero).
 #[tokio::test]
 async fn reset_borra_los_vinculos_m2m_antes_que_sus_padres() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     rt.execute_command(
@@ -264,7 +260,7 @@ async fn reset_borra_los_vinculos_m2m_antes_que_sus_padres() {
 /// reales. Y por ser dry-run, no puede borrar nada — se ejecuta solo con abrir el panel.
 #[tokio::test]
 async fn plan_reset_cuenta_filas_reales_y_no_borra_nada() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h1", "Té", "TEV").await;
@@ -290,7 +286,7 @@ async fn plan_reset_cuenta_filas_reales_y_no_borra_nada() {
 /// El plan cuenta lo del hub que pregunta, no lo del vecino (misma BD, distinto tenant).
 #[tokio::test]
 async fn plan_reset_no_cuenta_filas_de_otro_hub() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     for (i, sku) in ["A", "B", "C", "D"].iter().enumerate() {
@@ -309,7 +305,7 @@ async fn plan_reset_no_cuenta_filas_de_otro_hub() {
 /// no puede perder, de paso, su configuración fiscal.
 #[tokio::test]
 async fn reset_solo_toca_las_secciones_seleccionadas() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     rt.execute_command(
@@ -339,7 +335,7 @@ async fn reset_solo_toca_las_secciones_seleccionadas() {
 /// owner podría quedarse fuera de su propio hub con un clic y sin vuelta atrás.
 #[tokio::test]
 async fn reset_de_usuarios_conserva_a_quien_lo_ejecuta() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let db = rt.db();
     let owner = erplora_runtime::identity::create_user(db, "Dueño", "1234", "owner", None)

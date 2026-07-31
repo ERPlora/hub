@@ -122,6 +122,11 @@ pub struct HubConfig {
     /// admitida por `POST /api/modules/install`. En producción el despliegue la fija a
     /// `/tmp/modules` (contenedor stateless) y se IGNORA.
     pub dev_modules_dir: Option<PathBuf>,
+    /// Claves públicas ed25519 de confianza para verificar la firma de módulos del marketplace
+    /// (hub#239), codificadas en hex o base64. Se cargan de `HUB_MODULE_TRUSTED_KEYS` (coma-sep);
+    /// los tests pueden inyectarlas directamente aquí (sin tocar el env global del proceso).
+    /// Vacío ⇒ anillo vacío ⇒ **deny-all** bajo [`Self::signature_policy`] en producción.
+    pub module_trusted_keys: Vec<String>,
 }
 
 /// UUID fijo de desarrollo si no se inyecta `HUB_ID` (decisión tomada — flag para humano).
@@ -177,6 +182,19 @@ impl HubConfig {
             .ok()
             .filter(|s| !s.trim().is_empty())
             .map(PathBuf::from);
+        // Claves públicas ed25519 de confianza para verificar firma de módulos (hub#239):
+        // `HUB_MODULE_TRUSTED_KEYS=k1=hex,k2=base64,...`. Vacío/ausente ⇒ anillo vacío (deny-all
+        // en producción). Las entradas ilegibles se ignoran con WARN en `signature_policy`.
+        let module_trusted_keys = std::env::var("HUB_MODULE_TRUSTED_KEYS")
+            .ok()
+            .map(|raw| {
+                raw.split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         Self {
             hub_id,
             cloud_base_url,
@@ -189,6 +207,7 @@ impl HubConfig {
             sector,
             dev_mode,
             dev_modules_dir,
+            module_trusted_keys,
         }
     }
 
@@ -207,6 +226,40 @@ impl HubConfig {
             }
         }
         roots
+    }
+
+    /// Política de verificación de **firma** de módulos (hub#239). DEFAULT **deny**:
+    ///
+    /// - **Producción** (`!dev_mode`): [`SignaturePolicy::Enforce`] con el anillo de claves de
+    ///   `HUB_MODULE_TRUSTED_KEYS`. Anillo vacío ⇒ **deny-all** (fail-closed): ningún módulo del
+    ///   marketplace verifica hasta que el env lleve la clave del marketplace — exactamente el
+    ///   invariante que faltaba. La imagen de producción NUNCA devuelve `DevTrust`.
+    /// - **Desarrollo** (`dev_mode`): [`SignaturePolicy::DevTrust`] — acepta módulos sin firmar
+    ///   (los módulos horneados del monorepo y los instalados desde carpeta no se firman en local).
+    ///   Es el escape hatch **explícito** del flag de dev; si `HUB_MODULE_TRUSTED_KEYS` trae claves,
+    ///   se respetan igual (un módulo firmado valida; uno sin firma se admite por el hatch).
+    ///
+    /// TODO (rotación de claves): hoy el anillo es estático por arranque, cargado del env. Falta
+    /// fetch desde el Cloud + revocación — ver el commit/message del fix.
+    pub fn signature_policy(&self) -> cloud_client::SignaturePolicy {
+        // El anillo se construye de los `module_trusted_keys` del config (cargados del env en
+        // `from_env`, o inyectados por los tests). `from_env` acepta el formato crudo con o sin
+        // `key_id=`; reusarlo evita duplicar el parser.
+        let joined = self.module_trusted_keys.join(",");
+        let (ring, bad) = cloud_client::TrustedKeyRing::from_env(Some(&joined));
+        if !bad.is_empty() {
+            tracing::warn!(
+                count = bad.len(),
+                "HUB_MODULE_TRUSTED_KEYS: entradas ilegibles ignoradas (arrancando con menos claves)"
+            );
+        }
+        if self.dev_mode {
+            // Escape hatch explícito: en dev admitimos sin firma. Mantenemos el anillo por si el
+            // flujo de dev quiere probar verificación (no se fuerza aquí).
+            cloud_client::SignaturePolicy::DevTrust
+        } else {
+            cloud_client::SignaturePolicy::Enforce(ring)
+        }
     }
 }
 
@@ -227,6 +280,7 @@ mod staging_tests {
             sector: None,
             dev_mode,
             dev_modules_dir: Some(PathBuf::from("/tmp/modules")),
+            module_trusted_keys: Vec::new(),
         }
     }
 

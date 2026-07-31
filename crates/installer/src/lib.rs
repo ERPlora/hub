@@ -100,6 +100,7 @@ impl<'a> Installer<'a> {
         runtime: &mut Runtime,
         module_id: &str,
         version: &str,
+        policy: &source::SignaturePolicy,
     ) -> Result<InstallOutcome, InstallError> {
         // (1) Cloud: construir la petición de instalación (URL + cabeceras de Auth).
         // NOTA: `request_install` está DEPRECADO (endpoint ficticio). El flujo real vive ahora
@@ -119,8 +120,8 @@ impl<'a> Installer<'a> {
         // ¿Estaba ya en cache? (determina `from_cache` y si hubo descarga).
         let from_cache = self.store.is_cached(&grant.module_id, &grant.version);
 
-        // (4) Source: descargar (si hace falta) + verificar SHA256 + descomprimir + cachear.
-        let path = self.store.install(transport, &grant)?;
+        // (4) Source: descargar (si hace falta) + verificar firma + SHA256 + descomprimir + cachear.
+        let path = self.store.install(transport, &grant, policy)?;
 
         // (5) Runtime: instalar desde la carpeta extraída (migra, registra, activa).
         let installed_id = runtime
@@ -359,7 +360,14 @@ mod tests {
         let mut rt = runtime().await;
 
         let outcome = installer
-            .install(&transport, &auth(), &mut rt, "inventory", "1.0.0")
+            .install(
+                &transport,
+                &auth(),
+                &mut rt,
+                "inventory",
+                "1.0.0",
+                &source::SignaturePolicy::DevTrust,
+            )
             .await
             .unwrap();
 
@@ -396,7 +404,17 @@ mod tests {
 
         // Primera instalación: descarga real.
         let mut rt1 = runtime().await;
-        let first = installer.install(&transport, &auth(), &mut rt1, "inventory", "1.0.0").await.unwrap();
+        let first = installer
+            .install(
+                &transport,
+                &auth(),
+                &mut rt1,
+                "inventory",
+                "1.0.0",
+                &source::SignaturePolicy::DevTrust,
+            )
+            .await
+            .unwrap();
         assert!(!first.from_cache);
         assert_eq!(transport.grant_calls.get(), 1);
         assert_eq!(transport.fetch_calls.get(), 1);
@@ -404,7 +422,17 @@ mod tests {
         // Segunda instalación (mismo cache): hit, sin volver a descargar el zip.
         // (get_text aún se llama: el grant trae el sha que decide el cache; fetch NO.)
         let mut rt2 = runtime().await;
-        let second = installer.install(&transport, &auth(), &mut rt2, "inventory", "1.0.0").await.unwrap();
+        let second = installer
+            .install(
+                &transport,
+                &auth(),
+                &mut rt2,
+                "inventory",
+                "1.0.0",
+                &source::SignaturePolicy::DevTrust,
+            )
+            .await
+            .unwrap();
         assert!(second.from_cache);
         assert_eq!(transport.fetch_calls.get(), 1, "no debe re-descargar el zip");
     }
@@ -419,7 +447,14 @@ mod tests {
         let mut rt = runtime().await;
 
         let err = installer
-            .install(&transport, &auth(), &mut rt, "inventory", "1.0.0")
+            .install(
+                &transport,
+                &auth(),
+                &mut rt,
+                "inventory",
+                "1.0.0",
+                &source::SignaturePolicy::DevTrust,
+            )
             .await
             .unwrap_err();
 

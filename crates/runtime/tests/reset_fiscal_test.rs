@@ -33,10 +33,6 @@ fn modules_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
 }
 
-fn have_modules() -> bool {
-    modules_root().exists()
-}
-
 fn ctx(hub: &str) -> RequestContext {
     RequestContext::new(hub, "u1", ["*".to_string()])
 }
@@ -97,7 +93,7 @@ fn blocked(plan: &erplora_runtime::reset::ResetPlan, section: &str) -> Option<St
 
 #[tokio::test]
 async fn plan_bloquea_las_secciones_fiscales_si_hay_facturas_remitidas() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     insert_record(&rt, "h1", 2, "FAC-002", "transmitted", "").await;
@@ -122,7 +118,7 @@ async fn plan_bloquea_las_secciones_fiscales_si_hay_facturas_remitidas() {
 /// exactamente el estado de los datos de demo, y bloquear ahí haría inútil la feature.
 #[tokio::test]
 async fn plan_no_bloquea_nada_si_las_facturas_no_se_han_remitido() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h1", 1, "FAC-001", "pending", "").await;
     insert_record(&rt, "h1", 2, "FAC-002", "error", "").await;
@@ -141,7 +137,7 @@ async fn plan_no_bloquea_nada_si_las_facturas_no_se_han_remitido() {
 /// el reset de este hub (misma BD, distinto tenant).
 #[tokio::test]
 async fn plan_no_se_bloquea_por_las_facturas_de_otro_hub() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h2", 1, "FAC-VECINO", "accepted", "CSV-VECINO").await;
 
@@ -157,7 +153,7 @@ async fn plan_no_se_bloquea_por_las_facturas_de_otro_hub() {
 
 #[tokio::test]
 async fn execute_rechaza_la_seccion_bloqueada_y_no_borra_nada() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     let antes = count(&rt, "verifactu_record", "h1").await;
@@ -183,7 +179,7 @@ async fn execute_rechaza_la_seccion_bloqueada_y_no_borra_nada() {
 /// catálogo de la demo — que es el caso que motiva todo el ADR.
 #[tokio::test]
 async fn execute_deja_resetear_lo_no_fiscal_aunque_haya_facturas_remitidas() {
-    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     rt.execute_command(

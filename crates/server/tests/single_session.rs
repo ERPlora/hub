@@ -38,6 +38,7 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
         sector: None,
         dev_mode: false,
         dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     };
     let state = AppState::with_config(rt, cfg);
     (app(state.clone()), state, temp)

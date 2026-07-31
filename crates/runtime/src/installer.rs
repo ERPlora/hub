@@ -25,6 +25,12 @@ const ENSURE_HUB_MODULE: &str = "CREATE TABLE IF NOT EXISTS hub_module (\
     module_id TEXT PRIMARY KEY, version TEXT NOT NULL, status TEXT NOT NULL, \
     installed_at TEXT NOT NULL, updated_at TEXT NOT NULL);";
 
+/// Seed suplementario de IVA España (hub#107): completa la baseline IVA ES (21/10/4) que la
+/// semilla del módulo `taxes` deja a medias. Versionado en `crates/server/seeds/es_iva.sql` y
+/// embebido aquí para no depender del FS en el arranque (igual que `seed.rs` con `demo.sql`).
+/// Ver `es_iva.sql` para el porqué.
+const ES_IVA_SEED: &str = include_str!("../../server/seeds/es_iva.sql");
+
 /// Asegura el baseline (v0) de `hub_module` (idempotente). Lo llama `ensure_system_tables` antes
 /// de aplicar las migraciones de sistema, para que la migración v1 (que recrea/altera la tabla)
 /// tenga sobre qué operar también en un hub vacío.
@@ -95,6 +101,20 @@ pub async fn install(
         for file in seed_files {
             let sql = loader::read_text(dir, file)?;
             crate::seed::apply_module_seed(db, &sql, hub_id, &now).await?;
+        }
+    }
+
+    // Seed suplementario de IVA España para hubs ES (hub#107): la semilla propia del módulo
+    // `taxes` cubre 21% (genéricos/alcohol) y 10% (restauración), pero NO el tipo superreducido
+    // del 4% ni deja baseline útil para categorías genéricas al alta de producto. Sin esto, un
+    // hub de hostelería ES no puede vender correctamente tras instalar `taxes` sin configurar el
+    // IVA a mano. El SQL es idempotente (`WHERE NOT EXISTS` por la clave natural) y compone con
+    // la semilla del módulo (mismas claves); re-instalar no duplica. Sólo para hubs cuyo
+    // `country_code` = ES (default ES, ADR-0085): un hub de otro país no recibe reglas ES.
+    if manifest.id == "taxes" {
+        if crate::settings::country_code_of(db, hub_id).await? == "ES" {
+            let now = crate::registry::now_rfc3339();
+            crate::seed::apply_module_seed(db, ES_IVA_SEED, hub_id, &now).await?;
         }
     }
 

@@ -75,9 +75,7 @@ async fn rt_pos() -> Runtime {
 /// El servidor debe declarar **el 10 % del catálogo**, no el 0 % del cliente.
 #[tokio::test]
 async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_cliente() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = rt_pos().await;
     let ctx = admin();
 
@@ -159,9 +157,7 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
 /// venta se completa igual (con la pista del cliente como último recurso) — pero se completa.
 #[tokio::test]
 async fn una_read_que_falla_no_impide_cobrar() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     // Se instala el conjunto completo, pero SIN sembrar ninguna regla fiscal: el catálogo de
     // confianza llega VACÍO. Lo que se prueba es que la venta NO se cae por eso — cobrar es lo
     // último que puede fallar en un TPV.

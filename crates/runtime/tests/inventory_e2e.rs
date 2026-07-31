@@ -45,9 +45,7 @@ async fn fresh() -> Runtime {
 
 #[tokio::test]
 async fn install_registers_capabilities() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let reg = rt.registry();
     assert!(reg.is_installed("inventory"));
@@ -62,9 +60,7 @@ async fn install_registers_capabilities() {
 
 #[tokio::test]
 async fn product_crud_and_low_stock() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let ctx = admin_ctx();
 
@@ -105,9 +101,7 @@ async fn product_crud_and_low_stock() {
 /// ambigüedad que #7 elimina; el contrato completo del ledger vive en inventory_ledger_e2e.rs.
 #[tokio::test]
 async fn stock_adjust_is_absolute_count() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let ctx = admin_ctx();
     rt.execute_command(
@@ -129,9 +123,7 @@ async fn stock_adjust_is_absolute_count() {
 
 #[tokio::test]
 async fn bulk_create_wasm_inserts_with_generated_skus() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: modules/inventory/dist/handler.wasm no existe");
         return;
@@ -165,9 +157,7 @@ async fn bulk_create_wasm_inserts_with_generated_skus() {
 
 #[tokio::test]
 async fn receive_stock_wasm_increments_existing() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm_present() {
         eprintln!("SKIP: handler.wasm no existe");
         return;
@@ -199,9 +189,7 @@ async fn receive_stock_wasm_increments_existing() {
 
 #[tokio::test]
 async fn category_crud() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let ctx = admin_ctx();
     rt.execute_command(
@@ -223,9 +211,7 @@ async fn category_crud() {
 /// hub del contexto (la tabla es un join puro, sin `hub_id` propio → la guarda la pone el SQL).
 #[tokio::test]
 async fn product_category_link_add_and_remove() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let ctx = admin_ctx();
 
