@@ -619,6 +619,10 @@ async function doImport(): Promise<void> {
     step.value = 'report';
     // El import pudo instalar módulos: refresca el menú del shell.
     await refreshModuleNav();
+    // #267 — avisa al dashboard (y a quien escuche) de que el conjunto de módulos/datos cambió.
+    // DashboardPage solo cargaba en onMounted; al reutilizar la instancia, no refrescaba y mostraba
+    // los KPIs y widgets PRE-import. Con este evento recarga widgets + actividad.
+    window.dispatchEvent(new CustomEvent('erp:modules-changed'));
   } catch (err) {
     // Rechazo ENTERO (integridad dura / server caído): vuelve al resumen con el motivo del server.
     error.value = err instanceof Error ? err.message : String(err);
