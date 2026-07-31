@@ -38,6 +38,7 @@ pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
 pub mod export_import;
+pub mod reset;
 pub mod ingest;
 pub mod install;
 pub mod install_guard;
@@ -629,6 +630,11 @@ pub fn app(state: AppState) -> Router {
             )),
         )
         .route("/api/hub/import", post(export_import::import_blueprint))
+        // Reset del hub — volver a cero (ADR-0170): el espejo destructivo del export. Mismo gate
+        // admin. El `plan` es dry-run (lo que la UI pinta antes de confirmar); el límite fiscal
+        // (facturas remitidas a la AEAT) lo aplica el MOTOR, no esta capa.
+        .route("/api/hub/reset/plan", post(reset::reset_plan))
+        .route("/api/hub/reset", post(reset::reset_hub))
         // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
         .route(
             "/api/media",

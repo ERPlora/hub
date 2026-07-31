@@ -724,3 +724,79 @@ export async function bootHubContext(): Promise<HubContext | null> {
     return null;
   }
 }
+
+// ── Reset del hub (volver a cero, ADR-0170 — architecture/hub/export-import.md §8) ────────────
+// El espejo DESTRUCTIVO del export. Dos pasos deliberados: `plan` (dry-run) enumera qué hay y qué
+// está bloqueado; `reset` borra. La UI nunca inventa cifras: las saca del plan. Solo owner/admin
+// (el runtime revalida; la UI gatea únicamente para mostrar/ocultar).
+
+/** Una sección en el dry-run: cuántas filas se llevaría y, si aplica, por qué NO se puede. */
+export interface ResetSectionPlan {
+  /** `hub_settings` · `hub_users` · `media` · `fiscal` · `modules/<id>`. */
+  section: string;
+  /** Filas reales que se borrarían. Es la cifra que se enseña al usuario. */
+  rows: number;
+  /** Motivo legible del bloqueo (p. ej. facturas remitidas a la AEAT). `null` = se puede borrar. */
+  blocked_by: string | null;
+}
+
+/** Dry-run completo (`POST /api/hub/reset/plan`). */
+export interface ResetPlan {
+  sections: ResetSectionPlan[];
+}
+
+/** Selección de secciones a borrar (`POST /api/hub/reset`). Todo `false` = no se borra nada. */
+export interface ResetSelection {
+  settings: boolean;
+  users: boolean;
+  media: boolean;
+  fiscal: boolean;
+  /** Ids de módulo cuyos datos de usuario se borran. */
+  modules: string[];
+}
+
+/** Una entrada del informe del reset. */
+export interface ResetSectionOutcome {
+  section: string;
+  rows_deleted: number;
+}
+
+/** Informe final del reset (`POST /api/hub/reset`). */
+export interface ResetReport {
+  sections: ResetSectionOutcome[];
+}
+
+/**
+ * Dry-run del reset (`POST /api/hub/reset/plan`): NO borra nada. Se llama al abrir el panel para
+ * pintar las secciones con sus cifras y sus bloqueos.
+ */
+export async function fetchResetPlan(): Promise<ResetPlan> {
+  const res = await fetch(`${RUNTIME_URL}/api/hub/reset/plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+    body: '{}',
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, `reset/plan → ${res.status}`));
+  const body = (await res.json()) as { ok: boolean; plan?: ResetPlan };
+  return body.plan ?? { sections: [] };
+}
+
+/**
+ * Ejecuta el reset (`POST /api/hub/reset`). Irreversible: el llamador ya ha confirmado.
+ * Un 409 significa que el runtime lo bloqueó (límite fiscal) — su mensaje explica el motivo.
+ */
+export async function resetHub(selection: ResetSelection): Promise<ResetReport> {
+  beginRequest(); // barrer varias tablas puede tardar → barra de progreso del shell
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ selection }),
+    });
+    if (!res.ok) throw new Error(await readErrorMessage(res, `reset → ${res.status}`));
+    const body = (await res.json()) as { ok: boolean; report?: ResetReport };
+    return body.report ?? { sections: [] };
+  } finally {
+    endRequest();
+  }
+}

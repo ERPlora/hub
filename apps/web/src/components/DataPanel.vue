@@ -16,10 +16,18 @@
       <ion-segment-button value="export" data-testid="data-view-export">
         <ion-label>{{ t('settings.dataExport') }}</ion-label>
       </ion-segment-button>
+      <!-- Restablecer (ADR-0170): el espejo destructivo del export. Va el ÚLTIMO y nunca por
+           defecto — se llega a él queriendo, no de paso. -->
+      <ion-segment-button value="reset" data-testid="data-view-reset">
+        <ion-label>{{ t('settings.dataReset') }}</ion-label>
+      </ion-segment-button>
     </ion-segment>
 
     <ImportPanel v-if="view === 'import'" />
-    <ExportPanel v-else />
+    <ExportPanel v-else-if="view === 'export'" />
+    <!-- «Exportar antes de borrar» aterriza en el panel de export: la red de seguridad está a un
+         clic del sitio donde se borra. -->
+    <ResetPanel v-else @go-export="view = 'export'" />
   </div>
 </template>
 
@@ -29,8 +37,9 @@ import { useI18n } from 'vue-i18n';
 import { IonSegment, IonSegmentButton, IonLabel } from '@ionic/vue';
 import ImportPanel from './ImportPanel.vue';
 import ExportPanel from './ExportPanel.vue';
+import ResetPanel from './ResetPanel.vue';
 
-type View = 'import' | 'export';
+type View = 'import' | 'export' | 'reset';
 const props = defineProps<{ initial?: View }>();
 
 const { t } = useI18n();
@@ -38,7 +47,7 @@ const view = ref<View>(props.initial ?? 'import');
 
 function onSegChange(e: CustomEvent): void {
   const v = (e.detail as { value?: string }).value;
-  if (v === 'import' || v === 'export') view.value = v;
+  if (v === 'import' || v === 'export' || v === 'reset') view.value = v;
 }
 </script>
 
