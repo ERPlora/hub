@@ -19,9 +19,11 @@
 //! Hub=Rust/AES-GCM) — ver el informe final de `hub#114`.
 //!
 //! **Formato almacenado, versionado:** `v1:` + base64-estándar(nonce[12] || ciphertext || tag).
-//! El prefijo permite (a) detectar cifrado sin ambigüedad — ninguna fila legacy en claro puede
-//! empezar por `v1:` en la práctica (`:` no es base64 válido) — y (b) rotar de esquema en el futuro
-//! (`v2:` conviviría con `v1:` sin migración bloqueante).
+//! El prefijo permite rotar de esquema en el futuro (`v2:` conviviría con `v1:` sin migración
+//! bloqueante). La detección de "¿está cifrado?" NO es solo el prefijo, es ESTRUCTURAL
+//! ([`is_encrypted`]/`parse_envelope`): para `pkcs12_b64` legacy el prefijo bastaría (base64 nunca
+//! contiene `:`), pero el `password` legacy es texto libre y podría empezar por `v1:` por
+//! casualidad — se exige además base64 válido de al menos nonce+tag bytes tras el prefijo.
 //!
 //! **Compatibilidad con filas legacy (en claro, sin prefijo):** [`decrypt_or_legacy`] las devuelve
 //! tal cual — LEER nunca exige master key para datos viejos. Volver a ESCRIBIR esa fila (p. ej. subir
@@ -111,9 +113,28 @@ fn key_from_env_var(name: &'static str) -> Result<Option<SecretsKey>, SecretBoxE
     Ok(Some(SecretsKey(key)))
 }
 
-/// `true` si `value` ya está en el formato cifrado de este módulo (prefijo `v1:`).
+/// Bytes del envelope (`nonce || ciphertext || tag`) si `value` parsea ESTRUCTURALMENTE como el
+/// formato de este módulo; `None` en caso contrario (→ el valor es legacy/en claro). El prefijo
+/// `v1:` solo no basta: el `pkcs12_b64` legacy es base64 (nunca contiene `:`), pero el password
+/// legacy es TEXTO LIBRE y podría empezar por `v1:` por casualidad — se exige además que el resto
+/// sea base64-estándar válido con al menos nonce+tag bytes (el mínimo que [`encrypt`] produce,
+/// incluso con plaintext vacío). Riesgo residual documentado: un password legacy que sea
+/// literalmente `v1:` + base64 válido de ≥28 bytes se malinterpretaría — combinación tan
+/// improbable que no justifica una migración de datos; el remedio operativo es resubir el
+/// certificado.
+fn parse_envelope(value: &str) -> Option<Vec<u8>> {
+    let b64 = value.strip_prefix(PREFIX)?;
+    let raw = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
+    if raw.len() < NONCE_LEN + AES_256_GCM.tag_len() {
+        return None;
+    }
+    Some(raw)
+}
+
+/// `true` si `value` ya está en el formato cifrado de este módulo (envelope `v1:` estructuralmente
+/// válido — ver [`parse_envelope`]).
 pub fn is_encrypted(value: &str) -> bool {
-    value.starts_with(PREFIX)
+    parse_envelope(value).is_some()
 }
 
 /// Cifra `plaintext` con `key` → `v1:` + base64(nonce || ciphertext || tag). Nonce aleatorio de
@@ -137,19 +158,13 @@ pub fn encrypt(key: &SecretsKey, plaintext: &str) -> Result<String, SecretBoxErr
     Ok(format!("{PREFIX}{}", base64::engine::general_purpose::STANDARD.encode(blob)))
 }
 
-/// Descifra un valor que YA tiene el prefijo `v1:`. `Err(Decrypt)` uniforme ante cualquier fallo
-/// (base64 inválido, longitud corta, tag/autenticación inválida, UTF-8 inválido tras abrir) — no
-/// hay que distinguirle al llamador *por qué* falló: "clave incorrecta o dato corrupto" es toda la
-/// información que un atacante no debería poder usar para adivinar nada más, y toda la que un
-/// operador necesita para saber qué mirar (¿la clave es la correcta? ¿el dato se corrompió?).
-fn decrypt(key: &SecretsKey, value: &str) -> Result<String, SecretBoxError> {
-    let b64 = value.strip_prefix(PREFIX).ok_or(SecretBoxError::Decrypt)?;
-    let raw = base64::engine::general_purpose::STANDARD
-        .decode(b64)
-        .map_err(|_| SecretBoxError::Decrypt)?;
-    if raw.len() < NONCE_LEN {
-        return Err(SecretBoxError::Decrypt);
-    }
+/// Descifra un envelope ya parseado por [`parse_envelope`] (`nonce || ciphertext || tag`).
+/// `Err(Decrypt)` uniforme ante cualquier fallo (tag/autenticación inválida, UTF-8 inválido tras
+/// abrir) — no hay que distinguirle al llamador *por qué* falló: "clave incorrecta o dato corrupto"
+/// es toda la información que un atacante no debería poder usar para adivinar nada más, y toda la
+/// que un operador necesita para saber qué mirar (¿la clave es la correcta? ¿el dato se corrompió?).
+fn decrypt_raw(key: &SecretsKey, raw: &[u8]) -> Result<String, SecretBoxError> {
+    debug_assert!(raw.len() >= NONCE_LEN + AES_256_GCM.tag_len());
     let (nonce_bytes, ciphertext) = raw.split_at(NONCE_LEN);
     let nonce = Nonce::try_assume_unique_for_key(nonce_bytes).map_err(|_| SecretBoxError::Decrypt)?;
 
@@ -161,16 +176,18 @@ fn decrypt(key: &SecretsKey, value: &str) -> Result<String, SecretBoxError> {
     String::from_utf8(plain.to_vec()).map_err(|_| SecretBoxError::Decrypt)
 }
 
-/// Descifra con compatibilidad hacia atrás: las filas escritas ANTES de este fix (`hub#114`) no
-/// llevan el prefijo `v1:` y están en claro — se devuelven TAL CUAL, sin exigir master key (leer
-/// datos legacy nunca debe romperse por no tener clave). Solo las filas YA cifradas la exigen; si
-/// falta, el error es explícito.
+/// Descifra con compatibilidad hacia atrás: las filas escritas ANTES de este fix (`hub#114`) están
+/// en claro y NO parsean como envelope ([`parse_envelope`]) — se devuelven TAL CUAL, sin exigir
+/// master key (leer datos legacy nunca debe romperse por no tener clave). Solo las filas YA
+/// cifradas la exigen; si falta, el error es explícito. Nunca hay fallback de "descifrado fallido →
+/// devolver el valor tal cual": eso enmascararía una clave mal rotada devolviendo ciphertext como
+/// si fuera la contraseña.
 pub fn decrypt_or_legacy(key: Option<&SecretsKey>, value: &str) -> Result<String, SecretBoxError> {
-    if !is_encrypted(value) {
+    let Some(raw) = parse_envelope(value) else {
         return Ok(value.to_string());
-    }
+    };
     let key = key.ok_or(SecretBoxError::MissingKey(MASTER_KEY_ENV))?;
-    decrypt(key, value)
+    decrypt_raw(key, &raw)
 }
 
 /// Helpers de test compartidos con `certificate.rs`: serializar el acceso a la variable de
@@ -296,6 +313,20 @@ mod tests {
         let legacy = "contraseña-en-claro-de-antes-del-fix";
         assert!(!is_encrypted(legacy));
         assert_eq!(decrypt_or_legacy(None, legacy).unwrap(), legacy);
+    }
+
+    #[test]
+    fn legacy_password_that_merely_starts_with_v1_passes_through() {
+        // El password legacy es TEXTO LIBRE (a diferencia del pkcs12_b64, que es base64 y nunca
+        // contiene `:`): puede empezar por "v1:" sin ser un envelope nuestro. Solo un valor que
+        // parsea ESTRUCTURALMENTE como envelope (base64-estándar válido tras el prefijo, con al
+        // menos nonce+tag bytes) se trata como cifrado; el resto pasa como legacy, con o sin clave.
+        let key = SecretsKey::for_test(11);
+        for legacy in ["v1:mi-contraseña", "v1:", "v1:no base64!", "v1:QQ=="] {
+            assert!(!is_encrypted(legacy), "malinterpretado como cifrado: {legacy:?}");
+            assert_eq!(decrypt_or_legacy(Some(&key), legacy).unwrap(), legacy);
+            assert_eq!(decrypt_or_legacy(None, legacy).unwrap(), legacy);
+        }
     }
 
     #[test]
