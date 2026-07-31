@@ -27,6 +27,11 @@ fn test_config(auth_mode: AuthMode, tag: &str) -> HubConfig {
         device_trust_enforce: false,
         media_dir: base.join("media"),
         sector: None,
+        // Confinamiento del install/import (endurecimiento de seguridad de `main`): el reset no
+        // instala nada, pero `HubConfig` es exhaustivo y el test debe declarar el modo real de
+        // producción — dev OFF.
+        dev_mode: false,
+        dev_modules_dir: None,
     }
 }
 
