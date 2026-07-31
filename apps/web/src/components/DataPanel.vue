@@ -16,7 +16,7 @@
       <ion-segment-button value="export" data-testid="data-view-export">
         <ion-label>{{ t('settings.dataExport') }}</ion-label>
       </ion-segment-button>
-      <!-- Restablecer (ADR-0166): el espejo destructivo del export. Va el ÚLTIMO y nunca por
+      <!-- Restablecer (ADR-0170): el espejo destructivo del export. Va el ÚLTIMO y nunca por
            defecto — se llega a él queriendo, no de paso. -->
       <ion-segment-button value="reset" data-testid="data-view-reset">
         <ion-label>{{ t('settings.dataReset') }}</ion-label>

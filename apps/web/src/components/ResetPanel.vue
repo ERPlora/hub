@@ -64,7 +64,7 @@
 
 <script setup lang="ts">
 /**
- * Panel «Restablecer» (Ajustes › Datos, ADR-0166) — el espejo destructivo del export.
+ * Panel «Restablecer» (Ajustes › Datos, ADR-0170) — el espejo destructivo del export.
  *
  * Reglas de diseño que sostienen los tests (`ResetPanel.test.ts`):
  *  - las cifras salen del PLAN real (dry-run del runtime), nunca de un texto genérico;

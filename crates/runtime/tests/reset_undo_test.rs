@@ -1,4 +1,4 @@
-//! E2E ROJOS (TDD, ADR-0166 Fase 3) de DESHACER UNA IMPORTACIÓN.
+//! E2E ROJOS (TDD, ADR-0170 Fase 3) de DESHACER UNA IMPORTACIÓN.
 //!
 //! Es el camino que motiva todo el ADR: **importo la demo → la miro → la quito limpiamente →
 //! cargo mis datos**. El reset por secciones no vale aquí, porque para entonces el usuario ya ha
@@ -73,7 +73,7 @@ fn demo_sql() -> String {
         .collect()
 }
 
-/// Aplica un blueprint REGISTRANDO el lote (lo que hace el import tras ADR-0166).
+/// Aplica un blueprint REGISTRANDO el lote (lo que hace el import tras ADR-0170).
 async fn import_demo(rt: &Runtime, hub: &str, name: &str) -> String {
     erplora_runtime::reset::apply_tracked(rt, hub, name, &demo_sql())
         .await

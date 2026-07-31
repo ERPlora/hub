@@ -251,7 +251,7 @@ export default {
     tabData: 'Datos y copias',
     dataImport: 'Importar',
     dataExport: 'Exportar',
-    // Reset del hub (ADR-0166).
+    // Reset del hub (ADR-0170).
     dataReset: 'Restablecer',
     resetIntro:
       'Borra definitivamente los datos que marques. No se puede deshacer: si dudas, expórtate antes una copia.',

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Contrato del panel «Restablecer» (Ajustes › Datos, ADR-0166) — la operación más destructiva del
+// Contrato del panel «Restablecer» (Ajustes › Datos, ADR-0170) — la operación más destructiva del
 // producto. Lo que estos tests protegen no es el layout, es que NO se pueda borrar por accidente:
 //   - las cifras del alert salen del PLAN real (dry-run), no de un texto genérico,
 //   - lo bloqueado por el límite fiscal (facturas remitidas a la AEAT) no es ni seleccionable,

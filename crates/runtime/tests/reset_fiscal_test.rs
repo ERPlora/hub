@@ -1,4 +1,4 @@
-//! E2E ROJOS (TDD, ADR-0166 Fase 2) del LÍMITE FISCAL del reset.
+//! E2E ROJOS (TDD, ADR-0170 Fase 2) del LÍMITE FISCAL del reset.
 //!
 //! Bajo **RD 1007/2023** los registros de facturación VeriFactu son **inalterables** y van
 //! encadenados por `(hub_id, issuer_nif)`. Borrar facturas ya remitidas a la AEAT no es una

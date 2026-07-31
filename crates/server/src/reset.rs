@@ -1,4 +1,4 @@
-//! Capa SERVER del RESET del hub (ADR-0166).
+//! Capa SERVER del RESET del hub (ADR-0170).
 //!
 //! El MOTOR vive en el runtime (`erplora_runtime::reset::{plan_reset, execute_reset}`); esta capa
 //! solo añade lo que es del server: **auth** (sesión admin owner/admin — el mismo gate que

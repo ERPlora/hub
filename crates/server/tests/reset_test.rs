@@ -1,4 +1,4 @@
-//! Tests de integración de la capa SERVER del RESET del hub (ADR-0166 Fase 4).
+//! Tests de integración de la capa SERVER del RESET del hub (ADR-0170 Fase 4).
 //!
 //! Superficie: `POST /api/hub/reset/plan` (dry-run) y `POST /api/hub/reset`.
 //! Gate = **sesión admin (owner/admin)**, el MISMO que `PUT /api/settings`, el certificado y el

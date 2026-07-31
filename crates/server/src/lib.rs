@@ -630,7 +630,7 @@ pub fn app(state: AppState) -> Router {
             )),
         )
         .route("/api/hub/import", post(export_import::import_blueprint))
-        // Reset del hub — volver a cero (ADR-0166): el espejo destructivo del export. Mismo gate
+        // Reset del hub — volver a cero (ADR-0170): el espejo destructivo del export. Mismo gate
         // admin. El `plan` es dry-run (lo que la UI pinta antes de confirmar); el límite fiscal
         // (facturas remitidas a la AEAT) lo aplica el MOTOR, no esta capa.
         .route("/api/hub/reset/plan", post(reset::reset_plan))

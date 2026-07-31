@@ -725,7 +725,7 @@ export async function bootHubContext(): Promise<HubContext | null> {
   }
 }
 
-// ── Reset del hub (volver a cero, ADR-0166 — architecture/hub/export-import.md §8) ────────────
+// ── Reset del hub (volver a cero, ADR-0170 — architecture/hub/export-import.md §8) ────────────
 // El espejo DESTRUCTIVO del export. Dos pasos deliberados: `plan` (dry-run) enumera qué hay y qué
 // está bloqueado; `reset` borra. La UI nunca inventa cifras: las saca del plan. Solo owner/admin
 // (el runtime revalida; la UI gatea únicamente para mostrar/ocultar).

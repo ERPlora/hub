@@ -250,7 +250,7 @@ export default {
     tabData: 'Data & backups',
     dataImport: 'Import',
     dataExport: 'Export',
-    // Reset del hub (ADR-0166). Inglés = idioma canónico del Hub (ADR-0055).
+    // Reset del hub (ADR-0170). Inglés = idioma canónico del Hub (ADR-0055).
     dataReset: 'Reset',
     resetIntro:
       'Permanently deletes the data you select. This cannot be undone — export a backup first if in doubt.',

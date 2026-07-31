@@ -1,4 +1,4 @@
-//! E2E ROJOS (TDD, ADR-0166 Fase 1) del RESET del hub — volver el hub a cero.
+//! E2E ROJOS (TDD, ADR-0170 Fase 1) del RESET del hub — volver el hub a cero.
 //!
 //! El reset es el **espejo del export**: mismo inventario de tablas (`table_owner` por prefijo
 //! más largo, FKs del catálogo), recorrido al revés. Garantías que fijan estos tests:
@@ -335,7 +335,7 @@ async fn reset_solo_toca_las_secciones_seleccionadas() {
 
 // ── 7. No te puedes auto-expulsar ───────────────────────────────────────────────────────
 
-/// Garantía del ADR-0166: el reset nunca borra al usuario que lo ejecuta. Si lo hiciera, un
+/// Garantía del ADR-0170: el reset nunca borra al usuario que lo ejecuta. Si lo hiciera, un
 /// owner podría quedarse fuera de su propio hub con un clic y sin vuelta atrás.
 #[tokio::test]
 async fn reset_de_usuarios_conserva_a_quien_lo_ejecuta() {

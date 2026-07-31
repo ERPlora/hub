@@ -1,4 +1,4 @@
-//! Reset del hub — volver el hub a cero (ADR-0166).
+//! Reset del hub — volver el hub a cero (ADR-0170).
 //!
 //! **Espejo del export**: reutiliza su mismo inventario de tablas (`list_tables`, `table_owner`
 //! por prefijo más largo, `foreign_keys` del catálogo) recorrido al revés. Así lo que el hub sabe
@@ -114,7 +114,7 @@ const FISCAL_SECTIONS: [&str; 3] = ["verifactu", "invoice", "sales"];
 /// consulta falla y `count_raw` devuelve 0), que es justo el caso «hub sin fiscal».
 ///
 /// El criterio es EXACTO, no heurístico: los datos de demo se quedan en `pending` y sin CSV, así
-/// que el caso que motiva el ADR-0166 —probar la demo y borrarla— nunca se bloquea.
+/// que el caso que motiva el ADR-0170 —probar la demo y borrarla— nunca se bloquea.
 async fn remitted_invoices(rt: &Runtime, hub_id: &str) -> i64 {
     count_raw(
         rt,
@@ -460,7 +460,7 @@ mod tests {
     }
 }
 
-// ── Deshacer una importación (ADR-0166 Fase 3) ──────────────────────────────────────────
+// ── Deshacer una importación (ADR-0170 Fase 3) ──────────────────────────────────────────
 //
 // El camino que motiva el ADR: importo la demo → la miro → la quito limpiamente → cargo lo mío.
 // El reset por secciones no sirve aquí, porque para entonces el usuario ya ha creado cosas suyas
