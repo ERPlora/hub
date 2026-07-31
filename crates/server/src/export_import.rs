@@ -18,7 +18,7 @@
 
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read as _, Write as _};
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 use axum::body::{Body, Bytes};
 use axum::extract::State;
@@ -696,17 +696,15 @@ async fn run_import(
             let Some(rel) = path.strip_prefix("media/") else {
                 continue;
             };
-            let Some(target) = media::safe_join(&st.config.media_dir, rel) else {
+            // Confinamiento DURO del destino (hub#239): `..`/rutas absolutas y, sobre todo,
+            // symlinks ya presentes dentro de `media/` que apuntan fuera. Sin esto, un
+            // `media/<link>/x.png` escribía a través del symlink FUERA de la carpeta del hub.
+            let Some(target) = prepare_media_target(&st.config.media_dir, rel) else {
+                tracing::warn!(entry = %path, "import: destino de media rechazado (fuera de media/)");
                 media_failed += 1;
                 continue;
             };
-            let ok = target
-                .parent()
-                .map(std::fs::create_dir_all)
-                .map(|r| r.is_ok())
-                .unwrap_or(false)
-                && std::fs::write(&target, bytes).is_ok();
-            if ok {
+            if std::fs::write(&target, bytes).is_ok() {
                 media_copied += 1;
             } else {
                 media_failed += 1;
@@ -736,6 +734,55 @@ async fn run_import(
     Ok(report_v)
 }
 
+/// Prepara (creando las carpetas intermedias) el destino de un `media/<rel>` del bundle,
+/// **confinado** a `root`. `None` = la ruta escapa y NO debe escribirse.
+///
+/// `safe_join` ya descarta `..` y las rutas absolutas, pero eso no basta: si dentro de `media/`
+/// existe un **symlink** (creado por otra vía: subida, import previo, volumen montado), escribir
+/// «dentro» de él aterriza fuera del hub. Por eso aquí se recorre componente a componente
+/// rechazando cualquier symlink, se crean solo directorios reales, y al final se comprueba contra
+/// la raíz **canonicalizada** (defensa en profundidad). Nada se crea si la ruta no es válida.
+fn prepare_media_target(root: &Path, rel: &str) -> Option<PathBuf> {
+    let joined = media::safe_join(root, rel)?;
+    // `media/` puede no existir todavía (creación perezosa): se crea la RAÍZ y se canonicaliza.
+    std::fs::create_dir_all(root).ok()?;
+    let canonical_root = std::fs::canonicalize(root).ok()?;
+    let relative = joined.strip_prefix(root).ok()?;
+    let mut components: Vec<&std::ffi::OsStr> = Vec::new();
+    for comp in relative.components() {
+        match comp {
+            Component::Normal(c) => components.push(c),
+            Component::CurDir => {}
+            _ => return None,
+        }
+    }
+    let (file_name, dirs) = components.split_last()?;
+    let mut cur = canonical_root.clone();
+    for dir in dirs {
+        cur.push(dir);
+        match std::fs::symlink_metadata(&cur) {
+            // Un symlink en el camino es una fuga potencial: se rechaza (no se sigue).
+            Ok(meta) if meta.file_type().is_symlink() => return None,
+            Ok(meta) if meta.is_dir() => {}
+            // Existe pero no es directorio → no se puede anidar dentro.
+            Ok(_) => return None,
+            Err(_) => std::fs::create_dir(&cur).ok()?,
+        }
+    }
+    // Belt & braces: la carpeta contenedora real sigue dentro de `media/`.
+    if !std::fs::canonicalize(&cur).ok()?.starts_with(&canonical_root) {
+        return None;
+    }
+    let target = cur.join(file_name);
+    // Sobrescribir a través de un symlink existente también escaparía.
+    if let Ok(meta) = std::fs::symlink_metadata(&target) {
+        if meta.file_type().is_symlink() {
+            return None;
+        }
+    }
+    Some(target)
+}
+
 /// Extrae TODO el bundle en memoria: valida rutas (anti zip-slip), parsea `manifest.json`
 /// (versión conocida) y devuelve el resto de ficheros como mapa ruta→bytes.
 fn extract_bundle(
@@ -763,4 +810,108 @@ fn extract_bundle(
         files.insert(name, buf);
     }
     Ok((manifest, files))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn media_root(tag: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "erplora-media-target-{}-{tag}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    /// Toda ruta del bundle con `..`, absoluta o con `\` queda fuera del zip ANTES de extraer.
+    #[test]
+    fn las_rutas_del_zip_con_traversal_se_rechazan() {
+        assert!(is_safe_entry("media/logo.png"));
+        assert!(is_safe_entry("data/hub_settings.sql"));
+        for evil in [
+            "media/../../evil",
+            "../evil",
+            "/etc/evil",
+            "media/../../../etc/passwd",
+            "media\\..\\evil",
+        ] {
+            assert!(!is_safe_entry(evil), "{evil} debería rechazarse");
+        }
+    }
+
+    /// El destino de un fichero legítimo cae dentro de `media/` (creando las carpetas del camino).
+    #[test]
+    fn el_destino_legitimo_queda_dentro_de_media() {
+        let root = media_root("ok");
+        let target = prepare_media_target(&root, "modules/inventory/logo.png")
+            .expect("ruta relativa legítima");
+        assert!(target.starts_with(std::fs::canonicalize(&root).unwrap()));
+        assert!(target.parent().unwrap().is_dir(), "se crean las carpetas");
+        std::fs::write(&target, b"x").unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Un symlink dentro de `media/` que apunta fuera NO sirve de puente para escribir fuera.
+    #[cfg(unix)]
+    #[test]
+    fn un_symlink_dentro_de_media_no_deja_escribir_fuera() {
+        let root = media_root("symlink");
+        let outside = root.parent().unwrap().join(format!(
+            "erplora-media-target-{}-symlink-outside",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&outside);
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("escape")).unwrap();
+
+        assert_eq!(
+            prepare_media_target(&root, "escape/pwned.png"),
+            None,
+            "escribir a través de un symlink de media/ debe rechazarse"
+        );
+        // Y tampoco se crea nada al otro lado del enlace.
+        assert!(!outside.join("pwned.png").exists());
+
+        // Sobrescribir el propio symlink (fichero) tampoco.
+        std::fs::write(outside.join("f.png"), b"orig").unwrap();
+        std::os::unix::fs::symlink(outside.join("f.png"), root.join("f.png")).unwrap();
+        assert_eq!(prepare_media_target(&root, "f.png"), None);
+
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    /// PRIMER import de un hub: `media/` todavía no existe (creación perezosa) → se crea la raíz y
+    /// el destino cae dentro. Sin esto el primer bundle con imágenes perdería TODAS sus medias.
+    #[test]
+    fn con_la_raiz_de_media_sin_crear_el_primer_import_funciona() {
+        let root = media_root("lazy");
+        std::fs::remove_dir_all(&root).unwrap(); // la raíz NO existe
+        let target = prepare_media_target(&root, "logo.png").expect("la raíz se crea al vuelo");
+        assert!(target.starts_with(std::fs::canonicalize(&root).unwrap()));
+        std::fs::write(&target, b"x").unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Entradas del zip que no nombran un fichero (`media/`, `media/sub/`) no producen destino.
+    #[test]
+    fn una_entrada_sin_nombre_de_fichero_no_produce_destino() {
+        let root = media_root("empty");
+        assert_eq!(prepare_media_target(&root, ""), None);
+        assert_eq!(prepare_media_target(&root, "."), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `safe_join` sigue descartando lo evidente (por si el bundle llegara por otra vía).
+    #[test]
+    fn traversal_y_rutas_absolutas_no_producen_destino() {
+        let root = media_root("traversal");
+        assert_eq!(prepare_media_target(&root, "../evil.png"), None);
+        assert_eq!(prepare_media_target(&root, "/etc/passwd"), None);
+        assert_eq!(prepare_media_target(&root, "a/../../evil.png"), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

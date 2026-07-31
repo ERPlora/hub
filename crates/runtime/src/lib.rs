@@ -23,6 +23,7 @@ pub mod export;
 pub mod host_notify;
 pub mod identity;
 pub mod import;
+pub mod import_sql;
 pub mod installer;
 pub mod loader;
 pub mod manifest;

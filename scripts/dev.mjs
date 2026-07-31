@@ -33,6 +33,11 @@ const DEFAULTS = {
   // Fuente de módulos de dev = el workspace del toolkit en el root del monorepo. El runtime los
   // instala al arrancar (los mismos que apps/web carga como WebComponents vía sync-modules.mjs).
   HUB_MODULES_DIR: join(MONOREPO_ROOT, 'modules-workspace', 'modules'),
+  // Modo desarrollo EXPLÍCITO (hub#239): habilita las vías de carga de código local — el escaneo
+  // de HUB_MODULES_DIR al arrancar y `POST /api/modules/install {dir}` (confinado al staging).
+  // El provisioning del SaaS NUNCA inyecta esta variable: en producción esas vías están apagadas
+  // y los módulos vienen del marketplace con su SHA256 verificado (ADR-0015).
+  HUB_DEV_MODE: '1',
   // Bind del runtime Axum.
   HUB_BIND: '127.0.0.1:8787',
   // Auth en modo sesión server-side (el ÚNICO flujo del frontend: login cloud/PIN → X-Hub-Session).
@@ -114,7 +119,7 @@ function shutdown(reason) {
 }
 
 log('dev', '\x1b[32m', `HUB_DATABASE_URL=${env.HUB_DATABASE_URL}`);
-log('dev', '\x1b[32m', `HUB_MODULES_DIR=${env.HUB_MODULES_DIR}`);
+log('dev', '\x1b[32m', `HUB_MODULES_DIR=${env.HUB_MODULES_DIR}  HUB_DEV_MODE=${env.HUB_DEV_MODE}`);
 log('dev', '\x1b[32m', `HUB_BIND=${env.HUB_BIND}  VITE_RUNTIME_URL='${env.VITE_RUNTIME_URL}'`);
 log('dev', '\x1b[32m', 'runtime → http://127.0.0.1:8787   web → http://localhost:5173');
 

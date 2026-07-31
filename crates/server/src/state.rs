@@ -111,6 +111,17 @@ pub struct HubConfig {
     /// servicios/peluquería. El sector NO se persiste en el modelo `Hub` (vive en
     /// `pending_metadata['business_type']`): este env es la fuente del contrato runtime↔Cloud.
     pub sector: Option<String>,
+    /// **Modo desarrollo explícito** (`HUB_DEV_MODE`, hub#239). Abre las vías de carga de código
+    /// LOCAL —`POST /api/modules/install {dir}` y el escaneo de [`Self::dev_modules_dir`] al
+    /// arrancar— que esquivan el pipeline del marketplace (grant + SHA256 obligatorio, ADR-0015).
+    /// **Fail-closed**: `false` salvo que el env lo active (el provisioning del SaaS nunca lo
+    /// inyecta ⇒ en producción esas vías están apagadas). Ver [`crate::install_guard`].
+    pub dev_mode: bool,
+    /// `HUB_MODULES_DIR`: carpeta de módulos de DESARROLLO (el workspace de módulos del monorepo).
+    /// Se escanea al arrancar **solo** con [`Self::dev_mode`], y es la segunda raíz de staging
+    /// admitida por `POST /api/modules/install`. En producción el despliegue la fija a
+    /// `/tmp/modules` (contenedor stateless) y se IGNORA.
+    pub dev_modules_dir: Option<PathBuf>,
 }
 
 /// UUID fijo de desarrollo si no se inyecta `HUB_ID` (decisión tomada — flag para humano).
@@ -158,6 +169,14 @@ impl HubConfig {
         let media_dir = std::env::var("HUB_MEDIA_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("media"));
+        // Modo desarrollo explícito (hub#239): abre las vías de carga de código LOCAL. Ausente o
+        // con cualquier otro valor ⇒ producción (fail-closed).
+        let dev_mode =
+            crate::install_guard::parse_dev_mode(std::env::var("HUB_DEV_MODE").ok().as_deref());
+        let dev_modules_dir = std::env::var("HUB_MODULES_DIR")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .map(PathBuf::from);
         Self {
             hub_id,
             cloud_base_url,
@@ -168,7 +187,63 @@ impl HubConfig {
             device_trust_enforce,
             media_dir,
             sector,
+            dev_mode,
+            dev_modules_dir,
         }
+    }
+
+    /// Raíces de staging admitidas por `POST /api/modules/install {dir}` (hub#239): la **caché de
+    /// descargas** (donde `erplora-source` extrae los zips ya verificados por SHA256) y, **solo en
+    /// modo desarrollo**, la carpeta de módulos de dev. Cualquier `dir` fuera de estas raíces
+    /// —tras canonicalizar— se rechaza. Ver [`crate::install_guard::resolve_install_dir`].
+    ///
+    /// En producción `dev_modules_dir` es `/tmp/modules` (contenedor stateless): un directorio
+    /// escribible que NO debe ser staging válido ni aunque la vía se reabriera por error.
+    pub fn install_staging_roots(&self) -> Vec<PathBuf> {
+        let mut roots = vec![self.module_cache.clone()];
+        if self.dev_mode {
+            if let Some(dev_dir) = &self.dev_modules_dir {
+                roots.push(dev_dir.clone());
+            }
+        }
+        roots
+    }
+}
+
+#[cfg(test)]
+mod staging_tests {
+    use super::*;
+
+    fn config(dev_mode: bool) -> HubConfig {
+        HubConfig {
+            hub_id: "h1".into(),
+            cloud_base_url: "http://127.0.0.1:1".into(),
+            module_cache: PathBuf::from("/var/cache/erplora"),
+            auth_mode: AuthMode::Session,
+            jwt_public_key: None,
+            cloud_api_token: None,
+            device_trust_enforce: false,
+            media_dir: PathBuf::from("/var/media"),
+            sector: None,
+            dev_mode,
+            dev_modules_dir: Some(PathBuf::from("/tmp/modules")),
+        }
+    }
+
+    /// El `/tmp/modules` que inyecta el despliegue NO es staging válido en producción.
+    #[test]
+    fn el_dir_de_modulos_de_dev_solo_es_staging_en_modo_desarrollo() {
+        assert_eq!(
+            config(false).install_staging_roots(),
+            vec![PathBuf::from("/var/cache/erplora")]
+        );
+        assert_eq!(
+            config(true).install_staging_roots(),
+            vec![
+                PathBuf::from("/var/cache/erplora"),
+                PathBuf::from("/tmp/modules")
+            ]
+        );
     }
 }
 

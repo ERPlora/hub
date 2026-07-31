@@ -162,6 +162,8 @@ async fn proxy_entitlement_incluye_revalidation_aunque_el_cloud_no_responda() {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-test-media"),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
     };
     let state = AppState::with_config(rt, cfg);
     // Estado sembrado por el job: último token válido con gracia 9_000, sin bloqueos.

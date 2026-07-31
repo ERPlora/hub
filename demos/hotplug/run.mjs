@@ -18,8 +18,18 @@ await mkdir(SHOTS, { recursive: true });
 // 1) server Rust (Postgres-only, ADR-0154). BD de demo dedicada; créala con
 //    `createdb erplora_hotplug_demo` o exporta HUB_DATABASE_URL apuntando a otra.
 const DB_URL = process.env.HUB_DATABASE_URL || 'postgres://localhost/erplora_hotplug_demo';
+// `HUB_DEV_MODE=1` + `HUB_MODULES_DIR`: el demo instala desde CARPETA (hub#239), una vía de
+// desarrollo confinada al staging que en producción está apagada (allí los módulos vienen del
+// marketplace con SHA256 verificado). Sin estas dos variables el POST de abajo responde 403.
 const srv = spawn('cargo', ['run', '-q', '-p', 'erplora-server'], {
-  cwd: ROOT, env: { ...process.env, HUB_DATABASE_URL: DB_URL, HUB_BIND: `127.0.0.1:${API_PORT}` },
+  cwd: ROOT,
+  env: {
+    ...process.env,
+    HUB_DATABASE_URL: DB_URL,
+    HUB_BIND: `127.0.0.1:${API_PORT}`,
+    HUB_DEV_MODE: '1',
+    HUB_MODULES_DIR: join(ROOT, 'modules'),
+  },
   stdio: 'ignore',
 });
 const apiBase = `http://127.0.0.1:${API_PORT}`;
