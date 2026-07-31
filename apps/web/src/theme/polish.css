@@ -160,7 +160,10 @@ ion-badge {
 }
 
 /* ── Segment (tabs de footer): moderno, sin mayúsculas ────────────────────────────────────── */
-ion-footer { box-shadow: none; }
+/* #278 — reservar la barra de gestos/home-indicator en iOS/Android: sin este padding las pestañas
+   (min-height 46px, labels de 2 líneas) quedan bajo ella y se recortan. Mismo patrón que
+   ok-app-launcher/ok-notification-center. En escritorio env() resuelve a 0 (sin efecto). */
+ion-footer { box-shadow: none; padding-bottom: env(safe-area-inset-bottom, 0px); }
 ion-footer ion-toolbar { --border-width: 0; }
 ion-segment { --background: transparent; padding: 4px; gap: 4px; }
 /* El tabbar de footer (ADR-0022: `navigation[]` → ion-segment) lo estiliza ahora OutfitKit:
