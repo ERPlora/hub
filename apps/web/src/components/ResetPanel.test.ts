@@ -11,9 +11,13 @@ import { createI18n } from 'vue-i18n';
 
 const fetchResetPlan = vi.fn();
 const resetHub = vi.fn();
+const fetchImportBatches = vi.fn();
+const undoImport = vi.fn();
 vi.mock('../lib/runtime', () => ({
   fetchResetPlan: (...a: unknown[]) => fetchResetPlan(...a),
   resetHub: (...a: unknown[]) => resetHub(...a),
+  fetchImportBatches: (...a: unknown[]) => fetchImportBatches(...a),
+  undoImport: (...a: unknown[]) => undoImport(...a),
 }));
 
 // El nombre del hub que hay que teclear para confirmar sale de los settings del hub.
@@ -48,6 +52,12 @@ const i18n = createI18n({
         resetConfirmBody: '{total} rows will be permanently deleted:',
         resetConfirmPlaceholder: 'business name',
         resetCancel: 'Cancel',
+        resetImportsTitle: 'Undo an import',
+        resetImportsHint: 'Removes only what that blueprint brought in.',
+        resetSectionsTitle: 'Or delete by section',
+        resetUndo: 'Undo',
+        resetUndoTitle: 'Undo {name}',
+        resetUndoBody: '{n} rows brought in by this blueprint will be deleted.',
         resetConfirm: 'Delete permanently',
         reset_hub_settings: 'Hub settings',
         reset_hub_users: 'Employees',
@@ -84,6 +94,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   fetchResetPlan.mockResolvedValue(PLAN);
   resetHub.mockResolvedValue({ sections: [{ section: 'modules/inventory', rows_deleted: 124 }] });
+  fetchImportBatches.mockResolvedValue([
+    { id: 'batch-1', name: 'restaurante_es', rows: 312, created_at: '2026-07-31T10:14:00Z' },
+  ]);
+  undoImport.mockResolvedValue({ sections: [{ section: 'inventory_product', rows_deleted: 312 }] });
   // Por defecto el usuario teclea bien el nombre y confirma.
   alertCreate.mockResolvedValue({
     present: vi.fn(),
@@ -193,3 +207,54 @@ describe('ResetPanel', () => {
     expect(w.emitted('go-export')).toBeTruthy();
   });
 });
+
+describe('ResetPanel · deshacer una importación', () => {
+  it('lista las importaciones con su nombre y sus filas', async () => {
+    const w = mountPanel();
+    await flush(w);
+
+    expect(fetchImportBatches).toHaveBeenCalledTimes(1);
+    const html = w.html();
+    expect(html).toContain('restaurante_es');
+    expect(html).toContain('312');
+  });
+
+  it('deshacer pide confirmación y solo entonces llama al runtime', async () => {
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+
+    expect(alertCreate).toHaveBeenCalledTimes(1);
+    const opts = alertCreate.mock.calls[0][0] as { message?: string };
+    // El aviso dice QUÉ se deshace y cuánto: sin cifras no informa.
+    expect(opts.message).toContain('312');
+    expect(undoImport).toHaveBeenCalledWith('batch-1');
+  });
+
+  it('cancelar deja la importación intacta', async () => {
+    alertCreate.mockResolvedValue({
+      present: vi.fn(),
+      onDidDismiss: vi.fn().mockResolvedValue({ role: 'cancel' }),
+    });
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+
+    expect(undoImport).not.toHaveBeenCalled();
+  });
+
+  it('deshacer NO exige teclear el nombre del hub: es reversible por diseño', async () => {
+    // A diferencia del reset por secciones, deshacer solo quita lo que trajo ese blueprint —
+    // se puede volver a importar. La fricción debe ser proporcional al daño.
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+
+    const opts = alertCreate.mock.calls[0][0] as { inputs?: unknown[] };
+    expect(opts.inputs ?? []).toHaveLength(0);
+    expect(undoImport).toHaveBeenCalled();
+  });
+})

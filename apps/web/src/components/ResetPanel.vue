@@ -15,6 +15,31 @@
       {{ t('settings.resetExportFirst') }}
     </ion-button>
 
+    <!-- Deshacer una importación: el camino PREFERIDO cuando existe, porque es quirúrgico
+         (borra lo que trajo el blueprint y nada más). Va ANTES del reset por secciones. -->
+    <template v-if="batches.length">
+      <h3 class="reset-subtitle">{{ t('settings.resetImportsTitle') }}</h3>
+      <ion-note class="reset-intro">{{ t('settings.resetImportsHint') }}</ion-note>
+      <ion-list>
+        <ion-item v-for="b in batches" :key="b.id" :data-testid="`reset-batch-${b.id}`">
+          <ion-label>
+            <strong>{{ b.name }}</strong>
+            <div class="reset-row-rows">{{ t('settings.resetRows', { n: b.rows }) }}</div>
+          </ion-label>
+          <ion-button
+            slot="end"
+            fill="outline"
+            size="small"
+            :data-testid="`reset-undo-${b.id}`"
+            @click="undo(b.id)"
+          >
+            {{ t('settings.resetUndo') }}
+          </ion-button>
+        </ion-item>
+      </ion-list>
+      <h3 class="reset-subtitle">{{ t('settings.resetSectionsTitle') }}</h3>
+    </template>
+
     <ion-spinner v-if="loading" />
 
     <ion-list v-else>
@@ -88,8 +113,11 @@ import {
   alertController,
 } from '@ionic/vue';
 import {
+  fetchImportBatches,
   fetchResetPlan,
   resetHub,
+  undoImport,
+  type ImportBatch,
   type ResetPlan,
   type ResetReport,
   type ResetSectionPlan,
@@ -104,6 +132,7 @@ const loading = ref(true);
 const sections = ref<ResetSectionPlan[]>([]);
 const selected = ref<Set<string>>(new Set());
 const report = ref<ResetReport | null>(null);
+const batches = ref<ImportBatch[]>([]);
 
 /** Solo lo que de verdad se puede borrar: lo bloqueado nunca entra en la selección efectiva. */
 const selectable = computed(() =>
@@ -114,10 +143,38 @@ onMounted(async () => {
   try {
     const plan: ResetPlan = await fetchResetPlan();
     sections.value = plan.sections;
+    // Las importaciones son informativas: si fallan, el reset por secciones sigue disponible.
+    batches.value = await fetchImportBatches().catch(() => []);
   } finally {
     loading.value = false;
   }
 });
+
+/**
+ * Deshace una importación. La fricción es DELIBERADAMENTE menor que la del reset por secciones:
+ * esto solo quita lo que trajo ese blueprint y se puede volver a importar, así que pedir el
+ * nombre del hub sería desproporcionado. Sí se avisa de cuántas filas se van.
+ */
+async function undo(batchId: string): Promise<void> {
+  const batch = batches.value.find((b) => b.id === batchId);
+  if (!batch) return;
+  const alert = await alertController.create({
+    header: t('settings.resetUndoTitle', { name: batch.name }),
+    message: t('settings.resetUndoBody', { n: batch.rows }),
+    buttons: [
+      { text: t('settings.resetCancel'), role: 'cancel' },
+      { text: t('settings.resetUndo'), role: 'confirm', cssClass: 'alert-button-danger' },
+    ],
+  });
+  await alert.present();
+  const { role } = await alert.onDidDismiss();
+  if (role !== 'confirm') return;
+
+  report.value = await undoImport(batchId);
+  // Refrescar ambos: el lote desaparece y las cifras del plan cambian.
+  batches.value = await fetchImportBatches().catch(() => []);
+  sections.value = (await fetchResetPlan()).sections;
+}
 
 /** Nombre legible de una sección (`modules/inventory` → «inventory»). */
 function label(section: string): string {
@@ -186,7 +243,7 @@ async function submit(): Promise<void> {
 }
 
 // Superficie que los tests ejercen directamente (el DOM de ion-* va stubeado en shallow mount).
-defineExpose({ toggle, submit });
+defineExpose({ toggle, submit, undo });
 </script>
 
 <style scoped>
@@ -210,6 +267,11 @@ defineExpose({ toggle, submit });
   max-width: 45%;
   white-space: normal;
   text-align: right;
+}
+.reset-subtitle {
+  margin: 1.25rem 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 .reset-submit {
   margin-top: 1rem;

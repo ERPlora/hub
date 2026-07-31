@@ -800,3 +800,41 @@ export async function resetHub(selection: ResetSelection): Promise<ResetReport> 
     endRequest();
   }
 }
+
+/** Una importación registrada: lo que trajo un blueprint, para poder deshacerlo (ADR-0170). */
+export interface ImportBatch {
+  id: string;
+  /** Nombre del blueprint importado (`restaurante_es`), como lo reconoce el usuario. */
+  name: string;
+  /** Filas que ESE lote insertó realmente. */
+  rows: number;
+  created_at: string;
+}
+
+/** Importaciones del hub, de la más reciente a la más antigua (`GET /api/hub/import/batches`). */
+export async function fetchImportBatches(): Promise<ImportBatch[]> {
+  const res = await fetch(`${RUNTIME_URL}/api/hub/import/batches`, { headers: runtimeHeaders() });
+  if (!res.ok) throw new Error(await readErrorMessage(res, `import/batches → ${res.status}`));
+  const body = (await res.json()) as { ok: boolean; batches?: ImportBatch[] };
+  return body.batches ?? [];
+}
+
+/**
+ * Deshace una importación (`POST /api/hub/import/undo`): borra solo lo que trajo ese blueprint,
+ * conservando lo que el usuario creó después. Un lote ya deshecho es un no-op.
+ */
+export async function undoImport(batchId: string): Promise<ResetReport> {
+  beginRequest();
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/import/undo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ batch_id: batchId }),
+    });
+    if (!res.ok) throw new Error(await readErrorMessage(res, `import/undo → ${res.status}`));
+    const body = (await res.json()) as { ok: boolean; report?: ResetReport };
+    return body.report ?? { sections: [] };
+  } finally {
+    endRequest();
+  }
+}
