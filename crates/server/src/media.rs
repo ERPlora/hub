@@ -15,11 +15,18 @@
 //! (anti path-traversal) la hace el Cloud, dueño del almacenamiento.
 //!
 //! Endpoints (contrato consumido por `lib/media.ts`):
-//!   GET    /api/media?folder=<rel>      → { ok, data: { folders[], files[], path[] } }
-//!   GET    /api/media/raw?path=<rel>    → bytes del fichero (inline)
+//!   GET    /api/media?folder=<rel>      → { ok, data: { folders[], files[], path[], quota, policy } }
+//!   GET    /api/media/raw?path=<rel>    → bytes del fichero (inline). El Cloud devuelve una URL
+//!                                         firmada y la descarga la hace ESTE runtime: los buckets
+//!                                         no tienen CORS, así que el navegador no puede leerla, y
+//!                                         es lo que necesita el visor (ADR-0165).
 //!   POST   /api/media/upload            → multipart `folder` + `files`
-//!   DELETE /api/media?path=<rel>        → borra un fichero
+//!   DELETE /api/media?path=<rel>        → borra un fichero o una carpeta (con su contenido)
 //!   POST   /api/media/folder            → json { parent, name } crea sub-carpeta
+//!   POST   /api/media/rename            → json { path, name } renombra fichero o carpeta
+//!
+//! Qué puede hacer el USUARIO con cada ruta lo decide el módulo dueño de la carpeta
+//! (`static_files.user_actions`, ADR-0166): por defecto solo ver y descargar. Ver `policy_for`.
 
 use axum::body::Body;
 use axum::extract::{Multipart, Query, State};
@@ -156,7 +163,7 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
         .pointer("/usage/used_bytes")
         .and_then(Value::as_u64)
         .unwrap_or(0);
-    // Política de la carpeta pedida: la UI pinta solo las acciones posibles (ADR-0165). No es la
+    // Política de la carpeta pedida: la UI pinta solo las acciones posibles (ADR-0166). No es la
     // autoridad — cada endpoint la revalida —, pero evita ofrecer un botón que va a dar 403.
     let policy = resolve_policy(st, folder).await;
     let data = json!({
@@ -307,7 +314,23 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     if !resp.status().is_success() {
         return err(StatusCode::NOT_FOUND, "fichero no encontrado");
     }
-    let bytes = match resp.bytes().await {
+    // El Cloud responde `{ url }` con una firma temporal de Object Storage. La descarga la hace
+    // el runtime, no el navegador: los buckets no tienen CORS (un `fetch` desde el visor se cae) y
+    // la firma caduca. Se pide con un cliente LIMPIO —sin las cabeceras de máquina del hub—:
+    // `X-Hub-Token` es un secreto del hub y no puede viajar a un tercero (ADR-0003).
+    let signed = match resp.json::<Value>().await {
+        Ok(v) => v.get("url").and_then(Value::as_str).unwrap_or_default().to_string(),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+    };
+    if signed.is_empty() {
+        return err(StatusCode::BAD_GATEWAY, "el Cloud no devolvió la URL del fichero");
+    }
+    let object = match st.http.get(&signed).send().await {
+        Ok(o) if o.status().is_success() => o,
+        Ok(_) => return err(StatusCode::NOT_FOUND, "fichero no encontrado"),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+    };
+    let bytes = match object.bytes().await {
         Ok(b) => b,
         Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
     };
@@ -443,7 +466,7 @@ fn valid_file_name(name: &str) -> bool {
         && !name.chars().any(char::is_control)
 }
 
-/// Renombra un fichero o una carpeta dentro de `media/` (ADR-0165), proxyando al Cloud.
+/// Renombra un fichero o una carpeta dentro de `media/` (ADR-0166), proxyando al Cloud.
 pub async fn media_rename(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -570,7 +593,7 @@ fn err(code: StatusCode, msg: &str) -> Response {
         .into_response()
 }
 
-// ─────────────────────────── Política de acciones del usuario (ADR-0165) ───────────────────────────
+// ─────────────────────────── Política de acciones del usuario (ADR-0166) ───────────────────────────
 //
 // Ver y descargar es siempre posible con sesión. Lo que MODIFICA (subir, renombrar, borrar) depende
 // de quién sea el dueño de la carpeta:

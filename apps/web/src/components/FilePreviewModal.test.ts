@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Contrato del visor de ficheros de `/files` (ADR-0164): un modal GRANDE que previsualiza dentro
+// Contrato del visor de ficheros de `/files` (ADR-0165): un modal GRANDE que previsualiza dentro
 // del Hub en vez de escupir el fichero a una pestaña del navegador.
 //   - Los bytes SIEMPRE salen del runtime (sesión del hub); el navegador no toca disco ni S3.
 //   - Cada tipo tiene su visor; los parsers pesados (pdf/xlsx/docx) se cargan PEREZOSAMENTE,

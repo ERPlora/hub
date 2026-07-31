@@ -89,7 +89,7 @@ pub struct Manifest {
 ///
 /// Ver y descargar NO están aquí: son siempre posibles (con sesión y permiso de lectura). Esta
 /// enumeración cubre solo lo que **modifica** el contenido, que es lo que un módulo debe conceder
-/// explícitamente (ADR-0165).
+/// explícitamente (ADR-0166).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserFileAction {
     /// Subir ficheros o crear subcarpetas dentro de la carpeta del módulo.
@@ -784,7 +784,7 @@ mod tests {
         assert_eq!(storage.folder, "verifactu");
     }
 
-    /// Lo que el USUARIO puede hacer desde `/files` con los ficheros de un módulo (ADR-0165).
+    /// Lo que el USUARIO puede hacer desde `/files` con los ficheros de un módulo (ADR-0166).
     /// Por defecto: solo ver y descargar. El módulo tiene que pedir explícitamente lo demás.
     /// (El propio módulo sigue escribiendo por `ModuleStorage`: esto no le limita a él.)
     #[test]

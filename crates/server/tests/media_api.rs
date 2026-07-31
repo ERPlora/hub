@@ -163,7 +163,7 @@ async fn only_admin_can_modify_media() {
     );
 }
 
-// ─────────────── Permisos por módulo sobre sus ficheros (ADR-0165) ───────────────
+// ─────────────── Permisos por módulo sobre sus ficheros (ADR-0166) ───────────────
 
 /// Storage de módulo no-op: el fixture solo necesita que instalar un manifest con `static_files`
 /// no falle; lo que se prueba aquí es la política, no la materialización de la carpeta.
@@ -483,4 +483,72 @@ async fn the_listing_tells_the_ui_what_can_be_done_in_the_current_folder() {
     assert_eq!(json["data"]["policy"]["upload"], json!(false));
     assert_eq!(json["data"]["policy"]["rename"], json!(false));
     assert_eq!(json["data"]["policy"]["delete"], json!(false));
+}
+
+// ─────────────── El runtime sirve los bytes: el navegador nunca toca Object Storage ───────────────
+
+#[tokio::test]
+async fn raw_downloads_the_file_server_side_and_never_leaks_the_hub_token_to_storage() {
+    // El Cloud devuelve una URL FIRMADA; el runtime la descarga él (server-side) y entrega los
+    // bytes por su propio origen. Dos motivos: los buckets no tienen CORS (el navegador no puede
+    // leerla) y la cabecera de máquina del hub es un secreto que no puede viajar a un tercero.
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static TOKEN_LEAKED: AtomicBool = AtomicBool::new(false);
+
+    // "Object Storage": sirve los bytes y delata si le llega la cabecera de máquina.
+    let storage = Router::new().fallback(|req: Request| async move {
+        if req.headers().contains_key("x-hub-token") {
+            TOKEN_LEAKED.store(true, Ordering::SeqCst);
+        }
+        ([("content-type", "application/pdf")], Body::from(&b"%PDF-1.7 bytes"[..]))
+    });
+    let storage_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let storage_addr = storage_listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(storage_listener, storage).await.unwrap() });
+
+    // Mini-Cloud: responde con la URL firmada del almacenamiento simulado.
+    let signed = format!("http://{storage_addr}/erplora-hubs/hubs/h1/a.pdf?X-Amz-Signature=abc");
+    let cloud = Router::new().fallback(move || {
+        let signed = signed.clone();
+        async move { Json(json!({ "url": signed })) }
+    });
+    let cloud_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let cloud_addr = cloud_listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(cloud_listener, cloud).await.unwrap() });
+
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-media");
+    rt.ensure_system_tables().await.unwrap();
+    let user_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let session = rt.create_session(&user_id, 3600, None).await.unwrap();
+    let cfg = HubConfig {
+        hub_id: "hub-media".into(),
+        cloud_base_url: format!("http://{cloud_addr}"),
+        module_cache: std::env::temp_dir().join("erplora-media-raw-cache"),
+        auth_mode: AuthMode::Session,
+        jwt_public_key: None,
+        cloud_api_token: Some("test-machine-token".into()),
+        device_trust_enforce: false,
+        media_dir: std::env::temp_dir().join("erplora-media-raw-scratch"),
+        sector: None,
+    };
+    let router = app(AppState::with_config(rt, cfg));
+
+    let response = send(
+        &router,
+        Request::builder()
+            .uri("/api/media/raw?path=a.pdf")
+            .header("x-hub-session", &session)
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(&body[..], b"%PDF-1.7 bytes");
+    assert!(
+        !TOKEN_LEAKED.load(Ordering::SeqCst),
+        "el token de máquina del hub no puede llegar al almacenamiento"
+    );
 }

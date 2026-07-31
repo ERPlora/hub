@@ -26,7 +26,7 @@
 
     <ok-file-manager ref="fmEl" searchable :uploadable="isAdmin"></ok-file-manager>
 
-    <!-- «Abrir» previsualiza aquí dentro (ADR-0164); «Descargar» sigue bajando el fichero. -->
+    <!-- «Abrir» previsualiza aquí dentro (ADR-0165); «Descargar» sigue bajando el fichero. -->
     <FilePreviewModal
       :file="previewFile"
       :open="previewOpen"
@@ -59,8 +59,10 @@ import {
   createMediaFolder,
   type MediaFolder,
   type MediaFile,
+  renameMedia,
   type MediaCrumb,
   type MediaQuota,
+  type MediaPolicy,
 } from '../lib/media';
 
 const { t } = useI18n();
@@ -71,6 +73,7 @@ type FmElement = HTMLElement & {
   files: MediaFile[];
   path: MediaCrumb[];
   quota?: MediaQuota;
+  policy?: MediaPolicy;
   selected: string;
   view: 'grid' | 'list';
   loading: boolean;
@@ -83,6 +86,9 @@ let folders: MediaFolder[] = [];
 let allFiles: MediaFile[] = [];
 let path: MediaCrumb[] = [];
 let quota: MediaQuota | undefined;
+// Lo que el runtime dice que se puede hacer en la carpeta actual (ADR-0166). Solo adorna la UI:
+// el servidor revalida en cada endpoint, así que aquí no hay barrera que saltarse.
+let policy: MediaPolicy | undefined;
 let selected = '';
 let query = '';
 
@@ -119,6 +125,7 @@ function applyState(): void {
   el.files = q ? allFiles.filter((f) => f.name.toLowerCase().includes(q)) : allFiles;
   el.path = path;
   el.quota = quota;
+  el.policy = policy;
   el.selected = selected;
   el.labels = labels();
 }
@@ -134,6 +141,7 @@ async function load(folder = ''): Promise<void> {
     allFiles = data.files ?? [];
     path = data.path ?? [];
     quota = data.quota;
+    policy = data.policy;
     selected = folder;
   } else {
     // El feedback explica el error; el gestor queda vacío y permite reintentar sin inventar datos.
@@ -141,6 +149,7 @@ async function load(folder = ''): Promise<void> {
     allFiles = [];
     path = [];
     quota = undefined;
+    policy = undefined;
     selected = folder;
   }
   query = '';
@@ -148,7 +157,7 @@ async function load(folder = ''): Promise<void> {
   applyState();
 }
 
-// ---- Visor (ADR-0164) ----
+// ---- Visor (ADR-0165) ----
 // «Abrir» ya no lanza el fichero a una pestaña del navegador: lo previsualiza en el modal, que
 // es lo único que funciona igual en los dos productos (en Hub Local/Tauri no hay pestañas).
 const previewFile = ref<MediaFile | null>(null);
@@ -228,16 +237,25 @@ async function onUpload(e: Event): Promise<void> {
   toast(ok ? t('files.uploadSuccess') : t('files.uploadError'));
   if (ok) await load(selected);
 }
+/** Carpeta que contiene a `path` (cadena vacía = la raíz de `media/`). */
+function parentOf(path: string): string {
+  return path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+}
+
 async function onDelete(e: Event): Promise<void> {
   if (!isAdmin.value) {
     toast(t('files.permissionDenied'));
     return;
   }
-  const id = (e as CustomEvent<{ id: string }>).detail.id;
-  const file = allFiles.find((f) => f.id === id);
+  const { id, kind } = (e as CustomEvent<{ id: string; kind?: 'file' | 'folder' }>).detail;
+  const isFolder = kind === 'folder';
+  const name = isFolder ? id.split('/').pop() : allFiles.find((f) => f.id === id)?.name;
   const alert = await alertController.create({
-    header: t('files.deleteTitle'),
-    message: t('files.deleteBody', { name: file?.name ?? id }),
+    header: isFolder ? t('files.deleteFolderTitle') : t('files.deleteTitle'),
+    // Borrar una carpeta se lleva lo de dentro: el aviso tiene que decirlo.
+    message: isFolder
+      ? t('files.deleteFolderBody', { name: name ?? id })
+      : t('files.deleteBody', { name: name ?? id }),
     buttons: [
       { text: t('files.cancel'), role: 'cancel' },
       { text: t('files.delete'), role: 'confirm', cssClass: 'alert-button-danger' },
@@ -248,7 +266,46 @@ async function onDelete(e: Event): Promise<void> {
   if (result.role !== 'confirm') return;
   const ok = await deleteMedia(id);
   toast(ok ? t('files.deleteSuccess') : t('files.deleteError'));
-  if (ok) await load(selected);
+  // Si se ha borrado la carpeta donde estabas, quedarte ahí sería quedarse en algo que ya no
+  // existe: se sube a la de arriba.
+  if (ok) await load(isFolder && id === selected ? parentOf(id) : selected);
+}
+
+async function onRename(e: Event): Promise<void> {
+  if (!isAdmin.value) {
+    toast(t('files.permissionDenied'));
+    return;
+  }
+  const { id, name, kind } = (e as CustomEvent<{ id: string; name?: string; kind?: 'file' | 'folder' }>).detail;
+  const alert = await alertController.create({
+    header: t('files.rename'),
+    inputs: [
+      {
+        name: 'name',
+        type: 'text',
+        // El nombre actual va precargado: renombrar suele ser retocarlo, no escribirlo entero.
+        value: name ?? '',
+        placeholder: t('files.newName'),
+        attributes: { maxlength: 255, autocomplete: 'off' },
+      },
+    ],
+    buttons: [
+      { text: t('files.cancel'), role: 'cancel' },
+      { text: t('files.rename'), role: 'confirm' },
+    ],
+  });
+  await alert.present();
+  const result = await alert.onDidDismiss<{ values?: { name?: string } }>();
+  if (result.role !== 'confirm') return;
+  const next = result.data?.values?.name?.trim();
+  if (!next || next === name) return;
+  const ok = await renameMedia(id, next);
+  toast(ok ? t('files.renameSuccess') : t('files.renameError'));
+  if (!ok) return;
+  // Renombrar la carpeta en la que estás cambia su ruta: hay que seguirla, no recargar la vieja.
+  const renamedCurrent = kind === 'folder' && id === selected;
+  const target = parentOf(id);
+  await load(renamedCurrent ? (target ? `${target}/${next}` : next) : selected);
 }
 async function onCreateFolder(e: Event): Promise<void> {
   if (!isAdmin.value) {
@@ -290,6 +347,7 @@ onMounted(async () => {
     el.addEventListener('ok-download', onDownload);
     el.addEventListener('ok-upload', onUpload as EventListener);
     el.addEventListener('ok-delete', onDelete as EventListener);
+    el.addEventListener('ok-rename', onRename as EventListener);
     el.addEventListener('ok-create-folder', onCreateFolder as EventListener);
   }
   await load('');
@@ -304,6 +362,7 @@ onBeforeUnmount(() => {
   el.removeEventListener('ok-download', onDownload);
   el.removeEventListener('ok-upload', onUpload as EventListener);
   el.removeEventListener('ok-delete', onDelete as EventListener);
+  el.removeEventListener('ok-rename', onRename as EventListener);
   el.removeEventListener('ok-create-folder', onCreateFolder as EventListener);
 });
 </script>

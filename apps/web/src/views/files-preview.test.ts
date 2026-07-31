@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Contrato del cableado de `/files` con el visor (ADR-0164): «abrir» un fichero previsualiza
+// Contrato del cableado de `/files` con el visor (ADR-0165): «abrir» un fichero previsualiza
 // DENTRO del Hub; «descargar» sigue bajando el fichero. Antes ambas cosas hacían lo mismo
 // (descargar y lanzar el blob a una pestaña del navegador), que en Hub Local ni siquiera existe.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
