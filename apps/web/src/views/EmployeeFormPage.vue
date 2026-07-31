@@ -2,6 +2,7 @@
   <AppPage
     :title="isEdit ? t('employeeForm.titleEdit') : t('employeeForm.titleNew')"
     back-href="/employees"
+    content-layout="detail"
   >
     <div v-if="loading" class="form-loading">
       <ion-spinner name="crescent" />
@@ -298,10 +299,6 @@ watch(form, () => {
 </script>
 
 <style scoped>
-.employee-card {
-  max-width: 56rem;
-}
-
 .form-loading {
   display: flex;
   justify-content: center;

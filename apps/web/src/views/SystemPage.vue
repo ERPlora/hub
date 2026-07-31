@@ -1,5 +1,5 @@
 <template>
-  <AppPage :title="t('nav.system')">
+  <AppPage :title="t('nav.system')" content-layout="detail">
 
     <!-- ── Cargando: una sola vez en el boot ─────────────────────────── -->
     <div v-if="loading" class="boot-loading">

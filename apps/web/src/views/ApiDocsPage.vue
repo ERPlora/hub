@@ -17,7 +17,7 @@
   contenedor con scroll propio (`.api-docs-host`) para que el bloque viva dentro del `ion-content`.
 -->
 <template>
-  <AppPage :title="t('apiDocs.title')">
+  <AppPage :title="t('apiDocs.title')" content-layout="detail-fill">
     <div class="api-docs-wrap">
       <ok-inline-feedback
         tone="info"

@@ -13,6 +13,7 @@
   Props:
     title      → título de la vista (a AppTopbar).
     backHref   → si se pasa, AppTopbar muestra el botón Back (vista de detalle).
+    contentLayout → `detail` centra contenido legible; `detail-fill` conserva además el alto útil.
 
   NO lo usan LoginPage ni ActivationPage: son pantallas a pantalla completa sin chrome
   (sin topbar/sidebar), con su propia maquetación.
@@ -30,7 +31,14 @@
          (polish.css): con fullscreen las 2 esquinas superiores quedaban ocultas tras la topbar
          opaca; así las 4 esquinas de la tarjeta son visibles sobre el lienzo del shell. -->
     <ion-content :fullscreen="false" class="ion-padding">
-      <slot />
+      <div
+        v-if="contentLayout !== 'fluid'"
+        class="hub-detail-shell"
+        :class="{ 'hub-detail-shell--fill': contentLayout === 'detail-fill' }"
+      >
+        <slot />
+      </div>
+      <slot v-else />
     </ion-content>
 
     <slot name="footer" />
@@ -43,12 +51,19 @@ import { IonPage, IonContent } from '@ionic/vue';
 import { bindTabbar } from '@erplora/outfitkit/tabbar';
 import AppTopbar from './AppTopbar.vue';
 
-defineProps<{
-  /** Título de la vista (se pasa a AppTopbar). */
-  title: string;
-  /** Href de fallback del botón Back; si se pasa, AppTopbar muestra el Back (vista de detalle). */
-  backHref?: string;
-}>();
+withDefaults(
+  defineProps<{
+    /** Título de la vista (se pasa a AppTopbar). */
+    title: string;
+    /** Href de fallback del botón Back; si se pasa, AppTopbar muestra el Back (vista de detalle). */
+    backHref?: string;
+    /** Anchura interior: fluida para datos/tablas; centrada para lectura, formularios y ajustes. */
+    contentLayout?: 'fluid' | 'detail' | 'detail-fill';
+  }>(),
+  {
+    contentLayout: 'fluid',
+  },
+);
 
 // ── Tabbar de footer ───────────────────────────────────────────────────────────────────────────
 // Cuando hay más pestañas de las que caben, la barra scrollea y hay que SEÑALARLO: sin eso el

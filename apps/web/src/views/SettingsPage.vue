@@ -1,5 +1,5 @@
 <template>
-  <AppPage :title="t('nav.settings')">
+  <AppPage :title="t('nav.settings')" content-layout="detail">
       <!-- ── Tab: Hub ── -->
       <template v-if="tab === 'hub'">
         <h2 class="text-base font-semibold mb-2 px-1">{{ t('settings.hubWide') }}</h2>
