@@ -57,7 +57,8 @@ módulos rojo/verde/amarillo), el mismo layout que
 `media/generate-v5-icons.py` del monorepo. Sirve para que `tauri.conf.json` apunte a
 iconos válidos y la app **compile/arranque** mientras el diseño no esté.
 
-> **Decisión de marca = del humano (`owner:human`).** Un icono de app dedicado NO es
+> **Decisión de marca = de Ioan (fundador/marca), no de la política de quién escribe código.**
+> Un icono de app dedicado NO es
 > el logo de navbar: el hub central azul sobre fondo azul casi desaparece (se ve como
 > un cuadrado vacío), y un icono real querría más contraste / composición propia.
 > Sustituye `app-icon-source.png` por el arte definitivo y vuelve a correr el pipeline.
