@@ -168,3 +168,79 @@ async fn reset_reports_deleted_rows_per_section() {
         .expect("la sección seleccionada debe aparecer en el informe");
     assert!(s["rows_deleted"].is_i64(), "el informe debe traer rows_deleted: {s}");
 }
+
+// ── Lotes de importación: listar y deshacer (ADR-0170) ──────────────────────────────────
+
+/// Listar las importaciones enseña qué trajo cada blueprint: es información del negocio y va
+/// tras el mismo gate admin que el resto.
+#[tokio::test]
+async fn import_batches_without_session_is_401() {
+    let app = make_app(AuthMode::Session, "batches_401").await;
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/hub/import/batches")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+/// Deshacer una importación borra datos: nunca sin sesión admin.
+#[tokio::test]
+async fn undo_import_without_session_is_401() {
+    let app = make_app(AuthMode::Session, "undo_401").await;
+    let resp = app
+        .oneshot(post_json("/api/hub/import/undo", json!({ "batch_id": "x" })))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+/// Sin importaciones, la lista es vacía (no un 404 ni un 500): el panel la pinta tal cual.
+#[tokio::test]
+async fn import_batches_lists_empty_on_a_fresh_hub() {
+    let app = make_app(AuthMode::Dev, "batches_empty").await;
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/hub/import/batches")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(true));
+    assert!(body["batches"].as_array().expect("batches").is_empty());
+}
+
+/// Deshacer un lote inexistente es un **no-op 200**, no un error: el usuario puede pulsar dos
+/// veces o reintentar tras una red mala, y eso no puede parecer un fallo.
+#[tokio::test]
+async fn undo_import_of_unknown_batch_is_a_noop() {
+    let app = make_app(AuthMode::Dev, "undo_noop").await;
+    let resp = app
+        .oneshot(post_json("/api/hub/import/undo", json!({ "batch_id": "no-existe" })))
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(true));
+    assert!(body["report"]["sections"].as_array().expect("sections").is_empty());
+}
+
+/// Sin `batch_id` → 422: deshacer nunca se dispara «por defecto».
+#[tokio::test]
+async fn undo_import_without_batch_id_is_422() {
+    let app = make_app(AuthMode::Dev, "undo_nobatch").await;
+    let resp = app.oneshot(post_json("/api/hub/import/undo", json!({}))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}

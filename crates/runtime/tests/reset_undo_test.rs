@@ -75,7 +75,11 @@ fn demo_sql() -> String {
 
 /// Aplica un blueprint REGISTRANDO el lote (lo que hace el import tras ADR-0170).
 async fn import_demo(rt: &Runtime, hub: &str, name: &str) -> String {
-    erplora_runtime::reset::apply_tracked(rt, hub, name, &demo_sql())
+    // Mismo scope que usaría el import real para `data/inventory.sql`: el trazado NO puede
+    // ejecutar SQL que el import rechazaría.
+    let scope = erplora_runtime::import_sql::scope_for_data_file("data/inventory.sql")
+        .expect("scope de la sección inventory");
+    erplora_runtime::reset::apply_tracked(rt, hub, name, &demo_sql(), &scope)
         .await
         .expect("importar el blueprint registrando el lote")
 }
@@ -184,4 +188,88 @@ async fn un_lote_solo_registra_las_filas_que_realmente_inserto() {
 
     undo_import(&rt, "h1", &primero).await.expect("deshacer el primero");
     assert_eq!(count(&rt, "inventory_product", "h1").await, 0);
+}
+
+// ── Integración con el import REAL (no solo el motor suelto) ────────────────────────────
+
+/// El camino completo: exportar de A → **importar en B con `import_sections`** → el lote queda
+/// registrado y se puede deshacer. Sin esto, el motor de lotes existe pero nadie lo alimenta:
+/// es la diferencia entre «implementado» y «disponible».
+#[tokio::test]
+async fn el_import_real_registra_un_lote_deshacible() {
+    if !have_modules() { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    // Hub A con datos → bundle.
+    let a = fresh().await;
+    for (name, sku) in [("Café", "CAF"), ("Té verde", "TEV")] {
+        a.execute_command(
+            "inventory.products.create",
+            &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": 10 })),
+            &ctx("h1"),
+        )
+        .await
+        .expect("producto en A");
+    }
+    let bundle = erplora_runtime::export::export_hub(
+        &a,
+        "h1",
+        &erplora_runtime::export::ExportSelection {
+            users: false,
+            settings: false,
+            settings_items: None,
+            fiscal: false,
+            media: false,
+            modules: vec![erplora_runtime::export::ModuleDataSelection {
+                module_id: "inventory".into(),
+                with_data: true,
+            }],
+        },
+        "restaurante",
+        "es",
+        "2026-07-31T10:00:00Z",
+    )
+    .await
+    .expect("export de A");
+
+    // Hub destino B (tenant h2) — el flujo real del import.
+    let mut b = fresh().await;
+    erplora_runtime::import::import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &erplora_runtime::import::ImportSelection {
+            users: false,
+            settings: false,
+            fiscal: false,
+            media: false,
+            modules: vec!["inventory".into()],
+        },
+        "h2",
+    )
+    .await
+    .expect("import en B");
+
+    assert_eq!(count(&b, "inventory_product", "h2").await, 2, "precondición: la demo entró en B");
+
+    // El import dejó UN lote, con el nombre del blueprint y sus filas.
+    let batches = list_import_batches(&b, "h2").await.expect("listar lotes tras el import real");
+    assert_eq!(batches.len(), 1, "el import real debe registrar un lote: {batches:?}");
+    assert_eq!(batches[0].name, "restaurante", "el lote toma el nombre del manifest");
+    assert_eq!(batches[0].rows, 2, "el lote debe apuntar las 2 filas insertadas");
+
+    // Y el usuario añade lo suyo DESPUÉS.
+    b.execute_command(
+        "inventory.products.create",
+        &params(json!({ "name": "Mío", "sku": "MIO", "price": 900, "cost": 400, "stock": 1 })),
+        &ctx("h2"),
+    )
+    .await
+    .expect("producto del usuario en B");
+
+    undo_import(&b, "h2", &batches[0].id).await.expect("deshacer el import real");
+
+    assert_eq!(
+        count(&b, "inventory_product", "h2").await,
+        1,
+        "deshacer se lleva la demo importada y conserva lo del usuario"
+    );
 }

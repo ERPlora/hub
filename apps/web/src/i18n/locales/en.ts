@@ -269,6 +269,12 @@ export default {
     resetIntro:
       'Permanently deletes the data you select. This cannot be undone — export a backup first if in doubt.',
     resetExportFirst: 'Export a backup first',
+    resetImportsTitle: 'Undo an import',
+    resetImportsHint: 'Removes only what that blueprint brought in. Anything you created afterwards is kept.',
+    resetSectionsTitle: 'Or delete by section',
+    resetUndo: 'Undo',
+    resetUndoTitle: 'Undo “{name}”',
+    resetUndoBody: '{n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
     resetRows: '{n} rows',
     resetSubmit: 'Reset hub',
     resetDeleted: '{n} rows deleted',

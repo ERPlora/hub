@@ -270,6 +270,12 @@ export default {
     resetIntro:
       'Borra definitivamente los datos que marques. No se puede deshacer: si dudas, expórtate antes una copia.',
     resetExportFirst: 'Exportar una copia antes',
+    resetImportsTitle: 'Deshacer una importación',
+    resetImportsHint: 'Quita solo lo que trajo ese blueprint. Lo que hayas creado después se conserva.',
+    resetSectionsTitle: 'O borrar por secciones',
+    resetUndo: 'Deshacer',
+    resetUndoTitle: 'Deshacer «{name}»',
+    resetUndoBody: 'Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
     resetRows: '{n} filas',
     resetSubmit: 'Restablecer el hub',
     resetDeleted: '{n} filas borradas',

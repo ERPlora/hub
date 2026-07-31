@@ -504,10 +504,18 @@ pub async fn apply_tracked(
     hub_id: &str,
     name: &str,
     sql: &str,
+    scope: &crate::import_sql::TableScope,
 ) -> crate::Result<String> {
+    let batch_id = begin_batch(rt, hub_id, name).await?;
+    apply_tracked_into(rt, &batch_id, hub_id, sql, scope).await?;
+    Ok(batch_id)
+}
+
+/// Abre un lote de importación vacío y devuelve su id. Lo llama `import_sections` UNA vez por
+/// importación, para que todas sus secciones queden bajo el mismo lote deshacible.
+pub async fn begin_batch(rt: &Runtime, hub_id: &str, name: &str) -> crate::Result<String> {
     let db = rt.db();
     ensure_batch_tables(db).await?;
-
     let batch_id = crate::registry::new_id();
     let mut p = erplora_db::Params::new();
     p.insert("id".into(), serde_json::json!(batch_id));
@@ -521,8 +529,27 @@ pub async fn apply_tracked(
     )
     .await
     .map_err(|e| crate::RuntimeError::Other(format!("reset: registrar el lote: {e}")))?;
+    Ok(batch_id)
+}
 
-    for stmt in crate::seed::split_statements(sql) {
+/// Aplica el SQL de una sección DENTRO de un lote ya abierto, registrando las filas insertadas.
+///
+/// **Valida con el mismo `import_sql::validate` que el import** (subconjunto SQL confinado al
+/// scope de la sección, hub#239): el trazado de lotes no puede ser una puerta trasera que
+/// ejecute SQL que el import rechazaría.
+pub async fn apply_tracked_into(
+    rt: &Runtime,
+    batch_id: &str,
+    hub_id: &str,
+    sql: &str,
+    scope: &crate::import_sql::TableScope,
+) -> crate::Result<usize> {
+    let db = rt.db();
+    ensure_batch_tables(db).await?;
+    let stmts = crate::import_sql::validate(sql, scope).map_err(crate::RuntimeError::Other)?;
+    let mut applied = 0usize;
+
+    for stmt in stmts {
         let stmt = stmt.replace(crate::export::HUB_ID_PLACEHOLDER, hub_id);
         let table = insert_target(&stmt);
         let Some(table) = table else {
@@ -558,8 +585,9 @@ pub async fn apply_tracked(
             .await
             .map_err(|e| crate::RuntimeError::Other(format!("reset: registrar fila del lote: {e}")))?;
         }
+        applied += 1;
     }
-    Ok(batch_id)
+    Ok(applied)
 }
 
 /// Tabla destino de un `INSERT INTO <tabla> …`, o `None` si la sentencia no lo es.
