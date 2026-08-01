@@ -1,4 +1,4 @@
-//! Tests de integración de la INTEGRACIÓN de la capa web pública (ADR-0160, Wave 2) por HTTP
+//! Tests de integración de la INTEGRACIÓN de la capa web pública (ADR-0177, Wave 2) por HTTP
 //! (sin red): el endpoint anónimo `POST /api/public/query` (default-deny + `hub_id` de sistema) y
 //! el cableado de `GET /p/<path>` (bloques → HTML seguro). Mismo estilo que `tests/public_api.rs`
 //! (`tower::ServiceExt::oneshot`).
@@ -48,6 +48,7 @@ fn snapshot_on() -> PublicSnapshot {
         landing_visible: true,
         business_name: "Bar Pepe".into(),
         business_address: "Calle Mayor 1".into(),
+        public_origin: None,
     }
 }
 
@@ -167,6 +168,42 @@ async fn flag_on_command_via_public_query_is_rejected() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
+#[tokio::test]
+async fn public_command_surface_does_not_exist() {
+    let app = app(AppState::with_config(make_runtime().await, dev_config())
+        .with_public_snapshot(snapshot_on()));
+    let response = app
+        .oneshot(
+            Request::post("/api/public/command")
+                .header("content-type", "application/json")
+                .body(Body::from("{}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn public_query_returns_429_with_retry_after_after_the_quota() {
+    let app = app(AppState::with_config(make_runtime().await, dev_config())
+        .with_public_snapshot(snapshot_on()));
+    for request_number in 1..=120 {
+        let response = app
+            .clone()
+            .oneshot(public_query("menu.items.list", json!({})))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "request {request_number}");
+    }
+    let response = app
+        .oneshot(public_query("menu.items.list", json!({})))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(response.headers().contains_key("retry-after"));
+}
+
 // ── Flag ON: cableado de /p/<path> ──────────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -244,20 +281,94 @@ async fn authenticated_editor_roundtrips_block_json_then_public_page_renders_it(
     });
     let response = app
         .clone()
-        .oneshot(admin_json("PUT", "/api/public-pages/carta", doc.clone()))
+        .oneshot(admin_json("PUT", "/api/public-pages/menu", doc.clone()))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
     let response = app
         .clone()
-        .oneshot(admin_json("GET", "/api/public-pages/carta", json!({})))
+        .oneshot(admin_json("GET", "/api/public-pages/menu", json!({})))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(body_json(response).await["data"], doc);
 
-    let response = app.oneshot(get("/p/carta")).await.unwrap();
+    let response = app.oneshot(get("/p/menu")).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     assert!(body_text(response).await.contains("Carta <b>de hoy</b>"));
+}
+
+#[tokio::test]
+async fn authoring_catalog_and_home_are_derived_from_active_manifest() {
+    let rt = make_runtime().await;
+    rt.set_public_page(
+        "menu",
+        &json!({ "blocks": [{ "type": "paragraph", "data": { "text": "Hoy" } }] }),
+        "test",
+    )
+    .await
+    .unwrap();
+    let app = app(AppState::with_config(rt, dev_config()).with_public_snapshot(snapshot_on()));
+
+    let response = app
+        .clone()
+        .oneshot(admin_json("GET", "/api/public-pages", json!({})))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["data"][0]["path"], json!("menu"));
+    assert_eq!(body["data"][0]["title"], json!("Menu"));
+    assert_eq!(body["data"][0]["reads"], json!(["menu.items.list"]));
+    assert_eq!(body["data"][0]["slot"], json!("public.home.sections"));
+
+    let response = app
+        .clone()
+        .oneshot(admin_json(
+            "PUT",
+            "/api/public-pages/inventada",
+            json!({ "blocks": [] }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    let response = app.oneshot(get("/")).await.unwrap();
+    let html = body_text(response).await;
+    assert!(html.contains("href=\"/p/menu\""));
+    assert!(html.contains("data-module=\"menu\""));
+    assert!(html.contains("Cafe con leche"));
+}
+
+#[tokio::test]
+async fn configured_origin_binds_host_and_generates_seo() {
+    let rt = make_runtime().await;
+    rt.set_public_page("menu", &json!({ "blocks": [] }), "test")
+        .await
+        .unwrap();
+    let snapshot = snapshot_on()
+        .with_origin(Some("https://menu.example"))
+        .unwrap();
+    let app = app(AppState::with_config(rt, dev_config()).with_public_snapshot(snapshot));
+
+    let wrong = app.clone().oneshot(get("/p/menu")).await.unwrap();
+    assert_eq!(wrong.status(), StatusCode::MISDIRECTED_REQUEST);
+
+    let request = Request::get("/p/menu")
+        .header("host", "menu.example")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let html = body_text(response).await;
+    assert!(html.contains("rel=\"canonical\" href=\"https://menu.example/p/menu\""));
+
+    let request = Request::get("/sitemap.xml")
+        .header("host", "menu.example")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(body_text(response).await.contains("https://menu.example/p/menu"));
 }

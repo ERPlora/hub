@@ -49,7 +49,7 @@ pub mod members;
 pub mod module_storage;
 pub mod openapi;
 pub mod profile;
-/// Capa web PÚBLICA del hub (ADR-0160, F0): frontera del gate + landing server-side + CSP estricta.
+/// Capa web PÚBLICA del hub (ADR-0177, F0): frontera del gate + landing server-side + CSP estricta.
 pub mod public;
 pub mod public_render;
 pub mod rate_limit;
@@ -506,7 +506,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     if let Some(dir) = cfg.web_dir.as_deref() {
         eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
     }
-    // Snapshot de la capa web PÚBLICA (ADR-0160 F0): lee el flag `public.landing.visible` + los datos
+    // Snapshot de la capa web PÚBLICA (ADR-0177 F0): lee el flag `public.landing.visible` + los datos
     // de negocio de `hub_settings` UNA sola vez, tras aplicar el seed. El gate y las rutas públicas
     // leen ESTE snapshot cacheado (no la BD) en cada request. Sin hot-reload: cambiar el flag en la
     // BD requiere reiniciar el proceso para que la capa pública se abra/cierre (aceptable en F0).
@@ -514,6 +514,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         let rt = state.runtime.lock().await;
         let settings = rt.get_settings().await.unwrap_or_else(|_| json!({}));
         public::PublicSnapshot::from_settings(&settings)
+            .with_origin(std::env::var("HUB_PUBLIC_ORIGIN").ok().as_deref())
+            .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidInput, message))?
     };
     if public_snapshot.landing_visible {
         eprintln!("capa web pública ACTIVA (public.landing.visible=true): sirviendo / y /p/* anónimos");
@@ -619,7 +621,7 @@ async fn shutdown_signal() {
 pub fn app(state: AppState) -> Router {
     let registration_state = state.clone();
     let activity_state = state.activity.clone();
-    // Capa web PÚBLICA (ADR-0160 F0): se monta SOLO si el snapshot de arranque trae el flag
+    // Capa web PÚBLICA (ADR-0177 F0): se monta SOLO si el snapshot de arranque trae el flag
     // `public.landing.visible` activo. Con el flag desactivado (default) NO existen `/` ni `/p/*`
     // como rutas → caen al comportamiento de hoy (gate 428 / fallback SPA→login), intacto.
     let landing_visible = state.public.landing_visible;
@@ -642,6 +644,7 @@ pub fn app(state: AppState) -> Router {
                 .put(public::put_page_source)
                 .layer(axum::extract::DefaultBodyLimit::max(512 * 1024)),
         )
+        .route("/api/public-pages", get(public::list_page_sources))
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
             "/api/profile",
@@ -761,7 +764,7 @@ pub fn app(state: AppState) -> Router {
         // reconexión del navegador (EventSource) + keep-alive (idle timeout del ALB). Nombre de
         // ruta = decisión del humano (`/api/events` por defecto).
         .route("/api/events", get(sse_events));
-    // Rutas públicas montadas ANTES del fallback SPA (ADR-0160 F0): `/` (landing server-side) +
+    // Rutas públicas montadas ANTES del fallback SPA (ADR-0177 F0): `/` (landing server-side) +
     // `/p/*` (placeholder de página). Son rutas EXPLÍCITAS → ganan al `index.html` del `ServeDir`.
     // Llevan su CSP estricta propia (SOLO ellas, ver `public::routes`). Merge condicional al flag.
     let router = if landing_visible {
@@ -832,7 +835,7 @@ async fn require_machine_registration(
     next: Next,
 ) -> Response {
     let path = request.uri().path();
-    // ADR-0160 F0: con la capa pública ACTIVA (`public.landing.visible`, del snapshot cacheado en el
+    // ADR-0177 F0: con la capa pública ACTIVA (`public.landing.visible`, del snapshot cacheado en el
     // AppState — NO se lee `hub_settings` en cada request), el árbol público (`/`, `/p/*`,
     // `/api/public/*`) pasa SIN 428. Con el flag desactivado (default) el gate se comporta
     // EXACTAMENTE como antes: la capa pública no existe.
@@ -873,7 +876,7 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
 /// En las respuestas de API el header es inocuo. El valor lo decide el llamador (es columna de
 /// seguridad/humano): en Tauri lo fija `embedded_serve_config`; en ECS sale de `HUB_CSP` (o `None`).
 ///
-/// **`if_not_present`** (ADR-0160 F0): es una CSP de FALLBACK — se emite salvo que la respuesta ya
+/// **`if_not_present`** (ADR-0177 F0): es una CSP de FALLBACK — se emite salvo que la respuesta ya
 /// traiga una. Así el árbol público (`public::routes`) puede fijar su CSP MÁS estricta en un layer
 /// interno y esta global NO la pisa. Para la app autenticada el efecto es idéntico al de antes: ningún
 /// handler emite CSP propia, así que todas reciben esta global (antes con `overriding`, ahora como
@@ -993,6 +996,9 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         "machine_registered": machine_registered,
         "registration_required": !demo && !machine_registered,
         "public_key_loaded": st.config.jwt_public_key.is_some(),
+        // Snapshot efectivo de arranque. Puede diferir temporalmente del setting persistido tras
+        // usar el toggle: la UI avisa que las rutas públicas se aplican al reiniciar el Hub.
+        "public_landing_visible": st.public.landing_visible,
         "business_type": sector,
         "sector": sector,
         // Settings de arranque (tabla `hub_settings` ∪ defaults). El SPA los usa para formato de

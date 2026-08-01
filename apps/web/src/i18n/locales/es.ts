@@ -53,7 +53,7 @@ export default {
     iosHint: 'En iPhone/iPad: toca Compartir (el cuadrado con la flecha) y elige «Añadir a pantalla de inicio».',
     browserHint: 'En el menú de tu navegador, elige «Instalar aplicación» (o «Añadir a pantalla de inicio»).',
   },
-  // Editor de páginas públicas (PageEditor.vue, ADR-0160). Editor por bloques para páginas públicas.
+  // Editor de páginas públicas (PageEditor.vue, ADR-0177). Editor por bloques para páginas públicas.
   pageEditor: {
     placeholder: 'Escribe aquí tu página…',
   },
@@ -236,6 +236,7 @@ export default {
     showApiDocsDesc: 'Añade una página interna con la API pública del Hub (Swagger) para integraciones',
     publicPresence: 'Presencia web pública',
     publicPresenceDesc: 'Publica una landing y páginas públicas para este hub. Si está desactivado, el hub no tiene web pública.',
+    publicPresenceRestartRequired: 'Reinicia el Hub para aplicar este cambio a las rutas públicas.',
     publicPageEditor: 'Páginas públicas',
     publicPageEditorDesc: 'Edita páginas seguras por bloques que el Hub renderiza sin JavaScript del tenant.',
     publicPageEdit: 'Editar página',
@@ -246,6 +247,7 @@ export default {
     publicPageSaved: 'Página pública guardada',
     publicPageLoadError: 'No se pudo cargar la página pública.',
     publicPageSaveError: 'No se pudo guardar la página pública.',
+    publicPageNone: 'Instala y activa un módulo que declare public_pages para poder editar sus páginas.',
     hardware: 'Hardware',
     bridgeDesc: 'Impresoras, cajón, escáner y conexión de hardware periférico',
     disabled: 'Desactivado',

@@ -151,6 +151,9 @@ fn tenant_factory() -> RuntimeFactory {
                     .join("../runtime/tests/fixture_inventory");
                 runtime.install_from_dir(&fixture).await.unwrap();
             }
+            let public_fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixture_public_query");
+            runtime.install_from_dir(&public_fixture).await.unwrap();
             Ok(runtime)
         })
     })
@@ -296,7 +299,43 @@ async fn preview_install_settings_and_catalog_are_isolated_by_request_hub() {
         .unwrap()
         .iter()
         .any(|module| module == "inventory"));
-    assert!(plan_b["installed"].as_array().unwrap().is_empty());
+    assert!(!plan_b["installed"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|module| module == "inventory"));
+
+    // La autoría pública también es hub-scoped: una ruta declarada con el mismo nombre en
+    // dos organizaciones conserva documentos independientes y nunca usa el runtime bootstrap.
+    for (hub, text) in [("hub-a1", "Página A"), ("hub-b1", "Página B")] {
+        let response = app
+            .clone()
+            .oneshot(request(
+                "PUT",
+                hub,
+                "/api/public-pages/menu",
+                Some(json!({
+                    "blocks": [{ "type": "paragraph", "data": { "text": text } }]
+                })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+    for (hub, expected, absent) in [
+        ("hub-a1", "Página A", "Página B"),
+        ("hub-b1", "Página B", "Página A"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(request("GET", hub, "/api/public-pages/menu", None))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let page = body_json(response).await;
+        assert_eq!(page["data"]["blocks"][0]["data"]["text"], json!(expected));
+        assert_ne!(page["data"]["blocks"][0]["data"]["text"], json!(absent));
+    }
 
     for hub in ["hub-b1", "hub-a1"] {
         let response = app

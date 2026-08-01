@@ -1,5 +1,5 @@
 <!--
-  PublicPresencePanel — toggle "Presencia web pública" de Ajustes (ADR-0160).
+  PublicPresencePanel — toggle "Presencia web pública" de Ajustes (ADR-0177).
 
   Activa/desactiva la PARTE PÚBLICA del hub (landing + páginas públicas) escribiendo la clave core
   `public.landing.visible` (bool, default false) por la API de settings del hub ya existente
@@ -17,6 +17,9 @@
         <ion-label>
           <h2>{{ t('settings.publicPresence') }}</h2>
           <p>{{ t('settings.publicPresenceDesc') }}</p>
+          <ion-note data-testid="public-presence-restart-note">
+            {{ t('settings.publicPresenceRestartRequired') }}
+          </ion-note>
         </ion-label>
         <ion-toggle
           :checked="landingVisible"
@@ -45,7 +48,11 @@
       <ion-toolbar>
         <ion-title>{{ t('settings.publicPageEditor') }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button :aria-label="t('settings.publicPageClose')" @click="closeEditor">
+          <ion-button
+            :aria-label="t('settings.publicPageClose')"
+            data-testid="public-page-close"
+            @click="closeEditor"
+          >
             <HubIcon name="close-outline" />
           </ion-button>
         </ion-buttons>
@@ -53,12 +60,21 @@
     </ion-header>
     <ion-content class="ion-padding">
       <div class="editor-path">
-        <ion-input
+        <ion-select
           v-model="pagePath"
+          interface="popover"
           :label="t('settings.publicPagePath')"
           label-placement="stacked"
           data-testid="public-page-path"
-        />
+        >
+          <ion-select-option
+            v-for="page in pageDefinitions"
+            :key="`${page.module_id}:${page.path}`"
+            :value="page.path"
+          >
+            {{ page.title }} · /{{ page.path }}
+          </ion-select-option>
+        </ion-select>
         <ion-button
           fill="outline"
           :disabled="loadingPage || savingPage"
@@ -68,6 +84,9 @@
           {{ t('settings.publicPageLoad') }}
         </ion-button>
       </div>
+      <ok-inline-feedback v-if="!loadingPage && pageDefinitions.length === 0" tone="info">
+        {{ t('settings.publicPageNone') }}
+      </ok-inline-feedback>
       <div v-if="loadingPage" class="editor-loading"><ion-spinner name="dots" /></div>
       <PageEditor
         v-else-if="pageDocument"
@@ -99,16 +118,23 @@ import type { OutputData } from '@editorjs/editorjs';
 import { useI18n } from 'vue-i18n';
 import {
   IonButton, IonButtons, IonCard, IonCardContent, IonContent, IonFooter, IonHeader,
-  IonInput, IonItem, IonLabel, IonModal, IonSpinner, IonTitle, IonToggle, IonToolbar,
+  IonItem, IonLabel, IonModal, IonNote, IonSelect, IonSelectOption, IonSpinner, IonTitle,
+  IonToggle, IonToolbar,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import PageEditor from './PageEditor.vue';
 import { isAdmin } from '../lib/session';
 import { hubSettings, updateHubSettings } from '../lib/hub-settings';
-import { getPublicPage, normalizePublicPagePath, putPublicPage } from '../lib/public-pages';
+import {
+  getPublicPage,
+  listPublicPages,
+  normalizePublicPagePath,
+  putPublicPage,
+  type PublicPageDefinition,
+} from '../lib/public-pages';
 import { toastSuccess, toastError } from '../lib/toast';
 
-// Clave core plana del store k/v (ADR-0160). `as const` para que el tipo del PUT sea exacto.
+// Clave core plana del store k/v (ADR-0177). `as const` para que el tipo del PUT sea exacto.
 const KEY = 'public.landing.visible' as const;
 
 const { t } = useI18n();
@@ -118,7 +144,8 @@ const landingVisible = ref<boolean>(hubSettings.value?.[KEY] ?? false);
 const editorOpen = ref(false);
 const loadingPage = ref(false);
 const savingPage = ref(false);
-const pagePath = ref('inicio');
+const pagePath = ref('');
+const pageDefinitions = ref<PublicPageDefinition[]>([]);
 const pageDocument = ref<OutputData | null>(null);
 const pageEditor = ref<InstanceType<typeof PageEditor> | null>(null);
 const editorKey = ref(0);
@@ -136,7 +163,7 @@ async function onToggle(e: Event): Promise<void> {
   landingVisible.value = checked;
   try {
     await updateHubSettings({ [KEY]: checked });
-    await toastSuccess(t('settings.saved'));
+    await toastSuccess(t('settings.publicPresenceRestartRequired'));
   } catch {
     landingVisible.value = prev;
     await toastError(t('settings.saveError'));
@@ -146,7 +173,19 @@ async function onToggle(e: Event): Promise<void> {
 async function openEditor(): Promise<void> {
   if (!isAdmin.value) return;
   editorOpen.value = true;
-  await loadPage();
+  loadingPage.value = true;
+  try {
+    pageDefinitions.value = await listPublicPages();
+    if (!pageDefinitions.value.some((page) => page.path === pagePath.value)) {
+      pagePath.value = pageDefinitions.value[0]?.path ?? '';
+    }
+  } catch {
+    pageDefinitions.value = [];
+    await toastError(t('settings.publicPageLoadError'));
+  } finally {
+    loadingPage.value = false;
+  }
+  if (pagePath.value) await loadPage();
 }
 
 async function loadPage(): Promise<void> {
@@ -168,6 +207,7 @@ async function loadPage(): Promise<void> {
 function closeEditor(): void {
   editorOpen.value = false;
   pageDocument.value = null;
+  pageDefinitions.value = [];
 }
 
 async function savePage(): Promise<void> {
@@ -200,7 +240,7 @@ async function savePage(): Promise<void> {
   margin-bottom: 1rem;
 }
 
-.editor-path ion-input {
+.editor-path ion-select {
   flex: 1;
 }
 </style>

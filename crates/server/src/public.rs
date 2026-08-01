@@ -1,4 +1,4 @@
-//! Capa web **PÚBLICA** del Hub (ADR-0160, F0 — la frontera).
+//! Capa web **PÚBLICA** del Hub (ADR-0177, F0 — la frontera).
 //!
 //! El Hub es hoy 100% autenticado (`require_machine_registration` responde 428 a todo salvo salud +
 //! contexto). Esta capa abre una superficie anónima MÍNIMA — una landing server-side del negocio —
@@ -35,8 +35,10 @@ use crate::state::AppState;
 
 const MAX_PAGE_BYTES: usize = 512 * 1024;
 const MAX_PAGE_BLOCKS: usize = 200;
+const MAX_PUBLIC_READ_ROWS: usize = 100;
+const MAX_PUBLIC_READ_HTML_BYTES: usize = 128 * 1024;
 
-/// CSP MÁS estricta del proyecto, aplicada SOLO al árbol público (columna de seguridad; ADR-0160):
+/// CSP MÁS estricta del proyecto, aplicada SOLO al árbol público (columna de seguridad; ADR-0177):
 /// nada de scripts, estilos solo self, imágenes self + `data:`. El árbol público no ejecuta JS.
 pub const PUBLIC_CSP: &str =
     "default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self' data:; \
@@ -53,6 +55,9 @@ pub struct PublicSnapshot {
     pub business_name: String,
     /// Dirección del negocio (`business_address` de `hub_settings`). Vacío ⇒ se omite.
     pub business_address: String,
+    /// Origen público canónico (`HUB_PUBLIC_ORIGIN`). Si existe, vincula este proceso al `Host`
+    /// configurado y alimenta canonical/sitemap. En producción solo admite HTTPS.
+    pub public_origin: Option<String>,
 }
 
 impl PublicSnapshot {
@@ -74,14 +79,47 @@ impl PublicSnapshot {
                 .unwrap_or(false),
             business_name: str_of("business_legal_name"),
             business_address: str_of("business_address"),
+            public_origin: None,
         }
+    }
+
+    /// Valida y normaliza `HUB_PUBLIC_ORIGIN`. No admite path, credenciales, query ni fragmento;
+    /// HTTP queda limitado a loopback para desarrollo y pruebas. TLS se termina en el edge, pero
+    /// la URL que ve el visitante y que publicamos en SEO siempre debe ser HTTPS en producción.
+    pub fn with_origin(mut self, raw: Option<&str>) -> Result<Self, String> {
+        let Some(raw) = raw.map(str::trim).filter(|raw| !raw.is_empty()) else {
+            return Ok(self);
+        };
+        let url = reqwest::Url::parse(raw).map_err(|_| "HUB_PUBLIC_ORIGIN no es una URL válida")?;
+        if url.path() != "/"
+            || url.query().is_some()
+            || url.fragment().is_some()
+            || !url.username().is_empty()
+            || url.password().is_some()
+        {
+            return Err("HUB_PUBLIC_ORIGIN debe contener solo esquema y host".into());
+        }
+        let host = url
+            .host_str()
+            .ok_or_else(|| "HUB_PUBLIC_ORIGIN no contiene host".to_string())?;
+        let loopback = matches!(host, "localhost" | "127.0.0.1" | "::1");
+        if url.scheme() != "https" && !(url.scheme() == "http" && loopback) {
+            return Err("HUB_PUBLIC_ORIGIN exige HTTPS fuera de loopback".into());
+        }
+        let authority = match url.port() {
+            Some(port) => format!("{host}:{port}"),
+            None => host.to_string(),
+        };
+        self.public_origin = Some(format!("{}://{authority}", url.scheme()));
+        Ok(self)
     }
 }
 
 /// ¿La ruta pertenece al árbol PÚBLICO? Exactamente `/`, lo que empieza por `/p/` y lo que empieza
-/// por `/api/public/` (ADR-0160 F0). El gate deja pasar estas rutas SIN 428 cuando el flag está on.
+/// por `/api/public/` (ADR-0177 F0). El gate deja pasar estas rutas SIN 428 cuando el flag está on.
 pub fn is_public_path(path: &str) -> bool {
     path == "/"
+        || matches!(path, "/robots.txt" | "/sitemap.xml")
         || path.starts_with("/p/")
         || path.starts_with("/api/public/")
         || path.starts_with("/files/pages/")
@@ -95,6 +133,8 @@ pub fn routes() -> Router<AppState> {
     use tower_http::set_header::SetResponseHeaderLayer;
     Router::new()
         .route("/", get(root))
+        .route("/robots.txt", get(robots))
+        .route("/sitemap.xml", get(sitemap))
         .route("/p/*path", get(page))
         .route("/files/pages/*path", get(crate::media::public_page_media))
         .route("/api/public/query", post(public_query))
@@ -102,6 +142,38 @@ pub fn routes() -> Router<AppState> {
             header::CONTENT_SECURITY_POLICY,
             HeaderValue::from_static(PUBLIC_CSP),
         ))
+}
+
+/// Vincula la superficie anónima al dominio configurado para este hub. Sin origen canónico se
+/// conserva el modo same-origin de desarrollo; cuando existe, un `Host` distinto nunca llega a
+/// consultar datos ni media de este tenant.
+pub(crate) fn public_host_allowed(snapshot: &PublicSnapshot, headers: &HeaderMap) -> bool {
+    let Some(origin) = snapshot.public_origin.as_deref() else {
+        return true;
+    };
+    let Ok(url) = reqwest::Url::parse(origin) else {
+        return false;
+    };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let expected = match url.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host.to_string(),
+    };
+    headers
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|actual| actual.trim().eq_ignore_ascii_case(&expected))
+}
+
+fn wrong_public_host() -> Response {
+    (
+        StatusCode::MISDIRECTED_REQUEST,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        "dominio público no asociado a este hub",
+    )
+        .into_response()
 }
 
 /// Normaliza el path de autoría. Se permiten segmentos URL legibles; no se admiten claves vacías,
@@ -142,6 +214,47 @@ fn editor_bad_request(message: &str) -> Response {
         .into_response()
 }
 
+fn editor_not_found() -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({ "ok": false, "error": "página pública no declarada por un módulo activo" })),
+    )
+        .into_response()
+}
+
+/// GET /api/public-pages — catálogo de autoría derivado de `public_pages[]` de módulos activos.
+/// No acepta rutas inventadas por el navegador: el manifest/Registry es la fuente de verdad.
+pub async fn list_page_sources(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let hub_id = crate::auth::hub_id(&headers, &st.hub_id());
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(error) => return crate::tenant_rejected(error),
+    };
+    let rt = arc.lock().await;
+    if let Err(error) = crate::auth::require_admin_session(&headers, &st.config, &rt).await {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": error.message() })),
+        )
+            .into_response();
+    }
+    let pages: Vec<Value> = rt
+        .public_page_definitions()
+        .into_iter()
+        .filter_map(|(module_id, page)| {
+            let path = normalized_page_path(&page.path)?;
+            Some(json!({
+                "module_id": module_id,
+                "path": path,
+                "title": page.title,
+                "reads": page.reads,
+                "slot": page.slot,
+            }))
+        })
+        .collect();
+    Json(json!({ "ok": true, "data": pages })).into_response()
+}
+
 /// GET /api/public-pages/*path — fuente JSON de una página para el editor autenticado.
 pub async fn get_page_source(
     State(st): State<AppState>,
@@ -151,13 +264,21 @@ pub async fn get_page_source(
     let Some(path) = normalized_page_path(&path) else {
         return editor_bad_request("path público inválido");
     };
-    let rt = st.runtime.lock().await;
+    let hub_id = crate::auth::hub_id(&headers, &st.hub_id());
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(error) => return crate::tenant_rejected(error),
+    };
+    let rt = arc.lock().await;
     if let Err(error) = crate::auth::require_admin_session(&headers, &st.config, &rt).await {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": error.message() })),
         )
             .into_response();
+    }
+    if rt.public_page_definition(&path).is_none() {
+        return editor_not_found();
     }
     match rt.get_public_page(&path).await {
         Ok(doc) => Json(json!({
@@ -180,10 +301,12 @@ pub async fn put_page_source(
     let Some(path) = normalized_page_path(&path) else {
         return editor_bad_request("path público inválido");
     };
-    if !valid_editor_document(&doc) {
-        return editor_bad_request("documento Editor.js inválido o demasiado grande");
-    }
-    let rt = st.runtime.lock().await;
+    let hub_id = crate::auth::hub_id(&headers, &st.hub_id());
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(error) => return crate::tenant_rejected(error),
+    };
+    let rt = arc.lock().await;
     let admin = match crate::auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(admin) => admin,
         Err(error) => {
@@ -194,6 +317,12 @@ pub async fn put_page_source(
                 .into_response()
         }
     };
+    if rt.public_page_definition(&path).is_none() {
+        return editor_not_found();
+    }
+    if !valid_editor_document(&doc) {
+        return editor_bad_request("documento Editor.js inválido o demasiado grande");
+    }
     let updated_by = format!("hub_user:{}", admin.id);
     match rt.set_public_page(&path, &doc, &updated_by).await {
         Ok(()) => Json(json!({ "ok": true, "data": doc })).into_response(),
@@ -202,11 +331,86 @@ pub async fn put_page_source(
 }
 
 /// `GET /` (flag on) — landing HTML MÍNIMA server-side con los datos que ya hay en `hub_settings`.
-async fn root(State(st): State<AppState>) -> Response {
+async fn root(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    if !public_host_allowed(&st.public, &headers) {
+        return wrong_public_host();
+    }
+    let mut sections = String::new();
+    let rt = st.runtime.lock().await;
+    let ctx = RequestContext::new(rt.hub_id().to_string(), String::new(), ["*".to_string()]);
+    for (module_id, page) in rt.public_page_definitions() {
+        if page.slot.as_deref() != Some("public.home.sections") {
+            continue;
+        }
+        let Some(path) = normalized_page_path(&page.path) else {
+            continue;
+        };
+        let mut live = String::new();
+        for query in &page.reads {
+            if !rt.public_page_read_allowed(&module_id, query) {
+                continue;
+            }
+            if let Ok(rows) = rt.execute_query(query, &serde_json::Map::new(), &ctx).await {
+                live.push_str(&render_public_rows(query, &rows));
+            }
+        }
+        sections.push_str(&render_home_section(&module_id, &path, &page.title, &live));
+    }
+    drop(rt);
     (
         StatusCode::OK,
         [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        render_landing(&st.public),
+        render_landing_with_sections(&st.public, &sections),
+    )
+        .into_response()
+}
+
+/// Política de indexación. El sitemap solo se anuncia cuando existe un origen absoluto validado.
+async fn robots(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    if !public_host_allowed(&st.public, &headers) {
+        return wrong_public_host();
+    }
+    let sitemap = st
+        .public
+        .public_origin
+        .as_deref()
+        .map(|origin| format!("Sitemap: {origin}/sitemap.xml\n"))
+        .unwrap_or_default();
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        format!("User-agent: *\nAllow: /\n{sitemap}"),
+    )
+        .into_response()
+}
+
+/// Sitemap derivado del mismo `public_pages[]` activo que autoría y SSR. Omite páginas todavía
+/// sin documento guardado para no anunciar URLs que responderían 404.
+async fn sitemap(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    if !public_host_allowed(&st.public, &headers) {
+        return wrong_public_host();
+    }
+    let Some(origin) = st.public.public_origin.as_deref() else {
+        return page_not_found();
+    };
+    let rt = st.runtime.lock().await;
+    let mut urls = format!("<url><loc>{}</loc></url>", escape_html(origin));
+    for (_, page) in rt.public_page_definitions() {
+        let Some(path) = normalized_page_path(&page.path) else {
+            continue;
+        };
+        if matches!(rt.get_public_page(&path).await, Ok(Some(_))) {
+            urls.push_str(&format!(
+                "<url><loc>{}/p/{}</loc></url>",
+                escape_html(origin),
+                escape_html(&path)
+            ));
+        }
+    }
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/xml; charset=utf-8")],
+        format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">{urls}</urlset>"),
     )
         .into_response()
 }
@@ -221,53 +425,83 @@ async fn page(
     headers: HeaderMap,
     Path(path): Path<String>,
 ) -> Response {
+    if !public_host_allowed(&st.public, &headers) {
+        return wrong_public_host();
+    }
     // Resuelve el runtime del hub (single-tenant, o el pool de la org en cloud compartido). El hub_id
     // es el del despliegue (contexto de sistema), NUNCA aportado por el cliente.
     let Ok(arc) = st.runtime_for(&st.hub_id()).await else {
         return page_not_found();
     };
+    let Some(path) = normalized_page_path(&path) else {
+        return page_not_found();
+    };
     let rt = arc.lock().await;
+    let Some(definition) = rt.public_page_definition(&path) else {
+        return page_not_found();
+    };
     match rt.get_public_page(&path).await {
         Ok(Some(doc)) => {
-            let definition = rt.public_page_definition(&path);
             let mut main = crate::public_render::render_blocks(&doc);
-            if let Some((_, page)) = &definition {
-                let ctx = RequestContext::new(
-                    rt.hub_id().to_string(),
-                    String::new(),
-                    ["*".to_string()],
-                );
-                for query in &page.reads {
-                    // Doble default-deny: `reads` solo es una referencia; el flag de la query
-                    // sigue siendo la autoridad. Un typo o una query privada se omite sin filtrar
-                    // si existe ni degradar el contenido estático de la página.
-                    if !rt.is_query_public(query) {
-                        continue;
-                    }
-                    if let Ok(rows) = rt.execute_query(query, &serde_json::Map::new(), &ctx).await {
-                        main.push_str(&render_public_rows(query, &rows));
-                    }
+            let (page_module_id, page) = &definition;
+            let ctx =
+                RequestContext::new(rt.hub_id().to_string(), String::new(), ["*".to_string()]);
+            for query in &page.reads {
+                // Doble default-deny: `public:true` y query del propio módulo/dependencia.
+                if !rt.public_page_read_allowed(page_module_id, query) {
+                    continue;
+                }
+                if let Ok(rows) = rt.execute_query(query, &serde_json::Map::new(), &ctx).await {
+                    main.push_str(&render_public_rows(query, &rows));
                 }
             }
-            let title = definition.as_ref().map(|(_, page)| page.title.as_str());
-            cacheable_html(&headers, page_html(&st.public, title, &main))
+            cacheable_html(
+                &headers,
+                page_html(&st.public, Some(&page.title), &path, &main),
+            )
         }
         // Sin página para ese path (o JSON corrupto) → 404, como antes.
         _ => page_not_found(),
     }
 }
 
+fn render_home_section(module_id: &str, path: &str, title: &str, live: &str) -> String {
+    format!(
+        "<section class=\"public-home-section\" data-module=\"{}\"><h2><a href=\"/p/{}\">{}</a></h2>{}</section>",
+        escape_html(module_id),
+        escape_html(path),
+        escape_html(title),
+        live,
+    )
+}
+
 /// Render genérico y sin scripts de las `reads` vivas declaradas por el módulo. La forma del dato
 /// es deliberadamente transparente (JSON en `<pre>`); un renderer de dominio puede evolucionar
 /// después sin que esta frontera ejecute HTML/JS aportado por el tenant.
 fn render_public_rows(query: &str, rows: &[Value]) -> String {
-    let data = serde_json::to_string_pretty(rows).unwrap_or_else(|_| "[]".to_string());
+    let data = serde_json::to_string_pretty(&rows[..rows.len().min(MAX_PUBLIC_READ_ROWS)])
+        .unwrap_or_else(|_| "[]".to_string());
+    // El renderer de bloques ya tiene sus propios topes; las lecturas vivas también se acotan
+    // para que una query defectuosa no convierta el SSR en una respuesta de tamaño ilimitado.
+    let data = bounded_owned(escape_html(&data), MAX_PUBLIC_READ_HTML_BYTES);
     format!(
         "<section class=\"public-data\" data-query=\"{}\"><h2>{}</h2><pre>{}</pre></section>",
         escape_html(query),
         escape_html(query),
-        escape_html(&data),
+        data,
     )
+}
+
+fn bounded_owned(mut text: String, max_bytes: usize) -> String {
+    if text.len() <= max_bytes {
+        return text;
+    }
+    let mut end = max_bytes;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text.truncate(end);
+    text
 }
 
 /// ETag fuerte del HTML final. `304` conserva el ETag y evita retransferir páginas sin cambios.
@@ -300,13 +534,20 @@ struct PublicQueryReq {
     params: serde_json::Map<String, Value>,
 }
 
-/// `POST /api/public/query` (flag on) — endpoint **anónimo** de solo lectura (ADR-0160).
+/// `POST /api/public/query` (flag on) — endpoint **anónimo** de solo lectura (ADR-0177).
 ///
 /// Puerta ÚNICA: la query debe estar marcada `public: true` en su manifest. NO se usa el `permission`
 /// (no hay usuario). Cualquier otra query —aunque exista— o un command → 404, sin revelar existencia
 /// (default-deny). El `hub_id` lo inyecta el runtime (contexto de sistema), NUNCA el cliente. Solo
 /// `queries`, jamás `commands` (el dispatcher de queries no ejecuta escrituras).
-async fn public_query(State(st): State<AppState>, Json(req): Json<PublicQueryReq>) -> Response {
+async fn public_query(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<PublicQueryReq>,
+) -> Response {
+    if !public_host_allowed(&st.public, &headers) {
+        return wrong_public_host();
+    }
     // Lectura anónima: cuota conservadora por hub+query. No hay commands públicos en v1, así que
     // Turnstile no se introduce en un flujo que no escribe; cualquier `public_write` sigue ausente.
     if let Err(retry_after) = st.rate_limits.check(
@@ -364,6 +605,10 @@ fn page_not_found() -> Response {
 /// (la [`PUBLIC_CSP`] prohíbe `style-src 'unsafe-inline'` y `script-src`). Todo dato de negocio va
 /// escapado (viene de `hub_settings`, controlado por el dueño, pero se sirve anónimo).
 pub fn render_landing(snap: &PublicSnapshot) -> String {
+    render_landing_with_sections(snap, "")
+}
+
+fn render_landing_with_sections(snap: &PublicSnapshot, sections: &str) -> String {
     let name = snap.business_name.trim();
     let name = if name.is_empty() { "ERPlora" } else { name };
     let title = escape_html(name);
@@ -371,8 +616,13 @@ pub fn render_landing(snap: &PublicSnapshot) -> String {
     let mut main = format!("<h1>{title}</h1>");
     let address = snap.business_address.trim();
     if !address.is_empty() {
-        main.push_str(&format!("<p class=\"address\">{}</p>", escape_html(address)));
+        main.push_str(&format!(
+            "<p class=\"address\">{}</p>",
+            escape_html(address)
+        ));
     }
+    main.push_str(sections);
+    let seo = seo_head(snap, name, "/");
 
     format!(
         "<!doctype html>\n\
@@ -381,6 +631,7 @@ pub fn render_landing(snap: &PublicSnapshot) -> String {
          <meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{title}</title>\n\
+         {seo}\
          </head>\n\
          <body>\n\
          <main>{main}</main>\n\
@@ -393,13 +644,14 @@ pub fn render_landing(snap: &PublicSnapshot) -> String {
 /// inline (la [`PUBLIC_CSP`] prohíbe `style-src 'unsafe-inline'` y `script-src`); el `main` viene del
 /// renderer seguro ([`crate::public_render::render_blocks`]), así que se inserta tal cual. El título
 /// sale del nombre del negocio (escapado), con fallback genérico.
-fn page_html(snap: &PublicSnapshot, page_title: Option<&str>, main: &str) -> String {
+fn page_html(snap: &PublicSnapshot, page_title: Option<&str>, path: &str, main: &str) -> String {
     let name = snap.business_name.trim();
     let name = if name.is_empty() { "ERPlora" } else { name };
     let title = page_title
         .filter(|title| !title.trim().is_empty())
         .map(|title| format!("{} · {}", title.trim(), name))
         .unwrap_or_else(|| name.to_string());
+    let seo = seo_head(snap, &title, &format!("/p/{path}"));
     let title = escape_html(&title);
     format!(
         "<!doctype html>\n\
@@ -408,11 +660,35 @@ fn page_html(snap: &PublicSnapshot, page_title: Option<&str>, main: &str) -> Str
          <meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{title}</title>\n\
+         {seo}\
          </head>\n\
          <body>\n\
          <main>{main}</main>\n\
          </body>\n\
          </html>\n"
+    )
+}
+
+fn seo_head(snap: &PublicSnapshot, title: &str, path: &str) -> String {
+    let title = escape_html(title);
+    let description = if snap.business_address.trim().is_empty() {
+        format!("Información pública de {title}")
+    } else {
+        format!("{} · {}", title, escape_html(snap.business_address.trim()))
+    };
+    let canonical = snap
+        .public_origin
+        .as_deref()
+        .map(|origin| {
+            let url = format!("{origin}{path}");
+            let url = escape_html(&url);
+            format!(
+                "<link rel=\"canonical\" href=\"{url}\">\n<meta property=\"og:url\" content=\"{url}\">\n"
+            )
+        })
+        .unwrap_or_default();
+    format!(
+        "<meta name=\"description\" content=\"{description}\">\n<meta name=\"robots\" content=\"index,follow\">\n<meta property=\"og:type\" content=\"website\">\n<meta property=\"og:title\" content=\"{title}\">\n{canonical}"
     )
 }
 
@@ -459,6 +735,8 @@ mod tests {
         assert!(is_public_path("/p/menu"));
         assert!(is_public_path("/api/public/query"));
         assert!(is_public_path("/files/pages/menu/foto.png"));
+        assert!(is_public_path("/robots.txt"));
+        assert!(is_public_path("/sitemap.xml"));
         // NO públicas: la API autenticada, la SPA, y prefijos que solo "parecen" públicos.
         assert!(!is_public_path("/api/settings"));
         assert!(!is_public_path("/dashboard"));
@@ -495,9 +773,13 @@ mod tests {
             landing_visible: true,
             business_name: "Bar <b>Pepe</b>".into(),
             business_address: "Calle & Co".into(),
+            public_origin: Some("https://bar.example".into()),
         };
         let html = render_landing(&snap);
-        assert!(html.contains("Bar &lt;b&gt;Pepe&lt;/b&gt;"), "nombre escapado");
+        assert!(
+            html.contains("Bar &lt;b&gt;Pepe&lt;/b&gt;"),
+            "nombre escapado"
+        );
         assert!(html.contains("Calle &amp; Co"), "dirección escapada");
         // Nunca el texto crudo peligroso.
         assert!(!html.contains("<b>Pepe</b>"));
@@ -506,16 +788,67 @@ mod tests {
     #[test]
     fn render_landing_falls_back_to_generic_name_when_empty() {
         let html = render_landing(&PublicSnapshot::default());
-        assert!(html.contains("ERPlora"), "sin nombre ⇒ título genérico, no vacío");
+        assert!(
+            html.contains("ERPlora"),
+            "sin nombre ⇒ título genérico, no vacío"
+        );
+    }
+
+    #[test]
+    fn public_origin_requires_a_clean_https_origin_except_loopback() {
+        let snap = PublicSnapshot::default()
+            .with_origin(Some("https://menu.example:8443/"))
+            .unwrap();
+        assert_eq!(
+            snap.public_origin.as_deref(),
+            Some("https://menu.example:8443")
+        );
+        assert!(PublicSnapshot::default()
+            .with_origin(Some("http://menu.example"))
+            .is_err());
+        assert!(PublicSnapshot::default()
+            .with_origin(Some("https://user@menu.example/path"))
+            .is_err());
+        assert_eq!(
+            PublicSnapshot::default()
+                .with_origin(Some("http://127.0.0.1:8787"))
+                .unwrap()
+                .public_origin
+                .as_deref(),
+            Some("http://127.0.0.1:8787")
+        );
     }
 
     #[test]
     fn editor_paths_and_documents_are_bounded() {
-        assert_eq!(normalized_page_path("/Carta/Verano/"), Some("carta/verano".into()));
+        assert_eq!(
+            normalized_page_path("/Carta/Verano/"),
+            Some("carta/verano".into())
+        );
         assert_eq!(normalized_page_path("../secreto"), None);
         assert!(valid_editor_document(&json!({
             "blocks": [{ "type": "paragraph", "data": { "text": "hola" } }]
         })));
-        assert!(!valid_editor_document(&json!({ "blocks": [{ "type": "paragraph" }] })));
+        assert!(!valid_editor_document(
+            &json!({ "blocks": [{ "type": "paragraph" }] })
+        ));
+    }
+
+    #[test]
+    fn live_public_reads_have_row_and_output_limits() {
+        let rows = (0..150)
+            .map(|index| json!({ "value": format!("row-{index}") }))
+            .collect::<Vec<_>>();
+        let html = render_public_rows("menu.items.list", &rows);
+        assert!(html.contains("row-99"));
+        assert!(!html.contains("row-100"));
+
+        let huge = vec![json!({ "value": "<".repeat(MAX_PUBLIC_READ_HTML_BYTES) })];
+        let html = render_public_rows("menu.items.list", &huge);
+        assert!(html.len() <= MAX_PUBLIC_READ_HTML_BYTES + 512);
+        assert!(
+            !html.contains("<<<<"),
+            "el dato vivo también debe escaparse"
+        );
     }
 }

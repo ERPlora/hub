@@ -1,4 +1,4 @@
-//! Renderer de la presencia web pública del Hub (ADR-0160): convierte el JSON de bloques
+//! Renderer de la presencia web pública del Hub (ADR-0177): convierte el JSON de bloques
 //! (formato Editor.js) que se guarda por página a **HTML seguro**, SIN ejecutar NUNCA JS del
 //! usuario. Este módulo ES la frontera de seguridad de la página pública.
 //!
@@ -10,6 +10,16 @@
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
+/// Límites defensivos del renderer. El endpoint de autoría valida además el documento completo,
+/// pero estos topes también protegen el SSR si la base contiene datos antiguos o manipulados.
+const MAX_RENDER_BLOCKS: usize = 200;
+const MAX_RENDER_OUTPUT_BYTES: usize = 512 * 1024;
+const MAX_INLINE_BYTES: usize = 4 * 1024;
+const MAX_LIST_DEPTH: usize = 8;
+const MAX_LIST_ITEMS: usize = 256;
+const MAX_TABLE_ROWS: usize = 100;
+const MAX_TABLE_CELLS_PER_ROW: usize = 32;
+
 /// Renderiza el documento de bloques (Editor.js) a HTML seguro. El documento es el JSON que guarda
 /// el editor (`{ "blocks": [ { "type", "data" }, … ] }`); cada bloque conocido se renderiza y
 /// cualquier `type` desconocido se OMITE (default-deny). Entrada sin `blocks` (o que no sea un
@@ -19,13 +29,20 @@ pub fn render_blocks(doc: &Value) -> String {
     let Some(blocks) = doc.get("blocks").and_then(Value::as_array) else {
         return String::new();
     };
-    let mut out: Vec<String> = Vec::with_capacity(blocks.len());
-    for block in blocks {
+    let mut out = String::with_capacity(blocks.len().min(MAX_RENDER_BLOCKS) * 64);
+    for block in blocks.iter().take(MAX_RENDER_BLOCKS) {
         if let Some(html) = render_block(block) {
-            out.push(html);
+            let separator = usize::from(!out.is_empty());
+            if out.len() + separator + html.len() > MAX_RENDER_OUTPUT_BYTES {
+                break;
+            }
+            if separator == 1 {
+                out.push('\n');
+            }
+            out.push_str(&html);
         }
     }
-    out.join("\n")
+    out
 }
 
 /// Renderiza UN bloque según su `type`. `None` ⇒ el bloque se omite: tipo desconocido (default-deny)
@@ -69,12 +86,20 @@ fn render_list(data: &Value) -> String {
         .get("items")
         .and_then(Value::as_array)
         .unwrap_or(&empty);
-    format!("<{tag}>{}</{tag}>", render_list_items(items))
+    let mut remaining = MAX_LIST_ITEMS;
+    format!(
+        "<{tag}>{}</{tag}>",
+        render_list_items(items, 0, &mut remaining)
+    )
 }
 
-fn render_list_items(items: &[Value]) -> String {
+fn render_list_items(items: &[Value], depth: usize, remaining: &mut usize) -> String {
+    if depth >= MAX_LIST_DEPTH || *remaining == 0 {
+        return String::new();
+    }
     let mut out = String::new();
-    for item in items {
+    for item in items.iter().take(*remaining) {
+        *remaining -= 1;
         let (content, children) = match item {
             Value::String(s) => (s.as_str(), None),
             Value::Object(_) => (
@@ -87,7 +112,7 @@ fn render_list_items(items: &[Value]) -> String {
         out.push_str(&sanitize_inline(content));
         if let Some(children) = children.filter(|c| !c.is_empty()) {
             out.push_str("<ul>");
-            out.push_str(&render_list_items(children));
+            out.push_str(&render_list_items(children, depth + 1, remaining));
             out.push_str("</ul>");
         }
         out.push_str("</li>");
@@ -120,11 +145,11 @@ fn render_table(data: &Value) -> String {
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let mut out = String::from("<table>");
-    for (i, row) in rows.iter().enumerate() {
+    for (i, row) in rows.iter().take(MAX_TABLE_ROWS).enumerate() {
         let Some(cells) = row.as_array() else { continue };
         let cell_tag = if with_headings && i == 0 { "th" } else { "td" };
         out.push_str("<tr>");
-        for cell in cells {
+        for cell in cells.iter().take(MAX_TABLE_CELLS_PER_ROW) {
             let text = sanitize_inline(cell.as_str().unwrap_or(""));
             out.push_str(&format!("<{cell_tag}>{text}</{cell_tag}>"));
         }
@@ -192,6 +217,7 @@ fn escape_text(text: &str) -> String {
 ///   - sin atributos genéricos (ni `class`/`style`/`title`) y sin `on*` (no están en la allowlist);
 ///   - `<script>`/`<style>` se eliminan CON su contenido (clean_content_tags por defecto de ammonia).
 fn sanitize_inline(html: &str) -> String {
+    let html = bounded_str(html, MAX_INLINE_BYTES);
     let tags: HashSet<&str> = ["b", "i", "a", "mark", "code", "br"].into_iter().collect();
     let url_schemes: HashSet<&str> = ["http", "https", "mailto"].into_iter().collect();
     let mut tag_attributes: HashMap<&str, HashSet<&str>> = HashMap::new();
@@ -203,6 +229,19 @@ fn sanitize_inline(html: &str) -> String {
         .generic_attributes(HashSet::new())
         .clean(html)
         .to_string()
+}
+
+/// Prefijo UTF-8 válido de como máximo `max_bytes`; evita que un único campo fuerce una
+/// asignación desproporcionada en `ammonia` o en el HTML SSR.
+fn bounded_str(text: &str, max_bytes: usize) -> &str {
+    if text.len() <= max_bytes {
+        return text;
+    }
+    let mut end = max_bytes;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
 }
 
 #[cfg(test)]
@@ -408,5 +447,58 @@ mod tests {
         assert_eq!(render_blocks(&json!({ "blocks": [] })), "");
         assert_eq!(render_blocks(&json!(null)), "");
         assert_eq!(render_blocks(&json!("no soy un objeto")), "");
+    }
+
+    #[test]
+    fn limita_bloques_y_tamano_de_salida() {
+        let mut blocks = (0..MAX_RENDER_BLOCKS)
+            .map(|_| json!({ "type": "paragraph", "data": { "text": "&".repeat(MAX_INLINE_BYTES) } }))
+            .collect::<Vec<_>>();
+        blocks.push(json!({ "type": "paragraph", "data": { "text": "NO-DEBE-APARECER" } }));
+        let html = render_blocks(&json!({ "blocks": blocks }));
+        assert!(html.len() <= MAX_RENDER_OUTPUT_BYTES);
+        assert!(!html.contains("NO-DEBE-APARECER"));
+    }
+
+    #[test]
+    fn limita_profundidad_y_numero_total_de_items() {
+        let mut nested = json!({ "content": "fin", "items": [] });
+        for depth in (0..20).rev() {
+            nested = json!({ "content": format!("nivel-{depth}"), "items": [nested] });
+        }
+        let many = (0..(MAX_LIST_ITEMS + 20))
+            .map(|i| json!(format!("item-{i}")))
+            .collect::<Vec<_>>();
+        let html = render_blocks(&json!({ "blocks": [
+            { "type": "list", "data": { "items": [nested] } },
+            { "type": "list", "data": { "items": many } }
+        ] }));
+        assert!(!html.contains("nivel-8"), "la recursión debe parar antes de nivel 8: {html}");
+        assert!(html.contains("item-255"));
+        assert!(!html.contains("item-256"));
+    }
+
+    #[test]
+    fn limita_filas_columnas_y_texto_de_tabla() {
+        let rows = (0..(MAX_TABLE_ROWS + 1))
+            .map(|row| {
+                (0..(MAX_TABLE_CELLS_PER_ROW + 1))
+                    .map(|col| json!(format!("r{row}c{col}")))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let html = render_blocks(&json!({ "blocks": [
+            { "type": "table", "data": { "content": rows } }
+        ] }));
+        assert!(html.contains("r99c31"));
+        assert!(!html.contains("r99c32"));
+        assert!(!html.contains("r100c0"));
+
+        let unicode = "ñ".repeat(MAX_INLINE_BYTES);
+        let paragraph = render_blocks(&json!({ "blocks": [
+            { "type": "paragraph", "data": { "text": unicode } }
+        ] }));
+        assert!(paragraph.len() <= MAX_INLINE_BYTES + "<p></p>".len());
+        assert!(paragraph.is_char_boundary(paragraph.len()));
     }
 }

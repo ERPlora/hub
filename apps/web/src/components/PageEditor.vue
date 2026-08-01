@@ -4,11 +4,11 @@
 </template>
 
 <script setup lang="ts">
-// PageEditor — editor de páginas públicas del Hub (ADR-0160 F2). Envuelve Editor.js y produce
+// PageEditor — editor de páginas públicas del Hub (ADR-0177 F2). Envuelve Editor.js y produce
 // JSON de BLOQUES (nunca HTML). Se usa SOLO en la ruta de edición autenticada; esta pieza es el
 // componente; el padre autenticado resuelve la ruta y persiste el JSON que `save()` devuelve.
 //
-// SEGURIDAD (ADR-0160): SOLO tools curados. Se PROHÍBE registrar `@editorjs/raw` (inyecta HTML
+// SEGURIDAD (ADR-0177): SOLO tools curados. Se PROHÍBE registrar `@editorjs/raw` (inyecta HTML
 // crudo) y `@editorjs/embed` (inyecta iframes). Media: solo del propio Hub vía /files (ADR-0047),
 // nunca URLs externas.
 import { onMounted, onBeforeUnmount, ref, shallowRef } from 'vue';
@@ -87,7 +87,7 @@ async function uploadByUrl(url: string): Promise<UploadResult> {
   return { success: 1, file: { url } };
 }
 
-/** Conjunto CURADO de tools. NO se añaden `raw` ni `embed` a propósito (seguridad, ADR-0160). */
+/** Conjunto CURADO de tools. NO se añaden `raw` ni `embed` a propósito (seguridad, ADR-0177). */
 function buildTools(): NonNullable<EditorConfig['tools']> {
   return {
     header: { class: Header, inlineToolbar: true },

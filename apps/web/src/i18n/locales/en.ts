@@ -52,7 +52,7 @@ export default {
     iosHint: 'On iPhone/iPad: tap Share (the square with an arrow) and choose “Add to Home Screen”.',
     browserHint: 'In your browser menu, choose “Install app” (or “Add to Home Screen”).',
   },
-  // Public page editor (PageEditor.vue, ADR-0160). Block-based editor for public pages.
+  // Public page editor (PageEditor.vue, ADR-0177). Block-based editor for public pages.
   pageEditor: {
     placeholder: 'Write your page here…',
   },
@@ -235,6 +235,7 @@ export default {
     showApiDocsDesc: 'Adds an internal page with the Hub public API (Swagger) for integrations',
     publicPresence: 'Public web presence',
     publicPresenceDesc: 'Publish a public landing and pages for this hub. When off, the hub has no public site.',
+    publicPresenceRestartRequired: 'Restart the Hub to apply this change to public routes.',
     publicPageEditor: 'Public pages',
     publicPageEditorDesc: 'Edit safe block-based pages rendered by the Hub without tenant JavaScript.',
     publicPageEdit: 'Edit page',
@@ -245,6 +246,7 @@ export default {
     publicPageSaved: 'Public page saved',
     publicPageLoadError: 'The public page could not be loaded.',
     publicPageSaveError: 'The public page could not be saved.',
+    publicPageNone: 'Install and activate a module that declares public_pages to edit its pages.',
     hardware: 'Hardware',
     bridgeDesc: 'Printers, cash drawer, scanner and peripheral hardware connection',
     disabled: 'Disabled',

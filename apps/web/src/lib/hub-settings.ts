@@ -44,7 +44,7 @@ export interface HubSettings {
    *  palettes.css; 'erplora' = marca por defecto. El override POR USUARIO vive en
    *  `hub_user_pref` y gana a esta. */
   theme_palette: string;
-  /** ¿Está activa la PRESENCIA WEB PÚBLICA del hub (landing + páginas públicas)? (ADR-0160).
+  /** ¿Está activa la PRESENCIA WEB PÚBLICA del hub (landing + páginas públicas)? (ADR-0177).
    *  Clave core plana `public.landing.visible` del store k/v; `false` = el hub no tiene parte
    *  pública. La escribe un admin desde Ajustes; el runtime es la autoridad (PUT owner/admin). */
   'public.landing.visible': boolean;

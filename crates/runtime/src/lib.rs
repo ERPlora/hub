@@ -490,7 +490,7 @@ impl Runtime {
             .unwrap_or(false)
     }
 
-    /// ¿Es `name` una **query pública** (ADR-0160): existe, de un módulo activo, marcada `public`?
+    /// ¿Es `name` una **query pública** (ADR-0177): existe, de un módulo activo, marcada `public`?
     /// Es la ÚNICA puerta del endpoint anónimo `POST /api/public/query` (sin usuario, el `permission`
     /// no gatea). Un command nunca casa (solo mira queries).
     pub fn is_query_public(&self, name: &str) -> bool {
@@ -505,6 +505,22 @@ impl Runtime {
         self.registry
             .public_page(path)
             .map(|(module_id, page)| (module_id.to_string(), page.clone()))
+    }
+
+    /// Catálogo declarativo de páginas públicas de todos los módulos activos.
+    pub fn public_page_definitions(&self) -> Vec<(String, crate::manifest::PublicPageDef)> {
+        self.registry
+            .public_pages()
+            .into_iter()
+            .map(|(module_id, page)| (module_id.to_string(), page.clone()))
+            .collect()
+    }
+
+    /// Doble puerta de un `read` SSR: `public:true` + pertenencia al módulo de la página o a una
+    /// dependencia declarada por este.
+    pub fn public_page_read_allowed(&self, page_module_id: &str, query: &str) -> bool {
+        self.registry
+            .public_page_read_allowed(page_module_id, query)
     }
 
     /// Ejecuta un command declarativo (solo si su módulo está activo). Los eventos emitidos se
@@ -825,7 +841,7 @@ impl Runtime {
         settings::set_many(self.db.as_ref(), &self.hub_id, updates, updated_by).await
     }
 
-    // ── Páginas de la presencia web PÚBLICA (ADR-0160) ──────────────────────────────────────────
+    // ── Páginas de la presencia web PÚBLICA (ADR-0177) ──────────────────────────────────────────
     //
     // Decisión de almacenamiento (columna de Ioan): el JSON de bloques (Editor.js) de cada página
     // pública se guarda en el **settings store existente** (`hub_settings`) bajo la clave

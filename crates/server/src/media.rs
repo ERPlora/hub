@@ -208,20 +208,21 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
     if files.is_empty() {
         return err(StatusCode::BAD_REQUEST, "no se enviaron ficheros");
     }
+    let normalized_folder = folder.trim_matches('/');
+    let public_page_folder = is_public_page_folder(normalized_folder);
+    if public_page_folder
+        && files
+            .iter()
+            .any(|(name, _)| !is_safe_public_image_name(name))
+    {
+        return err(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "las páginas públicas solo admiten imágenes png, jpg, jpeg, gif o webp",
+        );
+    }
     let public_url = files.first().and_then(|(name, _)| {
-        let folder = folder.trim_matches('/');
-        let folder_path = Path::new(folder);
-        let folder_is_public = folder_path.components().all(|c| matches!(c, Component::Normal(_)))
-            && folder_path
-                .components()
-                .next()
-                .is_some_and(|c| c.as_os_str() == "pages");
-        let name_is_single_segment = Path::new(name)
-            .components()
-            .all(|c| matches!(c, Component::Normal(_)))
-            && Path::new(name).components().count() == 1;
-        (folder_is_public && name_is_single_segment).then(|| {
-            let rel = format!("{folder}/{name}");
+        (public_page_folder && is_safe_public_image_name(name)).then(|| {
+            let rel = format!("{normalized_folder}/{name}");
             format!("/files/{}", pct_encode(&rel))
         })
     });
@@ -374,18 +375,32 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
 /// El runtime descarga la URL firmada con su credencial de máquina y devuelve solo los bytes.
 pub async fn public_page_media(
     State(st): State<AppState>,
+    headers: HeaderMap,
     AxumPath(path): AxumPath<String>,
 ) -> Response {
+    if !crate::public::public_host_allowed(&st.public, &headers) {
+        return err(StatusCode::MISDIRECTED_REQUEST, "dominio público no asociado a este hub");
+    }
     let relative = Path::new(&path);
     let valid = !path.is_empty()
         && !relative.is_absolute()
         && relative
             .components()
-            .all(|component| matches!(component, Component::Normal(_)));
+            .all(|component| matches!(component, Component::Normal(_)))
+        && is_safe_public_image_name(file_name_str(relative).as_str());
     if !valid {
         return err(StatusCode::NOT_FOUND, "fichero no encontrado");
     }
-    cloud_raw(&st, &format!("pages/{path}")).await
+    let mut response = cloud_raw(&st, &format!("pages/{path}")).await;
+    response.headers_mut().insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        "nosniff".parse().expect("static header"),
+    );
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        "public, max-age=3600".parse().expect("static header"),
+    );
+    response
 }
 
 // ─────────────────────────── GET /api/media ───────────────────────────
@@ -564,6 +579,28 @@ fn ext_of(name: &str) -> String {
         .extension()
         .map(|e| e.to_string_lossy().to_lowercase())
         .unwrap_or_default()
+}
+
+fn is_public_page_folder(folder: &str) -> bool {
+    let path = Path::new(folder);
+    !folder.is_empty()
+        && !path.is_absolute()
+        && path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+        && path
+            .components()
+            .next()
+            .is_some_and(|component| component.as_os_str() == "pages")
+}
+
+fn is_safe_public_image_name(name: &str) -> bool {
+    let path = Path::new(name);
+    path.components().count() == 1
+        && path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+        && matches!(ext_of(name).as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp")
 }
 
 /// `Content-Type` por extensión (mapa mínimo; el resto cae a octet-stream).
@@ -812,5 +849,17 @@ mod policy_tests {
         assert_eq!(module_folder_of("modules"), None);
         assert_eq!(module_folder_of("facturas/modules/x"), None);
         assert_eq!(module_folder_of(""), None);
+    }
+
+    #[test]
+    fn public_pages_only_accept_safe_raster_images() {
+        assert!(is_public_page_folder("pages/menu"));
+        assert!(!is_public_page_folder("pages/../private"));
+        assert!(!is_public_page_folder("other/pages"));
+        assert!(is_safe_public_image_name("plato.WEBP"));
+        assert!(is_safe_public_image_name("foto.jpeg"));
+        for unsafe_name in ["x.svg", "x.html", "x.pdf", "../x.png", "folder/x.png"] {
+            assert!(!is_safe_public_image_name(unsafe_name), "{unsafe_name}");
+        }
     }
 }

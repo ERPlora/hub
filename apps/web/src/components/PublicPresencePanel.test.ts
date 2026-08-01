@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Contrato del toggle "Presencia web pública" de Ajustes (ADR-0160): activa/desactiva la parte
+// Contrato del toggle "Presencia web pública" de Ajustes (ADR-0177): activa/desactiva la parte
 // pública del hub (landing + páginas públicas) escribiendo la clave core `public.landing.visible`
 // por la API de settings ya existente. El toggle DEBE reflejar el valor server-side actual y, al
 // cambiarlo, persistirlo por el cliente de settings (mismo patrón que "Mostrar documentación de la
@@ -40,6 +40,7 @@ const i18n = createI18n({
       settings: {
         publicPresence: 'Public web presence',
         publicPresenceDesc: 'Turn on the public landing and pages',
+        publicPresenceRestartRequired: 'Restart the Hub to apply this change to public routes.',
         saved: 'Settings saved',
         saveError: 'Could not save settings',
       },
@@ -77,6 +78,11 @@ beforeEach(() => {
 });
 
 describe('PublicPresencePanel', () => {
+  it('explica que el estado de las rutas se aplica al reiniciar', () => {
+    const w = mountPanel();
+    expect(w.get('[data-testid="public-presence-restart-note"]').text()).toContain('Restart the Hub');
+  });
+
   it('refleja el valor inicial ACTIVADO de la setting', () => {
     hubSettings.value = makeSettings({ 'public.landing.visible': true });
     const w = mountPanel();

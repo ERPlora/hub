@@ -161,7 +161,7 @@
     "public_pages": {
       "type": "array",
       "default": [],
-      "description": "Páginas de la PRESENCIA WEB PÚBLICA del Hub que aporta este módulo (ADR-0160): rutas anónimas (sin usuario ni sesión) servidas por el runtime a partir de bloques (formato Editor.js) renderizados a HTML seguro, alimentadas por queries marcadas `public`. Cada página declara su `path` + `title`; opcionalmente las `reads` (queries public que la nutren) y un `slot` que aporta una sección a la home vía slots (ADR-0043). El runtime NUNCA ejecuta JS del usuario: el JSON de bloques se sanea al renderizar.",
+      "description": "Páginas de la PRESENCIA WEB PÚBLICA del Hub que aporta este módulo (ADR-0177): rutas anónimas (sin usuario ni sesión) servidas por el runtime a partir de bloques (formato Editor.js) renderizados a HTML seguro, alimentadas por queries marcadas `public`. Cada página declara su `path` + `title`; opcionalmente las `reads` (queries public que la nutren) y un `slot` que aporta una sección a la home vía slots (ADR-0043). El runtime NUNCA ejecuta JS del usuario: el JSON de bloques se sanea al renderizar.",
       "items": {
         "type": "object",
         "required": [
@@ -244,7 +244,7 @@
           "public": {
             "type": "boolean",
             "default": false,
-            "description": "Opt-in: expone esta query al endpoint anónimo `POST /api/public/query` (ADR-0160). Default-deny e INDEPENDIENTE de `expose_api` (API-key). Una query pública solo lee; el runtime inyecta `hub_id` igual que siempre. Gemelo de `expose_api`, pero para la presencia web pública del Hub (sin usuario ni API key)."
+            "description": "Opt-in: expone esta query al endpoint anónimo `POST /api/public/query` (ADR-0177). Default-deny e INDEPENDIENTE de `expose_api` (API-key). Una query pública solo lee; el runtime inyecta `hub_id` igual que siempre. Gemelo de `expose_api`, pero para la presencia web pública del Hub (sin usuario ni API key)."
           }
         }
       }

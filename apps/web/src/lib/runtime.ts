@@ -55,6 +55,8 @@ export interface HubContext {
   registration_required?: boolean;
   /** La clave pública RSA del SaaS está disponible para validar el JWT de usuario. */
   public_key_loaded?: boolean;
+  /** Estado efectivo del árbol público en este proceso; los cambios de settings requieren reinicio. */
+  public_landing_visible?: boolean;
   /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
   pin_users?: PinUser[];
   /**
@@ -736,9 +738,11 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     // La paleta global tampoco viaja en el context: la trae el GET completo (que además
     // la refleja en el shell vía theme.ts). Aquí solo se preserva la cache.
     theme_palette: hubSettings.value?.theme_palette ?? 'erplora',
-    // La presencia web pública (ADR-0160) tampoco viaja en el context: la trae el GET completo de
-    // /api/settings. Preservamos la cache o degradamos a OFF (default seguro).
-    'public.landing.visible': hubSettings.value?.['public.landing.visible'] ?? false,
+    // Snapshot efectivo de la presencia web pública. El GET completo puede mostrar después el
+    // valor deseado persistido, que solo se aplica a las rutas tras reiniciar el Hub.
+    'public.landing.visible': ctx.public_landing_visible
+      ?? hubSettings.value?.['public.landing.visible']
+      ?? false,
   };
   // Publica la moneda a `globalThis.__erploraCurrency` para los Web Components de módulo (ADR-0059):
   // el SDK la lee de ahí como fallback cuando el shell no inyecta el getter (mirror de cómo `locale`

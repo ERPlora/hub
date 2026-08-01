@@ -364,7 +364,7 @@ impl Registry {
             .unwrap_or(false)
     }
 
-    /// ¿Es `name` una **query pública** (ADR-0160): existe, pertenece a un módulo **activo** y está
+    /// ¿Es `name` una **query pública** (ADR-0177): existe, pertenece a un módulo **activo** y está
     /// marcada `public: true`? Es la ÚNICA puerta del endpoint anónimo `POST /api/public/query`
     /// (no hay usuario, así que el `permission` no gatea; lo hace este flag). Gemelo de
     /// [`is_query_exposed`] pero para la capa web pública. Un command NUNCA casa (solo mira queries),
@@ -391,6 +391,38 @@ impl Registry {
                 .find(|page| page.path.trim_matches('/').eq_ignore_ascii_case(&wanted))
                 .map(|page| (manifest.id.as_str(), page))
         })
+    }
+
+    /// Todas las páginas públicas de módulos activos, en orden estable de instalación. La capa
+    /// SSR las usa tanto para el editor autenticado como para sitemap y slots de la home; no vuelve
+    /// a parsear `module.json` por su cuenta.
+    pub fn public_pages(&self) -> Vec<(&str, &PublicPageDef)> {
+        self.installed
+            .iter()
+            .filter(|manifest| self.is_active(&manifest.id))
+            .flat_map(|manifest| {
+                manifest
+                    .public_pages
+                    .iter()
+                    .map(move |page| (manifest.id.as_str(), page))
+            })
+            .collect()
+    }
+
+    /// Comprueba el contrato completo de un `read` de página: la query debe ser pública y debe
+    /// pertenecer al propio módulo de la página o a una dependencia declarada. Así `reads[]` no se
+    /// convierte en un import implícito de cualquier módulo activo del Hub.
+    pub fn public_page_read_allowed(&self, page_module_id: &str, query: &str) -> bool {
+        let Some(query_entry) = self.get_query(query).filter(|entry| entry.def.public) else {
+            return false;
+        };
+        if query_entry.module_id == page_module_id {
+            return true;
+        }
+        self.installed
+            .iter()
+            .find(|manifest| manifest.id == page_module_id && self.is_active(&manifest.id))
+            .is_some_and(|manifest| manifest.depends_on.contains(&query_entry.module_id))
     }
 
     /// Cambia el estado de un módulo instalado. Devuelve `false` si no existe.
@@ -524,6 +556,7 @@ pub(crate) fn new_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     fn cmd_def(expose_api: bool, internal: bool) -> CommandDef {
         CommandDef {
@@ -590,5 +623,76 @@ mod tests {
         let reg = registry_with("pricing.set_default", true, false);
         assert_eq!(reg.exposed_commands("pricing").len(), 1);
         assert!(reg.is_command_exposed("pricing", "pricing.set_default"));
+    }
+
+    fn public_manifest(id: &str, dependencies: &[&str]) -> Manifest {
+        serde_json::from_value(json!({
+            "id": id,
+            "name": id,
+            "version": "1.0.0",
+            "depends_on": dependencies,
+            "public_pages": [{
+                "path": format!("/{id}"),
+                "title": id,
+                "reads": [format!("{id}.own")]
+            }]
+        }))
+        .unwrap()
+    }
+
+    fn public_query(module_id: &str, public: bool) -> RegisteredQuery {
+        RegisteredQuery {
+            module_id: module_id.into(),
+            def: serde_json::from_value(json!({
+                "permission": format!("{module_id}.read"),
+                "sql": "queries/list.sql",
+                "public": public
+            }))
+            .unwrap(),
+            sql: "SELECT 1".into(),
+            schema: None,
+        }
+    }
+
+    #[test]
+    fn public_page_reads_only_own_or_declared_dependency_public_queries() {
+        let mut registry = Registry::new();
+        registry.installed = vec![
+            public_manifest("page", &["dependency"]),
+            public_manifest("dependency", &[]),
+            public_manifest("unrelated", &[]),
+        ];
+        for id in ["page", "dependency", "unrelated"] {
+            registry.status.insert(id.into(), ModuleStatus::Active);
+            registry
+                .queries
+                .insert(format!("{id}.own"), public_query(id, true));
+        }
+        registry.queries.insert(
+            "dependency.private".into(),
+            public_query("dependency", false),
+        );
+
+        assert!(registry.public_page_read_allowed("page", "page.own"));
+        assert!(registry.public_page_read_allowed("page", "dependency.own"));
+        assert!(!registry.public_page_read_allowed("page", "dependency.private"));
+        assert!(!registry.public_page_read_allowed("page", "unrelated.own"));
+
+        registry.set_status("dependency", ModuleStatus::Inactive);
+        assert!(!registry.public_page_read_allowed("page", "dependency.own"));
+    }
+
+    #[test]
+    fn public_pages_only_lists_active_modules() {
+        let mut registry = Registry::new();
+        registry.installed = vec![public_manifest("active", &[]), public_manifest("off", &[])];
+        registry
+            .status
+            .insert("active".into(), ModuleStatus::Active);
+        registry.status.insert("off".into(), ModuleStatus::Inactive);
+        let pages = registry.public_pages();
+        assert_eq!(pages.len(), 1);
+        assert_eq!(pages[0].0, "active");
+        assert_eq!(pages[0].1.path, "/active");
     }
 }

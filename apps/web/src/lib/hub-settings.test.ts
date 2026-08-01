@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Contrato del cliente de settings para la presencia web pública del Hub (ADR-0160): la clave
+// Contrato del cliente de settings para la presencia web pública del Hub (ADR-0177): la clave
 // core `public.landing.visible` (bool, default false) se LEE y se ESCRIBE por la MISMA API de
 // settings del hub (`GET/PUT /api/settings`), como `api_docs_enabled`. No es un cliente nuevo:
 // es una clave más del store k/v ya existente.

@@ -1,4 +1,4 @@
-//! E2E del server: **frontera de la capa web PÚBLICA** del Hub (ADR-0160, F0).
+//! E2E del server: **frontera de la capa web PÚBLICA** del Hub (ADR-0177, F0).
 //!
 //! Invariante crítica: la parte pública SOLO existe cuando el flag `public.landing.visible` (tabla
 //! `hub_settings`, default **false**) está activo. Con el flag desactivado, `/`, `/p/*` y
@@ -50,6 +50,7 @@ async fn fixture(landing_visible: bool) -> (AppState, std::path::PathBuf) {
         landing_visible,
         business_name: BUSINESS_NAME.into(),
         business_address: BUSINESS_ADDRESS.into(),
+        public_origin: None,
     };
     let state = AppState::with_config(rt, cfg).with_public_snapshot(snap);
     (state, temp)
@@ -155,6 +156,8 @@ async fn flag_on_healthz_and_context_still_pass() {
 
     let resp = app(st).oneshot(get("/api/hub/context")).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK, "/api/hub/context sigue pasando");
+    let context: serde_json::Value = serde_json::from_str(&body_string(resp).await).unwrap();
+    assert_eq!(context["public_landing_visible"], serde_json::json!(true));
     cleanup(temp);
 }
 

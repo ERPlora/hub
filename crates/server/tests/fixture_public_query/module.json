@@ -8,7 +8,8 @@
     {
       "path": "/menu",
       "title": "Menu",
-      "reads": ["menu.items.list"]
+      "reads": ["menu.items.list"],
+      "slot": "public.home.sections"
     }
   ],
   "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },

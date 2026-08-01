@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
-// Contrato del editor de páginas públicas (ADR-0160 F2). PageEditor envuelve Editor.js y produce
+// Contrato del editor de páginas públicas (ADR-0177 F2). PageEditor envuelve Editor.js y produce
 // JSON de bloques (NO HTML). Aquí probamos el CONTRATO del wrapper, no la librería: Editor.js y sus
 // tools se mockean (tocan el DOM real y no hacen falta para verificar el cableado).
 //
 // Contrato bajo prueba:
 //   - monta sin error y crea UNA instancia de Editor.js sobre su holder;
 //   - registra SOLO los tools curados (header, list, quote, delimiter, table, image) y NUNCA los
-//     peligrosos (`raw` = HTML crudo, `embed` = iframes) — decisión de seguridad de ADR-0160;
+//     peligrosos (`raw` = HTML crudo, `embed` = iframes) — decisión de seguridad de ADR-0177;
 //   - el tool `image` va con un `uploader` propio (media del Hub /files, ADR-0047), no un endpoint
 //     externo;
 //   - `initialData` se pasa como `data` al editor;
