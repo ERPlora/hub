@@ -7,7 +7,8 @@
   "navigation": [],
   "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
   "queries": {
-    "w140.items.list": { "permission": "w140.item.read", "sql": "queries/items_list.sql" }
+    "w140.items.list": { "permission": "w140.item.read", "sql": "queries/items_list.sql" },
+    "w140.bridge.inspect": { "permission": "w140.item.read", "sql": "queries/bridge_inspect.sql" }
   },
   "commands": {
     "w140.items.create": {
@@ -18,6 +19,16 @@
       "permission": "w140.item.transition", "transaction": true,
       "sql": ["commands/items_confirm.sql"], "emit": ["w140.item.confirmed"],
       "min_affected_rows": 1
+    },
+    "w140.items.consume": {
+      "permission": "w140.item.transition", "transaction": true,
+      "sql": ["commands/items_confirm.sql"], "emit": ["w140.item.consumed"],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "w140.insufficient_stock",
+        "message": "No hay stock suficiente"
+      }
     },
     "w140.items.legacy_touch": {
       "permission": "w140.item.update", "transaction": true,

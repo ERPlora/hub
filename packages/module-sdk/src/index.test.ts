@@ -13,6 +13,7 @@ import {
   majorToMinor,
   minorToMajor,
   dataTableLabels,
+  type ErploraTransport,
 } from './index.ts';
 
 test('dataTableLabels traduce todo el chrome compartido de las tablas', () => {
@@ -66,6 +67,19 @@ test('un sobre {ok:false} lanza ErploraError con el code del server', async () =
     () => t.command('x.y'),
     (e: unknown) => e instanceof ErploraError && e.code === 'permission_denied',
   );
+});
+
+test('commandResult entrega el canal result sin perder objeto/lista/null', async () => {
+  const values: unknown[] = [{ is_open: true }, [1, 2], null];
+  const transport: ErploraTransport = {
+    query: async () => [],
+    command: async () => ({ ok: true, operations: 0, new_ids: [], result: values.shift() }),
+    subscribe: () => () => {},
+  };
+  const client = new ErploraClient(transport);
+  assert.deepEqual(await client.commandResult('schedules.is_open'), { is_open: true });
+  assert.deepEqual(await client.commandResult('taxes.calculate'), [1, 2]);
+  assert.equal(await client.commandResult('example.null'), null);
 });
 
 test('headers() se inyectan en cada POST (auth X-Hub-Id, etc.)', async () => {

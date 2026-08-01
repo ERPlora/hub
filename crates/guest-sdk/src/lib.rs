@@ -149,10 +149,32 @@ impl Event {
     }
 }
 
-/// Resultado de un handler WASM: el conjunto de **intenciones** a aplicar.
+/// Rechazo de negocio devuelto por un handler.
+///
+/// `code` es estable, namespaced (`<module>.<snake_case>`) y lo traduce la UI. `message` es el
+/// fallback humano para clientes que aún no tengan esa traducción. El host valida el namespace
+/// antes de exponerlo y aborta la transacción completa.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DomainError {
+    pub code: String,
+    pub message: String,
+}
+
+impl DomainError {
+    pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+        }
+    }
+}
+
+/// Resultado de un handler WASM: intenciones, eventos, resultado y rechazo de negocio.
 ///
 /// El host valida y ejecuta `operations` en orden dentro de una transacción y
-/// luego emite `events`. Nunca contiene SQL crudo ni filas de BD.
+/// luego emite `events`. `result` es un canal JSON independiente que vuelve al caller incluso
+/// para handlers solo-lectura. `error`, si existe, aborta antes de persistir nada. Nunca contiene
+/// SQL crudo ni filas de BD.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Output {
     /// Operaciones SQL (por nombre de command + params) a ejecutar.
@@ -161,6 +183,13 @@ pub struct Output {
     /// Eventos a emitir tras ejecutar las operaciones.
     #[serde(default)]
     pub events: Vec<Event>,
+    /// Resultado de negocio del handler. `null` es un resultado válido y el default compatible
+    /// con guests antiguos que solo serializaban `operations`/`events`.
+    #[serde(default)]
+    pub result: Value,
+    /// Rechazo de negocio estructurado. Ausente en guests antiguos.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<DomainError>,
 }
 
 impl Output {
@@ -178,6 +207,19 @@ impl Output {
     /// Añade un evento (builder).
     pub fn with_event(mut self, ev: Event) -> Self {
         self.events.push(ev);
+        self
+    }
+
+    /// Fija el resultado JSON que el host devolverá al caller tras el commit.
+    pub fn with_result(mut self, result: impl Into<Value>) -> Self {
+        self.result = result.into();
+        self
+    }
+
+    /// Rechaza el command con un error de dominio estable. El host no aplicará operaciones ni
+    /// eventos presentes en este mismo output.
+    pub fn with_error(mut self, error: DomainError) -> Self {
+        self.error = Some(error);
         self
     }
 }
@@ -232,6 +274,11 @@ mod tests {
         assert_eq!(v["operations"][0]["command"], "create_sale_line");
         assert_eq!(v["operations"][0]["params"]["qty"], 3);
         assert_eq!(v["events"][0]["name"], "sale.line_added");
+        assert_eq!(v["result"], Value::Null);
+        assert!(
+            v.get("error").is_none(),
+            "el campo opcional no rompe guests/hosts antiguos"
+        );
     }
 
     #[test]
@@ -239,6 +286,8 @@ mod tests {
         let out: Output = serde_json::from_str("{}").unwrap();
         assert!(out.operations.is_empty());
         assert!(out.events.is_empty());
+        assert_eq!(out.result, Value::Null);
+        assert!(out.error.is_none());
 
         let op: Operation =
             serde_json::from_str(r#"{"kind":"sql","command":"noop"}"#).unwrap();
@@ -260,5 +309,21 @@ mod tests {
         });
         assert_eq!(out.events.len(), 1);
         assert_eq!(out.events[0].payload, json!(4));
+    }
+
+    #[test]
+    fn output_preserves_null_object_list_and_domain_error() {
+        for result in [Value::Null, json!({"answer": 42}), json!([1, 2, 3])] {
+            let out = Output::new().with_result(result.clone());
+            let back: Output = serde_json::from_slice(&serde_json::to_vec(&out).unwrap()).unwrap();
+            assert_eq!(back.result, result);
+        }
+
+        let out = Output::new().with_error(DomainError::new(
+            "inventory.insufficient_stock",
+            "No hay stock suficiente",
+        ));
+        let back: Output = serde_json::from_slice(&serde_json::to_vec(&out).unwrap()).unwrap();
+        assert_eq!(back.error, out.error);
     }
 }

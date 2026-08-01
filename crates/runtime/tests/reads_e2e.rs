@@ -24,8 +24,9 @@
 //!   el permiso del command ya se comprobó, y las reads son contrato *vouched* por el autor del
 //!   módulo. Un empleado de POS sin `taxes.view_tax` igual obtiene los tipos, porque los necesita
 //!   para cobrar.
-//! * **Errores graceful**: una read que falle se **omite** (no revienta el command). El handler ya
-//!   tiene fallback; lo que no puede es quedarse sin cobrar porque `taxes` esté raro.
+//! * **Política explícita**: una read legacy u opcional que falle se omite. Una read marcada
+//!   `required:true` aborta antes del handler; se usa cuando degradar a datos del caller sería una
+//!   violación de autoridad, como horarios o reglas fiscales.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -220,8 +221,27 @@ fn una_read_parametrizada_toma_el_valor_del_payload() {
 
     let payload = params(serde_json::json!({ "product_id": "prod-1", "qty": 500 }));
     let resueltos = def.resolve_params_from_map(&payload);
-    assert_eq!(resueltos.get("product_id"), Some(&serde_json::json!("prod-1")));
-    assert_eq!(resueltos.len(), 1, "solo lo declarado, no el payload entero");
+    assert_eq!(
+        resueltos.get("product_id"),
+        Some(&serde_json::json!("prod-1"))
+    );
+    assert_eq!(
+        resueltos.len(),
+        1,
+        "solo lo declarado, no el payload entero"
+    );
+    assert!(
+        !def.is_required(),
+        "el default sigue siendo graceful por compatibilidad"
+    );
+}
+
+#[test]
+fn una_read_puede_declararse_requerida() {
+    let def: erplora_runtime::manifest::ReadDef =
+        serde_json::from_str(r#"{ "query": "inventory.products.get", "required": true }"#)
+            .expect("read requerida");
+    assert!(def.is_required());
 }
 
 #[test]

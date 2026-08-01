@@ -1,0 +1,44 @@
+{
+  "id": "contract",
+  "name": "Handler contract fixture",
+  "version": "1.0.0",
+  "permissions": ["contract.run", "contract.read"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "contract.authoritative": {
+      "permission": "contract.read",
+      "sql": "queries/authoritative.sql"
+    },
+    "contract.too_large": {
+      "permission": "contract.read",
+      "sql": "queries/too_large.sql"
+    },
+    "contract.rows": {
+      "permission": "contract.read",
+      "sql": "queries/rows.sql"
+    }
+  },
+  "commands": {
+    "contract.handle": {
+      "permission": "contract.run",
+      "handler": { "type": "native", "function": "handle" },
+      "reads": [{ "query": "contract.authoritative", "required": true }]
+    },
+    "contract.required_missing": {
+      "permission": "contract.run",
+      "handler": { "type": "native", "function": "required_missing" },
+      "reads": [{ "query": "contract.does_not_exist", "required": true }]
+    },
+    "contract.required_too_large": {
+      "permission": "contract.run",
+      "handler": { "type": "native", "function": "required_too_large" },
+      "reads": [{ "query": "contract.too_large", "required": true }]
+    },
+    "contract._insert": {
+      "permission": "contract.run",
+      "internal": true,
+      "sql": ["commands/insert.sql"]
+    }
+  },
+  "events": { "emits": ["contract.completed"] }
+}

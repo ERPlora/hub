@@ -244,42 +244,48 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#140: un `min_affected_rows` incumplido es un error esperable del llamador (recurso
         // inexistente / transición no aplicable), no un fallo inesperado del Hub.
         | E::MinAffectedRows { .. }
+        | E::Domain { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
 }
 
 /// Código corto y estable derivado de la variante de [`RuntimeError`] (snake_case del nombre).
-pub fn error_code_of(err: &RuntimeError) -> &'static str {
+pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
+    use std::borrow::Cow;
     use RuntimeError as E;
     match err {
-        E::Io(_) => "io",
-        E::Manifest { .. } => "manifest",
-        E::Db(_) => "db",
-        E::QueryNotFound(_) => "query_not_found",
-        E::ModuleNotInstalled { .. } => "module_not_installed",
-        E::ModuleInactive { .. } => "module_inactive",
-        E::CommandNotFound(_) => "command_not_found",
-        E::InternalCommand(_) => "internal_command",
+        E::Io(_) => Cow::Borrowed("io"),
+        E::Manifest { .. } => Cow::Borrowed("manifest"),
+        E::Db(_) => Cow::Borrowed("db"),
+        E::QueryNotFound(_) => Cow::Borrowed("query_not_found"),
+        E::ModuleNotInstalled { .. } => Cow::Borrowed("module_not_installed"),
+        E::ModuleInactive { .. } => Cow::Borrowed("module_inactive"),
+        E::CommandNotFound(_) => Cow::Borrowed("command_not_found"),
+        E::InternalCommand(_) => Cow::Borrowed("internal_command"),
         // hub#140: el código estable refleja el `kind` (not_found vs conflict/invalid_transition),
         // no la variante genérica — es lo que el SDK y los listeners programan. `as_str` es la
         // única fuente de verdad del nombre, así que la regla vive en `AffectedKind`.
-        E::MinAffectedRows { kind, .. } => kind.as_str(),
-        E::PermissionDenied(_) => "permission_denied",
-        E::CapabilityDenied { .. } => "capability_denied",
-        E::MissingDependency { .. } => "missing_dependency",
-        E::DependencyCycle { .. } => "dependency_cycle",
-        E::EventLoop => "event_loop",
-        E::EventNotDeclared { .. } => "event_not_declared",
-        E::NotImplemented(_) => "not_implemented",
-        E::Wasm(_) => "wasm",
-        E::Native(_) => "native",
-        E::InvalidPayload { .. } => "invalid_payload",
-        E::Schema { .. } => "schema",
-        E::Notify(_) => "notify",
-        E::Storage(_) => "module_storage",
-        E::Certificate(_) => "certificate",
-        E::Other(_) => "other",
+        E::MinAffectedRows { kind, .. } => Cow::Borrowed(kind.as_str()),
+        E::Domain { code, .. } => Cow::Borrowed(code.as_str()),
+        E::RequiredReadFailed { .. } => Cow::Borrowed("required_read_failed"),
+        E::ReadTooLarge { .. } => Cow::Borrowed("read_too_large"),
+        E::HandlerResultTooLarge { .. } => Cow::Borrowed("handler_result_too_large"),
+        E::PermissionDenied(_) => Cow::Borrowed("permission_denied"),
+        E::CapabilityDenied { .. } => Cow::Borrowed("capability_denied"),
+        E::MissingDependency { .. } => Cow::Borrowed("missing_dependency"),
+        E::DependencyCycle { .. } => Cow::Borrowed("dependency_cycle"),
+        E::EventLoop => Cow::Borrowed("event_loop"),
+        E::EventNotDeclared { .. } => Cow::Borrowed("event_not_declared"),
+        E::NotImplemented(_) => Cow::Borrowed("not_implemented"),
+        E::Wasm(_) => Cow::Borrowed("wasm"),
+        E::Native(_) => Cow::Borrowed("native"),
+        E::InvalidPayload { .. } => Cow::Borrowed("invalid_payload"),
+        E::Schema { .. } => Cow::Borrowed("schema"),
+        E::Notify(_) => Cow::Borrowed("notify"),
+        E::Storage(_) => Cow::Borrowed("module_storage"),
+        E::Certificate(_) => Cow::Borrowed("certificate"),
+        E::Other(_) => Cow::Borrowed("other"),
     }
 }
 

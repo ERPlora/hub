@@ -217,3 +217,28 @@ async fn sin_el_campo_legacy_emite_aunque_mutara_cero_filas() {
         "el command legacy emite aunque no mutara nada — compatibilidad hacia atrás"
     );
 }
+
+#[tokio::test]
+async fn expect_rows_devuelve_error_de_dominio_namespaced_y_no_emite() {
+    let rt = fresh_runtime().await;
+    let ctx = admin_ctx();
+
+    let err = rt
+        .execute_command(
+            "w140.items.consume",
+            &params(json!({ "item_id": "sin-stock" })),
+            &ctx,
+        )
+        .await
+        .expect_err("0 filas debe convertirse en un rechazo traducible");
+    assert!(matches!(
+        err,
+        RuntimeError::Domain { ref code, ref message }
+            if code == "w140.insufficient_stock" && message == "No hay stock suficiente"
+    ));
+    assert_eq!(
+        outbox_count(&rt, "h1", "w140.item.consumed").await,
+        0,
+        "el UPDATE rechazado revierte también el emit"
+    );
+}

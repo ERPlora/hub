@@ -33,6 +33,14 @@ export interface Notification {
   message: string;
 }
 
+/** Respuesta estable de un command del runtime. `result` es el canal de negocio del handler. */
+export interface CommandOutcome<T = unknown> {
+  ok: true;
+  result: T;
+  operations?: number;
+  new_ids?: unknown[];
+}
+
 /** Opciones de formateo de dinero (ADR-0059). Mismo shape que `apps/web/src/lib/money.ts`. */
 export interface FormatMoneyOptions {
   /** ISO-4217. Por defecto, la moneda del hub (`erplora.currency`). */
@@ -634,6 +642,17 @@ export class ErploraClient {
   }
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
     return this.transport.command(name, payload) as Promise<T>;
+  }
+  /**
+   * Ejecuta un command y devuelve solo su canal `result` tipado. Es aditivo: `command()` conserva
+   * la respuesta completa (`new_ids`, `operations`) para los consumidores existentes.
+   */
+  async commandResult<T = unknown>(
+    name: string,
+    payload?: Record<string, unknown>,
+  ): Promise<T> {
+    const outcome = (await this.transport.command(name, payload)) as CommandOutcome<T>;
+    return outcome.result;
   }
   /** Suscribe a un evento de dominio; devuelve una función para cancelar. */
   on(event: string, cb: (payload: unknown) => void): () => void {

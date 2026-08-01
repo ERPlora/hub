@@ -251,6 +251,11 @@
                       "type": "object",
                       "additionalProperties": { "type": "string" },
                       "description": "Parámetros de la query. Cada valor referencia un campo del payload del command (`payload.<campo>`); cualquier otra cosa se pasa como literal. Solo eso: nada de expresiones ni de leer otras reads, para que el manifest siga siendo declarativo y auditable de un vistazo."
+                    },
+                    "required": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Si true, un fallo o exceso de tamaño aborta el command antes de invocar el handler. Si false/ausente conserva el modo graceful de manifests anteriores."
                     }
                   },
                   "description": "Query FILTRADA por campos del payload."
@@ -313,6 +318,27 @@
             "type": "integer",
             "minimum": 0,
             "description": "Contrato de mutación (hub#140): mínimo de filas que las sentencias `sql` del command DEBEN afectar (en total) para que el command se considere exitoso y se emitan sus `emit`. Si el recuento real queda por debajo, la transacción se revierte ENTERA y NO se escribe ningún evento en el outbox (ni notificación al WS) — porque el hecho declarado nunca ocurrió. Es OPT-IN: ausente = comportamiento de siempre (emite haya o no mutado), para no romper los módulos publicados ni los commands genuinamente idempotentes. `1` es el caso habitual de un command de transición (confirmar/anular/cerrar) que NO debe emitir si el `WHERE` no casa; `0` declararía explícitamente un no-op idempotente permitido que sí emite. El error estable distingue `not_found` (0 filas) de `conflict` (>0 pero por debajo del mínimo)."
+          },
+          "expect_rows": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op", "n", "error"],
+            "properties": {
+              "op": { "type": "string", "enum": ["min"] },
+              "n": { "type": "integer", "minimum": 0 },
+              "error": {
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                "description": "Código de dominio namespaced que traduce la UI."
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 500,
+                "description": "Fallback humano opcional; no debe contener datos internos."
+              }
+            },
+            "description": "Gate traducible de filas afectadas (hub#139). Si no se cumple, rollback + HTTP 409 con el code indicado; no se emite ningún evento. No combinar con min_affected_rows."
           },
           "ai": {
             "$ref": "#/$defs/aiTool"

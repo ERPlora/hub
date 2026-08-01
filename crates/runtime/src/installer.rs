@@ -48,6 +48,7 @@ pub async fn install(
     dir: &Path,
 ) -> Result<String> {
     let manifest = Manifest::load(dir)?;
+    validate_command_contracts(&manifest)?;
 
     // `static_files.folder` es un nombre, nunca una ruta. Se vuelve a validar en runtime aunque el
     // toolkit ya lo haga: un ZIP descargado es una frontera hostil. Si el host ha inyectado el
@@ -201,6 +202,38 @@ pub async fn install(
 
     persist_status(db, hub_id, &id, &version, ModuleStatus::Active).await?;
     Ok(id)
+}
+
+/// Validaciones que dependen del id del módulo y por tanto no puede expresar por sí solo el JSON
+/// Schema: namespace propio de errores y exclusión entre la gate legacy y la traducible.
+fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
+    for (name, command) in &manifest.commands {
+        if command.min_affected_rows.is_some() && command.expect_rows.is_some() {
+            return Err(RuntimeError::Other(format!(
+                "manifest `{}`: command `{name}` no puede combinar `min_affected_rows` y `expect_rows`",
+                manifest.id
+            )));
+        }
+        if let Some(expect) = &command.expect_rows {
+            if !crate::errors::valid_domain_code(&manifest.id, &expect.error) {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` declara el código de dominio inválido `{}`; se espera `{}.<snake_case>`",
+                    manifest.id, expect.error, manifest.id
+                )));
+            }
+            if expect
+                .message
+                .as_ref()
+                .is_some_and(|message| message.chars().count() > 500)
+            {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` excede 500 caracteres en `expect_rows.message`",
+                    manifest.id
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Lee y **compila** el JSON Schema del payload de una query/command (si lo declara).
@@ -432,8 +465,9 @@ async fn persist_status(
 
 #[cfg(test)]
 mod tests {
-    use super::install_order;
+    use super::{install_order, validate_command_contracts};
     use crate::errors::RuntimeError;
+    use crate::manifest::Manifest;
 
     fn m(id: &str, deps: &[&str]) -> (String, Vec<String>) {
         (id.to_string(), deps.iter().map(|s| s.to_string()).collect())
@@ -493,5 +527,33 @@ mod tests {
         let mut ids: Vec<usize> = order.clone();
         ids.sort_unstable();
         assert_eq!(ids, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn rejects_foreign_domain_codes_and_ambiguous_row_gates() {
+        let foreign: Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "commands": {
+                "inventory.consume": {
+                    "permission": "inventory.consume",
+                    "expect_rows": { "op": "min", "n": 1, "error": "sales.insufficient_stock" }
+                }
+            }
+        }))
+        .unwrap();
+        assert!(validate_command_contracts(&foreign).is_err());
+
+        let ambiguous: Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "commands": {
+                "inventory.consume": {
+                    "permission": "inventory.consume",
+                    "min_affected_rows": 1,
+                    "expect_rows": { "op": "min", "n": 1, "error": "inventory.insufficient_stock" }
+                }
+            }
+        }))
+        .unwrap();
+        assert!(validate_command_contracts(&ambiguous).is_err());
     }
 }

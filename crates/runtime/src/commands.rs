@@ -20,6 +20,15 @@ pub(crate) const MAX_EVENT_DEPTH: u32 = 16;
 /// dividir la operación. ARQUITECTURA.md §5.3.
 pub(crate) const NEW_IDS_BATCH: usize = 256;
 
+/// Presupuesto máximo del JSON de UNA read pre-cargada y del conjunto entregado al sandbox.
+/// Evita que una query declarada sin `limit` convierta una llamada pequeña en una copia masiva de
+/// datos dentro del WASM. El límite se comprueba sobre el JSON serializado real.
+pub(crate) const MAX_PRELOADED_READ_BYTES: usize = 1024 * 1024;
+
+/// Presupuesto independiente del canal `Output.result`. Operaciones/eventos llevan sus propios
+/// límites del sandbox; un cálculo no puede usar `result` como canal de exfiltración sin cota.
+pub(crate) const MAX_HANDLER_RESULT_BYTES: usize = 1024 * 1024;
+
 /// Origen de una invocación de [`execute_at`] (hub#131, hub#145).
 ///
 /// Distingue el camino EXTERNO — todo lo que entra por `Runtime::execute_command` (HTTP
@@ -163,13 +172,16 @@ pub(crate) async fn execute_at(
             // el usuario no ha concedido → CapabilityDenied y el motor nativo NO corre (el cert no
             // se lee ni se toca la AEAT). Ortogonal al RBAC de usuario ya chequeado arriba.
             crate::capabilities::enforce(db, registry, &cmd.module_id, &ctx.hub_id).await?;
-            return execute_native(db, registry, cmd, payload, ctx, depth, extra_ops).await;
+            return execute_native(db, registry, name, cmd, payload, ctx, depth, extra_ops).await;
         }
     }
 
     // ── Tier 2: handler WASM ────────────────────────────────────────────────
     if let Some(bytes) = &cmd.wasm {
-        return execute_wasm(db, registry, cmd, payload, ctx, depth, bytes, extra_ops).await;
+        return execute_wasm(
+            db, registry, name, cmd, payload, ctx, depth, bytes, extra_ops,
+        )
+        .await;
     }
 
     // ── Tier 0/1: SQL declarativo ───────────────────────────────────────────
@@ -209,11 +221,22 @@ pub(crate) async fn execute_at(
     // `sql_op_count` ops, NUNCA sobre los INSERT del outbox (que siempre afectan 1 y harían
     // inútil la gate). Se evalúa DENTRO de la tx vía `execute_tx_gated`: si no se cumple, la tx
     // entera revierte (ni mutación ni outbox) y devolvemos el error estable, SIN notificar al WS.
-    let min = cmd.def.min_affected_rows;
+    let expected = cmd.def.expect_rows.as_ref();
+    let min = expected
+        .map(|expect| expect.n)
+        .or(cmd.def.min_affected_rows);
     match db.execute_tx_gated(&ops, sql_op_count, min).await? {
         TxGatedOutcome::RolledBack { sql_counts } => {
             let min = min.expect("la gate sólo revierte con Some(min)");
             let affected: u64 = sql_counts.iter().sum();
+            if let Some(expect) = expected {
+                return Err(RuntimeError::Domain {
+                    code: expect.error.clone(),
+                    message: expect.message.clone().unwrap_or_else(|| {
+                        format!("la operación `{name}` no pudo aplicarse en el estado actual")
+                    }),
+                });
+            }
             return Err(RuntimeError::MinAffectedRows {
                 command: name.to_string(),
                 required: min,
@@ -260,18 +283,21 @@ pub(crate) async fn execute_at(
 ///    ya se comprobó, y las reads son contrato vouched por el autor del módulo. Un empleado de POS
 ///    sin `taxes.view_tax` igual necesita los tipos para poder cobrar. Se conserva el `hub_id` del
 ///    caller (el tenant NO es negociable) y se usa el wildcard de permisos.
-/// 3. **Fallo GRACEFUL.** Una read que no resuelve se **omite** (no aborta el command). Cobrar es
-///    lo último que puede romperse en un TPV: si `taxes` está raro, el handler degrada a su
-///    fallback, pero la venta se cierra.
+/// 3. **Política explícita.** Las strings y `{required:false}` conservan el fallo graceful de los
+///    manifests antiguos. `{required:true}` aborta *antes* de invocar el handler: una dependencia
+///    fiscal autoritativa no puede degradar a datos aportados por el navegador.
+/// 4. **Tamaño acotado.** Ninguna read ni el conjunto total puede superar
+///    [`MAX_PRELOADED_READ_BYTES`].
 async fn preload_reads(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
+    command_name: &str,
     cmd: &RegisteredCommand,
     ctx: &RequestContext,
     payload: &erplora_db::Params,
-) -> Json {
+) -> Result<Json> {
     if cmd.def.reads.is_empty() {
-        return Json::Object(Default::default());
+        return Ok(Json::Object(Default::default()));
     }
 
     // Regla 1 — alcance: el propio módulo + sus `depends_on` declarados en el manifest.
@@ -293,12 +319,18 @@ async fn preload_reads(
         let name = read.query();
         let owner = name.split('.').next().unwrap_or("");
         if !allowed.contains(&owner) {
-            // No es un error del caller: es un manifest mal declarado. Se avisa y se omite —
-            // el módulo no puede leer lo que no declaró como dependencia.
+            // El módulo no puede leer lo que no declaró como dependencia. Una dependencia
+            // requerida corta; una legacy/opcional mantiene el comportamiento graceful.
             eprintln!(
                 "⚠ reads: `{}` declara `{name}`, pero `{owner}` no está en su depends_on → omitida",
                 cmd.module_id
             );
+            if read.is_required() {
+                return Err(RuntimeError::RequiredReadFailed {
+                    command: command_name.to_string(),
+                    query: name.to_string(),
+                });
+            }
             continue;
         }
         // Regla 4 — parámetros desde el PAYLOAD (ADR-0069 fase 2). Sin esto, un handler podía
@@ -309,19 +341,46 @@ async fn preload_reads(
         // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente), se omite.
         match crate::queries::execute(db, registry, name, &params, &sys).await {
             Ok(rows) => {
+                let bytes = serde_json::to_vec(&rows)
+                    .map(|json| json.len())
+                    .unwrap_or(usize::MAX);
                 out.insert(name.to_string(), Json::Array(rows));
+                let total = serde_json::to_vec(&out)
+                    .map(|json| json.len())
+                    .unwrap_or(usize::MAX);
+                if bytes > MAX_PRELOADED_READ_BYTES || total > MAX_PRELOADED_READ_BYTES {
+                    out.remove(name);
+                    eprintln!(
+                        "⚠ reads: `{name}` excede el presupuesto del sandbox ({bytes} bytes)"
+                    );
+                    if read.is_required() {
+                        return Err(RuntimeError::ReadTooLarge {
+                            command: command_name.to_string(),
+                            query: name.to_string(),
+                            max_bytes: MAX_PRELOADED_READ_BYTES,
+                        });
+                    }
+                    continue;
+                }
             }
             Err(e) => {
                 eprintln!("⚠ reads: `{name}` falló ({e}) → se omite; el handler degradará");
+                if read.is_required() {
+                    return Err(RuntimeError::RequiredReadFailed {
+                        command: command_name.to_string(),
+                        query: name.to_string(),
+                    });
+                }
             }
         }
     }
-    Json::Object(out)
+    Ok(Json::Object(out))
 }
 
 async fn execute_wasm(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
+    command_name: &str,
     cmd: &RegisteredCommand,
     payload: &Params,
     ctx: &RequestContext,
@@ -347,7 +406,7 @@ async fn execute_wasm(
     // LECTURAS PRE-CARGADAS (ADR-0069). El handler corre en un sandbox y NO puede leer la BD, así
     // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
     // confianza del hub**.
-    let reads = preload_reads(db, registry, cmd, ctx, payload).await;
+    let reads = preload_reads(db, registry, command_name, cmd, ctx, payload).await?;
     let input = json!({
         "payload": Json::Object(bound_payload),
         "context": {
@@ -366,7 +425,16 @@ async fn execute_wasm(
     let output = call_wasm_off_thread(bytes, &handler.function, input).await?;
 
     persist_handler_output(
-        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
+        db,
+        registry,
+        command_name,
+        cmd,
+        payload,
+        ctx,
+        depth,
+        extra_ops,
+        &output,
+        &new_ids,
     )
     .await
 }
@@ -444,6 +512,7 @@ async fn call_wasm_off_thread(bytes: &[u8], function: &str, input: Json) -> Resu
 async fn execute_native(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
+    command_name: &str,
     cmd: &RegisteredCommand,
     payload: &Params,
     ctx: &RequestContext,
@@ -467,6 +536,7 @@ async fn execute_native(
     let new_ids: Vec<Json> = (0..NEW_IDS_BATCH)
         .map(|_| Json::String(crate::registry::new_id()))
         .collect();
+    let reads = preload_reads(db, registry, command_name, cmd, ctx, payload).await?;
     let input = json!({
         "payload": Json::Object(bound_payload),
         "context": {
@@ -474,6 +544,9 @@ async fn execute_native(
             "current_user_id": ctx.user_id,
             "now": crate::registry::now_rfc3339(),
             "new_ids": new_ids.clone(),
+            "country_code": ctx.country_code,
+            "region_code": ctx.region_code,
+            "reads": reads,
         },
     });
 
@@ -493,7 +566,16 @@ async fn execute_native(
     let output = engine.call(&handler.function, &input, &host).await?;
 
     persist_handler_output(
-        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
+        db,
+        registry,
+        command_name,
+        cmd,
+        payload,
+        ctx,
+        depth,
+        extra_ops,
+        &output,
+        &new_ids,
     )
     .await
 }
@@ -505,6 +587,7 @@ async fn execute_native(
 async fn persist_handler_output(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
+    command_name: &str,
     cmd: &RegisteredCommand,
     payload: &Params,
     ctx: &RequestContext,
@@ -516,6 +599,34 @@ async fn persist_handler_output(
     // para añadirle líneas). Por convención `new_ids[0]` es la entidad principal (§5.3).
     new_ids: &[Json],
 ) -> Result<Json> {
+    // Un rechazo de negocio es una salida normal del guest, no un trap WASM. Se valida antes de
+    // mirar/aplicar sus intenciones: incluso un guest defectuoso que devuelva error + operations
+    // no puede persistir efectos parciales.
+    if let Some(error) = &output.error {
+        if !crate::errors::valid_domain_code(&cmd.module_id, &error.code)
+            || error.code.len() > 128
+            || error.message.chars().count() > 500
+        {
+            return Err(RuntimeError::Wasm(format!(
+                "el handler de `{command_name}` devolvió un error de dominio inválido"
+            )));
+        }
+        return Err(RuntimeError::Domain {
+            code: error.code.clone(),
+            message: error.message.clone(),
+        });
+    }
+
+    let result_bytes = serde_json::to_vec(&output.result)
+        .map(|json| json.len())
+        .unwrap_or(usize::MAX);
+    if result_bytes > MAX_HANDLER_RESULT_BYTES {
+        return Err(RuntimeError::HandlerResultTooLarge {
+            command: command_name.to_string(),
+            max_bytes: MAX_HANDLER_RESULT_BYTES,
+        });
+    }
+
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
     for op in &output.operations {
@@ -585,7 +696,12 @@ async fn persist_handler_output(
         events::notify_sink(registry, name, payload);
     }
 
-    Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))
+    Ok(json!({
+        "ok": true,
+        "operations": output.operations.len(),
+        "new_ids": new_ids,
+        "result": output.result,
+    }))
 }
 
 /// Valida el **nombre de un evento devuelto por un handler** contra lo declarado en el
@@ -745,6 +861,7 @@ mod tests {
             sql: vec!["INSERT INTO x VALUES (1);".to_string()],
             emit: vec![],
             min_affected_rows: None,
+            expect_rows: None,
             handler: None,
             ai: None,
             schema: None,
@@ -973,6 +1090,7 @@ mod tests {
                     name: self.0.to_string(),
                     payload: json!({}),
                 }],
+                ..Output::default()
             })
         }
     }

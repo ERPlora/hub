@@ -1619,19 +1619,34 @@ struct InstallReq {
 pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     use erplora_runtime::RuntimeError as E;
     let (status, code) = match &e {
-        E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied"),
-        E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
+        E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied".to_string()),
+        E::QueryNotFound(_) | E::CommandNotFound(_) => {
+            (StatusCode::NOT_FOUND, "not_found".to_string())
+        }
         // hub#131, hub#145: un command interno (prefijo `_`/`internal:true`) invocado desde un
         // origen EXTERNO. `403` (como `permission_denied`): el command EXISTE, pero esta puerta
         // no es la suya — nunca `404`, que sugeriría que ni siquiera está registrado.
-        E::InternalCommand(_) => (StatusCode::FORBIDDEN, "internal_command"),
+        E::InternalCommand(_) => (StatusCode::FORBIDDEN, "internal_command".to_string()),
         // ADR-0127: `queryOptional` del SDK devuelve `undefined` SOLO con este código; un
         // `not_found` normal (contrato roto contra un módulo presente) sigue siendo un error.
-        E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed"),
-        E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive"),
-        E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload"),
-        E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
-        _ => (StatusCode::BAD_REQUEST, "error"),
+        E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed".to_string()),
+        E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive".to_string()),
+        E::InvalidPayload { .. } => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid_payload".to_string(),
+        ),
+        // hub#139: un rechazo de negocio NO es un fallo genérico del WASM. El code namespaced
+        // viaja tal cual para que la UI lo traduzca y `queryOptional` nunca lo trague.
+        E::Domain { code, .. } => (StatusCode::CONFLICT, code.clone()),
+        E::MinAffectedRows { kind, .. } => (StatusCode::CONFLICT, kind.as_str().to_string()),
+        E::RequiredReadFailed { .. } => (StatusCode::CONFLICT, "required_read_failed".to_string()),
+        E::ReadTooLarge { .. } => (StatusCode::PAYLOAD_TOO_LARGE, "read_too_large".to_string()),
+        E::HandlerResultTooLarge { .. } => (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "handler_result_too_large".to_string(),
+        ),
+        E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".to_string()),
+        _ => (StatusCode::BAD_REQUEST, "error".to_string()),
     };
     let body = json!({ "ok": false, "error": { "code": code, "message": e.to_string() } });
     (status, Json(body)).into_response()

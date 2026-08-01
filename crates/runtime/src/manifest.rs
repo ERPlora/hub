@@ -329,7 +329,7 @@ pub struct Agent {
 /// ```json
 /// "reads": [
 ///   "taxes.rules.list",
-///   { "query": "inventory.products.unit_of", "params": { "product_id": "payload.product_id" } }
+///   { "query": "inventory.products.unit_of", "params": { "product_id": "payload.product_id" }, "required": true }
 /// ]
 /// ```
 ///
@@ -353,6 +353,11 @@ pub enum ReadDef {
         query: String,
         #[serde(default)]
         params: HashMap<String, String>,
+        /// Una read requerida falla *closed*: si la query no resuelve, excede el límite o no se
+        /// puede ejecutar, el host aborta antes de invocar el handler. `false` conserva el modo
+        /// graceful de los manifests anteriores.
+        #[serde(default)]
+        required: bool,
     },
 }
 
@@ -382,6 +387,31 @@ impl ReadDef {
         }
         out
     }
+
+    /// Si el command no puede continuar sin esta lectura autoritativa.
+    pub fn is_required(&self) -> bool {
+        matches!(self, ReadDef::Parameterized { required: true, .. })
+    }
+}
+
+/// Operación soportada por el contrato declarativo de filas afectadas (hub#139).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExpectRowsOp {
+    Min,
+}
+
+/// Gate de un command SQL que convierte un `UPDATE ... WHERE` sin match en un rechazo de negocio
+/// estable, en vez de un `200 ok` ambiguo.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ExpectRows {
+    pub op: ExpectRowsOp,
+    pub n: u64,
+    /// Código namespaced que programa/traduce el caller (`inventory.insufficient_stock`).
+    pub error: String,
+    /// Fallback humano opcional. Si se omite, el runtime genera uno sin datos internos.
+    #[serde(default)]
+    pub message: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -619,8 +649,8 @@ pub struct CommandDef {
     /// **Alcance**: queries del propio módulo o de los declarados en `depends_on`. Se gatea por la
     /// DEPENDENCIA, no por el permiso del usuario: el permiso del command ya se comprobó y las reads
     /// son contrato *vouched* por el autor del módulo (un empleado de POS sin `taxes.view_tax` igual
-    /// necesita los tipos para cobrar). Una read que falle se **omite**: cobrar es lo último que
-    /// puede romperse en un TPV.
+    /// necesita los tipos para cobrar). Una read legacy/opcional que falle se omite; una declarada
+    /// con `required:true` aborta antes del handler para impedir fallbacks con datos del caller.
     #[serde(default)]
     pub reads: Vec<ReadDef>,
     #[serde(default)]
@@ -643,6 +673,10 @@ pub struct CommandDef {
     /// [`crate::errors::RuntimeError::MinAffectedRows`].
     #[serde(default)]
     pub min_affected_rows: Option<u64>,
+    /// Error de dominio declarativo basado en filas afectadas (hub#139). Es la versión
+    /// traducible/namespaced de `min_affected_rows`; ambos campos no pueden coexistir.
+    #[serde(default)]
+    pub expect_rows: Option<ExpectRows>,
     /// Handler de lógica: Tier 2 (WASM sandbox) o **plugin nativo first-party**
     /// (ADR-0009, crate horneado en el runtime). Si está presente, el command ejecuta
     /// el handler en vez de su `sql` directo. ARQUITECTURA.md §5.3.

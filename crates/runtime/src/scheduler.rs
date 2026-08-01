@@ -428,6 +428,7 @@ mod tests {
                 sql: vec![sql.to_string()],
                 emit: vec![],
                 min_affected_rows: None,
+                expect_rows: None,
                 handler: None,
                 ai: None,
                 schema: None,

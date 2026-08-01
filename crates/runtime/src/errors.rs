@@ -51,6 +51,24 @@ pub enum RuntimeError {
         affected: u64,
         kind: AffectedKind,
     },
+    /// Rechazo de negocio estable emitido por un handler o por `expect_rows` (hub#139).
+    /// El `code` es namespaced y la UI programa/traduce contra él; `message` es fallback humano.
+    #[error("{message}")]
+    Domain { code: String, message: String },
+    /// Una read marcada `required:true` no pudo materializarse. La causa interna se registra en el
+    /// host, pero el caller solo ve query/command: nunca SQL, parámetros ni filas sensibles.
+    #[error("la lectura requerida `{query}` no está disponible para `{command}`")]
+    RequiredReadFailed { command: String, query: String },
+    /// Las filas pre-cargadas superan el presupuesto del sandbox.
+    #[error("la lectura `{query}` de `{command}` supera el límite de {max_bytes} bytes")]
+    ReadTooLarge {
+        command: String,
+        query: String,
+        max_bytes: usize,
+    },
+    /// El canal `result` de un handler supera su límite independiente de operaciones/eventos.
+    #[error("el resultado del handler de `{command}` supera el límite de {max_bytes} bytes")]
+    HandlerResultTooLarge { command: String, max_bytes: usize },
     #[error("permiso denegado: requiere `{0}`")]
     PermissionDenied(String),
     /// El módulo necesita una **capability** (ADR-0079: red/certificado/impresora/notify) que el
@@ -149,5 +167,48 @@ pub fn affected_kind(affected: u64, min: u64) -> AffectedKind {
         // El caller ya garantiza `affected < min` (la gate falló); aquí solo se decide la forma.
         let _ = min;
         AffectedKind::TooFew
+    }
+}
+
+/// Valida el ABI público de códigos de dominio: exactamente
+/// `<module>.<snake_case>`, sin espacios, puntos extra ni namespace ajeno.
+pub fn valid_domain_code(module: &str, code: &str) -> bool {
+    let Some((namespace, name)) = code.split_once('.') else {
+        return false;
+    };
+    code.len() <= 128
+        && namespace == module
+        && !name.contains('.')
+        && valid_snake_segment(namespace)
+        && valid_snake_segment(name)
+}
+
+fn valid_snake_segment(value: &str) -> bool {
+    let mut chars = value.chars();
+    matches!(chars.next(), Some('a'..='z'))
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+#[cfg(test)]
+mod domain_code_tests {
+    use super::valid_domain_code;
+
+    #[test]
+    fn accepts_only_owned_namespaced_snake_case_codes() {
+        assert!(valid_domain_code(
+            "inventory",
+            "inventory.insufficient_stock"
+        ));
+        assert!(!valid_domain_code("inventory", "sales.insufficient_stock"));
+        assert!(!valid_domain_code(
+            "inventory",
+            "inventory.InsufficientStock"
+        ));
+        assert!(!valid_domain_code("inventory", "inventory.stock.low"));
+        assert!(!valid_domain_code("inventory", "inventory."));
+        assert!(!valid_domain_code(
+            "inventory",
+            &format!("inventory.{}", "x".repeat(128))
+        ));
     }
 }
