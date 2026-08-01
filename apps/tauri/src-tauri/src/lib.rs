@@ -175,6 +175,36 @@ fn clear_hub_url(cache_dir: &Path) {
     let _ = std::fs::remove_file(cache_dir.join(HUB_URL_FILE));
 }
 
+/// Qué contesta el hub recordado cuando se le pregunta al arrancar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HubProbe {
+    /// Contestó con este código HTTP.
+    Status(u16),
+    /// No se pudo contactar: sin red, DNS caído, timeout.
+    Unreachable,
+}
+
+/// ¿Hay que olvidar el `hub.url` recordado?
+///
+/// **Solo** si el hub ya no existe. Es una decisión asimétrica a propósito: olvidarlo de más le
+/// borra al usuario su hub y le manda a rehacer el onboarding, mientras que olvidarlo de menos
+/// solo le deja una pantalla fea que se arregla sola en cuanto el hub vuelva. Ante la duda, se
+/// conserva.
+///
+/// Existe porque [`forget_hub`] **no alcanza este caso**: a ese lo llama el frontend al recibir un
+/// 410 del Cloud, y si el hub fue borrado la PWA no llega a cargarse nunca — el 404 lo sirve el
+/// edge. Sin esto la app abre en «404 page not found» de forma permanente y sin salida por la UI.
+/// Medido en un Mac el 2026-08-01 con un hub que la purga de prod se había llevado por delante.
+fn should_forget_hub(probe: HubProbe) -> bool {
+    match probe {
+        // El hub no está. 410 es además el contrato explícito `hub_not_found` del Cloud.
+        HubProbe::Status(404) | HubProbe::Status(410) => true,
+        // Todo lo demás —vivo, redirigiendo al login, sin autenticar, caído o inalcanzable— es un
+        // hub que SÍ existe.
+        _ => false,
+    }
+}
+
 /// URL inicial de la ventana, por precedencia: override dev ([`ENV_SHELL_URL`]) → `hub.url`
 /// persistido (modo app) → onboarding del SaaS. Pura para poder testearla.
 fn initial_url_for(override_url: Option<&str>, persisted: Option<&str>, saas_base: &str) -> String {
@@ -206,6 +236,42 @@ fn forget_hub(app: tauri::AppHandle) -> Result<(), ShellError> {
     Ok(())
 }
 
+/// Pregunta en segundo plano si el hub recordado sigue existiendo y, si no, lo olvida y devuelve
+/// la ventana al onboarding.
+///
+/// En un hilo aparte a propósito: la ventana ya está abierta y mostrando el hub, así que en el
+/// caso normal —el hub existe— esto no se nota. En el caso malo el usuario ve el 404 un instante
+/// y acaba en el onboarding, que es de donde puede salir. Bloquear el arranque para evitar ese
+/// parpadeo penalizaría **todos** los arranques por un caso raro.
+///
+/// Un `HEAD` basta y no descarga la PWA entera. El timeout es corto porque no hay prisa: si no
+/// contesta a tiempo se conserva el hub, que es la decisión segura ([`should_forget_hub`]).
+fn spawn_hub_liveness_check(app: tauri::AppHandle, cache_dir: PathBuf, origin: String) {
+    std::thread::spawn(move || {
+        use tauri::Manager;
+
+        let probe = match reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(6))
+            .build()
+            .and_then(|c| c.head(format!("{}/", normalize_base(&origin))).send())
+        {
+            Ok(r) => HubProbe::Status(r.status().as_u16()),
+            Err(_) => HubProbe::Unreachable,
+        };
+        if !should_forget_hub(probe) {
+            return;
+        }
+
+        eprintln!("shell: el hub recordado ({origin}) ya no existe ({probe:?}); vuelvo al onboarding");
+        clear_hub_url(&cache_dir);
+        if let Some(window) = app.get_webview_window("main") {
+            if let Ok(url) = onboarding_url(&saas_base_url()).parse::<tauri::Url>() {
+                let _ = window.navigate(url);
+            }
+        }
+    });
+}
+
 /// Crea la ventana principal apuntando a [`initial_url_for`] y registra el `on_navigation` que
 /// captura `?shell=1` → persiste el origen como `hub.url` (una sola escritura por cambio).
 fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Result<()> {
@@ -225,6 +291,15 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
             WebviewUrl::App("index.html".into())
         }
     };
+
+    // Si se arranca contra un hub recordado, hay que comprobar que sigue existiendo — pero DESPUÉS
+    // de abrir la ventana, no antes: bloquear el arranque de un TPV por una petición de red sería
+    // peor que la pantalla que se intenta evitar.
+    if override_url.is_none() {
+        if let (Some(dir), Some(origin)) = (cache_dir.clone(), persisted.clone()) {
+            spawn_hub_liveness_check(app.handle().clone(), dir, origin);
+        }
+    }
 
     let last = std::sync::Mutex::new(persisted);
     WebviewWindowBuilder::new(app, "main", url)
@@ -648,6 +723,50 @@ mod tests {
             initial_url_for(None, None, "https://erplora.com"),
             "https://erplora.com/shell/"
         );
+    }
+
+    // ── El hub recordado ya no existe: la app NO puede quedarse tapiada ──────────────────────
+
+    #[test]
+    fn un_hub_borrado_se_olvida_al_arrancar() {
+        // Medido en un Mac el 2026-08-01: `hub.url` apuntaba a un hub que la purga de prod había
+        // borrado, y la app abría en «404 page not found» — para siempre y SIN salida. El
+        // `forget_hub` que ya existe no sirve aquí: lo invoca el frontend al recibir un 410, y en
+        // este caso la PWA no llega a cargarse nunca porque el 404 lo sirve el edge.
+        assert!(should_forget_hub(HubProbe::Status(404)));
+        // 410 es el contrato explícito de `hub_not_found` del Cloud.
+        assert!(should_forget_hub(HubProbe::Status(410)));
+    }
+
+    #[test]
+    fn un_hub_vivo_no_se_olvida() {
+        assert!(!should_forget_hub(HubProbe::Status(200)));
+        // El hub redirige al login: existe.
+        assert!(!should_forget_hub(HubProbe::Status(302)));
+    }
+
+    #[test]
+    fn no_estar_autenticado_no_es_que_el_hub_no_exista() {
+        // Confundirlo echaría al usuario al onboarding cada vez que le caduca la sesión.
+        assert!(!should_forget_hub(HubProbe::Status(401)));
+        assert!(!should_forget_hub(HubProbe::Status(403)));
+    }
+
+    #[test]
+    fn un_hub_caido_no_se_olvida() {
+        // Caído ≠ inexistente. Olvidarlo por una caída de 30 s le borraría al usuario su hub y le
+        // obligaría a rehacer el onboarding, que es MUCHO peor que esperar.
+        for s in [500, 502, 503, 504] {
+            assert!(!should_forget_hub(HubProbe::Status(s)), "{s} no debe olvidar el hub");
+        }
+    }
+
+    #[test]
+    fn sin_red_no_se_olvida_nada() {
+        // Un TPV arranca en locales con wifi malo, con el router reiniciándose o con el portátil
+        // aún sin asociar. Borrar el hub por no poder contactarlo sería catastrófico: el hub está
+        // perfectamente vivo y el usuario acabaría en el onboarding sin entender por qué.
+        assert!(!should_forget_hub(HubProbe::Unreachable));
     }
 
     #[test]
