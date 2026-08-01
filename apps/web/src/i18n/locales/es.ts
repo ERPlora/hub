@@ -218,6 +218,8 @@ export default {
     countrySpain: 'España',
     countryPortugal: 'Portugal',
     countryFrance: 'Francia',
+    countryGermany: 'Alemania',
+    countryItaly: 'Italia',
     region: 'Región fiscal',
     regionDesc: 'Subdivisión ISO-3166-2 sin prefijo (por ejemplo PV o CN)',
     theme: 'Tema',

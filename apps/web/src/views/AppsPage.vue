@@ -22,7 +22,7 @@
         </ion-button>
       </ok-inline-feedback>
 
-      <div v-if="tab !== 'mine'" class="catalog-country" data-testid="marketplace-country-filter">
+      <div v-if="tab !== 'mine' && !config.demo" class="catalog-country" data-testid="marketplace-country-filter">
         <ion-label>{{ t('apps.countryFilter') }}</ion-label>
         <ion-select
           v-model="catalogCountry"

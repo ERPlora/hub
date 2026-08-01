@@ -26,6 +26,8 @@
                   <ion-select-option value="ES">{{ t('settings.countrySpain') }}</ion-select-option>
                   <ion-select-option value="FR">{{ t('settings.countryFrance') }}</ion-select-option>
                   <ion-select-option value="PT">{{ t('settings.countryPortugal') }}</ion-select-option>
+                  <ion-select-option value="DE">{{ t('settings.countryGermany') }}</ion-select-option>
+                  <ion-select-option value="IT">{{ t('settings.countryItaly') }}</ion-select-option>
                 </ion-select>
                 <ion-note v-else slot="end">{{ hubCountry }}</ion-note>
               </ion-item>

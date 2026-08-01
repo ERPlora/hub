@@ -35,6 +35,7 @@ import imageOutline from "~icons/ion/image-outline?raw";
 import informationCircleOutline from "~icons/ion/information-circle-outline?raw";
 import keypadOutline from "~icons/ion/keypad-outline?raw";
 import languageOutline from "~icons/ion/language-outline?raw";
+import locationOutline from "~icons/ion/location-outline?raw";
 import logInOutline from "~icons/ion/log-in-outline?raw";
 import logOutOutline from "~icons/ion/log-out-outline?raw";
 import mailOutline from "~icons/ion/mail-outline?raw";
@@ -191,6 +192,7 @@ const SVGS: Record<string, string> = {
   "information-circle-outline": informationCircleOutline,
   "keypad-outline": keypadOutline,
   "language-outline": languageOutline,
+  "location-outline": locationOutline,
   "log-in-outline": logInOutline,
   "log-out-outline": logOutOutline,
   "mail-outline": mailOutline,

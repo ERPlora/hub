@@ -1,82 +1,54 @@
-// ADR-0062 / hub#69 — evidencia Playwright del filtro visible del Marketplace.
-// El país y la región del Hub son el valor inicial; al elegir otro país la región anterior no se
-// arrastra a la consulta siguiente.
+// ADR-0062 / hub#69 — filtro visible contra Vite → Axum → mini-SaaS real, sin interceptar `/api`.
+// El mini-SaaS solo devuelve Factur-X para FR sin región: verlo demuestra que no se arrastró ES-MD.
 
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-const MODULE = {
-  id: 10,
-  module_id: 'verifactu',
-  name: 'VeriFactu',
-  description: 'Cumplimiento fiscal',
-  version: '2.0.0',
-  module_type: 'free',
-  is_free: true,
-  is_active: true,
-  countries: ['FR', 'ES'],
-  country_links: [
-    { country: 'FR', regions: ['IDF'], excluded_regions: [] },
-    { country: 'ES', regions: [], excluded_regions: [] },
-  ],
-};
+const enabled = process.env.HUB_MARKETPLACE_E2E === '1';
 
-function json(route: Route, body: unknown) {
-  return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-}
-
-async function mockHub(page: Page, catalogRequests: string[]): Promise<void> {
+async function ownerSession(page: Page): Promise<void> {
   await page.addInitScript(() => {
     localStorage.setItem('erplora.hub_session', 'pw-session');
+    localStorage.setItem('erplora.pwa.hideInstallModal', '1');
     localStorage.setItem(
       'erplora.session',
-      JSON.stringify({ id: 'owner', name: 'Owner', email: 'owner@example.test', role: 'owner', permissions: ['*'] }),
+      JSON.stringify({
+        id: 'owner',
+        name: 'Owner',
+        email: 'owner@example.test',
+        role: 'owner',
+        permissions: ['*'],
+      }),
     );
-  });
-
-  await page.route('**/api/**', async (route) => {
-    const url = new URL(route.request().url());
-    if (url.pathname === '/api/hub/context') {
-      return json(route, {
-        hub_id: 'hub-pw', machine_registered: true, registration_required: false,
-        country: 'FR', region: 'IDF', country_code: 'FR', region_code: 'IDF',
-        currency: 'EUR', language: 'es', pin_users: [],
-      });
-    }
-    if (url.pathname === '/api/marketplace/catalog') {
-      catalogRequests.push(url.search);
-      return json(route, { results: [MODULE] });
-    }
-    if (url.pathname === '/api/modules') return json(route, { ok: true, data: [] });
-    if (url.pathname === '/api/navigation') return json(route, { ok: true, data: [] });
-    if (url.pathname === '/api/settings') {
-      return json(route, {
-        currency: 'EUR', language: 'es', api_docs_enabled: false,
-        country_code: 'FR', region_code: 'IDF', business_tax_id: '',
-        business_legal_name: '', business_address: '', theme_palette: 'erplora',
-      });
-    }
-    if (url.pathname === '/api/entitlement') return json(route, { modules: ['verifactu'] });
-    return json(route, { ok: true, data: [] });
   });
 }
 
-test('usa país/región del Hub y limpia la región al elegir otro país', async ({ page }) => {
-  const catalogRequests: string[] = [];
-  await mockHub(page, catalogRequests);
-
+test('filtra el catálogo real por país y limpia la región al cambiar de ES a FR', async ({ page }) => {
+  test.skip(!enabled, 'requiere marketplace_e2e_server y HUB_MARKETPLACE_E2E=1');
+  await ownerSession(page);
   await page.goto('/apps#all');
 
   const filter = page.getByTestId('marketplace-country-filter');
   await expect(filter).toBeVisible();
   const country = filter.locator('ion-select');
-  await expect(country).toHaveJSProperty('value', 'FR');
-  await expect.poll(() => catalogRequests.some((query) => query.includes('countries=FR') && query.includes('region=IDF'))).toBe(true);
+  await expect(country).toHaveJSProperty('value', 'ES');
+  await expect(page.getByText('VeriFactu', { exact: true })).toBeVisible();
 
   await country.evaluate((element) => {
-    (element as HTMLIonSelectElement).value = 'ES';
-    element.dispatchEvent(new CustomEvent('ionChange', { bubbles: true, detail: { value: 'ES' } }));
+    (element as HTMLIonSelectElement).value = 'FR';
+    element.dispatchEvent(new CustomEvent('ionChange', { bubbles: true, detail: { value: 'FR' } }));
   });
 
-  await expect(country).toHaveJSProperty('value', 'ES');
-  await expect.poll(() => catalogRequests.some((query) => query.includes('countries=ES') && !query.includes('region='))).toBe(true);
+  await expect(country).toHaveJSProperty('value', 'FR');
+  await expect(page.getByText('Factur-X', { exact: true })).toBeVisible();
+  await expect(page.getByText('VeriFactu', { exact: true })).toHaveCount(0);
+});
+
+test('el selector de país del Hub ofrece también Alemania e Italia', async ({ page }) => {
+  test.skip(!enabled, 'requiere marketplace_e2e_server y HUB_MARKETPLACE_E2E=1');
+  await ownerSession(page);
+  await page.goto('/settings#hub');
+
+  await page.getByTestId('hub-country').click();
+  await expect(page.getByRole('radio', { name: 'Alemania' })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Italia' })).toBeVisible();
 });
