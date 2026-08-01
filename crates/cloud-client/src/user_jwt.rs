@@ -18,6 +18,17 @@ pub struct HubMembership {
     pub org: String,
 }
 
+/// Pertenencia a una organización del SaaS declarada en el JWT (claim `organizations`, ADR-0157):
+/// `{id, role}` con el rol del usuario EN esa organización (owner/admin/…). El SaaS ya lo emite
+/// (`CustomTokenObtainPairSerializer.get_token`); es lo que permite al Hub saber con qué rol entra
+/// alguien sin preguntar nada.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct OrgMembership {
+    pub id: String,
+    #[serde(default)]
+    pub role: String,
+}
+
 /// Claims verificadas del access token. `user_id` se deja como `Value` porque SimpleJWT emite el
 /// PK crudo (entero o uuid según el modelo `User`); usa [`UserClaims::user_id_str`].
 #[derive(Debug, Clone, Deserialize)]
@@ -37,6 +48,11 @@ pub struct UserClaims {
     /// previo a ADR-0157 no lo traen → lista vacía (no es miembro de nada → el gate rechaza).
     #[serde(default)]
     pub hubs: Vec<HubMembership>,
+    /// Organizaciones del usuario con su ROL (claim `organizations: [{id, role}]`, ADR-0157).
+    /// **`#[serde(default)]`**: un SaaS anterior no lo trae → lista vacía → sin rol, y se cae al
+    /// rol por defecto de siempre. Nunca debe impedir el login.
+    #[serde(default)]
+    pub organizations: Vec<OrgMembership>,
 }
 
 impl UserClaims {
@@ -53,6 +69,30 @@ impl UserClaims {
     /// claim (SaaS legacy) tiene `hubs` vacío → siempre `false` (rechazo, se pide invitación).
     pub fn is_member_of_hub(&self, hub_id: &str) -> bool {
         self.hubs.iter().any(|h| h.id == hub_id)
+    }
+
+    /// Rol del usuario en la ORGANIZACIÓN dueña de `hub_id`, si el token lo dice.
+    ///
+    /// El SaaS manda las dos piezas por separado —`hubs: [{id, org}]` y
+    /// `organizations: [{id, role}]`— y cruzarlas da el rol sin tocar el SaaS. Hasta ahora el Hub
+    /// solo leía `hubs`, así que el rol se perdía y **un admin de la organización entraba en su
+    /// propio hub con el rol de mínimo privilegio**, sin poder administrarlo ni arreglarlo desde
+    /// dentro (solo el email sembrado al desplegar tenía privilegio).
+    ///
+    /// Devuelve `None` —y el llamador cae al rol por defecto— cuando el hub no está en el token
+    /// (el gate de presencia ya lo rechaza), cuando su `org` no figura en `organizations`, o
+    /// cuando el token es de un SaaS anterior que no manda el claim. Es deliberado: sin saber el
+    /// rol, lo seguro es no conceder nada.
+    pub fn role_for_hub(&self, hub_id: &str) -> Option<String> {
+        let org = &self.hubs.iter().find(|h| h.id == hub_id)?.org;
+        if org.is_empty() {
+            return None;
+        }
+        self.organizations
+            .iter()
+            .find(|o| &o.id == org)
+            .map(|o| o.role.clone())
+            .filter(|r| !r.is_empty())
     }
 }
 
@@ -184,6 +224,65 @@ nQIDAQAB
         }));
         let claims = verify_user_jwt(&no_email, PUB).unwrap();
         assert!(claims.email.is_empty(), "sin `email` → cadena vacía");
+    }
+
+
+    /// El SaaS **ya manda** el rol: `organizations: [{id, role}]` junto a `hubs: [{id, org}]`
+    /// (`CustomTokenObtainPairSerializer.get_token`). El Hub no lo leía, así que un admin de la
+    /// organización entraba con el rol de mínimo privilegio y no podía administrar su propio hub.
+    /// Cruzando el `org` del hub con `organizations` sale el rol sin tocar el SaaS.
+    #[test]
+    fn role_for_hub_cruza_el_org_del_hub_con_las_organizaciones() {
+        let token = sign(json!({
+            "user_id": 7,
+            "token_type": "access",
+            "exp": 9_999_999_999_i64,
+            "organizations": [{"id": "org-1", "role": "admin"}, {"id": "org-2", "role": "employee"}],
+            "hubs": [{"id": "hub-a", "org": "org-1"}, {"id": "hub-b", "org": "org-2"}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert_eq!(claims.role_for_hub("hub-a").as_deref(), Some("admin"));
+        assert_eq!(claims.role_for_hub("hub-b").as_deref(), Some("employee"));
+    }
+
+    /// Un hub que no está en el token no da rol: el gate de presencia ya lo rechaza, y devolver
+    /// algo aquí sería conceder privilegio a un hub del que no se es miembro.
+    #[test]
+    fn role_for_hub_de_un_hub_ajeno_no_da_nada() {
+        let token = sign(json!({
+            "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
+            "organizations": [{"id": "org-1", "role": "owner"}],
+            "hubs": [{"id": "hub-a", "org": "org-1"}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert_eq!(claims.role_for_hub("hub-de-otro"), None);
+    }
+
+    /// Retrocompat: un token sin `organizations` (SaaS anterior) parsea igual y no da rol, así que
+    /// se cae al rol por defecto de siempre. Nunca debe romper el login.
+    #[test]
+    fn sin_claim_organizations_no_hay_rol_pero_el_token_vale() {
+        let token = sign(json!({
+            "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
+            "hubs": [{"id": "hub-a", "org": "org-1"}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert!(claims.organizations.is_empty());
+        assert_eq!(claims.role_for_hub("hub-a"), None);
+        assert!(claims.is_member_of_hub("hub-a"), "el gate de presencia sigue funcionando");
+    }
+
+    /// Un hub cuyo `org` no figura en `organizations` tampoco da rol: sin saber el rol, lo seguro
+    /// es no conceder nada y dejar que decida el rol por defecto.
+    #[test]
+    fn un_org_desconocido_no_concede_rol() {
+        let token = sign(json!({
+            "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
+            "organizations": [{"id": "otra", "role": "owner"}],
+            "hubs": [{"id": "hub-a", "org": "org-1"}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert_eq!(claims.role_for_hub("hub-a"), None);
     }
 
     /// Retrocompat: un token viejo (SaaS previo a ADR-0157) NO trae `hubs`. Debe parsear igual
