@@ -2129,7 +2129,14 @@ async fn open_cloud_session(
     // §6: los roles operativos del Hub son locales/custom, ortogonales al rol SaaS). Se elige el
     // rol de **mínimo privilegio** (`employee`), NO `admin` a ciegas: el auto-admin era el hueco
     // que este ADR cierra. Configurable por entorno (`HUB_DEFAULT_ROLE`).
-    let default_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "employee".into());
+    let base_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "employee".into());
+    // …salvo que el SaaS diga que este usuario es owner/admin DE LA ORGANIZACIÓN dueña del hub.
+    // Ese dato ya viajaba en el token (`organizations` × `hubs[].org`) y el Hub lo tiraba, así que
+    // un admin de la organización entraba en su propio hub como `employee` y no podía ni importar
+    // un blueprint ni promocionarse: solo el email sembrado al desplegar tenía privilegio. Ver
+    // `local_role_for_cloud_login`: solo ascienden owner/admin, y solo en el PRIMER enlace.
+    let default_role =
+        crate::auth::local_role_for_cloud_login(claims.role_for_hub(&hub_id).as_deref(), &base_role);
     // **Owner sembrado del env, NO «primer login = owner»** (ADR-0157, corrección de Ioan): el owner
     // es el CREADOR del hub, sembrado por el provisioning del SaaS (`HUB_OWNER_EMAIL`) ANTES del
     // primer login (ver `serve()`). El **enlace** del login con ese owner (y con cualquier usuario

@@ -101,6 +101,21 @@ fn sign_user_jwt(user_id: i64, hubs: Value) -> String {
 
 /// JWT de usuario firmado con un `email` explícito (ADR-0157: el Hub enlaza el login con el
 /// `hub_user` sembrado/invitado por email). `hubs` = claim *coarse* de presencia.
+/// Como [`sign_user_jwt_email`] pero fijando el ROL del usuario en la organización `org-A`.
+/// El Hub lo lee (`organizations` × `hubs[].org`) para decidir con qué rol local se provisiona.
+fn sign_user_jwt_role(user_id: i64, email: &str, hubs: Value, org_role: &str) -> String {
+    let claims = json!({
+        "user_id": user_id,
+        "email": email,
+        "token_type": "access",
+        "exp": 9_999_999_999_i64,
+        "organizations": [{"id": "org-A", "role": org_role}],
+        "hubs": hubs,
+    });
+    let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
+    encode(&Header::new(Algorithm::RS256), &claims, &key).unwrap()
+}
+
 fn sign_user_jwt_email(user_id: i64, email: &str, hubs: Value) -> String {
     let claims = json!({
         "user_id": user_id,
@@ -222,18 +237,46 @@ async fn seeded_owner_is_linked_by_email_keeping_owner_role() {
 }
 
 #[tokio::test]
-async fn member_without_seed_is_provisioned_as_employee_not_owner() {
-    // Un miembro que pasa el gate SIN fila pre-sembrada (ni owner ni invitación) → rol de mínimo
-    // privilegio (`employee`), NUNCA owner. Cierra el auto-admin/auto-owner: el owner es del env.
+async fn member_without_seed_is_never_owner() {
+    // Este test decía `employee` y ahora dice `admin`, y el cambio es deliberado.
+    //
+    // Lo que protege —y sigue protegiendo, más fuerte que antes— es que **el owner del hub NO se
+    // deriva de un token**: sale del env sembrado al desplegar (`HUB_OWNER_EMAIL`, ADR-0157). Eso
+    // no ha cambiado.
+    //
+    // Lo que sí cambia: el helper firma a este usuario como **owner de la organización `org-A`**,
+    // que es la dueña del hub. Provisionarlo como `employee` era el bug que Ioan encontró el
+    // 2026-08-01 — admin de su propia organización, dentro del hub sin poder importar un
+    // blueprint ni promocionarse, y sin arreglo posible desde dentro. Ahora entra como `admin`.
+    //
+    // El auto-admin que cerró ADR-0157 sigue cerrado: ascendía a CUALQUIER usuario del SaaS con un
+    // token válido; esto exige un rol administrativo **de la organización dueña de este hub**,
+    // firmado por el SaaS. Lo verifica el test de abajo.
     let (router, state, temp) = fixture().await;
     let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
     let user = sign_user_jwt_email(2, "nuevo@bar.com", member);
     let resp = router.oneshot(cloud_login_bare(&user)).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+    let rol = cloud_user_role(&state, "2").await;
+    assert_ne!(rol.as_deref(), Some("owner"), "el owner es del env, NUNCA del token");
+    assert_eq!(rol.as_deref(), Some("admin"), "owner/admin de la org → admin local");
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn member_sin_rol_administrativo_en_la_org_se_queda_en_minimo_privilegio() {
+    // El guardián de verdad del auto-admin: pertenecer al hub NO basta para administrarlo. Alguien
+    // que en el SaaS es `employee` de la organización entra con el mínimo privilegio aunque su
+    // token sea válido y pase el gate de presencia.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+    let user = sign_user_jwt_role(3, "curra@bar.com", member, "employee");
+    let resp = router.oneshot(cloud_login_bare(&user)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
-        cloud_user_role(&state, "2").await.as_deref(),
+        cloud_user_role(&state, "3").await.as_deref(),
         Some("employee"),
-        "sin seed → mínimo privilegio, no owner"
+        "sin rol administrativo en la org → mínimo privilegio"
     );
     std::fs::remove_dir_all(temp).ok();
 }

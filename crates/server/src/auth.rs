@@ -251,3 +251,77 @@ pub fn hub_scoped_auth(headers: &HeaderMap, st: &AppState) -> Option<cloud_clien
     let hub_id = st.hub_id();
     machine_auth(st).or_else(|| st.is_demo().then(|| user_auth(headers, &hub_id)).flatten())
 }
+
+/// Rol LOCAL con el que se provisiona a alguien que entra por primera vez desde el Cloud.
+///
+/// El SaaS ya manda el rol del usuario en la organización dueña del hub (claim `organizations`,
+/// cruzado con `hubs[].org` — ver `UserClaims::role_for_hub`). Hasta ahora el Hub lo ignoraba y
+/// provisionaba a TODO el mundo con el mínimo privilegio, así que **un admin de la organización
+/// entraba en su propio hub como `employee`**: no podía importar un blueprint, ni gestionar
+/// usuarios, ni arreglarlo desde dentro. Solo el email sembrado al desplegar (`HUB_OWNER_EMAIL`)
+/// tenía privilegio, de modo que un segundo socio, o el mismo dueño entrando con otra cuenta,
+/// quedaba fuera sin remedio.
+///
+/// Solo ascienden los dos roles que el propio Hub reconoce como administrativos
+/// ([`is_admin_role`]), y **siempre a `admin`, NUNCA a `owner`**. Cualquier otro —`manager`,
+/// `employee`, uno desconocido o ninguno— cae al rol por defecto, que sigue siendo el mínimo
+/// privilegio.
+///
+/// Que el owner de la organización entre como `admin` y no como `owner` es deliberado: ADR-0157
+/// fijó que **el owner del hub sale del env sembrado al desplegar (`HUB_OWNER_EMAIL`), no de un
+/// claim**, y esa invariante se conserva entera. `admin` ya resuelve el problema real —importar
+/// blueprints, gestionar usuarios, administrar el hub— sin que la propiedad del hub pueda
+/// derivarse de un token.
+///
+/// Tampoco reabre el auto-admin que cerró ADR-0157: aquello ascendía a CUALQUIER usuario del SaaS
+/// con un token válido; esto exige ser owner/admin **de la organización dueña de este hub**,
+/// firmado por el SaaS.
+///
+/// Afecta únicamente al PRIMER enlace: `get_or_link_cloud_user` devuelve la fila existente sin
+/// tocar su rol, así que una degradación hecha a mano en el hub sigue mandando.
+pub fn local_role_for_cloud_login(saas_role: Option<&str>, default_role: &str) -> String {
+    match saas_role {
+        Some(r) if is_admin_role(r) => "admin".to_string(),
+        _ => default_role.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod rol_local_tests {
+    use super::local_role_for_cloud_login as rol;
+
+    #[test]
+    fn el_owner_y_el_admin_de_la_organizacion_entran_como_admin() {
+        // Es el caso que estaba roto: admin de la org → `employee` dentro del hub.
+        assert_eq!(rol(Some("admin"), "employee"), "admin");
+        // El OWNER de la org también entra como `admin`, NO como `owner`: la propiedad del hub la
+        // fija el env sembrado al desplegar (ADR-0157) y no puede derivarse de un token.
+        assert_eq!(rol(Some("owner"), "employee"), "admin");
+    }
+
+    #[test]
+    fn el_rol_del_saas_llega_en_cualquier_capitalizacion() {
+        assert_eq!(rol(Some("Owner"), "employee"), "admin");
+        assert_eq!(rol(Some("ADMIN"), "employee"), "admin");
+    }
+
+    #[test]
+    fn los_demas_roles_se_quedan_en_el_minimo_privilegio() {
+        // `manager` gestiona su día a día en el SaaS, pero eso NO es administrar el hub.
+        for r in ["manager", "employee", "member", "loquesea"] {
+            assert_eq!(rol(Some(r), "employee"), "employee", "{r} no debe ascender");
+        }
+    }
+
+    #[test]
+    fn sin_rol_en_el_token_manda_el_por_defecto() {
+        // Token de un SaaS anterior, o hub cuyo `org` no figura: no se concede nada.
+        assert_eq!(rol(None, "employee"), "employee");
+        assert_eq!(rol(None, "cajero"), "cajero", "respeta HUB_DEFAULT_ROLE");
+    }
+
+    #[test]
+    fn un_rol_vacio_no_asciende() {
+        assert_eq!(rol(Some(""), "employee"), "employee");
+    }
+}
