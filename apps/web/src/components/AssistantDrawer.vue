@@ -375,6 +375,13 @@ onBeforeUnmount(() => {
   top: 0;
   right: 0;
   height: 100%;
+  /* La webview pinta de borde a borde (`viewport-fit=cover`), así que sin compensar el área segura
+     la cabecera de este panel se dibuja DEBAJO del reloj y los iconos del sistema, y su caja de
+     escribir bajo la barra de gestos. Ionic solo compensa SUS componentes; este panel es chrome
+     propio y tiene que hacerlo a mano. Visto en Android el 2026-08-02. */
+  padding-top: var(--ion-safe-area-top, env(safe-area-inset-top, 0px));
+  padding-bottom: var(--ion-safe-area-bottom, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
   width: min(100%, var(--assistant-panel-width, 420px));
   background: var(--ion-card-background, #fff);
   z-index: 50;

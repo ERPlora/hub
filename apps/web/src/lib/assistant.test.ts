@@ -11,6 +11,9 @@ const { queryMock, commandMock } = vi.hoisted(() => ({ queryMock: vi.fn(), comma
 vi.mock('./runtime', () => ({
   RUNTIME_URL: '',
   getClient: () => ({ query: queryMock, command: commandMock }),
+  // El asistente usa el MISMO helper de cabeceras que el resto de `/api/*` (la sesión
+  // local `X-Hub-Session` es la autoridad de permisos del runtime).
+  runtimeHeaders: () => ({ 'X-Hub-Id': 'h1', 'X-Hub-Session': 'sesion' }),
 }));
 vi.mock('./config', () => ({ config: { hubId: 'h1' } }));
 vi.mock('./cloud', () => ({ getAccessToken: () => 'tok' }));
