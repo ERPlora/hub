@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { printerIdForRole, createPrintService } from './print';
+import { printerIdForRole, createPrintService, printHtmlInIframe } from './print';
 
 // El Hub expone UNA puerta de impresión para TODOS los módulos (sales, kitchen, cash_register…).
 // Dos vías: si hay Bridge se imprime por la impresora del ROL pedido (ESC/POS); si no, se cae al
@@ -149,3 +149,75 @@ describe('impresión aislada en iframe', () => {
     expect(iframePrint).not.toHaveBeenCalled();
   });
 });
+
+// ── Formato del papel: el tiquet y la factura NO se imprimen igual ─────────────────────────────
+// El iframe estaba fijado a 80mm (tiquet térmico). Una factura A4 metida ahí sale con el ancho de
+// un tiquet. Y `@page` NO puede vivir en el shadow DOM de `ok-invoice` (es una at-rule de
+// documento: dentro de un shadow root se ignora), así que tiene que inyectarla quien escribe el
+// documento del iframe — aquí.
+describe('formato de papel del documento aislado', () => {
+  it('por defecto imprime en formato tiquet (80mm), que es el caso mayoritario del TPV', () => {
+    const doc = fakeIframeDoc();
+    printHtmlInIframe('<article>TIQUET</article>', doc.document);
+
+    expect(doc.escrito()).toContain('@page');
+    expect(doc.escrito()).toContain('80mm');
+    expect(doc.anchoDelIframe()).toBe('80mm');
+  });
+
+  it('en formato a4 declara @page A4 y da al iframe el ancho de un folio', () => {
+    const doc = fakeIframeDoc();
+    printHtmlInIframe('<article>FACTURA</article>', doc.document, 'a4');
+
+    expect(doc.escrito()).toContain('size: A4');
+    expect(doc.anchoDelIframe()).toBe('210mm');
+  });
+
+  it('respeta el @page que traiga el documento en vez de imponer el suyo', () => {
+    // Quien imprime conoce su documento: si ya declara su propio @page (etiquetas, formatos
+    // raros), no se le pisa.
+    const doc = fakeIframeDoc();
+    printHtmlInIframe('<style>@page { size: 58mm auto }</style><article>x</article>', doc.document);
+
+    expect(doc.escrito().match(/@page/g)).toHaveLength(1);
+    expect(doc.escrito()).toContain('58mm');
+  });
+
+  it('no toca el contenido del documento', () => {
+    const doc = fakeIframeDoc();
+    printHtmlInIframe('<article>FACTURA F2026/0001</article>', doc.document, 'a4');
+
+    expect(doc.escrito()).toContain('FACTURA F2026/0001');
+  });
+});
+
+/** Document mínimo con el que `printHtmlInIframe` puede trabajar sin un navegador real. */
+function fakeIframeDoc() {
+  let escrito = '';
+  const iframe: Record<string, unknown> = {
+    setAttribute: () => {},
+    style: { cssText: '' },
+    remove: () => {},
+    get contentWindow() {
+      return { focus: () => {}, print: () => {}, addEventListener: () => {} };
+    },
+    get contentDocument() {
+      return {
+        open: () => {},
+        write: (h: string) => { escrito += h; },
+        close: () => {},
+        readyState: 'complete',
+      };
+    },
+  };
+
+  return {
+    document: {
+      createElement: () => iframe,
+      body: { appendChild: () => {} },
+    } as unknown as Document,
+    escrito: () => escrito,
+    anchoDelIframe: () =>
+      /width:\s*([^;]+)/.exec((iframe.style as { cssText: string }).cssText)?.[1]?.trim(),
+  };
+}

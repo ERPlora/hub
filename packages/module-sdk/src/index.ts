@@ -796,7 +796,17 @@ export const BRIDGE_DEFAULT_PORT = 12321;
 export interface BridgePrinter {
   id: string;
   name: string;
+  /** Transporte. Siempre `network`. */
   type: string;
+  /**
+   * Familia de la impresora: `'a4'` (de oficina, anuncia IPP) o `'unknown'`.
+   *
+   * El puerto 9100 es un tubo tonto: una térmica y una láser A4 escuchan las dos ahí pero hablan
+   * idiomas distintos (ESC/POS vs PCL/PostScript), así que mandarle un ticket a una A4 saca folios
+   * de basura. Solo el anuncio mDNS `_ipp._tcp` la delata con certeza; lo demás queda `'unknown'`
+   * porque **no se adivina**. Opcional: el bridge Kotlin todavía no lo emite.
+   */
+  category?: string;
   status: string;
   paper_width: number;
   mac?: string;
@@ -804,7 +814,19 @@ export interface BridgePrinter {
 
 /** Dispositivo del registro persistente del Bridge (con su rol asignado). */
 export interface BridgeDevice {
-  mac: string;
+  /**
+   * Identidad estable del dispositivo: la MAC normalizada cuando el sistema pudo resolverla por
+   * ARP y, si no, el `printer_id` (`network:{ip}:{port}`). Es lo que hay que pasar a
+   * `setDeviceRole`/`setDeviceName`/`removeDevice`.
+   */
+  key: string;
+  /**
+   * MAC real, solo si ARP la resolvió. **Opcional a propósito**: en Android nunca está
+   * disponible (no existe el binario `arp` y `/proc/net/arp` está restringido desde Android 10),
+   * y en escritorio falla con VPN, contenedores o firewall. Para identificar el dispositivo usa
+   * `key`, no esto.
+   */
+  mac?: string;
   ip: string;
   port: number;
   name: string;
@@ -833,7 +855,12 @@ export interface BridgeTransport {
   print(printerId: string, documentType: string, data: Record<string, unknown>, jobId?: string): Promise<void>;
   testPrint(printerId: string): Promise<void>;
   openDrawer(printerId: string, pin?: number): Promise<void>;
-  setDeviceRole(mac: string, role: string): Promise<BridgeDevice[]>;
+  /**
+   * Asigna un rol a un dispositivo. `keyOrMac` es el {@link BridgeDevice.key} — o una MAC, que el
+   * registro resuelve igual. Usa `printer.mac ?? printer.id`: en Android la MAC nunca existe.
+   * (El campo del protocolo JSON se sigue llamando `mac` por compatibilidad.)
+   */
+  setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]>;
 }
 
 /**
@@ -974,9 +1001,13 @@ export class BridgeClient implements BridgeTransport {
     await this.request({ action: 'open_drawer', printer_id: printerId, pin }, ['drawer_opened']);
   }
 
-  /** Asigna un rol (receipt/kitchen/bar/label) a un dispositivo y devuelve el registro. */
-  async setDeviceRole(mac: string, role: string): Promise<BridgeDevice[]> {
-    const r = await this.request({ action: 'set_device_role', mac, role }, ['devices']);
+  /**
+   * Asigna un rol (receipt/kitchen/bar/label) a un dispositivo y devuelve el registro.
+   * `keyOrMac` viaja en el campo `mac` del protocolo (nombre histórico); el registro acepta
+   * indistintamente la clave o la MAC.
+   */
+  async setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]> {
+    const r = await this.request({ action: 'set_device_role', mac: keyOrMac, role }, ['devices']);
     return (r.devices as BridgeDevice[]) ?? [];
   }
 }
@@ -1026,8 +1057,10 @@ export class IpcBridgeTransport implements BridgeTransport {
     await this.tauri.invoke('erplora_open_drawer', { printerId, pin });
   }
 
-  setDeviceRole(mac: string, role: string): Promise<BridgeDevice[]> {
-    return this.tauri.invoke('erplora_set_device_role', { mac, role }) as Promise<BridgeDevice[]>;
+  setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]> {
+    return this.tauri.invoke('erplora_set_device_role', { mac: keyOrMac, role }) as Promise<
+      BridgeDevice[]
+    >;
   }
 }
 

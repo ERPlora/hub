@@ -72,9 +72,20 @@ pub struct PrinterInfo {
     /// `network:{ip}:{port}`.
     pub id: String,
     pub name: String,
-    /// Siempre `"network"` en red-only.
+    /// Transporte. Siempre `"network"` en red-only.
     #[serde(rename = "type")]
     pub kind: String,
+    /// Familia de la impresora: `"a4"` | `"unknown"`.
+    ///
+    /// El puerto 9100 es un tubo tonto: una térmica y una láser A4 de oficina **escuchan las dos
+    /// ahí**, pero hablan idiomas distintos (ESC/POS vs PCL/PostScript). Mandarle ESC/POS a una A4
+    /// escupe folios de basura, así que hay que distinguirlas.
+    ///
+    /// Lo único que lo delata con certeza es el anuncio mDNS **`_ipp._tcp`**: lo publican las de
+    /// oficina y las AirPrint, y prácticamente ninguna térmica ESC/POS. Lo demás —incluido lo que
+    /// solo aparece en el escaneo del 9100— se queda en `"unknown"`: **no se adivina**.
+    #[serde(default = "default_printer_category")]
+    pub category: String,
     /// `ready` | `busy` | `error` | `offline`.
     pub status: String,
     pub paper_width: u32,
@@ -82,10 +93,37 @@ pub struct PrinterInfo {
     pub mac: Option<String>,
 }
 
+/// Familia por defecto: desconocida. Nunca se asume "térmica" sin evidencia.
+pub fn default_printer_category() -> String {
+    PRINTER_CATEGORY_UNKNOWN.to_string()
+}
+
+/// Impresora de oficina / A4: anuncia IPP. No admite ESC/POS crudo.
+pub const PRINTER_CATEGORY_A4: &str = "a4";
+/// No hay evidencia suficiente para clasificarla (p. ej. solo responde al 9100).
+pub const PRINTER_CATEGORY_UNKNOWN: &str = "unknown";
+
 /// Entrada del registro persistente de dispositivos (espejo del dict en `network.py`).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Device {
-    pub mac: String,
+    /// Identidad estable del dispositivo en el registro: la MAC normalizada cuando se conoce y,
+    /// si no, el `printer_id` (`network:{ip}:{port}`).
+    ///
+    /// La MAC no siempre está disponible: en Android **nunca** lo está (no existe el binario `arp`
+    /// y `/proc/net/arp` está restringido desde Android 10), y en escritorio falla con VPN,
+    /// contenedores o firewall. Antes de existir este campo, un dispositivo sin MAC no llegaba a
+    /// entrar en el registro, así que `get_devices` devolvía `[]` y **no se le podía asignar rol**
+    /// (cocina/barra/caja) — lo que dejaba el módulo `printing` inservible.
+    ///
+    /// `#[serde(default)]`: los `devices.json` escritos antes de esta versión no lo traen; al
+    /// cargarlos se rellena con la clave del mapa (que era la MAC).
+    #[serde(default)]
+    pub key: String,
+    /// MAC real, solo si el sistema pudo resolverla por ARP. `None` no impide operar: para
+    /// identificar el dispositivo está `key`. Lo único que exige MAC es la recuperación tras un
+    /// cambio de IP por DHCP, que sin ella es imposible por definición.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mac: Option<String>,
     pub ip: String,
     pub port: u16,
     pub name: String,
