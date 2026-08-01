@@ -192,4 +192,29 @@ async fn required_read_failure_and_size_limit_abort_before_invoking_handler() {
         .await
         .unwrap_err();
     assert!(matches!(too_large, RuntimeError::ReadTooLarge { .. }));
+
+    // `ContractHandler` solo acepta la función `handle`: si cualquiera de los dos caminos hubiese
+    // llegado al handler, el test ya habría hecho panic. Además fijamos las dos consecuencias
+    // observables que no pueden quedar tras el aborto: ni persistencia ni evento durable.
+    let rows = runtime
+        .execute_query("contract.rows", &Params::new(), &ctx("h1"))
+        .await
+        .unwrap();
+    assert!(
+        rows.is_empty(),
+        "una read requerida fallida no persiste operaciones"
+    );
+    let outbox = runtime
+        .db_for_test()
+        .query(
+            "SELECT COUNT(*) AS n FROM _event_outbox WHERE hub_id = :hub_id",
+            &params(json!({ "hub_id": "h1" })),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        outbox.rows[0]["n"].as_i64(),
+        Some(0),
+        "una read requerida fallida no encola eventos"
+    );
 }

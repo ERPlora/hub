@@ -7,11 +7,7 @@ use erplora_runtime::{RequestContext, Runtime, RuntimeError};
 use serde_json::{json, Value};
 
 fn modules_root() -> PathBuf {
-    std::env::var_os("ERPLORA_MODULES_WORKSPACE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
-        })
+    erplora_runtime::e2e_support::modules_root()
 }
 
 fn module(name: &str) -> PathBuf {
@@ -84,6 +80,40 @@ async fn taxes_calculate_returns_the_authoritative_wasm_result() {
     assert_eq!(out["result"]["tax"], json!(210));
     assert_eq!(out["result"]["total"], json!(1210));
     assert_eq!(out["result"]["source"], json!("rule"));
+}
+
+#[tokio::test]
+async fn taxes_calculate_stops_before_wasm_when_its_required_read_breaks() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "h1");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime.install_from_dir(&module("taxes")).await.unwrap();
+    runtime
+        .db_for_test()
+        .execute_batch("DROP TABLE taxes_rule")
+        .await
+        .unwrap();
+
+    let error = runtime
+        .execute_command(
+            "taxes.calculate",
+            &params(json!({
+                "amount": 1210,
+                "tax_included": true,
+                "tax_category_key": "test.standard"
+            })),
+            &admin(),
+        )
+        .await
+        .expect_err("no debe invocar el guest sin su catálogo fiscal");
+    assert!(matches!(
+        error,
+        RuntimeError::RequiredReadFailed { ref command, ref query }
+            if command == "taxes.calculate" && query == "taxes.rules.list"
+    ));
 }
 
 #[tokio::test]

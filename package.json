@@ -20,6 +20,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:web": "pnpm -F @erplora/web dev",
     "dev:runtime": "cargo run -p erplora-server",
+    "test:e2e:runtime-contracts": "node scripts/playwright-runtime-contracts.mjs",
     "build:modules": "pnpm -F @erplora/module-cli build:all"
   },
   "devDependencies": {

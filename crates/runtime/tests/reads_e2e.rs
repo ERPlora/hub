@@ -31,7 +31,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{EventSink, RequestContext, Runtime};
 use serde_json::json;
 
@@ -39,9 +39,7 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 fn mdir(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules")
-        .join(name)
+    erplora_runtime::e2e_support::modules_root().join(name)
 }
 fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
@@ -53,7 +51,10 @@ struct Sink {
 }
 impl EventSink for Sink {
     fn emit(&self, name: &str, payload: &serde_json::Value) {
-        self.events.lock().unwrap().push((name.to_string(), payload.clone()));
+        self.events
+            .lock()
+            .unwrap()
+            .push((name.to_string(), payload.clone()));
     }
 }
 
@@ -63,7 +64,9 @@ async fn rt_pos() -> Runtime {
     let mut rt = Runtime::new(Box::new(db));
     rt.set_event_sink(Arc::new(Sink::default()));
     for m in ["taxes", "inventory", "customers", "sales"] {
-        rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));
+        rt.install_from_dir(&mdir(m))
+            .await
+            .unwrap_or_else(|e| panic!("instalar {m}: {e}"));
     }
     rt
 }
@@ -76,7 +79,9 @@ async fn rt_pos() -> Runtime {
 /// El servidor debe declarar **el 10 % del catálogo**, no el 0 % del cliente.
 #[tokio::test]
 async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_cliente() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = rt_pos().await;
     let ctx = admin();
 
@@ -102,8 +107,14 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
     .expect("crear la regla fiscal (ES · restaurant.food · 10 %)");
 
     // Guardarraíl del propio test: si la regla no llegó al catálogo, no estaría probando nada.
-    let reglas = rt.execute_query("taxes.rules.list", &Params::new(), &ctx).await.unwrap();
-    assert!(!reglas.is_empty(), "la regla fiscal no se sembró: el test no probaría nada");
+    let reglas = rt
+        .execute_query("taxes.rules.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
+    assert!(
+        !reglas.is_empty(),
+        "la regla fiscal no se sembró: el test no probaría nada"
+    );
 
     // El POS cobra un menú de 11,00 € (IVA incluido) diciendo que su IVA es 0 %.
     rt.execute_command(
@@ -125,13 +136,20 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
     .await
     .expect("completar la venta");
 
-    let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    let ventas = rt
+        .execute_query("sales.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     let v = &ventas[0];
 
     // Si el runtime NO pre-cargara las reads, el handler caería al fallback (la pista del cliente)
     // y declararía 0 € de IVA sobre una base de 11,00 €. Con el catálogo de confianza declara el
     // 10 %: base 10,00 € + cuota 1,00 €.
-    assert_eq!(v["total"].as_i64().unwrap(), 1100, "lo que paga el cliente no cambia");
+    assert_eq!(
+        v["total"].as_i64().unwrap(),
+        1100,
+        "lo que paga el cliente no cambia"
+    );
     assert_ne!(
         v["tax_amount"].as_i64().unwrap(),
         0,
@@ -152,36 +170,82 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
     assert_eq!(filas.len(), 1);
 }
 
-/// Una `read` que no se puede resolver **no revienta el command**: el handler degrada.
+/// Una dependencia fiscal rota falla **antes** del handler y no deja ningún efecto parcial.
 ///
-/// Cobrar es lo último que puede fallar en un TPV. Si `taxes` está raro o la query no existe, la
-/// venta se completa igual (con la pista del cliente como último recurso) — pero se completa.
+/// Cobrar con un IVA inventado por el navegador es peor que rechazar el cobro: si la query
+/// autoritativa no puede ejecutarse, `required:true` corta antes de generar las operaciones WASM.
 #[tokio::test]
-async fn una_read_que_falla_no_impide_cobrar() {
-    if !erplora_runtime::require_modules_workspace() { return; }
-    // Se instala el conjunto completo, pero SIN sembrar ninguna regla fiscal: el catálogo de
-    // confianza llega VACÍO. Lo que se prueba es que la venta NO se cae por eso — cobrar es lo
-    // último que puede fallar en un TPV.
+async fn una_read_fiscal_requerida_falla_sin_handler_persistencia_ni_outbox() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = rt_pos().await;
     let ctx = admin();
 
-    // Sin NINGUNA regla fiscal en el hub: el catálogo llega vacío.
-    rt.execute_command(
-        "sales.complete_sale",
-        &params(json!({
-            "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }],
-            "tax_included": true,
-            "amount_tendered": 1000,
-            "payment_method_name": "Efectivo"
-        })),
-        &ctx,
-    )
-    .await
-    .expect("la venta DEBE completarse aunque no haya catálogo fiscal");
+    // Rompe la FUENTE, no el contenido: una tabla vacía sigue siendo una lectura válida; una tabla
+    // ausente simula exactamente un fallo de migración/BD de `taxes.rules.list`.
+    rt.db_for_test()
+        .execute_batch("DROP TABLE taxes_rule")
+        .await
+        .expect("romper la read fiscal para la regresión");
 
-    let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
-    assert_eq!(ventas.len(), 1, "el TPV cobró");
-    assert_eq!(ventas[0]["total"].as_i64().unwrap(), 1000);
+    let err = rt
+        .execute_command(
+            "sales.complete_sale",
+            &params(json!({
+                "items": [{
+                    "product_name": "X",
+                    "price": 1000,
+                    "quantity": 1_000_000,
+                    "tax_category_key": "product.generic",
+                    "tax_rate": 21.0
+                }],
+                "tax_included": true,
+                "amount_tendered": 1000,
+                "payment_method_name": "Efectivo"
+            })),
+            &ctx,
+        )
+        .await
+        .expect_err("una read fiscal requerida nunca degrada al porcentaje del navegador");
+    assert!(
+        matches!(
+            err,
+            erplora_runtime::RuntimeError::RequiredReadFailed { ref command, ref query }
+                if command == "sales.complete_sale" && query == "taxes.rules.list"
+        ),
+        "error inesperado: {err:?}"
+    );
+
+    let ventas = rt
+        .execute_query("sales.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
+    assert!(
+        ventas.is_empty(),
+        "el handler no debe haber persistido cabecera de venta"
+    );
+
+    for table in [
+        "sales_sale_counter",
+        "sales_sale",
+        "sales_sale_item",
+        "_event_outbox",
+    ] {
+        let rows = rt
+            .db_for_test()
+            .query(
+                &format!("SELECT COUNT(*) AS n FROM {table}"),
+                &Params::new(),
+            )
+            .await
+            .unwrap_or_else(|e| panic!("contar {table}: {e}"));
+        assert_eq!(
+            rows.rows[0]["n"].as_i64(),
+            Some(0),
+            "fallar la read no puede tocar {table}"
+        );
+    }
 }
 
 // ── `reads` CON PARÁMETROS (ADR-0069 fase 2) ────────────────────────────────────────────────────
@@ -207,7 +271,10 @@ fn una_read_sin_parametros_sigue_siendo_un_string() {
     let def: erplora_runtime::manifest::ReadDef =
         serde_json::from_str(r#""taxes.rules.list""#).expect("string suelto");
     assert_eq!(def.query(), "taxes.rules.list");
-    assert!(def.resolve_params_from_map(&Params::new()).is_empty(), "sin parámetros");
+    assert!(
+        def.resolve_params_from_map(&Params::new()).is_empty(),
+        "sin parámetros"
+    );
 }
 
 #[test]

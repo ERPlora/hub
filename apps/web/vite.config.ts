@@ -52,6 +52,10 @@ function serveModulesRaw(): Plugin {
   };
 }
 
+// La receta E2E reserva un puerto propio para poder ejecutarse junto a otros worktrees. En el
+// desarrollo normal no se define HUB_RUNTIME_URL y se conserva el runtime local estándar.
+const runtimeProxyTarget = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
+
 // Shell web del Hub: Vite + Vue 3 + @ionic/vue + Tailwind v4. Base Ionic (componentes ion-* vía
 // @ionic/vue). Los componentes `ok-*` de OutfitKit son Web Components (Lit): se marcan como custom
 // elements para que el compilador de Vue no los trate como componentes Vue. Los módulos (WC Lit) se
@@ -107,8 +111,8 @@ export default defineConfig({
         secure: false,
         rewrite: (p) => p.replace(/^\/cloud/, ''),
       },
-      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/ws': { target: 'http://127.0.0.1:8787', changeOrigin: true, ws: true },
+      '/api': { target: runtimeProxyTarget, changeOrigin: true },
+      '/ws': { target: runtimeProxyTarget, changeOrigin: true, ws: true },
     },
   },
 });

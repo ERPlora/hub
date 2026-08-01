@@ -7,6 +7,11 @@ const sdkModule = `/@fs/${resolve(
   import.meta.dirname,
   '../../../../packages/module-sdk/src/index.ts',
 )}`;
+const DEV_AUTH_HEADERS = {
+  'x-hub-id': '00000000-0000-0000-0000-000000000001',
+  'x-user-id': 'playwright',
+  'x-permissions': '*',
+} as const;
 
 test.skip(
   process.env.HUB_RUNTIME_CONTRACT_E2E !== '1',
@@ -16,14 +21,10 @@ test.skip(
 test('commandResult conserva el resultado WASM calculado con reads autoritativas', async ({ page }) => {
   await page.goto('/');
 
-  const result = await page.evaluate(async ({ moduleUrl }) => {
+  const result = await page.evaluate(async ({ moduleUrl, authHeaders }) => {
     const { ErploraClient, HttpWsTransport } = await import(/* @vite-ignore */ moduleUrl);
     const transport = new HttpWsTransport({
-      headers: () => ({
-        'x-hub-id': 'h1',
-        'x-user-id': 'playwright',
-        'x-permissions': '*',
-      }),
+      headers: () => authHeaders,
     });
     const client = new ErploraClient(transport);
 
@@ -44,7 +45,7 @@ test('commandResult conserva el resultado WASM calculado con reads autoritativas
       'schedules.is_open',
       { when: `${date}T12:00:00Z` },
     );
-  }, { moduleUrl: sdkModule });
+  }, { moduleUrl: sdkModule, authHeaders: DEV_AUTH_HEADERS });
 
   expect(result).toEqual({
     is_open: false,
@@ -58,17 +59,11 @@ test('commandResult conserva el resultado WASM calculado con reads autoritativas
 test('el SDK conserva el code de dominio namespaced del runtime', async ({ page }) => {
   await page.goto('/');
 
-  const failures = await page.evaluate(async ({ moduleUrl }) => {
+  const failures = await page.evaluate(async ({ moduleUrl, authHeaders }) => {
     const { ErploraClient, HttpWsTransport, ErploraError } = await import(
       /* @vite-ignore */ moduleUrl
     );
-    const client = new ErploraClient(new HttpWsTransport({
-      headers: () => ({
-        'x-hub-id': 'h1',
-        'x-user-id': 'playwright',
-        'x-permissions': '*',
-      }),
-    }));
+    const client = new ErploraClient(new HttpWsTransport({ headers: () => authHeaders }));
     const capture = async (name: string, payload: Record<string, unknown>) => {
       try {
         await client.command(name, payload);
@@ -82,7 +77,7 @@ test('el SDK conserva el code de dominio namespaced del runtime', async ({ page 
       wasm: await capture('schedules.is_open', { when: 'fecha-invalida' }),
       expectRows: await capture('w140.items.consume', { item_id: 'missing' }),
     };
-  }, { moduleUrl: sdkModule });
+  }, { moduleUrl: sdkModule, authHeaders: DEV_AUTH_HEADERS });
 
   expect(failures.wasm).toEqual({
     code: 'schedules.invalid_date',
@@ -97,17 +92,11 @@ test('el SDK conserva el code de dominio namespaced del runtime', async ({ page 
 test('una query del navegador ejecuta las funciones-puente SQL del contrato', async ({ page }) => {
   await page.goto('/');
 
-  const rows = await page.evaluate(async ({ moduleUrl }) => {
+  const rows = await page.evaluate(async ({ moduleUrl, authHeaders }) => {
     const { ErploraClient, HttpWsTransport } = await import(/* @vite-ignore */ moduleUrl);
-    const client = new ErploraClient(new HttpWsTransport({
-      headers: () => ({
-        'x-hub-id': 'h1',
-        'x-user-id': 'playwright',
-        'x-permissions': '*',
-      }),
-    }));
+    const client = new ErploraClient(new HttpWsTransport({ headers: () => authHeaders }));
     return client.query('w140.bridge.inspect', { at: '2026-08-01T09:07:00Z' });
-  }, { moduleUrl: sdkModule });
+  }, { moduleUrl: sdkModule, authHeaders: DEV_AUTH_HEADERS });
 
   expect(rows).toEqual([{ date: '2026-08-01', time: '09:07', dow: 5 }]);
 });
