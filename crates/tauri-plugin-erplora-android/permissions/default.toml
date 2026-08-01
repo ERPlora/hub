@@ -1,0 +1,7 @@
+# Concedidos por defecto: preguntar y pedir permisos NUNCA es peligroso —lo peligroso es no poder
+# pedirlos y que el hardware quede muerto sin que nadie sepa por qué.
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Consultar y solicitar los permisos de runtime que el TPV necesita en Android."
+permissions = ["allow-check-permissions", "allow-request-permissions"]

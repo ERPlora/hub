@@ -1,0 +1,7 @@
+# Salida de Gradle del módulo Android: se regenera con `cargo tauri android build`.
+android/build
+android/.gradle
+# Copia que Tauri deja del SDK `tauri-android` al construir; viene del crate `tauri`, no es fuente.
+android/.tauri
+# Build de Cargo.
+/target

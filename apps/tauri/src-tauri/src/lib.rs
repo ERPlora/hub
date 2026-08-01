@@ -476,6 +476,7 @@ fn erplora_notify(app: tauri::AppHandle, title: String, body: String) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_erplora_android::init())
         .setup(|app| {
             use tauri::Manager;
             // Raíz de datos por-instalación: device.id + hub.url + devices.json. Si no se puede
