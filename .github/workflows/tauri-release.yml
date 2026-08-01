@@ -288,13 +288,6 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
 
-      # Los tests KOTLIN del plugin de permisos: es donde vive la lógica que decide qué se pide
-      # en cada nivel de API, y cazan las dos trampas que dejan el `invoke` colgado para siempre
-      # (pedir fuera de la fontanería de Tauri, y un permiso ausente de la anotación).
-      - name: Kotlin unit tests (plugin de permisos)
-        working-directory: apps/tauri/src-tauri/gen/android
-        run: ./gradlew :tauri-plugin-erplora-android:testDebugUnitTest
-
       - name: Set version from tag
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -319,6 +312,18 @@ jobs:
       - name: Build APK + AAB
         working-directory: apps/tauri
         run: cargo tauri android build --apk --aab
+
+      # DESPUÉS del build a propósito: `tauri.settings.gradle` —que es quien incluye el módulo del
+      # plugin— lo GENERA el propio build y no está en git. Correrlo antes falla con «Could not
+      # read script tauri.settings.gradle as it does not exist». Y no vale generarlo con
+      # `android init`: eso reescribe `AndroidManifest.xml` y se llevaría por delante los permisos.
+      #
+      # Estos tests son donde vive la lógica de qué se pide en cada nivel de API, y cazan las dos
+      # trampas que dejan el `invoke` colgado para siempre: pedir fuera de la fontanería de Tauri,
+      # y un permiso ausente de la anotación.
+      - name: Kotlin unit tests (plugin de permisos)
+        working-directory: apps/tauri/src-tauri/gen/android
+        run: ./gradlew :tauri-plugin-erplora-android:testDebugUnitTest
 
       # `versionCode` es puerta de UN SOLO SENTIDO en Play: publicado uno, ese número queda
       # quemado para siempre. Se comprueba contra la fórmula de ADR-0160 en el artefacto REAL,
