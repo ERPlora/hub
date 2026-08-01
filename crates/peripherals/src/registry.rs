@@ -107,16 +107,33 @@ pub fn normalize_mac(mac: &str) -> String {
         .join(":")
 }
 
+/// Identidad estable de un dispositivo en el registro.
+///
+/// La MAC normalizada cuando el sistema pudo resolverla por ARP; si no, el `printer_id`
+/// (`network:{ip}:{port}`). Sin este fallback, un dispositivo sin MAC no llegaba a registrarse y
+/// por tanto **no se le podía asignar un rol** (cocina/barra/caja) — que es justo lo que el módulo
+/// `printing` necesita. Ocurre siempre en Android y con VPN/contenedores/firewall en escritorio.
+pub fn device_key(mac: Option<&str>, ip: &str, port: u16) -> String {
+    match mac {
+        Some(m) if !m.trim().is_empty() => normalize_mac(m.trim()),
+        _ => format!("network:{ip}:{port}"),
+    }
+}
+
 /// Marca de tiempo ISO con resolución de segundos. Espejo de `datetime.now().isoformat(timespec='seconds')`.
 fn now_iso() -> String {
     chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string()
 }
 
-/// Registro persistente MAC → dispositivo, respaldado por `devices.json` en el dir de config.
+/// Registro persistente clave → dispositivo, respaldado por `devices.json` en el dir de config.
 /// Porta `DeviceRegistry`. (Persistencia con `RwLock` síncrono + escritura al disco.)
+///
+/// La clave es [`device_key`]: la MAC normalizada cuando se conoce y el `printer_id`
+/// (`network:{ip}:{port}`) cuando no. Antes se indexaba solo por MAC, así que las impresoras sin
+/// ARP resoluble —todas en Android— no llegaban a entrar y no admitían rol.
 pub struct DeviceRegistry {
     path: PathBuf,
-    /// Mapa en memoria MAC → dispositivo. `RwLock` síncrono: las operaciones son rápidas y no
+    /// Mapa en memoria clave → dispositivo. `RwLock` síncrono: las operaciones son rápidas y no
     /// se mantiene el lock a través de un `await`.
     devices: RwLock<HashMap<String, Device>>,
 }
@@ -127,7 +144,7 @@ impl DeviceRegistry {
         let devices = if path.exists() {
             match std::fs::read_to_string(&path) {
                 Ok(text) => match serde_json::from_str::<DevicesFile>(&text) {
-                    Ok(file) => file.devices,
+                    Ok(file) => Self::backfill_keys(file.devices),
                     Err(exc) => {
                         tracing::warn!("fallo al parsear el registro de dispositivos {path:?}: {exc}");
                         HashMap::new()
@@ -145,6 +162,21 @@ impl DeviceRegistry {
         Self { path, devices: RwLock::new(devices) }
     }
 
+    /// Rellena `key` en los ficheros escritos antes de que el campo existiera (estaban indexados
+    /// por MAC, así que la clave del mapa **es** la identidad). `devices.json` es dato de usuario:
+    /// un cliente con roles ya asignados no puede perderlos al actualizar.
+    fn backfill_keys(devices: HashMap<String, Device>) -> HashMap<String, Device> {
+        devices
+            .into_iter()
+            .map(|(map_key, mut device)| {
+                if device.key.trim().is_empty() {
+                    device.key = map_key.clone();
+                }
+                (device.key.clone(), device)
+            })
+            .collect()
+    }
+
     /// Persiste a disco. Porta `save`.
     pub fn save(&self) -> Result<()> {
         let payload = {
@@ -159,25 +191,45 @@ impl DeviceRegistry {
         Ok(())
     }
 
-    /// Alta/actualización por MAC; preserva `first_seen` y `role`. Porta `register`.
-    pub fn register(&self, mac: &str, ip: &str, port: u16, name: &str, kind: &str) -> Result<Device> {
-        let mac = normalize_mac(mac);
+    /// Alta/actualización por [`device_key`]; preserva `first_seen` y `role`. Porta `register`.
+    ///
+    /// `mac` es `Option` a propósito: cuando ARP no la resuelve el dispositivo **igualmente se
+    /// registra**, identificado por su `printer_id`. Antes se salía sin registrar nada.
+    pub fn register(
+        &self,
+        mac: Option<&str>,
+        ip: &str,
+        port: u16,
+        name: &str,
+        kind: &str,
+    ) -> Result<Device> {
+        let key = device_key(mac, ip, port);
+        let mac = mac
+            .map(str::trim)
+            .filter(|m| !m.is_empty())
+            .map(normalize_mac);
         let now = now_iso();
 
         let device = {
             let mut map = self.devices.write().expect("registry lock envenenado");
-            match map.get_mut(&mac) {
+            match map.get_mut(&key) {
                 Some(existing) => {
                     existing.ip = ip.to_string();
                     existing.port = port;
                     existing.name = name.to_string();
                     existing.kind = kind.to_string();
                     existing.last_seen = now;
+                    // Una MAC que aparece más tarde (p. ej. el ARP responde en el 2º escaneo)
+                    // enriquece la entrada, pero nunca la borra si ya se conocía.
+                    if mac.is_some() {
+                        existing.mac = mac;
+                    }
                     existing.clone()
                 }
                 None => {
                     let device = Device {
-                        mac: mac.clone(),
+                        key: key.clone(),
+                        mac,
                         ip: ip.to_string(),
                         port,
                         name: name.to_string(),
@@ -187,7 +239,7 @@ impl DeviceRegistry {
                         last_seen: now,
                         status: "online".to_string(),
                     };
-                    map.insert(mac.clone(), device.clone());
+                    map.insert(key.clone(), device.clone());
                     device
                 }
             }
@@ -197,10 +249,30 @@ impl DeviceRegistry {
         Ok(device)
     }
 
-    pub fn get_by_mac(&self, mac: &str) -> Option<Device> {
-        let mac = normalize_mac(mac);
+    /// Resuelve una entrada a partir de su clave **o** de su MAC.
+    ///
+    /// El protocolo JSON llama `mac` a este parámetro (`SetDeviceRole { mac }`) y los llamadores
+    /// existentes le pasan lo que tengan a mano, así que se aceptan las dos formas: primero tal
+    /// cual (será un `printer_id`), luego normalizada como MAC.
+    fn resolve_key(&self, key_or_mac: &str) -> Option<String> {
         let map = self.devices.read().expect("registry lock envenenado");
-        map.get(&mac).cloned()
+        if map.contains_key(key_or_mac) {
+            return Some(key_or_mac.to_string());
+        }
+        let normalized = normalize_mac(key_or_mac);
+        map.contains_key(&normalized).then_some(normalized)
+    }
+
+    /// Dispositivo por clave o MAC.
+    pub fn get(&self, key_or_mac: &str) -> Option<Device> {
+        let key = self.resolve_key(key_or_mac)?;
+        let map = self.devices.read().expect("registry lock envenenado");
+        map.get(&key).cloned()
+    }
+
+    /// Alias histórico de [`Self::get`]; acepta igualmente clave o MAC.
+    pub fn get_by_mac(&self, mac: &str) -> Option<Device> {
+        self.get(mac)
     }
 
     pub fn get_by_ip(&self, ip: &str) -> Option<Device> {
@@ -216,11 +288,14 @@ impl DeviceRegistry {
         devices
     }
 
-    pub fn set_role(&self, mac: &str, role: &str) -> Result<()> {
-        let mac = normalize_mac(mac);
+    /// Asigna el rol (`receipt`/`kitchen`/`bar`…). Acepta clave o MAC.
+    pub fn set_role(&self, key_or_mac: &str, role: &str) -> Result<()> {
+        let Some(key) = self.resolve_key(key_or_mac) else {
+            return Ok(());
+        };
         let mutated = {
             let mut map = self.devices.write().expect("registry lock envenenado");
-            match map.get_mut(&mac) {
+            match map.get_mut(&key) {
                 Some(device) => {
                     device.role = Some(role.to_string());
                     true
@@ -234,11 +309,14 @@ impl DeviceRegistry {
         Ok(())
     }
 
-    pub fn set_status(&self, mac: &str, status: &str) -> Result<()> {
-        let mac = normalize_mac(mac);
+    /// Marca online/offline. Acepta clave o MAC.
+    pub fn set_status(&self, key_or_mac: &str, status: &str) -> Result<()> {
+        let Some(key) = self.resolve_key(key_or_mac) else {
+            return Ok(());
+        };
         let mutated = {
             let mut map = self.devices.write().expect("registry lock envenenado");
-            match map.get_mut(&mac) {
+            match map.get_mut(&key) {
                 Some(device) => {
                     device.status = status.to_string();
                     true
@@ -252,11 +330,14 @@ impl DeviceRegistry {
         Ok(())
     }
 
-    pub fn set_name(&self, mac: &str, name: &str) -> Result<()> {
-        let mac = normalize_mac(mac);
+    /// Renombra el dispositivo. Acepta clave o MAC.
+    pub fn set_name(&self, key_or_mac: &str, name: &str) -> Result<()> {
+        let Some(key) = self.resolve_key(key_or_mac) else {
+            return Ok(());
+        };
         let mutated = {
             let mut map = self.devices.write().expect("registry lock envenenado");
-            match map.get_mut(&mac) {
+            match map.get_mut(&key) {
                 Some(device) => {
                     device.name = name.to_string();
                     true
@@ -271,11 +352,15 @@ impl DeviceRegistry {
     }
 
     /// Actualiza la IP (auto-recuperación tras cambio DHCP). Porta `update_ip`.
-    pub fn update_ip(&self, mac: &str, new_ip: &str) -> Result<()> {
-        let mac = normalize_mac(mac);
+    /// Acepta clave o MAC — pero solo tiene sentido con MAC: sin ella no se puede reconocer al
+    /// dispositivo en una IP nueva (y la clave, que ES la IP, ya no valdría).
+    pub fn update_ip(&self, key_or_mac: &str, new_ip: &str) -> Result<()> {
+        let Some(key) = self.resolve_key(key_or_mac) else {
+            return Ok(());
+        };
         let mutated = {
             let mut map = self.devices.write().expect("registry lock envenenado");
-            match map.get_mut(&mac) {
+            match map.get_mut(&key) {
                 Some(device) => {
                     device.ip = new_ip.to_string();
                     device.last_seen = now_iso();
@@ -290,11 +375,14 @@ impl DeviceRegistry {
         Ok(())
     }
 
-    pub fn remove(&self, mac: &str) -> Result<()> {
-        let mac = normalize_mac(mac);
+    /// Borra el dispositivo del registro. Acepta clave o MAC.
+    pub fn remove(&self, key_or_mac: &str) -> Result<()> {
+        let Some(key) = self.resolve_key(key_or_mac) else {
+            return Ok(());
+        };
         let mutated = {
             let mut map = self.devices.write().expect("registry lock envenenado");
-            map.remove(&mac).is_some()
+            map.remove(&key).is_some()
         };
         if mutated {
             self.save()?;
@@ -385,7 +473,10 @@ impl Watchdog {
     /// Comprueba la alcanzabilidad de todos los dispositivos conocidos. Porta `_check_devices`.
     async fn check_devices(&self, registry: &DeviceRegistry) {
         for device in registry.get_all() {
-            if device.ip.is_empty() || device.mac.is_empty() {
+            // El chequeo de salud solo necesita IP: se hace por `key`, así que las impresoras sin
+            // MAC (todas en Android) también se vigilan. La MAC solo hace falta para el recovery
+            // scan, más abajo.
+            if device.ip.is_empty() {
                 continue;
             }
 
@@ -393,30 +484,30 @@ impl Watchdog {
             let reachable = tcp_check(&device.ip, port, self.config.connect_timeout_ms).await;
 
             if reachable && device.status != "online" {
-                if let Err(e) = registry.set_status(&device.mac, "online") {
-                    tracing::warn!("no se pudo persistir status online de {}: {e}", device.mac);
+                if let Err(e) = registry.set_status(&device.key, "online") {
+                    tracing::warn!("no se pudo persistir status online de {}: {e}", device.key);
                 }
                 tracing::info!(
                     "dispositivo {} ({}) de nuevo online en {}:{}",
                     device.name,
-                    device.mac,
+                    device.key,
                     device.ip,
                     port
                 );
-                let recovered = registry.get_by_mac(&device.mac).unwrap_or_else(|| device.clone());
+                let recovered = registry.get(&device.key).unwrap_or_else(|| device.clone());
                 self.emit(WatchdogEvent::Recovered(recovered));
             } else if !reachable && device.status == "online" {
-                if let Err(e) = registry.set_status(&device.mac, "offline") {
-                    tracing::warn!("no se pudo persistir status offline de {}: {e}", device.mac);
+                if let Err(e) = registry.set_status(&device.key, "offline") {
+                    tracing::warn!("no se pudo persistir status offline de {}: {e}", device.key);
                 }
                 tracing::warn!(
                     "dispositivo {} ({}) pasó a offline en {}:{}",
                     device.name,
-                    device.mac,
+                    device.key,
                     device.ip,
                     port
                 );
-                let lost = registry.get_by_mac(&device.mac).unwrap_or_else(|| device.clone());
+                let lost = registry.get(&device.key).unwrap_or_else(|| device.clone());
                 self.emit(WatchdogEvent::Lost(lost));
             }
         }
@@ -425,11 +516,15 @@ impl Watchdog {
     /// Escaneo de recuperación completo: por cada dispositivo offline, barre la subred buscándolo
     /// por MAC en una IP nueva. Porta `_recovery_scan`.
     async fn recovery_scan(&self, registry: &DeviceRegistry) {
+        // Solo entran los que TIENEN MAC: reconocer una impresora en una IP nueva exige una
+        // identidad que no dependa de la IP, y la clave de las que no tienen MAC *es* la IP.
+        // Sin ARP no hay recuperación posible tras un cambio de DHCP — es un límite real, no una
+        // omisión: en Android el usuario tendrá que volver a descubrir la impresora.
         let mut mac_lookup: HashMap<String, Device> = registry
             .get_all()
             .into_iter()
             .filter(|d| d.status == "offline")
-            .map(|d| (d.mac.clone(), d))
+            .filter_map(|d| d.mac.clone().map(|mac| (mac, d)))
             .collect();
 
         if mac_lookup.is_empty() {
@@ -515,4 +610,128 @@ fn local_subnet_prefix() -> Option<String> {
     let c = parts.next()?;
     parts.next()?; // Solo IPv4 tiene 4 octetos.
     Some(format!("{a}.{b}.{c}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Ruta aislada por test bajo el temp del sistema (el registro escribe a disco).
+    fn temp_registry(name: &str) -> (DeviceRegistry, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("erplora-registry-test-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        let path = dir.join("devices.json");
+        (DeviceRegistry::load(path.clone()), path)
+    }
+
+    // ── device_key: la identidad estable ────────────────────────────────────────────────────────
+
+    #[test]
+    fn la_clave_es_la_mac_normalizada_cuando_se_conoce() {
+        assert_eq!(device_key(Some("aa-bb-cc-dd-ee-f1"), "10.0.0.5", 9100), "AA:BB:CC:DD:EE:F1");
+    }
+
+    #[test]
+    fn la_clave_cae_al_printer_id_cuando_no_hay_mac() {
+        // En Android NUNCA hay MAC (no existe el binario `arp` y /proc/net/arp está restringido
+        // desde Android 10), y en escritorio falla con VPN, contenedores o firewall.
+        assert_eq!(device_key(None, "10.0.0.5", 9100), "network:10.0.0.5:9100");
+        assert_eq!(device_key(Some("   "), "10.0.0.5", 9100), "network:10.0.0.5:9100");
+    }
+
+    // ── El bug: sin MAC no se podía registrar ni asignar rol ────────────────────────────────────
+
+    #[test]
+    fn registra_una_impresora_sin_mac() {
+        let (registry, _) = temp_registry("registra-sin-mac");
+        let device = registry.register(None, "10.0.0.5", 9100, "Caja", "network").unwrap();
+
+        assert_eq!(device.key, "network:10.0.0.5:9100");
+        assert_eq!(device.mac, None, "sin ARP no se inventa una MAC");
+        assert_eq!(registry.get_all().len(), 1, "la impresora DEBE entrar en el registro");
+    }
+
+    #[test]
+    fn asigna_rol_a_una_impresora_sin_mac() {
+        // Este es el defecto que bloqueaba el módulo `printing` en Android: sin MAC el
+        // dispositivo no llegaba a `devices.json`, `get_devices` devolvía [] y no se podía
+        // marcar ninguna impresora como cocina/barra/caja.
+        let (registry, _) = temp_registry("rol-sin-mac");
+        let device = registry.register(None, "10.0.0.7", 9100, "Cocina", "network").unwrap();
+
+        registry.set_role(&device.key, "kitchen").unwrap();
+
+        let stored = registry.get(&device.key).expect("el dispositivo sigue en el registro");
+        assert_eq!(stored.role.as_deref(), Some("kitchen"));
+    }
+
+    // ── Compatibilidad hacia atrás: con MAC todo sigue igual ────────────────────────────────────
+
+    #[test]
+    fn con_mac_la_clave_sigue_siendo_la_mac_normalizada() {
+        let (registry, _) = temp_registry("clave-es-mac");
+        let device = registry
+            .register(Some("aa-bb-cc-dd-ee-f2"), "10.0.0.8", 9100, "Barra", "network")
+            .unwrap();
+
+        assert_eq!(device.key, "AA:BB:CC:DD:EE:F2");
+        assert_eq!(device.mac.as_deref(), Some("AA:BB:CC:DD:EE:F2"));
+    }
+
+    #[test]
+    fn las_mutaciones_aceptan_indistintamente_la_mac_o_la_clave() {
+        // El protocolo JSON llama `mac` a este parámetro (`SetDeviceRole { mac }`) y los
+        // llamadores existentes (apps/bridge, apps/tauri) le pasan lo que tengan a mano.
+        let (registry, _) = temp_registry("mac-o-clave");
+        registry
+            .register(Some("AA:BB:CC:DD:EE:F3"), "10.0.0.9", 9100, "Caja", "network")
+            .unwrap();
+
+        registry.set_role("aa-bb-cc-dd-ee-f3", "receipt").unwrap();
+        assert_eq!(
+            registry.get("AA:BB:CC:DD:EE:F3").unwrap().role.as_deref(),
+            Some("receipt"),
+            "una MAC sin normalizar debe resolver al mismo dispositivo"
+        );
+
+        registry.set_name("AA:BB:CC:DD:EE:F3", "Caja principal").unwrap();
+        assert_eq!(registry.get("AA:BB:CC:DD:EE:F3").unwrap().name, "Caja principal");
+    }
+
+    #[test]
+    fn re_registrar_preserva_first_seen_y_el_rol() {
+        let (registry, _) = temp_registry("preserva");
+        let first = registry.register(None, "10.0.0.10", 9100, "Caja", "network").unwrap();
+        registry.set_role(&first.key, "receipt").unwrap();
+
+        let again = registry.register(None, "10.0.0.10", 9100, "Caja renombrada", "network").unwrap();
+
+        assert_eq!(again.first_seen, first.first_seen, "first_seen no se pisa");
+        assert_eq!(again.role.as_deref(), Some("receipt"), "el rol asignado sobrevive");
+        assert_eq!(registry.get_all().len(), 1, "no se duplica la entrada");
+    }
+
+    // ── Datos ya persistidos en casa de clientes ────────────────────────────────────────────────
+
+    #[test]
+    fn carga_un_devices_json_antiguo_sin_campo_key() {
+        // `devices.json` es dato de usuario: los ficheros escritos antes de esta versión están
+        // indexados por MAC y no traen `key`. Deben seguir cargando y quedar operativos.
+        let (_, path) = temp_registry("legacy");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            r#"{"devices":{"AA:BB:CC:DD:EE:F4":{"mac":"AA:BB:CC:DD:EE:F4","ip":"10.0.0.11",
+               "port":9100,"name":"Cocina","role":"kitchen","type":"network",
+               "first_seen":"2026-01-01T00:00:00","last_seen":"2026-01-01T00:00:00",
+               "status":"online"}}}"#,
+        )
+        .unwrap();
+
+        let registry = DeviceRegistry::load(path);
+        let device = registry.get("AA:BB:CC:DD:EE:F4").expect("el dispositivo legacy carga");
+
+        assert_eq!(device.key, "AA:BB:CC:DD:EE:F4", "la clave se rellena desde la MAC");
+        assert_eq!(device.role.as_deref(), Some("kitchen"), "el rol asignado no se pierde");
+    }
 }

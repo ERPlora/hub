@@ -303,11 +303,13 @@ fn build_peripherals_state(devices_path: PathBuf) -> PeripheralsState {
         tauri::async_runtime::spawn(async move {
             while let Some(ev) = events_rx.recv().await {
                 match ev {
+                    // `key` y no `mac`: es la identidad estable del dispositivo y siempre existe
+                    // (la MAC es `None` cuando ARP no resuelve — siempre en Android).
                     WatchdogEvent::Recovered(d) => {
-                        eprintln!("peripherals: dispositivo recuperado {} ({})", d.name, d.mac)
+                        eprintln!("peripherals: dispositivo recuperado {} ({})", d.name, d.key)
                     }
                     WatchdogEvent::Lost(d) => {
-                        eprintln!("peripherals: dispositivo perdido {} ({})", d.name, d.mac)
+                        eprintln!("peripherals: dispositivo perdido {} ({})", d.name, d.key)
                     }
                 }
             }

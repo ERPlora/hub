@@ -97,11 +97,13 @@ pub async fn discover_printers(registry: &DeviceRegistry) -> Result<Vec<PrinterI
             Err(_) => continue,
         };
 
-        if let Some(mac) = crate::registry::get_mac_for_ip(&ip) {
-            p.mac = Some(mac.clone());
-            // El registro puede aún ser `todo!()` en desarrollo paralelo; ignoramos su `Result`.
-            let _ = registry.register(&mac, &ip, port, &p.name, "network");
-        }
+        // La MAC es un ENRIQUECIMIENTO, no un requisito: el registro se hace siempre. Antes el
+        // `register` colgaba del `if let Some(mac)`, así que en Android —donde ARP nunca resuelve,
+        // no existe el binario `arp` y `/proc/net/arp` está restringido desde Android 10— ninguna
+        // impresora llegaba a `devices.json`: `get_devices` devolvía `[]` y no se podía asignar
+        // ningún rol de cocina/barra/caja.
+        p.mac = crate::registry::get_mac_for_ip(&ip);
+        let _ = registry.register(p.mac.as_deref(), &ip, port, &p.name, "network");
     }
 
     Ok(printers)
@@ -138,6 +140,9 @@ pub async fn discover_subnet_scan(port: u16) -> Result<Vec<PrinterInfo>> {
                 id: format!("network:{ip}:{port}"),
                 name: format!("Network Printer ({ip})"),
                 kind: "network".into(),
+                // Responder al 9100 no dice qué idioma habla: una láser A4 de oficina también
+                // escucha ahí. Sin más evidencia no se clasifica.
+                category: crate::protocol::default_printer_category(),
                 status: "ready".into(),
                 paper_width: 80,
                 mac: None,
@@ -180,10 +185,12 @@ fn browse_mdns_blocking() -> Vec<PrinterInfo> {
         }
     };
 
+    // Se conserva el tipo de servicio junto al receptor: es lo ÚNICO que permite distinguir una
+    // impresora de oficina (`_ipp._tcp`) de una térmica, y se perdía al meter solo el `rx`.
     let mut receivers = Vec::new();
     for service_type in MDNS_SERVICE_TYPES {
         match daemon.browse(service_type) {
-            Ok(rx) => receivers.push(rx),
+            Ok(rx) => receivers.push((service_type, rx)),
             Err(e) => tracing::debug!("no se pudo navegar {service_type}: {e}"),
         }
     }
@@ -198,12 +205,12 @@ fn browse_mdns_blocking() -> Vec<PrinterInfo> {
 
         // Recorre todos los receptores con un timeout corto; al expirar la ventana, salimos.
         let mut progressed = false;
-        for rx in &receivers {
+        for (service_type, rx) in &receivers {
             let slice = remaining.min(Duration::from_millis(100));
             match rx.recv_timeout(slice) {
                 Ok(ServiceEvent::ServiceResolved(info)) => {
                     progressed = true;
-                    if let Some(printer) = service_to_printer(&info) {
+                    if let Some(printer) = service_to_printer(&info, service_type) {
                         if seen_ids.insert(printer.id.clone()) {
                             tracing::debug!(
                                 "impresora mDNS encontrada: {} ({})",
@@ -234,7 +241,7 @@ fn browse_mdns_blocking() -> Vec<PrinterInfo> {
 }
 
 /// Mapea un `ServiceInfo` resuelto a `PrinterInfo` de red. `None` si no tiene direcciones.
-fn service_to_printer(info: &mdns_sd::ServiceInfo) -> Option<PrinterInfo> {
+fn service_to_printer(info: &mdns_sd::ServiceInfo, service_type: &str) -> Option<PrinterInfo> {
     let ip = info.get_addresses().iter().next()?.to_string();
     let port = match info.get_port() {
         0 => ESCPOS_NETWORK_PORT,
@@ -251,6 +258,7 @@ fn service_to_printer(info: &mdns_sd::ServiceInfo) -> Option<PrinterInfo> {
         id: format!("network:{ip}:{port}"),
         name,
         kind: "network".into(),
+        category: category_for_service(service_type).to_string(),
         status: "ready".into(),
         paper_width: 80,
         mac: None,
@@ -271,4 +279,51 @@ fn local_subnet_prefix() -> Option<String> {
     // Solo IPv4 tiene 4 octetos; si no, no es una subred /24 escaneable.
     parts.next()?;
     Some(format!("{a}.{b}.{c}"))
+}
+
+/// Clasifica una impresora por el servicio mDNS que la anunció.
+///
+/// `_ipp._tcp` lo publican las multifunción de oficina y las AirPrint, y prácticamente ninguna
+/// térmica ESC/POS → es la única señal fiable de "A4". `_pdl-datastream._tcp` (impresión cruda al
+/// 9100) lo anuncian **las dos familias**, así que no clasifica nada.
+pub fn category_for_service(service_type: &str) -> &'static str {
+    if service_type.starts_with("_ipp.") {
+        crate::protocol::PRINTER_CATEGORY_A4
+    } else {
+        crate::protocol::PRINTER_CATEGORY_UNKNOWN
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::{PRINTER_CATEGORY_A4, PRINTER_CATEGORY_UNKNOWN};
+
+    #[test]
+    fn ipp_delata_una_impresora_de_oficina() {
+        assert_eq!(category_for_service("_ipp._tcp.local."), PRINTER_CATEGORY_A4);
+    }
+
+    #[test]
+    fn la_impresion_cruda_no_clasifica_nada() {
+        // `_pdl-datastream._tcp` es "acepto bytes en el 9100": lo dicen tanto una térmica como una
+        // láser A4. Clasificarlo como térmica sería adivinar.
+        assert_eq!(
+            category_for_service("_pdl-datastream._tcp.local."),
+            PRINTER_CATEGORY_UNKNOWN
+        );
+    }
+
+    #[test]
+    fn lo_encontrado_solo_por_escaneo_de_puerto_queda_sin_clasificar() {
+        // El escaneo del 9100 no aporta ninguna señal: responder ahí no dice qué idioma habla.
+        assert_eq!(crate::protocol::default_printer_category(), PRINTER_CATEGORY_UNKNOWN);
+    }
+
+    #[test]
+    fn parse_printer_id_sigue_rechazando_transportes_no_de_red() {
+        assert!(parse_printer_id("bluetooth:AA:BB:CC:DD:EE:FF").is_err());
+        assert!(parse_printer_id("usb:001:002").is_err());
+        assert!(parse_printer_id("network:10.0.0.5:9100").is_ok());
+    }
 }
