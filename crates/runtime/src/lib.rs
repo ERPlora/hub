@@ -497,6 +497,16 @@ impl Runtime {
         self.registry.is_query_public(name)
     }
 
+    /// Definición declarativa de una página SSR perteneciente a un módulo activo.
+    pub fn public_page_definition(
+        &self,
+        path: &str,
+    ) -> Option<(String, crate::manifest::PublicPageDef)> {
+        self.registry
+            .public_page(path)
+            .map(|(module_id, page)| (module_id.to_string(), page.clone()))
+    }
+
     /// Ejecuta un command declarativo (solo si su módulo está activo). Los eventos emitidos se
     /// persisten en el outbox en la misma transacción; sus listeners los entrega el relay (§5.4).
     pub async fn execute_command(

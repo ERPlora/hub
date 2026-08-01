@@ -4,6 +4,13 @@
   "version": "1.0.0",
   "permissions": ["menu.read", "menu.write", "menu.secret"],
   "role_permissions": { "admin": ["*"] },
+  "public_pages": [
+    {
+      "path": "/menu",
+      "title": "Menu",
+      "reads": ["menu.items.list"]
+    }
+  ],
   "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
   "seed": { "postgres": ["seed/postgres/001_seed.sql"] },
   "queries": {

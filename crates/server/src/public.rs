@@ -12,23 +12,29 @@
 //! Alcance F0: frontera del gate + router público montado ANTES del fallback SPA + CSP estricta SOLO
 //! en el árbol público.
 //!
-//! Alcance Wave 2 (esto): sobre esa frontera,
+//! Sobre esa frontera:
 //!  - `POST /api/public/query` — endpoint **anónimo** de solo lectura. Puerta ÚNICA = el flag
 //!    `public: true` del manifest de la query (default-deny; el `permission` NO gatea, no hay
 //!    usuario). El `hub_id` lo inyecta el runtime (contexto de sistema), nunca el cliente.
 //!  - `GET /p/<path>` — sirve la página pública: lee el JSON de bloques de `hub_settings`
-//!    (`public.page.<path>`) y lo renderiza a HTML seguro con [`crate::public_render`] (NUNCA ejecuta
-//!    JS del usuario). Sin página para ese path → 404, como antes.
+//!    (`public.page.<path>`), ejecuta únicamente las `reads` marcadas `public` en el manifest y lo
+//!    renderiza a HTML seguro con [`crate::public_render`] (NUNCA ejecuta JS del usuario). Sin
+//!    página para ese path → 404, como antes. Emite ETag del HTML final.
 
 use axum::extract::{Path, State};
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use erplora_runtime::RequestContext;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::time::Duration;
 
 use crate::state::AppState;
+
+const MAX_PAGE_BYTES: usize = 512 * 1024;
+const MAX_PAGE_BLOCKS: usize = 200;
 
 /// CSP MÁS estricta del proyecto, aplicada SOLO al árbol público (columna de seguridad; ADR-0160):
 /// nada de scripts, estilos solo self, imágenes self + `data:`. El árbol público no ejecuta JS.
@@ -75,7 +81,10 @@ impl PublicSnapshot {
 /// ¿La ruta pertenece al árbol PÚBLICO? Exactamente `/`, lo que empieza por `/p/` y lo que empieza
 /// por `/api/public/` (ADR-0160 F0). El gate deja pasar estas rutas SIN 428 cuando el flag está on.
 pub fn is_public_path(path: &str) -> bool {
-    path == "/" || path.starts_with("/p/") || path.starts_with("/api/public/")
+    path == "/"
+        || path.starts_with("/p/")
+        || path.starts_with("/api/public/")
+        || path.starts_with("/files/pages/")
 }
 
 /// Rutas del árbol público montadas ANTES del fallback SPA (rutas EXPLÍCITAS → no caen al
@@ -87,11 +96,109 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(root))
         .route("/p/*path", get(page))
+        .route("/files/pages/*path", get(crate::media::public_page_media))
         .route("/api/public/query", post(public_query))
         .layer(SetResponseHeaderLayer::overriding(
             header::CONTENT_SECURITY_POLICY,
             HeaderValue::from_static(PUBLIC_CSP),
         ))
+}
+
+/// Normaliza el path de autoría. Se permiten segmentos URL legibles; no se admiten claves vacías,
+/// `.`/`..` ni caracteres capaces de escapar del namespace `public.page.*`.
+fn normalized_page_path(raw: &str) -> Option<String> {
+    let path = raw.trim_matches('/');
+    if path.is_empty() || path.len() > 120 {
+        return None;
+    }
+    let valid = path.split('/').all(|segment| {
+        !segment.is_empty()
+            && segment != "."
+            && segment != ".."
+            && segment
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    });
+    valid.then(|| path.to_ascii_lowercase())
+}
+
+fn valid_editor_document(doc: &Value) -> bool {
+    let Some(blocks) = doc.get("blocks").and_then(Value::as_array) else {
+        return false;
+    };
+    blocks.len() <= MAX_PAGE_BLOCKS
+        && doc.to_string().len() <= MAX_PAGE_BYTES
+        && blocks.iter().all(|block| {
+            block.get("type").and_then(Value::as_str).is_some()
+                && block.get("data").is_some_and(Value::is_object)
+        })
+}
+
+fn editor_bad_request(message: &str) -> Response {
+    (
+        StatusCode::UNPROCESSABLE_ENTITY,
+        Json(json!({ "ok": false, "error": message })),
+    )
+        .into_response()
+}
+
+/// GET /api/public-pages/*path — fuente JSON de una página para el editor autenticado.
+pub async fn get_page_source(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(path): Path<String>,
+) -> Response {
+    let Some(path) = normalized_page_path(&path) else {
+        return editor_bad_request("path público inválido");
+    };
+    let rt = st.runtime.lock().await;
+    if let Err(error) = crate::auth::require_admin_session(&headers, &st.config, &rt).await {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": error.message() })),
+        )
+            .into_response();
+    }
+    match rt.get_public_page(&path).await {
+        Ok(doc) => Json(json!({
+            "ok": true,
+            "data": doc.unwrap_or_else(|| json!({ "blocks": [] })),
+        }))
+        .into_response(),
+        Err(error) => crate::err_response(error),
+    }
+}
+
+/// PUT /api/public-pages/*path — persiste JSON de bloques Editor.js. Solo owner/admin; el JSON se
+/// valida y acota antes de tocar la BD. El renderer Rust sigue siendo la frontera final default-deny.
+pub async fn put_page_source(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(path): Path<String>,
+    Json(doc): Json<Value>,
+) -> Response {
+    let Some(path) = normalized_page_path(&path) else {
+        return editor_bad_request("path público inválido");
+    };
+    if !valid_editor_document(&doc) {
+        return editor_bad_request("documento Editor.js inválido o demasiado grande");
+    }
+    let rt = st.runtime.lock().await;
+    let admin = match crate::auth::require_admin_session(&headers, &st.config, &rt).await {
+        Ok(admin) => admin,
+        Err(error) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "ok": false, "error": error.message() })),
+            )
+                .into_response()
+        }
+    };
+    let updated_by = format!("hub_user:{}", admin.id);
+    match rt.set_public_page(&path, &doc, &updated_by).await {
+        Ok(()) => Json(json!({ "ok": true, "data": doc })).into_response(),
+        Err(error) => crate::err_response(error),
+    }
 }
 
 /// `GET /` (flag on) — landing HTML MÍNIMA server-side con los datos que ya hay en `hub_settings`.
@@ -107,12 +214,13 @@ async fn root(State(st): State<AppState>) -> Response {
 /// `GET /p/*path` (flag on) — sirve la página pública `path`. Lee el JSON de bloques guardado en
 /// `hub_settings` (`public.page.<path>`) y lo renderiza a HTML seguro con [`crate::public_render`].
 /// Sin página para ese path (o contenido corrupto) → 404 server-side (nunca la SPA).
-///
-/// TODO(datos dinámicos): las secciones alimentadas por `reads` (queries `public`) NO se ejecutan
-/// aún server-side; esta fase mínima solo renderiza los bloques estáticos. Cablear los `reads` de
-/// `public_pages[]` es un follow-up (usaría `Runtime::execute_query` con el mismo contexto de sistema
-/// que `POST /api/public/query`).
-async fn page(State(st): State<AppState>, Path(path): Path<String>) -> Response {
+/// Si el módulo declara la ruta en `public_pages[]`, sus `reads` se ejecutan server-side solo cuando
+/// la query conserva `public: true`; una referencia privada/rota se omite (default-deny).
+async fn page(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(path): Path<String>,
+) -> Response {
     // Resuelve el runtime del hub (single-tenant, o el pool de la org en cloud compartido). El hub_id
     // es el del despliegue (contexto de sistema), NUNCA aportado por el cliente.
     let Ok(arc) = st.runtime_for(&st.hub_id()).await else {
@@ -121,17 +229,67 @@ async fn page(State(st): State<AppState>, Path(path): Path<String>) -> Response 
     let rt = arc.lock().await;
     match rt.get_public_page(&path).await {
         Ok(Some(doc)) => {
-            let main = crate::public_render::render_blocks(&doc);
-            (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-                page_html(&st.public, &main),
-            )
-                .into_response()
+            let definition = rt.public_page_definition(&path);
+            let mut main = crate::public_render::render_blocks(&doc);
+            if let Some((_, page)) = &definition {
+                let ctx = RequestContext::new(
+                    rt.hub_id().to_string(),
+                    String::new(),
+                    ["*".to_string()],
+                );
+                for query in &page.reads {
+                    // Doble default-deny: `reads` solo es una referencia; el flag de la query
+                    // sigue siendo la autoridad. Un typo o una query privada se omite sin filtrar
+                    // si existe ni degradar el contenido estático de la página.
+                    if !rt.is_query_public(query) {
+                        continue;
+                    }
+                    if let Ok(rows) = rt.execute_query(query, &serde_json::Map::new(), &ctx).await {
+                        main.push_str(&render_public_rows(query, &rows));
+                    }
+                }
+            }
+            let title = definition.as_ref().map(|(_, page)| page.title.as_str());
+            cacheable_html(&headers, page_html(&st.public, title, &main))
         }
         // Sin página para ese path (o JSON corrupto) → 404, como antes.
         _ => page_not_found(),
     }
+}
+
+/// Render genérico y sin scripts de las `reads` vivas declaradas por el módulo. La forma del dato
+/// es deliberadamente transparente (JSON en `<pre>`); un renderer de dominio puede evolucionar
+/// después sin que esta frontera ejecute HTML/JS aportado por el tenant.
+fn render_public_rows(query: &str, rows: &[Value]) -> String {
+    let data = serde_json::to_string_pretty(rows).unwrap_or_else(|_| "[]".to_string());
+    format!(
+        "<section class=\"public-data\" data-query=\"{}\"><h2>{}</h2><pre>{}</pre></section>",
+        escape_html(query),
+        escape_html(query),
+        escape_html(&data),
+    )
+}
+
+/// ETag fuerte del HTML final. `304` conserva el ETag y evita retransferir páginas sin cambios.
+fn cacheable_html(request_headers: &HeaderMap, html: String) -> Response {
+    let etag = format!("\"{:x}\"", Sha256::digest(html.as_bytes()));
+    if request_headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.split(',').any(|candidate| candidate.trim() == etag))
+    {
+        return Response::builder()
+            .status(StatusCode::NOT_MODIFIED)
+            .header(header::ETAG, etag)
+            .body(axum::body::Body::empty())
+            .unwrap_or_else(|_| page_not_found());
+    }
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+        .header(header::ETAG, etag)
+        .body(axum::body::Body::from(html))
+        .unwrap_or_else(|_| page_not_found())
 }
 
 /// Body de `POST /api/public/query`: `{ "query": "<module>.<name>", "params": { … } }`.
@@ -149,6 +307,22 @@ struct PublicQueryReq {
 /// (default-deny). El `hub_id` lo inyecta el runtime (contexto de sistema), NUNCA el cliente. Solo
 /// `queries`, jamás `commands` (el dispatcher de queries no ejecuta escrituras).
 async fn public_query(State(st): State<AppState>, Json(req): Json<PublicQueryReq>) -> Response {
+    // Lectura anónima: cuota conservadora por hub+query. No hay commands públicos en v1, así que
+    // Turnstile no se introduce en un flujo que no escribe; cualquier `public_write` sigue ausente.
+    if let Err(retry_after) = st.rate_limits.check(
+        format!("public:{}:{}", st.hub_id(), req.query),
+        120,
+        Duration::from_secs(60),
+    ) {
+        return Response::builder()
+            .status(StatusCode::TOO_MANY_REQUESTS)
+            .header(header::RETRY_AFTER, retry_after.to_string())
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(
+                json!({ "ok": false, "error": { "code": "rate_limited" } }).to_string(),
+            ))
+            .unwrap_or_else(|_| public_query_denied());
+    }
     let Ok(arc) = st.runtime_for(&st.hub_id()).await else {
         return public_query_denied();
     };
@@ -219,10 +393,14 @@ pub fn render_landing(snap: &PublicSnapshot) -> String {
 /// inline (la [`PUBLIC_CSP`] prohíbe `style-src 'unsafe-inline'` y `script-src`); el `main` viene del
 /// renderer seguro ([`crate::public_render::render_blocks`]), así que se inserta tal cual. El título
 /// sale del nombre del negocio (escapado), con fallback genérico.
-fn page_html(snap: &PublicSnapshot, main: &str) -> String {
+fn page_html(snap: &PublicSnapshot, page_title: Option<&str>, main: &str) -> String {
     let name = snap.business_name.trim();
     let name = if name.is_empty() { "ERPlora" } else { name };
-    let title = escape_html(name);
+    let title = page_title
+        .filter(|title| !title.trim().is_empty())
+        .map(|title| format!("{} · {}", title.trim(), name))
+        .unwrap_or_else(|| name.to_string());
+    let title = escape_html(&title);
     format!(
         "<!doctype html>\n\
          <html lang=\"es\">\n\
@@ -280,6 +458,7 @@ mod tests {
         assert!(is_public_path("/"));
         assert!(is_public_path("/p/menu"));
         assert!(is_public_path("/api/public/query"));
+        assert!(is_public_path("/files/pages/menu/foto.png"));
         // NO públicas: la API autenticada, la SPA, y prefijos que solo "parecen" públicos.
         assert!(!is_public_path("/api/settings"));
         assert!(!is_public_path("/dashboard"));
@@ -328,5 +507,15 @@ mod tests {
     fn render_landing_falls_back_to_generic_name_when_empty() {
         let html = render_landing(&PublicSnapshot::default());
         assert!(html.contains("ERPlora"), "sin nombre ⇒ título genérico, no vacío");
+    }
+
+    #[test]
+    fn editor_paths_and_documents_are_bounded() {
+        assert_eq!(normalized_page_path("/Carta/Verano/"), Some("carta/verano".into()));
+        assert_eq!(normalized_page_path("../secreto"), None);
+        assert!(valid_editor_document(&json!({
+            "blocks": [{ "type": "paragraph", "data": { "text": "hola" } }]
+        })));
+        assert!(!valid_editor_document(&json!({ "blocks": [{ "type": "paragraph" }] })));
     }
 }

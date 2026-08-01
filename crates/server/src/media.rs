@@ -29,7 +29,7 @@
 //! (`static_files.user_actions`, ADR-0172): por defecto solo ver y descargar. Ver `policy_for`.
 
 use axum::body::Body;
-use axum::extract::{Multipart, Query, State};
+use axum::extract::{Multipart, Path as AxumPath, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -208,6 +208,23 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
     if files.is_empty() {
         return err(StatusCode::BAD_REQUEST, "no se enviaron ficheros");
     }
+    let public_url = files.first().and_then(|(name, _)| {
+        let folder = folder.trim_matches('/');
+        let folder_path = Path::new(folder);
+        let folder_is_public = folder_path.components().all(|c| matches!(c, Component::Normal(_)))
+            && folder_path
+                .components()
+                .next()
+                .is_some_and(|c| c.as_os_str() == "pages");
+        let name_is_single_segment = Path::new(name)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+            && Path::new(name).components().count() == 1;
+        (folder_is_public && name_is_single_segment).then(|| {
+            let rel = format!("{folder}/{name}");
+            format!("/files/{}", pct_encode(&rel))
+        })
+    });
     let mut form = reqwest::multipart::Form::new().text("folder", folder);
     for (fname, data) in files {
         form = form.part(
@@ -221,7 +238,14 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
         r = r.header(k, v);
     }
     match r.send().await {
-        Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
+        Ok(resp) if resp.status().is_success() => Json(match public_url {
+            Some(url) => json!({
+                "ok": true,
+                "data": { "url": url, "file": { "url": url } },
+            }),
+            None => json!({ "ok": true }),
+        })
+        .into_response(),
         Ok(_) => err(StatusCode::BAD_GATEWAY, "el Cloud rechazó la subida"),
         Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
     }
@@ -343,6 +367,25 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
         )
         .body(Body::from(bytes.to_vec()))
         .unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "respuesta inválida"))
+}
+
+/// GET /files/pages/*path — media EXCLUSIVA de las páginas públicas. No acepta `..`, prefijos
+/// alternativos ni rutas absolutas; jamás abre `_logs`, adjuntos de módulos u otros ficheros del hub.
+/// El runtime descarga la URL firmada con su credencial de máquina y devuelve solo los bytes.
+pub async fn public_page_media(
+    State(st): State<AppState>,
+    AxumPath(path): AxumPath<String>,
+) -> Response {
+    let relative = Path::new(&path);
+    let valid = !path.is_empty()
+        && !relative.is_absolute()
+        && relative
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)));
+    if !valid {
+        return err(StatusCode::NOT_FOUND, "fichero no encontrado");
+    }
+    cloud_raw(&st, &format!("pages/{path}")).await
 }
 
 // ─────────────────────────── GET /api/media ───────────────────────────

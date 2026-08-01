@@ -353,6 +353,8 @@ pub struct AppState {
     /// datos de negocio para la landing. Lo carga `serve()` UNA vez al arrancar; el gate y las rutas
     /// públicas lo leen sin pegar a `hub_settings`. Por defecto = capa pública CERRADA (flag false).
     pub public: Arc<crate::public::PublicSnapshot>,
+    /// Cuotas de borde por principal (páginas públicas e integraciones). Compartido por clones.
+    pub rate_limits: Arc<crate::rate_limit::RateLimiter>,
 }
 
 impl AppState {
@@ -405,6 +407,7 @@ impl AppState {
             // Capa pública CERRADA por defecto (ADR-0160 F0). `serve()` la reemplaza con el snapshot
             // real leído de `hub_settings` al arrancar; los tests la inyectan con `with_public_snapshot`.
             public: Arc::new(crate::public::PublicSnapshot::default()),
+            rate_limits: Arc::new(crate::rate_limit::RateLimiter::default()),
         }
     }
 

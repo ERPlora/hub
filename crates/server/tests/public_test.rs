@@ -42,6 +42,9 @@ async fn fixture(landing_visible: bool) -> (AppState, std::path::PathBuf) {
         device_trust_enforce: false,
         media_dir: temp.clone(),
         sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     };
     let snap = PublicSnapshot {
         landing_visible,

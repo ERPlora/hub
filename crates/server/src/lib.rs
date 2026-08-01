@@ -52,6 +52,7 @@ pub mod profile;
 /// Capa web PÚBLICA del hub (ADR-0160, F0): frontera del gate + landing server-side + CSP estricta.
 pub mod public;
 pub mod public_render;
+pub mod rate_limit;
 pub mod router;
 pub mod settings;
 pub mod state;
@@ -633,6 +634,13 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/settings",
             get(settings::get_settings).put(settings::put_settings),
+        )
+        // Autoría de páginas públicas: ruta autenticada separada del árbol anónimo `/api/public/*`.
+        .route(
+            "/api/public-pages/*path",
+            get(public::get_page_source)
+                .put(public::put_page_source)
+                .layer(axum::extract::DefaultBodyLimit::max(512 * 1024)),
         )
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(

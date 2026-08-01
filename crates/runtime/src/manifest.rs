@@ -18,6 +18,11 @@ pub struct Manifest {
     pub role_permissions: HashMap<String, Vec<String>>,
     #[serde(default)]
     pub navigation: Vec<Nav>,
+    /// Páginas SSR anónimas aportadas por el módulo (ADR-0160). El contenido editable vive como
+    /// JSON de bloques; este contrato declara la ruta y las queries opt-in que alimentan datos
+    /// vivos. El runtime solo devuelve definiciones de módulos activos.
+    #[serde(default)]
+    pub public_pages: Vec<PublicPageDef>,
     #[serde(default)]
     pub migrations: Migrations,
     /// **Datos de referencia** que el módulo siembra al instalarse (ADR-0147; `taxes` lo usa desde
@@ -549,6 +554,17 @@ pub struct QueryDef {
     pub public: bool,
 }
 
+/// Contrato declarativo de una página pública de módulo (`public_pages[]`).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PublicPageDef {
+    pub path: String,
+    pub title: String,
+    #[serde(default)]
+    pub reads: Vec<String>,
+    #[serde(default)]
+    pub slot: Option<String>,
+}
+
 /// Contrato declarativo de una query de lista (`list` en `module.json`). Espejo de
 /// `$defs/listSpec` en `schemas/module.schema.json`. El runtime lo consume en `queries.rs`
 /// para componer el SQL paginado. ARQUITECTURA.md §4, §8.2.
@@ -820,6 +836,27 @@ mod tests {
             !manifest.queries.get("menu.items.secret").unwrap().public,
             "public ausente ⇒ false (default-deny)"
         );
+    }
+
+    #[test]
+    fn parses_public_pages_with_live_reads() {
+        let json = r#"{
+            "id": "menu",
+            "name": "Menu",
+            "version": "1.0.0",
+            "public_pages": [{
+                "path": "/carta",
+                "title": "Menu",
+                "reads": ["menu.items.list"],
+                "slot": "public.home.sections"
+            }]
+        }"#;
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        assert_eq!(manifest.public_pages.len(), 1);
+        let page = &manifest.public_pages[0];
+        assert_eq!(page.path, "/carta");
+        assert_eq!(page.reads, vec!["menu.items.list"]);
+        assert_eq!(page.slot.as_deref(), Some("public.home.sections"));
     }
 
     #[test]

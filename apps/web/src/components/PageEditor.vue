@@ -6,7 +6,7 @@
 <script setup lang="ts">
 // PageEditor — editor de páginas públicas del Hub (ADR-0160 F2). Envuelve Editor.js y produce
 // JSON de BLOQUES (nunca HTML). Se usa SOLO en la ruta de edición autenticada; esta pieza es el
-// componente, no la ruta ni el transporte de guardado (aún no existe): el guardado se emite.
+// componente; el padre autenticado resuelve la ruta y persiste el JSON que `save()` devuelve.
 //
 // SEGURIDAD (ADR-0160): SOLO tools curados. Se PROHÍBE registrar `@editorjs/raw` (inyecta HTML
 // crudo) y `@editorjs/embed` (inyecta iframes). Media: solo del propio Hub vía /files (ADR-0047),
@@ -32,8 +32,8 @@ const props = withDefaults(
   { mediaFolder: 'pages' },
 );
 
-// El guardado no tiene transporte todavía: el padre (la ruta de edición) recibe el JSON y decide
-// dónde persistirlo. `save()` (expuesto) también lo devuelve para composición imperativa.
+// El padre autenticado persiste el JSON por `/api/public-pages/*path`. `save()` (expuesto) lo
+// devuelve para mantener el editor desacoplado del transporte.
 const emit = defineEmits<{ (e: 'save', data: OutputData): void }>();
 
 const { t } = useI18n();
@@ -48,17 +48,14 @@ const FAILED: UploadResult = { success: 0, file: { url: '' } };
 
 /** Solo se acepta media ya alojada en el propio Hub. Cualquier esquema/host externo → rechazo. */
 function isInternalMediaUrl(url: string): boolean {
-  return url.startsWith('/files/') || url.startsWith('/api/media/');
+  return url.startsWith('/files/pages/');
 }
 
 /**
  * Sube una imagen a `media/<folder>` vía el runtime del Hub (mismo contrato que lib/media.ts).
  *
- * TODO(ADR-0047): fijar el contrato de `POST /api/media/upload` para que devuelva la URL (firmada)
- * del fichero subido. Hoy `uploadMedia()` (lib/media.ts) solo devuelve `ok:boolean`; aquí leemos
- * de forma defensiva `data.file.url` / `data.url`, pero el wiring fino vive en `crates/server`
- * (columna del humano). Si el runtime no devuelve una URL interna, la subida se reporta fallida
- * (Editor.js muestra su propio error) — nunca se acepta una URL externa.
+ * El runtime devuelve una URL pública acotada a `/files/pages/*`; si falta o no es interna, la
+ * subida se reporta fallida (Editor.js muestra su error) y nunca se acepta una URL externa.
  */
 async function uploadByFile(file: Blob): Promise<UploadResult> {
   try {
@@ -84,7 +81,7 @@ async function uploadByFile(file: Blob): Promise<UploadResult> {
   }
 }
 
-/** Referenciar por URL: solo rutas internas del Hub (/files, /api/media). Externas → rechazo. */
+/** Referenciar por URL: solo el namespace público `/files/pages/`. Externas → rechazo. */
 async function uploadByUrl(url: string): Promise<UploadResult> {
   if (!isInternalMediaUrl(url)) return FAILED;
   return { success: 1, file: { url } };

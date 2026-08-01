@@ -36,6 +36,9 @@ fn dev_config() -> HubConfig {
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-public-media"),
         sector: None,
+        dev_mode: true,
+        dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
     }
 }
 
@@ -82,6 +85,18 @@ fn get(uri: &str) -> Request<Body> {
         .method("GET")
         .uri(uri)
         .body(Body::empty())
+        .unwrap()
+}
+
+fn admin_json(method: &str, uri: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-type", "application/json")
+        .header("x-hub-id", HUB_ID)
+        .header("x-user-id", "owner")
+        .header("x-permissions", "*")
+        .body(Body::from(body.to_string()))
         .unwrap()
 }
 
@@ -186,6 +201,12 @@ async fn flag_on_page_with_stored_json_renders_html_with_strict_csp() {
     // Página con JSON → 200 HTML del renderer seguro + CSP estricta pública.
     let resp = app.clone().oneshot(get("/p/menu")).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+    let etag = resp
+        .headers()
+        .get("etag")
+        .and_then(|value| value.to_str().ok())
+        .expect("SSR page emits ETag")
+        .to_string();
     let csp = resp
         .headers()
         .get("content-security-policy")
@@ -195,9 +216,48 @@ async fn flag_on_page_with_stored_json_renders_html_with_strict_csp() {
     let html = body_text(resp).await;
     assert!(html.contains("<h1>Nuestra carta</h1>"), "salió: {html}");
     assert!(html.contains("<b>bar</b>"), "el inline saneado se conserva: {html}");
+    assert!(html.contains("Cafe con leche"), "la read pública se renderiza server-side: {html}");
     assert!(!html.contains("<script"), "nunca JS del usuario");
+
+    let conditional = Request::builder()
+        .method("GET")
+        .uri("/p/menu")
+        .header("if-none-match", etag)
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(conditional).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_MODIFIED);
 
     // Path sin página almacenada → 404 (como hoy).
     let resp = app.oneshot(get("/p/no-existe")).await.unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn authenticated_editor_roundtrips_block_json_then_public_page_renders_it() {
+    let app = app(
+        AppState::with_config(make_runtime().await, dev_config())
+            .with_public_snapshot(snapshot_on()),
+    );
+    let doc = json!({
+        "blocks": [{ "type": "paragraph", "data": { "text": "Carta <b>de hoy</b>" } }]
+    });
+    let response = app
+        .clone()
+        .oneshot(admin_json("PUT", "/api/public-pages/carta", doc.clone()))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = app
+        .clone()
+        .oneshot(admin_json("GET", "/api/public-pages/carta", json!({})))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(body_json(response).await["data"], doc);
+
+    let response = app.oneshot(get("/p/carta")).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(body_text(response).await.contains("Carta <b>de hoy</b>"));
 }

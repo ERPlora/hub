@@ -33,3 +33,6 @@ apps/web/public/modules/*
 
 # Script de inspección temporal con Playwright (no versionar).
 erplora-inspect.mjs
+
+# Artefactos y trazas regenerables de Playwright.
+apps/web/test-results/

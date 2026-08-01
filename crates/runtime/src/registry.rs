@@ -3,7 +3,7 @@
 //! INACTIVO; solo los activos exponen menú/queries/commands/eventos (hot-plug, §4 paso 11).
 use std::collections::{HashMap, HashSet};
 
-use crate::manifest::{CommandDef, Manifest, ModuleLocale, Nav, QueryDef};
+use crate::manifest::{CommandDef, Manifest, ModuleLocale, Nav, PublicPageDef, QueryDef};
 
 /// Estado de un módulo instalado en este hub (equivalente a la tabla `hub_module`, §2.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -374,6 +374,23 @@ impl Registry {
     /// es pública aunque su manifest lo declarara.
     pub fn is_query_public(&self, name: &str) -> bool {
         self.get_query(name).map(|q| q.def.public).unwrap_or(false)
+    }
+
+    /// Página pública declarada por un módulo activo. La ruta se compara normalizada (sin barras
+    /// exteriores y en minúsculas). Si dos manifests colisionan, gana el primero instalado para
+    /// mantener una resolución estable y no mezclar contratos entre módulos.
+    pub fn public_page(&self, path: &str) -> Option<(&str, &PublicPageDef)> {
+        let wanted = path.trim_matches('/').to_ascii_lowercase();
+        self.installed.iter().find_map(|manifest| {
+            if !self.is_active(&manifest.id) {
+                return None;
+            }
+            manifest
+                .public_pages
+                .iter()
+                .find(|page| page.path.trim_matches('/').eq_ignore_ascii_case(&wanted))
+                .map(|page| (manifest.id.as_str(), page))
+        })
     }
 
     /// Cambia el estado de un módulo instalado. Devuelve `false` si no existe.

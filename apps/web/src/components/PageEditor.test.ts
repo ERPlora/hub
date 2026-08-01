@@ -125,6 +125,18 @@ describe('PageEditor', () => {
     expect(image.config?.endpoints).toBeUndefined();
   });
 
+  it('el uploader solo acepta el namespace público /files/pages', async () => {
+    mountEditor();
+    const tools = instances[0].config.tools as Record<string, {
+      config?: { uploader?: { uploadByUrl?: (url: string) => Promise<{ success: number }> } };
+    }>;
+    const uploadByUrl = tools.image.config?.uploader?.uploadByUrl;
+    expect(uploadByUrl).toBeTypeOf('function');
+    await expect(uploadByUrl!('/files/pages/carta/plato.png')).resolves.toMatchObject({ success: 1 });
+    await expect(uploadByUrl!('/files/contracts/private.pdf')).resolves.toMatchObject({ success: 0 });
+    await expect(uploadByUrl!('https://evil.test/image.png')).resolves.toMatchObject({ success: 0 });
+  });
+
   it('pasa initialData como `data` al editor', () => {
     const data = { time: 42, blocks: [{ type: 'header', data: { text: 'Hi', level: 2 } }], version: '2.30.0' };
     mountEditor(data);

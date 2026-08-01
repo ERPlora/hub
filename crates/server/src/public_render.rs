@@ -134,7 +134,7 @@ fn render_table(data: &Value) -> String {
     out
 }
 
-/// `<figure><img>` SOLO si el `src` referencia media del propio hub (ruta `/files`, ADR-0047).
+/// `<figure><img>` SOLO si el `src` referencia media pública de páginas (`/files/pages/`).
 /// Cualquier URL externa o esquema (`http(s)://…`, `javascript:`, `data:`…) ⇒ `None` (se descarta
 /// la imagen entera). Soporta `data.file.url` (@editorjs/image) y `data.url` (@editorjs/simple-image).
 /// `src` y `alt` se ESCAPAN (contexto de atributo/texto, no HTML inline).
@@ -145,9 +145,10 @@ fn render_image(data: &Value) -> Option<String> {
         .and_then(Value::as_str)
         .or_else(|| data.get("url").and_then(Value::as_str))
         .unwrap_or("");
-    // Frontera: solo rutas de la carpeta media del hub. `starts_with("/files/")` evita que
-    // `/filesX` (u otra ruta que comparta prefijo) cuele; `/files` exacto también se admite.
-    if !(src == "/files" || src.starts_with("/files/")) {
+    // Frontera: la ruta anónima del server solo abre este namespace. Aceptar `/files/*` aquí
+    // produciría HTML que intenta acceder a adjuntos privados del hub (el gate los bloquearía,
+    // pero no deben aparecer siquiera en la página pública).
+    if !src.starts_with("/files/pages/") {
         return None;
     }
     let src = escape_text(src);
@@ -361,16 +362,24 @@ mod tests {
         assert!(html.contains("sí visible"), "el bloque conocido sí se renderiza: {html}");
     }
 
-    // ── Bloque image: solo media del hub (/files, ADR-0047) ─────────────────────────────────
+    // ── Bloque image: solo media pública de páginas (/files/pages, ADR-0047) ────────────────
 
     #[test]
-    fn image_de_files_renderiza_img() {
+    fn image_de_pages_renderiza_img() {
         let html = render_blocks(&json!({ "blocks": [
-            { "type": "image", "data": { "file": { "url": "/files/menu/foto.png" }, "caption": "Un plato" } },
+            { "type": "image", "data": { "file": { "url": "/files/pages/menu/foto.png" }, "caption": "Un plato" } },
         ]}));
         assert!(html.contains("<img"), "debe renderizar img: {html}");
-        assert!(html.contains("src=\"/files/menu/foto.png\""), "salió: {html}");
+        assert!(html.contains("src=\"/files/pages/menu/foto.png\""), "salió: {html}");
         assert!(html.contains("Un plato"), "el caption escapado debe aparecer: {html}");
+    }
+
+    #[test]
+    fn image_privada_fuera_de_pages_no_renderiza() {
+        let html = render_blocks(&json!({ "blocks": [
+            { "type": "image", "data": { "file": { "url": "/files/contracts/private.pdf" } } },
+        ]}));
+        assert!(!html.contains("<img"), "media privada no aparece en HTML público: {html}");
     }
 
     #[test]
