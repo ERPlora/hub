@@ -232,9 +232,15 @@ pub fn user_auth(headers: &HeaderMap, fallback_hub: &str) -> Option<cloud_client
 /// está enrolado. Lee el token **vivo** del [`AppState`] (`machine_token`), no la config estática,
 /// para que un enrol/rotación aplique sin reiniciar (§2.3, hot-reload). `None` si no hay token.
 pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
+    machine_auth_for(st, &st.hub_id())
+}
+
+/// Variante multi-tenant: el token de máquina permanece server-side, pero el `X-Hub-Id` de la
+/// llamada saliente debe ser el tenant ya resuelto para esta petición, no el runtime bootstrap.
+pub fn machine_auth_for(st: &AppState, hub_id: &str) -> Option<cloud_client::Auth> {
     st.machine_token()
         .map(|token| cloud_client::Auth::HubToken {
-            hub_id: st.hub_id(),
+            hub_id: hub_id.to_string(),
             token,
         })
 }
@@ -249,5 +255,16 @@ pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
 /// estas llamadas las hace el runtime (server-side).
 pub fn hub_scoped_auth(headers: &HeaderMap, st: &AppState) -> Option<cloud_client::Auth> {
     let hub_id = st.hub_id();
-    machine_auth(st).or_else(|| st.is_demo().then(|| user_auth(headers, &hub_id)).flatten())
+    hub_scoped_auth_for(headers, st, &hub_id)
+}
+
+/// Credencial Cloud para el tenant que ya pasó por [`AppState::runtime_for`]. Separar este id del
+/// bootstrap evita que un proceso compartido consulte/instale en Cloud como otro Hub.
+pub fn hub_scoped_auth_for(
+    headers: &HeaderMap,
+    st: &AppState,
+    hub_id: &str,
+) -> Option<cloud_client::Auth> {
+    machine_auth_for(st, hub_id)
+        .or_else(|| st.is_demo().then(|| user_auth(headers, hub_id)).flatten())
 }

@@ -34,7 +34,8 @@ fn unauthorized(e: auth::AuthError) -> Response {
 /// usuario válida (cualquier rol). Devuelve `{ currency, language, api_docs_enabled, … }` **plano**
 /// (no envuelto en `{ok,data}`): es el contrato directo que consume el frontend.
 pub async fn get_settings(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let arc = match st.runtime_for(&st.hub_id()).await {
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let arc = match st.runtime_for(&hub_id).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -57,7 +58,8 @@ pub async fn put_settings(
     body: Option<Json<Map<String, Value>>>,
 ) -> Response {
     let updates = body.map(|b| b.0).unwrap_or_default();
-    let arc = match st.runtime_for(&st.hub_id()).await {
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let arc = match st.runtime_for(&hub_id).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };

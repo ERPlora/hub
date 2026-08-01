@@ -1027,20 +1027,22 @@ async fn preview_install_plan(
     headers: HeaderMap,
     Json(req): Json<RequestInstallReq>,
 ) -> Response {
-    {
-        let rt = st.runtime.lock().await;
-        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-            return unauthorized(e);
-        }
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(runtime) => runtime,
+        Err(error) => return tenant_rejected(error),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
     }
-    let Some(cloud_auth) = auth::hub_scoped_auth(&headers, &st) else {
+    let Some(cloud_auth) = auth::hub_scoped_auth_for(&headers, &st, &hub_id) else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
         )
             .into_response();
     };
-    let rt = st.runtime.lock().await;
     match install::resolve_install_plan(
         &st.http,
         &st.config.cloud_base_url,
@@ -1076,14 +1078,19 @@ async fn request_install(
     // La credencial de máquina sirve para que ESTE Hub hable con Cloud, no para autorizar al
     // navegador. Exigimos primero la sesión local de un owner/admin: de lo contrario cualquier
     // módulo web same-origin podría disparar instalaciones usando indirectamente el token del Hub.
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(runtime) => runtime,
+        Err(error) => return tenant_rejected(error),
+    };
     {
-        let rt = st.runtime.lock().await;
+        let rt = arc.lock().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
     }
     // Hub-scoped: token de máquina si el hub está enrolado; si no, JWT del usuario.
-    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+    let Some(auth) = auth::hub_scoped_auth_for(&headers, &st, &hub_id) else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
@@ -1105,7 +1112,7 @@ async fn request_install(
         }));
     };
 
-    let mut rt = st.runtime.lock().await;
+    let mut rt = arc.lock().await;
     let result = install::install_from_cloud(
         &st.http,
         &st.config.cloud_base_url,
@@ -1138,7 +1145,7 @@ async fn request_install(
                     match embed::index_chunks(
                         &embedder,
                         store.as_ref(),
-                        &st.hub_id(),
+                        &hub_id,
                         &installed.version,
                         &chunks,
                     )
@@ -1278,7 +1285,16 @@ async fn cloud_get_raw(
     headers: &HeaderMap,
     req: cloud_client::PreparedRequest,
 ) -> Result<(StatusCode, axum::body::Bytes), CloudGetError> {
-    let Some(auth) = auth::hub_scoped_auth(headers, st) else {
+    cloud_get_raw_for_hub(st, headers, req, &st.hub_id()).await
+}
+
+async fn cloud_get_raw_for_hub(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+    hub_id: &str,
+) -> Result<(StatusCode, axum::body::Bytes), CloudGetError> {
+    let Some(auth) = auth::hub_scoped_auth_for(headers, st, hub_id) else {
         return Err(CloudGetError::NoCredential);
     };
     let mut r = st.http.get(&req.url);
@@ -1331,6 +1347,28 @@ async fn proxy_cloud_get(
         )
             .into_response(),
         Err(e) => cloud_get_error_response(e),
+    }
+}
+
+/// Variante del proxy para un tenant ya resuelto. El `PreparedRequest` aporta URL/query; la
+/// credencial se reconstruye con el mismo `hub_id` que seleccionó el Runtime de la petición.
+async fn proxy_cloud_get_for_hub(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+    hub_id: &str,
+) -> Response {
+    match cloud_get_raw_for_hub(st, headers, req, hub_id).await {
+        Ok((status, body)) => (
+            status,
+            [
+                (axum::http::header::CONTENT_TYPE, "application/json"),
+                (axum::http::header::CACHE_CONTROL, "no-store"),
+            ],
+            body,
+        )
+            .into_response(),
+        Err(error) => cloud_get_error_response(error),
     }
 }
 
@@ -1468,8 +1506,13 @@ async fn proxy_marketplace_catalog(
     Query(filter): Query<MarketplaceFilter>,
     headers: HeaderMap,
 ) -> Response {
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(runtime) => runtime,
+        Err(error) => return tenant_rejected(error),
+    };
     let (hub_country, hub_region) = {
-        let rt = st.runtime.lock().await;
+        let rt = arc.lock().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -1516,10 +1559,10 @@ async fn proxy_marketplace_catalog(
             .into_response();
     }
     let placeholder = cloud_client::Auth::HubToken {
-        hub_id: st.hub_id(),
+        hub_id: hub_id.clone(),
         token: String::new(),
     };
-    proxy_cloud_get(
+    proxy_cloud_get_for_hub(
         &st,
         &headers,
         cloud.marketplace_modules_filtered(
@@ -1527,6 +1570,7 @@ async fn proxy_marketplace_catalog(
             Some(&countries),
             region.as_deref(),
         ),
+        &hub_id,
     )
     .await
 }
