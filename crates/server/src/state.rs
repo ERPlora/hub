@@ -429,8 +429,19 @@ impl AppState {
         &self,
         hub_id: &str,
     ) -> Result<Arc<Mutex<Runtime>>, crate::tenant::TenantError> {
+        Ok(self.resources_for(hub_id).await?.runtime.clone())
+    }
+
+    /// Resuelve conjuntamente runtime e índice vectorial para la frontera del tenant. En modo
+    /// compartido ambos proceden del mismo DSN por-org; en single-tenant conserva los recursos de
+    /// arranque. Los handlers de assistant/install/lifecycle deben usar este método una sola vez
+    /// por petición para no mezclar accidentalmente recursos de organizaciones distintas.
+    pub async fn resources_for(
+        &self,
+        hub_id: &str,
+    ) -> Result<Arc<crate::tenant::TenantResources>, crate::tenant::TenantError> {
         match &self.tenants {
-            Some(router) => router.resolve_runtime(hub_id).await,
+            Some(router) => router.resolve_resources(hub_id).await,
             None => {
                 // En single-tenant el primer login puede sustituir el placeholder de arranque por
                 // el UUID real. Sincronizamos el Runtime antes de devolverlo para que sus helpers
@@ -443,7 +454,10 @@ impl AppState {
                     runtime.adopt_hub_id(effective_hub_id);
                 }
                 drop(runtime);
-                Ok(self.runtime.clone())
+                Ok(Arc::new(crate::tenant::TenantResources {
+                    runtime: self.runtime.clone(),
+                    vector: self.vector.clone(),
+                }))
             }
         }
     }

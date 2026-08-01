@@ -149,7 +149,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { IonButton, IonTextarea, IonSpinner } from '@ionic/vue';
+import { IonButton, IonTextarea, IonSpinner, alertController } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { assistantOpen, closeAssistant, assistantSeed } from '../lib/shell';
 import {
@@ -321,6 +321,19 @@ async function send(): Promise<void> {
       abort = null;
       if (!messageText(assistantMsg.value.content)) assistantMsg.value.content = t('assistant.error');
       saveAssistantHistory();
+    },
+    onConfirm: async (call) => {
+      const alert = await alertController.create({
+        header: t('assistant.confirmTitle'),
+        message: `${call.name}\n${call.arguments}`,
+        buttons: [
+          { text: t('assistant.confirmCancel'), role: 'cancel' },
+          { text: t('assistant.confirmRun'), role: 'confirm' },
+        ],
+      });
+      await alert.present();
+      const result = await alert.onDidDismiss();
+      return result.role === 'confirm';
     },
   });
 }

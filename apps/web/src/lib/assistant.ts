@@ -8,6 +8,7 @@
 import { RUNTIME_URL, getClient } from './runtime';
 import { config } from './config';
 import { getAccessToken } from './cloud';
+import { getHubSession } from './session';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
@@ -119,7 +120,7 @@ interface FunctionCall {
   name: string;
   call_id: string;
   arguments: string; // JSON string of the arguments
-  kind?: string; // 'query' (read, auto) | 'command' (write, needs confirm), tagged by the runtime
+  kind: 'query' | 'command'; // authoritative catalog kind, tagged by the runtime
 }
 
 /** OpenAI-style tool_call, as the Cloud expects it back on the assistant message. */
@@ -216,6 +217,8 @@ async function streamRound(
     Accept: 'text/event-stream',
   };
   if (config.hubId) headers['X-Hub-Id'] = config.hubId;
+  const session = getHubSession();
+  if (session) headers['X-Hub-Session'] = session;
   const token = getAccessToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -263,16 +266,26 @@ async function streamRound(
         cb.onToken(t);
       } else if (evt.type === 'function_call') {
         const fc = evt as { name?: string; call_id?: string; arguments?: string; kind?: string };
+        if (
+          !fc.name
+          || !fc.call_id
+          || typeof fc.arguments !== 'string'
+          || (fc.kind !== 'query' && fc.kind !== 'command')
+        ) {
+          cb.onError?.(new Error('assistant returned an unavailable or malformed tool'));
+          return { functionCalls: [], text, errored: true };
+        }
         functionCalls.push({
-          name: fc.name ?? '',
-          call_id: fc.call_id ?? '',
-          arguments: typeof fc.arguments === 'string' ? fc.arguments : '{}',
-          kind: typeof fc.kind === 'string' ? fc.kind : undefined,
+          name: fc.name,
+          call_id: fc.call_id,
+          arguments: fc.arguments,
+          kind: fc.kind,
         });
       } else if (evt.type === 'done') {
         return { functionCalls, text, errored: false };
       } else if (evt.type === 'error') {
-        cb.onError?.(new Error((evt as { message?: string }).message ?? 'assistant error'));
+        const errorEvt = evt as { message?: string; error?: string };
+        cb.onError?.(new Error(errorEvt.message ?? errorEvt.error ?? 'assistant error'));
         return { functionCalls, text, errored: true };
       }
     }
@@ -283,7 +296,7 @@ async function streamRound(
 
 /** Ejecuta una tool call con la sesión del usuario y la envuelve como mensaje `tool`.
  *
- *  - LECTURA (`query`, o kind ausente): se corre directo (sin efectos), con el mismo gate
+ *  - LECTURA (`query`): se corre directo (sin efectos), con el mismo gate
  *    de permisos que la UI (`getClient().query`).
  *  - ESCRITURA (`command`): pide confirmación con `onConfirm`; solo tras el `true` se
  *    ejecuta (`getClient().command`). Sin handler o si se cancela → NO se muta y se devuelve
@@ -291,7 +304,12 @@ async function streamRound(
  *
  *  Cualquier fallo degrada a una nota de error (nunca lanza): el turno sigue. */
 async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireMessage> {
-  const params = safeParseArgs(fc.arguments);
+  let params: Record<string, unknown>;
+  try {
+    params = parseArgs(fc.arguments);
+  } catch (err) {
+    return toolMessage(fc.call_id, { error: errMessage(err) });
+  }
 
   if (fc.kind === 'command') {
     const approved = cb.onConfirm
@@ -316,12 +334,12 @@ async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireM
   }
 }
 
-function safeParseArgs(s: string): Record<string, unknown> {
-  try {
-    return s ? (JSON.parse(s) as Record<string, unknown>) : {};
-  } catch {
-    return {};
+function parseArgs(s: string): Record<string, unknown> {
+  const parsed = JSON.parse(s) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('assistant tool arguments must be a JSON object');
   }
+  return parsed as Record<string, unknown>;
 }
 
 function toolMessage(callId: string, content: unknown): WireMessage {

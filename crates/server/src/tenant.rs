@@ -30,7 +30,10 @@ use std::sync::{Arc, RwLock};
 
 use erplora_db::PgAdapter;
 use erplora_runtime::Runtime;
+use erplora_vector::{PgVectorStore, VectorStore};
 use tokio::sync::Mutex;
+
+use crate::state::SharedVectorStore;
 
 /// Identificador de organización (frontera de datos en ERPlora: una BD por org, §2.5). Newtype
 /// sobre `String` para no confundirlo con un `hub_id` (varios hubs comparten la BD de una org).
@@ -67,6 +70,9 @@ pub enum TenantError {
     /// Fallo al abrir el pool de la org (DSN inválido, Aurora caída…).
     #[error("no se pudo conectar a la BD de la org: {0}")]
     Connect(#[from] erplora_db::DbError),
+    /// Fallo al preparar el corpus vectorial que vive en la misma BD de la organización.
+    #[error("no se pudo preparar el índice vectorial de la org: {0}")]
+    Vector(#[from] erplora_vector::VectorError),
 }
 
 /// Resuelve `hub_id → OrgDescriptor` (org + DSN). Es el **seam** donde entra el mecanismo real de
@@ -118,16 +124,42 @@ pub type RuntimeFactory = Arc<
         + Sync,
 >;
 
-/// Mapa de runtimes por organización + resolución `hub_id → org → runtime`.
+/// Recursos que comparten una misma frontera de organización. El runtime y el índice vectorial
+/// se construyen desde el mismo descriptor/DSN y se cachean juntos; así una petición nunca puede
+/// ejecutar SQL en la org A y buscar o escribir embeddings en la org B.
+#[derive(Clone)]
+pub struct TenantResources {
+    pub runtime: Arc<Mutex<Runtime>>,
+    pub vector: Option<SharedVectorStore>,
+}
+
+/// Resultado sin envolver de una fábrica de recursos. Es público para permitir fábricas de test
+/// con un `MemoryVectorStore` distinto por organización.
+pub struct TenantResourceBundle {
+    pub runtime: Runtime,
+    pub vector: Option<SharedVectorStore>,
+}
+
+/// Fábrica de la frontera completa por org (runtime + vector store).
+pub type TenantResourceFactory = Arc<
+    dyn Fn(
+            &OrgDescriptor,
+        )
+            -> futures_util::future::BoxFuture<'static, Result<TenantResourceBundle, TenantError>>
+        + Send
+        + Sync,
+>;
+
+/// Mapa de recursos por organización + resolución `hub_id → org → {runtime, vector}`.
 ///
-/// Cada entrada es un `Arc<Mutex<Runtime>>` (mismo patrón que el `AppState` single-tenant: el
-/// `Runtime` no es `Sync` para mutación). El `Mutex` es por-org, así que orgs distintas no se
-/// bloquean entre sí. El mapa va tras un `RwLock` (lecturas concurrentes baratas: el caso común es
-/// "el pool ya existe").
+/// Cada entrada contiene un `Arc<Mutex<Runtime>>` y su vector store (mismo patrón que el
+/// `AppState` single-tenant). El `Mutex` es por-org, así que orgs distintas no se bloquean entre
+/// sí. El mapa va tras un `RwLock` (lecturas concurrentes baratas: el caso común es "el pool ya
+/// existe").
 pub struct TenantRouter {
     resolver: Arc<dyn OrgResolver>,
-    pools: RwLock<HashMap<OrgId, Arc<Mutex<Runtime>>>>,
-    factory: RuntimeFactory,
+    pools: RwLock<HashMap<OrgId, Arc<TenantResources>>>,
+    factory: TenantResourceFactory,
     max_pools: usize,
 }
 
@@ -138,13 +170,31 @@ impl TenantRouter {
     /// runtime solo scopea el estado de módulos/sistema. Por eso el factory por defecto siembra el
     /// runtime con el `hub_id` de la petición que lo creó — ver [`resolve_runtime`].
     pub fn new(resolver: Arc<dyn OrgResolver>) -> Self {
-        Self::with_factory(resolver, default_pg_factory(), max_pools_from_env())
+        Self::with_resource_factory(resolver, default_pg_factory(), max_pools_from_env())
     }
 
     /// Variante con factory + límite explícitos (tests: factory SQLite de dos orgs simuladas).
     pub fn with_factory(
         resolver: Arc<dyn OrgResolver>,
         factory: RuntimeFactory,
+        max_pools: usize,
+    ) -> Self {
+        let resources: TenantResourceFactory = Arc::new(move |desc: &OrgDescriptor| {
+            let future = factory(desc);
+            Box::pin(async move {
+                Ok(TenantResourceBundle {
+                    runtime: future.await?,
+                    vector: None,
+                })
+            })
+        });
+        Self::with_resource_factory(resolver, resources, max_pools)
+    }
+
+    /// Variante que crea y cachea conjuntamente runtime e índice vectorial por organización.
+    pub fn with_resource_factory(
+        resolver: Arc<dyn OrgResolver>,
+        factory: TenantResourceFactory,
         max_pools: usize,
     ) -> Self {
         Self {
@@ -166,6 +216,14 @@ impl TenantRouter {
     /// `hub_id` de la org A solo puede resolver al runtime de A: el acceso cruzado es imposible por
     /// construcción (no hay ruta de A al pool de B).
     pub async fn resolve_runtime(&self, hub_id: &str) -> Result<Arc<Mutex<Runtime>>, TenantError> {
+        Ok(self.resolve_resources(hub_id).await?.runtime.clone())
+    }
+
+    /// Resuelve atómicamente todos los recursos de la organización dueña de `hub_id`.
+    pub async fn resolve_resources(
+        &self,
+        hub_id: &str,
+    ) -> Result<Arc<TenantResources>, TenantError> {
         let desc = self
             .resolver
             .resolve(hub_id)
@@ -183,8 +241,11 @@ impl TenantRouter {
 
         // Camino lento: crear el pool de la org (escritura exclusiva). Re-chequea por si otra tarea
         // lo creó mientras esperábamos el lock (doble-check), y aplica el límite de pools.
-        let rt = (self.factory)(&desc).await?;
-        let rt = Arc::new(Mutex::new(rt));
+        let bundle = (self.factory)(&desc).await?;
+        let resources = Arc::new(TenantResources {
+            runtime: Arc::new(Mutex::new(bundle.runtime)),
+            vector: bundle.vector,
+        });
         let mut map = self.pools.write().expect("pools RwLock envenenado");
         if let Some(existing) = map.get(&desc.org_id) {
             return Ok(existing.clone());
@@ -192,8 +253,8 @@ impl TenantRouter {
         if map.len() >= self.max_pools {
             return Err(TenantError::PoolLimit(self.max_pools));
         }
-        map.insert(desc.org_id.clone(), rt.clone());
-        Ok(rt)
+        map.insert(desc.org_id.clone(), resources.clone());
+        Ok(resources)
     }
 }
 
@@ -209,15 +270,20 @@ fn max_pools_from_env() -> usize {
 /// Factory de producción: abre un [`PgAdapter`] (un `PgPool`) contra el DSN de la org y construye un
 /// [`Runtime`] sembrado con el `hub_id` del descriptor de la org. El tuning del pool (max_connections
 /// por plan, TLS require, timeouts de failover de Aurora) está pendiente en `crates/db` (§8).
-fn default_pg_factory() -> RuntimeFactory {
+fn default_pg_factory() -> TenantResourceFactory {
     Arc::new(|desc: &OrgDescriptor| {
         let dsn = desc.dsn.clone();
         let hub_id = desc.org_id.0.clone();
         Box::pin(async move {
             let db = PgAdapter::connect(&dsn).await?;
+            let vector = PgVectorStore::new(Box::new(db.clone()));
+            vector.ensure_schema().await?;
             // El `hub_id` del runtime scopea el estado de módulos/sistema; el `hub_id` de cada fila
             // de negocio lo aporta el `RequestContext` de la petición (auth, no spoofable).
-            Ok(Runtime::with_hub_id(Box::new(db), hub_id))
+            Ok(TenantResourceBundle {
+                runtime: Runtime::with_hub_id(Box::new(db), hub_id),
+                vector: Some(Arc::new(vector)),
+            })
         })
     })
 }
@@ -227,6 +293,7 @@ mod tests {
     use super::*;
     use erplora_db::testutil::fresh_db;
     use erplora_runtime::RequestContext;
+    use erplora_vector::{Chunk, MemoryVectorStore};
     use serde_json::{json, Map};
 
     /// Factory de test: cada org tiene su **propio** SQLite en memoria (dos pools independientes)
@@ -238,6 +305,19 @@ mod tests {
                 let db = fresh_db().await;
                 let rt = Runtime::with_hub_id(Box::new(db), hub_id);
                 Ok(rt)
+            })
+        })
+    }
+
+    fn sqlite_resource_factory() -> TenantResourceFactory {
+        Arc::new(|desc: &OrgDescriptor| {
+            let hub_id = desc.org_id.0.clone();
+            Box::pin(async move {
+                let db = fresh_db().await;
+                Ok(TenantResourceBundle {
+                    runtime: Runtime::with_hub_id(Box::new(db), hub_id),
+                    vector: Some(Arc::new(MemoryVectorStore::new())),
+                })
             })
         })
     }
@@ -342,6 +422,52 @@ mod tests {
         let r2 = router.resolve_runtime("hub-a1").await.unwrap();
         assert!(Arc::ptr_eq(&r1, &r2), "misma org ⇒ mismo pool cacheado");
         assert_eq!(router.pool_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn vector_store_is_cached_and_isolated_with_its_org_runtime() {
+        let router =
+            TenantRouter::with_resource_factory(two_org_resolver(), sqlite_resource_factory(), 32);
+        let a = router.resolve_resources("hub-a1").await.unwrap();
+        let a_again = router.resolve_resources("hub-a1").await.unwrap();
+        let b = router.resolve_resources("hub-b1").await.unwrap();
+        assert!(
+            Arc::ptr_eq(&a, &a_again),
+            "misma org reutiliza todos sus recursos"
+        );
+        assert!(!Arc::ptr_eq(&a, &b), "orgs distintas no comparten recursos");
+
+        let chunk = Chunk {
+            id: "a-1".into(),
+            hub_id: "hub-a1".into(),
+            ref_id: "sales".into(),
+            version: "1".into(),
+            lang: "es".into(),
+            source: "agent".into(),
+            content: "ventas de A".into(),
+            embedding: vec![1.0, 0.0],
+        };
+        a.vector.as_ref().unwrap().upsert(&chunk).await.unwrap();
+        assert_eq!(
+            a.vector
+                .as_ref()
+                .unwrap()
+                .search("hub-a1", &[1.0, 0.0], 10, None)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            b.vector
+                .as_ref()
+                .unwrap()
+                .search("hub-a1", &[1.0, 0.0], 10, None)
+                .await
+                .unwrap()
+                .is_empty(),
+            "el corpus de A no existe físicamente en el store de B"
+        );
     }
 
     /// El límite de pools aplica back-pressure: con un techo de 1, la segunda org distinta se

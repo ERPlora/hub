@@ -76,7 +76,13 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
 /// Construye la tool-spec de una operación. `module_id` lo usa el router vectorial (§9.2b) para
 /// prefiltrar por módulo ([`crate::router::filter_tools_by_modules`]); el Cloud lo ignora si no lo
 /// necesita (ya recibe `kind` de la misma forma).
-fn tool_def(name: &str, description: &str, kind: &str, module_id: &str, schema: Option<&str>) -> Value {
+fn tool_def(
+    name: &str,
+    description: &str,
+    kind: &str,
+    module_id: &str,
+    schema: Option<&str>,
+) -> Value {
     // The operation's input schema (a JSON-Schema string) becomes the tool's
     // `parameters`, so the model calls with valid arguments. The Cloud reads it
     // as `fn.parameters` (orchestrator `_tools_from_hub`). Absent or unparseable
@@ -158,7 +164,10 @@ pub fn last_user_message(frontend: &Value) -> String {
 /// Devuelve `Some(frame)` con la línea SSE ya formateada (incluye `\n\n`), o `None` si la línea
 /// no aporta contenido (comentarios, keep-alives). El terminador `[DONE]` del Cloud se traduce a
 /// `{"type":"done"}`.
-pub fn translate_sse_line(line: &str, kinds: &std::collections::HashMap<String, String>) -> Option<String> {
+pub fn translate_sse_line(
+    line: &str,
+    kinds: &std::collections::HashMap<String, String>,
+) -> Option<String> {
     let payload = line.strip_prefix("data:")?.trim();
     if payload.is_empty() {
         return None;
@@ -188,20 +197,47 @@ pub fn translate_sse_line(line: &str, kinds: &std::collections::HashMap<String, 
     match ev.get("type").and_then(Value::as_str) {
         Some("error") => Some(sse(&ev)),
         // `function_call`: el bucle del web app ejecuta la op con la sesión del usuario
-        // (§9.2). Se anota su `kind` (query/command) desde el catálogo ensamblado, para que
-        // el web app sepa si es LECTURA (auto) o ESCRITURA (pide confirmación antes).
+        // (§9.2). El Cloud NO es autoridad sobre nombre ni kind: ambos se validan contra el
+        // catálogo exacto ofrecido y el kind se sobrescribe. Un evento desconocido/malformado
+        // falla cerrado y jamás llega al ejecutor web (en particular, un command no puede
+        // disfrazarse de query para saltarse la confirmación).
         Some("function_call") => {
             let mut out = ev;
-            let name = out.get("name").and_then(Value::as_str).map(str::to_string);
-            if let Some(kind) = name.and_then(|n| kinds.get(&n)) {
-                if let Some(obj) = out.as_object_mut() {
-                    obj.insert("kind".to_string(), json!(kind));
-                }
+            let Some(name) = out.get("name").and_then(Value::as_str) else {
+                return Some(rejected_tool_frame());
+            };
+            let Some(kind) = kinds
+                .get(name)
+                .filter(|kind| matches!(kind.as_str(), "query" | "command"))
+            else {
+                return Some(rejected_tool_frame());
+            };
+            let valid_call_id = out
+                .get("call_id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| !id.trim().is_empty());
+            let valid_arguments = out
+                .get("arguments")
+                .and_then(Value::as_str)
+                .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+                .is_some_and(|args| args.is_object());
+            if !valid_call_id || !valid_arguments {
+                return Some(rejected_tool_frame());
+            }
+            if let Some(obj) = out.as_object_mut() {
+                obj.insert("kind".to_string(), json!(kind));
             }
             Some(sse(&out))
         }
         _ => None,
     }
+}
+
+fn rejected_tool_frame() -> String {
+    sse(&json!({
+        "type": "error",
+        "message": "assistant requested an unavailable or malformed tool"
+    }))
 }
 
 /// Formatea un valor JSON como un evento SSE `data: …\n\n`.
@@ -290,16 +326,19 @@ mod tests {
     }
 
     #[test]
-    fn translate_forwards_function_call() {
+    fn translate_forwards_catalogued_function_call() {
         // The model asking to call a module tool MUST reach the web app: it runs the
         // query/command with the user's session and continues the turn. Previously
         // this event was dropped (§9.2 keystone).
-        let kinds = std::collections::HashMap::new();
+        let mut kinds = std::collections::HashMap::new();
+        kinds.insert("inventory.products.list".to_string(), "query".to_string());
         let line = r#"data: {"type":"function_call","name":"inventory.products.list","call_id":"c1","arguments":"{}"}"#;
-        let out = translate_sse_line(line, &kinds).expect("function_call must be forwarded, not dropped");
+        let out =
+            translate_sse_line(line, &kinds).expect("function_call must be forwarded, not dropped");
         assert!(out.contains("function_call"));
         assert!(out.contains("inventory.products.list"));
         assert!(out.contains("c1"));
+        assert!(out.contains("\"kind\":\"query\""));
     }
 
     #[test]
@@ -311,17 +350,39 @@ mod tests {
         let line = r#"data: {"type":"function_call","name":"pos.sale.create","call_id":"c9","arguments":"{}"}"#;
         let out = translate_sse_line(line, &kinds).expect("forwarded");
         assert!(out.contains("\"kind\":\"command\""));
-        // An unknown tool (not in the map) is forwarded without a kind → treated as read.
-        let line2 = r#"data: {"type":"function_call","name":"who.knows","call_id":"c0","arguments":"{}"}"#;
-        let out2 = translate_sse_line(line2, &kinds).expect("forwarded");
-        assert!(!out2.contains("\"kind\""));
+        // An unknown tool (not in the offered catalog) fails closed.
+        let line2 =
+            r#"data: {"type":"function_call","name":"who.knows","call_id":"c0","arguments":"{}"}"#;
+        let out2 = translate_sse_line(line2, &kinds).expect("error frame");
+        assert!(out2.contains("\"type\":\"error\""));
+        assert!(!out2.contains("who.knows"));
+
+        // El kind aportado por el upstream no es autoridad: el catálogo manda.
+        let line3 = r#"data: {"type":"function_call","name":"pos.sale.create","call_id":"c1","arguments":"{}","kind":"query"}"#;
+        let out3 = translate_sse_line(line3, &kinds).expect("forwarded");
+        assert!(out3.contains("\"kind\":\"command\""));
+    }
+
+    #[test]
+    fn translate_rejects_malformed_function_calls() {
+        let mut kinds = std::collections::HashMap::new();
+        kinds.insert("sales.list".to_string(), "query".to_string());
+        for line in [
+            r#"data: {"type":"function_call","name":"sales.list","arguments":"{}"}"#,
+            r#"data: {"type":"function_call","name":"sales.list","call_id":"c1","arguments":"{"}"#,
+            r#"data: {"type":"function_call","name":"sales.list","call_id":"c1","arguments":"[]"}"#,
+        ] {
+            let out = translate_sse_line(line, &kinds).expect("error frame");
+            assert!(out.contains("\"type\":\"error\""), "{out}");
+        }
     }
 
     #[test]
     fn tool_def_carries_params_schema() {
         // The op's input schema becomes the tool's `parameters` so the model calls
         // with valid arguments (the Cloud reads `fn.parameters`).
-        let schema = r#"{"type":"object","properties":{"since":{"type":"string"}},"required":["since"]}"#;
+        let schema =
+            r#"{"type":"object","properties":{"since":{"type":"string"}},"required":["since"]}"#;
         let t = tool_def("sales.list", "List sales", "query", "sales", Some(schema));
         assert_eq!(t["parameters"]["properties"]["since"]["type"], "string");
         assert_eq!(t["parameters"]["required"][0], "since");
@@ -355,7 +416,8 @@ mod tests {
         }
 
         let mut reg = Registry::new();
-        reg.status.insert("cash_register".to_string(), ModuleStatus::Active);
+        reg.status
+            .insert("cash_register".to_string(), ModuleStatus::Active);
         // Interno por CONVENCIÓN (prefijo `_`), sin declarar `internal:true`.
         reg.commands.insert(
             "cash_register._reverse_sale".to_string(),

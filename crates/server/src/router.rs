@@ -42,6 +42,28 @@ impl Default for RouterConfig {
     }
 }
 
+impl RouterConfig {
+    /// Política configurable para despliegues y E2E. Valores ausentes, inválidos o cero (para el
+    /// umbral) conservan los defaults seguros; `top_k=0` sigue siendo válido para desactivar todos
+    /// los resultados de forma explícita.
+    pub fn from_env() -> Self {
+        let defaults = Self::default();
+        let top_k = std::env::var("HUB_ASSISTANT_ROUTE_TOP_K")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(defaults.top_k);
+        let min_modules_to_route = std::env::var("HUB_ASSISTANT_ROUTE_MIN_MODULES")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|v| *v > 0)
+            .unwrap_or(defaults.min_modules_to_route);
+        Self {
+            top_k,
+            min_modules_to_route,
+        }
+    }
+}
+
 /// Calcula el conjunto de **módulos relevantes** para `query` por búsqueda vectorial.
 ///
 /// Devuelve:
@@ -101,9 +123,7 @@ pub async fn route_modules<S: VectorStore + ?Sized>(
         score_b.total_cmp(score_a).then_with(|| id_a.cmp(id_b))
     });
     scored_modules.truncate(cfg.top_k);
-    Ok(Some(
-        scored_modules.into_iter().map(|(id, _)| id).collect(),
-    ))
+    Ok(Some(scored_modules.into_iter().map(|(id, _)| id).collect()))
 }
 
 /// Error del router (red/embedding o store). Se mantiene separado de `EmbedError` para que el

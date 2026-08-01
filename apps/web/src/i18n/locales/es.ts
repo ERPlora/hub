@@ -54,6 +54,9 @@ export default {
     browserHint: 'En el menú de tu navegador, elige «Instalar aplicación» (o «Añadir a pantalla de inicio»).',
   },
   assistant: {
+    confirmTitle: 'Confirmar acción del asistente',
+    confirmCancel: 'Cancelar',
+    confirmRun: 'Ejecutar',
     title: 'Asistente',
     empty: 'Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.',
     emptySetup: 'Revisa la configuración del hub. Elige una opción o escribe tu duda.',

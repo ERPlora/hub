@@ -53,6 +53,9 @@ export default {
     browserHint: 'In your browser menu, choose “Install app” (or “Add to Home Screen”).',
   },
   assistant: {
+    confirmTitle: 'Confirm assistant action',
+    confirmCancel: 'Cancel',
+    confirmRun: 'Run',
     title: 'Assistant',
     empty: 'Ask me about your sales, your inventory or anything about your business.',
     emptySetup: 'Review the hub configuration. Pick an option or type your question.',

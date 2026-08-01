@@ -58,7 +58,8 @@ pub mod tenant;
 
 pub use state::{AppState, AuthMode, HubConfig, HubId, MachineToken, WsEvent, DEV_HUB_ID};
 pub use tenant::{
-    EnvOrgResolver, OrgDescriptor, OrgId, OrgResolver, RuntimeFactory, TenantError, TenantRouter,
+    EnvOrgResolver, OrgDescriptor, OrgId, OrgResolver, RuntimeFactory, TenantError,
+    TenantResourceBundle, TenantResourceFactory, TenantResources, TenantRouter,
 };
 
 /// Configuración de arranque del runtime del hub — la usa el binario (`main.rs`). Envuelve la
@@ -951,17 +952,22 @@ async fn request_install(
     headers: HeaderMap,
     Json(req): Json<RequestInstallReq>,
 ) -> Response {
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let resources = match st.resources_for(&hub_id).await {
+        Ok(resources) => resources,
+        Err(e) => return tenant_rejected(e),
+    };
     // La credencial de máquina sirve para que ESTE Hub hable con Cloud, no para autorizar al
     // navegador. Exigimos primero la sesión local de un owner/admin: de lo contrario cualquier
     // módulo web same-origin podría disparar instalaciones usando indirectamente el token del Hub.
     {
-        let rt = st.runtime.lock().await;
+        let rt = resources.runtime.lock().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
     }
     // Hub-scoped: token de máquina si el hub está enrolado; si no, JWT del usuario.
-    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+    let Some(auth) = auth::hub_scoped_auth_for(&headers, &st, &hub_id) else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
@@ -983,7 +989,7 @@ async fn request_install(
         }));
     };
 
-    let mut rt = st.runtime.lock().await;
+    let mut rt = resources.runtime.lock().await;
     let result = install::install_from_cloud(
         &st.http,
         &st.config.cloud_base_url,
@@ -1006,15 +1012,13 @@ async fn request_install(
             // instalación (el módulo ya está instalado y operativo; el router degrada a "todos").
             let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
             drop(rt);
-            if let Some(store) = &st.vector {
+            if let Some(store) = &resources.vector {
                 if chunks.is_empty() {
                     // Un upgrade también puede retirar todo el bloque agent/ai: limpia el corpus
                     // anterior aunque ya no haya textos nuevos que mandar al Cloud.
-                    if let Err(e) = embed::drop_module(
-                        store.as_ref(),
-                        &st.hub_id(),
-                        &installed.module_id,
-                    ).await {
+                    if let Err(e) =
+                        embed::drop_module(store.as_ref(), &hub_id, &installed.module_id).await
+                    {
                         tracing::warn!(module_id = %installed.module_id, error = %e, "limpieza de embeddings obsoletos falló (no crítico)");
                     }
                 } else {
@@ -1026,7 +1030,7 @@ async fn request_install(
                     match embed::index_chunks(
                         &embedder,
                         store.as_ref(),
-                        &st.hub_id(),
+                        &hub_id,
                         &installed.version,
                         &chunks,
                     )
@@ -1469,9 +1473,14 @@ async fn assistant_chat_stream(
     headers: HeaderMap,
     Json(frontend): Json<Value>,
 ) -> Response {
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let resources = match st.resources_for(&hub_id).await {
+        Ok(resources) => resources,
+        Err(e) => return tenant_rejected(e),
+    };
     // Credencial hub-scoped: token de máquina del hub si está enrolado; si no, el JWT del usuario.
     // Así un cajero solo-local (sesión por PIN, sin JWT cloud) también usa el asistente.
-    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+    let Some(auth) = auth::hub_scoped_auth_for(&headers, &st, &hub_id) else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
@@ -1481,7 +1490,7 @@ async fn assistant_chat_stream(
     // La sesión LOCAL del hub da el contexto/permisos para ensamblar las tools (gate = el de la UI)
     // y el id del usuario activo, que se manda como metadata de coste/auditoría (no permisos).
     let (all_tools, active_user, active_modules) = {
-        let rt = st.runtime.lock().await;
+        let rt = resources.runtime.lock().await;
         let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
             Ok(c) => c,
             Err(e) => return unauthorized(e),
@@ -1495,7 +1504,7 @@ async fn assistant_chat_stream(
     // índice y recorta los tools a los módulos relevantes. Degrada a "todos los tools" si no hay
     // índice, si hay pocos módulos, o ante cualquier fallo del prefiltro (§9.5). El permiso lo
     // revalida igual el runtime: el router solo abarata el prompt, no es un gate.
-    let tools = match &st.vector {
+    let tools = match &resources.vector {
         Some(store) => {
             let query = assistant::last_user_message(&frontend);
             let embedder =
@@ -1503,11 +1512,11 @@ async fn assistant_chat_stream(
             router::assemble_routed_tools(
                 &embedder,
                 store.as_ref(),
-                &st.hub_id(),
+                &hub_id,
                 &query,
                 all_tools,
                 &active_modules,
-                router::RouterConfig::default(),
+                router::RouterConfig::from_env(),
             )
             .await
         }
@@ -1649,13 +1658,14 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
 ///  - `UnknownOrg` → `403`: el `hub_id` de la petición no pertenece a ninguna org conocida; es un
 ///    intento de acceso cruzado o un hub no provisionado. **No** se cae a ninguna BD.
 ///  - `PoolLimit` → `503`: back-pressure (techo de orgs por proceso alcanzado), reintenta luego.
-///  - `Connect`   → `502`: la Aurora de la org no responde (failover/credencial).
+///  - `Connect`/`Vector` → `502`: la Aurora o su corpus vectorial no están disponibles.
 pub(crate) fn tenant_rejected(e: tenant::TenantError) -> Response {
     use tenant::TenantError as T;
     let (status, code) = match &e {
         T::UnknownOrg(_) => (StatusCode::FORBIDDEN, "unknown_org"),
         T::PoolLimit(_) => (StatusCode::SERVICE_UNAVAILABLE, "pool_limit"),
         T::Connect(_) => (StatusCode::BAD_GATEWAY, "org_db_unavailable"),
+        T::Vector(_) => (StatusCode::BAD_GATEWAY, "org_vector_unavailable"),
     };
     let body = json!({ "ok": false, "error": { "code": code, "message": e.to_string() } });
     (status, Json(body)).into_response()
@@ -1785,7 +1795,12 @@ async fn install_module(
     headers: HeaderMap,
     Json(req): Json<InstallReq>,
 ) -> Response {
-    let mut rt = st.runtime.lock().await;
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let resources = match st.resources_for(&hub_id).await {
+        Ok(resources) => resources,
+        Err(e) => return tenant_rejected(e),
+    };
+    let mut rt = resources.runtime.lock().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -1798,7 +1813,43 @@ async fn install_module(
         Err(rejection) => return install_dir_rejected(&req.dir, rejection),
     };
     match rt.install_from_dir(&dir).await {
-        Ok(id) => Json(json!({ "ok": true, "data": { "module_id": id } })).into_response(),
+        Ok(id) => {
+            let chunks = ingest::collect_chunks(rt.registry(), &id);
+            let version = rt
+                .modules()
+                .into_iter()
+                .find(|module| module.id == id)
+                .map(|module| module.version)
+                .unwrap_or_default();
+            drop(rt);
+
+            // La vía local de desarrollo comparte exactamente el lifecycle de embeddings de la
+            // instalación Cloud. Sigue siendo best-effort para no convertir el router en gate.
+            if let (Some(store), Some(cloud_auth)) = (
+                resources.vector.as_ref(),
+                auth::hub_scoped_auth_for(&headers, &st, &hub_id),
+            ) {
+                if chunks.is_empty() {
+                    if let Err(e) = embed::drop_module(store.as_ref(), &hub_id, &id).await {
+                        tracing::warn!(module_id = %id, error = %e, "limpieza de embeddings obsoletos falló (no crítico)");
+                    }
+                } else {
+                    let embedder = embed::CloudEmbedder::new(
+                        st.http.clone(),
+                        &st.config.cloud_base_url,
+                        cloud_auth,
+                    );
+                    if let Err(e) =
+                        embed::index_chunks(&embedder, store.as_ref(), &hub_id, &version, &chunks)
+                            .await
+                    {
+                        tracing::warn!(module_id = %id, error = %e, "ingestión de embeddings local falló (no crítico; router degrada)");
+                    }
+                }
+            }
+            st.broadcast(json!({ "type": "module.installed", "module_id": id }));
+            Json(json!({ "ok": true, "data": { "module_id": id } })).into_response()
+        }
         Err(e) => err_response(e),
     }
 }
@@ -1829,7 +1880,12 @@ async fn activate_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let mut rt = st.runtime.lock().await;
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let resources = match st.resources_for(&hub_id).await {
+        Ok(resources) => resources,
+        Err(e) => return tenant_rejected(e),
+    };
+    let mut rt = resources.runtime.lock().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -1844,7 +1900,12 @@ async fn deactivate_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let mut rt = st.runtime.lock().await;
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let resources = match st.resources_for(&hub_id).await {
+        Ok(resources) => resources,
+        Err(e) => return tenant_rejected(e),
+    };
+    let mut rt = resources.runtime.lock().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -1859,7 +1920,12 @@ async fn uninstall_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let mut rt = st.runtime.lock().await;
+    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let resources = match st.resources_for(&hub_id).await {
+        Ok(resources) => resources,
+        Err(e) => return tenant_rejected(e),
+    };
+    let mut rt = resources.runtime.lock().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -1868,8 +1934,8 @@ async fn uninstall_module(
             drop(rt);
             // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
             // Best-effort: no falla la desinstalación si el store da error.
-            if let Some(store) = &st.vector {
-                if let Err(e) = embed::drop_module(store.as_ref(), &st.hub_id(), &id).await {
+            if let Some(store) = &resources.vector {
+                if let Err(e) = embed::drop_module(store.as_ref(), &hub_id, &id).await {
                     tracing::warn!(module_id = %id, error = %e, "no se pudieron borrar embeddings del módulo (no crítico)");
                 }
             }
@@ -2190,7 +2256,7 @@ async fn open_cloud_session(
                 max_devices,
                 cloud_tokens,
             )
-            .await
+                .await
         }
         Err(e) => err_response(e),
     }

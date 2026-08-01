@@ -14,6 +14,7 @@ vi.mock('./runtime', () => ({
 }));
 vi.mock('./config', () => ({ config: { hubId: 'h1' } }));
 vi.mock('./cloud', () => ({ getAccessToken: () => 'tok' }));
+vi.mock('./session', () => ({ getHubSession: () => 'session-1' }));
 
 import { streamAssistant } from './assistant';
 
@@ -74,6 +75,7 @@ describe('streamAssistant tool round-trip', () => {
           name: 'sales.list',
           call_id: 'c1',
           arguments: JSON.stringify({ since: '2026-01-01' }),
+          kind: 'query',
         }),
         sseLine({ type: 'done' }),
       ],
@@ -103,7 +105,7 @@ describe('streamAssistant tool round-trip', () => {
   it('degrades gracefully when the tool fails (e.g. a write op is not a query)', async () => {
     queryMock.mockRejectedValue(new Error('unknown query'));
     const { bodies } = mockFetchRounds([
-      [sseLine({ type: 'function_call', name: 'pos.sale.create', call_id: 'c2', arguments: '{}' }), sseLine({ type: 'done' })],
+      [sseLine({ type: 'function_call', name: 'sales.list', call_id: 'c2', arguments: '{}', kind: 'query' }), sseLine({ type: 'done' })],
       [sseLine({ type: 'token', text: 'No pude hacerlo.' }), sseLine({ type: 'done' })],
     ]);
 
@@ -122,6 +124,25 @@ describe('streamAssistant tool round-trip', () => {
     const { tokens } = await run([{ role: 'user', content: 'hola' }]);
     expect(tokens.join('')).toBe('Hola.');
     expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a function call has no authoritative catalog kind', async () => {
+    mockFetchRounds([[sseLine({ type: 'function_call', name: 'sales.list', call_id: 'bad', arguments: '{}' })]]);
+    const { error } = await run([{ role: 'user', content: 'lista' }]);
+    expect(error).toBeInstanceOf(Error);
+    expect(queryMock).not.toHaveBeenCalled();
+    expect(commandMock).not.toHaveBeenCalled();
+  });
+
+  it('does not execute a tool whose arguments are malformed', async () => {
+    const { bodies } = mockFetchRounds([
+      [sseLine({ type: 'function_call', name: 'sales.list', call_id: 'bad-args', arguments: '{', kind: 'query' }), sseLine({ type: 'done' })],
+      [sseLine({ type: 'token', text: 'No pude leer los argumentos.' }), sseLine({ type: 'done' })],
+    ]);
+    await run([{ role: 'user', content: 'lista' }]);
+    expect(queryMock).not.toHaveBeenCalled();
+    const tool = (bodies[1].messages as Array<Record<string, unknown>>).find((m) => m.role === 'tool') as { content: string };
+    expect(tool.content).toContain('error');
   });
 
   it('a write tool (command) runs only after onConfirm approves', async () => {
