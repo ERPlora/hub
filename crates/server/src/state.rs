@@ -345,6 +345,10 @@ pub struct AppState {
     /// periódico de `serve()` y lo leen el gate de `query`/`command` y el proxy `/api/entitlement`.
     /// Estado inicial = fail-open (nada bloqueado). Ver `crate::entitlement`.
     pub entitlement: crate::entitlement::SharedRevalidation,
+    /// Marca de **actividad de usuario**: la toca cada petición autenticada (middleware del router)
+    /// y viaja al Cloud en el heartbeat de `daily_usage`. Es el reloj con el que el Cloud apaga
+    /// (60d) y acaba borrando (120d) los hubs free en los que nadie entra. Ver `crate::activity`.
+    pub activity: Arc<crate::activity::ActivityState>,
 }
 
 impl AppState {
@@ -393,6 +397,7 @@ impl AppState {
             tenants: None,
             vector: None,
             entitlement: crate::entitlement::new_shared(),
+            activity: Arc::new(crate::activity::ActivityState::new()),
         }
     }
 

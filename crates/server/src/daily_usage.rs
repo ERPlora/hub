@@ -18,6 +18,14 @@ pub struct DailyUsageHeartbeat {
     pub last_sale_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminals: Option<u64>,
+    /// Última vez que alguien **entró** en el hub (ADR-0175), si la hubo desde el último latido.
+    ///
+    /// Es la señal con la que el Cloud apaga (60d) y acaba borrando (120d) los hubs free que nadie
+    /// usa, y va aquí — y no en un job aparte — porque este heartbeat ya viaja con la credencial
+    /// de máquina y la cadencia correcta. Que sea `Option` es el contrato: **ausente = nadie ha
+    /// entrado**, y el Cloud debe dejar correr el reloj. Ver `crate::activity`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_user_activity_at: Option<String>,
 }
 
 /// Collect today's completed, non-deleted sales and the latest sale timestamp.
@@ -65,6 +73,9 @@ pub async fn collect_daily_usage(
         orders_today,
         last_sale_at,
         terminals,
+        // La actividad de usuario no sale de la BD: la lleva el `ActivityState` en memoria, y la
+        // rellena el llamador (`serve`) solo si hay algo nuevo que reportar.
+        last_user_activity_at: None,
     }
 }
 
@@ -194,6 +205,7 @@ mod tests {
             orders_today: Some(12),
             last_sale_at: Some("2026-07-27T11:30:00Z".into()),
             terminals: Some(3),
+            last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
         };
         send_heartbeat(
             &reqwest::Client::new(),
@@ -213,8 +225,25 @@ mod tests {
                 "orders_today": 12,
                 "last_sale_at": "2026-07-27T11:30:00Z",
                 "terminals": 3,
+                "last_user_activity_at": "2026-07-27T11:45:00Z",
             })
         );
         server.abort();
+    }
+
+    /// ADR-0175: sin actividad de usuario el campo NO viaja. El silencio es la señal — si el
+    /// Cloud recibiese una marca en cada latido, un hub encendido que nadie usa parecería usado
+    /// y no vencería nunca.
+    #[tokio::test]
+    async fn a_hub_nobody_uses_reports_no_user_activity() {
+        let usage = DailyUsageHeartbeat {
+            orders_today: Some(0),
+            last_sale_at: None,
+            terminals: Some(0),
+            last_user_activity_at: None,
+        };
+        let body = serde_json::to_value(&usage).unwrap();
+        assert!(body.get("last_user_activity_at").is_none());
+        assert_eq!(body, json!({"orders_today": 0, "terminals": 0}));
     }
 }

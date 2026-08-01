@@ -30,6 +30,7 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
+pub mod activity;
 pub mod api_keys;
 pub mod assistant;
 pub mod auth;
@@ -456,10 +457,15 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 // an entitlement failure must not suppress business-usage retention (or vice versa).
                 let now = entitlement::now_unix();
                 let now_iso = chrono::Utc::now().to_rfc3339();
-                let usage = {
+                let mut usage = {
                     let runtime = st.runtime.lock().await;
                     daily_usage::collect_daily_usage(runtime.db(), runtime.hub_id(), &now_iso).await
                 };
+                // ADR-0175: la actividad de usuario viaja en ESTE heartbeat, y solo si la hubo.
+                // Un hub encendido que nadie toca no manda la marca — que es exactamente lo que el
+                // Cloud tiene que observar para poder apagarlo.
+                let pending_activity = st.activity.pending();
+                usage.last_user_activity_at = pending_activity.map(activity::to_iso8601);
                 let entitlement_request = entitlement::fetch_verified_claims(
                     &st.http,
                     &st.config.cloud_base_url,
@@ -475,8 +481,15 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let (outcome, heartbeat_result) =
                     tokio::join!(entitlement_request, heartbeat_request);
                 entitlement::record_outcome(&st.entitlement, outcome, now);
-                if let Err(error) = heartbeat_result {
-                    tracing::warn!(%error, "daily usage heartbeat failed");
+                match heartbeat_result {
+                    // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
+                    // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
+                    Ok(()) => {
+                        if let Some(ts) = pending_activity {
+                            st.activity.mark_reported(ts);
+                        }
+                    }
+                    Err(error) => tracing::warn!(%error, "daily usage heartbeat failed"),
                 }
             }
         });
@@ -588,6 +601,7 @@ async fn shutdown_signal() {
 /// Construye el router con todas las rutas montadas sobre `state`.
 pub fn app(state: AppState) -> Router {
     let registration_state = state.clone();
+    let activity_state = state.activity.clone();
     Router::new()
         .route("/healthz", get(healthz))
         .route("/api/hub/context", get(hub_context))
@@ -730,6 +744,13 @@ pub fn app(state: AppState) -> Router {
                     tower_http::trace::DefaultOnFailure::new().level(tracing::Level::ERROR),
                 ),
         )
+        // Marca de actividad de usuario (`crate::activity`): una petición autenticada y aceptada
+        // significa que alguien está usando este hub. Viaja al Cloud en el heartbeat de
+        // `daily_usage`, que apaga (60d) y acaba borrando (120d) los hubs free que nadie usa.
+        .layer(axum::middleware::from_fn_with_state(
+            activity_state,
+            track_user_activity,
+        ))
         // Primera barrera del runtime: una máquina real sin UUID+credencial Cloud solo puede
         // consultar salud/contexto para pintar el login. Demo es la única excepción.
         .layer(axum::middleware::from_fn_with_state(
@@ -741,6 +762,27 @@ pub fn app(state: AppState) -> Router {
 
 async fn healthz() -> &'static str {
     "ok"
+}
+
+/// Anota que **alguien está usando** este hub (ver `crate::activity`).
+///
+/// Punto ÚNICO a propósito: cada handler resuelve la auth a su manera (sesión, API key, token de
+/// máquina), y colgar la marca de cada uno se desincronizaría al añadir el siguiente. Aquí se ve
+/// lo que importa — llevaba credencial y no se rechazó — sin tocar ninguna firma.
+///
+/// Coste por petición: leer una cabecera y un `fetch_max` atómico. Ninguna escritura a disco.
+async fn track_user_activity(
+    State(activity): State<std::sync::Arc<crate::activity::ActivityState>>,
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let has_credential = auth::session_token(request.headers()).is_some()
+        || auth::api_key_token(request.headers()).is_some();
+    let response = next.run(request).await;
+    if crate::activity::is_user_activity(has_credential, response.status().as_u16()) {
+        activity.touch(entitlement::now_unix());
+    }
+    response
 }
 
 /// Bloquea toda la superficie de negocio hasta completar el registro de la máquina. El login
