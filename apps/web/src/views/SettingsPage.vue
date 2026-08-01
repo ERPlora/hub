@@ -21,11 +21,30 @@
                   :aria-label="t('settings.country')"
                   slot="end"
                   @ion-change="onCountryChange($event.detail.value as string)"
+                  data-testid="hub-country"
                 >
                   <ion-select-option value="ES">{{ t('settings.countrySpain') }}</ion-select-option>
+                  <ion-select-option value="FR">{{ t('settings.countryFrance') }}</ion-select-option>
                   <ion-select-option value="PT">{{ t('settings.countryPortugal') }}</ion-select-option>
                 </ion-select>
                 <ion-note v-else slot="end">{{ hubCountry }}</ion-note>
+              </ion-item>
+              <ion-item>
+                <HubIcon slot="start" name="location-outline" />
+                <ion-label>
+                  <h2>{{ t('settings.region') }}</h2>
+                  <p>{{ t('settings.regionDesc') }}</p>
+                </ion-label>
+                <ion-input
+                  v-if="isAdmin"
+                  v-model="hubRegion"
+                  class="settings-short-input"
+                  :maxlength="3"
+                  placeholder="PV"
+                  data-testid="hub-region"
+                  @ion-blur="onRegionChange"
+                />
+                <ion-note v-else slot="end">{{ hubRegion || '—' }}</ion-note>
               </ion-item>
             </ion-list>
           </ion-card-content>
@@ -472,6 +491,7 @@ const hubLanguage = ref<Locale>(hubSettings.value?.language ?? 'es');
 // Paleta GLOBAL del hub (ADR-0138): la default para usuarios sin override local.
 const hubPalette = ref<string>(hubSettings.value?.theme_palette ?? 'erplora');
 const hubCountry = ref<string>(hubSettings.value?.country_code ?? 'ES');
+const hubRegion = ref<string>(hubSettings.value?.region_code ?? '');
 // Doc de la API: deriva del setting server-side (lib/api-docs → hubSettings.api_docs_enabled).
 const showApiDocs = apiDocsEnabled;
 
@@ -487,6 +507,7 @@ watch(hubSettings, (s) => {
   hubLanguage.value = s.language;
   hubPalette.value = s.theme_palette;
   hubCountry.value = s.country_code;
+  hubRegion.value = s.region_code ?? '';
   businessTaxId.value = s.business_tax_id;
   businessLegalName.value = s.business_legal_name;
   businessAddress.value = s.business_address;
@@ -570,9 +591,23 @@ function onHubLanguageChange(value: Locale): void {
 // código ISO; nunca se deriva del catálogo de tipos de negocio del SaaS.
 function onCountryChange(value: string): void {
   const prev = hubSettings.value?.country_code ?? 'ES';
+  const prevRegion = hubSettings.value?.region_code ?? '';
   hubCountry.value = value;
-  void persistHubSettings({ country_code: value }, () => {
+  // Una subdivisión solo tiene sentido dentro de su país: al cambiarlo se limpia atómicamente.
+  hubRegion.value = '';
+  void persistHubSettings({ country_code: value, region_code: null }, () => {
     hubCountry.value = prev;
+    hubRegion.value = prevRegion;
+  });
+}
+
+function onRegionChange(): void {
+  const prev = hubSettings.value?.region_code ?? '';
+  const normalized = hubRegion.value.trim().toUpperCase();
+  if (normalized === prev) return;
+  hubRegion.value = normalized;
+  void persistHubSettings({ region_code: normalized || null }, () => {
+    hubRegion.value = prev;
   });
 }
 
@@ -785,5 +820,11 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 /* Input de fichero oculto (lo dispara un ion-button). Antes iba por inline style. */
 .cert-file-input {
   display: none;
+}
+
+.settings-short-input {
+  max-width: 7rem;
+  text-align: end;
+  text-transform: uppercase;
 }
 </style>

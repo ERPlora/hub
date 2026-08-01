@@ -134,6 +134,29 @@ impl CloudClient {
         self.get("/api/v1/marketplace/modules/", auth)
     }
 
+    /// Catálogo filtrado por identidad fiscal del hub (ADR-0062). `countries` admite el CSV del
+    /// contrato Cloud; `region` es la subdivisión ISO-3166-2 sin prefijo (`PV`, `CN`…).
+    pub fn marketplace_modules_filtered(
+        &self,
+        auth: &Auth,
+        countries: Option<&str>,
+        region: Option<&str>,
+    ) -> PreparedRequest {
+        let mut query = Vec::new();
+        if let Some(value) = countries.map(str::trim).filter(|v| !v.is_empty()) {
+            query.push(format!("countries={}", encode_path_segment(value)));
+        }
+        if let Some(value) = region.map(str::trim).filter(|v| !v.is_empty()) {
+            query.push(format!("region={}", encode_path_segment(value)));
+        }
+        let suffix = if query.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", query.join("&"))
+        };
+        self.get(&format!("/api/v1/marketplace/modules/{suffix}"), auth)
+    }
+
     /// Catálogo público de metadatos para Demo. No concede descarga, compra ni entitlement.
     pub fn public_marketplace_modules(&self) -> PreparedRequest {
         self.public_get("/api/v1/marketplace/catalog/")
@@ -660,6 +683,12 @@ mod tests {
             .headers
             .contains(&("Authorization", "Bearer abc".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+
+        let filtered = c.marketplace_modules_filtered(&auth, Some("ES,FR"), Some("PV"));
+        assert_eq!(
+            filtered.url,
+            "https://erplora.com/api/v1/marketplace/modules/?countries=ES%2CFR&region=PV"
+        );
     }
 
     /// ADR-0157 §7: alta de un miembro del hub. `POST /api/v1/hub/device/members/` firmado con la

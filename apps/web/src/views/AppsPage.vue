@@ -22,6 +22,20 @@
         </ion-button>
       </ok-inline-feedback>
 
+      <div v-if="tab !== 'mine'" class="catalog-country" data-testid="marketplace-country-filter">
+        <ion-label>{{ t('apps.countryFilter') }}</ion-label>
+        <ion-select
+          v-model="catalogCountry"
+          interface="popover"
+          :aria-label="t('apps.countryFilter')"
+          @ion-change="onCatalogCountryChange($event.detail.value as string)"
+        >
+          <ion-select-option v-for="country in MARKETPLACE_COUNTRIES" :key="country" :value="country">
+            {{ country }}
+          </ion-select-option>
+        </ion-select>
+      </div>
+
       <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida. -->
       <ok-data-table
         v-show="tab === 'mine'"
@@ -183,6 +197,7 @@ import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel,
   IonSpinner, IonToast,
+  IonSelect, IonSelectOption,
   IonModal, IonHeader, IonTitle, IonButtons, IonButton, IonContent,
   IonList, IonItem, alertController,
 } from '@ionic/vue';
@@ -205,6 +220,7 @@ import { isModuleInstalled } from '../lib/apps-catalog';
 import { resolveEntitlement } from '../lib/entitlement';
 import { openExternal } from '../lib/open-external';
 import { isAdmin } from '../lib/session';
+import { hubSettings } from '../lib/hub-settings';
 
 // --- Tipos ---
 interface Mod {
@@ -218,6 +234,8 @@ interface Mod {
   cat: string;
   /** Versión a instalar; si el Cloud no la expone usamos 'latest' en el request-install. */
   version?: string;
+  countries: string[];
+  coverage: string;
 }
 
 type AppsTab = 'mine' | 'all' | 'paid';
@@ -260,6 +278,13 @@ interface DataTableAction {
 
 // --- Estado ---
 const modules = ref<Mod[]>([]);
+const MARKETPLACE_COUNTRIES = ['ES', 'FR', 'PT', 'DE', 'IT'] as const;
+const catalogCountry = ref<string>(hubSettings.value?.country_code ?? 'ES');
+const catalogRegion = computed<string | null>(() =>
+  catalogCountry.value === (hubSettings.value?.country_code ?? 'ES')
+    ? (hubSettings.value?.region_code ?? null)
+    : null,
+);
 const installedModules = ref<InstalledModule[]>([]);
 const loading = ref(true);
 const catalogError = ref(false);
@@ -406,6 +431,7 @@ const catalogColumns = computed<DataTableColumn[]>(() => [
   { key: 'name', header: t('apps.colModule') },
   { key: 'version', header: t('apps.colVersion'), format: (r) => String(r.version ?? '—') },
   { key: 'cat', header: t('apps.colCategory'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.cat ?? ''), 'medium') },
+  { key: 'coverage', header: t('apps.colCountries'), render: (r) => badgeCell(String(r.coverage ?? ''), 'primary') },
   { key: 'desc', header: t('apps.colDescription') },
   { key: 'price', header: t('apps.colPrice'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.paid ? 'medium' : 'success') },
   // Estado visual (Instalado / Instalando… + fase / Disponible). `stateLabel` (traducido) es el
@@ -431,6 +457,15 @@ function onTabChange(ev: Event): void {
   const detail = (ev as CustomEvent<{ value: string }>).detail;
   const next = TABS.find((v) => v === detail.value);
   if (next) tab.value = next;
+}
+
+function onCatalogCountryChange(value: string): void {
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) return;
+  // `v-model` actualiza el ref antes de `ionChange`; comparar contra el ref aquí impediría
+  // recargar el catálogo precisamente cuando el usuario cambia de país.
+  catalogCountry.value = normalized;
+  void loadCatalog();
 }
 
 function notify(msg: string, color: 'primary' | 'success' | 'danger', duration = 2500): void {
@@ -754,6 +789,8 @@ function toViewModule(m: CloudMarketplaceModule): Mod {
     available: m.available,
     cat: m.category,
     version: m.version,
+    countries: m.countries,
+    coverage: m.countries.length ? m.countries.join(', ') : t('apps.countryUniversal'),
   };
 }
 
@@ -763,7 +800,7 @@ async function loadCatalog(): Promise<void> {
   loading.value = true;
   catalogError.value = false;
   try {
-    const cloudMods = await cloudMarketplaceModules();
+    const cloudMods = await cloudMarketplaceModules(catalogCountry.value, catalogRegion.value);
     if (loadId !== catalogLoadId) return;
     modules.value = cloudMods.map(toViewModule);
   } catch {
@@ -824,6 +861,11 @@ watch(locale, () => {
   // efectivo para no mezclar cabeceras traducidas con metadatos del catálogo en otro idioma.
   void loadCatalog();
 });
+watch(hubSettings, (settings) => {
+  if (!settings || catalogCountry.value === settings.country_code) return;
+  catalogCountry.value = settings.country_code;
+  void loadCatalog();
+});
 
 // --- Fetch + suscripción al evento de instalación al montar ---
 onMounted(() => {
@@ -864,5 +906,17 @@ onBeforeUnmount(() => {
    :host{height:100%} contra este contenedor → cabecera + pager fijos y scroll solo en el cuerpo. */
 .fill {
   height: 100%;
+}
+
+.catalog-country {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.catalog-country ion-select {
+  min-width: 7rem;
 }
 </style>

@@ -61,13 +61,17 @@ const KNOWN: &[Setting] = &[
         validate: validate_country,
         parse_stored: |s| json!(s),
     },
-    // Región/comunidad (`ES-MD`, `ES-CN`…). `null` = todo el país (el caso normal). Existe porque
+    // Región/comunidad SIN prefijo de país (`MD`, `CN`, `PV`…). `null` = todo el país. Existe porque
     // hay regímenes con tipos propios (Canarias/IGIC, Ceuta y Melilla/IPSI).
     Setting {
         key: "region_code",
         default: || Value::Null,
         validate: validate_region,
-        parse_stored: |s| if s.is_empty() { Value::Null } else { json!(s) },
+        // Compatibilidad: las primeras builds guardaban `ES-MD`; al leer se normaliza a `MD`.
+        parse_stored: |s| {
+            let normalized = s.split_once('-').map(|(_, region)| region).unwrap_or(s);
+            if normalized.is_empty() { Value::Null } else { json!(normalized) }
+        },
     },
     // Los decimales de la moneda. `null` = «resuélvelos del registro ISO-4217» (el caso normal);
     // un número = el hub los declara a mano, para una moneda que el registro no conoce.
@@ -172,7 +176,7 @@ fn validate_country(v: &Value) -> std::result::Result<String, String> {
     }
 }
 
-/// `region_code`: subdivisión ISO-3166-2 (`ES-MD`, `ES-CN`…) o vacío/`null` = todo el país.
+/// `region_code`: subdivisión ISO-3166-2 SIN prefijo (`MD`, `CN`, `PV`…) o vacío/`null`.
 ///
 /// Existe porque hay regímenes con tipos propios (Canarias/IGIC, Ceuta y Melilla/IPSI): una regla
 /// con región gana a la del país (ADR-0085).
@@ -182,21 +186,19 @@ fn validate_region(v: &Value) -> std::result::Result<String, String> {
         Value::String(s) if s.trim().is_empty() => Ok(String::new()),
         Value::String(s) => {
             let up = s.trim().to_ascii_uppercase();
-            // `XX-YYY`: país + subdivisión.
-            let ok = up.len() >= 4
-                && up.len() <= 6
-                && up.as_bytes()[2] == b'-'
-                && up[..2].chars().all(|c| c.is_ascii_alphabetic())
-                && up[3..].chars().all(|c| c.is_ascii_alphanumeric());
+            // Acepta el formato legacy `ES-MD`, pero persiste siempre solo la subdivisión.
+            let region = up.split_once('-').map(|(_, value)| value).unwrap_or(&up);
+            let ok = (1..=3).contains(&region.len())
+                && region.chars().all(|c| c.is_ascii_alphanumeric());
             if ok {
-                Ok(up)
+                Ok(region.to_string())
             } else {
                 Err(format!(
-                    "región inválida `{s}`: se espera ISO-3166-2 (p. ej. ES-CN) o vacío"
+                    "región inválida `{s}`: se espera la subdivisión ISO-3166-2 sin prefijo (p. ej. CN) o vacío"
                 ))
             }
         }
-        _ => Err("debe ser un string ISO-3166-2 (p. ej. \"ES-CN\") o null".to_string()),
+        _ => Err("debe ser una subdivisión ISO-3166-2 sin prefijo (p. ej. \"CN\") o null".to_string()),
     }
 }
 
@@ -548,6 +550,17 @@ mod tests {
         assert_eq!(validate_bool(&json!(false)).unwrap(), "false");
         assert!(validate_bool(&json!("true")).is_err());
         assert!(validate_bool(&json!(1)).is_err());
+
+        assert_eq!(validate_country(&json!("fr")).unwrap(), "FR");
+        assert!(validate_country(&json!("FRA")).is_err());
+        assert_eq!(validate_region(&json!("pv")).unwrap(), "PV");
+        assert_eq!(
+            validate_region(&json!("ES-CN")).unwrap(),
+            "CN",
+            "el formato legacy se normaliza sin prefijo"
+        );
+        assert_eq!(validate_region(&Value::Null).unwrap(), "");
+        assert!(validate_region(&json!("TOOLONG")).is_err());
     }
 
     #[tokio::test]

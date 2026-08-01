@@ -75,6 +75,11 @@ export interface HubContext {
    * en el boot (i18n → bootHubLanguage). Ausente → degrada a 'es'.
    */
   language?: string | null;
+  /** Driver fiscal/marketplace del hub (ADR-0062). */
+  country?: string | null;
+  region?: string | null;
+  country_code?: string | null;
+  region_code?: string | null;
 }
 
 /**
@@ -715,8 +720,14 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     currency,
     language,
     api_docs_enabled: hubSettings.value?.api_docs_enabled ?? false,
-    country_code: hubSettings.value?.country_code ?? 'ES',
-    region_code: hubSettings.value?.region_code ?? null,
+    country_code:
+      (ctx.country_code ?? ctx.country)?.trim().toUpperCase()
+      || hubSettings.value?.country_code
+      || 'ES',
+    region_code:
+      (ctx.region_code ?? ctx.region)?.trim().toUpperCase()
+      || hubSettings.value?.region_code
+      || null,
     // El contexto del hub solo trae moneda/idioma; la identidad de negocio la rellena el GET completo
     // de /api/settings (getHubSettings). Preservamos lo ya cacheado para no pisarlo con vacío.
     business_tax_id: hubSettings.value?.business_tax_id ?? '',

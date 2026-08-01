@@ -22,6 +22,18 @@ describe('marketplace module normalization', () => {
       isFree: true,
       priceAmount: null,
       available: true,
+      countries: [],
+    });
+  });
+
+  it('preserves country and regional coverage for marketplace badges', () => {
+    expect(normalizeMarketplaceModule({
+      module_id: 'verifactu',
+      countries: ['es'],
+      country_links: [{ country: 'es', regions: [], excluded_regions: ['PV', 'NA'] }],
+    })).toMatchObject({
+      countries: ['ES'],
+      countryLinks: [{ country: 'ES', regions: [], excludedRegions: ['PV', 'NA'] }],
     });
   });
 

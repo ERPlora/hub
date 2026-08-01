@@ -74,6 +74,9 @@ export interface CloudMarketplaceModule {
   installed: boolean;
   available: boolean;
   version?: string;
+  /** ISO-3166 alpha-2; vacío = módulo universal. */
+  countries: string[];
+  countryLinks: Array<{ country: string; regions: string[]; excludedRegions: string[] }>;
 }
 
 // --- Token store (JWT del usuario activo) -----------------------------------
@@ -649,13 +652,36 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
     installed: Boolean(raw.installed ?? raw.is_installed ?? raw.active),
     available: Boolean(raw.can_install ?? raw.is_active ?? true) && raw.is_coming_soon !== true,
     version: raw.version ? String(raw.version) : undefined,
+    countries: Array.isArray(raw.countries)
+      ? raw.countries.filter((v): v is string => typeof v === 'string').map((v) => v.toUpperCase())
+      : [],
+    countryLinks: Array.isArray(raw.country_links)
+      ? raw.country_links.flatMap((link) => {
+          if (!link || typeof link !== 'object') return [];
+          const value = link as Record<string, unknown>;
+          if (typeof value.country !== 'string') return [];
+          return [{
+            country: value.country.toUpperCase(),
+            regions: Array.isArray(value.regions)
+              ? value.regions.filter((v): v is string => typeof v === 'string')
+              : [],
+            excludedRegions: Array.isArray(value.excluded_regions)
+              ? value.excluded_regions.filter((v): v is string => typeof v === 'string')
+              : [],
+          }];
+        })
+      : [],
   };
 }
 
 /** Catálogo real del Marketplace vía el runtime local. Un Hub real firma con su token de máquina;
  *  Demo usa el endpoint público de metadatos del SaaS. Nunca hay una lista local alternativa. */
-export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[]> {
-  const data = await runtimeGet<unknown>('/api/marketplace/catalog');
+export async function cloudMarketplaceModules(country?: string, region?: string | null): Promise<CloudMarketplaceModule[]> {
+  const query = new URLSearchParams();
+  if (country?.trim()) query.set('countries', country.trim().toUpperCase());
+  if (region?.trim()) query.set('region', region.trim().toUpperCase());
+  const suffix = query.size ? `?${query.toString()}` : '';
+  const data = await runtimeGet<unknown>(`/api/marketplace/catalog${suffix}`);
   const items = Array.isArray(data)
     ? data
     : Array.isArray((data as { results?: unknown[] }).results)

@@ -873,7 +873,7 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         Err(error) => return tenant_rejected(error),
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (pin_users, currency, currency_decimals, language) = {
+    let (pin_users, currency, currency_decimals, language, country_code, region_code) = {
         let rt = runtime.lock().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
@@ -910,7 +910,19 @@ async fn hub_context(State(st): State<AppState>) -> Response {
             .get("language")
             .cloned()
             .unwrap_or_else(|| json!("es"));
-        (pin_users, currency, currency_decimals, language)
+        let country_code = settings
+            .get("country_code")
+            .cloned()
+            .unwrap_or_else(|| json!("ES"));
+        let region_code = settings.get("region_code").cloned().unwrap_or(Value::Null);
+        (
+            pin_users,
+            currency,
+            currency_decimals,
+            language,
+            country_code,
+            region_code,
+        )
     };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
@@ -935,6 +947,12 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         // Cuántos decimales tiene esa moneda. El front NO puede asumir 2 (ADR-0123 §7).
         "currency_decimals": currency_decimals,
         "language": language,
+        // Driver de descubrimiento fiscal (ADR-0062): el marketplace se auto-fija a estos valores.
+        "country": country_code.clone(),
+        "region": region_code.clone(),
+        // Alias del store moderno para evitar traducciones innecesarias en clientes nuevos.
+        "country_code": country_code,
+        "region_code": region_code,
     }))
     .into_response()
 }
@@ -1385,22 +1403,78 @@ async fn proxy_bridge_token(State(st): State<AppState>, headers: HeaderMap) -> R
 /// Un Hub registrado usa `/api/v1/marketplace/modules/` con su token de máquina para recibir el
 /// contexto de ese Hub. Demo, única excepción al registro, consume el catálogo público de metadatos
 /// `/api/v1/marketplace/catalog/`; ninguna operación protegida se vuelve pública.
-async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    {
+#[derive(Debug, Default, Deserialize)]
+struct MarketplaceFilter {
+    countries: Option<String>,
+    region: Option<String>,
+}
+
+async fn proxy_marketplace_catalog(
+    State(st): State<AppState>,
+    Query(filter): Query<MarketplaceFilter>,
+    headers: HeaderMap,
+) -> Response {
+    let (hub_country, hub_region) = {
         let rt = st.runtime.lock().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
-    }
+        let settings = rt.get_settings().await.unwrap_or_else(|_| json!({}));
+        (
+            settings["country_code"].as_str().unwrap_or("ES").to_string(),
+            settings["region_code"].as_str().map(str::to_string),
+        )
+    };
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     if st.is_demo() {
         return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules()).await;
+    }
+    let explicit_country = filter.countries.is_some();
+    let countries = filter.countries.unwrap_or(hub_country).to_ascii_uppercase();
+    let valid_countries = countries
+        .split(',')
+        .all(|code| code.len() == 2 && code.chars().all(|c| c.is_ascii_alphabetic()));
+    if !valid_countries {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "ok": false, "error": "countries debe ser CSV de códigos ISO-3166 alpha-2" })),
+        )
+            .into_response();
+    }
+    // Si la UI elige OTRO país, no hereda una región del país anterior. La región del hub solo
+    // se auto-aplica junto con el país default; una región explícita siempre gana.
+    let region = filter.region.or_else(|| (!explicit_country).then_some(hub_region).flatten());
+    let region = region.map(|raw| {
+        raw.trim()
+            .to_ascii_uppercase()
+            .split_once('-')
+            .map(|(_, value)| value.to_string())
+            .unwrap_or_else(|| raw.trim().to_ascii_uppercase())
+    });
+    if region
+        .as_deref()
+        .is_some_and(|code| code.is_empty() || code.len() > 3 || !code.chars().all(|c| c.is_ascii_alphanumeric()))
+    {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "ok": false, "error": "region debe ser una subdivisión ISO-3166-2 sin prefijo" })),
+        )
+            .into_response();
     }
     let placeholder = cloud_client::Auth::HubToken {
         hub_id: st.hub_id(),
         token: String::new(),
     };
-    proxy_cloud_get(&st, &headers, cloud.marketplace_modules(&placeholder)).await
+    proxy_cloud_get(
+        &st,
+        &headers,
+        cloud.marketplace_modules_filtered(
+            &placeholder,
+            Some(&countries),
+            region.as_deref(),
+        ),
+    )
+    .await
 }
 
 /// GET /api/blueprints/catalog — catálogo de blueprints (proxy de `/api/v1/catalog/blueprints/`).
