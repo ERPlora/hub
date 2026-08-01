@@ -424,10 +424,9 @@ fn pg_cell(row: &PgRow, i: usize) -> Json {
 /// propósito: usar una `erp_*` fuera de este set debe **fallar en `validate`** (build) del
 /// `module-toolkit`, nunca colarse a runtime.
 ///
-/// **REGLA VINCULANTE: este array DEBE coincidir EXACTAMENTE con `BRIDGE_FUNCTIONS` del
-/// validador del toolkit** (`module-toolkit/src/validate-sql.mjs`). Si añades/quitas una
-/// función-puente, cámbiala en LOS DOS sitios a la vez o el validador y el runtime se
-/// desincronizan (el validador aceptaría algo que el runtime no sabe reescribir, o al revés).
+/// El set se genera en build desde el contrato versionado
+/// `schemas/sql-bridge-functions.json`. El toolkit consume un snapshot verificable del mismo
+/// artefacto: no hay dos literales independientes que puedan divergir silenciosamente.
 ///
 /// Conjunto (ADR-0007 §4a; cubre las divergencias reales de los módulos POS):
 /// - String/número:  `erp_now`, `erp_pad`, `erp_lpad`.
@@ -436,19 +435,8 @@ fn pg_cell(row: &PgRow, i: usize) -> Json {
 ///   `erp_dateadd` (suma intervalo), `erp_month_start` (trunca a inicio de mes),
 ///   `erp_dow_mon0` (día de la semana 0=lunes…6=domingo), `erp_extract` (extrae hora/minuto),
 ///   `erp_datediff_days` (diferencia fraccionaria en días), `erp_timefmt` (formatea HH:MM).
-pub const BRIDGE_FUNCTIONS: &[&str] = &[
-    "erp_now",
-    "erp_lpad",
-    "erp_pad",
-    "erp_dt",
-    "erp_date",
-    "erp_dateadd",
-    "erp_month_start",
-    "erp_dow_mon0",
-    "erp_extract",
-    "erp_datediff_days",
-    "erp_timefmt",
-];
+pub const BRIDGE_FUNCTIONS: &[&str] =
+    include!(concat!(env!("OUT_DIR"), "/sql_bridge_functions.rs"));
 
 /// Reescribe las **funciones-puente** del subconjunto portable a la expresión nativa de Postgres.
 /// Sustitución textual anclada con escaneo de paréntesis balanceados (NO es un parser AST),

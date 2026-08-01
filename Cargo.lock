@@ -1630,6 +1630,7 @@ name = "erplora-db"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "serde",
  "serde_json",
  "sqlx",
  "thiserror 2.0.18",
