@@ -210,6 +210,25 @@ ALTER TABLE hub_api_key ADD COLUMN rate_limit_per_minute INTEGER NOT NULL DEFAUL
 CREATE TABLE hub_api_key_rate_window (\
   api_key_id TEXT PRIMARY KEY, window_epoch_minute BIGINT NOT NULL, request_count BIGINT NOT NULL);",
     },
+    // ── v11 — ADR-0049: entrada/salida webhook ─────────────────────────────────────────────
+    // El receipt evita repetir un command cuando el emisor reintenta el mismo envelope. Los
+    // secretos de salida se cifran con HUB_SECRETS_KEY; el Outbox reintenta por destino.
+    SystemMigration {
+        version: 11,
+        name: "integration_webhooks",
+        postgres: "\
+CREATE TABLE hub_webhook_receipt (\
+  hub_id TEXT NOT NULL, api_key_id TEXT NOT NULL, request_id TEXT NOT NULL, command TEXT NOT NULL, request_hash TEXT NOT NULL, \
+  status TEXT NOT NULL DEFAULT 'processing', response_json TEXT, created_at TEXT NOT NULL, \
+  completed_at TEXT, PRIMARY KEY (hub_id, api_key_id, request_id));\
+CREATE TABLE hub_webhook_subscription (\
+  id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL, \
+  events_json TEXT NOT NULL DEFAULT '[]', secret_encrypted TEXT NOT NULL, \
+  status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT '', \
+  last_delivery_at TEXT);\
+CREATE INDEX IF NOT EXISTS ix_hub_webhook_subscription_hub \
+  ON hub_webhook_subscription (hub_id, status);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).

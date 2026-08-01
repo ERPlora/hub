@@ -45,6 +45,7 @@ pub mod system_migrations;
 pub mod ui;
 pub mod user_profile;
 pub mod wasm;
+pub mod webhooks;
 
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{Result, RuntimeError};
@@ -795,6 +796,80 @@ impl Runtime {
         principal: &api_keys::ApiKeyPrincipal,
     ) -> Result<api_keys::RateLimitDecision> {
         api_keys::consume_rate_limit(self.db.as_ref(), &principal.key_id, principal.rate_limit_per_minute).await
+    }
+
+    // ── Borde webhook de integración (ADR-0049) ───────────────────────────────────────────
+
+    pub async fn create_webhook_subscription(
+        &self,
+        name: &str,
+        url: &str,
+        events: &[String],
+        created_by: &str,
+    ) -> Result<webhooks::WebhookSubscriptionSecret> {
+        webhooks::create_subscription(self.db.as_ref(), &self.hub_id, name, url, events, created_by).await
+    }
+
+    pub async fn list_webhook_subscriptions(&self) -> Result<Vec<webhooks::WebhookSubscriptionInfo>> {
+        webhooks::list_subscriptions(self.db.as_ref(), &self.hub_id).await
+    }
+
+    pub async fn rotate_webhook_subscription(
+        &self,
+        id: &str,
+    ) -> Result<Option<webhooks::WebhookSubscriptionSecret>> {
+        webhooks::rotate_subscription(self.db.as_ref(), &self.hub_id, id).await
+    }
+
+    pub async fn revoke_webhook_subscription(&self, id: &str) -> Result<bool> {
+        webhooks::revoke_subscription(self.db.as_ref(), &self.hub_id, id).await
+    }
+
+    pub fn set_webhook_transport(
+        &mut self,
+        transport: std::sync::Arc<dyn webhooks::WebhookTransport>,
+    ) {
+        self.registry.webhook_transport = Some(transport);
+    }
+
+    /// Ejecuta el command de entrada y sella el receipt en la misma transacción que sus efectos.
+    /// Después persiste la respuesta real; un crash intermedio nunca deja repetir la mutación.
+    pub async fn execute_webhook_command(
+        &self,
+        name: &str,
+        payload: &Params,
+        ctx: &RequestContext,
+        api_key_id: &str,
+        request_id: &str,
+    ) -> Result<Json> {
+        let receipt = webhooks::complete_receipt_op(
+            &self.hub_id,
+            api_key_id,
+            request_id,
+            &Json::Null,
+        );
+        let data = commands::execute_at(
+            self.db.as_ref(),
+            &self.registry,
+            name,
+            payload,
+            ctx,
+            0,
+            &[receipt],
+            commands::Origin::External,
+        )
+        .await?;
+        // El receipt ya quedó sellado atómicamente. Enriquecerlo con la respuesta es best-effort:
+        // una caída posterior al commit no debe convertir un éxito en un retry duplicado.
+        let _ = webhooks::complete_receipt(
+            self.db.as_ref(),
+            &self.hub_id,
+            api_key_id,
+            request_id,
+            &data,
+        )
+        .await;
+        Ok(data)
     }
 
     // ── Settings del hub (store key/value de sistema, scoped por hub_id) ────────────────────────

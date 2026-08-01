@@ -163,6 +163,8 @@ pub struct Registry {
     /// `host.notify` no está disponible (los eventos `*.reminder.due` se entregan a sus
     /// listeners de módulo, pero el listener-host no envía nada). Ver `outbox.rs`.
     pub notify_transport: Option<std::sync::Arc<dyn crate::host_notify::NotifyTransport>>,
+    /// Transporte HTTP de suscripciones webhook salientes. `None` deja el listener-host inactivo.
+    pub webhook_transport: Option<std::sync::Arc<dyn crate::webhooks::WebhookTransport>>,
     /// Conjunto de módulos cuyo canal WhatsApp es **premium de ERPlora** (sale por el proxy de
     /// Cloud con `check_quota`, ADR-0006/ADR-0012). El `tier` vive en Cloud (ADR-0007), así que
     /// el host lo siembra; un módulo no listado usa WhatsApp del tenant (secreto local).
@@ -225,6 +227,26 @@ impl Registry {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Un evento solo puede salir del Hub si el módulo emisor lo incluyó explícitamente en
+    /// `events.external`; las suscripciones por sí solas nunca convierten un evento privado.
+    pub fn is_external_event(&self, module_id: &str, event: &str) -> bool {
+        self.is_active(module_id)
+            && self
+                .installed
+                .iter()
+                .find(|m| m.id == module_id)
+                .map(|m| m.events.external.iter().any(|name| name == event))
+                .unwrap_or(false)
+    }
+
+    /// Comprueba si algún módulo activo publica `event` como contrato externo. La usa el plano
+    /// de gestión para rechazar suscripciones que nunca podrían recibir entregas.
+    pub fn is_any_external_event(&self, event: &str) -> bool {
+        self.installed
+            .iter()
+            .any(|manifest| self.is_external_event(&manifest.id, event))
     }
 
     /// Menú dinámico: entradas de navegación **solo de módulos activos**.

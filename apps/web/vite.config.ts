@@ -95,7 +95,7 @@ export default defineConfig({
     // Vite quedaba escuchando SOLO en IPv6 `[::1]:5173`. El webview de Tauri pega a `127.0.0.1`
     // → conexión rechazada → ventana en blanco. Forzar 127.0.0.1 + strictPort lo evita.
     host: '127.0.0.1',
-    port: 5173,
+    port: Number(process.env.HUB_WEB_PORT ?? 5173),
     strictPort: true,
     proxy: {
       '/cloud': {
@@ -107,8 +107,9 @@ export default defineConfig({
         secure: false,
         rewrite: (p) => p.replace(/^\/cloud/, ''),
       },
-      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/ws': { target: 'http://127.0.0.1:8787', changeOrigin: true, ws: true },
+      '/api': { target: process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787', changeOrigin: true },
+      '/webhook': { target: process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787', changeOrigin: true },
+      '/ws': { target: process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787', changeOrigin: true, ws: true },
     },
   },
 });

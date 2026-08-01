@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.erplora.com/webhook-envelope.schema.json",
+  "title": "ERPlora inbound webhook envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "payload"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "description": "Stable idempotency key chosen by the source. Reusing it replays the original result."
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional source timestamp for audit; it never overrides the Hub clock."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Payload validated by the JSON Schema of the exposed module command."
+    }
+  }
+}

@@ -294,6 +294,7 @@ async fn openapi_lists_only_exposed_operations() {
     // Las dos operaciones expuestas aparecen…
     assert!(paths.contains_key("/api/v1/catalog/q/items.list"));
     assert!(paths.contains_key("/api/v1/catalog/c/item.create"));
+    assert!(paths.contains_key("/webhook/catalog/item.create"));
     // …y las privadas NO.
     assert!(!paths.contains_key("/api/v1/catalog/q/items.secret"));
     assert!(!paths.contains_key("/api/v1/catalog/c/item.purge"));

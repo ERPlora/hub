@@ -103,7 +103,12 @@ pub fn build_spec(reg: &Registry, hub_id: &str) -> Value {
             let body_schema = c.schema.as_ref().map(|s| (*s.raw).clone());
             paths.insert(
                 route,
-                json!({ "post": command_operation(&module, name, body_schema) }),
+                json!({ "post": command_operation(&module, name, body_schema.clone()) }),
+            );
+            let webhook_route = format!("/webhook/{module}/{op}");
+            paths.insert(
+                webhook_route,
+                json!({ "post": webhook_operation(&module, name, body_schema) }),
             );
         }
     }
@@ -199,6 +204,41 @@ fn command_operation(module: &str, name: &str, body_schema: Option<Value>) -> Va
             "403": { "description": "La key no tiene el permiso de esta operación" },
             "404": { "description": "Operación inexistente o no expuesta (`expose_api`)" },
             "422": { "description": "Payload inválido (no cumple el JSON Schema del command)" }
+        }
+    })
+}
+
+fn webhook_operation(module: &str, name: &str, body_schema: Option<Value>) -> Value {
+    let payload_schema = body_schema.unwrap_or_else(|| json!({ "type": "object" }));
+    json!({
+        "tags": [module],
+        "operationId": format!("webhook.{name}"),
+        "summary": format!("Inbound webhook → {name}"),
+        "description": "Envelope idempotente autenticado. `id` se deduplica por API key; el payload pasa al mismo execute_command y JSON Schema del módulo.",
+        "requestBody": {
+            "required": true,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "required": ["id", "payload"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.:-]+$" },
+                            "occurred_at": { "type": "string", "format": "date-time" },
+                            "payload": payload_schema
+                        }
+                    }
+                }
+            }
+        },
+        "responses": {
+            "200": { "description": "Procesado o replay idempotente" },
+            "400": { "description": "Envelope inválido" },
+            "401": { "description": "API key ausente, inválida o revocada" },
+            "403": { "description": "Scope insuficiente" },
+            "409": { "description": "Id en proceso o reutilizado para otro command" },
+            "429": { "description": "Cuota por minuto agotada; incluye Retry-After" }
         }
     })
 }

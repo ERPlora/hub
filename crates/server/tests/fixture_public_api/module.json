@@ -22,6 +22,7 @@
       "permission": "catalog.write",
       "transaction": true,
       "sql": ["commands/item_create.sql"],
+      "emit": ["catalog.item.created"],
       "expose_api": true
     },
     "catalog.item.purge": {
@@ -29,5 +30,8 @@
       "transaction": true,
       "sql": ["commands/item_create.sql"]
     }
+  },
+  "events": {
+    "external": ["catalog.item.created"]
   }
 }

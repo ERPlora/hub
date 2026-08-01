@@ -87,6 +87,10 @@ pub enum RuntimeError {
     /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.
     #[error("host.notify: {0}")]
     Notify(String),
+    /// Fallo del borde webhook (configuración, cifrado, firma o transporte). El Outbox trata un
+    /// fallo de salida como cualquier listener: backoff y dead-letter sin perder el evento.
+    #[error("host.webhook: {0}")]
+    Webhook(String),
     /// Fallo al materializar o escribir la carpeta persistente declarada por un módulo.
     #[error("host.module_storage: {0}")]
     Storage(String),

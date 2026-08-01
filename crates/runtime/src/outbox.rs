@@ -30,6 +30,7 @@ pub const REMINDER_DUE_SUFFIX: &str = ".reminder.due";
 /// Nombre del listener sintético del host en `_event_delivery` (idempotencia del envío externo).
 /// No es un command de módulo: lo entrega el runtime vía el transporte de notificación.
 pub const HOST_NOTIFY_LISTENER: &str = "host.notify";
+pub const HOST_WEBHOOK_LISTENER_PREFIX: &str = "host.webhook:";
 
 /// Tamaño de lote por ciclo del relay (mantiene el lock del runtime acotado).
 const BATCH: i64 = 50;
@@ -128,7 +129,7 @@ pub async fn process_once(db: &dyn DatabaseAdapter, registry: &Registry) -> Resu
     q.insert("lim".into(), json!(BATCH));
     let due = db
         .query(
-            "SELECT id, hub_id, user_id, permissions, event_name, module_id, payload, depth, attempts \
+            "SELECT id, hub_id, user_id, permissions, event_name, module_id, payload, depth, attempts, created_at \
              FROM _event_outbox WHERE status = 'pending' AND next_attempt_at <= :now \
              ORDER BY created_at LIMIT :lim",
             &q,
@@ -235,6 +236,28 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         }
     }
 
+    // ── Listener-host de webhooks salientes (ADR-0049 Fase 3) ─────────────────────────────
+    // Solo se considera cuando el MÓDULO EMISOR marcó el evento `events.external`. Cada destino
+    // tiene su propio marcador, por lo que una URL caída no repite las entregas ya exitosas.
+    let module_id = row["module_id"].as_str().unwrap_or_default();
+    if registry.is_external_event(module_id, &event_name) {
+        if let Err(e) = deliver_outbound_webhooks(
+            db,
+            registry,
+            &id,
+            &event_name,
+            &ctx.hub_id,
+            row["created_at"].as_str().unwrap_or_default(),
+            &payload,
+        )
+        .await
+        {
+            if first_err.is_none() {
+                first_err = Some(e.to_string());
+            }
+        }
+    }
+
     // Si algún listener falló, la fila se difiere/dead-lettera (NO se marca entregada): el/los
     // listeners fallidos se reintentarán; los que sí se entregaron ya tienen su marcador.
     if let Some(err) = first_err {
@@ -242,6 +265,53 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     }
 
     mark_delivered(db, &id).await
+}
+
+async fn deliver_outbound_webhooks(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    event_id: &str,
+    event_name: &str,
+    hub_id: &str,
+    created_at: &str,
+    payload: &Params,
+) -> Result<()> {
+    let Some(transport) = &registry.webhook_transport else {
+        return Ok(());
+    };
+    let subscriptions = crate::webhooks::active_for_event(db, hub_id, event_name).await?;
+    let mut first_error = None;
+    for subscription in subscriptions {
+        let listener = format!("{HOST_WEBHOOK_LISTENER_PREFIX}{}", subscription.id);
+        if delivery_exists(db, event_id, &listener).await? {
+            continue;
+        }
+        let delivery = crate::webhooks::build_delivery(
+            &subscription,
+            event_id,
+            event_name,
+            hub_id,
+            created_at,
+            payload,
+        )?;
+        match transport.send(&delivery).await {
+            Ok(()) => {
+                crate::webhooks::touch_subscription(db, hub_id, &subscription.id).await?;
+                let (sql, params) = delivery_op(event_id, &listener);
+                db.execute(&sql, &params).await?;
+            }
+            Err(error) if first_error.is_none() => {
+                first_error = Some(RuntimeError::Webhook(format!(
+                    "suscripción {}: {error}", subscription.id
+                )));
+            }
+            Err(_) => {}
+        }
+    }
+    match first_error {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
 }
 
 /// Entrega un evento `*.reminder.due` al transporte de `host.notify` (ADR-0012), con idempotencia

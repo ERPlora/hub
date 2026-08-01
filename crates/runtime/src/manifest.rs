@@ -722,6 +722,10 @@ pub struct Events {
     /// `notify`. Ver `commands::validate_handler_event`.
     #[serde(default)]
     pub emits: Vec<String>,
+    /// Allowlist de eventos que pueden cruzar el borde de salida por webhook. Deben estar además
+    /// declarados en `emits` o en el `emit` de un command del mismo módulo.
+    #[serde(default)]
+    pub external: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

@@ -84,6 +84,21 @@ pub async fn install(
         }
     }
 
+    // Un evento externo es una capacidad explícita del catálogo, no una cadena libre añadida por
+    // una suscripción. Exige que el propio módulo ya lo declare como hecho emitible.
+    for event in &manifest.events.external {
+        let declared_by_handler = manifest.events.emits.iter().any(|name| name == event);
+        let declared_by_command = manifest
+            .commands
+            .values()
+            .any(|command| command.emit.iter().any(|name| name == event));
+        if !declared_by_handler && !declared_by_command {
+            return Err(RuntimeError::Other(format!(
+                "evento externo `{event}` no declarado en events.emits ni en commands.*.emit"
+            )));
+        }
+    }
+
     migrations::apply(db, dir, &manifest).await?;
 
     // Datos de REFERENCIA del módulo (ADR-0147): unidades de medida, categorías fiscales… lo que

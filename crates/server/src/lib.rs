@@ -55,6 +55,7 @@ pub mod state;
 pub mod system;
 pub mod system_metrics;
 pub mod tenant;
+pub mod webhooks;
 
 pub use state::{AppState, AuthMode, HubConfig, HubId, MachineToken, WsEvent, DEV_HUB_ID};
 pub use tenant::{
@@ -391,6 +392,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             erplora_runtime::host_notify::MockTransport::new(),
         ));
 
+    // Webhooks salientes (ADR-0049): transporte HTTP real, sin redirects y con protección SSRF.
+    // Solo el modo dev explícito puede apuntar a loopback (necesario para el stack E2E local).
+    let webhook_transport = webhooks::HttpWebhookTransport::new(state.config.dev_mode)
+        .map_err(std::io::Error::other)?;
+    state.runtime.lock().await.set_webhook_transport(std::sync::Arc::new(webhook_transport));
+
     // Registro GLOBAL de errores ("todo controlado", un único embudo): instala el sink que reenvía
     // al Cloud (`POST /api/v1/hub/device/error-report/`, X-Hub-Token) cada error del runtime
     // (core + módulos), del panic hook y de la ruta local del frontend. Best-effort (spawn detached);
@@ -699,6 +706,20 @@ pub fn app(state: AppState) -> Router {
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
         .route("/api/v1/:module/c/:command", post(api_keys::data_command))
+        // Entrada idempotente → command expuesto. La gestión de destinos exige sesión admin.
+        .route("/webhook/:module/:command", post(webhooks::inbound))
+        .route(
+            "/api/webhooks/subscriptions",
+            get(webhooks::list_subscriptions).post(webhooks::create_subscription),
+        )
+        .route(
+            "/api/webhooks/subscriptions/:id/rotate",
+            post(webhooks::rotate_subscription),
+        )
+        .route(
+            "/api/webhooks/subscriptions/:id",
+            axum::routing::delete(webhooks::revoke_subscription),
+        )
         // OpenAPI 3.1 dinámico per-hub, **gateado por sesión de usuario** (interno, no público —
         // ADR-0057 §4 refinado 2026-06-24). El Swagger UI YA NO lo sirve el server: lo renderiza una
         // vista Vue interna del Hub (`apps/web/ApiDocsPage.vue`, `swagger-ui-dist` de npm) que pide
