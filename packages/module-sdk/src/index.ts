@@ -861,6 +861,19 @@ export interface BridgeTransport {
    * (El campo del protocolo JSON se sigue llamando `mac` por compatibilidad.)
    */
   setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]>;
+  /**
+   * Muestra una notificación del SISTEMA — la del SO, no un toast dentro de la app.
+   *
+   * Para eso existe: avisar cuando **nadie está mirando la pantalla**. El caso que la motiva es la
+   * comanda — entra un pedido y cocina tiene que enterarse aunque la tablet esté en otra vista o
+   * bloqueada. Un toast de la app no sirve ahí.
+   *
+   * Disponible para CUALQUIER módulo (`erplora.peripherals.notify(...)`), no solo para cocina.
+   *
+   * Best-effort por contrato: si la plataforma no puede mostrarla —permiso denegado, entorno sin
+   * escritorio— **no lanza**. Una notificación que falla no puede tumbar la venta ni la comanda.
+   */
+  notify(title: string, body: string): Promise<void>;
 }
 
 /**
@@ -1010,6 +1023,19 @@ export class BridgeClient implements BridgeTransport {
     const r = await this.request({ action: 'set_device_role', mac: keyOrMac, role }, ['devices']);
     return (r.devices as BridgeDevice[]) ?? [];
   }
+
+  /**
+   * Notificación del SO por el bridge. `send_notification` no responde con ningún evento —el
+   * bridge la muestra y sigue—, así que no se espera respuesta ni se propaga el fallo: una
+   * notificación que no sale no puede tumbar la comanda que la provocó.
+   */
+  async notify(title: string, body: string): Promise<void> {
+    try {
+      await this.request({ action: 'send_notification', title, body }, []);
+    } catch {
+      // best-effort: el bridge puede no estar, o la plataforma puede no permitirlo.
+    }
+  }
 }
 
 /** Alias semántico del transporte de hardware por WebSocket (combo web-PWA). */
@@ -1061,6 +1087,15 @@ export class IpcBridgeTransport implements BridgeTransport {
     return this.tauri.invoke('erplora_set_device_role', { mac: keyOrMac, role }) as Promise<
       BridgeDevice[]
     >;
+  }
+
+  /** Notificación del SO por el shell (que ES el bridge en Tauri). Best-effort: no propaga fallos. */
+  async notify(title: string, body: string): Promise<void> {
+    try {
+      await this.tauri.invoke('erplora_notify', { title, body });
+    } catch {
+      // best-effort: permiso denegado o plataforma sin soporte no puede romper el flujo que avisa.
+    }
   }
 }
 

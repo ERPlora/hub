@@ -79,19 +79,31 @@ fn device_context(app: tauri::AppHandle) -> Result<DeviceContext, ShellError> {
         .app_data_dir()
         .map_err(|e| ShellError::Io(e.to_string()))?;
     let id = ensure_device_id(&cache_dir)?;
+    // Verificado en el emulador (API 37): sin la rama `android` el shell se anunciaba como
+    // `hub-desktop`/`desktop` DESDE UN MÓVIL, así que el Cloud no podía distinguir una tablet de
+    // un TPV de mostrador — ni en la lista de sesiones ni en la sesión única de ADR-0154.
     let platform = if cfg!(target_os = "windows") {
         "windows"
     } else if cfg!(target_os = "macos") {
         "macos"
     } else if cfg!(target_os = "linux") {
         "linux"
+    } else if cfg!(target_os = "android") {
+        "android"
+    } else if cfg!(target_os = "ios") {
+        "ios"
     } else {
         "desktop"
     };
+    let client_type = if cfg!(any(target_os = "android", target_os = "ios")) {
+        "hub-mobile"
+    } else {
+        "hub-desktop"
+    };
     Ok(DeviceContext {
         id,
-        // Taxonomía vigente del Cloud; la plataforma real viaja aparte en X-Device-Platform.
-        client_type: "hub-desktop".to_string(),
+        // Taxonomía del Cloud; la plataforma concreta viaja aparte en X-Device-Platform.
+        client_type: client_type.to_string(),
         platform: platform.to_string(),
     })
 }
@@ -437,9 +449,33 @@ fn erplora_remove_device(
     Ok(state.registry.get_all())
 }
 
+/// `erplora_notify` — notificación del SISTEMA (la del SO, no un toast dentro de la app).
+///
+/// Para eso existe: avisar cuando **nadie está mirando la pantalla**. El caso que la motiva es la
+/// comanda — entra un pedido y cocina tiene que enterarse aunque la tablet esté en otra vista o
+/// bloqueada. Un toast de la app no sirve ahí.
+///
+/// Lo expone el SHELL y no `apps/bridge` porque en Tauri el shell **es** el bridge (ADR-0050 §2.7);
+/// el binario suelto ya lo hacía con `notify_rust` para el caso «PWA en Chrome». El protocolo lo
+/// declaraba desde el principio (`Command::SendNotification`) y este era el lado que faltaba: sin
+/// él, ningún módulo podía avisar de nada desde la app.
+///
+/// **Nunca falla hacia arriba.** Si el usuario denegó el permiso o la plataforma no puede
+/// mostrarla, se registra y se sigue: una notificación que no sale no puede tumbar la comanda que
+/// la provocó.
+#[tauri::command]
+fn erplora_notify(app: tauri::AppHandle, title: String, body: String) {
+    use tauri_plugin_notification::NotificationExt;
+
+    if let Err(e) = app.notification().builder().title(&title).body(&body).show() {
+        eprintln!("notify: la plataforma no pudo mostrar «{title}» ({e}) — se sigue igualmente");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             use tauri::Manager;
             // Raíz de datos por-instalación: device.id + hub.url + devices.json. Si no se puede
@@ -481,7 +517,8 @@ pub fn run() {
             erplora_open_drawer,
             erplora_set_device_role,
             erplora_set_device_name,
-            erplora_remove_device
+            erplora_remove_device,
+            erplora_notify
         ])
         .run(tauri::generate_context!())
         .expect("error while running ERPlora shell");

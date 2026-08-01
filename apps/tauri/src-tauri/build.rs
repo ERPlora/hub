@@ -22,6 +22,8 @@ fn main() {
             "erplora_set_device_role",
             "erplora_set_device_name",
             "erplora_remove_device",
+            // Notificación del SO: el aviso cuando NADIE mira la pantalla (comanda a cocina).
+            "erplora_notify",
         ])),
     )
     .expect("error en tauri-build (app manifest / capabilities)");
