@@ -116,7 +116,8 @@ async fn catalog(
     let countries = query.get("countries").cloned().unwrap_or_default();
     let region = query.get("region").cloned();
     state.seen.lock().unwrap().push(json!({
-        "kind": "catalog", "hub_id": hub_id, "countries": countries, "region": region
+        "kind": "catalog", "hub_id": hub_id, "token": request_token(&headers),
+        "countries": countries, "region": region
     }));
     Json(json!({ "hub_id": hub_id, "countries": countries, "region": region, "results": [] }))
 }
@@ -314,6 +315,17 @@ async fn preview_install_settings_and_catalog_are_isolated_by_request_hub() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            "hub-without-secret",
+            "/api/marketplace/catalog",
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     let observations = seen.lock().unwrap().clone();
     let plan_a = observations
         .iter()
@@ -390,6 +402,9 @@ async fn preview_install_settings_and_catalog_are_isolated_by_request_hub() {
     let observations = seen.lock().unwrap();
     for hub in ["hub-a1", "hub-b1"] {
         let expected_token = format!("token-{hub}");
+        assert!(observations.iter().any(|item| item["kind"] == "catalog"
+            && item["hub_id"] == hub
+            && item["token"] == expected_token));
         assert!(observations.iter().any(|item| item["kind"] == "plan"
             && item["hub_id"] == hub
             && item["token"] == expected_token));
