@@ -32,6 +32,10 @@ thiserror = "1"
 tokio = { version = "1", features = ["sync"] }
 # `device.id` estable por instalación (X-Device-Id del login, §2.9b / sesión única ADR-0154).
 uuid = { version = "1", features = ["v4"] }
+# Notificaciones del SISTEMA: el aviso cuando NADIE mira la pantalla (comanda → cocina). Plugin
+# oficial; cubre Windows/macOS/Linux y Android/iOS con la misma API, así que el shell expone un
+# solo comando `erplora_notify` para las cuatro plataformas.
+tauri-plugin-notification = "2"
 
 [dev-dependencies]
 # `tests/remote_acl.rs` valida los patrones de `capabilities/default.json` con el MISMO motor que

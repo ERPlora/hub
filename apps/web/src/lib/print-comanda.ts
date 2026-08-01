@@ -48,6 +48,14 @@ export interface ComandaPrintFailure {
 interface Deps {
   print: (req: PrintRequest) => Promise<PrintResult>;
   onFailure?: (f: ComandaPrintFailure) => void;
+  /**
+   * Notificación del SISTEMA al entrar la comanda. Opcional: sin ella todo sigue igual.
+   *
+   * El papel es una copia y el KDS es la fuente de verdad — pero una pantalla que nadie mira no
+   * avisa de nada. En cocina caliente la tablet está apoyada, en otra vista o bloqueada, y la
+   * notificación del SO es lo único que atraviesa eso.
+   */
+  notify?: (title: string, body: string) => Promise<void>;
 }
 
 /**
@@ -99,7 +107,6 @@ export async function onKitchenOrderCreated(
     .query<ComandaItem[]>('kitchen.orders.items', { order_id: orderId })
     .catch(() => [] as ComandaItem[]);
   const groups = buildComandaGroups(items ?? []);
-  if (!groups.length) return; // todo era de pantalla, o la comanda venía vacía
 
   const header = first(
     await client
@@ -111,6 +118,23 @@ export async function onKitchenOrderCreated(
   const label = str(header?.label);
   const roundNumber = num(header?.round_number ?? 1);
   const orderNumber = str(header?.order_number);
+
+  // El aviso va ANTES de la comprobación de hojas y ANTES de imprimir, a propósito:
+  //  - antes de las hojas, porque una comanda de SOLO PANTALLA no genera ninguna y es justo el
+  //    caso donde la notificación es el único aviso que existe;
+  //  - antes de imprimir, porque avisar es instantáneo e imprimir puede tardar (o colgarse en una
+  //    impresora sin papel), y cocina debe enterarse ya.
+  // Best-effort: si falla, la comanda sigue su curso — igual que con el papel.
+  if (deps.notify) {
+    const titulo = label ? `Nueva comanda · ${label}` : 'Nueva comanda';
+    const total = (items ?? []).length;
+    const cuerpo = [orderNumber, total ? `${total} línea${total === 1 ? '' : 's'}` : '']
+      .filter(Boolean)
+      .join(' · ');
+    await deps.notify(titulo, cuerpo).catch(() => {});
+  }
+
+  if (!groups.length) return; // todo era de pantalla, o la comanda venía vacía
 
   // En secuencia y cada una con su try: una impresora sin papel no puede impedir que la otra
   // estación reciba su comanda.

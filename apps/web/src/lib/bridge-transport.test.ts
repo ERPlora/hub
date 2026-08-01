@@ -39,3 +39,41 @@ describe('ADR-0159: selección del transporte de hardware', () => {
     expect(status.online).toBe(true);
   });
 });
+
+// ── Notificaciones ──────────────────────────────────────────────────────────────────────────
+// El protocolo declara `send_notification` desde el principio y SOLO lo implementaba el binario
+// suelto `apps/bridge` (escritorio, vía notify_rust). Ni el shell Tauri ni el SDK lo exponían, así
+// que un módulo NO PODÍA avisar de nada: cuando entra una comanda, cocina no se entera.
+//
+// El contrato es el mismo por los dos transportes para que el módulo no sepa dónde corre.
+describe('notificaciones: el mismo contrato por los dos transportes', () => {
+  it('el shell Tauri las manda por invoke', async () => {
+    tauriMode.value = true;
+    const transport = makeBridgeTransport();
+
+    await transport.notify('Nueva comanda', 'Mesa 4 · 3 platos');
+
+    expect(invokeSpy).toHaveBeenCalledWith('erplora_notify', {
+      title: 'Nueva comanda',
+      body: 'Mesa 4 · 3 platos',
+    });
+  });
+
+  it('el transporte WS las manda con la acción `send_notification` del protocolo', async () => {
+    const enviados: unknown[] = [];
+    const ws = new BridgeClient(undefined, { token: () => null });
+    // El WS real no está levantado en el test: se intercepta el envío, que es el contrato.
+    (ws as unknown as { request: unknown }).request = async (payload: unknown) => {
+      enviados.push(payload);
+      return {};
+    };
+
+    await ws.notify('Nueva comanda', 'Mesa 4 · 3 platos');
+
+    expect(enviados[0]).toEqual({
+      action: 'send_notification',
+      title: 'Nueva comanda',
+      body: 'Mesa 4 · 3 platos',
+    });
+  });
+});

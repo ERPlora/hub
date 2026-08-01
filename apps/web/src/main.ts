@@ -155,6 +155,10 @@ bootPrintComanda(getClient(), {
   onFailure: (f) => {
     void toastError(`No se imprimió la comanda de ${f.label || 'sala'} (${f.role}): ${f.error}`);
   },
+  // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
+  // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell
+  // en Tauri, el binario/WS en navegador), así que sale igual en escritorio y en Android.
+  notify: (title, body) => getClient().peripherals.notify(title, body),
 });
 
 // Si un refresh falla (sesión expirada de verdad), cloud.ts ya limpió los tokens; aquí

@@ -23,6 +23,7 @@
     "allow-erplora-open-drawer",
     "allow-erplora-set-device-role",
     "allow-erplora-set-device-name",
-    "allow-erplora-remove-device"
+    "allow-erplora-remove-device",
+    "allow-erplora-notify"
   ]
 }

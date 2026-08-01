@@ -151,3 +151,62 @@ describe('la cantidad del papel habla lógico, el cable habla µ (ADR-0147)', ()
     ]);
   });
 });
+
+// ── Aviso a cocina ──────────────────────────────────────────────────────────────────────────────
+// El papel es una copia; la pantalla del KDS es la fuente de verdad. Pero una pantalla que nadie
+// mira no avisa de nada: en cocina caliente la tablet está apoyada, en otra vista o bloqueada. La
+// notificación del SISTEMA es lo único que atraviesa eso.
+describe('aviso al entrar una comanda', () => {
+  it('notifica con la etiqueta de sala y el número de comanda', async () => {
+    const print = vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+    const notify = vi.fn<(t: string, b: string) => Promise<void>>(async () => {});
+
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, notify });
+
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [titulo, cuerpo] = notify.mock.calls[0]!;
+    expect(titulo).toContain('Mesa 4');
+    expect(cuerpo).toContain('C-018');
+  });
+
+  it('AVISA aunque la comanda sea solo de pantalla — que es justo cuando más falta hace', async () => {
+    // Sin papel de por medio, la notificación es el ÚNICO aviso que hay. `buildComandaGroups`
+    // descarta lo que es `display`, así que este caso salía por la puerta de atrás sin avisar.
+    const soloPantalla = fakeClient({
+      query: vi.fn(async (name: string) => {
+        if (name === 'kitchen.orders.items')
+          return [{ product_name: 'Cañas', quantity: 2_000_000, destination: 'display', printer_role: 'bar' }];
+        if (name === 'kitchen.orders.get') return [{ label: 'Barra', round_number: 1, order_number: 'C-019' }];
+        return [];
+      }),
+    });
+    const print = vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'bar' }));
+    const notify = vi.fn<(t: string, b: string) => Promise<void>>(async () => {});
+
+    await onKitchenOrderCreated(soloPantalla, { order_id: 'k-2' }, { print, notify });
+
+    expect(print).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('si la notificación falla, la comanda se imprime igual', async () => {
+    // Misma regla que el papel: nada de lo accesorio puede tumbar la comanda.
+    const print = vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+    const notify = vi.fn<(t: string, b: string) => Promise<void>>(async () => {
+      throw new Error('permiso denegado');
+    });
+
+    await expect(
+      onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, notify }),
+    ).resolves.toBeUndefined();
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin `notify` cableado sigue funcionando como antes', async () => {
+    const print = vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+    await expect(
+      onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print }),
+    ).resolves.toBeUndefined();
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+});
