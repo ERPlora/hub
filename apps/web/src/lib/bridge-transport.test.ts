@@ -8,7 +8,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 const { tauriMode, invokeSpy } = vi.hoisted(() => ({
   tauriMode: { value: false },
-  invokeSpy: vi.fn(async () => ({ version: 'test' })),
+  invokeSpy: vi.fn<(cmd: string, args?: Record<string, unknown>) => Promise<unknown>>(
+    async () => ({ version: 'test' }),
+  ),
 }));
 
 vi.mock('./device', () => ({
@@ -75,5 +77,53 @@ describe('notificaciones: el mismo contrato por los dos transportes', () => {
       title: 'Nueva comanda',
       body: 'Mesa 4 · 3 platos',
     });
+  });
+});
+
+// ── Permisos de Android ─────────────────────────────────────────────────────────────────────
+// Declarar un permiso en el manifest NO basta: `ACCESS_LOCAL_NETWORK` (API 37+) y
+// `POST_NOTIFICATIONS` (API 33+) se conceden en runtime, y su ausencia falla EN SILENCIO —
+// el descubrimiento devuelve [] y las notificaciones no salen, sin un solo error.
+// Verificado en el emulador API 37: `discover_printers` daba [] hasta concederlo con `adb`.
+describe('permisos de runtime antes de tocar el hardware', () => {
+  it('pide permisos antes de descubrir impresoras', async () => {
+    tauriMode.value = true;
+    invokeSpy.mockClear();
+    const transport = makeBridgeTransport();
+
+    await transport.discoverPrinters();
+
+    const llamadas = invokeSpy.mock.calls.map((c) => c[0]);
+    expect(llamadas).toContain('plugin:erplora-android|request_permissions');
+    expect(llamadas.indexOf('plugin:erplora-android|request_permissions')).toBeLessThan(
+      llamadas.indexOf('erplora_discover_printers'),
+    );
+  });
+
+  it('pide permisos antes de notificar', async () => {
+    tauriMode.value = true;
+    invokeSpy.mockClear();
+    const transport = makeBridgeTransport();
+
+    await transport.notify('Nueva comanda', 'Mesa 4');
+
+    const llamadas = invokeSpy.mock.calls.map((c) => c[0]);
+    expect(llamadas).toContain('plugin:erplora-android|request_permissions');
+    expect(llamadas.indexOf('plugin:erplora-android|request_permissions')).toBeLessThan(
+      llamadas.indexOf('erplora_notify'),
+    );
+  });
+
+  it('si el usuario DENIEGA, la operación sigue — no revienta', async () => {
+    // Un «no» es una respuesta, no un error. Sin impresora el TPV tiene que seguir cobrando.
+    tauriMode.value = true;
+    invokeSpy.mockClear();
+    invokeSpy.mockImplementation(async (cmd: string) => {
+      if (cmd === 'plugin:erplora-android|request_permissions') throw new Error('denegado');
+      return [];
+    });
+    const transport = makeBridgeTransport();
+
+    await expect(transport.discoverPrinters()).resolves.toEqual([]);
   });
 });

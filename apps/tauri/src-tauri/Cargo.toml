@@ -36,6 +36,13 @@ uuid = { version = "1", features = ["v4"] }
 # oficial; cubre Windows/macOS/Linux y Android/iOS con la misma API, así que el shell expone un
 # solo comando `erplora_notify` para las cuatro plataformas.
 tauri-plugin-notification = "2"
+# Permisos de RUNTIME de Android. Sin ellos el hardware está muerto y falla EN SILENCIO: el
+# descubrimiento devuelve [] y las notificaciones no salen, sin un solo error.
+tauri-plugin-erplora-android = { path = "../../../crates/tauri-plugin-erplora-android" }
+# Solo para preguntarle al hub recordado si sigue existiendo al arrancar (`should_forget_hub`).
+# Sin esto, un hub borrado deja la app tapiada en un 404 permanente y sin salida por la UI.
+# Mismo spec que el resto del workspace, así que no añade compilación nueva.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 
 [dev-dependencies]
 # `tests/remote_acl.rs` valida los patrones de `capabilities/default.json` con el MISMO motor que

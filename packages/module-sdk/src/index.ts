@@ -1049,6 +1049,29 @@ export { BridgeClient as WsBridgeTransport };
 export class IpcBridgeTransport implements BridgeTransport {
   constructor(private readonly tauri: TauriBridge) {}
 
+  /**
+   * Asegura los permisos de RUNTIME antes de tocar el hardware.
+   *
+   * Declararlos en el manifest **no basta**: `ACCESS_LOCAL_NETWORK` (Android 17+) y
+   * `POST_NOTIFICATIONS` (Android 13+) se conceden en runtime, y su ausencia **falla en
+   * silencio** — el descubrimiento devuelve `[]` y las notificaciones no salen, sin un solo
+   * error. Verificado en el emulador API 37.
+   *
+   * Es idempotente en el lado nativo: si ya están concedidos no sale ningún diálogo, así que
+   * llamarlo antes de cada escaneo no molesta al usuario.
+   *
+   * Nunca propaga: un «no» del usuario es una respuesta, no un fallo. Sin impresora el TPV
+   * tiene que seguir cobrando, y sin avisos la comanda tiene que seguir imprimiéndose.
+   */
+  private async ensurePermissions(): Promise<void> {
+    try {
+      await this.tauri.invoke('plugin:erplora-android|request_permissions', {});
+    } catch {
+      // En escritorio el comando no existe o no hay nada que pedir; en Android, el usuario dijo
+      // que no. En ambos casos se sigue.
+    }
+  }
+
   async detect(): Promise<BridgeStatus> {
     try {
       const v = (await this.tauri.invoke('erplora_bridge_status', {})) as { version?: string };
@@ -1058,7 +1081,8 @@ export class IpcBridgeTransport implements BridgeTransport {
     }
   }
 
-  discoverPrinters(): Promise<BridgePrinter[]> {
+  async discoverPrinters(): Promise<BridgePrinter[]> {
+    await this.ensurePermissions();
     return this.tauri.invoke('erplora_discover_printers', {}) as Promise<BridgePrinter[]>;
   }
 
@@ -1091,6 +1115,7 @@ export class IpcBridgeTransport implements BridgeTransport {
 
   /** Notificación del SO por el shell (que ES el bridge en Tauri). Best-effort: no propaga fallos. */
   async notify(title: string, body: string): Promise<void> {
+    await this.ensurePermissions();
     try {
       await this.tauri.invoke('erplora_notify', { title, body });
     } catch {
