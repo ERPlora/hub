@@ -762,9 +762,10 @@ impl Runtime {
         &self,
         name: &str,
         scope: &[api_keys::ScopeEntry],
+        rate_limit_per_minute: i64,
         created_by: &str,
     ) -> Result<api_keys::ApiKeySecret> {
-        api_keys::create(self.db.as_ref(), &self.hub_id, name, scope, created_by).await
+        api_keys::create(self.db.as_ref(), &self.hub_id, name, scope, rate_limit_per_minute, created_by).await
     }
 
     /// Lista las API keys del hub (sin secreto), recientes primero.
@@ -784,8 +785,16 @@ impl Runtime {
 
     /// Verifica un token `erpl_live_…` y lo resuelve al `RequestContext` (con los permisos del
     /// scope expandido contra el Registry). `None` = token inválido/revocado (el server → 401).
-    pub async fn resolve_api_key(&self, token: &str) -> Result<Option<RequestContext>> {
+    pub async fn resolve_api_key(&self, token: &str) -> Result<Option<api_keys::ApiKeyPrincipal>> {
         api_keys::verify_and_resolve(self.db.as_ref(), &self.registry, &self.hub_id, token).await
+    }
+
+    /// Consume una petición de la cuota durable de una API key autenticada.
+    pub async fn consume_api_key_rate_limit(
+        &self,
+        principal: &api_keys::ApiKeyPrincipal,
+    ) -> Result<api_keys::RateLimitDecision> {
+        api_keys::consume_rate_limit(self.db.as_ref(), &principal.key_id, principal.rate_limit_per_minute).await
     }
 
     // ── Settings del hub (store key/value de sistema, scoped por hub_id) ────────────────────────

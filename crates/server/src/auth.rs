@@ -63,6 +63,16 @@ pub async fn api_key_context(
     config: &HubConfig,
     rt: &Runtime,
 ) -> Result<RequestContext, AuthError> {
+    Ok(api_key_principal(headers, config, rt).await?.context)
+}
+
+/// Variante que conserva id y cuota; las superficies externas la usan para consumir el rate
+/// limit durable antes de llegar al dispatcher.
+pub async fn api_key_principal(
+    headers: &HeaderMap,
+    config: &HubConfig,
+    rt: &Runtime,
+) -> Result<erplora_runtime::api_keys::ApiKeyPrincipal, AuthError> {
     let token = api_key_token(headers).ok_or(AuthError::MissingSession)?;
     let _ = config; // hub_id lo aporta el runtime (despliegue); aquí solo documentamos el plano.
     rt.resolve_api_key(&token)
@@ -71,7 +81,9 @@ pub async fn api_key_context(
         .ok_or_else(|| AuthError::Invalid("API key inválida o revocada".into()))
 }
 
-/// Autentica la petición y construye el `RequestContext` según el modo configurado.
+/// Autentica una petición de la superficie **interna** y construye su `RequestContext` según el
+/// modo configurado. Las API keys solo se aceptan en `/api/v1` y `/webhook`; rechazarlas aquí
+/// evita saltarse el doble gate `expose_api` usando `/api/query` o `/api/command`.
 /// - `Dev`: confía en cabeceras (`X-User-Id`/`X-Permissions`).
 /// - `Session`: resuelve la sesión server-side → `hub_user` → permisos del rol (autoridad local).
 pub async fn authenticate(
@@ -79,12 +91,10 @@ pub async fn authenticate(
     config: &HubConfig,
     rt: &Runtime,
 ) -> Result<RequestContext, AuthError> {
-    // **Tercer camino** (ADR-0057): una petición con bearer de API key (`erpl_live_…`) se resuelve
-    // SIEMPRE como API key, sea cual sea el `auth_mode`. Va primero porque su contexto (permisos =
-    // scope expandido) es independiente de Dev/Session. Si el bearer no es de API key, sigue el
-    // flujo normal de abajo (sesión / cabeceras dev).
     if api_key_token(headers).is_some() {
-        return api_key_context(headers, config, rt).await;
+        return Err(AuthError::Invalid(
+            "la API key solo se admite en /api/v1 y /webhook".into(),
+        ));
     }
     match config.auth_mode {
         AuthMode::Dev => Ok(context_from_headers(headers)),

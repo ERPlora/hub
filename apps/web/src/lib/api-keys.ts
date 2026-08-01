@@ -44,6 +44,8 @@ export interface ApiKey {
   created_at: string;
   /** ISO-8601 del último uso, o `null` si nunca se usó. */
   last_used_at: string | null;
+  /** Cuota durable aplicada antes de llegar al dispatcher. */
+  rate_limit_per_minute: number;
 }
 
 /** Respuesta de `POST /api/keys`: la key creada + el secreto que se muestra UNA sola vez. */
@@ -54,12 +56,14 @@ export interface ApiKeyCreated {
   secret: string;
   prefix: string;
   scope: ApiKeyScopeEntry[];
+  rate_limit_per_minute: number;
 }
 
 /** Payload de creación: nombre + matriz de scope (solo entradas con r y/o w marcados). */
 export interface CreateApiKeyInput {
   name: string;
   scope: ApiKeyScopeEntry[];
+  rate_limit_per_minute: number;
 }
 
 /** Envelope estándar del runtime (`{ ok, data }`); algunas rutas devuelven el cuerpo directo. */

@@ -45,9 +45,22 @@
           <ion-item>
             <ion-input
               v-model="form.name"
+              data-testid="api-key-name"
               :label="t('apiKeys.name')"
               label-placement="floating"
               :placeholder="t('apiKeys.namePlaceholder')"
+            />
+          </ion-item>
+          <ion-item>
+            <ion-input
+              v-model.number="form.rate_limit_per_minute"
+              data-testid="api-key-rate-limit"
+              type="number"
+              min="1"
+              max="10000"
+              :label="t('apiKeys.rateLimit')"
+              label-placement="floating"
+              :helper-text="t('apiKeys.rateLimitHint')"
             />
           </ion-item>
         </ion-list>
@@ -121,7 +134,7 @@
         <ion-toolbar>
           <div class="footer-actions">
             <ion-button fill="outline" @click="closeCreate">{{ t('apiKeys.cancel') }}</ion-button>
-            <ion-button :disabled="!canCreate || creating" @click="onCreate">
+            <ion-button data-testid="api-key-create" :disabled="!canCreate || creating" @click="onCreate">
               <ion-spinner v-if="creating" name="dots" slot="start" />
               <HubIcon v-else name="add-outline" slot="start" />
               {{ t('apiKeys.create') }}
@@ -148,7 +161,7 @@
           {{ t('apiKeys.secretWarnBody') }}
         </ok-inline-feedback>
         <div class="secret-box">
-          <code class="secret-code">{{ secret }}</code>
+          <code class="secret-code" data-testid="api-key-secret">{{ secret }}</code>
           <ion-button fill="solid" @click="copySecret">
             <HubIcon :name="copied ? 'checkmark-circle-outline' : 'copy-outline'" slot="start" />
             {{ copied ? t('apiKeys.copied') : t('apiKeys.copy') }}
@@ -204,8 +217,8 @@ const creating = ref(false);
 const secret = ref<string | null>(null);
 const copied = ref(false);
 
-interface CreateForm { name: string; scope: Record<string, { read: boolean; write: boolean }> }
-const form = reactive<CreateForm>({ name: '', scope: {} });
+interface CreateForm { name: string; rate_limit_per_minute: number; scope: Record<string, { read: boolean; write: boolean }> }
+const form = reactive<CreateForm>({ name: '', rate_limit_per_minute: 60, scope: {} });
 
 const fmtDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -309,6 +322,7 @@ const columns = computed<DataTableColumn[]>(() => [
   },
   { key: 'createdText', header: t('apiKeys.colCreated'), format: (r) => String(r.createdText ?? '') },
   { key: 'lastUsedText', header: t('apiKeys.colLastUsed'), format: (r) => String(r.lastUsedText ?? t('apiKeys.never')) },
+  { key: 'rateLimitText', header: t('apiKeys.colRateLimit'), format: (r) => String(r.rateLimitText ?? '') },
   // Acciones por fila en columna propia (no en `:actions`, que es global) para poder ocultar
   // Rotar/Revocar en keys revocadas (ADR-0057). Alineada a la derecha, sin selector de columna.
   { key: '_actions', header: t('apiKeys.colActions'), align: 'right', render: actionsCell, width: '8rem' },
@@ -324,6 +338,7 @@ const rows = computed<Row[]>(() =>
     status: k.status,
     createdText: k.created_at ? fmtDate(k.created_at) : '',
     lastUsedText: k.last_used_at ? fmtDate(k.last_used_at) : t('apiKeys.never'),
+    rateLimitText: t('apiKeys.perMinute', { count: k.rate_limit_per_minute }),
     _raw: k,
   })),
 );
@@ -342,6 +357,9 @@ const someWrite = computed(() => modules.value.some((m) => form.scope[m.id]?.wri
 // Habilita "Crear" solo con nombre + al menos un permiso marcado (no se crean keys vacías).
 const canCreate = computed(() =>
   form.name.trim().length > 0 &&
+  Number.isInteger(Number(form.rate_limit_per_minute)) &&
+  Number(form.rate_limit_per_minute) >= 1 &&
+  Number(form.rate_limit_per_minute) <= 10_000 &&
   Object.values(form.scope).some((c) => c.read || c.write),
 );
 
@@ -370,6 +388,7 @@ async function reloadKeys(): Promise<void> {
 
 async function openCreate(): Promise<void> {
   form.name = '';
+  form.rate_limit_per_minute = 60;
   form.scope = {};
   createOpen.value = true;
   if (!modules.value.length) {
@@ -395,7 +414,11 @@ async function onCreate(): Promise<void> {
     .filter((s) => s.read || s.write);
   creating.value = true;
   try {
-    const created = await createApiKey({ name: form.name.trim(), scope });
+    const created = await createApiKey({
+      name: form.name.trim(),
+      rate_limit_per_minute: Number(form.rate_limit_per_minute),
+      scope,
+    });
     createOpen.value = false;
     await reloadKeys();
     showSecret(created.secret);
