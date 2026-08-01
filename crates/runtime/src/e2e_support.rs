@@ -193,9 +193,15 @@ mod tests {
     #[test]
     fn modules_root_por_defecto_apunta_a_monorepo() {
         // `env!` se evalúa al compilar `erplora-runtime` (MANIFEST_DIR = crates/runtime); la ruta
-        // por defecto siempre termina en el segmento canónico del repo hermano.
+        // por defecto siempre termina en el segmento canónico del repo hermano. El runner de
+        // contratos puede reemplazarla para ensamblar módulos de varios worktrees: en ese caso el
+        // test comprueba que el override se respeta, sin mutar el entorno de forma racy.
         let root = modules_root();
-        assert!(root.ends_with("modules-workspace/modules"));
+        if let Ok(override_dir) = std::env::var("ERPLORA_MODULES_DIR") {
+            assert_eq!(root, PathBuf::from(override_dir));
+        } else {
+            assert!(root.ends_with("modules-workspace/modules"));
+        }
     }
 
     #[test]
@@ -209,4 +215,3 @@ mod tests {
         assert!(require_modules_workspace());
     }
 }
-

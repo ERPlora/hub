@@ -24,7 +24,9 @@ use erplora_runtime::{RequestContext, Runtime, DEV_HUB_ID};
 use serde_json::json;
 
 fn module_dir(id: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(id)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules")
+        .join(id)
 }
 
 #[tokio::test]
@@ -39,7 +41,9 @@ async fn install_on_postgres_applies_migrations_and_queries_work() {
     let db = fresh_db().await;
 
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&module_dir("customers")).await.expect("instalar customers");
+    rt.install_from_dir(&module_dir("customers"))
+        .await
+        .expect("instalar customers");
 
     // Síntoma del bug: el módulo queda `active` en `hub_module`…
     let mut p = Params::new();
@@ -53,7 +57,11 @@ async fn install_on_postgres_applies_migrations_and_queries_work() {
         .await
         .unwrap()
         .rows;
-    assert_eq!(status[0]["status"], json!("active"), "install deja el módulo activo");
+    assert_eq!(
+        status[0]["status"],
+        json!("active"),
+        "install deja el módulo activo"
+    );
 
     // …pero el contrato exige que sus migraciones se hayan aplicado de verdad:
     let applied = rt
@@ -98,7 +106,11 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
     let db = fresh_db().await;
 
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&module_dir("invoice")).await.expect("instalar invoice");
+    for module in ["taxes", "inventory", "customers", "sales", "invoice"] {
+        rt.install_from_dir(&module_dir(module))
+            .await
+            .unwrap_or_else(|e| panic!("instalar {module}: {e}"));
+    }
 
     let applied = rt
         .db_for_test()
@@ -109,7 +121,10 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
         .await
         .unwrap()
         .rows;
-    let names: Vec<&str> = applied.iter().map(|r| r["filename"].as_str().unwrap()).collect();
+    let names: Vec<&str> = applied
+        .iter()
+        .map(|r| r["filename"].as_str().unwrap())
+        .collect();
     assert_eq!(
         names,
         [

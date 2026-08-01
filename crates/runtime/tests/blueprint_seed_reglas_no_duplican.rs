@@ -4,7 +4,7 @@
 //! por [`export::is_module_seeded`] (PR #191).
 //!
 //! Hueco que fija ESTE test: `taxes_rule` no lleva `is_system` NI `source` — el heurístico no la
-//! reconocía y sus 6 reglas de IVA sembradas SÍ viajaban. Al importar sobre un hub que ya re-sembró
+//! reconocía y sus reglas de IVA sembradas SÍ viajaban. Al importar sobre un hub que ya re-sembró
 //! las suyas, el guard-por-`id` no las ve (el `id` embebe el hub ORIGEN: `h1|taxrule|…` vs el
 //! destino `h2|taxrule|…`) → el destino acaba con 12 reglas y el lookup de IVA es AMBIGUO. No
 //! revienta (`taxes_rule` no tiene índice único por clave natural), así que es un fallo SILENCIOSO
@@ -16,7 +16,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::Runtime;
@@ -49,9 +49,20 @@ async fn count(rt: &Runtime, sql: &str) -> i64 {
 /// Restaurar un blueprint sobre un hub que ya tiene su semilla NO duplica las reglas de IVA.
 #[tokio::test]
 async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // ORIGEN h1 → bundle con taxes (los `id` embeben 'h1'; created_by='system').
     let a = hub_con_taxes("h1").await;
+    let expected_seeded = count(
+        &a,
+        "SELECT count(*) AS n FROM taxes_rule WHERE hub_id = 'h1'",
+    )
+    .await;
+    assert!(
+        expected_seeded > 0,
+        "precondición: taxes debe sembrar reglas"
+    );
     let selection = ExportSelection {
         users: false,
         settings: false,
@@ -74,7 +85,7 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
     .await
     .expect("export h1");
 
-    // DESTINO h2, sembrado bajo SU PROPIO hub_id: ya tiene sus 6 reglas ES.
+    // DESTINO h2, sembrado bajo SU PROPIO hub_id: debe tener el mismo catálogo de referencia.
     let mut b = hub_con_taxes("h2").await;
     assert_eq!(
         count(
@@ -82,8 +93,8 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
             "SELECT count(*) AS n FROM taxes_rule WHERE hub_id = 'h2'"
         )
         .await,
-        6,
-        "precondición: 6 reglas sembradas"
+        expected_seeded,
+        "precondición: ambos hubs reciben el mismo catálogo sembrado"
     );
 
     let import = ImportSelection {
@@ -107,14 +118,15 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
         taxes.status
     );
 
-    // Las reglas de IVA sembradas NO se duplican: siguen siendo 6, y ES/product.generic es única.
+    // Las reglas de IVA sembradas NO se duplican: conservan el cardinal original, y
+    // ES/product.generic sigue siendo única.
     assert_eq!(
         count(
             &b,
             "SELECT count(*) AS n FROM taxes_rule WHERE hub_id = 'h2'"
         )
         .await,
-        6,
+        expected_seeded,
         "las reglas de IVA sembradas por el módulo se duplicaron al restaurar el blueprint",
     );
     assert_eq!(

@@ -21,11 +21,16 @@ use erplora_db::Params;
 use erplora_runtime::{RequestContext, Runtime};
 
 fn module_dir(id: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(id)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules")
+        .join(id)
 }
 
 fn blueprint_seed(sector: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../blueprints/starter_catalogs/es").join(sector).join("seed.sql")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../blueprints/starter_catalogs/es")
+        .join(sector)
+        .join("seed.sql")
 }
 
 /// Unión de módulos POS relevantes a los 3 sectores (barbería/peluquería = beauty, restaurante),
@@ -35,18 +40,18 @@ const POS_MODULES_ORDERED: &[&str] = &[
     "pricing",
     "tables",
     "cash_register",
-    "invoice",
     "printing",
     "staff",
     "customers",
     "schedules",
-    "inventory",   // dep: taxes
-    "services",    // dep: taxes
-    "sales",       // dep: inventory, taxes
-    "kitchen",     // dep: sales, inventory
-    "appointments",// dep: customers, services
-    "reservations",// dep: tables, customers
-    "verifactu",   // dep: invoice
+    "inventory",      // dep: taxes
+    "services",       // dep: taxes
+    "sales",          // dep: inventory, taxes
+    "invoice",        // dep: sales
+    "kitchen",        // dep: sales, inventory
+    "appointments",   // dep: customers, services
+    "reservations",   // dep: tables, customers
+    "verifactu",      // dep: invoice
     "online_booking", // dep: customers
 ];
 
@@ -65,9 +70,15 @@ async fn install_pack(rt: &mut Runtime, failures: &mut Vec<String>) {
 async fn exercise_list_queries(rt: &Runtime, ctx: &RequestContext, failures: &mut Vec<String>) {
     for id in POS_MODULES_ORDERED {
         let mj = module_dir(id).join("module.json");
-        let Ok(txt) = std::fs::read_to_string(&mj) else { continue };
-        let Ok(json) = serde_json::from_str::<serde_json::Value>(&txt) else { continue };
-        let Some(queries) = json.get("queries").and_then(|q| q.as_object()) else { continue };
+        let Ok(txt) = std::fs::read_to_string(&mj) else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&txt) else {
+            continue;
+        };
+        let Some(queries) = json.get("queries").and_then(|q| q.as_object()) else {
+            continue;
+        };
         for name in queries.keys().filter(|n| n.ends_with(".list")) {
             if let Err(e) = rt.execute_query(name, &Params::new(), ctx).await {
                 failures.push(format!("QUERY {name}: {e}"));
@@ -102,7 +113,9 @@ async fn run_sector(sector: &str) {
     let mut rt = Runtime::new(Box::new(db));
     // El server llama esto al arrancar: crea las tablas de sistema (incl. identidad `hub_user`)
     // que el blueprint necesita para sembrar los cajeros. Sin esto el seed fallaría por hub_user.
-    rt.ensure_system_tables().await.expect("ensure_system_tables");
+    rt.ensure_system_tables()
+        .await
+        .expect("ensure_system_tables");
     let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
     let mut failures: Vec<String> = Vec::new();
 

@@ -71,6 +71,38 @@ async fn rt_pos() -> Runtime {
     rt
 }
 
+async fn assert_no_sale_effects(rt: &Runtime) {
+    let ventas = rt
+        .execute_query("sales.list", &Params::new(), &admin())
+        .await
+        .unwrap();
+    assert!(
+        ventas.is_empty(),
+        "un fallo fiscal no debe persistir una cabecera de venta"
+    );
+
+    for table in [
+        "sales_sale_counter",
+        "sales_sale",
+        "sales_sale_item",
+        "_event_outbox",
+    ] {
+        let rows = rt
+            .db_for_test()
+            .query(
+                &format!("SELECT COUNT(*) AS n FROM {table}"),
+                &Params::new(),
+            )
+            .await
+            .unwrap_or_else(|e| panic!("contar {table}: {e}"));
+        assert_eq!(
+            rows.rows[0]["n"].as_i64(),
+            Some(0),
+            "un fallo fiscal no puede tocar {table}"
+        );
+    }
+}
+
 /// El caso que da nombre a todo esto: **el cliente MIENTE sobre el IVA y el servidor lo ignora**.
 ///
 /// El hub tiene una regla fiscal que dice que `restaurant.food` va al 10 %. El POS manda la línea
@@ -182,8 +214,9 @@ async fn una_read_fiscal_requerida_falla_sin_handler_persistencia_ni_outbox() {
     let rt = rt_pos().await;
     let ctx = admin();
 
-    // Rompe la FUENTE, no el contenido: una tabla vacía sigue siendo una lectura válida; una tabla
-    // ausente simula exactamente un fallo de migración/BD de `taxes.rules.list`.
+    // Rompe la FUENTE, no solo el contenido: una tabla ausente simula exactamente un fallo de
+    // migración/BD de `taxes.rules.list`. Los casos de catálogo vacío y regla no aplicable se
+    // cubren por separado porque también deben fallar cerrados desde el handler.
     rt.db_for_test()
         .execute_batch("DROP TABLE taxes_rule")
         .await
@@ -217,35 +250,112 @@ async fn una_read_fiscal_requerida_falla_sin_handler_persistencia_ni_outbox() {
         "error inesperado: {err:?}"
     );
 
-    let ventas = rt
-        .execute_query("sales.list", &Params::new(), &ctx)
+    assert_no_sale_effects(&rt).await;
+}
+
+#[tokio::test]
+async fn un_catalogo_fiscal_vacio_rechaza_la_venta_sin_efectos() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let rt = rt_pos().await;
+    let ctx = admin();
+
+    rt.db_for_test()
+        .execute_batch("DELETE FROM taxes_rule")
         .await
-        .unwrap();
+        .expect("vaciar el catálogo fiscal");
+
+    let err = rt
+        .execute_command(
+            "sales.complete_sale",
+            &params(json!({
+                "items": [{
+                    "product_name": "X",
+                    "price": 1000,
+                    "quantity": 1_000_000,
+                    "tax_category_key": "product.generic",
+                    "tax_rate": 0.0
+                }],
+                "tax_included": true,
+                "amount_tendered": 1000,
+                "payment_method_name": "Efectivo"
+            })),
+            &ctx,
+        )
+        .await
+        .expect_err("un catálogo vacío nunca degrada al porcentaje del navegador");
     assert!(
-        ventas.is_empty(),
-        "el handler no debe haber persistido cabecera de venta"
+        err.to_string()
+            .contains("empty_required_read: taxes.rules.list"),
+        "error inesperado: {err:?}"
     );
 
-    for table in [
-        "sales_sale_counter",
-        "sales_sale",
-        "sales_sale_item",
-        "_event_outbox",
-    ] {
-        let rows = rt
-            .db_for_test()
-            .query(
-                &format!("SELECT COUNT(*) AS n FROM {table}"),
-                &Params::new(),
-            )
-            .await
-            .unwrap_or_else(|e| panic!("contar {table}: {e}"));
-        assert_eq!(
-            rows.rows[0]["n"].as_i64(),
-            Some(0),
-            "fallar la read no puede tocar {table}"
-        );
+    assert_no_sale_effects(&rt).await;
+}
+
+#[tokio::test]
+async fn una_categoria_sin_regla_aplicable_rechaza_la_venta_sin_efectos() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
     }
+    let rt = rt_pos().await;
+    let ctx = admin();
+
+    rt.execute_command(
+        "taxes.categories.create",
+        &params(json!({ "key": "test.catalogo.presente", "name": "Control" })),
+        &ctx,
+    )
+    .await
+    .expect("crear categoría de control");
+    rt.execute_command(
+        "taxes.rules.create",
+        &params(json!({
+            "country_code": "ES", "region_code": null,
+            "tax_category_key": "test.catalogo.presente", "rate_pct": 21.0,
+            "tax_type": "vat", "valid_from": null, "valid_to": null
+        })),
+        &ctx,
+    )
+    .await
+    .expect("crear una regla de control no aplicable a la venta");
+    rt.db_for_test()
+        .execute_batch("DELETE FROM _event_outbox")
+        .await
+        .expect("aislar los efectos del intento de venta de los eventos del setup fiscal");
+
+    let reglas = rt
+        .execute_query("taxes.rules.list", &Params::new(), &ctx)
+        .await
+        .expect("leer catálogo fiscal sembrado");
+    assert!(!reglas.is_empty(), "el test necesita un catálogo no vacío");
+
+    let err = rt
+        .execute_command(
+            "sales.complete_sale",
+            &params(json!({
+                "items": [{
+                    "product_name": "X",
+                    "price": 1000,
+                    "quantity": 1_000_000,
+                    "tax_category_key": "test.sin.regla.aplicable",
+                    "tax_rate": 99.0
+                }],
+                "tax_included": true,
+                "amount_tendered": 1000,
+                "payment_method_name": "Efectivo"
+            })),
+            &ctx,
+        )
+        .await
+        .expect_err("una categoría desconocida nunca degrada al porcentaje del navegador");
+    assert!(
+        err.to_string().contains("tax_rule_not_applicable"),
+        "error inesperado: {err:?}"
+    );
+
+    assert_no_sale_effects(&rt).await;
 }
 
 // ── `reads` CON PARÁMETROS (ADR-0069 fase 2) ────────────────────────────────────────────────────

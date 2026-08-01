@@ -17,6 +17,14 @@ const DEV_HUB_ID = '00000000-0000-0000-0000-000000000001';
 const modulesDir = mkdtempSync(join(tmpdir(), 'erplora-runtime-contracts-'));
 const schedulesDir = process.env.ERPLORA_SCHEDULES_MODULE_DIR
   ?? join(MONOREPO_ROOT, 'modules-workspace', 'modules', 'schedules');
+const taxesDir = process.env.ERPLORA_TAXES_MODULE_DIR
+  ?? join(MONOREPO_ROOT, 'modules-workspace', 'modules', 'taxes');
+const inventoryDir = process.env.ERPLORA_INVENTORY_MODULE_DIR
+  ?? join(MONOREPO_ROOT, 'modules-workspace', 'modules', 'inventory');
+const customersDir = process.env.ERPLORA_CUSTOMERS_MODULE_DIR
+  ?? join(MONOREPO_ROOT, 'modules-workspace', 'modules', 'customers');
+const salesDir = process.env.ERPLORA_SALES_MODULE_DIR
+  ?? join(MONOREPO_ROOT, 'modules-workspace', 'modules', 'sales');
 const w140Dir = join(HUB_ROOT, 'crates', 'runtime', 'tests', 'fixture_w140');
 const children = [];
 let postgresContainer = null;
@@ -110,7 +118,14 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 }
 
 try {
-  for (const [name, path] of [['schedules', schedulesDir], ['w140', w140Dir]]) {
+  for (const [name, path] of [
+    ['taxes', taxesDir],
+    ['inventory', inventoryDir],
+    ['customers', customersDir],
+    ['sales', salesDir],
+    ['schedules', schedulesDir],
+    ['w140', w140Dir],
+  ]) {
     if (!existsSync(join(path, 'module.json'))) throw new Error(`falta el módulo ${name}: ${path}`);
     symlinkSync(path, join(modulesDir, name), 'dir');
   }
