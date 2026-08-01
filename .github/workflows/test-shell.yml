@@ -16,10 +16,12 @@ on:
     branches: [main]
     paths:
       - "apps/tauri/**"
+      - "crates/tauri-plugin-erplora-android/**"
       - ".github/workflows/test-shell.yml"
   pull_request:
     paths:
       - "apps/tauri/**"
+      - "crates/tauri-plugin-erplora-android/**"
       - ".github/workflows/test-shell.yml"
   workflow_dispatch:
 
@@ -59,4 +61,4 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: cargo test -p erplora-tauri
-        run: cargo test -p erplora-tauri
+        run: cargo test -p erplora-tauri -p tauri-plugin-erplora-android
