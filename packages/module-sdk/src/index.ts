@@ -11,6 +11,17 @@
 // autoridad: valida permiso, hub_id, payload y ejecuta). El WC es una mini-app que llama a
 // `query`/`command`/`on`; nunca toca la BD ni confía en su propio `hasPermission` para seguridad.
 
+// Contrato público de cantidades (ADR-0147). Vive en un fichero sin dependencias para que los
+// módulos puedan importarlo también de forma tree-shakeable desde `@erplora/module-sdk`.
+export {
+  QUANTITY_SCALE,
+  toMicro,
+  fromMicro,
+  parseQuantity,
+  formatQuantity,
+  onGrid,
+} from './quantity';
+
 export interface ErploraTransport {
   query(name: string, params?: Record<string, unknown>): Promise<unknown>;
   command(name: string, payload?: Record<string, unknown>): Promise<unknown>;
