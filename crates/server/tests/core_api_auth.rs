@@ -154,3 +154,52 @@ async fn cloud_install_cannot_use_the_hub_machine_token_without_an_admin_session
     assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
     std::fs::remove_dir_all(temp).ok();
 }
+
+#[tokio::test]
+async fn single_tenant_rejects_divergent_hub_header_before_using_session_or_machine_token() {
+    let (router, admin, _employee, temp) = fixture().await;
+    let context = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/hub/context")
+                .header("x-hub-id", "hub-chosen-by-client")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        context.status(),
+        StatusCode::FORBIDDEN,
+        "la frontera global cubre incluso rutas que no resuelven auth en su handler"
+    );
+
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/assistant/chat/stream")
+                .header("content-type", "application/json")
+                .header("x-hub-session", admin)
+                .header("x-hub-id", "hub-chosen-by-client")
+                .body(Body::from(json!({ "input": "hola" }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let bytes = http_body_util::BodyExt::collect(response.into_body())
+        .await
+        .unwrap()
+        .to_bytes();
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(
+        body["error"]
+            .as_str()
+            .is_some_and(|message| message.contains("esperado=hub-auth")),
+        "el rechazo identifica al hub autoritativo sin alcanzar el proxy Cloud: {body}"
+    );
+    std::fs::remove_dir_all(temp).ok();
+}

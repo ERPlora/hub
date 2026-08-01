@@ -75,18 +75,19 @@ impl RouterConfig {
 ///  - `Err` — fallo de red/embedding o del store; el llamador decide (típicamente: degradar a
 ///    "todos los tools" para no romper el asistente por un fallo del prefiltro).
 ///
-/// `active_module_ids` lo pasa el llamador para aplicar el umbral sin acoplar el router al
-/// `Registry` y para excluir del search cualquier corpus residual de módulos desactivados.
+/// `candidate_module_ids` procede de las tools que ya sobrevivieron al gate de permisos. Usar el
+/// catálogo activo completo aquí permitiría que módulos sin ninguna tool autorizada ocupasen el
+/// top-K y dejasen fuera resultados que el usuario sí puede ejecutar (*permission starvation*).
 pub async fn route_modules<S: VectorStore + ?Sized>(
     embedder: &dyn Embedder,
     store: &S,
     hub_id: &str,
     query: &str,
-    active_module_ids: &[String],
+    candidate_module_ids: &[String],
     cfg: RouterConfig,
 ) -> Result<Option<Vec<String>>, RouterError> {
     let query = query.trim();
-    if query.is_empty() || active_module_ids.len() < cfg.min_modules_to_route {
+    if query.is_empty() || candidate_module_ids.len() < cfg.min_modules_to_route {
         return Ok(None);
     }
     if cfg.top_k == 0 {
@@ -105,7 +106,7 @@ pub async fn route_modules<S: VectorStore + ?Sized>(
     // deduplicar por módulo. Pedir solo K chunks era incorrecto: varias descripciones del primer
     // módulo podían ocupar todas las plazas y devolver menos de K módulos relevantes.
     let hits = store
-        .search(hub_id, &query_vec, usize::MAX, Some(active_module_ids))
+        .search(hub_id, &query_vec, usize::MAX, Some(candidate_module_ids))
         .await?;
     if hits.is_empty() {
         // Índice vacío (nada indexado todavía) → degradar a "todos" en vez de "ninguno".
@@ -162,10 +163,18 @@ pub async fn assemble_routed_tools<S: VectorStore + ?Sized>(
     hub_id: &str,
     query: &str,
     all_tools: Vec<Value>,
-    active_module_ids: &[String],
     cfg: RouterConfig,
 ) -> Vec<Value> {
-    match route_modules(embedder, store, hub_id, query, active_module_ids, cfg).await {
+    // Fuente única de candidatos: el catálogo YA filtrado por `assistant::assemble_tools` según
+    // los permisos del usuario. Deduplicamos de forma estable antes de consultar el índice.
+    let mut seen = std::collections::HashSet::new();
+    let candidate_module_ids: Vec<String> = all_tools
+        .iter()
+        .filter_map(|tool| tool.get("module_id").and_then(Value::as_str))
+        .filter(|module_id| seen.insert((*module_id).to_string()))
+        .map(str::to_string)
+        .collect();
+    match route_modules(embedder, store, hub_id, query, &candidate_module_ids, cfg).await {
         Ok(allowed) => filter_tools_by_modules(all_tools, allowed.as_deref()),
         Err(e) => {
             tracing::warn!(error = %e, "router vectorial falló; degradando a todas las tools");
@@ -416,18 +425,37 @@ mod tests {
             top_k: 1,
             min_modules_to_route: 1,
         };
-        let active_modules = active(&["inventory", "sales", "customers"]);
+        let routed =
+            assemble_routed_tools(&KeywordEmbedder, &s, "h1", "stock of product", all, cfg).await;
+        assert_eq!(routed.len(), 1);
+        assert_eq!(routed[0]["module_id"], "inventory");
+    }
+
+    #[tokio::test]
+    async fn forbidden_top_hit_cannot_starve_authorized_modules() {
+        let s = indexed_store().await;
+        let cfg = RouterConfig {
+            top_k: 1,
+            min_modules_to_route: 1,
+        };
+        // `inventory` es el hit semántico más fuerte, pero no aparece en `all_tools`: el gate de
+        // permisos ya lo retiró. El router debe buscar exclusivamente entre sales/customers.
+        let authorized_tools = vec![
+            json!({ "module_id": "sales", "name": "sales.list" }),
+            json!({ "module_id": "customers", "name": "customers.list" }),
+        ];
+
         let routed = assemble_routed_tools(
             &KeywordEmbedder,
             &s,
             "h1",
             "stock of product",
-            all,
-            &active_modules,
+            authorized_tools,
             cfg,
         )
         .await;
+
         assert_eq!(routed.len(), 1);
-        assert_eq!(routed[0]["module_id"], "inventory");
+        assert_eq!(routed[0]["module_id"], "sales");
     }
 }

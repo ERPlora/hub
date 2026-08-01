@@ -10,9 +10,9 @@
 //! adaptador entre orgs, y un token de la org A no tiene ningún camino hacia el pool de la org B.
 //!
 //! Resolución `org → runtime` (cada petición):
-//!   1. La identidad de la petición (`hub_id`) sale de la auth ya existente (`X-Hub-Id` inyectado
-//!      por el despliegue, no spoofable; ver `auth.rs`). En el tier compartido el gateway **mapea**
-//!      ese `hub_id` a su organización y al DSN de su Aurora vía un [`OrgResolver`].
+//!   1. `X-Hub-Id` aporta solo una pista para localizar organización/DSN mediante [`OrgResolver`].
+//!      No es autoridad: la sesión/API key debe resolver dentro del runtime candidato antes de
+//!      ejecutar, y una credencial de máquina global nunca se firma con esa pista (ver `auth.rs`).
 //!   2. Se busca/crea el [`Runtime`] de esa org en el mapa (lazy, con límite de pools).
 //!   3. El handler ejecuta `execute_query`/`execute_command` sobre **ese** runtime: el gate de
 //!      permisos, el scoping `hub_id` y `requires_primary`/`requires_cloud` siguen aplicándose

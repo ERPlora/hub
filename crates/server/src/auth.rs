@@ -1,8 +1,8 @@
 //! Autenticación de la petición → `RequestContext` (ARQUITECTURA.md §2.3, §2.5, §2.9).
 //!
 //! Dos modos (`HubConfig::auth_mode`):
-//!  - **Dev**: confía en `X-Hub-Id` + `X-User-Id` + `X-Permissions` que pone el frontend. Para
-//!    desarrollo local sin Cloud.
+//!  - **Dev**: confía en `X-User-Id` + `X-Permissions` del frontend. En single-tenant el `hub_id`
+//!    sigue viniendo del host; `X-Hub-Id` solo selecciona tenant en el harness multi-tenant.
 //!  - **Session** (modelo real, §2.9): la **autoridad de identidad/permisos es LOCAL**. El login
 //!    (PIN local o JWT de usuario cloud — ver handlers en `lib.rs`) abre una **sesión server-side**
 //!    (`hub_session`) y devuelve un token opaco; cada petición lo manda en `X-Hub-Session` y aquí se
@@ -24,6 +24,10 @@ const DEFAULT_USER: &str = "local";
 #[derive(Debug)]
 pub enum AuthError {
     MissingSession,
+    HubMismatch {
+        requested: String,
+        authoritative: String,
+    },
     Invalid(String),
 }
 
@@ -31,8 +35,18 @@ impl AuthError {
     pub fn message(&self) -> String {
         match self {
             AuthError::MissingSession => "falta sesión (cabecera X-Hub-Session)".to_string(),
+            AuthError::HubMismatch {
+                requested,
+                authoritative,
+            } => format!(
+                "X-Hub-Id no coincide con el hub autorizado (recibido={requested}, esperado={authoritative})"
+            ),
             AuthError::Invalid(e) => format!("no autenticado: {e}"),
         }
+    }
+
+    pub fn is_forbidden(&self) -> bool {
+        matches!(self, AuthError::HubMismatch { .. })
     }
 }
 
@@ -213,19 +227,44 @@ pub fn bearer(headers: &HeaderMap) -> Option<String> {
         .and_then(|h| h.strip_prefix("Bearer ").map(|t| t.trim().to_string()))
 }
 
-/// `X-Hub-Id` de la petición, con fallback al `hub_id` de despliegue (config).
-pub fn hub_id(headers: &HeaderMap, fallback: &str) -> String {
-    header(headers, "x-hub-id").unwrap_or_else(|| fallback.to_string())
+/// Resuelve el selector de tenant sin convertir una cabecera del navegador en autoridad.
+///
+/// - single-tenant: el host (`AppState::hub_id`) es la fuente única. Una cabecera ausente o igual
+///   produce ese id; una divergente se rechaza antes de tocar runtime o credencial Cloud.
+/// - multi-tenant: la cabecera solo es una *pista de resolución*. El handler debe autenticar la
+///   sesión/API key contra el runtime resuelto antes de ejecutar o llamar al Cloud. Sin pista no se
+///   elige una organización por defecto.
+pub fn request_hub_id(headers: &HeaderMap, st: &AppState) -> Result<String, AuthError> {
+    let authoritative = st.hub_id();
+    let requested = header(headers, "x-hub-id").filter(|value| !value.trim().is_empty());
+    if st.tenants.is_none() {
+        return match requested {
+            Some(requested) if requested != authoritative => Err(AuthError::HubMismatch {
+                requested,
+                authoritative,
+            }),
+            _ => Ok(authoritative),
+        };
+    }
+    requested.ok_or_else(|| {
+        AuthError::Invalid("falta X-Hub-Id para resolver el tenant compartido".into())
+    })
+}
+
+/// Construye una credencial de usuario para un hub que el handler ya resolvió y autorizó. El id
+/// aportado nunca debe ser una cabecera cruda.
+fn user_auth_for_hub(headers: &HeaderMap, authorized_hub: &str) -> Option<cloud_client::Auth> {
+    let access = bearer(headers)?;
+    Some(cloud_client::Auth::UserJwt {
+        hub_id: authorized_hub.to_string(),
+        access,
+    })
 }
 
 /// Construye la credencial `Auth::UserJwt` (Bearer + `X-Hub-Id`) para hablar con el Cloud
 /// en nombre del usuario activo (ARQUITECTURA.md §2.3). `None` si no hay JWT en la petición.
-pub fn user_auth(headers: &HeaderMap, fallback_hub: &str) -> Option<cloud_client::Auth> {
-    let access = bearer(headers)?;
-    Some(cloud_client::Auth::UserJwt {
-        hub_id: hub_id(headers, fallback_hub),
-        access,
-    })
+pub fn user_auth(headers: &HeaderMap, authorized_hub: &str) -> Option<cloud_client::Auth> {
+    user_auth_for_hub(headers, authorized_hub)
 }
 
 /// Credencial de **máquina** del hub (`Auth::HubToken` = `X-Hub-Token` + `X-Hub-Id`), si el hub
@@ -235,9 +274,15 @@ pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
     machine_auth_for(st, &st.hub_id())
 }
 
-/// Variante tenant-aware: conserva el secreto de máquina del proceso pero enlaza la petición
-/// saliente al `hub_id` ya resuelto/autorizado para esta petición.
+/// Variante que solo firma si `hub_id` es el hub autoritativo del host single-tenant. En un proceso
+/// multi-tenant no existe todavía un token por tenant, por lo que devuelve `None`.
 pub fn machine_auth_for(st: &AppState, hub_id: &str) -> Option<cloud_client::Auth> {
+    // El secreto de `AppState` pertenece al host single-tenant. El gateway compartido todavía no
+    // tiene un vault de tokens por tenant: combinar este secreto global con un hub elegido por el
+    // cliente sería una confusión de credenciales, así que falla cerrado.
+    if st.tenants.is_some() || hub_id != st.hub_id() {
+        return None;
+    }
     st.machine_token()
         .map(|token| cloud_client::Auth::HubToken {
             hub_id: hub_id.to_string(),
@@ -264,6 +309,14 @@ pub fn hub_scoped_auth_for(
     st: &AppState,
     hub_id: &str,
 ) -> Option<cloud_client::Auth> {
-    machine_auth_for(st, hub_id)
-        .or_else(|| st.is_demo().then(|| user_auth(headers, hub_id)).flatten())
+    if st.tenants.is_some() {
+        // La sesión local debe haberse validado contra los recursos del tenant antes de llegar
+        // aquí. Nunca firma con el secreto de máquina global del proceso compartido.
+        return user_auth_for_hub(headers, hub_id);
+    }
+    machine_auth_for(st, hub_id).or_else(|| {
+        st.is_demo()
+            .then(|| user_auth_for_hub(headers, hub_id))
+            .flatten()
+    })
 }

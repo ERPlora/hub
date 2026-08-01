@@ -20,7 +20,7 @@ use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{
-    app, AppState, AuthMode, EnvOrgResolver, HubConfig, OrgDescriptor, OrgId, RuntimeFactory,
+    app, auth, AppState, AuthMode, EnvOrgResolver, HubConfig, OrgDescriptor, OrgId, RuntimeFactory,
     TenantRouter,
 };
 use http_body_util::BodyExt;
@@ -71,11 +71,17 @@ async fn shared_app() -> axum::Router {
     let mut map = HashMap::new();
     map.insert(
         "hub-a1".to_string(),
-        OrgDescriptor { org_id: OrgId("org-a".into()), dsn: "sqlite::memory:".into() },
+        OrgDescriptor {
+            org_id: OrgId("org-a".into()),
+            dsn: "sqlite::memory:".into(),
+        },
     );
     map.insert(
         "hub-b1".to_string(),
-        OrgDescriptor { org_id: OrgId("org-b".into()), dsn: "sqlite::memory:".into() },
+        OrgDescriptor {
+            org_id: OrgId("org-b".into()),
+            dsn: "sqlite::memory:".into(),
+        },
     );
     let router = Arc::new(TenantRouter::with_factory(
         Arc::new(EnvOrgResolver::new(map)),
@@ -88,6 +94,75 @@ async fn shared_app() -> axum::Router {
     let db = fresh_db().await;
     let base = AppState::with_config(Runtime::new(Box::new(db)), HubConfig::from_env_with_auth(AuthMode::Dev));
     app(base.with_tenants(router))
+}
+
+/// Variante realista de auth: la pista `X-Hub-Id` selecciona un pool, pero solo una sesión que
+/// existe dentro de ese tenant lo autoriza. Devuelve una sesión distinta por org.
+async fn shared_session_app() -> (axum::Router, String, String) {
+    let mut map = HashMap::new();
+    map.insert(
+        "hub-a1".to_string(),
+        OrgDescriptor {
+            org_id: OrgId("org-a".into()),
+            dsn: "sqlite::memory:".into(),
+        },
+    );
+    map.insert(
+        "hub-b1".to_string(),
+        OrgDescriptor {
+            org_id: OrgId("org-b".into()),
+            dsn: "sqlite::memory:".into(),
+        },
+    );
+    let tenants = Arc::new(TenantRouter::with_factory(
+        Arc::new(EnvOrgResolver::new(map)),
+        inventory_factory(),
+        32,
+    ));
+
+    let resources_a = tenants.resolve_resources("hub-a1").await.unwrap();
+    let resources_b = tenants.resolve_resources("hub-b1").await.unwrap();
+    let session_a = {
+        let rt = resources_a.runtime.lock().await;
+        rt.ensure_system_tables().await.unwrap();
+        let user = rt
+            .create_user("Admin A", "1111", "admin", None)
+            .await
+            .unwrap();
+        rt.create_session(&user, 3600, None).await.unwrap()
+    };
+    let session_b = {
+        let rt = resources_b.runtime.lock().await;
+        rt.ensure_system_tables().await.unwrap();
+        let user = rt
+            .create_user("Admin B", "2222", "admin", None)
+            .await
+            .unwrap();
+        rt.create_session(&user, 3600, None).await.unwrap()
+    };
+
+    let db = fresh_db().await;
+    let mut config = HubConfig::from_env_with_auth(AuthMode::Session);
+    config.hub_id = "shared-gateway-test".into();
+    config.cloud_api_token = Some("gateway-process-token-must-not-be-used-per-tenant".into());
+    let base = AppState::with_config(Runtime::new(Box::new(db)), config);
+    let state = base.with_tenants(tenants);
+    assert!(
+        auth::machine_auth_for(&state, "hub-a1").is_none(),
+        "el token de máquina del proceso compartido nunca se firma con un hub del cliente"
+    );
+    (app(state), session_a, session_b)
+}
+
+fn post_with_session(hub_id: &str, session: &str, uri: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header("content-type", "application/json")
+        .header("x-hub-id", hub_id)
+        .header("x-hub-session", session)
+        .body(Body::from(body.to_string()))
+        .unwrap()
 }
 
 /// Criterio 1 + 3: dos orgs en un solo router; el token de A solo ve datos de A, el de B solo los
@@ -183,4 +258,55 @@ async fn permission_gate_still_enforced_per_org() {
         .unwrap();
     assert_eq!(r.status(), StatusCode::FORBIDDEN);
     assert_eq!(body_json(r).await["error"]["code"], json!("permission_denied"));
+}
+
+#[tokio::test]
+async fn session_from_org_a_cannot_authorize_client_selected_org_b() {
+    let (app, session_a, session_b) = shared_session_app().await;
+
+    let own = app
+        .clone()
+        .oneshot(post_with_session(
+            "hub-a1",
+            &session_a,
+            "/api/query",
+            json!({ "name": "inventory.products.list" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        own.status(),
+        StatusCode::OK,
+        "la sesión A funciona en su tenant"
+    );
+
+    let cross = app
+        .clone()
+        .oneshot(post_with_session(
+            "hub-b1",
+            &session_a,
+            "/api/query",
+            json!({ "name": "inventory.products.list" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(cross.status(), StatusCode::UNAUTHORIZED);
+    assert!(body_json(cross).await["error"]
+        .as_str()
+        .is_some_and(|message| message.contains("sesión inválida")));
+
+    let b = app
+        .oneshot(post_with_session(
+            "hub-b1",
+            &session_b,
+            "/api/query",
+            json!({ "name": "inventory.products.list" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        b.status(),
+        StatusCode::OK,
+        "la sesión B sigue funcionando en B"
+    );
 }

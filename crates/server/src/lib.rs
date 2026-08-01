@@ -600,6 +600,7 @@ async fn shutdown_signal() {
 /// Construye el router con todas las rutas montadas sobre `state`.
 pub fn app(state: AppState) -> Router {
     let registration_state = state.clone();
+    let tenant_boundary_state = state.clone();
     let activity_state = state.activity.clone();
     Router::new()
         .route("/healthz", get(healthz))
@@ -756,6 +757,13 @@ pub fn app(state: AppState) -> Router {
             registration_state,
             require_machine_registration,
         ))
+        // Frontera uniforme para TODA la API: en single-tenant el navegador no puede cambiar el
+        // hub del host mediante X-Hub-Id. Esto cubre también export/reset/settings/auth, no solo
+        // query/command/assistant. En multi-tenant el handler valida la sesión en el pool elegido.
+        .layer(axum::middleware::from_fn_with_state(
+            tenant_boundary_state,
+            enforce_single_tenant_hub,
+        ))
         .with_state(state)
 }
 
@@ -807,6 +815,19 @@ async fn require_machine_registration(
         })),
     )
         .into_response()
+}
+
+async fn enforce_single_tenant_hub(
+    State(st): State<AppState>,
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    if st.tenants.is_none() {
+        if let Err(error) = auth::request_hub_id(request.headers(), &st) {
+            return unauthorized(error);
+        }
+    }
+    next.run(request).await
 }
 
 /// Envuelve el router de API para servir el frontend estático (el `dist/` de Vite) con **fallback
@@ -945,14 +966,18 @@ struct RequestInstallReq {
 }
 
 /// POST /api/modules/request-install — flujo real Cloud→descarga→runtime (ARQUITECTURA.md §2.2).
-/// Auth = JWT del usuario + `X-Hub-Id` de las cabeceras. Tras instalar, emite el evento
+/// Auth = sesión admin local; la llamada Cloud se firma server-side con la credencial autorizada
+/// para el tenant. Tras instalar, emite el evento
 /// `module.installed` por `/ws` y prepara la ingestión de embeddings (vía Cloud, pendiente §9.3).
 async fn request_install(
     State(st): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<RequestInstallReq>,
 ) -> Response {
-    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let hub_id = match auth::request_hub_id(&headers, &st) {
+        Ok(hub_id) => hub_id,
+        Err(e) => return unauthorized(e),
+    };
     let resources = match st.resources_for(&hub_id).await {
         Ok(resources) => resources,
         Err(e) => return tenant_rejected(e),
@@ -1466,38 +1491,40 @@ fn bad_gateway(reason: String) -> Response {
 }
 
 /// POST /api/assistant/chat/stream — proxy SSE hacia el Cloud (ARQUITECTURA.md §9.3).
-/// Reenvía el `Authorization: Bearer` + `X-Hub-Id` entrantes; ensambla las tools permitidas
+/// Valida sesión/tenant, construye una credencial Cloud server-side, ensambla las tools permitidas
 /// (§9.2) y traduce el stream del Cloud al contrato del frontend (`token`/`done`).
 async fn assistant_chat_stream(
     State(st): State<AppState>,
     headers: HeaderMap,
     Json(frontend): Json<Value>,
 ) -> Response {
-    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let hub_id = match auth::request_hub_id(&headers, &st) {
+        Ok(hub_id) => hub_id,
+        Err(e) => return unauthorized(e),
+    };
     let resources = match st.resources_for(&hub_id).await {
         Ok(resources) => resources,
         Err(e) => return tenant_rejected(e),
     };
-    // Credencial hub-scoped: token de máquina del hub si está enrolado; si no, el JWT del usuario.
-    // Así un cajero solo-local (sesión por PIN, sin JWT cloud) también usa el asistente.
-    let Some(auth) = auth::hub_scoped_auth_for(&headers, &st, &hub_id) else {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
-        )
-            .into_response();
-    };
     // La sesión LOCAL del hub da el contexto/permisos para ensamblar las tools (gate = el de la UI)
     // y el id del usuario activo, que se manda como metadata de coste/auditoría (no permisos).
-    let (all_tools, active_user, active_modules) = {
+    let (all_tools, active_user) = {
         let rt = resources.runtime.lock().await;
         let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
             Ok(c) => c,
             Err(e) => return unauthorized(e),
         };
         let tools = assistant::assemble_tools(rt.registry(), &ctx);
-        let active = rt.registry().active_module_ids();
-        (tools, ctx.user_id.clone(), active)
+        (tools, ctx.user_id.clone())
+    };
+    // Construye la credencial Cloud solo DESPUÉS de validar la sesión contra el runtime elegido.
+    // En multi-tenant el token de máquina global nunca se combina con la pista del navegador.
+    let Some(auth) = auth::hub_scoped_auth_for(&headers, &st, &hub_id) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial autorizada para este tenant" })),
+        )
+            .into_response();
     };
 
     // Router de tools por vectores (§9.2b): embebe la última petición del usuario, busca en el
@@ -1515,7 +1542,6 @@ async fn assistant_chat_stream(
                 &hub_id,
                 &query,
                 all_tools,
-                &active_modules,
                 router::RouterConfig::from_env(),
             )
             .await
@@ -1698,11 +1724,12 @@ fn entitlement_blocked(st: &AppState, module_id: Option<&str>) -> Option<Respons
 
 /// `401` uniforme para fallos de autenticación (modo Jwt: token ausente/ inválido).
 fn unauthorized(e: auth::AuthError) -> Response {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(json!({ "ok": false, "error": e.message() })),
-    )
-        .into_response()
+    let status = if e.is_forbidden() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::UNAUTHORIZED
+    };
+    (status, Json(json!({ "ok": false, "error": e.message() }))).into_response()
 }
 
 /// Query param de idioma para los endpoints localizables (ADR-0055). `?locale=es`; default `en`.
@@ -1795,7 +1822,10 @@ async fn install_module(
     headers: HeaderMap,
     Json(req): Json<InstallReq>,
 ) -> Response {
-    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let hub_id = match auth::request_hub_id(&headers, &st) {
+        Ok(hub_id) => hub_id,
+        Err(e) => return unauthorized(e),
+    };
     let resources = match st.resources_for(&hub_id).await {
         Ok(resources) => resources,
         Err(e) => return tenant_rejected(e),
@@ -1880,7 +1910,10 @@ async fn activate_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let hub_id = match auth::request_hub_id(&headers, &st) {
+        Ok(hub_id) => hub_id,
+        Err(e) => return unauthorized(e),
+    };
     let resources = match st.resources_for(&hub_id).await {
         Ok(resources) => resources,
         Err(e) => return tenant_rejected(e),
@@ -1900,7 +1933,10 @@ async fn deactivate_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let hub_id = match auth::request_hub_id(&headers, &st) {
+        Ok(hub_id) => hub_id,
+        Err(e) => return unauthorized(e),
+    };
     let resources = match st.resources_for(&hub_id).await {
         Ok(resources) => resources,
         Err(e) => return tenant_rejected(e),
@@ -1920,7 +1956,10 @@ async fn uninstall_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let hub_id = auth::hub_id(&headers, &st.hub_id());
+    let hub_id = match auth::request_hub_id(&headers, &st) {
+        Ok(hub_id) => hub_id,
+        Err(e) => return unauthorized(e),
+    };
     let resources = match st.resources_for(&hub_id).await {
         Ok(resources) => resources,
         Err(e) => return tenant_rejected(e),
@@ -1953,7 +1992,11 @@ async fn query(
     // Tier cloud compartido (ADR-0005): resuelve el runtime de la ORG dueña del `hub_id` de la
     // petición (un pool por org). En single-tenant devuelve el runtime único. El rechazo cross-org
     // (hub_id de org desconocida) ocurre aquí, ANTES de tocar ninguna BD.
-    let arc = match st.runtime_for(&auth::hub_id(&headers, &st.hub_id())).await {
+    let hub_id = match auth::request_hub_id(&headers, &st) {
+        Ok(hub_id) => hub_id,
+        Err(e) => return unauthorized(e),
+    };
+    let arc = match st.runtime_for(&hub_id).await {
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
     };
@@ -1991,7 +2034,11 @@ async fn command(
     Json(req): Json<CommandReq>,
 ) -> Response {
     // Mismo enrutado por org que `query` (ADR-0005): el `PgAdapter` de la org corre server-side.
-    let arc = match st.runtime_for(&auth::hub_id(&headers, &st.hub_id())).await {
+    let hub_id = match auth::request_hub_id(&headers, &st) {
+        Ok(hub_id) => hub_id,
+        Err(e) => return unauthorized(e),
+    };
+    let arc = match st.runtime_for(&hub_id).await {
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
     };

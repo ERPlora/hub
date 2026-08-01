@@ -422,9 +422,9 @@ impl AppState {
     ///    petición, vía el [`TenantRouter`]. Si el `hub_id` no mapea a ninguna org, **se rechaza**
     ///    (`TenantError::UnknownOrg`) — un token de la org A no puede resolver el pool de la B.
     ///
-    /// El `hub_id` viene de la auth ya existente (`X-Hub-Id` inyectado por el despliegue, no
-    /// spoofable; ver `auth.rs`). La autoridad sigue **server-side**: el gate de permisos + el
-    /// scoping `hub_id` los aplica el `Runtime` resuelto en `execute_query`/`execute_command`.
+    /// En single-tenant el `hub_id` autoritativo viene del host y una cabecera divergente se
+    /// rechaza. En multi-tenant `X-Hub-Id` solo localiza un pool candidato; la sesión/API key debe
+    /// validarse dentro de él antes de ejecutar (ver `auth.rs`). La autoridad sigue server-side.
     pub async fn runtime_for(
         &self,
         hub_id: &str,
