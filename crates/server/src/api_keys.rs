@@ -27,6 +27,12 @@ pub struct CreateKeyReq {
     name: String,
     #[serde(default)]
     scope: Vec<ScopeEntry>,
+    #[serde(default = "default_rate_limit")]
+    rate_limit_per_minute: i64,
+}
+
+fn default_rate_limit() -> i64 {
+    erplora_runtime::api_keys::DEFAULT_RATE_LIMIT_PER_MINUTE
 }
 
 /// `401` para fallo de auth del admin (sin sesión / sesión inválida / rol insuficiente).
@@ -73,7 +79,15 @@ pub async fn create_key(
     };
     // Auditoría: quién creó la key (no es `apikey:…`, es el hub_user admin).
     let created_by = format!("hub_user:{}", admin.id);
-    match rt.create_api_key(&req.name, &req.scope, &created_by).await {
+    match rt
+        .create_api_key(
+            &req.name,
+            &req.scope,
+            req.rate_limit_per_minute,
+            &created_by,
+        )
+        .await
+    {
         Ok(secret) => Json(json!({ "ok": true, "data": secret })).into_response(),
         Err(e) => key_err(e),
     }
@@ -143,6 +157,41 @@ fn api_unauthorized(e: auth::AuthError) -> Response {
         .into_response()
 }
 
+/// Auth + cuota para cualquier superficie consumida por terceros. La cuota vive en Postgres y se
+/// consume antes del dispatcher, incluyendo replays idempotentes y errores de payload.
+pub(crate) async fn external_principal(
+    headers: &HeaderMap,
+    config: &crate::state::HubConfig,
+    rt: &erplora_runtime::Runtime,
+) -> Result<erplora_runtime::api_keys::ApiKeyPrincipal, Response> {
+    let principal = auth::api_key_principal(headers, config, rt)
+        .await
+        .map_err(api_unauthorized)?;
+    let decision = rt
+        .consume_api_key_rate_limit(&principal)
+        .await
+        .map_err(key_err)?;
+    if !decision.allowed {
+        let mut response = (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "rate_limited", "message": "cuota de API key agotada" }
+            })),
+        )
+            .into_response();
+        if let Ok(value) =
+            axum::http::HeaderValue::from_str(&decision.retry_after_seconds.to_string())
+        {
+            response
+                .headers_mut()
+                .insert(axum::http::header::RETRY_AFTER, value);
+        }
+        return Err(response);
+    }
+    Ok(principal)
+}
+
 /// `404` cuando la operación no existe, no pertenece al `{module}` de la ruta, o no está
 /// `expose_api` (primera de las dos puertas, §5). NO revela si la operación existe pero es privada
 /// (mismo 404 para "no existe" y "no expuesta"): no filtra la superficie interna a un tercero.
@@ -180,9 +229,9 @@ pub async fn data_query(
         return not_exposed("query", &module, &name);
     }
     // Auth de API key (puerta 2 = el gate de permisos lo aplica `execute_query` con el ctx de la key).
-    let ctx = match auth::api_key_context(&headers, &st.config, &rt).await {
-        Ok(c) => c,
-        Err(e) => return api_unauthorized(e),
+    let ctx = match external_principal(&headers, &st.config, &rt).await {
+        Ok(principal) => principal.context,
+        Err(response) => return response,
     };
 
     if rt.is_list_query(&name) {
@@ -218,9 +267,9 @@ pub async fn data_command(
     if !rt.registry().is_command_exposed(&module, &name) {
         return not_exposed("command", &module, &name);
     }
-    let ctx = match auth::api_key_context(&headers, &st.config, &rt).await {
-        Ok(c) => c,
-        Err(e) => return api_unauthorized(e),
+    let ctx = match external_principal(&headers, &st.config, &rt).await {
+        Ok(principal) => principal.context,
+        Err(response) => return response,
     };
 
     match rt.execute_command(&name, &body.payload, &ctx).await {

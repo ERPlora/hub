@@ -307,6 +307,22 @@ async fn openapi_lists_only_exposed_operations() {
     assert!(q_params.get("limit").is_some());
 }
 
+#[tokio::test]
+async fn api_key_cannot_bypass_public_gate_through_internal_dispatcher() {
+    let app = make_app().await;
+    let (_id, secret) = create_key(&app).await;
+    let resp = app
+        .clone()
+        .oneshot(api_post(
+            "/api/command",
+            &secret,
+            json!({ "name": "catalog.item.create", "payload": { "name": "Bypass" } }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
 // ── Settings del hub (tabla `hub_settings`, GET/PUT /api/settings) ───────────────────────────────
 
 /// GET parcial sobre la superficie de settings. En `AuthMode::Dev` la sesión la llevan las cabeceras.

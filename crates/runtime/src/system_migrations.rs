@@ -201,6 +201,15 @@ CREATE TABLE hub_user_pref (\
 ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
     },
+    // ── v10 — #42: cuota durable de API keys ────────────────────────────────────────────────
+    SystemMigration {
+        version: 10,
+        name: "api_key_rate_limit",
+        postgres: "\
+ALTER TABLE hub_api_key ADD COLUMN rate_limit_per_minute INTEGER NOT NULL DEFAULT 60;\
+CREATE TABLE hub_api_key_rate_window (\
+  api_key_id TEXT PRIMARY KEY, window_epoch_minute BIGINT NOT NULL, request_count BIGINT NOT NULL);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
