@@ -239,30 +239,45 @@ fn forget_hub(app: tauri::AppHandle) -> Result<(), ShellError> {
 /// Pregunta en segundo plano si el hub recordado sigue existiendo y, si no, lo olvida y devuelve
 /// la ventana al onboarding.
 ///
-/// En un hilo aparte a propósito: la ventana ya está abierta y mostrando el hub, así que en el
+/// En segundo plano a propósito: la ventana ya está abierta y mostrando el hub, así que en el
 /// caso normal —el hub existe— esto no se nota. En el caso malo el usuario ve el 404 un instante
 /// y acaba en el onboarding, que es de donde puede salir. Bloquear el arranque para evitar ese
 /// parpadeo penalizaría **todos** los arranques por un caso raro.
 ///
 /// Un `HEAD` basta y no descarga la PWA entera. El timeout es corto porque no hay prisa: si no
 /// contesta a tiempo se conserva el hub, que es la decisión segura ([`should_forget_hub`]).
+///
+/// Va por el runtime **async** de Tauri y con el cliente async de reqwest, NO por
+/// `std::thread` + `reqwest::blocking`. Medido en el emulador API 37: con el cliente blocking la
+/// petición **no llegaba a salir** en Android —ni un solo `HEAD` en el servidor— así que el
+/// rescate no existía justo en la plataforma donde el usuario no puede borrar datos de la app a
+/// mano. En macOS sí funcionaba, que es lo que lo hacía fácil de dar por bueno.
 fn spawn_hub_liveness_check(app: tauri::AppHandle, cache_dir: PathBuf, origin: String) {
-    std::thread::spawn(move || {
+    tauri::async_runtime::spawn(async move {
         use tauri::Manager;
 
-        let probe = match reqwest::blocking::Client::builder()
+        let url = format!("{}/", normalize_base(&origin));
+        let probe = match reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(6))
             .build()
-            .and_then(|c| c.head(format!("{}/", normalize_base(&origin))).send())
         {
-            Ok(r) => HubProbe::Status(r.status().as_u16()),
-            Err(_) => HubProbe::Unreachable,
+            Ok(c) => match c.head(&url).send().await {
+                Ok(r) => HubProbe::Status(r.status().as_u16()),
+                Err(e) => {
+                    log::warn!("shell: no se pudo consultar el hub recordado ({origin}): {e}");
+                    HubProbe::Unreachable
+                }
+            },
+            Err(e) => {
+                log::warn!("shell: no se pudo crear el cliente HTTP: {e}");
+                HubProbe::Unreachable
+            }
         };
         if !should_forget_hub(probe) {
             return;
         }
 
-        eprintln!("shell: el hub recordado ({origin}) ya no existe ({probe:?}); vuelvo al onboarding");
+        log::info!("shell: el hub recordado ({origin}) ya no existe ({probe:?}); vuelvo al onboarding");
         clear_hub_url(&cache_dir);
         if let Some(window) = app.get_webview_window("main") {
             if let Ok(url) = onboarding_url(&saas_base_url()).parse::<tauri::Url>() {

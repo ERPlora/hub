@@ -42,7 +42,10 @@ tauri-plugin-erplora-android = { path = "../../../crates/tauri-plugin-erplora-an
 # Solo para preguntarle al hub recordado si sigue existiendo al arrancar (`should_forget_hub`).
 # Sin esto, un hub borrado deja la app tapiada en un 404 permanente y sin salida por la UI.
 # Mismo spec que el resto del workspace, así que no añade compilación nueva.
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# El `eprintln!` de Rust NO llega a logcat en Android: sin esto, un fallo del chequeo del
+# hub recordado es invisible, que es justo como se coló que no corría.
+log = "0.4"
 
 [dev-dependencies]
 # `tests/remote_acl.rs` valida los patrones de `capabilities/default.json` con el MISMO motor que
