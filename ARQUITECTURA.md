@@ -161,7 +161,7 @@ El escáner por HID lo maneja el SO/navegador como teclado.
 
 | Pieza | Elección | Nota |
 |-------|----------|------|
-| DB | **PostgreSQL** (`PgAdapter`, per-org en cloud) | soporta `pgvector` (clave para RAG, §9) |
+| DB | **PostgreSQL** (`PgAdapter`, per-org en cloud) | índice actual en JSONB; `pgvector` queda como optimización de escala (§9) |
 | Lógica avanzada | **WASM (Extism)** | Sandbox + ABI lista; evita diseñar una ABI propia al inicio |
 | Empaquetado módulo | **module.zip** | manifest + SQL + schemas + UI + WASM + docs, firmado + SHA256 |
 
@@ -572,7 +572,7 @@ cambios. Instalación desde el marketplace real (`source/s3_source` + `cloud-cli
 ### Fase 5 — WASM + tooling + RAG
 `wasm-host` (Extism) + `guest-sdk`; portar `sale_create`/reglas a WASM; capacidades host
 (`render.pdf`/`render.xlsx`, `http.fetch` mediado §5.5); CLI completo + firma; `ai_tools` +
-`search_docs` (pgvector cloud + degradación local §9.5).
+`search_docs` (corpus Postgres JSONB actual; pgvector/HNSW como optimización futura de escala §9.5).
 
 ### Fase 6 — Cierre
 Conversión de módulos **completada** (27 módulos declarativos; source en `modules-workspace/modules/<id>/`,
@@ -627,7 +627,7 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | **Entitlement en runtime** | Abierto: qué pasa con un módulo (y sus datos) si caduca su suscripción (desactivar / read-only). |
 | **Credencial de dispositivo de confianza** | Abierto: formato/rotación de la credencial que habilita el PIN offline (§2.9). |
 | **SQL portable** | ✅ **Resuelto (ADR-0154)**: Postgres-only; el dialecto `sqlite` quedó deprecado/ignorado. Sin capa de portabilidad. |
-| **RAG / vector** | Prod: pgvector es **follow-up** (hub#204 / pm#29); hoy el índice del asistente es `None` (degrada a "todas las tools"). `MemoryVectorStore` es solo referencia/test (§9.5). |
+| **RAG / vector** | ✅ `PgVectorStore` persiste hoy los embeddings en `knowledge_chunk.embedding_json` (JSONB) y calcula coseno por barrido determinista; install/update reindexa y uninstall borra por módulo. `MemoryVectorStore` es referencia/test. `pgvector vector(1536)` + HNSW es una optimización futura cuando el corpus deje de ser pequeño, no el estado actual (§9.5). |
 | **UI de módulos (Lit vs Stencil)** | ✅ **Recomendado Lit** (§3.1, default 2026; no necesitamos wrappers multi-framework). Confirmar con PoC de ambos en Fase 0. |
 | **Guest WASM lenguaje** | Rust-only (recomendado, WASM pequeño/rápido) vs multi-lenguaje (JS/Go/Python vía Extism, baja la barrera de autoría). |
 | **Impresión / primary-satellite** | ✅ Impresoras de red por terminal; hardware vía **Bridge standalone (red-only)** (§2.7). Abierto: descubrimiento primary↔satellite y promoción si cae el primario (§2.7b). |
@@ -719,7 +719,7 @@ Login = email+password online (setup) → dispositivo de confianza → PIN (offl
 Reactividad = evento (WS; ADR-0050) → el WC re-consulta (no server-render)
 Eventos = transactional outbox (escritura atómica + relay async at-least-once + _event_delivery); WS solo push UI (§4.1)
 Venta = sales (libro mayor) → sale.completed; tiquet/factura = FORMATO (ok-receipt/ok-invoice), no módulo; pantallas POS seleccionables (§15)
-RAG = solo conocimiento (docs); vector store pgvector = follow-up (hub#204); hoy índice None → todas las tools
+RAG = conocimiento + routing de tools; hoy `PgVectorStore` usa JSONB persistente + coseno lineal; pgvector/HNSW es optimización futura de escala
 AI = embeddings + generación SIEMPRE por el proxy del SaaS (medido)
 Red de módulos = http.fetch mediado por el host (Opción A) / nativo para fiscal
 1 producto = Hub Cloud (PostgreSQL, PWA, online) — ADR-0154 retiró Hub Local/Tauri/SQLite (§1)

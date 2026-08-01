@@ -1,0 +1,26 @@
+{
+  "id": "assistant_fixture",
+  "name": "Assistant fixture",
+  "version": "1.0.0",
+  "permissions": ["assistant_fixture.read", "assistant_fixture.write"],
+  "role_permissions": { "admin": ["*"] },
+  "agent": { "description": "Create and inspect deterministic assistant test markers." },
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "assistant_fixture.items.find": {
+      "permission": "assistant_fixture.read",
+      "sql": "queries/items_find.sql",
+      "schema": "schemas/item_name.json",
+      "ai": { "description": "Find an assistant test marker by its exact name." }
+    }
+  },
+  "commands": {
+    "assistant_fixture.item.create": {
+      "permission": "assistant_fixture.write",
+      "transaction": true,
+      "sql": ["commands/item_create.sql"],
+      "schema": "schemas/item_name.json",
+      "ai": { "description": "Create a deterministic assistant test marker." }
+    }
+  }
+}
