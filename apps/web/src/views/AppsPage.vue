@@ -486,6 +486,35 @@ function notify(msg: string, color: 'primary' | 'success' | 'danger', duration =
 const client = inject(clientInjectionKey) ?? getClient();
 let unsubInstalled: (() => void) | null = null;
 let unsubProgress: (() => void) | null = null;
+// El mismo resultado puede llegar por dos canales: la respuesta HTTP de `requestInstall` y el
+// evento WS `module.installed`. Para una instalación iniciada en ESTA pestaña, HTTP es el único
+// dueño del toast final; WS sigue refrescando estado/nav, pero no pisa ni duplica el mensaje.
+const localInstallRequests = new Set<string>();
+const localInstallExpiryTimers = new Map<string, number>();
+
+function beginLocalInstall(moduleId: string): void {
+  const previous = localInstallExpiryTimers.get(moduleId);
+  if (previous !== undefined) window.clearTimeout(previous);
+  localInstallExpiryTimers.delete(moduleId);
+  localInstallRequests.add(moduleId);
+}
+
+function expireLocalInstall(moduleId: string): void {
+  if (!localInstallRequests.has(moduleId)) return;
+  const timer = window.setTimeout(() => {
+    localInstallRequests.delete(moduleId);
+    localInstallExpiryTimers.delete(moduleId);
+  }, 60_000);
+  localInstallExpiryTimers.set(moduleId, timer);
+}
+
+function consumeLocalInstall(moduleId: string): boolean {
+  const local = localInstallRequests.delete(moduleId);
+  const timer = localInstallExpiryTimers.get(moduleId);
+  if (timer !== undefined) window.clearTimeout(timer);
+  localInstallExpiryTimers.delete(moduleId);
+  return local;
+}
 
 // --- Consentimiento de permisos al instalar (modal best-effort) ---
 // Si el módulo a instalar DECLARA capabilities, las mostramos antes de instalar y al confirmar las
@@ -631,7 +660,9 @@ async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<
   // La card pasa a "Instalando…" al instante (fase genérica hasta que llegue el primer evento WS
   // `module.install.progress` con la fase real). El toast persistente se mantiene como refuerzo.
   setProgress(mod.id, mod.id, '');
+  beginLocalInstall(mod.id);
   notify(t('apps.installing', { name: mod.name }), 'primary', 0);
+  let installed = false;
   try {
     // Pide la instalación al runtime: descarga el zip firmado (marketplace Cloud), verifica
     // SHA256 y aplica migraciones. La confirmación llega por el evento WS `module.installed`.
@@ -647,10 +678,15 @@ async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<
     // detrás vía `module.installed` y confirma el estado real del Cloud).
     const row = modules.value.find((m) => m.id === mod.id);
     if (row) row.installed = true;
+    installed = true;
     notify(t('apps.installSuccess', { name: mod.name }), 'success');
   } catch {
+    consumeLocalInstall(mod.id);
     notify(t('apps.installError', { name: mod.name }), 'danger');
   } finally {
+    // Si WS llegó durante el await, ya consumió la marca. Si HTTP ganó la carrera, la conservamos
+    // brevemente para suprimir el evento tardío sin silenciar instalaciones externas futuras.
+    if (installed) expireLocalInstall(mod.id);
     clearProgress(mod.id);
   }
 }
@@ -877,7 +913,10 @@ onMounted(() => {
     const found = modules.value.find((m) => m.id === id);
     // Cubre también instalaciones iniciadas por OTRO cliente/pestaña (aquí no corre doInstall).
     if (id) clearProgress(id);
-    notify(found ? t('apps.moduleInstalledNamed', { name: found.name }) : t('apps.moduleInstalled'), 'success');
+    const initiatedHere = id ? consumeLocalInstall(id) : false;
+    if (!initiatedHere) {
+      notify(found ? t('apps.moduleInstalledNamed', { name: found.name }) : t('apps.moduleInstalled'), 'success');
+    }
     void loadCatalog();
     void loadInstalled();
     void refreshModuleNav();
@@ -896,6 +935,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   unsubInstalled?.();
   unsubProgress?.();
+  for (const timer of localInstallExpiryTimers.values()) window.clearTimeout(timer);
+  localInstallExpiryTimers.clear();
+  localInstallRequests.clear();
   mineTable.value?.removeEventListener('rowAction', handleMineAction);
   catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
 });

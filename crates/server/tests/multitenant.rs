@@ -58,7 +58,9 @@ fn inventory_factory() -> RuntimeFactory {
         Box::pin(async move {
             let db = fresh_db().await;
             let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
-            rt.install_from_dir(&fixture()).await.expect("instala inventory");
+            rt.install_from_dir(&fixture())
+                .await
+                .expect("instala inventory");
             Ok(rt)
         })
     })
@@ -71,11 +73,19 @@ async fn shared_app() -> axum::Router {
     let mut map = HashMap::new();
     map.insert(
         "hub-a1".to_string(),
-        OrgDescriptor { org_id: OrgId("org-a".into()), dsn: "sqlite::memory:".into() },
+        OrgDescriptor {
+            org_id: OrgId("org-a".into()),
+            dsn: "sqlite::memory:".into(),
+            cloud_api_token: Some("token-a".into()),
+        },
     );
     map.insert(
         "hub-b1".to_string(),
-        OrgDescriptor { org_id: OrgId("org-b".into()), dsn: "sqlite::memory:".into() },
+        OrgDescriptor {
+            org_id: OrgId("org-b".into()),
+            dsn: "sqlite::memory:".into(),
+            cloud_api_token: Some("token-b".into()),
+        },
     );
     let router = Arc::new(TenantRouter::with_factory(
         Arc::new(EnvOrgResolver::new(map)),
@@ -86,7 +96,10 @@ async fn shared_app() -> axum::Router {
     // El `runtime` single-tenant del AppState es un throwaway (no se usa en el camino de datos
     // cuando hay tenants): un SQLite vacío sirve de bootstrap.
     let db = fresh_db().await;
-    let base = AppState::with_config(Runtime::new(Box::new(db)), HubConfig::from_env_with_auth(AuthMode::Dev));
+    let base = AppState::with_config(
+        Runtime::new(Box::new(db)),
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    );
     app(base.with_tenants(router))
 }
 
@@ -127,7 +140,12 @@ async fn org_a_request_only_touches_org_a_db() {
     // A solo ve su producto.
     let la = app
         .clone()
-        .oneshot(post_as("hub-a1", "*", "/api/query", json!({ "name": "inventory.products.list" })))
+        .oneshot(post_as(
+            "hub-a1",
+            "*",
+            "/api/query",
+            json!({ "name": "inventory.products.list" }),
+        ))
         .await
         .unwrap();
     let ja = body_json(la).await;
@@ -138,7 +156,12 @@ async fn org_a_request_only_touches_org_a_db() {
     // B solo ve su producto (nunca el de A).
     let lb = app
         .clone()
-        .oneshot(post_as("hub-b1", "*", "/api/query", json!({ "name": "inventory.products.list" })))
+        .oneshot(post_as(
+            "hub-b1",
+            "*",
+            "/api/query",
+            json!({ "name": "inventory.products.list" }),
+        ))
         .await
         .unwrap();
     let jb = body_json(lb).await;
@@ -182,5 +205,8 @@ async fn permission_gate_still_enforced_per_org() {
         .await
         .unwrap();
     assert_eq!(r.status(), StatusCode::FORBIDDEN);
-    assert_eq!(body_json(r).await["error"]["code"], json!("permission_denied"));
+    assert_eq!(
+        body_json(r).await["error"]["code"],
+        json!("permission_denied")
+    );
 }

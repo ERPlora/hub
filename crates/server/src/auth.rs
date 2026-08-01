@@ -238,11 +238,17 @@ pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
 /// Variante multi-tenant: el token de máquina permanece server-side, pero el `X-Hub-Id` de la
 /// llamada saliente debe ser el tenant ya resuelto para esta petición, no el runtime bootstrap.
 pub fn machine_auth_for(st: &AppState, hub_id: &str) -> Option<cloud_client::Auth> {
-    st.machine_token()
-        .map(|token| cloud_client::Auth::HubToken {
-            hub_id: hub_id.to_string(),
-            token,
-        })
+    let token = match &st.tenants {
+        // Gateway compartido: el descriptor del tenant es la ÚNICA fuente de credencial. Usar el
+        // token bootstrap con un hub aportado por el cliente rompería el aislamiento (o fallaría de
+        // forma confusa contra Cloud). Descriptor sin secreto ⇒ fail-closed.
+        Some(router) => router.cloud_api_token(hub_id),
+        None => st.machine_token(),
+    }?;
+    Some(cloud_client::Auth::HubToken {
+        hub_id: hub_id.to_string(),
+        token,
+    })
 }
 
 /// Credencial para llamadas **hub-scoped** al Cloud (marketplace, entitlement, install, asistente):

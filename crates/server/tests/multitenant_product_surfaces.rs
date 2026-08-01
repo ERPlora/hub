@@ -51,6 +51,14 @@ fn request_hub(headers: &HeaderMap) -> String {
         .to_string()
 }
 
+fn request_token(headers: &HeaderMap) -> String {
+    headers
+        .get("x-hub-token")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_string()
+}
+
 async fn install_plan(
     State(state): State<CloudState>,
     headers: HeaderMap,
@@ -58,7 +66,8 @@ async fn install_plan(
 ) -> Json<Value> {
     let hub_id = request_hub(&headers);
     state.seen.lock().unwrap().push(json!({
-        "kind": "plan", "hub_id": hub_id, "installed": body["installed"]
+        "kind": "plan", "hub_id": hub_id, "token": request_token(&headers),
+        "installed": body["installed"]
     }));
     let already = body["installed"]
         .as_array()
@@ -86,14 +95,14 @@ async fn install_plan(
 
 async fn download(State(state): State<CloudState>, headers: HeaderMap) -> Vec<u8> {
     state.seen.lock().unwrap().push(json!({
-        "kind": "download", "hub_id": request_hub(&headers)
+        "kind": "download", "hub_id": request_hub(&headers), "token": request_token(&headers)
     }));
     state.package.as_ref().clone()
 }
 
 async fn mark_installed(State(state): State<CloudState>, headers: HeaderMap) -> Json<Value> {
     state.seen.lock().unwrap().push(json!({
-        "kind": "mark", "hub_id": request_hub(&headers)
+        "kind": "mark", "hub_id": request_hub(&headers), "token": request_token(&headers)
     }));
     Json(json!({ "ok": true }))
 }
@@ -170,9 +179,18 @@ async fn shared_app(
             OrgDescriptor {
                 org_id: OrgId(org.into()),
                 dsn: "unused".into(),
+                cloud_api_token: Some(format!("token-{hub}")),
             },
         );
     }
+    map.insert(
+        "hub-without-secret".to_string(),
+        OrgDescriptor {
+            org_id: OrgId("org-without-secret".into()),
+            dsn: "unused".into(),
+            cloud_api_token: None,
+        },
+    );
     let tenants = Arc::new(TenantRouter::with_factory(
         Arc::new(EnvOrgResolver::new(map)),
         tenant_factory(),
@@ -190,7 +208,7 @@ async fn shared_app(
         module_cache: temp.join("modules"),
         auth_mode: AuthMode::Dev,
         jwt_public_key: None,
-        cloud_api_token: Some("shared-machine-token".into()),
+        cloud_api_token: Some("bootstrap-token-must-never-leave".into()),
         device_trust_enforce: false,
         media_dir: temp.join("media"),
         sector: None,
@@ -285,6 +303,17 @@ async fn preview_install_settings_and_catalog_are_isolated_by_request_hub() {
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK, "preview {hub}");
     }
+    let response = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "hub-without-secret",
+            "/api/modules/install-plan",
+            Some(json!({ "module_id": "notes" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     let observations = seen.lock().unwrap().clone();
     let plan_a = observations
         .iter()
@@ -360,13 +389,20 @@ async fn preview_install_settings_and_catalog_are_isolated_by_request_hub() {
 
     let observations = seen.lock().unwrap();
     for hub in ["hub-a1", "hub-b1"] {
-        assert!(observations
-            .iter()
-            .any(|item| item["kind"] == "catalog" && item["hub_id"] == hub));
-        assert!(observations
-            .iter()
-            .any(|item| item["kind"] == "mark" && item["hub_id"] == hub));
+        let expected_token = format!("token-{hub}");
+        assert!(observations.iter().any(|item| item["kind"] == "plan"
+            && item["hub_id"] == hub
+            && item["token"] == expected_token));
+        assert!(observations.iter().any(|item| item["kind"] == "download"
+            && item["hub_id"] == hub
+            && item["token"] == expected_token));
+        assert!(observations.iter().any(|item| item["kind"] == "mark"
+            && item["hub_id"] == hub
+            && item["token"] == expected_token));
     }
+    assert!(observations
+        .iter()
+        .all(|item| item["token"] != "bootstrap-token-must-never-leave"));
 
     let _ = std::fs::remove_dir_all(temp);
 }

@@ -52,6 +52,10 @@ pub struct OrgDescriptor {
     /// DSN Postgres de la Aurora de **esta** org (`postgres://user:pass@host:5432/org_abc…`).
     /// Secreto: vive solo aquí (server-side), nunca viaja al navegador.
     pub dsn: String,
+    /// Credencial de máquina del Hub para llamadas Hub→Cloud. En un gateway compartido no puede
+    /// reutilizarse el token bootstrap del proceso con un `hub_id` elegido por la petición: cada
+    /// descriptor aporta su propio secreto o la operación Cloud falla cerrada.
+    pub cloud_api_token: Option<String>,
 }
 
 /// Errores del gateway multi-tenant. Se mapean a `4xx/5xx` en los handlers.
@@ -160,6 +164,12 @@ impl TenantRouter {
         self.pools.read().map(|m| m.len()).unwrap_or(0)
     }
 
+    /// Credencial Cloud del Hub resuelto. `None` significa fail-closed para cualquier proxy
+    /// hub-scoped; nunca cae al token bootstrap global del proceso compartido.
+    pub fn cloud_api_token(&self, hub_id: &str) -> Option<String> {
+        self.resolver.resolve(hub_id)?.cloud_api_token
+    }
+
     /// Resuelve el [`Runtime`] de la org dueña del `hub_id` de la petición, creando su pool bajo
     /// demanda. **Rechaza** (`UnknownOrg`) si el `hub_id` no mapea a ninguna org → un token cuyo
     /// `hub_id` no esté registrado jamás toca una BD. Como cada org tiene su propio runtime/pool, un
@@ -250,6 +260,7 @@ mod tests {
             OrgDescriptor {
                 org_id: OrgId("org-a".into()),
                 dsn: "sqlite::memory:".into(),
+                cloud_api_token: Some("token-a".into()),
             },
         );
         map.insert(
@@ -257,6 +268,7 @@ mod tests {
             OrgDescriptor {
                 org_id: OrgId("org-b".into()),
                 dsn: "sqlite::memory:".into(),
+                cloud_api_token: Some("token-b".into()),
             },
         );
         Arc::new(EnvOrgResolver::new(map))
