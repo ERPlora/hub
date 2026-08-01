@@ -3,22 +3,22 @@
 //! Reemplaza el endpoint ficticio `…/install/` del antiguo `erplora-cloud-client` por el
 //! flujo verificado contra el Cloud:
 //!
-//!   1. `GET versions/`          → lista de versiones; elige la pedida (o la última activa).
-//!   2. `GET download/?version=` → descarga el ZIP binario (async reqwest).
+//!   1. `POST install-plan/`      → Cloud resuelve cierre + topo-sort + entitlement.
+//!   2. `GET download/?version=` → descarga cada ZIP en el orden del plan.
 //!   3. verify SHA256 + unzip    → reusa `erplora-source::ModuleStore` (anti zip-slip + cache).
-//!   4. `Runtime::install_from_dir` → migra, registra capacidades, deja el módulo activo.
-//!   5. `POST mark_installed/`   → registra la instalación en el Cloud (best-effort).
+//!   4. `Runtime::install_from_dir` → migra y activa cada nodo (deps primero).
+//!   5. `POST mark_installed/`   → registra cada instalación en Cloud (best-effort).
 //!
 //! Auth = JWT del usuario activo (`Authorization: Bearer`) + `X-Hub-Id` (cabeceras de la
 //! petición entrante). La verificación SHA256 es **obligatoria y no-saltable** (ADR-0015):
-//! si el Cloud no expone `sha256` en `versions/`, la instalación se **aborta** con
+//! si el Cloud no expone `sha256` en el plan, la instalación se **aborta** con
 //! [`InstallError::MissingSha256`] antes de descargar nada (el fix server-side para que el
 //! serializer lo exponga siempre va en el issue pareja de Cloud).
 
 use std::cell::RefCell;
 use std::path::PathBuf;
 
-use cloud_client::{Auth, CloudClient, InstallGrant, ModuleVersion};
+use cloud_client::{Auth, CloudClient, InstallGrant, InstallPlan, InstallPlanNode, ModuleVersion};
 use source::{Fetcher, ModuleStore, SourceError};
 
 /// Error del flujo de instalación server-side.
@@ -34,6 +34,15 @@ pub enum InstallError {
     /// integridad es obligatoria y no-saltable → se aborta **antes** de descargar el zip.
     #[error("integridad: el Cloud no expuso sha256 para {module_id}@{version} — instalación abortada (ADR-0015)")]
     MissingSha256 { module_id: String, version: String },
+    /// El plan entero se valida antes de descargar el primer byte: un nodo premium bloqueado no
+    /// deja una instalación parcial y la UI conserva precio + URL para pedir compra/consentimiento.
+    #[error("plan bloqueado por entitlement: {blocked_on:?}")]
+    Blocked {
+        blocked_on: Vec<String>,
+        plan: Box<InstallPlan>,
+    },
+    #[error("install-plan inválido: {0}")]
+    InvalidPlan(String),
     #[error("runtime: {0}")]
     Runtime(String),
 }
@@ -126,6 +135,85 @@ async fn send_text(
         .map_err(|e| InstallError::Cloud(e.to_string()))
 }
 
+/// Resuelve el plan canónico en Cloud. Es público para que el endpoint de previsualización y el
+/// ejecutor compartan exactamente el mismo contrato (la UI nunca infiere dependencias).
+pub async fn resolve_install_plan(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    runtime: &erplora_runtime::Runtime,
+    module_id: &str,
+    requested_version: &str,
+) -> Result<InstallPlan, InstallError> {
+    let cloud = CloudClient::new(cloud_base_url);
+    let installed: Vec<String> = runtime.modules().into_iter().map(|m| m.id).collect();
+    let prepared = cloud.install_plan(auth, module_id, Some(requested_version), &installed);
+    let mut req = http
+        .request(method(&prepared.request), &prepared.request.url)
+        .json(&prepared.body);
+    for (k, v) in &prepared.request.headers {
+        req = req.header(*k, v);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| InstallError::Cloud(e.to_string()))?;
+    let status = resp.status();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| InstallError::Cloud(e.to_string()))?;
+    if !status.is_success() {
+        return Err(if status == reqwest::StatusCode::NOT_FOUND {
+            InstallError::VersionNotFound(module_id.to_string())
+        } else {
+            InstallError::Cloud(format!("install-plan {status}: {text}"))
+        });
+    }
+    let plan =
+        InstallPlan::parse(&text).map_err(|e| InstallError::InvalidPlan(format!("JSON: {e}")))?;
+    validate_plan(&plan, module_id)?;
+    Ok(plan)
+}
+
+fn validate_plan(plan: &InstallPlan, requested: &str) -> Result<(), InstallError> {
+    if plan.requested != requested {
+        return Err(InstallError::InvalidPlan(format!(
+            "requested={} pero se pidió {requested}",
+            plan.requested
+        )));
+    }
+    let mut seen = std::collections::HashSet::new();
+    for node in &plan.plan {
+        if node.module_id.trim().is_empty() || node.version.trim().is_empty() {
+            return Err(InstallError::InvalidPlan(
+                "cada nodo necesita module_id y version".into(),
+            ));
+        }
+        if node.sha256.trim().is_empty() {
+            return Err(InstallError::MissingSha256 {
+                module_id: node.module_id.clone(),
+                version: node.version.clone(),
+            });
+        }
+        if !seen.insert(node.module_id.as_str()) {
+            return Err(InstallError::InvalidPlan(format!(
+                "módulo duplicado: {}",
+                node.module_id
+            )));
+        }
+    }
+    if !plan.blocked
+        && !plan.already_satisfied.iter().any(|m| m == requested)
+        && !plan.plan.iter().any(|n| n.module_id == requested)
+    {
+        return Err(InstallError::InvalidPlan(
+            "el plan ejecutable no contiene el módulo pedido".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Ejecuta una `PreparedRequest` GET y devuelve el cuerpo binario (descarga del ZIP).
 async fn send_bytes(
     http: &reqwest::Client,
@@ -183,19 +271,8 @@ fn acquire(
     Ok(dir)
 }
 
-/// Pipeline completo de instalación **con resolución de dependencias anidadas** (nested install).
-/// Descarga el módulo pedido y, ANTES de instalarlo, descarga+instala recursivamente cada
-/// dependencia declarada en su manifest que aún no esté instalada (topo-orden por profundidad).
-/// Devuelve la `Installed` del módulo pedido (el "headline"); las deps quedan instaladas como
-/// efecto lateral, igual que al instalar un lote horneado con `install_all_from_dir`.
-///
-/// El grafo de deps se lee del **manifest del ZIP publicado** (la fuente autoritativa que valida
-/// el runtime al registrar), no del catálogo del Cloud: ADR-0060 (`resolve_install_plan`) sigue
-/// sin cablear y el M2M `Module.dependencies` del Cloud está vacío en prod, así que un plan
-/// Cloud-side no ordenaría nada. El entitlement se sigue aplicando por módulo en cada `download/`.
-///
-/// `runtime` se bloquea por el llamador (server) y se pasa por `&mut`; el resto del I/O
-/// (red, FS) es async/blocking sin tocar el lock más de lo necesario.
+/// Ejecuta el plan canónico del Cloud en orden. El plan completo se resuelve y valida antes de
+/// descargar: `blocked=true` corta sin instalar nada y nunca inicia una compra automática.
 pub async fn install_from_cloud(
     http: &reqwest::Client,
     cloud_base_url: &str,
@@ -207,126 +284,103 @@ pub async fn install_from_cloud(
     on_progress: OnProgress<'_>,
     signature_policy: &cloud_client::SignaturePolicy,
 ) -> Result<Installed, InstallError> {
-    let mut installing: std::collections::HashSet<String> = std::collections::HashSet::new();
-    install_recursive(
+    on_progress(module_id, "resolving");
+    let plan = resolve_install_plan(
         http,
         cloud_base_url,
-        cache_root,
         auth,
         runtime,
-        module_id.to_string(),
-        requested_version.to_string(),
-        &mut installing,
-        on_progress,
-        signature_policy,
+        module_id,
+        requested_version,
     )
-    .await
-}
+    .await?;
+    if plan.blocked {
+        return Err(InstallError::Blocked {
+            blocked_on: plan.blocked_on.clone(),
+            plan: Box::new(plan),
+        });
+    }
+    if plan.already_satisfied.iter().any(|m| m == module_id) && plan.plan.is_empty() {
+        let installed = runtime
+            .modules()
+            .into_iter()
+            .find(|m| m.id == module_id)
+            .ok_or_else(|| {
+                InstallError::InvalidPlan("Cloud marcó satisfecho un módulo ausente".into())
+            })?;
+        return Ok(Installed {
+            module_id: installed.id,
+            version: installed.version,
+            dir: cache_root.join(module_id),
+        });
+    }
 
-/// Instala `module_id`@`requested_version` resolviendo sus deps primero (recursivo). `installing`
-/// guarda la cadena en curso para cortar ciclos (`a→b→a`): una dep ya presente en la pila no se
-/// re-expande — el runtime la rechazará luego con `MissingDependency` si el ciclo es real, que es
-/// lo correcto (un ciclo es un error de autoría del módulo, no algo a resolver aquí).
-#[allow(clippy::too_many_arguments)]
-fn install_recursive<'a>(
-    http: &'a reqwest::Client,
-    cloud_base_url: &'a str,
-    cache_root: &'a std::path::Path,
-    auth: &'a Auth,
-    runtime: &'a mut erplora_runtime::Runtime,
-    module_id: String,
-    requested_version: String,
-    installing: &'a mut std::collections::HashSet<String>,
-    on_progress: OnProgress<'a>,
-    signature_policy: &'a cloud_client::SignaturePolicy,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Installed, InstallError>> + Send + 'a>>
-{
-    Box::pin(async move {
-        let cloud = CloudClient::new(cloud_base_url);
+    let cloud = CloudClient::new(cloud_base_url);
+    let store = ModuleStore::new(cache_root);
+    let mut headline: Option<Installed> = None;
+    for node in &plan.plan {
+        let InstallPlanNode {
+            module_id: id,
+            version,
+            sha256,
+            signature,
+            ..
+        } = node;
+        on_progress(id, "resolving");
 
-        // (1) Resolver versión contra el Cloud. SHA256 obligatorio (ADR-0015): sin hash esperado
-        //     no hay verificación de integridad posible → abortar ANTES de descargar nada.
-        on_progress(&module_id, "resolving");
-        let version = resolve_version(http, &cloud, auth, &module_id, &requested_version).await?;
-        let sha = version
-            .sha256
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .ok_or_else(|| InstallError::MissingSha256 {
-                module_id: module_id.clone(),
-                version: version.version.clone(),
-            })?
-            .to_string();
+        // ADR-0060 antecede a hub#239. Mientras el plan de Cloud no lleve `signature`, pedimos
+        // SOLO esa metadata a versions/ bajo política Enforce. Dev usa cero round-trips extra.
+        let signature = if signature.is_none() && signature_policy.requires_signature() {
+            resolve_version(http, &cloud, auth, id, version)
+                .await?
+                .signature
+        } else {
+            signature.clone()
+        };
 
-        // (2) Descargar el ZIP binario.
-        on_progress(&module_id, "downloading");
-        let dl_req = cloud.download(auth, &module_id, &version.version);
-        let zip_bytes = send_bytes(http, &dl_req).await?;
-
-        // (3) Verificar firma ed25519 (hub#239, DEFAULT deny según policy) + SHA256 + descomprimir
-        //     de forma segura + cachear.
-        on_progress(&module_id, "verifying");
-        let store = ModuleStore::new(cache_root);
+        on_progress(id, "downloading");
+        let zip_bytes = send_bytes(http, &cloud.download(auth, id, version)).await?;
+        on_progress(id, "verifying");
+        let metadata = ModuleVersion {
+            version: version.clone(),
+            changelog: String::new(),
+            is_active: true,
+            file_size_bytes: 0,
+            sha256: Some(sha256.clone()),
+            signature: signature.clone(),
+        };
         let dir = acquire(
             &store,
-            &module_id,
-            &version,
-            &sha,
-            version.signature.clone(),
+            id,
+            &metadata,
+            sha256,
+            signature,
             zip_bytes,
             signature_policy,
         )?;
 
-        // (4) INSTALACIÓN ANIDADA: instala las dependencias declaradas que falten ANTES del módulo.
-        //     El runtime exige que las deps estén registradas al instalar (installer.rs::install);
-        //     aquí se satisface ese contrato descargándolas del Cloud en orden de profundidad.
-        let missing = runtime
-            .missing_dependencies(&dir)
-            .map_err(|e| InstallError::Runtime(e.to_string()))?;
-        installing.insert(module_id.clone());
-        for dep in missing {
-            // Ya en la cadena en curso (ciclo) o ya instalada por otra rama (dep en diamante): saltar.
-            if installing.contains(&dep) || runtime.registry().is_installed(&dep) {
-                continue;
-            }
-            install_recursive(
-                http,
-                cloud_base_url,
-                cache_root,
-                auth,
-                &mut *runtime,
-                dep,
-                "latest".to_string(),
-                &mut *installing,
-                on_progress,
-                signature_policy,
-            )
-            .await?;
-        }
-
-        // (5) Instalar el módulo (migra, registra, activa) — ya con sus deps presentes.
-        on_progress(&module_id, "installing");
+        on_progress(id, "installing");
         let installed_id = runtime
             .install_from_dir(&dir)
             .await
             .map_err(|e| InstallError::Runtime(e.to_string()))?;
 
-        // (6) Registrar la instalación en el Cloud (best-effort: no aborta si falla).
-        let mark = cloud.mark_installed(auth, &module_id);
-        let mark_body = serde_json::json!({ "version": version.version });
+        let mark = cloud.mark_installed(auth, id);
+        let mark_body = serde_json::json!({ "version": version });
         let mut r = http.request(method(&mark), &mark.url).json(&mark_body);
         for (k, v) in &mark.headers {
             r = r.header(*k, v);
         }
         if let Err(e) = r.send().await {
-            tracing::warn!(module_id = %module_id, error = %e, "mark_installed/ falló (no crítico)");
+            tracing::warn!(module_id = %id, error = %e, "mark_installed/ falló (no crítico)");
         }
-
-        Ok(Installed {
-            module_id: installed_id,
-            version: version.version,
-            dir,
-        })
-    })
+        if id == module_id {
+            headline = Some(Installed {
+                module_id: installed_id,
+                version: version.clone(),
+                dir,
+            });
+        }
+    }
+    headline.ok_or_else(|| InstallError::InvalidPlan("el plan no instaló el módulo pedido".into()))
 }

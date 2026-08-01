@@ -177,6 +177,55 @@ export interface InstallRequestResult {
   status: string;
 }
 
+export interface InstallPlanPurchase {
+  module_type: string;
+  price: string;
+  currency: string;
+  purchase_url: string;
+}
+
+export interface InstallPlanNode {
+  module_id: string;
+  version: string;
+  sha256: string;
+  tier: string;
+  entitled: boolean;
+  requires_purchase: boolean;
+  reason: 'requested' | 'dependency';
+  purchase?: InstallPlanPurchase;
+}
+
+export interface InstallPlan {
+  requested: string;
+  plan: InstallPlanNode[];
+  already_satisfied: string[];
+  blocked: boolean;
+  blocked_on: string[];
+}
+
+/** Previsualiza el cierre de dependencias sin descargar, instalar ni cobrar (ADR-0060). */
+export async function previewInstallPlan(moduleId: string, version: string): Promise<InstallPlan> {
+  beginRequest();
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/modules/install-plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ module_id: moduleId, version }),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      data?: InstallPlan;
+      error?: string;
+    };
+    if (!res.ok || !body.data) {
+      throw new Error(body.error ?? `install-plan ${moduleId} → ${res.status}`);
+    }
+    return body.data;
+  } finally {
+    endRequest();
+  }
+}
+
 /**
  * Pide al runtime que instale (vía marketplace del Cloud) un módulo. El runtime descarga el
  * zip firmado, verifica SHA256 y aplica migraciones; al terminar emite el evento WS

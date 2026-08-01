@@ -208,7 +208,11 @@ async fn instalar_del_marketplace_firmado_funciona_en_produccion() {
         .body(Body::from(json!({ "module_id": "notes" }).to_string()))
         .unwrap();
     let resp = router.clone().oneshot(req).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "el marketplace debe instalar un módulo firmado");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "el marketplace debe instalar un módulo firmado"
+    );
     let body = body_json(resp).await;
     assert_eq!(body["ok"], json!(true), "{body}");
 
@@ -285,7 +289,10 @@ fn module_zip(id: &str) -> Vec<u8> {
 /// Mini-SaaS con las tres rutas que consume `CloudClient` (versions/download/mark_installed),
 /// sirviendo el zip con su SHA256 REAL y, opcionalmente, su **firma ed25519** (hub#239). La
 /// verificación de integridad Y autenticidad se ejercita de verdad.
-async fn spawn_mock_cloud(zip_bytes: Vec<u8>, signature: Option<cloud_client::ModuleSignature>) -> String {
+async fn spawn_mock_cloud(
+    zip_bytes: Vec<u8>,
+    signature: Option<cloud_client::ModuleSignature>,
+) -> String {
     use axum::extract::State;
     use axum::routing::{get, post};
     use axum::{Json, Router};
@@ -307,6 +314,21 @@ async fn spawn_mock_cloud(zip_bytes: Vec<u8>, signature: Option<cloud_client::Mo
         }
         json!([entry]).into()
     }
+    async fn install_plan(State(pkg): State<Pkg>) -> Json<Value> {
+        let mut node = json!({
+            "module_id": "notes", "version": "1.0.0", "sha256": pkg.1,
+            "tier": "free", "entitled": true, "requires_purchase": false,
+            "reason": "requested"
+        });
+        if let Some(sig) = &pkg.2 {
+            node["signature"] = serde_json::to_value(sig).unwrap();
+        }
+        json!({
+            "requested": "notes", "plan": [node], "already_satisfied": [],
+            "blocked": false, "blocked_on": []
+        })
+        .into()
+    }
     async fn download(State(pkg): State<Pkg>) -> Vec<u8> {
         pkg.0.clone()
     }
@@ -315,9 +337,13 @@ async fn spawn_mock_cloud(zip_bytes: Vec<u8>, signature: Option<cloud_client::Mo
     }
 
     let app = Router::new()
+        .route("/api/v1/marketplace/install-plan/", post(install_plan))
         .route("/api/v1/marketplace/modules/:id/versions/", get(versions))
         .route("/api/v1/marketplace/modules/:id/download/", get(download))
-        .route("/api/v1/marketplace/modules/:id/mark_installed/", post(mark_installed))
+        .route(
+            "/api/v1/marketplace/modules/:id/mark_installed/",
+            post(mark_installed),
+        )
         .with_state(pkg);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();

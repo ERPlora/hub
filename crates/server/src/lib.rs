@@ -665,6 +665,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/navigation", get(navigation))
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))
+        .route("/api/modules/install-plan", post(preview_install_plan))
         .route("/api/modules/request-install", post(request_install))
         // Assets web de un módulo instalado (module.json + `dist/*.esm.js` + wasm/icons) servidos
         // desde la CACHÉ de descargas, resueltos por la VERSIÓN instalada. En Hub Cloud los módulos
@@ -945,6 +946,53 @@ struct RequestInstallReq {
     version: String,
 }
 
+/// POST /api/modules/install-plan — previsualiza el plan canónico sin instalar ni cobrar.
+/// La UI lo usa para pedir consentimiento cuando aparecen dependencias y para mostrar el CTA de
+/// compra si Cloud marca un nodo premium como bloqueado. Repite la resolución al confirmar para
+/// evitar ejecutar un plan obsoleto (entitlement/versiones pueden cambiar entre ambos clics).
+async fn preview_install_plan(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RequestInstallReq>,
+) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    let Some(cloud_auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response();
+    };
+    let rt = st.runtime.lock().await;
+    match install::resolve_install_plan(
+        &st.http,
+        &st.config.cloud_base_url,
+        &cloud_auth,
+        &rt,
+        &req.module_id,
+        &req.version,
+    )
+    .await
+    {
+        Ok(plan) => Json(json!({ "ok": true, "data": plan })).into_response(),
+        Err(e) => {
+            let status = match e {
+                install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
+                install::InstallError::InvalidPlan(_) | install::InstallError::MissingSha256 { .. } => {
+                    StatusCode::BAD_GATEWAY
+                }
+                _ => StatusCode::BAD_GATEWAY,
+            };
+            (status, Json(json!({ "ok": false, "error": e.to_string() }))).into_response()
+        }
+    }
+}
+
 /// POST /api/modules/request-install — flujo real Cloud→descarga→runtime (ARQUITECTURA.md §2.2).
 /// Auth = JWT del usuario + `X-Hub-Id` de las cabeceras. Tras instalar, emite el evento
 /// `module.installed` por `/ws` y prepara la ingestión de embeddings (vía Cloud, pendiente §9.3).
@@ -1058,9 +1106,22 @@ async fn request_install(
                 error = %e,
                 "request-install falló"
             );
+            if let install::InstallError::Blocked { plan, .. } = &e {
+                return (
+                    StatusCode::CONFLICT,
+                    Json(json!({
+                        "ok": false,
+                        "error": "install_plan_blocked",
+                        "data": plan,
+                    })),
+                )
+                    .into_response();
+            }
             let code = match &e {
                 install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
-                install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
+                install::InstallError::Runtime(_) | install::InstallError::InvalidPlan(_) => {
+                    StatusCode::UNPROCESSABLE_ENTITY
+                }
                 // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
                 // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
                 install::InstallError::Source(source::SourceError::BadSignature(_)) => {
@@ -1069,6 +1130,7 @@ async fn request_install(
                 install::InstallError::Cloud(_)
                 | install::InstallError::Source(_)
                 | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
+                install::InstallError::Blocked { .. } => unreachable!("manejado arriba"),
             };
             (code, Json(json!({ "ok": false, "error": e.to_string() }))).into_response()
         }

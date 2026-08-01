@@ -37,13 +37,19 @@ fn build_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// `module.zip` mínimo instalable: `module.json` con id/name/version + depends_on.
 fn module_zip(id: &str, deps: &[&str]) -> Vec<u8> {
     let manifest = json!({ "id": id, "name": id, "version": "1.0.0", "depends_on": deps });
-    build_zip(&[("module.json", serde_json::to_string(&manifest).unwrap().as_bytes())])
+    build_zip(&[(
+        "module.json",
+        serde_json::to_string(&manifest).unwrap().as_bytes(),
+    )])
 }
 
 /// id → (zip, sha256) del catálogo publicado en el mini-Cloud.
@@ -51,7 +57,42 @@ type Catalog = Arc<HashMap<String, (Vec<u8>, String)>>;
 
 /// Levanta el mini-Cloud en un puerto efímero y devuelve su base URL.
 async fn spawn_mock_cloud(catalog: Catalog) -> String {
-    async fn versions(State(cat): State<Catalog>, Path(id): Path<String>) -> Json<serde_json::Value> {
+    async fn install_plan(
+        State(cat): State<Catalog>,
+        Json(body): Json<serde_json::Value>,
+    ) -> Json<serde_json::Value> {
+        let requested = body["module_id"].as_str().unwrap_or_default();
+        let ids: Vec<&str> = if requested == "dependent" {
+            vec!["leaf", "dependent"]
+        } else {
+            vec![requested]
+        };
+        let plan: Vec<_> = ids
+            .into_iter()
+            .map(|id| {
+                json!({
+                    "module_id": id,
+                    "version": "1.0.0",
+                    "sha256": cat.get(id).map(|(_, s)| s.clone()).unwrap_or_default(),
+                    "tier": "free",
+                    "entitled": true,
+                    "requires_purchase": false,
+                    "reason": if id == requested { "requested" } else { "dependency" }
+                })
+            })
+            .collect();
+        Json(json!({
+            "requested": requested,
+            "plan": plan,
+            "already_satisfied": [],
+            "blocked": false,
+            "blocked_on": []
+        }))
+    }
+    async fn versions(
+        State(cat): State<Catalog>,
+        Path(id): Path<String>,
+    ) -> Json<serde_json::Value> {
         let sha = cat.get(&id).map(|(_, s)| s.clone()).unwrap_or_default();
         Json(json!([{ "version": "1.0.0", "is_active": true, "sha256": sha }]))
     }
@@ -62,9 +103,13 @@ async fn spawn_mock_cloud(catalog: Catalog) -> String {
         Json(json!({ "ok": true }))
     }
     let app = Router::new()
+        .route("/api/v1/marketplace/install-plan/", post(install_plan))
         .route("/api/v1/marketplace/modules/:id/versions/", get(versions))
         .route("/api/v1/marketplace/modules/:id/download/", get(download))
-        .route("/api/v1/marketplace/modules/:id/mark_installed/", post(mark_installed))
+        .route(
+            "/api/v1/marketplace/modules/:id/mark_installed/",
+            post(mark_installed),
+        )
         .with_state(catalog);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -79,12 +124,19 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
     let leaf = module_zip("leaf", &[]);
     let dependent = module_zip("dependent", &["leaf"]);
     cat.insert("leaf".to_string(), (leaf.clone(), sha256_hex(&leaf)));
-    cat.insert("dependent".to_string(), (dependent.clone(), sha256_hex(&dependent)));
+    cat.insert(
+        "dependent".to_string(),
+        (dependent.clone(), sha256_hex(&dependent)),
+    );
     let base_url = spawn_mock_cloud(Arc::new(cat)).await;
 
     let http = reqwest::Client::new();
-    let auth = Auth::HubToken { hub_id: "hub-test".into(), token: "tok".into() };
-    let cache = std::env::temp_dir().join(format!("erplora-install-progress-{}", std::process::id()));
+    let auth = Auth::HubToken {
+        hub_id: "hub-test".into(),
+        token: "tok".into(),
+    };
+    let cache =
+        std::env::temp_dir().join(format!("erplora-install-progress-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&cache);
     let mut rt = Runtime::new(Box::new(fresh_db().await));
 
@@ -92,7 +144,9 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
     let seen: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
     let sink = seen.clone();
     let on_progress = move |module_id: &str, phase: &str| {
-        sink.lock().unwrap().push((module_id.to_string(), phase.to_string()));
+        sink.lock()
+            .unwrap()
+            .push((module_id.to_string(), phase.to_string()));
     };
 
     let installed = install_from_cloud(
@@ -112,17 +166,18 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
     .expect("instalación con dep anidada debe funcionar");
     assert_eq!(installed.module_id, "dependent");
 
-    // Orden esperado: el headline se resuelve/descarga/verifica primero; su dep se instala
-    // COMPLETA antes (incluida su fase installing); el headline instala (migra) el último.
+    // Orden del plan canónico: el root entra en resolving mientras Cloud calcula el cierre;
+    // después cada nodo completa sus fases en topo-orden (dependencia antes que dependiente).
     let got = seen.lock().unwrap().clone();
     let expect: Vec<(String, String)> = [
         ("dependent", "resolving"),
-        ("dependent", "downloading"),
-        ("dependent", "verifying"),
         ("leaf", "resolving"),
         ("leaf", "downloading"),
         ("leaf", "verifying"),
         ("leaf", "installing"),
+        ("dependent", "resolving"),
+        ("dependent", "downloading"),
+        ("dependent", "verifying"),
         ("dependent", "installing"),
     ]
     .iter()
@@ -130,4 +185,64 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
     .collect();
     assert_eq!(got, expect);
     let _ = std::fs::remove_dir_all(&cache);
+}
+
+#[tokio::test]
+async fn blocked_plan_stops_before_any_download_or_install() {
+    let downloads = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let seen_downloads = downloads.clone();
+    async fn blocked() -> Json<serde_json::Value> {
+        Json(json!({
+            "requested": "premium",
+            "plan": [{
+                "module_id": "premium", "version": "1.0.0", "sha256": "aa",
+                "tier": "premium", "entitled": false, "requires_purchase": true,
+                "reason": "requested",
+                "purchase": {"module_type":"subscription","price":"19.99","currency":"EUR","purchase_url":"/premium"}
+            }],
+            "already_satisfied": [], "blocked": true, "blocked_on": ["premium"]
+        }))
+    }
+    async fn should_not_download(
+        State(counter): State<Arc<std::sync::atomic::AtomicUsize>>,
+    ) -> Vec<u8> {
+        counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Vec::new()
+    }
+    let app = Router::new()
+        .route("/api/v1/marketplace/install-plan/", post(blocked))
+        .route(
+            "/api/v1/marketplace/modules/:id/download/",
+            get(should_not_download),
+        )
+        .with_state(seen_downloads);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
+    let result = install_from_cloud(
+        &reqwest::Client::new(),
+        &format!("http://{addr}"),
+        &std::env::temp_dir().join("erplora-blocked-plan"),
+        &Auth::HubToken {
+            hub_id: "hub-test".into(),
+            token: "tok".into(),
+        },
+        &mut rt,
+        "premium",
+        "latest",
+        &|_, _| {},
+        &erplora_server::install::dev_signature_policy(),
+    )
+    .await;
+    assert!(matches!(
+        result,
+        Err(erplora_server::install::InstallError::Blocked { .. })
+    ));
+    assert_eq!(downloads.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert!(
+        rt.modules().is_empty(),
+        "blocked=true no deja instalación parcial"
+    );
 }

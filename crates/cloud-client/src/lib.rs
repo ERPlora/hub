@@ -10,7 +10,7 @@
 //!  2. JWT del usuario activo → `Authorization: Bearer …` (+ `X-Hub-Id`).
 //!  3. `X-Webhook-Secret` (+ `X-Hub-Id`): M2M de fondo.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub mod entitlement;
 pub mod integrity;
@@ -313,6 +313,32 @@ impl CloudClient {
         )
     }
 
+    /// Pide al Cloud el cierre transitivo de dependencias en orden topológico (ADR-0060).
+    /// Cada nodo trae `version` + `sha256`; el Hub ejecuta el plan tal cual y conserva
+    /// `MissingDependency` como red de seguridad. El Cloud solo informa de compra: nunca cobra.
+    pub fn install_plan(
+        &self,
+        auth: &Auth,
+        module_id: &str,
+        version: Option<&str>,
+        installed: &[String],
+    ) -> PreparedInstallPlan {
+        PreparedInstallPlan {
+            request: PreparedRequest {
+                method: "POST",
+                url: format!("{}/api/v1/marketplace/install-plan/", self.base_url),
+                headers: auth.headers(),
+            },
+            body: InstallPlanRequest {
+                module_id: module_id.to_string(),
+                version: version
+                    .filter(|v| !v.is_empty() && *v != "latest")
+                    .map(str::to_string),
+                installed: installed.to_vec(),
+            },
+        }
+    }
+
     /// **Flujo real de instalación, paso 3** — registra la instalación en el Cloud.
     /// `POST /api/v1/marketplace/modules/{module_id}/mark_installed/` con body
     /// `{"version":"…"}` (verificado en `api_views.py::mark_installed`). §2.2.
@@ -404,6 +430,69 @@ impl CloudClient {
             &format!("/api/v1/marketplace/modules/{module_id}/versions/{version}/install/"),
             auth,
         )
+    }
+}
+
+/// Petición completa del endpoint `install-plan`: transporte + body tipado.
+#[derive(Debug, Clone)]
+pub struct PreparedInstallPlan {
+    pub request: PreparedRequest,
+    pub body: InstallPlanRequest,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct InstallPlanRequest {
+    pub module_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    pub installed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct InstallPlanPurchase {
+    pub module_type: String,
+    pub price: String,
+    pub currency: String,
+    pub purchase_url: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct InstallPlanNode {
+    pub module_id: String,
+    pub version: String,
+    pub sha256: String,
+    #[serde(default)]
+    pub tier: String,
+    #[serde(default)]
+    pub entitled: bool,
+    #[serde(default)]
+    pub requires_purchase: bool,
+    #[serde(default)]
+    pub reason: String,
+    #[serde(default)]
+    pub purchase: Option<InstallPlanPurchase>,
+    /// Compatibilidad adelantada con la verificación ed25519 (hub#239). El contrato original
+    /// de ADR-0060 no la incluía; cuando Cloud la entregue se evita el fallback a `versions/`.
+    #[serde(default)]
+    pub signature: Option<ModuleSignature>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct InstallPlan {
+    pub requested: String,
+    #[serde(default)]
+    pub plan: Vec<InstallPlanNode>,
+    #[serde(default)]
+    pub already_satisfied: Vec<String>,
+    #[serde(default)]
+    pub blocked: bool,
+    #[serde(default)]
+    pub blocked_on: Vec<String>,
+}
+
+impl InstallPlan {
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
     }
 }
 
@@ -678,6 +767,19 @@ mod tests {
             "https://erplora.com/api/v1/marketplace/modules/inventory/versions/"
         );
 
+        let p = c.install_plan(&auth, "verifactu", Some("latest"), &["invoice".to_string()]);
+        assert_eq!(p.request.method, "POST");
+        assert_eq!(
+            p.request.url,
+            "https://erplora.com/api/v1/marketplace/install-plan/"
+        );
+        assert_eq!(p.body.module_id, "verifactu");
+        assert_eq!(
+            p.body.version, None,
+            "latest se omite: Cloud resuelve la activa"
+        );
+        assert_eq!(p.body.installed, ["invoice"]);
+
         let d = c.download(&auth, "inventory", "1.0.0");
         assert_eq!(
             d.url,
@@ -701,6 +803,31 @@ mod tests {
             .headers
             .contains(&("Authorization", "Bearer abc".to_string())));
         assert!(s.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn install_plan_parses_dependencies_and_purchase_without_charging() {
+        let plan = InstallPlan::parse(
+            r#"{
+              "requested":"verifactu",
+              "plan":[
+                {"module_id":"invoice","version":"1.2.0","sha256":"aa","tier":"free","entitled":true,"requires_purchase":false,"reason":"dependency"},
+                {"module_id":"verifactu","version":"2.0.0","sha256":"bb","tier":"premium","entitled":false,"requires_purchase":true,"reason":"requested","purchase":{"module_type":"subscription","price":"19.99","currency":"EUR","purchase_url":"/modules/verifactu"}}
+              ],
+              "already_satisfied":[],"blocked":true,"blocked_on":["verifactu"]
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(
+            plan.plan
+                .iter()
+                .map(|n| n.module_id.as_str())
+                .collect::<Vec<_>>(),
+            ["invoice", "verifactu"]
+        );
+        assert!(plan.blocked);
+        assert_eq!(plan.blocked_on, ["verifactu"]);
+        assert_eq!(plan.plan[1].purchase.as_ref().unwrap().price, "19.99");
     }
 
     #[test]

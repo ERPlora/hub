@@ -94,6 +94,55 @@
       </ion-content>
     </ion-modal>
 
+    <!-- ADR-0060: el Cloud resuelve el árbol completo ANTES de instalar. Dependencias gratis =
+         consentimiento informativo; cualquier nodo bloqueado = compra explícita, nunca autocobro. -->
+    <ion-modal :is-open="planOpen" data-testid="install-plan-modal" @did-dismiss="closePlan">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ plan?.blocked ? t('apps.planBlockedTitle') : t('apps.planTitle') }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button :aria-label="t('apps.consentCancel')" @click="closePlan">
+              <HubIcon name="close-outline" />
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <p>{{ plan?.blocked ? t('apps.planBlockedIntro') : t('apps.planIntro') }}</p>
+        <ion-list lines="full" data-testid="install-plan-items">
+          <ion-item v-for="node in plan?.plan ?? []" :key="node.module_id">
+            <HubIcon slot="start" :name="node.requires_purchase ? 'card-outline' : 'cube-outline'" />
+            <ion-label class="ion-text-wrap">
+              <h2>{{ moduleName(node.module_id) }}</h2>
+              <p>{{ node.reason === 'dependency' ? t('apps.planDependency') : t('apps.planRequested') }} · v{{ node.version }}</p>
+            </ion-label>
+            <ion-button
+              v-if="node.requires_purchase"
+              slot="end"
+              size="small"
+              data-testid="install-plan-purchase"
+              @click="openPlanPurchase(node)"
+            >
+              {{ t('apps.planPurchase') }}
+            </ion-button>
+          </ion-item>
+        </ion-list>
+        <ion-button
+          v-if="plan && !plan.blocked"
+          class="mt-3"
+          expand="block"
+          data-testid="install-plan-confirm"
+          @click="confirmPlanInstall"
+        >
+          <HubIcon slot="start" name="download-outline" />
+          {{ t('apps.planConfirm') }}
+        </ion-button>
+        <ion-button class="mt-2" expand="block" fill="outline" @click="closePlan">
+          {{ t('apps.consentCancel') }}
+        </ion-button>
+      </ion-content>
+    </ion-modal>
+
     <!-- Toast simple (Ionic IonToast no requiere importaciones extra en el template) -->
     <ion-toast
       :is-open="toastOpen"
@@ -146,14 +195,14 @@ const tableLabels = computed(() => dataTableLabels(locale.value));
 import { cloudMarketplaceModules, type CloudMarketplaceModule } from '../lib/cloud';
 import { config } from '../lib/config';
 import {
-  clientInjectionKey, getClient, requestInstall,
+  clientInjectionKey, getClient, requestInstall, previewInstallPlan,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
   getModuleCapabilities, putModuleCapabilities,
-  type InstalledModule, type ModuleCapability
+  type InstalledModule, type ModuleCapability, type InstallPlan, type InstallPlanNode
 } from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
 import { isModuleInstalled } from '../lib/apps-catalog';
-import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
+import { resolveEntitlement } from '../lib/entitlement';
 import { openExternal } from '../lib/open-external';
 import { isAdmin } from '../lib/session';
 
@@ -411,11 +460,24 @@ let unsubProgress: (() => void) | null = null;
 const consentOpen = ref(false);
 const consentCaps = ref<ModuleCapability[]>([]);
 const consentMod = ref<Mod | null>(null);
+const planOpen = ref(false);
+const plan = ref<InstallPlan | null>(null);
+const planMod = ref<Mod | null>(null);
 
 function closeConsent(): void {
   consentOpen.value = false;
   consentMod.value = null;
   consentCaps.value = [];
+}
+
+function closePlan(): void {
+  planOpen.value = false;
+  plan.value = null;
+  planMod.value = null;
+}
+
+function moduleName(id: string): string {
+  return modules.value.find((m) => m.id === id)?.name ?? id;
 }
 
 /** Deep-link a la ficha de compra del módulo en el marketplace del SaaS (el Hub NO vende,
@@ -439,24 +501,34 @@ async function openPurchase(mod: Mod): Promise<void> {
   }
 }
 
-/** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
-async function installModule(mod: Mod): Promise<void> {
-  if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
-  if (mod.installed) { notify(t('apps.alreadyInstalled', { name: mod.name }), 'primary'); return; }
-  // Ya en curso (doble clic o instalación arrancada por otro cliente): no relanzar el request.
-  if (installing.value.has(mod.id)) return;
-  // Gate de compra (ADR-0114): un módulo de pago SIN entitlement de ESTE hub no se intenta
-  // instalar (el download/ del SaaS lo denegaría con un error genérico) — se manda a comprar
-  // al marketplace del SaaS. El freemium (premium con capa gratis) SÍ viene en el token de
-  // entitlement, así que sigue instalándose sin compra (ADR-0032). Solo gateamos con el
-  // entitlement RESUELTO (permisivo mientras 'unknown', igual que el resto del shell).
-  if (mod.paid && entitlementStatus.value === 'unlocked' && !isModuleEntitled(mod.id)) {
+async function openPlanPurchase(node: InstallPlanNode): Promise<void> {
+  const mod = planMod.value;
+  if (!mod) return;
+  const raw = node.purchase?.purchase_url;
+  if (!raw) {
     await openPurchase(mod);
     return;
   }
-  // Best-effort: intentamos conocer los permisos que declara el módulo ANTES de instalar. El catálogo
-  // Cloud no los expone, así que esto solo encuentra algo si el módulo ya estuvo instalado (runtime lo
-  // recuerda); si no, instalamos directo y los permisos se gestionan luego en Ajustes → Permisos.
+  const url = new URL(raw, config.cloudApiUrl);
+  url.searchParams.set('hub', config.hubId);
+  url.searchParams.set('utm_source', 'hub');
+  const recheck = (): void => {
+    window.removeEventListener('focus', recheck);
+    closePlan();
+    void resolveEntitlement().then(() => loadCatalog());
+  };
+  window.addEventListener('focus', recheck);
+  try {
+    await openExternal(url.toString());
+    notify(t('apps.purchaseInBrowser', { name: moduleName(node.module_id) }), 'primary');
+  } catch {
+    window.removeEventListener('focus', recheck);
+    notify(t('apps.purchaseOpenError'), 'danger');
+  }
+}
+
+/** Tras consentir el plan, conserva el consentimiento de capabilities ya existente. */
+async function prepareCapabilitiesOrInstall(mod: Mod): Promise<void> {
   let declared: ModuleCapability[] = [];
   try {
     const caps = await getModuleCapabilities(mod.id);
@@ -471,6 +543,41 @@ async function installModule(mod: Mod): Promise<void> {
     return;
   }
   await doInstall(mod);
+}
+
+async function confirmPlanInstall(): Promise<void> {
+  const mod = planMod.value;
+  if (!mod || plan.value?.blocked) return;
+  closePlan();
+  await prepareCapabilitiesOrInstall(mod);
+}
+
+/** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
+async function installModule(mod: Mod): Promise<void> {
+  if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
+  if (mod.installed) { notify(t('apps.alreadyInstalled', { name: mod.name }), 'primary'); return; }
+  // Ya en curso (doble clic o instalación arrancada por otro cliente): no relanzar el request.
+  if (installing.value.has(mod.id)) return;
+  // El plan Cloud es la autoridad para dependencias Y compra. Se resuelve antes de descargar: si
+  // está bloqueado mostramos su CTA; si trae deps pedimos consentimiento informativo.
+  setProgress(mod.id, mod.id, 'resolving');
+  try {
+    const resolved = await previewInstallPlan(mod.id, mod.version ?? 'latest');
+    const dependencies = resolved.plan.filter((n) => n.reason === 'dependency');
+    if (resolved.blocked || dependencies.length > 0) {
+      plan.value = resolved;
+      planMod.value = mod;
+      planOpen.value = true;
+      clearProgress(mod.id);
+      return;
+    }
+  } catch {
+    clearProgress(mod.id);
+    notify(t('apps.planError', { name: mod.name }), 'danger');
+    return;
+  }
+  clearProgress(mod.id);
+  await prepareCapabilitiesOrInstall(mod);
 }
 
 /** Confirma el modal: instala y, al terminar, concede todas las capabilities declaradas. */

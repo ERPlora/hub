@@ -23,6 +23,7 @@
     "build:modules": "pnpm -F @erplora/module-cli build:all"
   },
   "devDependencies": {
+    "@playwright/test": "1.60.0",
     "@types/node": "^25.9.2"
   }
 }
