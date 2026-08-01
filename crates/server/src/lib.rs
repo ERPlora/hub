@@ -187,6 +187,7 @@ pub fn normalize_pg_dsn(url: &str) -> String {
 /// `cfg.hub.cloud_api_token` (Tauri la inyecta desde el keychain; ECS desde el env).
 pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error>> {
     use erplora_runtime::Runtime;
+    use erplora_vector::{PgVectorStore, VectorStore};
 
     // Logging del hub → consola + `media/_logs/` (rotación diaria, retención 6 meses, ADR-0047).
     // Se monta lo primero para capturar el arranque. El guard se mantiene vivo toda la función
@@ -203,8 +204,13 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             .into());
     }
     eprintln!("db: backend Postgres vía HUB_DATABASE_URL");
-    let db: Box<dyn erplora_db::DatabaseAdapter> =
-        Box::new(erplora_db::PgAdapter::connect(&dsn).await?);
+    let db = erplora_db::PgAdapter::connect(&dsn).await?;
+    // Comparte el mismo PgPool que el runtime (clonar PgAdapter clona el handle, no abre otro
+    // pool): el corpus de routing sobrevive reinicios sin consumir conexiones adicionales.
+    let vector_store = PgVectorStore::new(Box::new(db.clone()));
+    vector_store.ensure_schema().await?;
+    let vector_store: state::SharedVectorStore = std::sync::Arc::new(vector_store);
+    let db: Box<dyn erplora_db::DatabaseAdapter> = Box::new(db);
     // Identidad viva: en Cloud nace del deployment; en el primer arranque Tauri la aporta el
     // shell y puede pasar del placeholder al UUID registrado sin reiniciar.
     let hub_id_cell = cfg
@@ -279,17 +285,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     }
     eprintln!("auth: modo {:?}", cfg.hub.auth_mode);
 
-    // Índice vectorial del asistente (§9.2b routing + §9.6 ingestión). Hoy **None**: el store
-    // pgvector para Postgres es un follow-up (ADR-0154; hub#204 / pm#29). Mientras tanto el
-    // asistente degrada a "todos los tools" (§9.5). La generación de embeddings sigue yendo por el
-    // Cloud (§9.3). TODO(humano): `PgVectorStore` (pgvector) para el índice de routing/RAG.
-    let vector_store: Option<state::SharedVectorStore> = None;
-
     // Celda del token de máquina: externa (compartida con el shell Tauri para hot-reload) o propia.
-    let mut state = AppState::with_config_cells(runtime, cfg.hub, machine_token_cell, hub_id_cell);
-    if let Some(vs) = vector_store {
-        state = state.with_vector(vs);
-    }
+    let state = AppState::with_config_cells(runtime, cfg.hub, machine_token_cell, hub_id_cell)
+        .with_vector(vector_store);
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
@@ -1008,8 +1006,18 @@ async fn request_install(
             // instalación (el módulo ya está instalado y operativo; el router degrada a "todos").
             let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
             drop(rt);
-            if !chunks.is_empty() {
-                if let Some(store) = &st.vector {
+            if let Some(store) = &st.vector {
+                if chunks.is_empty() {
+                    // Un upgrade también puede retirar todo el bloque agent/ai: limpia el corpus
+                    // anterior aunque ya no haya textos nuevos que mandar al Cloud.
+                    if let Err(e) = embed::drop_module(
+                        store.as_ref(),
+                        &st.hub_id(),
+                        &installed.module_id,
+                    ).await {
+                        tracing::warn!(module_id = %installed.module_id, error = %e, "limpieza de embeddings obsoletos falló (no crítico)");
+                    }
+                } else {
                     let embedder = embed::CloudEmbedder::new(
                         st.http.clone(),
                         &st.config.cloud_base_url,
@@ -1031,9 +1039,9 @@ async fn request_install(
                             tracing::warn!(module_id = %installed.module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)")
                         }
                     }
-                } else {
-                    tracing::info!(module_id = %installed.module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
                 }
+            } else if !chunks.is_empty() {
+                tracing::info!(module_id = %installed.module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
             }
 
             // Evento WS con la forma exacta del contrato del frontend.

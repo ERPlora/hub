@@ -88,8 +88,9 @@ fn chunk_id(hub_id: &str, module_id: &str, source: &str) -> String {
     format!("{hub_id}:{module_id}:{source}")
 }
 
-/// Embebe los `chunks` recolectados de un módulo (vía Cloud) y los registra en `store`
-/// (ARQUITECTURA.md §9.6). Idempotente: re-instalar un módulo re-embebe y reemplaza sus filas.
+/// Embebe los `chunks` recolectados de un módulo (vía Cloud) y reemplaza su corpus en `store`
+/// (ARQUITECTURA.md §9.6). Idempotente: instalar/actualizar borra los chunks de la versión
+/// anterior antes de insertar el nuevo conjunto, por lo que también desaparecen sources retirados.
 ///
 /// `version`/`lang` viajan a cada [`Chunk`] (per-version, §9.4). Si `chunks` está vacío
 /// (módulo sin bloque `ai`/`agent`), no se llama al Cloud y no se indexa nada.
@@ -111,6 +112,11 @@ pub async fn index_chunks<S: VectorStore + ?Sized>(
             got: vectors.len(),
         });
     }
+
+    // El batch remoto ya está validado: ahora limpia el corpus anterior del módulo. Hacerlo tras
+    // obtener todos los embeddings conserva el índice viejo si el Cloud está temporalmente caído
+    // y evita chunks huérfanos cuando una query/command desaparece en un upgrade.
+    store.delete_by_ref(hub_id, &chunks[0].module_id).await?;
 
     let mut n = 0usize;
     for (chunk, embedding) in chunks.iter().zip(vectors) {
@@ -240,6 +246,25 @@ mod tests {
             2,
             "upsert por id estable, no duplica al reinstalar"
         );
+    }
+
+    #[tokio::test]
+    async fn upgrade_removes_sources_that_disappeared() {
+        let s = store().await;
+        let emb = MockEmbedder::new();
+        index_chunks(&emb, &s, "h1", "1.0.0", &chunks()).await.unwrap();
+
+        let upgraded = vec![PendingChunk {
+            module_id: "inventory".into(),
+            source: "agent".into(),
+            content: "Manage inventory".into(),
+        }];
+        index_chunks(&emb, &s, "h1", "2.0.0", &upgraded).await.unwrap();
+
+        let all = s.search("h1", &[1.0, 1.0, 0.0], 100, None).await.unwrap();
+        assert_eq!(all.len(), 1, "el source query retirado no puede quedar huérfano");
+        assert_eq!(all[0].chunk.source, "agent");
+        assert_eq!(all[0].chunk.version, "2.0.0");
     }
 
     #[tokio::test]

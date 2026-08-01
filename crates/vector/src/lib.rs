@@ -6,24 +6,19 @@
 //! so a linear scan is fast enough and needs no native index.
 //!
 //! The former SQLite-backed local store was **removed** with ADR-0154 (the hub is now
-//! Postgres-only; there is no local SQLite database). The reference/test implementation
-//! is [`MemoryVectorStore`], a pure in-memory store with **no** database dependency.
-//!
-//! The production store is a **Postgres/pgvector** implementation (`embedding vector(1536)`
-//! + HNSW index, ARQUITECTURA.md §9.4) tracked as a follow-up (hub#204 / pm#29). It will
-//! sit behind this same [`VectorStore`] trait and reuse [`VectorError::Db`] as its error
-//! contract.
+//! Postgres-only; there is no local SQLite database). [`PgVectorStore`] is the production
+//! implementation; [`MemoryVectorStore`] remains the reference/test implementation.
 
 use async_trait::async_trait;
 use erplora_db::DbError;
 use std::sync::Mutex;
 use thiserror::Error;
 
+mod postgres;
+pub use postgres::PgVectorStore;
+
 #[derive(Debug, Error)]
 pub enum VectorError {
-    /// Reserved for the Postgres/pgvector store (hub#204 / pm#29): the error contract for
-    /// the future `PgVectorStore`. `MemoryVectorStore` never fails, so it is unused today.
-    #[allow(dead_code)]
     #[error("db error: {0}")]
     Db(#[from] DbError),
     #[error("serialization error: {0}")]

@@ -213,6 +213,7 @@ macro_rules! build_query {
 /// Postgres backend over `PgPool`. `max_connections` is injected via environment at
 /// construction ([`PG_MAX_CONNECTIONS_ENV`], per plan, managed by the SaaS); the rest of the
 /// pool tuning (TLS, timeouts) is pending (§8).
+#[derive(Clone)]
 pub struct PgAdapter {
     pool: PgPool,
 }

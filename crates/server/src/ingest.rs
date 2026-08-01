@@ -4,11 +4,9 @@
 //! nivel 1) y cada bloque `ai.description` de sus queries/commands (tools de nivel 2) — y lo
 //! preparamos para el índice vectorial local (`erplora-vector`).
 //!
-//! ⚠️ **El embedding se obtiene SIEMPRE vía el proxy del Cloud** (§9.3 — el Hub nunca llama a
-//! un proveedor de embeddings directamente). Ese endpoint de proxy aún no está cableado aquí,
-//! así que esta función **recoge y devuelve el texto a indexar** (listo para upsert) y deja la
-//! obtención del vector marcada como pendiente: "wired to Cloud, pending". NO se inventa un
-//! embedding local ni se llama a ningún LLM.
+//! El embedding se obtiene SIEMPRE vía el proxy del Cloud (§9.3 — el Hub nunca llama a un
+//! proveedor directamente). [`crate::embed::index_chunks`] consume esta recolección, obtiene el
+//! batch de vectores del Cloud y reemplaza el índice persistente del módulo.
 
 use erplora_runtime::Registry;
 
@@ -26,8 +24,8 @@ pub struct PendingChunk {
 /// Recoge los textos del asistente del módulo recién instalado.
 ///
 /// Se queda con la `agent.description` del manifest y las `ai.description` de las queries y
-/// commands que aportó ese módulo. El llamador (server) debe, cuando el proxy de embeddings
-/// del Cloud esté disponible, pedir el vector de cada `content` y hacer `VectorStore::upsert`.
+/// commands que aportó ese módulo. El server pide después un vector por `content` y persiste el
+/// conjunto mediante `VectorStore::upsert`.
 pub fn collect_chunks(registry: &Registry, module_id: &str) -> Vec<PendingChunk> {
     let mut out = Vec::new();
 

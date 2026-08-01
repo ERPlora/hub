@@ -12,4 +12,5 @@ thiserror = "1"
 async-trait = "0.1"
 
 [dev-dependencies]
+erplora-db = { path = "../db", features = ["test-util"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
