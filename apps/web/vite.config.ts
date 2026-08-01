@@ -8,6 +8,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 
+const RUNTIME_PROXY_TARGET =
+  process.env.VITE_RUNTIME_PROXY_TARGET || 'http://127.0.0.1:8787';
+
 // Versión de la app, horneada en build → la lee el footer del sidebar vía `__APP_VERSION__`.
 // Orden de prioridad: env APP_VERSION (CI) > git tag más reciente > package.json.
 // package.json es "0.0.0" a propósito (monorepo); la versión real viene de los tags git.
@@ -107,8 +110,8 @@ export default defineConfig({
         secure: false,
         rewrite: (p) => p.replace(/^\/cloud/, ''),
       },
-      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/ws': { target: 'http://127.0.0.1:8787', changeOrigin: true, ws: true },
+      '/api': { target: RUNTIME_PROXY_TARGET, changeOrigin: true },
+      '/ws': { target: RUNTIME_PROXY_TARGET, changeOrigin: true, ws: true },
     },
   },
 });

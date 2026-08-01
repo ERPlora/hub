@@ -4,8 +4,8 @@
 import { expect, request as pwRequest, test, type Page, type Request } from '@playwright/test';
 import { resolve } from 'node:path';
 
-const RUNTIME = 'http://127.0.0.1:8787';
-const CLOUD = 'http://127.0.0.1:18991';
+const RUNTIME = `http://127.0.0.1:${process.env.ASSISTANT_E2E_RUNTIME_PORT ?? '8787'}`;
+const CLOUD = `http://127.0.0.1:${process.env.ASSISTANT_E2E_CLOUD_PORT ?? '18991'}`;
 const HUB_ID = 'assistant-e2e-hub';
 const FIXTURE = resolve(process.cwd(), '../../crates/server/tests/fixture_assistant');
 
@@ -50,6 +50,15 @@ async function observations() {
   }>;
 }
 
+async function indexedRows() {
+  const response = await fetch(`${CLOUD}/__index`);
+  const text = await response.text();
+  expect(response.ok, `inspección knowledge_chunk falló: ${text}`).toBeTruthy();
+  return (JSON.parse(text) as {
+    rows: Array<{ refId: string; source: string; version: string }>;
+  }).rows;
+}
+
 function rpcCapture(request: Request) {
   const path = new URL(request.url()).pathname;
   if (request.method() !== 'POST' || !['/api/query', '/api/command'].includes(path)) return null;
@@ -64,6 +73,16 @@ test('tool routing + install/reindex/uninstall con query y command reales', asyn
   const installed = await moduleAction(session, '/api/modules/install', { dir: FIXTURE });
   expect(installed.ok, `install falló (${installed.status}): ${installed.text}`).toBeTruthy();
   await expect.poll(async () => (await observations()).embeddings.length).toBeGreaterThan(0);
+  const firstIndex = await indexedRows();
+  expect(firstIndex).toHaveLength(3); // agent + query + command, persistidos en PostgreSQL real
+  expect(firstIndex.every((row) => row.refId === 'assistant_fixture')).toBe(true);
+
+  // Reinstalar ejerce el camino real de reindex: los ids estables se reemplazan, no se duplican.
+  const embeddingCallsBeforeReindex = (await observations()).embeddings.length;
+  const reinstalled = await moduleAction(session, '/api/modules/install', { dir: FIXTURE });
+  expect(reinstalled.ok, `reinstall falló (${reinstalled.status}): ${reinstalled.text}`).toBeTruthy();
+  await expect.poll(async () => (await observations()).embeddings.length).toBeGreaterThan(embeddingCallsBeforeReindex);
+  expect(await indexedRows()).toEqual(firstIndex);
 
   const rpc: NonNullable<ReturnType<typeof rpcCapture>>[] = [];
   const assistantHeaders: Array<Record<string, string>> = [];
@@ -116,6 +135,7 @@ test('tool routing + install/reindex/uninstall con query y command reales', asyn
 
   const removed = await moduleAction(session, '/api/modules/assistant_fixture/uninstall');
   expect(removed.ok, `uninstall falló (${removed.status}): ${removed.text}`).toBeTruthy();
+  await expect.poll(async () => (await indexedRows()).length).toBe(0);
   await fetch(`${CLOUD}/__reset`, { method: 'POST' });
   await input.fill('NO TOOLS');
   await send.click();

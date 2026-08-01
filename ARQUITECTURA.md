@@ -61,15 +61,18 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    `POST /api/query`, `POST /api/command`, `GET /api/navigation`, `GET /api/modules`, `GET /ws`.
    `[✓ verificado: query/command ejecutan SQL real con scoping hub_id]`
 
-3. **`hub_id` inyectado por despliegue (1 contenedor = 1 hub)** — el server lee `HUB_ID` del entorno
-   y lo expone en **`GET /api/hub/context` → `{hub_id, user}`**; `apps/web` lo resuelve al arrancar
-   (`bootHubContext`) y lo envía como **`X-Hub-Id`** en toda llamada. **No hay selector de hub.** Liga
+3. **`hub_id` autoritativo del host (single-tenant)** — el server lee `HUB_ID` del entorno y lo
+   expone en **`GET /api/hub/context` → `{hub_id, user}`**; `apps/web` lo refleja como `X-Hub-Id`,
+   pero la cabecera **no elige** tenant: si diverge del host, Axum responde `403` antes de tocar BD o
+   credenciales Cloud. En el gateway compartido la cabecera es solo una pista para localizar el
+   pool; una sesión debe resolver dentro de ese tenant antes de ejecutar nada. El token de máquina
+   global nunca se combina con una pista aportada por el cliente. **No hay selector de hub.** Liga
    con la tenancy de §2.5. `[✓ verificado]`
 
 4. **Login de usuario real contra el SaaS** — `POST /api/v1/auth/login/` + `GET /api/v1/auth/me/`;
    tokens en `localStorage` (`erplora.access`/`erplora.refresh`); **interceptor refresh-en-401** con
    rotación de ambos tokens y un reintento (`POST /api/v1/auth/refresh/`); `X-Hub-Id` en todas. El
-   **fallback demo** queda SOLO tras `VITE_DEMO=1` (producción falla duro). Contrato en §2.3. **Server-side (modelo decidido + implementado, §2.9):** la autoridad de identidad/permisos es **local**. Login por **PIN** o por **JWT de usuario cloud** (verificado RS256 → mapeado a un `hub_user` local) abre una **sesión server-side** (`HUB_AUTH=session`); cada petición lleva `X-Hub-Session` y el runtime resuelve `hub_user` → **permisos del rol** (`role_permissions` de los módulos activos). `hub_id` del despliegue. Verificado vivo: gate por rol real (employee `list`→200, `create`→403). Pendiente menor: argon2id para el PIN; gestión de usuarios/roles (UI admin); credencial de dispositivo de confianza (§14).
+   **fallback demo** queda SOLO tras `VITE_DEMO=1` (producción falla duro). Contrato en §2.3. **Server-side (modelo decidido + implementado, §2.9):** la autoridad de identidad/permisos es **local**. Login por **PIN** o por **JWT de usuario cloud** (verificado RS256 → mapeado a un `hub_user` local) abre una **sesión server-side** (`HUB_AUTH=session`); cada petición lleva `X-Hub-Session` y el runtime resuelve `hub_user` → **permisos del rol** (`role_permissions` de los módulos activos). `hub_id` sale del host en single-tenant; en multi-tenant la sesión se valida en el pool resuelto antes de aceptar la pista. Verificado vivo: gate por rol real (employee `list`→200, `create`→403), PIN argon2id y rechazo cross-tenant. Pendiente: vault/rotación de credenciales por tenant para llamadas machine-to-machine del gateway compartido; mientras no exista, ese camino falla cerrado y requiere credencial de usuario verificable por Cloud.
 
 5. **Instalación de módulos por el marketplace (API real del SaaS)** — flujo: `GET
    /api/v1/marketplace/modules/{id}/versions/` (sha256) → `GET .../download/?version=` (zip binario) →
@@ -87,9 +90,11 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    Su billing es **propio** (`AssistantTier`/`AssistantUsage`, capa gratis con tope + upgrade), fuera de
    `ModulePurchase`/`is_module_entitled`. Su WC alcanza el LLM del SaaS por una **capacidad de host**:
    `POST /api/assistant/chat/stream` del runtime, que hace de **proxy SSE** hacia el SaaS
-   (`/api/v1/hub/device/assistant/chat/stream/`, reenvía `Authorization: Bearer` + `X-Hub-Id`)
+   (`/api/v1/hub/device/assistant/chat/stream/`, firmado server-side con la credencial del host
+   single-tenant, o con JWT de usuario en gateway compartido)
    con **ensamblado de tools por permiso** (solo queries/commands con bloque `ai:` que el usuario puede
-   ejecutar, §9.2). El Hub nunca habla con el LLM directo (§9.3); embeddings/RAG por el proxy del SaaS
+   ejecutar, §9.2). El router vectorial busca exclusivamente entre esos módulos autorizados, por lo
+   que un módulo prohibido no puede consumir el top-K. El Hub nunca habla con el LLM directo (§9.3); embeddings/RAG por el proxy del SaaS
    (§9.4/§9.6). La UI de chat de referencia quedó en `apps/web/src/parked/AssistantChat.vue`.
 
 7. **Modelo de eventos del runtime = Outbox transaccional (entrega asíncrona at-least-once)** — ver
@@ -520,7 +525,7 @@ local.
 | Bundles UI de módulos | **HTTP/CDN** |
 | Descarga `module.zip` | **HTTP** (Object Storage) |
 | Exports PDF/Excel | **HTTP** |
-| SaaS (marketplace, billing, embeddings/LLM) | **HTTP REST** (user-JWT + `X-Hub-Id`) |
+| SaaS (marketplace, billing, embeddings/LLM) | **HTTP REST server-side** (token de máquina ligado al `HUB_ID` del host; en gateway compartido, JWT de usuario tras validar sesión/tenant) |
 
 > **Canal de hardware (modelo decidido, [ADR-0050](../architecture/00-overview/decision-log.md)):**
 > el hardware lo aporta el **Bridge standalone** (red-only), alcanzado por `http://localhost` /

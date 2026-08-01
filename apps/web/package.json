@@ -12,7 +12,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
-    "test:e2e:assistant": "playwright test --config tests/playwright.assistant.config.ts",
+    "test:e2e:assistant": "node tests/e2e/support/run-assistant-e2e.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

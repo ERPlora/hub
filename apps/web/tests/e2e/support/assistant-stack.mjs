@@ -7,10 +7,30 @@ const root = fileURLToPath(new URL('../../../../../', import.meta.url));
 const webDir = resolve(root, 'apps/web');
 const fixtureRoot = resolve(root, 'crates/server/tests');
 const seed = resolve(root, 'crates/server/seeds/demo.sql');
-const cloudPort = 18991;
-const pgPort = 55_000 + (process.pid % 1_000);
+const port = (name, fallback) => {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isInteger(value) || value < 1 || value > 65_535) throw new Error(`${name} inválido`);
+  return value;
+};
+const cloudPort = port('ASSISTANT_E2E_CLOUD_PORT', 18991);
+const pgPort = port('ASSISTANT_E2E_PG_PORT', 55432);
+const runtimePort = port('ASSISTANT_E2E_RUNTIME_PORT', 8787);
+const webPort = port('ASSISTANT_E2E_WEB_PORT', 5173);
 const children = [];
 let observations = { embeddings: [], assistant: [] };
+
+function inspectIndex() {
+  const sql = "SELECT ref_id, source, version FROM knowledge_chunk WHERE hub_id = 'assistant-e2e-hub' ORDER BY ref_id, source";
+  const command = dockerName
+    ? ['docker', ['exec', dockerName, 'psql', '-U', 'postgres', '-d', 'erplora_assistant_e2e', '-At', '-F', '\t', '-c', sql]]
+    : ['psql', [databaseUrl, '-At', '-F', '\t', '-c', sql]];
+  const result = spawnSync(command[0], command[1], { encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(result.stderr || 'no se pudo inspeccionar knowledge_chunk');
+  return result.stdout.trim().split('\n').filter(Boolean).map((line) => {
+    const [refId, source, version] = line.split('\t');
+    return { refId, source, version };
+  });
+}
 
 function json(res, status, value) {
   res.writeHead(status, { 'content-type': 'application/json' });
@@ -30,6 +50,10 @@ function readJson(req) {
 
 const cloud = createServer(async (req, res) => {
   if (req.url === '/__observations' && req.method === 'GET') return json(res, 200, observations);
+  if (req.url === '/__index' && req.method === 'GET') {
+    try { return json(res, 200, { rows: inspectIndex() }); }
+    catch (error) { return json(res, 500, { error: String(error) }); }
+  }
   if (req.url === '/__reset' && req.method === 'POST') {
     observations = { embeddings: [], assistant: [] };
     return json(res, 200, { ok: true });
@@ -152,14 +176,17 @@ process.on('exit', () => {
   if (dockerName) spawnSync('docker', ['rm', '-f', dockerName], { stdio: 'ignore' });
 });
 
-cloud.listen(cloudPort, '127.0.0.1');
 const databaseUrl = await provisionDatabase();
+await new Promise((resolveListen, reject) => {
+  cloud.once('error', reject);
+  cloud.listen(cloudPort, '127.0.0.1', resolveListen);
+});
 run('cargo', ['run', '-p', 'erplora-server'], {
   cwd: root,
   env: {
     ...process.env,
     HUB_DATABASE_URL: databaseUrl,
-    HUB_BIND: '127.0.0.1:8787',
+    HUB_BIND: `127.0.0.1:${runtimePort}`,
     HUB_AUTH: 'session',
     HUB_ID: 'assistant-e2e-hub',
     HUB_DEV_MODE: '1',
@@ -171,10 +198,13 @@ run('cargo', ['run', '-p', 'erplora-server'], {
     HUB_ASSISTANT_ROUTE_MIN_MODULES: '1',
   },
 });
-run('pnpm', ['exec', 'vite', '--host', '127.0.0.1', '--port', '5173'], { cwd: webDir, env: process.env });
+run('pnpm', ['exec', 'vite', '--host', '127.0.0.1', '--port', String(webPort), '--strictPort'], {
+  cwd: webDir,
+  env: { ...process.env, VITE_RUNTIME_PROXY_TARGET: `http://127.0.0.1:${runtimePort}` },
+});
 await Promise.all([
-  waitFor('http://127.0.0.1:8787/healthz'),
-  waitFor('http://127.0.0.1:5173'),
+  waitFor(`http://127.0.0.1:${runtimePort}/healthz`),
+  waitFor(`http://127.0.0.1:${webPort}`),
 ]);
 console.log('assistant E2E stack ready');
 await new Promise(() => {});
