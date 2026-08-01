@@ -5,9 +5,7 @@
 // Contrato backend:
 //   POST /api/assistant/chat/stream  {messages:[{role,content}]}
 //   -> SSE: líneas `data: {"type":"token","text":"…"}` … `data: {"type":"done"}`
-import { RUNTIME_URL, getClient } from './runtime';
-import { config } from './config';
-import { getAccessToken } from './cloud';
+import { RUNTIME_URL, getClient, runtimeHeaders } from './runtime';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
@@ -211,13 +209,19 @@ async function streamRound(
   const functionCalls: FunctionCall[] = [];
   let text = '';
 
+  // `runtimeHeaders()`, el MISMO helper que el resto de `/api/*`, y NO cabeceras a mano: este
+  // endpoint lo sirve el RUNTIME del hub, que exige la sesión local (`X-Hub-Session`, la autoridad
+  // de permisos local, ARQUITECTURA.md §2.9). Aquí se montaba a mano y se mandaba
+  // `Authorization: Bearer <JWT del cloud>` — otra credencial y para otro interlocutor: el JWT
+  // cloud es el adaptador de LOGIN, no la sesión. Cada mensaje respondía
+  // `401 {"error":"falta sesión (cabecera X-Hub-Session)"}` y el chat decía «No se pudo contactar
+  // con el asistente». El helper sigue mandando el JWT como fallback hub-scoped, así que no se
+  // pierde nada.
   const headers: Record<string, string> = {
+    ...runtimeHeaders(),
     'Content-Type': 'application/json',
     Accept: 'text/event-stream',
   };
-  if (config.hubId) headers['X-Hub-Id'] = config.hubId;
-  const token = getAccessToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${RUNTIME_URL}/api/assistant/chat/stream`, {
     method: 'POST',
