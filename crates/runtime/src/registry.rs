@@ -195,6 +195,19 @@ impl Registry {
             .count()
     }
 
+    /// Ids de módulos activos, en orden estable. El router vectorial usa esta lista como
+    /// allow-list: un embedding antiguo de un módulo desactivado nunca debe volver a ofrecer sus
+    /// tools al asistente.
+    pub fn active_module_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .status
+            .iter()
+            .filter_map(|(id, status)| matches!(status, ModuleStatus::Active).then(|| id.clone()))
+            .collect();
+        ids.sort();
+        ids
+    }
+
     /// Query registrada, **solo si su módulo está activo** (hot-plug).
     pub fn get_query(&self, name: &str) -> Option<&RegisteredQuery> {
         self.queries
@@ -526,6 +539,19 @@ mod tests {
             },
         );
         reg
+    }
+
+    #[test]
+    fn active_module_ids_are_sorted_and_exclude_inactive_modules() {
+        let mut reg = Registry::new();
+        reg.status
+            .insert("sales".to_string(), ModuleStatus::Inactive);
+        reg.status
+            .insert("inventory".to_string(), ModuleStatus::Active);
+        reg.status
+            .insert("customers".to_string(), ModuleStatus::Active);
+
+        assert_eq!(reg.active_module_ids(), vec!["customers", "inventory"]);
     }
 
     /// (d) hub#131/#145 — un command "privado por convención" (último segmento con `_`, estilo

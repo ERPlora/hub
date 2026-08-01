@@ -1487,7 +1487,7 @@ async fn assistant_chat_stream(
             Err(e) => return unauthorized(e),
         };
         let tools = assistant::assemble_tools(rt.registry(), &ctx);
-        let active = rt.registry().active_module_count();
+        let active = rt.registry().active_module_ids();
         (tools, ctx.user_id.clone(), active)
     };
 
@@ -1506,7 +1506,7 @@ async fn assistant_chat_stream(
                 &st.hub_id(),
                 &query,
                 all_tools,
-                active_modules,
+                &active_modules,
                 router::RouterConfig::default(),
             )
             .await

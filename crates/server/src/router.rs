@@ -21,8 +21,9 @@ use serde_json::Value;
 
 use crate::embed::Embedder;
 
-/// Política del router. `top_k` = nº de chunks a recuperar; `min_modules_to_route` = umbral por
-/// debajo del cual NO se enruta (con pocos módulos sale más barato mandarlos todos, §9.2b).
+/// Política del router. `top_k` = nº máximo de módulos a cargar; `min_modules_to_route` =
+/// umbral por debajo del cual NO se enruta (con pocos módulos sale más barato mandarlos todos,
+/// §9.2b).
 #[derive(Debug, Clone, Copy)]
 pub struct RouterConfig {
     pub top_k: usize,
@@ -32,9 +33,10 @@ pub struct RouterConfig {
 impl Default for RouterConfig {
     fn default() -> Self {
         // Umbral conservador: con <8 módulos el coste del embedding por petición no compensa
-        // (§9.2b "el vector gana a escala"). top_k holgado para no perder un módulo relevante.
+        // (§9.2b "el vector gana a escala"). top_k limita módulos, no chunks: un módulo puede
+        // tener varias descripciones indexadas sin comerse por sí solo todo el resultado.
         Self {
-            top_k: 24,
+            top_k: 8,
             min_modules_to_route: 8,
         }
     }
@@ -51,19 +53,22 @@ impl Default for RouterConfig {
 ///  - `Err` — fallo de red/embedding o del store; el llamador decide (típicamente: degradar a
 ///    "todos los tools" para no romper el asistente por un fallo del prefiltro).
 ///
-/// `installed_module_count` lo pasa el llamador (= nº de módulos activos) para aplicar el umbral
-/// sin acoplar el router al `Registry`.
+/// `active_module_ids` lo pasa el llamador para aplicar el umbral sin acoplar el router al
+/// `Registry` y para excluir del search cualquier corpus residual de módulos desactivados.
 pub async fn route_modules<S: VectorStore + ?Sized>(
     embedder: &dyn Embedder,
     store: &S,
     hub_id: &str,
     query: &str,
-    installed_module_count: usize,
+    active_module_ids: &[String],
     cfg: RouterConfig,
 ) -> Result<Option<Vec<String>>, RouterError> {
     let query = query.trim();
-    if query.is_empty() || installed_module_count < cfg.min_modules_to_route {
+    if query.is_empty() || active_module_ids.len() < cfg.min_modules_to_route {
         return Ok(None);
+    }
+    if cfg.top_k == 0 {
+        return Ok(Some(Vec::new()));
     }
 
     let mut vectors = embedder
@@ -74,21 +79,31 @@ pub async fn route_modules<S: VectorStore + ?Sized>(
         _ => return Ok(None), // el Cloud no devolvió embedding → degradar a "todos".
     };
 
-    let hits = store.search(hub_id, &query_vec, cfg.top_k, None).await?;
+    // Recuperamos todos los chunks de los módulos activos y aplicamos top-K DESPUÉS de
+    // deduplicar por módulo. Pedir solo K chunks era incorrecto: varias descripciones del primer
+    // módulo podían ocupar todas las plazas y devolver menos de K módulos relevantes.
+    let hits = store
+        .search(hub_id, &query_vec, usize::MAX, Some(active_module_ids))
+        .await?;
     if hits.is_empty() {
         // Índice vacío (nada indexado todavía) → degradar a "todos" en vez de "ninguno".
         return Ok(None);
     }
 
-    // Deduplica `ref_id` (= module_id) preservando el orden por score descendente.
-    let mut seen = std::collections::HashSet::new();
-    let mut modules = Vec::new();
+    // Conserva el mejor score de cada `ref_id` (= module_id). El desempate por id hace estable el
+    // resultado también con Postgres, cuyo orden de filas sin ORDER BY no está definido.
+    let mut best_scores = std::collections::HashMap::new();
     for h in hits {
-        if seen.insert(h.chunk.ref_id.clone()) {
-            modules.push(h.chunk.ref_id);
-        }
+        best_scores.entry(h.chunk.ref_id).or_insert(h.score);
     }
-    Ok(Some(modules))
+    let mut scored_modules: Vec<(String, f32)> = best_scores.into_iter().collect();
+    scored_modules.sort_by(|(id_a, score_a), (id_b, score_b)| {
+        score_b.total_cmp(score_a).then_with(|| id_a.cmp(id_b))
+    });
+    scored_modules.truncate(cfg.top_k);
+    Ok(Some(
+        scored_modules.into_iter().map(|(id, _)| id).collect(),
+    ))
 }
 
 /// Error del router (red/embedding o store). Se mantiene separado de `EmbedError` para que el
@@ -127,10 +142,10 @@ pub async fn assemble_routed_tools<S: VectorStore + ?Sized>(
     hub_id: &str,
     query: &str,
     all_tools: Vec<Value>,
-    installed_module_count: usize,
+    active_module_ids: &[String],
     cfg: RouterConfig,
 ) -> Vec<Value> {
-    match route_modules(embedder, store, hub_id, query, installed_module_count, cfg).await {
+    match route_modules(embedder, store, hub_id, query, active_module_ids, cfg).await {
         Ok(allowed) => filter_tools_by_modules(all_tools, allowed.as_deref()),
         Err(e) => {
             tracing::warn!(error = %e, "router vectorial falló; degradando a todas las tools");
@@ -190,6 +205,10 @@ mod tests {
         s
     }
 
+    fn active(ids: &[&str]) -> Vec<String> {
+        ids.iter().map(|id| (*id).to_string()).collect()
+    }
+
     #[tokio::test]
     async fn routes_to_relevant_module() {
         let s = indexed_store().await;
@@ -197,12 +216,13 @@ mod tests {
             top_k: 1,
             min_modules_to_route: 1,
         };
+        let active_modules = active(&["inventory", "sales", "customers"]);
         let modules = route_modules(
             &KeywordEmbedder,
             &s,
             "h1",
             "how much stock of this product?",
-            3,
+            &active_modules,
             cfg,
         )
         .await
@@ -216,7 +236,8 @@ mod tests {
         let s = indexed_store().await;
         // 3 módulos < umbral 8 → None (mandar todos, no enrutar).
         let cfg = RouterConfig::default();
-        let r = route_modules(&KeywordEmbedder, &s, "h1", "stock?", 3, cfg)
+        let active_modules = active(&["inventory", "sales", "customers"]);
+        let r = route_modules(&KeywordEmbedder, &s, "h1", "stock?", &active_modules, cfg)
             .await
             .unwrap();
         assert!(r.is_none());
@@ -229,10 +250,13 @@ mod tests {
             top_k: 5,
             min_modules_to_route: 1,
         };
-        assert!(route_modules(&KeywordEmbedder, &s, "h1", "   ", 99, cfg)
-            .await
-            .unwrap()
-            .is_none());
+        let active_modules = active(&["inventory"]);
+        assert!(
+            route_modules(&KeywordEmbedder, &s, "h1", "   ", &active_modules, cfg)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -243,11 +267,103 @@ mod tests {
             top_k: 5,
             min_modules_to_route: 1,
         };
-        // Muchos módulos "instalados" pero índice vacío → None (degrada a todos), no [].
-        assert!(route_modules(&KeywordEmbedder, &s, "h1", "stock?", 50, cfg)
+        // Hay módulos activos pero el índice está vacío → None (degrada a todos), no [].
+        let active_modules = active(&["inventory"]);
+        assert!(
+            route_modules(&KeywordEmbedder, &s, "h1", "stock?", &active_modules, cfg,)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn search_excludes_inactive_module_embeddings() {
+        let s = indexed_store().await;
+        let cfg = RouterConfig {
+            top_k: 2,
+            min_modules_to_route: 1,
+        };
+        let active_modules = active(&["sales", "customers"]);
+
+        let modules = route_modules(
+            &KeywordEmbedder,
+            &s,
+            "h1",
+            "stock of a product",
+            &active_modules,
+            cfg,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(modules.len(), 2);
+        assert!(modules.iter().all(|id| active_modules.contains(id)));
+        assert!(!modules.iter().any(|id| id == "inventory"));
+    }
+
+    #[tokio::test]
+    async fn top_k_counts_unique_modules_not_chunks() {
+        let s = MemoryVectorStore::new();
+        s.ensure_schema().await.unwrap();
+        let chunks = vec![
+            PendingChunk {
+                module_id: "inventory".into(),
+                source: "agent".into(),
+                content: "products and stock".into(),
+            },
+            PendingChunk {
+                module_id: "inventory".into(),
+                source: "query:products.list".into(),
+                content: "list products in stock".into(),
+            },
+            PendingChunk {
+                module_id: "inventory".into(),
+                source: "command:stock.adjust".into(),
+                content: "adjust product stock".into(),
+            },
+        ];
+        index_chunks(&KeywordEmbedder, &s, "h1", "1.0.0", &chunks)
             .await
-            .unwrap()
-            .is_none());
+            .unwrap();
+        for (id, content) in [
+            ("sales", "create a sale and sell products"),
+            ("customers", "manage customers and clients"),
+        ] {
+            index_chunks(
+                &KeywordEmbedder,
+                &s,
+                "h1",
+                "1.0.0",
+                &[PendingChunk {
+                    module_id: id.into(),
+                    source: "agent".into(),
+                    content: content.into(),
+                }],
+            )
+            .await
+            .unwrap();
+        }
+        let cfg = RouterConfig {
+            top_k: 2,
+            min_modules_to_route: 1,
+        };
+        let active_modules = active(&["inventory", "sales", "customers"]);
+
+        let modules = route_modules(
+            &KeywordEmbedder,
+            &s,
+            "h1",
+            "product stock",
+            &active_modules,
+            cfg,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(modules, vec!["inventory", "sales"]);
     }
 
     #[test]
@@ -280,9 +396,17 @@ mod tests {
             top_k: 1,
             min_modules_to_route: 1,
         };
-        let routed =
-            assemble_routed_tools(&KeywordEmbedder, &s, "h1", "stock of product", all, 3, cfg)
-                .await;
+        let active_modules = active(&["inventory", "sales", "customers"]);
+        let routed = assemble_routed_tools(
+            &KeywordEmbedder,
+            &s,
+            "h1",
+            "stock of product",
+            all,
+            &active_modules,
+            cfg,
+        )
+        .await;
         assert_eq!(routed.len(), 1);
         assert_eq!(routed[0]["module_id"], "inventory");
     }
