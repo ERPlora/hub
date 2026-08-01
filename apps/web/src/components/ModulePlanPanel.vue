@@ -131,7 +131,7 @@ const props = defineProps<{
   billing: ModuleBilling;
 }>();
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const sub = ref<CloudModuleSubscription | null>(null);
 const loadingStatus = ref(true);
@@ -173,7 +173,8 @@ const statusHint = computed(() => {
 
 function fmtDate(iso: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+  // #273 — locale de la app (vue-i18n), no del navegador (mezclaba idiomas).
+  return new Date(iso).toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 function fmtMoney(units: number): string {
   return formatAmount(units);

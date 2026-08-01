@@ -141,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -281,7 +281,8 @@ const eur = (n: number, dec = 0): string => formatAmount(n, { maximumFractionDig
 
 // ── Zona 1 — Cabecera contextual: saludo por franja horaria + fecha del día ───────────────────
 // El saludo interpola el nombre del usuario en sesión; si no hay nombre, degrada a '—'. La fecha
-// se formatea con el locale del navegador (es-ES / en-EN…) para respetar el idioma del usuario.
+// sigue el locale de la APP (vue-i18n), no el del navegador (#273): app `es` + navegador `en-US`
+// producía «lunes, July 2026». Mismo `locale.value === 'en' ? 'en-GB' : 'es-ES'` que fmtDateTime.
 const greeting = computed<string>(() => {
   const h = new Date().getHours();
   const name = user.value?.name?.trim() || '—';
@@ -289,7 +290,7 @@ const greeting = computed<string>(() => {
   return t(key, { name });
 });
 const todayLabel = computed<string>(() => {
-  const today = new Date().toLocaleDateString(undefined, {
+  const today = new Date().toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   return `${t('dashboard.todayLabel')}, ${today}`;
@@ -399,7 +400,23 @@ onMounted(async () => {
   void loadSystemHealth();
   void loadActivity();
   void refreshSetupStatus(client); // módulos sin configurar (ADR-0063): banner (solo admin)
+
+  // #267 — tras importar un blueprint el catálogo de widgets y los datos cambian, pero Vue
+  // reutiliza esta instancia (onMounted no vuelve a dispararse). ImportPanel emite este evento al
+  // terminar; aquí recargamos widgets + actividad + salud para no mostrar datos PRE-import.
+  window.addEventListener('erp:modules-changed', onModulesChanged);
 });
+
+onUnmounted(() => {
+  window.removeEventListener('erp:modules-changed', onModulesChanged);
+});
+
+/** Recarga todo lo que depende del conjunto de módulos instalados / datos importados (#267). */
+function onModulesChanged(): void {
+  void loadWidgets();
+  void loadSystemHealth();
+  void loadActivity();
+}
 </script>
 
 <style scoped>

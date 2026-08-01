@@ -40,13 +40,21 @@ function isApiRequest(url) {
   );
 }
 
+// #266 — los bundles de módulos (`/modules/<id>/dist/...`) NO llevan hash en su nombre: se
+// reescriben in-place al reconstruir un módulo. Con SWR el SW serviría uno VIEJO en la primera
+// carga aunque el servidor tuviera uno nuevo (y si el viejo tenía un bug, se reproducía). Van
+// SIEMPRE a la red, como /api.
+function isUnversionedAsset(url) {
+  return url.pathname.startsWith('/modules/');
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  // Cross-origin o API/WS/health: lo gestiona la red/runtime, nunca el SW.
-  if (url.origin !== self.location.origin || isApiRequest(url)) return;
+  // Cross-origin, API/WS/health o assets sin hash (/modules/): lo gestiona la red/runtime, nunca el SW.
+  if (url.origin !== self.location.origin || isApiRequest(url) || isUnversionedAsset(url)) return;
 
   // Navegaciones (SPA): red primero, fallback al index cacheado si no hay red.
   if (req.mode === 'navigate') {
