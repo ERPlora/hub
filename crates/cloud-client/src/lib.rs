@@ -494,8 +494,8 @@ pub struct InstallPlanNode {
     pub reason: String,
     #[serde(default)]
     pub purchase: Option<InstallPlanPurchase>,
-    /// Compatibilidad adelantada con la verificación ed25519 (hub#239). El contrato original
-    /// de ADR-0060 no la incluía; cuando Cloud la entregue se evita el fallback a `versions/`.
+    /// Firma ed25519 detached del ZIP. Es parte del contrato canónico SaaS→Hub: bajo la política
+    /// de producción `Enforce`, su ausencia aborta el plan antes de cualquier descarga.
     #[serde(default)]
     pub signature: Option<ModuleSignature>,
 }

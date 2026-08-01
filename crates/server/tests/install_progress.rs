@@ -3,7 +3,7 @@
 //! callback, incluyendo las dependencias anidadas, para que el server lo retransmita por WS
 //! (`module.install.progress`) y el Hub pinte en la card del catálogo en qué punto está.
 //!
-//! El mock replica las formas EXACTAS de URL que consume `CloudClient` (§2.2): `versions/`,
+//! El mock replica las formas EXACTAS del contrato canónico que consume el Hub: `install-plan/`,
 //! `download/?version=` y `mark_installed/`, sirviendo zips reales con SHA256 correcto para
 //! ejercitar el pipeline completo (ADR-0015: verificación obligatoria) sin red externa.
 
@@ -55,25 +55,39 @@ fn module_zip(id: &str, deps: &[&str]) -> Vec<u8> {
 /// id → (zip, sha256) del catálogo publicado en el mini-Cloud.
 type Catalog = Arc<HashMap<String, (Vec<u8>, String)>>;
 
+#[derive(Clone)]
+struct MockCloudState {
+    catalog: Catalog,
+    installed_requests: Arc<Mutex<Vec<Vec<String>>>>,
+}
+
 /// Levanta el mini-Cloud en un puerto efímero y devuelve su base URL.
-async fn spawn_mock_cloud(catalog: Catalog) -> String {
+async fn spawn_mock_cloud(catalog: Catalog) -> (String, Arc<Mutex<Vec<Vec<String>>>>) {
     async fn install_plan(
-        State(cat): State<Catalog>,
+        State(state): State<MockCloudState>,
         Json(body): Json<serde_json::Value>,
     ) -> Json<serde_json::Value> {
         let requested = body["module_id"].as_str().unwrap_or_default();
-        let ids: Vec<&str> = if requested == "dependent" {
+        let installed: Vec<String> = body["installed"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|value| value.as_str().map(str::to_string))
+            .collect();
+        state.installed_requests.lock().unwrap().push(installed.clone());
+        let mut ids: Vec<&str> = if requested == "dependent" {
             vec!["leaf", "dependent"]
         } else {
             vec![requested]
         };
+        ids.retain(|id| !installed.iter().any(|active| active == id));
         let plan: Vec<_> = ids
             .into_iter()
             .map(|id| {
                 json!({
                     "module_id": id,
                     "version": "1.0.0",
-                    "sha256": cat.get(id).map(|(_, s)| s.clone()).unwrap_or_default(),
+                    "sha256": state.catalog.get(id).map(|(_, s)| s.clone()).unwrap_or_default(),
                     "tier": "free",
                     "entitled": true,
                     "requires_purchase": false,
@@ -84,37 +98,38 @@ async fn spawn_mock_cloud(catalog: Catalog) -> String {
         Json(json!({
             "requested": requested,
             "plan": plan,
-            "already_satisfied": [],
+            "already_satisfied": installed,
             "blocked": false,
             "blocked_on": []
         }))
     }
-    async fn versions(
-        State(cat): State<Catalog>,
-        Path(id): Path<String>,
-    ) -> Json<serde_json::Value> {
-        let sha = cat.get(&id).map(|(_, s)| s.clone()).unwrap_or_default();
-        Json(json!([{ "version": "1.0.0", "is_active": true, "sha256": sha }]))
-    }
-    async fn download(State(cat): State<Catalog>, Path(id): Path<String>) -> Vec<u8> {
-        cat.get(&id).map(|(z, _)| z.clone()).unwrap_or_default()
+    async fn download(State(state): State<MockCloudState>, Path(id): Path<String>) -> Vec<u8> {
+        state
+            .catalog
+            .get(&id)
+            .map(|(z, _)| z.clone())
+            .unwrap_or_default()
     }
     async fn mark_installed() -> Json<serde_json::Value> {
         Json(json!({ "ok": true }))
     }
+    let installed_requests = Arc::new(Mutex::new(Vec::new()));
+    let state = MockCloudState {
+        catalog,
+        installed_requests: installed_requests.clone(),
+    };
     let app = Router::new()
         .route("/api/v1/marketplace/install-plan/", post(install_plan))
-        .route("/api/v1/marketplace/modules/:id/versions/", get(versions))
         .route("/api/v1/marketplace/modules/:id/download/", get(download))
         .route(
             "/api/v1/marketplace/modules/:id/mark_installed/",
             post(mark_installed),
         )
-        .with_state(catalog);
+        .with_state(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    format!("http://{addr}")
+    (format!("http://{addr}"), installed_requests)
 }
 
 #[tokio::test]
@@ -128,7 +143,7 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
         "dependent".to_string(),
         (dependent.clone(), sha256_hex(&dependent)),
     );
-    let base_url = spawn_mock_cloud(Arc::new(cat)).await;
+    let (base_url, _) = spawn_mock_cloud(Arc::new(cat)).await;
 
     let http = reqwest::Client::new();
     let auth = Auth::HubToken {
@@ -184,6 +199,83 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
     .map(|(m, p)| (m.to_string(), p.to_string()))
     .collect();
     assert_eq!(got, expect);
+    let _ = std::fs::remove_dir_all(&cache);
+}
+
+#[tokio::test]
+async fn inactive_dependency_is_not_reported_satisfied_and_finishes_active() {
+    let mut cat = HashMap::new();
+    let leaf = module_zip("leaf", &[]);
+    let dependent = module_zip("dependent", &["leaf"]);
+    cat.insert("leaf".to_string(), (leaf.clone(), sha256_hex(&leaf)));
+    cat.insert(
+        "dependent".to_string(),
+        (dependent.clone(), sha256_hex(&dependent)),
+    );
+    let (base_url, requests) = spawn_mock_cloud(Arc::new(cat)).await;
+    let cache = std::env::temp_dir().join(format!(
+        "erplora-install-inactive-dependency-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&cache);
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
+    let auth = Auth::HubToken {
+        hub_id: "hub-test".into(),
+        token: "tok".into(),
+    };
+
+    install_from_cloud(
+        &reqwest::Client::new(),
+        &base_url,
+        &cache,
+        &auth,
+        &mut rt,
+        "dependent",
+        "latest",
+        &|_, _| {},
+        &erplora_server::install::dev_signature_policy(),
+    )
+    .await
+    .unwrap();
+    rt.deactivate("leaf").await.unwrap();
+    let inactive: HashMap<_, _> = rt
+        .modules()
+        .into_iter()
+        .map(|module| (module.id, module.status))
+        .collect();
+    assert_eq!(inactive["leaf"], erplora_runtime::ModuleStatus::Inactive);
+    assert_eq!(
+        inactive["dependent"],
+        erplora_runtime::ModuleStatus::InactiveAuto
+    );
+
+    install_from_cloud(
+        &reqwest::Client::new(),
+        &base_url,
+        &cache,
+        &auth,
+        &mut rt,
+        "dependent",
+        "latest",
+        &|_, _| {},
+        &erplora_server::install::dev_signature_policy(),
+    )
+    .await
+    .unwrap();
+
+    let seen = requests.lock().unwrap();
+    assert_eq!(seen.len(), 2);
+    assert!(
+        seen[1].is_empty(),
+        "Inactive/InactiveAuto no se envían a Cloud como satisfied: {seen:?}"
+    );
+    let statuses: HashMap<_, _> = rt
+        .modules()
+        .into_iter()
+        .map(|module| (module.id, module.status))
+        .collect();
+    assert_eq!(statuses["leaf"], erplora_runtime::ModuleStatus::Active);
+    assert_eq!(statuses["dependent"], erplora_runtime::ModuleStatus::Active);
     let _ = std::fs::remove_dir_all(&cache);
 }
 

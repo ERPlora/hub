@@ -190,7 +190,7 @@ async fn instalar_del_marketplace_firmado_funciona_en_produccion() {
     let (signer, _) = cloud_client::Signer::generate(&rng);
     let sig = signer.sign("marketplace", &zip);
     let trusted_pk_hex = hex::encode(signer.public_key());
-    let cloud = spawn_mock_cloud(zip, Some(sig)).await;
+    let (cloud, downloads) = spawn_mock_cloud(zip, Some(sig)).await;
 
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-install");
@@ -220,6 +220,7 @@ async fn instalar_del_marketplace_firmado_funciona_en_produccion() {
         installed_ids(&router).await.contains(&"notes".to_string()),
         "el módulo firmado del marketplace queda instalado"
     );
+    assert_eq!(downloads.load(std::sync::atomic::Ordering::SeqCst), 1);
     let _ = std::fs::remove_dir_all(&base);
 }
 
@@ -237,8 +238,8 @@ async fn instalar_del_marketplace_sin_firma_se_rechaza_en_produccion() {
     std::fs::create_dir_all(base.join("module_cache")).unwrap();
 
     let zip = module_zip("notes");
-    // El mock cloud NO firma (como el serializer del Cloud actual, que aún no expone signature).
-    let cloud = spawn_mock_cloud(zip, None).await;
+    // El mock omite la firma del install-plan: producción debe fallar antes de descargar.
+    let (cloud, downloads) = spawn_mock_cloud(zip, None).await;
 
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-install");
@@ -269,6 +270,11 @@ async fn instalar_del_marketplace_sin_firma_se_rechaza_en_produccion() {
         !installed_ids(&router).await.contains(&"notes".to_string()),
         "el módulo sin firma NO debe quedar instalado"
     );
+    assert_eq!(
+        downloads.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "la ausencia de firma en el plan corta antes de descargar"
+    );
     let _ = std::fs::remove_dir_all(&base);
 }
 
@@ -286,13 +292,13 @@ fn module_zip(id: &str) -> Vec<u8> {
     buf
 }
 
-/// Mini-SaaS con las tres rutas que consume `CloudClient` (versions/download/mark_installed),
-/// sirviendo el zip con su SHA256 REAL y, opcionalmente, su **firma ed25519** (hub#239). La
+/// Mini-SaaS con el contrato canónico install-plan/download/mark_installed, sirviendo el zip con
+/// su SHA256 REAL y, opcionalmente, su **firma ed25519** (hub#239). La
 /// verificación de integridad Y autenticidad se ejercita de verdad.
 async fn spawn_mock_cloud(
     zip_bytes: Vec<u8>,
     signature: Option<cloud_client::ModuleSignature>,
-) -> String {
+) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
     use axum::extract::State;
     use axum::routing::{get, post};
     use axum::{Json, Router};
@@ -302,18 +308,15 @@ async fn spawn_mock_cloud(
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
-    type Pkg = std::sync::Arc<(Vec<u8>, String, Option<cloud_client::ModuleSignature>)>;
-    let pkg: Pkg = std::sync::Arc::new((zip_bytes, sha, signature));
+    type Pkg = std::sync::Arc<(
+        Vec<u8>,
+        String,
+        Option<cloud_client::ModuleSignature>,
+        std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    )>;
+    let downloads = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let pkg: Pkg = std::sync::Arc::new((zip_bytes, sha, signature, downloads.clone()));
 
-    async fn versions(State(pkg): State<Pkg>) -> Json<Value> {
-        // Expone sha256 (integridad) y, si la hay, signature (autenticidad). El serializer del
-        // Cloud real aún no expone `signature` (TODO); el mock sí para ejercitar la verificación.
-        let mut entry = json!({ "version": "1.0.0", "is_active": true, "sha256": pkg.1 });
-        if let Some(sig) = &pkg.2 {
-            entry["signature"] = serde_json::to_value(sig).unwrap();
-        }
-        json!([entry]).into()
-    }
     async fn install_plan(State(pkg): State<Pkg>) -> Json<Value> {
         let mut node = json!({
             "module_id": "notes", "version": "1.0.0", "sha256": pkg.1,
@@ -330,6 +333,7 @@ async fn spawn_mock_cloud(
         .into()
     }
     async fn download(State(pkg): State<Pkg>) -> Vec<u8> {
+        pkg.3.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         pkg.0.clone()
     }
     async fn mark_installed() -> Json<Value> {
@@ -338,7 +342,6 @@ async fn spawn_mock_cloud(
 
     let app = Router::new()
         .route("/api/v1/marketplace/install-plan/", post(install_plan))
-        .route("/api/v1/marketplace/modules/:id/versions/", get(versions))
         .route("/api/v1/marketplace/modules/:id/download/", get(download))
         .route(
             "/api/v1/marketplace/modules/:id/mark_installed/",
@@ -348,7 +351,7 @@ async fn spawn_mock_cloud(
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    format!("http://{addr}")
+    (format!("http://{addr}"), downloads)
 }
 
 /// (c) Modo desarrollo + `dir` dentro del staging (la caché de descargas) = flujo de siempre.

@@ -85,56 +85,6 @@ pub fn dev_signature_policy() -> cloud_client::SignaturePolicy {
     cloud_client::SignaturePolicy::DevTrust
 }
 
-/// Resuelve la versión a instalar contra `versions/`: la pedida si se indica, o la última
-/// activa. Devuelve la entrada completa (incluye `sha256` si el Cloud lo expone).
-async fn resolve_version(
-    http: &reqwest::Client,
-    cloud: &CloudClient,
-    auth: &Auth,
-    module_id: &str,
-    requested: &str,
-) -> Result<ModuleVersion, InstallError> {
-    let req = cloud.versions(auth, module_id);
-    let body = send_text(http, &req).await?;
-    let mut versions = ModuleVersion::parse_list(&body)
-        .map_err(|e| InstallError::Cloud(format!("versions/ inválido: {e}")))?;
-    versions.retain(|v| v.is_active);
-
-    if !requested.is_empty() && requested != "latest" {
-        versions
-            .into_iter()
-            .find(|v| v.version == requested)
-            .ok_or_else(|| InstallError::VersionNotFound(requested.to_string()))
-    } else {
-        // "última activa": el endpoint las devuelve por `-created_at` (más reciente primero).
-        versions
-            .into_iter()
-            .next()
-            .ok_or_else(|| InstallError::VersionNotFound("latest".into()))
-    }
-}
-
-/// Ejecuta una `PreparedRequest` GET y devuelve el cuerpo como texto.
-async fn send_text(
-    http: &reqwest::Client,
-    req: &cloud_client::PreparedRequest,
-) -> Result<String, InstallError> {
-    let mut r = http.request(method(req), &req.url);
-    for (k, v) in &req.headers {
-        r = r.header(*k, v);
-    }
-    let resp = r
-        .send()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    let resp = resp
-        .error_for_status()
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    resp.text()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))
-}
-
 /// Resuelve el plan canónico en Cloud. Es público para que el endpoint de previsualización y el
 /// ejecutor compartan exactamente el mismo contrato (la UI nunca infiere dependencias).
 pub async fn resolve_install_plan(
@@ -146,7 +96,15 @@ pub async fn resolve_install_plan(
     requested_version: &str,
 ) -> Result<InstallPlan, InstallError> {
     let cloud = CloudClient::new(cloud_base_url);
-    let installed: Vec<String> = runtime.modules().into_iter().map(|m| m.id).collect();
+    // Solo un módulo ACTIVO satisface una dependencia. Enviar también Inactive/InactiveAuto haría
+    // que Cloud lo pusiera en `already_satisfied` y el plan terminara con dependencias apagadas.
+    // Al omitirlos, el plan los incluye y `install_from_dir` los reactiva de forma completa.
+    let installed: Vec<String> = runtime
+        .modules()
+        .into_iter()
+        .filter(|module| module.status == erplora_runtime::ModuleStatus::Active)
+        .map(|module| module.id)
+        .collect();
     let prepared = cloud.install_plan(auth, module_id, Some(requested_version), &installed);
     let mut req = http
         .request(method(&prepared.request), &prepared.request.url)
@@ -300,13 +258,25 @@ pub async fn install_from_cloud(
             plan: Box::new(plan),
         });
     }
+    // Firma y SHA pertenecen al MISMO contrato canónico del plan. En producción el plan debe
+    // traer la firma detached de cada ZIP; `versions/` no la expone y no es un fallback válido.
+    // Validamos TODO antes de descargar el primer byte para evitar instalaciones parciales.
+    if signature_policy.requires_signature() {
+        if plan.plan.iter().any(|node| node.signature.is_none()) {
+            return Err(InstallError::Source(source::SourceError::BadSignature(
+                cloud_client::SignatureError::Missing,
+            )));
+        }
+    }
     if plan.already_satisfied.iter().any(|m| m == module_id) && plan.plan.is_empty() {
         let installed = runtime
             .modules()
             .into_iter()
-            .find(|m| m.id == module_id)
+            .find(|m| m.id == module_id && m.status == erplora_runtime::ModuleStatus::Active)
             .ok_or_else(|| {
-                InstallError::InvalidPlan("Cloud marcó satisfecho un módulo ausente".into())
+                InstallError::InvalidPlan(
+                    "Cloud marcó satisfecho un módulo ausente o inactivo".into(),
+                )
             })?;
         return Ok(Installed {
             module_id: installed.id,
@@ -328,15 +298,7 @@ pub async fn install_from_cloud(
         } = node;
         on_progress(id, "resolving");
 
-        // ADR-0060 antecede a hub#239. Mientras el plan de Cloud no lleve `signature`, pedimos
-        // SOLO esa metadata a versions/ bajo política Enforce. Dev usa cero round-trips extra.
-        let signature = if signature.is_none() && signature_policy.requires_signature() {
-            resolve_version(http, &cloud, auth, id, version)
-                .await?
-                .signature
-        } else {
-            signature.clone()
-        };
+        let signature = signature.clone();
 
         on_progress(id, "downloading");
         let zip_bytes = send_bytes(http, &cloud.download(auth, id, version)).await?;
