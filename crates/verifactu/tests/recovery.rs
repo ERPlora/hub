@@ -6,7 +6,7 @@
 use erplora_db::Params;
 use erplora_runtime::native::{NativeHandler, NativeHost};
 use erplora_runtime::Result;
-use erplora_verifactu::{aeat, chain, VerifactuEngine};
+use erplora_verifactu::{chain, VerifactuEngine};
 use serde_json::{json, Value};
 
 /// Host de prueba: discrimina por la SQL (config singleton / ancla DESC / cadena ASC).
@@ -153,39 +153,11 @@ async fn validate_chain_trusts_recovery_anchor() {
     assert_eq!(out.operations[0].params.get("event_type").unwrap().as_str().unwrap(), "chain_validated");
 }
 
-// ── consulta AEAT (parser + sobre) ────────────────────────────────────────────
-
-#[test]
-fn parse_consult_extracts_records() {
-    let body = "<env><reg>\
-        <sum1:IDEmisorFactura>B12345678</sum1:IDEmisorFactura>\
-        <sum1:NumSerieFactura>FA/001</sum1:NumSerieFactura>\
-        <sum1:FechaExpedicionFactura>10-06-2026</sum1:FechaExpedicionFactura>\
-        <sum1:Huella>ABC123</sum1:Huella>\
-        <sum1:EstadoRegistro>Correcto</sum1:EstadoRegistro>\
-        <sum1:CSV>CSV-1</sum1:CSV></reg>\
-        <reg><sum1:IDEmisorFactura>B12345678</sum1:IDEmisorFactura>\
-        <sum1:NumSerieFactura>FA/002</sum1:NumSerieFactura>\
-        <sum1:FechaExpedicionFactura>11-06-2026</sum1:FechaExpedicionFactura>\
-        <sum1:Huella>DEF456</sum1:Huella>\
-        <sum1:EstadoRegistro>Correcto</sum1:EstadoRegistro>\
-        <sum1:CSV>CSV-2</sum1:CSV></reg></env>";
-    let recs = aeat::parse_consult_response(body);
-    assert_eq!(recs.len(), 2);
-    assert_eq!(recs[0].invoice_number, "FA/001");
-    assert_eq!(recs[0].record_hash, "ABC123");
-    assert_eq!(recs[1].invoice_number, "FA/002");
-    assert_eq!(recs[1].csv, "CSV-2");
-}
-
-#[test]
-fn build_consult_soap_includes_nif_and_period() {
-    let xml = aeat::build_consult_soap("B12345678", "ACME", "2026", "06");
-    assert!(xml.contains("ConsultaFactuSistemaFacturacion"));
-    assert!(xml.contains("<sum1:NIF>B12345678</sum1:NIF>"), "{xml}");
-    assert!(xml.contains("<sum1:Ejercicio>2026</sum1:Ejercicio>"), "{xml}");
-    assert!(xml.contains("<sum1:Periodo>06</sum1:Periodo>"), "{xml}");
-}
+// ── consulta AEAT ─────────────────────────────────────────────────────────────
+//
+// El sobre, el parser (sobre la respuesta REAL capturada de preproducción) y la elección del
+// ancla viven en `tests/consult.rs`: son el núcleo de hub#287 y merecen fichero propio. Los que
+// había aquí iban contra un XML inventado que la AEAT no devuelve.
 
 #[test]
 fn is_valid_hash_checks_64_hex() {
