@@ -67,6 +67,52 @@ fn la_anulacion_que_genera_el_modulo_pasa_la_validacion() {
     xsd::validate_registro(&xml_de(&rec)).expect("anulación válida");
 }
 
+/// El registro **encadenado** — es decir, TODOS menos el primero de la vida del sistema.
+///
+/// `Encadenamiento/RegistroAnterior` repite cuatro nombres que también existen en la secuencia
+/// exterior (`IDEmisorFactura`, `NumSerieFactura`, `FechaExpedicionFactura` y sobre todo
+/// **`Huella`**, que es el ÚLTIMO elemento de `ORDER_ALTA`). El validador recorría el documento
+/// plano, sin noción de anidamiento, así que la `Huella` del registro anterior agotaba el
+/// iterador de orden y el `SistemaInformatico` que viene después parecía «fuera de orden».
+///
+/// Resultado: el gate previo a la transmisión rechazaba **toda factura que no fuera la primera**,
+/// antes de tocar la red. Ningún test lo cazó porque todos construían el XML con `prev = None`.
+#[test]
+fn el_alta_encadenada_pasa_la_validacion() {
+    let previo = json!({
+        "issuer_nif": "B27593136",
+        "invoice_number": "FA/000",
+        "invoice_date": "2026-08-01",
+        "record_hash": "B".repeat(64),
+    });
+    let mut rec = alta("F2", "");
+    rec["is_first_record"] = json!(0);
+    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1");
+    assert!(xml.contains("<sum1:RegistroAnterior>"), "{xml}");
+
+    xsd::validate_registro(&xml)
+        .expect("una factura encadenada es el caso NORMAL: debe pasar el gate");
+}
+
+/// La anulación encadenada tiene el mismo choque de nombres (`ORDER_ANULACION` también acaba en
+/// `Huella`), y además su `IDFactura` usa los nombres con sufijo `Anulada`.
+#[test]
+fn la_anulacion_encadenada_pasa_la_validacion() {
+    let previo = json!({
+        "issuer_nif": "B27593136",
+        "invoice_number": "FA/000",
+        "invoice_date": "2026-08-01",
+        "record_hash": "B".repeat(64),
+    });
+    let mut rec = alta("F1", "B12345678");
+    rec["record_type"] = json!("anulacion");
+    rec["is_first_record"] = json!(0);
+    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1");
+    assert!(xml.contains("<sum1:RegistroAnterior>"), "{xml}");
+
+    xsd::validate_registro(&xml).expect("una anulación encadenada también debe pasar el gate");
+}
+
 // ── Obligatorios ausentes ─────────────────────────────────────────────────────────────────
 
 /// `DescripcionOperacion` es `minOccurs="1"`: la AEAT lo rechaza con 1100. Ya se le puso un

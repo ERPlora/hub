@@ -560,6 +560,64 @@ pub struct AeatResponse {
     pub descripcion_error: String,
 }
 
+/// Veredicto sobre una respuesta de la AEAT: qué se persiste y si hay algo más que hacer.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Verdict {
+    /// Estado que se guarda en el registro: `accepted` | `rejected` | `error`.
+    pub status: &'static str,
+    /// `AceptadoConErrores`: la AEAT **registró** el documento, pero le anotó un error.
+    /// Es un aceptado **con aviso**, no un aceptado limpio y tampoco un rechazo.
+    pub accepted_with_errors: bool,
+    /// Código a persistir. En un aceptado con errores es el código de la AEAT (p. ej. `2007`),
+    /// no la etiqueta de estado: si se tira, el operador nunca ve que la cadena venía mal.
+    pub code: String,
+    pub message: String,
+}
+
+impl Verdict {
+    /// ¿Hay que volver a enviar este registro?
+    ///
+    /// **Nunca** para un aceptado (con o sin errores). Verificado contra preproducción el
+    /// 2026-08-02: reenviar re-anclado un registro que la AEAT ya tenía devuelve **3000
+    /// «Registro de facturación duplicado»** —con un bloque `RegistroDuplicado` que repite el
+    /// estado del original— y la consulta posterior sigue mostrando UNA sola aparición: la AEAT
+    /// ni duplica ni sustituye, rechaza. Ver `tests/aceptado_con_errores.rs`.
+    pub fn should_retransmit(&self) -> bool {
+        self.status != "accepted"
+    }
+}
+
+/// Clasifica la respuesta de la AEAT.
+///
+/// `AceptadoConErrores` cuenta como **aceptado**: el registro está en la AEAT y reenviarlo sería
+/// un duplicado. Lo que cambia respecto a un `Correcto` es que se conserva el código de error
+/// para que el evento lo cuente (`accepted_with_errors`).
+pub fn classify(resp: &AeatResponse) -> Verdict {
+    let status = match resp.estado_registro.as_str() {
+        "Correcto" | "AceptadoConErrores" => "accepted",
+        "Incorrecto" => "rejected",
+        _ if resp.estado_envio == "Correcto" => "accepted",
+        _ => "error",
+    };
+    let accepted_with_errors = status == "accepted" && !resp.codigo_error.trim().is_empty();
+
+    if status == "accepted" && !accepted_with_errors {
+        Verdict {
+            status,
+            accepted_with_errors,
+            code: resp.estado_registro.clone(),
+            message: resp.estado_envio.clone(),
+        }
+    } else {
+        Verdict {
+            status,
+            accepted_with_errors,
+            code: resp.codigo_error.clone(),
+            message: resp.descripcion_error.clone(),
+        }
+    }
+}
+
 /// Extrae `<*:tag>texto</...>` por búsqueda de sufijo de nombre (las respuestas AEAT van
 /// namespaced con prefijos variables; evitamos una dependencia XML completa).
 fn xml_text(body: &str, tag: &str) -> String {
@@ -664,13 +722,19 @@ pub fn build_consult_soap(
                 .into(),
         ));
     }
-    // Sin periodo el filtro es solo el ejercicio: un `<Periodo></Periodo>` vacío es un elemento
-    // obligatorio mal informado, no un filtro abierto.
-    let periodo_xml = if periodo.trim().is_empty() {
-        String::new()
-    } else {
-        format!("<sum1:Periodo>{}</sum1:Periodo>", esc(periodo))
-    };
+    // `Periodo` es OBLIGATORIO. Antes se omitía cuando llegaba vacío, dando por hecho que un
+    // filtro sin mes consultaba el ejercicio entero. No existe tal filtro: la AEAT responde
+    // `Codigo[4102].El XML no cumple el esquema. Falta informar campo obligatorio.: Periodo`
+    // (verificado contra preproducción el 2026-08-02, ADR-0189). Se corta aquí porque el 4102
+    // llega DESPUÉS de haber hablado con Hacienda.
+    if periodo.trim().is_empty() {
+        return Err(VerifactuError::Payload(
+            "falta el Periodo (mes MM) de la consulta: la AEAT lo exige y sin él responde 4102; \
+             no existe el filtro «todo el ejercicio»"
+                .into(),
+        ));
+    }
+    let periodo_xml = format!("<sum1:Periodo>{}</sum1:Periodo>", esc(periodo));
     Ok(format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
          <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \

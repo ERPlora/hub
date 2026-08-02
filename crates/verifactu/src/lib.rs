@@ -911,13 +911,25 @@ async fn transmit_one(
         Ok(body) => {
             let resp = aeat::parse_response(&body);
 
-            // ── Recuperación AUTOMÁTICA ante un rechazo de encadenamiento ──────────────────
-            // El caso real es **restaurar un backup**: la cadena local retrocede, la AEAT
-            // conserva los registros posteriores y el envío se rechaza con 2007. Antes eso
-            // dejaba el registro parado esperando a que alguien pulsara «Recuperar desde la
-            // AEAT» en la UI; ahora se re-ancla y se reintenta UNA vez, aquí mismo — es decir,
-            // también desde la cola de contingencia, que reintenta con backoff.
-            if classify(&resp).0 == "rejected"
+            // ── Recuperación automática: SOLO si la AEAT rechazó de verdad ─────────────────
+            // El caso que se quería cubrir es **restaurar un backup**: la cadena local retrocede
+            // y el envío sale con `PrimerRegistro=S` cuando la AEAT ya tiene registros de ese
+            // obligado y sistema informático. Se asumió que eso llegaba como rechazo. El ensayo
+            // contra preproducción (2026-08-02, ADR-0189) demostró que no, y que re-enviar es lo
+            // peor que se puede hacer:
+            //
+            //   1. La AEAT contesta `EstadoRegistro=AceptadoConErrores` + `2007` — un ACEPTADO:
+            //      el registro **ya está en la AEAT** con la huella que se le calculó.
+            //   2. Reenviarlo re-anclado devuelve **3000 «Registro de facturación duplicado»**, y
+            //      la consulta posterior sigue mostrando una sola aparición. Ni duplica ni
+            //      sustituye: rechaza.
+            //
+            // Por eso el disparo cuelga de `should_retransmit()` —es decir, de que el registro NO
+            // esté aceptado—, y no de una lista de códigos. Un 2007 se cierra abajo como aceptado
+            // **con aviso**: la cadena sigue desde él, que es lo que la AEAT tiene por último.
+            // Re-anclar ANTES de emitir sigue siendo una acción explícita (`recover_from_aeat`).
+            let verdict = aeat::classify(&resp);
+            if verdict.should_retransmit()
                 && aeat::is_chaining_rejection(&resp.codigo_error, &resp.descripcion_error)
                 && !recovery_id.is_empty()
             {
@@ -1034,29 +1046,6 @@ async fn transmit_one(
     }
 }
 
-/// Traduce la respuesta de la AEAT a `(status, código, mensaje)` del registro.
-fn classify(resp: &aeat::AeatResponse) -> (&'static str, String, String) {
-    let status = match resp.estado_registro.as_str() {
-        "Correcto" | "AceptadoConErrores" => "accepted",
-        "Incorrecto" => "rejected",
-        _ if resp.estado_envio == "Correcto" => "accepted",
-        _ => "error",
-    };
-    if status == "accepted" {
-        (
-            status,
-            resp.estado_registro.clone(),
-            resp.estado_envio.clone(),
-        )
-    } else {
-        (
-            status,
-            resp.codigo_error.clone(),
-            resp.descripcion_error.clone(),
-        )
-    }
-}
-
 /// Intenciones que aplican una respuesta de la AEAT sobre el registro: UPDATE + evento (+ salida
 /// de la cola de contingencia si fue aceptado). Compartido por el primer intento y por el
 /// reintento tras re-anclar.
@@ -1071,14 +1060,21 @@ fn response_ops(
     now: &str,
     note: Option<&str>,
 ) -> (Vec<Operation>, bool) {
-    let (status, code, message) = classify(resp);
-    let success = status == "accepted";
+    let verdict = aeat::classify(resp);
+    let success = verdict.status == "accepted";
+    // Un `AceptadoConErrores` está registrado en la AEAT (no se reenvía), pero no puede pasar por
+    // un éxito limpio: se persiste el código de la AEAT y el evento sale como aviso, no como info.
+    let (event_type, severity) = match (success, verdict.accepted_with_errors) {
+        (true, false) => ("transmission_success", "info"),
+        (true, true) => ("transmission_warning", "warning"),
+        (false, _) => ("transmission_failure", "error"),
+    };
     let mut ops = vec![
         apply_transmission(
             record_id,
-            status,
-            &code,
-            &message,
+            verdict.status,
+            &verdict.code,
+            &verdict.message,
             &resp.csv,
             xml,
             xml_storage_path,
@@ -1089,8 +1085,8 @@ fn response_ops(
             json!({
                 "event_id": event_id,
                 "record_id": record_id,
-                "event_type": if success { "transmission_success" } else { "transmission_failure" },
-                "severity": if success { "info" } else { "error" },
+                "event_type": event_type,
+                "severity": severity,
                 "message": match note {
                     Some(n) => format!("AEAT ({environment}): {} {} — {n}", resp.estado_envio, resp.estado_registro),
                     None => format!("AEAT ({environment}): {} {}", resp.estado_envio, resp.estado_registro),
