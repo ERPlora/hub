@@ -97,7 +97,7 @@ pub async fn authenticate(
                 .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
             // hub_id del runtime (no del header, no spoofable). Durante el primer bootstrap puede
             // haber sido adoptado en caliente después de construir `HubConfig`.
-            let perms = rt.permissions_for_role(&user.role);
+            let perms = rt.session_permissions(&user.role);
             Ok(RequestContext::new(rt.hub_id().to_string(), user.id, perms))
         }
     }
@@ -133,7 +133,7 @@ pub async fn require_user_session(
                 .await
                 .map_err(|e| AuthError::Invalid(e.to_string()))?
                 .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
-            let perms = rt.permissions_for_role(&user.role);
+            let perms = rt.session_permissions(&user.role);
             Ok(RequestContext::new(rt.hub_id().to_string(), user.id, perms))
         }
     }

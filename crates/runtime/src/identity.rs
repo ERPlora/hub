@@ -680,10 +680,6 @@ pub async fn untrust_device(db: &dyn DatabaseAdapter, device_id: &str) -> Result
 pub fn permissions_for_role(registry: &Registry, role: &str) -> HashSet<String> {
     let role = if role.eq_ignore_ascii_case("owner") { "admin" } else { role };
     let mut perms = HashSet::new();
-    // Permiso del CORE (ADR-0192): cualquier rol local puede leer el personal del hub por el
-    // dispatcher (`hub.users.list`) — el nombre y el rol de cada uno ya son públicos en el grid de
-    // PIN del login. No se concede a una API key: su contexto sale del scope de módulos, no de aquí.
-    perms.insert(crate::hub_users::VIEW_USERS_PERMISSION.to_string());
     for m in &registry.installed {
         if !registry.is_active(&m.id) {
             continue;
@@ -694,6 +690,21 @@ pub fn permissions_for_role(registry: &Registry, role: &str) -> HashSet<String> 
             }
         }
     }
+    perms
+}
+
+/// Permisos de una **sesión de usuario local**: lo que conceden los módulos a su rol MÁS el permiso
+/// del core (ADR-0192, `hub.users.view`) — leer el personal del hub, que ya es público en el grid de
+/// PIN del login.
+///
+/// Separado de [`permissions_for_role`] a propósito: aquello responde «qué conceden los MÓDULOS a
+/// este rol» y lo consumen la herencia `owner`→`admin` y el contador de la pestaña Roles. Si el
+/// permiso del core viviera ahí, hasta un rol que ningún manifest declara recibiría permisos y cada
+/// rol pintaría un permiso fantasma. Lo que decide quién puede leer el personal no es el rol: es
+/// **tener sesión local**. Una API key nunca pasa por aquí (su contexto sale de su scope).
+pub fn session_permissions(registry: &Registry, role: &str) -> HashSet<String> {
+    let mut perms = permissions_for_role(registry, role);
+    perms.insert(crate::hub_users::VIEW_USERS_PERMISSION.to_string());
     perms
 }
 

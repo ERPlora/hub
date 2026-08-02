@@ -411,3 +411,27 @@ async fn deactivating_a_cloud_user_revokes_the_access_too() {
     assert_eq!(ana["is_active"], false);
     std::fs::remove_dir_all(f.media).ok();
 }
+
+#[tokio::test]
+async fn the_profile_publishes_the_same_permissions_the_gate_grants() {
+    // El shell decide qué enseña con los permisos que le devuelve el perfil/login. Si el servidor
+    // concede `hub.users.view` a la sesión pero el perfil no lo lista, la UI esconde acciones que
+    // el runtime sí permite — una divergencia silenciosa entre las dos caras del mismo gate.
+    let f = fixture().await;
+    let profile = body_json(
+        get(&f.router, "/api/profile", Some(&f.cashier)).await,
+    )
+    .await;
+    let perms: Vec<&str> = profile["permissions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|p| p.as_str())
+        .collect();
+    assert!(
+        perms.contains(&"hub.users.view"),
+        "el perfil no publica el permiso del core: {perms:?}"
+    );
+    std::fs::remove_dir_all(f.media).ok();
+}
+
