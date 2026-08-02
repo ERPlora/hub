@@ -1,3 +1,16 @@
+<!--
+  Personal — pantalla CORE de los usuarios del Hub.
+
+  Fuente de verdad: la tabla `hub_user` del runtime (`lib/hub-users.ts` → `/api/hub/users`), NO el
+  módulo `staff`. `staff` es un módulo de negocio (profesional reservable, comisiones, horarios) con
+  su propia navegación; pedirle la lista dejaba esta pantalla muerta («No se pudo cargar el
+  personal») en cualquier hub sin él, y escondía al owner/administrador, que entra por Cloud y no
+  tiene PIN. Aquí salen TODOS: owner, admins, personal solo-local, activos y dados de baja.
+
+  Pestañas: Personal (los usuarios) · Roles (catálogo del core, lectura) · API keys (solo admin).
+  El alta y la edición rápida viven en el panel lateral de la tabla; la edición detallada en
+  /employees/:id. Escribir exige rol owner/admin: el runtime revalida y aquí solo se muestra/oculta.
+-->
 <template>
   <AppPage :title="t('nav.employees')">
     <div class="fill">
@@ -7,59 +20,50 @@
 
       <template v-else>
         <ok-inline-feedback
-          v-if="staffLoadError && (tab === 'staff' || tab === 'roles')"
+          v-if="loadError"
           class="load-feedback"
           tone="warning"
           icon="cloud-offline-outline"
           :heading="t('employees.loadErrorTitle')"
         >
           {{ t('employees.loadErrorBody') }}
-          <ion-button slot="actions" size="small" fill="outline" @click="loadStaff">
+          <ion-button slot="actions" size="small" fill="outline" @click="load">
             {{ t('employees.retry') }}
           </ion-button>
         </ok-inline-feedback>
 
-        <!-- Personal operativo del módulo staff. Alta y edición rápida viven dentro del panel
-             lateral de la tabla; la edición detallada conserva /employees/:id. -->
+        <!-- Usuarios del hub. Alta solo para admin (el runtime rechazaría al resto). -->
         <ok-data-table
           v-show="tab === 'staff'"
           ref="staffTable"
           fill
-          :addable="!staffLoadError"
-          :columns="employeeColumns"
-          :rows="employees"
-          :searchKeys="['full_name', 'email', 'role_name']"
-          :actions="staffRowActions"
+          :addable="isAdmin && !loadError"
+          :columns="userColumns"
+          :rows="users"
+          :searchKeys="['name', 'email', 'role']"
+          :actions="userRowActions"
           :search-placeholder="t('employees.searchEmployee')"
           :empty-message="t('employees.emptyStaff')"
           page-size="10"
           views
           csv
-          csv-name="empleados"
+          csv-name="personal"
           column-picker
         >
-          <form slot="create" class="table-form" @submit.prevent="createEmployee">
-            <ok-inline-feedback v-if="staffFormError" tone="danger">
-              {{ staffFormError }}
+          <form slot="create" class="table-form" @submit.prevent="createUser">
+            <ok-inline-feedback v-if="formError" tone="danger">
+              {{ formError }}
             </ok-inline-feedback>
             <ion-input
-              v-model="staffForm.firstName"
+              v-model="form.name"
               fill="outline"
               label-placement="floating"
-              :label="t('employeeForm.firstName')"
-              :maxlength="100"
+              :label="t('employeeForm.fullName')"
+              :maxlength="150"
               required
             />
             <ion-input
-              v-model="staffForm.lastName"
-              fill="outline"
-              label-placement="floating"
-              :label="t('employeeForm.lastName')"
-              :maxlength="100"
-              required
-            />
-            <ion-input
-              v-model="staffForm.email"
+              v-model="form.email"
               fill="outline"
               label-placement="floating"
               type="email"
@@ -68,86 +72,47 @@
               :maxlength="254"
             />
             <ion-select
-              v-model="staffForm.roleId"
+              v-model="form.role"
               fill="outline"
               label-placement="floating"
               interface="popover"
               :label="t('employeeForm.role')"
             >
-              <ion-select-option value="">{{ t('employeeForm.noRole') }}</ion-select-option>
-              <ion-select-option v-for="role in roles" :key="String(role.id)" :value="String(role.id)">
-                {{ role.name }}
+              <ion-select-option v-for="role in roles" :key="role.name" :value="role.name">
+                {{ roleLabel(role.name) }}
               </ion-select-option>
             </ion-select>
-            <ion-button
-              type="submit"
-              size="small"
-              :disabled="staffSaving || !staffForm.firstName.trim() || !staffForm.lastName.trim()"
-            >
-              <ion-spinner v-if="staffSaving" slot="start" name="crescent" />
-              {{ staffSaving ? t('employeeForm.saving') : t('employeeForm.create') }}
+            <ion-input
+              v-model="form.pin"
+              fill="outline"
+              label-placement="floating"
+              inputmode="numeric"
+              :label="t('employeeForm.pin')"
+              :helper-text="t('employeeForm.pinHelp')"
+              :maxlength="8"
+            />
+            <ion-button type="submit" size="small" :disabled="saving || !form.name.trim()">
+              <ion-spinner v-if="saving" slot="start" name="crescent" />
+              {{ saving ? t('employeeForm.saving') : t('employeeForm.create') }}
             </ion-button>
           </form>
         </ok-data-table>
 
-        <!-- Identidades reales con acceso al Hub. `pinUsers` viene del runtime; añadimos el
-             usuario de la sesión si su acceso es Cloud y no tiene PIN local. -->
-        <ok-data-table
-          v-show="tab === 'users'"
-          ref="usersTable"
-          fill
-          :columns="userColumns"
-          :rows="hubUsers"
-          :searchKeys="['name', 'email', 'role']"
-          :search-placeholder="t('employees.searchUser')"
-          :empty-message="t('employees.emptyUsers')"
-          page-size="10"
-          views
-          column-picker
-        ></ok-data-table>
-
-        <!-- Roles operativos reales del módulo staff. -->
+        <!-- Roles del core: catálogo base ∪ los que declaran los módulos activos ∪ los que ya usa
+             alguien. No se crean a mano: un rol existe porque algún módulo le concede permisos. -->
         <ok-data-table
           v-show="tab === 'roles'"
           ref="rolesTable"
           fill
-          :addable="!staffLoadError"
           :columns="roleColumns"
           :rows="roles"
-          :searchKeys="['name', 'description']"
+          :searchKeys="['name']"
           :search-placeholder="t('employees.searchRole')"
           :empty-message="t('employees.emptyRoles')"
           page-size="10"
           views
-          csv
-          csv-name="roles"
           column-picker
-        >
-          <form slot="create" class="table-form" @submit.prevent="createRole">
-            <ok-inline-feedback v-if="roleFormError" tone="danger">
-              {{ roleFormError }}
-            </ok-inline-feedback>
-            <ion-input
-              v-model="roleForm.name"
-              fill="outline"
-              label-placement="floating"
-              :label="t('employees.roleName')"
-              :maxlength="100"
-              required
-            />
-            <ion-textarea
-              v-model="roleForm.description"
-              fill="outline"
-              label-placement="floating"
-              :label="t('employees.roleDescription')"
-              :auto-grow="true"
-            />
-            <ion-button type="submit" size="small" :disabled="roleSaving || !roleForm.name.trim()">
-              <ion-spinner v-if="roleSaving" slot="start" name="crescent" />
-              {{ roleSaving ? t('employeeForm.saving') : t('employees.newRole') }}
-            </ion-button>
-          </form>
-        </ok-data-table>
+        ></ok-data-table>
 
         <ApiKeysPanel v-if="isAdmin" v-show="tab === 'apikeys'" />
       </template>
@@ -165,10 +130,6 @@
             <ion-segment-button value="staff">
               <HubIcon name="people-outline" />
               <ion-label>{{ t('employees.tabStaff') }}</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="users">
-              <HubIcon name="person-circle-outline" />
-              <ion-label>{{ t('employees.tabUsers') }}</ion-label>
             </ion-segment-button>
             <ion-segment-button value="roles">
               <HubIcon name="shield-checkmark-outline" />
@@ -199,7 +160,6 @@ import {
   IonSelect,
   IonSelectOption,
   IonSpinner,
-  IonTextarea,
   IonToolbar,
   alertController,
 } from '@ionic/vue';
@@ -207,7 +167,16 @@ import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import ApiKeysPanel from './ApiKeysPanel.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
-import { getClient, pinUsers } from '../lib/runtime';
+import {
+  accessOf,
+  canDeactivate,
+  createHubUser,
+  deactivateHubUser,
+  listHubRoles,
+  listHubUsers,
+  type HubRole,
+  type HubUser,
+} from '../lib/hub-users';
 import { isAdmin, user } from '../lib/session';
 import { toast } from '../lib/toast';
 
@@ -229,8 +198,10 @@ type DataTableElement = HTMLElement & {
   close?: () => void;
 };
 
-type EmployeeTab = 'staff' | 'users' | 'roles' | 'apikeys';
-const TABS: readonly EmployeeTab[] = ['staff', 'users', 'roles', 'apikeys'];
+// La pestaña «Usuarios» separada desapareció: el personal del Hub SON sus usuarios. Se mantiene el
+// valor 'staff' del hash para no romper los deep-links (/employees#staff) ya publicados.
+type EmployeeTab = 'staff' | 'roles' | 'apikeys';
+const TABS: readonly EmployeeTab[] = ['staff', 'roles', 'apikeys'];
 const route = useRoute();
 const router = useRouter();
 const tab = ref<EmployeeTab>(TABS.find((value) => value === route.hash.slice(1)) ?? 'staff');
@@ -246,39 +217,14 @@ watch(isAdmin, (admin) => {
   if (!admin && tab.value === 'apikeys') tab.value = 'staff';
 });
 
-const client = getClient();
 const loading = ref(true);
-const staffLoadError = ref(false);
-const employees = ref<Row[]>([]);
-const roles = ref<Row[]>([]);
+const loadError = ref(false);
+const users = ref<HubUser[]>([]);
+const roles = ref<HubRole[]>([]);
 
-const staffForm = reactive({ firstName: '', lastName: '', email: '', roleId: '' });
-const roleForm = reactive({ name: '', description: '' });
-const staffSaving = ref(false);
-const roleSaving = ref(false);
-const staffFormError = ref('');
-const roleFormError = ref('');
-
-const hubUsers = computed<Row[]>(() => {
-  const rows = pinUsers.value.map((entry) => ({
-    id: entry.id,
-    name: entry.name,
-    email: '',
-    role: entry.role,
-    access: 'pin',
-  }));
-  const active = user.value;
-  if (active && !rows.some((entry) => entry.id === active.id)) {
-    rows.push({
-      id: active.id,
-      name: active.name,
-      email: active.email ?? '',
-      role: active.role ?? '',
-      access: 'cloud',
-    });
-  }
-  return rows;
-});
+const form = reactive({ name: '', email: '', role: 'employee', pin: '' });
+const saving = ref(false);
+const formError = ref('');
 
 function fmtDate(iso: string): string {
   if (!iso) return '—';
@@ -289,16 +235,23 @@ function fmtDate(iso: string): string {
   });
 }
 
+/** Etiqueta traducida de un rol conocido; los que aporta un módulo se muestran tal cual. */
+function roleLabel(role: string): string {
+  const key = `employees.roles.${role}`;
+  const label = t(key);
+  return label === key ? role : label;
+}
+
 function nameCell(row: Row): Node {
   const wrap = document.createElement('span');
   wrap.style.cssText = 'display:flex;align-items:center;gap:.6rem';
   const avatar = document.createElement('span');
-  avatar.textContent = (String(row.full_name ?? row.name ?? '?')[0] ?? '?').toUpperCase();
+  avatar.textContent = (String(row.name ?? '?')[0] ?? '?').toUpperCase();
   avatar.style.cssText =
     'display:grid;place-items:center;width:2rem;height:2rem;border-radius:999px;font-size:12px;font-weight:700;' +
     'background:color-mix(in srgb,var(--ion-color-primary) 15%,transparent);color:var(--ion-color-primary)';
   const name = document.createElement('span');
-  name.textContent = String(row.full_name ?? row.name ?? '');
+  name.textContent = String(row.name ?? '');
   name.style.fontWeight = '500';
   wrap.append(avatar, name);
   return wrap;
@@ -315,45 +268,29 @@ function badgeCell(text: string, tone: 'success' | 'neutral' | 'primary' | 'dang
   return span;
 }
 
-const employeeColumns = computed<DataTableColumn[]>(() => [
-  { key: 'full_name', header: t('employees.colEmployee'), render: nameCell },
-  { key: 'email', header: t('employees.colEmail'), format: (row) => String(row.email ?? '—') || '—' },
-  { key: 'role_name', header: t('employees.colRole'), filterable: true, filterType: 'select' },
+const userColumns = computed<DataTableColumn[]>(() => [
+  { key: 'name', header: t('employees.colEmployee'), render: nameCell },
+  { key: 'email', header: t('employees.colEmail'), format: (row) => String(row.email ?? '') || '—' },
   {
-    key: 'status',
-    header: t('employees.colStatus'),
+    key: 'role',
+    header: t('employees.colRole'),
     filterable: true,
     filterType: 'select',
-    render: (row) => badgeCell(
-      t(`employees.status.${String(row.status ?? 'inactive')}`),
-      row.status === 'active' ? 'success' : row.status === 'terminated' ? 'danger' : 'neutral',
-    ),
+    format: (row) => roleLabel(String(row.role ?? '')),
   },
   {
-    key: 'hire_date',
-    header: t('employees.colCreatedAt'),
-    filterable: true,
-    filterType: 'daterange',
-    format: (row) => fmtDate(String(row.hire_date ?? '')),
-  },
-]);
-
-const userColumns = computed<DataTableColumn[]>(() => [
-  { key: 'name', header: t('employees.colUser'), render: nameCell },
-  { key: 'email', header: t('employees.colEmail'), format: (row) => String(row.email ?? '') || '—' },
-  { key: 'role', header: t('employees.colRole'), filterable: true, filterType: 'select' },
-  {
-    key: 'access',
+    // Cómo entra cada uno: PIN local (personal de tienda), cuenta online (owner/admin del portal)
+    // o NINGUNA — alguien dado de alta como persona que no inicia sesión en el Hub.
+    key: 'has_pin',
     header: t('employees.colAccess'),
-    render: (row) => badgeCell(
-      row.access === 'pin' ? t('employees.accessPin') : t('employees.accessCloud'),
-      row.access === 'pin' ? 'primary' : 'neutral',
-    ),
+    render: (row) => {
+      const access = accessOf(row as unknown as HubUser);
+      return badgeCell(
+        t(`employees.access.${access}`),
+        access === 'pin' ? 'primary' : access === 'cloud' ? 'neutral' : 'danger',
+      );
+    },
   },
-]);
-
-const roleColumns = computed<DataTableColumn[]>(() => [
-  { key: 'name', header: t('employees.colRole') },
   {
     key: 'is_active',
     header: t('employees.colStatus'),
@@ -361,106 +298,99 @@ const roleColumns = computed<DataTableColumn[]>(() => [
     filterType: 'select',
     render: (row) => badgeCell(
       row.is_active ? t('employees.active') : t('employees.inactive'),
-      row.is_active ? 'primary' : 'neutral',
+      row.is_active ? 'success' : 'neutral',
     ),
   },
-  { key: 'member_count', header: t('employees.colMembers'), align: 'center' },
-  { key: 'description', header: t('employees.roleDescription'), format: (row) => String(row.description ?? '—') },
+  {
+    key: 'created_at',
+    header: t('employees.colCreatedAt'),
+    filterable: true,
+    filterType: 'daterange',
+    format: (row) => fmtDate(String(row.created_at ?? '')),
+  },
 ]);
 
-const staffRowActions = computed<DataTableAction[]>(() => [
-  { id: 'edit', label: t('employees.actionEdit'), icon: 'pencil' },
-  { id: 'delete', label: t('employees.actionDelete'), icon: 'trash', color: 'danger' },
+const roleColumns = computed<DataTableColumn[]>(() => [
+  { key: 'name', header: t('employees.colRole'), format: (row) => roleLabel(String(row.name ?? '')) },
+  { key: 'members', header: t('employees.colMembers'), align: 'center' },
+  { key: 'permissions', header: t('employees.colPermissions'), align: 'center' },
 ]);
 
-async function loadStaff(): Promise<void> {
+const userRowActions = computed<DataTableAction[]>(() =>
+  isAdmin.value
+    ? [
+        { id: 'edit', label: t('employees.actionEdit'), icon: 'pencil' },
+        { id: 'delete', label: t('employees.actionDeactivate'), icon: 'person-remove', color: 'danger' },
+      ]
+    : [],
+);
+
+async function load(): Promise<void> {
   loading.value = true;
-  staffLoadError.value = false;
-  const [memberResult, roleResult] = await Promise.allSettled([
-    client.queryPage<Row>('staff.members.list', { limit: 200 }),
-    client.queryPage<Row>('staff.roles.list', { limit: 200 }),
-  ]);
-  employees.value = memberResult.status === 'fulfilled' ? memberResult.value.rows : [];
-  roles.value = roleResult.status === 'fulfilled' ? roleResult.value.rows : [];
-  staffLoadError.value = memberResult.status === 'rejected' || roleResult.status === 'rejected';
+  loadError.value = false;
+  const [userResult, roleResult] = await Promise.allSettled([listHubUsers(), listHubRoles()]);
+  users.value = userResult.status === 'fulfilled' ? userResult.value : [];
+  roles.value = roleResult.status === 'fulfilled' ? roleResult.value : [];
+  loadError.value = userResult.status === 'rejected' || roleResult.status === 'rejected';
   loading.value = false;
 }
 
-async function createEmployee(): Promise<void> {
-  if (!staffForm.firstName.trim() || !staffForm.lastName.trim()) return;
-  staffSaving.value = true;
-  staffFormError.value = '';
+async function createUser(): Promise<void> {
+  if (!form.name.trim()) return;
+  saving.value = true;
+  formError.value = '';
   try {
-    await client.command('staff.members.create', {
-      first_name: staffForm.firstName.trim(),
-      last_name: staffForm.lastName.trim(),
-      email: staffForm.email.trim(),
-      role_id: staffForm.roleId || null,
-      is_bookable: 1,
-      status: 'active',
+    await createHubUser({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      role: form.role || 'employee',
+      pin: form.pin.trim(),
     });
-    Object.assign(staffForm, { firstName: '', lastName: '', email: '', roleId: '' });
+    Object.assign(form, { name: '', email: '', role: 'employee', pin: '' });
     staffTable.value?.close?.();
-    await loadStaff();
+    await load();
     void toast(t('employees.created'), 'success');
   } catch (error) {
-    staffFormError.value = error instanceof Error ? error.message : t('employees.saveError');
+    formError.value = error instanceof Error ? error.message : t('employees.saveError');
   } finally {
-    staffSaving.value = false;
+    saving.value = false;
   }
 }
 
-async function createRole(): Promise<void> {
-  if (!roleForm.name.trim()) return;
-  roleSaving.value = true;
-  roleFormError.value = '';
-  try {
-    await client.command('staff.roles.create', {
-      name: roleForm.name.trim(),
-      description: roleForm.description.trim(),
-      color: '',
-      order: 0,
-    });
-    Object.assign(roleForm, { name: '', description: '' });
-    rolesTable.value?.close?.();
-    await loadStaff();
-    void toast(t('employees.roleCreated'), 'success');
-  } catch (error) {
-    roleFormError.value = error instanceof Error ? error.message : t('employees.saveError');
-  } finally {
-    roleSaving.value = false;
+async function deactivateUser(row: Row): Promise<void> {
+  const id = String(row.id ?? '');
+  // Espejo del guard del runtime: si el servidor lo rechazaría, ni se pregunta.
+  if (!canDeactivate(users.value, user.value?.id ?? '', id)) {
+    void toast(t('employees.deactivateBlocked'), 'warning');
+    return;
   }
-}
-
-async function deleteEmployee(row: Row): Promise<void> {
   const alert = await alertController.create({
-    header: t('employees.deleteTitle'),
-    message: t('employees.deleteBody', { name: String(row.full_name ?? '') }),
+    header: t('employees.deactivateTitle'),
+    message: t('employees.deactivateBody', { name: String(row.name ?? '') }),
     buttons: [
       { text: t('employeeForm.cancel'), role: 'cancel' },
-      { text: t('employees.actionDelete'), role: 'confirm', cssClass: 'alert-button-danger' },
+      { text: t('employees.actionDeactivate'), role: 'confirm', cssClass: 'alert-button-danger' },
     ],
   });
   await alert.present();
   const result = await alert.onDidDismiss();
   if (result.role !== 'confirm') return;
   try {
-    await client.command('staff.members.delete', { staff_id: String(row.id) });
-    await loadStaff();
-    void toast(t('employees.deleted'), 'success');
-  } catch {
-    void toast(t('employees.deleteError'), 'danger');
+    await deactivateHubUser(id);
+    await load();
+    void toast(t('employees.deactivated'), 'success');
+  } catch (error) {
+    void toast(error instanceof Error ? error.message : t('employees.deleteError'), 'danger');
   }
 }
 
 const staffTable = ref<DataTableElement | null>(null);
-const usersTable = ref<DataTableElement | null>(null);
 const rolesTable = ref<DataTableElement | null>(null);
 
-function handleStaffRowAction(event: Event): void {
+function handleUserRowAction(event: Event): void {
   const { actionId, row } = (event as CustomEvent<{ actionId: string; row: Row }>).detail;
   if (actionId === 'edit' && row.id) void router.push(`/employees/${encodeURIComponent(String(row.id))}`);
-  if (actionId === 'delete' && row.id) void deleteEmployee(row);
+  if (actionId === 'delete' && row.id) void deactivateUser(row);
 }
 
 function bindTable(element: DataTableElement | null, rowHandler?: (event: Event) => void): void {
@@ -472,20 +402,18 @@ function bindTable(element: DataTableElement | null, rowHandler?: (event: Event)
   }
 }
 
-watch(staffTable, (element) => bindTable(element, handleStaffRowAction));
-watch(usersTable, (element) => bindTable(element));
+watch(staffTable, (element) => bindTable(element, handleUserRowAction));
 watch(rolesTable, (element) => bindTable(element));
 watch(locale, () => {
-  bindTable(staffTable.value, handleStaffRowAction);
-  bindTable(usersTable.value);
+  bindTable(staffTable.value, handleUserRowAction);
   bindTable(rolesTable.value);
 });
 
 onMounted(() => {
-  void loadStaff();
+  void load();
 });
 onBeforeUnmount(() => {
-  staffTable.value?.removeEventListener('rowAction', handleStaffRowAction);
+  staffTable.value?.removeEventListener('rowAction', handleUserRowAction);
 });
 </script>
 

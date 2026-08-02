@@ -1,3 +1,9 @@
+<!--
+  Ficha de un usuario del Hub (Personal → editar). CORE: edita `hub_user` vía /api/hub/users/{id},
+  no el módulo `staff`. Campos = los que el core conoce de una identidad: nombre visible, email del
+  perfil, rol (permisos), estado (alta/baja) y PIN local. El alta rápida vive en la tabla; esta
+  pantalla es la edición detallada de /employees/:id.
+-->
 <template>
   <AppPage
     :title="isEdit ? t('employeeForm.titleEdit') : t('employeeForm.titleNew')"
@@ -29,23 +35,13 @@
 
           <div class="form-grid">
             <ion-input
-              v-model="form.firstName"
-              :label="t('employeeForm.firstName')"
+              v-model="form.name"
+              :label="t('employeeForm.fullName')"
               label-placement="floating"
               fill="outline"
-              autocomplete="given-name"
-              :maxlength="100"
-              :error-text="submitted && !form.firstName.trim() ? t('employeeForm.required') : ''"
-              required
-            />
-            <ion-input
-              v-model="form.lastName"
-              :label="t('employeeForm.lastName')"
-              label-placement="floating"
-              fill="outline"
-              autocomplete="family-name"
-              :maxlength="100"
-              :error-text="submitted && !form.lastName.trim() ? t('employeeForm.required') : ''"
+              autocomplete="name"
+              :maxlength="150"
+              :error-text="submitted && !form.name.trim() ? t('employeeForm.required') : ''"
               required
             />
             <ion-input
@@ -58,57 +54,51 @@
               :maxlength="254"
               :error-text="submitted && !emailValid ? t('employeeForm.invalidEmail') : ''"
             />
-            <ion-input
-              v-model="form.phone"
-              :label="t('employeeForm.phone')"
-              label-placement="floating"
-              fill="outline"
-              type="tel"
-              autocomplete="tel"
-              :maxlength="20"
-            />
             <ion-select
-              v-model="form.roleId"
+              v-model="form.role"
               :label="t('employeeForm.role')"
               label-placement="floating"
               fill="outline"
               interface="popover"
             >
-              <ion-select-option value="">{{ t('employeeForm.noRole') }}</ion-select-option>
-              <ion-select-option v-for="role in roles" :key="String(role.id)" :value="String(role.id)">
-                {{ role.name }}
+              <ion-select-option v-for="role in roles" :key="role.name" :value="role.name">
+                {{ roleLabel(role.name) }}
               </ion-select-option>
             </ion-select>
-            <ion-select
-              v-model="form.status"
-              :label="t('employeeForm.status')"
-              label-placement="floating"
-              fill="outline"
-              interface="popover"
-            >
-              <ion-select-option value="active">{{ t('employees.status.active') }}</ion-select-option>
-              <ion-select-option value="inactive">{{ t('employees.status.inactive') }}</ion-select-option>
-              <ion-select-option value="on_leave">{{ t('employees.status.on_leave') }}</ion-select-option>
-              <ion-select-option value="terminated">{{ t('employees.status.terminated') }}</ion-select-option>
-            </ion-select>
+            <!-- PIN local: en blanco = no se toca. Escribirlo lo cambia; «retirar» lo deja sin
+                 acceso por PIN (seguirá pudiendo entrar por Cloud si tiene cuenta). -->
             <ion-input
-              v-model="form.hireDate"
-              :label="t('employeeForm.hireDate')"
+              v-model="form.pin"
+              :label="t('employeeForm.pin')"
               label-placement="floating"
               fill="outline"
-              type="date"
+              inputmode="numeric"
+              :maxlength="8"
+              :helper-text="hasPin ? t('employeeForm.pinSetHelp') : t('employeeForm.pinHelp')"
             />
           </div>
 
           <ion-toggle
-            :checked="form.isBookable"
+            :checked="form.isActive"
             label-placement="start"
             justify="space-between"
             class="active-toggle"
-            @ion-change="form.isBookable = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
+            @ion-change="form.isActive = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
           >
-            {{ t('employeeForm.bookable') }}
+            {{ t('employeeForm.activeUser') }}
           </ion-toggle>
+
+          <ion-button
+            v-if="hasPin"
+            type="button"
+            fill="clear"
+            size="small"
+            class="clear-pin"
+            :disabled="saving"
+            @click="clearPin"
+          >
+            {{ t('employeeForm.clearPin') }}
+          </ion-button>
 
           <div class="form-actions">
             <ion-button type="button" fill="outline" :disabled="saving" @click="onCancel">
@@ -141,46 +131,31 @@ import {
   alertController,
 } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
-import { getClient } from '../lib/runtime';
+import {
+  createHubUser,
+  listHubRoles,
+  listHubUsers,
+  updateHubUser,
+  type HubRole,
+  type HubUserPatch,
+} from '../lib/hub-users';
 import { toast } from '../lib/toast';
-
-interface StaffRole {
-  id: string;
-  name: string;
-}
-
-interface StaffMember {
-  id: string;
-  first_name?: string;
-  last_name?: string;
-  email?: string;
-  phone?: string;
-  role_id?: string | null;
-  status?: EmployeeStatus;
-  hire_date?: string | null;
-  is_bookable?: number | boolean;
-}
-
-type EmployeeStatus = 'active' | 'inactive' | 'on_leave' | 'terminated';
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
-const client = getClient();
 const isEdit = computed(() => typeof route.params.id === 'string' && route.params.id.length > 0);
 
 const form = reactive({
-  firstName: '',
-  lastName: '',
+  name: '',
   email: '',
-  phone: '',
-  roleId: '',
-  status: 'active' as EmployeeStatus,
-  hireDate: '',
-  isBookable: true,
+  role: 'employee',
+  pin: '',
+  isActive: true,
 });
 
-const roles = ref<StaffRole[]>([]);
+const roles = ref<HubRole[]>([]);
+const hasPin = ref(false);
 const loading = ref(true);
 const saving = ref(false);
 const loadError = ref(false);
@@ -188,13 +163,20 @@ const saveError = ref('');
 const submitted = ref(false);
 const dirty = ref(false);
 let snapshot = '';
+/** Estado guardado, para mandar en el PUT solo lo que cambia. */
+let initial = { name: '', email: '', role: '', isActive: true };
 
 const emailValid = computed(() =>
   !form.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()),
 );
-const canSubmit = computed(() =>
-  Boolean(form.firstName.trim() && form.lastName.trim() && emailValid.value),
-);
+const canSubmit = computed(() => Boolean(form.name.trim() && emailValid.value));
+
+/** Etiqueta traducida de un rol conocido; los que aporta un módulo se muestran tal cual. */
+function roleLabel(role: string): string {
+  const key = `employees.roles.${role}`;
+  const label = t(key);
+  return label === key ? role : label;
+}
 
 function serializeForm(): string {
   return JSON.stringify(form);
@@ -209,23 +191,25 @@ async function load(): Promise<void> {
   loading.value = true;
   loadError.value = false;
   try {
-    roles.value = await client.query<StaffRole[]>('staff.roles.list');
+    roles.value = await listHubRoles();
     if (isEdit.value) {
-      const rows = await client.query<StaffMember[]>('staff.members.get', {
-        staff_id: String(route.params.id),
-      });
-      const member = rows[0];
-      if (!member) throw new Error(t('employeeForm.notFound'));
+      const id = String(route.params.id);
+      const target = (await listHubUsers()).find((u) => u.id === id);
+      if (!target) throw new Error(t('employeeForm.notFound'));
+      hasPin.value = target.has_pin;
       Object.assign(form, {
-        firstName: member.first_name ?? '',
-        lastName: member.last_name ?? '',
-        email: member.email ?? '',
-        phone: member.phone ?? '',
-        roleId: member.role_id ?? '',
-        status: member.status ?? 'active',
-        hireDate: member.hire_date ?? '',
-        isBookable: Boolean(member.is_bookable),
+        name: target.name,
+        email: target.email,
+        role: target.role,
+        pin: '',
+        isActive: target.is_active,
       });
+      initial = {
+        name: target.name,
+        email: target.email,
+        role: target.role,
+        isActive: target.is_active,
+      };
     }
     markClean();
   } catch {
@@ -235,29 +219,35 @@ async function load(): Promise<void> {
   }
 }
 
+/** Retira el PIN del usuario (queda sin acceso local). Se aplica al guardar. */
+function clearPin(): void {
+  form.pin = '';
+  hasPin.value = false;
+  dirty.value = true;
+}
+
 async function onSave(): Promise<void> {
   submitted.value = true;
   if (!canSubmit.value) return;
   saving.value = true;
   saveError.value = '';
-  const payload = {
-    first_name: form.firstName.trim(),
-    last_name: form.lastName.trim(),
-    email: form.email.trim(),
-    phone: form.phone.trim(),
-    role_id: form.roleId || null,
-    status: form.status,
-    hire_date: form.hireDate || null,
-    is_bookable: form.isBookable ? 1 : 0,
-  };
+  const name = form.name.trim();
+  const email = form.email.trim();
+  const pin = form.pin.trim();
   try {
     if (isEdit.value) {
-      await client.command('staff.members.update', {
-        staff_id: String(route.params.id),
-        ...payload,
-      });
+      // Parcial: solo viaja lo que cambió. `pin: ''` solo si se pulsó «retirar PIN» — un campo
+      // vacío sin tocar nada no debe borrarle el PIN a nadie.
+      const patch: HubUserPatch = {};
+      if (name !== initial.name) patch.name = name;
+      if (email !== initial.email) patch.email = email;
+      if (form.role !== initial.role) patch.role = form.role;
+      if (form.isActive !== initial.isActive) patch.is_active = form.isActive;
+      if (pin) patch.pin = pin;
+      else if (!hasPin.value) patch.pin = '';
+      await updateHubUser(String(route.params.id), patch);
     } else {
-      await client.command('staff.members.create', payload);
+      await createHubUser({ name, email, role: form.role || 'employee', pin });
     }
     markClean();
     void toast(isEdit.value ? t('employees.updated') : t('employees.created'), 'success');
@@ -320,6 +310,11 @@ watch(form, () => {
 .active-toggle {
   width: 100%;
   padding-block: 0.25rem;
+}
+
+.clear-pin {
+  align-self: flex-start;
+  --color: var(--ion-color-danger);
 }
 
 .form-actions {

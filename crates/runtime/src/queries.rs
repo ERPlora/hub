@@ -45,6 +45,15 @@ pub async fn execute_page(
     params: &Params,
     ctx: &RequestContext,
 ) -> Result<QueryPage> {
+    // **Namespace reservado del core** (ADR-0188): `hub.*` no pertenece a ningún módulo — lo sirve
+    // el propio runtime. Un módulo no puede pegar a las rutas HTTP del core (el contrato es
+    // WC → SDK → dispatcher), así que la identidad del hub se ofrece como una query más, con el
+    // mismo gate de permisos. Va ANTES del registry: ningún módulo puede suplantarla.
+    if let Some(rest) = name.strip_prefix(crate::hub_users::CORE_NAMESPACE) {
+        let rows = crate::hub_users::core_query(db, registry, &ctx.hub_id, name, rest, ctx).await?;
+        let total = rows.len() as u64;
+        return Ok(QueryPage { rows, total, limit: total, offset: 0 });
+    }
     let q = registry.get_query(name).ok_or_else(|| {
         // Tres ausencias distintas, tres errores (ADR-0127/0128): módulo NO instalado y módulo
         // DESACTIVADO son ausencias que `queryOptional` perdona; una query inexistente en un

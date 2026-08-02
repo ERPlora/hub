@@ -138,7 +138,7 @@ pub struct AddMemberReq {
 
 /// Mapea un [`MembersError`] a la respuesta HTTP del handler admin. El alta/baja **local** ya se
 /// aplicó (idempotente); esto reporta que la parte SaaS falló, con un status honesto.
-fn members_error_response(e: MembersError) -> Response {
+pub(crate) fn members_error_response(e: MembersError) -> Response {
     let (code, kind) = match &e {
         // Bootstrap incompleto: el hub no está enrolado → no puede administrar el acceso en el SaaS.
         MembersError::NoMachineToken => (StatusCode::CONFLICT, "not_enrolled"),

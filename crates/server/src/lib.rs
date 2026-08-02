@@ -39,6 +39,7 @@ pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
 pub mod export_import;
+pub mod hub_users;
 pub mod reset;
 pub mod ingest;
 pub mod install;
@@ -614,6 +615,20 @@ pub fn app(state: AppState) -> Router {
             "/api/settings",
             get(settings::get_settings).put(settings::put_settings),
         )
+        // Personal (core): los usuarios REALES del hub (`hub_user`) — incluido el owner, que entra
+        // por Cloud y no tiene PIN. GET = cualquier sesión; alta/edición/baja = sesión admin. La
+        // pantalla de Personal NO depende del módulo `staff` (que es otra cosa: profesional
+        // reservable, comisiones, horarios). Ver `crate::hub_users`.
+        .route(
+            "/api/hub/users",
+            get(hub_users::list_users).post(hub_users::create_user),
+        )
+        .route(
+            "/api/hub/users/:id",
+            axum::routing::put(hub_users::update_user)
+                .delete(hub_users::deactivate_user),
+        )
+        .route("/api/hub/roles", get(hub_users::list_roles))
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
             "/api/profile",
