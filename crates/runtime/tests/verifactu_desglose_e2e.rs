@@ -33,6 +33,44 @@ fn wasm() -> bool {
     mdir("invoice").join("dist/handler.wasm").exists()
 }
 
+/// `(tipo %, base en céntimos, cuota en céntimos)` de cada línea del `tax_breakdown`, **sea cual
+/// sea la generación del contrato** (hub#292):
+///
+/// - **array** — una entrada por clave fiscal completa (`tax`/`regime`/`class`/`rate`/`base`/
+///   `quota`), que es lo que emite `invoice` desde que la calificación dejó de ser literal;
+/// - **objeto** — clave = tipo, `{base, tax}`, el formato de las facturas ya encadenadas.
+///
+/// La tolerancia es DELIBERADA y no afloja el test: este fichero vive en el repo `hub` y lee el
+/// módulo `invoice` **del disco**, que es otro repo con su propio PR. Atarlo a una sola forma
+/// haría que el CI del hub dependiera del orden en que se mergean los dos. Lo que el test asegura
+/// —que invoice produce una entrada por tipo REAL, con base y cuota en céntimos, y no un tipo
+/// efectivo inventado— es idéntico en ambas.
+fn lineas_de_desglose(tb: &Value) -> Vec<(f64, i64, i64)> {
+    let cents = |v: &Value| v.as_i64().expect("céntimos i64");
+    match tb {
+        Value::Array(entradas) => entradas
+            .iter()
+            .map(|e| {
+                (
+                    e["rate"].as_f64().unwrap_or(0.0),
+                    cents(&e["base"]),
+                    cents(&e["quota"]),
+                )
+            })
+            .collect(),
+        Value::Object(map) => map
+            .iter()
+            .filter_map(|(k, v)| {
+                k.trim()
+                    .parse::<f64>()
+                    .ok()
+                    .map(|r| (r, cents(&v["base"]), cents(&v["tax"])))
+            })
+            .collect(),
+        _ => panic!("tax_breakdown no es ni array ni objeto: {tb}"),
+    }
+}
+
 async fn rt_invoice() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
@@ -77,23 +115,24 @@ async fn factura_mixta_produce_un_desglose_por_tipo_para_verifactu() {
     let tb: Value =
         serde_json::from_str(inv["tax_breakdown"].as_str().expect("tax_breakdown string"))
             .expect("tax_breakdown es JSON");
-    let by_rate = tb.as_object().expect("tax_breakdown es objeto por tipo");
+    let lineas = lineas_de_desglose(&tb);
 
     // Dos tipos reales, NO uno solo con el efectivo. Este es el corazón del arreglo.
-    let rates: Vec<f64> = by_rate.keys().filter_map(|k| k.trim().parse().ok()).collect();
-    assert_eq!(by_rate.len(), 2, "una entrada por tipo real, no una agregada: {tb}");
-    assert!(rates.contains(&21.0), "falta el 21%: {tb}");
-    assert!(rates.contains(&10.0), "falta el 10%: {tb}");
-    assert!(!rates.iter().any(|r| (*r - 17.33).abs() < 0.01), "el tipo efectivo no debe aparecer: {tb}");
+    assert_eq!(lineas.len(), 2, "una entrada por tipo real, no una agregada: {tb}");
+    let de = |rate: f64| {
+        lineas
+            .iter()
+            .find(|(r, _, _)| (r - rate).abs() < 0.01)
+            .unwrap_or_else(|| panic!("falta el {rate}%: {tb}"))
+    };
+    assert!(
+        !lineas.iter().any(|(r, _, _)| (r - 17.33).abs() < 0.01),
+        "el tipo efectivo no debe aparecer: {tb}"
+    );
 
     // Base y cuota por tipo, en céntimos (el contrato que espera `aeat::desglose`).
-    let cents = |rate: &str, field: &str| by_rate[rate][field].as_i64().expect("céntimos i64");
-    let k21 = by_rate.keys().find(|k| k.trim().parse::<f64>() == Ok(21.0)).unwrap().clone();
-    let k10 = by_rate.keys().find(|k| k.trim().parse::<f64>() == Ok(10.0)).unwrap().clone();
-    assert_eq!(cents(&k21, "base"), 1000);
-    assert_eq!(cents(&k21, "tax"), 210);
-    assert_eq!(cents(&k10, "base"), 500);
-    assert_eq!(cents(&k10, "tax"), 50);
+    assert_eq!((de(21.0).1, de(21.0).2), (1000, 210));
+    assert_eq!((de(10.0).1, de(10.0).2), (500, 50));
 
     // Coherencia con los totales de cabecera (lo que alimenta CuotaTotal/ImporteTotal del XML).
     assert_eq!(inv["tax_amount"].as_i64().unwrap(), 260);

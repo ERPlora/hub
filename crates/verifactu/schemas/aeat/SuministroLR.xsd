@@ -16,7 +16,7 @@
 			<documentation xml:lang="es">Datos correspondientes a los registros de facturacion</documentation>
 		</annotation>
 		<sequence>
-			<choice> 
+			<choice>
 				<element ref="sf:RegistroAlta"/>
 				<element ref="sf:RegistroAnulacion"/>
 			</choice>

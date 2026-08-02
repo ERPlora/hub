@@ -241,6 +241,24 @@
 			<element name="IndicadorMultiplesOT" type="sf:SiNoType"/>
 		</sequence>
 	</complexType>
+	<complexType name="SistemaInformaticoConsultaType">
+		<sequence>
+			<sequence>
+				<element name="NombreRazon" type="sf:TextMax120Type"/>
+				<choice>
+					<element name="NIF" type="sf:NIFType"/>
+					<element name="IDOtro" type="sf:IDOtroType"/>
+				</choice>
+			</sequence>
+			<element name="NombreSistemaInformatico" type="sf:TextMax30Type" minOccurs="0"/>
+			<element name="IdSistemaInformatico" type="sf:TextMax2Type"/>
+			<element name="Version" type="sf:TextMax50Type" minOccurs="0"/>
+			<element name="NumeroInstalacion" type="sf:TextMax100Type"/>
+			<element name="TipoUsoPosibleSoloVerifactu" type="sf:SiNoType" minOccurs="0"/>
+			<element name="TipoUsoPosibleMultiOT" type="sf:SiNoType" minOccurs="0"/>
+			<element name="IndicadorMultiplesOT" type="sf:SiNoType" minOccurs="0"/>
+		</sequence>
+	</complexType>
 	<complexType name="IDFacturaExpedidaType">
 		<annotation>
 			<documentation xml:lang="es"> Datos de identificación de factura </documentation>
@@ -678,36 +696,14 @@
 	</simpleType>
 	<simpleType name="OperacionExentaType">
 		<restriction base="string">
-			<enumeration value="E1">
-				<annotation>
-					<documentation xml:lang="es">EXENTA por Art. 20 </documentation>
-				</annotation>
-			</enumeration>
-			<enumeration value="E2">
-				<annotation>
-					<documentation xml:lang="es">EXENTA por Art. 21</documentation>
-				</annotation>
-			</enumeration>
-			<enumeration value="E3">
-				<annotation>
-					<documentation xml:lang="es">EXENTA por Art. 22</documentation>
-				</annotation>
-			</enumeration>
-			<enumeration value="E4">
-				<annotation>
-					<documentation xml:lang="es">EXENTA por Art. 24</documentation>
-				</annotation>
-			</enumeration>
-			<enumeration value="E5">
-				<annotation>
-					<documentation xml:lang="es">EXENTA por Art. 25</documentation>
-				</annotation>
-			</enumeration>
-			<enumeration value="E6">
-				<annotation>
-					<documentation xml:lang="es">EXENTA otros</documentation>
-				</annotation>
-			</enumeration>
+			<enumeration value="E1"/>
+			<enumeration value="E2"/>
+			<enumeration value="E3"/>
+			<enumeration value="E4"/>
+			<enumeration value="E5"/>
+			<enumeration value="E6"/>
+			<enumeration value="E7"/>
+			<enumeration value="E8"/>
 		</restriction>
 	</simpleType>
 	<!-- Códigos de Tipo de factura -->
@@ -960,6 +956,7 @@
 			<enumeration value="18"/>
 			<enumeration value="19"/>
 			<enumeration value="20"/>
+			<enumeration value="21"/>
 		</restriction>
 	</simpleType>
 	<!-- ISO 3166-1 alpha-2 codes -->
@@ -1148,6 +1145,7 @@
 			<enumeration value="RW"/>
 			<enumeration value="RO"/>
 			<enumeration value="RU"/>
+			<enumeration value="RE"/>
 			<enumeration value="SB"/>
 			<enumeration value="SV"/>
 			<enumeration value="WS"/>

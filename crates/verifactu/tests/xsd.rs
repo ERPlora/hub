@@ -202,3 +202,264 @@ fn el_orden_del_validador_sale_del_xsd_oficial() {
         );
     }
 }
+
+// ── DetalleDesglose: las reglas que el XSD NO atrapa (hub#292) ────────────────────────────
+//
+// Un desglose mal CALIFICADO valida contra el esquema igual de bien que uno correcto: los tipos
+// del XSD admiten cualquier combinación de `CalificacionOperacion` con `TipoImpositivo` y
+// `CuotaRepercutida`. Lo que rechaza la AEAT son las **validaciones** (documento «Validaciones ·
+// Sistemas Informáticos de Facturación y Sistemas VERI*FACTU» v1.2.2), y por eso van en código.
+
+/// Sustituye el bloque `Desglose` del XML por uno construido a mano, para poder probar detalles
+/// que el módulo nunca generaría (y que otro caller sí podría construir).
+fn con_desglose(detalle: &str) -> String {
+    let xml = xml_de(&alta("F2", ""));
+    let ini = xml.find("<sum1:Desglose>").expect("Desglose");
+    let fin = xml.find("</sum1:Desglose>").expect("cierre") + "</sum1:Desglose>".len();
+    format!(
+        "{}<sum1:Desglose>{detalle}</sum1:Desglose>{}",
+        &xml[..ini],
+        &xml[fin..]
+    )
+}
+
+const DETALLE_OK: &str = "<sum1:DetalleDesglose>\
+     <sum1:Impuesto>01</sum1:Impuesto>\
+     <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
+     <sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
+     <sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>\
+     <sum1:BaseImponibleOimporteNoSujeto>100.00</sum1:BaseImponibleOimporteNoSujeto>\
+     <sum1:CuotaRepercutida>21.00</sum1:CuotaRepercutida>\
+     </sum1:DetalleDesglose>";
+
+#[test]
+fn un_detalle_bien_calificado_pasa() {
+    xsd::validate_registro(&con_desglose(DETALLE_OK)).expect("venta nacional al 21 %");
+}
+
+/// **Error 1237.** Es la regla que más caro sale descubrir tarde, porque el XSD la deja pasar.
+#[test]
+fn el_1237_no_deja_informar_tipo_ni_cuota_con_n2() {
+    let malo = DETALLE_OK.replace(
+        "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+        "<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>",
+    );
+    let err = xsd::validate_registro(&con_desglose(&malo)).expect_err("N2 con tipo y cuota");
+    let msg = err.to_string();
+    assert!(msg.contains("1237"), "el código de la AEAT, para buscarlo: {msg}");
+    assert!(msg.contains("TipoImpositivo") || msg.contains("CuotaRepercutida"), "{msg}");
+}
+
+/// El régimen 17 (OSS) **no** es una excepción al 1237 desde la revisión v1.0.6 (25/04/2025) del
+/// documento de validaciones. Este test es el que impide reintroducir el mapeo del SaaS.
+#[test]
+fn el_regimen_17_tampoco_deja_informar_tipo_con_n2() {
+    let malo = DETALLE_OK
+        .replace(
+            "<sum1:ClaveRegimen>01</sum1:ClaveRegimen>",
+            "<sum1:ClaveRegimen>17</sum1:ClaveRegimen>",
+        )
+        .replace(
+            "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+            "<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>",
+        );
+    let err = xsd::validate_registro(&con_desglose(&malo)).expect_err("17 no salva del 1237");
+    assert!(err.to_string().contains("1237"), "{err}");
+}
+
+/// **§15.5.** Con `OperacionExenta` no se informan tipo, cuota ni recargo.
+#[test]
+fn una_exenta_no_puede_llevar_tipo_ni_cuota() {
+    let malo = DETALLE_OK.replace(
+        "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+        "<sum1:OperacionExenta>E1</sum1:OperacionExenta>",
+    );
+    let err = xsd::validate_registro(&con_desglose(&malo)).expect_err("exenta con tipo");
+    assert!(err.to_string().contains("OperacionExenta"), "{err}");
+}
+
+/// El `<choice>` del XSD: ni los dos, ni ninguno.
+#[test]
+fn calificacion_y_exenta_son_excluyentes() {
+    let ambos = DETALLE_OK.replace(
+        "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+        "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
+         <sum1:OperacionExenta>E1</sum1:OperacionExenta>",
+    );
+    assert!(xsd::validate_registro(&con_desglose(&ambos)).is_err(), "los dos a la vez");
+
+    let ninguno = DETALLE_OK.replace(
+        "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+        "",
+    );
+    assert!(xsd::validate_registro(&con_desglose(&ninguno)).is_err(), "ninguno de los dos");
+}
+
+/// **§15.4.** `S2` exige `TipoImpositivo = 0` y `CuotaRepercutida = 0` **presentes**: es el caso
+/// que se comporta al revés que N1/N2, y confundirlos es un rechazo.
+#[test]
+fn la_s2_exige_ceros_explicitos() {
+    let sin_ceros = "<sum1:DetalleDesglose>\
+         <sum1:Impuesto>01</sum1:Impuesto>\
+         <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
+         <sum1:CalificacionOperacion>S2</sum1:CalificacionOperacion>\
+         <sum1:BaseImponibleOimporteNoSujeto>100.00</sum1:BaseImponibleOimporteNoSujeto>\
+         </sum1:DetalleDesglose>";
+    let err = xsd::validate_registro(&con_desglose(sin_ceros)).expect_err("S2 sin ceros");
+    assert!(err.to_string().contains("S2"), "{err}");
+
+    let con_ceros = DETALLE_OK
+        .replace(
+            "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+            "<sum1:CalificacionOperacion>S2</sum1:CalificacionOperacion>",
+        )
+        .replace("21.00</sum1:TipoImpositivo>", "0.00</sum1:TipoImpositivo>")
+        .replace("21.00</sum1:CuotaRepercutida>", "0.00</sum1:CuotaRepercutida>");
+    xsd::validate_registro(&con_desglose(&con_ceros)).expect("S2 con ceros explícitos");
+}
+
+/// **§15.6.6.** `ClaveRegimen 08` obliga a `N2`.
+#[test]
+fn el_regimen_08_exige_n2() {
+    let malo = DETALLE_OK.replace(
+        "<sum1:ClaveRegimen>01</sum1:ClaveRegimen>",
+        "<sum1:ClaveRegimen>08</sum1:ClaveRegimen>",
+    );
+    let err = xsd::validate_registro(&con_desglose(&malo)).expect_err("08 con S1");
+    assert!(err.to_string().contains("08"), "{err}");
+}
+
+/// **§15.1.** Con IVA y `S1`, la AEAT solo admite `0; 2; 4; 5; 7,5; 10; 21`. Ahí es donde
+/// aterrizaba el recargo de equivalencia cuando salía como una línea con `TipoImpositivo 5,20`.
+#[test]
+fn un_tipo_que_no_es_de_iva_no_sale_a_la_red() {
+    let malo = DETALLE_OK.replace("21.00</sum1:TipoImpositivo>", "5.20</sum1:TipoImpositivo>");
+    let err = xsd::validate_registro(&con_desglose(&malo)).expect_err("5,20 % no es tipo de IVA");
+    assert!(err.to_string().contains("TipoImpositivo"), "{err}");
+}
+
+/// …y ese mismo 5,20 % **sí** es válido como recargo de equivalencia dentro de la línea del 21 %.
+#[test]
+fn el_recargo_de_equivalencia_es_valido_dentro_de_la_linea_del_iva() {
+    let bueno = DETALLE_OK.replace(
+        "</sum1:DetalleDesglose>",
+        "<sum1:TipoRecargoEquivalencia>5.20</sum1:TipoRecargoEquivalencia>\
+         <sum1:CuotaRecargoEquivalencia>5.20</sum1:CuotaRecargoEquivalencia>\
+         </sum1:DetalleDesglose>",
+    );
+    xsd::validate_registro(&con_desglose(&bueno)).expect("recargo en la línea del IVA");
+}
+
+/// El tipo de IGIC (7 %) NO está en la lista de tipos de IVA — y con `Impuesto 03` no tiene por
+/// qué estarlo. Confundir el ámbito de §15.1 haría imposible facturar en Canarias.
+#[test]
+fn un_tipo_de_igic_es_valido_con_impuesto_03() {
+    let canario = DETALLE_OK
+        .replace(
+            "<sum1:Impuesto>01</sum1:Impuesto>",
+            "<sum1:Impuesto>03</sum1:Impuesto>",
+        )
+        .replace("21.00</sum1:TipoImpositivo>", "7.00</sum1:TipoImpositivo>")
+        .replace("21.00</sum1:CuotaRepercutida>", "7.00</sum1:CuotaRepercutida>");
+    xsd::validate_registro(&con_desglose(&canario)).expect("IGIC al 7 %");
+}
+
+/// Enumeraciones: `Impuesto`, `CalificacionOperacion` y `OperacionExenta` son listas cerradas.
+#[test]
+fn las_enumeraciones_del_detalle_son_cerradas() {
+    for (de, a) in [
+        ("<sum1:Impuesto>01</sum1:Impuesto>", "<sum1:Impuesto>04</sum1:Impuesto>"),
+        (
+            "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+            "<sum1:CalificacionOperacion>S3</sum1:CalificacionOperacion>",
+        ),
+    ] {
+        let malo = DETALLE_OK.replace(de, a);
+        assert!(
+            xsd::validate_registro(&con_desglose(&malo)).is_err(),
+            "debería rechazar `{a}`"
+        );
+    }
+}
+
+/// `E7`/`E8` son exenciones **de IGIC**: con IVA no existen (§15.5).
+#[test]
+fn las_exenciones_e7_e8_son_solo_de_igic() {
+    let exenta = |impuesto: &str, causa: &str| {
+        format!(
+            "<sum1:DetalleDesglose>\
+             <sum1:Impuesto>{impuesto}</sum1:Impuesto>\
+             <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
+             <sum1:OperacionExenta>{causa}</sum1:OperacionExenta>\
+             <sum1:BaseImponibleOimporteNoSujeto>100.00</sum1:BaseImponibleOimporteNoSujeto>\
+             </sum1:DetalleDesglose>"
+        )
+    };
+    xsd::validate_registro(&con_desglose(&exenta("03", "E7"))).expect("E7 con IGIC");
+    assert!(
+        xsd::validate_registro(&con_desglose(&exenta("01", "E7"))).is_err(),
+        "E7 no existe con IVA"
+    );
+    xsd::validate_registro(&con_desglose(&exenta("01", "E1"))).expect("E1 con IVA");
+}
+
+/// El XSD limita `DetalleDesglose` a `maxOccurs="12"`, y un `Desglose` sin ningún detalle no es
+/// un desglose.
+#[test]
+fn el_desglose_lleva_entre_uno_y_doce_detalles() {
+    assert!(xsd::validate_registro(&con_desglose("")).is_err(), "sin detalle");
+    let trece = DETALLE_OK.repeat(13);
+    let err = xsd::validate_registro(&con_desglose(&trece)).expect_err("13 detalles");
+    assert!(err.to_string().contains("12"), "{err}");
+}
+
+/// El orden dentro del `DetalleType` también es `xs:sequence`.
+#[test]
+fn el_orden_dentro_del_detalle_es_parte_del_esquema() {
+    let desordenado = "<sum1:DetalleDesglose>\
+         <sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
+         <sum1:Impuesto>01</sum1:Impuesto>\
+         <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
+         <sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>\
+         <sum1:BaseImponibleOimporteNoSujeto>100.00</sum1:BaseImponibleOimporteNoSujeto>\
+         <sum1:CuotaRepercutida>21.00</sum1:CuotaRepercutida>\
+         </sum1:DetalleDesglose>";
+    let err = xsd::validate_registro(&con_desglose(desordenado)).expect_err("orden alterado");
+    assert!(err.to_string().contains("orden"), "{err}");
+}
+
+/// Las enumeraciones del validador tampoco pueden separarse del XSD oficial: si la AEAT añade un
+/// código (como `E7`/`E8` o la clave de régimen `21`, que faltaban en la copia que teníamos
+/// vendorizada), este test es el que se entera.
+#[test]
+fn las_enumeraciones_del_detalle_salen_del_xsd_oficial() {
+    let xsd_src = include_str!("../schemas/aeat/SuministroInformacion.xsd");
+    for (tipo, esperado) in [
+        ("ImpuestoType", xsd::IMPUESTO),
+        ("CalificacionOperacionType", xsd::CALIFICACION),
+        ("OperacionExentaType", xsd::OPERACION_EXENTA),
+        ("IdOperacionesTrascendenciaTributariaType", xsd::CLAVE_REGIMEN),
+    ] {
+        let del_esquema = xsd::enumeration_of(xsd_src, tipo)
+            .unwrap_or_else(|| panic!("{tipo} no está en el XSD vendorizado"));
+        assert_eq!(
+            del_esquema, esperado,
+            "la enumeración de {tipo} no coincide con el XSD oficial"
+        );
+    }
+}
+
+/// Y el orden del detalle sale del `xs:sequence` de `DetalleType`, no de una lista a mano.
+#[test]
+fn el_orden_del_detalle_sale_del_xsd_oficial() {
+    let xsd_src = include_str!("../schemas/aeat/SuministroInformacion.xsd");
+    let del_esquema = xsd::sequence_of(xsd_src, "DetalleType").expect("DetalleType");
+    // El `<choice>` no es un `<element>` del sequence, así que el scraper no lo ve: la tabla del
+    // validador lo intercala. Quitándolo, tiene que coincidir literalmente.
+    let sin_choice: Vec<&str> = xsd::ORDER_DETALLE
+        .iter()
+        .copied()
+        .filter(|e| *e != "CalificacionOperacion" && *e != "OperacionExenta")
+        .collect();
+    assert_eq!(del_esquema, sin_choice);
+}
