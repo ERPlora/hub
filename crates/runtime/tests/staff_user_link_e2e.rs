@@ -1,4 +1,4 @@
-//! **La ficha de `staff` cuelga de un usuario del Hub** (ADR-0188).
+//! **La ficha de `staff` cuelga de un usuario del Hub** (ADR-0192).
 //!
 //! `staff` es una capa de negocio SOBRE la identidad del core: el profesional que atiende es (casi
 //! siempre) alguien que existe en `hub_user`. La columna `staff_member.user_id` estaba en el

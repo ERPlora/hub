@@ -45,7 +45,7 @@ pub async fn execute_page(
     params: &Params,
     ctx: &RequestContext,
 ) -> Result<QueryPage> {
-    // **Namespace reservado del core** (ADR-0188): `hub.*` no pertenece a ningún módulo — lo sirve
+    // **Namespace reservado del core** (ADR-0192): `hub.*` no pertenece a ningún módulo — lo sirve
     // el propio runtime. Un módulo no puede pegar a las rutas HTTP del core (el contrato es
     // WC → SDK → dispatcher), así que la identidad del hub se ofrece como una query más, con el
     // mismo gate de permisos. Va ANTES del registry: ningún módulo puede suplantarla.

@@ -1,4 +1,4 @@
-//! Personal = **core** (ADR-0187): la pantalla de Personal del Hub lista los usuarios REALES del
+//! Personal = **core** (ADR-0191): la pantalla de Personal del Hub lista los usuarios REALES del
 //! hub (`hub_user`), no los miembros del módulo `staff`. El módulo `staff` es otra cosa (profesional
 //! reservable, comisiones, horarios) y trae su propia navegación; el core no depende de él.
 //!
