@@ -49,6 +49,17 @@ pub async fn install(
 ) -> Result<String> {
     let manifest = Manifest::load(dir)?;
 
+    // `hub` es el namespace RESERVADO del core (ADR-0188): el dispatcher resuelve `hub.*` antes de
+    // mirar el registry, así que un módulo con ese id tendría capacidades inalcanzables y aparentaría
+    // servir la identidad del propio Hub. Se rechaza en la frontera hostil (el zip de terceros).
+    if manifest.id == crate::hub_users::CORE_NAMESPACE.trim_end_matches('.') {
+        return Err(RuntimeError::Storage(format!(
+            "`{}` es un id reservado del core: ningún módulo puede ocupar el namespace `{}`",
+            manifest.id,
+            crate::hub_users::CORE_NAMESPACE
+        )));
+    }
+
     // `static_files.folder` es un nombre, nunca una ruta. Se vuelve a validar en runtime aunque el
     // toolkit ya lo haga: un ZIP descargado es una frontera hostil. Si el host ha inyectado el
     // backend, materializamos la carpeta ANTES de activar el módulo.
