@@ -35,6 +35,12 @@ fn context(now: &str, ids: usize) -> Value {
 }
 
 /// Fila de factura canónica que devuelve la lectura sobre `invoice_invoice`.
+///
+/// Lleva `customer_tax_id`: los registros de este fichero son **F1**, y una F1 sin destinatario
+/// identificado es exactamente el XML que la AEAT rechaza con el error **1189**. Hasta hub#287
+/// esta fila iba sin NIF de cliente y el test afirmaba que salía una F1 — fijando una conducta que
+/// Hacienda no acepta. El caso real sin NIF ya no pasa por aquí: sale como F2 (`tests/chain.rs`,
+/// `resolve_invoice_type`).
 fn invoice_row() -> Value {
     json!({
         "invoice_type": "F1",
@@ -42,6 +48,8 @@ fn invoice_row() -> Value {
         "issue_date": "2026-06-10",
         "issuer_nif": "B12345678",
         "issuer_name": "ACME",
+        "customer_tax_id": "B87654321",
+        "customer_name": "Cliente SL",
         "base_amount": 10000,
         "tax_amount": 2100,
         "total_amount": 12100,

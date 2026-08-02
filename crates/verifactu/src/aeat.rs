@@ -22,19 +22,18 @@ pub fn endpoint(environment: &str) -> &'static str {
     }
 }
 
-/// Endpoint SOAP del **servicio de consulta** VERI*FACTU (`ConsultaFactuSistemaFacturacion`)
-/// por entorno. Es un endpoint DISTINTO al de alta (`VerifactuSOAP`): sirve para recuperar de
-/// la AEAT los registros ya presentados de un emisor.
+/// Endpoint SOAP del **servicio de consulta** VERI*FACTU (`ConsultaFactuSistemaFacturacion`).
 ///
-/// ⚠️ Verificar la ruta exacta contra el WSDL vigente de la AEAT antes de producción (las URLs
-/// de los servicios web pueden cambiar; aquí se sigue el patrón de `endpoint()`).
+/// Es el **MISMO** que el de alta. El WSDL oficial (`SistemaFacturacion.wsdl`, servicio
+/// `sfVerifactu`) publica la operación de consulta en `VerifactuSOAP`: no tiene URL propia.
+///
+/// Aquí había una `.../SistemaFacturacion/ConsultaFactuSistemaFacturacion` inventada, con un
+/// comentario que pedía verificarla contra el WSDL «antes de producción». Nunca se verificó, y
+/// por eso toda consulta —y con ella `recover_from_aeat`, la única recuperación automática de la
+/// cadena— devolvía 404 desde siempre (hub#287; el SaaS traía el mismo fallo, saas#1081).
+/// Sondeadas ocho rutas con el certificado real contra preproducción: todas 404, y la del alta 200.
 pub fn consult_endpoint(environment: &str) -> &'static str {
-    match environment {
-        "production" => {
-            "https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/ConsultaFactuSistemaFacturacion"
-        }
-        _ => "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/ConsultaFactuSistemaFacturacion",
-    }
+    endpoint(environment)
 }
 
 /// Escapa texto para XML.
@@ -354,6 +353,38 @@ fn xml_text(body: &str, tag: &str) -> String {
     String::new()
 }
 
+/// Códigos de la AEAT que indican que el rechazo es **de encadenamiento**: el registro está bien
+/// formado, pero cuelga del eslabón equivocado.
+///
+/// `2007` es el que aparece tras **restaurar un backup**: la cadena local retrocede, la AEAT
+/// conserva los registros posteriores y el siguiente envío se anuncia como primero cuando no lo
+/// es — *«No debe informarse como primer registro, existen facturas emitidas con el obligado
+/// emisión y el sistema informático actual»*.
+const CHAINING_ERROR_CODES: [&str; 1] = ["2007"];
+
+/// Marcas en la **descripción** del error que delatan un problema de encadenamiento cuando el
+/// código no está en la lista. La tabla de códigos de la AEAT es más amplia de lo que se ha
+/// podido verificar contra el servicio real, así que el texto es la red de seguridad.
+const CHAINING_ERROR_HINTS: [&str; 4] = [
+    "encadenamiento",
+    "registro anterior",
+    "primer registro",
+    "último registro",
+];
+
+/// ¿El rechazo de la AEAT es de **encadenamiento** (y por tanto recuperable re-anclando)?
+///
+/// Importa que sea estrecho: re-anclar mueve la cadena fiscal. Hacerlo por un NIF mal escrito
+/// (1100) o por un `Destinatarios` que falta (1189) sería mucho peor que el fallo original, así
+/// que todo lo que no delate un problema de eslabón se trata como un rechazo normal.
+pub fn is_chaining_rejection(code: &str, description: &str) -> bool {
+    if CHAINING_ERROR_CODES.contains(&code.trim()) {
+        return true;
+    }
+    let d = description.to_lowercase();
+    CHAINING_ERROR_HINTS.iter().any(|h| d.contains(h))
+}
+
 /// Parsea la respuesta SOAP de la AEAT (`RespuestaRegFactuSistemaFacturacion`).
 pub fn parse_response(body: &str) -> AeatResponse {
     AeatResponse {
@@ -377,11 +408,302 @@ pub struct ConsultRecord {
     pub record_hash: String,
     pub csv: String,
     pub estado: String,
+    /// `FechaHoraHusoGenRegistro` — marca temporal de generación del registro. Es la clave de
+    /// **orden** de la cadena (entra en el cálculo de la propia huella), y la única forma fiable
+    /// de saber cuál es el último: la AEAT devuelve los registros del más NUEVO al más viejo.
+    pub generated_at: String,
+}
+/// Construye el sobre SOAP de **consulta** para un emisor y periodo (`ejercicio` = año YYYY,
+/// `periodo` = mes MM; vacío = todo el ejercicio).
+///
+/// **Dos namespaces, no uno.** `ConsultaLR.xsd` **importa** `SuministroInformacion.xsd`, así que
+/// el documento lleva los dos —igual que el XML de alta (`sum:`/`sum1:`)— y cada elemento va en
+/// el del esquema donde se **declara**: el envoltorio (`ConsultaFactuSistemaFacturacion`,
+/// `Cabecera`, `FiltroConsulta`, `PeriodoImputacion`) en ConsultaLR; los campos de dentro
+/// (`IDVersion`, `ObligadoEmision`, `Ejercicio`, `Periodo`) en SuministroInformacion. Con uno
+/// solo la AEAT responde `Codigo[4102] … Falta informar campo obligatorio.: IDVersion` — el
+/// campo está, pero en el namespace equivocado (saas#1083).
+///
+/// `ObligadoEmisionConsultaType` exige **`NombreRazon` además del NIF**: sin él no se construye
+/// el sobre. Mandarlo incompleto solo produce otro 4102 DESPUÉS de haber hablado con Hacienda.
+pub fn build_consult_soap(
+    issuer_nif: &str,
+    issuer_name: &str,
+    ejercicio: &str,
+    periodo: &str,
+) -> Result<String, VerifactuError> {
+    if issuer_nif.trim().is_empty() {
+        return Err(VerifactuError::Payload(
+            "falta el NIF del obligado a emisión para consultar a la AEAT".into(),
+        ));
+    }
+    if issuer_name.trim().is_empty() {
+        return Err(VerifactuError::Payload(
+            "falta la razón social del obligado a emisión (la exige ObligadoEmisionConsultaType)"
+                .into(),
+        ));
+    }
+    // Sin periodo el filtro es solo el ejercicio: un `<Periodo></Periodo>` vacío es un elemento
+    // obligatorio mal informado, no un filtro abierto.
+    let periodo_xml = if periodo.trim().is_empty() {
+        String::new()
+    } else {
+        format!("<sum1:Periodo>{}</sum1:Periodo>", esc(periodo))
+    };
+    Ok(format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+         <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \
+         xmlns:con=\"https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/ConsultaLR.xsd\" \
+         xmlns:sum1=\"https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd\">\
+         <soapenv:Header/><soapenv:Body>\
+         <con:ConsultaFactuSistemaFacturacion>\
+         <con:Cabecera>\
+         <sum1:IDVersion>1.0</sum1:IDVersion>\
+         <sum1:ObligadoEmision>\
+         <sum1:NombreRazon>{name}</sum1:NombreRazon>\
+         <sum1:NIF>{nif}</sum1:NIF>\
+         </sum1:ObligadoEmision>\
+         </con:Cabecera>\
+         <con:FiltroConsulta>\
+         <con:PeriodoImputacion>\
+         <sum1:Ejercicio>{ejercicio}</sum1:Ejercicio>{periodo_xml}\
+         </con:PeriodoImputacion>\
+         </con:FiltroConsulta>\
+         </con:ConsultaFactuSistemaFacturacion>\
+         </soapenv:Body></soapenv:Envelope>",
+        name = esc(issuer_name),
+        nif = esc(issuer_nif),
+        ejercicio = esc(ejercicio),
+    ))
 }
 
-/// Construye el sobre SOAP de **consulta** para un emisor y periodo (`ejercicio` = año YYYY,
-/// `periodo` = mes MM). ⚠️ Namespaces/elementos según el patrón del servicio de suministro;
-/// verificar contra el WSDL `ConsultaLR.xsd` vigente de la AEAT antes de producción.
+/// Un evento del documento. Hacen falta los CIERRES, y no solo los nombres: la respuesta de
+/// consulta **anida bloques que repiten las mismas etiquetas**, así que sin saber dónde acaba
+/// `Encadenamiento` no hay forma de distinguir la huella del registro de la de su anterior.
+enum XmlEvent<'a> {
+    Open(&'a str, &'a str),
+    /// El cierre solo aporta la **profundidad**: qué etiqueta cerró da igual, porque el bloque
+    /// que se está saltando se identifica por el nivel al que se abrió.
+    Close,
+}
+
+/// Recorre el documento emitiendo aperturas y cierres en orden. Ignora el prefijo de namespace
+/// (las respuestas AEAT usan prefijos variables: `tik:`, `tikLRRC:`, …), la declaración XML y los
+/// comentarios; las auto-cerradas (`<x/>`) emiten apertura y cierre. Sin dependencia XML completa,
+/// en la línea de `xml_text`.
+fn xml_events(body: &str) -> Vec<XmlEvent<'_>> {
+    let bytes = body.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while let Some(rel) = body[i..].find('<') {
+        let lt = i + rel;
+        match bytes.get(lt + 1) {
+            None => break,
+            // `<!-- … -->` comentario / DOCTYPE.
+            Some(&b'!') => {
+                i = match body[lt..].find("-->") {
+                    Some(j) => lt + j + 3,
+                    None => body[lt..].find('>').map(|j| lt + j + 1).unwrap_or(lt + 1),
+                };
+                continue;
+            }
+            // `<?xml …?>` declaración.
+            Some(&b'?') => {
+                i = body[lt..].find('>').map(|j| lt + j + 1).unwrap_or(lt + 1);
+                continue;
+            }
+            // `</…>` cierre.
+            Some(&b'/') => {
+                let after = &body[lt + 2..];
+                let Some(gt) = after.find('>') else { break };
+                out.push(XmlEvent::Close);
+                i = lt + 2 + gt;
+                continue;
+            }
+            _ => {}
+        }
+        let after = &body[lt + 1..];
+        let Some(gt) = after.find('>') else { break };
+        let name_end = after[..gt].find(['/', ' ', '\t', '\n', '\r']).unwrap_or(gt);
+        let raw_name = &after[..name_end];
+        let local = raw_name.rsplit(':').next().unwrap_or(raw_name);
+        let self_closing = after[..gt].ends_with('/');
+        let text = if self_closing {
+            ""
+        } else {
+            let val_start = lt + 1 + gt + 1;
+            match body[val_start..].find('<') {
+                Some(j) => body[val_start..val_start + j].trim(),
+                None => "",
+            }
+        };
+        if !local.is_empty() {
+            out.push(XmlEvent::Open(local, text));
+            if self_closing {
+                out.push(XmlEvent::Close);
+            }
+        }
+        i = lt + 1 + gt;
+    }
+    out
+}
+
+/// Nombre local del elemento que abre CADA registro en la respuesta de consulta. La AEAT
+/// devuelve `RegistroRespuestaConsultaFactuSistemaFacturacion`; `RegistroFactura` se acepta por
+/// tolerancia con respuestas del servicio de alta.
+const RECORD_BOUNDARY: [&str; 2] = [
+    "RegistroRespuestaConsultaFactuSistemaFacturacion",
+    "RegistroFactura",
+];
+
+/// Bloques del registro cuyo contenido NO describe al propio registro y hay que **saltarse
+/// entero**. El decisivo es `Encadenamiento`: dentro lleva un `RegistroAnterior` con el
+/// `NumSerieFactura`, la `FechaExpedicionFactura` y la `Huella` **del registro ANTERIOR** — las
+/// mismas etiquetas que las del registro que se está leyendo. Un parser que vaya por nombre se
+/// queda con las del anterior y el ancla acaba señalando a la factura equivocada.
+///
+/// Los otros tres repiten identificadores por el mismo motivo (`Destinatarios` trae NIF del
+/// cliente, `DatosPresentacion` el del presentador, `Desglose` los importes por tipo).
+const NESTED_BLOCKS: [&str; 4] = [
+    "Encadenamiento",
+    "Destinatarios",
+    "DatosPresentacion",
+    "Desglose",
+];
+
+/// Parsea la respuesta de consulta agrupando **por registro**.
+///
+/// Antes alineaba los campos **por posición** (todos los `NumSerieFactura`, todos los `Huella`, y
+/// luego se emparejaban por índice). Contra la respuesta real eso no se sostiene ni un renglón: el
+/// nº y la fecha viven dentro de `IDFactura`, la huella dentro de `DatosRegistroFacturacion`,
+/// `EstadoRegistro` es a la vez contenedor y hoja, el `CSV` no viene, y —lo que de verdad lo
+/// rompe— cada registro incluye un `Encadenamiento/RegistroAnterior` con las mismas etiquetas
+/// referidas al registro anterior (ver [`NESTED_BLOCKS`]).
+///
+/// Un **SOAP Fault** se devuelve como error, no como lista vacía: leerlo como «0 registros» lo
+/// hace indistinguible de «la AEAT no tiene nada que recuperar», que es justo la lectura que
+/// rompe la recuperación de la cadena (saas#1083).
+pub fn parse_consult_response(body: &str) -> Result<Vec<ConsultRecord>, VerifactuError> {
+    let events = xml_events(body);
+
+    for ev in &events {
+        if let XmlEvent::Open("faultstring", text) = ev {
+            return Err(VerifactuError::Consult(format!(
+                "la AEAT rechazó la consulta: {text}"
+            )));
+        }
+    }
+
+    let mut records: Vec<ConsultRecord> = Vec::new();
+    let mut current = ConsultRecord::default();
+    let mut started = false;
+    let mut depth: i32 = 0;
+    // Profundidad a la que se abrió el bloque anidado que se está saltando, si lo hay.
+    let mut skipping_from: Option<i32> = None;
+
+    for ev in events {
+        match ev {
+            XmlEvent::Close => {
+                if skipping_from == Some(depth) {
+                    skipping_from = None;
+                }
+                depth -= 1;
+            }
+            XmlEvent::Open(tag, text) => {
+                depth += 1;
+                if skipping_from.is_none() && NESTED_BLOCKS.contains(&tag) {
+                    skipping_from = Some(depth);
+                }
+                if skipping_from.is_some() {
+                    continue;
+                }
+                if RECORD_BOUNDARY.contains(&tag) {
+                    if started && current != ConsultRecord::default() {
+                        records.push(std::mem::take(&mut current));
+                    }
+                    current = ConsultRecord::default();
+                    started = true;
+                    continue;
+                }
+                match tag {
+                    "IDEmisorFactura" => current.issuer_nif = text.to_string(),
+                    "NumSerieFactura" => current.invoice_number = text.to_string(),
+                    "FechaExpedicionFactura" => current.invoice_date = text.to_string(),
+                    "Huella" => current.record_hash = text.to_string(),
+                    "CSV" => current.csv = text.to_string(),
+                    // `EstadoRegistro` es contenedor Y hoja: el contenedor no tiene texto propio,
+                    // así que solo cuenta cuando trae valor.
+                    "EstadoRegistro" | "EstadoRegistroFactura" if !text.is_empty() => {
+                        current.estado = text.to_string()
+                    }
+                    "FechaHoraHusoGenRegistro" => current.generated_at = text.to_string(),
+                    _ => {}
+                }
+            }
+        }
+    }
+    if started && current != ConsultRecord::default() {
+        records.push(current);
+    }
+    Ok(records)
+}
+
+/// El registro **más reciente** de los que devuelve la AEAT, o `None`.
+///
+/// **No vale coger uno por posición.** La AEAT los devuelve del más NUEVO al más viejo, así que
+/// `records[0]` acierta por casualidad y `records[-1]` da justo el más antiguo. Anclar en el
+/// equivocado hace que la siguiente factura se encadene desde un eslabón que no es el último y
+/// Hacienda la rechace: la recuperación rompería exactamente lo que viene a arreglar (saas#1083).
+///
+/// El orden lo da `FechaHoraHusoGenRegistro`, la marca temporal de generación del registro, que
+/// **forma parte de la propia huella** — es el criterio de orden de la cadena, no una heurística.
+/// Los que no traen huella no sirven de ancla (la huella ES el eslabón) y se descartan. En empate
+/// gana el que llegó antes, que en el orden de la AEAT es el más nuevo.
+pub fn pick_latest_record(records: &[ConsultRecord]) -> Option<&ConsultRecord> {
+    let mut best: Option<&ConsultRecord> = None;
+    for r in records.iter().filter(|r| !r.record_hash.is_empty()) {
+        match best {
+            Some(b) if r.generated_at <= b.generated_at => {}
+            _ => best = Some(r),
+        }
+    }
+    best
+}
+
+/// POST TLS-mutua del sobre SOAP al endpoint AEAT. Devuelve el cuerpo de la respuesta
+/// (estado HTTP 2xx) o un [`VerifactuError::Transmission`].
+pub async fn post_soap(
+    endpoint_url: &str,
+    identity: reqwest::Identity,
+    xml: &str,
+) -> Result<String, VerifactuError> {
+    let client = reqwest::Client::builder()
+        .identity(identity)
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| VerifactuError::Transmission(format!("cliente TLS: {e}")))?;
+    let resp = client
+        .post(endpoint_url)
+        .header("Content-Type", "text/xml;charset=UTF-8")
+        .header("SOAPAction", "")
+        .body(xml.to_string())
+        .send()
+        .await
+        .map_err(|e| VerifactuError::Transmission(format!("conexión AEAT: {e}")))?;
+    let status = resp.status();
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| VerifactuError::Transmission(format!("respuesta AEAT: {e}")))?;
+    if !status.is_success() {
+        return Err(VerifactuError::Transmission(format!(
+            "AEAT HTTP {status}: {}",
+            body.chars().take(300).collect::<String>()
+        )));
+    }
+    Ok(body)
+}
+
 #[cfg(test)]
 mod desglose_tests {
     use super::*;
@@ -484,138 +806,4 @@ mod desglose_tests {
         ));
         assert!(xml.contains("<sum1:CuotaRepercutida>-2.10</sum1:CuotaRepercutida>"));
     }
-}
-
-pub fn build_consult_soap(
-    issuer_nif: &str,
-    issuer_name: &str,
-    ejercicio: &str,
-    periodo: &str,
-) -> String {
-    format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
-         <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \
-         xmlns:con=\"https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/ConsultaLR.xsd\" \
-         xmlns:sum1=\"https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd\">\
-         <soapenv:Header/><soapenv:Body>\
-         <con:ConsultaFactuSistemaFacturacion>\
-         <con:Cabecera>\
-         <sum1:IDVersion>1.0</sum1:IDVersion>\
-         <sum1:ObligadoEmision>\
-         <sum1:NombreRazon>{name}</sum1:NombreRazon>\
-         <sum1:NIF>{nif}</sum1:NIF>\
-         </sum1:ObligadoEmision>\
-         </con:Cabecera>\
-         <con:FiltroConsulta>\
-         <con:PeriodoImputacion>\
-         <sum1:Ejercicio>{ejercicio}</sum1:Ejercicio>\
-         <sum1:Periodo>{periodo}</sum1:Periodo>\
-         </con:PeriodoImputacion>\
-         </con:FiltroConsulta>\
-         </con:ConsultaFactuSistemaFacturacion>\
-         </soapenv:Body></soapenv:Envelope>",
-        name = esc(issuer_name),
-        nif = esc(issuer_nif),
-        ejercicio = esc(ejercicio),
-        periodo = esc(periodo),
-    )
-}
-
-/// Texto de todas las apariciones del elemento con **nombre local** `tag` (ignora el prefijo de
-/// namespace) en orden de documento. Reconoce SOLO etiquetas de apertura (las de cierre `</…>`
-/// se saltan); sin dependencia XML completa, como `xml_text`.
-fn xml_all(body: &str, tag: &str) -> Vec<String> {
-    let bytes = body.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while let Some(rel) = body[i..].find('<') {
-        let lt = i + rel;
-        // Etiqueta de cierre `</…>` → no es apertura.
-        if bytes.get(lt + 1) == Some(&b'/') {
-            i = lt + 1;
-            continue;
-        }
-        let after = &body[lt + 1..];
-        let name_end = after
-            .find(['>', ' ', '/', '\t', '\n'])
-            .unwrap_or(after.len());
-        let raw_name = &after[..name_end];
-        let local = raw_name.rsplit(':').next().unwrap_or(raw_name);
-        if local == tag {
-            if let Some(gt) = after.find('>') {
-                let val_start = lt + 1 + gt + 1;
-                if let Some(j) = body[val_start..].find('<') {
-                    out.push(body[val_start..val_start + j].trim().to_string());
-                    i = val_start + j;
-                    continue;
-                }
-            }
-        }
-        i = lt + 1;
-    }
-    out
-}
-
-/// Parsea la respuesta de consulta en una lista de registros. Best-effort: alinea por posición
-/// los campos presentes una vez por registro (`NumSerieFactura`/`Huella`/…). El caller ordena y
-/// recorta a los últimos N. Verificar nombres de elementos contra el WSDL de la AEAT.
-pub fn parse_consult_response(body: &str) -> Vec<ConsultRecord> {
-    let nifs = xml_all(body, "IDEmisorFactura");
-    let nums = xml_all(body, "NumSerieFactura");
-    let dates = xml_all(body, "FechaExpedicionFactura");
-    let huellas = xml_all(body, "Huella");
-    let csvs = xml_all(body, "CSV");
-    let estados = {
-        let e = xml_all(body, "EstadoRegistro");
-        if e.is_empty() {
-            xml_all(body, "EstadoRegistroFactura")
-        } else {
-            e
-        }
-    };
-    let n = nums.len().max(huellas.len());
-    (0..n)
-        .map(|i| ConsultRecord {
-            issuer_nif: nifs.get(i).cloned().unwrap_or_default(),
-            invoice_number: nums.get(i).cloned().unwrap_or_default(),
-            invoice_date: dates.get(i).cloned().unwrap_or_default(),
-            record_hash: huellas.get(i).cloned().unwrap_or_default(),
-            csv: csvs.get(i).cloned().unwrap_or_default(),
-            estado: estados.get(i).cloned().unwrap_or_default(),
-        })
-        .collect()
-}
-
-/// POST TLS-mutua del sobre SOAP al endpoint AEAT. Devuelve el cuerpo de la respuesta
-/// (estado HTTP 2xx) o un [`VerifactuError::Transmission`].
-pub async fn post_soap(
-    endpoint_url: &str,
-    identity: reqwest::Identity,
-    xml: &str,
-) -> Result<String, VerifactuError> {
-    let client = reqwest::Client::builder()
-        .identity(identity)
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| VerifactuError::Transmission(format!("cliente TLS: {e}")))?;
-    let resp = client
-        .post(endpoint_url)
-        .header("Content-Type", "text/xml;charset=UTF-8")
-        .header("SOAPAction", "")
-        .body(xml.to_string())
-        .send()
-        .await
-        .map_err(|e| VerifactuError::Transmission(format!("conexión AEAT: {e}")))?;
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| VerifactuError::Transmission(format!("respuesta AEAT: {e}")))?;
-    if !status.is_success() {
-        return Err(VerifactuError::Transmission(format!(
-            "AEAT HTTP {status}: {}",
-            body.chars().take(300).collect::<String>()
-        )));
-    }
-    Ok(body)
 }

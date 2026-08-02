@@ -26,6 +26,7 @@ use serde_json::{json, Value as Json};
 
 pub mod aeat;
 pub mod chain;
+pub mod xsd;
 
 /// Errores internos del motor (se aplanan a [`RuntimeError::Native`]).
 #[derive(Debug, thiserror::Error)]
@@ -36,6 +37,11 @@ pub enum VerifactuError {
     Certificate(String),
     #[error("transmisión AEAT: {0}")]
     Transmission(String),
+    /// La AEAT respondió a la **consulta** con un fallo (SOAP Fault). Es un error propio y no
+    /// una lista vacía: «0 registros» se leería como «no hay nada que recuperar», que es la
+    /// lectura que rompe la recuperación de la cadena (hub#287).
+    #[error("consulta AEAT: {0}")]
+    Consult(String),
 }
 
 impl From<VerifactuError> for RuntimeError {
@@ -238,6 +244,99 @@ fn has_certificate(config: &Json) -> bool {
 
 const INVOICE_TYPES: [&str; 8] = ["F1", "F2", "F3", "R1", "R2", "R3", "R4", "R5"];
 
+/// Tipos que exigen el bloque `Destinatarios` en el XML: sin destinatario identificado la AEAT
+/// los rechaza con el error **1189**.
+const TYPES_REQUIRING_RECIPIENT: [&str; 6] = ["F1", "F3", "R1", "R2", "R3", "R4"];
+
+/// Estados de registro que **siguen siendo eslabón** de la cadena.
+///
+/// Solo `rejected` deja de serlo: la AEAT no lo tiene, así que su huella no existe para Hacienda
+/// y encadenar ahí garantiza que también rechacen al siguiente — un fallo puntual se convierte
+/// en una cadena que ya no avanza sola (hub#287, mismo defecto confirmado en el SaaS).
+///
+/// Lo que está **en vuelo** (`pending`, `retry`, `error` — encolado en contingencia con backoff)
+/// sí encadena: ese registro se transmitirá con la huella que ya calculó, y saltárselo
+/// bifurcaría la cadena.
+pub fn is_chainable_status(status: &str) -> bool {
+    status != "rejected"
+}
+
+/// Tipo de factura efectivo según haya o no **destinatario identificado**.
+///
+/// Una F1 exige el bloque `Destinatarios`; sin NIF de cliente el XML sale sin él y la AEAT lo
+/// rechaza con **1189**, después de que el registro haya consumido su número en la cadena. Una
+/// venta a consumidor final sin NIF es justo el supuesto de la **simplificada (F2)**.
+///
+/// Una rectificativa sin NIF **no** es una simplificada: es una rectificativa **de** simplificada
+/// (**R5**). Degradarla a F2 declararía una venta donde hay una devolución.
+///
+/// Se resuelve **antes** de encadenar porque el tipo entra en el cálculo de la huella.
+fn resolve_invoice_type(declared: &str, recipient_nif: &str) -> String {
+    if !recipient_nif.trim().is_empty() || !TYPES_REQUIRING_RECIPIENT.contains(&declared) {
+        return declared.to_string();
+    }
+    match declared {
+        "R1" | "R2" | "R3" | "R4" => "R5".to_string(),
+        _ => "F2".to_string(),
+    }
+}
+
+/// Recompone un registro **rechazado** sobre el último eslabón que la AEAT sí tiene.
+///
+/// Cambia `previous_hash`, el número de secuencia y —por tanto— la propia huella. Reescribir el
+/// registro localmente es legítimo *precisamente* porque la AEAT lo rechazó: nunca entró en la
+/// cadena oficial. Lo que no vale es reenviarlo colgando de la huella equivocada.
+///
+/// Devuelve el registro recompuesto (para reconstruir el XML) y la intención que lo persiste.
+/// El `xml_content` se limpia: el XML archivado corresponde al eslabón viejo y un reintento
+/// posterior debe regenerarlo, no reenviar el que ya rechazaron.
+pub fn rechain_record(
+    record: &Json,
+    anchor: &aeat::ConsultRecord,
+    sequence_number: i64,
+) -> (Json, Operation) {
+    let previous_hash = chain::normalize_hash(&anchor.record_hash);
+    let mut rechained = record.clone();
+    let record_hash = if str_field(record, "record_type") == "anulacion" {
+        chain::anulacion_hash(
+            &str_field(record, "issuer_nif"),
+            &str_field(record, "invoice_number"),
+            &str_field(record, "invoice_date"),
+            &previous_hash,
+            &str_field(record, "generation_timestamp"),
+        )
+    } else {
+        chain::alta_hash(
+            &str_field(record, "issuer_nif"),
+            &str_field(record, "invoice_number"),
+            &str_field(record, "invoice_date"),
+            &str_field(record, "invoice_type"),
+            num_field(record, "tax_amount", 0.0) / 100.0,
+            num_field(record, "total_amount", 0.0) / 100.0,
+            &previous_hash,
+            &str_field(record, "generation_timestamp"),
+        )
+    };
+    if let Some(m) = rechained.as_object_mut() {
+        m.insert("previous_hash".into(), json!(previous_hash));
+        m.insert("record_hash".into(), json!(record_hash));
+        m.insert("sequence_number".into(), json!(sequence_number));
+        m.insert("is_first_record".into(), json!(0));
+        m.insert("xml_content".into(), json!(""));
+    }
+    let record_id = str_field(record, "id");
+    let intent = op(
+        "verifactu._rechain_record",
+        json!({
+            "record_id": record_id,
+            "sequence_number": sequence_number,
+            "previous_hash": previous_hash,
+            "record_hash": record_hash,
+        }),
+    );
+    (rechained, intent)
+}
+
 /// Genera el registro fiscal encadenado (alta/anulación): ancla de cadena por
 /// `(hub_id, issuer_nif)`, huella SHA-256 (formatos AEAT exactos), `qr_url`, e
 /// intenciones INSERT record(pending) + event + (si `auto_transmit` off) cola.
@@ -377,13 +476,19 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
         .into());
     }
 
+    // Destinatario de la factura: decide el TIPO antes de encadenar nada.
+    let recipient_nif = str_field(&inv, "customer_tax_id");
     let invoice_type = {
         let t = str_field(&inv, "invoice_type");
-        if INVOICE_TYPES.contains(&t.as_str()) {
+        let declared = if INVOICE_TYPES.contains(&t.as_str()) {
             t
         } else {
             "F1".to_string()
-        }
+        };
+        // Sin NIF de cliente, una F1 sale sin `Destinatarios` y la AEAT la rechaza con 1189 —
+        // ya con el número de cadena gastado. El tipo entra en la huella, así que se resuelve
+        // AQUÍ, antes de calcularla (`resolve_invoice_type`).
+        resolve_invoice_type(&declared, &recipient_nif)
     };
 
     // DescripcionOperacion: la AEAT la exige NO vacía (rechaza con código 1100). Usa la descripción
@@ -427,7 +532,7 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             invoice_id: Json::String(invoice_id),
             // Destinatario para el bloque XML Destinatarios (F1/F3/R1-R4). Tiquets (F2) sin cliente
             // → vacío → sin Destinatarios. Evita el error AEAT 1189 en facturas completas.
-            recipient_nif: str_field(&inv, "customer_tax_id"),
+            recipient_nif,
             recipient_name: str_field(&inv, "customer_name"),
             // F3 → FacturasSustituidas: datos de la F2 sustituida (del LEFT JOIN). Vacíos si no es F3.
             substitutes_number: str_field(&inv, "substitutes_number"),
@@ -481,22 +586,26 @@ struct RecordInput {
 /// si dos creates compiten, el segundo INSERT viola el índice y SU transacción entera revierte
 /// (sin fork de cadena). En SQLite además las escrituras se serializan.
 async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -> Result<Output> {
-    // Ancla de cadena: última fila por (hub_id, issuer_nif).
+    // Ancla de cadena: última fila ENCADENABLE por (hub_id, issuer_nif). Un registro `rejected`
+    // no está en la AEAT, así que su huella no puede ser el `previous_hash` del siguiente —
+    // encadenar ahí garantiza otro rechazo y deja la cadena parada (`is_chainable_status`).
     let anchor = host
         .read(
             "SELECT record_hash, sequence_number FROM verifactu_record \
              WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif AND is_deleted = 0 \
+             AND status <> 'rejected' \
              ORDER BY sequence_number DESC LIMIT 1",
             &params(json!({ "hub_id": ctx.hub_id, "issuer_nif": r.issuer_nif })),
         )
         .await?;
-    let (previous_hash, sequence_number, is_first) = match anchor.first() {
-        Some(row) => (
-            str_field(row, "record_hash"),
-            int_field(row, "sequence_number", 0) + 1,
-            false,
-        ),
-        None => (String::new(), 1, true),
+    // La SECUENCIA, en cambio, cuenta TODAS las filas: un registro rechazado ya gastó su número
+    // y el índice único `uq_verifactu_record_hub_seq` no admite reutilizarlo.
+    let sequence_number = next_sequence(host, &ctx.hub_id, &r.issuer_nif).await?;
+    let (previous_hash, is_first) = match anchor.first() {
+        Some(row) => (str_field(row, "record_hash"), false),
+        // Sin eslabón anterior que la AEAT reconozca, este SÍ es el primero: si lo único previo
+        // fue un rechazo, Hacienda no tiene nada de este emisor.
+        None => (String::new(), true),
     };
 
     // Huella (formatos AEAT exactos — chain.rs) + QR.
@@ -645,7 +754,7 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "substitutes_nif": r.substitutes_nif,
             });
             if let Ok((ops, _success)) =
-                transmit_one(host, ctx, &record_json, cfg, &ids[3], &ids[4]).await
+                transmit_one(host, ctx, &record_json, cfg, &ids[3], &ids[4], &ids[5]).await
             {
                 for o in ops {
                     output = output.with_operation(o);
@@ -709,6 +818,8 @@ async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> 
         &config,
         &ctx.new_ids[0],
         &ctx.new_ids[1],
+        // Id reservado para el ancla si la AEAT rechaza por encadenamiento y hay que re-anclar.
+        &ctx.new_ids[2],
     )
     .await?;
     let mut out = Output::new();
@@ -731,6 +842,7 @@ async fn transmit_one(
     config: &Json,
     event_id: &str,
     queue_id: &str,
+    recovery_id: &str,
 ) -> Result<(Vec<Operation>, bool)> {
     let record_id = str_field(record, "id");
     let is_first = int_field(record, "is_first_record", 0) != 0;
@@ -760,6 +872,34 @@ async fn transmit_one(
         .filter(|value| !value.trim().is_empty())
         .map(ToString::to_string)
         .unwrap_or_else(|| aeat::build_soap(record, config, prev.as_ref(), &ctx.hub_id));
+
+    // Validación contra el esquema ANTES de tocar la red (`xsd::validate_registro`). Cuando la
+    // AEAT contesta 4102 el número de cadena ya está gastado, así que un XML que no cumple no
+    // puede llegar a salir. No corta el proceso: marca el registro como rechazado LOCALMENTE con
+    // el motivo, para que se vea en la UI y para que un fallo de configuración no bloquee la cola
+    // de contingencia entera.
+    if let Err(e) = xsd::validate_registro(&xml) {
+        let reason = e.to_string();
+        return Ok((
+            vec![
+                apply_transmission(&record_id, "rejected", "XSD", &reason, "", &xml, "", 0),
+                op(
+                    "verifactu._insert_event",
+                    json!({
+                        "event_id": event_id,
+                        "record_id": record_id,
+                        "event_type": "transmission_failure",
+                        "severity": "error",
+                        "message": format!("XML no conforme al esquema de la AEAT; no se ha transmitido: {reason}"),
+                        "details": json!({ "validation_error": reason }).to_string(),
+                        "timestamp": ctx.now,
+                    }),
+                ),
+            ],
+            false,
+        ));
+    }
+
     // Archivo duradero ANTES de tocar la red. Si el backend Local/S3 no confirma la escritura, no
     // se envía: nunca aceptamos una transmisión fiscal sin conservar su XML para auditoría/reenvío.
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
@@ -770,62 +910,60 @@ async fn transmit_one(
     match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
         Ok(body) => {
             let resp = aeat::parse_response(&body);
-            let status = match resp.estado_registro.as_str() {
-                "Correcto" | "AceptadoConErrores" => "accepted",
-                "Incorrecto" => "rejected",
-                _ if resp.estado_envio == "Correcto" => "accepted",
-                _ => "error",
-            };
-            let success = status == "accepted";
-            let (code, message) = if success {
-                (resp.estado_registro.clone(), resp.estado_envio.clone())
-            } else {
-                (resp.codigo_error.clone(), resp.descripcion_error.clone())
-            };
-            let event_type = if success {
-                "transmission_success"
-            } else {
-                "transmission_failure"
-            };
-            let severity = if success { "info" } else { "error" };
-            let mut ops = vec![
-                apply_transmission(
-                    &record_id,
-                    status,
-                    &code,
-                    &message,
-                    &resp.csv,
-                    &xml,
-                    &xml_storage_path,
-                    0,
-                ),
-                op(
-                    "verifactu._insert_event",
-                    json!({
-                        "event_id": event_id,
-                        "record_id": record_id.clone(),
-                        "event_type": event_type,
-                        "severity": severity,
-                        "message": format!("AEAT ({environment}): {} {}", resp.estado_envio, resp.estado_registro),
-                        "details": json!({
-                            "estado_envio": resp.estado_envio,
-                            "estado_registro": resp.estado_registro,
-                            "csv": resp.csv,
-                            "codigo_error": resp.codigo_error,
-                            "descripcion_error": resp.descripcion_error,
-                        }).to_string(),
-                        "timestamp": ctx.now,
-                    }),
-                ),
-            ];
-            if success {
-                // Si el registro estaba en la cola de contingencia, sale de ella.
-                ops.push(op(
-                    "verifactu._resolve_contingency",
-                    json!({ "record_id": record_id }),
-                ));
+
+            // ── Recuperación AUTOMÁTICA ante un rechazo de encadenamiento ──────────────────
+            // El caso real es **restaurar un backup**: la cadena local retrocede, la AEAT
+            // conserva los registros posteriores y el envío se rechaza con 2007. Antes eso
+            // dejaba el registro parado esperando a que alguien pulsara «Recuperar desde la
+            // AEAT» en la UI; ahora se re-ancla y se reintenta UNA vez, aquí mismo — es decir,
+            // también desde la cola de contingencia, que reintenta con backoff.
+            if classify(&resp).0 == "rejected"
+                && aeat::is_chaining_rejection(&resp.codigo_error, &resp.descripcion_error)
+                && !recovery_id.is_empty()
+            {
+                match auto_rechain_and_retry(
+                    host,
+                    ctx,
+                    record,
+                    config,
+                    &resp,
+                    recovery_id,
+                    event_id,
+                )
+                .await
+                {
+                    // Re-anclado y reintentado: ese es el resultado que vale.
+                    Ok(Some(result)) => return Ok(result),
+                    // La AEAT no dio ancla utilizable → se registra el rechazo original.
+                    Ok(None) => {}
+                    // La recuperación falló (consulta caída, sin certificado…). El rechazo
+                    // original se registra igual, con el motivo del fallo anotado: nunca se
+                    // traga en silencio.
+                    Err(e) => {
+                        return Ok(response_ops(
+                            &record_id,
+                            &resp,
+                            &environment,
+                            &xml,
+                            &xml_storage_path,
+                            event_id,
+                            &ctx.now,
+                            Some(&format!("recuperación automática fallida: {e}")),
+                        ))
+                    }
+                }
             }
-            Ok((ops, success))
+
+            Ok(response_ops(
+                &record_id,
+                &resp,
+                &environment,
+                &xml,
+                &xml_storage_path,
+                event_id,
+                &ctx.now,
+                None,
+            ))
         }
         Err(err) => {
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
@@ -896,6 +1034,186 @@ async fn transmit_one(
     }
 }
 
+/// Traduce la respuesta de la AEAT a `(status, código, mensaje)` del registro.
+fn classify(resp: &aeat::AeatResponse) -> (&'static str, String, String) {
+    let status = match resp.estado_registro.as_str() {
+        "Correcto" | "AceptadoConErrores" => "accepted",
+        "Incorrecto" => "rejected",
+        _ if resp.estado_envio == "Correcto" => "accepted",
+        _ => "error",
+    };
+    if status == "accepted" {
+        (
+            status,
+            resp.estado_registro.clone(),
+            resp.estado_envio.clone(),
+        )
+    } else {
+        (
+            status,
+            resp.codigo_error.clone(),
+            resp.descripcion_error.clone(),
+        )
+    }
+}
+
+/// Intenciones que aplican una respuesta de la AEAT sobre el registro: UPDATE + evento (+ salida
+/// de la cola de contingencia si fue aceptado). Compartido por el primer intento y por el
+/// reintento tras re-anclar.
+#[allow(clippy::too_many_arguments)]
+fn response_ops(
+    record_id: &str,
+    resp: &aeat::AeatResponse,
+    environment: &str,
+    xml: &str,
+    xml_storage_path: &str,
+    event_id: &str,
+    now: &str,
+    note: Option<&str>,
+) -> (Vec<Operation>, bool) {
+    let (status, code, message) = classify(resp);
+    let success = status == "accepted";
+    let mut ops = vec![
+        apply_transmission(
+            record_id,
+            status,
+            &code,
+            &message,
+            &resp.csv,
+            xml,
+            xml_storage_path,
+            0,
+        ),
+        op(
+            "verifactu._insert_event",
+            json!({
+                "event_id": event_id,
+                "record_id": record_id,
+                "event_type": if success { "transmission_success" } else { "transmission_failure" },
+                "severity": if success { "info" } else { "error" },
+                "message": match note {
+                    Some(n) => format!("AEAT ({environment}): {} {} — {n}", resp.estado_envio, resp.estado_registro),
+                    None => format!("AEAT ({environment}): {} {}", resp.estado_envio, resp.estado_registro),
+                },
+                "details": json!({
+                    "estado_envio": resp.estado_envio,
+                    "estado_registro": resp.estado_registro,
+                    "csv": resp.csv,
+                    "codigo_error": resp.codigo_error,
+                    "descripcion_error": resp.descripcion_error,
+                    "note": note,
+                }).to_string(),
+                "timestamp": now,
+            }),
+        ),
+    ];
+    if success {
+        // Si el registro estaba en la cola de contingencia, sale de ella.
+        ops.push(op(
+            "verifactu._resolve_contingency",
+            json!({ "record_id": record_id }),
+        ));
+    }
+    (ops, success)
+}
+
+/// El eslabón anterior en la forma que espera `aeat::build_soap`, a partir del ancla que devolvió
+/// la AEAT. `invoice_date` llega en formato AEAT (`DD-MM-YYYY`) y `build_soap` lo re-formatea, así
+/// que se normaliza a ISO aquí igual que en el resto de la recuperación.
+fn anchor_as_prev(anchor: &aeat::ConsultRecord) -> Json {
+    json!({
+        "issuer_nif": anchor.issuer_nif,
+        "invoice_number": anchor.invoice_number,
+        "invoice_date": iso_date(&anchor.invoice_date),
+        "record_hash": chain::normalize_hash(&anchor.record_hash),
+    })
+}
+
+/// Re-ancla el registro desde lo que la AEAT tiene y lo **reintenta una vez**.
+///
+/// Es la recuperación automática de hub#287. Devuelve `Ok(None)` si la AEAT no dio un ancla
+/// utilizable (no hay de dónde recuperar → se registra el rechazo original) y `Err` si la propia
+/// recuperación falló (consulta caída, sin certificado…) — nunca en silencio.
+///
+/// Un solo reintento, a propósito: si el segundo envío también se rechaza, el problema no era el
+/// eslabón y reintentar en bucle solo quemaría números de cadena.
+async fn auto_rechain_and_retry(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    record: &Json,
+    config: &Json,
+    rejection: &aeat::AeatResponse,
+    recovery_id: &str,
+    event_id: &str,
+) -> Result<Option<(Vec<Operation>, bool)>> {
+    let issuer_nif = str_field(record, "issuer_nif");
+    let records = run_consult(host, &ctx.hub_id, config, &issuer_nif, &ctx.now).await?;
+    let Some(anchor) = aeat::pick_latest_record(&records) else {
+        return Ok(None);
+    };
+
+    // El ancla ocupa el siguiente número; el registro recompuesto, el de después.
+    let anchor_seq = next_sequence(host, &ctx.hub_id, &issuer_nif).await?;
+    let anchor_hash = chain::normalize_hash(&anchor.record_hash);
+    let anchor_op = op(
+        "verifactu._insert_recovery",
+        json!({
+            "record_id": recovery_id,
+            "sequence_number": anchor_seq,
+            "issuer_nif": issuer_nif,
+            "issuer_name": obligado_name(config),
+            "invoice_number": if anchor.invoice_number.is_empty() {
+                format!("AEAT-{}", short(&anchor_hash))
+            } else {
+                anchor.invoice_number.clone()
+            },
+            "invoice_date": iso_date(&anchor.invoice_date),
+            "description": "Ancla recuperada automáticamente tras un rechazo de encadenamiento",
+            "record_hash": anchor_hash,
+            "aeat_csv": anchor.csv,
+        }),
+    );
+
+    let (rechained, rechain_op) = rechain_record(record, anchor, anchor_seq + 1);
+    let record_id = str_field(record, "id");
+    let xml = aeat::build_soap(
+        &rechained,
+        config,
+        Some(&anchor_as_prev(anchor)),
+        &ctx.hub_id,
+    );
+    let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
+    let environment = environment_of(config);
+    let identity = build_identity(host, &ctx.hub_id, config).await?;
+    let body = aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await?;
+    let resp = aeat::parse_response(&body);
+
+    let note = format!(
+        "re-anclado automáticamente tras {} ({}) y reintentado sobre la huella {}…",
+        if rejection.codigo_error.is_empty() {
+            "rechazo de encadenamiento"
+        } else {
+            &rejection.codigo_error
+        },
+        rejection.descripcion_error.trim(),
+        short(&chain::normalize_hash(&anchor.record_hash)),
+    );
+    let (mut ops, success) = response_ops(
+        &record_id,
+        &resp,
+        &environment,
+        &xml,
+        &xml_storage_path,
+        event_id,
+        &ctx.now,
+        Some(&note),
+    );
+    // El ancla y el re-encadenado se aplican ANTES del resultado del reintento (orden del Output).
+    ops.insert(0, rechain_op);
+    ops.insert(0, anchor_op);
+    Ok(Some((ops, success)))
+}
+
 /// Guarda el XML con una clave estable por registro. Los reintentos sobrescriben atómicamente el
 /// mismo objeto con el mismo contenido; el estado/contador de intentos vive en la BD.
 async fn archive_transmission_xml(
@@ -921,6 +1239,7 @@ async fn archive_transmission_xml(
 }
 
 /// Intención UPDATE del registro tras un intento de transmisión.
+#[allow(clippy::too_many_arguments)]
 fn apply_transmission(
     record_id: &str,
     status: &str,
@@ -974,8 +1293,8 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
         )
         .await?;
 
-    // 2 ids por registro (evento + cola); reservamos 1 para el evento resumen.
-    let max_records = (ctx.new_ids.len().saturating_sub(1)) / 2;
+    // 3 ids por registro (evento + cola + ancla de recuperación); reservamos 1 para el resumen.
+    let max_records = (ctx.new_ids.len().saturating_sub(1)) / 3;
     let mut out = Output::new();
     let mut id_idx = 0usize;
     let (mut successful, mut failed) = (0i64, 0i64);
@@ -1004,8 +1323,20 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
         }
         let event_id = ctx.new_ids[id_idx].clone();
         let queue_id = ctx.new_ids[id_idx + 1].clone();
-        id_idx += 2;
-        let (ops, success) = transmit_one(host, &ctx, &rec, &config, &event_id, &queue_id).await?;
+        // Tercer id: el ancla de recuperación automática. La cola de contingencia es JUSTO el
+        // sitio donde engancha el reintento tras restaurar un backup (hub#287).
+        let recovery_id = ctx.new_ids[id_idx + 2].clone();
+        id_idx += 3;
+        let (ops, success) = transmit_one(
+            host,
+            &ctx,
+            &rec,
+            &config,
+            &event_id,
+            &queue_id,
+            &recovery_id,
+        )
+        .await?;
         for o in ops {
             out = out.with_operation(o);
         }
@@ -1150,23 +1481,30 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
                     "generation_timestamp": gen_ts,
                 });
                 let xml = aeat::build_soap(&sample, &config, None, &ctx.hub_id);
-                match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
-                    Ok(body) => {
-                        let r = aeat::parse_response(&body);
-                        let accepted = r.estado_registro == "Correcto"
-                            || r.estado_registro == "AceptadoConErrores"
-                            || r.estado_envio == "Correcto";
-                        aeat = json!({
-                            "ok": accepted,
-                            "estado_envio": r.estado_envio,
-                            "estado_registro": r.estado_registro,
-                            "csv": r.csv,
-                            "codigo_error": r.codigo_error,
-                            "descripcion_error": r.descripcion_error,
-                        });
-                    }
-                    Err(e) => {
-                        aeat = json!({ "ok": false, "error": e.to_string() });
+                // Mismo gate que la transmisión real: la prueba tiene que fallar donde falla el
+                // envío de verdad, no ir a la AEAT a que lo diga con un 4102.
+                if let Err(e) = xsd::validate_registro(&xml) {
+                    aeat =
+                        json!({ "ok": false, "error": format!("XML no conforme al esquema: {e}") });
+                } else {
+                    match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
+                        Ok(body) => {
+                            let r = aeat::parse_response(&body);
+                            let accepted = r.estado_registro == "Correcto"
+                                || r.estado_registro == "AceptadoConErrores"
+                                || r.estado_envio == "Correcto";
+                            aeat = json!({
+                                "ok": accepted,
+                                "estado_envio": r.estado_envio,
+                                "estado_registro": r.estado_registro,
+                                "csv": r.csv,
+                                "codigo_error": r.codigo_error,
+                                "descripcion_error": r.descripcion_error,
+                            });
+                        }
+                        Err(e) => {
+                            aeat = json!({ "ok": false, "error": e.to_string() });
+                        }
                     }
                 }
             }
@@ -1208,24 +1546,20 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
 
 // ── helpers de recuperación / consulta ────────────────────────────────────────
 
-/// NIF del emisor a usar: el del payload o, si falta, `software_nif` de la config.
+/// NIF del **obligado tributario** a usar: el del payload o, si falta, el `issuer_nif` de la
+/// config.
+///
+/// Ya **no** cae a `software_nif`: ese es el NIF del PRODUCTOR del software (ERPlora), y usarlo
+/// como emisor anclaría la cadena de un cliente a la identidad fiscal de ERPlora. Sin NIF del
+/// obligado la operación falla, que es lo correcto: no hay cadena que consultar ni recuperar.
 fn resolve_nif(payload: &Json, config: Option<&Json>) -> String {
     let n = str_field(payload, "issuer_nif");
     if !n.is_empty() {
         return n;
     }
-    // El NIF del OBLIGADO (issuer_nif); software_nif es el productor, solo fallback legacy.
-    match config {
-        Some(c) => {
-            let iss = str_field(c, "issuer_nif");
-            if iss.is_empty() {
-                str_field(c, "software_nif")
-            } else {
-                iss
-            }
-        }
-        None => String::new(),
-    }
+    config
+        .map(|c| str_field(c, "issuer_nif"))
+        .unwrap_or_default()
 }
 
 /// Entorno AEAT efectivo (`testing` por defecto).
@@ -1278,6 +1612,16 @@ async fn next_sequence(host: &dyn NativeHost, hub_id: &str, issuer_nif: &str) ->
         + 1)
 }
 
+/// Razón social del **OBLIGADO tributario** (el negocio del hub), que es lo que la AEAT valida
+/// contra el NIF del certificado.
+///
+/// No es `software_name`: ese es el PRODUCTOR del software (ERPlora), fijo para todos los hubs.
+/// El envelope de consulta llevaba el nombre del productor junto al NIF del negocio — dos
+/// identidades distintas en el mismo `ObligadoEmision`, que la AEAT rechaza.
+fn obligado_name(config: &Json) -> String {
+    str_field(config, "issuer_name")
+}
+
 /// Consulta a la AEAT (TLS mutua con el cert de la config) los registros del emisor en el
 /// periodo actual y los parsea. Red real — sin cert/red devuelve error (no silencioso).
 async fn run_consult(
@@ -1289,16 +1633,18 @@ async fn run_consult(
 ) -> Result<Vec<aeat::ConsultRecord>> {
     // Identity mTLS vía `build_identity`: cert del core (opaca) o legacy. Ver ADR-0079.
     let identity = build_identity(host, hub_id, config).await?;
-    let issuer_name = str_field(config, "software_name");
+    let issuer_name = obligado_name(config);
     let (ejercicio, periodo) = year_month(now);
-    let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo);
+    // Se construye ANTES de abrir la conexión: si falta la razón social del obligado, el sobre
+    // no es válido y no tiene sentido hablar con Hacienda para llevarse un 4102.
+    let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo)?;
     let body = aeat::post_soap(
         aeat::consult_endpoint(&environment_of(config)),
         identity,
         &xml,
     )
     .await?;
-    Ok(aeat::parse_consult_response(&body))
+    Ok(aeat::parse_consult_response(&body)?)
 }
 
 /// Intenciones para volcar el snapshot de consulta AEAT: limpia el anterior de este emisor +
@@ -1348,16 +1694,17 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let config = read_config(host, &ctx.hub_id).await?;
     let issuer_nif = resolve_nif(&payload, config.as_ref());
     if issuer_nif.is_empty() {
-        return Err(
-            VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into(),
-        );
+        return Err(VerifactuError::Payload(
+            "falta issuer_nif del obligado (config VeriFactu → identidad fiscal)".into(),
+        )
+        .into());
     }
 
     let rows = host
         .read(
             "SELECT id, record_type, sequence_number, issuer_nif, invoice_number, invoice_date, \
              invoice_type, tax_amount, total_amount, previous_hash, record_hash, is_first_record, \
-             generation_timestamp FROM verifactu_record \
+             generation_timestamp, status FROM verifactu_record \
              WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif AND is_deleted = 0 \
              ORDER BY sequence_number ASC",
             &params(json!({ "hub_id": ctx.hub_id, "issuer_nif": issuer_nif })),
@@ -1369,6 +1716,12 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     for (idx, r) in rows.iter().enumerate() {
         let rtype = str_field(r, "record_type");
         let stored = str_field(r, "record_hash");
+        // Un registro rechazado no es eslabón (`is_chainable_status`): el ancla de
+        // `build_record_output` ya no cuelga de él, así que contarlo aquí marcaría rota una
+        // cadena que es correcta. Ni valida su huella ni mueve `prev_hash`.
+        if !is_chainable_status(&str_field(r, "status")) {
+            continue;
+        }
         if rtype == "recovery" {
             // Ancla de confianza: no se recomputa; su huella enlaza con la siguiente.
             prev_hash = stored;
@@ -1460,9 +1813,10 @@ async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Outpu
     })?;
     let issuer_nif = resolve_nif(&payload, Some(&config));
     if issuer_nif.is_empty() {
-        return Err(
-            VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into(),
-        );
+        return Err(VerifactuError::Payload(
+            "falta issuer_nif del obligado (config VeriFactu → identidad fiscal)".into(),
+        )
+        .into());
     }
     let records = run_consult(host, &ctx.hub_id, &config, &issuer_nif, &ctx.now).await?;
     let (ops, limit) = aeat_snapshot_ops(&ctx, &issuer_nif, &records);
@@ -1497,9 +1851,10 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
     })?;
     let issuer_nif = resolve_nif(&payload, Some(&config));
     if issuer_nif.is_empty() {
-        return Err(
-            VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into(),
-        );
+        return Err(VerifactuError::Payload(
+            "falta issuer_nif del obligado (config VeriFactu → identidad fiscal)".into(),
+        )
+        .into());
     }
     let records = run_consult(host, &ctx.hub_id, &config, &issuer_nif, &ctx.now).await?;
     if records.is_empty() {
@@ -1508,8 +1863,14 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
         ));
     }
     let (ops, limit) = aeat_snapshot_ops(&ctx, &issuer_nif, &records);
-    // Ancla = registro más reciente devuelto (la lista viene best-effort; se asume el primero).
-    let latest = &records[0];
+    // Ancla = el registro MÁS RECIENTE por `FechaHoraHusoGenRegistro`, no el que caiga en una
+    // posición: la AEAT devuelve del más nuevo al más viejo y aquí se cogía `records[0]`, que
+    // acertaba por casualidad. Ver `aeat::pick_latest_record`.
+    let latest = aeat::pick_latest_record(&records).ok_or_else(|| {
+        RuntimeError::Native(
+            "la AEAT devolvió registros pero ninguno con huella; no hay ancla que recuperar".into(),
+        )
+    })?;
     let seq = next_sequence(host, &ctx.hub_id, &issuer_nif).await?;
     let record_hash = chain::normalize_hash(&latest.record_hash);
     let anchor_id = ctx.new_ids.get(limit).cloned().unwrap_or_default();
@@ -1530,7 +1891,7 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
                 "record_id": anchor_id.clone(),
                 "sequence_number": seq,
                 "issuer_nif": issuer_nif.clone(),
-                "issuer_name": str_field(&config, "software_name"),
+                "issuer_name": obligado_name(&config),
                 "invoice_number": invoice_number,
                 "invoice_date": iso_date(&latest.invoice_date),
                 "description": "Ancla recuperada desde la AEAT (ConsultaFactuSistemaFacturacion)",
@@ -1595,7 +1956,8 @@ async fn recover_manual(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     };
     let issuer_name = config
         .as_ref()
-        .map(|c| str_field(c, "software_name"))
+        .as_ref()
+        .map(|c| obligado_name(c))
         .unwrap_or_default();
     let anchor_id = ctx.new_ids.first().cloned().unwrap_or_default();
 
