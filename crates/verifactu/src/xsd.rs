@@ -189,16 +189,30 @@ const CONTAINERS: &[&str] = &[
 
 // ── Recorrido del XML ─────────────────────────────────────────────────────────────────────
 
-/// Los elementos del documento como `(nombre local, texto)`, en orden. Ignora prefijos de
-/// namespace, cierres, declaración y comentarios.
-fn walk(xml: &str) -> Vec<(&str, &str)> {
+/// Los elementos del documento como `(nombre local, texto, profundidad)`, en orden. Ignora
+/// prefijos de namespace, cierres, declaración y comentarios.
+///
+/// **La profundidad no es decorativa.** `Encadenamiento/RegistroAnterior` repite nombres que
+/// también están en la secuencia exterior (`IDEmisorFactura`, `NumSerieFactura`,
+/// `FechaExpedicionFactura` y `Huella`). Sin saber a qué nivel cuelga cada uno, el validador
+/// confundía la huella del registro ANTERIOR con la del registro que se está enviando: rechazaba
+/// por «fuera de orden» toda factura encadenada —es decir, todas menos la primera— y comprobaba
+/// el formato de la huella equivocada.
+fn walk(xml: &str) -> Vec<(&str, &str, usize)> {
     let bytes = xml.as_bytes();
     let mut out = Vec::new();
+    let mut depth = 0usize;
     let mut i = 0;
     while let Some(rel) = xml[i..].find('<') {
         let lt = i + rel;
         match bytes.get(lt + 1) {
-            Some(&b'/') | Some(&b'?') | Some(&b'!') | None => {
+            // Cierre `</tag>`: se sube un nivel.
+            Some(&b'/') => {
+                depth = depth.saturating_sub(1);
+                i = lt + 1;
+                continue;
+            }
+            Some(&b'?') | Some(&b'!') | None => {
                 i = lt + 1;
                 continue;
             }
@@ -209,7 +223,9 @@ fn walk(xml: &str) -> Vec<(&str, &str)> {
         let name_end = after[..gt].find(['/', ' ', '\t', '\n', '\r']).unwrap_or(gt);
         let raw = &after[..name_end];
         let local = raw.rsplit(':').next().unwrap_or(raw);
-        let text = if after[..gt].ends_with('/') {
+        // `<tag/>` abre y cierra: no cambia la profundidad de lo que viene después.
+        let self_closing = after[..gt].ends_with('/');
+        let text = if self_closing {
             ""
         } else {
             let start = lt + 1 + gt + 1;
@@ -219,7 +235,10 @@ fn walk(xml: &str) -> Vec<(&str, &str)> {
             }
         };
         if !local.is_empty() {
-            out.push((local, text));
+            out.push((local, text, depth));
+            if !self_closing {
+                depth += 1;
+            }
         }
         i = lt + 1 + gt;
     }
@@ -230,12 +249,36 @@ fn err(msg: impl Into<String>) -> VerifactuError {
     VerifactuError::Payload(msg.into())
 }
 
-fn text_of<'a>(elements: &[(&'a str, &'a str)], tag: &str) -> Option<&'a str> {
-    elements.iter().find(|(t, _)| *t == tag).map(|(_, v)| *v)
+type Element<'a> = (&'a str, &'a str, usize);
+
+/// Primer elemento con ese nombre, a cualquier profundidad.
+fn text_of<'a>(elements: &[Element<'a>], tag: &str) -> Option<&'a str> {
+    elements.iter().find(|(t, _, _)| *t == tag).map(|(_, v, _)| *v)
 }
 
-fn present(elements: &[(&str, &str)], tag: &str) -> bool {
-    elements.iter().any(|(t, _)| *t == tag)
+/// Profundidad del primer elemento con ese nombre.
+fn depth_of(elements: &[Element<'_>], tag: &str) -> Option<usize> {
+    elements
+        .iter()
+        .find(|(t, _, _)| *t == tag)
+        .map(|(_, _, d)| *d)
+}
+
+/// Primer elemento con ese nombre **a esa profundidad exacta**. Es lo que separa el
+/// `Huella` del registro del `Huella` de su `RegistroAnterior`.
+fn text_at<'a>(elements: &[Element<'a>], tag: &str, depth: usize) -> Option<&'a str> {
+    elements
+        .iter()
+        .find(|(t, _, d)| *t == tag && *d == depth)
+        .map(|(_, v, _)| *v)
+}
+
+fn present(elements: &[Element<'_>], tag: &str) -> bool {
+    elements.iter().any(|(t, _, _)| *t == tag)
+}
+
+fn present_at(elements: &[Element<'_>], tag: &str, depth: usize) -> bool {
+    elements.iter().any(|(t, _, d)| *t == tag && *d == depth)
 }
 
 /// Valida el sobre SOAP `RegFactuSistemaFacturacion` completo (cabecera + un registro).
@@ -286,13 +329,22 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
         (REQUIRED_ALTA, ORDER_ALTA, REQUIRED_ID_FACTURA_ALTA)
     };
 
+    // Todo lo que sigue se mide sobre los hijos DIRECTOS del registro. Sin ese anclaje, el
+    // `RegistroAnterior` de una factura encadenada se cuela en la secuencia exterior.
+    let registro_tag = if anulacion {
+        "RegistroAnulacion"
+    } else {
+        "RegistroAlta"
+    };
+    let nivel = depth_of(&elements, registro_tag).unwrap_or(0) + 1;
+
     // Obligatorios presentes y NO vacíos. Un elemento obligatorio vacío es exactamente lo que la
     // AEAT rechaza con «Falta informar campo obligatorio».
-    if !present(&elements, "IDFactura") {
+    if !present_at(&elements, "IDFactura", nivel) {
         return Err(err("falta IDFactura"));
     }
     for tag in id_factura {
-        match text_of(&elements, tag) {
+        match text_at(&elements, tag, nivel + 1) {
             Some(v) if !v.is_empty() => {}
             _ => {
                 return Err(err(format!(
@@ -305,7 +357,7 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
         // Contenedores: su texto propio está vacío por definición (llevan hijos), así que basta
         // con que el elemento esté presente.
         let contenedor = CONTAINERS.contains(tag);
-        match text_of(&elements, tag) {
+        match text_at(&elements, tag, nivel) {
             Some(v) if contenedor || !v.is_empty() => {}
             Some(_) => return Err(err(format!("{tag} es obligatorio y viene vacío"))),
             None => {
@@ -319,7 +371,8 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     // ── Orden: los tipos de la AEAT son xs:sequence ──────────────────────────────────────
     let emitidos: Vec<&str> = elements
         .iter()
-        .map(|(t, _)| *t)
+        .filter(|(_, _, d)| *d == nivel)
+        .map(|(t, _, _)| *t)
         .filter(|t| order.contains(t))
         .collect();
     let mut esperado = order.iter();
@@ -334,7 +387,7 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
 
     // ── Enumeraciones, formatos y reglas con código propio de la AEAT ────────────────────
     if !anulacion {
-        let tipo = text_of(&elements, "TipoFactura").unwrap_or_default();
+        let tipo = text_at(&elements, "TipoFactura", nivel).unwrap_or_default();
         if !TIPO_FACTURA.contains(&tipo) {
             return Err(err(format!(
                 "TipoFactura `{tipo}` no está en la enumeración del esquema ({})",
@@ -342,7 +395,8 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
             )));
         }
         // Error 1189: los tipos que identifican destinatario NO pueden ir sin el bloque.
-        if TIPOS_CON_DESTINATARIO.contains(&tipo) && !present(&elements, "Destinatarios") {
+        if TIPOS_CON_DESTINATARIO.contains(&tipo) && !present_at(&elements, "Destinatarios", nivel)
+        {
             return Err(err(format!(
                 "una factura {tipo} exige el bloque Destinatarios; la AEAT la rechaza con el \
                  error 1189 (una venta sin NIF de cliente es una simplificada F2)"
@@ -363,10 +417,12 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
         validate_desglose(&elements)?;
     }
 
-    if text_of(&elements, "TipoHuella").unwrap_or_default() != "01" {
+    if text_at(&elements, "TipoHuella", nivel).unwrap_or_default() != "01" {
         return Err(err("TipoHuella solo admite `01` (SHA-256)"));
     }
-    let huella = text_of(&elements, "Huella").unwrap_or_default();
+    // La huella PROPIA del registro, no la de su `RegistroAnterior` (mismo nombre, un nivel más
+    // abajo): comprobar la del anterior daba por buena una huella propia corrupta o vacía.
+    let huella = text_at(&elements, "Huella", nivel).unwrap_or_default();
     if huella.len() != 64 || !huella.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(err(
             "Huella debe ser un SHA-256 en hexadecimal (64 caracteres)",
@@ -379,10 +435,12 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
 // ── Desglose / DetalleDesglose ─────────────────────────────────────────────────────────────
 
 /// Trocea el documento en un grupo de elementos por cada `DetalleDesglose`.
-fn detalles<'a>(elements: &[(&'a str, &'a str)]) -> Vec<Vec<(&'a str, &'a str)>> {
+fn detalles<'a>(elements: &[Element<'a>]) -> Vec<Vec<(&'a str, &'a str)>> {
     let mut out: Vec<Vec<(&str, &str)>> = Vec::new();
     let mut abierto = false;
-    for (tag, text) in elements {
+    // La profundidad no hace falta aquí: `DetalleDesglose` abre el grupo y el primer elemento
+    // ajeno a `ORDER_DETALLE` lo cierra, así que el troceo ya es por bloque.
+    for (tag, text, _) in elements {
         if *tag == "DetalleDesglose" {
             out.push(Vec::new());
             abierto = true;
@@ -409,7 +467,7 @@ fn en_lista(v: f64, permitidos: &[f64]) -> bool {
 }
 
 /// Valida el bloque `Desglose` de un registro de alta.
-fn validate_desglose(elements: &[(&str, &str)]) -> Result<(), VerifactuError> {
+fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
     let grupos = detalles(elements);
     if grupos.is_empty() {
         return Err(err(
@@ -784,6 +842,25 @@ mod tests {
     #[test]
     fn walk_ignora_cierres_declaracion_y_autocerradas() {
         let els = walk("<?xml version=\"1.0\"?><a:X>1</a:X><Y/><!-- c --><Z>2</Z>");
-        assert_eq!(els, vec![("X", "1"), ("Y", ""), ("Z", "2")]);
+        assert_eq!(els, vec![("X", "1", 0), ("Y", "", 0), ("Z", "2", 0)]);
+    }
+
+    /// La profundidad es lo que distingue el `Huella` del registro del `Huella` de su
+    /// `RegistroAnterior`. Una autocerrada no abre nivel; un cierre lo baja.
+    #[test]
+    fn walk_anota_la_profundidad_de_cada_elemento() {
+        let els = walk("<R><IDFactura><Huella>propia</Huella></IDFactura><Vacio/><Huella>otra</Huella></R>");
+        assert_eq!(
+            els,
+            vec![
+                ("R", "", 0),
+                ("IDFactura", "", 1),
+                ("Huella", "propia", 2),
+                ("Vacio", "", 1),
+                ("Huella", "otra", 1),
+            ]
+        );
+        assert_eq!(text_at(&els, "Huella", 1), Some("otra"));
+        assert_eq!(text_at(&els, "Huella", 2), Some("propia"));
     }
 }

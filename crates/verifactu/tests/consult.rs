@@ -128,21 +128,12 @@ fn sin_nif_del_obligado_no_se_construye_el_envelope() {
     assert!(aeat::build_consult_soap("", "ERPLORA CLOUD SL", "2026", "08").is_err());
 }
 
-/// Sin periodo el filtro es solo el ejercicio; emitir `<Periodo></Periodo>` vacío es un
-/// elemento obligatorio mal informado.
-#[test]
-fn sin_periodo_no_se_emite_el_elemento_vacio() {
-    let xml =
-        aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "").expect("envelope");
-    assert!(
-        !xml.contains("Periodo>"),
-        "no debe emitirse Periodo vacío: {xml}"
-    );
-    assert!(
-        xml.contains("<sum1:Ejercicio>2026</sum1:Ejercicio>"),
-        "{xml}"
-    );
-}
+// NOTA — aquí vivía `sin_periodo_no_se_emite_el_elemento_vacio`, que afirmaba que sin periodo
+// «el filtro es solo el ejercicio» y daba por buena la construcción del sobre. Era objetivamente
+// falso, y lo demostró el servicio real (2026-08-02, ADR-0189): ese sobre recibe
+// `Codigo[4102].El XML no cumple el esquema. Falta informar campo obligatorio.: Periodo`.
+// El contrato correcto —el sobre no se construye— lo cubre
+// `el_sobre_de_consulta_sin_periodo_no_se_construye`, al final de este fichero.
 
 // ── 3. El parser, sobre la respuesta REAL ─────────────────────────────────────────────────
 
@@ -281,4 +272,29 @@ fn sobrevive_a_un_registro_sin_marca_temporal() {
         },
     ];
     assert_eq!(aeat::pick_latest_record(&recs).unwrap().invoice_number, "B");
+}
+
+/// `Periodo` **no es opcional**. Se emitía el filtro solo con `Ejercicio` cuando el periodo
+/// llegaba vacío, dando por hecho que eso consultaba el año entero. La AEAT de preproducción
+/// responde (verificado el 2026-08-02, ADR-0189):
+///
+/// ```text
+/// Codigo[4102].El XML no cumple el esquema. Falta informar campo obligatorio.: Periodo
+/// ```
+///
+/// Un sobre así se rechaza DESPUÉS de haber hablado con Hacienda, así que se corta antes.
+#[test]
+fn el_sobre_de_consulta_sin_periodo_no_se_construye() {
+    let err = aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "")
+        .expect_err("sin Periodo la AEAT responde 4102: no se manda");
+    let msg = err.to_string().to_lowercase();
+    assert!(msg.contains("periodo"), "el error debe nombrar el campo: {msg}");
+}
+
+#[test]
+fn el_sobre_de_consulta_con_periodo_lo_incluye() {
+    let xml = aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "08")
+        .expect("con periodo se construye");
+    assert!(xml.contains("<sum1:Periodo>08</sum1:Periodo>"), "{xml}");
+    assert!(xml.contains("<sum1:Ejercicio>2026</sum1:Ejercicio>"), "{xml}");
 }
