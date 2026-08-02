@@ -1,4 +1,4 @@
-//! Personal = **core** (ADR-0187): la pantalla de Personal del Hub lista los usuarios REALES del
+//! Personal = **core** (ADR-0191): la pantalla de Personal del Hub lista los usuarios REALES del
 //! hub (`hub_user`), no los miembros del módulo `staff`. El módulo `staff` es otra cosa (profesional
 //! reservable, comisiones, horarios) y trae su propia navegación; el core no depende de él.
 //!
@@ -302,20 +302,38 @@ async fn only_locally_authenticated_principals_read_the_users() {
         .unwrap_err();
     assert!(err.to_string().to_lowercase().contains("permis"), "{err}");
 
-    // Cualquier ROL local sí lo tiene: la lista ya es pública en el grid de PIN del login. Y solo
-    // eso: `permissions_for_role` no inventa ningún otro permiso del core.
+    // Cualquier usuario con SESIÓN local sí lo tiene: la lista ya es pública en el grid de PIN del
+    // login. Se concede al abrir la sesión, no en el catálogo de roles.
     for role in ["owner", "admin", "manager", "employee", "cashier"] {
-        let perms = rt.permissions_for_role(role);
         assert!(
-            perms.contains("hub.users.view"),
-            "el rol {role} tiene que poder leer el personal"
-        );
-        assert_eq!(
-            perms.len(),
-            1,
-            "sin módulos instalados, {role} solo gana el permiso del core"
+            rt.session_permissions(role).contains("hub.users.view"),
+            "una sesión con rol {role} tiene que poder leer el personal"
         );
     }
+}
+
+#[tokio::test]
+async fn the_core_permission_does_not_pollute_the_role_catalogue() {
+    // `permissions_for_role` responde «qué conceden los MÓDULOS a este rol»: es lo que cuenta la
+    // pestaña Roles y lo que hereda `owner` de `admin`. Meter ahí el permiso del core hacía que
+    // hasta un rol que no existe en ningún manifest recibiera permisos — y que la pestaña Roles
+    // pintara un permiso fantasma para todos. El permiso del core se concede en la SESIÓN.
+    let rt = runtime("hub-dispatch").await;
+    for role in ["owner", "employee", "un-rol-que-nadie-declara"] {
+        assert!(
+            rt.permissions_for_role(role).is_empty(),
+            "sin módulos instalados, el catálogo no concede nada a {role}"
+        );
+    }
+    assert!(rt.session_permissions("employee").contains("hub.users.view"));
+
+    // Y el catálogo de roles no cuenta ese permiso como si lo diera un módulo.
+    let roles = rt.list_hub_roles().await.unwrap();
+    assert_eq!(
+        roles.iter().find(|r| r.name == "employee").unwrap().permissions,
+        0,
+        "un rol sin módulos que le concedan nada muestra 0 permisos"
+    );
 }
 
 #[tokio::test]

@@ -26,7 +26,7 @@ use crate::identity;
 use crate::registry::Registry;
 use crate::user_profile;
 
-/// **Namespace reservado del core** en el dispatcher (ADR-0188). Ningún módulo puede registrar
+/// **Namespace reservado del core** en el dispatcher (ADR-0192). Ningún módulo puede registrar
 /// queries bajo `hub.`: el instalador rechaza un módulo con ese id y el dispatcher resuelve el
 /// prefijo antes de mirar el registry.
 pub const CORE_NAMESPACE: &str = "hub.";
@@ -354,7 +354,7 @@ pub async fn list_roles(db: &dyn DatabaseAdapter, registry: &Registry) -> Result
         .collect())
 }
 
-/// Despacha una query del namespace reservado `hub.` (ADR-0188). `rest` es el nombre sin prefijo.
+/// Despacha una query del namespace reservado `hub.` (ADR-0192). `rest` es el nombre sin prefijo.
 ///
 /// Lo que ve un módulo es **menos** que lo que ve la pantalla de Personal: id, nombre, rol y estado
 /// — lo justo para vincular su ficha a una persona (p. ej. `staff_member.user_id`). **Sin email ni

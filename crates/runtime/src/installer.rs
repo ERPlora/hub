@@ -49,7 +49,7 @@ pub async fn install(
 ) -> Result<String> {
     let manifest = Manifest::load(dir)?;
 
-    // `hub` es el namespace RESERVADO del core (ADR-0188): el dispatcher resuelve `hub.*` antes de
+    // `hub` es el namespace RESERVADO del core (ADR-0192): el dispatcher resuelve `hub.*` antes de
     // mirar el registry, así que un módulo con ese id tendría capacidades inalcanzables y aparentaría
     // servir la identidad del propio Hub. Se rechaza en la frontera hostil (el zip de terceros).
     if manifest.id == crate::hub_users::CORE_NAMESPACE.trim_end_matches('.') {

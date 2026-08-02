@@ -2382,7 +2382,7 @@ async fn mint_session_with_extra(
         .await
     {
         Ok(token) => {
-            let permissions = rt.permissions_for_role(&user.role);
+            let permissions = rt.session_permissions(&user.role);
             let mut payload = json!({
                 "ok": true,
                 "token": token,

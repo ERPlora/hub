@@ -99,7 +99,7 @@ pub async fn get_profile(State(st): State<AppState>, headers: HeaderMap) -> Resp
     let rt = arc.lock().await;
     match rt.user_profile(&user_id).await {
         Ok(profile) => {
-            let permissions = rt.permissions_for_role(&profile.role);
+            let permissions = rt.session_permissions(&profile.role);
             Json(profile_json(profile, permissions)).into_response()
         }
         Err(e) => crate::err_response(e),
@@ -118,7 +118,7 @@ pub async fn put_profile(
     let rt = arc.lock().await;
     match rt.update_user_profile(&user_id, &input).await {
         Ok(profile) => {
-            let permissions = rt.permissions_for_role(&profile.role);
+            let permissions = rt.session_permissions(&profile.role);
             Json(profile_json(profile, permissions)).into_response()
         }
         Err(e) => crate::err_response(e),
@@ -256,7 +256,7 @@ pub async fn upload_avatar(
             }
             let permissions = {
                 let rt = arc.lock().await;
-                rt.permissions_for_role(&profile.role)
+                rt.session_permissions(&profile.role)
             };
             Json(profile_json(profile, permissions)).into_response()
         }
@@ -291,7 +291,7 @@ pub async fn delete_avatar(State(st): State<AppState>, headers: HeaderMap) -> Re
     }
     let permissions = {
         let rt = arc.lock().await;
-        rt.permissions_for_role(&profile.role)
+        rt.session_permissions(&profile.role)
     };
     Json(profile_json(profile, permissions)).into_response()
 }

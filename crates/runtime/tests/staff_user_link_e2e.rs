@@ -1,4 +1,4 @@
-//! **La ficha de `staff` cuelga de un usuario del Hub** (ADR-0188).
+//! **La ficha de `staff` cuelga de un usuario del Hub** (ADR-0192).
 //!
 //! `staff` es una capa de negocio SOBRE la identidad del core: el profesional que atiende es (casi
 //! siempre) alguien que existe en `hub_user`. La columna `staff_member.user_id` estaba en el
@@ -25,6 +25,13 @@ fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
 }
 
+/// El modulo vive en `modules-workspace`, un repo HERMANO que el CI del hub no clona. Igual que
+/// `sales_e2e` y compañia: si no esta en disco, el test se SALTA con aviso en vez de romper el
+/// pipeline. En local (con el workspace al lado) se ejecuta de verdad contra el modulo real.
+fn staff_en_disco() -> bool {
+    mdir("staff").join("module.json").exists()
+}
+
 async fn rt_staff() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
@@ -45,6 +52,10 @@ fn member_payload(first: &str, user_id: Option<&str>) -> serde_json::Value {
 
 #[tokio::test]
 async fn a_staff_member_is_linked_to_a_hub_user() {
+    if !staff_en_disco() {
+        eprintln!("SKIP: modules-workspace/modules/staff ausente (repo hermano)");
+        return;
+    }
     let rt = rt_staff().await;
     let ctx = admin();
     let marta = rt
@@ -89,6 +100,10 @@ async fn a_staff_member_is_linked_to_a_hub_user() {
 
 #[tokio::test]
 async fn the_link_can_be_set_and_cleared_later() {
+    if !staff_en_disco() {
+        eprintln!("SKIP: modules-workspace/modules/staff ausente (repo hermano)");
+        return;
+    }
     let rt = rt_staff().await;
     let ctx = admin();
     let luis = rt
@@ -162,6 +177,10 @@ async fn the_link_can_be_set_and_cleared_later() {
 
 #[tokio::test]
 async fn the_module_reaches_the_hub_users_through_the_dispatcher() {
+    if !staff_en_disco() {
+        eprintln!("SKIP: modules-workspace/modules/staff ausente (repo hermano)");
+        return;
+    }
     // La UI del módulo necesita ofrecer «¿qué usuario es?»: los lee del core como una query más.
     let rt = rt_staff().await;
     rt.create_hub_user(&NewHubUser {

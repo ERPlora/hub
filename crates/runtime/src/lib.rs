@@ -776,6 +776,12 @@ impl Runtime {
         identity::untrust_device(self.db.as_ref(), device_id).await
     }
 
+    /// Permisos de una **sesión** con ese rol: los de los módulos + el permiso del core
+    /// (`hub.users.view`, ADR-0192). Es lo que debe usar el gate de auth al abrir sesión.
+    pub fn session_permissions(&self, role: &str) -> std::collections::HashSet<String> {
+        identity::session_permissions(&self.registry, role)
+    }
+
     /// Permisos efectivos del `role` (unión de `role_permissions` de los módulos activos).
     pub fn permissions_for_role(&self, role: &str) -> std::collections::HashSet<String> {
         identity::permissions_for_role(&self.registry, role)
