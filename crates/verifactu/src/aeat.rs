@@ -186,56 +186,277 @@ fn nonempty(val: String, fallback: &str) -> String {
         val
     }
 }
-///
-/// La AEAT admite varias líneas de desglose. Antes se emitía **una sola**, con el tipo **efectivo**
-/// (`cuota/base`) cuando la factura era mixta: un ticket con una caña al 21% y una tapa al 10%
-/// declaraba un 17,33% que no existe en el sistema fiscal español. No era un caso de borde: es el
-/// ticket normal de un bar, el vertical principal del producto.
-///
-/// Los importes vienen en CÉNTIMOS (ADR-0007) y la AEAT exige euros con 2 decimales → `/100.0` en el
-/// límite. Los signos se conservan (rectificativas llevan base y cuota negativas).
-///
-/// Sin desglose (`'{}'`, facturas anteriores a este campo) se emite una única línea con el tipo
-/// efectivo, que para una factura de tipo único **es** su tipo real.
-fn desglose(record: &Json) -> String {
-    // (tipo %, base en céntimos, cuota en céntimos)
-    let mut lines: Vec<(f64, f64, f64)> = Vec::new();
+// ── Desglose: el TIPO y la CALIFICACIÓN ───────────────────────────────────────────────────
+//
+// Una `DetalleDesglose` tiene DOS ejes y hay que acertar los dos:
+//
+//   * el **tipo** — cuánto se repercute. Antes se emitía una sola línea con el tipo *efectivo*
+//     (`cuota/base`): un ticket con una caña al 21 % y una tapa al 10 % declaraba un 17,33 % que no
+//     existe en el sistema fiscal español. Resuelto: una línea por tipo real.
+//   * la **calificación** — qué impuesto es, bajo qué régimen, y si la operación está sujeta,
+//     exenta o no sujeta. Iba literal (`01`/`01`/`S1`), que describe solo la venta nacional sujeta
+//     y no exenta: un hub canario declaraba IGIC como si fuera IVA, un servicio sanitario exento
+//     salía como «sujeto al 0 %», el recargo de equivalencia salía como un tipo inventado del
+//     5,20 %, y una venta intracomunitaria repercutía IVA español (hub#292).
+//
+// El `tax_breakdown` que escribe `invoice` es el contrato entre los dos módulos, y su FORMA
+// distingue las dos generaciones — las facturas ya emitidas están encadenadas en la huella y no se
+// pueden reinterpretar:
+//
+//   * **objeto** (viejo) `{"21.00":{"base":1000,"tax":210}}` — clave = tipo. Todo se declara como
+//     venta nacional sujeta y no exenta, que es lo que aquellas facturas efectivamente eran.
+//   * **array** (nuevo) — una entrada por **clave fiscal completa**:
+//     ```json
+//     {"tax":"vat|igic|ipsi|other", "regime":"01", "class":"subject|subject_reverse|exempt|
+//       not_subject|not_subject_location", "exempt_reason":"E1", "rate":21.00,
+//       "base":1000, "quota":210, "surcharge_rate":5.20, "surcharge_quota":52}
+//     ```
+//     `regime` y `exempt_reason` son códigos de la jurisdicción y viajan **opacos** (para España,
+//     `ClaveRegimen` de L8A/L8B y `OperacionExenta` de L10): `taxes` los guarda, `invoice` los
+//     copia y aquí se emiten tal cual. El vocabulario de `tax`/`class` es el mismo que el del
+//     VeriFactu del SaaS (ADR-0183) para que los dos se expliquen igual, pero el código NO se
+//     comparte: son emisores, cadenas y certificados distintos a propósito (ADR-0049).
+//
+// Los importes vienen en CÉNTIMOS (ADR-0007) y la AEAT exige euros con 2 decimales → `/100.0` en el
+// límite. Los signos se conservan (las rectificativas llevan base y cuota negativas).
 
-    if let Ok(Json::Object(map)) = serde_json::from_str::<Json>(&s(record, "tax_breakdown")) {
-        for (rate, amounts) in map {
-            if let Ok(rate) = rate.trim().parse::<f64>() {
-                lines.push((rate, f(&amounts, "base"), f(&amounts, "tax")));
-            }
+/// `Impuesto` (L1 del diseño de registro). Lo que no se reconozca es IVA, que es el default
+/// explícito de la AEAT («o no se cumplimenta, considerándose 01 - IVA»).
+fn impuesto_code(kind: &str) -> &'static str {
+    match kind.trim().to_ascii_lowercase().as_str() {
+        "igic" | "03" => "03",
+        "ipsi" | "02" => "02",
+        "other" | "otros" | "05" => "05",
+        _ => "01",
+    }
+}
+
+/// Una línea del desglose ya resuelta a códigos de la AEAT. `base`/`quota`/`surcharge_quota` en
+/// céntimos; `rate`/`surcharge_rate` en tanto por ciento.
+struct Detalle {
+    impuesto: &'static str,
+    regimen: String,
+    /// `S1|S2|N1|N2`, o vacío cuando la línea va por `OperacionExenta` (el XSD es un `<choice>`).
+    calificacion: &'static str,
+    /// `E1…E8`, o vacío si la línea lleva `CalificacionOperacion`.
+    exenta: String,
+    rate: f64,
+    base: f64,
+    quota: f64,
+    surcharge_rate: f64,
+    surcharge_quota: f64,
+    has_surcharge: bool,
+}
+
+impl Detalle {
+    /// Línea del formato viejo (y del fallback sin desglose): venta nacional, régimen general,
+    /// sujeta y no exenta.
+    fn nacional(rate: f64, base: f64, quota: f64) -> Self {
+        Detalle {
+            impuesto: "01",
+            regimen: "01".to_string(),
+            calificacion: "S1",
+            exenta: String::new(),
+            rate,
+            base,
+            quota,
+            surcharge_rate: 0.0,
+            surcharge_quota: 0.0,
+            has_surcharge: false,
         }
     }
+
+    /// ¿Se pueden informar tipo, cuota y recargo en esta línea?
+    ///
+    /// - **Exenta** — no (§15.5: con `OperacionExenta` no se informan `TipoImpositivo`,
+    ///   `CuotaRepercutida`, `TipoRecargoEquivalencia` ni `CuotaRecargoEquivalencia`).
+    /// - **N1/N2** — no. Es el **error 1237**, y hay que resistir la tentación de la excepción por
+    ///   `ClaveRegimen 17`: la revisión **v1.0.6 (25/04/2025)** del documento de validaciones la
+    ///   **eliminó** («eliminando las referencias a la clave de régimen 17 en la clasificación
+    ///   operación N1/N2»), y §15.7 lo remata sin excepciones — «CuotaRepercutida solo podrá ser
+    ///   distinta de cero si CalificacionOperacion es S1». Formalmente 1237 solo acota el IVA, pero
+    ///   §15.7 no distingue impuesto, así que la regla se aplica igual con IGIC/IPSI.
+    /// - **S1/S2** — sí. Ojo con S2: no es «omitir», es informar **ceros explícitos** (§15.4).
+    fn con_importes(&self) -> bool {
+        self.exenta.is_empty() && !matches!(self.calificacion, "N1" | "N2")
+    }
+
+    fn render(&self) -> String {
+        // Orden fijado por el `xs:sequence` de `DetalleType` en SuministroInformacion.xsd.
+        let mut out = format!(
+            "<sum1:DetalleDesglose>\
+             <sum1:Impuesto>{imp}</sum1:Impuesto>",
+            imp = self.impuesto,
+        );
+        if !self.regimen.is_empty() {
+            out.push_str(&format!(
+                "<sum1:ClaveRegimen>{}</sum1:ClaveRegimen>",
+                esc(&self.regimen)
+            ));
+        }
+        // `<choice>`: uno de los dos, nunca los dos.
+        if self.exenta.is_empty() {
+            out.push_str(&format!(
+                "<sum1:CalificacionOperacion>{}</sum1:CalificacionOperacion>",
+                self.calificacion
+            ));
+        } else {
+            out.push_str(&format!(
+                "<sum1:OperacionExenta>{}</sum1:OperacionExenta>",
+                esc(&self.exenta)
+            ));
+        }
+        let con_importes = self.con_importes();
+        if con_importes {
+            out.push_str(&format!(
+                "<sum1:TipoImpositivo>{}</sum1:TipoImpositivo>",
+                format_amount(self.rate)
+            ));
+        }
+        // El único elemento obligatorio del detalle. En una operación no sujeta o exenta no es «la
+        // base de un impuesto que no hay»: es el IMPORTE de la operación (el nombre del campo lo
+        // dice, `BaseImponible` **O** `importeNoSujeto`), y el productor lo manda ya así.
+        out.push_str(&format!(
+            "<sum1:BaseImponibleOimporteNoSujeto>{}</sum1:BaseImponibleOimporteNoSujeto>",
+            format_amount(self.base / 100.0)
+        ));
+        if con_importes {
+            out.push_str(&format!(
+                "<sum1:CuotaRepercutida>{}</sum1:CuotaRepercutida>",
+                format_amount(self.quota / 100.0)
+            ));
+            // Recargo de equivalencia: NO es otro tipo impositivo, son dos campos MÁS dentro de la
+            // misma línea del IVA. Emitirlo como una `DetalleDesglose` aparte manda un
+            // `TipoImpositivo` de 5,20 %, que no está en la lista de tipos que admite la AEAT
+            // (§15.1: 0; 2; 4; 5; 7,5; 10; 21) — rechazo garantizado.
+            //
+            // La restricción de tener que usar `ClaveRegimen 18` para informarlo **ya no existe**:
+            // v1.0.7 (26/05/2025) la eliminó y v1.1.2 (15/07/2025) borró la sección entera. Los
+            // listados de errores de terceros que la repiten (1279/1280) están desfasados.
+            if self.has_surcharge {
+                out.push_str(&format!(
+                    "<sum1:TipoRecargoEquivalencia>{}</sum1:TipoRecargoEquivalencia>\
+                     <sum1:CuotaRecargoEquivalencia>{}</sum1:CuotaRecargoEquivalencia>",
+                    format_amount(self.surcharge_rate),
+                    format_amount(self.surcharge_quota / 100.0),
+                ));
+            }
+        }
+        out.push_str("</sum1:DetalleDesglose>");
+        out
+    }
+}
+
+/// El XSD limita `DetalleDesglose` a `maxOccurs="12"`. Pasarse es un rechazo por esquema (4102),
+/// y el registro ya habría gastado su número.
+const MAX_DETALLES: usize = 12;
+
+/// Traduce una entrada del array a códigos de la AEAT.
+fn detalle_de_entrada(e: &Json) -> Detalle {
+    let impuesto = impuesto_code(&s(e, "tax"));
+    // §15.6: `ClaveRegimen` es obligatoria con IVA e IGIC, y el régimen general es `01`.
+    let regimen = {
+        let r = s(e, "regime");
+        if r.trim().is_empty() {
+            "01".to_string()
+        } else {
+            r.trim().to_string()
+        }
+    };
+    let class = s(e, "class");
+    let class = if class.trim().is_empty() {
+        "subject".to_string()
+    } else {
+        class.trim().to_ascii_lowercase()
+    };
+    let mut calificacion = match class.as_str() {
+        "subject_reverse" => "S2",
+        "not_subject" => "N1",
+        "not_subject_location" => "N2",
+        "exempt" => "",
+        _ => "S1",
+    };
+    let exenta = if class == "exempt" {
+        let causa = s(e, "exempt_reason");
+        if causa.trim().is_empty() {
+            // El `<choice>` obliga a poner uno de los dos: sin causa declarada, «exenta por
+            // otros» es exactamente lo que la AEAT tiene para este hueco.
+            "E6".to_string()
+        } else {
+            causa.trim().to_ascii_uppercase()
+        }
+    } else {
+        String::new()
+    };
+    // §15.6.6: con `ClaveRegimen 08` (la operación se localiza en Canarias/Ceuta/Melilla y por eso
+    // NO lleva el impuesto del emisor) la calificación tiene que ser `N2`, siempre. Igual con la
+    // clave `20` de IGIC (operaciones sujetas al IPSI, §15.6.10). Se corrige aquí en vez de
+    // confiar en que el productor acierte: un desglose mal calificado valida contra el XSD.
+    if calificacion != "" && (regimen == "08" || (impuesto == "03" && regimen == "20")) {
+        calificacion = "N2";
+    }
+    Detalle {
+        impuesto,
+        regimen,
+        calificacion,
+        exenta,
+        rate: f(e, "rate"),
+        base: f(e, "base"),
+        quota: f(e, "quota"),
+        surcharge_rate: f(e, "surcharge_rate"),
+        surcharge_quota: f(e, "surcharge_quota"),
+        has_surcharge: e.get("surcharge_rate").is_some() || e.get("surcharge_quota").is_some(),
+    }
+}
+
+fn desglose(record: &Json) -> String {
+    let mut lines: Vec<Detalle> = Vec::new();
+
+    match serde_json::from_str::<Json>(&s(record, "tax_breakdown")) {
+        // Formato nuevo: una entrada por clave fiscal completa.
+        Ok(Json::Array(entries)) => {
+            for e in &entries {
+                if e.is_object() {
+                    lines.push(detalle_de_entrada(e));
+                }
+            }
+        }
+        // Formato viejo: clave = tipo, todo venta nacional sujeta y no exenta.
+        Ok(Json::Object(map)) => {
+            for (rate, amounts) in map {
+                if let Ok(rate) = rate.trim().parse::<f64>() {
+                    lines.push(Detalle::nacional(
+                        rate,
+                        f(&amounts, "base"),
+                        f(&amounts, "tax"),
+                    ));
+                }
+            }
+        }
+        _ => {}
+    }
     if lines.is_empty() {
-        lines.push((
+        // Facturas anteriores al campo (`'{}'`), o un desglose ilegible: el tipo efectivo de una
+        // factura de tipo único ES su tipo real, y `Desglose` no puede quedarse sin detalle.
+        lines.push(Detalle::nacional(
             f(record, "tax_rate"),
             f(record, "base_amount"),
             f(record, "tax_amount"),
         ));
     }
-    // Tipo descendente: el XML no puede depender del orden de las claves del JSON.
-    lines.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    // Orden estable: el XML no puede depender del orden de las claves de un objeto JSON ni de cómo
+    // el productor construyera el array. Dentro de la misma clave fiscal, tipo descendente.
+    lines.sort_by(|a, b| {
+        a.impuesto
+            .cmp(b.impuesto)
+            .then_with(|| a.regimen.cmp(&b.regimen))
+            .then_with(|| a.exenta.cmp(&b.exenta))
+            .then_with(|| a.calificacion.cmp(b.calificacion))
+            .then_with(|| b.rate.partial_cmp(&a.rate).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    lines.truncate(MAX_DETALLES);
 
-    lines
-        .iter()
-        .map(|(rate, base, cuota)| {
-            format!(
-                "<sum1:DetalleDesglose>\
-                 <sum1:Impuesto>01</sum1:Impuesto>\
-                 <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
-                 <sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
-                 <sum1:TipoImpositivo>{tipo}</sum1:TipoImpositivo>\
-                 <sum1:BaseImponibleOimporteNoSujeto>{base}</sum1:BaseImponibleOimporteNoSujeto>\
-                 <sum1:CuotaRepercutida>{cuota}</sum1:CuotaRepercutida>\
-                 </sum1:DetalleDesglose>",
-                tipo = format_amount(*rate),
-                base = format_amount(base / 100.0),
-                cuota = format_amount(cuota / 100.0),
-            )
-        })
-        .collect()
+    lines.iter().map(Detalle::render).collect()
 }
 
 /// Construye el sobre SOAP `RegFactuSistemaFacturacion` para un registro (alta/anulación).
@@ -805,5 +1026,253 @@ mod desglose_tests {
             "<sum1:BaseImponibleOimporteNoSujeto>-10.00</sum1:BaseImponibleOimporteNoSujeto>"
         ));
         assert!(xml.contains("<sum1:CuotaRepercutida>-2.10</sum1:CuotaRepercutida>"));
+    }
+
+    // ── La CALIFICACIÓN (hub#292) ────────────────────────────────────────────────────────
+    //
+    // El eje del TIPO ya estaba resuelto (arriba). Este bloque cubre el otro eje: qué IMPUESTO
+    // es, bajo qué RÉGIMEN y con qué CALIFICACIÓN se declara cada línea. Antes los tres iban
+    // literales (`01`/`01`/`S1`) y describían solo la venta nacional sujeta y no exenta.
+    //
+    // El `tax_breakdown` nuevo es un ARRAY (una entrada por clave fiscal completa); el viejo era
+    // un objeto por tipo. La forma los distingue, así que las facturas ya encadenadas siguen
+    // generando su XML sin tocar nada.
+
+    /// Cuenta las apariciones de un elemento (por nombre local con prefijo `sum1:`).
+    fn count(xml: &str, tag: &str) -> usize {
+        xml.matches(&format!("<sum1:{tag}>")).count()
+    }
+
+    /// Un hub en CANARIAS no cobra IVA: cobra IGIC. Declararlo con `Impuesto 01` es declarar un
+    /// impuesto que ese hub no repercute, con un tipo (7 %) que ni siquiera existe en la lista de
+    /// tipos de IVA que admite la AEAT (§15.1: 0; 2; 4; 5; 7,5; 10; 21).
+    ///
+    /// Verificado contra las validaciones oficiales v1.2.2 §15.6: con `Impuesto 03` la
+    /// `ClaveRegimen` sale de la lista **L8B**, y el régimen general sigue siendo `01`. NO es `08`
+    /// — en L8B, `08` significa «operaciones sujetas al IPSI / IVA», es decir, los OTROS impuestos.
+    #[test]
+    fn un_hub_canario_declara_igic_no_iva() {
+        let tb = r#"[{"tax":"igic","regime":"01","class":"subject","rate":7.00,
+                      "base":10000,"quota":700}]"#;
+        let xml = xml_de(&alta(tb, 10000.0, 700.0, 7.0));
+        assert!(xml.contains("<sum1:Impuesto>03</sum1:Impuesto>"), "{xml}");
+        assert!(xml.contains("<sum1:ClaveRegimen>01</sum1:ClaveRegimen>"));
+        assert!(xml.contains("<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>"));
+        assert!(xml.contains("<sum1:TipoImpositivo>7.00</sum1:TipoImpositivo>"));
+        assert!(xml.contains("<sum1:CuotaRepercutida>7.00</sum1:CuotaRepercutida>"));
+    }
+
+    /// Ceuta y Melilla: IPSI, `Impuesto 02`.
+    #[test]
+    fn un_hub_de_ceuta_declara_ipsi() {
+        let tb = r#"[{"tax":"ipsi","regime":"01","class":"subject","rate":4.00,
+                      "base":10000,"quota":400}]"#;
+        let xml = xml_de(&alta(tb, 10000.0, 400.0, 4.0));
+        assert!(xml.contains("<sum1:Impuesto>02</sum1:Impuesto>"), "{xml}");
+    }
+
+    /// Un servicio EXENTO (sanitario, formación — reales en el vertical de estética) NO es «sujeto
+    /// y no exento al 0 %»: exige `OperacionExenta`, que en el XSD es una ALTERNATIVA a
+    /// `CalificacionOperacion` (`<choice>`), no un tipo del 0 %.
+    ///
+    /// §15.5: con `OperacionExenta` no se pueden informar `TipoImpositivo`, `CuotaRepercutida`,
+    /// `TipoRecargoEquivalencia` ni `CuotaRecargoEquivalencia`.
+    #[test]
+    fn un_servicio_exento_va_por_operacion_exenta_sin_tipo_ni_cuota() {
+        let tb = r#"[{"tax":"vat","regime":"01","class":"exempt","exempt_reason":"E1",
+                      "rate":0.00,"base":5000,"quota":0}]"#;
+        let xml = xml_de(&alta(tb, 5000.0, 0.0, 0.0));
+        assert!(xml.contains("<sum1:OperacionExenta>E1</sum1:OperacionExenta>"), "{xml}");
+        assert_eq!(count(&xml, "CalificacionOperacion"), 0, "el XSD es un <choice>: uno u otro");
+        assert_eq!(count(&xml, "TipoImpositivo"), 0, "§15.5: exenta no lleva tipo");
+        assert_eq!(count(&xml, "CuotaRepercutida"), 0, "§15.5: exenta no lleva cuota");
+        // El importe de la operación sigue viajando: es el único obligatorio del detalle.
+        assert!(xml.contains(
+            "<sum1:BaseImponibleOimporteNoSujeto>50.00</sum1:BaseImponibleOimporteNoSujeto>"
+        ));
+    }
+
+    /// Venta a empresa de otro estado miembro: no sujeta por reglas de localización (art.
+    /// 69.Uno.1º LIVA) → **N2**, y la cuota la autoliquida el cliente. NO es S2 (que es la
+    /// inversión en operaciones *sujetas en España*, art. 84.Uno.2º).
+    ///
+    /// **Error 1237**: con N1/N2 e Impuesto IVA no se puede informar `TipoImpositivo` ni
+    /// `CuotaRepercutida`. El XSD NO cubre esta regla — un XML mal calificado valida igual.
+    #[test]
+    fn una_venta_intracomunitaria_b2b_es_n2_y_no_lleva_tipo_ni_cuota() {
+        let tb = r#"[{"tax":"vat","regime":"01","class":"not_subject_location",
+                      "rate":0.00,"base":100000,"quota":0}]"#;
+        let xml = xml_de(&alta(tb, 100000.0, 0.0, 0.0));
+        assert!(xml.contains("<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>"), "{xml}");
+        assert_eq!(count(&xml, "TipoImpositivo"), 0, "error 1237");
+        assert_eq!(count(&xml, "CuotaRepercutida"), 0, "error 1237");
+    }
+
+    /// La excepción de `ClaveRegimen 17` (OSS) al error 1237 **ya no existe**: la revisión v1.0.6
+    /// (25/04/2025) del documento de validaciones eliminó «las referencias a la clave de régimen 17
+    /// en la clasificación operación N1/N2». §15.7 lo remata sin excepción alguna: «CuotaRepercutida
+    /// solo podrá ser distinta de cero (positivo o negativo) si CalificacionOperacion es S1».
+    ///
+    /// El VeriFactu del SaaS (ADR-0183) todavía mapea `oss → ("17","N2", con tipo y cuota)`. Este
+    /// test es el que impide que ese mapeo se copie aquí.
+    #[test]
+    fn el_regimen_17_no_es_excepcion_al_1237() {
+        let tb = r#"[{"tax":"vat","regime":"17","class":"not_subject_location",
+                      "rate":19.00,"base":10000,"quota":1900}]"#;
+        let xml = xml_de(&alta(tb, 10000.0, 1900.0, 19.0));
+        assert!(xml.contains("<sum1:ClaveRegimen>17</sum1:ClaveRegimen>"), "{xml}");
+        assert_eq!(count(&xml, "TipoImpositivo"), 0, "1237 sin excepción de régimen 17");
+        assert_eq!(count(&xml, "CuotaRepercutida"), 0, "1237 sin excepción de régimen 17");
+    }
+
+    /// `ClaveRegimen 08` (operación localizada en Canarias/Ceuta/Melilla, declarada por un emisor
+    /// peninsular) obliga a `N2` (§15.6.6) — y por tanto arrastra el 1237.
+    #[test]
+    fn el_regimen_08_fuerza_n2() {
+        let tb = r#"[{"tax":"vat","regime":"08","class":"subject","rate":21.00,
+                      "base":10000,"quota":2100}]"#;
+        let xml = xml_de(&alta(tb, 10000.0, 2100.0, 21.0));
+        assert!(xml.contains("<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>"), "{xml}");
+        assert_eq!(count(&xml, "TipoImpositivo"), 0);
+    }
+
+    /// El RECARGO DE EQUIVALENCIA no es otro tipo impositivo: son dos campos MÁS dentro de la
+    /// MISMA línea del IVA. Hoy `taxes` lo modela como una fila componente y el desglose le daba su
+    /// propia clave, así que salía una `DetalleDesglose` con `TipoImpositivo 5.20` — que no es un
+    /// tipo de IVA válido (§15.1) y hace que la AEAT rechace el registro.
+    #[test]
+    fn el_recargo_de_equivalencia_va_en_la_linea_del_iva_no_en_otra() {
+        let tb = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,
+                      "base":10000,"quota":2100,"surcharge_rate":5.20,"surcharge_quota":520}]"#;
+        let xml = xml_de(&alta(tb, 10000.0, 2620.0, 21.0));
+        assert_eq!(count(&xml, "DetalleDesglose"), 1, "una sola línea, no dos: {xml}");
+        assert!(xml.contains("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>"));
+        assert!(xml.contains("<sum1:TipoRecargoEquivalencia>5.20</sum1:TipoRecargoEquivalencia>"));
+        assert!(xml.contains("<sum1:CuotaRecargoEquivalencia>5.20</sum1:CuotaRecargoEquivalencia>"));
+        assert!(
+            !xml.contains("<sum1:TipoImpositivo>5.20</sum1:TipoImpositivo>"),
+            "5,20 % no es un tipo de IVA: la AEAT solo admite 0; 2; 4; 5; 7,5; 10; 21"
+        );
+    }
+
+    /// Inversión del sujeto pasivo en operación SUJETA en España (art. 84.Uno.2º) → `S2`. §15.4
+    /// exige `TipoImpositivo = 0` y `CuotaRepercutida = 0` **presentes** — no omitidos, que es lo
+    /// contrario de lo que pide N1/N2.
+    #[test]
+    fn la_inversion_sujeta_en_espana_es_s2_con_tipo_y_cuota_a_cero_explicitos() {
+        let tb = r#"[{"tax":"vat","regime":"01","class":"subject_reverse",
+                      "rate":0.00,"base":50000,"quota":0}]"#;
+        let xml = xml_de(&alta(tb, 50000.0, 0.0, 0.0));
+        assert!(xml.contains("<sum1:CalificacionOperacion>S2</sum1:CalificacionOperacion>"), "{xml}");
+        assert!(xml.contains("<sum1:TipoImpositivo>0.00</sum1:TipoImpositivo>"), "§15.4: 0 explícito");
+        assert!(xml.contains("<sum1:CuotaRepercutida>0.00</sum1:CuotaRepercutida>"), "§15.4: 0 explícito");
+    }
+
+    /// El caso que junta los dos ejes: la peluquería que en el mismo ticket vende un corte (21 %) y
+    /// un tratamiento sanitario exento. Dos líneas, cada una con SU calificación.
+    #[test]
+    fn un_ticket_mixto_sujeto_mas_exento_declara_las_dos_calificaciones() {
+        let tb = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,
+                      "base":2000,"quota":420},
+                     {"tax":"vat","regime":"01","class":"exempt","exempt_reason":"E1",
+                      "rate":0.00,"base":4000,"quota":0}]"#;
+        let xml = xml_de(&alta(tb, 6000.0, 420.0, 7.0));
+        assert_eq!(count(&xml, "DetalleDesglose"), 2, "{xml}");
+        assert_eq!(count(&xml, "CalificacionOperacion"), 1, "solo la sujeta lleva calificación");
+        assert_eq!(count(&xml, "OperacionExenta"), 1);
+        assert_eq!(count(&xml, "TipoImpositivo"), 1, "la exenta no lleva tipo");
+    }
+
+    /// El `<choice>` del XSD es `CalificacionOperacion` **o** `OperacionExenta`, y el
+    /// `xs:sequence` de `DetalleType` fija el orden: Impuesto → ClaveRegimen → (choice) →
+    /// TipoImpositivo → BaseImponibleOimporteNoSujeto → CuotaRepercutida →
+    /// TipoRecargoEquivalencia → CuotaRecargoEquivalencia.
+    #[test]
+    fn el_detalle_respeta_el_orden_del_xs_sequence() {
+        let tb = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,
+                      "base":10000,"quota":2100,"surcharge_rate":5.20,"surcharge_quota":520}]"#;
+        let xml = xml_de(&alta(tb, 10000.0, 2620.0, 21.0));
+        let at = |t: &str| xml.find(&format!("<sum1:{t}>")).unwrap_or_else(|| panic!("falta {t}"));
+        assert!(at("Impuesto") < at("ClaveRegimen"));
+        assert!(at("ClaveRegimen") < at("CalificacionOperacion"));
+        assert!(at("CalificacionOperacion") < at("TipoImpositivo"));
+        assert!(at("TipoImpositivo") < at("BaseImponibleOimporteNoSujeto"));
+        assert!(at("BaseImponibleOimporteNoSujeto") < at("CuotaRepercutida"));
+        assert!(at("CuotaRepercutida") < at("TipoRecargoEquivalencia"));
+        assert!(at("TipoRecargoEquivalencia") < at("CuotaRecargoEquivalencia"));
+    }
+
+    /// El XSD limita `DetalleDesglose` a `maxOccurs="12"`. Más de 12 claves fiscales distintas no
+    /// caben, y mandarlas es un rechazo seguro por esquema.
+    #[test]
+    fn el_desglose_no_pasa_de_doce_lineas() {
+        let entradas: Vec<String> = (1..=15)
+            .map(|i| {
+                format!(
+                    r#"{{"tax":"vat","regime":"{i:02}","class":"subject","rate":21.00,
+                        "base":100,"quota":21}}"#
+                )
+            })
+            .collect();
+        let tb = format!("[{}]", entradas.join(","));
+        let xml = xml_de(&alta(&tb, 1500.0, 315.0, 21.0));
+        assert_eq!(count(&xml, "DetalleDesglose"), 12, "maxOccurs=12 en el XSD");
+    }
+
+    /// COMPATIBILIDAD: una factura ya emitida con el formato viejo (objeto por tipo) sigue
+    /// produciendo EXACTAMENTE el XML de antes. Está encadenada en la huella: no se puede
+    /// reinterpretar.
+    #[test]
+    fn el_formato_viejo_sigue_declarandose_como_venta_nacional_sujeta() {
+        let tb = r#"{"21.00":{"base":1000,"tax":210},"10.00":{"base":500,"tax":50}}"#;
+        let xml = xml_de(&alta(tb, 1500.0, 260.0, 17.33));
+        assert_eq!(count(&xml, "DetalleDesglose"), 2);
+        assert_eq!(count(&xml, "Impuesto"), 2);
+        assert!(xml.contains("<sum1:Impuesto>01</sum1:Impuesto>"));
+        assert!(xml.contains("<sum1:ClaveRegimen>01</sum1:ClaveRegimen>"));
+        assert_eq!(count(&xml, "CalificacionOperacion"), 2);
+        assert!(xml.contains("<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>"));
+        assert_eq!(count(&xml, "OperacionExenta"), 0);
+    }
+
+    /// El orden del array tampoco puede depender de cómo lo escribiera el productor.
+    #[test]
+    fn el_orden_de_las_lineas_del_array_es_estable() {
+        let tb = r#"[{"tax":"vat","regime":"01","class":"subject","rate":10.00,"base":500,"quota":50},
+                     {"tax":"vat","regime":"01","class":"subject","rate":21.00,"base":1000,"quota":210}]"#;
+        let xml = xml_de(&alta(tb, 1500.0, 260.0, 17.33));
+        let pos21 = xml.find("<sum1:TipoImpositivo>21.00").expect("21%");
+        let pos10 = xml.find("<sum1:TipoImpositivo>10.00").expect("10%");
+        assert!(pos21 < pos10, "tipo descendente dentro de la misma clave fiscal");
+    }
+
+    /// Un array vacío o basura no puede dejar el `Desglose` sin ninguna línea: el elemento es
+    /// obligatorio y sin detalle el registro se rechaza. Cae al tipo efectivo, como el `'{}'`.
+    #[test]
+    fn un_desglose_vacio_cae_al_tipo_efectivo() {
+        let xml = xml_de(&alta("[]", 1000.0, 100.0, 10.0));
+        assert_eq!(count(&xml, "DetalleDesglose"), 1);
+        assert!(xml.contains("<sum1:TipoImpositivo>10.00</sum1:TipoImpositivo>"));
+        assert!(xml.contains("<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>"));
+    }
+
+    /// Defaults del contrato: sin `tax` es IVA, sin `regime` es régimen general, sin `class` es
+    /// sujeta y no exenta. Es lo que hace que un productor que solo sepa de tipos siga funcionando.
+    #[test]
+    fn los_defaults_del_contrato_son_iva_regimen_general_y_sujeta() {
+        let tb = r#"[{"rate":21.00,"base":1000,"quota":210}]"#;
+        let xml = xml_de(&alta(tb, 1000.0, 210.0, 21.0));
+        assert!(xml.contains("<sum1:Impuesto>01</sum1:Impuesto>"), "{xml}");
+        assert!(xml.contains("<sum1:ClaveRegimen>01</sum1:ClaveRegimen>"));
+        assert!(xml.contains("<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>"));
+    }
+
+    /// Una exenta sin causa declarada no puede quedarse sin `OperacionExenta` (el `<choice>` exige
+    /// uno de los dos): cae a `E6` — «exenta por otros» — que es lo que la AEAT tiene para eso.
+    #[test]
+    fn una_exenta_sin_causa_cae_a_e6() {
+        let tb = r#"[{"tax":"vat","class":"exempt","rate":0.00,"base":1000,"quota":0}]"#;
+        let xml = xml_de(&alta(tb, 1000.0, 0.0, 0.0));
+        assert!(xml.contains("<sum1:OperacionExenta>E6</sum1:OperacionExenta>"), "{xml}");
     }
 }

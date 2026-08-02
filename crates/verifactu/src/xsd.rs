@@ -115,6 +115,62 @@ const ORDER_ANULACION: &[&str] = &[
 /// `ClaveTipoFacturaType`. F1–F3 y R1–R5 son los que emite el módulo (`INVOICE_TYPES`).
 const TIPO_FACTURA: &[&str] = &["F1", "F2", "F3", "R1", "R2", "R3", "R4", "R5"];
 
+// ── DetalleDesglose ────────────────────────────────────────────────────────────────────────
+//
+// Aquí es donde el XSD se queda corto y hay que poner reglas a mano. El esquema admite
+// cualquier combinación de calificación con tipo y cuota: los cuatro casos que la AEAT rechaza
+// —N1/N2 con tipo (1237), exenta con cuota (§15.5), S2 sin ceros (§15.4), régimen 08 sin N2
+// (§15.6.6)— validan contra `DetalleType` igual de bien que una venta nacional correcta. Las
+// referencias son al documento «Validaciones · Sistemas Informáticos de Facturación y Sistemas
+// VERI*FACTU» v1.2.2 (08/04/2026), no a listados de errores de terceros (que llevan desfasados
+// desde que en 2025 se eliminaron la excepción del régimen 17 y la restricción del régimen 18).
+
+/// Orden del `xs:sequence` de `DetalleType`, con el `<choice>` intercalado en su sitio.
+/// `tests/xsd.rs` lo contrasta contra el XSD oficial.
+pub const ORDER_DETALLE: &[&str] = &[
+    "Impuesto",
+    "ClaveRegimen",
+    // `<choice>`: uno de los dos, nunca los dos ni ninguno.
+    "CalificacionOperacion",
+    "OperacionExenta",
+    "TipoImpositivo",
+    "BaseImponibleOimporteNoSujeto",
+    "BaseImponibleACoste",
+    "CuotaRepercutida",
+    "TipoRecargoEquivalencia",
+    "CuotaRecargoEquivalencia",
+];
+
+/// `ImpuestoType` (L1): 01 IVA · 02 IPSI · 03 IGIC · 05 Otros.
+pub const IMPUESTO: &[&str] = &["01", "02", "03", "05"];
+
+/// `CalificacionOperacionType` (L9).
+pub const CALIFICACION: &[&str] = &["S1", "S2", "N1", "N2"];
+
+/// `OperacionExentaType` (L10 + E7/E8, que son exenciones **de IGIC**).
+pub const OPERACION_EXENTA: &[&str] = &["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"];
+
+/// `IdOperacionesTrascendenciaTributariaType` — la unión de L8A (IVA) y L8B (IGIC).
+pub const CLAVE_REGIMEN: &[&str] = &[
+    "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "14", "15", "17", "18", "19",
+    "20", "21",
+];
+
+/// Causas de exención que **solo** existen con IGIC (§15.5).
+const EXENTA_SOLO_IGIC: &[&str] = &["E7", "E8"];
+
+/// §15.1 — tipos de IVA admitidos con `Impuesto 01` y `CalificacionOperacion S1`. La lista es
+/// cerrada, y es donde aterrizaba el recargo de equivalencia cuando salía como línea propia con
+/// un `TipoImpositivo` del 5,20 %. (Los tipos 2 / 5 / 7,5 tuvieron ventanas de vigencia; no se
+/// comprueban aquí porque acotar de más bloquearía rectificativas de aquellos periodos.)
+const TIPOS_IVA: &[f64] = &[0.0, 2.0, 4.0, 5.0, 7.5, 10.0, 21.0];
+
+/// §15.3 — tipos de recargo de equivalencia admitidos con IVA y `S1`.
+const TIPOS_RECARGO: &[f64] = &[0.0, 0.26, 0.5, 0.62, 1.0, 1.4, 1.75, 5.2];
+
+/// `DesgloseType` limita `DetalleDesglose` a `maxOccurs="12"`.
+const MAX_DETALLES: usize = 12;
+
 /// Tipos que exigen el bloque `Destinatarios`: sin él la AEAT responde **1189**.
 const TIPOS_CON_DESTINATARIO: &[&str] = &["F1", "F3", "R1", "R2", "R3", "R4"];
 
@@ -302,6 +358,11 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
         )));
     }
 
+    // ── Desglose: la calificación, que el XSD deja pasar ─────────────────────────────────
+    if !anulacion {
+        validate_desglose(&elements)?;
+    }
+
     if text_of(&elements, "TipoHuella").unwrap_or_default() != "01" {
         return Err(err("TipoHuella solo admite `01` (SHA-256)"));
     }
@@ -312,6 +373,246 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
         ));
     }
 
+    Ok(())
+}
+
+// ── Desglose / DetalleDesglose ─────────────────────────────────────────────────────────────
+
+/// Trocea el documento en un grupo de elementos por cada `DetalleDesglose`.
+fn detalles<'a>(elements: &[(&'a str, &'a str)]) -> Vec<Vec<(&'a str, &'a str)>> {
+    let mut out: Vec<Vec<(&str, &str)>> = Vec::new();
+    let mut abierto = false;
+    for (tag, text) in elements {
+        if *tag == "DetalleDesglose" {
+            out.push(Vec::new());
+            abierto = true;
+        } else if abierto && ORDER_DETALLE.contains(tag) {
+            out.last_mut().expect("grupo abierto").push((tag, text));
+        } else if abierto {
+            abierto = false; // el detalle se cerró (llegó CuotaTotal, ImporteTotal…)
+        }
+    }
+    out
+}
+
+/// Lee un importe/tipo de la AEAT (`21.00`) como `f64`.
+fn num(v: &str) -> Option<f64> {
+    v.trim().parse().ok()
+}
+
+/// ¿Coincide con alguno de los valores permitidos? Compara en céntesimas para no depender de la
+/// representación binaria de `7.5` o `5.2`.
+fn en_lista(v: f64, permitidos: &[f64]) -> bool {
+    permitidos
+        .iter()
+        .any(|p| ((p - v) * 100.0).abs() < 0.5)
+}
+
+/// Valida el bloque `Desglose` de un registro de alta.
+fn validate_desglose(elements: &[(&str, &str)]) -> Result<(), VerifactuError> {
+    let grupos = detalles(elements);
+    if grupos.is_empty() {
+        return Err(err(
+            "Desglose no lleva ningún DetalleDesglose: la AEAT no admite un desglose vacío",
+        ));
+    }
+    if grupos.len() > MAX_DETALLES {
+        return Err(err(format!(
+            "el Desglose lleva {} líneas y el esquema admite {MAX_DETALLES} \
+             (DesgloseType/DetalleDesglose maxOccurs=12)",
+            grupos.len()
+        )));
+    }
+
+    for (i, g) in grupos.iter().enumerate() {
+        let n = i + 1;
+        let get = |tag: &str| g.iter().find(|(t, _)| *t == tag).map(|(_, v)| *v);
+        let hay = |tag: &str| get(tag).is_some();
+
+        // Orden: `DetalleType` es un xs:sequence.
+        let mut esperado = ORDER_DETALLE.iter();
+        for (tag, _) in g {
+            if !esperado.any(|e| e == tag) {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: `{tag}` va fuera de orden; la secuencia del esquema es {}",
+                    ORDER_DETALLE.join(" → ")
+                )));
+            }
+        }
+
+        // Impuesto (ausente ⇒ IVA, es el default explícito de la AEAT).
+        let impuesto = get("Impuesto").unwrap_or("01");
+        if !IMPUESTO.contains(&impuesto) {
+            return Err(err(format!(
+                "DetalleDesglose #{n}: Impuesto `{impuesto}` no está en la enumeración ({})",
+                IMPUESTO.join("|")
+            )));
+        }
+        let es_iva = impuesto == "01";
+        let es_igic = impuesto == "03";
+
+        // ClaveRegimen (§15.6): solo con IVA/IPSI/IGIC, y obligatoria con IVA e IGIC.
+        let regimen = get("ClaveRegimen");
+        match regimen {
+            Some(r) if !CLAVE_REGIMEN.contains(&r) => {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: ClaveRegimen `{r}` no está en las listas L8A/L8B"
+                )))
+            }
+            Some(_) if impuesto == "05" => {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: ClaveRegimen solo se admite con Impuesto 01, 02 o 03"
+                )))
+            }
+            None if es_iva || es_igic => {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: ClaveRegimen es obligatoria con Impuesto \
+                     {impuesto}; sin ella la AEAT responde 1245"
+                )))
+            }
+            _ => {}
+        }
+
+        // El `<choice>`: CalificacionOperacion **o** OperacionExenta.
+        let calificacion = get("CalificacionOperacion");
+        let exenta = get("OperacionExenta");
+        match (calificacion, exenta) {
+            (Some(_), Some(_)) => {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: CalificacionOperacion y OperacionExenta son un \
+                     <choice> del esquema — van una o la otra, no las dos"
+                )))
+            }
+            (None, None) => {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: falta CalificacionOperacion u OperacionExenta \
+                     (el <choice> exige una de las dos)"
+                )))
+            }
+            _ => {}
+        }
+        if let Some(c) = calificacion {
+            if !CALIFICACION.contains(&c) {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: CalificacionOperacion `{c}` no está en la \
+                     enumeración ({})",
+                    CALIFICACION.join("|")
+                )));
+            }
+        }
+        if let Some(e) = exenta {
+            if !OPERACION_EXENTA.contains(&e) {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: OperacionExenta `{e}` no está en la enumeración ({})",
+                    OPERACION_EXENTA.join("|")
+                )));
+            }
+            if EXENTA_SOLO_IGIC.contains(&e) && !es_igic {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: OperacionExenta `{e}` solo existe con Impuesto 03 \
+                     (IGIC); con IVA la lista es E1–E6"
+                )));
+            }
+        }
+
+        if !hay("BaseImponibleOimporteNoSujeto") {
+            return Err(err(format!(
+                "DetalleDesglose #{n}: BaseImponibleOimporteNoSujeto es obligatorio"
+            )));
+        }
+
+        // Los cuatro campos que dependen de la calificación.
+        let importes = [
+            "TipoImpositivo",
+            "CuotaRepercutida",
+            "TipoRecargoEquivalencia",
+            "CuotaRecargoEquivalencia",
+        ];
+
+        // §15.5 — con OperacionExenta no se informa ninguno.
+        if exenta.is_some() {
+            if let Some(t) = importes.iter().find(|t| hay(t)) {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: una línea con OperacionExenta no puede informar \
+                     `{t}` (validaciones AEAT §15.5)"
+                )));
+            }
+        }
+
+        if let Some(c) = calificacion {
+            // **Error 1237** — con N1/N2 no se informa ninguno de los cuatro.
+            //
+            // Sin excepción por `ClaveRegimen 17`: la revisión v1.0.6 (25/04/2025) del documento
+            // de validaciones eliminó esa referencia, y §15.7 no admite cuota distinta de cero
+            // fuera de S1 para ningún impuesto.
+            if matches!(c, "N1" | "N2") {
+                if let Some(t) = importes.iter().find(|t| hay(t)) {
+                    return Err(err(format!(
+                        "DetalleDesglose #{n}: con CalificacionOperacion `{c}` no se puede \
+                         informar `{t}` — es el error 1237 de la AEAT, y el régimen 17 dejó de \
+                         ser una excepción en abril de 2025"
+                    )));
+                }
+            }
+
+            // §15.4 — S2 es el caso al revés: los ceros van EXPLÍCITOS.
+            if c == "S2" {
+                for tag in ["TipoImpositivo", "CuotaRepercutida"] {
+                    match get(tag).and_then(num) {
+                        Some(v) if v == 0.0 => {}
+                        Some(v) => {
+                            return Err(err(format!(
+                                "DetalleDesglose #{n}: con S2 (inversión del sujeto pasivo) \
+                                 `{tag}` tiene que ser 0 y vale {v}"
+                            )))
+                        }
+                        None => {
+                            return Err(err(format!(
+                                "DetalleDesglose #{n}: con S2 (inversión del sujeto pasivo) \
+                                 `{tag}` es obligatorio y va a 0 — no se omite (§15.4)"
+                            )))
+                        }
+                    }
+                }
+            }
+
+            // §15.6.6 — la clave 08 (operación localizada en Canarias/Ceuta/Melilla) obliga a N2.
+            if regimen == Some("08") && c != "N2" {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: ClaveRegimen 08 exige CalificacionOperacion N2 y \
+                     lleva `{c}` (§15.6.6)"
+                )));
+            }
+            // §15.6.10 — ídem para la clave 20 de IGIC (operaciones sujetas al IPSI).
+            if es_igic && regimen == Some("20") && c != "N2" {
+                return Err(err(format!(
+                    "DetalleDesglose #{n}: con IGIC, ClaveRegimen 20 exige \
+                     CalificacionOperacion N2 y lleva `{c}` (§15.6.10)"
+                )));
+            }
+
+            // §15.1 / §15.3 — las listas cerradas de tipos. Acotadas a IVA: los tipos de IGIC
+            // (7 %, 9,5 %, 15 %…) y de IPSI no están —ni tienen por qué— en la lista del IVA.
+            if es_iva && c == "S1" {
+                if let Some(t) = get("TipoImpositivo").and_then(num) {
+                    if !en_lista(t, TIPOS_IVA) {
+                        return Err(err(format!(
+                            "DetalleDesglose #{n}: TipoImpositivo {t} no es un tipo de IVA; la \
+                             AEAT solo admite 0; 2; 4; 5; 7,5; 10 y 21 (§15.1)"
+                        )));
+                    }
+                }
+                if let Some(t) = get("TipoRecargoEquivalencia").and_then(num) {
+                    if !en_lista(t, TIPOS_RECARGO) {
+                        return Err(err(format!(
+                            "DetalleDesglose #{n}: TipoRecargoEquivalencia {t} no es un tipo de \
+                             recargo; la AEAT admite 0; 0,26; 0,5; 0,62; 1; 1,4; 1,75 y 5,2 (§15.3)"
+                        )));
+                    }
+                }
+            }
+        }
+    }
     Ok(())
 }
 
@@ -343,6 +644,32 @@ pub fn required_elements_of(xsd_src: &str, type_name: &str) -> Option<Vec<String
             .filter(|n| n != "IDFactura")
             .collect(),
     )
+}
+
+/// Valores de las `<enumeration>` del `simpleType` `type_name`, en orden de documento.
+///
+/// Mismo propósito que `sequence_of`: que las listas cerradas del validador se contrasten contra
+/// el esquema oficial en cada `cargo test`, en vez de envejecer a mano. La copia vendorizada que
+/// había antes ya se había quedado sin `E7`/`E8` (exenciones de IGIC) ni la clave de régimen `21`,
+/// y nadie se enteró.
+pub fn enumeration_of(xsd_src: &str, type_name: &str) -> Option<Vec<String>> {
+    let start = xsd_src.find(&format!("simpleType name=\"{type_name}\""))?;
+    let rest = &xsd_src[start..];
+    let end = rest.find("</simpleType>")?;
+    let cuerpo = &rest[..end];
+
+    let mut out = Vec::new();
+    let mut i = 0;
+    while let Some(rel) = cuerpo[i..].find("<enumeration ") {
+        let lt = i + rel;
+        let after = &cuerpo[lt..];
+        let gt = after.find('>')?;
+        if let Some(v) = attr(&after[..gt], "value") {
+            out.push(v);
+        }
+        i = lt + gt;
+    }
+    Some(out)
 }
 
 /// `(nombre, minOccurs)` de los `<element>` que cuelgan DIRECTAMENTE del `xs:sequence` de primer
