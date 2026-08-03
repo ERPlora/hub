@@ -52,7 +52,7 @@ export default {
     iosHint: 'On iPhone/iPad: tap Share (the square with an arrow) and choose “Add to Home Screen”.',
     browserHint: 'In your browser menu, choose “Install app” (or “Add to Home Screen”).',
   },
-  // Public page editor (PageEditor.vue, ADR-0177). Block-based editor for public pages.
+  // Public page editor (PageEditor.vue, ADR-0179). Block-based editor for public pages.
   pageEditor: {
     placeholder: 'Write your page here…',
   },

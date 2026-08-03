@@ -364,7 +364,7 @@ impl Registry {
             .unwrap_or(false)
     }
 
-    /// ¿Es `name` una **query pública** (ADR-0177): existe, pertenece a un módulo **activo** y está
+    /// ¿Es `name` una **query pública** (ADR-0179): existe, pertenece a un módulo **activo** y está
     /// marcada `public: true`? Es la ÚNICA puerta del endpoint anónimo `POST /api/public/query`
     /// (no hay usuario, así que el `permission` no gatea; lo hace este flag). Gemelo de
     /// [`is_query_exposed`] pero para la capa web pública. Un command NUNCA casa (solo mira queries),

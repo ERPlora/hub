@@ -1,4 +1,4 @@
-//! Tests de integración de la INTEGRACIÓN de la capa web pública (ADR-0177, Wave 2) por HTTP
+//! Tests de integración de la INTEGRACIÓN de la capa web pública (ADR-0179, Wave 2) por HTTP
 //! (sin red): el endpoint anónimo `POST /api/public/query` (default-deny + `hub_id` de sistema) y
 //! el cableado de `GET /p/<path>` (bloques → HTML seguro). Mismo estilo que `tests/public_api.rs`
 //! (`tower::ServiceExt::oneshot`).
@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 use axum::body::Body;
+use axum::extract::ConnectInfo;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_db::Params;
@@ -17,6 +18,7 @@ use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 const HUB_ID: &str = "hub-public-1";
 
@@ -48,7 +50,7 @@ fn snapshot_on() -> PublicSnapshot {
         landing_visible: true,
         business_name: "Bar Pepe".into(),
         business_address: "Calle Mayor 1".into(),
-        public_origin: None,
+        public_origin: Some("https://public.example".into()),
     }
 }
 
@@ -73,18 +75,26 @@ async fn body_text(resp: axum::response::Response) -> String {
 }
 
 fn public_query(query: &str, params: Value) -> Request<Body> {
-    Request::builder()
+    public_query_from(query, params, Ipv4Addr::new(127, 0, 0, 1))
+}
+
+fn public_query_from(query: &str, params: Value, ip: Ipv4Addr) -> Request<Body> {
+    let mut request = Request::builder()
         .method("POST")
         .uri("/api/public/query")
+        .header("host", "public.example")
         .header("content-type", "application/json")
         .body(Body::from(json!({ "query": query, "params": params }).to_string()))
-        .unwrap()
+        .unwrap();
+    request.extensions_mut().insert(ConnectInfo(SocketAddr::new(IpAddr::V4(ip), 43210)));
+    request
 }
 
 fn get(uri: &str) -> Request<Body> {
     Request::builder()
         .method("GET")
         .uri(uri)
+        .header("host", "public.example")
         .body(Body::empty())
         .unwrap()
 }
@@ -93,6 +103,7 @@ fn admin_json(method: &str, uri: &str, body: Value) -> Request<Body> {
     Request::builder()
         .method(method)
         .uri(uri)
+        .header("host", "public.example")
         .header("content-type", "application/json")
         .header("x-hub-id", HUB_ID)
         .header("x-user-id", "owner")
@@ -191,13 +202,31 @@ async fn public_query_returns_429_with_retry_after_after_the_quota() {
     for request_number in 1..=120 {
         let response = app
             .clone()
-            .oneshot(public_query("menu.items.list", json!({})))
+            .oneshot(public_query_from(
+                "menu.items.list",
+                json!({}),
+                Ipv4Addr::new(10, 0, 0, 1),
+            ))
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK, "request {request_number}");
     }
+    let other_ip = app
+        .clone()
+        .oneshot(public_query_from(
+            "menu.items.list",
+            json!({}),
+            Ipv4Addr::new(10, 0, 0, 2),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(other_ip.status(), StatusCode::OK, "otra IP conserva su cuota");
     let response = app
-        .oneshot(public_query("menu.items.list", json!({})))
+        .oneshot(public_query_from(
+            "menu.items.list",
+            json!({}),
+            Ipv4Addr::new(10, 0, 0, 1),
+        ))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
@@ -259,6 +288,7 @@ async fn flag_on_page_with_stored_json_renders_html_with_strict_csp() {
     let conditional = Request::builder()
         .method("GET")
         .uri("/p/menu")
+        .header("host", "public.example")
         .header("if-none-match", etag)
         .body(Body::empty())
         .unwrap();

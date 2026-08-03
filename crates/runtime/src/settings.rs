@@ -135,7 +135,7 @@ const KNOWN: &[Setting] = &[
         validate: validate_text,
         parse_stored: |s| json!(s),
     },
-    // Interruptor de la capa web PÚBLICA del hub (ADR-0177, F0). Con `false` (default) NO existe
+    // Interruptor de la capa web PÚBLICA del hub (ADR-0179, F0). Con `false` (default) NO existe
     // parte pública: `/`, `/p/*` y `/api/public/*` se comportan como hoy. El dueño la activa desde
     // Ajustes (`PUT /api/settings`); el runtime la lee al arrancar (snapshot cacheado). Cambiarla en
     // caliente requiere reiniciar el proceso (aceptable en F0; sin hot-reload por diseño).
@@ -487,7 +487,7 @@ pub async fn set_many(
 // ── Acceso CRUDO a `hub_settings` (fuera del allowlist de claves conocidas) ─────────────────────
 //
 // [`get_all`]/[`set_many`] son un contrato CERRADO: solo dejan pasar las claves de [`KNOWN`]. La
-// presencia web pública (ADR-0177) guarda el JSON de bloques de CADA página bajo una clave dinámica
+// presencia web pública (ADR-0179) guarda el JSON de bloques de CADA página bajo una clave dinámica
 // `public.page.<path>` que NO es un setting conocido — así que necesita una puerta APARTE sobre la
 // MISMA tabla, sin inventar tabla nueva. Estos dos helpers son esa puerta: crudos, por clave exacta,
 // sin validación de allowlist. Úsalos SOLO para claves con espacio de nombres propio (`public.page.*`),
@@ -642,7 +642,7 @@ mod tests {
     // compartida con Cloud). El override vive en `hub_user_pref`; esta clave es lo que ve quien no
     // ha elegido nada.
 
-    // ── Capa web PÚBLICA (ADR-0177, F0) ────────────────────────────────────────────────
+    // ── Capa web PÚBLICA (ADR-0179, F0) ────────────────────────────────────────────────
     //
     // `public.landing.visible` es el interruptor de la parte pública. Debe existir como setting
     // conocido para poder leerse (`get_all` → snapshot) y activarse desde Ajustes (`set_many`); y su

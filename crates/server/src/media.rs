@@ -36,8 +36,11 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 use erplora_runtime::manifest::{StaticFilesDef, UserFileAction};
+use erplora_runtime::Runtime;
+use tokio::sync::Mutex;
 
 use crate::{auth, AppState};
 
@@ -49,20 +52,42 @@ fn unauthorized(error: auth::AuthError) -> Response {
         .into_response()
 }
 
-async fn require_user(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
-    let rt = st.runtime.lock().await;
-    auth::require_user_session(headers, &st.config, &rt)
+type AuthenticatedTenant = (String, Arc<Mutex<Runtime>>);
+
+async fn require_user(
+    st: &AppState,
+    headers: &HeaderMap,
+) -> Result<AuthenticatedTenant, Response> {
+    let hub_id = auth::hub_id(headers, &st.hub_id());
+    let runtime = st
+        .runtime_for(&hub_id)
         .await
-        .map(|_| ())
-        .map_err(unauthorized)
+        .map_err(crate::tenant_rejected)?;
+    {
+        let rt = runtime.lock().await;
+        auth::require_user_session(headers, &st.config, &rt)
+            .await
+            .map_err(unauthorized)?;
+    }
+    Ok((hub_id, runtime))
 }
 
-async fn require_admin(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
-    let rt = st.runtime.lock().await;
-    auth::require_admin_session(headers, &st.config, &rt)
+async fn require_admin(
+    st: &AppState,
+    headers: &HeaderMap,
+) -> Result<AuthenticatedTenant, Response> {
+    let hub_id = auth::hub_id(headers, &st.hub_id());
+    let runtime = st
+        .runtime_for(&hub_id)
         .await
-        .map(|_| ())
-        .map_err(unauthorized)
+        .map_err(crate::tenant_rejected)?;
+    {
+        let rt = runtime.lock().await;
+        auth::require_admin_session(headers, &st.config, &rt)
+            .await
+            .map_err(unauthorized)?;
+    }
+    Ok((hub_id, runtime))
 }
 
 // ─────────────────────────── Proxy Hub→Cloud (Object Storage) ───────────────────────────
@@ -73,15 +98,8 @@ async fn require_admin(st: &AppState, headers: &HeaderMap) -> Result<(), Respons
 
 /// Cabeceras de autenticación de máquina (`X-Hub-Token` + `X-Hub-Id`) para hablar con el Cloud.
 /// `None` si el hub no está enrolado (sin token de máquina) → no se puede proxyar.
-fn cloud_headers(st: &AppState) -> Option<Vec<(&'static str, String)>> {
-    let token = st.machine_token()?;
-    Some(
-        cloud_client::Auth::HubToken {
-            hub_id: st.hub_id(),
-            token,
-        }
-        .headers(),
-    )
+fn cloud_headers(st: &AppState, hub_id: &str) -> Option<Vec<(&'static str, String)>> {
+    Some(auth::machine_auth_for(st, hub_id)?.headers())
 }
 
 /// Base del Cloud sin barra final.
@@ -102,8 +120,13 @@ fn fmt_iso(s: &str) -> String {
 
 /// `GET /api/v1/hub/device/media/?folder=` → mapea el shape RAW del Cloud al del frontend
 /// (formatea bytes/fecha, quota "sin límite").
-async fn cloud_list(st: &AppState, folder: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+async fn cloud_list(
+    st: &AppState,
+    hub_id: &str,
+    runtime: &Arc<Mutex<Runtime>>,
+    folder: &str,
+) -> Response {
+    let Some(headers) = cloud_headers(st, hub_id) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     let url = format!(
@@ -165,7 +188,7 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
         .unwrap_or(0);
     // Política de la carpeta pedida: la UI pinta solo las acciones posibles (ADR-0172). No es la
     // autoridad — cada endpoint la revalida —, pero evita ofrecer un botón que va a dar 403.
-    let policy = resolve_policy(st, folder).await;
+    let policy = resolve_policy(runtime, folder).await;
     let data = json!({
         "folders": raw.get("folders").cloned().unwrap_or_else(|| json!([])),
         "files": files,
@@ -178,8 +201,13 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
 }
 
 /// Reenvía un multipart de subida al Cloud (`POST …/media/`).
-async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+async fn cloud_upload(
+    st: &AppState,
+    hub_id: &str,
+    runtime: &Arc<Mutex<Runtime>>,
+    mut mp: Multipart,
+) -> Response {
+    let Some(headers) = cloud_headers(st, hub_id) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     // El multipart se recoge ENTERO antes de decidir: el orden de los campos no está garantizado
@@ -202,7 +230,7 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
             _ => {}
         }
     }
-    if let Err(response) = require_action(st, &folder, UserFileAction::Upload).await {
+    if let Err(response) = require_action(runtime, &folder, UserFileAction::Upload).await {
         return response;
     }
     if files.is_empty() {
@@ -253,8 +281,8 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
 }
 
 /// `DELETE …/media/?path=` en el Cloud.
-async fn cloud_delete(st: &AppState, path: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+async fn cloud_delete(st: &AppState, hub_id: &str, path: &str) -> Response {
+    let Some(headers) = cloud_headers(st, hub_id) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     let url = format!(
@@ -277,8 +305,8 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
 }
 
 /// `POST …/media/rename/` en el Cloud (que hace el copy+delete sobre Object Storage).
-async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+async fn cloud_rename(st: &AppState, hub_id: &str, path: &str, name: &str) -> Response {
+    let Some(headers) = cloud_headers(st, hub_id) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     let url = format!("{}/api/v1/hub/device/media/rename/", cloud_base(st));
@@ -297,8 +325,8 @@ async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
 }
 
 /// `POST …/media/folder/` en el Cloud.
-async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+async fn cloud_create_folder(st: &AppState, hub_id: &str, parent: &str, name: &str) -> Response {
+    let Some(headers) = cloud_headers(st, hub_id) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     let url = format!("{}/api/v1/hub/device/media/folder/", cloud_base(st));
@@ -319,8 +347,8 @@ async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Respons
 /// `GET …/media/raw?path=` en el Cloud → reenvía los bytes del fichero (inline) al cliente. Lee a
 /// memoria (los ficheros de media son modestos: logs, PDFs, imágenes) y fija `Content-Type` por
 /// extensión, igual que hacía la rama local.
-async fn cloud_raw(st: &AppState, path: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+async fn cloud_raw(st: &AppState, hub_id: &str, path: &str) -> Response {
+    let Some(headers) = cloud_headers(st, hub_id) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     let url = format!(
@@ -378,9 +406,10 @@ pub async fn public_page_media(
     headers: HeaderMap,
     AxumPath(path): AxumPath<String>,
 ) -> Response {
-    if !crate::public::public_host_allowed(&st.public, &headers) {
-        return err(StatusCode::MISDIRECTED_REQUEST, "dominio público no asociado a este hub");
-    }
+    let (hub_id, _, _) = match crate::public::resolve_public_tenant(&st, &headers).await {
+        Ok(resolved) => resolved,
+        Err(response) => return response,
+    };
     let relative = Path::new(&path);
     let valid = !path.is_empty()
         && !relative.is_absolute()
@@ -391,7 +420,7 @@ pub async fn public_page_media(
     if !valid {
         return err(StatusCode::NOT_FOUND, "fichero no encontrado");
     }
-    let mut response = cloud_raw(&st, &format!("pages/{path}")).await;
+    let mut response = cloud_raw(&st, &hub_id, &format!("pages/{path}")).await;
     response.headers_mut().insert(
         header::X_CONTENT_TYPE_OPTIONS,
         "nosniff".parse().expect("static header"),
@@ -417,10 +446,11 @@ pub async fn media_list(
     headers: HeaderMap,
     Query(q): Query<FolderQuery>,
 ) -> Response {
-    if let Err(response) = require_user(&st, &headers).await {
-        return response;
-    }
-    cloud_list(&st, &q.folder).await
+    let (hub_id, runtime) = match require_user(&st, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return response,
+    };
+    cloud_list(&st, &hub_id, &runtime, &q.folder).await
 }
 
 // ─────────────────────────── GET /api/media/raw ───────────────────────────
@@ -436,10 +466,11 @@ pub async fn media_raw(
     headers: HeaderMap,
     Query(q): Query<PathQuery>,
 ) -> Response {
-    if let Err(response) = require_user(&st, &headers).await {
-        return response;
-    }
-    cloud_raw(&st, &q.path).await
+    let (hub_id, _) = match require_user(&st, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return response,
+    };
+    cloud_raw(&st, &hub_id, &q.path).await
 }
 
 // ─────────────────────────── POST /api/media/upload ───────────────────────────
@@ -451,10 +482,11 @@ pub async fn media_upload(
     headers: HeaderMap,
     mp: Multipart,
 ) -> Response {
-    if let Err(response) = require_admin(&st, &headers).await {
-        return response;
-    }
-    cloud_upload(&st, mp).await
+    let (hub_id, runtime) = match require_admin(&st, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return response,
+    };
+    cloud_upload(&st, &hub_id, &runtime, mp).await
 }
 
 // ─────────────────────────── DELETE /api/media ───────────────────────────
@@ -465,13 +497,14 @@ pub async fn media_delete(
     headers: HeaderMap,
     Query(q): Query<PathQuery>,
 ) -> Response {
-    if let Err(response) = require_admin(&st, &headers).await {
+    let (hub_id, runtime) = match require_admin(&st, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return response,
+    };
+    if let Err(response) = require_action(&runtime, &q.path, UserFileAction::Delete).await {
         return response;
     }
-    if let Err(response) = require_action(&st, &q.path, UserFileAction::Delete).await {
-        return response;
-    }
-    cloud_delete(&st, &q.path).await
+    cloud_delete(&st, &hub_id, &q.path).await
 }
 
 // ─────────────────────────── POST /api/media/folder ───────────────────────────
@@ -489,14 +522,15 @@ pub async fn media_create_folder(
     headers: HeaderMap,
     Json(req): Json<CreateFolderReq>,
 ) -> Response {
-    if let Err(response) = require_admin(&st, &headers).await {
-        return response;
-    }
+    let (hub_id, runtime) = match require_admin(&st, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return response,
+    };
     // Crear una subcarpeta es escribir dentro del padre → misma acción que subir.
-    if let Err(response) = require_action(&st, &req.parent, UserFileAction::Upload).await {
+    if let Err(response) = require_action(&runtime, &req.parent, UserFileAction::Upload).await {
         return response;
     }
-    cloud_create_folder(&st, &req.parent, &req.name).await
+    cloud_create_folder(&st, &hub_id, &req.parent, &req.name).await
 }
 
 // ─────────────────────────── POST /api/media/rename ───────────────────────────
@@ -530,9 +564,10 @@ pub async fn media_rename(
     headers: HeaderMap,
     Json(req): Json<RenameReq>,
 ) -> Response {
-    if let Err(response) = require_admin(&st, &headers).await {
-        return response;
-    }
+    let (hub_id, runtime) = match require_admin(&st, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return response,
+    };
     if !valid_file_name(&req.name) {
         return err(
             StatusCode::BAD_REQUEST,
@@ -542,10 +577,10 @@ pub async fn media_rename(
     if req.path.trim_matches('/').is_empty() {
         return err(StatusCode::BAD_REQUEST, "falta la ruta a renombrar");
     }
-    if let Err(response) = require_action(&st, &req.path, UserFileAction::Rename).await {
+    if let Err(response) = require_action(&runtime, &req.path, UserFileAction::Rename).await {
         return response;
     }
-    cloud_rename(&st, &req.path, &req.name).await
+    cloud_rename(&st, &hub_id, &req.path, &req.name).await
 }
 
 // ─────────────────────────── Helpers ───────────────────────────
@@ -755,11 +790,11 @@ pub fn policy_for(rel: &str, owner: Option<&StaticFilesDef>) -> MediaPolicy {
 }
 
 /// Resuelve la política de una ruta consultando el registro de módulos instalados.
-async fn resolve_policy(st: &AppState, rel: &str) -> MediaPolicy {
+async fn resolve_policy(runtime: &Arc<Mutex<Runtime>>, rel: &str) -> MediaPolicy {
     let Some(folder) = module_folder_of(rel) else {
         return policy_for(rel, None);
     };
-    let rt = st.runtime.lock().await;
+    let rt = runtime.lock().await;
     let owner = rt
         .registry()
         .installed
@@ -770,8 +805,12 @@ async fn resolve_policy(st: &AppState, rel: &str) -> MediaPolicy {
 }
 
 /// Corta la petición con 403 si la política de `rel` no concede `action`.
-async fn require_action(st: &AppState, rel: &str, action: UserFileAction) -> Result<(), Response> {
-    if resolve_policy(st, rel).await.allows(action) {
+async fn require_action(
+    runtime: &Arc<Mutex<Runtime>>,
+    rel: &str,
+    action: UserFileAction,
+) -> Result<(), Response> {
+    if resolve_policy(runtime, rel).await.allows(action) {
         return Ok(());
     }
     Err(err(

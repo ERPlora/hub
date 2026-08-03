@@ -56,6 +56,9 @@ pub struct OrgDescriptor {
     /// reutilizarse el token bootstrap del proceso con un `hub_id` elegido por la petición: cada
     /// descriptor aporta su propio secreto o la operación Cloud falla cerrada.
     pub cloud_api_token: Option<String>,
+    /// Origen público canónico de este Hub. Se convierte en una allowlist `Host → tenant` al
+    /// construir el resolvedor; `None` significa que la org no publica por este gateway.
+    pub public_origin: Option<String>,
 }
 
 /// Errores del gateway multi-tenant. Se mapean a `4xx/5xx` en los handlers.
@@ -79,6 +82,17 @@ pub enum TenantError {
 /// org es y cuál es el DSN de su Aurora? `None` ⇒ org desconocida ⇒ la petición se rechaza.
 pub trait OrgResolver: Send + Sync {
     fn resolve(&self, hub_id: &str) -> Option<OrgDescriptor>;
+
+    /// Resolución inversa de un `Host` público normalizado (`host[:port]`). El default niega para
+    /// que añadir un resolvedor nuevo no abra datos anónimos accidentalmente.
+    fn resolve_public_host(&self, _host: &str) -> Option<(String, OrgDescriptor)> {
+        None
+    }
+
+    /// Descriptores que declararon un origen público válido, para congelar snapshots al arranque.
+    fn public_descriptors(&self) -> Vec<(String, OrgDescriptor)> {
+        Vec::new()
+    }
 }
 
 /// Resolvedor **mínimo** por entorno (placeholder del mecanismo real). Lee un mapa estático
@@ -94,18 +108,62 @@ pub trait OrgResolver: Send + Sync {
 pub struct EnvOrgResolver {
     /// `hub_id → descriptor`. Inmutable tras construcción (un refresco vivo sería otro trabajo).
     map: HashMap<String, OrgDescriptor>,
+    /// `host[:port]` en minúsculas → `hub_id`, derivado únicamente de `public_origin` válido.
+    public_hosts: HashMap<String, Option<String>>,
 }
 
 impl EnvOrgResolver {
     /// Construye desde un mapa explícito (tests / arranque controlado).
     pub fn new(map: HashMap<String, OrgDescriptor>) -> Self {
-        Self { map }
+        let mut public_hosts: HashMap<String, Option<String>> = HashMap::new();
+        for (hub_id, descriptor) in &map {
+            let Some(origin) = descriptor.public_origin.as_deref() else {
+                continue;
+            };
+            let Ok(url) = reqwest::Url::parse(origin) else {
+                continue;
+            };
+            let Some(host) = url.host_str() else {
+                continue;
+            };
+            let authority = match url.port() {
+                Some(port) => format!("{host}:{port}"),
+                None => host.to_string(),
+            };
+            public_hosts
+                .entry(authority.to_ascii_lowercase())
+                .and_modify(|existing| {
+                    if existing.as_deref() != Some(hub_id.as_str()) {
+                        *existing = None;
+                    }
+                })
+                .or_insert_with(|| Some(hub_id.clone()));
+        }
+        Self { map, public_hosts }
     }
 }
 
 impl OrgResolver for EnvOrgResolver {
     fn resolve(&self, hub_id: &str) -> Option<OrgDescriptor> {
         self.map.get(hub_id).cloned()
+    }
+
+    fn resolve_public_host(&self, host: &str) -> Option<(String, OrgDescriptor)> {
+        let hub_id = self
+            .public_hosts
+            .get(&host.trim().to_ascii_lowercase())?
+            .as_ref()?;
+        Some((hub_id.clone(), self.map.get(hub_id)?.clone()))
+    }
+
+    fn public_descriptors(&self) -> Vec<(String, OrgDescriptor)> {
+        self.public_hosts
+            .values()
+            .filter_map(|hub_id| {
+                let hub_id = hub_id.as_ref()?;
+                Some((hub_id.clone(), self.map.get(hub_id)?.clone()))
+            })
+            .collect()
     }
 }
 
@@ -168,6 +226,16 @@ impl TenantRouter {
     /// hub-scoped; nunca cae al token bootstrap global del proceso compartido.
     pub fn cloud_api_token(&self, hub_id: &str) -> Option<String> {
         self.resolver.resolve(hub_id)?.cloud_api_token
+    }
+
+    /// Host público configurado → `(hub_id, descriptor)`. La identidad anónima nace de esta
+    /// allowlist server-side, nunca de `X-Hub-Id`.
+    pub fn resolve_public_host(&self, host: &str) -> Option<(String, OrgDescriptor)> {
+        self.resolver.resolve_public_host(host)
+    }
+
+    pub fn public_descriptors(&self) -> Vec<(String, OrgDescriptor)> {
+        self.resolver.public_descriptors()
     }
 
     /// Resuelve el [`Runtime`] de la org dueña del `hub_id` de la petición, creando su pool bajo
@@ -261,6 +329,7 @@ mod tests {
                 org_id: OrgId("org-a".into()),
                 dsn: "sqlite::memory:".into(),
                 cloud_api_token: Some("token-a".into()),
+                public_origin: Some("https://a.example".into()),
             },
         );
         map.insert(
@@ -269,9 +338,29 @@ mod tests {
                 org_id: OrgId("org-b".into()),
                 dsn: "sqlite::memory:".into(),
                 cloud_api_token: Some("token-b".into()),
+                public_origin: Some("https://b.example".into()),
             },
         );
         Arc::new(EnvOrgResolver::new(map))
+    }
+
+    #[test]
+    fn duplicate_public_host_is_ambiguous_and_denied() {
+        let mut map = HashMap::new();
+        for (hub_id, org_id) in [("hub-a", "org-a"), ("hub-b", "org-b")] {
+            map.insert(
+                hub_id.to_string(),
+                OrgDescriptor {
+                    org_id: OrgId(org_id.into()),
+                    dsn: "unused".into(),
+                    cloud_api_token: Some(format!("token-{hub_id}")),
+                    public_origin: Some("https://shared.example".into()),
+                },
+            );
+        }
+        let resolver = EnvOrgResolver::new(map);
+        assert!(resolver.resolve_public_host("shared.example").is_none());
+        assert!(resolver.public_descriptors().is_empty());
     }
 
     /// Crea la tabla `t` (con `hub_id`) en el runtime y registra una fila marcada con `marker`.

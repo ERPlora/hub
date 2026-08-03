@@ -1,4 +1,4 @@
-//! Capa web **PÚBLICA** del Hub (ADR-0177, F0 — la frontera).
+//! Capa web **PÚBLICA** del Hub (ADR-0179, F0 — la frontera).
 //!
 //! El Hub es hoy 100% autenticado (`require_machine_registration` responde 428 a todo salvo salud +
 //! contexto). Esta capa abre una superficie anónima MÍNIMA — una landing server-side del negocio —
@@ -21,15 +21,18 @@
 //!    renderiza a HTML seguro con [`crate::public_render`] (NUNCA ejecuta JS del usuario). Sin
 //!    página para ese path → 404, como antes. Emite ETag del HTML final.
 
-use axum::extract::{Path, State};
+use axum::extract::{ConnectInfo, Path, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use erplora_runtime::RequestContext;
+use erplora_runtime::{RequestContext, Runtime};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
+use std::net::SocketAddr;
 use std::time::Duration;
+use tokio::sync::Mutex;
 
 use crate::state::AppState;
 
@@ -37,8 +40,9 @@ const MAX_PAGE_BYTES: usize = 512 * 1024;
 const MAX_PAGE_BLOCKS: usize = 200;
 const MAX_PUBLIC_READ_ROWS: usize = 100;
 const MAX_PUBLIC_READ_HTML_BYTES: usize = 128 * 1024;
+const MAX_PUBLIC_AGGREGATE_HTML_BYTES: usize = 512 * 1024;
 
-/// CSP MÁS estricta del proyecto, aplicada SOLO al árbol público (columna de seguridad; ADR-0177):
+/// CSP MÁS estricta del proyecto, aplicada SOLO al árbol público (columna de seguridad; ADR-0179):
 /// nada de scripts, estilos solo self, imágenes self + `data:`. El árbol público no ejecuta JS.
 pub const PUBLIC_CSP: &str =
     "default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self' data:; \
@@ -88,7 +92,11 @@ impl PublicSnapshot {
     /// la URL que ve el visitante y que publicamos en SEO siempre debe ser HTTPS en producción.
     pub fn with_origin(mut self, raw: Option<&str>) -> Result<Self, String> {
         let Some(raw) = raw.map(str::trim).filter(|raw| !raw.is_empty()) else {
-            return Ok(self);
+            return if self.landing_visible {
+                Err("HUB_PUBLIC_ORIGIN es obligatorio al activar la presencia pública".into())
+            } else {
+                Ok(self)
+            };
         };
         let url = reqwest::Url::parse(raw).map_err(|_| "HUB_PUBLIC_ORIGIN no es una URL válida")?;
         if url.path() != "/"
@@ -102,7 +110,8 @@ impl PublicSnapshot {
         let host = url
             .host_str()
             .ok_or_else(|| "HUB_PUBLIC_ORIGIN no contiene host".to_string())?;
-        let loopback = matches!(host, "localhost" | "127.0.0.1" | "::1");
+        let loopback = matches!(host, "localhost" | "127.0.0.1" | "::1")
+            || host.ends_with(".localhost");
         if url.scheme() != "https" && !(url.scheme() == "http" && loopback) {
             return Err("HUB_PUBLIC_ORIGIN exige HTTPS fuera de loopback".into());
         }
@@ -113,10 +122,15 @@ impl PublicSnapshot {
         self.public_origin = Some(format!("{}://{authority}", url.scheme()));
         Ok(self)
     }
+
+    /// Una presencia pública solo está lista con flag y origen canónico válidos.
+    pub fn is_ready(&self) -> bool {
+        self.landing_visible && self.public_origin.is_some()
+    }
 }
 
 /// ¿La ruta pertenece al árbol PÚBLICO? Exactamente `/`, lo que empieza por `/p/` y lo que empieza
-/// por `/api/public/` (ADR-0177 F0). El gate deja pasar estas rutas SIN 428 cuando el flag está on.
+/// por `/api/public/` (ADR-0179 F0). El gate deja pasar estas rutas SIN 428 cuando el flag está on.
 pub fn is_public_path(path: &str) -> bool {
     path == "/"
         || matches!(path, "/robots.txt" | "/sitemap.xml")
@@ -145,11 +159,10 @@ pub fn routes() -> Router<AppState> {
 }
 
 /// Vincula la superficie anónima al dominio configurado para este hub. Sin origen canónico se
-/// conserva el modo same-origin de desarrollo; cuando existe, un `Host` distinto nunca llega a
-/// consultar datos ni media de este tenant.
+/// niega: un despliegue incompleto nunca puede publicar el tenant bootstrap por accidente.
 pub(crate) fn public_host_allowed(snapshot: &PublicSnapshot, headers: &HeaderMap) -> bool {
     let Some(origin) = snapshot.public_origin.as_deref() else {
-        return true;
+        return false;
     };
     let Ok(url) = reqwest::Url::parse(origin) else {
         return false;
@@ -165,6 +178,93 @@ pub(crate) fn public_host_allowed(snapshot: &PublicSnapshot, headers: &HeaderMap
         .get(header::HOST)
         .and_then(|value| value.to_str().ok())
         .is_some_and(|actual| actual.trim().eq_ignore_ascii_case(&expected))
+}
+
+fn request_host(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|host| !host.is_empty())
+}
+
+/// Resuelve una petición anónima exclusivamente desde la allowlist `Host → tenant`. En modo
+/// compartido carga y congela el snapshot del runtime de ESA org al primer acceso. En modo N=1
+/// usa el snapshot de arranque. `X-Hub-Id` no participa en ningún caso.
+pub(crate) async fn resolve_public_tenant(
+    st: &AppState,
+    headers: &HeaderMap,
+) -> Result<(String, Arc<Mutex<Runtime>>, Arc<PublicSnapshot>), Response> {
+    if let Some(tenants) = &st.tenants {
+        let host = request_host(headers).ok_or_else(wrong_public_host)?;
+        let (hub_id, descriptor) = tenants
+            .resolve_public_host(host)
+            .ok_or_else(wrong_public_host)?;
+        let runtime = st
+            .runtime_for(&hub_id)
+            .await
+            .map_err(|_| wrong_public_host())?;
+        if let Some(snapshot) = st.public_tenants.read().await.get(&hub_id).cloned() {
+            return snapshot
+                .is_ready()
+                .then_some((hub_id, runtime, snapshot))
+                .ok_or_else(page_not_found);
+        }
+        let snapshot = {
+            let rt = runtime.lock().await;
+            let settings = rt.get_settings().await.unwrap_or_else(|_| json!({}));
+            PublicSnapshot::from_settings(&settings)
+                .with_origin(descriptor.public_origin.as_deref())
+                .map_err(|_| page_not_found())?
+        };
+        let snapshot = Arc::new(snapshot);
+        let snapshot = {
+            let mut cache = st.public_tenants.write().await;
+            cache.entry(hub_id.clone()).or_insert(snapshot).clone()
+        };
+        return snapshot
+            .is_ready()
+            .then_some((hub_id, runtime, snapshot))
+            .ok_or_else(page_not_found);
+    }
+
+    if !st.public.is_ready() || !public_host_allowed(&st.public, headers) {
+        return Err(wrong_public_host());
+    }
+    let hub_id = st.hub_id();
+    let runtime = st
+        .runtime_for(&hub_id)
+        .await
+        .map_err(|_| page_not_found())?;
+    Ok((hub_id, runtime, st.public.clone()))
+}
+
+/// Congela al arranque el snapshot de cada origen público declarado en un gateway compartido.
+/// `resolve_public_tenant` conserva la carga perezosa solo como red de seguridad para builders de
+/// test; los servidores reales llaman a esta barrera antes de aceptar conexiones.
+pub async fn warm_public_snapshots(st: &AppState) -> Result<(), String> {
+    let Some(tenants) = &st.tenants else {
+        return Ok(());
+    };
+    for (hub_id, descriptor) in tenants.public_descriptors() {
+        let runtime = st
+            .runtime_for(&hub_id)
+            .await
+            .map_err(|error| error.to_string())?;
+        let settings = runtime
+            .lock()
+            .await
+            .get_settings()
+            .await
+            .unwrap_or_else(|_| json!({}));
+        let snapshot = PublicSnapshot::from_settings(&settings)
+            .with_origin(descriptor.public_origin.as_deref())?;
+        st.public_tenants
+            .write()
+            .await
+            .insert(hub_id, Arc::new(snapshot));
+    }
+    Ok(())
 }
 
 fn wrong_public_host() -> Response {
@@ -332,11 +432,12 @@ pub async fn put_page_source(
 
 /// `GET /` (flag on) — landing HTML MÍNIMA server-side con los datos que ya hay en `hub_settings`.
 async fn root(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    if !public_host_allowed(&st.public, &headers) {
-        return wrong_public_host();
-    }
+    let (_, runtime, snapshot) = match resolve_public_tenant(&st, &headers).await {
+        Ok(resolved) => resolved,
+        Err(response) => return response,
+    };
     let mut sections = String::new();
-    let rt = st.runtime.lock().await;
+    let rt = runtime.lock().await;
     let ctx = RequestContext::new(rt.hub_id().to_string(), String::new(), ["*".to_string()]);
     for (module_id, page) in rt.public_page_definitions() {
         if page.slot.as_deref() != Some("public.home.sections") {
@@ -351,27 +452,33 @@ async fn root(State(st): State<AppState>, headers: HeaderMap) -> Response {
                 continue;
             }
             if let Ok(rows) = rt.execute_query(query, &serde_json::Map::new(), &ctx).await {
-                live.push_str(&render_public_rows(query, &rows));
+                let rendered = render_public_rows(query, &rows);
+                if live.len().saturating_add(rendered.len()) > MAX_PUBLIC_AGGREGATE_HTML_BYTES {
+                    break;
+                }
+                live.push_str(&rendered);
             }
         }
-        sections.push_str(&render_home_section(&module_id, &path, &page.title, &live));
+        let section = render_home_section(&module_id, &path, &page.title, &live);
+        if sections.len().saturating_add(section.len()) > MAX_PUBLIC_AGGREGATE_HTML_BYTES {
+            break;
+        }
+        sections.push_str(&section);
     }
     drop(rt);
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        render_landing_with_sections(&st.public, &sections),
+    cacheable_html(
+        &headers,
+        render_landing_with_sections(&snapshot, &sections),
     )
-        .into_response()
 }
 
 /// Política de indexación. El sitemap solo se anuncia cuando existe un origen absoluto validado.
 async fn robots(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    if !public_host_allowed(&st.public, &headers) {
-        return wrong_public_host();
-    }
-    let sitemap = st
-        .public
+    let (_, _, snapshot) = match resolve_public_tenant(&st, &headers).await {
+        Ok(resolved) => resolved,
+        Err(response) => return response,
+    };
+    let sitemap = snapshot
         .public_origin
         .as_deref()
         .map(|origin| format!("Sitemap: {origin}/sitemap.xml\n"))
@@ -387,13 +494,14 @@ async fn robots(State(st): State<AppState>, headers: HeaderMap) -> Response {
 /// Sitemap derivado del mismo `public_pages[]` activo que autoría y SSR. Omite páginas todavía
 /// sin documento guardado para no anunciar URLs que responderían 404.
 async fn sitemap(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    if !public_host_allowed(&st.public, &headers) {
-        return wrong_public_host();
-    }
-    let Some(origin) = st.public.public_origin.as_deref() else {
+    let (_, runtime, snapshot) = match resolve_public_tenant(&st, &headers).await {
+        Ok(resolved) => resolved,
+        Err(response) => return response,
+    };
+    let Some(origin) = snapshot.public_origin.as_deref() else {
         return page_not_found();
     };
-    let rt = st.runtime.lock().await;
+    let rt = runtime.lock().await;
     let mut urls = format!("<url><loc>{}</loc></url>", escape_html(origin));
     for (_, page) in rt.public_page_definitions() {
         let Some(path) = normalized_page_path(&page.path) else {
@@ -425,13 +533,9 @@ async fn page(
     headers: HeaderMap,
     Path(path): Path<String>,
 ) -> Response {
-    if !public_host_allowed(&st.public, &headers) {
-        return wrong_public_host();
-    }
-    // Resuelve el runtime del hub (single-tenant, o el pool de la org en cloud compartido). El hub_id
-    // es el del despliegue (contexto de sistema), NUNCA aportado por el cliente.
-    let Ok(arc) = st.runtime_for(&st.hub_id()).await else {
-        return page_not_found();
+    let (_, arc, snapshot) = match resolve_public_tenant(&st, &headers).await {
+        Ok(resolved) => resolved,
+        Err(response) => return response,
     };
     let Some(path) = normalized_page_path(&path) else {
         return page_not_found();
@@ -452,12 +556,18 @@ async fn page(
                     continue;
                 }
                 if let Ok(rows) = rt.execute_query(query, &serde_json::Map::new(), &ctx).await {
-                    main.push_str(&render_public_rows(query, &rows));
+                    let section = render_public_rows(query, &rows);
+                    if main.len().saturating_add(section.len())
+                        > MAX_PAGE_BYTES + MAX_PUBLIC_AGGREGATE_HTML_BYTES
+                    {
+                        break;
+                    }
+                    main.push_str(&section);
                 }
             }
             cacheable_html(
                 &headers,
-                page_html(&st.public, Some(&page.title), &path, &main),
+                page_html(&snapshot, Some(&page.title), &path, &main),
             )
         }
         // Sin página para ese path (o JSON corrupto) → 404, como antes.
@@ -510,7 +620,12 @@ fn cacheable_html(request_headers: &HeaderMap, html: String) -> Response {
     if request_headers
         .get(header::IF_NONE_MATCH)
         .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.split(',').any(|candidate| candidate.trim() == etag))
+        .is_some_and(|value| {
+            value.split(',').any(|candidate| {
+                let candidate = candidate.trim();
+                candidate == "*" || candidate.strip_prefix("W/").unwrap_or(candidate) == etag
+            })
+        })
     {
         return Response::builder()
             .status(StatusCode::NOT_MODIFIED)
@@ -534,7 +649,25 @@ struct PublicQueryReq {
     params: serde_json::Map<String, Value>,
 }
 
-/// `POST /api/public/query` (flag on) — endpoint **anónimo** de solo lectura (ADR-0177).
+fn valid_public_query_name(query: &str) -> bool {
+    !query.is_empty()
+        && query.len() <= 160
+        && query.split('.').count() >= 2
+        && query.split('.').all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+        })
+}
+
+fn public_client_ip(connect: Option<ConnectInfo<SocketAddr>>) -> String {
+    connect
+        .map(|ConnectInfo(address)| address.ip().to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// `POST /api/public/query` (flag on) — endpoint **anónimo** de solo lectura (ADR-0179).
 ///
 /// Puerta ÚNICA: la query debe estar marcada `public: true` en su manifest. NO se usa el `permission`
 /// (no hay usuario). Cualquier otra query —aunque exista— o un command → 404, sin revelar existencia
@@ -542,16 +675,28 @@ struct PublicQueryReq {
 /// `queries`, jamás `commands` (el dispatcher de queries no ejecuta escrituras).
 async fn public_query(
     State(st): State<AppState>,
+    connect: Option<ConnectInfo<SocketAddr>>,
     headers: HeaderMap,
     Json(req): Json<PublicQueryReq>,
 ) -> Response {
-    if !public_host_allowed(&st.public, &headers) {
-        return wrong_public_host();
+    // Rechaza nombres arbitrarios ANTES de crear estado en el limiter. Así un atacante no puede
+    // llenar memoria enviando claves únicas que ni siquiera podrían resolver a una query.
+    if !valid_public_query_name(&req.query) {
+        return public_query_denied();
     }
-    // Lectura anónima: cuota conservadora por hub+query. No hay commands públicos en v1, así que
-    // Turnstile no se introduce en un flujo que no escribe; cualquier `public_write` sigue ausente.
+    let (hub_id, arc, _) = match resolve_public_tenant(&st, &headers).await {
+        Ok(resolved) => resolved,
+        Err(response) => return response,
+    };
+    let rt = arc.lock().await;
+    // Default-deny ANTES del limiter: tampoco se reserva memoria para nombres válidos pero privados.
+    if !rt.is_query_public(&req.query) {
+        return public_query_denied();
+    }
+    // Cuota por tenant + IP de conexión + query. Un cliente ruidoso no consume el presupuesto de
+    // otro visitante ni de otra org servida por el mismo proceso.
     if let Err(retry_after) = st.rate_limits.check(
-        format!("public:{}:{}", st.hub_id(), req.query),
+        format!("public:{hub_id}:{}:{}", public_client_ip(connect), req.query),
         120,
         Duration::from_secs(60),
     ) {
@@ -564,19 +709,15 @@ async fn public_query(
             ))
             .unwrap_or_else(|_| public_query_denied());
     }
-    let Ok(arc) = st.runtime_for(&st.hub_id()).await else {
-        return public_query_denied();
-    };
-    let rt = arc.lock().await;
-    // Default-deny: solo queries `public: true`. Un command jamás casa (solo mira queries).
-    if !rt.is_query_public(&req.query) {
-        return public_query_denied();
-    }
     // Contexto de SISTEMA: hub_id del despliegue + comodín de permisos (la puerta es el flag `public`,
     // no el `permission`). Mismo patrón que los `reads` (ADR-0069) / el scheduler: sin usuario.
     let ctx = RequestContext::new(rt.hub_id().to_string(), String::new(), ["*".to_string()]);
     match rt.execute_query(&req.query, &req.params, &ctx).await {
-        Ok(rows) => Json(json!({ "ok": true, "data": rows })).into_response(),
+        Ok(rows) => Json(json!({
+            "ok": true,
+            "data": &rows[..rows.len().min(MAX_PUBLIC_READ_ROWS)],
+        }))
+        .into_response(),
         // Un fallo de ejecución no filtra la estructura interna al anónimo.
         Err(_) => public_query_denied(),
     }
@@ -816,6 +957,19 @@ mod tests {
                 .public_origin
                 .as_deref(),
             Some("http://127.0.0.1:8787")
+        );
+        assert_eq!(
+            PublicSnapshot::default()
+                .with_origin(Some("http://a.localhost:8787"))
+                .unwrap()
+                .public_origin
+                .as_deref(),
+            Some("http://a.localhost:8787")
+        );
+        let visible = PublicSnapshot::from_settings(&json!({ "public.landing.visible": true }));
+        assert!(
+            visible.with_origin(None).is_err(),
+            "flag público sin origen canónico debe fallar cerrado"
         );
     }
 

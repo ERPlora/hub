@@ -1,4 +1,4 @@
-//! Renderer de la presencia web pública del Hub (ADR-0177): convierte el JSON de bloques
+//! Renderer de la presencia web pública del Hub (ADR-0179): convierte el JSON de bloques
 //! (formato Editor.js) que se guarda por página a **HTML seguro**, SIN ejecutar NUNCA JS del
 //! usuario. Este módulo ES la frontera de seguridad de la página pública.
 //!

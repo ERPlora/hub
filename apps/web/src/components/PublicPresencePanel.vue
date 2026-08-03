@@ -1,5 +1,5 @@
 <!--
-  PublicPresencePanel — toggle "Presencia web pública" de Ajustes (ADR-0177).
+  PublicPresencePanel — toggle "Presencia web pública" de Ajustes (ADR-0179).
 
   Activa/desactiva la PARTE PÚBLICA del hub (landing + páginas públicas) escribiendo la clave core
   `public.landing.visible` (bool, default false) por la API de settings del hub ya existente
@@ -134,7 +134,7 @@ import {
 } from '../lib/public-pages';
 import { toastSuccess, toastError } from '../lib/toast';
 
-// Clave core plana del store k/v (ADR-0177). `as const` para que el tipo del PUT sea exacto.
+// Clave core plana del store k/v (ADR-0179). `as const` para que el tipo del PUT sea exacto.
 const KEY = 'public.landing.visible' as const;
 
 const { t } = useI18n();

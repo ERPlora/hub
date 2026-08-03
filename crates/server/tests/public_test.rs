@@ -1,4 +1,4 @@
-//! E2E del server: **frontera de la capa web PÚBLICA** del Hub (ADR-0177, F0).
+//! E2E del server: **frontera de la capa web PÚBLICA** del Hub (ADR-0179, F0).
 //!
 //! Invariante crítica: la parte pública SOLO existe cuando el flag `public.landing.visible` (tabla
 //! `hub_settings`, default **false**) está activo. Con el flag desactivado, `/`, `/p/*` y
@@ -50,14 +50,17 @@ async fn fixture(landing_visible: bool) -> (AppState, std::path::PathBuf) {
         landing_visible,
         business_name: BUSINESS_NAME.into(),
         business_address: BUSINESS_ADDRESS.into(),
-        public_origin: None,
+        public_origin: Some("https://public.example".into()),
     };
     let state = AppState::with_config(rt, cfg).with_public_snapshot(snap);
     (state, temp)
 }
 
 fn get(uri: &str) -> Request<Body> {
-    Request::get(uri).body(Body::empty()).unwrap()
+    Request::get(uri)
+        .header("host", "public.example")
+        .body(Body::empty())
+        .unwrap()
 }
 
 async fn body_string(resp: axum::response::Response) -> String {
@@ -100,7 +103,8 @@ async fn flag_off_root_and_protected_are_gated_as_today() {
 #[tokio::test]
 async fn flag_on_root_serves_landing_with_business_data_and_strict_csp() {
     let (st, temp) = fixture(true).await;
-    let resp = app(st).oneshot(get("/")).await.unwrap();
+    let router = app(st);
+    let resp = router.clone().oneshot(get("/")).await.unwrap();
 
     assert_eq!(resp.status(), StatusCode::OK, "flag on → landing 200 anónima");
     assert_eq!(
@@ -113,6 +117,28 @@ async fn flag_on_root_serves_landing_with_business_data_and_strict_csp() {
         body.contains(BUSINESS_NAME),
         "la landing pinta un dato de hub_settings (nombre del negocio); body = {body}"
     );
+
+    let etag = router
+        .clone()
+        .oneshot(get("/"))
+        .await
+        .unwrap()
+        .headers()
+        .get("etag")
+        .and_then(|value| value.to_str().ok())
+        .expect("la landing emite ETag")
+        .to_string();
+    for matcher in [format!("W/{etag}"), "*".to_string()] {
+        let conditional = Request::get("/")
+            .header("host", "public.example")
+            .header("if-none-match", matcher)
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            router.clone().oneshot(conditional).await.unwrap().status(),
+            StatusCode::NOT_MODIFIED
+        );
+    }
     cleanup(temp);
 }
 

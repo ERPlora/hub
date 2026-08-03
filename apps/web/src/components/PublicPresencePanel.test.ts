@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Contrato del toggle "Presencia web pública" de Ajustes (ADR-0177): activa/desactiva la parte
+// Contrato del toggle "Presencia web pública" de Ajustes (ADR-0179): activa/desactiva la parte
 // pública del hub (landing + páginas públicas) escribiendo la clave core `public.landing.visible`
 // por la API de settings ya existente. El toggle DEBE reflejar el valor server-side actual y, al
 // cambiarlo, persistirlo por el cliente de settings (mismo patrón que "Mostrar documentación de la

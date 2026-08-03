@@ -10,14 +10,16 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::public::PublicSnapshot;
-use erplora_server::{app, AppState, AuthMode, HubConfig};
+use erplora_server::{
+    app, AppState, AuthMode, EnvOrgResolver, HubConfig, OrgDescriptor, OrgId, RuntimeFactory,
+    TenantRouter,
+};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use tokio::sync::Mutex;
@@ -33,7 +35,16 @@ struct RawQuery {
     path: String,
 }
 
-async fn media_upload(State(state): State<MediaCloud>, mut multipart: Multipart) -> Json<Value> {
+async fn media_upload(
+    State(state): State<MediaCloud>,
+    headers: HeaderMap,
+    mut multipart: Multipart,
+) -> Json<Value> {
+    let hub_id = headers
+        .get("x-hub-id")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
     let mut folder = String::new();
     let mut files = Vec::new();
     while let Ok(Some(field)) = multipart.next_field().await {
@@ -50,20 +61,46 @@ async fn media_upload(State(state): State<MediaCloud>, mut multipart: Multipart)
     }
     let mut objects = state.objects.lock().await;
     for (name, bytes) in files {
-        objects.insert(format!("{}/{name}", folder.trim_matches('/')), bytes);
+        objects.insert(
+            format!("{hub_id}:{}/{name}", folder.trim_matches('/')),
+            bytes,
+        );
     }
     Json(json!({ "ok": true }))
 }
 
-async fn media_raw(State(state): State<MediaCloud>, Query(query): Query<RawQuery>) -> Response {
-    if !state.objects.lock().await.contains_key(&query.path) {
+async fn media_raw(
+    State(state): State<MediaCloud>,
+    headers: HeaderMap,
+    Query(query): Query<RawQuery>,
+) -> Response {
+    let hub_id = headers
+        .get("x-hub-id")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    if !state
+        .objects
+        .lock()
+        .await
+        .contains_key(&format!("{hub_id}:{}", query.path))
+    {
         return StatusCode::NOT_FOUND.into_response();
     }
-    Json(json!({ "url": format!("{}/objects/{}", state.origin, query.path) })).into_response()
+    Json(json!({ "url": format!("{}/objects/{hub_id}/{}", state.origin, query.path) }))
+        .into_response()
 }
 
 async fn object(State(state): State<MediaCloud>, Path(path): Path<String>) -> Response {
-    let Some(bytes) = state.objects.lock().await.get(&path).cloned() else {
+    let Some((hub_id, relative)) = path.split_once('/') else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let Some(bytes) = state
+        .objects
+        .lock()
+        .await
+        .get(&format!("{hub_id}:{relative}"))
+        .cloned()
+    else {
         return StatusCode::NOT_FOUND.into_response();
     };
     Response::builder()
@@ -96,41 +133,63 @@ async fn spawn_media_cloud() -> String {
     origin
 }
 
+fn public_runtime_factory() -> RuntimeFactory {
+    Arc::new(|descriptor: &OrgDescriptor| {
+        let org_id = descriptor.org_id.0.clone();
+        Box::pin(async move {
+            let db = fresh_db().await;
+            let mut runtime = Runtime::with_hub_id(Box::new(db), org_id.clone());
+            runtime
+                .ensure_system_tables()
+                .await
+                .expect("tenant system tables");
+            let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixture_public_query");
+            runtime
+                .install_from_dir(&fixture)
+                .await
+                .expect("tenant public fixture");
+            let (business, address, heading, paragraph) = if org_id == "org-a" {
+                (
+                    "Bar Pepe",
+                    "Calle Mayor 1",
+                    "Nuestra carta",
+                    "Café <b>recién molido</b> · Tenant A",
+                )
+            } else {
+                ("Bistró Beta", "Calle Norte 2", "Carta Beta", "Tenant B")
+            };
+            let mut settings = Map::new();
+            settings.insert("public.landing.visible".into(), json!(true));
+            settings.insert("business_legal_name".into(), json!(business));
+            settings.insert("business_address".into(), json!(address));
+            settings.insert("country_code".into(), json!("ES"));
+            settings.insert("currency".into(), json!("EUR"));
+            settings.insert("language".into(), json!("es"));
+            runtime
+                .set_settings(&settings, "playwright")
+                .await
+                .expect("tenant public settings");
+            runtime
+                .set_public_page(
+                    "menu",
+                    &json!({
+                        "blocks": [
+                            { "type": "header", "data": { "text": heading, "level": 1 } },
+                            { "type": "paragraph", "data": { "text": paragraph } }
+                        ]
+                    }),
+                    "playwright",
+                )
+                .await
+                .expect("tenant public page");
+            Ok(runtime)
+        })
+    })
+}
+
 #[tokio::main]
 async fn main() {
-    let hub_id = "hub-public-playwright";
-    let db = fresh_db().await;
-    let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
-    rt.ensure_system_tables().await.expect("system tables");
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixture_public_query");
-    rt.install_from_dir(&fixture)
-        .await
-        .expect("install public page fixture");
-
-    let mut settings = Map::new();
-    settings.insert("public.landing.visible".into(), json!(true));
-    settings.insert("business_legal_name".into(), json!("Bar Pepe"));
-    settings.insert("business_address".into(), json!("Calle Mayor 1"));
-    settings.insert("country_code".into(), json!("ES"));
-    settings.insert("currency".into(), json!("EUR"));
-    settings.insert("language".into(), json!("es"));
-    rt.set_settings(&settings, "playwright")
-        .await
-        .expect("seed public settings");
-    rt.set_public_page(
-        "menu",
-        &json!({
-            "blocks": [
-                { "type": "header", "data": { "text": "Nuestra carta", "level": 1 } },
-                { "type": "paragraph", "data": { "text": "Café <b>recién molido</b>" } }
-            ]
-        }),
-        "playwright",
-    )
-    .await
-    .expect("seed public page");
-
     let cloud_base_url = spawn_media_cloud().await;
     let temp = std::env::temp_dir().join(format!(
         "erplora-public-playwright-{}",
@@ -138,12 +197,12 @@ async fn main() {
     ));
     let _ = std::fs::remove_dir_all(&temp);
     let cfg = HubConfig {
-        hub_id: hub_id.into(),
+        hub_id: "hub-public-playwright".into(),
         cloud_base_url,
         module_cache: temp.join("modules-cache"),
         auth_mode: AuthMode::Dev,
         jwt_public_key: None,
-        cloud_api_token: Some("playwright-machine-token".into()),
+        cloud_api_token: Some("bootstrap-token-must-never-leave".into()),
         device_trust_enforce: false,
         media_dir: temp.join("media"),
         sector: None,
@@ -156,12 +215,52 @@ async fn main() {
         .await
         .expect("bind public e2e server");
     let address = listener.local_addr().expect("public server address");
-    let snapshot = PublicSnapshot::from_settings(&Value::Object(settings))
-        .with_origin(Some(&format!("http://{address}")))
-        .expect("public origin");
-    let state = AppState::with_config(rt, cfg).with_public_snapshot(snapshot);
+    let mut descriptors = HashMap::new();
+    for (hub_id, org_id, origin, token) in [
+        (
+            "hub-public-playwright",
+            "org-a",
+            format!("http://{address}"),
+            "token-a",
+        ),
+        (
+            "hub-a",
+            "org-a",
+            format!("http://a.localhost:{}", address.port()),
+            "token-a",
+        ),
+        (
+            "hub-b",
+            "org-b",
+            format!("http://b.localhost:{}", address.port()),
+            "token-b",
+        ),
+    ] {
+        descriptors.insert(
+            hub_id.to_string(),
+            OrgDescriptor {
+                org_id: OrgId(org_id.into()),
+                dsn: "unused".into(),
+                cloud_api_token: Some(token.into()),
+                public_origin: Some(origin),
+            },
+        );
+    }
+    let tenants = Arc::new(TenantRouter::with_factory(
+        Arc::new(EnvOrgResolver::new(descriptors)),
+        public_runtime_factory(),
+        8,
+    ));
+    let bootstrap = Runtime::with_hub_id(Box::new(fresh_db().await), "bootstrap");
+    let state = AppState::with_config(bootstrap, cfg).with_tenants(tenants);
+    erplora_server::public::warm_public_snapshots(&state)
+        .await
+        .expect("warm public tenant snapshots");
     println!("public e2e server listening on http://{address}");
-    axum::serve(listener, app(state))
+    axum::serve(
+        listener,
+        app(state).into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
         .await
         .expect("serve public e2e server");
 }

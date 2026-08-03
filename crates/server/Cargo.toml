@@ -48,7 +48,7 @@ zip = "2"
 sha2 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 base64 = "0.22"
-# Presencia web pública del Hub (ADR-0177): saneado del HTML inline (allowlist) del renderer de
+# Presencia web pública del Hub (ADR-0179): saneado del HTML inline (allowlist) del renderer de
 # bloques (Editor.js → HTML). Auditada, basada en html5ever; NUNCA se ejecuta JS del usuario.
 ammonia = "4"
 

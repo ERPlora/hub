@@ -147,7 +147,7 @@
           </ion-card-content>
         </ion-card>
 
-        <!-- Presencia web pública del hub (ADR-0177): toggle server-side `public.landing.visible`.
+        <!-- Presencia web pública del hub (ADR-0179): toggle server-side `public.landing.visible`.
              Mismo patrón que el de doc de la API; el panel encapsula lectura/persistencia. -->
         <PublicPresencePanel class="mt-3" />
 

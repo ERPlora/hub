@@ -122,6 +122,13 @@ async fn catalog(
     Json(json!({ "hub_id": hub_id, "countries": countries, "region": region, "results": [] }))
 }
 
+async fn cloud_media(State(state): State<CloudState>, headers: HeaderMap) -> Json<Value> {
+    state.seen.lock().unwrap().push(json!({
+        "kind": "media", "hub_id": request_hub(&headers), "token": request_token(&headers)
+    }));
+    Json(json!({ "folders": [], "files": [], "path": [], "usage": { "used_bytes": 0 } }))
+}
+
 async fn spawn_cloud(signer: &cloud_client::Signer) -> (String, Arc<Mutex<Vec<Value>>>) {
     let package = module_zip();
     let state = CloudState {
@@ -142,6 +149,10 @@ async fn spawn_cloud(signer: &cloud_client::Signer) -> (String, Arc<Mutex<Vec<Va
             post(mark_installed),
         )
         .route("/api/v1/marketplace/modules/", get(catalog))
+        .route(
+            "/api/v1/hub/device/media/",
+            get(cloud_media).post(cloud_media),
+        )
         .with_state(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -181,6 +192,7 @@ async fn shared_app(
                 org_id: OrgId(org.into()),
                 dsn: "unused".into(),
                 cloud_api_token: Some(format!("token-{hub}")),
+                public_origin: Some(format!("https://{hub}.example")),
             },
         );
     }
@@ -190,6 +202,7 @@ async fn shared_app(
             org_id: OrgId("org-without-secret".into()),
             dsn: "unused".into(),
             cloud_api_token: None,
+            public_origin: None,
         },
     );
     let tenants = Arc::new(TenantRouter::with_factory(
@@ -278,6 +291,21 @@ async fn preview_install_settings_and_catalog_are_isolated_by_request_hub() {
         let settings = body_json(response).await;
         assert_eq!(settings["country_code"], json!(country));
         assert_eq!(settings["region_code"], json!(region));
+
+        let response = app
+            .clone()
+            .oneshot(request(
+                "PUT",
+                hub,
+                "/api/settings",
+                Some(json!({
+                    "public.landing.visible": true,
+                    "business_legal_name": format!("Negocio {hub}"),
+                })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
 
         let response = app
             .clone()
@@ -378,6 +406,57 @@ async fn preview_install_settings_and_catalog_are_isolated_by_request_hub() {
         assert_ne!(page["data"]["blocks"][0]["data"]["text"], json!(absent));
     }
 
+    // La lectura anónima ignora por completo `X-Hub-Id`: solo el Host configurado elige tenant.
+    for (host, spoofed_hub, expected, absent, runtime_hub) in [
+        ("hub-a1.example", "hub-b1", "Página A", "Página B", "org-a"),
+        ("hub-b1.example", "hub-a1", "Página B", "Página A", "org-b"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::get("/p/menu")
+                    .header("host", host)
+                    .header("x-hub-id", spoofed_hub)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let html = String::from_utf8(
+            response.into_body().collect().await.unwrap().to_bytes().to_vec(),
+        )
+        .unwrap();
+        assert!(html.contains(expected), "{host} sirve su propia página");
+        assert!(!html.contains(absent), "{host} no filtra la página vecina");
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::post("/api/public/query")
+                    .header("host", host)
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({ "query": "menu.items.list", "params": {} }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(body_json(response).await["data"][0]["hub_id"], json!(runtime_hub));
+    }
+
+    // El gestor autenticado resuelve sesión/runtime/credencial en el mismo tenant.
+    for hub in ["hub-a1", "hub-b1"] {
+        let response = app
+            .clone()
+            .oneshot(request("GET", hub, "/api/media", None))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
     for hub in ["hub-b1", "hub-a1"] {
         let response = app
             .clone()
@@ -412,6 +491,9 @@ async fn preview_install_settings_and_catalog_are_isolated_by_request_hub() {
             && item["hub_id"] == hub
             && item["token"] == expected_token));
         assert!(observations.iter().any(|item| item["kind"] == "mark"
+            && item["hub_id"] == hub
+            && item["token"] == expected_token));
+        assert!(observations.iter().any(|item| item["kind"] == "media"
             && item["hub_id"] == hub
             && item["token"] == expected_token));
     }

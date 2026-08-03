@@ -18,7 +18,7 @@ pub struct Manifest {
     pub role_permissions: HashMap<String, Vec<String>>,
     #[serde(default)]
     pub navigation: Vec<Nav>,
-    /// Páginas SSR anónimas aportadas por el módulo (ADR-0177). El contenido editable vive como
+    /// Páginas SSR anónimas aportadas por el módulo (ADR-0179). El contenido editable vive como
     /// JSON de bloques; este contrato declara la ruta y las queries opt-in que alimentan datos
     /// vivos. El runtime solo devuelve definiciones de módulos activos.
     #[serde(default)]
@@ -544,7 +544,7 @@ pub struct QueryDef {
     #[serde(default)]
     pub expose_api: bool,
     /// Opt-in: expone esta query al endpoint **anónimo** `POST /api/public/query` de la presencia
-    /// web pública del Hub (ADR-0177). **Gemelo de [`expose_api`](Self::expose_api) pero para la
+    /// web pública del Hub (ADR-0179). **Gemelo de [`expose_api`](Self::expose_api) pero para la
     /// capa pública** e INDEPENDIENTE de él: `expose_api` gatea la API-key (con permiso de la key);
     /// `public` gatea el visitante anónimo. Default-deny (`false`): una query solo es pública si el
     /// autor la marca. Sin usuario, el `permission` NO es la puerta — la ÚNICA puerta es este flag;
@@ -813,7 +813,7 @@ pub struct NavLocale {
 mod tests {
     use super::*;
 
-    /// El flag `public` de una query (ADR-0177) se parsea como gemelo de `expose_api`: default
+    /// El flag `public` de una query (ADR-0179) se parsea como gemelo de `expose_api`: default
     /// `false` (ausente ⇒ no pública) y `true` cuando el manifest lo declara. Es la ÚNICA puerta
     /// del endpoint anónimo `POST /api/public/query`.
     #[test]

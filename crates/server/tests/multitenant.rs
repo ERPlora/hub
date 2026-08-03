@@ -77,6 +77,7 @@ async fn shared_app() -> axum::Router {
             org_id: OrgId("org-a".into()),
             dsn: "sqlite::memory:".into(),
             cloud_api_token: Some("token-a".into()),
+            public_origin: Some("https://a.example".into()),
         },
     );
     map.insert(
@@ -85,6 +86,7 @@ async fn shared_app() -> axum::Router {
             org_id: OrgId("org-b".into()),
             dsn: "sqlite::memory:".into(),
             cloud_api_token: Some("token-b".into()),
+            public_origin: Some("https://b.example".into()),
         },
     );
     let router = Arc::new(TenantRouter::with_factory(

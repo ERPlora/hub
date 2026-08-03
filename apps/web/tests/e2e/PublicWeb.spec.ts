@@ -1,4 +1,4 @@
-// ADR-0177 / hub#224 — navegador real → Vite → Axum → Runtime/Postgres → mini-Cloud media.
+// ADR-0179 / hub#224 — navegador real → Vite → Axum → Runtime/Postgres → mini-Cloud media.
 // Este archivo no intercepta rutas: todas las respuestas proceden de los handlers de producción.
 
 import { expect, test } from '@playwright/test';
@@ -158,4 +158,79 @@ test('SSR, CSP, ETag, Host y SEO proceden del listener Axum real', async ({ page
     headers: { Host: `wrong.${origin.hostname}` },
   });
   expect(wrongHost.status()).toBe(421);
+});
+
+test('dos hosts aíslan snapshot, página, query, autoría y media de cada tenant', async ({ page, request }) => {
+  const publicUrl = process.env.HUB_PUBLIC_URL;
+  test.skip(!publicUrl, 'requiere public_e2e_server');
+
+  const base = new URL(publicUrl as string);
+  const originA = `${base.protocol}//a.localhost:${base.port}`;
+  const originB = `${base.protocol}//b.localhost:${base.port}`;
+  const adminHeaders = (hub: string) => ({
+    'X-Hub-Id': hub,
+    'X-User-Id': 'owner',
+    'X-Permissions': '*',
+    'Content-Type': 'application/json',
+  });
+  const adminAuthHeaders = (hub: string) => ({
+    'X-Hub-Id': hub,
+    'X-User-Id': 'owner',
+    'X-Permissions': '*',
+  });
+
+  for (const tenant of [
+    { hub: 'hub-a', origin: originA, text: 'Página exclusiva A', bytes: 'media-tenant-a' },
+    { hub: 'hub-b', origin: originB, text: 'Página exclusiva B', bytes: 'media-tenant-b' },
+  ]) {
+    const authored = await request.put(`${tenant.origin}/api/public-pages/menu`, {
+      headers: adminHeaders(tenant.hub),
+      data: { blocks: [{ type: 'paragraph', data: { text: tenant.text } }] },
+    });
+    expect(authored.status()).toBe(200);
+
+    const uploaded = await request.post(`${tenant.origin}/api/media/upload`, {
+      headers: adminAuthHeaders(tenant.hub),
+      multipart: {
+        folder: 'pages/menu',
+        files: {
+          name: 'probe.png',
+          mimeType: 'image/png',
+          buffer: Buffer.from(tenant.bytes),
+        },
+      },
+    });
+    expect(uploaded.status()).toBe(200);
+  }
+
+  for (const tenant of [
+    {
+      hub: 'hub-a', oppositeHub: 'hub-b', origin: originA, business: 'Bar Pepe',
+      text: 'Página exclusiva A', absent: 'Página exclusiva B', runtimeHub: 'org-a', media: 'media-tenant-a',
+    },
+    {
+      hub: 'hub-b', oppositeHub: 'hub-a', origin: originB, business: 'Bistró Beta',
+      text: 'Página exclusiva B', absent: 'Página exclusiva A', runtimeHub: 'org-b', media: 'media-tenant-b',
+    },
+  ]) {
+    const landing = await page.goto(`${tenant.origin}/`);
+    expect(landing?.status()).toBe(200);
+    await expect(page.getByRole('heading', { name: tenant.business })).toBeVisible();
+
+    const publicPage = await page.goto(`${tenant.origin}/p/menu`);
+    expect(publicPage?.status()).toBe(200);
+    await expect(page.getByText(tenant.text)).toBeVisible();
+    await expect(page.getByText(tenant.absent)).toHaveCount(0);
+
+    const query = await request.post(`${tenant.origin}/api/public/query`, {
+      headers: { 'X-Hub-Id': tenant.oppositeHub },
+      data: { query: 'menu.items.list', params: {} },
+    });
+    expect(query.status()).toBe(200);
+    expect((await query.json()).data[0].hub_id).toBe(tenant.runtimeHub);
+
+    const media = await request.get(`${tenant.origin}/files/pages/menu/probe.png`);
+    expect(media.status()).toBe(200);
+    expect((await media.body()).toString()).toBe(tenant.media);
+  }
 });
