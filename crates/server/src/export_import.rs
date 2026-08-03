@@ -721,7 +721,15 @@ async fn run_import(
 
     // (6) Fiscal (decisión (d)): el `.p12` NO se aplica automáticamente — la contraseña no viaja.
     //     Se devuelve como `pending` y el usuario lo sube por `PUT /api/business/certificate`.
-    let fiscal_status = if !selection.fiscal {
+    //
+    //     …salvo en una PLANTILLA (ADR-0195, hub#305). Esta sección es la única que el motor no
+    //     puede cerrar —la materializa esta capa, no él—, así que el guard se repite aquí. Con un
+    //     bundle `template`, `pending` no es un estado neutro: es una invitación a instalarse la
+    //     identidad fiscal de OTRO negocio (NIF, entorno VeriFactu, certificado de firma). Se
+    //     descarta y se dice, igual que hace el motor con las identidades.
+    let fiscal_status = if !manifest.purpose.allows_identity_sections() {
+        "ignored"
+    } else if !selection.fiscal {
         "skipped"
     } else if files.contains_key("data/fiscal/certificate.p12") {
         "pending"
@@ -734,9 +742,16 @@ async fn run_import(
     report_v["installed_modules"] = Value::Array(installed_modules);
     report_v["media"] =
         json!({ "selected": selection.media, "copied": media_copied, "failed": media_failed });
+    // La nota acompaña al estado: con `ignored`, «súbelo en Ajustes → Negocio» diría justo lo
+    // contrario de lo que acaba de decidirse, y el usuario acabaría instalándose a mano el
+    // certificado ajeno que el import se negó a ofrecerle.
     report_v["fiscal"] = json!({
         "certificate": fiscal_status,
-        "note": "el certificado no se aplica automáticamente (la contraseña no viaja en el bundle): súbelo en Ajustes → Negocio (PUT /api/business/certificate)",
+        "note": if fiscal_status == "ignored" {
+            "una plantilla no aplica datos fiscales: el NIF, la configuración VeriFactu y el certificado son de cada negocio. Configura los tuyos en Ajustes → Negocio."
+        } else {
+            "el certificado no se aplica automáticamente (la contraseña no viaja en el bundle): súbelo en Ajustes → Negocio (PUT /api/business/certificate)"
+        },
     });
     Ok(report_v)
 }

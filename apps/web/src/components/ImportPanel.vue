@@ -690,7 +690,7 @@ interface ReportRow {
   section: string;
   label: string;
   icon: string;
-  color: 'success' | 'medium' | 'danger';
+  color: 'success' | 'medium' | 'warning' | 'danger';
   statusLabel: string;
   reason?: string;
 }
@@ -700,6 +700,10 @@ interface ReportRow {
 const visual = {
   applied: { icon: 'checkmark-circle-outline', color: 'success', label: () => t('importPage.statusApplied') },
   skipped: { icon: 'remove-circle-outline', color: 'medium', label: () => t('importPage.statusSkipped') },
+  // ADR-0195: descartada a propósito (identidades de una plantilla). `warning`, no `medium`: no es
+  // un fallo, pero el usuario TIENE que verlo — es la diferencia entre «esta plantilla traía
+  // usuarios ajenos y no los he metido» y un «Saltado» gris que nadie lee.
+  ignored: { icon: 'shield-checkmark-outline', color: 'warning', label: () => t('importPage.statusIgnored') },
   failed: { icon: 'close-circle-outline', color: 'danger', label: () => t('importPage.statusFailed') },
 } as const;
 

@@ -429,6 +429,69 @@ async fn import_unlisted_file_is_422() {
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+/// 🔴 [ADR-0195, hub#305] El certificado fiscal lo materializa ESTA capa, no el motor: el `.p12`
+/// nunca se aplica solo (su contraseña no viaja), pero el informe decía `pending` — «súbelo en
+/// Ajustes → Negocio». Con un bundle `template`, ese `pending` es una invitación a instalarse la
+/// identidad fiscal **de otro negocio**: NIF, entorno VeriFactu y certificado de firma ajenos.
+///
+/// Es el mismo plano consumidor que el guard del runtime, en la única sección que el runtime no
+/// puede cerrar porque no es suya.
+#[tokio::test]
+async fn una_plantilla_no_ofrece_el_certificado_fiscal_que_traiga() {
+    let app = make_app(AuthMode::Dev, "import_template_fiscal").await;
+    let p12 = b"no soy un .p12 de verdad, pero ocupo su sitio".as_slice();
+    let manifest = json!({
+        "schema_version": 1,
+        // Lo que hace de este bundle un artefacto público: declara ser una plantilla…
+        "purpose": "template",
+        "name": "restaurante",
+        "locale": "es",
+        "hub": { "name": "Demo", "country": "ES", "currency": "EUR" },
+        "created_at": "2026-08-03T00:00:00Z",
+        "modules": [],
+        "sections": ["fiscal"],
+        "sha256": { "data/fiscal/certificate.p12": sha256_hex(p12) },
+    })
+    .to_string();
+    // …y aun así lleva el certificado dentro (bundle anterior al gate, o fichero local).
+    let zip = build_zip(&[
+        ("manifest.json", manifest.as_bytes()),
+        ("data/fiscal/certificate.p12", p12),
+    ]);
+    let resp = app.clone().oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let upload_id = body_json(resp).await["upload_id"].as_str().unwrap().to_string();
+
+    // Se PIDE fiscal explícitamente: el propósito tiene que ganar a la casilla.
+    let resp = app
+        .oneshot(post_json(
+            "/api/hub/import",
+            json!({ "upload_id": upload_id, "selection": { "fiscal": true } }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let j = body_json(resp).await;
+    assert_eq!(
+        j["report"]["fiscal"]["certificate"],
+        json!("ignored"),
+        "una plantilla no puede ofrecer el certificado de otro negocio: {}",
+        j["report"]["fiscal"]
+    );
+    // Y la sección del motor lo dice con su motivo, no en silencio.
+    let fiscal = j["report"]["sections"]
+        .as_array()
+        .expect("sections")
+        .iter()
+        .find(|s| s["section"] == json!("fiscal"))
+        .expect("la sección fiscal debe salir en el informe")
+        .clone();
+    assert!(
+        fiscal["status"]["Ignored"].is_string(),
+        "fiscal debía reportarse como Ignored con motivo: {fiscal}"
+    );
+}
+
 /// Flujo completo: import válido → 200 `{ ok, report }` con el informe del runtime EXTENDIDO
 /// (installed_modules / media / fiscal). Atraviesa `import_sections` del runtime.
 #[tokio::test]

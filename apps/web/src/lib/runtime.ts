@@ -435,9 +435,10 @@ export interface ImportSelection {
 
 /**
  * Estado de una sección del informe. Serde del enum Rust `SectionStatus`: `Applied`/`Skipped`
- * llegan como string; `Failed(motivo)` como objeto `{"Failed": "motivo"}`. Tolerar ambas formas.
+ * llegan como string; `Failed(motivo)` e `Ignored(motivo)` como objeto `{"Failed": "motivo"}` /
+ * `{"Ignored": "motivo"}`. Tolerar ambas formas.
  */
-export type SectionStatus = 'Applied' | 'Skipped' | { Failed: string };
+export type SectionStatus = 'Applied' | 'Skipped' | { Failed: string } | { Ignored: string };
 
 /** Una entrada del informe: sección (`hub_users`, `media`, `modules/<id>`, …) + estado. */
 export interface SectionResult {
@@ -483,14 +484,15 @@ export interface ModuleInstallResult {
 
 /** Estado normalizado de una sección del informe, listo para pintar. */
 export interface SectionStatusInfo {
-  kind: 'applied' | 'skipped' | 'failed';
-  /** Motivo del fallo (solo `failed`). */
+  kind: 'applied' | 'skipped' | 'ignored' | 'failed';
+  /** Motivo — de un `failed`, o de por qué se descartó un `ignored`. */
   reason?: string;
 }
 
 /**
- * Normaliza el `status` serde (string `"Applied"`/`"Skipped"` u objeto `{"Failed": "motivo"}` —
- * y, defensivamente, las variantes objeto `{"Applied": …}`) a un shape estable para la UI.
+ * Normaliza el `status` serde (string `"Applied"`/`"Skipped"` u objeto `{"Failed": "motivo"}` /
+ * `{"Ignored": "motivo"}` — y, defensivamente, las variantes objeto `{"Applied": …}`) a un shape
+ * estable para la UI.
  */
 export function sectionStatusInfo(status: SectionStatus | Record<string, unknown> | string): SectionStatusInfo {
   if (typeof status === 'string') {
@@ -502,6 +504,10 @@ export function sectionStatusInfo(status: SectionStatus | Record<string, unknown
   if (status && typeof status === 'object') {
     const obj = status as Record<string, unknown>;
     if ('Failed' in obj) return { kind: 'failed', reason: String(obj.Failed ?? '') };
+    // ADR-0195: el motor DESCARTÓ la sección a propósito (identidades de un bundle `template`).
+    // Ni un fallo —no se intentó nada— ni un «saltado» mudo, que sería indistinguible de «no la
+    // marqué». Lleva siempre su motivo, y ese motivo es lo que la pantalla enseña.
+    if ('Ignored' in obj) return { kind: 'ignored', reason: String(obj.Ignored ?? '') };
     if ('Applied' in obj) return { kind: 'applied' };
     if ('Skipped' in obj) return { kind: 'skipped' };
   }
