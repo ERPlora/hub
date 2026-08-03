@@ -91,6 +91,10 @@ pub enum RuntimeError {
     /// fallo de salida como cualquier listener: backoff y dead-letter sin perder el evento.
     #[error("host.webhook: {0}")]
     Webhook(String),
+    /// El worker que ejecutaba un webhook perdió el lease durable antes del commit. El guard de
+    /// fencing revierte la mutación completa; otro worker ya puede estar procesando el mismo id.
+    #[error("el lease del receipt webhook ya no pertenece a este worker")]
+    WebhookLeaseLost,
     /// Fallo al materializar o escribir la carpeta persistente declarada por un módulo.
     #[error("host.module_storage: {0}")]
     Storage(String),

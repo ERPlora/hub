@@ -71,6 +71,28 @@ pub(crate) async fn execute_at(
     extra_ops: &[(String, Params)],
     origin: Origin,
 ) -> Result<Json> {
+    execute_at_with_result_op(
+        db, registry, name, payload, ctx, depth, extra_ops, origin, None,
+    )
+    .await
+}
+
+/// Variante del dispatcher que puede añadir una operación construida con la respuesta final a la
+/// misma transacción del command. `required_result_op=true` convierte esa operación en un fence:
+/// si afecta 0 filas, toda la transacción revierte. El borde webhook lo usa para persistir la
+/// respuesta exacta y comprobar la propiedad del lease sin una ventana post-commit.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn execute_at_with_result_op(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    name: &str,
+    payload: &Params,
+    ctx: &RequestContext,
+    depth: u32,
+    extra_ops: &[(String, Params)],
+    origin: Origin,
+    result_op: Option<&(dyn Fn(&Json) -> (String, Params) + Sync)>,
+) -> Result<Json> {
     if depth > MAX_EVENT_DEPTH {
         return Err(RuntimeError::EventLoop);
     }
@@ -163,13 +185,19 @@ pub(crate) async fn execute_at(
             // el usuario no ha concedido → CapabilityDenied y el motor nativo NO corre (el cert no
             // se lee ni se toca la AEAT). Ortogonal al RBAC de usuario ya chequeado arriba.
             crate::capabilities::enforce(db, registry, &cmd.module_id, &ctx.hub_id).await?;
-            return execute_native(db, registry, cmd, payload, ctx, depth, extra_ops).await;
+            return execute_native(
+                db, registry, cmd, payload, ctx, depth, extra_ops, result_op,
+            )
+            .await;
         }
     }
 
     // ── Tier 2: handler WASM ────────────────────────────────────────────────
     if let Some(bytes) = &cmd.wasm {
-        return execute_wasm(db, registry, cmd, payload, ctx, depth, bytes, extra_ops).await;
+        return execute_wasm(
+            db, registry, cmd, payload, ctx, depth, bytes, extra_ops, result_op,
+        )
+        .await;
     }
 
     // ── Tier 0/1: SQL declarativo ───────────────────────────────────────────
@@ -202,6 +230,12 @@ pub(crate) async fn execute_at(
         ));
     }
     ops.extend_from_slice(extra_ops);
+    let data = json!({ "ok": true, "new_ids": [bound.get("new_id").cloned().unwrap_or(Json::Null)] });
+    let required_op_index = result_op.map(|build| {
+        let index = ops.len();
+        ops.push(build(&data));
+        index
+    });
 
     // Gate de filas afectadas (hub#140). `min_affected_rows` es OPT-IN: `None` mantiene el
     // comportamiento de siempre (emite haya o no mutado). `Some(n)` exige que la suma de filas
@@ -210,7 +244,10 @@ pub(crate) async fn execute_at(
     // inútil la gate). Se evalúa DENTRO de la tx vía `execute_tx_gated`: si no se cumple, la tx
     // entera revierte (ni mutación ni outbox) y devolvemos el error estable, SIN notificar al WS.
     let min = cmd.def.min_affected_rows;
-    match db.execute_tx_gated(&ops, sql_op_count, min).await? {
+    match db
+        .execute_tx_gated(&ops, sql_op_count, min, required_op_index)
+        .await?
+    {
         TxGatedOutcome::RolledBack { sql_counts } => {
             let min = min.expect("la gate sólo revierte con Some(min)");
             let affected: u64 = sql_counts.iter().sum();
@@ -222,6 +259,7 @@ pub(crate) async fn execute_at(
             });
         }
         TxGatedOutcome::Committed { .. } => {}
+        TxGatedOutcome::GuardFailed { .. } => return Err(RuntimeError::WebhookLeaseLost),
     }
 
     // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
@@ -234,8 +272,7 @@ pub(crate) async fn execute_at(
     // ya inyecta `:new_id` en el SQL, pero la respuesta se lo callaba. Sin él, quien crea una fila
     // no puede volver a tocarla — el POS se quedaba sin `line_id` al añadir un artículo y las
     // subidas de cantidad se perdían EN SILENCIO (5 tortillas en pantalla, 1 en la BD).
-    let new_id = bound.get("new_id").cloned().unwrap_or(Json::Null);
-    Ok(json!({ "ok": true, "new_ids": [new_id] }))
+    Ok(data)
 }
 
 /// Ejecuta un command Tier 2: invoca el handler WASM, valida cada intención y
@@ -328,6 +365,7 @@ async fn execute_wasm(
     depth: u32,
     bytes: &[u8],
     extra_ops: &[(String, Params)],
+    result_op: Option<&(dyn Fn(&Json) -> (String, Params) + Sync)>,
 ) -> Result<Json> {
     let handler =
         cmd.def.handler.as_ref().ok_or_else(|| {
@@ -366,7 +404,7 @@ async fn execute_wasm(
     let output = call_wasm_off_thread(bytes, &handler.function, input).await?;
 
     persist_handler_output(
-        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
+        db, registry, cmd, payload, ctx, depth, extra_ops, result_op, &output, &new_ids,
     )
     .await
 }
@@ -449,6 +487,7 @@ async fn execute_native(
     ctx: &RequestContext,
     depth: u32,
     extra_ops: &[(String, Params)],
+    result_op: Option<&(dyn Fn(&Json) -> (String, Params) + Sync)>,
 ) -> Result<Json> {
     let handler = cmd
         .def
@@ -493,7 +532,7 @@ async fn execute_native(
     let output = engine.call(&handler.function, &input, &host).await?;
 
     persist_handler_output(
-        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
+        db, registry, cmd, payload, ctx, depth, extra_ops, result_op, &output, &new_ids,
     )
     .await
 }
@@ -510,6 +549,7 @@ async fn persist_handler_output(
     ctx: &RequestContext,
     depth: u32,
     extra_ops: &[(String, Params)],
+    result_op: Option<&(dyn Fn(&Json) -> (String, Params) + Sync)>,
     output: &Output,
     // Lote de ids que el host generó y entregó al handler. Se devuelven al llamante para que la
     // UI pueda correlacionar lo que acaba de crear (el POS abre un pedido y necesita su `order_id`
@@ -575,7 +615,22 @@ async fn persist_handler_output(
         ));
     }
     tx_ops.extend_from_slice(extra_ops);
-    db.execute_tx(&tx_ops).await?;
+    let data = json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids });
+    let required_op_index = result_op.map(|build| {
+        let index = tx_ops.len();
+        tx_ops.push(build(&data));
+        index
+    });
+    match db
+        .execute_tx_gated(&tx_ops, 0, None, required_op_index)
+        .await?
+    {
+        TxGatedOutcome::Committed { .. } => {}
+        TxGatedOutcome::GuardFailed { .. } => return Err(RuntimeError::WebhookLeaseLost),
+        TxGatedOutcome::RolledBack { .. } => {
+            unreachable!("persist_handler_output no configura min_affected_rows")
+        }
+    }
 
     // Notificación al WS (UI en vivo) tras commit; entrega durable a listeners = relay.
     for event in &cmd.def.emit {
@@ -585,7 +640,7 @@ async fn persist_handler_output(
         events::notify_sink(registry, name, payload);
     }
 
-    Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))
+    Ok(data)
 }
 
 /// Valida el **nombre de un evento devuelto por un handler** contra lo declarado en el

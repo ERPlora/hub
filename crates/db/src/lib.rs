@@ -77,6 +77,10 @@ pub enum TxGatedOutcome {
     /// The gate failed; the tx **rolled back** (no mutation, no outbox). `sql_counts` holds the
     /// affected counts of just the mutation statements, so the runtime can report the real number.
     RolledBack { sql_counts: Vec<u64> },
+    /// A fencing/ownership operation selected by the caller affected no rows. The transaction
+    /// rolled back even if all business mutations had succeeded. This is used by durable leases:
+    /// a stale worker must never commit after another worker reclaimed the same receipt.
+    GuardFailed { guard_index: usize },
 }
 
 /// Common contract for the backend. The runtime only knows this trait; it does not know the
@@ -121,6 +125,7 @@ pub trait DatabaseAdapter: Send + Sync {
         ops: &[(String, Params)],
         sql_op_count: usize,
         min_affected_rows: Option<u64>,
+        required_op_index: Option<usize>,
     ) -> Result<TxGatedOutcome, DbError>;
 
     /// Runs a query and returns the rows as JSON objects.
@@ -308,6 +313,7 @@ impl DatabaseAdapter for PgAdapter {
         ops: &[(String, Params)],
         sql_op_count: usize,
         min_affected_rows: Option<u64>,
+        required_op_index: Option<usize>,
     ) -> Result<TxGatedOutcome, DbError> {
         let mut tx = self.pool.begin().await?;
         let mut per_op = Vec::with_capacity(ops.len());
@@ -329,6 +335,12 @@ impl DatabaseAdapter for PgAdapter {
                 tx.rollback().await?;
                 let sql_counts = per_op[..n].to_vec();
                 return Ok(TxGatedOutcome::RolledBack { sql_counts });
+            }
+        }
+        if let Some(index) = required_op_index {
+            if per_op.get(index).copied().unwrap_or(0) == 0 {
+                tx.rollback().await?;
+                return Ok(TxGatedOutcome::GuardFailed { guard_index: index });
             }
         }
         tx.commit().await?;
