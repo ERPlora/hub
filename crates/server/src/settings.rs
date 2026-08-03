@@ -21,6 +21,123 @@ use serde_json::{json, Map, Value};
 use crate::auth;
 use crate::state::AppState;
 
+// ── Comunicaciones / correo ────────────────────────────────────────────────────────────────────
+
+/// GET /api/communications/email — metadatos y salud de la conexión. Solo administradores; la
+/// respuesta nunca contiene contraseña, token OAuth ni ciphertext.
+pub async fn get_email_channel(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.email_channel_status().await {
+        Ok(status) => Json(status).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// PUT /api/communications/email — cambia entre relay, Google, Microsoft y SMTP. Las credenciales
+/// son campos solo-escritura y el runtime las cifra antes de tocar la base de datos.
+pub async fn put_email_channel(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(input): Json<erplora_runtime::email_channel::EmailChannelInput>,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
+        Ok(user) => user,
+        Err(e) => return unauthorized(e),
+    };
+    let by = format!("hub_user:{}", admin.id);
+    match rt.set_email_channel(&input, &by).await {
+        Ok(status) => Json(status).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// DELETE /api/communications/email — desconecta el proveedor propio. El resultado efectivo es el
+/// relay gestionado; nunca se hace este fallback de forma silenciosa tras un error de entrega.
+pub async fn delete_email_channel(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.disconnect_email_channel().await {
+        Ok(status) => Json(status).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// POST /api/communications/email/test — prueba real al email guardado del administrador. No
+/// acepta un destinatario escrito en el body, manteniendo la misma regla anti-correo-arbitrario.
+pub async fn test_email_channel(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
+        Ok(user) => user,
+        Err(e) => return unauthorized(e),
+    };
+    let mut email_params = erplora_db::Params::new();
+    email_params.insert("id".into(), json!(admin.id));
+    let email = rt
+        .db()
+        .query(
+            "SELECT email FROM hub_user WHERE id = :id AND is_active = 1 LIMIT 1",
+            &email_params,
+        )
+        .await
+        .ok()
+        .and_then(|result| result.rows.into_iter().next())
+        .and_then(|row| row.get("email").and_then(Value::as_str).map(str::to_string))
+        .unwrap_or_default();
+    if email.trim().is_empty() {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "error": "el administrador no tiene un email guardado para recibir la prueba"
+            })),
+        )
+            .into_response();
+    }
+    let result = st
+        .email_transport
+        .send_test(rt.db(), rt.hub_id(), &email)
+        .await;
+    match result {
+        Ok(_) => {
+            let _ = erplora_runtime::email_channel::record_test_result(rt.db(), rt.hub_id(), None)
+                .await;
+            Json(json!({ "ok": true })).into_response()
+        }
+        Err(error) => {
+            let message = error.to_string();
+            let _ = erplora_runtime::email_channel::record_test_result(
+                rt.db(),
+                rt.hub_id(),
+                Some(&message),
+            )
+            .await;
+            crate::err_response(error)
+        }
+    }
+}
+
 /// `401` para fallo de auth (sin sesión / sesión inválida / rol insuficiente).
 fn unauthorized(e: auth::AuthError) -> Response {
     (

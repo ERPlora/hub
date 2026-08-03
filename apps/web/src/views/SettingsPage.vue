@@ -269,6 +269,102 @@
         </ion-card>
       </template>
 
+      <!-- ── Tab: Comunicaciones ── -->
+      <template v-else-if="tab === 'communications'">
+        <ion-card>
+          <ion-card-content>
+            <ion-label>
+              <h2>{{ t('settings.emailChannelTitle') }}</h2>
+              <p>{{ t('settings.emailChannelDesc') }}</p>
+            </ion-label>
+
+            <ion-item lines="none" class="mt-2">
+              <HubIcon slot="start" :name="emailStatus.connected ? 'checkmark-circle-outline' : 'alert-circle-outline'" />
+              <ion-label>
+                <h2>{{ emailModeLabel }}</h2>
+                <p>{{ emailStatus.connected ? t('settings.emailReady') : t('settings.emailError') }}</p>
+                <p v-if="emailStatus.last_error">{{ emailStatus.last_error }}</p>
+              </ion-label>
+            </ion-item>
+
+            <ion-select
+              class="mt-2"
+              fill="outline"
+              label-placement="floating"
+              :label="t('settings.emailProvider')"
+              interface="popover"
+              :disabled="!isAdmin || emailBusy"
+              v-model="emailForm.mode"
+            >
+              <ion-select-option value="managed">{{ t('settings.emailManaged') }}</ion-select-option>
+              <ion-select-option value="google_oauth">Google</ion-select-option>
+              <ion-select-option value="microsoft_oauth">Microsoft</ion-select-option>
+              <ion-select-option value="smtp">SMTP</ion-select-option>
+            </ion-select>
+
+            <p v-if="emailForm.mode === 'managed'" class="communication-hint mt-2">
+              {{ t('settings.emailManagedDesc') }}
+            </p>
+
+            <template v-else-if="emailForm.mode === 'google_oauth' || emailForm.mode === 'microsoft_oauth'">
+              <p class="communication-hint mt-2">{{ t('settings.emailOauthDesc') }}</p>
+              <ion-button
+                expand="block"
+                fill="outline"
+                class="mt-2"
+                :disabled="!isAdmin || emailBusy"
+                @click="connectEmailOauth"
+              >
+                <HubIcon slot="start" name="log-in-outline" />
+                {{ t('settings.emailConnectAccount', { provider: emailForm.mode === 'google_oauth' ? 'Google' : 'Microsoft' }) }}
+              </ion-button>
+              <ion-note v-if="emailStatus.account_email" class="block mt-2">
+                {{ t('settings.emailConnectedAs', { email: emailStatus.account_email }) }}
+              </ion-note>
+            </template>
+
+            <template v-else>
+              <div class="communication-grid mt-2">
+                <ion-input fill="outline" label-placement="floating" :label="t('settings.smtpHost')" :readonly="!isAdmin" v-model="emailForm.host" />
+                <ion-input fill="outline" label-placement="floating" :label="t('settings.smtpPort')" type="number" :readonly="!isAdmin" v-model="emailForm.port" />
+                <ion-select fill="outline" label-placement="floating" :label="t('settings.smtpSecurity')" interface="popover" :disabled="!isAdmin" v-model="emailForm.security">
+                  <ion-select-option value="tls">TLS</ion-select-option>
+                  <ion-select-option value="starttls">STARTTLS</ion-select-option>
+                  <ion-select-option value="none">{{ t('settings.smtpNone') }}</ion-select-option>
+                </ion-select>
+                <ion-input fill="outline" label-placement="floating" :label="t('settings.smtpUsername')" :readonly="!isAdmin" v-model="emailForm.username" />
+                <ion-input fill="outline" label-placement="floating" :label="t('settings.smtpPassword')" type="password" :readonly="!isAdmin" v-model="emailForm.password" :placeholder="emailStatus.has_secret ? t('settings.smtpPasswordKeep') : ''" />
+                <ion-input fill="outline" label-placement="floating" :label="t('settings.emailFromName')" :readonly="!isAdmin" v-model="emailForm.from_name" />
+                <ion-input fill="outline" label-placement="floating" :label="t('settings.emailFromAddress')" type="email" :readonly="!isAdmin" v-model="emailForm.from_email" />
+              </div>
+            </template>
+
+            <ion-input
+              v-if="emailForm.mode !== 'google_oauth' && emailForm.mode !== 'microsoft_oauth'"
+              class="mt-2"
+              fill="outline"
+              label-placement="floating"
+              :label="t('settings.emailReplyTo')"
+              type="email"
+              :readonly="!isAdmin"
+              v-model="emailForm.reply_to"
+            />
+
+            <ion-button v-if="isAdmin && emailForm.mode !== 'google_oauth' && emailForm.mode !== 'microsoft_oauth'" expand="block" class="mt-3" :disabled="emailBusy" @click="saveEmailChannel">
+              <HubIcon slot="start" name="save-outline" />
+              {{ t('settings.saveChanges') }}
+            </ion-button>
+            <ion-button v-if="isAdmin" expand="block" fill="outline" class="mt-2" :disabled="emailBusy || !emailStatus.connected" @click="sendEmailTest">
+              <HubIcon slot="start" name="paper-plane-outline" />
+              {{ t('settings.emailSendTest') }}
+            </ion-button>
+            <ion-button v-if="isAdmin && emailStatus.mode !== 'managed'" expand="block" fill="clear" color="danger" class="mt-2" :disabled="emailBusy" @click="disconnectEmail">
+              {{ t('settings.emailDisconnect') }}
+            </ion-button>
+          </ion-card-content>
+        </ion-card>
+      </template>
+
       <!-- ── Tab: Tickets ── -->
       <template v-else-if="tab === 'tickets'">
         <ion-card>
@@ -357,6 +453,10 @@
             <HubIcon name="wallet-outline" />
             <ion-label>{{ t('settings.tabTax') }}</ion-label>
           </ion-segment-button>
+          <ion-segment-button value="communications">
+            <HubIcon name="mail-outline" />
+            <ion-label>{{ t('settings.tabCommunications') }}</ion-label>
+          </ion-segment-button>
           <ion-segment-button value="tickets">
             <HubIcon name="ticket-outline" />
             <ion-label>{{ t('settings.tabTickets') }}</ion-label>
@@ -417,8 +517,15 @@ import {
   getBusinessCertificate,
   putBusinessCertificate,
   deleteBusinessCertificate,
+  getEmailChannel,
+  putEmailChannel,
+  disconnectEmailChannel,
+  testEmailChannel,
+  beginEmailOauth,
   type ModuleCapability,
   type BusinessCertificate,
+  type EmailChannelStatus,
+  type EmailChannelInput,
 } from '../lib/runtime';
 
 const { t } = useI18n();
@@ -475,6 +582,93 @@ const hubCountry = ref<string>(hubSettings.value?.country_code ?? 'ES');
 // Doc de la API: deriva del setting server-side (lib/api-docs → hubSettings.api_docs_enabled).
 const showApiDocs = apiDocsEnabled;
 
+// ── Estado: Comunicaciones / correo ─────────────────────────────────────────────────────────
+const defaultEmailStatus = (): EmailChannelStatus => ({
+  mode: 'managed', connected: true, status: 'ready', host: '', port: 0,
+  security: 'starttls', username: '', from_name: 'ERPlora',
+  from_email: 'noreply@erplora.com', reply_to: '', account_email: '',
+  has_secret: false, last_error: '', updated_by: '',
+});
+const emailStatus = ref<EmailChannelStatus>(defaultEmailStatus());
+const emailForm = ref<EmailChannelInput>({ mode: 'managed', port: 587, security: 'starttls' });
+const emailBusy = ref(false);
+const emailModeLabel = computed(() => {
+  const labels: Record<string, string> = {
+    managed: t('settings.emailManaged'), google_oauth: 'Google',
+    microsoft_oauth: 'Microsoft', smtp: 'SMTP',
+  };
+  return labels[emailStatus.value.mode] ?? emailStatus.value.mode;
+});
+
+function hydrateEmailForm(status: EmailChannelStatus): void {
+  emailStatus.value = status;
+  emailForm.value = {
+    mode: status.mode,
+    host: status.host,
+    port: status.port || 587,
+    security: status.security,
+    username: status.username,
+    password: '',
+    from_name: status.from_name,
+    from_email: status.from_email,
+    reply_to: status.reply_to,
+    account_email: status.account_email,
+  };
+}
+
+async function loadEmailChannel(): Promise<void> {
+  if (!isAdmin.value) return;
+  try { hydrateEmailForm(await getEmailChannel()); }
+  catch { await toastError(t('settings.emailLoadError')); }
+}
+
+async function saveEmailChannel(): Promise<void> {
+  if (!isAdmin.value) return;
+  emailBusy.value = true;
+  try {
+    hydrateEmailForm(await putEmailChannel({
+      ...emailForm.value,
+      port: Number(emailForm.value.port) || 587,
+    }));
+    await toastSuccess(t('settings.emailSaved'));
+  } catch {
+    await toastError(t('settings.emailSaveError'));
+  } finally { emailBusy.value = false; }
+}
+
+async function sendEmailTest(): Promise<void> {
+  if (!isAdmin.value) return;
+  emailBusy.value = true;
+  try {
+    await testEmailChannel();
+    await loadEmailChannel();
+    await toastSuccess(t('settings.emailTestSent'));
+  } catch { await toastError(t('settings.emailTestError')); }
+  finally { emailBusy.value = false; }
+}
+
+async function disconnectEmail(): Promise<void> {
+  if (!isAdmin.value) return;
+  emailBusy.value = true;
+  try {
+    hydrateEmailForm(await disconnectEmailChannel());
+    await toastSuccess(t('settings.emailDisconnected'));
+  } catch { await toastError(t('settings.emailDisconnectError')); }
+  finally { emailBusy.value = false; }
+}
+
+async function connectEmailOauth(): Promise<void> {
+  if (!isAdmin.value) return;
+  emailBusy.value = true;
+  try {
+    const provider = emailForm.value.mode === 'google_oauth' ? 'google' : 'microsoft';
+    window.location.assign(await beginEmailOauth(provider));
+  } catch {
+    emailBusy.value = false;
+    await toastError(t('settings.emailOauthError'));
+  }
+}
+
 /** Nombre legible del idioma DEFAULT del hub (para la vista solo-lectura de no-admin). */
 const hubLanguageName = computed<string>(
   () => availableLocales.find((l) => l.code === hubLanguage.value)?.name ?? hubLanguage.value,
@@ -495,7 +689,20 @@ watch(hubSettings, (s) => {
 // Refresca los settings del hub al abrir Ajustes (best-effort; degrada a la cache sembrada).
 onMounted(() => {
   void getHubSettings().catch(() => null);
+  if (tab.value === 'communications') void loadEmailChannel();
 });
+
+let emailLoaded = false;
+watch(
+  tab,
+  (current) => {
+    if (current === 'communications' && !emailLoaded) {
+      emailLoaded = true;
+      void loadEmailChannel();
+    }
+  },
+  { immediate: true },
+);
 
 // ── Estado: Negocio (identidad fiscal genérica, server-side /api/settings — ADR-0061) ──
 // FUENTE ÚNICA país-agnóstica que usan invoice (emisor) y los módulos fiscales por país. Se siembra
@@ -785,5 +992,14 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 /* Input de fichero oculto (lo dispara un ion-button). Antes iba por inline style. */
 .cert-file-input {
   display: none;
+}
+.communication-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+.communication-hint {
+  color: var(--ion-color-medium);
+  line-height: 1.45;
 }
 </style>

@@ -7,7 +7,7 @@ const profileSource = readFileSync(new URL('../views/ProfilePage.vue', import.me
 
 describe('navegación de Ajustes', () => {
   it('no ofrece una pestaña Tienda duplicada', () => {
-    expect(SETTINGS_TABS).toEqual(['hub', 'tax', 'tickets', 'permissions', 'data']);
+    expect(SETTINGS_TABS).toEqual(['hub', 'tax', 'communications', 'tickets', 'permissions', 'data']);
     expect(SETTINGS_TABS).not.toContain('store');
   });
 
@@ -18,6 +18,7 @@ describe('navegación de Ajustes', () => {
 
   it('conserva los enlaces de las pestañas vigentes', () => {
     expect(resolveSettingsTab('#tax')).toBe('tax');
+    expect(resolveSettingsTab('#communications')).toBe('communications');
     expect(resolveSettingsTab('#tickets')).toBe('tickets');
     expect(resolveSettingsTab('#permissions')).toBe('permissions');
     expect(resolveSettingsTab('#data')).toBe('data');

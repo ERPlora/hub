@@ -52,7 +52,34 @@ export interface ModuleManifest {
    * pestaña `settings` del módulo cuando no hay `component`.
    */
   settings?: ModuleSettingsDef;
+  /** Resolvers seguros de destinatario aportados por módulos propietarios de contactos. */
+  notification_recipient_resolvers?: Record<string, NotificationRecipientResolverDef>;
+  /** Capabilities peligrosas solicitadas al host. */
+  capabilities?: {
+    notify?: ModuleNotifyCapability;
+    [key: string]: unknown;
+  };
   // queries/commands/events/ai_tools/network/scheduled_tasks → ver schemas/module.schema.json
+}
+
+export interface NotificationBindingDef {
+  event: string;
+  channel: 'email' | 'sms' | 'whatsapp';
+  template: string;
+  recipient_resolver: string;
+  artifact_ready_event?: string;
+  delivery_updated_event?: string;
+}
+
+export interface ModuleNotifyCapability {
+  channels?: ('email' | 'sms' | 'whatsapp')[];
+  bindings?: NotificationBindingDef[];
+}
+
+export interface NotificationRecipientResolverDef {
+  query: string;
+  id_param?: string;
+  channels: Partial<Record<'email' | 'sms' | 'whatsapp', string>>;
 }
 
 /** Bloque `settings` del manifest (settings declarativos estilo widgets). */

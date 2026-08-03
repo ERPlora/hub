@@ -335,6 +335,8 @@ pub struct AppState {
     pub hub_id: HubId,
     /// Cliente HTTP async (rustls) compartido para hablar con el Cloud (descargas + proxy SSE).
     pub http: reqwest::Client,
+    /// Transporte real del canal email, compartido también con la acción administrativa de prueba.
+    pub email_transport: Arc<crate::email_transport::EmailNotifyTransport>,
     /// Gateway multi-tenant (ADR-0005, hub#24). `None` = modo single-tenant actual (N=1); `Some` =
     /// tier "cloud compartido" (N orgs, un pool por org). Aditivo: no rompe el modo single-tenant.
     pub tenants: Option<Arc<crate::tenant::TenantRouter>>,
@@ -387,13 +389,21 @@ impl AppState {
         let (tx, _rx) = broadcast::channel::<WsEvent>(256);
         let sink = Arc::new(BroadcastSink { tx: tx.clone() });
         runtime.set_event_sink(sink);
+        let http = reqwest::Client::new();
+        let email_transport = Arc::new(crate::email_transport::EmailNotifyTransport::new(
+            http.clone(),
+            config.cloud_base_url.clone(),
+            machine_token.clone(),
+        ));
+        runtime.set_notify_transport(email_transport.clone());
         Self {
             runtime: Arc::new(Mutex::new(runtime)),
             events: tx,
             config,
             machine_token,
             hub_id,
-            http: reqwest::Client::new(),
+            http,
+            email_transport,
             tenants: None,
             vector: None,
             entitlement: crate::entitlement::new_shared(),

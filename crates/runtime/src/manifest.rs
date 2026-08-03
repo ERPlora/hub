@@ -57,6 +57,12 @@ pub struct Manifest {
     pub settings: Option<SettingsDef>,
     #[serde(default)]
     pub events: Events,
+    /// Resolvers de destinatarios que aporta el módulo. El runtime los usa para convertir una
+    /// referencia opaca (`customer_id`, `staff_id`, …) en un contacto del propio hub sin aceptar
+    /// una dirección libre enviada por el módulo consumidor. El resolver siempre apunta a una
+    /// query del MISMO módulo que lo declara.
+    #[serde(default)]
+    pub notification_recipient_resolvers: HashMap<String, NotificationRecipientResolver>,
     /// Resumen del módulo para el routing del asistente (nivel 1). ARQUITECTURA.md §9.2b.
     #[serde(default)]
     pub agent: Option<Agent>,
@@ -188,6 +194,48 @@ pub struct NotifyCapability {
     /// Canales declarados (`email`/`sms`/`whatsapp`).
     #[serde(default)]
     pub channels: Vec<String>,
+    /// Eventos exactos del propio módulo que el host puede convertir en una entrega externa.
+    /// Un binding fija canal, plantilla y resolver: esos valores no los elige el payload.
+    #[serde(default)]
+    pub bindings: Vec<NotificationBinding>,
+}
+
+/// Binding declarativo evento → notificación. Vive dentro de `capabilities.notify`, por lo que
+/// además de declararlo el administrador debe conceder la capability `notify` al módulo.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+pub struct NotificationBinding {
+    /// Evento de dominio exacto emitido por este módulo (p. ej. `invoice.delivery.requested`).
+    pub event: String,
+    /// Canal fijo para este evento (`email`/`sms`/`whatsapp`).
+    pub channel: String,
+    /// Plantilla fija del catálogo de transporte.
+    pub template: String,
+    /// Resolver exacto requerido por `recipient_ref.resolver`.
+    pub recipient_resolver: String,
+    /// Eventos derivados, propiedad del módulo, que el core persiste tras materializar/enviar.
+    #[serde(default)]
+    pub artifact_ready_event: Option<String>,
+    #[serde(default)]
+    pub delivery_updated_event: Option<String>,
+}
+
+/// Contrato aportado por un módulo propietario de contactos. El core ejecuta `query` con un único
+/// parámetro derivado de `recipient_ref.id` y toma el campo configurado para el canal. No conoce
+/// tablas ni esquemas de clientes, empleados o proveedores.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NotificationRecipientResolver {
+    /// Query namespaced del mismo módulo que declara el resolver.
+    pub query: String,
+    /// Nombre del parámetro que recibe el identificador opaco (default `id`).
+    #[serde(default = "default_recipient_id_param")]
+    pub id_param: String,
+    /// Mapa canal → campo devuelto por la query, p. ej. `{ "email": "email" }`.
+    #[serde(default)]
+    pub channels: HashMap<String, String>,
+}
+
+fn default_recipient_id_param() -> String {
+    "id".to_string()
 }
 
 /// Bloque `network` del manifest (ADR-0012, §5.5): allowlist de `http.fetch` mediado.
@@ -285,6 +333,137 @@ impl Manifest {
     /// ¿El módulo declara necesitar esta capability? (incluye los alias deprecados).
     pub fn requests_capability(&self, kind: CapabilityKind) -> bool {
         self.requested_capabilities().contains(&kind)
+    }
+
+    /// Comprueba las relaciones internas del contrato de notificaciones que JSON Schema no puede
+    /// expresar: propiedad de queries/eventos, canales declarados y unicidad de bindings.
+    pub fn validate_notification_contracts(&self) -> Result<()> {
+        let invalid = |detail: String| RuntimeError::Schema {
+            name: format!("{}.notifications", self.id),
+            detail,
+        };
+
+        for (name, resolver) in &self.notification_recipient_resolvers {
+            if name.split('.').next() != Some(self.id.as_str()) {
+                return Err(invalid(format!(
+                    "el resolver `{name}` debe pertenecer al namespace `{}`",
+                    self.id
+                )));
+            }
+            let Some(query) = self.queries.get(&resolver.query) else {
+                return Err(invalid(format!(
+                    "el resolver `{name}` referencia la query inexistente `{}`",
+                    resolver.query
+                )));
+            };
+            let _ = query;
+            if resolver.query.split('.').next() != Some(self.id.as_str()) {
+                return Err(invalid(format!(
+                    "el resolver `{name}` no puede ejecutar la query ajena `{}`",
+                    resolver.query
+                )));
+            }
+            if resolver.id_param.trim().is_empty() || resolver.channels.is_empty() {
+                return Err(invalid(format!(
+                    "el resolver `{name}` necesita `id_param` y al menos un canal"
+                )));
+            }
+            for (channel, field) in &resolver.channels {
+                if ChannelName::parse(channel).is_none() || field.trim().is_empty() {
+                    return Err(invalid(format!(
+                        "el resolver `{name}` declara el canal/campo inválido `{channel}` → `{field}`"
+                    )));
+                }
+            }
+        }
+
+        let Some(notify) = self.capabilities.notify.as_ref().or(self.notify.as_ref()) else {
+            return Ok(());
+        };
+        let declared_channels: std::collections::HashSet<&str> =
+            notify.channels.iter().map(String::as_str).collect();
+        let declared_events: std::collections::HashSet<&str> = self
+            .events
+            .emits
+            .iter()
+            .map(String::as_str)
+            .chain(
+                self.commands
+                    .values()
+                    .flat_map(|command| command.emit.iter().map(String::as_str)),
+            )
+            .collect();
+        let mut bound_events = std::collections::HashSet::new();
+        for binding in &notify.bindings {
+            if !bound_events.insert(binding.event.as_str()) {
+                return Err(invalid(format!(
+                    "el evento `{}` tiene más de un binding de notificación",
+                    binding.event
+                )));
+            }
+            if binding.event.split('.').next() != Some(self.id.as_str()) {
+                return Err(invalid(format!(
+                    "el binding `{}` debe usar el namespace `{}`",
+                    binding.event, self.id
+                )));
+            }
+            if !declared_events.contains(binding.event.as_str()) {
+                return Err(invalid(format!(
+                    "el binding `{}` debe declarar el evento en `events.emits` o en un command",
+                    binding.event
+                )));
+            }
+            if ChannelName::parse(&binding.channel).is_none()
+                || !declared_channels.contains(binding.channel.as_str())
+            {
+                return Err(invalid(format!(
+                    "el binding `{}` usa el canal `{}` sin declararlo en `channels`",
+                    binding.event, binding.channel
+                )));
+            }
+            if binding.template.trim().is_empty() || binding.recipient_resolver.trim().is_empty() {
+                return Err(invalid(format!(
+                    "el binding `{}` necesita plantilla y resolver",
+                    binding.event
+                )));
+            }
+            for derived in [
+                binding.artifact_ready_event.as_deref(),
+                binding.delivery_updated_event.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if derived.split('.').next() != Some(self.id.as_str())
+                    || !declared_events.contains(derived)
+                {
+                    return Err(invalid(format!(
+                        "el evento derivado `{derived}` del binding `{}` debe pertenecer al módulo y declararse",
+                        binding.event
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Nombres cerrados de canal usados solo para validar manifests sin acoplar `manifest` al
+/// transporte de runtime.
+enum ChannelName {
+    Email,
+    Sms,
+    Whatsapp,
+}
+
+impl ChannelName {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "email" => Some(Self::Email),
+            "sms" => Some(Self::Sms),
+            "whatsapp" => Some(Self::Whatsapp),
+            _ => None,
+        }
     }
 }
 
@@ -816,7 +995,10 @@ mod tests {
 
         let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
         let storage = manifest.static_files.expect("static_files present");
-        assert!(storage.user_actions.is_empty(), "el default es solo-lectura");
+        assert!(
+            storage.user_actions.is_empty(),
+            "el default es solo-lectura"
+        );
         assert!(!storage.allows(UserFileAction::Delete));
         assert!(!storage.allows(UserFileAction::Rename));
         assert!(!storage.allows(UserFileAction::Upload));
@@ -999,7 +1181,10 @@ mod tests {
         let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
 
         let internal_cmd = &manifest.commands["cash_register._reverse_sale"];
-        assert!(!internal_cmd.internal, "el campo `internal` no se declaró: default false");
+        assert!(
+            !internal_cmd.internal,
+            "el campo `internal` no se declaró: default false"
+        );
         assert!(
             internal_cmd.is_internal("cash_register._reverse_sale"),
             "el último segmento empieza por `_` → interno por convención, sin migrar el manifest"

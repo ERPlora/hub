@@ -17,6 +17,7 @@ pub mod capabilities;
 pub mod certificate;
 pub mod commands;
 pub mod e2e_support;
+pub mod email_channel;
 pub mod error_registry;
 pub mod errors;
 pub mod events;
@@ -808,6 +809,25 @@ impl Runtime {
         settings::set_many(self.db.as_ref(), &self.hub_id, updates, updated_by).await
     }
 
+    /// Metadatos y estado de la conexión de correo; nunca incluye contraseña ni token OAuth.
+    pub async fn email_channel_status(&self) -> Result<email_channel::EmailChannelStatus> {
+        email_channel::status(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Configura el proveedor de correo. El gate owner/admin vive en la capa HTTP.
+    pub async fn set_email_channel(
+        &self,
+        input: &email_channel::EmailChannelInput,
+        updated_by: &str,
+    ) -> Result<email_channel::EmailChannelStatus> {
+        email_channel::set(self.db.as_ref(), &self.hub_id, input, updated_by).await
+    }
+
+    /// Desconecta el proveedor propio y restaura el relay gestionado por defecto.
+    pub async fn disconnect_email_channel(&self) -> Result<email_channel::EmailChannelStatus> {
+        email_channel::disconnect(self.db.as_ref(), &self.hub_id).await
+    }
+
     /// Capabilities DECLARADAS por un módulo con su estado de grant (ADR-0079). Para
     /// `GET /api/modules/:id/capabilities`. Lista vacía = el módulo no pide permisos.
     pub async fn module_capabilities(&self, module_id: &str) -> Result<Vec<(String, bool)>> {
@@ -965,7 +985,9 @@ mod tests {
     #[tokio::test]
     async fn public_gate_rejects_underscore_but_internal_entrypoint_runs_it() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
 
         let mut rt = Runtime::new(Box::new(db));
         rt.registry

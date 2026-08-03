@@ -33,7 +33,7 @@
 //!    `hub_settings` o email de un usuario del hub. Nunca una dirección libre del payload.
 use std::sync::{Arc, Mutex};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as Json;
 
 use crate::errors::{Result, RuntimeError};
@@ -41,12 +41,40 @@ use crate::errors::{Result, RuntimeError};
 /// Canal de notificación de alto nivel. Conjunto **cerrado** (ADR-0012: añadir uno = tocar el
 /// runtime). El módulo declara qué canal usa en `notify.channels` del manifest, NO dónde viven
 /// los secretos/cuota.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Channel {
     Email,
     Sms,
     Whatsapp,
+}
+
+/// Referencia opaca a un contacto propiedad de un módulo. El módulo emisor solo conoce el id; el
+/// runtime ejecuta el resolver declarado por el módulo propietario y obtiene la dirección final.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct RecipientRef {
+    pub resolver: String,
+    pub id: String,
+}
+
+/// Artefacto inmutable ya materializado por un módulo o por el servicio genérico de documentos.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ArtifactRef {
+    pub id: String,
+    #[serde(default)]
+    pub filename: String,
+    #[serde(default)]
+    pub content_type: String,
+}
+
+/// Documento HTML producido por el módulo para que el transporte lo convierta en un artefacto
+/// PDF. El core lo trata como bytes opacos: no conoce facturas, tickets ni sus plantillas.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct DocumentSpec {
+    pub filename: String,
+    pub html: String,
+    #[serde(default)]
+    pub share: bool,
 }
 
 impl Channel {
@@ -63,28 +91,78 @@ impl Channel {
 
 /// La intención de notificación que un command emite en el payload del evento `*.reminder.due`.
 /// El módulo de negocio solo construye esto; el host resuelve el transporte y el secreto.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct NotifyIntent {
     pub channel: Channel,
-    /// Destinatario (email, teléfono E.164, wa_id…). Lo valida el transporte concreto.
-    pub to: String,
+    /// Destinatario final. Solo se admite en eventos legacy y debe estar en la allowlist; en los
+    /// bindings nuevos el runtime lo rellena después de resolver `recipient_ref`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+    /// Referencia segura al contacto, obligatoria en los eventos ligados por manifest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipient_ref: Option<RecipientRef>,
     /// Plantilla a renderizar (el catálogo de plantillas lo resuelve el transporte/Cloud).
     pub template: String,
+    /// Asunto opcional. El transporte rechaza caracteres de control antes de enviarlo.
+    #[serde(default)]
+    pub subject: String,
     /// Variables de la plantilla.
     #[serde(default)]
     pub vars: Json,
+    /// Artefactos existentes que se adjuntan a la entrega.
+    #[serde(default)]
+    pub artifact_refs: Vec<ArtifactRef>,
+    /// Documento nuevo producido por el módulo. El transporte puede renderizarlo una sola vez y
+    /// reutilizar el artefacto resultante en email, descarga, QR o WhatsApp.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document: Option<DocumentSpec>,
+    #[serde(default)]
+    pub correlation_id: String,
+    #[serde(default)]
+    pub idempotency_key: String,
 }
 
 impl NotifyIntent {
     /// Extrae la intención del payload de un evento `*.reminder.due`. `Err` si falta/!encaja.
     pub fn from_event_payload(payload: &erplora_db::Params) -> Result<NotifyIntent> {
         let value = Json::Object(payload.clone());
-        serde_json::from_value(value).map_err(|e| {
-            RuntimeError::InvalidPayload {
-                name: "host.notify".to_string(),
-                detail: format!("intención de notificación inválida: {e}"),
-            }
+        serde_json::from_value(value).map_err(|e| RuntimeError::InvalidPayload {
+            name: "host.notify".to_string(),
+            detail: format!("intención de notificación inválida: {e}"),
         })
+    }
+
+    /// Construye una intención desde un evento ligado por manifest. Canal y plantilla salen del
+    /// binding, nunca del payload. Un `to` libre es un error de contrato.
+    pub fn from_bound_event_payload(
+        payload: &erplora_db::Params,
+        binding: &crate::manifest::NotificationBinding,
+    ) -> Result<NotifyIntent> {
+        if payload.contains_key("to") {
+            return Err(RuntimeError::InvalidPayload {
+                name: binding.event.clone(),
+                detail: "un evento ligado no puede incluir `to`; usa `recipient_ref`".into(),
+            });
+        }
+        let mut value = payload.clone();
+        value.insert("channel".into(), Json::String(binding.channel.clone()));
+        value.insert("template".into(), Json::String(binding.template.clone()));
+        Self::from_event_payload(&value)
+    }
+
+    pub fn with_resolved_recipient(&self, to: String) -> NotifyIntent {
+        let mut resolved = self.clone();
+        resolved.to = Some(to);
+        resolved
+    }
+
+    pub fn resolved_to(&self) -> Result<&str> {
+        self.to
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| {
+                RuntimeError::Notify("la intención no tiene destinatario resuelto".into())
+            })
     }
 }
 
@@ -128,7 +206,11 @@ fn check_recipient_syntax(channel: Channel, to: &str) -> Result<()> {
             else {
                 return bad("no es una dirección de email");
             };
-            if local.is_empty() || !domain.contains('.') || domain.starts_with('.') || domain.ends_with('.') {
+            if local.is_empty()
+                || !domain.contains('.')
+                || domain.starts_with('.')
+                || domain.ends_with('.')
+            {
                 return bad("no es una dirección de email");
             }
             if t.chars().any(char::is_whitespace) {
@@ -218,8 +300,8 @@ pub async fn assert_recipient_allowed(
     hub_id: &str,
     intent: &NotifyIntent,
 ) -> Result<()> {
-    check_recipient_syntax(intent.channel, &intent.to)?;
-    let to = intent.to.trim();
+    let to = intent.resolved_to()?.trim();
+    check_recipient_syntax(intent.channel, to)?;
 
     // 1) Allowlist explícita del hub.
     let settings = crate::settings::get_all(db, hub_id)
@@ -255,6 +337,198 @@ pub async fn assert_recipient_allowed(
     )))
 }
 
+/// Binding exacto declarado por `module_id` para `event_name`. El bloque consolidado de
+/// `capabilities.notify` tiene precedencia sobre el alias top-level deprecado.
+pub fn event_binding(
+    registry: &crate::registry::Registry,
+    module_id: &str,
+    event_name: &str,
+) -> Option<crate::manifest::NotificationBinding> {
+    let manifest = registry.installed.iter().find(|m| m.id == module_id)?;
+    let notify = manifest
+        .capabilities
+        .notify
+        .as_ref()
+        .or(manifest.notify.as_ref())?;
+    notify
+        .bindings
+        .iter()
+        .find(|b| b.event == event_name)
+        .cloned()
+}
+
+/// Valida que el binding y la intención siguen siendo el mismo contrato después de parsear el
+/// payload. Protege frente a manifests inconsistentes y a futuras rutas que construyan la
+/// intención sin [`NotifyIntent::from_bound_event_payload`].
+pub fn assert_binding_matches(
+    binding: &crate::manifest::NotificationBinding,
+    intent: &NotifyIntent,
+) -> Result<()> {
+    let Some(channel) = Channel::parse(binding.channel.trim()) else {
+        return Err(RuntimeError::Notify(format!(
+            "binding `{}` declara un canal desconocido `{}`",
+            binding.event, binding.channel
+        )));
+    };
+    if intent.channel != channel || intent.template != binding.template {
+        return Err(RuntimeError::Notify(format!(
+            "la intención no coincide con el binding `{}`",
+            binding.event
+        )));
+    }
+    let Some(reference) = &intent.recipient_ref else {
+        return Err(RuntimeError::Notify(format!(
+            "el evento ligado `{}` exige `recipient_ref`",
+            binding.event
+        )));
+    };
+    if reference.resolver != binding.recipient_resolver {
+        return Err(RuntimeError::Notify(format!(
+            "resolver `{}` no autorizado para `{}`; se esperaba `{}`",
+            reference.resolver, binding.event, binding.recipient_resolver
+        )));
+    }
+    if reference.id.trim().is_empty() || reference.id.len() > 254 {
+        return Err(RuntimeError::Notify(
+            "recipient_ref.id vacío o demasiado largo".into(),
+        ));
+    }
+    if intent.idempotency_key.trim().is_empty() || intent.idempotency_key.len() > 255 {
+        return Err(RuntimeError::Notify(format!(
+            "el evento ligado `{}` exige `idempotency_key` (máximo 255 caracteres)",
+            binding.event
+        )));
+    }
+    if intent.correlation_id.len() > 255 {
+        return Err(RuntimeError::Notify(
+            "correlation_id supera 255 caracteres".into(),
+        ));
+    }
+    validate_headers_and_document(intent)
+}
+
+fn validate_headers_and_document(intent: &NotifyIntent) -> Result<()> {
+    if intent.subject.chars().any(char::is_control) {
+        return Err(RuntimeError::Notify(
+            "el asunto contiene caracteres de control (inyección de cabeceras)".into(),
+        ));
+    }
+    if intent.subject.len() > 998 {
+        return Err(RuntimeError::Notify("el asunto es demasiado largo".into()));
+    }
+    if let Some(document) = &intent.document {
+        if document.filename.trim().is_empty()
+            || document.filename.len() > 255
+            || document.filename.contains('/')
+            || document.filename.contains('\\')
+            || document.filename.chars().any(char::is_control)
+        {
+            return Err(RuntimeError::Notify("nombre de documento inválido".into()));
+        }
+        if document.html.len() > 1_000_000 {
+            return Err(RuntimeError::Notify(
+                "el documento supera el máximo de 1 MB de HTML".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Resuelve `recipient_ref` mediante el contrato aportado por el módulo propietario del contacto.
+/// `Ok(None)` significa que la referencia existe/no existe pero no tiene contacto para el canal:
+/// es un skip de producto, no un fallo reintentable. Una dirección libre solo se conserva para el
+/// camino legacy y sigue pasando por la allowlist de [`assert_recipient_allowed`].
+pub async fn resolve_recipient(
+    db: &dyn erplora_db::DatabaseAdapter,
+    registry: &crate::registry::Registry,
+    hub_id: &str,
+    intent: &NotifyIntent,
+    binding: Option<&crate::manifest::NotificationBinding>,
+) -> Result<Option<String>> {
+    let Some(reference) = &intent.recipient_ref else {
+        assert_recipient_allowed(db, hub_id, intent).await?;
+        return Ok(Some(intent.resolved_to()?.trim().to_string()));
+    };
+    let binding = binding.ok_or_else(|| {
+        RuntimeError::Notify("recipient_ref solo se admite en eventos ligados por manifest".into())
+    })?;
+    assert_binding_matches(binding, intent)?;
+
+    let mut providers = registry.installed.iter().filter(|manifest| {
+        registry.is_active(&manifest.id)
+            && manifest
+                .notification_recipient_resolvers
+                .contains_key(&reference.resolver)
+    });
+    // El módulo propietario del contacto es opcional: si no está instalado o activo, el negocio
+    // sigue pudiendo emitir el documento y la entrega se registra como `skipped_missing_contact`.
+    // La ausencia de un módulo no debe bloquear una venta ni convertir el outbox en dead-letter.
+    let Some(provider) = providers.next() else {
+        return Ok(None);
+    };
+    if providers.next().is_some() {
+        return Err(RuntimeError::Notify(format!(
+            "resolver de destinatario duplicado `{}`",
+            reference.resolver
+        )));
+    }
+    let resolver = &provider.notification_recipient_resolvers[&reference.resolver];
+    let owner = resolver.query.split('.').next().unwrap_or_default();
+    if owner != provider.id {
+        return Err(RuntimeError::Notify(format!(
+            "resolver `{}` intenta usar una query ajena `{}`",
+            reference.resolver, resolver.query
+        )));
+    }
+    let query = registry.get_query(&resolver.query).ok_or_else(|| {
+        RuntimeError::Notify(format!(
+            "query `{}` del resolver `{}` no disponible",
+            resolver.query, reference.resolver
+        ))
+    })?;
+    if query.module_id != provider.id {
+        return Err(RuntimeError::Notify(format!(
+            "query `{}` no pertenece al módulo proveedor `{}`",
+            resolver.query, provider.id
+        )));
+    }
+    let field = resolver
+        .channels
+        .get(channel_name(intent.channel))
+        .filter(|f| !f.trim().is_empty())
+        .ok_or_else(|| {
+            RuntimeError::Notify(format!(
+                "resolver `{}` no ofrece el canal {}",
+                reference.resolver,
+                channel_name(intent.channel)
+            ))
+        })?;
+    let mut params = erplora_db::Params::new();
+    params.insert(
+        resolver.id_param.clone(),
+        Json::String(reference.id.clone()),
+    );
+    // La resolución es una operación interna del host. La query sigue estando fijada por el
+    // manifest del proveedor y recibe un único id; el contacto no se devuelve al módulo emisor.
+    let ctx = crate::registry::RequestContext::new(
+        hub_id,
+        "system:notification-resolver",
+        ["*".to_string()],
+    );
+    let rows = crate::queries::execute(db, registry, &resolver.query, &params, &ctx).await?;
+    let Some(row) = rows.first() else {
+        return Ok(None);
+    };
+    let Some(to) = row.get(field).and_then(Json::as_str).map(str::trim) else {
+        return Ok(None);
+    };
+    if to.is_empty() {
+        return Ok(None);
+    }
+    check_recipient_syntax(intent.channel, to)?;
+    Ok(Some(to.to_string()))
+}
+
 /// De dónde sale el secreto/transporte de un canal (ADR-0012). Lo decide el host por canal y por
 /// `tier` del módulo, no el módulo.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -268,9 +542,21 @@ pub enum Routing {
 /// Resultado de un intento de envío. `Sent` = entregado al proveedor; `QuotaExceeded` = Cloud
 /// bloqueó por cuota agotada (no se reintenta: el relay lo manda a dead-letter como fallo
 /// terminal cuando el transporte lo marca así devolviendo `Err` con este detalle).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MaterializedArtifact {
+    pub id: String,
+    pub filename: String,
+    pub content_type: String,
+    pub download_url: String,
+    #[serde(default)]
+    pub share_url: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendOutcome {
-    Sent,
+    Sent {
+        artifact: Option<MaterializedArtifact>,
+    },
 }
 
 /// Transporte de notificación: el cliente real de un canal. **Trait inyectable** para no atar el
@@ -282,7 +568,14 @@ pub trait NotifyTransport: Send + Sync + std::fmt::Debug {
     /// Envía `intent` por `routing`. `Ok(SendOutcome::Sent)` si se entregó al proveedor; `Err`
     /// para que el relay reintente (fallo transitorio) o, si es terminal (cuota agotada / canal
     /// no configurado), lo registre como fallo (acabará en dead-letter tras los reintentos).
-    async fn send(&self, intent: &NotifyIntent, routing: Routing) -> Result<SendOutcome>;
+    async fn send(
+        &self,
+        db: &dyn erplora_db::DatabaseAdapter,
+        hub_id: &str,
+        source_module: &str,
+        intent: &NotifyIntent,
+        routing: Routing,
+    ) -> Result<SendOutcome>;
 }
 
 /// Decide el routing de un canal según el `tier` del módulo (ADR-0012/ADR-0006). Hoy: WhatsApp en
@@ -313,7 +606,10 @@ impl MockTransport {
 
     /// Variante que siempre falla (para tests del backoff/dead-letter del relay).
     pub fn failing() -> Self {
-        Self { sent: Arc::default(), fail: true }
+        Self {
+            sent: Arc::default(),
+            fail: true,
+        }
     }
 
     /// Envíos registrados (clon) — para aserciones en tests.
@@ -324,14 +620,23 @@ impl MockTransport {
 
 #[async_trait::async_trait]
 impl NotifyTransport for MockTransport {
-    async fn send(&self, intent: &NotifyIntent, routing: Routing) -> Result<SendOutcome> {
+    async fn send(
+        &self,
+        _db: &dyn erplora_db::DatabaseAdapter,
+        _hub_id: &str,
+        _source_module: &str,
+        intent: &NotifyIntent,
+        routing: Routing,
+    ) -> Result<SendOutcome> {
         if self.fail {
-            return Err(RuntimeError::Notify("transporte mock configurado para fallar".into()));
+            return Err(RuntimeError::Notify(
+                "transporte mock configurado para fallar".into(),
+            ));
         }
         if let Ok(mut g) = self.sent.lock() {
             g.push((intent.clone(), routing));
         }
-        Ok(SendOutcome::Sent)
+        Ok(SendOutcome::Sent { artifact: None })
     }
 }
 
@@ -363,14 +668,17 @@ mod tests {
     fn parses_intent_from_event_payload() {
         let intent = NotifyIntent::from_event_payload(&intent_params("email")).unwrap();
         assert_eq!(intent.channel, Channel::Email);
-        assert_eq!(intent.to, "a@b.com");
+        assert_eq!(intent.to.as_deref(), Some("a@b.com"));
         assert_eq!(intent.template, "appointment_reminder");
     }
 
     #[test]
     fn rejects_unknown_channel() {
         let err = NotifyIntent::from_event_payload(&intent_params("carrier_pigeon")).unwrap_err();
-        assert!(matches!(err, RuntimeError::InvalidPayload { .. }), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "got {err:?}"
+        );
     }
 
     #[test]
@@ -392,9 +700,15 @@ mod tests {
     fn intent(channel: Channel, to: &str) -> NotifyIntent {
         NotifyIntent {
             channel,
-            to: to.to_string(),
+            to: Some(to.to_string()),
+            recipient_ref: None,
             template: "t".into(),
+            subject: String::new(),
             vars: json!({}),
+            artifact_refs: vec![],
+            document: None,
+            correlation_id: String::new(),
+            idempotency_key: String::new(),
         }
     }
 
@@ -475,7 +789,9 @@ mod tests {
     #[tokio::test]
     async fn recipient_resolves_from_an_active_hub_user_email() {
         let db = erplora_db::testutil::fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "h1").await.unwrap();
 
@@ -512,18 +828,26 @@ mod tests {
 
     #[tokio::test]
     async fn mock_transport_records_send() {
+        let db = erplora_db::testutil::fresh_db().await;
         let t = MockTransport::new();
         let intent = NotifyIntent::from_event_payload(&intent_params("sms")).unwrap();
-        let out = t.send(&intent, Routing::Tenant).await.unwrap();
-        assert_eq!(out, SendOutcome::Sent);
+        let out = t
+            .send(&db, "h1", "appt", &intent, Routing::Tenant)
+            .await
+            .unwrap();
+        assert_eq!(out, SendOutcome::Sent { artifact: None });
         assert_eq!(t.sent().len(), 1);
         assert_eq!(t.sent()[0].1, Routing::Tenant);
     }
 
     #[tokio::test]
     async fn failing_transport_errors() {
+        let db = erplora_db::testutil::fresh_db().await;
         let t = MockTransport::failing();
         let intent = NotifyIntent::from_event_payload(&intent_params("email")).unwrap();
-        assert!(t.send(&intent, Routing::Tenant).await.is_err());
+        assert!(t
+            .send(&db, "h1", "appt", &intent, Routing::Tenant)
+            .await
+            .is_err());
     }
 }

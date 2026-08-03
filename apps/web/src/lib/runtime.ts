@@ -362,6 +362,91 @@ export async function deleteBusinessCertificate(): Promise<void> {
   if (!res.ok) throw new Error(`delete-business-certificate → ${res.status}`);
 }
 
+// ── Comunicaciones: canal de correo del Hub ────────────────────────────────────────────────
+
+export type EmailChannelMode = 'managed' | 'google_oauth' | 'microsoft_oauth' | 'smtp';
+export type SmtpSecurity = 'tls' | 'starttls' | 'none';
+
+/** Metadatos seguros de la conexión. El runtime nunca devuelve contraseñas ni tokens OAuth. */
+export interface EmailChannelStatus {
+  mode: EmailChannelMode;
+  connected: boolean;
+  status: string;
+  host: string;
+  port: number;
+  security: SmtpSecurity;
+  username: string;
+  from_name: string;
+  from_email: string;
+  reply_to: string;
+  account_email: string;
+  has_secret: boolean;
+  last_test_at?: string | null;
+  last_error: string;
+  updated_at?: string | null;
+  updated_by: string;
+}
+
+export interface EmailChannelInput {
+  mode: EmailChannelMode;
+  host?: string;
+  port?: number;
+  security?: SmtpSecurity;
+  username?: string;
+  /** Campo solo-escritura; vacío conserva la contraseña SMTP existente. */
+  password?: string;
+  from_name?: string;
+  from_email?: string;
+  reply_to?: string;
+  account_email?: string;
+  /** Solo lo entrega el broker OAuth central después del callback. */
+  oauth_connection_id?: string;
+}
+
+export async function getEmailChannel(): Promise<EmailChannelStatus> {
+  const res = await fetch(`${RUNTIME_URL}/api/communications/email`, { headers: runtimeHeaders() });
+  if (!res.ok) throw new Error(`communications/email → ${res.status}`);
+  return (await res.json()) as EmailChannelStatus;
+}
+
+export async function putEmailChannel(input: EmailChannelInput): Promise<EmailChannelStatus> {
+  const res = await fetch(`${RUNTIME_URL}/api/communications/email`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`communications/email PUT → ${res.status}`);
+  return (await res.json()) as EmailChannelStatus;
+}
+
+export async function disconnectEmailChannel(): Promise<EmailChannelStatus> {
+  const res = await fetch(`${RUNTIME_URL}/api/communications/email`, {
+    method: 'DELETE',
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) throw new Error(`communications/email DELETE → ${res.status}`);
+  return (await res.json()) as EmailChannelStatus;
+}
+
+export async function testEmailChannel(): Promise<void> {
+  const res = await fetch(`${RUNTIME_URL}/api/communications/email/test`, {
+    method: 'POST',
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) throw new Error(`communications/email/test → ${res.status}`);
+}
+
+export async function beginEmailOauth(provider: 'google' | 'microsoft'): Promise<string> {
+  const res = await fetch(`${RUNTIME_URL}/api/communications/email/oauth/${provider}/start`, {
+    method: 'POST',
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) throw new Error(`communications/email/oauth/${provider}/start → ${res.status}`);
+  const body = (await res.json()) as { authorization_url?: string };
+  if (!body.authorization_url) throw new Error('OAuth broker did not return an authorization URL');
+  return body.authorization_url;
+}
+
 // ── Export/Import del hub (blueprints, ADR-0113 — architecture/hub/export-import.md) ──────────
 // Motor CORE de backup/restore: exportar empaqueta configuración (+datos opcionales) en un
 // `*.blueprint.zip`; importar lo restaura en orden «migrate» (instalar módulos → SQL → media →

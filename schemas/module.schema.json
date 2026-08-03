@@ -347,6 +347,37 @@
         }
       }
     },
+    "notification_recipient_resolvers": {
+      "type": "object",
+      "default": {},
+      "description": "Resolvers de contacto aportados por el módulo. Convierten una referencia opaca en email/teléfono mediante una query del propio módulo; el consumidor nunca aporta la dirección final.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["query", "channels"],
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Query namespaced del mismo módulo que declara el resolver."
+          },
+          "id_param": {
+            "type": "string",
+            "default": "id",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "channels": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+              "email": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "sms": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "whatsapp": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+            }
+          }
+        }
+      }
+    },
     "widgets": {
       "type": "object",
       "description": "Widgets de dashboard que aporta el módulo (ADR-0054). Clave = id COMPLETO namespaced del widget (p. ej. `sales.today`, `inventory.low_stock`), misma convención que `queries`/`commands`. El shell del Hub recolecta los widgets de TODOS los manifests instalados y los pinta en `<ok-widget-board>`. CERO MOCKS: la vía declarativa (`kind`) SIEMPRE se alimenta de una `query` real del módulo. El Hub solo TRANSPORTA este bloque (el shell fetchea el `module.json` crudo, igual que `navigation`/`provides_slots`); el runtime no ejecuta nada por widget.",
@@ -493,6 +524,12 @@
             ]
           },
           "description": "Canales de alto nivel que necesita el módulo. Conjunto cerrado (añadir uno = tocar el runtime)."
+        },
+        "bindings": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/notificationBinding" },
+          "description": "Eventos exactos del módulo que el host puede convertir en entregas externas. Canal, plantilla y resolver quedan fijados por el manifest, no por el payload."
         }
       }
     },
@@ -555,6 +592,12 @@
                 ]
               },
               "description": "Canales que necesita el módulo."
+            },
+            "bindings": {
+              "type": "array",
+              "default": [],
+              "items": { "$ref": "#/$defs/notificationBinding" },
+              "description": "Bindings evento→notificación autorizados para este módulo."
             }
           }
         }
@@ -729,6 +772,37 @@
     }
   },
   "$defs": {
+    "notificationBinding": {
+      "type": "object",
+      "required": ["event", "channel", "template", "recipient_resolver"],
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["email", "sms", "whatsapp"]
+        },
+        "template": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "recipient_resolver": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "artifact_ready_event": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "delivery_updated_event": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        }
+      }
+    },
     "listSpec": {
       "type": "object",
       "description": "Marca la query como paginada/lista. Cuando está presente, el runtime envuelve el SELECT base como subconsulta y compone: búsqueda global (LIKE sobre `search`), filtro por columna (`filters`), orden por whitelist (`sort`, interpolado y anti-inyección) y LIMIT/OFFSET; devuelve `{rows,total,limit,offset}` en `data` (ARQUITECTURA.md §4, §8.2). El SQL base NO debe llevar su propio ORDER BY/LIMIT ni `;` final.",

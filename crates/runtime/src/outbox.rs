@@ -75,7 +75,10 @@ pub(crate) fn insert_op(
     p.insert("id".into(), json!(new_id()));
     p.insert("hub_id".into(), json!(ctx.hub_id));
     p.insert("user_id".into(), json!(ctx.user_id));
-    p.insert("permissions".into(), json!(serde_json::to_string(&perms).unwrap_or_else(|_| "[]".into())));
+    p.insert(
+        "permissions".into(),
+        json!(serde_json::to_string(&perms).unwrap_or_else(|_| "[]".into())),
+    );
     p.insert("event_name".into(), json!(event));
     p.insert("module_id".into(), json!(module_id));
     p.insert(
@@ -143,7 +146,10 @@ pub async fn process_once(db: &dyn DatabaseAdapter, registry: &Registry) -> Resu
         if let Err(e) = process_row(db, registry, row).await {
             // `process_row` ya intentó defer/dead; si hasta eso falla (p.ej. la BD se cayó),
             // lo dejamos para el próximo ciclo del relay y seguimos con las filas sanas.
-            eprintln!("relay outbox: fila {}: {e}", row["id"].as_str().unwrap_or("?"));
+            eprintln!(
+                "relay outbox: fila {}: {e}",
+                row["id"].as_str().unwrap_or("?")
+            );
         }
     }
     Ok(count)
@@ -225,9 +231,21 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // Un evento `*.reminder.due` además dispara el envío externo (email/sms/whatsapp) por el
     // transporte del runtime. Reusa la MISMA infra del outbox: idempotencia por `_event_delivery`
     // (listener sintético `host.notify`) y, si el transporte falla, reintento/backoff/dead-letter.
-    if event_name.ends_with(REMINDER_DUE_SUFFIX) {
-        let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
-        if let Err(e) = deliver_host_notify(db, registry, &id, &module_id, &ctx.hub_id, &payload).await
+    let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
+    let binding = host_notify::event_binding(registry, &module_id, &event_name);
+    if event_name.ends_with(REMINDER_DUE_SUFFIX) || binding.is_some() {
+        if let Err(e) = deliver_host_notify(
+            db,
+            registry,
+            &id,
+            &module_id,
+            &event_name,
+            &ctx,
+            depth,
+            &payload,
+            binding.as_ref(),
+        )
+        .await
         {
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {e}"));
@@ -260,8 +278,11 @@ async fn deliver_host_notify(
     registry: &Registry,
     event_id: &str,
     module_id: &str,
-    hub_id: &str,
+    event_name: &str,
+    ctx: &RequestContext,
+    depth: u32,
     payload: &Params,
+    binding: Option<&crate::manifest::NotificationBinding>,
 ) -> Result<()> {
     let Some(transport) = &registry.notify_transport else {
         return Ok(()); // capacidad no disponible: no se envía nada (ni se reintenta).
@@ -282,25 +303,155 @@ async fn deliver_host_notify(
         db,
         registry,
         module_id,
-        hub_id,
+        &ctx.hub_id,
         crate::manifest::CapabilityKind::Notify,
     )
     .await?;
 
-    let intent = NotifyIntent::from_event_payload(payload)?;
+    let intent = match binding {
+        Some(binding) => NotifyIntent::from_bound_event_payload(payload, binding)?,
+        None => NotifyIntent::from_event_payload(payload)?,
+    };
     // Puerta 2 — el canal tiene que estar declarado por el módulo emisor.
     host_notify::assert_channel_declared(registry, module_id, intent.channel)?;
+    if let Some(binding) = binding {
+        if binding.event != event_name {
+            return Err(RuntimeError::Notify(format!(
+                "binding `{}` no coincide con el evento `{event_name}`",
+                binding.event
+            )));
+        }
+        host_notify::assert_binding_matches(binding, &intent)?;
+    }
     // Puerta 3 — el destinatario sale de los datos del hub, no del payload del handler.
-    host_notify::assert_recipient_allowed(db, hub_id, &intent).await?;
+    let Some(to) =
+        host_notify::resolve_recipient(db, registry, &ctx.hub_id, &intent, binding).await?
+    else {
+        // Contacto ausente: decisión de producto no reintentable. Marca el listener para que el
+        // evento no termine en dead-letter y avisa al módulo mediante el bus en vivo.
+        let mut ops = vec![delivery_op(event_id, HOST_NOTIFY_LISTENER)];
+        let mut derived = None;
+        if let Some(event) = binding.and_then(|value| value.delivery_updated_event.as_deref()) {
+            let event_payload =
+                delivery_status_payload(module_id, event_name, &intent, "skipped_missing_contact");
+            ops.push(insert_op(
+                ctx,
+                module_id,
+                event,
+                &event_payload,
+                depth.saturating_add(1),
+            ));
+            derived = Some((event.to_string(), event_payload));
+        }
+        db.execute_tx(&ops).await?;
+        if let Some((event, payload)) = derived {
+            crate::events::notify_sink(registry, &event, &payload);
+        }
+        emit_delivery_status(
+            registry,
+            module_id,
+            event_name,
+            &intent,
+            "skipped_missing_contact",
+        );
+        return Ok(());
+    };
+    let intent = intent.with_resolved_recipient(to);
 
     // ¿WhatsApp premium de ERPlora? → proxy Cloud con cuota; si no, secreto local del tenant.
-    let premium = !registry.premium_whatsapp_modules.is_empty();
+    let premium = registry.premium_whatsapp_modules.contains(module_id);
     let routing = host_notify::route_channel(intent.channel, premium);
-    transport.send(&intent, routing).await?;
-    // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark).
-    let (sql, p) = delivery_op(event_id, HOST_NOTIFY_LISTENER);
-    db.execute(&sql, &p).await?;
+    let outcome = transport
+        .send(db, &ctx.hub_id, module_id, &intent, routing)
+        .await?;
+    // Envío con éxito → marcador + eventos derivados durables en una transacción.
+    let crate::host_notify::SendOutcome::Sent { artifact } = outcome;
+    let mut ops = vec![delivery_op(event_id, HOST_NOTIFY_LISTENER)];
+    let mut derived_events: Vec<(String, Params)> = Vec::new();
+    if let (Some(binding), Some(artifact)) = (binding, artifact.as_ref()) {
+        if let Some(event) = binding.artifact_ready_event.as_deref() {
+            let mut artifact_payload = Params::new();
+            artifact_payload.insert("correlation_id".into(), json!(intent.correlation_id));
+            artifact_payload.insert("artifact_id".into(), json!(artifact.id));
+            artifact_payload.insert("filename".into(), json!(artifact.filename));
+            artifact_payload.insert("content_type".into(), json!(artifact.content_type));
+            artifact_payload.insert("download_url".into(), json!(artifact.download_url));
+            artifact_payload.insert("share_url".into(), json!(artifact.share_url));
+            ops.push(insert_op(
+                ctx,
+                module_id,
+                event,
+                &artifact_payload,
+                depth.saturating_add(1),
+            ));
+            derived_events.push((event.to_string(), artifact_payload));
+        }
+    }
+    if let Some(event) = binding.and_then(|value| value.delivery_updated_event.as_deref()) {
+        let event_payload = delivery_status_payload(module_id, event_name, &intent, "sent");
+        ops.push(insert_op(
+            ctx,
+            module_id,
+            event,
+            &event_payload,
+            depth.saturating_add(1),
+        ));
+        derived_events.push((event.to_string(), event_payload));
+    }
+    db.execute_tx(&ops).await?;
+    for (event, payload) in derived_events {
+        crate::events::notify_sink(registry, &event, &payload);
+    }
+    emit_delivery_status(registry, module_id, event_name, &intent, "sent");
     Ok(())
+}
+
+fn delivery_status_payload(
+    module_id: &str,
+    source_event: &str,
+    intent: &NotifyIntent,
+    status: &str,
+) -> Params {
+    let mut payload = Params::new();
+    payload.insert("source_module".into(), json!(module_id));
+    payload.insert("source_event".into(), json!(source_event));
+    payload.insert("correlation_id".into(), json!(intent.correlation_id));
+    payload.insert(
+        "channel".into(),
+        json!(match intent.channel {
+            crate::host_notify::Channel::Email => "email",
+            crate::host_notify::Channel::Sms => "sms",
+            crate::host_notify::Channel::Whatsapp => "whatsapp",
+        }),
+    );
+    payload.insert("status".into(), json!(status));
+    payload
+}
+
+fn emit_delivery_status(
+    registry: &Registry,
+    module_id: &str,
+    source_event: &str,
+    intent: &NotifyIntent,
+    status: &str,
+) {
+    let Some(sink) = &registry.event_sink else {
+        return;
+    };
+    sink.emit(
+        "notification.delivery.updated",
+        &json!({
+            "source_module": module_id,
+            "source_event": source_event,
+            "correlation_id": intent.correlation_id,
+            "channel": match intent.channel {
+                crate::host_notify::Channel::Email => "email",
+                crate::host_notify::Channel::Sms => "sms",
+                crate::host_notify::Channel::Whatsapp => "whatsapp",
+            },
+            "status": status,
+        }),
+    );
 }
 
 fn reconstruct_ctx(row: &Json) -> RequestContext {
@@ -367,7 +518,8 @@ async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &
     if next >= MAX_ATTEMPTS {
         return mark_dead(db, id, err).await;
     }
-    let next_at = (chrono::Utc::now() + chrono::Duration::seconds(backoff_seconds(next))).to_rfc3339();
+    let next_at =
+        (chrono::Utc::now() + chrono::Duration::seconds(backoff_seconds(next))).to_rfc3339();
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
     p.insert("attempts".into(), json!(next));
@@ -384,8 +536,8 @@ async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manifest::CommandDef;
-    use crate::registry::{ModuleStatus, RegisteredCommand};
+    use crate::manifest::{CommandDef, QueryDef};
+    use crate::registry::{ModuleStatus, RegisteredCommand, RegisteredQuery};
     use erplora_db::{testutil::fresh_db, PgAdapter};
 
     fn cmd(module: &str, sql: &str, emit: Vec<String>) -> RegisteredCommand {
@@ -412,7 +564,10 @@ mod tests {
 
     async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
-        r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
+        r.rows[0]["c"]
+            .as_i64()
+            .or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64))
+            .unwrap_or(-1)
     }
 
     /// El command emisor NO corre el listener inline (entrega asíncrona); el relay lo entrega
@@ -420,24 +575,41 @@ mod tests {
     #[tokio::test]
     async fn outbox_async_delivery_is_exactly_once() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         ensure_tables(&db).await.unwrap();
 
         // Módulo "m" activo: "m.fire" emite "e"; "m.append" (listener de "e") inserta n=1.
         let mut reg = Registry::new();
         reg.status.insert("m".into(), ModuleStatus::Active);
-        reg.commands.insert("m.append".into(), cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]));
-        reg.commands
-            .insert("m.fire".into(), cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]));
+        reg.commands.insert(
+            "m.append".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]),
+        );
+        reg.commands.insert(
+            "m.fire".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]),
+        );
         reg.listeners.insert("e".into(), vec!["m.append".into()]);
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
 
         // Emisor: inserta su fila (99) + persiste el evento en el outbox, pero NO corre el listener.
-        crate::commands::execute(&db, &reg, "m.fire", &Params::new(), &ctx).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 0, "listener no inline");
+        crate::commands::execute(&db, &reg, "m.fire", &Params::new(), &ctx)
+            .await
+            .unwrap();
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await,
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            0,
+            "listener no inline"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'"
+            )
+            .await,
             1,
             "evento pendiente en outbox"
         );
@@ -446,13 +618,21 @@ mod tests {
         drain(&db, &reg).await.unwrap();
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1);
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             1
         );
 
         // Idempotencia: re-drenar no re-ejecuta el listener.
         drain(&db, &reg).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1, "idempotente");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            1,
+            "idempotente"
+        );
     }
 
     /// hub#131/#145: un listener marcado INTERNO por convención (último segmento `_`, estilo real
@@ -462,26 +642,38 @@ mod tests {
     #[tokio::test]
     async fn relay_delivers_to_an_underscore_prefixed_internal_listener() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         ensure_tables(&db).await.unwrap();
 
         // "sales.void" emite "sale.voided"; "cash_register._reverse_sale" (interno, sin
         // `expose_api`) es su listener, como en el caso real (void_reversal_e2e.rs).
         let mut reg = Registry::new();
         reg.status.insert("sales".into(), ModuleStatus::Active);
-        reg.status.insert("cash_register".into(), ModuleStatus::Active);
+        reg.status
+            .insert("cash_register".into(), ModuleStatus::Active);
         reg.commands.insert(
             "cash_register._reverse_sale".into(),
             cmd("cash_register", "INSERT INTO t (n) VALUES (1);", vec![]),
         );
         reg.commands.insert(
             "sales.void".into(),
-            cmd("sales", "INSERT INTO t (n) VALUES (99);", vec!["sale.voided".into()]),
+            cmd(
+                "sales",
+                "INSERT INTO t (n) VALUES (99);",
+                vec!["sale.voided".into()],
+            ),
         );
-        reg.listeners.insert("sale.voided".into(), vec!["cash_register._reverse_sale".into()]);
+        reg.listeners.insert(
+            "sale.voided".into(),
+            vec!["cash_register._reverse_sale".into()],
+        );
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx)
+            .await
+            .unwrap();
 
         drain(&db, &reg).await.unwrap();
         assert_eq!(
@@ -495,8 +687,12 @@ mod tests {
     /// el outbox. Necesaria desde hub#240: `host.notify` consulta grants y ajustes del hub.
     async fn db_for_notify() -> PgAdapter {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "h1").await.unwrap();
         ensure_tables(&db).await.unwrap();
@@ -518,7 +714,77 @@ mod tests {
             .push(serde_json::from_str(manifest_json).unwrap());
         reg.commands.insert(
             "appt.remind".into(),
-            cmd("appt", "INSERT INTO t (n) VALUES (1);", vec!["appt.reminder.due".into()]),
+            cmd(
+                "appt",
+                "INSERT INTO t (n) VALUES (1);",
+                vec!["appt.reminder.due".into()],
+            ),
+        );
+        reg
+    }
+
+    fn registry_for_bound_notify() -> Registry {
+        let invoice: crate::manifest::Manifest = serde_json::from_str(
+            r#"{
+                "id":"invoice","name":"Invoices","version":"1.0.0",
+                "events":{"emits":["invoice.delivery.requested"]},
+                "capabilities":{"notify":{
+                    "channels":["email"],
+                    "bindings":[{
+                        "event":"invoice.delivery.requested",
+                        "channel":"email",
+                        "template":"invoice",
+                        "recipient_resolver":"customers.customer"
+                    }]
+                }}
+            }"#,
+        )
+        .unwrap();
+        let customers: crate::manifest::Manifest = serde_json::from_str(
+            r#"{
+                "id":"customers","name":"Customers","version":"1.0.0",
+                "queries":{"customers.notification_contact":{
+                    "permission":"customers.read",
+                    "sql":"queries/notification_contact.sql"
+                }},
+                "notification_recipient_resolvers":{"customers.customer":{
+                    "query":"customers.notification_contact",
+                    "id_param":"customer_id",
+                    "channels":{"email":"email","whatsapp":"phone"}
+                }}
+            }"#,
+        )
+        .unwrap();
+        invoice.validate_notification_contracts().unwrap();
+        customers.validate_notification_contracts().unwrap();
+
+        let query_def: QueryDef = serde_json::from_value(json!({
+            "permission": "customers.read",
+            "sql": "queries/notification_contact.sql"
+        }))
+        .unwrap();
+        let mut reg = Registry::new();
+        reg.status.insert("invoice".into(), ModuleStatus::Active);
+        reg.status.insert("customers".into(), ModuleStatus::Active);
+        reg.installed.extend([invoice, customers]);
+        reg.queries.insert(
+            "customers.notification_contact".into(),
+            RegisteredQuery {
+                module_id: "customers".into(),
+                def: query_def,
+                sql:
+                    "SELECT email, phone FROM customer WHERE id = :customer_id AND hub_id = :hub_id"
+                        .into(),
+                schema: None,
+            },
+        );
+        reg.commands.insert(
+            "invoice.send".into(),
+            cmd(
+                "invoice",
+                "INSERT INTO t (n) VALUES (1);",
+                vec!["invoice.delivery.requested".into()],
+            ),
         );
         reg
     }
@@ -548,6 +814,144 @@ mod tests {
             .unwrap();
     }
 
+    async fn authorize_module_notify(db: &PgAdapter, reg: &Registry, module_id: &str) {
+        crate::capabilities::set_grant(db, reg, "h1", module_id, "notify", true, "hub_user:admin")
+            .await
+            .unwrap();
+    }
+
+    fn bound_payload(customer_id: &str) -> Params {
+        let mut payload = Params::new();
+        payload.insert(
+            "recipient_ref".into(),
+            json!({"resolver":"customers.customer","id":customer_id}),
+        );
+        payload.insert("subject".into(), json!("Factura F-2026-0001"));
+        payload.insert("correlation_id".into(), json!("invoice-1"));
+        payload.insert("idempotency_key".into(), json!("invoice-1:email:v1"));
+        payload
+    }
+
+    #[tokio::test]
+    async fn bound_event_resolves_contact_without_exposing_free_recipient() {
+        use crate::host_notify::{Channel, MockTransport};
+
+        let db = db_for_notify().await;
+        db.execute_batch(
+            "CREATE TABLE customer (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, email TEXT, phone TEXT);",
+        )
+        .await
+        .unwrap();
+        let mut insert = Params::new();
+        insert.insert("id".into(), json!("customer-1"));
+        insert.insert("hub_id".into(), json!("h1"));
+        insert.insert("email".into(), json!("cliente@ejemplo.com"));
+        db.execute(
+            "INSERT INTO customer (id, hub_id, email) VALUES (:id, :hub_id, :email)",
+            &insert,
+        )
+        .await
+        .unwrap();
+
+        let mut reg = registry_for_bound_notify();
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+        authorize_module_notify(&db, &reg, "invoice").await;
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+
+        crate::commands::execute(
+            &db,
+            &reg,
+            "invoice.send",
+            &bound_payload("customer-1"),
+            &ctx,
+        )
+        .await
+        .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        let sent = transport.sent();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].0.channel, Channel::Email);
+        assert_eq!(sent[0].0.to.as_deref(), Some("cliente@ejemplo.com"));
+        assert_eq!(sent[0].0.template, "invoice");
+        assert_eq!(sent[0].0.recipient_ref.as_ref().unwrap().id, "customer-1");
+    }
+
+    #[tokio::test]
+    async fn bound_event_rejects_a_free_recipient_even_when_contact_is_valid() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        db.execute_batch(
+            "CREATE TABLE customer (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, email TEXT, phone TEXT);",
+        )
+        .await
+        .unwrap();
+        let mut reg = registry_for_bound_notify();
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+        authorize_module_notify(&db, &reg, "invoice").await;
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let mut payload = bound_payload("customer-1");
+        payload.insert("to".into(), json!("atacante@evil.com"));
+
+        crate::commands::execute(&db, &reg, "invoice.send", &payload, &ctx)
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        assert!(transport.sent().is_empty());
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'"
+            )
+            .await,
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn bound_event_without_contact_is_recorded_as_skipped_not_retried() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        db.execute_batch(
+            "CREATE TABLE customer (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, email TEXT, phone TEXT);",
+        )
+        .await
+        .unwrap();
+        let mut reg = registry_for_bound_notify();
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+        authorize_module_notify(&db, &reg, "invoice").await;
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+
+        crate::commands::execute(&db, &reg, "invoice.send", &bound_payload("missing"), &ctx)
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert!(transport.sent().is_empty());
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'"
+            )
+            .await,
+            1
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
+            1
+        );
+    }
+
     /// Un evento `*.reminder.due` dispara el **listener-host** de `host.notify` (ADR-0012) por el
     /// relay: el transporte recibe la intención exactamente una vez y queda marcado en
     /// `_event_delivery` (idempotente al re-drenar). Es el camino que pasa por el Outbox.
@@ -565,26 +969,47 @@ mod tests {
         authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
-            .await
-            .unwrap();
-        assert!(transport.sent().is_empty(), "no se envía inline; va por el relay");
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+        )
+        .await
+        .unwrap();
+        assert!(
+            transport.sent().is_empty(),
+            "no se envía inline; va por el relay"
+        );
 
         // Relay: entrega el evento → el transporte recibe la intención una vez.
         drain(&db, &reg).await.unwrap();
         let sent = transport.sent();
         assert_eq!(sent.len(), 1, "una entrega por el listener-host");
         assert_eq!(sent[0].0.channel, Channel::Email);
-        assert_eq!(sent[0].0.to, "cliente@x.com");
-        assert_eq!(sent[0].1, Routing::Tenant, "email = canal del tenant (secreto local)");
+        assert_eq!(sent[0].0.to.as_deref(), Some("cliente@x.com"));
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'").await,
+            sent[0].1,
+            Routing::Tenant,
+            "email = canal del tenant (secreto local)"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'"
+            )
+            .await,
             1
         );
 
         // Idempotencia: re-drenar no re-envía.
         drain(&db, &reg).await.unwrap();
-        assert_eq!(transport.sent().len(), 1, "idempotente (marcador host.notify)");
+        assert_eq!(
+            transport.sent().len(),
+            1,
+            "idempotente (marcador host.notify)"
+        );
     }
 
     /// **hub#240 — el agujero.** Un módulo SIN la capability `notify` concedida emite su
@@ -601,9 +1026,15 @@ mod tests {
         reg.notify_transport = Some(transport.clone());
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+        )
+        .await
+        .unwrap();
         drain(&db, &reg).await.unwrap();
 
         assert!(
@@ -611,7 +1042,11 @@ mod tests {
             "sin grant de `notify` no puede salir NADA del hub"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'"
+            )
+            .await,
             0,
             "no hay entrega que marcar"
         );
@@ -663,14 +1098,31 @@ mod tests {
         authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+        )
+        .await
+        .unwrap();
 
         // Primer ciclo: el envío falla → la fila se difiere (sigue 'pending', attempts=1, no 'dead').
         process_once(&db, &reg).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await, 1);
-        assert_eq!(count(&db, "SELECT attempts AS c FROM _event_outbox").await, 1, "1 intento fallido");
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'"
+            )
+            .await,
+            1
+        );
+        assert_eq!(
+            count(&db, "SELECT attempts AS c FROM _event_outbox").await,
+            1,
+            "1 intento fallido"
+        );
 
         // Simula que ya agotó los reintentos (sin esperar el backoff real): attempts justo por
         // debajo del tope + vencido. El siguiente fallo lo manda a dead-letter.
@@ -683,7 +1135,15 @@ mod tests {
         .await
         .unwrap();
         process_once(&db, &reg).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await, 1, "dead-letter");
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'"
+            )
+            .await,
+            1,
+            "dead-letter"
+        );
     }
 
     /// **hub#142 — un listener que falla NO bloquea a sus hermanos.** Antes, `process_row`
@@ -694,7 +1154,9 @@ mod tests {
     #[tokio::test]
     async fn one_failing_listener_does_not_block_sibling_listeners() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         ensure_tables(&db).await.unwrap();
 
         // "sales.void" emite "sale.voided"; dos listeners: "bad" (revienta: columna inexistente)
@@ -715,7 +1177,11 @@ mod tests {
         );
         reg.commands.insert(
             "sales.void".into(),
-            cmd("sales", "INSERT INTO t (n) VALUES (99);", vec!["sale.voided".into()]),
+            cmd(
+                "sales",
+                "INSERT INTO t (n) VALUES (99);",
+                vec!["sale.voided".into()],
+            ),
         );
         reg.listeners.insert(
             "sale.voided".into(),
@@ -723,7 +1189,9 @@ mod tests {
         );
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx)
+            .await
+            .unwrap();
 
         // Un solo ciclo del relay: "good.listener" se entrega AUNQUE "bad.listener" falla antes.
         process_once(&db, &reg).await.unwrap();
@@ -734,18 +1202,30 @@ mod tests {
         );
         // La entrega del bueno queda marcada (idempotente); la del malo, no.
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='good.listener'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='good.listener'"
+            )
+            .await,
             1,
             "el listener bueno quedó marcado como entregado"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='bad.listener'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='bad.listener'"
+            )
+            .await,
             0,
             "el listener malo NO se marcó (falló) → se reintenta"
         );
         // La fila NO se marca 'delivered' (un listener falló): queda diferida para reintento.
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'"
+            )
+            .await,
             1,
             "la fila se difiere (no delivered) porque un listener falló"
         );
@@ -759,7 +1239,9 @@ mod tests {
         // (marcador de idempotencia). El contrato at-least-once + idempotencia por listener se mantiene.
         let mut p = Params::new();
         p.insert("a".into(), json!("2020-01-01T00:00:00+00:00"));
-        db.execute("UPDATE _event_outbox SET next_attempt_at = :a", &p).await.unwrap();
+        db.execute("UPDATE _event_outbox SET next_attempt_at = :a", &p)
+            .await
+            .unwrap();
         process_once(&db, &reg).await.unwrap();
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
@@ -778,7 +1260,9 @@ mod tests {
     #[tokio::test]
     async fn one_failing_row_does_not_starve_later_rows_in_the_batch() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         ensure_tables(&db).await.unwrap();
 
         // "poison.fire" emite "poison.e" cuyo ÚNICO listener revienta (columna inexistente).
@@ -790,7 +1274,11 @@ mod tests {
         }
         reg.commands.insert(
             "poison.listener".into(),
-            cmd("poison", "INSERT INTO t (no_such_column) VALUES (1);", vec![]),
+            cmd(
+                "poison",
+                "INSERT INTO t (no_such_column) VALUES (1);",
+                vec![],
+            ),
         );
         reg.commands.insert(
             "ok.listener".into(),
@@ -798,18 +1286,28 @@ mod tests {
         );
         reg.commands.insert(
             "poison.fire".into(),
-            cmd("poison", "INSERT INTO t (n) VALUES (99);", vec!["poison.e".into()]),
+            cmd(
+                "poison",
+                "INSERT INTO t (n) VALUES (99);",
+                vec!["poison.e".into()],
+            ),
         );
         reg.commands.insert(
             "ok.fire".into(),
             cmd("ok", "INSERT INTO t (n) VALUES (99);", vec!["ok.e".into()]),
         );
-        reg.listeners.insert("poison.e".into(), vec!["poison.listener".into()]);
-        reg.listeners.insert("ok.e".into(), vec!["ok.listener".into()]);
+        reg.listeners
+            .insert("poison.e".into(), vec!["poison.listener".into()]);
+        reg.listeners
+            .insert("ok.e".into(), vec!["ok.listener".into()]);
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "poison.fire", &Params::new(), &ctx).await.unwrap();
-        crate::commands::execute(&db, &reg, "ok.fire", &Params::new(), &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "poison.fire", &Params::new(), &ctx)
+            .await
+            .unwrap();
+        crate::commands::execute(&db, &reg, "ok.fire", &Params::new(), &ctx)
+            .await
+            .unwrap();
 
         // Un solo ciclo del relay procesa AMBAS filas (BATCH=50). La venenosa falla y se difiere;
         // la sana se entrega igual. Sin el fix, "ok.listener" no correría (n=1 sería 0 aquí).
@@ -820,7 +1318,11 @@ mod tests {
             "la fila sana se entrega aunque la venenosa (anterior en el lote) falle (hub#142)"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='ok.listener'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='ok.listener'"
+            )
+            .await,
             1,
             "la entrega de la fila sana queda marcada"
         );

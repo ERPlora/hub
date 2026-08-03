@@ -48,6 +48,7 @@ pub async fn install(
     dir: &Path,
 ) -> Result<String> {
     let manifest = Manifest::load(dir)?;
+    manifest.validate_notification_contracts()?;
 
     // `static_files.folder` es un nombre, nunca una ruta. Se vuelve a validar en runtime aunque el
     // toolkit ya lo haga: un ZIP descargado es una frontera hostil. Si el host ha inyectado el

@@ -1,5 +1,5 @@
 /** Navegación secundaria real de Ajustes. `store` se retiró porque duplicaba datos de Hub. */
-export const SETTINGS_TABS = ['hub', 'tax', 'tickets', 'permissions', 'data'] as const;
+export const SETTINGS_TABS = ['hub', 'tax', 'communications', 'tickets', 'permissions', 'data'] as const;
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 

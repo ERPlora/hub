@@ -22,8 +22,8 @@ pub use entitlement::{
 };
 pub use integrity::{verify_sha256, IntegrityError};
 pub use signature::{
-    ModuleSignature, SignatureError, SignaturePolicy, Signer, TrustedKeyRing,
-    PUBLIC_KEY_LEN, SIGNATURE_LEN,
+    ModuleSignature, SignatureError, SignaturePolicy, Signer, TrustedKeyRing, PUBLIC_KEY_LEN,
+    SIGNATURE_LEN,
 };
 pub use user_jwt::{verify_user_jwt, HubMembership, UserClaims, UserJwtError};
 
@@ -376,6 +376,35 @@ impl CloudClient {
         }
     }
 
+    /// Materializa un documento HTML de un evento de módulo como artefacto PDF privado e
+    /// inmutable. El body lo aporta el host; Cloud devuelve id, hash, URL firmada y, si se pidió,
+    /// el enlace público opaco/revocable.
+    pub fn create_artifact(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/artifacts/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// Obtiene metadatos + una URL firmada fresca para un artefacto ya existente.
+    pub fn artifact(&self, artifact_id: &str, auth: &Auth) -> PreparedRequest {
+        self.get(
+            &format!("/api/v1/hub/device/artifacts/{artifact_id}/"),
+            auth,
+        )
+    }
+
+    /// Relay gestionado de email. Siempre usa el remitente fijo de ERPlora; el body solo puede
+    /// originarse desde un binding de evento autorizado y lleva `recipient_ref` + idempotencia.
+    pub fn notify_email(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/notifications/email/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
     /// registro del Hub reenvía aquí TODO error (core, módulos, panics, frontend), best-effort.
     /// `POST /api/v1/hub/device/error-report/` con la credencial de **máquina** del hub
@@ -624,8 +653,7 @@ mod tests {
         let r = c.members_remove(&auth, "ana+x@bar.com");
         assert_eq!(r.method, "DELETE");
         assert_eq!(
-            r.url,
-            "https://erplora.com/api/v1/hub/device/members/ana%2Bx%40bar.com/",
+            r.url, "https://erplora.com/api/v1/hub/device/members/ana%2Bx%40bar.com/",
             "el email va percent-encoded en el path (@→%40, +→%2B); el punto se preserva"
         );
         assert!(r.headers.contains(&("X-Hub-Token", "tok".to_string())));
@@ -788,6 +816,38 @@ mod tests {
             .headers
             .contains(&("X-Hub-Token", "machine-tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn artifacts_and_email_use_machine_token() {
+        let c = CloudClient::new("https://erplora.com/");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
+        let artifact = c.create_artifact(&auth);
+        assert_eq!(artifact.method, "POST");
+        assert_eq!(
+            artifact.url,
+            "https://erplora.com/api/v1/hub/device/artifacts/"
+        );
+        let detail = c.artifact("artifact-1", &auth);
+        assert_eq!(
+            detail.url,
+            "https://erplora.com/api/v1/hub/device/artifacts/artifact-1/"
+        );
+        let email = c.notify_email(&auth);
+        assert_eq!(email.method, "POST");
+        assert_eq!(
+            email.url,
+            "https://erplora.com/api/v1/hub/device/notifications/email/"
+        );
+        for request in [artifact, detail, email] {
+            assert!(request
+                .headers
+                .contains(&("X-Hub-Token", "machine-tok".to_string())));
+            assert!(request.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        }
     }
 
     #[test]

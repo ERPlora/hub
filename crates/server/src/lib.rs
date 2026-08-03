@@ -35,11 +35,11 @@ pub mod api_keys;
 pub mod assistant;
 pub mod auth;
 pub mod daily_usage;
+pub mod email_transport;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
 pub mod export_import;
-pub mod reset;
 pub mod ingest;
 pub mod install;
 pub mod install_guard;
@@ -49,6 +49,7 @@ pub mod members;
 pub mod module_storage;
 pub mod openapi;
 pub mod profile;
+pub mod reset;
 pub mod router;
 pub mod settings;
 pub mod state;
@@ -198,9 +199,11 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // (`postgresql+asyncpg://…`); sqlx quiere `postgresql://…` → se normaliza (`normalize_pg_dsn`).
     let dsn = normalize_pg_dsn(cfg.database_url.trim());
     if dsn.is_empty() {
-        return Err("HUB_DATABASE_URL es obligatoria (Hub Cloud es Postgres-only, ADR-0154): \
+        return Err(
+            "HUB_DATABASE_URL es obligatoria (Hub Cloud es Postgres-only, ADR-0154): \
                     define el DSN Postgres del hub"
-            .into());
+                .into(),
+        );
     }
     eprintln!("db: backend Postgres vía HUB_DATABASE_URL");
     let db: Box<dyn erplora_db::DatabaseAdapter> =
@@ -379,18 +382,6 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
     }
 
-    // Transporte de `host.notify` (ADR-0012): cliente real de email/sms/whatsapp. Hoy un MOCK
-    // (decisión de dependencia del humano para el SMTP/SMS reales; ver crates/runtime/host_notify.rs).
-    // El mock pasa por el Outbox como cualquier transporte, así que la mecánica de reintentos/
-    // dead-letter del listener-host queda real. TODO: sustituir por el transporte real (lettre/HTTP).
-    state
-        .runtime
-        .lock()
-        .await
-        .set_notify_transport(std::sync::Arc::new(
-            erplora_runtime::host_notify::MockTransport::new(),
-        ));
-
     // Registro GLOBAL de errores ("todo controlado", un único embudo): instala el sink que reenvía
     // al Cloud (`POST /api/v1/hub/device/error-report/`, X-Hub-Token) cada error del runtime
     // (core + módulos), del panic hook y de la ruta local del frontend. Best-effort (spawn detached);
@@ -472,12 +463,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     &auth,
                     now,
                 );
-                let heartbeat_request = daily_usage::send_heartbeat(
-                    &st.http,
-                    &st.config.cloud_base_url,
-                    &auth,
-                    &usage,
-                );
+                let heartbeat_request =
+                    daily_usage::send_heartbeat(&st.http, &st.config.cloud_base_url, &auth, &usage);
                 let (outcome, heartbeat_result) =
                     tokio::join!(entitlement_request, heartbeat_request);
                 entitlement::record_outcome(&st.entitlement, outcome, now);
@@ -613,6 +600,16 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/settings",
             get(settings::get_settings).put(settings::put_settings),
+        )
+        .route(
+            "/api/communications/email",
+            get(settings::get_email_channel)
+                .put(settings::put_email_channel)
+                .delete(settings::delete_email_channel),
+        )
+        .route(
+            "/api/communications/email/test",
+            post(settings::test_email_channel),
         )
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
@@ -1567,7 +1564,8 @@ async fn assistant_chat_stream(
                     // Fin del stream del Cloud: procesa cualquier resto + cierra.
                     if !buf.is_empty() {
                         let rest = std::mem::take(&mut buf);
-                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_kinds) {
+                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_kinds)
+                        {
                             return Poll::Ready(Some(Ok(bytes_from(frame))));
                         }
                     }
@@ -1798,7 +1796,10 @@ async fn install_module(
 /// Respuesta estable a un `dir` de instalación rechazado (hub#239). `403` cuando la vía está
 /// cerrada por política (producción / fuera del staging), `422` cuando la ruta simplemente no
 /// sirve. Se registra a WARN: un intento fuera del staging es señal de abuso, no ruido.
-fn install_dir_rejected(requested: &str, rejection: install_guard::InstallDirRejection) -> Response {
+fn install_dir_rejected(
+    requested: &str,
+    rejection: install_guard::InstallDirRejection,
+) -> Response {
     use install_guard::InstallDirRejection as R;
     let status = match rejection {
         R::DevModeRequired | R::OutsideStaging => StatusCode::FORBIDDEN,
@@ -2175,14 +2176,8 @@ async fn open_cloud_session(
             }
             // Límite de dispositivos del plan (ADR-0154), como en el login por PIN.
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
-            mint_session_with_extra(
-                &rt,
-                user,
-                device_id.as_deref(),
-                max_devices,
-                cloud_tokens,
-            )
-            .await
+            mint_session_with_extra(&rt, user, device_id.as_deref(), max_devices, cloud_tokens)
+                .await
         }
         Err(e) => err_response(e),
     }
@@ -2275,10 +2270,17 @@ async fn auth_courier(State(st): State<AppState>, Json(req): Json<CourierReq>) -
             "email": grant.user.email,
         }
     });
-    let access = cloud_tokens["access"].as_str().unwrap_or_default().to_string();
+    let access = cloud_tokens["access"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
     let login = CloudLoginReq {
-        name: cloud_tokens["cloud_user"]["name"].as_str().map(str::to_string),
-        email: cloud_tokens["cloud_user"]["email"].as_str().map(str::to_string),
+        name: cloud_tokens["cloud_user"]["name"]
+            .as_str()
+            .map(str::to_string),
+        email: cloud_tokens["cloud_user"]["email"]
+            .as_str()
+            .map(str::to_string),
         device_id: req.device_id,
     };
     open_cloud_session(&st, &access, Some(login), Some(cloud_tokens)).await

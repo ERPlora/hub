@@ -409,18 +409,22 @@ async fn call_wasm_off_thread(bytes: &[u8], function: &str, input: Json) -> Resu
 
     // Fase 1 — compilar (sin reloj del guest). `extism::Plugin` es Send: puede cruzar de un
     // hilo bloqueante a otro.
-    let mut host = tokio::task::spawn_blocking(move || WasmHost::from_bytes_with_limits(&wasm, limits))
-        .await
-        .map_err(|join_err| {
-            RuntimeError::Wasm(format!("el handler `{function}` abortó al cargar: {join_err}"))
-        })?
-        .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
+    let mut host =
+        tokio::task::spawn_blocking(move || WasmHost::from_bytes_with_limits(&wasm, limits))
+            .await
+            .map_err(|join_err| {
+                RuntimeError::Wasm(format!(
+                    "el handler `{function}` abortó al cargar: {join_err}"
+                ))
+            })?
+            .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
 
     // Fase 2 — llamar, con tope.
     let func = function.to_string();
     let join = tokio::task::spawn_blocking(move || host.call(&func, &input));
 
-    let wait = std::time::Duration::from_millis(limits.timeout_ms.saturating_add(WASM_CALL_GRACE_MS));
+    let wait =
+        std::time::Duration::from_millis(limits.timeout_ms.saturating_add(WASM_CALL_GRACE_MS));
     match tokio::time::timeout(wait, join).await {
         Ok(Ok(Ok(output))) => Ok(output),
         Ok(Ok(Err(e))) => Err(RuntimeError::Wasm(e.to_string())),
@@ -635,8 +639,11 @@ pub(crate) fn validate_handler_event(
         .iter()
         .find(|m| m.id == handler_module_id);
 
-    // Regla 2 — el disparador de `host.notify` exige la capability declarada, pase lo que pase.
-    if name.ends_with(crate::outbox::REMINDER_DUE_SUFFIX) {
+    // Regla 2 — cualquier disparador de `host.notify` (legacy o binding exacto) exige la
+    // capability declarada, pase lo que pase.
+    let bound_to_notify =
+        crate::host_notify::event_binding(registry, handler_module_id, name).is_some();
+    if name.ends_with(crate::outbox::REMINDER_DUE_SUFFIX) || bound_to_notify {
         let declares_notify = manifest
             .map(|m| m.requests_capability(crate::manifest::CapabilityKind::Notify))
             .unwrap_or(false);
@@ -672,7 +679,9 @@ pub(crate) fn validate_handler_event(
     }
 
     // Regla 4 — modo estricto si el módulo declaró sus eventos; si no, compat + aviso.
-    let strict = manifest.map(|m| !m.events.emits.is_empty()).unwrap_or(false);
+    let strict = manifest
+        .map(|m| !m.events.emits.is_empty())
+        .unwrap_or(false);
     if strict {
         return Err(denied());
     }
@@ -1005,8 +1014,10 @@ mod tests {
                 schema: None,
             },
         );
-        reg.native
-            .insert("sales".into(), std::sync::Arc::new(EmittingHandler(emitted)));
+        reg.native.insert(
+            "sales".into(),
+            std::sync::Arc::new(EmittingHandler(emitted)),
+        );
         reg
     }
 
@@ -1152,7 +1163,9 @@ mod tests {
             _sql_op_count: usize,
             _min_affected_rows: Option<u64>,
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
-            panic!("DenyDb::execute_tx_gated no debía llamarse — el gate de origen debe cortar antes");
+            panic!(
+                "DenyDb::execute_tx_gated no debía llamarse — el gate de origen debe cortar antes"
+            );
         }
         async fn query(
             &self,
@@ -1259,7 +1272,10 @@ mod tests {
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, RuntimeError::InternalCommand(_)), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::InternalCommand(_)),
+            "got {err:?}"
+        );
     }
 
     /// (b) Una invocación INTERNA legítima (el relay del Outbox entregando un listener, o el
@@ -1304,7 +1320,10 @@ mod tests {
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, RuntimeError::InternalCommand(_)), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::InternalCommand(_)),
+            "got {err:?}"
+        );
     }
 
     /// Control: un command PÚBLICO normal (sin `_`, sin `internal: true`) sigue funcionando desde

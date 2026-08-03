@@ -48,6 +48,10 @@ zip = "2"
 sha2 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 base64 = "0.22"
+# SMTP propio del Hub. OAuth y relay gestionado viajan por el broker/relay del SaaS; las
+# credenciales SMTP se descifran en memoria y nunca salen en respuestas HTTP.
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "pool", "tokio1-rustls-tls"] }
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 # `test-util` = helper de esquema Postgres efímero por test (ADR-0154): los tests del server
