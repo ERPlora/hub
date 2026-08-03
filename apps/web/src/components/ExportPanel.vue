@@ -34,6 +34,33 @@
       </ion-card-content>
     </ion-card>
 
+    <!-- ── Para qué es este bundle (ADR-0195) ──
+         No es un detalle: decide si el zip puede llevar identidades y datos fiscales. Una
+         plantilla se publica y la descarga cualquiera; una copia es privada y del mismo dueño. -->
+    <h2 class="section-title">{{ t('exportPage.purposeTitle') }}</h2>
+    <ion-card>
+      <ion-card-content class="p-0">
+        <ion-list lines="none">
+          <ion-item>
+            <ion-radio-group v-model="purpose" data-testid="export-purpose">
+              <ion-item>
+                <ion-radio value="backup" justify="start" label-placement="end" alignment="start">
+                  <h2 class="cb-title">{{ t('exportPage.purposeBackup') }}</h2>
+                  <p class="cb-desc">{{ t('exportPage.purposeBackupDesc') }}</p>
+                </ion-radio>
+              </ion-item>
+              <ion-item>
+                <ion-radio value="template" justify="start" label-placement="end" alignment="start">
+                  <h2 class="cb-title">{{ t('exportPage.purposeTemplate') }}</h2>
+                  <p class="cb-desc">{{ t('exportPage.purposeTemplateDesc') }}</p>
+                </ion-radio>
+              </ion-item>
+            </ion-radio-group>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
     <!-- ── Secciones del hub ── -->
     <h2 class="section-title">{{ t('exportPage.sections') }}</h2>
     <ion-card>
@@ -45,7 +72,7 @@
                alignment=start alinea la casilla con la 1ª línea cuando la label es multilínea. -->
 
           <!-- Usuarios: empleados + roles + permisos (data/hub_users.sql). -->
-          <ion-item>
+          <ion-item v-if="!esPlantilla">
             <ion-checkbox
               data-testid="export-section-users"
               v-model="selUsers"
@@ -77,7 +104,7 @@
 
           <!-- Fiscal: OFF por defecto. Incluye config VeriFactu + certificado .p12 (viaja tal
                cual, protegido solo por su propia contraseña — decisión (d) del doc). -->
-          <ion-item>
+          <ion-item v-if="!esPlantilla">
             <ion-checkbox
               data-testid="export-section-fiscal"
               v-model="selFiscal"
@@ -184,13 +211,20 @@ import {
   IonCheckbox,
   IonButton,
   IonSpinner,
+  IonRadio,
+  IonRadioGroup,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
 import { isAdmin } from '../lib/session';
 import { availableLocales } from '../i18n';
 import { toastSuccess } from '../lib/toast';
-import { listInstalledModules, exportHub, type ExportSelection } from '../lib/runtime';
+import {
+  listInstalledModules,
+  exportHub,
+  type BundlePurpose,
+  type ExportSelection,
+} from '../lib/runtime';
 
 const { t, locale } = useI18n();
 
@@ -205,6 +239,13 @@ const filenamePreview = computed<string>(
 );
 
 // ── Secciones (usuarios/ajustes ON; fiscal OFF por defecto — incluye el .p12; media ON) ──
+// ADR-0195: para qué es este bundle. `backup` por defecto — es lo conservador: restaurar una
+// copia SIN identidades perdería roles y PINs. Al pasar a `template`, el motor excluye
+// identidades y fiscal del zip, así que la UI deja de ofrecer esas casillas (una casilla que el
+// motor va a ignorar es una mentira).
+const purpose = ref<BundlePurpose>('backup');
+const esPlantilla = computed(() => purpose.value === 'template');
+
 const selUsers = ref<boolean>(true);
 const selSettings = ref<boolean>(true);
 const selFiscal = ref<boolean>(false);
@@ -326,15 +367,18 @@ async function doExport(): Promise<void> {
   exporting.value = true;
   try {
     const selection: ExportSelection = {
-      users: selUsers.value,
+      users: esPlantilla.value ? false : selUsers.value,
       settings: selSettings.value,
       // TODO(ADR-0113): subselección ítem a ítem cuando el runtime enumere los settings.
       settings_items: null,
-      fiscal: selFiscal.value,
+      // En una plantilla no se mandan aunque el estado local los tuviera a true: el motor los
+      // ignora igualmente (ADR-0195), y mandar `true` daría a entender que viajan.
+      fiscal: esPlantilla.value ? false : selFiscal.value,
       media: selMedia.value,
       modules: rows.value
         .filter((r) => r.include)
         .map((r) => ({ module_id: r.id, with_data: r.withData })),
+      purpose: purpose.value,
     };
     const { blob, filename } = await exportHub(
       name.value.trim() || 'hub',

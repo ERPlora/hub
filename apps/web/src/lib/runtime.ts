@@ -373,6 +373,13 @@ export interface ExportModuleSelection {
   with_data: boolean;
 }
 
+/**
+ * Para qué es el bundle (ADR-0195). `backup` = copia/migración privada (lo lleva todo);
+ * `template` = plantilla publicable, y entonces el motor EXCLUYE identidades y fiscal del zip
+ * marque lo que marque el formulario.
+ */
+export type BundlePurpose = 'backup' | 'template';
+
 /** Selección de secciones del export (`POST /api/hub/export`). */
 export interface ExportSelection {
   users: boolean;
@@ -383,6 +390,8 @@ export interface ExportSelection {
   fiscal: boolean;
   media: boolean;
   modules: ExportModuleSelection[];
+  /** ADR-0195. Ausente en el server ⇒ `backup`; el front lo manda SIEMPRE explícito. */
+  purpose: BundlePurpose;
 }
 
 /** Un módulo listado en el manifest de un blueprint. */
