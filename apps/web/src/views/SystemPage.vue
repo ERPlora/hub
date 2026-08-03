@@ -52,8 +52,9 @@
             </ion-col>
 
             <!-- Base de datos: el tamaño solo existe en 'single' (SQLite). En 'cloud' es Aurora
-                 compartida por organización → sin tamaño local: N/A. El motor va en la subetiqueta. -->
-            <ion-col size="6" size-md="3">
+                 compartida por organización → sin tamaño local. Se oculta (#942) para no mostrar
+                 un placeholder "N/A"; el motor real sigue disponible en la card de conexiones. -->
+            <ion-col v-if="hasDbSize" size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
                 <ion-card-content class="metric-card__content metric-stat">
                   <HubIcon name="cube-outline" class="metric-stat__icon" />
@@ -383,6 +384,8 @@ const usageThresholds = [
 // Tamaño = headline. Solo existe en local (SQLite); en cloud (Aurora) no hay tamaño local → "N/A".
 // El motor (SQLite local / Aurora / PostgreSQL) va en la subetiqueta.
 const dbValue = computed<string>(() => info.value?.database?.sizeLabel ?? 'N/A');
+// #942: si no hay tamaño local (cloud/Aurora), ocultamos la card en vez de pintar "N/A".
+const hasDbSize = computed<boolean>(() => Boolean(info.value?.database?.sizeLabel));
 const dbSub = computed<string>(() => (info.value?.database ? dbEngineLabel.value : '—'));
 const dbConnections = computed<number>(() => info.value?.database?.connections ?? 0);
 const connectionsMax = computed<number>(() => info.value?.database?.connectionsLimit ?? 100);

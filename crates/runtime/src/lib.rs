@@ -22,6 +22,7 @@ pub mod events;
 pub mod export;
 pub mod host_backup;
 pub mod host_notify;
+pub mod hub_users;
 pub mod identity;
 pub mod import;
 pub mod installer;
@@ -600,6 +601,32 @@ impl Runtime {
     /// Usuarios activos del hub con PIN (para mostrar el grid de login local). `(id, name, role)`.
     pub async fn list_pin_users(&self) -> Result<Vec<(String, String, String)>> {
         identity::list_pin_users(self.db.as_ref()).await
+    }
+
+    // ── Personal (core): gestión de TODOS los usuarios del hub. Ver [`hub_users`]. ──────────
+
+    /// Todos los usuarios del hub — incluido el owner cloud sin PIN y los desactivados.
+    pub async fn list_hub_users(&self) -> Result<Vec<hub_users::HubUserRow>> {
+        hub_users::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Alta de un usuario del hub (nombre, rol, email y PIN opcionales). Devuelve su id.
+    pub async fn create_hub_user(&self, input: &hub_users::NewHubUser) -> Result<String> {
+        hub_users::create(self.db.as_ref(), &self.hub_id, input).await
+    }
+
+    /// Edición parcial de un usuario del hub; `is_active: Some(false)` es la baja.
+    pub async fn update_hub_user(
+        &self,
+        user_id: &str,
+        input: &hub_users::UpdateHubUser,
+    ) -> Result<hub_users::HubUserRow> {
+        hub_users::update(self.db.as_ref(), &self.hub_id, user_id, input).await
+    }
+
+    /// Roles del hub (catálogo base ∪ módulos activos ∪ en uso) con permisos y miembros.
+    pub async fn list_hub_roles(&self) -> Result<Vec<hub_users::HubRole>> {
+        hub_users::list_roles(self.db.as_ref(), &self.registry).await
     }
 
     /// Resuelve (o provisiona) el `hub_user` vinculado a una identidad cloud (mapeo del JWT).

@@ -446,6 +446,26 @@ export async function cloudLogin(email: string, password: string): Promise<Login
   return { access: tokens.access, refresh: tokens.refresh, user: me, hubId: tokens.hub_id };
 }
 
+/**
+ * Canjea un código de intercambio one-time por un par de tokens JWT (#945).
+ *
+ * Flujo Google hub-bridge: el Hub no puede hablar con Google directamente, así
+ * que abre el login de Google del Cloud con `?next=/auth/hub-bridge/?callback=<hub>`.
+ * Tras autenticarse, el Cloud acuña un `AuthExchangeCode` y redirige de vuelta al
+ * Hub como `<callback>?code=<code>`. Esta función POSTea ese code al endpoint
+ * anónimo `/api/v1/auth/session-exchange/` del Cloud y devuelve el mismo
+ * `LoginResult` que `cloudLogin`, para reutilizar el bootstrap post-login.
+ */
+export async function sessionExchange(code: string): Promise<LoginResult> {
+  const tokens = await post<{ access: string; refresh: string; hub_id?: string }>(
+    '/api/v1/auth/session-exchange/',
+    { code },
+    8000,
+  );
+  const me = await meRequest(tokens.access);
+  return { access: tokens.access, refresh: tokens.refresh, user: me, hubId: tokens.hub_id };
+}
+
 function positiveDecimal(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
   const amount = Number(value);

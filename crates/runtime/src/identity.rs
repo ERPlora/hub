@@ -408,6 +408,10 @@ pub async fn untrust_device(db: &dyn DatabaseAdapter, device_id: &str) -> Result
 /// activos** (ARQUITECTURA.md §2.5/§9.2). Si algún módulo concede `*` al rol, el usuario tiene `*`.
 pub fn permissions_for_role(registry: &Registry, role: &str) -> HashSet<String> {
     let mut perms = HashSet::new();
+    // Permiso del CORE (ADR-0188): cualquier rol local puede leer el personal del hub por el
+    // dispatcher (`hub.users.list`) — el nombre y el rol de cada uno ya son públicos en el grid de
+    // PIN del login. No se concede a una API key: su contexto sale del scope de módulos, no de aquí.
+    perms.insert(crate::hub_users::VIEW_USERS_PERMISSION.to_string());
     for m in &registry.installed {
         if !registry.is_active(&m.id) {
             continue;

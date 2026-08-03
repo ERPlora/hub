@@ -10,6 +10,36 @@
           <p class="dash-hero-date">{{ todayLabel }}</p>
         </header>
 
+        <!-- Zona 1.5 — Alertas de runtime (ADR-0067, lib/module-alerts): ESTADO operativo que se
+             autocura — más urgente que "sin configurar", así que va ENCIMA del setup-banner. P.ej. la
+             cola de contingencia VeriFactu: facturas sin enviar a la AEAT por falta de conexión; el TPV
+             sigue y se envían solas al volver la red. Cada módulo declara su alerta en module.json; el
+             tono (warning/danger/info) lo trae la propia señal. CTA → la pantalla donde se resuelve. -->
+        <section
+          v-for="a in moduleAlerts"
+          :key="a.moduleId + a.route"
+          class="alert-banner"
+          :class="`alert-banner--${a.severity}`"
+        >
+          <div class="alert-banner-text">
+            <div class="alert-banner-head">
+              <HubIcon :name="a.icon" class="alert-banner-icon" />
+              <h2 class="alert-banner-title">{{ a.title }}</h2>
+              <span v-if="a.count != null" class="alert-banner-count">{{ a.count }}</span>
+            </div>
+            <p v-if="a.hint" class="alert-banner-hint">{{ a.hint }}</p>
+          </div>
+          <ion-button
+            class="alert-banner-cta"
+            fill="outline"
+            :router-link="a.route"
+            router-direction="forward"
+          >
+            {{ t('dashboard.alertReview') }}
+            <HubIcon slot="end" name="chevron-forward-outline" />
+          </ion-button>
+        </section>
+
         <!-- Zona 2 — Tareas pendientes: módulos instalados SIN configurar (ADR-0063, lib/setup-status).
              Solo admin; cada módulo declara su chequeo `setup` en module.json. CTA → ajustes del
              módulo. Tono WARNING (tarea pendiente), no danger (no es un error). -->
@@ -157,6 +187,7 @@ import { getClient, getHubSector } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { pendingSetups, refreshSetupStatus, seedSetupContext } from '../lib/setup-status';
+import { moduleAlerts, refreshModuleAlerts } from '../lib/module-alerts';
 import { openAssistantWithContext } from '../lib/shell';
 import { detectBridge } from '../lib/bridge-client';
 import { user } from '../lib/session';
@@ -399,6 +430,7 @@ onMounted(async () => {
   void loadSystemHealth();
   void loadActivity();
   void refreshSetupStatus(client); // módulos sin configurar (ADR-0063): banner (solo admin)
+  void refreshModuleAlerts(client); // backlog de runtime (ADR-0067): banner que se autocura
 });
 </script>
 
@@ -530,5 +562,72 @@ onMounted(async () => {
   .setup-banner-cta {
     width: 100%;
   }
+}
+
+/* Banner de alerta de runtime (Zona 1.5, lib/module-alerts). Mismo lenguaje visual que el
+   setup-banner, pero con COLOR SEMÁNTICO por severidad (warning/backlog · danger/rechazo · info),
+   separado del acento, vía la var --alert-color. En desktop el CTA va a la derecha; en móvil apila. */
+.alert-banner {
+  --alert-color: var(--ion-color-warning, #ffc409);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.25rem 0 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--ok-radius, 12px);
+  background: color-mix(in srgb, var(--alert-color) 9%, var(--ion-card-background, #fff));
+  border: 1px solid color-mix(in srgb, var(--alert-color) 42%, transparent);
+}
+.alert-banner--warning { --alert-color: var(--ion-color-warning, #ffc409); }
+.alert-banner--danger { --alert-color: var(--ion-color-danger, #eb445a); }
+.alert-banner--info { --alert-color: var(--ion-color-primary, #0091ce); }
+.alert-banner-text {
+  flex: 1;
+  min-width: 16rem;
+}
+.alert-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.alert-banner-icon {
+  font-size: 1.15rem;
+  color: var(--alert-color);
+  flex: none;
+}
+.alert-banner-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ion-text-color);
+}
+.alert-banner-count {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+  background: var(--alert-color);
+  border-radius: var(--ok-radius-pill, 999px);
+  padding: 0.05rem 0.5rem;
+  min-width: 1.5rem;
+  text-align: center;
+}
+.alert-banner-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ion-color-medium);
+}
+.alert-banner-cta {
+  flex: none;
+  white-space: nowrap;
+  --color: var(--alert-color);
+  --border-color: color-mix(in srgb, var(--alert-color) 55%, transparent);
+}
+@media (max-width: 540px) {
+  .alert-banner-count { margin-inline-start: 0; }
+  .alert-banner-cta { width: 100%; }
 }
 </style>

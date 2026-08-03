@@ -259,3 +259,120 @@ async fn outside_working_schedule_rejected() {
     assert_eq!(avail_out, 0, "08:00 está fuera del horario de trabajo");
     assert_eq!(reason_out, "outside_schedule", "el motivo debe ser fuera de horario");
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Tests Postgres (Hub Cloud). Ignorados salvo que DATABASE_URL esté definida
+// (mismo convenio que postgres_install_e2e.rs / sector_packs_pg_e2e.rs). El bug #29
+// SOLO se manifiesta en Postgres — SQLite traga el RHS sin cualificar del ON CONFLICT,
+// así que los tests de arriba (SQLite) no pueden cazarlo. Ver:
+//   DATABASE_URL=postgres://postgres:test@localhost:5433/hub_test \
+//     cargo test -p erplora-runtime --test appointments_availability_e2e \
+//       -- --ignored --test-threads=1 --nocapture
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Instala la cadena taxes → customers → services → staff → appointments sobre Postgres.
+/// Mismo orden topológico que `rt_appts()` (SQLite); el reset del esquema garantiza un
+/// "hub nuevo" repetible entre tests PG.
+async fn rt_appts_pg() -> Runtime {
+    let url = std::env::var("DATABASE_URL").expect("set DATABASE_URL para los tests PG");
+    let db = erplora_db::PgAdapter::connect(&url).await.expect("connect to postgres");
+    use erplora_db::DatabaseAdapter;
+    db.execute_batch("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+        .await
+        .expect("reset schema public");
+    let mut rt = Runtime::new(Box::new(db));
+    rt.ensure_system_tables().await.expect("ensure_system_tables");
+    rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
+    rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
+    rt.install_from_dir(&mdir("services")).await.expect("instalar services");
+    rt.install_from_dir(&mdir("staff")).await.expect("instalar staff");
+    rt.install_from_dir(&mdir("appointments")).await.expect("instalar appointments");
+    rt
+}
+
+/// `appointment_number` de todas las citas creadas el día `day` (YYYYMMDD). La cita no
+/// guarda `day`: el nº ya lo codifica (`APT-YYYYMMDD-NNNN`), así que filtramos por el
+/// prefijo del día y ordenamos por el nº para que la secuencia sea determinista.
+async fn numbers_for_day(rt: &Runtime, day_key: &str) -> Vec<String> {
+    let mut p = Params::new();
+    p.insert("prefix".into(), json!(format!("APT-{day_key}-")));
+    let rows = rt
+        .db_for_test()
+        .query(
+            "SELECT appointment_number FROM appointments_appointment \
+             WHERE hub_id = 'h1' AND appointment_number LIKE :prefix || '%' \
+             ORDER BY appointment_number",
+            &p,
+        )
+        .await
+        .expect("SELECT appointment_number")
+        .rows;
+    rows.into_iter()
+        .map(|r| r["appointment_number"].as_str().unwrap_or("").to_string())
+        .collect()
+}
+
+/// Reproduce el bug #29: en Postgres, `commands/_bump_counter.sql` escribía
+/// `SET last_number = last_number + 1` (RHS ambiguo → error 42702) y toda `create`
+/// reventaba. Además cubre la trampa de `excluded.last_number`: si el fix usara esa
+/// pseudo-fila, el contador se quedaría clavado en 1 y TODAS las citas del día
+/// compartirían `APT-<day>-0001`. La secuencia correcta es 0001 → 0002.
+///
+/// Para aislar el contador del motor de solape (y no depender de `settings.upsert`,
+/// que padece el bug #25 sobre Postgres y se trata aparte), creamos DOS citas en la
+/// misma franja con PROFESIONALES DISTINTAS: con `allow_overlapping` por defecto (OFF)
+/// no hay solape entre staff distinto, así pasan ambas y el contador es lo único bajo
+/// test.
+///
+/// El `day` del contador (YYYYMMDD del nº de cita) lo calcula el handler a partir de
+/// `now` (la hora real del servidor), NO de la fecha de la cita — por eso el `day_key`
+/// que filtramos es HOY. La `start_datetime` sí es futura para no chocar con la
+/// validación `start >= now`.
+#[tokio::test]
+#[ignore = "requires a real Postgres via DATABASE_URL"]
+async fn pg_create_assigns_sequential_appointment_numbers_same_day() {
+    let rt = rt_appts_pg().await;
+    let ctx = admin();
+
+    // day_key = hoy (UTC): es el día que el handler usará para el contador y el nº de cita.
+    let day_key = Utc::now().format("%Y%m%d").to_string();
+    // Franja futura para pasar `start >= now`. Usamos +2h y +3h para no acercarnos al
+    // borde del minuto en relojes lentos (determinismo, sin tocar settings).
+    let start = format!("{}T12:00:00+00:00", next_wednesday());
+
+    // Cita 1 (P1) → APT-<hoy>-0001.
+    rt.execute_command(
+        "appointments.appointments.create",
+        &params(json!({
+            "customer_name": "Cliente Uno",
+            "staff_id": "P1", "staff_name": "P1",
+            "service_name": "Peinado/Lavado",
+            "start_datetime": start, "duration_minutes": 30
+        })),
+        &ctx,
+    )
+    .await
+    .expect("1ª create (sin el fix revienta con 42702 en _bump_counter)");
+
+    // Cita 2 MISMO día MISMA franja, OTRA profesional (P2) → no solapa → APT-<hoy>-0002.
+    rt.execute_command(
+        "appointments.appointments.create",
+        &params(json!({
+            "customer_name": "Cliente Dos",
+            "staff_id": "P2", "staff_name": "P2",
+            "service_name": "Peinado/Lavado",
+            "start_datetime": start, "duration_minutes": 30
+        })),
+        &ctx,
+    )
+    .await
+    .expect("2ª create (sin el fix, o con excluded.*, se clavaría en 0001)");
+
+    let numbers = numbers_for_day(&rt, &day_key).await;
+    assert_eq!(
+        numbers,
+        [format!("APT-{day_key}-0001"), format!("APT-{day_key}-0002")],
+        "dos citas el mismo día deben numerarse 0001 y 0002 (cubre el 42702 y la \
+         trampa de excluded: 0001/0001 significaría que el fix leyó excluded.last_number)"
+    );
+}

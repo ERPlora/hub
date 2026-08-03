@@ -362,6 +362,23 @@ impl CloudClient {
         }
     }
 
+    /// **Heartbeat del Hub → Cloud** (liveness + actividad de usuario).
+    /// `POST /api/v1/hub/device/heartbeat/` con la credencial de **máquina**
+    /// (`X-Hub-Token` + `X-Hub-Id`: lo dispara el runtime, sin usuario logueado).
+    ///
+    /// El **body** lo construye el llamador (`server::activity::heartbeat_payload`); todos sus
+    /// campos son opcionales. El que importa aquí es `last_user_activity_at`: el Cloud apaga y
+    /// acaba borrando los hubs free en los que nadie entra, y esa marca es la única prueba de
+    /// que alguien entró. Cualquier 2xx es éxito; la respuesta (`{ ok }`) se ignora. Espejo del
+    /// estilo de [`report_error`]/[`backup_upload`]: aquí solo se prepara la petición.
+    pub fn heartbeat(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/heartbeat/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// **DEPRECADO** — apuntaba a un endpoint ficticio `…/versions/{version}/install/` que
     /// **no existe** en el Cloud. Usa el flujo real [`CloudClient::versions`] +
     /// [`CloudClient::download`] + [`CloudClient::mark_installed`]. Se mantiene solo para no
@@ -564,6 +581,24 @@ mod tests {
             .headers
             .contains(&("Authorization", "Bearer abc".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    /// El heartbeat (liveness + actividad de usuario) es contexto de MÁQUINA: lo dispara el
+    /// runtime sin usuario logueado, así que va firmado con `X-Hub-Token`, nunca con un JWT.
+    #[test]
+    fn heartbeat_is_hub_scoped_post() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.heartbeat(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/heartbeat/");
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
     }
 
     #[test]

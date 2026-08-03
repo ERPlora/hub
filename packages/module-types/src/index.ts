@@ -37,6 +37,14 @@ export interface ModuleManifest {
    */
   setup?: ModuleSetupDef;
   /**
+   * Alertas de RUNTIME del módulo (ADR-0067). Hermano de `setup` pero para estado operativo que se
+   * AUTOCURA (no de configuración): el shell corre la `query` de cada alerta y, si su condición `when`
+   * se cumple, la surfacea como banner en el dashboard con un CTA a `route`. Se cura sola al drenar
+   * (p. ej. la cola de contingencia VeriFactu al recuperar la conexión con la AEAT). Declarativo y
+   * genérico: el Hub no conoce módulos; cada uno se autodeclara. Ver `architecture/hub/module-alerts.md`.
+   */
+  alerts?: ModuleAlertDef[];
+  /**
    * Monetización del módulo (ADR-0006/0013). El manifest es la fuente del pricing + los tiers; la
    * clasificación de marketplace (sectores, business types, is_published) vive en el Cloud, NO aquí.
    * El shell lo usa para auto-inyectar una pestaña "Plan" en la navegación del módulo (compra =
@@ -160,6 +168,54 @@ export interface ModuleSetupDef {
   /** Ruta de la pantalla de configuración (p. ej. `/m/verifactu/settings`). */
   route: string;
   /** Permiso para configurarlo: solo se alerta a quien puede (la query revalida en server). */
+  permission?: string;
+}
+
+/** Severidad de una alerta de runtime (color semántico, separado del acento; mapea a --ion-color-*). */
+export type AlertSeverity = 'info' | 'warning' | 'danger';
+
+/** Condición sobre una columna de la primera fila de la query de una alerta. EXACTAMENTE UNA por check. */
+export interface AlertCheck {
+  /** Columna del resultado a evaluar. */
+  field: string;
+  /** Dispara si el valor (numérico) es estrictamente mayor que este umbral. */
+  gt?: number;
+  /** Dispara si el valor (numérico) es mayor o igual que este umbral. */
+  gte?: number;
+  /** Dispara si `String(valor) === String(equals)` (comparación laxa). */
+  equals?: string | number;
+  /** Dispara si el valor es "verdadero" laxo (`truthy:true`) o falso (`truthy:false`). */
+  truthy?: boolean;
+}
+
+/**
+ * Declaración de una alerta de RUNTIME (ADR-0067). El shell ejecuta `query` (lectura declarativa del
+ * módulo, revalida permiso en server), toma la **primera fila** y evalúa `when`: si se cumple → alerta
+ * ACTIVA (banner con CTA a `route`); si no hay fila o no se cumple → sin alerta (se curó sola). El
+ * `title`/`hint` (inglés canónico) se traducen con el locale del módulo (ADR-0055), clave = `query`.
+ */
+export interface ModuleAlertDef {
+  /** Query namespaced que devuelve la fila a evaluar (1 fila / stats). */
+  query: string;
+  /** Params estáticos para la query. */
+  params?: Record<string, unknown>;
+  /** Condición que hace ACTIVA la alerta. */
+  when: AlertCheck;
+  /** Título (inglés canónico; el locale del módulo lo traduce, clave = `query`). */
+  title: string;
+  /** Subtexto opcional (tranquilizador offline-first: "el TPV sigue; se envían solas al volver"). */
+  hint?: string;
+  /** Ruta de la pantalla donde se resuelve el backlog (CTA del banner). */
+  route: string;
+  /** Icono ionicons para el banner (default `alert-circle-outline`). */
+  icon?: string;
+  /** Severidad literal de respaldo si no hay `severity_field` válido (default `warning`). */
+  severity?: AlertSeverity;
+  /** Columna de la fila que trae la severidad (`info|warning|danger`); tiene prioridad. */
+  severity_field?: string;
+  /** Columna de la fila con el contador a mostrar en el banner (opcional). */
+  count_field?: string;
+  /** Permiso para verla: solo se alerta a quien puede (la query revalida en server). */
   permission?: string;
 }
 

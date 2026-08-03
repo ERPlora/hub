@@ -187,6 +187,8 @@ async function loadEntryUrl(entryUrl: string): Promise<string> {
  */
 export interface ModuleLocaleFile {
   widgets?: Record<string, { title?: string; label?: string }>;
+  /** Traducción de las alertas de runtime (ADR-0067), clave = `query` de la alerta. Espeja `widgets`. */
+  alerts?: Record<string, { title?: string; hint?: string }>;
 }
 
 export interface InstalledManifest {

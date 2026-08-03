@@ -395,6 +395,96 @@
         }
       }
     },
+    "alerts": {
+      "type": "array",
+      "description": "Alertas de RUNTIME del módulo (ADR-0067). Hermano de `setup` pero para ESTADO OPERATIVO que se AUTOCURA (no configuración): el shell corre la `query` de cada alerta y, si su condición `when` se cumple sobre la 1ª fila, la surfacea como banner en el dashboard con un CTA a `route`. Se cura sola al drenar (p. ej. la cola de contingencia VeriFactu al recuperar la conexión con la AEAT). Genérico: el Hub solo TRANSPORTA este bloque (lo lee el shell del `module.json` crudo, igual que `widgets`/`setup`); el runtime no ejecuta nada por alerta. `title`/`hint` van en INGLÉS canónico (traducidos por `locales/<lang>.json`, clave = `query`, igual que los títulos de widget).",
+      "items": {
+        "type": "object",
+        "required": [
+          "query",
+          "when",
+          "title",
+          "route"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Query namespaced que devuelve la fila a evaluar (se toma la 1ª fila / stats)."
+          },
+          "params": {
+            "type": "object",
+            "description": "Params estáticos para la query."
+          },
+          "when": {
+            "type": "object",
+            "description": "Condición que hace ACTIVA la alerta (sobre la 1ª fila). Usa una de gt/gte/equals/truthy.",
+            "required": [
+              "field"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "Columna del resultado a evaluar."
+              },
+              "gt": {
+                "type": "number",
+                "description": "Dispara si el valor (numérico) es estrictamente mayor que este umbral."
+              },
+              "gte": {
+                "type": "number",
+                "description": "Dispara si el valor (numérico) es mayor o igual que este umbral."
+              },
+              "equals": {
+                "description": "Dispara si String(valor) === String(equals) (comparación laxa)."
+              },
+              "truthy": {
+                "type": "boolean",
+                "description": "Dispara si el valor es verdadero laxo (truthy:true) o falso (truthy:false)."
+              }
+            }
+          },
+          "title": {
+            "type": "string",
+            "description": "Título del banner (INGLÉS canónico; traducido por el locale del módulo, clave = query)."
+          },
+          "hint": {
+            "type": "string",
+            "description": "Subtexto opcional tranquilizador (offline-first). Inglés canónico; traducido por el locale."
+          },
+          "route": {
+            "type": "string",
+            "description": "Ruta de la pantalla donde se resuelve el backlog (CTA del banner)."
+          },
+          "icon": {
+            "type": "string",
+            "description": "Icono ionicons para el banner (default alert-circle-outline)."
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "danger"
+            ],
+            "description": "Severidad literal de respaldo si no hay severity_field válido (default warning)."
+          },
+          "severity_field": {
+            "type": "string",
+            "description": "Columna de la fila con la severidad (info|warning|danger); tiene prioridad sobre `severity`."
+          },
+          "count_field": {
+            "type": "string",
+            "description": "Columna de la fila con el contador a mostrar en el banner (opcional)."
+          },
+          "permission": {
+            "type": "string",
+            "description": "Permiso para verla (solo se alerta a quien puede; la query revalida en server)."
+          }
+        }
+      }
+    },
     "settings": {
       "type": "object",
       "description": "Pantalla de AJUSTES declarativa del módulo (estilo widgets). El shell pinta un formulario genérico a partir del `schema` (JSON Schema: campos/tipos/`default`/`title`/`enum`), lo carga con la query `get` y lo guarda con el command `set` (ambos del propio módulo, que ya existen). Si `component` está presente, el shell pinta ESE Web Component en vez del form genérico (escape-hatch para ajustes estructurales). El Hub solo TRANSPORTA este bloque (lo lee el shell del `module.json` crudo, igual que `widgets`/`setup`); el runtime no ejecuta nada por settings.",

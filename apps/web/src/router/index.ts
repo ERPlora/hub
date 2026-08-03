@@ -10,6 +10,10 @@ import { machineRegistrationRequired } from '../lib/runtime';
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'login', component: () => import('../views/LoginPage.vue') },
+  // Callback público del login con Google (#945): el Cloud redirige aquí con ?code=.
+  // Debe ir ANTES del catch-all (que si no traga la ruta → /dashboard → /login).
+  // Sin meta.auth: el bootstrap de sesión ocurre DENTRO de la vista.
+  { path: '/auth/google/callback', name: 'google-callback', component: () => import('../views/GoogleCallbackPage.vue') },
   // La pestaña activa del tabbar secundario va en el HASH (#permisos) en vez de en el path:
   // así la ruta base NO cambia → Ionic no trata el cambio de pestaña como navegación a una
   // página secundaria (no se desmonta el tabbar ni aparece el botón back). Deep-link: /settings#permisos.

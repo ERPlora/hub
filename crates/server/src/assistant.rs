@@ -104,11 +104,15 @@ pub fn build_cloud_body(frontend: &Value, tools: Vec<Value>, user: Option<&str>)
     body
 }
 
-/// Extrae el contenido del último mensaje de `role: user` del payload del frontend
+/// Extrae el contenido de texto del último mensaje de `role: user` del payload del frontend
 /// (`{"messages":[…]}`). Es la "petición" que el router vectorial embebe (§9.2b). Cadena vacía si
 /// no hay ningún mensaje de usuario.
+///
+/// El `content` puede ser una **cadena** (turno de solo texto) o una **lista de content-parts**
+/// (cuando el turno lleva adjuntos: `text` + `image_url`/`input_file`). En el segundo caso se
+/// concatena el texto de las partes `text` — los adjuntos (imagen/documento) no aportan query.
 pub fn last_user_message(frontend: &Value) -> String {
-    frontend
+    let Some(content) = frontend
         .get("messages")
         .and_then(Value::as_array)
         .and_then(|arr| {
@@ -116,9 +120,21 @@ pub fn last_user_message(frontend: &Value) -> String {
                 .rev()
                 .find(|m| m.get("role").and_then(Value::as_str) == Some("user"))
         })
-        .and_then(|m| m.get("content").and_then(Value::as_str))
-        .unwrap_or("")
-        .to_string()
+        .and_then(|m| m.get("content"))
+    else {
+        return String::new();
+    };
+
+    match content {
+        Value::String(s) => s.clone(),
+        Value::Array(parts) => parts
+            .iter()
+            .filter(|p| p.get("type").and_then(Value::as_str) == Some("text"))
+            .filter_map(|p| p.get("text").and_then(Value::as_str))
+            .collect::<Vec<_>>()
+            .join(" "),
+        _ => String::new(),
+    }
 }
 
 /// Traduce **una línea** SSE del Cloud (`data: …`) al frame del frontend.
@@ -182,6 +198,37 @@ mod tests {
         assert_eq!(body["input"], "crea una venta");
         assert_eq!(body["tools"][0]["name"], "pos.sale.create");
         assert_eq!(body["messages"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn last_user_message_from_content_parts_joins_text_only() {
+        // A turn with an attachment: content is a list of parts (text + input_file).
+        // The vector-router query must be the text, never the attachment.
+        let fe = json!({"messages":[
+            {"role":"user","content":[
+                {"type":"text","text":"¿cuánto suma esta factura?"},
+                {"type":"input_file","file_url":"https://s3/f.pdf","mime_type":"application/pdf","filename":"f.pdf"}
+            ]}
+        ]});
+        assert_eq!(last_user_message(&fe), "¿cuánto suma esta factura?");
+    }
+
+    #[test]
+    fn build_body_forwards_content_parts_verbatim() {
+        // The Cloud reads the canonical `messages`; content-parts (image_url /
+        // input_file) must reach it untouched so the assistant can read attachments.
+        let fe = json!({"messages":[
+            {"role":"user","content":[
+                {"type":"text","text":"mira esto"},
+                {"type":"image_url","image_url":{"url":"data:image/png;base64,AAA"}}
+            ]}
+        ]});
+        let body = build_cloud_body(&fe, vec![], None);
+        let parts = body["messages"][0]["content"].as_array().unwrap();
+        assert_eq!(parts[1]["type"], "image_url");
+        assert_eq!(parts[1]["image_url"]["url"], "data:image/png;base64,AAA");
+        // `input` (legacy) carries the text of the parts.
+        assert_eq!(body["input"], "mira esto");
     }
 
     #[test]

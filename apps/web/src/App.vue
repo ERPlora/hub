@@ -47,6 +47,10 @@
                     <HubIcon slot="start" name="person-outline" />
                     <ion-label>{{ t('sidebar.profile') }}</ion-label>
                   </ion-item>
+                  <ion-item button :detail="false" @click="onReportProblem">
+                    <HubIcon slot="start" name="flag-outline" />
+                    <ion-label>{{ t('sidebar.reportProblem') }}</ion-label>
+                  </ion-item>
                   <ion-item button :detail="false" @click="onLogout">
                     <HubIcon slot="start" name="log-out-outline" />
                     <ion-label>{{ t('sidebar.signOut') }}</ion-label>
@@ -114,6 +118,9 @@
       <!-- Modal «vista nativa» (PWA): se ofrece al entrar mientras la app no esté instalada;
            lib/pwa decide (standalone/Tauri/descartado-para-siempre → no se abre). -->
       <PwaInstallModal />
+      <!-- Modal «Reportar un problema» (lo abre el ítem del menú de usuario). Reutiliza el embudo
+           de errores del runtime → Cloud (lib/report-problem). -->
+      <ReportProblemModal />
     </template>
   </ion-app>
 </template>
@@ -130,6 +137,8 @@ import {
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
 import PwaInstallModal from './components/PwaInstallModal.vue';
+import ReportProblemModal from './components/ReportProblemModal.vue';
+import { openReportProblem } from './lib/report-problem';
 import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
@@ -247,6 +256,12 @@ function openUserMenuFromKeyboard(event: KeyboardEvent): void {
 // cierre sin await deja la ruta nueva debajo del menú abierto y hace que Perfil parezca inerte.
 async function goProfile(): Promise<void> {
   await runAfterShellMenuCloses(() => router.push(PROFILE_ROUTE));
+}
+
+// Cierra el menú (móvil) antes de abrir el modal de reporte, igual que Perfil: así el modal no
+// queda bajo el drawer abierto.
+async function onReportProblem(): Promise<void> {
+  await runAfterShellMenuCloses(() => openReportProblem());
 }
 
 async function onLogout(): Promise<void> {

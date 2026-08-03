@@ -233,6 +233,47 @@ pub async fn update(
     get(db, hub_id, user_id).await
 }
 
+/// Upsert de la **identidad** del perfil (nombre, apellidos, email) SIN tocar preferencias ni
+/// avatar. Es la vía de la gestión de Personal (`hub_users`), donde un admin edita a **otra**
+/// persona: [`update`] es self-service y reemplaza también las preferencias, que no son suyas.
+/// No escribe `hub_user.name` — de eso se encarga quien gestiona la identidad.
+pub async fn set_identity(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    user_id: &str,
+    first_name: &str,
+    last_name: &str,
+    email: &str,
+) -> Result<()> {
+    let first_name = clean_text(first_name, "first_name", 150)?;
+    let last_name = clean_text(last_name, "last_name", 150)?;
+    let email = clean_text(email, "email", 254)?;
+    if !email.is_empty() && (!email.contains('@') || email.starts_with('@') || email.ends_with('@'))
+    {
+        return Err(RuntimeError::InvalidPayload {
+            name: "user.profile.update".into(),
+            detail: "email no válido".into(),
+        });
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("user_id".into(), json!(user_id));
+    p.insert("first_name".into(), json!(first_name));
+    p.insert("last_name".into(), json!(last_name));
+    p.insert("email".into(), json!(email));
+    p.insert("now".into(), json!(now_rfc3339()));
+    db.execute(
+        "INSERT INTO hub_user_profile \
+         (hub_id, user_id, first_name, last_name, email, avatar_path, updated_at) \
+         VALUES (:hub_id, :user_id, :first_name, :last_name, :email, '', :now) \
+         ON CONFLICT (hub_id, user_id) DO UPDATE SET first_name = :first_name, \
+         last_name = :last_name, email = :email, updated_at = :now",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
 pub async fn set_avatar(
     db: &dyn DatabaseAdapter,
     hub_id: &str,

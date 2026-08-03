@@ -180,8 +180,9 @@ pub async fn require_admin_session(
 }
 
 /// ¿El rol gestiona API keys? owner/admin (insensible a mayúsculas). Conjunto cerrado y conservador
-/// (ADR-0057 §6: "gestionado por owner/admin").
-fn is_admin_role(role: &str) -> bool {
+/// (ADR-0057 §6: "gestionado por owner/admin"). Lo reusa `crate::hub_users` para no tener DOS
+/// definiciones de "quién administra el hub" que puedan divergir.
+pub(crate) fn is_admin_role(role: &str) -> bool {
     matches!(role.to_ascii_lowercase().as_str(), "owner" | "admin")
 }
 

@@ -30,6 +30,7 @@ import extensionPuzzleOutline from "~icons/ion/extension-puzzle-outline?raw";
 import globeOutline from "~icons/ion/globe-outline?raw";
 import gridOutline from "~icons/ion/grid-outline?raw";
 import hardwareChipOutline from "~icons/ion/hardware-chip-outline?raw";
+import imageOutline from "~icons/ion/image-outline?raw";
 import informationCircleOutline from "~icons/ion/information-circle-outline?raw";
 import keypadOutline from "~icons/ion/keypad-outline?raw";
 import languageOutline from "~icons/ion/language-outline?raw";
@@ -95,6 +96,7 @@ import sunnyOutline from "~icons/ion/sunny-outline?raw";
 import moonOutline from "~icons/ion/moon-outline?raw";
 import contrastOutline from "~icons/ion/contrast-outline?raw";
 import personOutline from "~icons/ion/person-outline?raw";
+import flagOutline from "~icons/ion/flag-outline?raw";
 import closeOutline from "~icons/ion/close-outline?raw";
 import stopCircleOutline from "~icons/ion/stop-circle-outline?raw";
 import copyOutline from "~icons/ion/copy-outline?raw";
@@ -104,6 +106,8 @@ import codeSlashOutline from "~icons/ion/code-slash-outline?raw";
 import logoWindows from "~icons/ion/logo-windows?raw";
 import logoTux from "~icons/ion/logo-tux?raw";
 import logoAndroid from "~icons/ion/logo-android?raw";
+// Botón "Continuar con Google" del login del Hub (#945).
+import logoGoogle from "~icons/ion/logo-google?raw";
 
 // Iconos que se pintan POR NOMBRE (`<ion-icon name="…">`) desde los ok-* de OutfitKit y desde los
 // Web Components de los módulos. Antes vivían en un `addIcons()` aparte, en main.ts, importados de
@@ -123,6 +127,7 @@ import chevronExpandOutline from "~icons/ion/chevron-expand-outline?raw";
 import close from "~icons/ion/close?raw";
 import cloudDownloadOutline from "~icons/ion/cloud-download-outline?raw";
 import cloudOfflineOutline from "~icons/ion/cloud-offline-outline?raw";
+import attachOutline from "~icons/ion/attach-outline?raw";
 import contractOutline from "~icons/ion/contract-outline?raw";
 import createOutline from "~icons/ion/create-outline?raw";
 import documentAttachOutline from "~icons/ion/document-attach-outline?raw";
@@ -180,6 +185,7 @@ const SVGS: Record<string, string> = {
   "globe-outline": globeOutline,
   "grid-outline": gridOutline,
   "hardware-chip-outline": hardwareChipOutline,
+  "image-outline": imageOutline,
   "information-circle-outline": informationCircleOutline,
   "keypad-outline": keypadOutline,
   "language-outline": languageOutline,
@@ -245,6 +251,7 @@ const SVGS: Record<string, string> = {
   "moon-outline": moonOutline,
   "contrast-outline": contrastOutline,
   "person-outline": personOutline,
+  "flag-outline": flagOutline,
   "close-outline": closeOutline,
   "stop-circle-outline": stopCircleOutline,
   "copy-outline": copyOutline,
@@ -252,6 +259,7 @@ const SVGS: Record<string, string> = {
   "logo-windows": logoWindows,
   "logo-tux": logoTux,
   "logo-android": logoAndroid,
+  "logo-google": logoGoogle,
   "panel-left": panelLeft,
 
   // Pintados por nombre desde los ok-* (OutfitKit) y los WC de los módulos — ver el bloque de
@@ -271,6 +279,7 @@ const SVGS: Record<string, string> = {
   "cloud-download-outline": cloudDownloadOutline,
   "cloud-offline-outline": cloudOfflineOutline,
   "contract-outline": contractOutline,
+  "attach-outline": attachOutline,
   "create-outline": createOutline,
   "document-attach-outline": documentAttachOutline,
   "document-outline": documentOutline,

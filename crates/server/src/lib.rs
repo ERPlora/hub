@@ -28,6 +28,7 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
+pub mod activity;
 pub mod api_keys;
 pub mod assistant;
 pub mod auth;
@@ -36,6 +37,7 @@ pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
 pub mod export_import;
+pub mod hub_users;
 pub mod ingest;
 pub mod install;
 pub mod logging;
@@ -489,6 +491,52 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
+    // Job de **reporte de actividad de usuario** (crate::activity): manda el heartbeat al Cloud
+    // cada `HUB_ACTIVITY_REPORT_SECS` (default 15 min) SOLO si alguien ha usado el hub desde el
+    // último envío. Es la señal con la que el Cloud apaga (60d) y acaba borrando (120d) los hubs
+    // free que nadie usa; sin ella el Cloud se cae a `created_at` y vencen todos por igual.
+    //
+    // Silencio deliberado: un hub encendido que nadie toca NO manda nada — que es justo lo que el
+    // Cloud debe observar. Sin token de máquina (dev/local sin enrolar) el tick se salta entero.
+    {
+        let st = state.clone();
+        let secs =
+            activity::interval_secs(std::env::var("HUB_ACTIVITY_REPORT_SECS").ok().as_deref());
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
+            loop {
+                tick.tick().await;
+                let Some(pending) = st.activity.pending() else {
+                    continue;
+                };
+                let Some(auth) = auth::machine_auth(&st) else {
+                    continue;
+                };
+                let req = cloud_client::CloudClient::new(&st.config.cloud_base_url).heartbeat(&auth);
+                let mut builder = st.http.post(&req.url);
+                for (k, v) in &req.headers {
+                    builder = builder.header(*k, v);
+                }
+                match builder
+                    .json(&activity::heartbeat_payload(pending, None))
+                    .send()
+                    .await
+                {
+                    // Solo se confirma con un 2xx: si no, `pending` lo sigue devolviendo y el
+                    // siguiente tick reintenta (perder el reporte adelantaría el apagado).
+                    Ok(resp) if resp.status().is_success() => st.activity.mark_reported(pending),
+                    Ok(resp) => tracing::warn!(
+                        status = %resp.status(),
+                        "reporte de actividad rechazado por el Cloud; se reintenta"
+                    ),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "reporte de actividad fallido; se reintenta")
+                    }
+                }
+            }
+        });
+    }
+
     // Router de API + (opcional) frontend estático en el MISMO origen (`cfg.web_dir`). En ECS/binario
     // lo vuelca `from_env` desde `HUB_WEB_DIR`; en Tauri (Hub Local, ADR-0050) lo fija el shell con la
     // ruta del `dist/` empaquetado (`resource_dir()`), para que el webview cargue front + datos del
@@ -595,6 +643,7 @@ async fn shutdown_signal() {
 /// Construye el router con todas las rutas montadas sobre `state`.
 pub fn app(state: AppState) -> Router {
     let registration_state = state.clone();
+    let activity_state = state.activity.clone();
     Router::new()
         .route("/healthz", get(healthz))
         .route("/api/hub/context", get(hub_context))
@@ -605,6 +654,20 @@ pub fn app(state: AppState) -> Router {
             "/api/settings",
             get(settings::get_settings).put(settings::put_settings),
         )
+        // Personal (core): los usuarios REALES del hub (`hub_user`) — incluido el owner, que entra
+        // por Cloud y no tiene PIN. GET = cualquier sesión; alta/edición/baja = sesión admin. La
+        // pantalla de Personal NO depende del módulo `staff` (que es otra cosa: profesional
+        // reservable, comisiones, horarios). Ver `crate::hub_users`.
+        .route(
+            "/api/hub/users",
+            get(hub_users::list_users).post(hub_users::create_user),
+        )
+        .route(
+            "/api/hub/users/:id",
+            axum::routing::put(hub_users::update_user)
+                .delete(hub_users::deactivate_user),
+        )
+        .route("/api/hub/roles", get(hub_users::list_roles))
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
             "/api/profile",
@@ -712,6 +775,13 @@ pub fn app(state: AppState) -> Router {
                     tower_http::trace::DefaultOnFailure::new().level(tracing::Level::ERROR),
                 ),
         )
+        // Marca de actividad de usuario (`crate::activity`): una petición autenticada y aceptada
+        // significa que alguien está usando este hub. El job de reporte se la manda al Cloud, que
+        // apaga (60d) y acaba borrando (120d) los hubs free en los que nadie entra.
+        .layer(axum::middleware::from_fn_with_state(
+            activity_state,
+            track_user_activity,
+        ))
         // Primera barrera del runtime: una máquina real sin UUID+credencial Cloud solo puede
         // consultar salud/contexto para pintar el login. Demo es la única excepción.
         .layer(axum::middleware::from_fn_with_state(
@@ -723,6 +793,27 @@ pub fn app(state: AppState) -> Router {
 
 async fn healthz() -> &'static str {
     "ok"
+}
+
+/// Anota que **alguien está usando** este hub (ver `crate::activity`).
+///
+/// Punto ÚNICO a propósito: cada handler resuelve la auth a su manera (sesión, API key, token de
+/// máquina), y colgar la marca de cada uno se desincronizaría al añadir el siguiente. Aquí se ve
+/// lo que importa — llevaba credencial y no se rechazó — sin tocar ninguna firma.
+///
+/// Coste por petición: leer una cabecera y un `fetch_max` atómico. Ninguna escritura a disco.
+async fn track_user_activity(
+    State(activity): State<std::sync::Arc<crate::activity::ActivityState>>,
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let has_credential = auth::session_token(request.headers()).is_some()
+        || auth::api_key_token(request.headers()).is_some();
+    let response = next.run(request).await;
+    if crate::activity::is_user_activity(has_credential, response.status().as_u16()) {
+        activity.touch(entitlement::now_unix());
+    }
+    response
 }
 
 /// Bloquea toda la superficie de negocio hasta completar el registro de la máquina. El login

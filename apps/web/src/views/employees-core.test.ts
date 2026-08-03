@@ -1,29 +1,42 @@
+// Contrato de la pantalla de **Personal**: es CORE, no una vista del módulo `staff`.
+//
+// Antes leía `staff.members.list`/`staff.roles.list`. El módulo `staff` es otra cosa (profesional
+// reservable, comisiones, horarios) y trae su propia navegación; en un hub sin él la pantalla salía
+// con «No se pudo cargar el personal» y el owner/administrador —que entra por Cloud y no tiene
+// PIN— no aparecía por ningún lado. La fuente es `hub_user` vía `lib/hub-users.ts`.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const listSource = readFileSync(new URL('./EmployeesPage.vue', import.meta.url), 'utf8');
 const formSource = readFileSync(new URL('./EmployeeFormPage.vue', import.meta.url), 'utf8');
 
-describe('Employees core contracts', () => {
-  it('uses the current staff module operation names', () => {
-    expect(listSource).toContain("'staff.members.list'");
-    expect(listSource).toContain("'staff.roles.list'");
-    expect(listSource).not.toContain("'staff.members_list'");
-    expect(listSource).not.toContain("'staff.roles_list'");
+describe('Personal (core)', () => {
+  it('no le pide nada al módulo staff', () => {
+    for (const source of [listSource, formSource]) {
+      expect(source).not.toMatch(/['"]staff\.[\w.]+['"]/);
+    }
   });
 
-  it('does not expose inert create, edit, or delete actions', () => {
-    expect(listSource).toContain("'staff.members.create'");
-    expect(listSource).toContain("'staff.roles.create'");
-    expect(listSource).toContain("'staff.members.delete'");
-    expect(listSource).not.toContain("console.info('roles.new')");
-    expect(formSource).toContain("'staff.members.get'");
-    expect(formSource).toContain("'staff.members.update'");
-    expect(formSource).not.toContain('María García');
+  it('lista y gestiona los usuarios del hub con el cliente core', () => {
+    expect(listSource).toContain('listHubUsers');
+    expect(listSource).toContain('createHubUser');
+    expect(listSource).toContain('deactivateHubUser');
+    expect(listSource).toContain('listHubRoles');
+    expect(formSource).toContain('updateHubUser');
   });
 
-  it('shows real Hub users instead of a future placeholder', () => {
-    expect(listSource).toContain('pinUsers');
-    expect(listSource).not.toContain('usersPlaceholder');
+  it('oculta la baja cuando el servidor la rechazaría (uno mismo / último admin)', () => {
+    expect(listSource).toContain('canDeactivate');
+  });
+
+  it('ya no duplica una pestaña de usuarios: el personal ES la lista de usuarios', () => {
+    // `pinUsers` solo trae los que tienen PIN — era la razón de que faltase el owner.
+    expect(listSource).not.toContain('pinUsers');
+    expect(listSource).not.toContain("value=\"users\"");
+  });
+
+  it('marca el acceso y el estado de cada usuario en la tabla', () => {
+    expect(listSource).toContain('has_pin');
+    expect(listSource).toContain('is_active');
   });
 });

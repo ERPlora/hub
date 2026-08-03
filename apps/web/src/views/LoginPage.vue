@@ -132,6 +132,18 @@
                   </template>
                 </ion-button>
 
+                <!-- Continuar con Google: abre el login de Google del Cloud y vuelve al Hub
+                     (no al SaaS) vía el hub-bridge + /auth/google/callback. #945 -->
+                <ion-button
+                  expand="block"
+                  fill="outline"
+                  color="medium"
+                  :href="googleLoginUrl()"
+                >
+                  <HubIcon slot="start" name="logo-google" />
+                  {{ t('login.signInWithGoogle') }}
+                </ion-button>
+
                 <ion-button
                   v-if="trusted && !showTabs"
                   fill="clear"
@@ -400,6 +412,23 @@ function redirectTarget(): string {
     && !raw.startsWith('/login')
     ? raw
     : '/';
+}
+
+/**
+ * URL de "Continuar con Google" que vuelve al Hub, no al SaaS (#945).
+ *
+ * El Hub no puede hablar con Google directamente (no tiene el client secret ni
+ * un redirect_uri registrado). Abre el login de Google del Cloud con un `next`
+ * que apunta al hub-bridge del Cloud; tras autenticarse, el Cloud acuña un
+ * AuthExchangeCode y redirige a ESTE hub como /auth/google/callback?code=…,
+ * que GoogleCallbackPage canjea por la sesión. El `next` y el `callback` van
+ * doble-codificados para no romperse en la cadena de redirects del Cloud.
+ */
+function googleLoginUrl(): string {
+  const hubOrigin = window.location.origin;
+  const hubCallback = `${hubOrigin}/auth/google/callback`;
+  const bridgeNext = `/auth/hub-bridge/?callback=${encodeURIComponent(hubCallback)}`;
+  return `${config.cloudApiUrl}/auth/google/login/?next=${encodeURIComponent(bridgeNext)}`;
 }
 
 // Genera iniciales a partir del nombre completo
