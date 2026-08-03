@@ -3,7 +3,6 @@
 // ok-data-table reutilizable (tarjetas por defecto + tabla), mientras que el fichero local sigue
 // siendo una acción explícita separada.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 
@@ -17,7 +16,9 @@ vi.mock('../lib/runtime', () => ({
   importBlueprint: vi.fn(),
   sectionStatusInfo: vi.fn(() => ({ color: '', label: '' })),
 }));
-vi.mock('../lib/session', () => ({ isAdmin: ref(true) }));
+// Ref mutable: varios tests necesitan alternar owner/admin ↔ sin permiso.
+const isAdminRef = vi.hoisted(() => ({ value: true }));
+vi.mock('../lib/session', () => ({ isAdmin: isAdminRef }));
 vi.mock('../lib/nav', () => ({ refreshModuleNav: vi.fn() }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 // HubIcon hornea todos los SVG del shell vía `~icons/…?raw`, que el entorno de test deniega.
@@ -41,6 +42,7 @@ function mountPanel() {
 beforeEach(() => {
   fetchBlueprintCatalog.mockReset();
   downloadBlueprint.mockReset();
+  isAdminRef.value = true;
 });
 
 describe('ImportPanel · paso pick', () => {
@@ -76,5 +78,87 @@ describe('ImportPanel · paso pick', () => {
     expect(w.find('[data-testid="import-error"]').exists()).toBe(false);
     // La subida sigue disponible: es el fallback cuando no hay nube.
     expect(w.find('[data-testid="import-upload-local"]').exists()).toBe(true);
+  });
+});
+
+describe('ImportPanel · el empty-state no puede mentir', () => {
+  // 🔴 Defecto de producción (2026-08-03): con una cuenta admin-de-org la pantalla afirmaba
+  // «Todavía no hay plantillas publicadas para tu hub». Con el owner listaba CUATRO. No es que no
+  // hubiera: es que ni se pedía el catálogo (`onMounted` solo lo carga `if (isAdmin)`), y el
+  // empty-state genérico afirmaba lo contrario.
+  it('sin permiso NO afirma que no haya plantillas', async () => {
+    isAdminRef.value = false;
+    const w = mountPanel();
+    await flushPromises();
+
+    // Ni siquiera se pide el catálogo: no hay base para afirmar nada sobre su contenido.
+    expect(fetchBlueprintCatalog).not.toHaveBeenCalled();
+    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe(
+      'importPage.catalogForbidden',
+    );
+  });
+
+  it('si el catálogo FALLA tampoco afirma que no haya (dice que no se pudo cargar)', async () => {
+    fetchBlueprintCatalog.mockRejectedValue(new Error('hub sin credencial'));
+    const w = mountPanel();
+    await flushPromises();
+    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe(
+      'importPage.catalogUnavailable',
+    );
+  });
+
+  it('cargado y realmente vacío SÍ dice que no hay plantillas', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const w = mountPanel();
+    await flushPromises();
+    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe(
+      'importPage.catalogEmpty',
+    );
+  });
+});
+
+describe('ImportPanel · informe: instalación de módulos', () => {
+  // 🔴 El import instala los módulos que faltan y anota el resultado en `report.installed_modules`,
+  // pero el panel SOLO pintaba `report.sections`. Con los 13 módulos fallando, el usuario veía el
+  // informe y «Ir al inicio» dejaba el panel igual de vacío, SIN señal de que algo había fallado.
+  function reportWith(installed_modules: unknown[]) {
+    // `sections` vacío a propósito: aquí se prueba SOLO la mitad de módulos del informe.
+    return { sections: [], installed_modules };
+  }
+
+  async function panelConInforme(installed_modules: unknown[]) {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const w = mountPanel();
+    await flushPromises();
+    const vm = w.vm as unknown as Record<string, unknown>;
+    vm.report = reportWith(installed_modules);
+    vm.step = 'report';
+    await flushPromises();
+    return w;
+  }
+
+  it('pinta una fila por módulo instalado', async () => {
+    const w = await panelConInforme([
+      { id: 'inventory', version: '1.2.16', status: 'installed' },
+      { id: 'sales', version: '2.12.8', status: 'already_installed' },
+    ]);
+    const texto = w.get('[data-testid="import-report"]').text();
+    expect(texto).toContain('inventory');
+    expect(texto).toContain('sales');
+  });
+
+  it('un módulo que NO se pudo instalar sale con su MOTIVO, no en silencio', async () => {
+    const w = await panelConInforme([
+      {
+        id: 'tables',
+        version: '1.4.0',
+        status: 'failed',
+        error: 'descarga/integridad: módulo sin firma: la política exige firma verificada',
+      },
+    ]);
+    const texto = w.get('[data-testid="import-report"]').text();
+    expect(texto).toContain('tables');
+    // El motivo REAL del motor, tal cual: sin él el usuario no puede ni reportar el fallo.
+    expect(texto).toContain('módulo sin firma');
   });
 });

@@ -453,7 +453,23 @@ export interface ImportReport {
    */
   media?: MediaReport;
   fiscal?: { certificate: string; note?: string };
-  installed_modules?: unknown[];
+  /**
+   * Qué hizo el import con **cada módulo del manifest**. La pantalla promete «instala los módulos
+   * que falten», así que este es el resultado de la mitad del trabajo — no un detalle interno.
+   *
+   * Estuvo tipado como `unknown[]` y el panel no lo pintaba: cuando los 13 módulos de un blueprint
+   * fallaban, el informe salía «bien» y el panel quedaba vacío sin ninguna señal (2026-08-03).
+   */
+  installed_modules?: ModuleInstallResult[];
+}
+
+/** Resultado del import para un módulo del manifest (best-effort: uno roto no aborta el resto). */
+export interface ModuleInstallResult {
+  id: string;
+  version: string;
+  status: 'installed' | 'already_installed' | 'failed';
+  /** Motivo real del motor — solo en `failed`. */
+  error?: string;
 }
 
 /** Estado normalizado de una sección del informe, listo para pintar. */
