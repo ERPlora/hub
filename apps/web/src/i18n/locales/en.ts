@@ -747,6 +747,7 @@ export default {
     reportModules: 'Modules',
     statusApplied: 'Applied',
     statusSkipped: 'Skipped',
+    statusIgnored: 'Discarded',
     statusFailed: 'Failed',
     mediaFailed: '{n} not copied',
     done: 'Go to home',

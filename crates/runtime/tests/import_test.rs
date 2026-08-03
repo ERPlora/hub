@@ -16,7 +16,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{Params, testutil::{fresh_db, TestDb}};
-use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection};
+use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
@@ -205,6 +205,129 @@ async fn unselected_sections_are_skipped() {
     // Los productos sí llegaron.
     let names = product_names(&b, "h2").await;
     assert!(names.contains(&"Café".to_string()));
+}
+
+/// 🔴 [ADR-0195, hub#305] **Plano CONSUMIDOR**: el import IGNORA las identidades que lleguen en un
+/// bundle `template`, aunque el fichero venga dentro y la casilla esté marcada.
+///
+/// Defensa en profundidad: el gate del productor (`export_hub`, #304) y el del publicador (el SaaS,
+/// saas#1107) cubren lo que se sube al catálogo, pero el import acepta **ficheros locales**
+/// («Subir desde archivo»), que no pasan por ninguno de los dos. Un `.blueprint.zip` publicado
+/// ANTES del gate —como el `restaurante` v1.0.2, con `Demo`/admin y PIN `0000`— entra por ahí sin
+/// filtro.
+///
+/// El bundle se construye como el real: se exporta un **backup** (que sí lleva `data/hub_users.sql`)
+/// y se marca su manifest como `template`. Es exactamente la forma de un artefacto viejo o
+/// manipulado.
+#[tokio::test]
+async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let a = fresh().await;
+    erplora_runtime::hub_users::create(
+        a.db(),
+        "h1",
+        &erplora_runtime::hub_users::NewHubUser {
+            name: "Demo".into(),
+            role: "admin".into(),
+            pin: "0000".into(),
+            email: String::new(),
+        },
+    )
+    .await
+    .expect("crear el usuario admin del hub de origen");
+    create_product(&a, "h1", "Café", "CAF").await;
+
+    let mut bundle = export_hub(&a, "h1", &full_selection(), "restaurante", "es", CREATED_AT)
+        .await
+        .expect("export A");
+    assert!(
+        bundle.files.contains_key("data/hub_users.sql"),
+        "el backup de partida debe traer identidades, o el test no prueba nada"
+    );
+    // El artefacto que se quiere cazar: dice ser plantilla y lleva identidades dentro.
+    bundle.manifest.purpose = BundlePurpose::Template;
+
+    let mut b = fresh().await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("import de la plantilla");
+
+    // 1. Ninguna identidad aterriza en el hub destino.
+    let users = erplora_runtime::hub_users::list(b.db(), "h2").await.expect("listar usuarios de h2");
+    assert!(
+        users.is_empty(),
+        "una plantilla repartió identidades en el hub destino: {:?}",
+        users.iter().map(|u| (&u.name, &u.role, u.has_pin)).collect::<Vec<_>>()
+    );
+
+    // 2. Y se DICE en el informe, con motivo legible: ni `Applied` (mentiría) ni un `Skipped` mudo
+    //    (indistinguible de «no la marqué»).
+    let seccion = report
+        .sections
+        .iter()
+        .find(|s| s.section == "hub_users")
+        .expect("hub_users en el informe");
+    let SectionStatus::Ignored(motivo) = &seccion.status else {
+        panic!("hub_users debía reportarse como Ignored con motivo, y salió {:?}", seccion.status);
+    };
+    assert!(
+        motivo.contains("plantilla"),
+        "el motivo tiene que ser legible para el usuario, y fue: {motivo}"
+    );
+
+    // 3. Lo que SÍ es una plantilla llega entero: los datos de negocio.
+    let names = product_names(&b, "h2").await;
+    assert!(names.contains(&"Café".to_string()), "la plantilla no aplicó sus datos: {names:?}");
+}
+
+/// El espejo, y es la mitad que impide arreglar el agujero rompiendo los backups: restaurar una
+/// COPIA sí debe traer sus usuarios. Sin ellos se pierden roles y PINs, y `get_or_link_cloud_user`
+/// recrearía a un `employee` como admin (ADR-0113 §1). Un bundle sin `purpose` es `backup`.
+#[tokio::test]
+async fn un_backup_si_importa_sus_identidades() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let a = fresh().await;
+    erplora_runtime::hub_users::create(
+        a.db(),
+        "h1",
+        &erplora_runtime::hub_users::NewHubUser {
+            name: "Encargada".into(),
+            role: "manager".into(),
+            pin: "4821".into(),
+            email: String::new(),
+        },
+    )
+    .await
+    .expect("crear la encargada en el hub de origen");
+
+    let bundle = export_hub(&a, "h1", &full_selection(), "copia", "es", CREATED_AT)
+        .await
+        .expect("export A");
+    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "el default es backup");
+
+    let mut b = fresh().await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("import del backup");
+
+    let seccion = report
+        .sections
+        .iter()
+        .find(|s| s.section == "hub_users")
+        .expect("hub_users en el informe");
+    assert!(
+        matches!(seccion.status, SectionStatus::Applied),
+        "un backup debe aplicar sus identidades: {:?}",
+        seccion.status
+    );
+
+    let users = erplora_runtime::hub_users::list(b.db(), "h2").await.expect("listar usuarios de h2");
+    let encargada = users
+        .iter()
+        .find(|u| u.name == "Encargada")
+        .expect("la encargada no sobrevivió a la restauración");
+    assert_eq!(encargada.role, "manager", "el rol se perdió al restaurar");
+    assert!(encargada.has_pin, "el PIN se perdió al restaurar");
 }
 
 #[tokio::test]

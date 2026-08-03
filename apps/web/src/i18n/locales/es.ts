@@ -748,6 +748,7 @@ export default {
     reportModules: 'Módulos',
     statusApplied: 'Aplicado',
     statusSkipped: 'Saltado',
+    statusIgnored: 'Descartado',
     statusFailed: 'Falló',
     mediaFailed: '{n} sin copiar',
     done: 'Ir al inicio',

@@ -40,6 +40,12 @@ pub enum SectionStatus {
     Applied,
     /// No seleccionada (o ausente del bundle): no se tocó.
     Skipped,
+    /// Se DESCARTÓ a propósito, aunque venga en el bundle y esté marcada — con el motivo legible
+    /// (ADR-0195, hub#305). Distinta de [`Skipped`](Self::Skipped), que es «no la pediste», y de
+    /// [`Failed`](Self::Failed), que es «se intentó y salió mal»: aquí el motor **decide** no
+    /// aplicarla y tiene que decir por qué. Sin este estado, ignorar en silencio sería
+    /// indistinguible de no haberla marcado.
+    Ignored(String),
     /// Falló; el motivo es legible para el informe de la UI. El resto del import continuó.
     Failed(String),
 }
@@ -116,11 +122,46 @@ pub async fn import_sections(
 
     let mut report = ImportReport::default();
     for section in &manifest.sections {
-        let status =
-            apply_section(rt, section, files, selection, target_hub_id, batch_id.as_deref()).await;
+        let status = match ignored_by_purpose(manifest, section) {
+            Some(motivo) => SectionStatus::Ignored(motivo),
+            None => {
+                apply_section(rt, section, files, selection, target_hub_id, batch_id.as_deref())
+                    .await
+            }
+        };
         report.sections.push(SectionResult { section: section.clone(), status });
     }
     Ok(report)
+}
+
+/// Secciones de IDENTIDAD que un bundle público no puede transportar: los usuarios del hub (con su
+/// rol y su `pin_hash`) y la identidad fiscal del negocio (NIF, config VeriFactu, certificado).
+/// Misma lista que aplica `export_hub` al producir — las dos puntas de la misma regla.
+const SECCIONES_DE_IDENTIDAD: [&str; 2] = ["hub_users", "fiscal"];
+
+/// ¿El PROPÓSITO del bundle prohíbe esta sección? (ADR-0195, plano consumidor — hub#305).
+///
+/// Tercer plano de la misma regla, y hace falta aunque existan los otros dos: el gate del productor
+/// (`export_hub`) y el del publicador (la prevalidación del SaaS) cubren lo que se sube al catálogo,
+/// pero el import acepta **ficheros locales** («Subir desde archivo») que no pasan por ninguno de
+/// los dos. Un `.blueprint.zip` publicado ANTES del gate —como el `restaurante` v1.0.2, con
+/// `Demo`/admin y PIN `0000` en `sha256("{sal}:{pin}")` con la sal dentro del propio zip— entra por
+/// ahí sin filtro, y quien lo descargue tiene PIN de administrador en todo hub que lo importe.
+///
+/// Se mira el **manifest**, no la selección: una casilla no es un control. Y solo con
+/// `purpose: template`; un bundle sin propósito es un `backup` y **debe** traer sus usuarios, o
+/// restaurar una copia pierde roles y PINs (ADR-0113 §1).
+///
+/// Devuelve el motivo legible para el informe: el usuario tiene que poder distinguir «no lo apliqué
+/// porque es una plantilla» de «no lo marcaste».
+fn ignored_by_purpose(manifest: &BlueprintManifest, section: &str) -> Option<String> {
+    if manifest.purpose.allows_identity_sections() || !SECCIONES_DE_IDENTIDAD.contains(&section) {
+        return None;
+    }
+    Some(format!(
+        "una plantilla no aplica identidades: la sección `{section}` del bundle se ha descartado \
+         (usuarios, roles, PIN y datos fiscales son de cada negocio)"
+    ))
 }
 
 /// Aplica una sección; cualquier fallo queda contenido en su `SectionStatus::Failed`.
