@@ -229,6 +229,12 @@ fn remap_section_ids(sql: &str, target_hub_id: &str) -> String {
     let mut id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for stmt in &stmts {
         let Some(parsed) = parse_insert(stmt) else { continue };
+        // Solo las filas ACOTADAS POR HUB entran al mapa: son las únicas cuyo `id` se remapea.
+        // Meter aquí el id de una fila no hub-scoped (`hub_user`) haría que una FK que lo
+        // referenciase se reescribiera hacia un id que nunca se insertó.
+        if !parsed.cols.iter().any(|c| c == "hub_id") {
+            continue;
+        }
         if let Some(old) = parsed.id_literal() {
             let derived = derive_id(target_hub_id, &old);
             id_map.entry(old).or_insert(derived);
@@ -324,8 +330,25 @@ fn rewrite_insert(stmt: &str, id_map: &std::collections::HashMap<String, String>
         return format!("{trimmed}\n");
     }
 
+    // ¿Esta tabla está acotada por hub? Lo dice la PROPIA fila: el export vuelca `SELECT *`, así
+    // que su lista de columnas ES la de la tabla. Autodescriptivo, sin lista negra que mantener.
+    //
+    // El remap de ids y la guarda `(hub_id, id)` existen SOLO para no colisionar contra la PK
+    // global entre hubs hermanos de una BD compartida (hub#260), y eso presupone filas hub-scoped.
+    // Sin `hub_id` hay DOS casos, y no se tratan igual:
+    //   · identidad del CORE (`hub_user`): tiene `id` propio; NO se remapea (derivarlo metería una
+    //     copia de cada persona por cada hub de la org, sobre una tabla que todos comparten) y su
+    //     guarda va por `id` a secas. Nombrar `hub_id` ahí tumbaba la sección Usuarios entera con
+    //     `column "hub_id" does not exist` (producción, 2026-08-03).
+    //   · tabla de VÍNCULO M2M (`inventory_product_categories`): no tiene `id` propio, solo FKs a
+    //     filas que SÍ son hub-scoped y que acaban de remapearse. Sus FKs DEBEN remapearse o
+    //     apuntan a ids inexistentes (`violates foreign key constraint`, visto importando el
+    //     blueprint `restaurante` de verdad).
+    // Lo común a ambos: la guarda no puede nombrar una columna que la tabla no tiene.
+    let hub_scoped = cols.iter().any(|c| c == "hub_id");
+
     // Remapear: el `id` propio y cualquier FK interna (columnas `id`/`*_id`/`parent_id`) cuyo
-    // literal esté en el mapa. La columna `id` siempre se reescribe con SU nuevo id.
+    // literal esté en el mapa. La columna `id` solo se reescribe si la fila es hub-scoped.
     let mut new_vals = vals.clone();
     for (i, col) in cols.iter().enumerate() {
         let is_id_like = col == "id" || col.ends_with("_id");
@@ -333,7 +356,10 @@ fn rewrite_insert(stmt: &str, id_map: &std::collections::HashMap<String, String>
             continue;
         }
         let Some(raw) = unquote_string_literal(&vals[i]) else { continue };
-        let mapped = if col == "id" {
+        let mapped = if col == "id" && !hub_scoped {
+            // Identidad del core: conserva su id (idempotente para toda la organización).
+            None
+        } else if col == "id" {
             // El propio id: siempre el nuevo (del mapa si se captó en la 1ª pasada; si no, se
             // deriva ahora de forma determinista para no romper la idempotencia del re-import).
             id_map.get(&raw).cloned().or_else(|| {
@@ -361,12 +387,19 @@ fn rewrite_insert(stmt: &str, id_map: &std::collections::HashMap<String, String>
         .join(", ");
     let val_list = new_vals.join(", ");
     let id_idx = cols.iter().position(|c| c == "id");
-    let guard = if let Some(i) = id_idx {
+    let guard = if let Some(i) = id_idx.filter(|_| hub_scoped) {
         let id_lit = &new_vals[i];
         format!(
             " WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE \"hub_id\" = {hub} AND id = {id})",
             hub = quote_string_literal(target_hub_id),
             id = id_lit,
+        )
+    } else if let Some(i) = id_idx {
+        // Sin `hub_id` (identidad del core): guarda por `id` a secas — nombrar una columna que la
+        // tabla no tiene rompe la sección entera.
+        format!(
+            " WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE id = {id})",
+            id = &new_vals[i]
         )
     } else {
         // Conserva la guarda original; remapea los ids del bundle que aparezcan como literales
@@ -605,16 +638,78 @@ mod tests {
         assert_eq!(out, remap_section_ids(sql, "h2"), "el remap debe ser determinista");
     }
 
+    /// 🔴 El SQL que rompía la sección **Usuarios** en producción (2026-08-03):
+    /// `reset: aplicar sentencia: sqlx: … column "hub_id" does not exist`.
+    ///
+    /// `rewrite_insert` metía `"hub_id" = <destino>` en la guarda de TODA tabla con `id`, pero
+    /// `hub_user` es identidad del CORE y **no tiene columna `hub_id`** (`identity.rs`: id, name,
+    /// pin_hash, role, cloud_user_id, is_active, created_at, email).
+    #[test]
+    fn una_tabla_sin_hub_id_no_puede_llevarlo_en_la_guarda() {
+        // Forma REAL del `data/hub_users.sql` del blueprint `restaurante` publicado.
+        let sql = "INSERT INTO hub_user (\"cloud_user_id\", \"created_at\", \"id\", \"name\", \"role\") \
+                   SELECT NULL, '2026-01-01T00:00:00+00:00', 'bp-user-manager-000000000000000', 'Manager', 'manager' \
+                   WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'bp-user-manager-000000000000000');";
+        let out = remap_section_ids(sql, "56f2bbe7-792e-44d3-adfe-c18891cfc925");
+
+        assert!(
+            !out.contains("hub_id"),
+            "`hub_user` no tiene columna hub_id: nombrarla revienta la sección entera:\n{out}"
+        );
+        // Su id se CONSERVA: sin hub_id no hay colisión entre hermanos que evitar, y derivarlo
+        // metería un «Manager» duplicado por cada hub de la organización (la tabla es compartida).
+        assert!(
+            out.contains("'bp-user-manager-000000000000000'"),
+            "una fila no-hub-scoped conserva su id (idempotencia para toda la org):\n{out}"
+        );
+    }
+
+    /// 🔴 Regresión detectada importando de VERDAD el blueprint `restaurante` (2026-08-03):
+    /// `inventory` falló con `violates foreign key constraint
+    /// inventory_product_categories_product_id_fkey`.
+    ///
+    /// «Sin `hub_id`» agrupa DOS cosas que no se pueden tratar igual: la identidad del core
+    /// (`hub_user`, con `id` propio que NO se remapea) y las tablas de VÍNCULO M2M (sin `id`
+    /// propio, solo FKs a filas hub-scoped que SÍ acaban de remapearse). Lo único común es que
+    /// ninguna puede nombrar `hub_id` en su guarda.
+    #[test]
+    fn una_tabla_de_vinculo_sin_hub_id_si_remapea_sus_fk() {
+        let sql = "INSERT INTO inventory_product (\"id\", \"hub_id\", \"name\") \
+                   SELECT 'src-prod', 'h2', 'Café' \
+                   WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');\n\
+                   INSERT INTO inventory_product_categories (\"product_id\", \"category_id\") \
+                   SELECT 'src-prod', 'src-cat' \
+                   WHERE NOT EXISTS (SELECT 1 FROM inventory_product_categories WHERE product_id = 'src-prod');";
+        let out = remap_section_ids(sql, "h2");
+
+        assert!(!out.contains("'src-prod'"), "el producto (hub-scoped) debe remapearse:\n{out}");
+        let prod = out.lines().find(|l| l.contains("INSERT INTO inventory_product ")).unwrap();
+        let nuevo = prod
+            .split("SELECT ").nth(1).unwrap().trim()
+            .strip_prefix('\'').unwrap().split('\'').next().unwrap().to_string();
+        let link = out.lines().find(|l| l.contains("inventory_product_categories")).unwrap();
+        assert!(
+            link.contains(&format!("'{nuevo}'")),
+            "la FK del vínculo debe apuntar al id NUEVO del producto ({nuevo}):\n{link}"
+        );
+        assert!(!link.contains("hub_id"), "el vínculo no tiene columna hub_id:\n{link}");
+    }
+
     /// Una FK interna (columna `*_id`) que apunta a otro id DEL BUNDLE se remapea al nuevo id;
     /// una que apunta a un id AJENO al bundle (un `tax_rate_id` cuya fila no viaja) se conserva.
     /// El remap solo conoce los ids de las filas PRESENTES en la sección (las que tienen `id`).
     #[test]
     fn remap_remapea_fk_interna_y_conserva_referencia_ajena() {
         // La categoría `src-cat` SÍ viaja en el bundle (otra fila con ese `id`); `ext-rate` no.
-        let sql = "INSERT INTO inventory_category (\"id\") SELECT 'src-cat' \
+        // El fixture lleva `hub_id` porque el export lo emite SIEMPRE en una tabla de módulo (el
+        // runtime lo auto-inyecta en toda fila — contrato de fila, tenancy.md §2.5), igual que el
+        // fixture del test hermano. Omitirlo describía una fila que el export no puede producir, y
+        // desde el fix de la guarda la ausencia de la columna SIGNIFICA «tabla no acotada por hub».
+        // La intención del test —FK interna se remapea, FK ajena se conserva— no cambia.
+        let sql = "INSERT INTO inventory_category (\"id\", \"hub_id\") SELECT 'src-cat', 'h2' \
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_category WHERE id = 'src-cat');\n\
-                   INSERT INTO inventory_product (\"id\", \"category_id\", \"tax_rate_id\") \
-                   SELECT 'src-prod', 'src-cat', 'ext-rate' \
+                   INSERT INTO inventory_product (\"id\", \"hub_id\", \"category_id\", \"tax_rate_id\") \
+                   SELECT 'src-prod', 'h2', 'src-cat', 'ext-rate' \
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');";
         let out = remap_section_ids(sql, "h2");
 
