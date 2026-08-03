@@ -256,10 +256,23 @@ impl HubConfig {
         if self.dev_mode {
             // Escape hatch explícito: en dev admitimos sin firma. Mantenemos el anillo por si el
             // flujo de dev quiere probar verificación (no se fuerza aquí).
-            cloud_client::SignaturePolicy::DevTrust
-        } else {
-            cloud_client::SignaturePolicy::Enforce(ring)
+            return cloud_client::SignaturePolicy::DevTrust;
         }
+        if ring.is_empty() {
+            // ADR-0194: anillo vacío = **no hay infraestructura de firma desplegada**, no «rechaza
+            // todo». Es el modo `warn` que ADR-0193 ya exigía en sus consecuencias. `Enforce` aquí
+            // no protegía nada: denegaba el 100 % de las instalaciones legítimas (403 en
+            // `request-install` y en el import de blueprints) porque NADIE firma todavía —
+            // `signing-key/` da 404 y `versions/` no expone `signature`. El control vigente sigue
+            // siendo el SHA256 obligatorio del grant (ADR-0015).
+            tracing::warn!(
+                "firma de módulos NO verificada: `HUB_MODULE_TRUSTED_KEYS` vacío. La integridad \
+                 la garantiza el SHA256 obligatorio del grant (ADR-0015). Despliega la clave \
+                 pública del marketplace para activar la verificación de firma (ADR-0194)."
+            );
+            return cloud_client::SignaturePolicy::Sha256Only;
+        }
+        cloud_client::SignaturePolicy::Enforce(ring)
     }
 }
 
@@ -268,6 +281,10 @@ mod staging_tests {
     use super::*;
 
     fn config(dev_mode: bool) -> HubConfig {
+        config_with_keys(dev_mode, Vec::new())
+    }
+
+    fn config_with_keys(dev_mode: bool, module_trusted_keys: Vec<String>) -> HubConfig {
         HubConfig {
             hub_id: "h1".into(),
             cloud_base_url: "http://127.0.0.1:1".into(),
@@ -280,8 +297,55 @@ mod staging_tests {
             sector: None,
             dev_mode,
             dev_modules_dir: Some(PathBuf::from("/tmp/modules")),
-            module_trusted_keys: Vec::new(),
+            module_trusted_keys,
         }
+    }
+
+    /// 🔴 El defecto que tumbó producción (2026-08-03): un hub desplegado SIN
+    /// `HUB_MODULE_TRUSTED_KEYS` quedaba en `Enforce(<anillo vacío>)` = **deny-all**, y como el
+    /// marketplace NO firma ningún módulo (el `ModuleVersionSerializer` del SaaS ni siquiera tiene
+    /// campo `signature`), TODA instalación devolvía 403: catálogo e import de blueprint muertos.
+    ///
+    /// El anillo vacío significa «no hay infraestructura de firma desplegada», no «rechaza todo».
+    /// Sin emisor, el control vigente es el SHA256 obligatorio de ADR-0015 — que es exactamente el
+    /// modo `warn` que ADR-0193 ya exigía.
+    #[test]
+    fn sin_anillo_de_claves_la_produccion_no_puede_exigir_firma() {
+        let policy = config(false).signature_policy();
+        assert!(
+            policy.check(None, b"module.zip").is_ok(),
+            "un hub de producción sin claves desplegadas debe poder instalar del marketplace \
+             (integridad = SHA256, ADR-0015); si no, el producto no arranca: {policy:?}"
+        );
+        assert!(
+            !policy.requires_signature(),
+            "sin claves de confianza no hay firma que exigir: {policy:?}"
+        );
+    }
+
+    /// El envés de la moneda: **desplegar una clave ENCIENDE el enforcement**. Es lo que convierte
+    /// el fix en un rollout progresivo y no en «hemos quitado el gate».
+    #[test]
+    fn con_anillo_de_claves_la_produccion_si_exige_firma() {
+        // Cualquier pubkey ed25519 bien formada (32 bytes = 64 chars hex) basta: lo que se prueba
+        // es que un anillo NO vacío enciende el enforcement, no la criptografía en sí.
+        let key = "a".repeat(64);
+        let policy = config_with_keys(false, vec![format!("marketplace={key}")]).signature_policy();
+
+        assert!(
+            policy.requires_signature(),
+            "con clave desplegada la política debe exigir firma: {policy:?}"
+        );
+        assert!(
+            policy.check(None, b"module.zip").is_err(),
+            "con clave desplegada, un módulo SIN firma se rechaza: {policy:?}"
+        );
+    }
+
+    /// Dev sigue siendo el escape hatch explícito, sin cambio (hub#239).
+    #[test]
+    fn en_modo_desarrollo_se_admite_sin_firma() {
+        assert!(config(true).signature_policy().check(None, b"zip").is_ok());
     }
 
     /// El `/tmp/modules` que inyecta el despliegue NO es staging válido en producción.
