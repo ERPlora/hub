@@ -91,6 +91,11 @@ Enlace a ficha: `https://apps.microsoft.com/detail/<STORE_ID>`.
 
 ## Bridge headless: canal S3, SIN ficha de Store (ADR-0160, 2026-07-29)
 
+> **ADR-0196 (2026-08-03) retira el bridge entero**, no solo su ficha de Store: mueren
+> `apps/bridge` y el WS `:12321`, y con ellos este canal de descarga. **La retirada aún no se
+> ha ejecutado** — comprueba si `apps/bridge/` sigue en el árbol antes de dar por buena
+> ninguna de las notas de abajo.
+
 **Decisión (Ioan, ADR-0160):** NO hay segunda ficha en ninguna tienda. Una sola ficha
 **«ERPlora»** (`com.erplora.app`) por tienda: la app es el antiguo bridge con interfaz de
 configuración rápida y, al abrirse, abre la PWA del Hub. La antigua «segunda ficha ERPlora

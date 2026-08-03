@@ -1,6 +1,6 @@
 # Workspace Rust de hub (ARQUITECTURA.md §4, §11).
-# Implementados: erplora-{db, runtime, server, cloud-client, vector, source, installer}.
-# Stubs: guest-sdk, wasm-host, sync.
+# Los miembros vigentes son la lista `members` de abajo; el estado de cada crate está en
+# crates/README.md. Ninguno es un esqueleto (guest-sdk, wasm-host y sync dejaron de serlo).
 [workspace]
 resolver = "2"
 members = [
