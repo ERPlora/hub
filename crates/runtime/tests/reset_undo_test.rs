@@ -218,6 +218,7 @@ async fn el_import_real_registra_un_lote_deshacible() {
                 module_id: "inventory".into(),
                 with_data: true,
             }],
+            purpose: Default::default(),
         },
         "restaurante",
         "es",

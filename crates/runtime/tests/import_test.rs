@@ -78,6 +78,7 @@ fn full_selection() -> ExportSelection {
             ModuleDataSelection { module_id: "taxes".into(), with_data: true },
             ModuleDataSelection { module_id: "inventory".into(), with_data: true },
         ],
+        purpose: Default::default(),
     }
 }
 

@@ -48,6 +48,7 @@ fn bundle(sql: &str) -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
         sha256.insert(path.clone(), sha256_hex(bytes));
     }
     let manifest = BlueprintManifest {
+        purpose: Default::default(),
         schema_version: SCHEMA_VERSION,
         name: "malicioso".into(),
         locale: "es".into(),
