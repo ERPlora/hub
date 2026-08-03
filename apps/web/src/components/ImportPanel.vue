@@ -62,7 +62,7 @@
         :renderCard="renderBlueprintCard"
         :labels="tableLabels"
         :search-placeholder="t('importPage.searchTemplates')"
-        :empty-message="t('importPage.catalogEmpty')"
+        :empty-message="catalogEmptyMessage"
         page-size="24"
       ></ok-data-table>
 
@@ -226,6 +226,20 @@
               <ion-label class="ion-text-wrap">
                 <h2>{{ row.label }}</h2>
                 <!-- Motivo del fallo tal cual lo reportó el motor (informe honesto). -->
+                <p v-if="row.reason" class="fail-reason">{{ row.reason }}</p>
+              </ion-label>
+              <ion-note slot="end" :color="row.color">{{ row.statusLabel }}</ion-note>
+            </ion-item>
+
+            <!-- Los módulos que el import instaló (o no pudo instalar). La pantalla los promete;
+                 el informe tiene que responder por ellos. -->
+            <ion-item-divider v-if="moduleInstallRows.length">
+              <ion-label>{{ t('importPage.reportModules') }}</ion-label>
+            </ion-item-divider>
+            <ion-item v-for="row in moduleInstallRows" :key="row.section">
+              <HubIcon slot="start" :name="row.icon" :style="{ color: `var(--ion-color-${row.color})` }" />
+              <ion-label class="ion-text-wrap">
+                <h2>{{ row.label }}</h2>
                 <p v-if="row.reason" class="fail-reason">{{ row.reason }}</p>
               </ion-label>
               <ion-note slot="end" :color="row.color">{{ row.statusLabel }}</ion-note>
@@ -500,23 +514,49 @@ watch(
 
 watch(locale, () => wireBlueprintTable(blueprintTable.value));
 
+/**
+ * Por qué la lista está vacía. `empty` es la ÚNICA que puede afirmar algo sobre el catálogo: las
+ * otras dos hablan de nosotros, no de él.
+ *
+ * Sin esta distinción, un admin-de-org veía «Todavía no hay plantillas publicadas para tu hub»
+ * mientras el owner listaba cuatro (2026-08-03). El empty-state afirmaba un hecho sobre el
+ * catálogo que nadie había comprobado — el catálogo ni siquiera se había pedido.
+ */
+type CatalogState = 'empty' | 'forbidden' | 'unavailable';
+const catalogState = ref<CatalogState>('empty');
+
+const catalogEmptyMessage = computed<string>(() => {
+  if (catalogState.value === 'forbidden') return t('importPage.catalogForbidden');
+  if (catalogState.value === 'unavailable') return t('importPage.catalogUnavailable');
+  return t('importPage.catalogEmpty');
+});
+
 async function loadCatalog(): Promise<void> {
   loadingCatalog.value = true;
   try {
     catalog.value = await fetchBlueprintCatalog();
+    catalogState.value = 'empty'; // se pidió y se recibió: ahora sí podemos hablar del catálogo
   } catch {
     // El catálogo es BEST-EFFORT: un hub sin credencial cloud (Local no enrolado, dev) o un fallo
     // de red NO deben gritar un banner de error — la card «subir desde archivo» siempre es el
     // fallback. Degradamos en silencio a catálogo vacío (la nota «sin plantillas» ya lo cubre).
     // El `error.value` se reserva para fallos de INSPECCIÓN de un fichero elegido por el usuario.
+    // Degradar NO es lo mismo que MENTIR: la lista queda vacía y el empty-state dice «no se pudo
+    // cargar», no «no hay».
     catalog.value = [];
+    catalogState.value = 'unavailable';
   } finally {
     loadingCatalog.value = false;
   }
 }
 
 onMounted(() => {
-  if (isAdmin.value) void loadCatalog();
+  if (isAdmin.value) {
+    void loadCatalog();
+  } else {
+    // No se pide el catálogo (importar es admin-only), así que no sabemos si hay plantillas.
+    catalogState.value = 'forbidden';
+  }
 });
 
 onBeforeUnmount(() => {
@@ -672,6 +712,31 @@ function mediaStatus(m: NonNullable<ImportReport['media']>): { kind: 'applied' |
   if (m.failed > 0) return { kind: 'failed', reason };
   return { kind: 'skipped' }; // seleccionada pero sin ficheros que copiar
 }
+
+// Los módulos del manifest son la MITAD del trabajo que esta pantalla promete («instala los
+// módulos que falten»), así que su resultado va en el informe como una fila más. Antes el motor
+// los reportaba en `installed_modules` y el panel los tiraba: con los 13 módulos fallando, el
+// informe salía en verde y el usuario volvía a un panel vacío sin saber por qué.
+const moduleStatus = {
+  installed: 'applied',
+  already_installed: 'skipped',
+  failed: 'failed',
+} as const;
+
+const moduleInstallRows = computed<ReportRow[]>(() =>
+  (report.value?.installed_modules ?? []).map((m) => {
+    const v = visual[moduleStatus[m.status] ?? 'failed'];
+    return {
+      section: `installed_modules/${m.id}`,
+      label: m.id,
+      icon: v.icon,
+      color: v.color,
+      statusLabel: v.label(),
+      // El motivo del motor, tal cual: sin él el fallo es irreportable.
+      reason: m.error,
+    };
+  }),
+);
 
 const reportRows = computed<ReportRow[]>(() =>
   (report.value?.sections ?? []).map((s) => {

@@ -62,6 +62,7 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
             module_id: "taxes".into(),
             with_data: true,
         }],
+        purpose: Default::default(),
     };
     let bundle = export_hub(
         &a,

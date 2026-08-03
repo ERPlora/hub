@@ -17,7 +17,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{Params, testutil::fresh_db};
-use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection, HUB_ID_PLACEHOLDER, SCHEMA_VERSION};
+use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection, HUB_ID_PLACEHOLDER, SCHEMA_VERSION};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -64,10 +64,71 @@ fn full_selection() -> ExportSelection {
             ModuleDataSelection { module_id: "taxes".into(), with_data: true },
             ModuleDataSelection { module_id: "inventory".into(), with_data: true },
         ],
+        purpose: Default::default(),
     }
 }
 
 const CREATED_AT: &str = "2026-07-11T18:00:00Z";
+
+/// 🔴 [ADR-0195] Una **plantilla pública** no puede llevar identidades ni datos fiscales.
+///
+/// Lo que había: el `restaurante` v1.0.2 del catálogo —descargable por cualquiera— traía cuatro
+/// filas de `hub_user` con su ROL y su `pin_hash` en el formato legacy `sha256("{sal}:{pin}")`,
+/// con la **sal dentro del propio artefacto**. Un PIN son 4 dígitos: las cuatro se revierten en
+/// 0,00 s, y `Demo` tenía rol **admin** con PIN `0000`. Quien descargara la plantilla tenía PIN de
+/// administrador en TODO hub que la hubiese importado.
+///
+/// La casilla «Usuarios» venía marcada por defecto, pero desmarcarla no es la solución: una
+/// casilla no es un control. Con `purpose: Template` las secciones **no entran en el bundle**.
+#[tokio::test]
+async fn una_plantilla_no_exporta_identidades_ni_fiscal() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let rt = fresh().await;
+    create_product(&rt, "h1", "Café", "CAF").await;
+
+    // Se PIDEN usuarios y fiscal explícitamente: el propósito debe ganar a la casilla.
+    let seleccion = ExportSelection {
+        users: true,
+        fiscal: true,
+        purpose: BundlePurpose::Template,
+        ..full_selection()
+    };
+    let bundle = export_hub(&rt, "h1", &seleccion, "restaurante", "es", CREATED_AT)
+        .await
+        .expect("export de plantilla");
+
+    assert!(
+        !bundle.files.contains_key("data/hub_users.sql"),
+        "una plantilla pública NO puede llevar identidades: {:?}",
+        bundle.files.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        !bundle.manifest.sections.iter().any(|s| s == "hub_users" || s == "fiscal"),
+        "el manifest no puede anunciar secciones de identidad/fiscal: {:?}",
+        bundle.manifest.sections
+    );
+    assert_eq!(bundle.manifest.purpose, BundlePurpose::Template);
+
+    // …y lo que SÍ es una plantilla sigue viajando entero: los datos de negocio.
+    let inv = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
+    assert!(inv.contains("Café"), "una plantilla debe llevar los datos de negocio");
+}
+
+/// El espejo: un **backup/migración** sigue llevándolo TODO. Sin identidades, restaurar perdería
+/// roles y PINs, y `get_or_link_cloud_user` recrearía a un `employee` como admin (ADR-0113 §1).
+/// Es el default cuando el manifest no declara propósito.
+#[tokio::test]
+async fn un_backup_si_exporta_identidades() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let rt = fresh().await;
+
+    let bundle = export_hub(&rt, "h1", &full_selection(), "backup", "es", CREATED_AT)
+        .await
+        .expect("export de backup");
+
+    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "el default es backup");
+    assert!(bundle.files.contains_key("data/hub_users.sql"), "un backup SÍ lleva identidades");
+}
 
 #[tokio::test]
 async fn full_export_produces_manifest_and_data_files() {
@@ -258,6 +319,7 @@ async fn deselected_sections_are_absent() {
         fiscal: false,
         media: false,
         modules: vec![ModuleDataSelection { module_id: "taxes".into(), with_data: true }],
+        purpose: Default::default(),
     };
     let bundle = export_hub(&rt, "h1", &sel, "solo-taxes", "es", CREATED_AT).await.expect("export");
 
@@ -480,6 +542,7 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
         fiscal,
         media: false,
         modules: vec![ModuleDataSelection { module_id: "verifactu".into(), with_data: true }],
+        purpose: Default::default(),
     };
 
     let sin = export_hub(&rt, "h1", &seleccion(false), "t", "es", "2026-07-31T00:00:00Z")
@@ -558,6 +621,7 @@ async fn export_ordena_las_filas_padre_antes_que_hija_en_tablas_autorreferenciad
         fiscal: false,
         media: false,
         modules: vec![ModuleDataSelection { module_id: "services".into(), with_data: true }],
+        purpose: Default::default(),
     };
     let bundle = export_hub(&rt, "h1", &seleccion, "t", "es", "2026-07-31T00:00:00Z")
         .await

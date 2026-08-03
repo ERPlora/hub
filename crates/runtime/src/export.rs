@@ -42,10 +42,45 @@ pub struct ManifestModule {
     pub with_data: bool,
 }
 
+/// **Para qué es este bundle** (ADR-0195).
+///
+/// El mismo motor sirve a dos propósitos con requisitos OPUESTOS (ADR-0113 §1) y hasta ahora
+/// producía el mismo zip para ambos:
+///
+/// - [`Backup`](Self::Backup) — copia o migración de un hub, **privada, del mismo dueño**: las
+///   identidades **deben** viajar (sin ellas, restaurar pierde roles y PINs y
+///   `get_or_link_cloud_user` recrearía a un `employee` como admin).
+/// - [`Template`](Self::Template) — plantilla que se **publica** en el catálogo: es un artefacto
+///   **público** y no puede llevar identidades, credenciales ni datos fiscales de nadie.
+///
+/// Ausente en el manifest ⇒ `Backup`: es el comportamiento histórico y lo que de hecho son los
+/// bundles ya existentes.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BundlePurpose {
+    /// Copia/migración privada: lo lleva todo.
+    #[default]
+    Backup,
+    /// Plantilla publicable: sin identidades (`hub_users`) ni fiscal.
+    Template,
+}
+
+impl BundlePurpose {
+    /// ¿Puede este bundle transportar identidades del hub y su certificado fiscal? Solo un
+    /// backup. Es la ÚNICA regla que consulta el export: una casilla no puede saltársela.
+    pub fn allows_identity_sections(self) -> bool {
+        matches!(self, Self::Backup)
+    }
+}
+
 /// `manifest.json` del bundle — fuente de verdad del contenido (a prueba de renombres del zip).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BlueprintManifest {
     pub schema_version: u32,
+    /// Para qué es el bundle (ADR-0195). `#[serde(default)]` ⇒ un manifest ANTERIOR a este campo
+    /// se lee como [`BundlePurpose::Backup`], que es exactamente lo que es.
+    #[serde(default)]
+    pub purpose: BundlePurpose,
     /// Nombre lógico elegido por el usuario (`barberia`); el default de fichero sugerido es
     /// `<name>_<locale>.blueprint.zip`, pero el fichero puede renombrarse sin romper nada.
     pub name: String,
@@ -80,6 +115,9 @@ pub struct ExportSelection {
     pub media: bool,
     /// Por módulo instalado: checkbox «módulo» (aparecer en el manifest) + checkbox «datos».
     pub modules: Vec<ModuleDataSelection>,
+    /// Para qué es el bundle (ADR-0195). **Manda sobre los checkboxes**: con
+    /// [`BundlePurpose::Template`], `users`/`fiscal` se ignoran aunque vengan a `true`.
+    pub purpose: BundlePurpose,
 }
 
 /// Fila de la tabla de selección: el módulo va al manifest; `with_data` añade `data/<id>.sql`.
@@ -114,7 +152,15 @@ pub async fn export_hub(
     let mut sections: Vec<String> = Vec::new();
 
     // ── Secciones a nivel hub ────────────────────────────────────────────────
-    if selection.users {
+    // ADR-0195: una PLANTILLA es un artefacto público. Las secciones de identidad y fiscal no se
+    // «desmarcan» — no entran en el bundle, decida lo que decida el formulario. Una casilla no es
+    // un control: la plantilla `restaurante` publicada llevaba 4 cuentas con rol y `pin_hash`
+    // legacy con la sal DENTRO del zip descargable (Demo/admin, PIN `0000`).
+    let identidades = selection.purpose.allows_identity_sections();
+    // `fiscal` EFECTIVO: el certificado y la identidad fiscal del negocio (NIF, entorno,
+    // auto_transmit) son del hub de ORIGEN, así que siguen la misma regla.
+    let fiscal = selection.fiscal && identidades;
+    if selection.users && identidades {
         // `hub_user` NO lleva hub_id (identidad por despliegue, identity.rs): se vuelca entera.
         let mut rows = fetch_rows(db, "hub_user", None).await.unwrap_or_default();
         // …pero DESVINCULADA de las cuentas Cloud. `cloud_user_id` es la identidad de una
@@ -147,7 +193,7 @@ pub async fn export_hub(
     }
     // fiscal/media: el runtime solo REGISTRA la sección; los bytes (certificado, imágenes)
     // los añade el server al empaquetar (gestor media ADR-0047 / almacén del certificado).
-    if selection.fiscal {
+    if fiscal {
         sections.push("fiscal".into());
     }
     if selection.media {
@@ -188,7 +234,7 @@ pub async fn export_hub(
             // certificado) solo viaja si se marca `fiscal` —la sección que ya mueve el `.p12`—.
             // Iba como una tabla más del módulo, así que el blueprint publicado sembraba el NIF
             // del hub demo y `auto_transmit=1` en el hub de cada cliente que lo importaba.
-            if table == "verifactu_config" && !selection.fiscal {
+            if table == "verifactu_config" && !fiscal {
                 continue;
             }
             // La mayoría de tablas llevan `hub_id` (contrato de fila §2.5) → se acotan por él.
@@ -224,6 +270,7 @@ pub async fn export_hub(
     }
     let manifest = BlueprintManifest {
         schema_version: SCHEMA_VERSION,
+        purpose: selection.purpose,
         name: name.to_string(),
         locale: locale.to_string(),
         hub: HubMeta {
@@ -631,6 +678,7 @@ mod tests {
     fn manifest_serde_round_trip() {
         let m = BlueprintManifest {
             schema_version: SCHEMA_VERSION,
+            purpose: BundlePurpose::Backup,
             name: "barberia".into(),
             locale: "es".into(),
             hub: HubMeta { name: "Demo".into(), country: "ES".into(), currency: "EUR".into() },

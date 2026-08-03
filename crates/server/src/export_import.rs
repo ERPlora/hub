@@ -29,7 +29,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use erplora_runtime::export::{self, ExportSelection, ModuleDataSelection};
+use erplora_runtime::export::{self, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{self, ImportSelection};
 use erplora_runtime::Runtime;
 
@@ -100,6 +100,11 @@ pub struct ExportSelectionReq {
     media: bool,
     #[serde(default)]
     modules: Vec<ModuleSelReq>,
+    /// Para qué es el bundle (ADR-0195). Ausente ⇒ `backup` (lo que ha sido siempre). Con
+    /// `"template"` el motor EXCLUYE identidades y fiscal del zip, marque lo que marque el
+    /// formulario: una plantilla se publica y no puede llevar cuentas ni certificados.
+    #[serde(default)]
+    purpose: BundlePurpose,
 }
 
 #[derive(Deserialize)]
@@ -117,6 +122,7 @@ impl ExportSelectionReq {
             settings_items: self.settings_items,
             fiscal: self.fiscal,
             media: self.media,
+            purpose: self.purpose,
             modules: self
                 .modules
                 .into_iter()

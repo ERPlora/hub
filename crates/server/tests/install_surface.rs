@@ -219,12 +219,21 @@ async fn instalar_del_marketplace_firmado_funciona_en_produccion() {
     let _ = std::fs::remove_dir_all(&base);
 }
 
-/// hub#239: en producción un módulo del marketplace **SIN firma** se rechaza (DEFAULT deny). El
-/// `request-install` baja a error y el módulo NO queda instalado — aunque el SHA256 del zip
-/// cuadre. Es el cierre del agujero: la integridad de transporte (SHA256) ya estaba; falta la
-/// autenticidad (firma), y sin ella no se instala.
+/// ⭐ **ADR-0194 (corrige el default de hub#239).** En producción **SIN anillo de claves
+/// desplegado**, un módulo sin firma **SÍ se instala**: la integridad la garantiza el SHA256
+/// obligatorio del grant (ADR-0015).
+///
+/// Este test afirmaba lo contrario (403) porque fijaba el default de hub#239. Ese default **tumbó
+/// producción**: el provisioning nunca inyecta `HUB_MODULE_TRUSTED_KEYS`, así que TODA imagen
+/// quedaba en `Enforce(<anillo vacío>)` = deny-all mientras **nadie firma** (`signing-key/` da 404
+/// y `versions/` no expone `signature`). Resultado: `request-install` devolvía 403 y el import de
+/// blueprint fallaba en 13 de 13 módulos — un hub nuevo no se podía poblar por ninguna vía.
+///
+/// Y no es una licencia nueva: ADR-0193 ya lo exigía en sus consecuencias — «hasta entonces el Hub
+/// debe estar en `warn`, no `enforce`». El rechazo real vive en el test hermano de abajo, que es
+/// donde el `enforce` tiene con qué verificar.
 #[tokio::test]
-async fn instalar_del_marketplace_sin_firma_se_rechaza_en_produccion() {
+async fn sin_anillo_desplegado_un_modulo_sin_firma_si_se_instala() {
     let base = std::env::temp_dir().join(format!(
         "erplora-install-surface-unsigned-{tag}",
         tag = std::process::id()
@@ -239,10 +248,60 @@ async fn instalar_del_marketplace_sin_firma_se_rechaza_en_produccion() {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-install");
     rt.ensure_system_tables().await.unwrap();
-    let mut cfg = config(&base, false); // producción, anillo de confianza VACÍO ⇒ deny-all
+    let mut cfg = config(&base, false); // producción, anillo de confianza VACÍO
     cfg.cloud_base_url = cloud;
-    // module_trusted_keys queda vacío: deny-all. Aunque tuviera claves, un módulo sin firma igual
-    // se rechaza (SignatureError::Missing).
+    // `module_trusted_keys` vacío = no hay infraestructura de firma desplegada ⇒ `Sha256Only`
+    // (el modo `warn` de ADR-0193), NO deny-all.
+    let router = app(AppState::with_config(rt, cfg));
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/modules/request-install")
+        .header("content-type", "application/json")
+        .header("x-permissions", "*")
+        .body(Body::from(json!({ "module_id": "notes" }).to_string()))
+        .unwrap();
+    let resp = router.clone().oneshot(req).await.unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "sin claves desplegadas NO hay firma que exigir: el hub debe poder instalar del \
+         marketplace (integridad = SHA256, ADR-0015). Si esto es 403, el producto no arranca."
+    );
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(true), "{body}");
+
+    assert!(
+        installed_ids(&router).await.contains(&"notes".to_string()),
+        "el módulo debe quedar instalado"
+    );
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// El envés de ADR-0194 y el que conserva el valor de seguridad de hub#239: **con una clave
+/// desplegada**, un módulo sin firma se rechaza con **403**. Desplegar la clave es el interruptor
+/// que enciende el `enforce`, sin tocar código ni imagen.
+#[tokio::test]
+async fn con_anillo_desplegado_un_modulo_sin_firma_se_rechaza() {
+    let base = std::env::temp_dir().join(format!(
+        "erplora-install-surface-unsigned-enforce-{tag}",
+        tag = std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(base.join("module_cache")).unwrap();
+
+    // El mock cloud NO firma (como el serializer del Cloud de hoy).
+    let cloud = spawn_mock_cloud(module_zip("notes"), None).await;
+
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-install");
+    rt.ensure_system_tables().await.unwrap();
+    let mut cfg = config(&base, false);
+    cfg.cloud_base_url = cloud;
+    // Clave del marketplace desplegada ⇒ el hub pasa SOLO a `Enforce`.
+    let rng = ring::rand::SystemRandom::new();
+    let (signer, _) = cloud_client::Signer::generate(&rng);
+    cfg.module_trusted_keys = vec![hex::encode(signer.public_key())];
     let router = app(AppState::with_config(rt, cfg));
 
     let req = Request::builder()
@@ -256,7 +315,7 @@ async fn instalar_del_marketplace_sin_firma_se_rechaza_en_produccion() {
     assert_eq!(
         resp.status(),
         StatusCode::FORBIDDEN,
-        "un módulo sin firma no se instala en producción (403, rechazo de seguridad)"
+        "con clave desplegada, un módulo sin firma se rechaza (403, rechazo de seguridad)"
     );
     let body = body_json(resp).await;
     assert_eq!(body["ok"], json!(false), "{body}");

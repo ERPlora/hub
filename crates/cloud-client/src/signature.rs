@@ -222,6 +222,23 @@ pub enum SignaturePolicy {
     /// **Escape hatch de desarrollo explícito.** Acepta módulos sin firma (con aviso). SOLO debe
     /// construirse tras `HUB_DEV_MODE` — nunca es el default y la imagen de prod no lo activa.
     DevTrust,
+    /// **Modo `warn` de ADR-0193** — sin infraestructura de firma desplegada (anillo de confianza
+    /// vacío en producción). La integridad la garantiza el **SHA256 obligatorio** del grant
+    /// (ADR-0015), control vigente mientras el marketplace sea de origen único sobre TLS con rutas
+    /// S3 inmutables.
+    ///
+    /// No es una licencia nueva: **ADR-0193 lo exige explícitamente** en sus consecuencias — «los
+    /// ~24 módulos ya publicados no están firmados: hay que re-publicarlos […] **hasta entonces el
+    /// Hub debe estar en `warn`, no `enforce`**». La firma es un protocolo de dos partes y el
+    /// emisor NO está desplegado: en producción `GET /api/v1/marketplace/signing-key/` da 404 y
+    /// `versions/` no expone `signature` (verificado 2026-08-03). Un `Enforce` con anillo vacío en
+    /// ese mundo no protege nada: deniega el 100 % de las instalaciones legítimas — 403 en
+    /// `request-install` y en el import de blueprints, que es como se tumbó el arranque de todo hub
+    /// nuevo (ADR-0194).
+    ///
+    /// **No es fail-open silencioso:** se anuncia con WARN al arrancar, y basta desplegar la clave
+    /// en `HUB_MODULE_TRUSTED_KEYS` para que el hub pase solo a [`Self::Enforce`], sin tocar código.
+    Sha256Only,
 }
 
 impl SignaturePolicy {
@@ -230,7 +247,7 @@ impl SignaturePolicy {
     /// que validó (autoritativa, no el auto-declarado en la firma) bajo `Enforce`.
     pub fn check(&self, sig: Option<&ModuleSignature>, message: &[u8]) -> Result<Option<String>, SignatureError> {
         match self {
-            Self::DevTrust => Ok(None),
+            Self::DevTrust | Self::Sha256Only => Ok(None),
             Self::Enforce(ring) => {
                 let sig = sig.ok_or(SignatureError::Missing)?;
                 let verified_key_id = ring.verify(sig, message)?;
@@ -239,7 +256,9 @@ impl SignaturePolicy {
         }
     }
 
-    /// `true` si esta política exige firma verificada (i.e. NO es el escape hatch de dev).
+    /// `true` si esta política exige firma verificada — es decir, hay un anillo de confianza
+    /// desplegado. Los dos modos sin anillo ([`Self::DevTrust`], [`Self::Sha256Only`]) no pueden
+    /// exigir nada: no tienen con qué verificar.
     pub fn requires_signature(&self) -> bool {
         matches!(self, Self::Enforce(_))
     }
