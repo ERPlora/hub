@@ -20,7 +20,12 @@ export {
   parseQuantity,
   formatQuantity,
   onGrid,
-} from './quantity';
+  // Con extensión a propósito: los tests del SDK corren con el runner de
+  // `node:test` sobre ESM (`--experimental-transform-types`), que EXIGE el
+  // especificador completo. Sin el `.ts` este barrel no resuelve y tumbaba
+  // `index.test.ts` entero — que es como se coló, porque `quantity.test.ts`
+  // importa el módulo directamente y por sí solo pasaba en verde.
+} from './quantity.ts';
 
 export interface ErploraTransport {
   query(name: string, params?: Record<string, unknown>): Promise<unknown>;
