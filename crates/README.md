@@ -11,8 +11,8 @@ no tiene lógica de negocio hardcodeada.
 
 ## Estado
 
-12 crates, todos con código real (ninguno es un esqueleto). Tabla orientativa — para el
-recuento de tests vigente, corre `cargo test -p <crate>`:
+Todos con código real (ninguno es un esqueleto). El recuento vigente es `ls -d crates/*/`;
+para el de tests, `cargo test -p <crate>`. Tabla orientativa:
 
 | Crate | Qué es | Estado |
 |-------|--------|--------|
@@ -28,6 +28,7 @@ recuento de tests vigente, corre `cargo test -p <crate>`:
 | `erplora-sync` | Cliente de eventos en vivo (consume `/ws`) con reconexión + backoff. | ✅ implementado |
 | `erplora-peripherals` | Hardware POS red-only (ESC/POS, cajón, discovery, cola/reintentos) — ver [`peripherals/README.md`](peripherals/README.md). | ✅ implementado |
 | `erplora-verifactu` | Lógica fiscal VeriFactu (encadenado, XML, hashing). | ✅ implementado |
+| `tauri-plugin-erplora-android` | Plugin Tauri para Android: permisos de runtime en contexto (`ACCESS_LOCAL_NETWORK`, `POST_NOTIFICATIONS`) y el Kotlin que Rust no alcanza (ADR-0180 §2). | ✅ implementado |
 
 ## Probarlo
 

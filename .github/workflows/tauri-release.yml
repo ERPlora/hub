@@ -6,8 +6,9 @@
 # Tauri v2). Espejo de `bridge-release.yml`: build por plataforma → S3 con el rol OIDC.
 #
 # Pipeline (build pesado: Windows ×2 de facturación → NO en cada push a main, ADR-CI 2026-07-10):
-#   push tag v*        ─► build (Windows + Linux) ─► S3 app/v{version}/ + latest/
-#   workflow_dispatch  ─► build (Windows + Linux) ─► S3 app/latest/   (refresco manual de `latest/`)
+#   push tag v*        ─► build + build-android ─► S3 app/v{version}/ + latest/
+#   workflow_dispatch  ─► build + build-android ─► S3 app/latest/   (refresco manual de `latest/`)
+# Los jobs vigentes son la lista de `jobs:` de este mismo fichero — no la reproduzcas aquí.
 #
 # S3 layout (mismo bucket que el bridge; lo consume el Cloud para la descarga):
 #   s3://erplora-saas/downloads/app/
@@ -20,12 +21,12 @@
 #
 # NO se construye aquí:
 #   - macOS  → build local (`cargo tauri build`); no hay cert Apple Developer ID (decisión 2026-06-22).
-#   - Android → RETIRADO de este repo (ADR-0160, 2026-07-29): una sola app instalable por
-#     plataforma bajo la identidad única `com.erplora.app`. La app Android es la Kotlin
-#     (shell webview ADR-0159 + bridge Ktor) y vive SOLO en el repo `ERPlora-Bridge-android`
-#     (su `build.yml` construye y publica en Google Play). Los jobs `check-secrets`,
-#     `build-android` y `publish-play` de este workflow se eliminaron; la Variable
-#     `PLAY_PACKAGE_NAME_APP` muere con ellos. Runbook: apps/tauri/GOOGLE-PLAY.md.
+#
+# Android SÍ se construye aquí (job `build-android`): ADR-0180 revierte el §3 de ADR-0160 y
+# devuelve el Tauri-Android a este workflow — Android es la MISMA app Tauri, bajo la identidad
+# única `com.erplora.app` (ADR-0160). ADR-0196 remata la dirección: muere la app Kotlin de
+# `ERPlora-Bridge-android`. Este workflow produce el AAB y lo sube a Object Storage; **no** lo
+# publica en Play (no hay job `publish-play` aquí). Runbook: apps/tauri/GOOGLE-PLAY.md.
 #
 # Firma Windows (ADR-0136, 2026-07-16): el canal PRINCIPAL de Windows es Microsoft Store —
 # MSIX sin firmar que la Store re-firma con su cert tras certificación (0€, sin SmartScreen,

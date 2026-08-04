@@ -66,6 +66,12 @@ Flujo (`src/lib.rs::EntitlementGate`):
 
 ## Hardware local = sidecar de `erplora-peripherals` (§2.7)
 
+> **ADR-0196 (2026-08-03) deroga el reparto de esta sección, y todavía NO se ha ejecutado.**
+> Decide que `apps/bridge` (WS `:12321`) y la app Kotlin desaparecen: queda `isTauri()` →
+> `invoke` in-process y nada más, y la cola de impresión se muda al Hub. Mientras el código de
+> `apps/bridge` siga en el árbol, lo de abajo describe el camino Tauri, que es el que
+> sobrevive. Para saber si la retirada ya ocurrió, mira si existe `apps/bridge/`.
+
 En el producto **Hub Local** (Tauri), el shell **es el bridge**: no hay proceso aparte ni segundo install. La
 lógica de hardware ya vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS
 sobre TCP:9100), el mismo que usa el bridge standalone (`apps/bridge`) en **Hub Cloud**.
