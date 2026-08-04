@@ -13,6 +13,12 @@ use crate::VerifactuError;
 
 /// Endpoint SOAP del sistema de facturación VERI*FACTU por entorno.
 /// `testing` (prewww1.aeat.es) es el **default** del módulo (config.environment).
+///
+/// ADR-0202 (pending): these hosts are only valid for personal/representative certificates. A
+/// **Sello de Entidad** cert — ERPlora's delegated identity — uses a DIFFERENT host pair:
+/// `prewww10.aeat.es` / `www10.agenciatributaria.gob.es` (OCA/l10n-spain#4597). Endpoint
+/// selection must depend on the certificate kind, not just the environment, or every POST with
+/// the delegated cert fails — same failure mode as the invented consult URL (hub#287).
 pub fn endpoint(environment: &str) -> &'static str {
     match environment {
         "production" => {
@@ -52,6 +58,8 @@ fn s(v: &Json, k: &str) -> String {
         .to_string()
 }
 
+// ⚠️ Known defect (ADR-0202, design doc §5.5): a missing or malformed amount silently becomes
+// 0.00, gets hashed and transmitted. Must become a hard error, not a default.
 fn f(v: &Json, k: &str) -> f64 {
     match v.get(k) {
         Some(Json::Number(n)) => n.as_f64().unwrap_or(0.0),
@@ -143,6 +151,13 @@ fn facturas_sustituidas(record: &Json) -> String {
 /// La identidad del PRODUCTOR del software (ERPlora) es FIJA — la misma para todos los hubs, lo
 /// declara la AEAT. Si la config del módulo no la trae (fila vacía/stale), usamos el fallback
 /// hardcodeado en vez de emitir un NIF vacío (que la AEAT rechaza con error 1100).
+///
+/// ADR-0202 (pending): `IndicadorMultiplesOT` is hardcoded to `N` below, but the AEAT developer
+/// FAQ requires computing it PER SaaS ACCOUNT — `S` when the account runs more than one
+/// facturación, same or different NIF. The hub cannot know that count: it must arrive from the
+/// SaaS as a producer fact (heartbeat / fiscal endpoint), together with the producer identity
+/// that today only exists as the hardcoded fallback above. `Version` stays declared by this
+/// binary (each hub is pinned to its own digest and must declare what actually runs).
 fn sistema_informatico(config: &Json, hub_id: &str) -> String {
     // Fallback del productor: identidad legal de ERPlora como fabricante del software.
     const PRODUCER_NAME: &str = "ERPLORA CLOUD SL";
@@ -526,6 +541,11 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
         )
     };
 
+    // ADR-0202 (pending): the Cabecera below carries only ObligadoEmision. Two optional XSD
+    // blocks are still never emitted — `RemisionVoluntaria/Incidencia=S` (flags a send coming
+    // out of the contingency queue; it is per ENVELOPE, so a future batch must not mix flagged
+    // and unflagged records) and `Representante` (required when transmitting with ERPlora's
+    // delegated certificate on behalf of the taxpayer).
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
          <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \

@@ -18,6 +18,15 @@
 //! - `validate_chain` / `process_contingency_queue` — pendientes (issues #4 / #7).
 //!
 //! [ADR-0009]: ../../../architecture/00-overview/decision-log.md
+//!
+//! ## Current plan — ADR-0202 (2026-08-04; design in `architecture/saas/verifactu-gateway.md`)
+//!
+//! This crate is ERPlora's ONLY VeriFactu engine going forward: the SaaS Python engine gets
+//! deleted once ERPlora invoices through its own hub. Decided and pending here: guards R1-R5
+//! (one-way go-live, no disable/uninstall with unsent records, `auto_transmit` removed, chain
+//! scoped by `environment`, `is_demo` never goes live), certificate fallback `own` → `delegated`
+//! (ERPlora's cert distributed and rotated by the SaaS control plane), per-certificate endpoint
+//! (`www10` for Sello de Entidad) and the `Incidencia`/`Representante` header blocks.
 use erplora_db::Params;
 use erplora_runtime::native::{NativeHandler, NativeHost};
 use erplora_runtime::{Result, RuntimeError};
@@ -219,6 +228,10 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
 /// `host.certificate_identity(hub_id)` lee la tabla del core y hace TODA la cripto PKCS#12;
 /// **los bytes del `.p12` y la contraseña NUNCA entran al módulo**. Si no hay certificado del
 /// core, se devuelve un error claro (el usuario debe subirlo en Ajustes → Negocio).
+///
+/// ADR-0202 (pending): this hard failure becomes a FALLBACK — use the `own` cert only if
+/// uploaded, else ERPlora's `delegated` cert (distributed by the SaaS control plane); error only
+/// when neither exists. Endpoint and the `Representante` block must follow the chosen cert.
 async fn build_identity(
     host: &dyn NativeHost,
     hub_id: &str,

@@ -13,6 +13,12 @@
 //! este fix, sin el prefijo `v1:`) se siguen LEYENDO igual (compat hacia atrás); se re-cifran de
 //! forma perezosa la próxima vez que alguien vuelva a subir el certificado (no hay migración de
 //! arranque — ver `secret_box.rs` para el porqué).
+//!
+//! ADR-0202 (pending): this table grows a second slot — `kind = 'own' | 'delegated'`. `own` is
+//! the business cert uploaded here (unchanged; ADR-0079/0081 stay in force). `delegated` is
+//! ERPlora's Sello de Entidad, distributed and rotated by the SaaS control plane (pull on boot,
+//! on heartbeat version mismatch, and on any TLS failure against the AEAT). Selection rule:
+//! `own` wins ONLY if uploaded — a fallback, never a user-facing option.
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value};
 

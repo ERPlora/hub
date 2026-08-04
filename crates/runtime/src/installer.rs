@@ -257,6 +257,11 @@ pub async fn set_status(
 
 /// Desinstala: quita capacidades del registro y borra la fila de `hub_module` **de este hub**
 /// (no toca el mismo módulo en otros hubs de la BD compartida). No borra datos.
+///
+/// ADR-0202 guard R2 (pending): uninstalling or disabling `verifactu` with unsent fiscal records
+/// must be BLOCKED (or drain first) — today this drops the module and nothing ever drains its
+/// contingency queue, leaving records the AEAT never receives ("RF huérfanos", forbidden by the
+/// AEAT developer FAQ §5).
 pub async fn uninstall(
     db: &dyn DatabaseAdapter,
     registry: &mut Registry,
