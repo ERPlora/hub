@@ -11,6 +11,22 @@
 // autoridad: valida permiso, hub_id, payload y ejecuta). El WC es una mini-app que llama a
 // `query`/`command`/`on`; nunca toca la BD ni confía en su propio `hasPermission` para seguridad.
 
+// Contrato público de cantidades (ADR-0147). Vive en un fichero sin dependencias para que los
+// módulos puedan importarlo también de forma tree-shakeable desde `@erplora/module-sdk`.
+export {
+  QUANTITY_SCALE,
+  toMicro,
+  fromMicro,
+  parseQuantity,
+  formatQuantity,
+  onGrid,
+  // Con extensión a propósito: los tests del SDK corren con el runner de
+  // `node:test` sobre ESM (`--experimental-transform-types`), que EXIGE el
+  // especificador completo. Sin el `.ts` este barrel no resuelve y tumbaba
+  // `index.test.ts` entero — que es como se coló, porque `quantity.test.ts`
+  // importa el módulo directamente y por sí solo pasaba en verde.
+} from './quantity.ts';
+
 export interface ErploraTransport {
   query(name: string, params?: Record<string, unknown>): Promise<unknown>;
   command(name: string, payload?: Record<string, unknown>): Promise<unknown>;
