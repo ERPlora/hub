@@ -31,6 +31,12 @@ pub struct HubMeta {
     pub country: String,
     /// ISO-4217 (`EUR`).
     pub currency: String,
+    /// `hub_id` of the ORIGIN hub. Lets the import tell a same-hub restore (the fiscal chain
+    /// may be applied) from a cross-hub one (it must not — ADR-0202 §4.2, hub#312).
+    /// `#[serde(default)]` ⇒ bundles older than this field read as "unknown origin", which
+    /// imports conservatively (the chain section is discarded).
+    #[serde(default)]
+    pub hub_id: String,
 }
 
 /// Un módulo referenciado por el bundle: se instala al importar; `with_data` indica si el
@@ -277,6 +283,7 @@ pub async fn export_hub(
             name: setting(db, hub_id, "business_name").await.unwrap_or_default(),
             country: setting(db, hub_id, "country").await.unwrap_or_else(|| "ES".into()),
             currency: setting(db, hub_id, "currency").await.unwrap_or_else(|| "EUR".into()),
+            hub_id: hub_id.to_string(),
         },
         created_at: created_at.to_string(),
         modules: manifest_modules,
@@ -681,7 +688,12 @@ mod tests {
             purpose: BundlePurpose::Backup,
             name: "barberia".into(),
             locale: "es".into(),
-            hub: HubMeta { name: "Demo".into(), country: "ES".into(), currency: "EUR".into() },
+            hub: HubMeta {
+                name: "Demo".into(),
+                country: "ES".into(),
+                currency: "EUR".into(),
+                hub_id: "6c9e7a52-0f1b-4b2e-9c1d-2f8a5e3d7b10".into(),
+            },
             created_at: "2026-07-11T18:00:00Z".into(),
             modules: vec![ManifestModule { id: "taxes".into(), version: "2.1.1".into(), with_data: true }],
             sections: vec!["hub_settings".into(), "modules/taxes".into()],

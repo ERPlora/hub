@@ -122,7 +122,9 @@ pub async fn import_sections(
 
     let mut report = ImportReport::default();
     for section in &manifest.sections {
-        let status = match ignored_by_purpose(manifest, section) {
+        let status = match ignored_by_purpose(manifest, section)
+            .or_else(|| chain_not_portable(manifest, section, target_hub_id))
+        {
             Some(motivo) => SectionStatus::Ignored(motivo),
             None => {
                 apply_section(rt, section, files, selection, target_hub_id, batch_id.as_deref())
@@ -162,6 +164,31 @@ fn ignored_by_purpose(manifest: &BlueprintManifest, section: &str) -> Option<Str
         "una plantilla no aplica identidades: la sección `{section}` del bundle se ha descartado \
          (usuarios, roles, PIN y datos fiscales son de cada negocio)"
     ))
+}
+
+/// The fiscal chain never travels across installations (ADR-0202 §4.2 — hub#312).
+///
+/// `NumeroInstalacion` = `hub_id`: the `verifactu` data section (chain records, contingency
+/// queue, events, AEAT log) is the fiscal history of ONE installation. Applied under another
+/// hub, its next record would chain on a `RegistroAnterior` the AEAT never received for that
+/// installation — and another hub's pending queue would get transmitted under the wrong
+/// `NumeroInstalacion`. A bundle proves its origin only through `manifest.hub.hub_id`
+/// (bundles older than that field read as unknown origin and import conservatively); the
+/// SAME hub restoring its own backup resumes its own chain (AEAT developer FAQ §4).
+fn chain_not_portable(
+    manifest: &BlueprintManifest,
+    section: &str,
+    target_hub_id: &str,
+) -> Option<String> {
+    if section != "modules/verifactu" || manifest.hub.hub_id == target_hub_id {
+        return None;
+    }
+    Some(
+        "la cadena VeriFactu pertenece a la instalación de origen (NumeroInstalacion = hub_id): \
+         los registros fiscales de otro hub no se aplican aquí — este hub abre su propia cadena \
+         con PrimerRegistro=S"
+            .into(),
+    )
 }
 
 /// Aplica una sección; cualquier fallo queda contenido en su `SectionStatus::Failed`.

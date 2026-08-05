@@ -586,6 +586,16 @@ struct RecordInput {
 /// si dos creates compiten, el segundo INSERT viola el índice y SU transacción entera revierte
 /// (sin fork de cadena). En SQLite además las escrituras se serializan.
 async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -> Result<Output> {
+    // ADR-0202 §4.2 (phase 0, hub#312): `NumeroInstalacion` is this hub's UUID before the AEAT
+    // and can never be reused — a record built under a slug or any non-UUID id would register a
+    // bogus installation that Hacienda can neither reconcile nor keep unique. Hard fail, before
+    // any sequence number is consumed.
+    if uuid::Uuid::parse_str(&ctx.hub_id).is_err() {
+        return Err(RuntimeError::Native(format!(
+            "verifactu: context.hub_id {:?} is not a UUID — NumeroInstalacion must be the hub UUID",
+            ctx.hub_id
+        )));
+    }
     // Ancla de cadena: última fila ENCADENABLE por (hub_id, issuer_nif). Un registro `rejected`
     // no está en la AEAT, así que su huella no puede ser el `previous_hash` del siguiente —
     // encadenar ahí garantiza otro rechazo y deja la cadena parada (`is_chainable_status`).
