@@ -413,6 +413,9 @@ pub struct AppState {
     /// y viaja al Cloud en el heartbeat de `daily_usage`. Es el reloj con el que el Cloud apaga
     /// (60d) y acaba borrando (120d) los hubs free en los que nadie entra. Ver `crate::activity`.
     pub activity: Arc<crate::activity::ActivityState>,
+    /// Brute-force guard for the PIN login (hub#329). A PIN is 4 digits on a host that lives on
+    /// the public internet; without a failure counter those are 10,000 free tries.
+    pub login_throttle: Arc<crate::login_throttle::LoginThrottle>,
 }
 
 impl AppState {
@@ -462,6 +465,7 @@ impl AppState {
             vector: None,
             entitlement: crate::entitlement::new_shared(),
             activity: Arc::new(crate::activity::ActivityState::new()),
+            login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
         }
     }
 

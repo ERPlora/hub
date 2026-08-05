@@ -40,6 +40,7 @@ pub mod entitlement;
 pub mod error_sink;
 pub mod export_import;
 pub mod hub_users;
+pub mod login_throttle;
 pub mod reset;
 pub mod ingest;
 pub mod install;
@@ -2055,18 +2056,36 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
             }
         }
     }
+    // Brute-force guard (hub#329): checked BEFORE verifying, so a locked identity stops leaking
+    // the right/wrong signal an attacker is fishing for.
+    if let Some(retry_after_secs) = st.login_throttle.locked_for(&req.name) {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({
+                "ok": false,
+                "error": "demasiados intentos fallidos: espera unos minutos",
+                "code": "too_many_attempts",
+                "retry_after_secs": retry_after_secs
+            })),
+        )
+            .into_response();
+    }
     match rt.verify_pin(&req.name, &req.pin).await {
         Ok(Some(user)) => {
+            st.login_throttle.record_success(&req.name);
             // Límite de dispositivos del plan (ADR-0154): lo aporta el estado de entitlement del
             // server (fail-open a 0 = ilimitado si el lock está envenenado o aún no hubo refresh).
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
             mint_session(&rt, user, req.device_id.as_deref(), max_devices).await
         }
-        Ok(None) => (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
-        )
-            .into_response(),
+        Ok(None) => {
+            st.login_throttle.record_failure(&req.name);
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
+            )
+                .into_response()
+        }
         Err(e) => err_response(e),
     }
 }
