@@ -345,6 +345,7 @@ mod tests {
                 emit: vec![],
                 handler: None,
                 min_affected_rows: None,
+                expect_rows: None,
                 ai: Some(AiTool {
                     description: "Revierte el efecto en caja de una venta anulada".to_string(),
                     name: None,

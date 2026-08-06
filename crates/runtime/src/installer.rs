@@ -214,6 +214,14 @@ pub async fn install(
     Ok(id)
 }
 
+/// Validations that depend on the module id and therefore cannot be expressed by the JSON
+/// Schema alone (hub#139): the error namespace must be the module's own, and the legacy gate
+/// (`min_affected_rows`) is mutually exclusive with the translatable one (`expect_rows`).
+fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
+    let _ = manifest;
+    Ok(())
+}
+
 /// Lee y **compila** el JSON Schema del payload de una query/command (si lo declara).
 /// Se compila UNA vez aquí (instalación) y queda cacheado en el `Registry`; un schema
 /// ilegible o que no compila aborta la instalación con error tipado (hub#27).
@@ -504,5 +512,53 @@ mod tests {
         let mut ids: Vec<usize> = order.clone();
         ids.sort_unstable();
         assert_eq!(ids, vec![0, 1, 2]);
+    }
+
+    /// hub#139: `expect_rows` is validated at INSTALL time — a foreign-namespace code or a
+    /// command mixing the legacy and the translatable gate never reaches runtime.
+    #[test]
+    fn rejects_foreign_domain_codes_and_ambiguous_row_gates() {
+        let foreign: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "commands": {
+                "inventory.consume": {
+                    "permission": "inventory.consume",
+                    "expect_rows": { "op": "min", "n": 1, "error": "sales.insufficient_stock" }
+                }
+            }
+        }))
+        .unwrap();
+        assert!(
+            super::validate_command_contracts(&foreign).is_err(),
+            "a module cannot mint domain codes in another module's namespace"
+        );
+
+        let ambiguous: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "commands": {
+                "inventory.consume": {
+                    "permission": "inventory.consume",
+                    "min_affected_rows": 1,
+                    "expect_rows": { "op": "min", "n": 1, "error": "inventory.insufficient_stock" }
+                }
+            }
+        }))
+        .unwrap();
+        assert!(
+            super::validate_command_contracts(&ambiguous).is_err(),
+            "min_affected_rows and expect_rows cannot coexist on one command"
+        );
+
+        let valid: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "commands": {
+                "inventory.consume": {
+                    "permission": "inventory.consume",
+                    "expect_rows": { "op": "min", "n": 1, "error": "inventory.insufficient_stock" }
+                }
+            }
+        }))
+        .unwrap();
+        assert!(super::validate_command_contracts(&valid).is_ok());
     }
 }

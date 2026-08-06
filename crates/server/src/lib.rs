@@ -2487,3 +2487,49 @@ async fn ws_loop(mut socket: WebSocket, st: AppState) {
         }
     }
 }
+
+#[cfg(test)]
+mod err_response_tests {
+    //! hub#139: HTTP mapping of the domain error channel. The namespaced code must travel to
+    //! the caller verbatim (the UI translates by code), on a status the SDK never swallows.
+    use super::err_response;
+    use axum::http::StatusCode;
+    use erplora_runtime::RuntimeError;
+    use http_body_util::BodyExt;
+    use serde_json::Value;
+
+    async fn shape(e: RuntimeError) -> (StatusCode, Value) {
+        let resp = err_response(e);
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn domain_error_maps_to_409_with_the_namespaced_code() {
+        let (status, body) = shape(RuntimeError::Domain {
+            code: "inventory.insufficient_stock".into(),
+            message: "Not enough stock".into(),
+        })
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["ok"], Value::Bool(false));
+        assert_eq!(body["error"]["code"], "inventory.insufficient_stock");
+        assert_eq!(body["error"]["message"], "Not enough stock");
+    }
+
+    #[tokio::test]
+    async fn min_affected_rows_maps_to_409_with_its_stable_kind_code() {
+        // Before hub#139 this fell into the generic 400 `{code:"error"}` bucket, erasing the
+        // stable `not_found`/`conflict` code hub#140 introduced at the runtime layer.
+        let (status, body) = shape(RuntimeError::MinAffectedRows {
+            command: "w140.items.confirm".into(),
+            required: 1,
+            affected: 0,
+            kind: erplora_runtime::errors::AffectedKind::NotFound,
+        })
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["error"]["code"], "not_found");
+    }
+}

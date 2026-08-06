@@ -19,6 +19,16 @@
       "sql": ["commands/items_confirm.sql"], "emit": ["w140.item.confirmed"],
       "min_affected_rows": 1
     },
+    "w140.items.consume": {
+      "permission": "w140.item.transition", "transaction": true,
+      "sql": ["commands/items_confirm.sql"], "emit": ["w140.item.consumed"],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "w140.insufficient_stock",
+        "message": "Not enough stock"
+      }
+    },
     "w140.items.legacy_touch": {
       "permission": "w140.item.update", "transaction": true,
       "sql": ["commands/items_touch.sql"], "emit": ["w140.item.touched"]

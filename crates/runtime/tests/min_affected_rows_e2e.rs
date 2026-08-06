@@ -217,3 +217,57 @@ async fn sin_el_campo_legacy_emite_aunque_mutara_cero_filas() {
         "el command legacy emite aunque no mutara nada — compatibilidad hacia atrás"
     );
 }
+
+// ── hub#139: domain error channel ────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn expect_rows_maps_zero_rows_to_a_namespaced_domain_error_and_does_not_emit() {
+    // hub#139: `expect_rows` is the translatable flavour of `min_affected_rows`. A rejected
+    // UPDATE must surface the module-declared, namespaced code (the UI translates by code via
+    // the module i18n catalog, ADR-0055) instead of the generic MinAffectedRows variant — and
+    // the whole tx (mutation + outbox) must still roll back.
+    let rt = fresh_runtime().await;
+    let ctx = admin_ctx();
+
+    let err = rt
+        .execute_command(
+            "w140.items.consume",
+            &params(json!({ "item_id": "out-of-stock" })),
+            &ctx,
+        )
+        .await
+        .expect_err("0 affected rows must become a translatable business rejection");
+    assert!(
+        matches!(
+            err,
+            RuntimeError::Domain { ref code, ref message }
+                if code == "w140.insufficient_stock" && message == "Not enough stock"
+        ),
+        "expected Domain with the manifest-declared code/message, got {err:?}"
+    );
+
+    assert_eq!(
+        outbox_count(&rt, "h1", "w140.item.consumed").await,
+        0,
+        "the rejected UPDATE rolls back its emit as well"
+    );
+}
+
+#[tokio::test]
+async fn expect_rows_lets_a_real_mutation_commit_and_emit() {
+    // Happy path: when the gate holds, `expect_rows` must be invisible — the tx commits and the
+    // declared event reaches the outbox exactly like a legacy command.
+    let rt = fresh_runtime().await;
+    let ctx = admin_ctx();
+    let id = create_item(&rt, &ctx, "Beans").await;
+
+    rt.execute_command("w140.items.consume", &params(json!({ "item_id": id })), &ctx)
+        .await
+        .expect("a matching UPDATE passes the expect_rows gate");
+
+    assert_eq!(
+        outbox_count(&rt, "h1", "w140.item.consumed").await,
+        1,
+        "the committed mutation emits its declared event"
+    );
+}
