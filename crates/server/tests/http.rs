@@ -203,6 +203,38 @@ async fn unknown_query_is_404() {
 }
 
 #[tokio::test]
+async fn get_api_query_route_does_not_exist_405_never_404_never_spa() {
+    // hub#332: a production hub's console showed `GET /api/query → 404` on every panel load.
+    // The query endpoint is POST-only by contract and the GET has NO legitimate caller — none
+    // exists in the shell, the module SDK, any module bundle, or their full git histories.
+    // This pins the router shape on both sides:
+    //   - a stray GET answers 405 (method not allowed), NOT 404 (which would suggest the
+    //     endpoint itself is missing) — and nobody may "fix" the console noise by registering
+    //     a GET handler (that would mask the symptom instead of removing the caller);
+    //   - the SPA static fallback never swallows it into a 200 index.html either.
+    let get = |uri: &str| {
+        Request::builder()
+            .method("GET")
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap()
+    };
+
+    // Bare API router.
+    let resp = make_app().await.oneshot(get("/api/query")).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
+
+    // Wrapped with the static frontend (what production serves): same answer, no SPA fallback.
+    let dir = std::env::temp_dir().join(format!("erplora_static_332_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), "<!doctype html><title>x</title>").unwrap();
+    let router = with_static_frontend(make_app().await, dir.to_str().unwrap());
+    let resp = router.oneshot(get("/api/query")).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[tokio::test]
 async fn hub_context_returns_configured_hub_id() {
     use erplora_server::HubConfig;
     let db = fresh_db().await;
