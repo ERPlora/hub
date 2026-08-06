@@ -114,6 +114,31 @@ pub(crate) async fn execute_at(
         ctx
     };
 
+    // PRECONDICIÓN FISCAL (hub#328): un command que se declara `fiscal_document` no se ejecuta sin
+    // la identidad del emisor. Hasta ahora nadie la validaba —`_insert_invoice.sql` cae a
+    // `COALESCE(NULLIF(:issuer_nif,''), :business_tax_id)`, así que vacío + vacío emitía una factura
+    // con el emisor EN BLANCO y VeriFactu encadenaba desde ahí (ADR-0189: un registro remitido no se
+    // reenvía). Se comprueba DESPUÉS de resolver la identidad (arriba) y ANTES de ejecutar nada.
+    // El requisito es país-agnóstico: razón social + NIF del emisor son obligatorios en toda la UE;
+    // el módulo solo declara QUÉ es un documento fiscal, el core decide qué exige. Es lo que hace
+    // verdadero el nivel ⛔ de `setup.status`.
+    if let Some(cmd) = registry.commands.get(name) {
+        if cmd.def.fiscal_document {
+            let mut missing = Vec::new();
+            if ctx.business_tax_id.trim().is_empty() {
+                missing.push("business_tax_id");
+            }
+            if ctx.business_legal_name.trim().is_empty() {
+                missing.push("business_legal_name");
+            }
+            if !missing.is_empty() {
+                return Err(RuntimeError::BusinessIdentityRequired {
+                    missing: missing.join(", "),
+                });
+            }
+        }
+    }
+
     let cmd = registry
         .get_command(name)
         .ok_or_else(|| RuntimeError::CommandNotFound(name.to_string()))?;
@@ -750,6 +775,7 @@ mod tests {
             schema: None,
             expose_api: false,
             internal: false,
+            fiscal_document: false,
         }
     }
 
@@ -1326,5 +1352,104 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(out["ok"], serde_json::json!(true));
+    }
+
+    // ── Fiscal precondition (hub#328) ────────────────────────────────────────────────────────
+
+    /// Registry whose single command declares (or not) that it issues a fiscal document.
+    fn registry_with_fiscal_command(name: &str, fiscal_document: bool) -> Registry {
+        let mut reg = registry_with_command("invoice", name);
+        reg.commands.get_mut(name).unwrap().def.fiscal_document = fiscal_document;
+        reg
+    }
+
+    /// A hub whose fiscal identity was never filled in — the ⛔ item of `setup.status` is pending.
+    fn ctx_without_identity() -> RequestContext {
+        RequestContext::new("h1", "u1", ["*".to_string()])
+    }
+
+    /// A hub with the system tables in place (so `hub_settings` can be read/seeded) and no fiscal
+    /// identity anywhere — neither in the context nor in the settings.
+    async fn runtime_without_identity() -> crate::Runtime {
+        let db = erplora_db::testutil::fresh_db().await;
+        db.execute_batch("CREATE TABLE x (n INTEGER);").await.unwrap();
+        let rt = crate::Runtime::new(Box::new(db));
+        rt.ensure_system_tables().await.expect("system tables");
+        rt
+    }
+
+    async fn rows_written(db: &dyn DatabaseAdapter) -> i64 {
+        let r = db
+            .query("SELECT COUNT(*) AS c FROM x", &Params::new())
+            .await
+            .unwrap();
+        r.rows[0]["c"]
+            .as_i64()
+            .or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64))
+            .unwrap_or(-1)
+    }
+
+    /// No identity, no fiscal document — and NOTHING is written. `invoice/_insert_invoice.sql`
+    /// falls back to the hub identity with `COALESCE(NULLIF(:issuer_nif,''), :business_tax_id)`,
+    /// so empty + empty used to issue an invoice with a blank issuer — and VeriFactu chains from
+    /// there (ADR-0189: a transmitted record is not resent).
+    #[tokio::test]
+    async fn a_fiscal_document_is_refused_without_the_business_identity() {
+        let rt = runtime_without_identity().await;
+        let reg = registry_with_fiscal_command("invoice.issue", true);
+        let err = execute(rt.db(), &reg, "invoice.issue", &Params::new(), &ctx_without_identity())
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::BusinessIdentityRequired { .. }),
+            "got {err:?}"
+        );
+        assert_eq!(rows_written(rt.db()).await, 0, "the command SQL must not have run");
+    }
+
+    /// The error names what is missing, so the UI can point at the field instead of saying «no».
+    /// The half-filled identity lives in `hub_settings` (the runtime re-reads it whenever the
+    /// context has no tax id — that is the real shape of a hub mid-setup).
+    #[tokio::test]
+    async fn the_refusal_names_the_missing_field() {
+        let rt = runtime_without_identity().await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_legal_name".into(), serde_json::json!("Bar Manolo SL"));
+        crate::settings::set_many(rt.db(), "h1", &updates, "u1")
+            .await
+            .expect("seed the legal name, leaving the tax id empty");
+        let reg = registry_with_fiscal_command("invoice.issue", true);
+        let err = execute(rt.db(), &reg, "invoice.issue", &Params::new(), &ctx_without_identity())
+            .await
+            .unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("business_tax_id"), "{message}");
+        assert!(
+            !message.contains("business_legal_name"),
+            "the legal name IS set, so it must not be reported as missing: {message}"
+        );
+    }
+
+    /// With the identity in place the document is issued, exactly as before.
+    #[tokio::test]
+    async fn a_fiscal_document_with_the_identity_goes_through() {
+        let rt = runtime_without_identity().await;
+        let reg = registry_with_fiscal_command("invoice.issue", true);
+        execute(rt.db(), &reg, "invoice.issue", &Params::new(), &ctx_admin())
+            .await
+            .expect("with a filled-in identity the document is issued");
+        assert_eq!(rows_written(rt.db()).await, 1);
+    }
+
+    /// The gate is opt-in per command: everything that is not a fiscal document is untouched, so
+    /// the 24 published modules keep working without a single change.
+    #[tokio::test]
+    async fn a_non_fiscal_command_does_not_require_the_identity() {
+        let rt = runtime_without_identity().await;
+        let reg = registry_with_fiscal_command("invoice.draft", false);
+        execute(rt.db(), &reg, "invoice.draft", &Params::new(), &ctx_without_identity())
+            .await
+            .expect("a non-fiscal command runs without the business identity");
+        assert_eq!(rows_written(rt.db()).await, 1);
     }
 }

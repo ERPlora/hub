@@ -509,6 +509,7 @@ mod tests {
             ai: None,
             expose_api,
             internal,
+            fiscal_document: false,
         }
     }
 

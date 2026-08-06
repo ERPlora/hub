@@ -53,6 +53,11 @@ pub enum RuntimeError {
     },
     #[error("permiso denegado: requiere `{0}`")]
     PermissionDenied(String),
+    /// Precondición fiscal (hub#328): un command que declara `fiscal_document` no se ejecuta sin
+    /// la identidad del emisor. `missing` nombra las claves que faltan (`business_tax_id`,
+    /// `business_legal_name`) para que la UI apunte al campo en vez de decir «no».
+    #[error("faltan los datos fiscales del negocio ({missing}): no se puede emitir un documento fiscal sin ellos")]
+    BusinessIdentityRequired { missing: String },
     /// El módulo necesita una **capability** (ADR-0079: red/certificado/impresora/notify) que el
     /// usuario NO ha concedido (default-deny). Distinto de `PermissionDenied` (RBAC de usuario):
     /// esto es el permiso módulo→host, gestionado en Settings → Permisos.

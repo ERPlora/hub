@@ -1636,6 +1636,9 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     use erplora_runtime::RuntimeError as E;
     let (status, code) = match &e {
         E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied"),
+        // Precondición fiscal (hub#328): 409 — no es un permiso que falte, es un requisito del
+        // negocio que el usuario puede cumplir yendo a Ajustes → Negocio.
+        E::BusinessIdentityRequired { .. } => (StatusCode::CONFLICT, "business_identity_required"),
         E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
         // hub#131, hub#145: un command interno (prefijo `_`/`internal:true`) invocado desde un
         // origen EXTERNO. `403` (como `permission_denied`): el command EXISTE, pero esta puerta

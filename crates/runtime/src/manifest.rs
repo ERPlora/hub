@@ -666,6 +666,14 @@ pub struct CommandDef {
     /// módulos que prefieren blindarlo explícitamente sin ese prefijo. Ver [`CommandDef::is_internal`].
     #[serde(default)]
     pub internal: bool,
+    /// ¿Este command emite un DOCUMENTO FISCAL? (hub#328). El módulo declara **qué** lo es; el
+    /// CORE decide qué exige — hoy, la identidad del emisor (`business_tax_id` ∧
+    /// `business_legal_name`), que es requisito en toda la UE y no de un país concreto. Es lo que
+    /// hace verdadero el nivel ⛔ de `setup.status`: si la checklist dice «bloquea» y se puede
+    /// facturar igual, la checklist es decorativa. OPT-IN: ausente = command normal, así que los
+    /// módulos publicados no se tocan.
+    #[serde(default)]
+    pub fiscal_document: bool,
 }
 
 impl CommandDef {

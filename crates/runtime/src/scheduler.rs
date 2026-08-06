@@ -433,6 +433,7 @@ mod tests {
                 schema: None,
                 expose_api: false,
                 internal: false,
+                fiscal_document: false,
             },
             sql: vec![sql.to_string()],
             wasm: None,

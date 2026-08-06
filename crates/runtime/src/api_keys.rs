@@ -461,6 +461,7 @@ mod tests {
             ai: None,
             expose_api: expose,
             internal: false,
+            fiscal_document: false,
         }
     }
 

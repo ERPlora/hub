@@ -238,6 +238,7 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
     match err {
         E::InvalidPayload { .. }
         | E::PermissionDenied(_)
+        | E::BusinessIdentityRequired { .. }
         | E::CommandNotFound(_)
         | E::QueryNotFound(_)
         | E::InternalCommand(_)
@@ -266,6 +267,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         // única fuente de verdad del nombre, así que la regla vive en `AffectedKind`.
         E::MinAffectedRows { kind, .. } => kind.as_str(),
         E::PermissionDenied(_) => "permission_denied",
+        E::BusinessIdentityRequired { .. } => "business_identity_required",
         E::CapabilityDenied { .. } => "capability_denied",
         E::MissingDependency { .. } => "missing_dependency",
         E::DependencyCycle { .. } => "dependency_cycle",

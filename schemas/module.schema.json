@@ -264,6 +264,11 @@
             "default": false,
             "description": "Opt-in: expone este command en la API pública REST/OpenAPI por módulo (ADR-0057, `architecture/hub/public-api.md`). Doble puerta: además de estar marcado, la API key debe tener el `permission` del command (escritura del módulo). Por defecto false → el command NO es accesible vía API key aunque la key tuviera el permiso. Espejo del flag `external` de los hooks de salida (ADR-0049)."
           },
+          "fiscal_document": {
+            "type": "boolean",
+            "default": false,
+            "description": "¿Este command emite un DOCUMENTO FISCAL (factura, tique, nota de abono)? (hub#328). El módulo declara QUÉ lo es; el CORE decide qué exige — hoy la identidad del emisor (`business_tax_id` ∧ `business_legal_name` de `hub_settings`), requisito en toda la UE y no de un país concreto. Sin ella el runtime rechaza el command con `business_identity_required` (HTTP 409) ANTES de ejecutar su SQL: hasta ahora `COALESCE(NULLIF(:issuer_nif,''), :business_tax_id)` emitía facturas con el emisor EN BLANCO y VeriFactu encadenaba desde ahí. Es lo que hace verdadero el nivel ⛔ del estado de configuración (`setup.status`): si la checklist dice «bloquea» y se puede facturar igual, la checklist es decorativa. OPT-IN: ausente = command normal."
+          },
           "internal": {
             "type": "boolean",
             "default": false,
