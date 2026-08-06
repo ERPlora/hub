@@ -244,6 +244,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#140: un `min_affected_rows` incumplido es un error esperable del llamador (recurso
         // inexistente / transición no aplicable), no un fallo inesperado del Hub.
         | E::MinAffectedRows { .. }
+        // hub#328: the fiscal precondition is expected state of a hub that has not finished its
+        // setup (missing business identity/certificate) — never a Hub bug worth an issue.
+        | E::FiscalPrecondition { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -279,6 +282,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::Notify(_) => "notify",
         E::Storage(_) => "module_storage",
         E::Certificate(_) => "certificate",
+        E::FiscalPrecondition { .. } => "fiscal_precondition_failed",
         E::Other(_) => "other",
     }
 }

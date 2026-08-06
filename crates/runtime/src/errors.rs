@@ -96,6 +96,15 @@ pub enum RuntimeError {
     /// del core: el módulo (verifactu, B2B…) solo PIDE la operación, no ve el `.p12`.
     #[error("host.certificate: {0}")]
     Certificate(String),
+    /// Fiscal precondition failed (hub#328, ADR-0203): a command whose SQL stamps the hub's
+    /// business identity into a document (it references the injected `:business_tax_id` /
+    /// `:business_legal_name` params — ADR-0061) cannot run while that identity is missing.
+    /// Without the gate, empty + empty produced an issued invoice with a BLANK issuer, and
+    /// VeriFactu chains from it (ADR-0189: an accepted record is never re-sent). `missing`
+    /// lists the unmet requirements: `business_legal_name`, `business_tax_id`, `certificate`
+    /// (the latter only while an installed module declares the `certificate` capability).
+    #[error("fiscal precondition failed: configure {} before issuing fiscal documents", missing.join(", "))]
+    FiscalPrecondition { missing: Vec<&'static str> },
     /// Error genérico que no encaja en una variante específica (p. ej. fallo del hasher argon2id
     /// al fijar un PIN, hub#15). Mensaje libre.
     #[error("{0}")]
