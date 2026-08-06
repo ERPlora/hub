@@ -1,34 +1,37 @@
 # hub — Arquitectura
 
-> **ADR-0154 — el Hub es Postgres-only y Cloud-only (PWA + Bridge).** Se retiró el producto
-> Hub Local (Tauri desktop) y el backend SQLite. La historia queda en el decision-log del repo
-> `architecture`.
+> **ADR-0154 + ADR-0196 — el Hub es Postgres-only y Cloud-only (PWA + app instalable).** Se
+> retiró el producto Hub Local (Tauri desktop) y el backend SQLite. La historia queda en el
+> decision-log del repo `architecture`.
 >
 > **Documento de diseño.** Define el Hub de
 > ERPlora: **Vue 3 + Ionic + Rust/Axum + módulos declarativos (module.json) +
-> WASM + SDK**, con **PostgreSQL per-org en cloud** (Hetzner `db-a`; AWS: Aurora, fallback).
+> WASM + SDK**, con **PostgreSQL per-hub — una BD por hub** (ADR-0201; decidido, provisioning
+> SaaS en migración 9/11) en cloud (Hetzner `db-a`; AWS: Aurora, fallback).
 >
 > **hub ES el Hub de ERPlora.**
 >
 > Fuentes: diseño AI/RAG [architecture/hub/crates/vector.md](../architecture/hub/crates/vector.md) (ADR-0033), mapa del monorepo
 > [CLAUDE.md](../CLAUDE.md), repo de arquitectura seccionado [architecture/](../architecture/).
 >
-> **Estado:** propuesta + scaffolding inicial (`apps/web` Vue 3 + Ionic, primer módulo
-> `modules/inventory` con WC Lit; CSP validada — §14). Última actualización: 2026-06-30
-> (decisiones fijadas: impresoras **solo LAN**, **PK = UUID v4 `TEXT` en todo** el dato de negocio (ADR-0035, sin remapeo) — §2.5, §2.7, §14).
+> **Estado:** en producción — 24 módulos, runtime con suites e2e amplias, imagen Docker del
+> tenant, instalación E2E por marketplace con SHA256. Estado vivo: `/estado`.
+> Última actualización: 2026-08-06.
 >
 > 🏗️ **Infra cloud (jul-2026):** donde este doc dice **Aurora/ECS** como backend del Hub Cloud, el
-> proveedor **ACTIVO es Hetzner** — Postgres 18 per-org (`db-a` + standby `db-b`) desplegado como
+> proveedor **ACTIVO es Hetzner** — Postgres 18 per-hub, una BD por hub (ADR-0201; decidido,
+> provisioning SaaS en migración 9/11) (`db-a` + standby `db-b`) desplegado como
 > **Dokploy application en el cluster Swarm**; **AWS (ECS + Aurora) = fallback seleccionable, sin infra
 > viva** (`get_provider`). Ver [CLAUDE.md](CLAUDE.md) y [architecture/hub/overview.md](../architecture/hub/overview.md).
 >
-> ⚠️ **Las secciones §2.x y §8–§12 citadas en este documento (tenancy, auth, module-system,
-> instalación, RAG/asistente, entitlement…) ya no existen como headers aquí: se reubicaron a**
-> [architecture/hub/tenancy.md](../architecture/hub/tenancy.md),
-> [architecture/hub/auth.md](../architecture/hub/auth.md),
-> [architecture/hub/module-system.md](../architecture/hub/module-system.md) y
-> [architecture/hub/overview.md](../architecture/hub/overview.md). Las referencias `§2.x`/`§8`-`§12`
-> que quedan sueltas en el texto son residuo de esa reubicación.
+> ⚠️ **Varias secciones citadas en este documento se reubicaron:** §2.3 (auth) →
+> [architecture/hub/auth.md](../architecture/hub/auth.md), §2.5 (tenancy) →
+> [architecture/hub/tenancy.md](../architecture/hub/tenancy.md), §2.2 (module-system) →
+> [architecture/hub/module-system.md](../architecture/hub/module-system.md), y §8–§12
+> (instalación, RAG/asistente, entitlement…) →
+> [architecture/hub/overview.md](../architecture/hub/overview.md). **§2.7/§2.7.1 SÍ siguen
+> aquí.** Las referencias `§2.x`/`§8`-`§12` que quedan sueltas en el texto son residuo de esa
+> reubicación.
 
 ---
 
@@ -55,8 +58,8 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 
 2. **Camino de datos (backend de datos) — Postgres-only** — `apps/web` habla con el runtime vía
    `ErploraClient` (`@erplora/module-sdk`, `HttpWsTransport`) → **`erplora-server` (Axum)** en
-   `VITE_RUNTIME_URL` (def `http://127.0.0.1:8787`) → **PostgreSQL** (`HUB_DATABASE_URL`, per-org
-   en cloud; el server falla duro sin él). `ModuleView` **inyecta el cliente** en el Web
+   `VITE_RUNTIME_URL` (def `http://127.0.0.1:8787`) → **PostgreSQL** (`HUB_DATABASE_URL`, per-hub
+   — una BD por hub (ADR-0201) — en cloud; el server falla duro sin él). `ModuleView` **inyecta el cliente** en el Web
    Component del módulo (`wc.client`) para que llame `client.query/command`. Endpoints del runtime:
    `POST /api/query`, `POST /api/command`, `GET /api/navigation`, `GET /api/modules`, `GET /ws`.
    `[✓ verificado: query/command ejecutan SQL real con scoping hub_id]`
@@ -106,10 +109,12 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 
 hub es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime). Tras
 [ADR-0154](../architecture/00-overview/decision-log.md) se entrega como **un único producto**: el
-**Hub Cloud** — una **PWA/web shell** sobre **PostgreSQL** per-org, con el **Bridge** (standalone,
-red-only) para el hardware. Se retiró el producto **Hub Local** (Tauri desktop) y el backend
-**SQLite**; ya no hay dos productos ni una matriz de ejes `single`/`cloud` (framing previo retirado
-por [ADR-0080](../architecture/00-overview/decision-log.md) y consolidado por ADR-0154):
+**Hub Cloud** — una **PWA/web shell** que corre en el navegador **y, la MISMA web, dentro de la
+app instalable `com.erplora.app`** (escritorio · Android · iOS, ADR-0196), que es quien aporta el
+hardware vía `invoke` in-process; **una BD Postgres por hub** (ADR-0201). Se retiró el producto
+**Hub Local** (Tauri desktop, como producto separado) y el backend **SQLite**; ya no hay dos
+productos ni una matriz de ejes `single`/`cloud` (framing previo retirado por
+[ADR-0080](../architecture/00-overview/decision-log.md) y consolidado por ADR-0154):
 
 > **Transporte de datos ([ADR-0050](../architecture/00-overview/decision-log.md)):** un solo runtime
 > Axum, **mismo transporte de datos** = **HTTP (RPC) + WebSocket (solo eventos)**. No hay `invoke`/IPC
@@ -117,51 +122,48 @@ por [ADR-0080](../architecture/00-overview/decision-log.md) y consolidado por AD
 > ficheros es **cloud-proxy** (Hub→Cloud→Object Storage), sin rama de disco local.
 
 - **Hub Cloud (PWA)**: el navegador **no puede** abrir TCP crudo (puerto 9100), USB ni
-  Bluetooth clásico. Si el usuario necesita hardware físico, instala el **Bridge standalone**
-  (red-only); la PWA shell lo detecta por HTTP/WebSocket en `localhost`. Si no lo necesita, imprime
-  por PDF/email o impresora **ePOS-HTTP** (alcanzable por navegador).
+  Bluetooth clásico. Si el usuario necesita hardware físico, el vehículo es la **app instalable**
+  `com.erplora.app` (ADR-0196): la misma web dentro del shell Tauri, que aporta los periféricos
+  vía `invoke` in-process. Si no lo necesita, imprime por PDF/email o impresora **ePOS-HTTP**
+  (alcanzable por navegador).
 
-**Transportes de impresora** — ✅ **Decidido: SOLO RED (TCP/IP ESC/POS, puerto 9100) — 100% LAN.**
-USB y Bluetooth **se descartan**: exigen drivers + mantenimiento por dispositivo/SO que no compensa.
-La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable. El Bridge es
-**red-only por construcción**: el crate `crates/peripherals` no incluye USB ni Bluetooth. Como el
-navegador no abre TCP crudo, **imprimir requiere el Bridge standalone** o una impresora **ePOS-HTTP**;
-no hay atajo WebUSB/WebBluetooth porque el hardware es de red.
+**Transportes de impresora** — ✅ **red (TCP/IP ESC/POS, puerto 9100) en todas las plataformas**;
+en **Android vuelve además el Bluetooth SPP** (ADR-0204, dentro de
+`crates/tauri-plugin-erplora-android`, pendiente hub#388). USB se sigue descartando. La **cola de
+impresión vive EN EL HUB** (ADR-0196 §6): el dispositivo con la app instalable la drena por el WS
+del runtime. En escritorio, el autostart de la app es un ajuste **OFF por defecto** (ADR-0204,
+pendiente hub#389).
 
-**Qué se conserva** (en el componente **Bridge standalone**, alcanzado por localhost HTTP/WS desde la
-web shell — **no** en un proceso de instalación obligatoria del propio Hub):
+**Qué se conserva** (en el crate **`crates/peripherals`**, consumido **in-process** por la app
+Tauri vía `invoke` — ADR-0196; la **cola de impresión se muda al hub**, ADR-0196 §6):
 
 - **Descubrimiento de dispositivos en red + watchdog** (NECESARIO): detectar impresoras en la
   LAN (escaneo de subred / mDNS), seguir su estado (online/offline) y **re-localizarlas si su
   IP cambia por DHCP**. Sin esto, el usuario tendría que configurar IPs a mano y se rompería la
-  impresión al renovar DHCP. → tarea async en el Bridge.
+  impresión al renovar DHCP. → tarea async en `crates/peripherals`.
 - **Config de impresoras por terminal** (IP, rol recibo/cocina/barra), persistida.
-- **Cola de impresión + reintentos** (impresora apagada / sin papel).
+- **Cola de impresión + reintentos** (impresora apagada / sin papel) — la cola vive en el hub
+  (ADR-0196 §6); el dispositivo la drena.
 - **Enrutado por rol** (recibo vs cocina) cuando un terminal tiene varias configuradas.
 
 El escáner por HID lo maneja el SO/navegador como teclado.
 
 > El escenario **Hub Cloud + hardware físico** **no** queda fuera de alcance: se cubre
-> con el **Bridge standalone** (red-only). El POS en navegador es un producto de primera clase (§1),
+> con la **app instalable** (ADR-0196). El POS en navegador es un producto de primera clase (§1),
 > no una excepción.
 
-#### 2.7.1 Estado de implementación (2026-06-09) — el Bridge ya es **Rust** (fuente de verdad)
+#### 2.7.1 🪦 Bridge standalone — retirado (ADR-0196)
 
-> ✅ **Decisiones finales** (ya tomadas: lenguaje, estructura, naming, empaquetado, CI).
-> Esta sub-sección es lo que debe consultar cualquiera para saber cómo funciona el Bridge hoy.
-
-- **Lenguaje y código único.** El Bridge se reescribió de Python/Kotlin/Ionic a **Rust**. La lógica
-  vive una sola vez en el crate compartido **`hub/crates/peripherals`** (red-only, ESC/POS sobre
-  TCP:9100), con módulos `protocol · discovery · escpos · drawer · queue · registry`. *Por qué Rust:*
-  la decisión **red-only** elimina lo único que hacía fuertes a Python/Kotlin (drivers USB/serial/HID);
-  con solo red, el Bridge es un socket TCP + un server WS, trivial en Rust.
-- **Una entrega, un crate:** **Standalone** `hub/apps/bridge` — binario **Axum** que expone
-  `GET /status` + `WS /ws` en `localhost:12321`. La web shell del Hub Cloud lo alcanza por localhost
-  HTTP/WS.
+> 🪦 **ADR-0196 retira este componente.** El standalone `apps/bridge` (binario Axum,
+> `GET /status` + `WS /ws` en `localhost:12321`), el pairing y `WsBridgeTransport` siguen en el
+> árbol **solo** porque hub#339/#340 están abiertas. **No construyas nada nuevo sobre esto**: el
+> modelo vigente es la **app instalable** con `invoke` in-process y la **cola de impresión en el
+> hub**. Ver [architecture/hub/apps/bridge.md](../architecture/hub/apps/bridge.md) y
+> [architecture/hub/crates/peripherals.md](../architecture/hub/crates/peripherals.md).
 
 | Pieza | Elección | Nota |
 |-------|----------|------|
-| DB | **PostgreSQL** (`PgAdapter`, per-org en cloud) | soporta `pgvector` (clave para RAG, §9) |
+| DB | **PostgreSQL** (`PgAdapter`, per-hub — una BD por hub, ADR-0201) | soporta `pgvector` (clave para RAG, §9) |
 | Lógica avanzada | **WASM (Extism)** | Sandbox + ABI lista; evita diseñar una ABI propia al inicio |
 | Empaquetado módulo | **module.zip** | manifest + SQL + schemas + UI + WASM + docs, firmado + SHA256 |
 
