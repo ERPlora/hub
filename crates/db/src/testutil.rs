@@ -4,15 +4,17 @@
 //! The tests point at `DATABASE_URL` (default `postgres://postgres:test@localhost:5433/hub_test`).
 //! Each test gets its own uniquely-named schema; the pool's `search_path` is pinned to it, so every
 //! unqualified `CREATE TABLE`/`INSERT`/`SELECT` lands in that schema and never collides with another
-//! test's tables. Schemas are cheap and the test database is disposable (a throwaway container in
-//! CI), so we do not drop them at the end — a fresh run starts from a fresh container.
+//! test's tables. Schemas are not dropped at the end of each test (a killed process could not do it
+//! anyway); instead, the first `TestDb::new` of each test binary garbage-collects the schemas of
+//! DEAD runs — in CI the container is throwaway, but a long-lived local container would otherwise
+//! accumulate orphans until catalog queries crawl (2 822 schemas / 30 864 tables on 2026-08-06).
 //!
 //! Bring one up locally with:
 //! ```sh
 //! docker run -d --name erplora-test-pg -e POSTGRES_PASSWORD=test -p 5433:5432 postgres:18
 //! ```
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{ConnectOptions, Connection};
@@ -62,6 +64,16 @@ impl TestDb {
             .connect()
             .await
             .expect("conectar a la BD de test (¿está el Postgres de test levantado?)");
+        // One best-effort GC per test binary: schemas from dead runs (killed processes never
+        // clean up after themselves) must not pile up in a long-lived local container.
+        static GC_DONE: AtomicBool = AtomicBool::new(false);
+        if !GC_DONE.swap(true, Ordering::Relaxed) {
+            match gc_dead_run_schemas(&mut conn).await {
+                Ok(0) => {}
+                Ok(n) => eprintln!("testutil: dropped {n} orphan schemas from dead test runs"),
+                Err(e) => eprintln!("testutil: orphan-schema GC failed (ignored): {e}"),
+            }
+        }
         run(
             &mut conn,
             &format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE; CREATE SCHEMA \"{schema}\";"),
@@ -114,6 +126,54 @@ async fn ensure_database(opts: &PgConnectOptions) {
     // CREATE DATABASE no puede ir en transacción; si otra ejecución la creó ya (42P04) lo ignoramos.
     let _ = run(&mut conn, &format!("CREATE DATABASE \"{db_name}\"")).await;
     let _ = conn.close().await;
+}
+
+/// Drop ephemeral schemas (`t_<pid>_<n>`) whose owning process is no longer alive on this host.
+/// Returns how many were dropped. Safe under concurrency: a live run's schema is never touched
+/// (its PID probes alive), and two GCs racing over the same corpses just `DROP IF EXISTS` twice.
+async fn gc_dead_run_schemas(conn: &mut sqlx::PgConnection) -> Result<usize, sqlx::Error> {
+    let names: Vec<String> =
+        sqlx::query_scalar("SELECT nspname FROM pg_namespace WHERE nspname LIKE 't\\_%'")
+            .fetch_all(&mut *conn)
+            .await?;
+    let dead: Vec<String> = names
+        .into_iter()
+        .filter(|n| matches!(schema_run_pid(n), Some(pid) if !process_alive(pid)))
+        .collect();
+    // Batched so one statement never grows unbounded (thousands of orphans is the normal case
+    // this GC exists for).
+    for chunk in dead.chunks(50) {
+        let sql: String =
+            chunk.iter().map(|s| format!("DROP SCHEMA IF EXISTS \"{s}\" CASCADE; ")).collect();
+        run(&mut *conn, &sql).await?;
+    }
+    Ok(dead.len())
+}
+
+/// `t_<pid>_<n>` → the run's PID; anything else (foreign schema, unparsable name) → `None`,
+/// meaning "not ours to judge": the GC leaves it alone.
+fn schema_run_pid(name: &str) -> Option<i32> {
+    let rest = name.strip_prefix("t_")?;
+    let (pid, seq) = rest.split_once('_')?;
+    seq.parse::<u64>().ok()?;
+    let pid = pid.parse::<i32>().ok()?;
+    (pid > 0).then_some(pid)
+}
+
+/// Is a process with this PID alive on this host? Conservative: on unsupported platforms it
+/// answers "alive", so schemas are kept rather than wrongly dropped.
+#[cfg(unix)]
+fn process_alive(pid: i32) -> bool {
+    // Signal 0 = pure existence probe: 0 → alive; EPERM → alive but not ours; ESRCH → dead.
+    if unsafe { libc::kill(pid, 0) } == 0 {
+        return true;
+    }
+    std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
+}
+
+#[cfg(not(unix))]
+fn process_alive(_pid: i32) -> bool {
+    true
 }
 
 /// Run a raw (possibly multi-statement) SQL script on a single connection.

@@ -8,9 +8,11 @@ license.workspace = true
 [features]
 # Helpers de test compartidos (esquema Postgres efímero por test, aislamiento en paralelo).
 # Los activan otros crates en sus `[dev-dependencies]`: `erplora-db = { …, features = ["test-util"] }`.
-test-util = []
+test-util = ["dep:libc"]
 
 [dependencies]
+# testutil's dead-process probe (`kill(pid, 0)`) for the orphan-schema GC; test-util builds only.
+libc = { version = "0.2", optional = true }
 serde_json = "1.0.150"
 thiserror = "2.0.18"
 async-trait="0.1"
@@ -29,3 +31,5 @@ sqlx={ version = "0.9.0", default-features = false, features = [
 
 [dev-dependencies]
 tokio = { version ="^1.52.3", features = ["macros", "rt-multi-thread"] }
+# testutil also compiles under plain `cfg(test)` (this crate's own tests), without the feature.
+libc = "0.2"
