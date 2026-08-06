@@ -71,6 +71,7 @@ impl NativeHandler for EmittingHandler {
                 name: "ob.from_handler".to_string(),
                 payload: json!({}),
             }],
+            ..Output::default()
         })
     }
 }
