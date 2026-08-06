@@ -244,6 +244,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#140: un `min_affected_rows` incumplido es un error esperable del llamador (recurso
         // inexistente / transición no aplicable), no un fallo inesperado del Hub.
         | E::MinAffectedRows { .. }
+        // hub#139: a domain rejection is a business rule doing its job (insufficient stock,
+        // invalid transition) — expected caller-facing behaviour, never a Hub bug.
+        | E::Domain { .. }
         // hub#328: the fiscal precondition is expected state of a hub that has not finished its
         // setup (missing business identity/certificate) — never a Hub bug worth an issue.
         | E::FiscalPrecondition { .. }

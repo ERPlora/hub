@@ -48,6 +48,9 @@ pub async fn install(
     dir: &Path,
 ) -> Result<String> {
     let manifest = Manifest::load(dir)?;
+    // hub#139: id-dependent contract checks (domain error namespaces, exclusive row gates)
+    // run BEFORE any side effect — a broken contract never reaches migrations or the registry.
+    validate_command_contracts(&manifest)?;
 
     // `hub` es el namespace RESERVADO del core (ADR-0192): el dispatcher resuelve `hub.*` antes de
     // mirar el registry, así que un módulo con ese id tendría capacidades inalcanzables y aparentaría
@@ -218,7 +221,32 @@ pub async fn install(
 /// Schema alone (hub#139): the error namespace must be the module's own, and the legacy gate
 /// (`min_affected_rows`) is mutually exclusive with the translatable one (`expect_rows`).
 fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
-    let _ = manifest;
+    for (name, command) in &manifest.commands {
+        if command.min_affected_rows.is_some() && command.expect_rows.is_some() {
+            return Err(RuntimeError::Other(format!(
+                "manifest `{}`: command `{name}` cannot combine `min_affected_rows` and `expect_rows`",
+                manifest.id
+            )));
+        }
+        if let Some(expect) = &command.expect_rows {
+            if !crate::errors::valid_domain_code(&manifest.id, &expect.error) {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` declares the invalid domain code `{}`; expected `{}.<snake_case>`",
+                    manifest.id, expect.error, manifest.id
+                )));
+            }
+            if expect
+                .message
+                .as_ref()
+                .is_some_and(|message| message.chars().count() > 500)
+            {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` exceeds 500 characters in `expect_rows.message`",
+                    manifest.id
+                )));
+            }
+        }
+    }
     Ok(())
 }
 
