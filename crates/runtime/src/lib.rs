@@ -376,6 +376,12 @@ impl Runtime {
     /// todavía a una autoridad externa y falla si queda algo. Ver
     /// [`installer::ensure_no_pending_obligations`].
     async fn ensure_module_can_go(&self, module_id: &str) -> Result<()> {
+        // El host deja los motores nativos registrados aunque este hub no tenga el módulo. La
+        // gate protege a un módulo que SE VA: si no está, no hay nada que proteger y quien llama
+        // debe seguir viendo su «módulo no instalado» de siempre, no un rechazo de retención.
+        if !self.registry.is_installed(module_id) {
+            return Ok(());
+        }
         let host = native::DbHost {
             db: self.db.as_ref(),
             storage: None,

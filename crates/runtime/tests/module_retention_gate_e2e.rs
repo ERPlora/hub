@@ -148,6 +148,22 @@ async fn the_cascade_cannot_be_used_to_disable_a_module_that_still_owes_records(
 }
 
 #[tokio::test]
+async fn a_module_that_is_not_installed_still_reports_that_and_not_the_retention_error() {
+    // A native engine stays registered by the host even for a module this hub never installed.
+    // The gate protects a module on its way OUT; with nothing to remove there is nothing to
+    // protect, and swapping `not installed` for a retention refusal would be a lie.
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.register_native("rowing", Arc::new(OwingEngine { count: 5 }));
+
+    let err = rt.uninstall("rowing").await.expect_err("nothing to uninstall");
+    assert!(
+        matches!(err, RuntimeError::CommandNotFound(_)),
+        "expected the usual not-installed error, got {err:?}"
+    );
+}
+
+#[tokio::test]
 async fn once_everything_is_handed_over_the_module_can_be_disabled_and_removed() {
     let mut rt = hub_owing(0).await;
 
