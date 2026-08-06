@@ -148,7 +148,7 @@ import { config } from '../lib/config';
 import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
-  getModuleCapabilities, putModuleCapabilities,
+  getModuleCapabilities, putModuleCapabilities, ModuleActionError,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
@@ -577,6 +577,18 @@ async function confirmCascade(titleKey: string, msgKey: string, m: InstalledModu
   return role === 'confirm';
 }
 
+/**
+ * Motivo REAL de un rechazo del runtime, o `fallback` si no lo hubo.
+ *
+ * hub#314: desactivar/desinstalar un módulo que aún debe registros a la AEAT se rechaza con un
+ * código de dominio (`verifactu.unsent_records`) y un mensaje que dice cuántos quedan. Aplanar eso
+ * a «no se pudo desinstalar» dejaba al usuario sin saber ni qué pasa ni qué hacer — la guarda
+ * volvía a ser un no-op mudo. Sin `code` (fallo de red/500) no hay motivo que enseñar: genérico.
+ */
+function reasonOf(e: unknown, fallback: string): string {
+  return e instanceof ModuleActionError && e.code && e.message ? e.message : fallback;
+}
+
 /** Activa o desactiva un módulo (hot-plug) y refresca la lista + la nav del shell. */
 async function toggleModule(m: InstalledModule): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
@@ -592,8 +604,8 @@ async function toggleModule(m: InstalledModule): Promise<void> {
     }
     await loadInstalled();
     void refreshModuleNav();
-  } catch {
-    notify(t('apps.toggleError', { name: m.name }), 'danger');
+  } catch (e) {
+    notify(reasonOf(e, t('apps.toggleError', { name: m.name })), 'danger');
   }
 }
 
@@ -620,8 +632,8 @@ async function removeModule(m: InstalledModule): Promise<void> {
     notify(t('apps.uninstalled', { name: m.name }), 'primary');
     await Promise.all([loadInstalled(), loadCatalog()]);
     void refreshModuleNav();
-  } catch {
-    notify(t('apps.uninstallError', { name: m.name }), 'danger');
+  } catch (e) {
+    notify(reasonOf(e, t('apps.uninstallError', { name: m.name })), 'danger');
   }
 }
 

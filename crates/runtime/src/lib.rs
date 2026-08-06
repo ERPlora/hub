@@ -221,7 +221,10 @@ impl Runtime {
         // es lo coherente (sin causa no hay caída).
         for (id, status) in persisted {
             if status == ModuleStatus::Inactive && self.registry.is_installed(&id) {
-                self.deactivate(&id).await?;
+                // `_unchecked`: reponer un estado ya persistido no es una decisión nueva, así que
+                // no pasa por el retention gate (hub#314) — si lo hiciera, un módulo con registros
+                // sin remitir tumbaría el arranque o resucitaría apagado por el admin.
+                self.deactivate_unchecked(&id).await?;
             }
         }
         Ok(installed)
@@ -256,7 +259,9 @@ impl Runtime {
             match self.install_from_dir(&dir).await {
                 Ok(rid) => {
                     if status == ModuleStatus::Inactive {
-                        let _ = self.deactivate(&rid).await; // repón inactivo (install lo dejó active)
+                        // `_unchecked`: repón inactivo (install lo dejó active). Es estado ya
+                        // persistido, no una decisión nueva → sin retention gate (hub#314).
+                        let _ = self.deactivate_unchecked(&rid).await;
                     }
                     eprintln!("✓ módulo re-hidratado: {rid}@{version}");
                     out.push(rid);
@@ -343,12 +348,65 @@ impl Runtime {
         Ok(())
     }
 
+    /// Módulos que caerían al desactivar `module_id`: él mismo + todo dependiente transitivo hoy
+    /// activo (ADR-0128). Puro (no muta): es el conjunto que la cascada de [`Self::deactivate`]
+    /// apagaría, calculado ANTES para poder revisarlo entero (hub#314).
+    fn deactivation_cascade(&self, module_id: &str) -> Vec<String> {
+        let mut fallen = vec![module_id.to_string()];
+        loop {
+            let wave: Vec<String> = self
+                .registry
+                .installed
+                .iter()
+                .filter(|m| {
+                    self.registry.is_active(&m.id)
+                        && !fallen.contains(&m.id)
+                        && m.depends_on.iter().any(|d| fallen.contains(d))
+                })
+                .map(|m| m.id.clone())
+                .collect();
+            if wave.is_empty() {
+                return fallen;
+            }
+            fallen.extend(wave);
+        }
+    }
+
+    /// Retention gate (hub#314, ADR-0202 R2) sobre un módulo: pregunta a su motor nativo qué debe
+    /// todavía a una autoridad externa y falla si queda algo. Ver
+    /// [`installer::ensure_no_pending_obligations`].
+    async fn ensure_module_can_go(&self, module_id: &str) -> Result<()> {
+        let host = native::DbHost {
+            db: self.db.as_ref(),
+            storage: None,
+            hub_id: &self.hub_id,
+            module_id,
+            static_folder: None,
+        };
+        installer::ensure_no_pending_obligations(&host, &self.registry, &self.hub_id, module_id)
+            .await
+    }
+
     /// Desactiva un módulo instalado — y ARRASTRA a todo dependiente transitivo activo (ADR-0128).
     ///
     /// El objetivo cae como `Inactive` (decisión MANUAL: se respeta hasta que el admin lo pida de
     /// vuelta). Los arrastrados caen como `InactiveAuto`: volverán solos en cuanto sus
     /// dependencias vuelvan a estar activas.
+    ///
+    /// hub#314: antes de tocar nada se revisa el conjunto ENTERO que caería. Apagar `invoice`
+    /// arrastra a `verifactu`, así que gatear solo el objetivo dejaría la puerta de atrás abierta:
+    /// si CUALQUIERA de los que caen aún debe registros sin remitir, no cae ninguno.
     pub async fn deactivate(&mut self, module_id: &str) -> Result<()> {
+        for id in self.deactivation_cascade(module_id) {
+            self.ensure_module_can_go(&id).await?;
+        }
+        self.deactivate_unchecked(module_id).await
+    }
+
+    /// [`Self::deactivate`] SIN el retention gate: repone un estado inactivo YA persistido
+    /// (arranque/rehidratación), que no es una decisión nueva del admin. Gatearlo aquí solo podría
+    /// tumbar el arranque o resucitar un módulo que el admin había apagado (hub#314).
+    async fn deactivate_unchecked(&mut self, module_id: &str) -> Result<()> {
         installer::set_status(
             self.db.as_ref(),
             &mut self.registry,
@@ -389,7 +447,11 @@ impl Runtime {
     }
 
     /// Desinstala un módulo (quita sus capacidades; no borra sus datos).
+    ///
+    /// hub#314: se rechaza mientras su motor deba trabajo a una autoridad externa — borrar la fila
+    /// de `hub_module` con registros sin remitir los dejaba huérfanos (VeriFactu FAQ §5).
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
+        self.ensure_module_can_go(module_id).await?;
         installer::uninstall(
             self.db.as_ref(),
             &mut self.registry,

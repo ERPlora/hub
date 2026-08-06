@@ -1,0 +1,7 @@
+{
+  "id": "rbase",
+  "name": "Retention Base",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] }
+}
