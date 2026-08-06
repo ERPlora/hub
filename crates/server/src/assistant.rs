@@ -351,6 +351,7 @@ mod tests {
                 }),
                 expose_api: false,
                 internal,
+                fiscal_document: false,
             }
         }
 
