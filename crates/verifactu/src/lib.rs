@@ -1,7 +1,8 @@
 //! # erplora-verifactu
 //!
 //! Motor fiscal **VeriFactu** (RD 1007/2023) como **plugin nativo first-party**
-//! ([ADR-0009]): cadena de hash SHA-256 encadenada por `(hub_id, issuer_nif)`,
+//! ([ADR-0009]): cadena de hash SHA-256 encadenada por `(hub_id, issuer_nif, environment)`
+//! (ADR-0202 guarda R4: `production` y `testing` son dos cadenas paralelas independientes),
 //! construcción del XML SOAP y transmisión a la AEAT con TLS mutua (PKCS#12).
 //!
 //! Es la "segunda clase de módulo" del sistema: el SQL declarativo y la UI del módulo
@@ -337,14 +338,14 @@ pub fn rechain_record(
     (rechained, intent)
 }
 
-/// Genera el registro fiscal encadenado (alta/anulación): ancla de cadena por
-/// `(hub_id, issuer_nif)`, huella SHA-256 (formatos AEAT exactos), `qr_url`, e
-/// intenciones INSERT record(pending) + event + (si `auto_transmit` off) cola.
+/// Generates the chained fiscal record (alta/anulación): chain anchor per
+/// `(hub_id, issuer_nif, environment)`, SHA-256 fingerprint (exact AEAT formats), `qr_url`,
+/// and the INSERT record(pending) + event intentions (see [`build_record_output`]).
 ///
-/// Atomicidad de la secuencia: el ancla se lee antes de calcular, y el índice único
-/// `uq_verifactu_record_hub_seq (hub_id, issuer_nif, sequence_number)` cierra la ventana
-/// TOCTOU — si dos creates compiten, el segundo INSERT viola el índice y SU transacción
-/// entera revierte (sin fork de cadena). En SQLite además las escrituras se serializan.
+/// Sequence atomicity: the anchor is read before computing, and the unique index
+/// `uq_verifactu_record_hub_seq (hub_id, issuer_nif, environment, sequence_number)` closes
+/// the TOCTOU window — if two creates race, the second INSERT violates the index and ITS
+/// whole transaction rolls back (no chain fork).
 async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let (payload, ctx) = split_input(input)?;
 
@@ -577,14 +578,19 @@ struct RecordInput {
     substitutes_nif: String,
 }
 
-/// Núcleo de encadenado: lee el ancla `(hub_id, issuer_nif)`, calcula la huella SHA-256 (formatos
-/// AEAT exactos) + `qr_url`, y devuelve las intenciones INSERT record(pending) + event + (si
-/// `auto_transmit` está off) cola de contingencia.
+/// Chaining core: reads the `(hub_id, issuer_nif, environment)` anchor, computes the SHA-256
+/// fingerprint (exact AEAT formats) + `qr_url`, and returns the INSERT record(pending) + event
+/// intentions (plus the inline transmission when a certificate is available — module active =
+/// always emit, ADR-0202 guard R3).
 ///
-/// Atomicidad de la secuencia: el ancla se lee antes de calcular, y el índice único
-/// `uq_verifactu_record_hub_seq (hub_id, issuer_nif, sequence_number)` cierra la ventana TOCTOU —
-/// si dos creates compiten, el segundo INSERT viola el índice y SU transacción entera revierte
-/// (sin fork de cadena). En SQLite además las escrituras se serializan.
+/// Environment scoping (ADR-0202 guard R4, hub#313): `production` and `testing` are two
+/// parallel, independent chains. The anchor, the sequence and `PrimerRegistro` never cross
+/// environments — switching the config toggle starts/resumes THAT environment's own chain.
+///
+/// Sequence atomicity: the anchor is read before computing, and the unique index
+/// `uq_verifactu_record_hub_seq (hub_id, issuer_nif, environment, sequence_number)` closes the
+/// TOCTOU window — if two creates race, the second INSERT violates the index and ITS whole
+/// transaction rolls back (no chain fork).
 async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -> Result<Output> {
     // ADR-0202 §4.2 (phase 0, hub#312): `NumeroInstalacion` is this hub's UUID before the AEAT
     // and can never be reused — a record built under a slug or any non-UUID id would register a
@@ -596,21 +602,33 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
             ctx.hub_id
         )));
     }
-    // Ancla de cadena: última fila ENCADENABLE por (hub_id, issuer_nif). Un registro `rejected`
-    // no está en la AEAT, así que su huella no puede ser el `previous_hash` del siguiente —
-    // encadenar ahí garantiza otro rechazo y deja la cadena parada (`is_chainable_status`).
+    // The record joins the chain of the hub's CURRENT config environment (guard R4). Read the
+    // config BEFORE the anchor: the environment scopes every chain read below (and the QR host).
+    let config = read_config(host, &ctx.hub_id).await?;
+    let environment = config
+        .as_ref()
+        .map(environment_of)
+        .unwrap_or_else(|| "testing".to_string());
+    // Chain anchor: last CHAINABLE row for (hub_id, issuer_nif, environment). A `rejected`
+    // record is not at the AEAT, so its fingerprint cannot be the next `previous_hash` —
+    // chaining there guarantees another rejection and stalls the chain (`is_chainable_status`).
     let anchor = host
         .read(
             "SELECT record_hash, sequence_number FROM verifactu_record \
-             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif AND is_deleted = 0 \
+             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif \
+             AND environment = :environment AND is_deleted = 0 \
              AND status <> 'rejected' \
              ORDER BY sequence_number DESC LIMIT 1",
-            &params(json!({ "hub_id": ctx.hub_id, "issuer_nif": r.issuer_nif })),
+            &params(json!({
+                "hub_id": ctx.hub_id,
+                "issuer_nif": r.issuer_nif,
+                "environment": environment,
+            })),
         )
         .await?;
-    // La SECUENCIA, en cambio, cuenta TODAS las filas: un registro rechazado ya gastó su número
-    // y el índice único `uq_verifactu_record_hub_seq` no admite reutilizarlo.
-    let sequence_number = next_sequence(host, &ctx.hub_id, &r.issuer_nif).await?;
+    // The SEQUENCE, instead, counts ALL rows of the environment: a rejected record already
+    // spent its number and the unique index `uq_verifactu_record_hub_seq` won't reuse it.
+    let sequence_number = next_sequence(host, &ctx.hub_id, &r.issuer_nif, &environment).await?;
     let (previous_hash, is_first) = match anchor.first() {
         Some(row) => (str_field(row, "record_hash"), false),
         // Sin eslabón anterior que la AEAT reconozca, este SÍ es el primero: si lo único previo
@@ -645,12 +663,7 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
             &generation_timestamp,
         )
     };
-    let config = read_config(host, &ctx.hub_id).await?;
-    // El host del QR depende del entorno (testing vs producción) → leer la config antes de generarlo.
-    let environment = config
-        .as_ref()
-        .map(environment_of)
-        .unwrap_or_else(|| "testing".to_string());
+    // The QR host depends on the environment (testing vs production), read above.
     let qr_url = chain::qr_url(
         &r.issuer_nif,
         &r.invoice_number,
@@ -658,10 +671,6 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
         total_amount_eur,
         &environment,
     );
-    let auto_transmit = config
-        .as_ref()
-        .map(|c| int_field(c, "auto_transmit", 1) != 0)
-        .unwrap_or(true);
 
     let ids = &ctx.new_ids;
     if ids.len() < 3 {
@@ -693,6 +702,10 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "is_first_record": if is_first { 1 } else { 0 },
                 "generation_timestamp": generation_timestamp,
                 "qr_url": qr_url,
+                // Guard R4 (hub#313): explicit environment — the record joins the chain whose
+                // anchor/sequence were read above; the SQL COALESCE fallback is only for older
+                // engines that omit the param.
+                "environment": environment,
                 // F3 → FacturasSustituidas (ADR-0140): snapshot de la F2 sustituida para reconstruir
                 // el XML en contingencia/reintento sin releer la factura. Vacíos si no es sustitución.
                 "substitutes_number": r.substitutes_number,
@@ -717,26 +730,15 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
             }),
         ));
 
-    if !auto_transmit {
-        // Sin auto-transmisión: el registro queda encolado en contingencia para envío diferido.
-        output = output.with_operation(op(
-            "verifactu._enqueue_contingency",
-            json!({
-                "queue_id": ids[2],
-                "record_id": record_id,
-                "priority": 2,
-                "attempts": 0,
-                "last_attempt_at": Json::Null,
-                "last_error": "",
-                "next_attempt_at": ctx.now,
-                "queue_status": "pending",
-            }),
-        ));
-    } else if let Some(cfg) = config.as_ref() {
-        // Auto-transmisión a la AEAT al emitir (como el Cloud). Reutiliza `transmit_one`, que aplica
-        // el resultado al registro (accepted/rejected + CSV) y, ante fallo de red, lo encola en
-        // contingencia con backoff. Sin certificado configurado → se deja `pending` (envío manual
-        // posterior). Las intenciones se aplican DESPUÉS del INSERT del registro (orden del Output).
+    // Module active = ALWAYS emit (ADR-0202 guard R3, verifactu#26): the `auto_transmit`
+    // column was dropped in verifactu v1.5.2 — there is no deferred-transmission mode.
+    // `ids[2]` stays reserved (it was the contingency queue id) so the transmit ids below
+    // keep their positions.
+    if let Some(cfg) = config.as_ref() {
+        // Inline AEAT transmission on emit. Reuses `transmit_one`, which applies the result to
+        // the record (accepted/rejected + CSV) and, on network failure, enqueues it in the
+        // contingency queue with backoff. Without a configured certificate → left `pending`
+        // (manual send later). Intentions apply AFTER the record INSERT (Output order).
         if has_certificate(cfg) {
             let record_json = json!({
                 "id": record_id,
@@ -757,6 +759,9 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "previous_hash": previous_hash,
                 "is_first_record": if is_first { 1 } else { 0 },
                 "generation_timestamp": generation_timestamp,
+                // Guard R4: `transmit_one` scopes its previous-link lookup by the record's
+                // environment; the freshly built record carries the one resolved above.
+                "environment": environment,
                 "recipient_nif": r.recipient_nif,
                 "recipient_name": r.recipient_name,
                 "substitutes_number": r.substitutes_number,
@@ -859,13 +864,18 @@ async fn transmit_one(
     let prev = if is_first {
         None
     } else {
+        // Guard R4 (hub#313): sequence numbers repeat across environments, so the previous
+        // link comes from the RECORD's own environment — a retried testing record must keep
+        // linking inside testing even after the hub switched its config to production.
         host.read(
             "SELECT issuer_nif, invoice_number, invoice_date, record_hash FROM verifactu_record \
-             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif AND sequence_number = :prev_seq \
+             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif \
+             AND environment = :environment AND sequence_number = :prev_seq \
              AND is_deleted = 0 LIMIT 1",
             &params(json!({
                 "hub_id": ctx.hub_id,
                 "issuer_nif": str_field(record, "issuer_nif"),
+                "environment": str_field(record, "environment"),
                 "prev_seq": int_field(record, "sequence_number", 1) - 1,
             })),
         )
@@ -1158,8 +1168,11 @@ async fn auto_rechain_and_retry(
         return Ok(None);
     };
 
-    // El ancla ocupa el siguiente número; el registro recompuesto, el de después.
-    let anchor_seq = next_sequence(host, &ctx.hub_id, &issuer_nif).await?;
+    // The AEAT consult ran against the config environment's endpoint, so the recovered anchor
+    // belongs to THAT environment's chain (guard R4).
+    let environment = environment_of(config);
+    // The anchor takes the next number; the rechained record, the one after.
+    let anchor_seq = next_sequence(host, &ctx.hub_id, &issuer_nif, &environment).await?;
     let anchor_hash = chain::normalize_hash(&anchor.record_hash);
     let anchor_op = op(
         "verifactu._insert_recovery",
@@ -1168,6 +1181,7 @@ async fn auto_rechain_and_retry(
             "sequence_number": anchor_seq,
             "issuer_nif": issuer_nif,
             "issuer_name": obligado_name(config),
+            "environment": environment,
             "invoice_number": if anchor.invoice_number.is_empty() {
                 format!("AEAT-{}", short(&anchor_hash))
             } else {
@@ -1189,7 +1203,6 @@ async fn auto_rechain_and_retry(
         &ctx.hub_id,
     );
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
-    let environment = environment_of(config);
     let identity = build_identity(host, &ctx.hub_id, config).await?;
     let body = aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await?;
     let resp = aeat::parse_response(&body);
@@ -1601,14 +1614,25 @@ fn short(hash: &str) -> String {
     hash.chars().take(8).collect()
 }
 
-/// Siguiente número de secuencia interno para `(hub_id, issuer_nif)` = max + 1.
-async fn next_sequence(host: &dyn NativeHost, hub_id: &str, issuer_nif: &str) -> Result<i64> {
+/// Next internal sequence number for `(hub_id, issuer_nif, environment)` = max + 1.
+/// Scoped per AEAT environment (guard R4): each chain numbers its own records.
+async fn next_sequence(
+    host: &dyn NativeHost,
+    hub_id: &str,
+    issuer_nif: &str,
+    environment: &str,
+) -> Result<i64> {
     let rows = host
         .read(
             "SELECT sequence_number FROM verifactu_record \
-             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif AND is_deleted = 0 \
+             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif \
+             AND environment = :environment AND is_deleted = 0 \
              ORDER BY sequence_number DESC LIMIT 1",
-            &params(json!({ "hub_id": hub_id, "issuer_nif": issuer_nif })),
+            &params(json!({
+                "hub_id": hub_id,
+                "issuer_nif": issuer_nif,
+                "environment": environment,
+            })),
         )
         .await?;
     Ok(rows
@@ -1691,7 +1715,8 @@ fn aeat_snapshot_ops(
 
 // ── validate_chain (issue verifactu#4) ────────────────────────────────────────
 
-/// Relee la cadena de `(hub_id, issuer_nif)` ordenada por secuencia, recomputa cada huella y
+/// Relee la cadena de `(hub_id, issuer_nif, environment)` (la del entorno ACTIVO de la config —
+/// guarda R4) ordenada por secuencia, recomputa cada huella y
 /// verifica el encadenamiento (`previous_hash` == huella anterior). Las filas `recovery` son
 /// anclas de confianza (no se recomputan; su huella es el enlace para la siguiente). El
 /// resultado se persiste como `verifactu_event` (`chain_validated`/`chain_error`) que la UI lee.
@@ -1706,14 +1731,26 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
         .into());
     }
 
+    // Guard R4 (hub#313): validate the ACTIVE environment's chain only. `production` and
+    // `testing` are parallel chains with independent sequences — interleaving them by
+    // sequence number would false-flag a break in two chains that are each intact.
+    let environment = config
+        .as_ref()
+        .map(environment_of)
+        .unwrap_or_else(|| "testing".to_string());
     let rows = host
         .read(
             "SELECT id, record_type, sequence_number, issuer_nif, invoice_number, invoice_date, \
              invoice_type, tax_amount, total_amount, previous_hash, record_hash, is_first_record, \
              generation_timestamp, status FROM verifactu_record \
-             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif AND is_deleted = 0 \
+             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif \
+             AND environment = :environment AND is_deleted = 0 \
              ORDER BY sequence_number ASC",
-            &params(json!({ "hub_id": ctx.hub_id, "issuer_nif": issuer_nif })),
+            &params(json!({
+                "hub_id": ctx.hub_id,
+                "issuer_nif": issuer_nif,
+                "environment": environment,
+            })),
         )
         .await?;
 
@@ -1786,6 +1823,7 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
         "valid": valid,
         "total": total,
         "issuer_nif": issuer_nif,
+        "environment": environment,
         "first_invalid_seq": first_invalid.as_ref().map(|x| x.0),
         "first_invalid_id": first_invalid.as_ref().map(|x| x.1.clone()),
     });
@@ -1877,7 +1915,10 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
             "la AEAT devolvió registros pero ninguno con huella; no hay ancla que recuperar".into(),
         )
     })?;
-    let seq = next_sequence(host, &ctx.hub_id, &issuer_nif).await?;
+    // Guard R4: the consult ran against the config environment's endpoint — the anchor joins
+    // that environment's chain, with its own scoped sequence.
+    let environment = environment_of(&config);
+    let seq = next_sequence(host, &ctx.hub_id, &issuer_nif, &environment).await?;
     let record_hash = chain::normalize_hash(&latest.record_hash);
     let anchor_id = ctx.new_ids.get(limit).cloned().unwrap_or_default();
     let invoice_number = if latest.invoice_number.is_empty() {
@@ -1898,6 +1939,7 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
                 "sequence_number": seq,
                 "issuer_nif": issuer_nif.clone(),
                 "issuer_name": obligado_name(&config),
+                "environment": environment,
                 "invoice_number": invoice_number,
                 "invoice_date": iso_date(&latest.invoice_date),
                 "description": "Ancla recuperada desde la AEAT (ConsultaFactuSistemaFacturacion)",
@@ -1943,7 +1985,12 @@ async fn recover_manual(input: &Json, host: &dyn NativeHost) -> Result<Output> {
         .into());
     }
     let record_hash = chain::normalize_hash(&raw_hash);
-    let seq = next_sequence(host, &ctx.hub_id, &issuer_nif).await?;
+    // Guard R4: the imported anchor continues the chain of the hub's ACTIVE environment.
+    let environment = config
+        .as_ref()
+        .map(environment_of)
+        .unwrap_or_else(|| "testing".to_string());
+    let seq = next_sequence(host, &ctx.hub_id, &issuer_nif, &environment).await?;
     let invoice_number = {
         let n = str_field(&payload, "invoice_number");
         if n.is_empty() {
@@ -1975,6 +2022,7 @@ async fn recover_manual(input: &Json, host: &dyn NativeHost) -> Result<Output> {
                 "sequence_number": seq,
                 "issuer_nif": issuer_nif.clone(),
                 "issuer_name": issuer_name,
+                "environment": environment,
                 "invoice_number": invoice_number,
                 "invoice_date": invoice_date,
                 "description": "Ancla importada manualmente (migración de otra aplicación)",
@@ -2170,6 +2218,351 @@ mod ingest_tests {
         assert!(
             err.contains("missing_issuer_nif"),
             "esperaba rechazo por issuer_nif vacío, llegó: {err}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod environment_chain_tests {
+    //! ADR-0202 phase 1, guard R4 (hub#313): the hash chain is scoped by AEAT environment.
+    //! `production` and `testing` are two parallel, independent chains — the anchor, the
+    //! sequence and `PrimerRegistro` never cross environments, and the engine passes the
+    //! explicit `:environment` param to the module's insert SQL.
+
+    use super::*;
+    use std::sync::Mutex;
+
+    /// A hub UUID (the engine hard-fails on non-UUID hub ids — ADR-0202 §4.2).
+    const HUB: &str = "7b2f8a44-9c1d-4e2f-8a3b-944445555666";
+    const NIF: &str = "B12345678";
+    /// 64-hex hashes so anything that validates hash shape accepts them.
+    const HASH_TESTING_1: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+    const HASH_TESTING_2: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+    const HASH_PRODUCTION_1: &str =
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+    /// In-memory `verifactu_record` table that honours EXACTLY the WHERE clauses present in
+    /// the SQL it receives — like a real database, it only filters by `environment` when the
+    /// query asks for it. That is what makes the red case honest: an unscoped anchor query
+    /// sees BOTH chains.
+    struct ChainHost {
+        config: Json,
+        records: Vec<Json>,
+        has_core_certificate: bool,
+        reads: Mutex<Vec<(String, Params)>>,
+    }
+
+    impl ChainHost {
+        fn new(config: Json, records: Vec<Json>) -> Self {
+            ChainHost {
+                config,
+                records,
+                has_core_certificate: false,
+                reads: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl NativeHost for ChainHost {
+        async fn read(&self, sql: &str, p: &Params) -> Result<Vec<Json>> {
+            self.reads
+                .lock()
+                .unwrap()
+                .push((sql.to_string(), p.clone()));
+            if sql.contains("_hub_certificate") {
+                return Ok(if self.has_core_certificate {
+                    vec![json!({ "pkcs12_b64": "QUJD", "password": "secret" })]
+                } else {
+                    vec![]
+                });
+            }
+            if sql.contains("FROM verifactu_config") {
+                return Ok(vec![self.config.clone()]);
+            }
+            if sql.contains("FROM verifactu_record") {
+                let param = |k: &str| p.get(k).cloned().unwrap_or(Json::Null);
+                let mut rows: Vec<Json> = self
+                    .records
+                    .iter()
+                    .filter(|r| {
+                        let mut keep = true;
+                        if sql.contains("hub_id = :hub_id") {
+                            keep &= r["hub_id"] == param("hub_id");
+                        }
+                        if sql.contains("issuer_nif = :issuer_nif") {
+                            keep &= r["issuer_nif"] == param("issuer_nif");
+                        }
+                        if sql.contains("environment = :environment") {
+                            keep &= r["environment"] == param("environment");
+                        }
+                        if sql.contains("status <> 'rejected'") {
+                            keep &= r["status"] != "rejected";
+                        }
+                        if sql.contains("sequence_number = :prev_seq") {
+                            keep &= r["sequence_number"] == param("prev_seq");
+                        }
+                        if sql.contains("id = :record_id") {
+                            keep &= r["id"] == param("record_id");
+                        }
+                        keep
+                    })
+                    .cloned()
+                    .collect();
+                if sql.contains("ORDER BY sequence_number DESC") {
+                    rows.sort_by_key(|r| {
+                        std::cmp::Reverse(r["sequence_number"].as_i64().unwrap_or(0))
+                    });
+                } else if sql.contains("ORDER BY sequence_number ASC") {
+                    rows.sort_by_key(|r| r["sequence_number"].as_i64().unwrap_or(0));
+                }
+                if sql.contains("LIMIT 1") {
+                    rows.truncate(1);
+                }
+                return Ok(rows);
+            }
+            Ok(vec![])
+        }
+
+        async fn write_static_file(
+            &self,
+            relative_path: &str,
+            _bytes: &[u8],
+            _content_type: &str,
+        ) -> Result<String> {
+            Ok(format!("modules/verifactu/{relative_path}"))
+        }
+    }
+
+    fn config_row(environment: &str) -> Json {
+        json!({ "hub_id": HUB, "environment": environment, "issuer_nif": NIF,
+                "issuer_name": "Test Business SL" })
+    }
+
+    /// A minimal chain row as the post-008 schema stores it (every row carries `environment`).
+    fn chain_row(id: &str, seq: i64, environment: &str, hash: &str, prev: &str) -> Json {
+        json!({
+            "id": id, "hub_id": HUB, "issuer_nif": NIF, "issuer_name": "Test Business SL",
+            "environment": environment, "sequence_number": seq,
+            "record_type": "alta", "invoice_number": format!("INV-{seq}"),
+            "invoice_date": "2026-08-01", "invoice_type": "F2",
+            "base_amount": 10000, "tax_rate": 21.0, "tax_amount": 2100, "total_amount": 12100,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "previous_hash": prev, "record_hash": hash,
+            "is_first_record": if prev.is_empty() { 1 } else { 0 },
+            "generation_timestamp": "2026-08-01T10:00:00+02:00",
+            "status": "accepted", "xml_content": "", "is_deleted": 0
+        })
+    }
+
+    fn create_input() -> Json {
+        json!({
+            "payload": {
+                "record_type": "alta", "issuer_nif": NIF, "issuer_name": "Test Business SL",
+                "invoice_number": "F-2026-000123", "invoice_date": "2026-08-06",
+                "invoice_type": "F2", "base_amount": 10000, "tax_rate": 21.0,
+                "tax_amount": 2100, "total_amount": 12100,
+                "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#
+            },
+            "context": {
+                "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00", "current_user_id": "u1",
+                "new_ids": ["id-rec", "id-evt", "id-queue", "id-t1", "id-t2", "id-t3"]
+            }
+        })
+    }
+
+    fn find_op<'a>(out: &'a Output, command: &str) -> &'a Operation {
+        out.operations
+            .iter()
+            .find(|o| o.command == command)
+            .unwrap_or_else(|| panic!("expected an `{command}` operation"))
+    }
+
+    /// TDD red case of hub#313: with records only in `testing`, the FIRST `production`
+    /// record starts its OWN chain — `PrimerRegistro=S` (is_first_record=1), empty
+    /// `previous_hash`, sequence 1 — and stamps the explicit `environment` param.
+    #[tokio::test]
+    async fn first_production_record_starts_a_new_chain_despite_testing_records() {
+        let host = ChainHost::new(
+            config_row("production"),
+            vec![chain_row("t1", 1, "testing", HASH_TESTING_1, "")],
+        );
+        let out = create_record(&create_input(), &host).await.unwrap();
+
+        let insert = find_op(&out, "verifactu._insert_record");
+        assert_eq!(
+            insert.params.get("is_first_record"),
+            Some(&json!(1)),
+            "the first production record must open its own chain (PrimerRegistro=S)"
+        );
+        assert_eq!(
+            insert.params.get("previous_hash"),
+            Some(&json!("")),
+            "a testing hash must never be the previous link of a production record"
+        );
+        assert_eq!(
+            insert.params.get("sequence_number"),
+            Some(&json!(1)),
+            "the production sequence starts at 1, independent of testing"
+        );
+        assert_eq!(
+            insert.params.get("environment"),
+            Some(&json!("production")),
+            "the engine must pass the explicit :environment param (no COALESCE fallback)"
+        );
+        // R3 pin (verifactu#26): module active = always emit; the schema no longer has
+        // `auto_transmit`, so nothing may enqueue a deferred-transmission entry on create.
+        assert!(
+            !out.operations
+                .iter()
+                .any(|o| o.command == "verifactu._enqueue_contingency"),
+            "create must not enqueue contingency: auto_transmit is gone (R3)"
+        );
+    }
+
+    /// Switching back to an environment RESUMES that environment's own chain: the anchor is
+    /// the last chainable row of the ACTIVE environment, even when the other chain is longer.
+    #[tokio::test]
+    async fn chaining_resumes_the_active_environment_chain_and_never_crosses() {
+        let host = ChainHost::new(
+            config_row("production"),
+            vec![
+                chain_row("t1", 1, "testing", HASH_TESTING_1, ""),
+                chain_row("t2", 2, "testing", HASH_TESTING_2, HASH_TESTING_1),
+                chain_row("p1", 1, "production", HASH_PRODUCTION_1, ""),
+            ],
+        );
+        let out = create_record(&create_input(), &host).await.unwrap();
+
+        let insert = find_op(&out, "verifactu._insert_record");
+        assert_eq!(
+            insert.params.get("previous_hash"),
+            Some(&json!(HASH_PRODUCTION_1)),
+            "the anchor must be production's last link, not testing's (longer) chain"
+        );
+        assert_eq!(
+            insert.params.get("sequence_number"),
+            Some(&json!(2)),
+            "the production sequence resumes at 2 even though testing is at 2 already"
+        );
+        assert_eq!(insert.params.get("is_first_record"), Some(&json!(0)));
+        assert_eq!(insert.params.get("environment"), Some(&json!("production")));
+    }
+
+    /// Recovery anchors join the chain of the ACTIVE environment: scoped sequence and an
+    /// explicit `environment` param on `_insert_recovery`.
+    #[tokio::test]
+    async fn recovery_anchor_is_scoped_and_stamped_with_the_active_environment() {
+        let host = ChainHost::new(
+            config_row("production"),
+            vec![
+                chain_row("t1", 1, "testing", HASH_TESTING_1, ""),
+                chain_row("t2", 2, "testing", HASH_TESTING_2, HASH_TESTING_1),
+            ],
+        );
+        let input = json!({
+            "payload": { "record_hash": HASH_TESTING_2 },
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1", "new_ids": ["id-anchor", "id-evt"] }
+        });
+        let out = recover_manual(&input, &host).await.unwrap();
+
+        let recovery = find_op(&out, "verifactu._insert_recovery");
+        assert_eq!(
+            recovery.params.get("sequence_number"),
+            Some(&json!(1)),
+            "the anchor takes production's next sequence (1), not testing's (3)"
+        );
+        assert_eq!(
+            recovery.params.get("environment"),
+            Some(&json!("production")),
+            "the recovery insert must carry the explicit :environment param"
+        );
+    }
+
+    /// Chain validation walks ONLY the active environment's chain: with a valid chain in each
+    /// environment, interleaving them by sequence number would false-flag a break.
+    #[tokio::test]
+    async fn validate_chain_walks_only_the_active_environment() {
+        let ts1 = "2026-08-01T10:00:00+02:00";
+        let ts2 = "2026-08-02T10:00:00+02:00";
+        // Real hashes so the walk's recompute matches (amounts in cents → euros /100).
+        let t1_hash = chain::alta_hash(NIF, "INV-1", "2026-08-01", "F2", 21.0, 121.0, "", ts1);
+        let t2_hash =
+            chain::alta_hash(NIF, "INV-2", "2026-08-01", "F2", 21.0, 121.0, &t1_hash, ts2);
+        let mut t1 = chain_row("t1", 1, "testing", &t1_hash, "");
+        t1["generation_timestamp"] = json!(ts1);
+        let mut t2 = chain_row("t2", 2, "testing", &t2_hash, t1_hash.as_str());
+        t2["generation_timestamp"] = json!(ts2);
+        // A parallel, self-consistent production chain that would break the walk if mixed in.
+        let p1 = chain_row("p1", 1, "production", HASH_PRODUCTION_1, "");
+
+        let host = ChainHost::new(config_row("testing"), vec![t1, p1, t2]);
+        let input = json!({
+            "payload": {},
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1", "new_ids": ["id-evt"] }
+        });
+        let out = validate_chain(&input, &host).await.unwrap();
+
+        let event = find_op(&out, "verifactu._insert_event");
+        assert_eq!(
+            event.params.get("event_type"),
+            Some(&json!("chain_validated")),
+            "both per-environment chains are valid; mixing them is what breaks"
+        );
+        let details: Json =
+            serde_json::from_str(event.params.get("details").and_then(Json::as_str).unwrap())
+                .unwrap();
+        assert_eq!(details["valid"], json!(true));
+        assert_eq!(
+            details["total"],
+            json!(2),
+            "only the 2 testing rows belong to the validated chain"
+        );
+    }
+
+    /// Retransmission reads the previous link from the RECORD's own environment — sequence
+    /// numbers repeat across environments, so an unscoped `prev_seq` lookup can pick the
+    /// other chain's row. The record's stored environment wins over the hub's current config.
+    #[tokio::test]
+    async fn transmit_previous_link_lookup_is_scoped_to_the_records_environment() {
+        let mut record = chain_row("rec-2", 2, "testing", HASH_TESTING_2, HASH_TESTING_1);
+        record["status"] = json!("pending");
+        let mut host = ChainHost::new(
+            // The hub has ALREADY switched to production; the retried record is testing.
+            config_row("production"),
+            vec![
+                // Inserted first so an UNSCOPED lookup (stable order, LIMIT 1) picks it.
+                chain_row("p1", 1, "production", HASH_PRODUCTION_1, ""),
+                chain_row("t1", 1, "testing", HASH_TESTING_1, ""),
+                record,
+            ],
+        );
+        host.has_core_certificate = true; // pass the certificate gate before transmit_one
+        let input = json!({
+            "payload": { "record_id": "rec-2" },
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor"] }
+        });
+        // The flow errs later (no real mTLS identity in tests) — the prev-link read under
+        // scrutiny happens before that, so the outcome itself is irrelevant here.
+        let _ = transmit_record(&input, &host).await;
+
+        let reads = host.reads.lock().unwrap();
+        let (sql, params) = reads
+            .iter()
+            .find(|(sql, _)| sql.contains(":prev_seq"))
+            .expect("transmit must look up the previous link");
+        assert!(
+            sql.contains("environment = :environment"),
+            "the previous-link lookup must filter by environment: {sql}"
+        );
+        assert_eq!(
+            params.get("environment"),
+            Some(&json!("testing")),
+            "the RECORD's environment scopes the lookup, not the current config's"
         );
     }
 }
