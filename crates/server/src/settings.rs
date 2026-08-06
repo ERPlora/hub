@@ -257,3 +257,146 @@ pub async fn delete_business_certificate(
         Err(e) => crate::err_response(e),
     }
 }
+
+// ── Identidad fiscal hacia el SaaS (ADR-0201 decisión 5, 7/11 — hub#333) ───────────────────────
+
+/// Campos de `hub_settings` que forman la identidad que ERPlora factura. Es una COPIA: el NIF del
+/// negocio se queda aquí (es con quién factura el cliente a los suyos); el del `BillingProfile` es
+/// a quién factura ERPlora. Dos NIF conceptualmente distintos que no se leen entre sí.
+fn fiscal_identity_payload(settings: &Value) -> Option<Map<String, Value>> {
+    let get = |k: &str| {
+        settings
+            .get(k)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string()
+    };
+    let tax_id = get("business_tax_id");
+    if tax_id.is_empty() {
+        return None; // sin NIF no hay nada que publicar: el SaaS lo rechazaría igualmente
+    }
+    let mut body = Map::new();
+    body.insert("tax_id".into(), Value::String(tax_id));
+    body.insert(
+        "billing_name".into(),
+        Value::String(get("business_legal_name")),
+    );
+    body.insert(
+        "billing_address".into(),
+        Value::String(get("business_address")),
+    );
+    body.insert("billing_country".into(), Value::String(get("country_code")));
+    Some(body)
+}
+
+/// POST /api/business/fiscal-identity — publica la identidad fiscal del negocio en el SaaS, que
+/// crea/actualiza el `BillingProfile` que paga este hub (ADR-0201 decisión 5).
+///
+/// Es la casilla *"usar estos datos también para mi factura de ERPlora"* de Ajustes → Negocio: el
+/// dato se escribió UNA vez aquí y la copia SUBE. Sin marcarla, el perfil se rellena aparte en el
+/// SaaS (el caso de la gestoría que paga los hubs de sus clientes).
+///
+/// **La llamada la hace el runtime**: el `cloud_api_token` es secreto del hub y nunca cruza al
+/// navegador (ADR-0003). Auth = sesión admin, porque la identidad fiscal es del dueño del negocio.
+pub async fn publish_fiscal_identity(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let settings = {
+        let rt = arc.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+        match rt.get_settings().await {
+            Ok(s) => s,
+            Err(e) => return crate::err_response(e),
+        }
+    };
+
+    let Some(body) = fiscal_identity_payload(&settings) else {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "ok": false,
+                "error": "business_tax_id_required",
+                "message": "Fill in the business tax id before sharing it with ERPlora",
+            })),
+        )
+            .into_response();
+    };
+
+    let Some(machine) = auth::machine_auth(&st) else {
+        return (
+            axum::http::StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({ "ok": false, "error": "hub_not_enrolled" })),
+        )
+            .into_response();
+    };
+
+    let req = cloud_client::CloudClient::new(&st.config.cloud_base_url).fiscal_identity(&machine);
+    let mut request = reqwest::Client::new().post(&req.url).json(&body);
+    for (name, value) in req.headers {
+        request = request.header(name, value);
+    }
+    match request.send().await {
+        Ok(response) if response.status().is_success() => {
+            Json(serde_json::json!({ "ok": true })).into_response()
+        }
+        Ok(response) => (
+            axum::http::StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({
+                "ok": false,
+                "error": "cloud_rejected",
+                "status": response.status().as_u16(),
+            })),
+        )
+            .into_response(),
+        Err(e) => (
+            axum::http::StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+#[cfg(test)]
+mod fiscal_identity_tests {
+    use super::*;
+    use serde_json::json;
+
+    /// The payload is a COPY of what the user already wrote once in `/setup`.
+    #[test]
+    fn it_maps_the_business_identity_onto_the_billing_profile_fields() {
+        let settings = json!({
+            "business_tax_id": " B12345678 ",
+            "business_legal_name": "Bar Manolo SL",
+            "business_address": "Calle Falsa 123",
+            "country_code": "ES",
+            "business_phone": "600000000",
+        });
+        let body = fiscal_identity_payload(&settings).expect("a filled-in identity publishes");
+
+        assert_eq!(body["tax_id"], json!("B12345678"), "trimmed");
+        assert_eq!(body["billing_name"], json!("Bar Manolo SL"));
+        assert_eq!(body["billing_address"], json!("Calle Falsa 123"));
+        assert_eq!(body["billing_country"], json!("ES"));
+        assert!(
+            !body.contains_key("stripe_customer_id"),
+            "the hub sends identity, never billing plumbing: {body:?}"
+        );
+        assert!(
+            !body.contains_key("business_phone"),
+            "only the invoice identity travels: {body:?}"
+        );
+    }
+
+    /// No tax id, nothing to publish — the SaaS would reject it anyway, and a round trip to say
+    /// «you left the field empty» is a worse error than the one the form can give right away.
+    #[test]
+    fn without_a_tax_id_there_is_nothing_to_publish() {
+        assert!(fiscal_identity_payload(&json!({ "business_legal_name": "Bar Manolo SL" })).is_none());
+        assert!(fiscal_identity_payload(&json!({ "business_tax_id": "   " })).is_none());
+    }
+}
