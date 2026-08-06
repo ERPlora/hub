@@ -462,15 +462,20 @@ pub(crate) async fn foreign_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
     if !safe_ident(table) {
         return Vec::new();
     }
-    // Postgres-only (ADR-0154), acotado al esquema activo (`current_schema()`).
+    // Postgres-only (ADR-0154), scoped to the active schema (`current_schema()`). The joins MUST
+    // also match `constraint_schema`: constraint names are only unique per schema, and joining by
+    // name alone pulls homonymous constraints from every other schema (duplicated FKs + a
+    // combinatorial join on databases with many schemas).
     let sql = format!(
         "SELECT kcu.column_name AS col_from, ccu.column_name AS col_to, \
                 ccu.table_name AS parent \
          FROM information_schema.table_constraints tc \
          JOIN information_schema.key_column_usage kcu \
-           ON kcu.constraint_name = tc.constraint_name \
+           ON kcu.constraint_schema = tc.constraint_schema \
+          AND kcu.constraint_name = tc.constraint_name \
          JOIN information_schema.constraint_column_usage ccu \
-           ON ccu.constraint_name = tc.constraint_name \
+           ON ccu.constraint_schema = tc.constraint_schema \
+          AND ccu.constraint_name = tc.constraint_name \
          WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = current_schema() \
            AND tc.table_name = '{table}'"
     );
@@ -671,6 +676,7 @@ async fn setting(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str, key: &str) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use erplora_db::{DatabaseAdapter, testutil::fresh_db};
 
     /// El manifest hace round-trip serde sin perder campos: es el contrato del fichero
     /// `manifest.json` (la fuente de verdad del bundle, a prueba de renombres del zip).
@@ -723,5 +729,31 @@ mod tests {
             2,
             "created_by/updated_by deben conservar su valor 'local', no convertirse en placeholder:\n{sql}"
         );
+    }
+
+    /// Constraint names are only unique PER SCHEMA: two schemas holding the same tables carry
+    /// identically-named FKs. The catalog query must not join `key_column_usage` /
+    /// `constraint_column_usage` rows that belong to a homonymous constraint in ANOTHER schema —
+    /// doing so returns the same FK duplicated (and, with many schemas, the join explodes
+    /// combinatorially: the 100%-CPU incident on the shared test database, 2026-08-06).
+    #[tokio::test]
+    async fn foreign_keys_ignores_homonymous_constraints_in_other_schemas() {
+        let db_a = fresh_db().await;
+        let db_b = fresh_db().await;
+        let ddl = "CREATE TABLE fk_parent (id TEXT PRIMARY KEY); \
+                   CREATE TABLE fk_child (id TEXT PRIMARY KEY, \
+                     parent_id TEXT CONSTRAINT fk_child_parent REFERENCES fk_parent(id));";
+        db_a.execute_batch(ddl).await.unwrap();
+        db_b.execute_batch(ddl).await.unwrap();
+
+        let fks = foreign_keys(&db_a, "fk_child").await;
+        assert_eq!(
+            fks.len(),
+            1,
+            "one declared FK must come back exactly once, not multiplied by other schemas' homonyms"
+        );
+        assert_eq!(fks[0].from, "parent_id");
+        assert_eq!(fks[0].parent, "fk_parent");
+        assert_eq!(fks[0].to, "id");
     }
 }
