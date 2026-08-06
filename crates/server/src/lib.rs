@@ -2031,29 +2031,41 @@ struct CloudLoginReq {
 }
 
 /// Login local por **PIN** → abre sesión. Body `{name, pin, device_id?}` → `{ok, token, user}`
-/// (401 si falla). Si el **device-trust** está activo (`HUB_DEVICE_TRUST=enforce`) y el cliente
-/// manda `device_id`, se rechaza el PIN si el dispositivo no es de confianza (no hubo login online
-/// previo en él, §2.9).
+/// (401 si falla). Con **device-trust** activo (por defecto; `HUB_DEVICE_TRUST=off` lo apaga) el
+/// PIN se rechaza si el cliente no identifica el dispositivo o si ese dispositivo no es de
+/// confianza — no hubo login online previo en él (§2.9, hub#330).
 async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Response {
     let rt = st.runtime.lock().await;
     // Gate de device-trust (opt-in): solo si está activo Y el cliente identifica el dispositivo.
     if st.config.device_trust_enforce {
-        if let Some(device_id) = req.device_id.as_deref() {
-            match rt.is_device_trusted(device_id).await {
-                Ok(true) => {}
-                Ok(false) => {
-                    return (
-                        StatusCode::FORBIDDEN,
-                        Json(json!({
-                            "ok": false,
-                            "error": "dispositivo no de confianza: inicia sesión online (cloud) primero",
-                            "code": "device_untrusted"
-                        })),
-                    )
-                        .into_response()
-                }
-                Err(e) => return err_response(e),
+        // No `device_id`, no bypass (hub#330): the check used to sit in an `if let Some(..)` with
+        // no `else`, so leaving the field out walked past the gate entirely. The hub lives on the
+        // public internet, so an unidentified device is the shape of the attack, not an oversight.
+        let Some(device_id) = req.device_id.as_deref() else {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(json!({
+                    "ok": false,
+                    "error": "este dispositivo no está identificado: inicia sesión online (cloud) primero",
+                    "code": "device_unidentified"
+                })),
+            )
+                .into_response();
+        };
+        match rt.is_device_trusted(device_id).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({
+                        "ok": false,
+                        "error": "dispositivo no de confianza: inicia sesión online (cloud) primero",
+                        "code": "device_untrusted"
+                    })),
+                )
+                    .into_response()
             }
+            Err(e) => return err_response(e),
         }
     }
     // Brute-force guard (hub#329): checked BEFORE verifying, so a locked identity stops leaking
