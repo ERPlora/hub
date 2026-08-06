@@ -86,6 +86,11 @@ fn import_verifactu() -> ImportSelection {
 
 #[tokio::test]
 async fn a_backup_restored_into_a_different_hub_does_not_inherit_the_chain() {
+    // CI checks out `hub` alone, without the sibling `modules-workspace` these fixtures install
+    // from; same guard the other module-backed e2e use.
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let origin = runtime_with_fiscal_chain(HUB_ORIGIN).await;
     insert_chain_record(&origin, HUB_ORIGIN).await;
     let bundle = export_hub(&origin, HUB_ORIGIN, &verifactu_backup_selection(), "backup", "es", "2026-08-05T12:00:00Z")
@@ -93,21 +98,27 @@ async fn a_backup_restored_into_a_different_hub_does_not_inherit_the_chain() {
         .expect("export origin backup");
 
     let mut other = runtime_with_fiscal_chain(HUB_OTHER).await;
-    import_sections(&mut other, &bundle.manifest, &bundle.files, &import_verifactu(), HUB_OTHER)
-        .await
-        .expect("import into another hub");
+    let report =
+        import_sections(&mut other, &bundle.manifest, &bundle.files, &import_verifactu(), HUB_OTHER)
+            .await
+            .expect("import into another hub");
 
     assert_eq!(
         chain_rows(&other, HUB_OTHER).await,
         0,
         "the chain belongs to the origin installation (NumeroInstalacion = hub_id): applying it \
          under another hub would make its next record chain on a RegistroAnterior the AEAT never \
-         received for that installation"
+         received for that installation — sections: {:?} · manifest.hub: {:?}",
+        report.sections,
+        bundle.manifest.hub,
     );
 }
 
 #[tokio::test]
 async fn a_backup_restored_into_the_same_hub_keeps_the_chain() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let origin = runtime_with_fiscal_chain(HUB_ORIGIN).await;
     insert_chain_record(&origin, HUB_ORIGIN).await;
     let bundle = export_hub(&origin, HUB_ORIGIN, &verifactu_backup_selection(), "backup", "es", "2026-08-05T12:00:00Z")
