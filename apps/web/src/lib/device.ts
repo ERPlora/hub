@@ -67,6 +67,16 @@ export async function getDeviceContext(): Promise<DeviceContext | null> {
 }
 
 /**
+ * Id del dispositivo para el login, con la MISMA resolución que las cabeceras: Tauri primero (su
+ * id vive fuera del webview), si no el contexto que aporta el runtime. `null` en una web pura sin
+ * máquina registrada — el llamador degrada y el hub decide si eso basta (device-trust, hub#330).
+ */
+export async function resolveDeviceId(): Promise<string | null> {
+  const dev = (await getDeviceContext()) ?? runtimeDeviceContext;
+  return dev?.id ?? null;
+}
+
+/**
  * Cabeceras de identificación para el login. En Tauri manda `X-Client-Type` (desktop/local)
  * + `X-Device-Id` para que el Cloud cree/resuelva el hub de ESTE dispositivo (§2.9b). En web
  * pura cae a `X-Client-Type: hub` (no dispara el registro por dispositivo).

@@ -2,7 +2,7 @@
 // billing van por aquí (ARQUITECTURA.md §2.1–2.3). Si el Cloud no es accesible (sandbox),
 // las llamadas lanzan y la capa de auth degrada a modo demo.
 import { config, isLocalHub } from './config';
-import { loginHeaders } from './device';
+import { loginHeaders, resolveDeviceId } from './device';
 import { getLocale } from '../i18n';
 import { beginRequest, endRequest } from './shell';
 import { getHubSession } from './session';
@@ -350,9 +350,16 @@ export async function runtimeCourierSession(
   );
 }
 
-/** Login local por PIN contra el runtime → sesión server-side. */
+/** Login local por PIN contra el runtime → sesión server-side. Va con el `device_id` que este
+ * cliente pueda acreditar: con device-trust activo el hub exige identificar el dispositivo
+ * (hub#330), y sin él el PIN se rechaza en vez de colarse por el hueco de antes. */
 export async function runtimePinLogin(name: string, pin: string): Promise<HubSessionResult> {
-  return runtimePost<HubSessionResult>('/api/auth/pin', { name, pin }, {});
+  const deviceId = await resolveDeviceId();
+  return runtimePost<HubSessionResult>(
+    '/api/auth/pin',
+    { name, pin, ...(deviceId ? { device_id: deviceId } : {}) },
+    {},
+  );
 }
 
 /** Fija el PIN del usuario de la sesión actual (alta de PIN tras el primer login cloud). */

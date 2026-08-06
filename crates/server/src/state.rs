@@ -96,11 +96,12 @@ pub struct HubConfig {
     /// (relativo al CWD del proceso), creado de forma perezosa al primer acceso. En cloud (S3) el
     /// listado de objetos es follow-up del humano (igual que documentos en `system.rs`).
     pub media_dir: PathBuf,
-    /// **Device-trust** del login por PIN (§2.9, hub#15). Si está activo (`HUB_DEVICE_TRUST=enforce`)
-    /// y el cliente manda `device_id`, el login por PIN se rechaza salvo que el dispositivo haya sido
-    /// marcado de confianza (tras un login online cloud previo). Por defecto **desactivado** para no
-    /// romper dev/local: un cliente que no manda `device_id` nunca se ve afectado.
-    /// TODO(humano): el host (Tauri/web) debe aportar un `device_id` estable; cerrar el diseño en §2.9.
+    /// **Device-trust** del login por PIN (§2.9, hub#15 · hub#330). Activo, el login por PIN exige
+    /// que el cliente identifique el dispositivo **y** que ese dispositivo sea de confianza (lo pasa
+    /// a serlo un login online cloud previo). Sin `device_id` se rechaza: omitirlo era el bypass.
+    /// Sigue siendo **opt-in** (`HUB_DEVICE_TRUST=enforce`): activarlo por defecto dejaría un hub
+    /// Cloud recién creado sin login por PIN, porque el navegador no tiene `device_id` hasta que la
+    /// máquina está registrada. Activarlo depende de un id de dispositivo estable por navegador.
     pub device_trust_enforce: bool,
     /// **Sector / tipo de negocio** del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`), lo
     /// inyecta el despliegue vía env `HUB_SECTOR` (hermano de `HUB_LANGUAGE`/`HUB_CURRENCY`). Lo
@@ -160,6 +161,10 @@ impl HubConfig {
         let cloud_api_token = std::env::var("HUB_CLOUD_API_TOKEN")
             .ok()
             .filter(|s| !s.trim().is_empty());
+        // Still opt-in (hub#330): turning it on by default would lock a fresh Cloud hub out of PIN
+        // login entirely — the browser only has a device id once the machine is registered
+        // (`runtime.ts` sets it from `hub_id` behind `machine_registered`), so on first run there
+        // is none to send. The bypass is closed regardless of this flag's value.
         let device_trust_enforce =
             matches!(std::env::var("HUB_DEVICE_TRUST").as_deref(), Ok("enforce"));
         // Sector / tipo de negocio del hub (preset "Recomendado" del dashboard, ADR-0054). Vacío o
