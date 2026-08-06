@@ -56,6 +56,7 @@ fn bundle(sql: &str) -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
             name: "Demo".into(),
             country: "ES".into(),
             currency: "EUR".into(),
+            hub_id: String::new(),
         },
         created_at: "2026-07-31T00:00:00Z".into(),
         modules: vec![],

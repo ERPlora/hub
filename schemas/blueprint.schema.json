@@ -70,6 +70,10 @@
           "type": "string",
           "pattern": "^[A-Z]{3}$",
           "description": "Moneda del hub de origen, ISO-4217 (`EUR`)."
+        },
+        "hub_id": {
+          "type": "string",
+          "description": "hub_id (UUID) del hub de ORIGEN. No se aplica como dato: el import lo usa para distinguir restaurar-en-el-mismo-hub (la cadena VeriFactu se aplica) de importar-en-otro-hub (la sección de datos de verifactu se descarta — ADR-0202 §4.2, NumeroInstalacion = hub_id). Ausente en bundles anteriores al campo (origen desconocido ⇒ descarte conservador)."
         }
       }
     },

@@ -35,7 +35,7 @@ fn empty_host() -> MockHost {
 
 fn context(now: &str, ids: usize) -> Value {
     let new_ids: Vec<Value> = (0..ids).map(|i| Value::String(format!("id-{i}"))).collect();
-    json!({ "hub_id": "hub-1", "current_user_id": "u-1", "now": now, "new_ids": new_ids })
+    json!({ "hub_id": "1e7d3f0a-5c2b-4a89-b0d6-3e94a1c7f258", "current_user_id": "u-1", "now": now, "new_ids": new_ids })
 }
 
 /// Fila `alta` con la huella REAL calculada por `chain::alta_hash` (importes en céntimos).

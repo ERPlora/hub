@@ -16,6 +16,9 @@ erplora-wasm-host = { path = "../wasm-host", default-features = false }
 async-trait = "0.1"
 serde_json = "1"
 sha2 = "0.10"
+# `NumeroInstalacion` must be the hub UUID (ADR-0202 §4.2): the guard parses it before any
+# record is built.
+uuid = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 # POST TLS-mutua a la AEAT con **rustls**. La identidad cliente (`reqwest::Identity`) ya NO la
 # construye este módulo: la entrega el **core** vía `NativeHost::certificate_*` (ADR-0079) — toda
