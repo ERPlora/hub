@@ -9,8 +9,20 @@ use serde_json::json;
 
 fn params(v: serde_json::Value) -> Params { v.as_object().cloned().unwrap_or_default() }
 fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(n) }
-fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
+// The ctx shares the Runtime's hub_id (DEV_HUB_ID) so `set_business_identity` and the dispatcher's
+// enricher read the SAME `hub_settings` row — required since the fiscal precondition gate
+// (hub#328, ADR-0203): issuing an invoice needs the hub's business identity configured.
+fn admin() -> RequestContext { RequestContext::new(erplora_runtime::DEV_HUB_ID, "u1", ["*".to_string()]) }
 fn wasm() -> bool { mdir("invoice").join("dist/handler.wasm").exists() }
+
+/// Configures the hub's business identity (ADR-0061 single source) — the fiscal precondition
+/// (hub#328): without it, `invoice.*` commands are rejected with `FiscalPrecondition`.
+async fn set_business_identity(rt: &Runtime) {
+    let mut up = serde_json::Map::new();
+    up.insert("business_tax_id".into(), json!("B12345678"));
+    up.insert("business_legal_name".into(), json!("Mi Empresa SL"));
+    rt.set_settings(&up, "u1").await.expect("set business identity");
+}
 
 /// Runtime con la cadena completa de dependencias de `invoice`.
 ///
@@ -23,6 +35,7 @@ async fn rt_invoice() -> Runtime {
     for m in ["taxes", "inventory", "customers", "sales", "invoice"] {
         rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));
     }
+    set_business_identity(&rt).await;
     rt
 }
 
@@ -131,6 +144,7 @@ async fn auto_f2_on_sale_completed() {
     // invoice falla con MissingDependency. (La read sales.get de create_from_sale, hub#108.)
     rt.install_from_dir(&mdir("sales")).await.unwrap();
     rt.install_from_dir(&mdir("invoice")).await.unwrap();
+    set_business_identity(&rt).await;
     let ctx = admin();
 
     rt.execute_command("sales.complete_sale", &params(json!({

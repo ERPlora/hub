@@ -180,6 +180,10 @@ pub(crate) async fn execute_at(
         ));
     }
 
+    // Fiscal precondition gate (hub#328, ADR-0203): SQL that stamps the business identity
+    // does not run while that identity (and the certificate, when required) is missing.
+    enforce_fiscal_precondition(registry, ctx, cmd.sql.iter().map(|s| s.as_str()))?;
+
     let bound = crate::system_params(payload, ctx);
 
     // SQL del command + INSERT en `_event_outbox` por cada evento emitido + `extra_ops` →
@@ -526,6 +530,11 @@ async fn persist_handler_output(
         }
     }
 
+    // Fiscal precondition gate (hub#328, ADR-0203) on the SQL the handler RESOLVED to —
+    // the handler itself is pure (no DB side effects), so rejecting here still means
+    // nothing was written. Same gate as the declarative path in `execute_at`.
+    enforce_fiscal_precondition(registry, ctx, tx_ops.iter().map(|(sql, _)| sql.as_str()))?;
+
     // Las intenciones + los INSERT de outbox (eventos declarados por el command + eventos
     // devueltos por el handler) + `extra_ops` (marcador de entrega del relay) → UNA transacción.
     let declared_payload = crate::system_params(payload, ctx);
@@ -728,6 +737,85 @@ pub(crate) fn validate_operation(
     }
 
     Ok(target.sql.clone())
+}
+
+// ─── Fiscal precondition gate (hub#328, ADR-0203) ────────────────────────────
+
+/// The `system_params` params that stamp the hub's BUSINESS identity into a document
+/// (ADR-0061). SQL that references any of them is, by definition, resolving the fiscal
+/// issuer of a document — the structural marker the fiscal precondition gate keys on.
+/// (`:business_address` is deliberately out: the decision requires name ∧ tax id.)
+const FISCAL_IDENTITY_PARAMS: [&str; 2] = ["business_tax_id", "business_legal_name"];
+
+/// Does `sql` reference the named parameter `:{param}` as a whole token? Boundary-checked
+/// on both sides so `:business_tax_id_verified` (another param) and `x::business_tax_id`
+/// (a Postgres cast, outside the ERPlora SQL subset anyway) do not count.
+fn references_param(sql: &str, param: &str) -> bool {
+    let needle = format!(":{param}");
+    let bytes = sql.as_bytes();
+    let mut start = 0;
+    while let Some(pos) = sql[start..].find(&needle) {
+        let abs = start + pos;
+        let end = abs + needle.len();
+        let next_is_ident = sql[end..]
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_');
+        let prev_is_colon = abs > 0 && bytes[abs - 1] == b':';
+        if !next_is_ident && !prev_is_colon {
+            return true;
+        }
+        start = end;
+    }
+    false
+}
+
+/// Fiscal precondition gate (hub#328, ADR-0203): a transaction whose SQL stamps the hub's
+/// business identity (any statement referencing [`FISCAL_IDENTITY_PARAMS`]) only runs when
+/// that identity exists. Otherwise `COALESCE(NULLIF(:issuer_nif,''), :business_tax_id)`
+/// (invoice) resolves empty + empty to an issued document with a BLANK issuer — and
+/// VeriFactu chains from it (ADR-0189: an accepted record is never re-sent). Preconditions:
+///
+/// 1. `business_legal_name` ∧ `business_tax_id` set in `hub_settings` (ADR-0061 source);
+/// 2. the business certificate loaded, while any INSTALLED module declares the
+///    `certificate` capability (today: verifactu) — installed even if inactive: emitting
+///    without it would strand documents outside the fiscal chain.
+///
+/// Structural and default-deny: no manifest flag a module could forget, no hardcoded
+/// module ids — the trigger is the SQL using the injected identity itself, so the runtime
+/// stays business-free. Both dispatch paths funnel through it (declarative Tier 0/1 in
+/// [`execute_at`], handler-resolved operations in [`persist_handler_output`]) BEFORE
+/// anything touches the DB. No modes, no toggles.
+fn enforce_fiscal_precondition<'a>(
+    registry: &Registry,
+    ctx: &RequestContext,
+    mut sqls: impl Iterator<Item = &'a str>,
+) -> Result<()> {
+    let stamps_identity =
+        sqls.any(|sql| FISCAL_IDENTITY_PARAMS.iter().any(|p| references_param(sql, p)));
+    if !stamps_identity {
+        return Ok(());
+    }
+    let mut missing: Vec<&'static str> = Vec::new();
+    if ctx.business_legal_name.trim().is_empty() {
+        missing.push("business_legal_name");
+    }
+    if ctx.business_tax_id.trim().is_empty() {
+        missing.push("business_tax_id");
+    }
+    if !ctx.has_certificate
+        && registry
+            .installed
+            .iter()
+            .any(|m| m.capabilities.certificate.is_some())
+    {
+        missing.push("certificate");
+    }
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(RuntimeError::FiscalPrecondition { missing })
+    }
 }
 
 #[cfg(test)]
@@ -1326,5 +1414,272 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(out["ok"], serde_json::json!(true));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Fiscal precondition gate (hub#328, ADR-0203).
+    //
+    // `system_params` injects `:business_tax_id` / `:business_legal_name` into every
+    // command's SQL so modules resolve the fiscal issuer without the caller passing it
+    // (ADR-0061) — but nothing validated that identity. `invoice/_insert_invoice.sql`
+    // does `COALESCE(NULLIF(:issuer_nif,''), :business_tax_id)`, so empty + empty =
+    // an issued invoice with a BLANK issuer, and VeriFactu chains from it (ADR-0189:
+    // an accepted record is never re-sent). The gate: SQL that stamps the business
+    // identity does not run until `business_legal_name` AND `business_tax_id` are set
+    // (AND the certificate is loaded, while an installed module declares the
+    // `certificate` capability). No modes, no toggles.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// SQL in the shape of `invoice._insert_invoice`: stamps the hub's business identity
+    /// as the document issuer. Referencing the injected identity params is the marker
+    /// the gate keys on.
+    const FISCAL_INSERT: &str = "INSERT INTO fiscal_doc (id, issuer_nif, issuer_name) VALUES \
+         (:new_id, COALESCE(NULLIF(:issuer_nif, ''), :business_tax_id), \
+         COALESCE(NULLIF(:issuer_name, ''), :business_legal_name));";
+
+    /// Registry with an active `invoice`-like module whose public command stamps the
+    /// business identity (declarative Tier 0/1 path).
+    fn registry_with_fiscal_command() -> Registry {
+        let mut reg = Registry::new();
+        reg.status.insert("invoice".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "invoice.create".into(),
+            RegisteredCommand {
+                module_id: "invoice".into(),
+                def: cmd_def(),
+                sql: vec![FISCAL_INSERT.to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg
+    }
+
+    /// Caller-side issuer fields empty, like a POS sale: the issuer falls back to the
+    /// injected business identity.
+    fn fiscal_payload() -> Params {
+        let mut p = Params::new();
+        p.insert("issuer_nif".into(), json!(""));
+        p.insert("issuer_name".into(), json!(""));
+        p
+    }
+
+    /// Real test DB with the fiscal table and `hub_settings` (system migration v4 DDL).
+    async fn db_with_fiscal_tables() -> erplora_db::PgAdapter {
+        let db = erplora_db::testutil::fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE fiscal_doc (id TEXT, issuer_nif TEXT, issuer_name TEXT);\
+             CREATE TABLE hub_settings (\
+               hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
+               updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+               PRIMARY KEY (hub_id, key));",
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    /// Sets the hub's business identity in `hub_settings` (the single source, ADR-0061).
+    async fn set_business_identity(db: &dyn DatabaseAdapter, hub_id: &str) {
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_tax_id".into(), json!("B12345678"));
+        updates.insert("business_legal_name".into(), json!("ACME SL"));
+        crate::settings::set_many(db, hub_id, &updates, "hub_user:1")
+            .await
+            .unwrap();
+    }
+
+    /// **The red test of hub#328.** Without `business_legal_name` ∧ `business_tax_id` in
+    /// `hub_settings`, a command that stamps the business identity is rejected with the
+    /// domain error and NOTHING is written — no blank-issuer invoice ever reaches the DB.
+    #[tokio::test]
+    async fn fiscal_document_without_business_identity_is_rejected() {
+        let db = db_with_fiscal_tables().await;
+        let reg = registry_with_fiscal_command();
+        // No `hub_settings` rows → the enriched context carries an EMPTY business identity.
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+
+        let err = execute(&db, &reg, "invoice.create", &fiscal_payload(), &ctx)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::FiscalPrecondition { missing }
+                if missing.contains(&"business_tax_id") && missing.contains(&"business_legal_name")),
+            "got {err:?}"
+        );
+
+        let rows = db
+            .query("SELECT COUNT(*) AS c FROM fiscal_doc", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.rows[0]["c"].as_i64().unwrap_or(-1),
+            0,
+            "a fiscal document with a blank issuer must never be written"
+        );
+    }
+
+    /// With the identity configured, the same command runs and the document carries the
+    /// hub's business identity as issuer (the ADR-0061 fallback keeps working).
+    #[tokio::test]
+    async fn fiscal_document_with_business_identity_set_is_emitted() {
+        let db = db_with_fiscal_tables().await;
+        set_business_identity(&db, "h1").await;
+        let reg = registry_with_fiscal_command();
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+
+        let out = execute(&db, &reg, "invoice.create", &fiscal_payload(), &ctx)
+            .await
+            .expect("with the business identity set, the fiscal document must be emitted");
+        assert_eq!(out["ok"], json!(true));
+
+        let rows = db
+            .query(
+                "SELECT issuer_nif, issuer_name FROM fiscal_doc",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1);
+        assert_eq!(rows.rows[0]["issuer_nif"], json!("B12345678"));
+        assert_eq!(rows.rows[0]["issuer_name"], json!("ACME SL"));
+    }
+
+    /// While an INSTALLED module declares the `certificate` capability (today: verifactu),
+    /// the loaded certificate becomes part of the precondition: identity alone is not
+    /// enough — emitting without it would strand documents outside the VeriFactu chain.
+    #[tokio::test]
+    async fn fiscal_document_requires_certificate_when_an_installed_module_declares_it() {
+        let db = db_with_fiscal_tables().await;
+        set_business_identity(&db, "h1").await;
+        let mut reg = registry_with_fiscal_command();
+        reg.installed.push(
+            serde_json::from_str(
+                r#"{"id":"verifactu","name":"VeriFactu","version":"1.0.0",
+                    "capabilities":{"certificate":{"purpose":"fiscal-sign"}}}"#,
+            )
+            .unwrap(),
+        );
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+
+        let err = execute(&db, &reg, "invoice.create", &fiscal_payload(), &ctx)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::FiscalPrecondition { missing }
+                if *missing == vec!["certificate"]),
+            "got {err:?}"
+        );
+    }
+
+    /// Native handler op that resolves to the fiscal SQL of its own module — the exact
+    /// path the real `invoice` WASM handler takes (`persist_handler_output`).
+    #[derive(Debug)]
+    struct FiscalOpHandler;
+
+    #[async_trait::async_trait]
+    impl crate::native::NativeHandler for FiscalOpHandler {
+        async fn call(
+            &self,
+            _function: &str,
+            _input: &Json,
+            _host: &dyn crate::native::NativeHost,
+        ) -> Result<Output> {
+            Ok(Output {
+                operations: vec![Operation::sql("invoice._insert", fiscal_payload())],
+                events: vec![],
+            })
+        }
+    }
+
+    /// The handler path is gated too: an operation resolved from a handler that stamps
+    /// the business identity is rejected before anything touches the DB.
+    #[tokio::test]
+    async fn handler_operation_stamping_business_identity_is_gated_too() {
+        let db = db_with_fiscal_tables().await;
+        let mut reg = Registry::new();
+        reg.status.insert("invoice".into(), ModuleStatus::Active);
+        let mut def = cmd_def();
+        def.sql = vec![];
+        def.handler = Some(crate::manifest::HandlerRef {
+            kind: "native".to_string(),
+            file: None,
+            function: "handle".to_string(),
+        });
+        reg.commands.insert(
+            "invoice.create".into(),
+            RegisteredCommand {
+                module_id: "invoice".into(),
+                def,
+                sql: vec![],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg.commands.insert(
+            "invoice._insert".into(),
+            RegisteredCommand {
+                module_id: "invoice".into(),
+                def: cmd_def(),
+                sql: vec![FISCAL_INSERT.to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg.native
+            .insert("invoice".into(), std::sync::Arc::new(FiscalOpHandler));
+
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        let err = execute(&db, &reg, "invoice.create", &Params::new(), &ctx)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::FiscalPrecondition { .. }),
+            "got {err:?}"
+        );
+
+        let rows = db
+            .query("SELECT COUNT(*) AS c FROM fiscal_doc", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(rows.rows[0]["c"].as_i64().unwrap_or(-1), 0);
+    }
+
+    /// Control: a command that does NOT stamp the business identity runs untouched with an
+    /// empty identity — the gate keys on the SQL, not on global hub state. Otherwise a
+    /// fresh hub could not even save its settings.
+    #[tokio::test]
+    async fn command_not_stamping_business_identity_runs_without_it() {
+        let reg = registry_with_command("notes", "notes.create");
+        // Empty business identity (FakeDb returns no settings rows).
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        let out = execute(&FakeDb, &reg, "notes.create", &Params::new(), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(out["ok"], json!(true));
+    }
+
+    /// Token boundary: a module param that merely STARTS with an identity param name
+    /// (`:business_tax_id_verified`) is not the injected identity param and must not
+    /// trigger the gate.
+    #[tokio::test]
+    async fn param_with_identity_prefix_does_not_trigger_the_gate() {
+        let mut reg = Registry::new();
+        reg.status.insert("crm".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "crm.flag".into(),
+            RegisteredCommand {
+                module_id: "crm".into(),
+                def: cmd_def(),
+                sql: vec!["INSERT INTO x VALUES (:business_tax_id_verified);".to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+        let mut payload = Params::new();
+        payload.insert("business_tax_id_verified".into(), json!(1));
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        let out = execute(&FakeDb, &reg, "crm.flag", &payload, &ctx).await.unwrap();
+        assert_eq!(out["ok"], json!(true));
     }
 }
