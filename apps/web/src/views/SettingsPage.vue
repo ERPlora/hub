@@ -181,6 +181,21 @@
               auto-grow
               v-model="businessAddress"
             />
+            <!-- ADR-0201 (7/11): the identity is written ONCE here and the copy goes UP. The
+                 runtime makes the call (the machine token never reaches this webview). -->
+            <ion-item lines="none" class="mt-2">
+              <ion-label>
+                <h2>{{ t('settings.shareWithErplora') }}</h2>
+                <p>{{ t('settings.shareWithErploraDesc') }}</p>
+              </ion-label>
+              <ion-toggle
+                :checked="shareWithErplora"
+                :disabled="!isAdmin || sharingFiscalIdentity"
+                :aria-label="t('settings.shareWithErplora')"
+                @ion-change="onShareWithErploraToggle($event)"
+                slot="end"
+              />
+            </ion-item>
           </ion-card-content>
         </ion-card>
 
@@ -415,6 +430,7 @@ import {
   getModuleCapabilities,
   putModuleCapabilities,
   getBusinessCertificate,
+  publishFiscalIdentity,
   putBusinessCertificate,
   deleteBusinessCertificate,
   type ModuleCapability,
@@ -505,6 +521,13 @@ const businessTaxId = ref<string>(hubSettings.value?.business_tax_id ?? '');
 const businessLegalName = ref<string>(hubSettings.value?.business_legal_name ?? '');
 const businessAddress = ref<string>(hubSettings.value?.business_address ?? '');
 
+// ADR-0201 (7/11): «usar estos datos también para mi factura de ERPlora». No es un ajuste que se
+// guarde: es una ACCIÓN puntual (sube una copia de la identidad al SaaS, que crea/actualiza el
+// BillingProfile). Sin marcarla, el perfil se rellena aparte en el SaaS — el caso de la gestoría
+// que paga los hubs de sus clientes.
+const shareWithErplora = ref<boolean>(false);
+const sharingFiscalIdentity = ref<boolean>(false);
+
 // Textos i18n del ok-theme-picker (defaults en inglés dentro del componente, ADR-0055).
 const pickerLabels = computed(() => ({
   palette: t('settings.themePalette'),
@@ -585,6 +608,31 @@ function onApiDocsToggle(e: Event): void {
   void persistHubSettings({ api_docs_enabled: checked }, () => {
     /* la cache no se tocó: el :checked vuelve solo al valor server */
   });
+}
+
+async function onShareWithErploraToggle(e: Event): Promise<void> {
+  if (!isAdmin.value) return; // defensa: el toggle ya está disabled para no-admin
+  const checked = (e as CustomEvent<{ checked: boolean }>).detail.checked;
+  if (!checked) {
+    shareWithErplora.value = false; // desmarcar no borra nada en el SaaS: deja de compartir y ya
+    return;
+  }
+  if (!businessTaxId.value.trim()) {
+    shareWithErplora.value = false;
+    await toastError(t('settings.shareWithErploraNeedsTaxId'));
+    return;
+  }
+  sharingFiscalIdentity.value = true;
+  try {
+    await publishFiscalIdentity();
+    shareWithErplora.value = true;
+    await toastSuccess(t('settings.shareWithErploraDone'));
+  } catch {
+    shareWithErplora.value = false; // el :checked vuelve solo al valor real
+    await toastError(t('settings.shareWithErploraError'));
+  } finally {
+    sharingFiscalIdentity.value = false;
+  }
 }
 
 async function saveTaxSettings(): Promise<void> {

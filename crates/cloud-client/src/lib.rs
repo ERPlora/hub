@@ -159,6 +159,22 @@ impl CloudClient {
         }
     }
 
+    /// **Identidad fiscal del negocio hacia el SaaS** (ADR-0201 decisión 5, 7/11 — hub#333).
+    /// `POST /api/v1/hub/device/fiscal-identity/` con la credencial de máquina; el body (razón
+    /// social, NIF, dirección) lo construye el server desde `hub_settings`, que es donde el
+    /// usuario ya lo escribió una vez. Crea/actualiza el `BillingProfile` del hub en el SaaS.
+    ///
+    /// **La llamada la hace el RUNTIME, no el navegador**: el `cloud_api_token` es secreto del hub
+    /// y nunca cruza al webview. Y sube una COPIA — el NIF del negocio se queda en `hub_settings`;
+    /// el del `BillingProfile` es a quién factura ERPlora. Dos NIF distintos que no se leen.
+    pub fn fiscal_identity(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/fiscal-identity/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// **Token del Bridge local** — el SaaS emite un JWT dedicado (`aud=erplora-bridge` + `hub_id`,
     /// exp corto) para autorizar el daemon de hardware. `GET /api/v1/hub/device/bridge-token/`. El
     /// runtime lo proxya a la app (el `cloud_api_token` nunca llega al navegador); la app lo presenta
@@ -739,6 +755,25 @@ mod tests {
         };
         let body = serde_json::to_value(&req).unwrap();
         assert_eq!(body["model"], "custom");
+    }
+
+    /// ADR-0201 (7/11, hub#333): the hub uploads the identity ERPlora invoices. Machine
+    /// credential, canonical path, POST — the `cloud_api_token` never reaches the browser, so
+    /// this call is made BY the runtime, not proxied from the web app.
+    #[test]
+    fn fiscal_identity_uses_machine_token_and_canonical_path() {
+        let c = CloudClient::new("https://erplora.com/");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
+        let r = c.fiscal_identity(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/fiscal-identity/");
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
     }
 
     #[test]

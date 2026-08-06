@@ -643,6 +643,13 @@ pub fn app(state: AppState) -> Router {
                 .layer(axum::extract::DefaultBodyLimit::max(3 * 1024 * 1024)),
         )
         // Certificado fiscal del negocio (ADR-0079): recurso del hub, subido en Ajustes → Negocio.
+        // Identidad fiscal hacia el SaaS (ADR-0201 7/11): la casilla «usar estos datos también
+        // para mi factura de ERPlora». La llamada la hace el RUNTIME — el cloud_api_token nunca
+        // cruza al navegador.
+        .route(
+            "/api/business/fiscal-identity",
+            post(settings::publish_fiscal_identity),
+        )
         .route(
             "/api/business/certificate",
             get(settings::get_business_certificate)

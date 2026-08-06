@@ -351,6 +351,22 @@ export async function putBusinessCertificate(pkcs12_b64: string, password: strin
 }
 
 /**
+ * Comparte la identidad fiscal del negocio con el SaaS (`POST /api/business/fiscal-identity`) —
+ * la casilla «usar estos datos también para mi factura de ERPlora» (ADR-0201 decisión 5).
+ *
+ * El body lo construye el RUNTIME leyendo `hub_settings`: el dato ya está escrito, aquí solo se
+ * autoriza que suba una copia. Y la llamada al SaaS la hace el runtime porque el token de máquina
+ * del hub nunca cruza a este navegador (ADR-0003). Solo admin (Rust revalida). Lanza si falla.
+ */
+export async function publishFiscalIdentity(): Promise<void> {
+  const res = await fetch(`${RUNTIME_URL}/api/business/fiscal-identity`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+  });
+  if (!res.ok) throw new Error(`publish-fiscal-identity → ${res.status}`);
+}
+
+/**
  * Elimina el certificado fiscal del negocio (`DELETE /api/business/certificate`). Solo admin (401
  * si no). Lanza si el runtime rechaza.
  */
