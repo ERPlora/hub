@@ -314,6 +314,27 @@
             "minimum": 0,
             "description": "Contrato de mutación (hub#140): mínimo de filas que las sentencias `sql` del command DEBEN afectar (en total) para que el command se considere exitoso y se emitan sus `emit`. Si el recuento real queda por debajo, la transacción se revierte ENTERA y NO se escribe ningún evento en el outbox (ni notificación al WS) — porque el hecho declarado nunca ocurrió. Es OPT-IN: ausente = comportamiento de siempre (emite haya o no mutado), para no romper los módulos publicados ni los commands genuinamente idempotentes. `1` es el caso habitual de un command de transición (confirmar/anular/cerrar) que NO debe emitir si el `WHERE` no casa; `0` declararía explícitamente un no-op idempotente permitido que sí emite. El error estable distingue `not_found` (0 filas) de `conflict` (>0 pero por debajo del mínimo)."
           },
+          "expect_rows": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op", "n", "error"],
+            "properties": {
+              "op": { "type": "string", "enum": ["min"] },
+              "n": { "type": "integer", "minimum": 0 },
+              "error": {
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                "description": "Código de dominio namespaced (`<module>.<snake_case>`) que la UI traduce vía el catálogo i18n del módulo (ADR-0055). El namespace DEBE ser el id del propio módulo (el installer lo valida)."
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 500,
+                "description": "Fallback humano opcional (inglés fuente); no debe contener datos internos. Si se omite, el runtime genera uno genérico."
+              }
+            },
+            "description": "Gate traducible de filas afectadas (hub#139): la versión con código de dominio estable de `min_affected_rows` (no combinables en un mismo command). Si la mutación afecta menos de `n` filas, rollback ENTERO (mutación + outbox) y el caller recibe HTTP 409 con `{code: error, message}` — nunca un `200 ok` con 0 filas ni un evento falso."
+          },
           "ai": {
             "$ref": "#/$defs/aiTool"
           }

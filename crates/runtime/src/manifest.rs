@@ -384,6 +384,26 @@ impl ReadDef {
     }
 }
 
+/// Operation supported by the declarative affected-rows contract (hub#139).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExpectRowsOp {
+    Min,
+}
+
+/// Gate of a declarative SQL command (hub#139) that turns an `UPDATE ... WHERE` matching fewer
+/// rows than expected into a stable business rejection instead of an ambiguous `200 ok`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ExpectRows {
+    pub op: ExpectRowsOp,
+    pub n: u64,
+    /// Namespaced code the caller programs/translates against (`inventory.insufficient_stock`).
+    pub error: String,
+    /// Optional human fallback. When omitted, the runtime generates one without internal data.
+    #[serde(default)]
+    pub message: Option<String>,
+}
+
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct Migrations {
     #[serde(default)]
@@ -643,6 +663,11 @@ pub struct CommandDef {
     /// [`crate::errors::RuntimeError::MinAffectedRows`].
     #[serde(default)]
     pub min_affected_rows: Option<u64>,
+    /// Declarative domain error based on affected rows (hub#139). The translatable, namespaced
+    /// flavour of `min_affected_rows`; the two fields cannot coexist on one command (the
+    /// installer rejects the manifest).
+    #[serde(default)]
+    pub expect_rows: Option<ExpectRows>,
     /// Handler de lógica: Tier 2 (WASM sandbox) o **plugin nativo first-party**
     /// (ADR-0009, crate horneado en el runtime). Si está presente, el command ejecuta
     /// el handler en vez de su `sql` directo. ARQUITECTURA.md §5.3.

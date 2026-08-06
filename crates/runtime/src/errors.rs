@@ -51,6 +51,11 @@ pub enum RuntimeError {
         affected: u64,
         kind: AffectedKind,
     },
+    /// Stable business rejection (hub#139), coming either from a handler's `Output.error` or
+    /// from the declarative `expect_rows` gate. `code` is namespaced (`<module>.<snake_case>`)
+    /// and the UI programs/translates against it; `message` is the human fallback.
+    #[error("{message}")]
+    Domain { code: String, message: String },
     #[error("permiso denegado: requiere `{0}`")]
     PermissionDenied(String),
     /// El módulo necesita una **capability** (ADR-0079: red/certificado/impresora/notify) que el
@@ -158,5 +163,57 @@ pub fn affected_kind(affected: u64, min: u64) -> AffectedKind {
         // El caller ya garantiza `affected < min` (la gate falló); aquí solo se decide la forma.
         let _ = min;
         AffectedKind::TooFew
+    }
+}
+
+/// Validates the public ABI of domain error codes (hub#139): exactly `<module>.<snake_case>`,
+/// owned by the emitting module — no spaces, no extra dots, no foreign namespace. It is the
+/// single authority for the shape; both the installer (declarative `expect_rows`) and the
+/// handler output path (`Output.error`) call it.
+pub fn valid_domain_code(module: &str, code: &str) -> bool {
+    let Some((namespace, name)) = code.split_once('.') else {
+        return false;
+    };
+    code.len() <= 128
+        && namespace == module
+        && !name.contains('.')
+        && valid_snake_segment(namespace)
+        && valid_snake_segment(name)
+}
+
+fn valid_snake_segment(value: &str) -> bool {
+    let mut chars = value.chars();
+    matches!(chars.next(), Some('a'..='z'))
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+#[cfg(test)]
+mod domain_code_tests {
+    use super::valid_domain_code;
+
+    #[test]
+    fn accepts_only_owned_namespaced_snake_case_codes() {
+        // hub#139: the code is a public ABI (`<module>.<snake_case>`) the UI translates against.
+        // A module may only speak in its own namespace — anything else is a broken contract.
+        assert!(valid_domain_code(
+            "inventory",
+            "inventory.insufficient_stock"
+        ));
+        assert!(valid_domain_code("w140", "w140.insufficient_stock"));
+        // Foreign namespace: a module must not mint codes on behalf of another module.
+        assert!(!valid_domain_code("inventory", "sales.insufficient_stock"));
+        // Shape violations: casing, extra dots, empty segments, oversized codes.
+        assert!(!valid_domain_code(
+            "inventory",
+            "inventory.InsufficientStock"
+        ));
+        assert!(!valid_domain_code("inventory", "inventory.stock.low"));
+        assert!(!valid_domain_code("inventory", "inventory."));
+        assert!(!valid_domain_code("inventory", "inventory"));
+        assert!(!valid_domain_code("inventory", ""));
+        assert!(!valid_domain_code(
+            "inventory",
+            &format!("inventory.{}", "x".repeat(128))
+        ));
     }
 }

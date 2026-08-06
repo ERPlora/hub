@@ -1641,24 +1641,33 @@ struct InstallReq {
 
 pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     use erplora_runtime::RuntimeError as E;
-    let (status, code) = match &e {
-        E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied"),
-        E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
+    // `Cow` because `Domain` (hub#139) carries a module-declared dynamic code; every other
+    // variant keeps its static stable code.
+    let (status, code): (StatusCode, std::borrow::Cow<'_, str>) = match &e {
+        E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied".into()),
+        E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found".into()),
         // hub#131, hub#145: un command interno (prefijo `_`/`internal:true`) invocado desde un
         // origen EXTERNO. `403` (como `permission_denied`): el command EXISTE, pero esta puerta
         // no es la suya — nunca `404`, que sugeriría que ni siquiera está registrado.
-        E::InternalCommand(_) => (StatusCode::FORBIDDEN, "internal_command"),
+        E::InternalCommand(_) => (StatusCode::FORBIDDEN, "internal_command".into()),
         // ADR-0127: `queryOptional` del SDK devuelve `undefined` SOLO con este código; un
         // `not_found` normal (contrato roto contra un módulo presente) sigue siendo un error.
-        E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed"),
-        E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive"),
-        E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload"),
+        E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed".into()),
+        E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive".into()),
+        E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload".into()),
+        // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
+        // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
+        // `409`: the request is well-formed, it conflicts with the current business state.
+        E::Domain { code, .. } => (StatusCode::CONFLICT, code.as_str().into()),
+        // hub#139/hub#140: the affected-rows gate carries its stable kind code (`not_found` /
+        // `conflict`) to the caller instead of collapsing into the generic 400 bucket.
+        E::MinAffectedRows { kind, .. } => (StatusCode::CONFLICT, kind.as_str().into()),
         // hub#328 (ADR-0203): the fiscal precondition gate — the hub's state (missing business
         // identity/certificate), not the request, blocks emitting fiscal documents. `409`: the
         // request is well-formed and allowed, it conflicts with the hub's current setup state.
-        E::FiscalPrecondition { .. } => (StatusCode::CONFLICT, "fiscal_precondition_failed"),
-        E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
-        _ => (StatusCode::BAD_REQUEST, "error"),
+        E::FiscalPrecondition { .. } => (StatusCode::CONFLICT, "fiscal_precondition_failed".into()),
+        E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".into()),
+        _ => (StatusCode::BAD_REQUEST, "error".into()),
     };
     let body = json!({ "ok": false, "error": { "code": code, "message": e.to_string() } });
     (status, Json(body)).into_response()
@@ -2485,5 +2494,51 @@ async fn ws_loop(mut socket: WebSocket, st: AppState) {
             Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
             Err(_) => break,
         }
+    }
+}
+
+#[cfg(test)]
+mod err_response_tests {
+    //! hub#139: HTTP mapping of the domain error channel. The namespaced code must travel to
+    //! the caller verbatim (the UI translates by code), on a status the SDK never swallows.
+    use super::err_response;
+    use axum::http::StatusCode;
+    use erplora_runtime::RuntimeError;
+    use http_body_util::BodyExt;
+    use serde_json::Value;
+
+    async fn shape(e: RuntimeError) -> (StatusCode, Value) {
+        let resp = err_response(e);
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn domain_error_maps_to_409_with_the_namespaced_code() {
+        let (status, body) = shape(RuntimeError::Domain {
+            code: "inventory.insufficient_stock".into(),
+            message: "Not enough stock".into(),
+        })
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["ok"], Value::Bool(false));
+        assert_eq!(body["error"]["code"], "inventory.insufficient_stock");
+        assert_eq!(body["error"]["message"], "Not enough stock");
+    }
+
+    #[tokio::test]
+    async fn min_affected_rows_maps_to_409_with_its_stable_kind_code() {
+        // Before hub#139 this fell into the generic 400 `{code:"error"}` bucket, erasing the
+        // stable `not_found`/`conflict` code hub#140 introduced at the runtime layer.
+        let (status, body) = shape(RuntimeError::MinAffectedRows {
+            command: "w140.items.confirm".into(),
+            required: 1,
+            affected: 0,
+            kind: erplora_runtime::errors::AffectedKind::NotFound,
+        })
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["error"]["code"], "not_found");
     }
 }

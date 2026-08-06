@@ -244,6 +244,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#140: un `min_affected_rows` incumplido es un error esperable del llamador (recurso
         // inexistente / transición no aplicable), no un fallo inesperado del Hub.
         | E::MinAffectedRows { .. }
+        // hub#139: a domain rejection is a business rule doing its job (insufficient stock,
+        // invalid transition) — expected caller-facing behaviour, never a Hub bug.
+        | E::Domain { .. }
         // hub#328: the fiscal precondition is expected state of a hub that has not finished its
         // setup (missing business identity/certificate) — never a Hub bug worth an issue.
         | E::FiscalPrecondition { .. }
@@ -253,9 +256,12 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
 }
 
 /// Código corto y estable derivado de la variante de [`RuntimeError`] (snake_case del nombre).
-pub fn error_code_of(err: &RuntimeError) -> &'static str {
+/// `Cow` because `Domain` (hub#139) carries a module-declared, dynamic namespaced code — for
+/// every other variant the code stays a borrowed static string.
+pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
+    use std::borrow::Cow;
     use RuntimeError as E;
-    match err {
+    Cow::Borrowed(match err {
         E::Io(_) => "io",
         E::Manifest { .. } => "manifest",
         E::Db(_) => "db",
@@ -268,6 +274,8 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         // no la variante genérica — es lo que el SDK y los listeners programan. `as_str` es la
         // única fuente de verdad del nombre, así que la regla vive en `AffectedKind`.
         E::MinAffectedRows { kind, .. } => kind.as_str(),
+        // hub#139: the namespaced domain code IS the stable code — the UI translates against it.
+        E::Domain { code, .. } => code.as_str(),
         E::PermissionDenied(_) => "permission_denied",
         E::CapabilityDenied { .. } => "capability_denied",
         E::MissingDependency { .. } => "missing_dependency",
@@ -284,7 +292,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::Certificate(_) => "certificate",
         E::FiscalPrecondition { .. } => "fiscal_precondition_failed",
         E::Other(_) => "other",
-    }
+    })
 }
 
 #[cfg(test)]
@@ -415,6 +423,19 @@ mod tests {
         );
         assert_eq!(error_code_of(&RuntimeError::Wasm("x".into())), "wasm");
         assert_eq!(error_code_of(&RuntimeError::EventLoop), "event_loop");
+    }
+
+    /// hub#139: a `Domain` rejection travels with the module-declared namespaced code — that IS
+    /// the stable code (the UI translates against it) — and is caller-expectable (`user`), never
+    /// an issue-worthy Hub bug.
+    #[test]
+    fn domain_error_keeps_its_namespaced_code_and_user_severity() {
+        let err = RuntimeError::Domain {
+            code: "inventory.insufficient_stock".into(),
+            message: "Not enough stock".into(),
+        };
+        assert_eq!(error_code_of(&err), "inventory.insufficient_stock");
+        assert_eq!(severity_of(&err), severity::USER);
     }
 
     #[test]

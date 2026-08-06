@@ -149,10 +149,31 @@ impl Event {
     }
 }
 
+/// Business rejection returned by a handler (hub#139).
+///
+/// `code` is stable and namespaced (`<module>.<snake_case>`); the UI translates against it via
+/// the module i18n catalog. `message` is the human fallback for clients without that translation
+/// yet. The host validates the namespace before exposing it and aborts the whole transaction.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DomainError {
+    pub code: String,
+    pub message: String,
+}
+
+impl DomainError {
+    pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+        }
+    }
+}
+
 /// Resultado de un handler WASM: el conjunto de **intenciones** a aplicar.
 ///
-/// El host valida y ejecuta `operations` en orden dentro de una transacción y
-/// luego emite `events`. Nunca contiene SQL crudo ni filas de BD.
+/// El host valida y ejecuta `operations` en orden dentro de una transacción y luego emite
+/// `events`. `error`, si viene, aborta la transacción entera ANTES de aplicar nada (hub#139).
+/// Nunca contiene SQL crudo ni filas de BD.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Output {
     /// Operaciones SQL (por nombre de command + params) a ejecutar.
@@ -161,6 +182,10 @@ pub struct Output {
     /// Eventos a emitir tras ejecutar las operaciones.
     #[serde(default)]
     pub events: Vec<Event>,
+    /// Structured business rejection (hub#139). Absent in older guests; when present, the host
+    /// discards `operations`/`events` and surfaces the code to the caller.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<DomainError>,
 }
 
 impl Output {
@@ -178,6 +203,13 @@ impl Output {
     /// Añade un evento (builder).
     pub fn with_event(mut self, ev: Event) -> Self {
         self.events.push(ev);
+        self
+    }
+
+    /// Rejects the command with a stable domain error. The host will not apply any operation or
+    /// event present in this same output (hub#139).
+    pub fn with_error(mut self, error: DomainError) -> Self {
+        self.error = Some(error);
         self
     }
 }
@@ -250,6 +282,36 @@ mod tests {
         let op = Operation::sql("do_thing", Map::new());
         assert_eq!(op.kind, "sql");
         assert_eq!(op.command, "do_thing");
+    }
+
+    #[test]
+    fn output_round_trips_a_domain_error() {
+        // hub#139: a business rejection is a normal guest output, not a trap. The struct must
+        // survive the host<->guest JSON boundary intact.
+        let out = Output::new().with_error(DomainError::new(
+            "inventory.insufficient_stock",
+            "Not enough stock",
+        ));
+        let back: Output = serde_json::from_slice(&serde_json::to_vec(&out).unwrap()).unwrap();
+        assert_eq!(back.error, out.error);
+        assert_eq!(
+            back.error.as_ref().unwrap().code,
+            "inventory.insufficient_stock"
+        );
+    }
+
+    #[test]
+    fn error_field_is_backwards_compatible_with_old_guests_and_hosts() {
+        // Old guests only serialize operations/events: the field must default to None…
+        let out: Output = serde_json::from_str("{}").unwrap();
+        assert!(out.error.is_none());
+        // …and an Output without a rejection must not emit an `error` key at all, so old hosts
+        // (which ignore unknown fields anyway) see exactly the same JSON as before.
+        let v: Value = serde_json::to_value(sample_output()).unwrap();
+        assert!(
+            v.get("error").is_none(),
+            "absent rejection must not serialize an `error` key"
+        );
     }
 
     #[test]

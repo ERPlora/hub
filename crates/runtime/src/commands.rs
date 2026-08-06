@@ -213,11 +213,26 @@ pub(crate) async fn execute_at(
     // `sql_op_count` ops, NUNCA sobre los INSERT del outbox (que siempre afectan 1 y harían
     // inútil la gate). Se evalúa DENTRO de la tx vía `execute_tx_gated`: si no se cumple, la tx
     // entera revierte (ni mutación ni outbox) y devolvemos el error estable, SIN notificar al WS.
-    let min = cmd.def.min_affected_rows;
+    //
+    // hub#139: `expect_rows` is the translatable flavour of the same gate — same rollback
+    // semantics, but the failure surfaces as `RuntimeError::Domain` with the module-declared
+    // namespaced code instead of the generic `MinAffectedRows` variant. The installer already
+    // guaranteed the two fields do not coexist and that the code lives in the module namespace.
+    let expected = cmd.def.expect_rows.as_ref();
+    let min = expected.map(|expect| expect.n).or(cmd.def.min_affected_rows);
     match db.execute_tx_gated(&ops, sql_op_count, min).await? {
         TxGatedOutcome::RolledBack { sql_counts } => {
             let min = min.expect("la gate sólo revierte con Some(min)");
             let affected: u64 = sql_counts.iter().sum();
+            if let Some(expect) = expected {
+                return Err(RuntimeError::Domain {
+                    code: expect.error.clone(),
+                    message: expect.message.clone().unwrap_or_else(|| {
+                        // Generated fallback: states the rejection without leaking internals.
+                        format!("the operation `{name}` could not be applied in the current state")
+                    }),
+                });
+            }
             return Err(RuntimeError::MinAffectedRows {
                 command: name.to_string(),
                 required: min,
@@ -520,6 +535,26 @@ async fn persist_handler_output(
     // para añadirle líneas). Por convención `new_ids[0]` es la entidad principal (§5.3).
     new_ids: &[Json],
 ) -> Result<Json> {
+    // hub#139: a business rejection is a normal guest output, not a WASM trap. It is checked
+    // BEFORE looking at any intention: even a buggy guest that returns `error` together with
+    // operations/events cannot persist partial effects. The code is validated against the
+    // module's own namespace — an invalid or foreign code is a broken guest contract (`Wasm`),
+    // never a `Domain` the UI would translate, so a module cannot spoof another module's ABI.
+    if let Some(error) = &output.error {
+        if !crate::errors::valid_domain_code(&cmd.module_id, &error.code)
+            || error.message.chars().count() > 500
+        {
+            return Err(RuntimeError::Wasm(format!(
+                "handler of module `{}` returned an invalid domain error code `{}`",
+                cmd.module_id, error.code
+            )));
+        }
+        return Err(RuntimeError::Domain {
+            code: error.code.clone(),
+            message: error.message.clone(),
+        });
+    }
+
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
     for op in &output.operations {
@@ -833,6 +868,7 @@ mod tests {
             sql: vec!["INSERT INTO x VALUES (1);".to_string()],
             emit: vec![],
             min_affected_rows: None,
+            expect_rows: None,
             handler: None,
             ai: None,
             schema: None,
@@ -1061,6 +1097,7 @@ mod tests {
                     name: self.0.to_string(),
                     payload: json!({}),
                 }],
+                ..Output::default()
             })
         }
     }
@@ -1147,6 +1184,102 @@ mod tests {
         assert_eq!(rows.rows[0]["event_name"], json!("sale.completed"));
         // La fila guarda el módulo emisor: es lo que permite exigirle la capability al entregar.
         assert_eq!(rows.rows[0]["module_id"], json!("sales"));
+    }
+
+    // ── hub#139: domain error channel from a handler ─────────────────────────────────────────
+    //
+    // Same rationale as the hub#240 regression above: the validator alone is not enough, the
+    // REAL path (handler → persist_handler_output) must abort. A native handler shares that
+    // path with WASM and needs no compiled `.wasm`.
+
+    /// Test handler that returns a business rejection, alongside a declared event that must
+    /// never be enqueued (a rejecting guest cannot persist partial effects).
+    #[derive(Debug)]
+    struct RejectingHandler(&'static str);
+
+    #[async_trait::async_trait]
+    impl crate::native::NativeHandler for RejectingHandler {
+        async fn call(
+            &self,
+            _function: &str,
+            _input: &Json,
+            _host: &dyn crate::native::NativeHost,
+        ) -> Result<Output> {
+            Ok(Output::new()
+                .with_event(erplora_wasm_host::Event {
+                    name: "sale.completed".to_string(),
+                    payload: json!({}),
+                })
+                .with_error(erplora_wasm_host::guest_sdk::DomainError::new(
+                    self.0,
+                    "Rejected by a business rule",
+                )))
+        }
+    }
+
+    /// Registry with the same `sales` module as the hub#240 harness, but a rejecting handler.
+    fn registry_with_rejecting_handler(code: &'static str) -> Registry {
+        let mut reg = registry_with_native_handler("sale.completed");
+        reg.native
+            .insert("sales".into(), std::sync::Arc::new(RejectingHandler(code)));
+        reg
+    }
+
+    /// hub#139: a handler that returns `error` aborts the whole command with a stable,
+    /// namespaced `Domain` code — and NOTHING it returned (events, operations) is persisted.
+    #[tokio::test]
+    async fn handler_domain_error_aborts_with_a_stable_code_and_persists_nothing() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_rejecting_handler("sales.rejected");
+
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        let err = execute(&db, &reg, "sales.complete_sale", &Params::new(), &ctx)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                RuntimeError::Domain { ref code, ref message }
+                    if code == "sales.rejected" && message == "Rejected by a business rule"
+            ),
+            "expected Domain with the guest-declared code, got {err:?}"
+        );
+
+        let rows = db
+            .query("SELECT COUNT(*) AS c FROM _event_outbox", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.rows[0]["c"].as_i64().unwrap_or(-1),
+            0,
+            "a rejecting handler must not persist any of its effects"
+        );
+    }
+
+    /// hub#139: a handler cannot mint codes in a namespace it does not own. An invalid code is
+    /// a broken guest contract (`Wasm` error, severity unexpected), NOT a `Domain` rejection —
+    /// otherwise a module could spoof another module's error ABI towards the UI.
+    #[tokio::test]
+    async fn handler_domain_error_with_a_foreign_namespace_is_a_contract_violation() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_rejecting_handler("inventory.not_owned");
+
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        let err = execute(&db, &reg, "sales.complete_sale", &Params::new(), &ctx)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::Wasm(_)),
+            "a foreign-namespace code must surface as a broken guest contract, got {err:?}"
+        );
+
+        let rows = db
+            .query("SELECT COUNT(*) AS c FROM _event_outbox", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(rows.rows[0]["c"].as_i64().unwrap_or(-1), 0);
     }
 
     #[test]
@@ -1588,6 +1721,7 @@ mod tests {
             Ok(Output {
                 operations: vec![Operation::sql("invoice._insert", fiscal_payload())],
                 events: vec![],
+                ..Output::default()
             })
         }
     }

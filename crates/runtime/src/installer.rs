@@ -48,6 +48,9 @@ pub async fn install(
     dir: &Path,
 ) -> Result<String> {
     let manifest = Manifest::load(dir)?;
+    // hub#139: id-dependent contract checks (domain error namespaces, exclusive row gates)
+    // run BEFORE any side effect — a broken contract never reaches migrations or the registry.
+    validate_command_contracts(&manifest)?;
 
     // `hub` es el namespace RESERVADO del core (ADR-0192): el dispatcher resuelve `hub.*` antes de
     // mirar el registry, así que un módulo con ese id tendría capacidades inalcanzables y aparentaría
@@ -212,6 +215,39 @@ pub async fn install(
 
     persist_status(db, hub_id, &id, &version, ModuleStatus::Active).await?;
     Ok(id)
+}
+
+/// Validations that depend on the module id and therefore cannot be expressed by the JSON
+/// Schema alone (hub#139): the error namespace must be the module's own, and the legacy gate
+/// (`min_affected_rows`) is mutually exclusive with the translatable one (`expect_rows`).
+fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
+    for (name, command) in &manifest.commands {
+        if command.min_affected_rows.is_some() && command.expect_rows.is_some() {
+            return Err(RuntimeError::Other(format!(
+                "manifest `{}`: command `{name}` cannot combine `min_affected_rows` and `expect_rows`",
+                manifest.id
+            )));
+        }
+        if let Some(expect) = &command.expect_rows {
+            if !crate::errors::valid_domain_code(&manifest.id, &expect.error) {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` declares the invalid domain code `{}`; expected `{}.<snake_case>`",
+                    manifest.id, expect.error, manifest.id
+                )));
+            }
+            if expect
+                .message
+                .as_ref()
+                .is_some_and(|message| message.chars().count() > 500)
+            {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` exceeds 500 characters in `expect_rows.message`",
+                    manifest.id
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Lee y **compila** el JSON Schema del payload de una query/command (si lo declara).
@@ -504,5 +540,53 @@ mod tests {
         let mut ids: Vec<usize> = order.clone();
         ids.sort_unstable();
         assert_eq!(ids, vec![0, 1, 2]);
+    }
+
+    /// hub#139: `expect_rows` is validated at INSTALL time — a foreign-namespace code or a
+    /// command mixing the legacy and the translatable gate never reaches runtime.
+    #[test]
+    fn rejects_foreign_domain_codes_and_ambiguous_row_gates() {
+        let foreign: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "commands": {
+                "inventory.consume": {
+                    "permission": "inventory.consume",
+                    "expect_rows": { "op": "min", "n": 1, "error": "sales.insufficient_stock" }
+                }
+            }
+        }))
+        .unwrap();
+        assert!(
+            super::validate_command_contracts(&foreign).is_err(),
+            "a module cannot mint domain codes in another module's namespace"
+        );
+
+        let ambiguous: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "commands": {
+                "inventory.consume": {
+                    "permission": "inventory.consume",
+                    "min_affected_rows": 1,
+                    "expect_rows": { "op": "min", "n": 1, "error": "inventory.insufficient_stock" }
+                }
+            }
+        }))
+        .unwrap();
+        assert!(
+            super::validate_command_contracts(&ambiguous).is_err(),
+            "min_affected_rows and expect_rows cannot coexist on one command"
+        );
+
+        let valid: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "commands": {
+                "inventory.consume": {
+                    "permission": "inventory.consume",
+                    "expect_rows": { "op": "min", "n": 1, "error": "inventory.insufficient_stock" }
+                }
+            }
+        }))
+        .unwrap();
+        assert!(super::validate_command_contracts(&valid).is_ok());
     }
 }
