@@ -33,5 +33,9 @@
       "@erplora/module-sdk": ["../../packages/module-sdk/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts", "env.d.ts"]
+  // `tests/**` holds the Playwright suite (specs + playwright.config.ts). It was outside the
+  // typecheck, so a spec could rot — reference a renamed selector, a removed helper, a changed
+  // signature — and nothing would say so: the QA harness is code too. Adding it costs nothing
+  // (measured: zero new errors) and closes the blind spot while we are here for hub#422.
+  "include": ["src/**/*.ts", "src/**/*.vue", "tests/**/*.ts", "vite.config.ts", "env.d.ts"]
 }
