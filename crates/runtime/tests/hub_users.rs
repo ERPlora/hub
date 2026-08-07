@@ -66,7 +66,8 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
             name: "Marta Ruiz".into(),
             email: "marta@example.com".into(),
             role: "cashier".into(),
-            pin: "1234".into(),
+            pin: "4821".into(),
+            local: false,
         })
         .await
         .unwrap();
@@ -77,7 +78,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
     assert_eq!(created.role, "cashier");
     assert!(created.has_pin);
     assert!(
-        rt.verify_pin("Marta Ruiz", "1234").await.unwrap().is_some(),
+        rt.verify_pin("Marta Ruiz", "4821").await.unwrap().is_some(),
         "el PIN del alta sirve para entrar"
     );
 
@@ -113,7 +114,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
     let inactive = row(&rt, &id).await;
     assert!(!inactive.is_active, "el inactivo sigue listado, marcado");
     assert!(
-        rt.verify_pin("Marta Ruiz Gil", "1234")
+        rt.verify_pin("Marta Ruiz Gil", "4821")
             .await
             .unwrap()
             .is_none(),
@@ -130,6 +131,7 @@ async fn resets_the_pin_and_clears_it_when_empty() {
             email: String::new(),
             role: "employee".into(),
             pin: String::new(),
+            local: false,
         })
         .await
         .unwrap();
@@ -169,6 +171,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             email: String::new(),
             role: "employee".into(),
             pin: String::new(),
+            local: false,
         })
         .await
         .unwrap_err();
@@ -180,6 +183,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             email: String::new(),
             role: "employee".into(),
             pin: "12".into(),
+            local: false,
         })
         .await
         .unwrap_err();
@@ -191,6 +195,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             email: "no-es-un-email".into(),
             role: "employee".into(),
             pin: String::new(),
+            local: false,
         })
         .await
         .unwrap_err();
@@ -202,6 +207,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             email: String::new(),
             role: "  ".into(),
             pin: String::new(),
+            local: false,
         })
         .await
         .unwrap_err();
@@ -316,7 +322,8 @@ async fn a_module_reads_the_hub_users_through_the_dispatcher() {
         name: "Marta Ruiz".into(),
         email: "marta@example.com".into(),
         role: "cashier".into(),
-        pin: "1234".into(),
+        pin: "4821".into(),
+        local: false,
     })
     .await
     .unwrap();

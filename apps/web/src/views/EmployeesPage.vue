@@ -62,7 +62,19 @@
               :maxlength="150"
               required
             />
+            <!-- «Local user» (hub#355): nombre + PIN, sin email y sin nada en el SaaS. Es la
+                 identidad del personal de barra; el usuario de CUENTA lleva email e invitación. -->
+            <ion-toggle
+              :checked="form.local"
+              label-placement="start"
+              justify="space-between"
+              class="local-toggle"
+              @ion-change="form.local = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
+            >
+              {{ t('employeeForm.localUser') }}
+            </ion-toggle>
             <ion-input
+              v-if="!form.local"
               v-model="form.email"
               fill="outline"
               label-placement="floating"
@@ -88,10 +100,16 @@
               label-placement="floating"
               inputmode="numeric"
               :label="t('employeeForm.pin')"
-              :helper-text="t('employeeForm.pinHelp')"
+              :helper-text="form.local ? t('employeeForm.localPinHelp') : t('employeeForm.pinHelp')"
+              :error-text="localIssue ? t(`employeeForm.errors.${localIssue}`) : ''"
+              :class="{ 'ion-invalid ion-touched': Boolean(localIssue) }"
               :maxlength="8"
             />
-            <ion-button type="submit" size="small" :disabled="saving || !form.name.trim()">
+            <ion-button
+              type="submit"
+              size="small"
+              :disabled="saving || !form.name.trim() || Boolean(localIssue)"
+            >
               <ion-spinner v-if="saving" slot="start" name="crescent" />
               {{ saving ? t('employeeForm.saving') : t('employeeForm.create') }}
             </ion-button>
@@ -160,6 +178,7 @@ import {
   IonSelect,
   IonSelectOption,
   IonSpinner,
+  IonToggle,
   IonToolbar,
   alertController,
 } from '@ionic/vue';
@@ -172,8 +191,10 @@ import {
   canDeactivate,
   createHubUser,
   deactivateHubUser,
+  hubUserErrorKey,
   listHubRoles,
   listHubUsers,
+  localUserIssue,
   type HubRole,
   type HubUser,
 } from '../lib/hub-users';
@@ -222,9 +243,17 @@ const loadError = ref(false);
 const users = ref<HubUser[]>([]);
 const roles = ref<HubRole[]>([]);
 
-const form = reactive({ name: '', email: '', role: 'employee', pin: '' });
+const form = reactive({ name: '', email: '', role: 'employee', pin: '', local: false });
 const saving = ref(false);
 const formError = ref('');
+/**
+ * Motivo por el que el runtime rechazaría este alta local, adelantado en la UI (hub#355). El
+ * runtime revalida y sigue siendo la autoridad; esto solo evita pulsar «Crear» para enterarse.
+ * `pin_in_use` no cabe aquí: los PIN están hasheados y el shell no los ve — llega del servidor.
+ */
+const localIssue = computed(() =>
+  form.local ? localUserIssue({ name: form.name, role: form.role, pin: form.pin }, users.value) : '',
+);
 
 function fmtDate(iso: string): string {
   if (!iso) return '—';
@@ -336,25 +365,34 @@ async function load(): Promise<void> {
 }
 
 async function createUser(): Promise<void> {
-  if (!form.name.trim()) return;
+  if (!form.name.trim() || localIssue.value) return;
   saving.value = true;
   formError.value = '';
   try {
     await createHubUser({
       name: form.name.trim(),
-      email: form.email.trim(),
+      // Un usuario local no lleva email: el runtime rechaza el alta si viene uno.
+      email: form.local ? '' : form.email.trim(),
       role: form.role || 'employee',
       pin: form.pin.trim(),
+      local: form.local,
     });
-    Object.assign(form, { name: '', email: '', role: 'employee', pin: '' });
+    Object.assign(form, { name: '', email: '', role: 'employee', pin: '', local: form.local });
     staffTable.value?.close?.();
     await load();
     void toast(t('employees.created'), 'success');
   } catch (error) {
-    formError.value = error instanceof Error ? error.message : t('employees.saveError');
+    formError.value = rejectionMessage(error);
   } finally {
     saving.value = false;
   }
+}
+
+/** Motivo TRADUCIDO de un rechazo del runtime; su mensaje inglés solo como último recurso. */
+function rejectionMessage(error: unknown): string {
+  const key = hubUserErrorKey(error);
+  if (key) return t(`employeeForm.errors.${key}`);
+  return error instanceof Error ? error.message : t('employees.saveError');
 }
 
 async function deactivateUser(row: Row): Promise<void> {
@@ -436,5 +474,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
+}
+
+.local-toggle {
+  width: 100%;
+  padding-block: 0.25rem;
 }
 </style>

@@ -240,8 +240,9 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
         &erplora_runtime::hub_users::NewHubUser {
             name: "Demo".into(),
             role: "admin".into(),
-            pin: "0000".into(),
+            pin: "4821".into(),
             email: String::new(),
+            local: false,
         },
     )
     .await
@@ -305,7 +306,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
     if !erplora_runtime::require_modules_workspace() { return; }
     // Origin hub: exactly what the published blueprint carries — accounts with a role and a PIN.
     let a = fresh().await;
-    for (name, role, pin) in [("Demo", "admin", "0000"), ("Manager", "manager", "1111")] {
+    for (name, role, pin) in [("Demo", "admin", "4821"), ("Manager", "manager", "5390")] {
         erplora_runtime::hub_users::create(
             a.db(),
             &erplora_runtime::Registry::new(),
@@ -315,6 +316,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
                 role: role.into(),
                 pin: pin.into(),
                 email: String::new(),
+                local: false,
             },
         )
         .await
@@ -343,6 +345,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
             role: "manager".into(),
             pin: "4821".into(),
             email: String::new(),
+            local: false,
         },
     )
     .await
@@ -408,6 +411,7 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
             role: "manager".into(),
             pin: "4821".into(),
             email: String::new(),
+            local: false,
         },
     )
     .await

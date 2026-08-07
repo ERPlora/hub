@@ -65,6 +65,13 @@ export interface NewHubUser {
   email: string;
   role: string;
   pin: string;
+  /**
+   * La casilla **«Local user»** (plan paso 2b, hub#355): esta persona existe solo en la BD de este
+   * hub — nombre + PIN, sin email y sin nada en el SaaS. El runtime aplica entonces las guardas de
+   * un usuario local (PIN obligatorio, ningún rol administrativo, un nombre que el hub no conozca
+   * ya). Ausente/`false` = el alta de siempre.
+   */
+  local?: boolean;
 }
 
 /** Edición parcial: solo viaja lo que se toca. `pin: ''` retira el PIN. */
@@ -79,7 +86,19 @@ export interface HubUserPatch {
 interface Envelope<T> {
   ok?: boolean;
   data?: T;
-  error?: { message?: string } | string;
+  error?: { message?: string; code?: string } | string;
+}
+
+/**
+ * Rechazo del runtime con su **código estable** (`hub.users.pin_in_use`, …) cuando lo trae. El
+ * mensaje del runtime está en inglés y es solo el respaldo: lo que se enseña se traduce por i18n
+ * contra el código (ver [`hubUserErrorKey`]).
+ */
+export class HubUsersError extends Error {
+  constructor(message: string, readonly code?: string) {
+    super(message);
+    this.name = 'HubUsersError';
+  }
 }
 
 /** Mensaje legible del envelope de error del runtime (`{ok:false,error:{message}}` o string). */
@@ -90,14 +109,24 @@ function errorMessage(body: unknown, fallback: string): string {
   return error?.message ?? fallback;
 }
 
+/** Código estable del envelope, si el error viene del namespace del core (`hub.users.*`). */
+function errorCode(body: unknown): string | undefined {
+  const error = (body as Envelope<unknown> | undefined)?.error;
+  return typeof error === 'string' ? undefined : error?.code;
+}
+
+function failed(body: unknown, fallback: string): HubUsersError {
+  return new HubUsersError(errorMessage(body, fallback), errorCode(body));
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { ...runtimeHeaders() };
   if (init?.body) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${RUNTIME_URL}${path}`, { ...init, headers });
   const body = await res.json().catch(() => undefined);
-  if (!res.ok) throw new Error(errorMessage(body, `${path} → ${res.status}`));
+  if (!res.ok) throw failed(body, `${path} → ${res.status}`);
   const env = body as Envelope<T>;
-  if (env?.ok === false) throw new Error(errorMessage(body, `${path} → error`));
+  if (env?.ok === false) throw failed(body, `${path} → error`);
   return (env?.data ?? (body as T)) as T;
 }
 
@@ -145,8 +174,63 @@ export function accessOf(user: HubUser): HubAccess {
   return user.cloud_user_id ? 'cloud' : 'none';
 }
 
+// ── Alta de usuario LOCAL (plan paso 2b, hub#355) ─────────────────────────────────────────────
+
 /** Roles que administran el hub (mismo conjunto que `is_admin_role` en el runtime). */
 const ADMIN_ROLES = ['owner', 'admin'];
+
+/** Prefijo de los códigos de rechazo del core en `/api/hub/users` (namespace reservado, ADR-0192). */
+const HUB_USERS_ERROR_PREFIX = 'hub.users.';
+
+/**
+ * Clave i18n del motivo de un rechazo del runtime (`hub.users.pin_in_use` → `pin_in_use`), o
+ * `undefined` si el error no trae uno (fallo de red, 401 del gate, un error del navegador).
+ *
+ * Es lo que permite enseñar el motivo **traducido**: el runtime responde en inglés a propósito
+ * (regla del código en inglés) y el Hub se ve en español.
+ */
+export function hubUserErrorKey(error: unknown): string | undefined {
+  const code = error instanceof HubUsersError ? error.code : undefined;
+  return code?.startsWith(HUB_USERS_ERROR_PREFIX)
+    ? code.slice(HUB_USERS_ERROR_PREFIX.length)
+    : undefined;
+}
+
+/**
+ * ¿Es este uno de los PIN que se prueban primero? Todo el mismo dígito (`0000`) o una cuesta
+ * seguida, arriba o abajo (`1234`, `4321`). **Espejo** de `is_guessable_pin` del runtime, que es
+ * quien manda; aquí solo sirve para no hacer pulsar «Crear» para enterarse.
+ */
+function isGuessablePin(pin: string): boolean {
+  const digits = [...pin].map(Number);
+  if (digits.length < 2 || digits.some(Number.isNaN)) return true;
+  const stepIs = (step: number) => digits.every((d, i) => i === 0 || d - digits[i - 1] === step);
+  return stepIs(0) || stepIs(1) || stepIs(-1);
+}
+
+/**
+ * Motivo por el que el runtime rechazaría este alta **local**, o `''` si es admisible. Espejo EN UI
+ * de `ensure_local_identity` (`crates/runtime/src/hub_users.rs`), igual que [`canDeactivate`] lo es
+ * del guard de la baja: la autoridad sigue siendo el runtime, que revalida y responde 409.
+ *
+ * `pin_in_use` **no** se puede adelantar desde aquí: los PIN se guardan hasheados (argon2id con sal
+ * propia) y el shell no los ve nunca. Ese motivo llega del servidor, por [`hubUserErrorKey`].
+ */
+export function localUserIssue(
+  input: { name: string; role: string; pin: string },
+  users: HubUser[],
+): string {
+  const pin = input.pin.trim();
+  if (!pin) return 'local_needs_pin';
+  if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) return 'pin_length';
+  if (isGuessablePin(pin)) return 'pin_too_simple';
+  if (ADMIN_ROLES.includes(input.role.trim().toLowerCase())) return 'local_cannot_administer';
+  // Activos e inactivos: una persona = una fila, y un homónimo al lado de quien fue dado de baja
+  // le devuelve por la espalda un PIN que funciona (hub#348).
+  const name = input.name.trim().toLowerCase();
+  if (users.some((u) => u.name.trim().toLowerCase() === name)) return 'name_taken';
+  return '';
+}
 
 /** ¿Este usuario administra el hub y está activo? */
 function isActiveAdmin(user: HubUser): boolean {

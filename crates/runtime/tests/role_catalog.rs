@@ -246,7 +246,7 @@ async fn uninstalling_a_module_retires_its_roles_and_clears_their_activation() {
         .create_hub_user(&NewHubUser {
             name: "Marta Ruiz".into(),
             role: "kitchen".into(),
-            pin: "1234".into(),
+            pin: "4821".into(),
             ..Default::default()
         })
         .await
@@ -380,7 +380,7 @@ async fn an_inactive_declared_role_cannot_be_handed_to_a_person() {
         .create_hub_user(&NewHubUser {
             name: "Marta Ruiz".into(),
             role: "kitchen".into(),
-            pin: "1234".into(),
+            pin: "4821".into(),
             ..Default::default()
         })
         .await
@@ -392,7 +392,7 @@ async fn an_inactive_declared_role_cannot_be_handed_to_a_person() {
     rt.create_hub_user(&NewHubUser {
         name: "Marta Ruiz".into(),
         role: "kitchen".into(),
-        pin: "1234".into(),
+        pin: "4821".into(),
         ..Default::default()
     })
     .await
@@ -409,7 +409,7 @@ async fn a_free_role_no_module_declares_keeps_being_assignable() {
     rt.create_hub_user(&NewHubUser {
         name: "Marta Ruiz".into(),
         role: "cashier".into(),
-        pin: "1234".into(),
+        pin: "4821".into(),
         ..Default::default()
     })
     .await
