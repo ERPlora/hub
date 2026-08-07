@@ -56,7 +56,10 @@ pub use manifest::Manifest;
 pub use registry::{EventSink, ModuleStatus, NavEntry, Registry, RequestContext};
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
-pub use e2e_support::require_modules_workspace;
+// `modules_root` travels with the guard on purpose: a test that resolves module paths by hand
+// diverges from the guard and reintroduces hub#253 (the guard says "run", every path is wrong,
+// the test skips itself and still reports `ok`).
+pub use e2e_support::{modules_root, require_modules_workspace};
 
 /// Descripción de un módulo instalado (para `/api/modules`).
 #[derive(Debug, Clone, serde::Serialize)]
