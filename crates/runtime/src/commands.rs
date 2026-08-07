@@ -92,10 +92,13 @@ pub(crate) async fn execute_at(
             .await
             .unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let has_cert = crate::certificate::status(db, &ctx.hub_id)
+        // «Can this hub issue?» — the OWN certificate if the business uploaded one, otherwise the
+        // DELEGATED one ERPlora handed down (ADR-0202 §2.1, hub#319). One named function, shared
+        // with `queries::execute_page` and with the ⛔ arm of `setup_status`, because a gate and a
+        // checklist that disagree about this turn ⛔ into a lie in one direction or the other.
+        // Degrading to `false` on error keeps the gate failing CLOSED.
+        let has_cert = crate::certificate::can_sign(db, &ctx.hub_id)
             .await
-            .ok()
-            .and_then(|s| s.get("present").and_then(|v| v.as_bool()))
             .unwrap_or(false);
         enriched_ctx = ctx
             .clone()

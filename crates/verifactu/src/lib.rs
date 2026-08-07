@@ -224,13 +224,21 @@ fn op(command: &str, p: Json) -> Operation {
 
 /// Lee la config VeriFactu del hub (fila singleton; `None` si no se ha guardado nunca).
 ///
-/// **Certificado (ADR-0079/0081):** el PKCS#12 del negocio vive en el core (`_hub_certificate`,
-/// subido en Ajustes → Negocio), NO en `verifactu_config`. Si existe, aquí solo se marca su
-/// presencia (`certificate_source = "core"`) — **los bytes del `.p12` y la contraseña NUNCA se
-/// copian a la config del módulo**; la firma/transmisión usa la capability opaca
+/// **Certificado (ADR-0079/0081, ADR-0202 §2.1):** el PKCS#12 vive en el core (`_hub_certificate`),
+/// NO en `verifactu_config`, y el hub tiene DOS slots — el `own` del negocio (subido en Ajustes →
+/// Negocio) y el `delegated` de ERPlora, que el plano de control reparte y rota. Aquí solo se marca
+/// **qué dice el core**: `certificate_source = "core"` (hay con qué firmar) y `certificate_kind`
+/// (con cuál). **Los bytes del `.p12` y la contraseña NUNCA se copian a la config del módulo** —
+/// ni se consultan siquiera: la firma/transmisión usa la capability opaca
 /// `certificate_identity(hub_id)` (el core hace la cripto; ver `build_identity`). El acceso está
 /// gateado por la capability `certificate` (el dispatcher la exige antes del handler nativo),
 /// así que llegar aquí implica que el usuario la concedió.
+///
+/// **Quién firma lo decide el CORE, no este módulo** (hub#319). Antes se sondeaba
+/// `SELECT pkcs12_b64, password FROM _hub_certificate … LIMIT 1`: sin `kind` (con dos filas, la que
+/// devolviese la BD), contando filas que el core se niega a seleccionar, y arrastrando la contraseña
+/// del certificado a la memoria del módulo solo para comprobar que no estaba vacía. La regla de
+/// selección (`own` si está, si no `delegated`) tiene un dueño y no se reimplementa aquí.
 async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>> {
     let rows = host
         .read(
@@ -240,27 +248,17 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
         .await?;
     let mut config = rows.into_iter().next();
 
-    // Certificado del core: sondea _hub_certificate (el único origen válido desde ADR-0081).
-    // Tolerante: si la tabla no existe (hub sin la migración del sistema), se queda sin marcador.
-    if let Ok(cert_rows) = host
-        .read(
-            "SELECT pkcs12_b64, password FROM _hub_certificate WHERE hub_id = :hub_id LIMIT 1",
-            &params(json!({ "hub_id": hub_id })),
-        )
+    // Tolerante: un host sin la capacidad (o un hub sin la migración de sistema) responde `None` y
+    // el módulo se queda sin marcador — que es «no puedo transmitir», el lado seguro.
+    if let Some(kind) = host
+        .certificate_signing_kind(hub_id)
         .await
+        .unwrap_or_default()
     {
-        if let Some(c) = cert_rows.into_iter().next() {
-            let b64 = c.get("pkcs12_b64").and_then(|v| v.as_str()).unwrap_or("");
-            if !b64.is_empty() {
-                // ADR-0079/0081: el `.p12` es del CORE. **No** copiamos los bytes ni la contraseña
-                // a la config del módulo — solo un marcador. La firma/transmisión usa la capability
-                // opaca `certificate_identity(hub_id)` (el core hace toda la cripto PKCS#12; la clave
-                // nunca cruza al módulo). Ver `build_identity`.
-                let obj = config.get_or_insert_with(|| json!({}));
-                if let Some(m) = obj.as_object_mut() {
-                    m.insert("certificate_source".into(), json!("core"));
-                }
-            }
+        let obj = config.get_or_insert_with(|| json!({}));
+        if let Some(m) = obj.as_object_mut() {
+            m.insert("certificate_source".into(), json!("core"));
+            m.insert("certificate_kind".into(), json!(kind));
         }
     }
     Ok(config)
@@ -268,11 +266,13 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
 
 /// Construye la **Identity mTLS** para firmar/transmitir a la AEAT.
 ///
-/// El certificado fiscal (.p12) es un recurso del NEGOCIO/hub (ADR-0079/0081): vive en
-/// `_hub_certificate` (se sube en Ajustes → Negocio). La capability opaca
-/// `host.certificate_identity(hub_id)` lee la tabla del core y hace TODA la cripto PKCS#12;
-/// **los bytes del `.p12` y la contraseña NUNCA entran al módulo**. Si no hay certificado del
-/// core, se devuelve un error claro (el usuario debe subirlo en Ajustes → Negocio).
+/// El certificado fiscal (.p12) es un recurso del NEGOCIO/hub (ADR-0079/0081) y desde ADR-0202 §2.1
+/// hay dos: el **propio** del negocio y el **delegado** de ERPlora. `host.certificate_identity`
+/// resuelve el fallback (`own` si está subido, si no `delegated`) y hace TODA la cripto PKCS#12;
+/// **los bytes del `.p12` y la contraseña NUNCA entran al módulo**.
+///
+/// Error **solo si no hay ninguno de los dos** (hub#319): un hub cuyo único certificado es el
+/// delegado transmite perfectamente — ERPlora firma en su nombre.
 async fn build_identity(
     host: &dyn NativeHost,
     hub_id: &str,
@@ -280,18 +280,52 @@ async fn build_identity(
 ) -> Result<reqwest::Identity> {
     if !has_certificate(config) {
         return Err(VerifactuError::Certificate(
-            "certificado del negocio no configurado: súbelo en Ajustes → Negocio".into(),
+            "no hay certificado con el que firmar: ni el del negocio (súbelo en Ajustes → Negocio) \
+             ni uno delegado de ERPlora"
+                .into(),
         )
         .into());
     }
     host.certificate_identity(hub_id).await
 }
 
-/// ¿Hay un certificado del core disponible para transmitir? Gate barato que NO carga los bytes
-/// del `.p12`: basta el marcador `certificate_source` que `read_config` pone al detectar
-/// `_hub_certificate`.
+/// ¿Hay un certificado del core con el que transmitir — propio **o** delegado? Gate barato que NO
+/// carga los bytes del `.p12`: basta el marcador `certificate_source` que `read_config` pone con lo
+/// que respondió el core.
 fn has_certificate(config: &Json) -> bool {
     str_field(config, "certificate_source") == "core"
+}
+
+/// **¿Puede este motor firmar por `hub_id` ahora mismo?** — exactamente el predicado con el que
+/// [`build_identity`] deja pasar o rechaza.
+///
+/// `pub` a propósito (hub#319): «¿puede este hub facturar?» la contestan TRES sitios —el gate fiscal
+/// del dispatcher (ADR-0203), el brazo ⛔ de la checklist (hub#370) y este motor— y tienen que
+/// contestar lo mismo. Un ⛔ que bloquea una pantalla mientras el runtime acepta la venta, o al
+/// revés, es la checklist mintiendo. Con el predicado del motor accesible, esa coherencia se
+/// comprueba en UN test junto a los otros dos, en vez de confiarla a tres tests separados que
+/// pueden separarse sin que nada avise.
+pub async fn can_sign(host: &dyn NativeHost, hub_id: &str) -> Result<bool> {
+    Ok(read_config(host, hub_id)
+        .await?
+        .as_ref()
+        .is_some_and(has_certificate))
+}
+
+/// Con **cuál** de los dos se firma: `"own"`, `"delegated"`, o `""` si no hay ninguno
+/// (ADR-0202 §2.1 — hub#319).
+///
+/// ⚠️ **Esta es la respuesta que tienen que leer [hub#320] (endpoint AEAT `www1` vs `www10`) y
+/// [hub#321] (bloque `Representante`), NO una segunda consulta a `_hub_certificate`.** La selección
+/// arrastra el endpoint y el `Representante`, así que resolverla otra vez por su cuenta es cómo
+/// vuelve el defecto que hub#317 y hub#318 ya arreglaron dos veces: dos lecturas de la misma
+/// pregunta que pueden contestar distinto. Hasta que esos dos aterricen, un hub que firme con el
+/// delegado transmite contra el endpoint del titular y sin `Representante`.
+///
+/// [hub#320]: https://github.com/ERPlora/hub/issues/320
+/// [hub#321]: https://github.com/ERPlora/hub/issues/321
+fn signing_kind(config: &Json) -> String {
+    str_field(config, "certificate_kind")
 }
 
 /// **Tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4 — hub#318): un fallo del
@@ -306,13 +340,29 @@ fn has_certificate(config: &Json) -> bool {
 /// min) y **no** se arreglan bajando otra vez una clave privada: pedirla en cada registro varado
 /// agotaría el presupuesto de 20/h del endpoint justo cuando el hub más lo necesita.
 ///
+/// **Y solo si quien se identificó fue el certificado DELEGADO** (`signing_kind`, hub#319). El
+/// refetch baja el de ERPlora; si el handshake lo rompió el certificado **propio** del negocio
+/// —caducado, revocado, contraseña cambiada—, bajar el delegado no arregla nada, porque el propio
+/// sigue ganando el fallback (ADR-0202 §2.1) y el intento siguiente falla igual. Lo único que
+/// lograría es gastar el cupo del hub en algo que no puede funcionar, y dejar sin él al disparador
+/// del latido —el que sí instala una rotación real— justo cuando llegue.
+///
 /// El `signal` es un parámetro —y no el global directamente— para que esto sea comprobable sin
 /// tocar estado de proceso compartido entre tests.
-fn request_certificate_refetch_on_tls(error: &VerifactuError, signal: &RefetchSignal) {
-    if matches!(error, VerifactuError::Tls(_)) {
+fn request_certificate_refetch_on_tls(
+    error: &VerifactuError,
+    signing_kind: &str,
+    signal: &RefetchSignal,
+) {
+    if matches!(error, VerifactuError::Tls(_)) && signing_kind == DELEGATED_SLOT {
         signal.request();
     }
 }
+
+/// Nombre del slot delegado tal y como lo devuelve el core
+/// (`certificate::CertificateKind::as_str`). Constante para que la comparación no se escriba a mano
+/// en cada sitio y pueda equivocarse en uno.
+const DELEGATED_SLOT: &str = "delegated";
 
 // ── create_record (issue verifactu#2) ────────────────────────────────────────
 
@@ -1077,7 +1127,7 @@ async fn transmit_one(
             // credencial de máquina ni debe tenerla—: lo PIDE, y el servicio de refetch del server
             // decide. Va justo aquí, encolando la contingencia, porque el fallo ES el disparador:
             // así se converge sin polling.
-            request_certificate_refetch_on_tls(&err, RefetchSignal::global());
+            request_certificate_refetch_on_tls(&err, &signing_kind(config), RefetchSignal::global());
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
             let queue = host
                 .read(
@@ -2223,7 +2273,9 @@ mod tests {
 mod cert_source_tests {
     use super::*;
 
-    /// Host que simula un hub con certificado del negocio en el core (`_hub_certificate`).
+    /// Host que simula un hub con certificado del negocio en el core (`_hub_certificate`). El core
+    /// responde el slot que firma; las filas de la tabla siguen ahí para que el test compruebe que
+    /// el módulo NO las lee (ADR-0079).
     struct CoreCertHost;
     #[async_trait::async_trait]
     impl NativeHost for CoreCertHost {
@@ -2235,6 +2287,9 @@ mod cert_source_tests {
             } else {
                 Ok(vec![])
             }
+        }
+        async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+            Ok(Some("own".to_string()))
         }
     }
 
@@ -2257,6 +2312,195 @@ mod cert_source_tests {
         assert!(
             cfg.get("certificate_password").is_none(),
             "la contraseña del cert NO debe entrar en la config del módulo (ADR-0079)"
+        );
+    }
+
+    // ── hub#319: which slot signs is the CORE's answer, never the module's guess ──────────────
+
+    /// A host that answers the certificate question the way the CORE does — with the slot that
+    /// signs — and that RECORDS every SQL the engine runs, so a test can assert what the module did
+    /// **not** ask the database for.
+    struct SlotHost {
+        signing: Option<&'static str>,
+        /// Rows `_hub_certificate` would return to a module that went behind the core's back.
+        stored_rows: Vec<Json>,
+        seen_sql: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl SlotHost {
+        fn new(signing: Option<&'static str>, stored_rows: Vec<Json>) -> Self {
+            Self { signing, stored_rows, seen_sql: std::sync::Mutex::new(Vec::new()) }
+        }
+        fn sql_touching_the_certificate_table(&self) -> Vec<String> {
+            self.seen_sql
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|s| s.contains("_hub_certificate"))
+                .cloned()
+                .collect()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl NativeHost for SlotHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            self.seen_sql.lock().unwrap().push(sql.to_string());
+            if sql.contains("_hub_certificate") {
+                Ok(self.stored_rows.clone())
+            } else if sql.contains("verifactu_config") {
+                Ok(vec![json!({ "hub_id": "h1", "environment": "testing" })])
+            } else {
+                Ok(vec![])
+            }
+        }
+        async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+            Ok(self.signing.map(str::to_string))
+        }
+    }
+
+    /// **A hub whose only certificate is the DELEGATED one can transmit** (ADR-0202 §2.1 — hub#319).
+    ///
+    /// `build_identity` used to demand the business's own certificate and send the user to
+    /// «Ajustes → Negocio». ERPlora's certificate signs on their behalf, so the engine has to accept
+    /// it — and it learns that from the core, which owns the fallback.
+    #[tokio::test]
+    async fn a_delegated_only_hub_can_transmit() {
+        let host = SlotHost::new(Some("delegated"), vec![]);
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        assert!(has_certificate(&cfg), "con el delegado el motor SÍ puede transmitir");
+        assert_eq!(signing_kind(&cfg), "delegated");
+    }
+
+    /// The own certificate wins — the fallback is an ORDER, not a preference, and the engine reports
+    /// the slot the core actually picked.
+    #[tokio::test]
+    async fn the_own_certificate_is_the_one_reported_when_both_slots_are_full() {
+        let host = SlotHost::new(Some("own"), vec![]);
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        assert!(has_certificate(&cfg));
+        assert_eq!(signing_kind(&cfg), "own");
+    }
+
+    /// No slot at all ⇒ nothing to sign with. The engine keeps failing CLOSED.
+    #[tokio::test]
+    async fn a_hub_with_neither_slot_cannot_transmit() {
+        let host = SlotHost::new(None, vec![]);
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        assert!(!has_certificate(&cfg));
+        assert_eq!(signing_kind(&cfg), "");
+    }
+
+    /// **The engine asks the CORE which certificate signs; it does not read the table.**
+    ///
+    /// `read_config` used to probe `_hub_certificate` with `SELECT … LIMIT 1` and no `kind`, which
+    /// re-derived a core rule from raw SQL: with two rows it picked whichever the database handed
+    /// back first, and it counted rows the core deliberately refuses to select (hub#316:
+    /// «a `kind` this runtime does not know is not guessed at»). Here the table holds such a row and
+    /// the core says there is nothing to sign with — the engine must believe the core, or it would
+    /// try to transmit with a certificate that cannot be loaded.
+    #[tokio::test]
+    async fn a_slot_the_core_refuses_to_select_does_not_count_as_a_certificate() {
+        let host = SlotHost::new(
+            None,
+            vec![json!({ "kind": "some_future_slot", "pkcs12_b64": "QUJD", "password": "secret" })],
+        );
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        assert!(
+            !has_certificate(&cfg),
+            "la fila existe en la tabla pero el core NO firma con ella: manda el core"
+        );
+    }
+
+    /// **The `.p12` and its password are never even SELECTed by the module** (ADR-0079).
+    ///
+    /// The old probe read `pkcs12_b64, password` just to test them for emptiness. Those columns are
+    /// encrypted at rest since hub#114, but legacy rows are still plaintext — so the module was
+    /// pulling the business's certificate password into its own memory to answer a yes/no question
+    /// the core can answer without decrypting anything.
+    #[tokio::test]
+    async fn the_engine_never_selects_the_certificate_bytes_or_its_password() {
+        let host = SlotHost::new(Some("own"), vec![]);
+        read_config(&host, "h1").await.unwrap();
+        assert!(
+            host.sql_touching_the_certificate_table().is_empty(),
+            "el módulo no consulta `_hub_certificate`: pregunta al core. SQL visto: {:?}",
+            host.sql_touching_the_certificate_table()
+        );
+    }
+
+    /// **Un host que no implementa la capacidad NO puede firmar — falla CERRADO.**
+    ///
+    /// El default de `NativeHost::certificate_signing_kind` es `None` a propósito, y esa decisión es
+    /// de seguridad, no de comodidad: `read_config` marca `certificate_source = "core"` ante
+    /// **cualquier** `Some`, así que un default con nombre —vacío o inventado— le diría al motor que
+    /// puede transmitir a la AEAT sobre un host que ni siquiera sabe entregarle una identidad. Lo
+    /// encontró la corrida de mutación: sustituir el default por `Ok(Some(""))` o `Ok(Some("xyzzy"))`
+    /// no rompía nada.
+    #[tokio::test]
+    async fn a_host_without_the_certificate_capability_cannot_sign() {
+        /// Lo mínimo que exige el trait: `read` y nada más.
+        struct BareHost;
+        #[async_trait::async_trait]
+        impl NativeHost for BareHost {
+            async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+                if sql.contains("verifactu_config") {
+                    Ok(vec![json!({ "hub_id": "h1", "environment": "testing" })])
+                } else {
+                    Ok(vec![])
+                }
+            }
+        }
+
+        assert!(
+            !can_sign(&BareHost, "h1").await.unwrap(),
+            "sin la capacidad no hay con qué firmar: el motor NO transmite"
+        );
+        let cfg = read_config(&BareHost, "h1").await.unwrap().unwrap();
+        assert!(cfg.get("certificate_source").is_none(), "y no se marca un certificado que no hay");
+        assert!(build_identity(&BareHost, "h1", &cfg).await.is_err());
+    }
+
+    /// **`can_sign` IS `build_identity`'s gate, and it is pinned here too.**
+    ///
+    /// Its only consumer is the coherence e2e of hub#319, which lives in the `erplora-runtime`
+    /// package — so a mutation run scoped to THIS package leaves it alive with nothing to say. That
+    /// is a hole in the evidence, not in the code: a `pub` predicate that decides whether a hub
+    /// transmits to the AEAT has to be pinned where it is defined, so it survives whatever the
+    /// cross-package test does later.
+    #[tokio::test]
+    async fn can_sign_answers_exactly_what_build_identity_gates_on() {
+        for (signing, expected) in [(Some("delegated"), true), (Some("own"), true), (None, false)] {
+            let host = SlotHost::new(signing, vec![]);
+            assert_eq!(
+                can_sign(&host, "h1").await.unwrap(),
+                expected,
+                "can_sign con el slot {signing:?}"
+            );
+            // Y es literalmente el predicado del gate sobre la misma config: si los dos pudieran
+            // diferir, el motor rechazaría lo que el runtime ya dio por bueno.
+            let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+            assert_eq!(
+                can_sign(&host, "h1").await.unwrap(),
+                has_certificate(&cfg),
+                "can_sign y el gate de build_identity tienen que ser la MISMA respuesta ({signing:?})"
+            );
+        }
+    }
+
+    /// **The error names the real cause.** «Súbelo en Ajustes → Negocio» is only half the story once
+    /// a delegated certificate exists: reaching here means the business uploaded none **and** the
+    /// control plane never handed one down. Telling the user only about their half sends them to a
+    /// screen that cannot fix an ERPlora-side gap.
+    #[tokio::test]
+    async fn the_error_without_any_certificate_names_both_halves() {
+        let host = SlotHost::new(None, vec![]);
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        let err = build_identity(&host, "h1", &cfg).await.unwrap_err().to_string();
+        assert!(err.contains("Ajustes → Negocio"), "sigue diciendo dónde subir el propio: {err}");
+        assert!(
+            err.to_lowercase().contains("erplora"),
+            "y que ERPlora tampoco entregó uno delegado: {err}"
         );
     }
 }
@@ -2350,13 +2594,6 @@ mod environment_chain_tests {
                 .lock()
                 .unwrap()
                 .push((sql.to_string(), p.clone()));
-            if sql.contains("_hub_certificate") {
-                return Ok(if self.has_core_certificate {
-                    vec![json!({ "pkcs12_b64": "QUJD", "password": "secret" })]
-                } else {
-                    vec![]
-                });
-            }
             if sql.contains("FROM verifactu_config") {
                 return Ok(vec![self.config.clone()]);
             }
@@ -2402,6 +2639,13 @@ mod environment_chain_tests {
                 return Ok(rows);
             }
             Ok(vec![])
+        }
+
+        /// The certificate question is the CORE's to answer (hub#319) — the engine no longer
+        /// queries `_hub_certificate`, so the fixture stops pretending to be that table. `own`,
+        /// because these tests are about the CHAIN and not about which certificate signs.
+        async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+            Ok(self.has_core_certificate.then(|| "own".to_string()))
         }
 
         async fn write_static_file(
@@ -2741,6 +2985,10 @@ mod certificate_refetch_trigger_tests {
     use super::{request_certificate_refetch_on_tls, VerifactuError};
     use erplora_runtime::certificate_refetch::RefetchSignal;
 
+    /// El slot que firmaba cuando falló el handshake (ver `signing_kind`).
+    const DELEGATED: &str = "delegated";
+    const OWN: &str = "own";
+
     /// 🔒 The failure IS the trigger (ADR-0202 §2 point 4). A rejected client certificate is the
     /// one transport failure that a retry cannot fix and a refetch can.
     #[test]
@@ -2748,9 +2996,49 @@ mod certificate_refetch_trigger_tests {
         let signal = RefetchSignal::new();
         request_certificate_refetch_on_tls(
             &VerifactuError::Tls("conexión AEAT: invalid peer certificate".into()),
+            DELEGATED,
             &signal,
         );
         assert!(signal.take(), "un rechazo del certificado tiene que pedir el vigente");
+    }
+
+    /// 🔒 **El certificado que falló tiene que ser el DELEGADO** (hub#319).
+    ///
+    /// El refetch baja el certificado de ERPlora. Si quien se identificó ante la AEAT fue el
+    /// certificado **propio** del negocio —caducado, revocado, con la contraseña cambiada—, pedir el
+    /// delegado no arregla nada: el propio sigue ganando el fallback (ADR-0202 §2.1) y el siguiente
+    /// intento vuelve a fallar igual. Lo único que consigue es **gastar el presupuesto**: la cola de
+    /// contingencia reintenta cada 5/10/20/40/60 min, así que un certificado propio roto se comería
+    /// las 6/h del hub y dejaría sin cupo al disparador que sí sirve —el del latido— justo cuando el
+    /// plano de control rote de verdad.
+    ///
+    /// Mismo defecto de frontera que hub#317 y hub#318 arreglaron dos veces: una señal que describe
+    /// el slot delegado levantada desde un contexto que podía estar hablando del propio.
+    #[test]
+    fn a_tls_failure_of_the_businesss_own_certificate_asks_for_nothing() {
+        let signal = RefetchSignal::new();
+        request_certificate_refetch_on_tls(
+            &VerifactuError::Tls("conexión AEAT: received fatal alert: CertificateExpired".into()),
+            OWN,
+            &signal,
+        );
+        assert!(
+            !signal.take(),
+            "el certificado del negocio no se arregla bajando el de ERPlora — y gastaría el cupo"
+        );
+    }
+
+    /// Sin certificado no se llega a abrir el canal, pero si se llegase tampoco se pide nada: el
+    /// cupo no se gasta en una pregunta cuya respuesta ya se sabe que no se está usando.
+    #[test]
+    fn a_tls_failure_without_a_known_signer_asks_for_nothing() {
+        let signal = RefetchSignal::new();
+        request_certificate_refetch_on_tls(
+            &VerifactuError::Tls("conexión AEAT: invalid peer certificate".into()),
+            "",
+            &signal,
+        );
+        assert!(!signal.take());
     }
 
     /// 🔒 **The AEAT being down does not make the hub ask for a private key.** These arrive once
@@ -2765,7 +3053,7 @@ mod certificate_refetch_trigger_tests {
             VerifactuError::Certificate("certificado del negocio no configurado".into()),
             VerifactuError::Consult("SOAP Fault".into()),
         ] {
-            request_certificate_refetch_on_tls(&error, &signal);
+            request_certificate_refetch_on_tls(&error, DELEGATED, &signal);
         }
         assert!(
             !signal.take(),
@@ -2782,6 +3070,7 @@ mod certificate_refetch_trigger_tests {
         for _ in 0..200 {
             request_certificate_refetch_on_tls(
                 &VerifactuError::Tls("conexión AEAT: received fatal alert: CertificateRevoked".into()),
+                DELEGATED,
                 &signal,
             );
         }

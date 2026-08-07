@@ -306,20 +306,18 @@ pub async fn slot_status(
 /// per [`active_kind`]) — the «firmando con: certificado propio / ERPlora» the module shows
 /// (ADR-0202 §2.2). `null` when the hub has neither.
 ///
-/// # ⚠️ `present` has THREE readers, and they must move together (hub#319)
+/// # ⚠️ `present` is NOT «can this hub issue?» — that question is [`can_sign`] (hub#319)
 ///
-/// `present` is not only this endpoint's field: it is also the answer to «can this hub issue?», read
-/// identically by [`crate::commands::execute`], [`crate::queries::execute_page`] (both to fill
-/// `RequestContext::has_certificate`, which is what the ADR-0203 gate checks) and
-/// [`crate::setup_status`] (the ⛔ arm of the checklist — hub#370). They must give the SAME answer:
-/// a ⛔ that blocks a screen while the dispatcher accepts, or the reverse, is the checklist lying.
+/// The two used to be the same read, and hub#316/#317 warned that they would have to part company.
+/// They did: `present` answers «did the owner upload a certificate?» and stays on the **own** slot,
+/// while «can this hub issue?» — the ADR-0203 gate on [`crate::commands::execute`] and
+/// [`crate::queries::execute_page`], and the ⛔ arm of [`crate::setup_status`] (hub#370) — now reads
+/// [`can_sign`], which accepts the delegated certificate too.
 ///
-/// This PR keeps all three on the **own** slot, so they stay consistent and today's behaviour is
-/// unchanged — nothing writes a delegated certificate yet (that is hub#317). The moment one exists,
-/// a hub that holds only the delegated one CAN invoice (ADR-0202 §2.1), and all three have to switch
-/// from `status()["present"]` to `active_kind(..).is_some()` **in the same change** (hub#319).
-/// Switching one alone is what starts the lie; switching them early, before hub#317, would be a
-/// no-op change to the hottest path in the runtime.
+/// So a delegated-only hub reports `present: false` **and** invoices normally. That is not a
+/// contradiction: nothing of the customer's is loaded (this screen has nothing to show and nothing
+/// to delete), and ERPlora signs on their behalf. What the module shows as «firmando con: ERPlora»
+/// comes from `active`/`slots` below, never from `present`.
 pub async fn status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
     let occupied = occupied_slots(db, hub_id).await?;
     let of = |kind: CertificateKind| {
@@ -370,14 +368,45 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, kind: CertificateKin
 /// next signature and deleting it hands the hub back to the delegated one — both directions, with
 /// nothing to reconfigure.
 ///
-/// **This is what «can this hub issue?» must eventually ask** — see the warning on [`status`]: the
-/// dispatcher gate and the ⛔ arm of the setup checklist still read the own slot, and hub#319 moves
-/// both here at once, once hub#317 makes a delegated certificate possible at all.
+/// **«Can this hub issue?» is this function's [`can_sign`] shape** — the dispatcher gate and the ⛔
+/// arm of the setup checklist both go through it (hub#319). Use `can_sign` when the question is
+/// *whether*, and this one when it is *which*.
 pub async fn active_kind(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
 ) -> Result<Option<CertificateKind>> {
     Ok(occupied_slots(db, hub_id).await?.first().map(|(k, _)| *k))
+}
+
+/// **«Can this hub issue?» — the one function that answers it** (ADR-0202 §2.1 — hub#319).
+///
+/// `true` when [`active_kind`] finds a certificate to sign with, i.e. the business uploaded its own
+/// **or** the control plane handed one down. A hub holding only the delegated certificate can
+/// invoice: ERPlora signs on its behalf, which is the whole point of the delegated slot.
+///
+/// # Why this is a function and not three copies of `active_kind(..).is_some()`
+///
+/// The question has three askers and they must never diverge:
+///
+/// 1. [`crate::commands::execute`] and 2. [`crate::queries::execute_page`], which fill
+///    [`RequestContext::has_certificate`] — the second arm of the ADR-0203 fiscal gate; and
+/// 3. [`crate::setup_status`], the ⛔ arm of the onboarding checklist (hub#370).
+///
+/// ⛔ *asserts that the dispatcher is going to refuse the operation*. If the checklist and the gate
+/// answer this differently, one of them is lying: either a ⛔ that blocks a screen while the sale
+/// goes through, or a rejection nobody warned about. They used to read
+/// `status(..)["present"]`, which describes the **own** slot only — correct while nothing could
+/// write a delegated certificate (hub#316), and wrong the moment hub#317 made that possible. Giving
+/// the question a NAME is what makes agreement structural instead of a comment asking three call
+/// sites to remember each other.
+///
+/// **Not the same question as `status(..)["present"]`, which stays where it is.** That one describes
+/// what the owner uploaded in Ajustes → Negocio — what that screen shows and what its delete button
+/// removes — and it must keep saying `false` for a hub that only holds ERPlora's certificate.
+///
+/// [`RequestContext::has_certificate`]: crate::registry::RequestContext::has_certificate
+pub async fn can_sign(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    Ok(active_kind(db, hub_id).await?.is_some())
 }
 
 // ── Signing/identity MEDIATED by the host (ADR-0079) ──────────────────────────
@@ -967,6 +996,10 @@ mod tests {
     /// The whole selection rule, in both directions and with nothing to configure: with no
     /// certificate nothing signs; the delegated one covers a hub that has no own certificate;
     /// uploading your own takes over; deleting it hands the hub back to the delegated one.
+    ///
+    /// Desde hub#319 el recorrido comprueba también [`can_sign`] en cada paso: «con cuál firmo» y
+    /// «¿puedo facturar?» son la misma respuesta en dos formas, y aquí es donde se ve que no se
+    /// separan — borrar el certificado propio NO deja al hub sin poder facturar.
     #[tokio::test]
     async fn the_own_certificate_wins_and_the_delegated_one_is_the_fallback() {
         let _lock = env_lock();
@@ -974,6 +1007,7 @@ mod tests {
         let db = db_ready().await;
 
         assert_eq!(active_kind(&db, "hub-test").await.unwrap(), None, "sin certificado no firma nada");
+        assert!(!can_sign(&db, "hub-test").await.unwrap(), "…y por tanto no puede facturar");
 
         set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None)
             .await
@@ -983,6 +1017,10 @@ mod tests {
             Some(CertificateKind::Delegated),
             "sin certificado propio firma el delegado"
         );
+        assert!(
+            can_sign(&db, "hub-test").await.unwrap(),
+            "y con el delegado el hub SÍ factura: ERPlora firma en su nombre (hub#319)"
+        );
 
         set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None).await.unwrap();
         assert_eq!(
@@ -990,12 +1028,17 @@ mod tests {
             Some(CertificateKind::Own),
             "el propio GANA en cuanto se sube — sin preguntar ni reconfigurar"
         );
+        assert!(can_sign(&db, "hub-test").await.unwrap());
 
         delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
         assert_eq!(
             active_kind(&db, "hub-test").await.unwrap(),
             Some(CertificateKind::Delegated),
             "y al borrarlo se vuelve al delegado: el hub no se queda sin poder facturar"
+        );
+        assert!(
+            can_sign(&db, "hub-test").await.unwrap(),
+            "borrar el propio no puede dejar al hub sin facturar"
         );
     }
 
@@ -1056,6 +1099,10 @@ mod tests {
 
     /// The selection rule and the export rule are DIFFERENT questions, and this is the case that
     /// proves it: the hub signs with the delegated certificate, and still exports none.
+    ///
+    /// hub#319 is the change that could most easily blur the two — once this hub counts as «has a
+    /// certificate» ([`can_sign`]) for the dispatcher and the checklist, it must NOT start putting
+    /// ERPlora's private key into a bundle that travels to other people's hubs.
     #[tokio::test]
     async fn signing_with_the_delegated_certificate_does_not_make_it_exportable() {
         let _lock = env_lock();
@@ -1066,7 +1113,12 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(active_kind(&db, "hub-test").await.unwrap(), Some(CertificateKind::Delegated));
-        assert_eq!(exportable_der_bytes(&db, "hub-test").await.unwrap(), None);
+        assert!(can_sign(&db, "hub-test").await.unwrap(), "este hub SÍ puede facturar…");
+        assert_eq!(
+            exportable_der_bytes(&db, "hub-test").await.unwrap(),
+            None,
+            "…y aun así no exporta certificado alguno"
+        );
     }
 
     #[test]
@@ -1356,30 +1408,81 @@ mod tests {
         )
     }
 
-    /// ⚠️ **PIN of the inconsistency hub#319 has to close, deliberately left standing here.**
+    /// **A hub whose only certificate is the delegated one CAN sign — and the screen that shows the
+    /// business's own certificate still says there is none** (ADR-0202 §2.1 — hub#319).
     ///
-    /// `status()["present"]` still describes the OWN slot, and three readers depend on it (the
-    /// dispatcher's fiscal gate via `RequestContext::has_certificate`, the paged-query path, and the
-    /// ⛔ arm of `setup_status` — hub#370). hub#317 makes a delegated-only hub POSSIBLE for the first
-    /// time, and in that state all of them answer «no certificate»: the checklist shows ⛔ **and**
-    /// the gate refuses to issue. They agree, so the checklist is not lying — it is uniformly
-    /// stricter than ADR-0202 §2.1 wants, and fails CLOSED.
+    /// This replaces the pin hub#316 left standing here
+    /// (`until_hub319_a_delegated_only_hub_still_reports_no_certificate`), and the edit is the point
+    /// of the issue rather than a side effect. Until now the three readers of «can this hub issue?»
+    /// looked at `status()["present"]`, i.e. the OWN slot, so a delegated-only hub was refused by
+    /// the dispatcher AND shown ⛔: they agreed, so nothing lied — the runtime was simply stricter
+    /// than the ADR, and failed closed.
     ///
-    /// Moving `present` here alone is what would start the lie (the module's `build_identity` still
-    /// demands the core marker), so hub#319 moves all of them at once. This test exists so that day
-    /// is a conscious edit and not a surprise: when #319 lands, it must be updated, not deleted.
+    /// The two questions are now told apart by NAME, which is what stops them drifting again:
+    ///
+    /// * [`can_sign`] — «can this hub issue?». Own **or** delegated. Moved, all three readers at once.
+    /// * `status()["present"]` — «did the owner upload a certificate in Ajustes → Negocio?». Own
+    ///   only, deliberately unchanged: that screen shows it and its delete button removes it, so
+    ///   answering `true` would offer the customer a certificate they cannot see and a button that
+    ///   deletes a key that is not theirs.
     #[tokio::test]
-    async fn until_hub319_a_delegated_only_hub_still_reports_no_certificate() {
+    async fn a_delegated_only_hub_can_sign_while_the_own_slot_stays_empty() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(18));
         let db = db_ready().await;
 
         set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4).await.unwrap();
 
-        let st = status(&db, "hub-test").await.unwrap();
-        assert_eq!(st["present"], json!(false), "hub#319 aún no ha movido el gate");
-        // Y sin embargo el core YA sabe con cuál firmaría: la pieza que falta es solo el gate.
-        assert_eq!(st["active"], json!("delegated"));
+        assert!(
+            can_sign(&db, "hub-test").await.unwrap(),
+            "ERPlora's certificate signs on the hub's behalf: this hub can invoice"
+        );
         assert_eq!(active_kind(&db, "hub-test").await.unwrap(), Some(CertificateKind::Delegated));
+
+        let st = status(&db, "hub-test").await.unwrap();
+        assert_eq!(
+            st["present"],
+            json!(false),
+            "Ajustes → Negocio still has nothing of the customer's to show or delete"
+        );
+        assert_eq!(st["active"], json!("delegated"), "…but the hub knows what it signs with");
     }
+
+    /// **`can_sign` is `active_kind` and can never be anything else.** The two are one answer split
+    /// in two shapes («whether» and «which»), and every state of the two slots has to agree — a hub
+    /// that «can sign» with nothing selected, or one that has a selection but «cannot sign», is the
+    /// contradiction the three readers would then propagate.
+    #[tokio::test]
+    async fn can_sign_and_active_kind_agree_in_every_state_of_the_two_slots() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(24));
+        let db = db_ready().await;
+
+        for (own, delegated, expected) in [
+            (false, false, None),
+            (true, false, Some(CertificateKind::Own)),
+            (false, true, Some(CertificateKind::Delegated)),
+            (true, true, Some(CertificateKind::Own)),
+        ] {
+            delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
+            delete(&db, "hub-test", CertificateKind::Delegated).await.unwrap();
+            if own {
+                set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw", "hub_user:a", None)
+                    .await
+                    .unwrap();
+            }
+            if delegated {
+                set_delegated(&db, "hub-test", DELEGATED_B64, "pw", 4).await.unwrap();
+            }
+
+            let kind = active_kind(&db, "hub-test").await.unwrap();
+            assert_eq!(kind, expected, "own={own} delegated={delegated}");
+            assert_eq!(
+                can_sign(&db, "hub-test").await.unwrap(),
+                kind.is_some(),
+                "own={own} delegated={delegated}: «whether» and «which» must be the same answer"
+            );
+        }
+    }
+
 }

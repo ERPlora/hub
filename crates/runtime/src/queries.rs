@@ -87,10 +87,11 @@ pub async fn execute_page(
     let ctx = if ctx.business_tax_id.is_empty() {
         let f = crate::settings::get_all(db, &ctx.hub_id).await.unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let has_cert = crate::certificate::status(db, &ctx.hub_id)
+        // Same reader as `commands::execute` and as the ⛔ arm of `setup_status`, on purpose: the
+        // own certificate if there is one, otherwise ERPlora's delegated one (ADR-0202 §2.1,
+        // hub#319). Degrading to `false` keeps the ADR-0203 gate failing CLOSED.
+        let has_cert = crate::certificate::can_sign(db, &ctx.hub_id)
             .await
-            .ok()
-            .and_then(|s| s.get("present").and_then(|v| v.as_bool()))
             .unwrap_or(false);
         enriched_ctx = ctx
             .clone()
