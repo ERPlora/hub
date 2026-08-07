@@ -239,12 +239,11 @@ pub async fn catalog(
         });
     }
 
-    // Se compara contra lo YA emitido, no contra `is_base_role`: la grafía legacy `owner` es
-    // "base" para el gate (hub#349) pero no está en [`BASE_ROLES`], así que descartarla por ahí
-    // haría desaparecer del catálogo a quien todavía la lleve — justo a quien hay que ver para
-    // poder reasignarlo. Comparación exacta, como antes de hub#352: una fila `Admin` sigue
-    // saliendo aparte en vez de fundirse con `admin` y llevarse sus miembros a un sitio donde no
-    // se ven.
+    // Compared against what was ALREADY listed, not against `is_base_role`: the legacy spelling
+    // `owner` is "base" for the gate (hub#349) but is not in `BASE_ROLES`, so discarding it there
+    // would drop from the catalogue whoever still carries it — precisely the row that has to be
+    // visible to be reassigned. Exact match, as before hub#352: an `Admin` row still shows up on
+    // its own instead of merging into `admin` and taking its members somewhere nobody looks.
     let listed: BTreeSet<String> = out.iter().map(|r| r.key.clone()).collect();
     for key in &in_use {
         if listed.contains(key) || declared.contains_key(key) {
