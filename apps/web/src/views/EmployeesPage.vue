@@ -95,7 +95,9 @@
               :error-text="issueOn(ROLE_ISSUES) ? t(`employeeForm.errors.${issueOn(ROLE_ISSUES)}`) : ''"
               :class="{ 'ion-invalid ion-touched': Boolean(issueOn(ROLE_ISSUES)) }"
             >
-              <ion-select-option v-for="role in roles" :key="role.name" :value="role.name">
+              <!-- Solo los ASIGNABLES: el runtime rechaza dar un rol declarado que el hub no ha
+                   encendido (`ensure_assignable`), así que ofrecerlo sería ofrecer un rechazo. -->
+              <ion-select-option v-for="role in assignable" :key="role.name" :value="role.name">
                 {{ roleLabel(role.name) }}
               </ion-select-option>
             </ion-select>
@@ -122,20 +124,9 @@
         </ok-data-table>
 
         <!-- Roles del core: catálogo base ∪ los que declaran los módulos activos ∪ los que ya usa
-             alguien. No se crean a mano: un rol existe porque algún módulo le concede permisos. -->
-        <ok-data-table
-          v-show="tab === 'roles'"
-          ref="rolesTable"
-          fill
-          :columns="roleColumns"
-          :rows="roles"
-          :searchKeys="['name']"
-          :search-placeholder="t('employees.searchRole')"
-          :empty-message="t('employees.emptyRoles')"
-          page-size="10"
-          views
-          column-picker
-        ></ok-data-table>
+             alguien. No se crean a mano: un rol existe porque algún módulo lo declara. Encenderlos
+             y apagarlos (solo admin) vive en RolesPanel — hub#353. -->
+        <RolesPanel v-show="tab === 'roles'" />
 
         <ApiKeysPanel v-if="isAdmin" v-show="tab === 'apikeys'" />
       </template>
@@ -190,9 +181,11 @@ import {
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import ApiKeysPanel from './ApiKeysPanel.vue';
+import RolesPanel from './RolesPanel.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
 import {
   accessOf,
+  assignableRoles,
   canDeactivate,
   accountUserIssue,
   createHubUser,
@@ -248,6 +241,8 @@ const loading = ref(true);
 const loadError = ref(false);
 const users = ref<HubUser[]>([]);
 const roles = ref<HubRole[]>([]);
+/** Los que el runtime dejaría asignar hoy (un rol declarado y sin encender, no). */
+const assignable = computed(() => assignableRoles(roles.value));
 
 const form = reactive({ name: '', email: '', role: 'employee', pin: '', local: false });
 const saving = ref(false);
@@ -372,12 +367,6 @@ const userColumns = computed<DataTableColumn[]>(() => [
   },
 ]);
 
-const roleColumns = computed<DataTableColumn[]>(() => [
-  { key: 'name', header: t('employees.colRole'), format: (row) => roleLabel(String(row.name ?? '')) },
-  { key: 'members', header: t('employees.colMembers'), align: 'center' },
-  { key: 'permissions', header: t('employees.colPermissions'), align: 'center' },
-]);
-
 const userRowActions = computed<DataTableAction[]>(() =>
   isAdmin.value
     ? [
@@ -458,7 +447,6 @@ async function deactivateUser(row: Row): Promise<void> {
 }
 
 const staffTable = ref<DataTableElement | null>(null);
-const rolesTable = ref<DataTableElement | null>(null);
 
 function handleUserRowAction(event: Event): void {
   const { actionId, row } = (event as CustomEvent<{ actionId: string; row: Row }>).detail;
@@ -476,10 +464,8 @@ function bindTable(element: DataTableElement | null, rowHandler?: (event: Event)
 }
 
 watch(staffTable, (element) => bindTable(element, handleUserRowAction));
-watch(rolesTable, (element) => bindTable(element));
 watch(locale, () => {
   bindTable(staffTable.value, handleUserRowAction);
-  bindTable(rolesTable.value);
 });
 
 onMounted(() => {

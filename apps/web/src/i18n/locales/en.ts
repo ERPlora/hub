@@ -453,6 +453,25 @@ export default {
     active: 'Active',
     inactive: 'Deactivated',
   },
+  // Role catalogue (hub#352/hub#353): base roles ∪ what the installed modules declare ∪ what
+  // somebody still carries. The administrator switches on the ones this business actually needs.
+  roleCatalog: {
+    intro:
+      'These are the roles this Hub can hand out. The built-in ones are always available; the ones a module brings in are yours to switch on when your business needs them.',
+    colSource: 'Comes from',
+    colActive: 'Available',
+    sourceCore: 'Built in',
+    sourceModule: '{module}',
+    sourceInUse: 'Module removed',
+    alwaysOn: 'Always on',
+    // Va DENTRO de la celda, al lado del interruptor: tiene que caber en una línea.
+    notDeclared: 'No app brings it in',
+    adminOnly: 'Only an administrator can switch roles on or off.',
+    activated: '“{role}” can now be assigned.',
+    deactivated: '“{role}” can no longer be assigned.',
+    toggleError: '“{role}” could not be switched.',
+    loadError: 'The role catalogue could not be loaded.',
+  },
   apiKeys: {
     // List
     searchKey: 'Search API key…',

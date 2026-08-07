@@ -454,6 +454,25 @@ export default {
     active: 'Activo',
     inactive: 'De baja',
   },
+  // Catálogo de roles (hub#352/hub#353): roles base ∪ los que declaran los módulos instalados ∪
+  // los que alguien todavía lleva. El administrador enciende los que su negocio necesita.
+  roleCatalog: {
+    intro:
+      'Estos son los roles que este Hub puede repartir. Los básicos están siempre; los que trae una app los enciendes tú cuando tu negocio los necesita.',
+    colSource: 'Viene de',
+    colActive: 'Disponible',
+    sourceCore: 'Básico',
+    sourceModule: '{module}',
+    sourceInUse: 'App desinstalada',
+    alwaysOn: 'Siempre disponible',
+    // Va DENTRO de la celda, al lado del interruptor: tiene que caber en una línea.
+    notDeclared: 'Ninguna app lo trae',
+    adminOnly: 'Solo un administrador puede encender o apagar roles.',
+    activated: 'Ya puedes asignar «{role}».',
+    deactivated: 'Ya no se puede asignar «{role}».',
+    toggleError: 'No se pudo cambiar «{role}».',
+    loadError: 'No se pudo cargar el catálogo de roles.',
+  },
   apiKeys: {
     // Lista
     searchKey: 'Buscar API key…',
