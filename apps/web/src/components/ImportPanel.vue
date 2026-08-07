@@ -287,13 +287,16 @@ import {
   importBlueprint,
   sectionStatusInfo,
   sectionDiscardCode,
+  moduleInstallStatusInfo,
   fetchBlueprintCatalog,
   downloadBlueprint,
   type BlueprintManifest,
   type CatalogBlueprint,
   type ImportReport,
+  type ModuleInstallPurchase,
   type SectionDiscardCode,
 } from '../lib/runtime';
+import { formatAmount } from '../lib/money';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -711,6 +714,10 @@ const visual = {
   // se quedó fuera es justamente la identidad fiscal de otro negocio.
   partial: { icon: 'shield-checkmark-outline', color: 'warning', label: () => t('importPage.statusPartial') },
   failed: { icon: 'close-circle-outline', color: 'danger', label: () => t('importPage.statusFailed') },
+  // hub#409 / ADR-0060: el módulo no se instaló porque el plan exige CONTRATAR una dependencia.
+  // `warning` como un descarte —hay que verlo— y nunca el rojo de un fallo: no es una avería, es
+  // una decisión de compra del usuario. El carrito lo dice sin leer.
+  blocked: { icon: 'cart-outline', color: 'warning', label: () => t('importPage.statusBlocked') },
 } as const;
 
 // El motor del runtime NO copia media (lo hace la capa server) y la reporta `Skipped`; su
@@ -730,20 +737,40 @@ function mediaStatus(m: NonNullable<ImportReport['media']>): { kind: 'applied' |
 const moduleStatus = {
   installed: 'applied',
   already_installed: 'skipped',
+  blocked: 'blocked',
   failed: 'failed',
 } as const;
 
+/** «invoice (9,00 €)» — el precio SOLO si el motor lo mandó; nunca se inventa. */
+function blockedModuleLabel(id: string, purchase: ModuleInstallPurchase[]): string {
+  const offer = purchase.find((p) => p.module_id === id);
+  const price = Number(offer?.price);
+  if (!offer?.currency || !Number.isFinite(price)) return id;
+  return `${id} (${formatAmount(price, { currency: offer.currency })})`;
+}
+
 const moduleInstallRows = computed<ReportRow[]>(() =>
   (report.value?.installed_modules ?? []).map((m) => {
-    const v = visual[moduleStatus[m.status] ?? 'failed'];
+    const info = moduleInstallStatusInfo(m);
+    const v = visual[moduleStatus[info.kind]];
     return {
       section: `installed_modules/${m.id}`,
       label: m.id,
       icon: v.icon,
       color: v.color,
       statusLabel: v.label(),
-      // El motivo del motor, tal cual: sin él el fallo es irreportable.
-      reason: m.error,
+      // Un fallo lleva el motivo del motor tal cual —sin él es irreportable—; un bloqueo lleva su
+      // frase traducida, que NOMBRA lo que hay que contratar (hub#409): decir «falló» a secas es
+      // mandar a diagnosticar una avería que no existe.
+      // Sin lista no hay frase: «necesita: .» no nombra nada — la etiqueta del estado ya lo dice.
+      reason:
+        info.kind === 'blocked'
+          ? info.blockedOn.length
+            ? t('importPage.reasonBlocked', {
+                missing: info.blockedOn.map((id) => blockedModuleLabel(id, info.purchase)).join(', '),
+              })
+            : undefined
+          : info.error,
     };
   }),
 );

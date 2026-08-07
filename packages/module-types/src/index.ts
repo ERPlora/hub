@@ -50,9 +50,10 @@ export interface ModuleManifest {
    */
   widgets?: Record<string, WidgetManifestDef>;
   /**
-   * Chequeo de CONFIGURACIÓN del módulo (ADR-0063). Declarativo y genérico: el shell lo evalúa para
-   * cada módulo instalado y, si NO está configurado, lo surfacea como alerta (campana + dashboard)
-   * con un CTA a su pantalla de ajustes. El Hub no conoce módulos concretos: cada uno se autodeclara.
+   * Chequeo de CONFIGURACIÓN del módulo (ADR-0063, extendido por hub#369). Declarativo y genérico:
+   * el **runtime** lo evalúa para cada módulo instalado y activo y lo devuelve como un ítem de la
+   * query core `hub.setup.status`, unido a los ítems del core (tus apps · datos del negocio · tu
+   * equipo). El Hub no conoce módulos concretos: cada uno se autodeclara.
    * Ver `architecture/hub/setup-status.md`.
    */
   setup?: ModuleSetupDef;
@@ -157,13 +158,21 @@ export interface ModuleSetupCheck {
 }
 
 /**
- * Declaración de "¿está el módulo configurado?" (ADR-0063). El shell ejecuta `query` (lectura
- * declarativa del módulo, revalida permiso en server), toma la **primera fila** y evalúa
- * `configured_when`: si TODOS los checks pasan → configurado; si no hay fila o algún check falla →
- * NO configurado → alerta con CTA a `route`.
+ * Declaración de "¿está el módulo configurado?" (ADR-0063, extendido por hub#369). El **runtime**
+ * ejecuta `query` (lectura declarativa del propio módulo, con los permisos de quien llama), toma la
+ * **primera fila** y evalúa `configured_when`: si TODOS los checks pasan → configurado; si no hay
+ * fila o algún check falla → NO configurado. El resultado sale como un ítem de la query core
+ * `hub.setup.status`, que leen la checklist y el asistente.
+ *
+ * Ya no lo evalúa el navegador: era un bucle de N queries desde el cliente y el asistente recibía
+ * prosa en vez del dato. Contrato completo en `architecture/hub/setup-status.md`.
  */
 export interface ModuleSetupDef {
-  /** Si true (por defecto) la config pendiente alerta en el DASHBOARD; si false es opcional y NO alerta. */
+  /**
+   * `true` (por defecto) = 🔴 funcional; `false` = 🟡 recomendado. **Nunca ⛔ bloqueante**: esa lista
+   * la mantiene el core, para que un módulo de terceros no pueda autoproclamarse bloqueante.
+   * Ojo: `required: false` ya NO se omite de la checklist — sale plegado tras "Ver todo".
+   */
   required?: boolean;
   /** Query namespaced que devuelve el estado de configuración (1 fila). */
   query: string;
@@ -171,16 +180,31 @@ export interface ModuleSetupDef {
   params?: Record<string, unknown>;
   /** Configurado ⇔ TODOS estos checks pasan sobre la primera fila. */
   configured_when: ModuleSetupCheck[];
-  /** Título de la alerta (p. ej. "Configura VeriFactu"). */
+  /** Título del ítem, **en inglés canónico** (ADR-0055); la traducción va en `locales/<lang>.json`. */
   title: string;
-  /** Texto de ayuda corto. */
+  /** Texto de ayuda corto, en inglés canónico. */
   description?: string;
-  /** Icono ionicons para la alerta. */
+  /** Icono ionicons para el ítem. */
   icon?: string;
-  /** Ruta de la pantalla de configuración (p. ej. `/m/verifactu/settings`). */
+  /** Ruta de la pantalla que completa el ítem (p. ej. `/m/verifactu/settings`). */
   route: string;
-  /** Permiso para configurarlo: solo se alerta a quien puede (la query revalida en server). */
+  /**
+   * Permiso para CONFIGURARLO: solo se le ofrece el ítem a quien puede actuar. Deliberadamente más
+   * estrecho que el permiso de LEER la query — quien solo mira no recibe una tarea que no puede
+   * completar.
+   */
   permission?: string;
+  /**
+   * Países (ISO-3166-1 alfa-2) donde aplica. Ausente/vacío = todos. Es lo que hace que VeriFactu no
+   * salga fuera de España sin cablear el nombre del módulo en el core.
+   */
+  countries?: string[];
+  /**
+   * Puesto en la checklist. La escala es del core (apps=10, datos del negocio=40, equipo=80) y
+   * asigna a cada módulo el suyo: usa el de la tabla de `architecture/hub/setup-status.md`, no uno
+   * inventado. Ausente = 500, detrás de todo lo que el core colocó.
+   */
+  order?: number;
 }
 
 /** Tamaño de celda de un widget en la rejilla de 12 columnas. sm=3, md=6, lg=8. */

@@ -782,6 +782,12 @@ export default {
     statusIgnored: 'Descartado',
     statusPartial: 'Aplicado en parte',
     statusFailed: 'Falló',
+    // hub#409 / ADR-0060 — no se instaló porque el plan necesita una dependencia sin contratar.
+    // Es una decisión de compra, no una avería: se dice QUÉ contratar (con el precio que mandó el
+    // motor), nunca una ✗ roja y muda.
+    statusBlocked: 'Requiere contratación',
+    reasonBlocked:
+      'No se ha instalado: necesita módulos que aún no tienes contratados: {missing}. Contrátalos y vuelve a importar — no se ha tocado nada más.',
     mediaFailed: '{n} sin copiar',
     reasonIdentityNotPortable:
       'Los usuarios, roles y PIN son del hub que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso a tu hub.',
