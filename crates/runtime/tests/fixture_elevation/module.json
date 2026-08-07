@@ -1,0 +1,47 @@
+{
+  "id": "till",
+  "name": "Till",
+  "version": "1.0.0",
+  "permissions": [
+    "till.view_sale",
+    "till.add_sale",
+    "till.take_payment",
+    "till.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": ["till.view_sale", "till.add_sale", "till.take_payment"],
+    "employee": ["till.view_sale", "till.add_sale"]
+  },
+  "navigation": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "till.sales.list": { "permission": "till.view_sale", "sql": "queries/sales_list.sql" },
+    "till.reports.revenue": {
+      "permission": "till.take_payment",
+      "sql": "queries/sales_list.sql"
+    }
+  },
+  "commands": {
+    "till.sale.create": {
+      "permission": "till.add_sale",
+      "transaction": true,
+      "sql": ["commands/sale_create.sql"]
+    },
+    "till.sale.take_payment": {
+      "permission": "till.take_payment",
+      "transaction": true,
+      "sql": ["commands/sale_create.sql"]
+    },
+    "till.settings.save": {
+      "permission": "till.manage_settings",
+      "transaction": true,
+      "sql": ["commands/sale_create.sql"]
+    },
+    "till._settle": {
+      "permission": "till.take_payment",
+      "transaction": true,
+      "sql": ["commands/sale_create.sql"]
+    }
+  }
+}

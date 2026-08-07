@@ -129,7 +129,13 @@ pub(crate) async fn execute_at(
     }
 
     // El handler corre bajo el permiso del command que lo invoca (no re-eleva).
-    permissions::check(ctx, &cmd.def.permission)?;
+    //
+    // hub#360 (paso 2b, rule 1): the same gate, with a refusal a MANAGER could approve reported as
+    // `RequiresElevation` naming the missing permission instead of a flat `403`. It denies exactly
+    // what `permissions::check` denied — nothing below this line runs either way — so no command
+    // becomes reachable; what changes is only that the caller can tell "ask the manager" from
+    // "this is not for you". The PIN that authorises is hub#361.
+    permissions::check_command(registry, ctx, &cmd.def.permission)?;
 
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y
     // cacheado en el Registry): rechaza ANTES de tocar la BD o invocar handlers (hub#27).

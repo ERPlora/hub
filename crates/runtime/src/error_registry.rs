@@ -250,6 +250,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#328: the fiscal precondition is expected state of a hub that has not finished its
         // setup (missing business identity/certificate) — never a Hub bug worth an issue.
         | E::FiscalPrecondition { .. }
+        // hub#360: a cashier reaching for something a manager approves is the permission model
+        // working, not a Hub bug. Same severity as the flat `PermissionDenied` it refines.
+        | E::RequiresElevation { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -277,6 +280,9 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // hub#139: the namespaced domain code IS the stable code — the UI translates against it.
         E::Domain { code, .. } => code.as_str(),
         E::PermissionDenied(_) => "permission_denied",
+        // hub#360: its own stable code, NOT a flavour of `permission_denied` — the UI branches on
+        // it to decide whether to offer the manager-approval dialog (hub#363).
+        E::RequiresElevation { .. } => "requires_elevation",
         E::CapabilityDenied { .. } => "capability_denied",
         E::MissingDependency { .. } => "missing_dependency",
         E::DependencyCycle { .. } => "dependency_cycle",

@@ -192,6 +192,84 @@ async fn permission_denied_is_403() {
     );
 }
 
+/// hub#360 (paso 2b, rule 1): a refusal a MANAGER could approve crosses the HTTP border as its
+/// own stable code, carrying the missing permission as a **field** — the dialog of hub#363 has to
+/// name what it asks approval for, and must not parse it out of a sentence. Still a `403`: it is
+/// a refusal, not a permit.
+#[tokio::test]
+async fn requires_elevation_is_403_naming_the_missing_permission() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixture_elevation"),
+    )
+    .await
+    .unwrap();
+    let app = app(AppState::with_config(
+        rt,
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    ));
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/command")
+        .header("content-type", "application/json")
+        .header("x-hub-id", "h1")
+        .header("x-user-id", "u2")
+        .header("x-permissions", "till.view_sale,till.add_sale") // a cashier
+        .body(Body::from(
+            json!({ "name": "till.sale.take_payment", "payload": { "label": "table 4" } })
+                .to_string(),
+        ))
+        .unwrap();
+
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body = body_json(resp).await;
+    assert_eq!(body["error"]["code"], json!("requires_elevation"));
+    assert_eq!(body["error"]["permission"], json!("till.take_payment"));
+}
+
+/// The other half of the same contract: an `admin` permission never advertises a PIN dialog
+/// (rule 5). `fixture_inventory` grants nothing to `manager`, so the shape the 24 published
+/// modules have keeps answering exactly what it answered before — see `permission_denied_is_403`.
+#[tokio::test]
+async fn a_flat_denial_carries_no_permission_field() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixture_elevation"),
+    )
+    .await
+    .unwrap();
+    let app = app(AppState::with_config(
+        rt,
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    ));
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/command")
+        .header("content-type", "application/json")
+        .header("x-hub-id", "h1")
+        .header("x-user-id", "u2")
+        .header("x-permissions", "till.view_sale,till.add_sale")
+        .body(Body::from(
+            json!({ "name": "till.settings.save", "payload": { "label": "x" } }).to_string(),
+        ))
+        .unwrap();
+
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body = body_json(resp).await;
+    assert_eq!(body["error"]["code"], json!("permission_denied"));
+    assert_eq!(
+        body["error"]["permission"],
+        json!(null),
+        "a flat refusal must not look like an offer to elevate"
+    );
+}
+
 #[tokio::test]
 async fn unknown_query_is_404() {
     let resp = make_app()

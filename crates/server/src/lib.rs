@@ -1873,11 +1873,22 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
         // identity/certificate), not the request, blocks emitting fiscal documents. `409`: the
         // request is well-formed and allowed, it conflicts with the hub's current setup state.
         E::FiscalPrecondition { .. } => (StatusCode::CONFLICT, "fiscal_precondition_failed".into()),
+        // hub#360 (paso 2b): a refusal a MANAGER could approve. `403` like `permission_denied` —
+        // it IS a refusal and nothing ran — but with its own stable code, so the UI can tell
+        // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling
+        // into the generic `400 {code:"error"}` bucket would have made the whole chain undecidable.
+        E::RequiresElevation { .. } => (StatusCode::FORBIDDEN, "requires_elevation".into()),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".into()),
         _ => (StatusCode::BAD_REQUEST, "error".into()),
     };
-    let body = json!({ "ok": false, "error": { "code": code, "message": e.to_string() } });
-    (status, Json(body)).into_response()
+    let mut error = json!({ "code": code, "message": e.to_string() });
+    // hub#360: the missing permission travels as a FIELD, never parsed out of the message — it is
+    // what the dialog names and what hub#361 re-checks. Only on the elevation branch: a flat
+    // refusal must not look like an offer to elevate.
+    if let E::RequiresElevation { permission } = &e {
+        error["permission"] = json!(permission);
+    }
+    (status, Json(json!({ "ok": false, "error": error }))).into_response()
 }
 
 /// Respuesta para un fallo de **enrutado multi-tenant** (ADR-0005, hub#24):
