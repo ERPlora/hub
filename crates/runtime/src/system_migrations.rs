@@ -302,6 +302,31 @@ ALTER TABLE _hub_certificate ADD COLUMN kind TEXT NOT NULL DEFAULT 'own';\
 ALTER TABLE _hub_certificate DROP CONSTRAINT _hub_certificate_pkey;\
 ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     },
+    // ── v16 — hub#317 / ADR-0202 §2: el certificado DELEGADO guarda la VERSIÓN con la que llegó ──
+    // El plano de control reparte su `.p12` con un entero monótono (`DelegatedCertificate.version`,
+    // saas#1124) y la convergencia de la flota entera se apoya en él: el heartbeat anuncia la
+    // versión del plano de control, el hub la compara con la suya y refetchea si difieren (#318), y
+    // la reporta de vuelta para que el panel pueda decir «987/1000 en v4» (saas#1126/#1127).
+    //
+    // Va en ESTA tabla, en la fila del certificado, y no en `hub_settings`: el número describe unos
+    // bytes concretos, así que tiene que moverse en el MISMO upsert que ellos. Separados, una
+    // escritura a medias deja la fila con el `.p12` nuevo bajo el número viejo — y un hub que
+    // reporta una versión que no tiene es un hub al que el panel da por al día mientras firma con
+    // una clave superada (en el peor caso, revocada).
+    //
+    // NULLable a propósito: el slot `own` NO tiene versión. Lo sube y lo renueva su dueño, no hay
+    // rotación central que numerar, y un `0` por defecto haría que un hub con certificado propio
+    // reportase «tengo la v0 de ERPlora» en vez de «no tengo ninguna».
+    //
+    // ⚠️ El hueco en la v15 es DELIBERADO: la reserva hub#341 (cola de impresión), que ya la había
+    // publicado en `architecture/hub/print-queue.md` cuando esto se escribió. Pisar un número que
+    // otra PR abierta ya anunció cuesta más que dejarlo libre — `apply` compara `version >` el
+    // máximo aplicado y el test de orden solo exige que crezcan, así que un salto no rompe nada.
+    SystemMigration {
+        version: 16,
+        name: "hub_certificate_delegated_version",
+        postgres: "ALTER TABLE _hub_certificate ADD COLUMN cert_version BIGINT;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).

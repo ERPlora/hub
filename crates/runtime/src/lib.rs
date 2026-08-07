@@ -1001,6 +1001,11 @@ impl Runtime {
             pkcs12_b64,
             password,
             by,
+            // Sin versión: la del plano de control describe la ROTACIÓN CENTRAL del certificado
+            // delegado (ADR-0202 §2.5). El del negocio lo sube y lo renueva su dueño, así que no hay
+            // número de flota que le corresponda y ponerle uno haría que este hub reportase como
+            // instalada una versión de ERPlora que no tiene.
+            None,
         )
         .await
     }

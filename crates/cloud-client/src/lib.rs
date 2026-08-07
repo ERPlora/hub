@@ -159,6 +159,20 @@ impl CloudClient {
         }
     }
 
+    /// **ERPlora's DELEGATED fiscal certificate for this hub** (ADR-0202 §2, saas#1125 — hub#317).
+    /// `GET /api/v1/hub/device/fiscal/certificate/` → [`DelegatedCertificate`].
+    ///
+    /// **Machine credential, and only that.** The SaaS pins `IsHubMachine` here on purpose — unlike
+    /// its neighbours it does NOT accept a member's JWT, because that JWT lives in a browser and
+    /// this response carries a private key. So the call is made BY the runtime, with the
+    /// `cloud_api_token`, and its body must never be proxied to the web app.
+    ///
+    /// **404 is a normal answer**, not a failure: `no_delegated_certificate` means the control plane
+    /// has never uploaded one (`version == 0`). The hub keeps whatever it has and carries on.
+    pub fn fiscal_certificate(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/fiscal/certificate/", auth)
+    }
+
     /// **Identidad fiscal del negocio hacia el SaaS** (ADR-0201 decisión 5, 7/11 — hub#333).
     /// `POST /api/v1/hub/device/fiscal-identity/` con la credencial de máquina; el body (razón
     /// social, NIF, dirección) lo construye el server desde `hub_settings`, que es donde el
@@ -694,6 +708,61 @@ impl EmbeddingsResponse {
     }
 }
 
+/// Response of [`CloudClient::fiscal_certificate`]: ERPlora's DELEGATED fiscal certificate for this
+/// hub (ADR-0202 §2, saas#1125 — hub#317).
+///
+/// # This value holds someone else's PRIVATE KEY
+///
+/// Not the customer's: it is the key with which **ERPlora** identifies itself before the AEAT for
+/// every hub under its power of attorney, so one leak compromises the fleet rather than one
+/// business. Everything about this type is built around not spilling it:
+///
+/// - [`Debug`] is **hand-written and redacted** (see the impl below). The derived one would print
+///   the container and the passphrase in full, and `Debug` is what ends up in a `tracing` field, in
+///   an `unwrap()` panic message and in `{:?}` inside an error string.
+/// - Nothing here is [`serde::Serialize`]: the value cannot be re-emitted into a response, a log
+///   line or a bundle by accident.
+/// - The caller must never put a parse/HTTP error's body into a message — see
+///   `erplora-server`'s `fiscal_certificate` module, which is the only consumer.
+#[derive(Clone, Deserialize)]
+pub struct DelegatedCertificate {
+    /// Monotonic version of the control plane (`DelegatedCertificate.version` in the SaaS). What the
+    /// hub caches to answer «am I up to date?»; `0` never arrives here (the SaaS answers 404).
+    pub version: i64,
+    /// The PKCS#12 container, base64 — exactly the shape `certificate::set` stores.
+    pub pkcs12_b64: String,
+    /// Passphrase of that container.
+    pub password: String,
+    /// `notAfter` as the SaaS read it. **Advisory metadata, not the source of truth**: the hub
+    /// derives the expiry from the container it actually stored (`certificate::expiry`), so a wrong
+    /// or missing value here cannot make a hub believe a certificate is valid for longer than it is.
+    #[serde(default)]
+    pub not_after: Option<String>,
+}
+
+/// Redacted on purpose — the derived `Debug` would print ERPlora's private key and its passphrase
+/// (see the type's docs). What survives is what diagnosing a rotation actually needs and what the
+/// heartbeat already announces in the clear: the version and the expiry.
+///
+/// The secrets are printed as a fixed `«···»`, never as a prefix and never as a length: a redaction
+/// that leaked either would still be handing an attacker who reads the log a head start.
+impl std::fmt::Debug for DelegatedCertificate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DelegatedCertificate")
+            .field("version", &self.version)
+            .field("pkcs12_b64", &"«···»")
+            .field("password", &"«···»")
+            .field("not_after", &self.not_after)
+            .finish()
+    }
+}
+
+impl DelegatedCertificate {
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1123,5 +1192,108 @@ mod tests {
         assert_eq!(purchase.price, "9.00");
         assert_eq!(purchase.currency, "EUR");
         assert_eq!(purchase.purchase_url, "/marketplace/invoice/");
+    }
+
+    // ── ERPlora's delegated fiscal certificate (ADR-0202 §2, hub#317) ─────────────────────────
+    // The response of this endpoint is a PRIVATE KEY plus its passphrase, so the security tests
+    // come first: what the type prints, and which credential the request carries.
+
+    const SERVED_CERTIFICATE: &str = r#"{
+        "version": 4,
+        "pkcs12_b64": "TUlJS3RnSUJBekNDQ25JR0NTcUdTSWIzRFFFSEFhQ0NDbU1FZ2dwZg==",
+        "password": "the-passphrase-of-erplora",
+        "not_after": "2028-06-10"
+    }"#;
+
+    /// 🔒 **The private key must not be printable.** `Debug` is not cosmetic here: it is what a
+    /// `tracing` field, an `unwrap()` panic and a `{:?}` inside an error string all reach for. A
+    /// derived `Debug` would hand the container and the passphrase to every one of them, so the
+    /// redaction is the type's job and not the discipline of each call site.
+    #[test]
+    fn debugging_the_delegated_certificate_never_prints_the_key_or_its_passphrase() {
+        let cert = DelegatedCertificate::parse(SERVED_CERTIFICATE).unwrap();
+
+        let printed = format!("{cert:?}");
+        assert!(
+            !printed.contains("TUlJS3RnSUJBekNDQ25JR0NTcUdTSWIzRFFFSEFhQ0NDbU1FZ2dwZg=="),
+            "el Debug ha impreso el contenedor PKCS#12: {printed}"
+        );
+        assert!(
+            !printed.contains("the-passphrase-of-erplora"),
+            "el Debug ha impreso la contraseña: {printed}"
+        );
+        // It still has to be USEFUL for diagnosis: the version is the whole point of the fetch and
+        // is not a secret (the heartbeat announces it in the clear).
+        assert!(
+            printed.contains('4'),
+            "el Debug debería seguir diciendo la versión: {printed}"
+        );
+    }
+
+    /// 🔒 A *fragment* of the passphrase must not leak either — a redaction that printed the first
+    /// characters, or the length, would still be a redaction that helps whoever reads the log.
+    #[test]
+    fn the_redacted_debug_leaks_neither_a_prefix_nor_the_length_of_the_secret() {
+        let cert = DelegatedCertificate::parse(SERVED_CERTIFICATE).unwrap();
+        let printed = format!("{cert:?}");
+        for fragment in ["the-passphrase", "the-pass", "TUlJS3Rn", "erplora-"] {
+            assert!(
+                !printed.contains(fragment),
+                "el Debug filtra el fragmento {fragment:?}: {printed}"
+            );
+        }
+        assert!(
+            !printed.contains(&"the-passphrase-of-erplora".len().to_string()),
+            "el Debug filtra la longitud de la contraseña: {printed}"
+        );
+    }
+
+    /// 🔒 The MACHINE credential and nothing else: the SaaS pins `IsHubMachine` on this endpoint
+    /// precisely so a member's JWT — which lives in a browser — can never be what asks for the key.
+    #[test]
+    fn fiscal_certificate_uses_the_machine_token_and_the_canonical_path() {
+        let c = CloudClient::new("https://erplora.com/");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
+        let r = c.fiscal_certificate(&auth);
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/fiscal/certificate/"
+        );
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
+        // Never the user's JWT: it is the HUB that authenticates itself.
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+    }
+
+    /// The contract of saas#1125 §2.4, parsed as served.
+    #[test]
+    fn the_delegated_certificate_parses_the_served_contract() {
+        let cert = DelegatedCertificate::parse(SERVED_CERTIFICATE).unwrap();
+        assert_eq!(cert.version, 4);
+        assert_eq!(
+            cert.pkcs12_b64,
+            "TUlJS3RnSUJBekNDQ25JR0NTcUdTSWIzRFFFSEFhQ0NDbU1FZ2dwZg=="
+        );
+        assert_eq!(cert.password, "the-passphrase-of-erplora");
+        assert_eq!(cert.not_after.as_deref(), Some("2028-06-10"));
+    }
+
+    /// `not_after` is advisory (the hub reads the expiry from the container it stored), so its
+    /// absence must not throw away a certificate that is otherwise perfectly usable. Unknown fields
+    /// are tolerated too — the SaaS may add metadata without breaking deployed runtimes.
+    #[test]
+    fn a_certificate_without_not_after_still_parses() {
+        let cert = DelegatedCertificate::parse(
+            r#"{"version": 1, "pkcs12_b64": "QQ==", "password": "p", "issuer": "ERPlora SL"}"#,
+        )
+        .unwrap();
+        assert_eq!(cert.version, 1);
+        assert_eq!(cert.not_after, None);
     }
 }
