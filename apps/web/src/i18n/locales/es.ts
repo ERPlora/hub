@@ -488,8 +488,17 @@ export default {
     localUserHelp:
       'Trabaja en este hub solo con un PIN: sin email y sin cuenta de ERPlora. Desmárcalo para darle una cuenta más adelante, sin perder su historial.',
     localPinHelp: 'Entre 4 y 8 dígitos. Obligatorio: es cómo entra esta persona.',
+    accountEmailHelp:
+      'Le mandamos por email una invitación a este hub. La contraseña la elige él: tú no la ves nunca.',
+    accountPinHelp:
+      'Opcional: entre 4 y 8 dígitos. Solo si además atiende una caja compartida de este hub.',
     errors: {
       local_needs_pin: 'Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.',
+      account_needs_email: 'Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.',
+      account_role_not_grantable: 'A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.',
+      email_taken: 'Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.',
+      role_above_inviter: 'No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.',
+      invalid_email: 'Introduce un email válido.',
       pin_length: 'El PIN debe tener entre 4 y 8 dígitos.',
       pin_too_simple: 'Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).',
       pin_in_use: 'Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.',

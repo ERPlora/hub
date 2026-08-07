@@ -82,6 +82,9 @@
               autocomplete="email"
               :label="t('employeeForm.email')"
               :maxlength="254"
+              :helper-text="t('employeeForm.accountEmailHelp')"
+              :error-text="issueOn(EMAIL_ISSUES) ? t(`employeeForm.errors.${issueOn(EMAIL_ISSUES)}`) : ''"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(EMAIL_ISSUES)) }"
             />
             <ion-select
               v-model="form.role"
@@ -89,6 +92,8 @@
               label-placement="floating"
               interface="popover"
               :label="t('employeeForm.role')"
+              :error-text="issueOn(ROLE_ISSUES) ? t(`employeeForm.errors.${issueOn(ROLE_ISSUES)}`) : ''"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(ROLE_ISSUES)) }"
             >
               <ion-select-option v-for="role in roles" :key="role.name" :value="role.name">
                 {{ roleLabel(role.name) }}
@@ -100,15 +105,15 @@
               label-placement="floating"
               inputmode="numeric"
               :label="t('employeeForm.pin')"
-              :helper-text="form.local ? t('employeeForm.localPinHelp') : t('employeeForm.pinHelp')"
-              :error-text="localIssue ? t(`employeeForm.errors.${localIssue}`) : ''"
-              :class="{ 'ion-invalid ion-touched': Boolean(localIssue) }"
+              :helper-text="form.local ? t('employeeForm.localPinHelp') : t('employeeForm.accountPinHelp')"
+              :error-text="pinIssue ? t(`employeeForm.errors.${pinIssue}`) : ''"
+              :class="{ 'ion-invalid ion-touched': Boolean(pinIssue) }"
               :maxlength="8"
             />
             <ion-button
               type="submit"
               size="small"
-              :disabled="saving || !form.name.trim() || Boolean(localIssue)"
+              :disabled="saving || !form.name.trim() || Boolean(altaIssue)"
             >
               <ion-spinner v-if="saving" slot="start" name="crescent" />
               {{ saving ? t('employeeForm.saving') : t('employeeForm.create') }}
@@ -189,6 +194,7 @@ import { dataTableLabels } from '../lib/data-table-labels';
 import {
   accessOf,
   canDeactivate,
+  accountUserIssue,
   createHubUser,
   deactivateHubUser,
   hubUserErrorKey,
@@ -246,13 +252,40 @@ const roles = ref<HubRole[]>([]);
 const form = reactive({ name: '', email: '', role: 'employee', pin: '', local: false });
 const saving = ref(false);
 const formError = ref('');
+/** ¿Se ha intentado ya crear? Decide cuándo se pinta «falta el email» (ver `issueOn`). */
+const submitted = ref(false);
 /**
  * Motivo por el que el runtime rechazaría este alta local, adelantado en la UI (hub#355). El
  * runtime revalida y sigue siendo la autoridad; esto solo evita pulsar «Crear» para enterarse.
  * `pin_in_use` no cabe aquí: los PIN están hasheados y el shell no los ve — llega del servidor.
  */
-const localIssue = computed(() =>
-  form.local ? localUserIssue({ name: form.name, role: form.role, pin: form.pin }, users.value) : '',
+const altaIssue = computed(() =>
+  form.local
+    ? localUserIssue({ name: form.name, role: form.role, pin: form.pin }, users.value)
+    : accountUserIssue({ email: form.email, role: form.role, pin: form.pin }, users.value),
+);
+
+/** Qué campo se lleva cada motivo, para que el error salga donde se arregla. */
+const EMAIL_ISSUES = ['account_needs_email', 'invalid_email', 'email_taken', 'local_has_email'];
+const ROLE_ISSUES = ['account_role_not_grantable', 'local_cannot_administer'];
+/**
+ * «Falta el email» es el estado normal del alta rápida recién abierta —el alta de cuenta es la que
+ * sale por defecto—, así que ese motivo no se pinta hasta que se intenta crear.
+ */
+const ISSUES_THAT_WAIT_FOR_SUBMIT = ['account_needs_email'];
+
+/** El motivo actual si pertenece a este campo (y ya toca enseñarlo), o `''`. */
+function issueOn(field: string[]): string {
+  const issue = altaIssue.value;
+  if (!issue || !field.includes(issue)) return '';
+  return !submitted.value && ISSUES_THAT_WAIT_FOR_SUBMIT.includes(issue) ? '' : issue;
+}
+
+/** El motivo del PIN es el que queda: todo lo que no es del email ni del rol. */
+const pinIssue = computed(() =>
+  altaIssue.value && ![...EMAIL_ISSUES, ...ROLE_ISSUES].includes(altaIssue.value)
+    ? altaIssue.value
+    : '',
 );
 
 function fmtDate(iso: string): string {
@@ -365,7 +398,8 @@ async function load(): Promise<void> {
 }
 
 async function createUser(): Promise<void> {
-  if (!form.name.trim() || localIssue.value) return;
+  submitted.value = true;
+  if (!form.name.trim() || altaIssue.value) return;
   saving.value = true;
   formError.value = '';
   try {
@@ -378,6 +412,7 @@ async function createUser(): Promise<void> {
       local: form.local,
     });
     Object.assign(form, { name: '', email: '', role: 'employee', pin: '', local: form.local });
+    submitted.value = false;
     staffTable.value?.close?.();
     await load();
     void toast(t('employees.created'), 'success');

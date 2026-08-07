@@ -41,9 +41,12 @@
               fill="outline"
               autocomplete="name"
               :maxlength="150"
-              :error-text="submitted && !form.name.trim() ? t('employeeForm.required') : ''"
+              :error-text="nameError"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(NAME_ISSUES)) }"
               required
             />
+            <!-- Sin la casilla, el email ES la identidad (hub#356): es por lo que el SaaS manda la
+                 invitación y por lo que su primer login encuentra esta ficha. -->
             <ion-input
               v-if="!isLocal"
               v-model="form.email"
@@ -53,7 +56,9 @@
               type="email"
               autocomplete="email"
               :maxlength="254"
-              :error-text="submitted && !emailValid ? t('employeeForm.invalidEmail') : ''"
+              :helper-text="isEdit ? '' : t('employeeForm.accountEmailHelp')"
+              :error-text="emailError"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(EMAIL_ISSUES)) }"
             />
             <ion-select
               v-model="form.role"
@@ -61,6 +66,8 @@
               label-placement="floating"
               fill="outline"
               interface="popover"
+              :error-text="issueOn(ROLE_ISSUES) ? t(`employeeForm.errors.${issueOn(ROLE_ISSUES)}`) : ''"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(ROLE_ISSUES)) }"
             >
               <ion-select-option v-for="role in roles" :key="role.name" :value="role.name">
                 {{ roleLabel(role.name) }}
@@ -76,8 +83,8 @@
               inputmode="numeric"
               :maxlength="8"
               :helper-text="pinHelp"
-              :error-text="localIssue ? t(`employeeForm.errors.${localIssue}`) : ''"
-              :class="{ 'ion-invalid ion-touched': Boolean(localIssue) }"
+              :error-text="pinError"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(PIN_ISSUES)) }"
             />
           </div>
 
@@ -150,6 +157,7 @@ import {
 } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
 import {
+  accountUserIssue,
   createHubUser,
   hubUserErrorKey,
   listHubRoles,
@@ -196,20 +204,58 @@ const emailValid = computed(() =>
 /** Alta de usuario LOCAL: solo se decide al crear (hub#355). */
 const isLocal = computed(() => !isEdit.value && form.local);
 /**
- * Motivo por el que el runtime rechazaría este alta local, adelantado aquí. El runtime revalida y
- * es la autoridad; `pin_in_use` solo lo sabe él (los PIN están hasheados) y llega en la respuesta.
+ * Motivo por el que el runtime rechazaría este alta, adelantado aquí. Cada identidad tiene el suyo
+ * —`localUserIssue` (hub#355) y `accountUserIssue` (hub#356)—, y el runtime revalida y es la
+ * autoridad: `pin_in_use` solo lo sabe él (los PIN están hasheados) y llega en la respuesta.
  */
-const localIssue = computed(() =>
-  isLocal.value
+const altaIssue = computed(() => {
+  if (isEdit.value) return '';
+  return isLocal.value
     ? localUserIssue({ name: form.name, role: form.role, pin: form.pin }, users.value)
-    : '',
-);
+    : accountUserIssue({ email: form.email, role: form.role, pin: form.pin }, users.value);
+});
+
+/** Qué campo se lleva cada motivo, para que el error salga donde se arregla. */
+const NAME_ISSUES = ['name_taken'];
+const EMAIL_ISSUES = ['account_needs_email', 'invalid_email', 'email_taken', 'local_has_email'];
+const ROLE_ISSUES = ['account_role_not_grantable', 'local_cannot_administer'];
+const PIN_ISSUES = ['local_needs_pin', 'pin_length', 'pin_too_simple'];
+/**
+ * «Falta el email» es el estado NORMAL de un formulario recién abierto —el alta de cuenta es la
+ * que sale por defecto—, así que ese motivo espera a que se pulse «Guardar»; los demás salen en
+ * cuanto se pueden ver, que es de lo que sirve adelantarlos.
+ */
+const ISSUES_THAT_WAIT_FOR_SUBMIT = ['account_needs_email'];
+
+/** El motivo actual si pertenece a este campo (y ya toca enseñarlo), o `''`. */
+function issueOn(field: string[]): string {
+  const issue = altaIssue.value;
+  if (!issue || !field.includes(issue)) return '';
+  return !submitted.value && ISSUES_THAT_WAIT_FOR_SUBMIT.includes(issue) ? '' : issue;
+}
+
+const nameError = computed(() => {
+  if (submitted.value && !form.name.trim()) return t('employeeForm.required');
+  const issue = issueOn(NAME_ISSUES);
+  return issue ? t(`employeeForm.errors.${issue}`) : '';
+});
+const emailError = computed(() => {
+  const issue = issueOn(EMAIL_ISSUES);
+  if (issue) return t(`employeeForm.errors.${issue}`);
+  return submitted.value && !emailValid.value ? t('employeeForm.invalidEmail') : '';
+});
+const pinError = computed(() => {
+  const issue = issueOn(PIN_ISSUES);
+  return issue ? t(`employeeForm.errors.${issue}`) : '';
+});
 const pinHelp = computed(() => {
   if (isLocal.value) return t('employeeForm.localPinHelp');
-  return hasPin.value ? t('employeeForm.pinSetHelp') : t('employeeForm.pinHelp');
+  if (hasPin.value) return t('employeeForm.pinSetHelp');
+  // En el alta de cuenta el PIN es un extra —entra con su cuenta—, no la vía de acceso.
+  return isEdit.value ? t('employeeForm.pinHelp') : t('employeeForm.accountPinHelp');
 });
 const canSubmit = computed(
-  () => Boolean(form.name.trim() && emailValid.value) && !localIssue.value,
+  () => Boolean(form.name.trim() && emailValid.value) && !altaIssue.value,
 );
 
 /** Etiqueta traducida de un rol conocido; los que aporta un módulo se muestran tal cual. */

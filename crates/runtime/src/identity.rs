@@ -342,6 +342,56 @@ pub async fn name_is_known(db: &dyn DatabaseAdapter, name: &str) -> Result<bool>
     Ok(!res.rows.is_empty())
 }
 
+/// `true` if this hub already knows this **email** — active or not, ignoring case (plan step 2b,
+/// hub#356). `excluding_id` is the user being edited, so re-typing your own email is not a clash.
+/// The email twin of [`name_is_known`], and it reads the column the ACCESS plane reads
+/// (`hub_user.email`), not the one Personal displays.
+///
+/// The reach over **deactivated** rows is the point, and it is the same argument as `name_is_known`
+/// seen from the other identity: a deactivated row is a door somebody closed — the hub in Personal,
+/// or the SaaS by revoking the membership (hub#348) — and inviting the same email again would hand
+/// that person a second, active row while the first one keeps their history. Worse, the SaaS cannot
+/// stop it: a revocation there is a **row delete**, so a second `POST /device/members/` is just a
+/// fresh membership. Reopening the door is [`crate::hub_users::update`] — explicit and audited.
+pub async fn email_is_known(
+    db: &dyn DatabaseAdapter,
+    email: &str,
+    excluding_id: Option<&str>,
+) -> Result<bool> {
+    let email = email.trim().to_lowercase();
+    if email.is_empty() {
+        return Ok(false);
+    }
+    let mut p = Params::new();
+    p.insert("email".into(), json!(email));
+    p.insert("id".into(), json!(excluding_id.unwrap_or_default()));
+    let res = db
+        .query(
+            "SELECT id FROM hub_user WHERE LOWER(email) = :email AND id != :id",
+            &p,
+        )
+        .await?;
+    Ok(!res.rows.is_empty())
+}
+
+/// Writes the email of an existing `hub_user` **where access looks for it** (`hub_user.email`).
+///
+/// That column is the one the whole access plane resolves against: [`get_or_link_cloud_user`] links
+/// a pre-provisioned row by it on the first login, [`revoke_cloud_access`] closes the door by it
+/// when the SaaS revokes a membership, and [`create_login_user`]/[`deactivate_login_user`] are the
+/// `/api/members` alta and baja. `hub_user_profile.email` is a **different** field — what the
+/// person's profile shows — so writing only that one (what the Personal alta used to do) produced a
+/// row the login could not find: it fell through to provisioning a SECOND identity with the
+/// least-privilege role, losing the role the administrator had granted.
+pub async fn set_email(db: &dyn DatabaseAdapter, user_id: &str, email: &str) -> Result<()> {
+    let mut p = Params::new();
+    p.insert("id".into(), json!(user_id));
+    p.insert("email".into(), json!(email.trim()));
+    db.execute("UPDATE hub_user SET email = :email WHERE id = :id", &p)
+        .await?;
+    Ok(())
+}
+
 /// Nombre legible por defecto derivado de un email (la parte local antes de `@`). Para dar un
 /// `name` mostrable al `hub_user` sembrado/invitado por email antes de su primer login (el usuario
 /// puede editarlo luego en su Perfil). `""` → `"owner"`/lo que pase el llamador.
@@ -711,6 +761,10 @@ pub async fn create_login_user(
     role: &str,
 ) -> Result<HubUser> {
     let email = email.trim();
+    // El rol tiene que ser uno que el SaaS pueda poner en la membresía (hub#356). Es la MISMA
+    // guarda que la del alta de Personal, aquí porque esta es la otra puerta del mismo alta: dejar
+    // una sin ella sería guardar el candado y dejar la ventana abierta.
+    crate::hub_users::ensure_account_role_is_grantable(role)?;
     let mut p = Params::new();
     p.insert("email".into(), json!(email));
     let existing = db
@@ -1420,7 +1474,12 @@ mod tests {
         // on every login would otherwise strip the owner of a hub that was never migrated.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        create_login_user(&db, "legacy@bar.com", "owner").await.unwrap();
+        // La fila se fabrica a mano, sin pasar por el alta: desde hub#356 **ninguna** puerta del
+        // alta escribe `owner` —el SaaS no lo concede—, así que usarla aquí probaría lo contrario
+        // de lo que este test dice. Una fila así llega restaurando un backup o importando.
+        create_login_user_row(&db, &new_id(), "Boss", "", "owner", None, "legacy@bar.com")
+            .await
+            .unwrap();
 
         let linked =
             get_or_link_cloud_user(&db, "1", "Boss", "employee", Some("legacy@bar.com"), Some("admin"))

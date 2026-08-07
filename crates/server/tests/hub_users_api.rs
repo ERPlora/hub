@@ -154,7 +154,9 @@ async fn owner_creates_edits_and_deactivates_users() {
         "POST",
         "/api/hub/users",
         &f.owner,
-        json!({ "name": "Luis Prat", "role": "employee", "pin": "4242" }),
+        // `local: true` desde hub#356: sin la casilla el alta es la de un usuario de CUENTA y pide
+        // email. Este es personal de barra —nombre + PIN—, que es justo lo que la casilla dice.
+        json!({ "name": "Luis Prat", "role": "employee", "pin": "4242", "local": true }),
     )
     .await;
     assert_eq!(created.status(), StatusCode::OK);
@@ -268,19 +270,25 @@ async fn the_hub_can_never_be_left_without_an_administrator() {
         .to_lowercase()
         .contains("administrador"));
 
-    // Con un segundo admin, degradar al primero ya es legítimo.
-    let second = body_json(
-        send(
-            &f.router,
-            "POST",
-            "/api/hub/users",
-            &f.owner,
-            json!({ "name": "Ana Soto", "role": "admin", "pin": "9042" }),
-        )
-        .await,
+    // Con un segundo admin, degradar al primero ya es legítimo. Un administrador es siempre un
+    // usuario de CUENTA (hub#356: administrar sale de una cuenta de ERPlora, nunca de un PIN), así
+    // que el alta lleva email e intenta invitarlo — el SaaS del fixture no responde y el 502 es lo
+    // esperado; la fila local queda creada igualmente, que es lo que esta barandilla mira.
+    let second = send(
+        &f.router,
+        "POST",
+        "/api/hub/users",
+        &f.owner,
+        json!({ "name": "Ana Soto", "email": "ana@example.com", "role": "admin" }),
     )
     .await;
-    assert!(second["data"]["id"].is_string());
+    assert_eq!(second.status(), StatusCode::BAD_GATEWAY);
+    let census = body_json(get(&f.router, "/api/hub/users", Some(&f.owner)).await).await;
+    assert!(census["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|u| u["name"] == "Ana Soto" && u["role"] == "admin" && u["is_active"] == true));
     let demote = send(
         &f.router,
         "PUT",
@@ -364,7 +372,7 @@ async fn a_pin_only_user_never_touches_the_saas() {
         "POST",
         "/api/hub/users",
         &f.owner,
-        json!({ "name": "Luis Prat", "role": "cashier", "pin": "4242" }),
+        json!({ "name": "Luis Prat", "role": "cashier", "pin": "4242", "local": true }),
     )
     .await;
     assert_eq!(res.status(), StatusCode::OK, "no debe intentar hablar con el SaaS");
@@ -506,6 +514,112 @@ async fn a_rejected_local_alta_answers_with_a_stable_code() {
         assert_eq!(res.status(), StatusCode::CONFLICT);
         assert_eq!(body_json(res).await["error"]["code"], expected);
     }
+    std::fs::remove_dir_all(f.media).ok();
+}
+
+// ── Account user alta: email + invitation (plan step 2b, hub#356) ─────────────────────────────
+// The other half of the same alta. Here the identity lives in the SaaS, so the door is the SaaS's
+// too: who may open it, and what they may grant through it, is decided BEFORE anything is written.
+
+#[tokio::test]
+async fn only_an_administrator_invites_anybody() {
+    // Same conservative answer as hub#355: the write gate of Personal stays
+    // `require_admin_session`. It matters more here than for a local user — this alta creates an
+    // ERPlora account with a membership, so widening the gate would let somebody hand out access
+    // to a hub they only work in.
+    let f = fixture().await;
+    let response = send(
+        &f.router,
+        "POST",
+        "/api/hub/users",
+        &f.cashier,
+        json!({ "name": "Luis Prat", "email": "luis@example.com", "role": "manager" }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let users = body_json(get(&f.router, "/api/hub/users", Some(&f.owner)).await).await;
+    assert_eq!(
+        users["data"].as_array().unwrap().len(),
+        2,
+        "a rejected invitation creates nobody, locally or in the SaaS"
+    );
+    std::fs::remove_dir_all(f.media).ok();
+}
+
+#[tokio::test]
+async fn a_rejected_account_alta_answers_with_a_stable_code_and_never_calls_the_saas() {
+    // Every one of these is refused BEFORE the invitation goes out — the fixture's SaaS is
+    // unreachable, so anything that reached it would answer `502 cloud_unreachable` instead of the
+    // `409` with its code. Refusing first is the point: half a provisioning (a local row with an
+    // email and no membership) is worse than no alta at all.
+    let f = fixture().await;
+    for (payload, expected) in [
+        (
+            json!({ "name": "Luis Prat", "role": "employee" }),
+            "hub.users.account_needs_email",
+        ),
+        (
+            json!({ "name": "Luis Prat", "email": "luis@example.com", "role": "kitchen" }),
+            "hub.users.account_role_not_grantable",
+        ),
+        (
+            json!({ "name": "Luis Prat", "email": "luis@example.com", "role": "owner" }),
+            "hub.users.account_role_not_grantable",
+        ),
+        (
+            json!({
+                "name": "Luis Prat", "email": "luis@example.com",
+                "role": "employee", "pin": "1234"
+            }),
+            "hub.users.pin_too_simple",
+        ),
+    ] {
+        let res = send(&f.router, "POST", "/api/hub/users", &f.owner, payload).await;
+        assert_eq!(res.status(), StatusCode::CONFLICT);
+        assert_eq!(body_json(res).await["error"]["code"], expected);
+    }
+    let users = body_json(get(&f.router, "/api/hub/users", Some(&f.owner)).await).await;
+    assert_eq!(users["data"].as_array().unwrap().len(), 2);
+    std::fs::remove_dir_all(f.media).ok();
+}
+
+#[tokio::test]
+async fn the_same_email_is_never_invited_into_this_hub_twice() {
+    let f = fixture().await;
+    // First invitation: the SaaS is unreachable (502) but the local row is created — that is the
+    // documented order (local → SaaS, honest status, idempotent by email).
+    send(
+        &f.router,
+        "POST",
+        "/api/hub/users",
+        &f.owner,
+        json!({ "name": "Ana Soto", "email": "ana@example.com", "role": "employee" }),
+    )
+    .await;
+
+    let again = send(
+        &f.router,
+        "POST",
+        "/api/hub/users",
+        &f.owner,
+        json!({ "name": "Ana S.", "email": "ana@example.com", "role": "admin" }),
+    )
+    .await;
+    assert_eq!(again.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(again).await["error"]["code"],
+        "hub.users.email_taken"
+    );
+
+    let users = body_json(get(&f.router, "/api/hub/users", Some(&f.owner)).await).await;
+    let anas: Vec<&Value> = users["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|u| u["email"] == "ana@example.com")
+        .collect();
+    assert_eq!(anas.len(), 1, "one email, one row");
+    assert_eq!(anas[0]["role"], "employee", "and no role was re-granted");
     std::fs::remove_dir_all(f.media).ok();
 }
 

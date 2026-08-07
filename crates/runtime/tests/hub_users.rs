@@ -65,7 +65,10 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
         .create_hub_user(&NewHubUser {
             name: "Marta Ruiz".into(),
             email: "marta@example.com".into(),
-            role: "cashier".into(),
+            // Un usuario de CUENTA lleva uno de los tres roles que el SaaS sabe poner en una
+            // membresía (hub#356); `cashier` es de los que declara un módulo, y esos son del
+            // personal LOCAL.
+            role: "employee".into(),
             pin: "4821".into(),
             local: false,
         })
@@ -75,7 +78,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
     let created = row(&rt, &id).await;
     assert_eq!(created.name, "Marta Ruiz");
     assert_eq!(created.email, "marta@example.com");
-    assert_eq!(created.role, "cashier");
+    assert_eq!(created.role, "employee");
     assert!(created.has_pin);
     assert!(
         rt.verify_pin("Marta Ruiz", "4821").await.unwrap().is_some(),
@@ -128,7 +131,10 @@ async fn resets_the_pin_and_clears_it_when_empty() {
     let id = rt
         .create_hub_user(&NewHubUser {
             name: "Ana Soto".into(),
-            email: String::new(),
+            // Usuario de CUENTA sin PIN: entra con su cuenta de ERPlora y aquí se le pone uno
+            // después, que es justo lo que este test recorre (hub#356: el PIN es opcional en las
+            // dos identidades, el email solo lo pide la de cuenta).
+            email: "ana@example.com".into(),
             role: "employee".into(),
             pin: String::new(),
             local: false,
@@ -318,12 +324,15 @@ async fn a_module_reads_the_hub_users_through_the_dispatcher() {
     rt.get_or_link_cloud_user("cloud-1", "Ioan Beilic", "owner", None, None)
         .await
         .unwrap();
+    // Personal de barra: nombre + PIN y nada en el SaaS (hub#355). Es lo que un módulo ve por el
+    // dispatcher, y el rol `cashier` —declarado, no del catálogo del SaaS— es justamente el de
+    // alguien que solo existe en este hub.
     rt.create_hub_user(&NewHubUser {
         name: "Marta Ruiz".into(),
-        email: "marta@example.com".into(),
         role: "cashier".into(),
         pin: "4821".into(),
-        local: false,
+        local: true,
+        ..NewHubUser::default()
     })
     .await
     .unwrap();

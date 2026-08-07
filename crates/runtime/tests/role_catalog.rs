@@ -247,6 +247,9 @@ async fn uninstalling_a_module_retires_its_roles_and_clears_their_activation() {
             name: "Marta Ruiz".into(),
             role: "kitchen".into(),
             pin: "4821".into(),
+            // Un rol que declara un módulo es del personal LOCAL: el SaaS no sabe ponerlo en una
+            // membresía, así que un usuario de CUENTA no puede llevarlo (hub#356).
+            local: true,
             ..Default::default()
         })
         .await
@@ -381,6 +384,9 @@ async fn an_inactive_declared_role_cannot_be_handed_to_a_person() {
             name: "Marta Ruiz".into(),
             role: "kitchen".into(),
             pin: "4821".into(),
+            // Un rol que declara un módulo es del personal LOCAL: el SaaS no sabe ponerlo en una
+            // membresía, así que un usuario de CUENTA no puede llevarlo (hub#356).
+            local: true,
             ..Default::default()
         })
         .await
@@ -393,6 +399,7 @@ async fn an_inactive_declared_role_cannot_be_handed_to_a_person() {
         name: "Marta Ruiz".into(),
         role: "kitchen".into(),
         pin: "4821".into(),
+        local: true,
         ..Default::default()
     })
     .await
@@ -410,6 +417,7 @@ async fn a_free_role_no_module_declares_keeps_being_assignable() {
         name: "Marta Ruiz".into(),
         role: "cashier".into(),
         pin: "4821".into(),
+        local: true,
         ..Default::default()
     })
     .await

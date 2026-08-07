@@ -487,9 +487,18 @@ export default {
     localUserHelp:
       'Works this hub with a PIN only: no email and no ERPlora account. Turn it off to give them an account later, keeping their history.',
     localPinHelp: 'Between 4 and 8 digits. Required: it is how this person signs in.',
+    accountEmailHelp:
+      'We email them an invitation to this hub. They choose their own password — you never see it.',
+    accountPinHelp:
+      'Optional: between 4 and 8 digits. Only needed if they also work a shared till in this hub.',
     // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
     errors: {
       local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
+      account_needs_email: 'An account user signs in with their ERPlora account, so an email is required. Tick «Local user» to create somebody who works this hub with a PIN.',
+      account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
+      email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
+      role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
+      invalid_email: 'Enter a valid email.',
       pin_length: 'The PIN must be between 4 and 8 digits.',
       pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
       pin_in_use: 'Another active user already has this PIN. A PIN says who is at the till, so no two people can share one.',
