@@ -51,6 +51,9 @@ pub async fn install(
     // hub#139: id-dependent contract checks (domain error namespaces, exclusive row gates)
     // run BEFORE any side effect — a broken contract never reaches migrations or the registry.
     validate_command_contracts(&manifest)?;
+    // hub#351 (paso 2b): same door for the roles the module declares. A manifest may add roles to
+    // the hub's catalogue, but it can neither redefine a base role nor hand out administration.
+    validate_role_declarations(&manifest)?;
 
     // `hub` es el namespace RESERVADO del core (ADR-0192): el dispatcher resuelve `hub.*` antes de
     // mirar el registry, así que un módulo con ese id tendría capacidades inalcanzables y aparentaría
@@ -248,6 +251,113 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Longest accepted `roles[].key`. It is stored in `hub_user.role` and used as a
+/// `role_permissions` key, so it is an identifier with a bounded size, not free text.
+const MAX_ROLE_KEY_LEN: usize = 32;
+
+/// Validates the `roles[]` block of a manifest (paso 2b, hub#351) — the roles a module declares
+/// for its vertical (`waiter`, `kitchen`, `accountant`) on top of the frozen base catalogue.
+///
+/// Runs at INSTALL time, before any side effect, for the same reason as the command contracts
+/// (hub#139): a `module.zip` is third-party input, and by the time migrations have run it is too
+/// late to say no.
+///
+/// Four things are checked, and the last one is the one that matters:
+///
+/// 1. **The key is an identifier.** It is what `role_permissions` grants against and what lands in
+///    `hub_user.role`, so free text would leak into a data column and into the permission union.
+/// 2. **It does not redefine a base role.** `admin`/`manager`/`employee` (and the legacy `owner`)
+///    mean the same in the 24 published modules; a module extends that catalogue, it does not get
+///    to reassign one of its keys.
+/// 3. **`extends` resolves to a base role**, never to another declared role. That is what keeps
+///    every role in the hub reducible to the frozen three-key contract, so the core gate and the
+///    published modules keep working with no republish and no migration.
+/// 4. **🔴 `extends` is never the administrative role.** A manifest cannot mint an administrator.
+///    Administering the hub comes from the hub itself (`HUB_OWNER_EMAIL`, ADR-0157) and from the
+///    floor the account role imposes at login (hub#347) — never from a declaration a third party
+///    ships in a zip. The gate ([`crate::hub_users::is_admin_role`]) refuses a declared role on
+///    its own, so this is the second lock on the same door: the manifest is rejected outright
+///    instead of being silently downgraded, which would leave the author believing the role
+///    administers when it does not.
+///
+/// What is deliberately NOT checked: that every key in `role_permissions` is declared here. A
+/// role's permissions are the union of what the INSTALLED modules grant to that key, so `sales`
+/// may grant `waiter` (declared by `tables`) `add_sale` without `take_payment`. Requiring the
+/// declaration would force every module to know roles it did not invent — the opposite of the
+/// design — and would break manifests that already grant to keys of their own.
+fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
+    let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    for role in &manifest.roles {
+        let key = role.key.as_str();
+        let reject = |detail: String| {
+            Err(RuntimeError::Other(format!(
+                "manifest `{}`: role `{key}` {detail}",
+                manifest.id
+            )))
+        };
+
+        if !is_valid_role_key(key) {
+            return reject(format!(
+                "has an invalid key: expected snake_case ASCII (`^[a-z][a-z0-9_]*$`, up to \
+                 {MAX_ROLE_KEY_LEN} chars), because the key is what `role_permissions` grants \
+                 against and what `hub_user.role` stores"
+            ));
+        }
+        if crate::hub_users::is_base_role(key) {
+            return reject(format!(
+                "collides with a base role of the hub ({}): a module EXTENDS the base catalogue, \
+                 it never redefines an entry of it",
+                crate::hub_users::BASE_ROLES.join(", ")
+            ));
+        }
+        if !seen.insert(key) {
+            return reject("is declared twice: a key names exactly one role".to_string());
+        }
+        if role.label.trim().is_empty() {
+            return reject(
+                "needs a non-empty `label`: it is what the administrator reads when activating the \
+                 role"
+                    .to_string(),
+            );
+        }
+        if crate::hub_users::is_admin_role(&role.extends) {
+            return reject(format!(
+                "cannot extend `{}`: a module never grants administration of the hub (hub#347). \
+                 That property comes from the hub itself (`HUB_OWNER_EMAIL`, ADR-0157) and from \
+                 the floor the account role imposes at login, never from a manifest. Extend \
+                 `manager` instead",
+                role.extends
+            ));
+        }
+        if !crate::hub_users::is_extendable_base_role(&role.extends) {
+            return reject(format!(
+                "declares `extends: {}`, which is not a base role of the hub: expected one of {}",
+                role.extends,
+                extendable_base_roles().join(", ")
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// The base roles a declared role may hang from, for error messages. Derived from the catalogue so
+/// the message cannot drift from the rule.
+fn extendable_base_roles() -> Vec<&'static str> {
+    crate::hub_users::BASE_ROLES
+        .iter()
+        .copied()
+        .filter(|base| crate::hub_users::is_extendable_base_role(base))
+        .collect()
+}
+
+/// Same shape as a module id or a permission segment: lowercase ASCII, digits and `_`.
+fn is_valid_role_key(key: &str) -> bool {
+    let mut chars = key.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_lowercase())
+        && key.len() <= MAX_ROLE_KEY_LEN
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 /// Lee y **compila** el JSON Schema del payload de una query/command (si lo declara).
@@ -766,5 +876,200 @@ mod tests {
         }))
         .unwrap();
         assert!(super::validate_command_contracts(&valid).is_ok());
+    }
+
+    /// Builds a manifest of module `kitchen` carrying the given `roles` block.
+    fn with_roles(roles: serde_json::Value) -> crate::manifest::Manifest {
+        serde_json::from_value(serde_json::json!({
+            "id": "kitchen", "name": "Kitchen", "version": "2.3.1", "roles": roles
+        }))
+        .expect("manifest parses")
+    }
+
+    /// The message of a rejected `roles` block (panics if the block was accepted).
+    fn role_rejection(roles: serde_json::Value) -> String {
+        super::validate_role_declarations(&with_roles(roles))
+            .expect_err("the block must be rejected")
+            .to_string()
+    }
+
+    /// hub#351 (paso 2b): the happy path. A module hangs its own roles from a base role and the
+    /// manifest is accepted — the base catalogue is EXTENDED, never rewritten.
+    #[test]
+    fn accepts_roles_that_hang_from_a_base_role() {
+        let manifest = with_roles(serde_json::json!([
+            { "key": "waiter", "label": "Waiter", "extends": "employee" },
+            { "key": "accountant", "label": "Accountant", "extends": "manager" }
+        ]));
+        assert!(
+            super::validate_role_declarations(&manifest).is_ok(),
+            "a role hanging from `employee`/`manager` is exactly what the block is for"
+        );
+    }
+
+    /// The ~24 published modules carry no `roles` block: their absence must keep validating, or
+    /// the whole catalogue would need republishing (which is precisely what this design avoids).
+    #[test]
+    fn a_manifest_without_the_roles_block_stays_valid() {
+        let published: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0",
+            "role_permissions": {
+                "admin": ["*"],
+                "manager": ["inventory.view_product", "inventory.add_product"],
+                "employee": ["inventory.view_product"]
+            }
+        }))
+        .unwrap();
+        assert!(
+            super::validate_role_declarations(&published).is_ok(),
+            "no `roles` block = nothing to validate; the module installs as it always did"
+        );
+    }
+
+    /// 🔴 The guard of hub#347, restated at the manifest border: **a module never mints an
+    /// administrator.** Administering the hub comes from the hub itself (`HUB_OWNER_EMAIL`,
+    /// ADR-0157, and the account role floor), never from a third-party manifest — so `extends`
+    /// resolves to the two NON-administrative base roles and `admin`/`owner` are rejected by name.
+    #[test]
+    fn a_module_cannot_declare_a_role_that_administers_the_hub() {
+        for forbidden in ["admin", "owner", "Admin", "OWNER"] {
+            let error = role_rejection(serde_json::json!([
+                { "key": "backdoor", "label": "Back door", "extends": forbidden }
+            ]));
+            assert!(
+                error.contains("backdoor") && error.contains("administ"),
+                "the refusal must say WHICH role and WHY (`{forbidden}`): {error}"
+            );
+        }
+
+        // And the gate itself does not move: whatever a manifest declares or grants, a custom role
+        // is not the "administers the hub" property (hub#347). Belt and braces — a hub running an
+        // older/newer runtime never derives administration from a declared role.
+        for declared in ["waiter", "bartender", "kitchen", "accountant", "shift_lead"] {
+            assert!(
+                !crate::hub_users::is_admin_role(declared),
+                "`{declared}` is declared by a module, so it never administers the hub"
+            );
+        }
+    }
+
+    /// The three base keys are the FROZEN contract every published module writes against
+    /// (24/24 declare `admin`/`manager`/`employee`). A module extends that catalogue; it does not
+    /// get to redefine an entry of it — including the legacy `owner` spelling.
+    #[test]
+    fn a_module_cannot_redefine_a_base_role() {
+        for base in ["admin", "manager", "employee", "owner"] {
+            let error = role_rejection(serde_json::json!([
+                { "key": base, "label": "Mine now", "extends": "employee" }
+            ]));
+            assert!(
+                error.contains(base),
+                "the refusal must name the base role it collides with: {error}"
+            );
+        }
+    }
+
+    /// A malformed role is refused with a message that names the offending role and the field, so
+    /// the module author can fix it without reading the runtime's source.
+    #[test]
+    fn rejects_a_malformed_role_with_a_useful_message() {
+        // A key is an identifier (same shape as a module id / a permission), not free text: it is
+        // what `role_permissions` and the `hub_user.role` column are keyed by.
+        let error = role_rejection(serde_json::json!([
+            { "key": "Bar tender", "label": "Bartender", "extends": "employee" }
+        ]));
+        assert!(
+            error.contains("Bar tender") && error.contains("key"),
+            "the refusal must quote the invalid key: {error}"
+        );
+
+        // The label is what the administrator reads when activating the role: blank is not a label.
+        let error = role_rejection(serde_json::json!([
+            { "key": "bartender", "label": "   ", "extends": "employee" }
+        ]));
+        assert!(
+            error.contains("bartender") && error.contains("label"),
+            "the refusal must name the empty field: {error}"
+        );
+
+        // `extends` resolves to a base role of the HUB, never to another declared role: that is
+        // what keeps every role resolvable to the frozen three-key contract.
+        let error = role_rejection(serde_json::json!([
+            { "key": "bartender", "label": "Bartender", "extends": "waiter" }
+        ]));
+        assert!(
+            error.contains("waiter") && error.contains("extends"),
+            "the refusal must quote the unknown base role: {error}"
+        );
+
+        // Two rows, one key: which label and which base would win is undefined, so it is refused.
+        let error = role_rejection(serde_json::json!([
+            { "key": "waiter", "label": "Waiter", "extends": "employee" },
+            { "key": "waiter", "label": "Server", "extends": "manager" }
+        ]));
+        assert!(
+            error.contains("waiter") && error.contains("twice"),
+            "a duplicated key must be called out: {error}"
+        );
+    }
+
+    /// Compatibility MEASURED against the real catalogue instead of asserted: every published
+    /// `module.json` keeps parsing and keeps passing the new validation, untouched — no republish,
+    /// no migration, which is the whole point of `extends` resolving to a base role.
+    ///
+    /// A manifest that does not parse at all is reported, not masked: the only claim under test is
+    /// that hub#351 did not break it, so its error is asserted NOT to come from the new block.
+    /// (Today one does: `tables` ships `"catch_up": false` where the contract says the string enum
+    /// `collapse`/`skip` — a defect of that module's repo that predates this block.)
+    ///
+    /// Skips (loudly) where `modules-workspace` is not checked out, like every other e2e.
+    #[test]
+    fn every_published_manifest_still_passes_role_validation() {
+        if !crate::require_modules_workspace() {
+            return;
+        }
+        let root = crate::e2e_support::modules_root();
+        let mut parsed = 0;
+        for entry in std::fs::read_dir(&root)
+            .expect("modules root is readable")
+            .flatten()
+        {
+            let dir = entry.path();
+            if !dir.join("module.json").is_file() {
+                continue;
+            }
+            let module = dir
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            match crate::manifest::Manifest::load(&dir) {
+                Ok(manifest) => {
+                    assert!(
+                        manifest.roles.is_empty(),
+                        "`{module}` already declares roles: this test asserts the OPTIONALITY of \
+                         the block against the catalogue as published"
+                    );
+                    super::validate_role_declarations(&manifest)
+                        .unwrap_or_else(|e| panic!("`{module}` must keep validating: {e}"));
+                    parsed += 1;
+                }
+                Err(error) => {
+                    let error = error.to_string();
+                    assert!(
+                        !error.contains("roles"),
+                        "`{module}` stopped parsing because of the new block: {error}"
+                    );
+                    println!(
+                        "⚠  `{module}` does not parse today, for a reason older than hub#351: {error}"
+                    );
+                }
+            }
+        }
+        assert!(
+            parsed >= 20,
+            "expected the published catalogue (~24 modules), only {parsed} parsed in {}",
+            root.display()
+        );
     }
 }

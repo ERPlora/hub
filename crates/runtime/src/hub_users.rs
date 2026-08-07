@@ -101,6 +101,31 @@ pub fn is_admin_role(role: &str) -> bool {
     matches!(role.to_ascii_lowercase().as_str(), "owner" | "admin")
 }
 
+/// ¿Es `role` una clave que **posee el core**? El catálogo base ([`BASE_ROLES`]) más la grafía
+/// legacy `owner`, insensible a mayúsculas.
+///
+/// Lo usa la validación del bloque `roles[]` de un manifest (paso 2b, hub#351): un módulo
+/// **extiende** el catálogo base, nunca redefine una de sus entradas. Que `manager` signifique lo
+/// mismo en los 24 módulos publicados es justamente lo que hace innecesaria una republicación.
+pub fn is_base_role(role: &str) -> bool {
+    BASE_ROLES
+        .iter()
+        .any(|base| base.eq_ignore_ascii_case(role))
+        || is_admin_role(role)
+}
+
+/// ¿Puede un rol **declarado por un módulo** colgar de `role` (su `extends`)? Los roles base que
+/// **no administran el hub**: hoy `manager` y `employee`.
+///
+/// Se deriva de [`is_base_role`] y [`is_admin_role`] en vez de copiar una lista, para que ampliar
+/// el catálogo no deje esta regla atrás. La exclusión de `admin` es la misma guarda de hub#347
+/// vista desde el manifest: administrar el hub sale del propio hub (`HUB_OWNER_EMAIL`, ADR-0157) y
+/// del suelo que impone la cuenta, **nunca** de lo que declare un paquete de terceros. Sin ella,
+/// un `module.zip` podría acuñar administradores con tres líneas de JSON.
+pub fn is_extendable_base_role(role: &str) -> bool {
+    is_base_role(role) && !is_admin_role(role)
+}
+
 /// Longitud válida de un PIN local (dígitos). El login es un pinpad numérico.
 const PIN_LEN: std::ops::RangeInclusive<usize> = 4..=8;
 
@@ -496,6 +521,38 @@ mod tests {
         // comes from `HUB_OWNER_EMAIL`, never from a token).
         assert_eq!(CLOUD_ROLE_FLOOR, "admin");
         assert!(is_admin_role(CLOUD_ROLE_FLOOR));
+    }
+
+    /// hub#351 (paso 2b): which base roles a module-declared role may hang from.
+    ///
+    /// The catalogue is the core's, so a manifest can neither redefine an entry of it nor hang a
+    /// role from the administrative one — the two halves of the same rule, derived from
+    /// [`BASE_ROLES`] and [`is_admin_role`] so a change to the catalogue cannot leave them behind.
+    #[test]
+    fn a_module_extends_the_base_catalogue_but_never_the_administrative_role() {
+        // The keys the core owns: the catalogue plus the legacy `owner` spelling.
+        for base in ["admin", "manager", "employee", "owner", "Admin", "EMPLOYEE"] {
+            assert!(is_base_role(base), "`{base}` is a key of the core");
+        }
+        for declared in ["waiter", "bartender", "kitchen", "accountant", ""] {
+            assert!(!is_base_role(declared), "`{declared}` is not a base role");
+        }
+
+        // What a declared role may extend: every base role EXCEPT the administrative one. A
+        // manifest that could hang from `admin` would mint administrators, which is exactly the
+        // door hub#347 closed.
+        for extendable in ["manager", "employee"] {
+            assert!(is_extendable_base_role(extendable));
+        }
+        for forbidden in ["admin", "owner", "ADMIN", "waiter", "member", ""] {
+            assert!(
+                !is_extendable_base_role(forbidden),
+                "`{forbidden}` cannot be the base of a declared role"
+            );
+        }
+        // Derived, not copied: whatever administers is never extendable.
+        assert!(!is_extendable_base_role(ADMIN_ROLE));
+        assert!(!is_extendable_base_role(CLOUD_ROLE_FLOOR));
     }
 
     #[test]

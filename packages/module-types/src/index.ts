@@ -9,6 +9,20 @@ export interface NavigationItem {
   component: string; // custom element a montar
 }
 
+/**
+ * A business role declared by a module (`roles[]`, paso 2b / hub#351). `extends` hangs it from a
+ * base role of the hub, which is what keeps the frozen `admin`/`manager`/`employee` contract
+ * intact. `admin` is NOT extendable: a manifest never grants administration of the hub (hub#347).
+ */
+export interface ModuleRole {
+  /** Stable identifier (`waiter`); the key `role_permissions` grants against. */
+  key: string;
+  /** Human name, canonical ENGLISH; translated in `locales/<lang>.json` (ADR-0055). */
+  label: string;
+  /** Base role it hangs from. */
+  extends: 'manager' | 'employee';
+}
+
 export interface ModuleManifest {
   id: string;
   name: string;
@@ -21,6 +35,11 @@ export interface ModuleManifest {
   static_files?: { folder: string; user_actions?: ('upload' | 'rename' | 'delete')[] };
   depends_on?: string[];
   permissions?: string[];
+  /**
+   * Business roles the module declares for its vertical (paso 2b, hub#351). Optional: the
+   * published catalogue does not carry it. Declaring NAMES a role; `role_permissions` GRANTS.
+   */
+  roles?: ModuleRole[];
   role_permissions?: Record<string, string[]>;
   navigation?: NavigationItem[];
   ui: { entry: string };

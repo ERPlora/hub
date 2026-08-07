@@ -72,8 +72,45 @@
       },
       "default": []
     },
+    "roles": {
+      "type": "array",
+      "default": [],
+      "description": "Business roles the module declares for its vertical (paso 2b, hub#351): restaurant → Waiter · Bartender · Kitchen · Cashier; salon → Receptionist · Stylist; both → Accountant. OPTIONAL: the ~24 published modules do not carry it and its absence invalidates nothing (no republish, no migration). The hub's base catalogue is FROZEN at three keys (`admin`/`manager`/`employee`) because renaming one would cost 24 repos and 24 republications, so a vertical does not rename the base: it adds on top of it. Declaring a role NAMES it; granting is `role_permissions`, and a role's effective permissions are the UNION of what the installed modules grant to that key — so a module may grant to a key another module declared (`sales` gives `waiter` `add_sale` but not `take_payment`). The Hub aggregates the roles of the installed modules into a catalogue and the administrator activates the ones the business needs (hub#352).",
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "extends"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "maxLength": 32,
+            "description": "Stable identifier of the role (`waiter`, `shift_lead`). It is the key `role_permissions` grants against and the value stored in `hub_user.role`: an identifier, not a label. It may NOT be one of the hub's base keys (`admin`/`manager`/`employee`, nor the legacy `owner` spelling): a module EXTENDS the base catalogue, it never redefines an entry of it."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Human name the administrator reads when activating the role. ALWAYS canonical ENGLISH (ADR-0055); the translation travels in `locales/<lang>.json`, like `navigation[].label`."
+          },
+          "extends": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "employee"
+            ],
+            "description": "Base role this one hangs from. It is what keeps the three-key contract intact: every declared role resolves to a base role, so the core gate and the 24 published modules keep working untouched. Only the base roles that do NOT administer the hub: `admin` (and its legacy `owner` spelling) is out on purpose — a `module.zip` is third-party input, and administering the hub comes from the hub itself (`HUB_OWNER_EMAIL`, ADR-0157) and from the floor the account role imposes at every login (hub#347), NEVER from a manifest. The runtime refuses to install a module that tries."
+          }
+        }
+      }
+    },
     "role_permissions": {
       "type": "object",
+      "description": "Permissions the module grants to each role key. The three base keys (`admin`/`manager`/`employee`) are the contract the 24 published modules already write against; a module may also grant to a key declared in `roles[]` — its own or another module's, since a role's effective permissions are the union of what the installed modules grant, so no module needs to know every role.",
       "additionalProperties": {
         "type": "array",
         "items": {
