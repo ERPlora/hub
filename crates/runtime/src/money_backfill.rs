@@ -42,10 +42,6 @@ use serde_json::json;
 use crate::errors::Result;
 use crate::registry::now_rfc3339;
 
-/// Tabla de metadatos de sistema del hub. Clave/valor, idempotente al crear.
-const ENSURE_META: &str = "CREATE TABLE IF NOT EXISTS _hub_meta (\
-    key TEXT PRIMARY KEY, value TEXT NOT NULL);";
-
 /// Clave del marcador "el dinero ya está en céntimos".
 const MONEY_UNIT_KEY: &str = "money_unit";
 const MONEY_UNIT_CENTS: &str = "cents";
@@ -128,10 +124,10 @@ pub struct BackfillReport {
     pub rows_updated: u64,
 }
 
-/// Asegura la tabla de metadatos (idempotente).
+/// Asegura la tabla de metadatos (idempotente). La DDL vive en [`crate::hub_meta`], que es el
+/// dueño de `_hub_meta` desde que hay más de un marcador que recordar (ADR-0212).
 pub async fn ensure_meta_table(db: &dyn DatabaseAdapter) -> Result<()> {
-    db.execute_batch(ENSURE_META).await?;
-    Ok(())
+    crate::hub_meta::ensure_table(db).await
 }
 
 /// `true` si el marcador `money_unit=cents` ya está puesto.

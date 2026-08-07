@@ -417,7 +417,7 @@ fn is_safe_entry(name: &str) -> bool {
 
 /// Abre el zip en memoria, valida TODAS las rutas (anti zip-slip) y devuelve el
 /// `BlueprintManifest` de `manifest.json` (con `schema_version` conocida). `Err(mensaje)` → 422.
-fn read_manifest(bytes: &[u8]) -> Result<export::BlueprintManifest, String> {
+pub(crate) fn read_manifest(bytes: &[u8]) -> Result<export::BlueprintManifest, String> {
     let mut archive =
         zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("zip inválido: {e}"))?;
     // Anti zip-slip: se validan TODAS las entradas ANTES de leer nada.
@@ -564,7 +564,7 @@ pub async fn import_blueprint(
     // función aparte y el borrado ocurre antes de devolver la respuesta.
     let result = run_import(
         &st,
-        &headers,
+        auth::hub_scoped_auth(&headers, &st),
         &bytes,
         req.selection.into_selection(),
         &data_hub_id,
@@ -579,9 +579,14 @@ pub async fn import_blueprint(
 
 /// El trabajo del import (sin el borrado del temporal, que garantiza el llamador).
 /// `Err(Response)` = respuesta de error ya formada.
-async fn run_import(
+///
+/// Toma la **credencial ya resuelta**, no las cabeceras: el import de arranque (ADR-0212, hub#406)
+/// entra por aquí **sin petición HTTP** —lo dispara `serve()` con el token de máquina— y sacar
+/// `hub_scoped_auth` fuera es lo que permite reusar este camino en vez de duplicarlo. `None` = hub
+/// sin credencial: los módulos del manifest no se pueden bajar y el informe lo dice.
+pub(crate) async fn run_import(
     st: &AppState,
-    headers: &HeaderMap,
+    cred: Option<cloud_client::Auth>,
     zip_bytes: &[u8],
     selection: ImportSelection,
     data_hub_id: &str,
@@ -619,7 +624,6 @@ async fn run_import(
     //     manifest). Best-effort: un fallo se registra y se sigue (estilo «migrate»).
     let mut installed_modules: Vec<Value> = Vec::new();
     if !manifest.modules.is_empty() {
-        let cred = auth::hub_scoped_auth(headers, st);
         let arc = st
             .runtime_for(&st.hub_id())
             .await
