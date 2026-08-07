@@ -145,7 +145,12 @@ Tauri vía `invoke` — ADR-0196; la **cola de impresión se muda al hub**, ADR-
 - **Cola de impresión + reintentos** (impresora apagada / sin papel) — la cola vive en el hub
   (ADR-0196 §6); el dispositivo la drena. **As-built (hub#341):** tabla `_print_queue` (migración
   de sistema v18) + `crates/runtime/src/print_queue.rs` + `POST/GET /api/print/jobs`, idempotente
-  por `jobId`. Falta quien la drene (hub#342/#343) y que `sdk.print` encole (hub#344). Diseño en
+  por `jobId`. **As-built (hub#342):** registro de **hosts** de impresión — tabla `_print_host`
+  (migración de sistema v19) + `crates/runtime/src/print_hosts.rs` + `/api/print/hosts`. Un rol
+  admite **varios** hosts y un equipo varios roles; la vivacidad **no se almacena**, se deriva del
+  último latido (sin noticias durante 3 latidos = no vivo), y el registro sobrevive al reinicio
+  porque es configuración, no sesión. `coverage` responde «cuánto espera y cuántos hosts vivos hay»
+  por rol. Falta el drenaje por el WS (hub#343) y que `sdk.print` encole (hub#344). Diseño en
   [architecture/hub/print-queue.md](../architecture/hub/print-queue.md).
 - **Enrutado por rol** (recibo vs cocina) cuando un terminal tiene varias configuradas.
 

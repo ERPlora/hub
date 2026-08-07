@@ -800,12 +800,25 @@ pub fn app(state: AppState) -> Router {
         .route("/api/query", post(query))
         .route("/api/command", post(command))
         // ── Print queue of the hub (ADR-0196 §6, hub#341) ───────────────────────────────────
-        // Enqueue `{jobId, role, html}` (idempotent by `jobId`) and observe the queue. Draining it
-        // — the print host over the runtime WS — is hub#342/#343. Auth = user session.
+        // Enqueue `{jobId, role, html}` (idempotent by `jobId`) and observe the queue. Drenarla
+        // por el WS del runtime es hub#343. Auth = sesión de usuario.
         .route(
             "/api/print/jobs",
             get(print::list_jobs).post(print::enqueue_job),
         )
+        // ── Registro de HOSTS de impresión (ADR-0196 §6, hub#342) ────────────────────────────
+        // Quién drena cada rol. Un dispositivo se registra/late/se retira A SÍ MISMO (el sujeto es
+        // su `X-Device-Id`, no hay parámetro para nombrar otro) → basta sesión de usuario: la app
+        // tiene que poder hacerlo al arrancar. La excepción es retirar el dispositivo de OTRO
+        // (la caja robada o sustituida), que pide sesión **admin**, como `/api/device/mode`.
+        // El `live` NO se almacena: se deriva del último latido — un equipo apagado no escribe.
+        .route(
+            "/api/print/hosts",
+            get(print::list_hosts)
+                .post(print::register_host)
+                .delete(print::retire_host),
+        )
+        .route("/api/print/hosts/heartbeat", post(print::host_heartbeat))
         // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────
         // Gestión de keys (auth = sesión admin owner/admin; NO una api key).
         .route(
