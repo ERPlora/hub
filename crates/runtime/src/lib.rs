@@ -16,6 +16,7 @@ pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
 pub mod commands;
+pub mod device_mode;
 pub mod e2e_support;
 pub mod error_registry;
 pub mod errors;
@@ -880,9 +881,28 @@ impl Runtime {
         identity::is_device_trusted(self.db.as_ref(), device_id).await
     }
 
-    /// Revoca la confianza de un dispositivo (perdido/robado). Idempotente (§2.9).
+    /// Revoca la confianza de un dispositivo (perdido/robado). Idempotente (§2.9). Se lleva con
+    /// ella el **modo** del dispositivo (hub#357): la fila borrada es donde vivía.
     pub async fn untrust_device(&self, device_id: &str) -> Result<()> {
         identity::untrust_device(self.db.as_ref(), device_id).await
+    }
+
+    /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
+    /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
+    pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {
+        device_mode::mode(self.db.as_ref(), device_id).await
+    }
+
+    /// Fija el modo de un dispositivo **ya conocido** (hub#357). `actor` = el `hub_user.id` que lo
+    /// decidió; la puerta HTTP exige sesión **admin**. Rechaza un `device_id` que el hub nunca vio:
+    /// esto registra una decisión sobre un dispositivo, no lo da de alta.
+    pub async fn set_device_mode(
+        &self,
+        device_id: &str,
+        mode: device_mode::DeviceMode,
+        actor: &str,
+    ) -> Result<()> {
+        device_mode::set_mode(self.db.as_ref(), device_id, mode, actor).await
     }
 
     /// Permisos de una **sesión** con ese rol: los de los módulos + el permiso del core
