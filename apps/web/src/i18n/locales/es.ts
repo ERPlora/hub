@@ -762,6 +762,8 @@ export default {
     statusIgnored: 'Descartado',
     statusFailed: 'Falló',
     mediaFailed: '{n} sin copiar',
+    reasonIdentityNotPortable:
+      'Los usuarios, roles y PIN son del hub que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso a tu hub.',
     done: 'Ir al inicio',
   },
   moduleView: {

@@ -549,6 +549,30 @@ export type SectionStatus = 'Applied' | 'Skipped' | { Failed: string } | { Ignor
 export interface SectionResult {
   section: string;
   status: SectionStatus;
+  /**
+   * Filas que el motor se negó a aplicar cuando descartó la sección (hub#331); 0 si no descartó
+   * nada. Ausente en informes de un runtime anterior al campo → se lee como 0.
+   */
+  discarded_rows?: number;
+}
+
+/**
+ * Motivos de descarte que el runtime emite como **código estable** (hub#331): la frase la pone el
+ * shell traducida (inglés fuente + su `es`), no el runtime. Los descartes anteriores viajan como
+ * prosa y se pintan tal cual, así que hay que distinguir unos de otros — traducir es SUSTITUIR el
+ * texto, y sustituir lo que no es un código borraría el motivo.
+ */
+export const SECTION_DISCARD_CODES = ['identity_not_portable'] as const;
+
+/** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */
+export type SectionDiscardCode = (typeof SECTION_DISCARD_CODES)[number];
+
+/** El código estable de un motivo de descarte, o `null` si es prosa heredada (o no hay motivo). */
+export function sectionDiscardCode(reason: string | undefined): SectionDiscardCode | null {
+  const code = reason?.trim() ?? '';
+  return (SECTION_DISCARD_CODES as readonly string[]).includes(code)
+    ? (code as SectionDiscardCode)
+    : null;
 }
 
 /** Resultado de la copia de media, que hace el SERVER (no el motor del runtime). */

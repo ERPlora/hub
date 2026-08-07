@@ -761,6 +761,10 @@ export default {
     statusIgnored: 'Discarded',
     statusFailed: 'Failed',
     mediaFailed: '{n} not copied',
+    // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
+    // identity of ONE hub: only that hub restoring its own backup gets them back.
+    reasonIdentityNotPortable:
+      'Users, roles and PINs belong to the hub that created them. Accounts discarded: {n}. Nobody was given access to your hub.',
     done: 'Go to home',
   },
   moduleView: {
