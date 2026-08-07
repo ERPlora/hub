@@ -764,6 +764,12 @@ export default {
     statusIgnored: 'Discarded',
     statusPartial: 'Applied in part',
     statusFailed: 'Failed',
+    // hub#409 / ADR-0060 — the module was not installed because the plan needs a dependency that
+    // is not subscribed to. It is a purchase decision, not a breakage: it says what to subscribe
+    // to (with the price the engine sent), never a mute red cross.
+    statusBlocked: 'Subscription required',
+    reasonBlocked:
+      'Not installed: it needs modules you have not subscribed to yet: {missing}. Subscribe to them and import again — nothing else was touched.',
     mediaFailed: '{n} not copied',
     // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
     // identity of ONE hub: only that hub restoring its own backup gets them back.

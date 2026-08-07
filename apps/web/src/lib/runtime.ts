@@ -608,13 +608,65 @@ export interface ImportReport {
   installed_modules?: ModuleInstallResult[];
 }
 
+/**
+ * Where to subscribe to a module that BLOCKS an install, as the engine serializes it inside
+ * `installed_modules[]` (wire shape, snake_case — `module_install_entry` in `export_import.rs`).
+ * The Hub never charges by itself: it only shows the price and where to go.
+ */
+export interface ModuleInstallPurchase {
+  module_id: string;
+  module_type?: string;
+  price?: string;
+  currency?: string;
+  purchase_url?: string;
+}
+
 /** Resultado del import para un módulo del manifest (best-effort: uno roto no aborta el resto). */
 export interface ModuleInstallResult {
   id: string;
   version: string;
-  status: 'installed' | 'already_installed' | 'failed';
+  /**
+   * `blocked` (ADR-0060) is a state of ITS OWN, not a `failed`: the module was not installed
+   * because the plan requires subscribing to a dependency — a purchase decision, not a breakage.
+   */
+  status: 'installed' | 'already_installed' | 'blocked' | 'failed';
+  /** Stable engine code (hub#139): `install_blocked` on `blocked`, the failure code on `failed`. */
+  code?: string;
+  /** Modules that have to be subscribed to first — only on `blocked`. */
+  blocked_on?: string[];
+  /** Where to subscribe to each blocking module — only on `blocked`. */
+  purchase?: ModuleInstallPurchase[];
   /** Motivo real del motor — solo en `failed`. */
   error?: string;
+}
+
+/** Estado normalizado de UN módulo del informe de import, listo para pintar. */
+export interface ModuleInstallStatusInfo {
+  kind: 'installed' | 'already_installed' | 'blocked' | 'failed';
+  /** Qué hay que contratar antes de reintentar — solo en `blocked`. */
+  blockedOn: string[];
+  /** Precio y enlace de cada módulo que bloquea — solo en `blocked`. */
+  purchase: ModuleInstallPurchase[];
+  /** Motivo del motor — solo en `failed`. */
+  error?: string;
+}
+
+/**
+ * Normaliza una entrada de `installed_modules[]` a un shape estable para la UI.
+ *
+ * El shell solo conocía tres estados, así que el `"status": "blocked"` del motor caía al fallback
+ * de fallo y un módulo que solo faltaba CONTRATAR se pintaba como un ✗ rojo y mudo (hub#409).
+ * Una forma desconocida sí cae a `failed` —misma regla de honestidad que `sectionStatusInfo`—:
+ * jamás se inventa un éxito.
+ */
+export function moduleInstallStatusInfo(m: ModuleInstallResult): ModuleInstallStatusInfo {
+  if (m.status === 'installed' || m.status === 'already_installed') {
+    return { kind: m.status, blockedOn: [], purchase: [] };
+  }
+  if (m.status === 'blocked') {
+    return { kind: 'blocked', blockedOn: m.blocked_on ?? [], purchase: m.purchase ?? [] };
+  }
+  return { kind: 'failed', blockedOn: [], purchase: [], error: m.error };
 }
 
 /** Estado normalizado de una sección del informe, listo para pintar. */
