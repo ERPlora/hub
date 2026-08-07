@@ -15,6 +15,10 @@
 // * **⛔ is not a strong recommendation.** It is the statement that the runtime REJECTS the
 //   operation (ADR-0203's fiscal gate). Softened, it promises a protection that does not exist;
 //   painted on a 🟡, it promises a gate that will never fire.
+// * **A wall the user cannot bring down is said, not assigned** (hub#435). The runtime keeps a ⛔ on
+//   the list of a session that cannot clear it, because the refusal is going to land on THEM. The
+//   assistant names it and names who can fix it; it never offers to do it and never sends them to
+//   the screen that would refuse them.
 // * **Nothing is invented and nothing is re-filtered.** The list is closed: an item that is not in
 //   the document does not exist, and one the query returned is not for this layer to hide.
 import {
@@ -47,13 +51,24 @@ export interface BriefingOptions {
 }
 
 /**
- * The items the assistant may hand over as something to do: **the pending ones and nothing else.**
+ * The items the assistant may hand over as something to do: **pending and this session's.**
  *
- * A `done` has nothing left, and an `unavailable` has nothing the user can do at all — offering it
- * would have the model invent a way to complete something that cannot be completed.
+ * A `done` has nothing left; an `unavailable` has nothing the user can do at all; and one that is
+ * not `actionable` (hub#435) is somebody else's to type — offering any of them would have the model
+ * invent a way to finish something that will be refused, or refuse itself.
  */
 export function assistantTasks(status: SetupStatus | null): SetupItem[] {
-  return (status?.items ?? []).filter((i) => i.state === STATE_PENDING);
+  return (status?.items ?? []).filter((i) => i.state === STATE_PENDING && i.actionable);
+}
+
+/**
+ * The walls the user cannot bring down themselves: ⛔ and pending, but not theirs (hub#435).
+ *
+ * They are in the document precisely because the runtime is going to refuse THIS session, so they
+ * are said out loud — with who can clear them — and never handed over as a task.
+ */
+function delegatedItems(status: SetupStatus | null): SetupItem[] {
+  return (status?.items ?? []).filter((i) => i.state === STATE_PENDING && !i.actionable);
 }
 
 /**
@@ -79,6 +94,12 @@ export function setupBriefing(status: SetupStatus | null, opts: BriefingOptions)
   if (focus) blocks.push(focusBlock(focus, tr));
 
   blocks.push(todoBlock(status, tr));
+
+  const delegated = delegatedItems(status);
+  if (delegated.length) {
+    const lines = delegated.map((i) => `- ${title(i, tr)}${levelNote(i)}`).join('\n');
+    blocks.push(`${NOT_THEIRS_HEADING}\n${lines}`);
+  }
 
   const broken = items.filter((i) => i.state === STATE_UNAVAILABLE);
   if (broken.length) {
@@ -107,6 +128,16 @@ const RULES = [
 const ON_US_HEADING = "ON US — not the user's task: never offer these, and never name a screen for them.";
 const ON_US_REASON = 'we cannot offer this yet; it is our breakdown to fix, not their job.';
 
+/**
+ * The heading for the walls that are not theirs (hub#435).
+ *
+ * Deliberately NOT the "on us" one: nothing of ours is broken, so promising a fix from us would have
+ * the user wait for something that is never coming. It names **who** can clear it — an administrator
+ * of the hub — because a wall with no owner is the dead end the strip and the card also refuse to be.
+ */
+const NOT_THEIRS_HEADING =
+  'BLOCKING, BUT NOT THE USER’S TO DO — an administrator of this hub has to set these up. Say what they block and who can clear them, do NOT offer to do them, and do NOT name a screen for them.';
+
 /** The opening: which item the chat was opened on, said before the list so it never opens blank. */
 function focusBlock(item: SetupItem, tr?: Translator): string {
   const name = `THE USER IS ASKING ABOUT «${title(item, tr)}»`;
@@ -116,20 +147,34 @@ function focusBlock(item: SetupItem, tr?: Translator): string {
   if (item.state === STATE_DONE) {
     return `${name} — and it is already done: confirm it and offer to review it, do not ask for it again.`;
   }
+  if (!item.actionable) {
+    return `${name} — and it is NOT THEIRS to do (see below): say what it blocks and who can clear it, do not offer to do it and do not name a screen for it.`;
+  }
   return `${name} — open on it: what it is, why it matters and how to finish it. Do not open with the whole list.`;
 }
 
-/** What is left for the USER, with the counters the query computed (never a recount of these lines). */
+/**
+ * What is left for the USER.
+ *
+ * The ⛔ figure is the query's (`blocking_pending`) — that one is a fact about the runtime and
+ * re-deriving it is the divergence hub#369 closed. The first number is the length of the list that
+ * follows, which since hub#435 can be shorter than `pending`: the walls that are not theirs are
+ * pending for the hub but are not lines here, and a header that counted them would have the model
+ * announce a task it then cannot name.
+ */
 function todoBlock(status: SetupStatus, tr?: Translator): string {
   const tasks = assistantTasks(status);
   if (tasks.length === 0) {
+    if (delegatedItems(status).length > 0) {
+      return 'STILL TO DO: nothing the user can do themselves — what is left is below and belongs to an administrator.';
+    }
     return status.unavailable > 0
       ? 'STILL TO DO: nothing the user can do right now.'
       : 'STILL TO DO: nothing — every item of the checklist is done.';
   }
   const blocking = status.blockingPending > 0 ? ` · blocking invoicing: ${status.blockingPending}` : '';
   const lines = tasks.map((item, i) => taskLines(item, i + 1, tr)).join('\n');
-  return `STILL TO DO (${status.pending} of ${status.total}${blocking}):\n${lines}`;
+  return `STILL TO DO (${tasks.length} of ${status.total}${blocking}):\n${lines}`;
 }
 
 /** One task: what it is, what it costs to skip it, where it is done and how. */

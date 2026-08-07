@@ -132,6 +132,9 @@ export default {
     // The third state: OUR breakdown, not the user's task. It must not read as a chore.
     unavailableLabel: 'Not available yet',
     unavailableHint: 'This one is on us: there is nothing on your side to do yet. We are on it.',
+    // A wall that is not yours to bring down (hub#435). It says WHO can — not the name of a
+    // permission — because a blocker with no owner leaves the user with nowhere to go.
+    delegatedHint: 'An administrator of this hub has to set this up.',
     completeTitle: 'Your hub is ready',
     completeBody: 'Everything on the checklist is done.',
     // The blocking strip (hub#374): the surface for the screens the checklist is not on. It says the
