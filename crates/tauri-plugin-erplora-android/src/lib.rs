@@ -23,6 +23,16 @@ use tauri::{
 /// Estado de un permiso tal y como lo ve la PWA: `{ "android.permission.X": true }`.
 pub type PermissionStatus = std::collections::HashMap<String, bool>;
 
+/// Local network access (API 37+). Without it the printer sweep is 254 silent timeouts.
+///
+/// Mirror of `PermissionPolicy.ACCESS_LOCAL_NETWORK` on the Kotlin side. The key of the map above
+/// **is** the permission string, so Rust needs the same literal to read the answer — and a test
+/// below checks the two never drift apart.
+pub const ACCESS_LOCAL_NETWORK: &str = "android.permission.ACCESS_LOCAL_NETWORK";
+
+/// System notifications (API 33+). Mirror of `PermissionPolicy.POST_NOTIFICATIONS`.
+pub const POST_NOTIFICATIONS: &str = "android.permission.POST_NOTIFICATIONS";
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("{0}")]
@@ -126,6 +136,23 @@ mod tests {
         estado.insert("android.permission.POST_NOTIFICATIONS".into(), true);
         let json = serde_json::to_string(&estado).unwrap();
         assert!(json.contains("\"android.permission.POST_NOTIFICATIONS\":true"));
+    }
+
+    /// The Kotlin policy is the only place that can actually ASK for these permissions, and the
+    /// map it returns is keyed by the raw string. If the two sides ever spelled one differently,
+    /// Rust would read `None` for a permission Android had denied and the till would go back to
+    /// reporting zero printers with a straight face (hub#338).
+    const PERMISSION_POLICY_KT: &str =
+        include_str!("../android/src/main/java/com/erplora/android/PermissionPolicy.kt");
+
+    #[test]
+    fn rust_and_kotlin_spell_the_permissions_the_same_way() {
+        for permission in [ACCESS_LOCAL_NETWORK, POST_NOTIFICATIONS] {
+            assert!(
+                PERMISSION_POLICY_KT.contains(permission),
+                "{permission} is not in PermissionPolicy.kt — the status map would never mention it"
+            );
+        }
     }
 
     #[test]

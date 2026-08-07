@@ -8,6 +8,9 @@ import {
   ErploraError,
   createClient,
   BridgeClient,
+  IpcBridgeTransport,
+  LocalNetworkPermissionDeniedError,
+  LOCAL_NETWORK_PERMISSION_DENIED,
   eurosToCents,
   centsToEuros,
   majorToMinor,
@@ -286,6 +289,104 @@ test('BridgeClient acepta un getter de token (se relee tras emparejar, sin recre
   assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws?token=later-token');
   driveBridge({ event: 'printers', printers: [] });
   await p;
+});
+
+// ── hub#338: «no encuentro impresoras» ≠ «no me dejan buscarlas» ────────────────────────
+//
+// Las dos llegaban aquí como el MISMO array vacío, y son instrucciones opuestas para el usuario:
+// «conecta una impresora» frente a «dale permiso a la app». El transporte de invoke ya recibe el
+// outcome con su `status`; lo que se prueba aquí es que el consumidor pueda distinguirlos —
+// resolver [] en el caso bloqueado sería exactamente el bug.
+
+/** Shell Tauri de mentira: responde lo que se le diga a `erplora_discover_printers`. */
+function fakeShell(discovery: unknown) {
+  const calls: string[] = [];
+  const tauri = {
+    invoke: async (cmd: string) => {
+      calls.push(cmd);
+      if (cmd === 'erplora_discover_printers') return discovery;
+      return {};
+    },
+    listen: async () => () => {},
+  };
+  return { transport: new IpcBridgeTransport(tauri), calls };
+}
+
+const A_PRINTER = {
+  id: 'network:192.168.1.50:9100',
+  name: 'Cocina',
+  type: 'network',
+  status: 'ready',
+  paper_width: 80,
+};
+
+test('descubrimiento con permiso: devuelve la lista tal cual', async () => {
+  const { transport } = fakeShell({ status: 'scanned', printers: [A_PRINTER] });
+  assert.deepEqual(await transport.discoverPrinters(), [A_PRINTER]);
+});
+
+test('descubrimiento con permiso y sin impresoras: un CERO honesto, no un error', async () => {
+  // Buscamos y no hay nada. Eso es una respuesta: el módulo enseña su estado vacío de siempre.
+  const { transport } = fakeShell({ status: 'scanned', printers: [] });
+  assert.deepEqual(await transport.discoverPrinters(), []);
+});
+
+test('descubrimiento SIN permiso: rechaza con un error propio en vez de resolver []', async () => {
+  const { transport } = fakeShell({
+    status: LOCAL_NETWORK_PERMISSION_DENIED,
+    permission: 'android.permission.ACCESS_LOCAL_NETWORK',
+  });
+
+  await assert.rejects(
+    () => transport.discoverPrinters(),
+    (e: unknown) => {
+      assert.ok(
+        e instanceof LocalNetworkPermissionDeniedError,
+        'el consumidor tiene que poder distinguirlo por tipo, no leyendo el texto',
+      );
+      assert.equal(e.code, LOCAL_NETWORK_PERMISSION_DENIED);
+      assert.equal(e.permission, 'android.permission.ACCESS_LOCAL_NETWORK');
+      return true;
+    },
+  );
+});
+
+test('un shell de escritorio VIEJO devuelve el array pelado y sus impresoras no se pierden', async () => {
+  // La app de escritorio es un binario INSTALADO y la PWA se sirve del hub: pueden ir desfasados.
+  // Leerle `.printers` a un array daría [] — esconder impresoras encontradas, la misma mentira
+  // mirando al otro lado.
+  const { transport } = fakeShell([A_PRINTER]);
+  assert.deepEqual(await transport.discoverPrinters(), [A_PRINTER]);
+});
+
+test('el bridge WS también distingue: `error` con el code del permiso', async () => {
+  const c = new BridgeClient(undefined, {
+    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
+  });
+  const p = c.discoverPrinters();
+  driveBridge({
+    event: 'error',
+    code: LOCAL_NETWORK_PERMISSION_DENIED,
+    message: 'the OS denies access to the local network',
+  });
+
+  await assert.rejects(p, (e: unknown) => e instanceof LocalNetworkPermissionDeniedError);
+});
+
+test('un error CUALQUIERA del bridge sigue siendo un Error normal', async () => {
+  // Solo el permiso cambia de tipo: un fallo de transporte no debe mandar al usuario a los
+  // ajustes del sistema a tocar un permiso que ya tiene.
+  const c = new BridgeClient(undefined, {
+    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
+  });
+  const p = c.discoverPrinters();
+  driveBridge({ event: 'error', code: 'peripheral_error', message: 'impresora inalcanzable' });
+
+  await assert.rejects(p, (e: unknown) => {
+    assert.ok(e instanceof Error);
+    assert.ok(!(e instanceof LocalNetworkPermissionDeniedError));
+    return true;
+  });
 });
 
 // ── La frontera EUROS ↔ CÉNTIMOS (ADR-0123) ─────────────────────────────────────────────

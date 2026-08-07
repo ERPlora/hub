@@ -4,7 +4,7 @@
 //   - Shell Tauri de escritorio → `IpcBridgeTransport` (invoke in-process: el shell ES el bridge,
 //     sin servidor WS ni token de emparejamiento).
 // Antes de 0159 la selección NUNCA estuvo cableada: getClient() construía siempre el WS.
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { tauriMode, invokeSpy } = vi.hoisted(() => ({
   tauriMode: { value: false },
@@ -18,9 +18,15 @@ vi.mock('./device', () => ({
   invokeTauri: invokeSpy,
 }));
 
-import { BridgeClient, IpcBridgeTransport } from '@erplora/module-sdk';
+import {
+  BridgeClient,
+  IpcBridgeTransport,
+  LOCAL_NETWORK_PERMISSION_DENIED,
+  LocalNetworkPermissionDeniedError,
+} from '@erplora/module-sdk';
 
 import { makeBridgeTransport } from './bridge-transport';
+import { printerDiscoveryMessage } from './printer-discovery';
 
 describe('ADR-0159: selección del transporte de hardware', () => {
   it('web pura → BridgeClient (WS a localhost:12321)', () => {
@@ -120,10 +126,69 @@ describe('permisos de runtime antes de tocar el hardware', () => {
     invokeSpy.mockClear();
     invokeSpy.mockImplementation(async (cmd: string) => {
       if (cmd === 'plugin:erplora-android|request_permissions') throw new Error('denegado');
-      return [];
+      return { status: 'scanned', printers: [] };
     });
     const transport = makeBridgeTransport();
 
     await expect(transport.discoverPrinters()).resolves.toEqual([]);
+  });
+});
+
+// ── hub#338: el shell le pone PALABRAS al estado ────────────────────────────────────────────
+//
+// El runtime ya distingue «no hay impresoras» de «no me dejan buscarlas», pero eso solo sirve si
+// llega a la pantalla como una frase que dice qué HACER. El shell es quien tiene i18n, así que es
+// quien la pone: cualquier módulo que ya enseñaba `error.message` acierta sin tocar una línea.
+describe('el escaneo bloqueado llega al usuario como una frase, no como una lista vacía', () => {
+  beforeEach(() => {
+    tauriMode.value = true;
+    invokeSpy.mockClear();
+    invokeSpy.mockImplementation(async () => ({ status: 'scanned', printers: [] }));
+  });
+
+  it('permiso denegado → rechaza con la frase de «dale permiso», no con []', async () => {
+    invokeSpy.mockImplementation(async (cmd: string) => {
+      if (cmd === 'erplora_discover_printers') {
+        return {
+          status: LOCAL_NETWORK_PERMISSION_DENIED,
+          permission: 'android.permission.ACCESS_LOCAL_NETWORK',
+        };
+      }
+      return {};
+    });
+    const transport = makeBridgeTransport();
+
+    await expect(transport.discoverPrinters()).rejects.toThrow(LocalNetworkPermissionDeniedError);
+    await expect(transport.discoverPrinters()).rejects.toThrow(
+      printerDiscoveryMessage('permission_denied'),
+    );
+  });
+
+  it('el permiso denegado conserva su nombre: la frase señala UN interruptor', async () => {
+    invokeSpy.mockImplementation(async () => ({
+      status: LOCAL_NETWORK_PERMISSION_DENIED,
+      permission: 'android.permission.ACCESS_LOCAL_NETWORK',
+    }));
+    const transport = makeBridgeTransport();
+
+    await transport.discoverPrinters().then(
+      () => expect.fail('un escaneo bloqueado no puede resolver'),
+      (e: unknown) => {
+        expect(e).toBeInstanceOf(LocalNetworkPermissionDeniedError);
+        expect((e as LocalNetworkPermissionDeniedError).permission).toBe(
+          'android.permission.ACCESS_LOCAL_NETWORK',
+        );
+      },
+    );
+  });
+
+  it('cero impresoras CON permiso sigue resolviendo []: es una respuesta, no un fallo', async () => {
+    const transport = makeBridgeTransport();
+    await expect(transport.discoverPrinters()).resolves.toEqual([]);
+  });
+
+  it('envolver el transporte no cambia cuál es (sigue siendo el de Tauri)', async () => {
+    // El contrato de ADR-0159 se decide por `instanceof`; ponerle copy no puede romperlo.
+    expect(makeBridgeTransport()).toBeInstanceOf(IpcBridgeTransport);
   });
 });

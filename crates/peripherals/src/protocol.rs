@@ -67,7 +67,7 @@ pub enum Event {
 }
 
 /// Info estandarizada de una impresora (espejo de `printer_info()` en Python).
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct PrinterInfo {
     /// `network:{ip}:{port}`.
     pub id: String,

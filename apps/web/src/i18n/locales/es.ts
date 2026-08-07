@@ -894,4 +894,14 @@ export default {
       past_due: 'Hay un pago pendiente en tu suscripción.',
     },
   },
+
+  // Hardware (impresoras, cajón). Las dos frases de abajo son el motivo de hub#338: un escaneo
+  // puede acabar sin impresoras por dos razones OPUESTAS, y cada una le pide al usuario una cosa
+  // distinta. Enseñar la que no toca le manda a arreglar algo que nunca estuvo roto.
+  hardware: {
+    printersBlocked:
+      'ERPlora no ha podido buscar en esta red: el sistema no le ha dado permiso a la app para acceder a los dispositivos de la red local. Concédele el acceso a la red local a ERPlora en los ajustes del dispositivo y vuelve a buscar.',
+    printersNone:
+      'No se ha encontrado ninguna impresora en esta red. Comprueba que la impresora está encendida y conectada a la misma red que este dispositivo, y vuelve a buscar.',
+  },
 } as const;

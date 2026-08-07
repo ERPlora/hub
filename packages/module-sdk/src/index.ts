@@ -859,6 +859,57 @@ export interface BridgeStatus {
 }
 
 /**
+ * El `status`/`code` de «el SO bloqueó el escaneo». Un solo literal para los dos transportes
+ * (invoke y WS), espejo de `discovery::LOCAL_NETWORK_PERMISSION_DENIED` en `crates/peripherals`.
+ */
+export const LOCAL_NETWORK_PERMISSION_DENIED = 'local_network_permission_denied';
+
+/**
+ * Resultado de un descubrimiento tal y como viaja por el cable. Espejo de `PrinterDiscovery`
+ * (`crates/peripherals/src/discovery.rs`).
+ */
+export type PrinterDiscoveryResult =
+  | { status: 'scanned'; printers: BridgePrinter[] }
+  | { status: typeof LOCAL_NETWORK_PERMISSION_DENIED; permission?: string };
+
+/**
+ * El SO no da acceso a la red local, así que el escaneo NUNCA llegó a correr.
+ *
+ * Se rechaza en vez de resolver un array vacío a propósito: `printers.length === 0` significaba
+ * dos cosas opuestas —«conecta una impresora» y «dale permiso a la app»— y quien llamaba no tenía
+ * forma de distinguirlas. Rechazando, todo estado vacío que ya existía sigue siendo honesto sin
+ * tocarlo, y quien quiera puede leer `permission` para señalar el interruptor exacto.
+ */
+export class LocalNetworkPermissionDeniedError extends Error {
+  readonly code = LOCAL_NETWORK_PERMISSION_DENIED;
+  /** El permiso que el SO denegó, si el transporte lo nombra (el WS del bridge no lo lleva). */
+  readonly permission?: string;
+
+  constructor(permission?: string, message?: string) {
+    super(message || `local network access denied${permission ? ` (${permission})` : ''}`);
+    this.name = 'LocalNetworkPermissionDeniedError';
+    this.permission = permission;
+  }
+}
+
+/**
+ * Desenvuelve el outcome: la lista si el escaneo corrió, un rechazo tipado si no llegó a correr.
+ * Nunca convierte «bloqueado» en «vacío» — es justo el paso donde se perdía la diferencia.
+ *
+ * Acepta también el array pelado, y no por cortesía: la app de escritorio es un **binario
+ * instalado** y la PWA que carga se sirve del hub, así que un shell viejo puede seguir devolviendo
+ * `BridgePrinter[]`. Leerle un `.printers` inexistente daría `[]` — o sea, esconder impresoras que
+ * SÍ se encontraron, la misma mentira mirando al otro lado.
+ */
+export function printersOrThrow(outcome: PrinterDiscoveryResult | BridgePrinter[]): BridgePrinter[] {
+  if (Array.isArray(outcome)) return outcome;
+  if (outcome?.status === LOCAL_NETWORK_PERMISSION_DENIED) {
+    throw new LocalNetworkPermissionDeniedError(outcome.permission);
+  }
+  return outcome?.printers ?? [];
+}
+
+/**
  * Transporte de hardware (periféricos) — abstracción intercambiable, igual que `ErploraTransport`
  * para los datos. El shell elige la implementación según Axis B (web-PWA → `WsBridgeTransport`
  * sobre `ws://localhost`; Tauri → `IpcBridgeTransport` sobre `invoke`). Los módulos consumen esto
@@ -947,6 +998,21 @@ export class BridgeClient implements BridgeTransport {
     }
   }
 
+  /**
+   * El rechazo que corresponde a una frame `error` del bridge.
+   *
+   * El `code` del protocolo es lo único estable que trae: por él se distingue «el SO no me deja
+   * mirar la red» de un fallo cualquiera de hardware, que le pide al usuario cosas distintas
+   * (tocar un permiso vs revisar la impresora). Leerlo del texto sería adivinar (hub#338).
+   */
+  private bridgeErrorFor(msg: Record<string, unknown>, event: string): Error {
+    const message = (msg.error as string) || (msg.message as string) || event;
+    if (msg.code === LOCAL_NETWORK_PERMISSION_DENIED) {
+      return new LocalNetworkPermissionDeniedError(msg.permission as string | undefined, message);
+    }
+    return new Error(message);
+  }
+
   /** Abre el WS, envía una acción y resuelve con el primer evento de `resolveOn`. */
   private request(
     action: Record<string, unknown>,
@@ -981,7 +1047,7 @@ export class BridgeClient implements BridgeTransport {
         }
         const event = msg.event as string;
         if (rejectOn.includes(event)) {
-          done(() => reject(new Error((msg.error as string) || (msg.message as string) || event)));
+          done(() => reject(this.bridgeErrorFor(msg, event)));
         } else if (resolveOn.includes(event)) {
           done(() => resolve(msg));
         }
@@ -991,7 +1057,13 @@ export class BridgeClient implements BridgeTransport {
     });
   }
 
-  /** Re-escanea la red (subred 9100 + mDNS) y devuelve las impresoras. */
+  /**
+   * Re-escanea la red (subred 9100 + mDNS) y devuelve las impresoras.
+   *
+   * Un `error` del bridge RECHAZA (por el `rejectOn` por defecto de `request`), y desde hub#338 lo
+   * hace con el tipo correcto: un `code` de permiso denegado llega como
+   * {@link LocalNetworkPermissionDeniedError}, no como un `Error` cualquiera.
+   */
   async discoverPrinters(): Promise<BridgePrinter[]> {
     const r = await this.request({ action: 'discover_printers' }, ['printers']);
     return (r.printers as BridgePrinter[]) ?? [];
@@ -1097,9 +1169,17 @@ export class IpcBridgeTransport implements BridgeTransport {
     }
   }
 
+  /**
+   * Re-escanea la red. Rechaza con {@link LocalNetworkPermissionDeniedError} si el SO no dio
+   * permiso: ahí no hay lista vacía que devolver, hay una razón — y una lista vacía mandaría al
+   * usuario a buscar una impresora que lleva encendida todo el rato (hub#338).
+   */
   async discoverPrinters(): Promise<BridgePrinter[]> {
     await this.ensurePermissions();
-    return this.tauri.invoke('erplora_discover_printers', {}) as Promise<BridgePrinter[]>;
+    const outcome = (await this.tauri.invoke('erplora_discover_printers', {})) as
+      | PrinterDiscoveryResult
+      | BridgePrinter[];
+    return printersOrThrow(outcome);
   }
 
   getDevices(): Promise<BridgeDevice[]> {
