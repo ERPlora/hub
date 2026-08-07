@@ -109,6 +109,46 @@ pub async fn list_roles(State(st): State<AppState>, headers: HeaderMap) -> Respo
     }
 }
 
+/// Cuerpo de `PUT /api/hub/roles/{key}`: encender o apagar un rol del catálogo.
+#[derive(serde::Deserialize)]
+pub struct RoleActivation {
+    pub active: bool,
+}
+
+/// PUT /api/hub/roles/{key} — activa o desactiva en ESTE hub un rol declarado por un módulo
+/// (paso 2b, hub#352). Devuelve el catálogo ya actualizado.
+///
+/// Auth = sesión **admin**, igual que ajustes, ficheros, API keys y el ciclo de vida de módulos:
+/// decidir qué roles existen en el negocio es administrarlo. Leerlo (`GET`) sigue siendo cualquier
+/// sesión — los nombres de rol ya son públicos en el grid de PIN del login.
+///
+/// El runtime rechaza (422) tanto un rol **base** (siempre activo, no se apaga) como una clave que
+/// **ningún módulo instalado declara**: esta puerta activa lo que hay en el catálogo, no inventa
+/// roles nuevos.
+pub async fn set_role_activation(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(key): Path<String>,
+    Json(input): Json<RoleActivation>,
+) -> Response {
+    let arc = match runtime(&st).await {
+        Ok(arc) => arc,
+        Err(response) => return response,
+    };
+    let rt = arc.lock().await;
+    let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
+        Ok(user) => user,
+        Err(e) => return unauthorized(e),
+    };
+    if let Err(e) = rt.set_role_active(&key, input.active, &admin.id).await {
+        return crate::err_response(e);
+    }
+    match rt.list_hub_roles().await {
+        Ok(roles) => ok(roles),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 /// POST /api/hub/users — alta `{name, email?, role, pin?}`. Auth = sesión admin.
 pub async fn create_user(
     State(st): State<AppState>,

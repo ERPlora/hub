@@ -12,6 +12,7 @@
 //   PUT    /api/hub/users/{id}   → HubUser     (sesión owner/admin; parcial)
 //   DELETE /api/hub/users/{id}   → HubUser     (sesión owner/admin; baja = desactivar)
 //   GET    /api/hub/roles        → HubRole[]   (cualquier sesión de usuario)
+//   PUT    /api/hub/roles/{key}  → HubRole[]   (sesión owner/admin; `{active}` — hub#352)
 //
 // Mismo transporte que el resto del shell (`runtime.ts`): mismo origen + `runtimeHeaders()`.
 
@@ -33,9 +34,25 @@ export interface HubUser {
   created_at: string;
 }
 
-/** Un rol del hub: catálogo base del core ∪ roles de los módulos activos ∪ roles en uso. */
+/** De dónde sale un rol del catálogo (hub#352). */
+export type HubRoleSource =
+  /** Rol base del core (`admin`/`manager`/`employee`): siempre en el catálogo y siempre activo. */
+  | { kind: 'core' }
+  /** Declarado en el `roles[]` de un módulo instalado y activo. */
+  | { kind: 'module'; module_id: string }
+  /** Ya no lo declara nadie, pero algún usuario todavía lo lleva (módulo desinstalado). */
+  | { kind: 'in_use' };
+
+/** Un rol del hub: catálogo base del core ∪ roles que declaran los módulos activos ∪ roles en uso. */
 export interface HubRole {
   name: string;
+  /** Etiqueta legible en **inglés canónico** (ADR-0055); la traducción va por i18n. */
+  label: string;
+  /** Rol base del que cuelga. Un rol base cuelga de sí mismo; uno huérfano, de nada. */
+  extends: string;
+  source: HubRoleSource;
+  /** ¿Está vivo en ESTE hub? Los base, siempre; los declarados, solo si el admin los activó. */
+  active: boolean;
   /** Permisos efectivos que concede (unión de `role_permissions` de los módulos activos). */
   permissions: number;
   /** Usuarios activos con ese rol. */

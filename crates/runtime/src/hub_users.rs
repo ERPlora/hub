@@ -13,10 +13,10 @@
 //!    él, con su email del perfil (`hub_user_profile`).
 //!  - La baja es **desactivar** (`is_active = 0`), nunca borrar: las sesiones, la auditoría
 //!    (`created_by`/`updated_by`) y el historial de ventas apuntan a ese id.
-//!  - Los **roles** son del core: catálogo base ([`BASE_ROLES`]) ∪ los roles que declaran los
-//!    módulos activos (`role_permissions`) ∪ los que ya usa algún usuario.
-use std::collections::BTreeSet;
-
+//!  - Los **roles** son del core y salen del catálogo agregado ([`crate::roles`], hub#352):
+//!    catálogo base ([`BASE_ROLES`]) ∪ los roles que **declaran** (`roles[]`) los módulos activos
+//!    ∪ los que aún carga algún usuario y ya no declara nadie. Aquí solo se decoran con sus
+//!    permisos efectivos y sus miembros.
 use erplora_db::{DatabaseAdapter, Params};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -150,6 +150,14 @@ pub struct HubUserRow {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct HubRole {
     pub name: String,
+    /// Etiqueta legible (inglés canónico).
+    pub label: String,
+    /// Rol base del que cuelga.
+    pub extends: String,
+    /// De dónde sale el rol.
+    pub source: crate::roles::RoleSource,
+    /// ¿Está activo en ESTE hub?
+    pub active: bool,
     /// Permisos efectivos = unión de `role_permissions[rol]` de los módulos **activos**.
     pub permissions: usize,
     /// Usuarios **activos** con este rol.
@@ -316,11 +324,17 @@ pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, user_id: &str) -> Resul
 }
 
 /// Alta de usuario: valida, crea la identidad (con PIN si lo trae) y guarda su email en el perfil.
-pub async fn create(db: &dyn DatabaseAdapter, hub_id: &str, input: &NewHubUser) -> Result<String> {
+pub async fn create(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    input: &NewHubUser,
+) -> Result<String> {
     let name = clean_name(&input.name)?;
     let role = clean_role(&input.role)?;
     let pin = clean_pin(&input.pin)?;
     let email = clean_email(&input.email)?;
+    crate::roles::ensure_assignable(db, registry, hub_id, &role).await?;
     ensure_name_is_free(db, &name, None).await?;
 
     let id = identity::create_user(db, &name, &pin, &role, None).await?;
@@ -334,6 +348,7 @@ pub async fn create(db: &dyn DatabaseAdapter, hub_id: &str, input: &NewHubUser) 
 /// Edición parcial de un usuario existente. Devuelve la fila resultante.
 pub async fn update(
     db: &dyn DatabaseAdapter,
+    registry: &Registry,
     hub_id: &str,
     user_id: &str,
     input: &UpdateHubUser,
@@ -359,6 +374,12 @@ pub async fn update(
         None => None,
     };
     let is_active = input.is_active.unwrap_or(current.is_active);
+    // El rol solo pasa por el catálogo cuando la edición lo CAMBIA (hub#352): revalidar el rol que
+    // ya tenía la fila convertiría desinstalar un módulo en «este usuario ya no se puede editar»,
+    // y quien queda con un rol huérfano es justo a quien hay que poder reasignar.
+    if input.role.is_some() && role != current.role {
+        crate::roles::ensure_assignable(db, registry, hub_id, &role).await?;
+    }
     if is_active && name != current.name {
         ensure_name_is_free(db, &name, Some(user_id)).await?;
     }
@@ -406,9 +427,21 @@ pub async fn update(
         .ok_or_else(|| RuntimeError::Other("usuario no encontrado".into()))
 }
 
-/// Roles del hub: catálogo base ∪ roles de los módulos activos ∪ roles en uso, con sus permisos
-/// efectivos y sus miembros activos.
-pub async fn list_roles(db: &dyn DatabaseAdapter, registry: &Registry) -> Result<Vec<HubRole>> {
+/// Roles del hub: el **catálogo agregado** ([`crate::roles::catalog`], hub#352) decorado con los
+/// permisos efectivos de cada rol y sus miembros activos.
+///
+/// Antes esta función construía su propia lista y metía en ella las **claves de
+/// `role_permissions`** de los módulos activos. Ya no: **declarar nombra un rol y `role_permissions`
+/// concede**, y son ejes distintos a propósito (un módulo puede conceder a una clave que inventó
+/// otro), así que una clave contra la que alguien concede no es, por sí sola, un rol del hub. En el
+/// catálogo publicado no cambia nada —los 24 módulos conceden **solo** a `admin`/`manager`/
+/// `employee`, medido— y un rol que nadie declara pero alguien lleva sigue saliendo, ahora marcado
+/// como huérfano (`in_use`).
+pub async fn list_roles(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+) -> Result<Vec<HubRole>> {
     let res = db
         .query(
             "SELECT role, COUNT(*) AS members FROM hub_user WHERE is_active = 1 GROUP BY role",
@@ -423,26 +456,17 @@ pub async fn list_roles(db: &dyn DatabaseAdapter, registry: &Registry) -> Result
         }
     }
 
-    // Los del catálogo base van primero y en su orden; el resto, alfabético y sin duplicar.
-    let mut extra: BTreeSet<String> = members.keys().cloned().collect();
-    for module in &registry.installed {
-        if registry.is_active(&module.id) {
-            extra.extend(module.role_permissions.keys().cloned());
-        }
-    }
-    let mut names: Vec<String> = BASE_ROLES.iter().map(|r| (*r).to_string()).collect();
-    let rest: Vec<String> = extra
+    Ok(crate::roles::catalog(db, registry, hub_id)
+        .await?
         .into_iter()
-        .filter(|role| !names.contains(role))
-        .collect();
-    names.extend(rest);
-
-    Ok(names
-        .into_iter()
-        .map(|name| HubRole {
-            permissions: identity::permissions_for_role(registry, &name).len(),
-            members: members.get(&name).copied().unwrap_or(0),
-            name,
+        .map(|role| HubRole {
+            permissions: identity::permissions_for_role(registry, &role.key).len(),
+            members: members.get(&role.key).copied().unwrap_or(0),
+            label: role.label,
+            extends: role.extends,
+            source: role.source,
+            active: role.active,
+            name: role.key,
         })
         .collect())
 }
@@ -480,7 +504,7 @@ pub async fn core_query(
             })
             .collect()),
         // Los roles no son PII: se devuelven enteros (nombre, permisos, miembros).
-        _ => Ok(list_roles(db, registry)
+        _ => Ok(list_roles(db, registry, hub_id)
             .await?
             .into_iter()
             .map(|r| json!({ "name": r.name, "permissions": r.permissions, "members": r.members }))

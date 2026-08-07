@@ -233,6 +233,9 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
     let a = fresh().await;
     erplora_runtime::hub_users::create(
         a.db(),
+        // Registro vacío: estos tests no instalan módulos, así que el catálogo de roles es el
+        // base y la guarda de activación (hub#352) no tiene nada que mirar.
+        &erplora_runtime::Registry::new(),
         "h1",
         &erplora_runtime::hub_users::NewHubUser {
             name: "Demo".into(),
@@ -305,6 +308,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
     for (name, role, pin) in [("Demo", "admin", "0000"), ("Manager", "manager", "1111")] {
         erplora_runtime::hub_users::create(
             a.db(),
+            &erplora_runtime::Registry::new(),
             "h1",
             &erplora_runtime::hub_users::NewHubUser {
                 name: name.into(),
@@ -330,6 +334,9 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
     let mut b = fresh().await;
     erplora_runtime::hub_users::create(
         b.db(),
+        // Registro vacío: estos tests no instalan módulos, así que el catálogo de roles es el
+        // base y la guarda de activación (hub#352) no tiene nada que mirar.
+        &erplora_runtime::Registry::new(),
         "h2",
         &erplora_runtime::hub_users::NewHubUser {
             name: "Encargada".into(),
@@ -392,6 +399,9 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
     let a = fresh().await;
     erplora_runtime::hub_users::create(
         a.db(),
+        // Registro vacío: estos tests no instalan módulos, así que el catálogo de roles es el
+        // base y la guarda de activación (hub#352) no tiene nada que mirar.
+        &erplora_runtime::Registry::new(),
         "h1",
         &erplora_runtime::hub_users::NewHubUser {
             name: "Encargada".into(),

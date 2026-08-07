@@ -643,6 +643,10 @@ pub fn app(state: AppState) -> Router {
                 .delete(hub_users::deactivate_user),
         )
         .route("/api/hub/roles", get(hub_users::list_roles))
+        .route(
+            "/api/hub/roles/:key",
+            axum::routing::put(hub_users::set_role_activation),
+        )
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
             "/api/profile",

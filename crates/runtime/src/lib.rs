@@ -39,6 +39,7 @@ pub mod permissions;
 pub mod queries;
 pub mod registry;
 pub mod reset;
+pub mod roles;
 pub mod scheduler;
 pub mod secret_box;
 pub mod seed;
@@ -713,7 +714,7 @@ impl Runtime {
 
     /// Alta de un usuario del hub (nombre, rol, email y PIN opcionales). Devuelve su id.
     pub async fn create_hub_user(&self, input: &hub_users::NewHubUser) -> Result<String> {
-        hub_users::create(self.db.as_ref(), &self.hub_id, input).await
+        hub_users::create(self.db.as_ref(), &self.registry, &self.hub_id, input).await
     }
 
     /// Edición parcial de un usuario del hub; `is_active: Some(false)` es la baja.
@@ -722,12 +723,30 @@ impl Runtime {
         user_id: &str,
         input: &hub_users::UpdateHubUser,
     ) -> Result<hub_users::HubUserRow> {
-        hub_users::update(self.db.as_ref(), &self.hub_id, user_id, input).await
+        hub_users::update(self.db.as_ref(), &self.registry, &self.hub_id, user_id, input).await
     }
 
     /// Roles del hub (catálogo base ∪ módulos activos ∪ en uso) con permisos y miembros.
     pub async fn list_hub_roles(&self) -> Result<Vec<hub_users::HubRole>> {
-        hub_users::list_roles(self.db.as_ref(), &self.registry).await
+        hub_users::list_roles(self.db.as_ref(), &self.registry, &self.hub_id).await
+    }
+
+    /// Catálogo de roles del hub (paso 2b, hub#352).
+    pub async fn role_catalog(&self) -> Result<Vec<roles::CatalogRole>> {
+        roles::catalog(self.db.as_ref(), &self.registry, &self.hub_id).await
+    }
+
+    /// Activa o desactiva en ESTE hub un rol declarado por un módulo (paso 2b, hub#352).
+    pub async fn set_role_active(&self, role_key: &str, active: bool, actor: &str) -> Result<()> {
+        roles::set_active(
+            self.db.as_ref(),
+            &self.registry,
+            &self.hub_id,
+            role_key,
+            active,
+            actor,
+        )
+        .await
     }
 
     /// **Siembra el owner del hub** desde el env del provisioning (`HUB_OWNER_EMAIL`, ADR-0157): el
