@@ -698,6 +698,64 @@ async fn regaining_the_membership_reuses_the_row_without_resurrecting_the_role()
 }
 
 #[tokio::test]
+async fn editing_a_revoked_user_without_deciding_about_the_door_keeps_the_revocation_theirs() {
+    // Who closed a door is state, and state is easy to lose by accident. Personal writes name, role
+    // and `is_active` in one UPDATE, so renaming somebody the SaaS had revoked must not quietly
+    // relabel that revocation as a decision of the hub — it would strand them: their membership
+    // could come back and the door would stay shut with nobody knowing why. Only an edit that
+    // actually *decides* about the door (`is_active` present) touches the mark.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let token = sign_user_jwt_role(25, "marta@bar.com", member.clone(), "employee");
+    router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    let revoked = sign_user_jwt_role(25, "marta@bar.com", json!([]), "employee");
+    app(state.clone())
+        .oneshot(cloud_login_bare(&revoked))
+        .await
+        .unwrap();
+    assert!(!cloud_user_is_active(&state, "25").await);
+
+    // An admin tidies up the name from Personal. They said nothing about the door.
+    let user_id = {
+        let rt = state.runtime.lock().await;
+        let id = rt
+            .list_hub_users()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|u| u.email == "marta@bar.com" || u.name.starts_with("user:25"))
+            .expect("the revoked row is still listed")
+            .id;
+        rt.update_hub_user(
+            &id,
+            &erplora_runtime::hub_users::UpdateHubUser {
+                name: Some("Marta Ruiz".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        id
+    };
+    assert!(!user_id.is_empty());
+
+    // The SaaS grants the membership again: the door it closed still opens.
+    let back = sign_user_jwt_role(25, "marta@bar.com", member, "employee");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&back))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "an unrelated edit must not strand a cloud revocation as a hub baja",
+    );
+    assert!(cloud_user_is_active(&state, "25").await);
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
 async fn a_user_the_hub_itself_deactivated_is_not_let_back_in_by_a_token() {
     // The other reason a row can be inactive: the hub's own admin showed them the door (ADR-0157
     // §7 / the Personal screen). That decision belongs to the hub, so a token must never undo it —
