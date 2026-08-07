@@ -28,7 +28,17 @@
       <h1>Sin conexión</h1>
       <p>ERPlora necesita internet para arrancar.</p>
       <p>Comprueba la red y vuelve a intentarlo.</p>
-      <button onclick="location.reload()">Reintentar</button>
+      <button id="retry">Reintentar</button>
     </main>
+    <!-- Wired from a script, not from an `onclick=`: this page is served under the app's CSP
+         (`script-src 'self'`), and CSP has neither a hash nor a nonce for an inline event handler,
+         so the button used to be pure decoration — the browser dropped the handler without a word.
+         `__TAURI_SCRIPT_NONCE__` is the token Tauri swaps for a fresh nonce when it serves the
+         asset, adding `'nonce-…'` to script-src (`tauri_utils::assets::SCRIPT_NONCE_TOKEN`).
+         Remove the attribute and the script is blocked, just as silently. Pinned by
+         `src-tauri/tests/shell_csp.rs`. -->
+    <script nonce="__TAURI_SCRIPT_NONCE__">
+      document.getElementById("retry").addEventListener("click", () => location.reload());
+    </script>
   </body>
 </html>
