@@ -277,6 +277,31 @@ CREATE TABLE hub_role_activation (\
   activated_at TEXT NOT NULL, activated_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, role_key));",
     },
+    // ── v14 — hub#316 / ADR-0202 §2.1: `_hub_certificate` deja de ser singleton — DOS SLOTS ──────
+    // Un hub podía tener UN certificado fiscal: el que su dueño sube en Ajustes → Negocio. La fase 2
+    // de VeriFactu añade un segundo origen —el certificado DELEGADO de ERPlora, que reparte el plano
+    // de control (saas#1124/#1125)— y los dos tienen que convivir: el propio no se puede borrar para
+    // hacerle sitio al delegado (es la identidad del negocio, y su renovación siempre fue del
+    // cliente) ni al revés (el delegado lo rota ERPlora, sin pasar por el hub).
+    //
+    // Por eso la PK pasa de `hub_id` a `(hub_id, kind)`: la fila deja de ser «el certificado del
+    // hub» y pasa a ser «el certificado de ESTE origen en este hub». El `kind` es un slot, NO una
+    // preferencia — cuál se usa lo decide la regla de selección del core (propio si está subido, si
+    // no el delegado), no una columna que alguien pueda cambiar.
+    //
+    // ADITIVA y conservadora: `DEFAULT 'own'` sella como PROPIAS las filas de los hubs ya
+    // desplegados, que es exactamente lo que son (las subió su dueño por `PUT /api/business/
+    // certificate`). Si el default fuese `delegated`, un hub ya en producción se encontraría de
+    // pronto con que su certificado «es de ERPlora»: dejaría de exportarse en su backup y quedaría
+    // a merced de una rotación central que nunca pidió.
+    SystemMigration {
+        version: 14,
+        name: "hub_certificate_slots",
+        postgres: "\
+ALTER TABLE _hub_certificate ADD COLUMN kind TEXT NOT NULL DEFAULT 'own';\
+ALTER TABLE _hub_certificate DROP CONSTRAINT _hub_certificate_pkey;\
+ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -634,5 +659,99 @@ mod tests {
             "v7 registrada"
         );
         apply(&db, "hub-test").await.unwrap();
+    }
+
+    /// A hub deployed BEFORE hub#316: `_hub_certificate` in its v6 shape (singleton, PK `hub_id`)
+    /// with the certificate its owner uploaded in Ajustes → Negocio, and every migration up to v13
+    /// already registered. Reproduces the only state v14 has to survive — an ALTER cannot be tested
+    /// against a table the same run has just created in its post-migration shape.
+    async fn hub_deployed_before_the_slots(db: &dyn DatabaseAdapter) {
+        db.execute_batch(
+            "CREATE TABLE _hub_certificate (\
+               hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
+               uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
+               PRIMARY KEY (hub_id));",
+        )
+        .await
+        .unwrap();
+        ensure_control_table(db).await.unwrap();
+        for v in 1..=13 {
+            let mut p = Params::new();
+            p.insert("version".into(), json!(v));
+            p.insert("name".into(), json!(format!("pre_slots_{v}")));
+            p.insert("applied_at".into(), json!("2026-01-01T00:00:00Z"));
+            db.execute(
+                "INSERT INTO _hub_system_migrations (version, name, applied_at) \
+                 VALUES (:version, :name, :applied_at)",
+                &p,
+            )
+            .await
+            .unwrap();
+        }
+    }
+
+    /// The certificate a deployed hub already had is the BUSINESS's own one, and v14 must say so.
+    ///
+    /// The default of the new column is the whole safety of this migration: sealed as `delegated`,
+    /// a hub in production would suddenly hold «ERPlora's certificate» — dropped from its own
+    /// backup and exposed to a central rotation it never asked for.
+    #[tokio::test]
+    async fn the_certificate_a_deployed_hub_already_had_becomes_its_own_slot_v14() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        hub_deployed_before_the_slots(&db).await;
+        db.execute_batch(
+            "INSERT INTO _hub_certificate (hub_id, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES ('hub-test', 'TEVHQUNZ', 'pw', '2026-01-01T00:00:00Z', 'hub_user:admin');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test").await.unwrap();
+        assert!(max_applied_version(&db).await.unwrap() >= 14, "v14 registrada");
+
+        let row = db
+            .query(
+                "SELECT kind, pkcs12_b64 FROM _hub_certificate WHERE hub_id = 'hub-test'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.rows.len(), 1, "la fila legacy sobrevive");
+        assert_eq!(row.rows[0]["kind"], json!("own"), "sellada como PROPIA del negocio");
+        assert_eq!(row.rows[0]["pkcs12_b64"], json!("TEVHQUNZ"), "sus bytes intactos");
+
+        // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').
+        apply(&db, "hub-test").await.unwrap();
+    }
+
+    /// After v14 the two slots are two ROWS of the same hub: the PK is `(hub_id, kind)`, so storing
+    /// the delegated certificate cannot evict the business's own one (nor the other way round).
+    #[tokio::test]
+    async fn after_v14_both_slots_fit_in_the_same_hub() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        hub_deployed_before_the_slots(&db).await;
+        apply(&db, "hub-test").await.unwrap();
+
+        db.execute_batch(
+            "INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES ('hub-test', 'own', 'T1dO', 'pw1', '2026-01-01T00:00:00Z', 'hub_user:admin');\
+             INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES ('hub-test', 'delegated', 'REVM', 'pw2', '2026-01-02T00:00:00Z', 'cloud');",
+        )
+        .await
+        .unwrap();
+
+        let rows = db
+            .query(
+                "SELECT kind FROM _hub_certificate WHERE hub_id = 'hub-test' ORDER BY kind",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        let kinds: Vec<&str> =
+            rows.rows.iter().filter_map(|r| r["kind"].as_str()).collect();
+        assert_eq!(kinds, vec!["delegated", "own"], "los dos slots conviven");
     }
 }

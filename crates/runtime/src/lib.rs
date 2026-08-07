@@ -983,24 +983,37 @@ impl Runtime {
         .await
     }
 
-    /// Sube/reemplaza el certificado fiscal del negocio (ADR-0079). `by` = `hub_user:<id>` admin.
+    /// Sube/reemplaza el certificado fiscal **del negocio** (ADR-0079). `by` = `hub_user:<id>` admin.
+    ///
+    /// Ata el slot [`certificate::CertificateKind::Own`] en el ÚNICO punto por el que entra un `.p12`
+    /// del cliente (`PUT /api/business/certificate`): el certificado delegado de ERPlora lo escribe
+    /// el plano de control por su propia vía (hub#317), nunca esta.
     pub async fn set_business_certificate(
         &self,
         pkcs12_b64: &str,
         password: &str,
         by: &str,
     ) -> Result<()> {
-        certificate::set(self.db.as_ref(), &self.hub_id, pkcs12_b64, password, by).await
+        certificate::set(
+            self.db.as_ref(),
+            &self.hub_id,
+            certificate::CertificateKind::Own,
+            pkcs12_b64,
+            password,
+            by,
+        )
+        .await
     }
 
-    /// Estado del certificado del negocio (presente/ausente + metadatos; sin bytes ni contraseña).
+    /// Estado de los certificados del hub (sin bytes ni contraseña): el del negocio en la raíz —
+    /// como siempre— más `slots`/`active` (ADR-0202 §2.1).
     pub async fn business_certificate_status(&self) -> Result<Json> {
         certificate::status(self.db.as_ref(), &self.hub_id).await
     }
 
-    /// Elimina el certificado del negocio.
+    /// Elimina el certificado **del negocio**. El delegado no se toca: no es del cliente.
     pub async fn delete_business_certificate(&self) -> Result<()> {
-        certificate::delete(self.db.as_ref(), &self.hub_id).await
+        certificate::delete(self.db.as_ref(), &self.hub_id, certificate::CertificateKind::Own).await
     }
 
     /// Un ciclo del relay de eventos: entrega los eventos vencidos del outbox a sus listeners.

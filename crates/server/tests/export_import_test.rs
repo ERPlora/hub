@@ -48,6 +48,17 @@ async fn make_app(auth_mode: AuthMode, tag: &str) -> axum::Router {
     app(AppState::with_config(rt, test_config(auth_mode, tag)))
 }
 
+/// Router + a SECOND handle on the same ephemeral schema, so a test can seed system tables the HTTP
+/// surface has no endpoint for (the delegated certificate slot arrives from the control plane, not
+/// from a request — ADR-0202 §2). The system schema is migrated first, exactly as boot does it.
+async fn make_app_with_db(auth_mode: AuthMode, tag: &str) -> (axum::Router, erplora_db::PgAdapter) {
+    let test_db = erplora_db::testutil::TestDb::new().await;
+    let rt = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-test");
+    rt.ensure_system_tables().await.expect("esquema de sistema");
+    let side = test_db.adapter().await;
+    (app(AppState::with_config(rt, test_config(auth_mode, tag))), side)
+}
+
 async fn body_json(resp: axum::response::Response) -> Value {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     serde_json::from_slice(&bytes).unwrap()
@@ -212,6 +223,118 @@ async fn export_returns_blueprint_zip() {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let mut ar = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
     assert!(ar.by_name("manifest.json").is_ok());
+}
+
+// ── ADR-0202 §2.1 (hub#316): el slot `delegated` NUNCA sale del hub ─────────────────────────
+
+/// Bytes reales de cada slot: el `.p12` del NEGOCIO y el de ERPlora. No comparten subcadena, así
+/// que un test que afirma que uno no se filtró no puede pasar por casualidad sobre el otro.
+const OWN_P12: &[u8] = b"OWN-PKCS12";
+const DELEGATED_P12: &[u8] = b"DELEGATED-PKCS12";
+/// Sus base64, que es como viven en `_hub_certificate.pkcs12_b64`.
+const OWN_P12_B64: &str = "T1dOLVBLQ1MxMg==";
+const DELEGATED_P12_B64: &str = "REVMRUdBVEVELVBLQ1MxMg==";
+
+/// Siembra un slot de `_hub_certificate` **en claro** (fila legacy, anterior al cifrado at-rest de
+/// hub#114): el core la sigue leyendo sin master key, así que el test no depende de una variable de
+/// entorno global que otro test en paralelo podría estar cambiando.
+async fn seed_certificate_slot(db: &erplora_db::PgAdapter, kind: &str, pkcs12_b64: &str) {
+    use erplora_db::DatabaseAdapter as _;
+    db.execute_batch(&format!(
+        "INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+         VALUES ('hub-test', '{kind}', '{pkcs12_b64}', 'pw-{kind}', '2026-08-07T00:00:00Z', 'seed');"
+    ))
+    .await
+    .unwrap();
+}
+
+/// Todas las entradas del zip `(nombre, bytes)` — el artefacto REAL que se descarga.
+fn zip_entries(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
+    use std::io::Read as _;
+    let mut ar = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
+    let mut out = Vec::new();
+    for i in 0..ar.len() {
+        let mut f = ar.by_index(i).unwrap();
+        let name = f.name().to_string();
+        let mut buf = Vec::new();
+        f.read_to_end(&mut buf).unwrap();
+        out.push((name, buf));
+    }
+    out
+}
+
+/// ¿Aparecen estos bytes en ALGUNA entrada del zip? Se busca sobre el artefacto entero —manifest
+/// incluido—, no sobre una lista de rutas conocidas: una fuga que estrenase un fichero nuevo pasaría
+/// por delante de una comprobación que solo mira `data/fiscal/certificate.p12`.
+fn zip_contains(entries: &[(String, Vec<u8>)], needle: &[u8]) -> bool {
+    entries.iter().any(|(_, bytes)| bytes.windows(needle.len()).any(|w| w == needle))
+}
+
+async fn export_with_fiscal(app: axum::Router, tag: &str) -> Vec<(String, Vec<u8>)> {
+    let body = json!({
+        "name": tag,
+        "locale": "es",
+        "selection": {
+            "users": true, "settings": true, "settings_items": null,
+            "fiscal": true, "media": false, "modules": []
+        }
+    });
+    // `X-Hub-Id` fija el hub del PLANO DE DATOS: en modo Dev el export vuelca el hub de la cabecera
+    // (`local` por defecto), no el de la config, así que sin esto miraría un hub sin certificados.
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/hub/export")
+        .header("content-type", "application/json")
+        .header("x-hub-id", "hub-test")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    zip_entries(&bytes)
+}
+
+/// **La regla de hub#316, sobre el zip de verdad.**
+///
+/// El certificado delegado es la clave privada con la que ERPlora se identifica ante la AEAT por
+/// apoderamiento, para TODA la flota. Un bundle se descarga, se publica en el catálogo y se importa
+/// en el hub de otro: si sale una vez, sale para siempre y no compromete a un negocio, sino a todos.
+/// El propio sí viaja (es el backup de su dueño, y su contraseña no va dentro).
+///
+/// Recorre los **dos** estados del hub, y el orden importa: con certificado propio la regla se
+/// cumple sola (el propio gana la selección y el delegado ni se lee), así que un test que solo
+/// mirase ese caso pasaría igual con la exclusión quitada. El estado que de verdad la ejercita es el
+/// hub que SOLO tiene el delegado — el que va a ser normal en cuanto el plano de control reparta
+/// (hub#317). Mutación que este test tiene que cazar:
+/// `CertificateKind::Delegated => may_leave_the_hub() = true`.
+#[tokio::test]
+async fn the_export_never_carries_the_delegated_certificate() {
+    let (app, db) = make_app_with_db(AuthMode::Dev, "export_delegated_out").await;
+
+    // (1) Hub que FIRMA con el delegado porque no tiene propio: exporta CERO certificados. Es el
+    //     caso que separa las dos preguntas — «con cuál firmo» y «cuál puede salir» no son la misma.
+    seed_certificate_slot(&db, "delegated", DELEGATED_P12_B64).await;
+    let entries = export_with_fiscal(app.clone(), "solodelegado").await;
+    assert!(
+        !entries.iter().any(|(name, _)| name == "data/fiscal/certificate.p12"),
+        "sin certificado propio no hay certificado que exportar"
+    );
+    assert!(
+        !zip_contains(&entries, DELEGATED_P12),
+        "el .p12 delegado de ERPlora ha salido del hub dentro del bundle: {:?}",
+        entries.iter().map(|(n, _)| n).collect::<Vec<_>>()
+    );
+
+    // (2) El negocio sube el suyo: ese sí viaja, y el delegado sigue sin aparecer.
+    seed_certificate_slot(&db, "own", OWN_P12_B64).await;
+    let entries = export_with_fiscal(app, "conlosdos").await;
+    let cert = entries
+        .iter()
+        .find(|(name, _)| name == "data/fiscal/certificate.p12")
+        .map(|(_, b)| b.clone())
+        .expect("el certificado PROPIO del negocio sí viaja en su backup");
+    assert_eq!(cert, OWN_P12, "viaja el del negocio, no otro");
+    assert!(!zip_contains(&entries, DELEGATED_P12), "el .p12 delegado se ha colado en el bundle");
 }
 
 // ─────────────────────── POST /api/hub/import/inspect ───────────────────────
