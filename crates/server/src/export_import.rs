@@ -92,6 +92,9 @@ pub struct ExportSelectionReq {
     users: bool,
     #[serde(default)]
     settings: bool,
+    /// Subselección de claves de `hub_settings`. `None` = todas las **exportables**, no todas a
+    /// secas (ADR-0195 §4, hub#405): con `purpose: template` el motor filtra a las claves de
+    /// configuración y el NIF/razón social no entran. El llamador ACOTA, nunca amplía.
     #[serde(default)]
     settings_items: Option<Vec<String>>,
     #[serde(default)]
@@ -101,8 +104,9 @@ pub struct ExportSelectionReq {
     #[serde(default)]
     modules: Vec<ModuleSelReq>,
     /// Para qué es el bundle (ADR-0195). Ausente ⇒ `backup` (lo que ha sido siempre). Con
-    /// `"template"` el motor EXCLUYE identidades y fiscal del zip, marque lo que marque el
-    /// formulario: una plantilla se publica y no puede llevar cuentas ni certificados.
+    /// `"template"` el motor EXCLUYE del zip identidades, fiscal y la identidad de negocio de
+    /// `hub_settings` (§4, hub#405), marque lo que marque el formulario: una plantilla se publica
+    /// y no puede llevar cuentas, certificados ni el NIF de nadie.
     #[serde(default)]
     purpose: BundlePurpose,
 }
