@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permisos base de la ventana 'main' (ADR-0159, cliente fino). La webview carga ORÍGENES REMOTOS: la PWA del hub cloud (https://*.erplora.com) y, en dev, la PWA local (Vite :5173 o el runtime :8787). Sin estos remote.urls el ACL de Tauri rechaza los invoke (device_context/forget_hub + erplora_* de hardware) desde la PWA. El SaaS (onboarding) no invoca comandos, no necesita entrada. Dominios CUSTOM de hub quedan sin hardware v1 (no se pueden enumerar aquí — ver ADR-0159). local:true mantiene autorizado tauri:// (arranques transitorios / página degradada).",
+  "description": "The HUB origins of the 'main' window (ADR-0159, thin client) — the only capability that hands out the hardware. The webview loads REMOTE origins: the cloud hub PWA (https://*.erplora.com) and, in dev, the local PWA (Vite :5173 or the runtime :8787). Without these remote.urls Tauri's ACL refuses every invoke from the PWA and the till cannot print. The wildcard crosses labels on purpose: hubs live at {slug}.{aura}.erplora.com, with lettered auras on Hetzner and numbered ones on the AWS fallback, so enumerating auras would mean shipping a new app to every till the day a new aura opens. The SaaS apex is NOT covered by this pattern and lives in `onboarding.json` with no hardware. CUSTOM hub domains get no hardware in v1 (they cannot be enumerated here — see ADR-0159). local:true keeps tauri:// authorized (transient boots / degraded page).",
   "local": true,
   "remote": {
     "urls": [
