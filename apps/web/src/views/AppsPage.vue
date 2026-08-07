@@ -148,7 +148,7 @@ import { config } from '../lib/config';
 import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
-  getModuleCapabilities, putModuleCapabilities, ModuleActionError,
+  getModuleCapabilities, putModuleCapabilities, ModuleActionError, InstallBlockedError,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
@@ -506,8 +506,20 @@ async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<
     const row = modules.value.find((m) => m.id === mod.id);
     if (row) row.installed = true;
     notify(t('apps.installSuccess', { name: mod.name }), 'success');
-  } catch {
-    notify(t('apps.installError', { name: mod.name }), 'danger');
+  } catch (e) {
+    // ADR-0060: «bloqueado» NO es una avería — al plan le faltan módulos de pago sin contratar y
+    // no se ha instalado nada. Decirlo y nombrarlos es la diferencia entre que el usuario sepa qué
+    // contratar y que vea un «no se pudo» opaco. La compra es suya: aquí nunca se cobra.
+    if (e instanceof InstallBlockedError) {
+      // Sticky (0): el usuario tiene que poder LEER qué le falta contratar, no verlo pasar.
+      notify(
+        t('apps.installBlocked', { name: mod.name, missing: e.blockedOn.join(', ') }),
+        'danger',
+        0,
+      );
+    } else {
+      notify(t('apps.installError', { name: mod.name }), 'danger');
+    }
   } finally {
     clearProgress(mod.id);
   }

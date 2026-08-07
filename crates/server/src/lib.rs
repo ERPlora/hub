@@ -1089,11 +1089,39 @@ async fn request_install(
                 install::InstallError::Source(source::SourceError::BadSignature(_)) => {
                     StatusCode::FORBIDDEN
                 }
+                // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
+                // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
+                install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
                 install::InstallError::Cloud(_)
                 | install::InstallError::Source(_)
                 | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
             };
-            (code, Json(json!({ "ok": false, "error": e.to_string() }))).into_response()
+            // Canal de errores de dominio (hub#139): además del mensaje humano viaja un `code`
+            // estable contra el que la UI programa y traduce. Un install fallido no es mudo.
+            let mut body = json!({
+                "ok": false,
+                "error": e.to_string(),
+                "code": e.code(),
+            });
+            if let install::InstallError::Blocked {
+                blocked_on,
+                purchase,
+                ..
+            } = &e
+            {
+                body["blocked_on"] = json!(blocked_on);
+                body["purchase"] = json!(purchase
+                    .iter()
+                    .map(|p| json!({
+                        "module_id": p.module_id,
+                        "module_type": p.module_type,
+                        "price": p.price,
+                        "currency": p.currency,
+                        "purchase_url": p.purchase_url,
+                    }))
+                    .collect::<Vec<_>>());
+            }
+            (code, Json(body)).into_response()
         }
     }
 }

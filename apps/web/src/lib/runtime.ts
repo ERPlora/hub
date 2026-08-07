@@ -177,10 +177,51 @@ export interface InstallRequestResult {
   status: string;
 }
 
+/** Un módulo del plan que hay que COMPRAR antes de poder instalar (ADR-0060). */
+export interface InstallPurchaseOption {
+  moduleId: string;
+  moduleType: string;
+  price: string;
+  currency: string;
+  purchaseUrl: string;
+}
+
 /**
- * Pide al runtime que instale (vía marketplace del Cloud) un módulo. El runtime descarga el
- * zip firmado, verifica SHA256 y aplica migraciones; al terminar emite el evento WS
- * `module.installed`. ARQUITECTURA.md §2.2/§4.
+ * El plan de instalación (ADR-0060) exige contratar dependencias: **no se ha instalado nada**.
+ * No es una avería, es una decisión del usuario — por eso es un error propio y lleva a dónde ir.
+ * Nunca hay auto-cobro: el Hub solo enseña el precio y el enlace.
+ */
+export class InstallBlockedError extends Error {
+  readonly code = 'install_blocked';
+  readonly blockedOn: string[];
+  readonly purchase: InstallPurchaseOption[];
+
+  constructor(message: string, blockedOn: string[], purchase: InstallPurchaseOption[]) {
+    super(message);
+    this.name = 'InstallBlockedError';
+    this.blockedOn = blockedOn;
+    this.purchase = purchase;
+  }
+}
+
+/** Fallo de instalación con el CÓDIGO estable del runtime (hub#139) para que la UI lo traduzca. */
+export class InstallFailedError extends Error {
+  readonly code: string;
+
+  constructor(message: string, code: string) {
+    super(message);
+    this.name = 'InstallFailedError';
+    this.code = code;
+  }
+}
+
+/**
+ * Pide al runtime que instale (vía marketplace del Cloud) un módulo. El runtime pide el PLAN al
+ * Cloud (ADR-0060), lo ejecuta en orden —instalando las dependencias que falten—, verifica SHA256
+ * y aplica migraciones; al terminar emite el evento WS `module.installed`. ARQUITECTURA.md §2.2/§4.
+ *
+ * Si el plan trae dependencias de pago sin contratar, el runtime responde **409** y aquí sale un
+ * [`InstallBlockedError`] con qué falta y su puntero de compra (nunca se cobra solo).
  */
 export async function requestInstall(moduleId: string, version: string): Promise<InstallRequestResult> {
   // Barra de progreso del shell mientras instala: descarga el zip + verifica SHA256 + migra puede
@@ -192,7 +233,31 @@ export async function requestInstall(moduleId: string, version: string): Promise
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ module_id: moduleId, version }),
     });
-    if (!res.ok) throw new Error(`request-install ${moduleId} → ${res.status}`);
+    if (!res.ok) {
+      // El cuerpo del runtime lleva `error` + `code` estables; un 409 además trae la compra.
+      // Si no se puede leer, se cae al mensaje de siempre (nunca se traga el fallo).
+      let body: Record<string, unknown> | null = null;
+      try {
+        body = (await res.json()) as Record<string, unknown>;
+      } catch {
+        body = null;
+      }
+      const message = (body?.error as string) || `request-install ${moduleId} → ${res.status}`;
+      const code = (body?.code as string) || 'install_failed';
+      if (code === 'install_blocked') {
+        const purchase = Array.isArray(body?.purchase)
+          ? (body!.purchase as Record<string, string>[]).map((p) => ({
+              moduleId: p.module_id,
+              moduleType: p.module_type,
+              price: p.price,
+              currency: p.currency,
+              purchaseUrl: p.purchase_url,
+            }))
+          : [];
+        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase);
+      }
+      throw new InstallFailedError(message, code);
+    }
     return (await res.json()) as InstallRequestResult;
   } finally {
     endRequest();
