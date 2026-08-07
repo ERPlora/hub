@@ -124,26 +124,26 @@ mod tests {
 
     fn served_body(version: i64) -> String {
         format!(
-            r#"{{"version": {version}, "pkcs12_b64": "{DELEGATED_B64}", \
-                 "password": "{DELEGATED_PASSWORD}", "not_after": "2028-06-10"}}"#
+            r#"{{"version": {version}, "pkcs12_b64": "{DELEGATED_B64}", "password": "{DELEGATED_PASSWORD}", "not_after": "2028-06-10"}}"#
         )
-        .replace('\\', "")
     }
 
     /// A cloud stub answering the fiscal-certificate endpoint with a fixed status and body, and
     /// recording the headers it was asked with. Returns `(base_url, captured_headers, shutdown)`.
     async fn cloud_stub(
         status: StatusCode,
-        body: &'static str,
+        body: impl Into<String>,
     ) -> (String, Arc<Mutex<Option<HeaderMap>>>, tokio::task::JoinHandle<()>) {
         type Seen = Arc<Mutex<Option<HeaderMap>>>;
         let seen: Seen = Arc::new(Mutex::new(None));
+        let body = body.into();
         let app = Router::new().route(
             "/api/v1/hub/device/fiscal/certificate/",
             get({
                 let seen = seen.clone();
                 move |headers: HeaderMap| {
                     *seen.lock().unwrap() = Some(headers);
+                    let body = body.clone();
                     async move { (status, body) }
                 }
             }),
@@ -169,13 +169,19 @@ mod tests {
         db
     }
 
-    /// `HUB_SECRETS_KEY` for the tests that actually store something. Set for the whole process:
-    /// these tests only ever read it, so unlike the runtime's fail-closed tests they do not need to
-    /// serialise on a mutex.
+    /// `HUB_SECRETS_KEY` for the tests that actually store something (base64 of 32 zero-ish bytes).
+    ///
+    /// Written exactly ONCE for the whole binary, and never removed: no test here asserts its
+    /// absence (the fail-closed path is covered where it belongs, in the runtime's own tests), so
+    /// there is no state another test could observe. Every reader goes through this function, and
+    /// `Once` makes them all wait for the write to finish before any of them reads.
     fn ensure_master_key() {
-        // SAFETY: idempotent and only ever SET (never removed) — no test in this file asserts its
-        // absence, so there is no ordering another test could observe.
-        unsafe { std::env::set_var("HUB_SECRETS_KEY", "A".repeat(43) + "=") };
+        static SET: std::sync::Once = std::sync::Once::new();
+        SET.call_once(|| {
+            // SAFETY: the only write in this binary, serialised by `Once`, and it happens-before
+            // every read because every reader calls this first.
+            unsafe { std::env::set_var("HUB_SECRETS_KEY", "A".repeat(43) + "=") };
+        });
     }
 
     // ── Security first: the key must not leak into an error, a log or the response path ───────
@@ -233,7 +239,7 @@ mod tests {
     async fn installing_the_certificate_writes_nothing_secret_to_the_logs() {
         ensure_master_key();
         let db = db_ready().await;
-        let body: &'static str = Box::leak(served_body(4).into_boxed_str());
+        let body = served_body(4);
         let (base, _seen, server) = cloud_stub(StatusCode::OK, body).await;
 
         let captured = Arc::new(Mutex::new(Vec::<u8>::new()));
@@ -301,7 +307,7 @@ mod tests {
     /// else, and a browser-borne token must never be what asks for a private key.
     #[tokio::test]
     async fn the_request_carries_the_machine_credential_and_no_user_jwt() {
-        let body: &'static str = Box::leak(served_body(2).into_boxed_str());
+        let body = served_body(2);
         let (base, seen, server) = cloud_stub(StatusCode::OK, body).await;
 
         fetch_delegated_certificate(&reqwest::Client::new(), &base, &machine_auth())
@@ -407,7 +413,7 @@ mod tests {
     async fn the_served_certificate_is_stored_encrypted_under_the_served_version() {
         ensure_master_key();
         let db = db_ready().await;
-        let body: &'static str = Box::leak(served_body(4).into_boxed_str());
+        let body = served_body(4);
         let (base, _seen, server) = cloud_stub(StatusCode::OK, body).await;
 
         let outcome = install_delegated_certificate(
@@ -487,7 +493,7 @@ mod tests {
         ensure_master_key();
         let db = db_ready().await;
 
-        let first: &'static str = Box::leak(served_body(4).into_boxed_str());
+        let first = served_body(4);
         let (base, _seen, server) = cloud_stub(StatusCode::OK, first).await;
         install_delegated_certificate(&reqwest::Client::new(), &base, &machine_auth(), &db, "hub-test")
             .await
@@ -495,11 +501,7 @@ mod tests {
         assert_eq!(certificate::delegated_version(&db, "hub-test").await.unwrap(), Some(4));
         server.abort();
 
-        let rotated: &'static str = Box::leak(
-            r#"{"version": 5, "pkcs12_b64": "Uk9UQVRFRC1QS0NTMTI=", "password": "pw-5"}"#
-                .to_string()
-                .into_boxed_str(),
-        );
+        let rotated = r#"{"version": 5, "pkcs12_b64": "Uk9UQVRFRC1QS0NTMTI=", "password": "pw-5"}"#;
         let (base, _seen, server) = cloud_stub(StatusCode::OK, rotated).await;
         install_delegated_certificate(&reqwest::Client::new(), &base, &machine_auth(), &db, "hub-test")
             .await
