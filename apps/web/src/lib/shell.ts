@@ -49,15 +49,23 @@ export function closeAssistant(): void {
   assistantOpen.value = false;
 }
 
-// ── Semilla de contexto del asistente ──────────────────────────────────────
-// Cuando el asistente se abre DESDE el botón "Revisar configuración" del dashboard, se siembra con
-// un contexto determinista (estado de configuración del hub) para que el LLM arranque informado.
-// AssistantDrawer lo consume como mensaje `system` en el primer turno y lo limpia tras usarlo.
-export const assistantSeed = ref<string | null>(null);
+// ── What the assistant was opened FOR ──────────────────────────────────────
+// A screen opening the assistant says **what about**, never **what to say** (hub#373). It used to
+// hand it a paragraph it had written itself out of a list kept beside the query, so the chat could
+// describe a hub the checklist did not. The assistant reads `hub.setup.status` on its own; all that
+// travels from the screen is the intent.
+export interface AssistantIntent {
+  /** What the chat opens on. Today the configuration checklist is the only topic. */
+  topic: 'setup';
+  /** `key` of the `hub.setup.status` item the user asked about; `null` = the whole checklist. */
+  itemKey: string | null;
+}
 
-/** Abre el asistente sembrado con un contexto (p. ej. el estado de configuración del hub). */
-export function openAssistantWithContext(context: string): void {
-  assistantSeed.value = context;
+export const assistantIntent = ref<AssistantIntent | null>(null);
+
+/** Opens the assistant on the hub's configuration, optionally loaded on one item of the checklist. */
+export function openAssistantForSetup(itemKey: string | null = null): void {
+  assistantIntent.value = { topic: 'setup', itemKey };
   assistantOpen.value = true;
 }
 

@@ -32,15 +32,20 @@
       <div ref="threadEl" class="assistant-body">
         <div v-if="messages.length === 0 && !streaming" class="chat-empty">
           <HubIcon name="sparkles-outline" class="chat-empty-icon" />
-          <p>{{ assistantSeed ? t('assistant.emptySetup') : t('assistant.empty') }}</p>
-          <!-- Sugerencias rápidas cuando hay contexto de configuración sembrado. -->
-          <div v-if="assistantSeed" class="chat-suggestions">
+          <p>{{ setupChat ? t('assistant.emptySetup') : t('assistant.empty') }}</p>
+          <!-- Quick chips when the chat opened on the configuration: one per PENDING item of
+               `hub.setup.status` (never an `unavailable` — there is nothing to ask about something
+               nobody can do) plus the overall one. Picking one loads the chat ON that item. -->
+          <div v-if="setupChat" class="chat-suggestions">
+            <button class="chat-suggestion" @click="askAboutSetup(null)">
+              {{ t('assistant.suggestWhatsMissing') }}
+            </button>
             <button
-              v-for="s in setupSuggestions"
-              :key="s"
+              v-for="task in quickTasks"
+              :key="task.key"
               class="chat-suggestion"
-              @click="sendSuggestion(s)"
-            >{{ s }}</button>
+              @click="askAboutSetup(task.key)"
+            >{{ t('assistant.suggestHowTo') }} {{ itemTitle(task) }}?</button>
           </div>
         </div>
 
@@ -151,7 +156,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { IonButton, IonTextarea, IonSpinner } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
-import { assistantOpen, closeAssistant, assistantSeed } from '../lib/shell';
+import { assistantOpen, closeAssistant, assistantIntent } from '../lib/shell';
 import {
   streamAssistant,
   fileToContentPart,
@@ -162,9 +167,11 @@ import {
   type ChatContentPart,
 } from '../lib/assistant';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
-import { pendingSetups } from '../lib/setup-status';
+import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
+import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
+import { getClient } from '../lib/runtime';
 
-const { t } = useI18n();
+const { t, te, locale } = useI18n();
 const router = useRouter();
 
 /**
@@ -204,14 +211,24 @@ function navigateTo(url: string): void {
   closeAssistant();
 }
 
-// Sugerencias rápidas cuando el asistente abre sembrado con contexto de configuración: una por
-// módulo pendiente ("¿Cómo configuro VeriFactu?") + una global ("¿Qué falta por configurar?").
-const setupSuggestions = computed<string[]>(() => {
-  const mods = pendingSetups.value.map((s) => s.title.replace(/^Configura\s+/i, ''));
-  const out = mods.slice(0, 4).map((m) => `${t('assistant.suggestHowTo')} ${m}?`);
-  out.unshift(t('assistant.suggestWhatsMissing'));
-  return out;
-});
+// ── The configuration chat: the assistant is the SECOND surface of `hub.setup.status` ───────────
+// (hub#373, `architecture/hub/setup-status.md`.) It reads the query itself; a screen only says WHAT
+// ABOUT (`assistantIntent`). The briefing is rebuilt on every turn from the current answer, so a hub
+// that gets configured mid-chat stops being described as unconfigured.
+const setupChat = computed<boolean>(() => assistantIntent.value?.topic === 'setup');
+
+/** The chips: PENDING items only, straight from the document — `assistantTasks` decides, not this. */
+const quickTasks = computed<SetupItem[]>(() => assistantTasks(setupStatus.value).slice(0, 4));
+
+/** The item as the CHECKLIST names it: same key convention, same name in both surfaces. */
+function itemTitle(item: SetupItem): string {
+  return translatedItem(item, 'title') || item.title || item.key;
+}
+
+function translatedItem(item: SetupItem, field: 'title' | 'description'): string | null {
+  const key = `setup.items.${item.key}.${field}`;
+  return te(key) ? t(key) : null;
+}
 
 // Hilo con alcance de SESIÓN (ADR-0149): vive en lib/assistant-history (sessionStorage),
 // sobrevive un reload y lo vacía logout(). El Cloud no guarda copia.
@@ -293,14 +310,27 @@ async function send(): Promise<void> {
   saveAssistantHistory();
   await scrollToBottom();
 
-  // El array COMPLETO menos la burbuja viva: el Cloud es un bridge sin estado (ADR-0149),
-  // el contexto multi-turno lo aporta el cliente en cada turno.
-  // Si hay un SEED de contexto (apertura desde "Revisar configuración"), se acopla como primer
-  // mensaje `system` — el backend lo reenvía al LLM. Solo en el primer turno; tras usarlo se limpia.
+  // The WHOLE array minus the live bubble: the Cloud is a stateless bridge (ADR-0149), so the
+  // multi-turn context is the client's to supply on every turn.
+  //
+  // In a configuration chat the first message is a `system` briefing built from `hub.setup.status`
+  // (hub#373). Two things it does NOT do: it is not stored in the thread (it is rebuilt every turn
+  // from the CURRENT answer, so what the user already finished stops being asked for), and it is not
+  // written by whoever opened the drawer — the assistant reads the query itself, right now, so it
+  // cannot describe a hub the checklist does not.
   let history = messages.value.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
-  if (assistantSeed.value) {
-    history = [{ role: 'system', content: assistantSeed.value }, ...history];
-    assistantSeed.value = null;
+  const intent = assistantIntent.value;
+  if (intent?.topic === 'setup') {
+    await refreshSetupStatus(getClient());
+    const briefing = setupBriefing(setupStatus.value, {
+      locale: locale.value,
+      focusKey: intent.itemKey,
+      translate: (key) => (te(key) ? t(key) : null),
+    });
+    // The focus OPENS the chat; it does not follow it. Repeating «the user is asking about X» on
+    // turn five would answer a question they already moved on from.
+    assistantIntent.value = { topic: 'setup', itemKey: null };
+    history = [{ role: 'system', content: briefing }, ...history];
   }
 
   abort = streamAssistant(history, {
@@ -325,9 +355,11 @@ async function send(): Promise<void> {
   });
 }
 
-/** Rellena el draft con una sugerencia y la envía (chips de configuración). */
-function sendSuggestion(text: string): void {
-  draft.value = text;
+/** Opens the chat loaded on one item of the checklist (or on all of it) and asks its question. */
+function askAboutSetup(itemKey: string | null): void {
+  assistantIntent.value = { topic: 'setup', itemKey };
+  const item = itemKey ? quickTasks.value.find((i) => i.key === itemKey) : null;
+  draft.value = item ? `${t('assistant.suggestHowTo')} ${itemTitle(item)}?` : t('assistant.suggestWhatsMissing');
   void send();
 }
 
@@ -347,6 +379,10 @@ watch(
   (open) => {
     document.documentElement.classList.toggle('assistant-open', open);
     if (open) void scrollToBottom();
+    // Opened on the configuration: read the query BEFORE painting the chips, or the drawer would
+    // offer the items of whatever screen last happened to read it (or none at all, from a screen
+    // that never does).
+    if (open && setupChat.value) void refreshSetupStatus(getClient());
   },
   { immediate: true }
 );

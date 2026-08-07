@@ -301,22 +301,8 @@ describe('`unavailable`: neither a pending to attempt nor a done', () => {
   });
 });
 
-describe('what is handed to the assistant', () => {
-  it('the pending ones, and NEVER an `unavailable`: there is no way to complete it', async () => {
-    await refreshSetupStatus(
-      clientReturning([
-        doc([
-          item('apps', { state: 'unavailable' }),
-          item('taxes.setup', { state: 'pending' }),
-          item('team', { state: 'done' }),
-        ]),
-      ]),
-    );
-
-    const { pendingSetups } = await import('./setup-status');
-    expect(pendingSetups.value.map((s) => s.moduleId)).toEqual(['taxes']);
-  });
-});
+// What is handed to the ASSISTANT now lives in `assistant-setup.test.ts` (hub#373): this module used
+// to keep a second projection of the document for it, and a second list is what hub#369 closed.
 
 describe('decision 1: the panel does not repeat what the apps card already offers', () => {
   it('with the apps card in sight, the checklist starts at item 2', () => {

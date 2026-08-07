@@ -152,8 +152,8 @@ import { dataTableLabels } from '../lib/data-table-labels';
 import { getClient, getHubSector } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
-import { refreshSetupStatus, seedSetupContext, setupStatus } from '../lib/setup-status';
-import { openAssistantWithContext } from '../lib/shell';
+import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
+import { openAssistantForSetup } from '../lib/shell';
 import { detectBridge } from '../lib/bridge-client';
 import { user } from '../lib/session';
 import { formatAmount } from '../lib/money';
@@ -387,12 +387,11 @@ async function loadActivity(): Promise<void> {
   }
 }
 
-// Opens the assistant seeded with the real configuration state (the SAME document the checklist
-// paints). It is the card's «ask the assistant» path; every item also keeps its own screen, so a
-// dead assistant never leaves an item without a way through. (hub#373 will have the assistant read
-// the query itself instead of this prose.)
+// The card's «ask the assistant» path. The panel says WHAT ABOUT and nothing more: the assistant
+// reads `hub.setup.status` itself (hub#373), so the chat cannot describe a hub the card does not.
+// Every item also keeps its own screen, so a dead assistant never leaves one without a way through.
 function reviewSetup(): void {
-  openAssistantWithContext(seedSetupContext());
+  openAssistantForSetup();
 }
 
 onMounted(async () => {

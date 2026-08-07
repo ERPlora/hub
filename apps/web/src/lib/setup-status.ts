@@ -1,10 +1,11 @@
-// The hub's configuration state, read from the ONE query that owns it (hub#372).
+// The hub's configuration state, read from the ONE query that owns it (hub#372, hub#373).
 //
 // **The configuration state is a single query. The checklist widget and the assistant are two
 // reads of the same query** (`architecture/hub/setup-status.md`, ADR-0224/0227). Until hub#372 they
 // were not: this file walked the installed manifests and fired N queries from the browser, so it
-// only ever knew about modules — your apps, your business identity and your team were invisible —
-// and the assistant received a paragraph built from that in-memory array instead of the data.
+// only ever knew about modules — your apps, your business identity and your team were invisible.
+// The assistant got a paragraph built from that in-memory array; since hub#373 it reads the document
+// itself (`assistant-setup.ts`) and there is no second list left to drift.
 //
 // What is left here is the reading and the SHAPE the card paints, and nothing else:
 //
@@ -227,55 +228,6 @@ export function isBlocking(item: SetupItem): boolean {
  */
 export function isActionable(item: SetupItem): boolean {
   return item.state === STATE_PENDING;
-}
-
-/** A module pending configuration, in the shape the assistant drawer still reads (hub#373). */
-export interface PendingSetup {
-  moduleId: string;
-  title: string;
-  description?: string;
-  icon: string;
-  route: string;
-}
-
-/**
- * The pending items, for the surfaces that have not moved to the document yet.
- *
- * `unavailable` is deliberately NOT here: it is not pending for the user, and offering the
- * assistant a task nobody can complete would have it invent a way to complete it.
- */
-export const pendingSetups = computed<PendingSetup[]>(() =>
-  (_status.value?.items ?? [])
-    .filter((i) => i.state === STATE_PENDING)
-    .map((i) => ({
-      moduleId: i.moduleId ?? i.key,
-      title: i.title,
-      description: i.description || undefined,
-      icon: i.icon,
-      route: i.route,
-    })),
-);
-
-/**
- * Deterministic seed for the assistant, from the SAME document the card paints.
- *
- * Still prose, and still a stop-gap: hub#373 replaces this with the assistant reading the query
- * itself. What it no longer does is describe a different hub than the card.
- */
-export function seedSetupContext(): string {
-  const list = pendingSetups.value;
-  const header = 'Eres el asistente de configuración del hub ERPlora. Ayuda al usuario a dejar todo configurado.';
-  if (!list.length) {
-    return `${header}\n\nEstado: no queda nada pendiente de configurar. Si el usuario pregunta por algo concreto, explícale cómo funciona y ofrécele ir a su pantalla.`;
-  }
-  const items = list
-    .map((s) => `• ${s.title}${s.description ? ` — "${s.description}"` : ''}\n  Pantalla: ${s.route}`)
-    .join('\n');
-  return (
-    `${header}\n\nQueda(n) ${list.length} cosa(s) por configurar:\n${items}\n\n` +
-    'Cuando el usuario pregunte cómo configurar algo, explica los pasos con la descripción de arriba y dile a qué pantalla ir (la ruta). ' +
-    'Puedes usar las tools disponibles para consultar el estado real de los módulos. Ofrece ayudar a configurar cada uno.'
-  );
 }
 
 /**
