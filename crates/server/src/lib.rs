@@ -55,6 +55,7 @@ pub mod media;
 pub mod members;
 pub mod module_storage;
 pub mod openapi;
+pub mod print;
 pub mod profile;
 pub mod router;
 pub mod settings;
@@ -740,6 +741,13 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        // ── Print queue of the hub (ADR-0196 §6, hub#341) ───────────────────────────────────
+        // Enqueue `{jobId, role, html}` (idempotent by `jobId`) and observe the queue. Draining it
+        // — the print host over the runtime WS — is hub#342/#343. Auth = user session.
+        .route(
+            "/api/print/jobs",
+            get(print::list_jobs).post(print::enqueue_job),
+        )
         // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────
         // Gestión de keys (auth = sesión admin owner/admin; NO una api key).
         .route(
