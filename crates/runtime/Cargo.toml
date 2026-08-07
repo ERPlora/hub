@@ -39,7 +39,7 @@ base64 = "0.22"
 # Ejecución del handler WASM FUERA del worker async (hub#241): `spawn_blocking` + `timeout`. La
 # llamada a wasmtime es bloqueante; hacerla en el propio worker de Tokio dejaba colgado el runtime
 # entero cuando un handler no terminaba. Solo se usan `rt` (spawn_blocking) y `time` (timeout).
-tokio = { version = "1", features = ["rt", "time"] }
+tokio = { version = "1", features = ["rt", "sync", "time"] }
 
 # OpenSSL parsea los `.p12` BER reales (FNMT/Windows) que un parser DER puro rechaza — pero
 # `openssl-sys` (vendored) NO cross-compila para Android (el NDK r23+ no trae los wrappers

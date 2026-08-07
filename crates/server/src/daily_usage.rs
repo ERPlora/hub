@@ -26,6 +26,64 @@ pub struct DailyUsageHeartbeat {
     /// entrado**, y el Cloud debe dejar correr el reloj. Ver `crate::activity`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_user_activity_at: Option<String>,
+    /// Version of the **delegated** certificate this hub holds (ADR-0202 §2.5 — hub#318).
+    ///
+    /// Three states, and the Cloud stores all three differently, so they must not be conflated:
+    /// an explicit **`0`** is «I hold no delegated certificate» (a fresh hub, or one that was
+    /// reprovisioned and lost its `HUB_SECRETS_KEY`), a positive number is the version it really
+    /// holds, and **absent** is «I am not telling you» — which the Cloud leaves as `NULL`, its
+    /// «never reported» state.
+    ///
+    /// Absent is therefore reserved for a READ FAILURE, never for «no certificate»: the same rule
+    /// `orders_today` follows above. A fabricated `0` would show up in the fleet panel as a hub
+    /// that lost ERPlora's certificate, and would send somebody looking for a rotation that never
+    /// broke.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cert_version: Option<i64>,
+    /// `notAfter` of that same delegated container, `YYYY-MM-DD`. Absent when unknown — including
+    /// when `cert_version` is `0`, which is what clears a stale expiry on the Cloud side.
+    ///
+    /// The Cloud compares it against the `not_after` of the `.p12` IT custodies: same version and a
+    /// different date means the hub is not really running our certificate (ADR-0202 §2.5).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cert_not_after: Option<String>,
+}
+
+/// What the control plane answered to a heartbeat (ADR-0202 §2.5 — hub#318).
+///
+/// The heartbeat is the **downstream** half of the convergence contract: the response carries the
+/// version of the certificate the control plane currently serves, and a hub whose own version
+/// differs refetches. It is the cheap trigger — the call already happens, with the credential it
+/// already carries, so a rotation converges without a second scheduler or a push channel.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HeartbeatResponse {
+    /// `cert_version` announced by the control plane, when it announced one at all.
+    ///
+    /// **`None` is «nothing was announced», not «zero»**: an older SaaS answers `{"ok": true}` and
+    /// a proxy can answer something that is not JSON at all. Reading either as `0` would be reading
+    /// «the control plane has no certificate» out of silence.
+    pub cert_version: Option<i64>,
+}
+
+impl HeartbeatResponse {
+    /// Reads the response body **best-effort**: anything unexpected means «nothing announced».
+    ///
+    /// Deliberately forgiving, and it is not laziness. A 2xx heartbeat already did its real job
+    /// (ADR-0175's activity clock, which is what decides whether a free hub gets switched off), so
+    /// a body this hub cannot understand must not turn into an error that stops the clock. The
+    /// certificate announcement is an extra that rides along, and it degrades to «no news».
+    pub fn parse(body: &str) -> Self {
+        let announced = serde_json::from_str::<Value>(body)
+            .ok()
+            .and_then(|value| value.get("cert_version").and_then(Value::as_i64))
+            // A negative version cannot exist (`DelegatedCertificate.version` starts at 0 and only
+            // grows). Treating it as an announcement would make the hub chase a version nobody can
+            // serve, once per heartbeat, against a budgeted endpoint.
+            .filter(|version| *version >= 0);
+        Self {
+            cert_version: announced,
+        }
+    }
 }
 
 /// Collect today's completed, non-deleted sales and the latest sale timestamp.
@@ -76,16 +134,22 @@ pub async fn collect_daily_usage(
         // La actividad de usuario no sale de la BD: la lleva el `ActivityState` en memoria, y la
         // rellena el llamador (`serve`) solo si hay algo nuevo que reportar.
         last_user_activity_at: None,
+        // El certificado delegado tampoco sale de aquí: lo rellena el llamador (`serve`) con
+        // `fiscal_certificate::delegated_certificate_report`, que sabe distinguir «no tengo» de
+        // «no he podido leerlo».
+        cert_version: None,
+        cert_not_after: None,
     }
 }
 
-/// Send a best-effort heartbeat with the existing machine credential.
+/// Send a best-effort heartbeat with the existing machine credential, and return what the control
+/// plane announced back (ADR-0202 §2.5 — hub#318).
 pub async fn send_heartbeat(
     http: &reqwest::Client,
     cloud_base_url: &str,
     auth: &cloud_client::Auth,
     body: &DailyUsageHeartbeat,
-) -> Result<(), String> {
+) -> Result<HeartbeatResponse, String> {
     let req = cloud_client::CloudClient::new(cloud_base_url).heartbeat(auth);
     let mut request = http.post(&req.url).json(body);
     for (name, value) in req.headers {
@@ -95,7 +159,11 @@ pub async fn send_heartbeat(
     if !response.status().is_success() {
         return Err(format!("{}: status {}", req.url, response.status()));
     }
-    Ok(())
+    // A 2xx IS the success: the heartbeat's own job (ADR-0175's activity clock) is done, and the
+    // caller may confirm it. The body is a bonus, so a truncated read degrades to «nothing
+    // announced» rather than undoing a heartbeat that the Cloud already recorded.
+    let body = response.text().await.unwrap_or_default();
+    Ok(HeartbeatResponse::parse(&body))
 }
 
 fn value_as_u64(value: &Value) -> Option<u64> {
@@ -206,6 +274,8 @@ mod tests {
             last_sale_at: Some("2026-07-27T11:30:00Z".into()),
             terminals: Some(3),
             last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
+            cert_version: Some(4),
+            cert_not_after: Some("2028-06-10".into()),
         };
         send_heartbeat(
             &reqwest::Client::new(),
@@ -226,6 +296,8 @@ mod tests {
                 "last_sale_at": "2026-07-27T11:30:00Z",
                 "terminals": 3,
                 "last_user_activity_at": "2026-07-27T11:45:00Z",
+                "cert_version": 4,
+                "cert_not_after": "2028-06-10",
             })
         );
         server.abort();
@@ -241,9 +313,185 @@ mod tests {
             last_sale_at: None,
             terminals: Some(0),
             last_user_activity_at: None,
+            cert_version: None,
+            cert_not_after: None,
         };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("last_user_activity_at").is_none());
         assert_eq!(body, json!({"orders_today": 0, "terminals": 0}));
+    }
+
+    // ── The certificate the hub REPORTS (ADR-0202 §2.5 — hub#318) ─────────────────────────────
+
+    /// **`0` travels, silence does not.** The Cloud stores `NULL` (never reported) and `0` (holds
+    /// no delegated certificate) in different states, so a hub that genuinely has none must SAY
+    /// `0` — omitting it would leave the fleet panel showing a hub that never spoke, forever.
+    #[test]
+    fn a_hub_with_no_delegated_certificate_reports_an_explicit_zero() {
+        let usage = DailyUsageHeartbeat {
+            orders_today: None,
+            last_sale_at: None,
+            terminals: None,
+            last_user_activity_at: None,
+            cert_version: Some(0),
+            cert_not_after: None,
+        };
+        let body = serde_json::to_value(&usage).unwrap();
+        assert_eq!(body, json!({"cert_version": 0}));
+        // Y la caducidad NO viaja: es justo lo que borra en el Cloud la fecha vieja de un hub
+        // reprovisionado (§2.5, «el par se escribe entero»).
+        assert!(body.get("cert_not_after").is_none());
+    }
+
+    /// **A read failure is silence, never a zero.** Same rule `orders_today` already follows: the
+    /// Cloud must not turn a failure of ours into a fact about the fleet. A fabricated `0` would
+    /// paint a healthy hub as one that lost ERPlora's certificate.
+    #[test]
+    fn a_hub_that_could_not_read_its_certificate_says_nothing_instead_of_zero() {
+        let usage = DailyUsageHeartbeat {
+            orders_today: Some(3),
+            last_sale_at: None,
+            terminals: Some(1),
+            last_user_activity_at: None,
+            cert_version: None,
+            cert_not_after: None,
+        };
+        let body = serde_json::to_value(&usage).unwrap();
+        assert!(body.get("cert_version").is_none());
+        assert_eq!(body, json!({"orders_today": 3, "terminals": 1}));
+    }
+
+    // ── What the control plane announces back (ADR-0202 §2.5) ─────────────────────────────────
+
+    #[test]
+    fn the_announced_version_is_read_from_the_response() {
+        assert_eq!(
+            HeartbeatResponse::parse(r#"{"ok": true, "cert_version": 4}"#),
+            HeartbeatResponse {
+                cert_version: Some(4)
+            }
+        );
+        // `0` es un anuncio de pleno derecho: «no he subido nada» (y el hub NO debe pedir el GET).
+        assert_eq!(
+            HeartbeatResponse::parse(r#"{"ok": true, "cert_version": 0}"#).cert_version,
+            Some(0)
+        );
+    }
+
+    /// **Silence is not zero.** A SaaS from before saas#1126 answers `{"ok": true}`; reading that
+    /// as «the control plane has no certificate» would be inventing news out of an old deployment.
+    #[test]
+    fn an_older_control_plane_that_announces_nothing_is_not_read_as_zero() {
+        assert_eq!(HeartbeatResponse::parse(r#"{"ok": true}"#).cert_version, None);
+        assert_eq!(
+            HeartbeatResponse::parse(r#"{"cert_version": null}"#).cert_version,
+            None
+        );
+    }
+
+    /// **A body this hub cannot parse must not become an error.** The heartbeat already succeeded
+    /// (2xx) and its real job is ADR-0175's activity clock: if an edge that answers HTML turned the
+    /// call into a failure, the hub would stop confirming activity and the Cloud would count it
+    /// idle — and eventually switch a hub off that people are using every day.
+    #[test]
+    fn a_body_that_is_not_json_degrades_to_no_news() {
+        assert_eq!(HeartbeatResponse::parse("<html>502</html>").cert_version, None);
+        assert_eq!(HeartbeatResponse::parse("").cert_version, None);
+        assert_eq!(HeartbeatResponse::parse("[]").cert_version, None);
+    }
+
+    /// A version that cannot exist is not an announcement. `DelegatedCertificate.version` starts at
+    /// `0` and only grows, so a negative would just make the hub chase a certificate nobody can
+    /// serve — once per heartbeat, against an endpoint that is budgeted at 20/h.
+    #[test]
+    fn a_negative_version_is_not_an_announcement() {
+        assert_eq!(
+            HeartbeatResponse::parse(r#"{"cert_version": -1}"#).cert_version,
+            None
+        );
+    }
+
+    /// A 2xx whose body is unreadable is still a heartbeat that ARRIVED: it must come back `Ok`,
+    /// because the caller confirms ADR-0175's activity mark on `Ok` and only on `Ok`.
+    #[tokio::test]
+    async fn an_unparseable_body_still_counts_as_a_delivered_heartbeat() {
+        let app = Router::new().route(
+            "/api/v1/hub/device/heartbeat/",
+            post(|| async { (StatusCode::OK, "<html>hola</html>") }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let auth = cloud_client::Auth::HubToken {
+            hub_id: "hub-a".into(),
+            token: "machine-token".into(),
+        };
+        let response = send_heartbeat(
+            &reqwest::Client::new(),
+            &format!("http://{address}"),
+            &auth,
+            &DailyUsageHeartbeat {
+                orders_today: None,
+                last_sale_at: None,
+                terminals: None,
+                last_user_activity_at: None,
+                cert_version: Some(0),
+                cert_not_after: None,
+            },
+        )
+        .await
+        .expect("un 2xx es un latido entregado, lo que traiga el cuerpo o no");
+        assert_eq!(response.cert_version, None);
+        server.abort();
+    }
+
+    /// 🔒 …y lo mismo cuando el cuerpo **no se puede ni leer**: la respuesta promete 64 bytes y la
+    /// conexión se corta a los 2.
+    ///
+    /// Es el caso que un stub HTTP normal no puede montar, y es justo el que aparece de verdad —
+    /// un reset a mitad de respuesta, un edge que se rinde. Si eso convirtiera el latido en un
+    /// error, el hub dejaría de confirmar la marca de actividad de ADR-0175 y el Cloud acabaría
+    /// **apagando un hub que se usa a diario**. El anuncio del certificado es un extra que viaja
+    /// encima; el latido ya llegó.
+    #[tokio::test]
+    async fn a_body_that_cannot_even_be_read_still_counts_as_a_delivered_heartbeat() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener.accept().await {
+                // Basta con drenar algo de la petición para que el cliente termine de enviarla.
+                let mut buffer = [0u8; 4096];
+                let _ = socket.read(&mut buffer).await;
+                let _ = socket
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\nok")
+                    .await;
+                let _ = socket.shutdown().await;
+            }
+        });
+
+        let auth = cloud_client::Auth::HubToken {
+            hub_id: "hub-a".into(),
+            token: "machine-token".into(),
+        };
+        let response = send_heartbeat(
+            &reqwest::Client::new(),
+            &format!("http://{address}"),
+            &auth,
+            &DailyUsageHeartbeat {
+                orders_today: None,
+                last_sale_at: None,
+                terminals: None,
+                last_user_activity_at: None,
+                cert_version: Some(4),
+                cert_not_after: None,
+            },
+        )
+        .await
+        .expect("un 2xx entregado no puede deshacerse porque el cuerpo se corte");
+        assert_eq!(response.cert_version, None, "sin cuerpo legible, sin noticias");
+        server.abort();
     }
 }

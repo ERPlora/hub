@@ -491,6 +491,29 @@ pub async fn slot_expiry(
     }
 }
 
+/// Expiry of ONE slot as the **instant** it really is (RFC 3339 UTC), not the day it falls on
+/// (hub#318).
+///
+/// [`slot_expiry`] truncates to `YYYY-MM-DD` because that is what a person reads. What the hub
+/// REPORTS to the control plane cannot be truncated: the fleet panel compares
+/// `reported_cert_not_after` against the `not_after` the SaaS extracted from the container IT
+/// custodies (`x509_cert.not_valid_after_utc`) for **equality**, and flags any hub that differs as
+/// «not running our certificate» (ADR-0202 §2.6). A date comes back as midnight, so it would differ
+/// for every certificate that does not expire at exactly 00:00:00 — that is, all of them — and the
+/// alarm would fire on the entire healthy fleet.
+///
+/// Same shape of mistake hub#317 fixed by reading the wrong SLOT; this one is the format axis.
+pub async fn slot_expiry_instant(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    kind: CertificateKind,
+) -> Result<Option<String>> {
+    match load_pkcs12(db, hub_id, kind).await? {
+        Some((der, password)) => expiry_instant_from_der(&der, &password),
+        None => Ok(None),
+    }
+}
+
 /// The PKCS#12 of the slot that [`active_kind`] selects.
 async fn load_active_pkcs12(
     db: &dyn DatabaseAdapter,
@@ -570,6 +593,28 @@ pub fn expiry_from_der(_der: &[u8], _password: &str) -> Result<Option<String>> {
     Ok(None)
 }
 
+/// `notAfter` de un PKCS#12 en DER como **instante** RFC 3339 UTC (`2028-06-10T09:12:33Z`).
+/// Gemelo de [`expiry_from_der`] sin truncar el día — ver [`slot_expiry_instant`] para el porqué.
+#[cfg(not(target_os = "android"))]
+pub fn expiry_instant_from_der(der: &[u8], password: &str) -> Result<Option<String>> {
+    ensure_legacy_provider();
+    let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
+    let parsed = pkcs12
+        .parse2(password)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    match parsed.cert {
+        Some(cert) => Ok(asn1_time_to_rfc3339(&cert.not_after().to_string())),
+        None => Ok(None),
+    }
+}
+
+/// Stub Android: sin OpenSSL no se puede leer la caducidad del `.p12` (ver `Cargo.toml`).
+#[cfg(target_os = "android")]
+pub fn expiry_instant_from_der(_der: &[u8], _password: &str) -> Result<Option<String>> {
+    Ok(None)
+}
+
 /// Carga (una sola vez) el proveedor **`legacy`** de OpenSSL 3 junto al `default`, para descifrar
 /// PKCS#12 con PBE antiguos (RC2-40-CBC, 3DES) de certificados reales (FNMT, exportados de Windows).
 /// OpenSSL 3 los movió fuera del proveedor por defecto; sin esto fallan con `RC2-40-CBC : unsupported`.
@@ -598,14 +643,75 @@ fn asn1_time_to_iso(s: &str) -> Option<String> {
     Some(format!("{}-{}-{}", parts[3], month, day))
 }
 
+/// "Jun 10 09:12:33 2028 GMT" → "2028-06-10T09:12:33Z". `None` si el formato no casa.
+///
+/// La fecha sale de [`asn1_time_to_iso`] —una sola lectura del día, para que las dos respuestas no
+/// puedan separarse— y solo se le añade la hora, que en el `Display` de OpenSSL es siempre UTC
+/// (`GMT`). Una hora con una forma que no reconocemos devuelve `None`: mejor «no lo sé» que un
+/// instante inventado, que es lo que el panel de flota compararía por igualdad.
+#[cfg(not(target_os = "android"))]
+fn asn1_time_to_rfc3339(s: &str) -> Option<String> {
+    let date = asn1_time_to_iso(s)?;
+    let time = s.split_whitespace().nth(2)?;
+    let shaped = time.len() == 8
+        && time.as_bytes().iter().enumerate().all(|(i, b)| {
+            if i == 2 || i == 5 {
+                *b == b':'
+            } else {
+                b.is_ascii_digit()
+            }
+        });
+    shaped.then(|| format!("{date}T{time}Z"))
+}
+
 #[cfg(all(test, not(target_os = "android")))]
 mod asn1_tests {
-    use super::asn1_time_to_iso;
+    use super::{asn1_time_to_iso, asn1_time_to_rfc3339};
     #[test]
     fn parses_openssl_asn1_time() {
         assert_eq!(asn1_time_to_iso("Jun 10 00:00:00 2028 GMT").as_deref(), Some("2028-06-10"));
         assert_eq!(asn1_time_to_iso("Mar 3 23:59:59 2027 GMT").as_deref(), Some("2027-03-03"));
         assert_eq!(asn1_time_to_iso("garbage").as_deref(), None);
+    }
+
+    /// El instante conserva la HORA. Truncarla haría que el hub reportase medianoche y que el panel
+    /// de flota (ADR-0202 §2.6, igualdad exacta) marcase «no está firmando con nuestro certificado»
+    /// a todo hub sano.
+    #[test]
+    fn parses_the_instant_and_not_only_the_day() {
+        assert_eq!(
+            asn1_time_to_rfc3339("Jun 10 09:12:33 2028 GMT").as_deref(),
+            Some("2028-06-10T09:12:33Z")
+        );
+        // Día de un dígito: OpenSSL mete DOS espacios, y el instante tiene que salir igual de bien.
+        assert_eq!(
+            asn1_time_to_rfc3339("Mar  3 23:59:59 2027 GMT").as_deref(),
+            Some("2027-03-03T23:59:59Z")
+        );
+    }
+
+    /// Una forma que no reconocemos vale `None`, nunca un instante inventado: la fecha que se
+    /// reporta se compara por IGUALDAD contra la que custodia el SaaS.
+    #[test]
+    fn an_unrecognised_shape_is_not_guessed_into_an_instant() {
+        assert_eq!(asn1_time_to_rfc3339("garbage").as_deref(), None);
+        assert_eq!(asn1_time_to_rfc3339("Jun 10 9:12:33 2028 GMT").as_deref(), None);
+        assert_eq!(asn1_time_to_rfc3339("Jun 10 091233 2028 GMT").as_deref(), None);
+        assert_eq!(asn1_time_to_rfc3339("Jun 10 09-12-33 2028 GMT").as_deref(), None);
+    }
+
+    /// **Las dos lecturas no pueden separarse**: la fecha es exactamente el prefijo del instante.
+    /// Si alguna vez divergen, lo que el usuario ve y lo que el hub reporta describirían días
+    /// distintos del mismo certificado.
+    #[test]
+    fn the_day_is_the_prefix_of_the_instant() {
+        for raw in ["Jun 10 09:12:33 2028 GMT", "Mar  3 23:59:59 2027 GMT"] {
+            let day = asn1_time_to_iso(raw).unwrap();
+            let instant = asn1_time_to_rfc3339(raw).unwrap();
+            assert_eq!(instant[..day.len()], day);
+            assert_eq!(&instant[day.len()..day.len() + 1], "T");
+            assert!(instant.ends_with('Z'));
+        }
     }
 }
 
@@ -1170,6 +1276,38 @@ mod tests {
         assert_eq!(
             slot_expiry(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
             Some(expected_date)
+        );
+    }
+
+    /// **The reported instant and the displayed day describe the SAME moment.** `slot_expiry` is
+    /// what a person reads and `slot_expiry_instant` is what the control plane compares by
+    /// equality, so the day has to be the instant's prefix — over a real container, not only over
+    /// the string parser.
+    #[tokio::test]
+    async fn the_reported_instant_and_the_displayed_day_agree_on_the_same_slot() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(21));
+        let db = db_ready().await;
+
+        let (delegated_b64, delegated_pw, expected_day) = real_pkcs12(365);
+        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4).await.unwrap();
+
+        let instant = slot_expiry_instant(&db, "hub-test", CertificateKind::Delegated)
+            .await
+            .unwrap()
+            .expect("el instante del contenedor");
+        assert!(
+            instant.starts_with(&expected_day),
+            "el instante {instant} no empieza por el día {expected_day}"
+        );
+        assert!(instant.ends_with('Z'), "el instante tiene que ser UTC: {instant}");
+        // Y lleva la HORA: si fuese la fecha truncada, el panel de flota lo leería como medianoche.
+        assert!(instant.len() > expected_day.len() + 1, "sin hora: {instant}");
+
+        // Un slot vacío no inventa fecha.
+        assert_eq!(
+            slot_expiry_instant(&db, "hub-test", CertificateKind::Own).await.unwrap(),
+            None
         );
     }
 
