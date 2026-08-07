@@ -402,6 +402,65 @@ CREATE TABLE _print_queue (\
 CREATE INDEX ix_print_queue_next ON _print_queue (hub_id, role, status, seq);\
 CREATE INDEX ix_print_queue_lease ON _print_queue (hub_id, status, lease_expires_at);",
     },
+    // ── v19 — hub#436: the email of the rows written before hub#356, moved to where ACCESS is ───
+    // hub#356 (PR #432) fixed the code — the alta now writes the email in the two places that need
+    // it — but not the rows that were already in the deployed hubs. Those hold the address **only**
+    // in `hub_user_profile.email`, what the person sees in their profile, while everything that
+    // administers access resolves against `hub_user.email` (v9): `get_or_link_cloud_user` links by
+    // it on the first login, `revoke_cloud_access` closes the door by it when the SaaS revokes a
+    // membership (rule D, hub#348), and it is the key of the `/api/members` alta and baja.
+    //
+    // So for those people **deactivating revokes nothing**: the SaaS takes their membership away
+    // and the hub matches no row — session, PIN and pinpad all keep working. That is the security
+    // half of hub#436 and the reason this is a migration and not a screen: the rows are already out
+    // there and nobody is going to find them by hand.
+    //
+    // ⚠️ **v19 and not a number reused from the 15 gap.** `apply` compares against the MAXIMUM
+    // applied version, so anything at or below it is skipped IN SILENCE — see the v18 note. The
+    // maximum in `develop` when this was written was 18; this takes the next number above it, and a
+    // rebase that brings another migration in must renumber this one, not squeeze it underneath.
+    //
+    // **What it deliberately does NOT do.** `hub_user.email` has no unique constraint (v9 creates a
+    // plain index; uniqueness is a SELECT-then-write in code), so a blind copy cannot fail — it
+    // would quietly leave two rows answering for one address. The two `NOT EXISTS` guards are that
+    // refusal, and the first one is a security guard, not tidiness: `/api/profile` is self-service
+    // and unchecked, so a cashier can type the administrator's address into their own profile.
+    // Copying it would give that row the administrator's access key, and the next cloud login could
+    // land on it and raise it to the role floor (hub#347) — a privilege escalation performed by the
+    // migration itself. The second guard covers the pair hub#356 produced (the row the admin created
+    // plus the row the first login provisioned): picking one means deciding which id keeps the
+    // sales, the sessions and the audit trail, and which of two different roles is the real one.
+    // Nothing in the data says that, so neither is touched and both are reported at every boot
+    // (`access_email::report_unresolved`) for a human to resolve.
+    //
+    // Scoped through the profile's `hub_id` (`hub_user` has none: since ADR-0201 each hub owns its
+    // database), exactly like the Personal listing. Copied VERBATIM after trimming — the access
+    // lookups compare the string exactly, so lower-casing it here would be a change of identity,
+    // not a normalisation; the guards compare case-insensitively because the alta guard that
+    // catches duplicates (`identity::email_is_known`) does.
+    //
+    // Idempotent by construction: it only writes rows whose access column is empty, so a second run
+    // finds none of the ones it fixed. Silent on a healthy hub — a new hub, or one where every alta
+    // went through the fixed code, matches nothing and this is a no-op.
+    SystemMigration {
+        version: 19,
+        name: "hub_user_access_email_backfill",
+        postgres: "\
+UPDATE hub_user AS u SET email = TRIM(pr.email) \
+  FROM hub_user_profile AS pr \
+ WHERE pr.user_id = u.id \
+   AND pr.hub_id = :hub_id \
+   AND COALESCE(TRIM(u.email), '') = '' \
+   AND TRIM(pr.email) <> '' \
+   AND NOT EXISTS (SELECT 1 FROM hub_user AS o \
+                    WHERE o.id <> u.id \
+                      AND LOWER(TRIM(COALESCE(o.email, ''))) = LOWER(TRIM(pr.email))) \
+   AND NOT EXISTS (SELECT 1 FROM hub_user_profile AS r \
+                     JOIN hub_user AS ru ON ru.id = r.user_id \
+                    WHERE r.hub_id = pr.hub_id AND r.user_id <> pr.user_id \
+                      AND LOWER(TRIM(r.email)) = LOWER(TRIM(pr.email)) \
+                      AND COALESCE(TRIM(ru.email), '') = '');",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -508,33 +567,27 @@ mod tests {
     /// cual, la segunda en llegar habría desaparecido en los hubs que ya hubieran pasado por la
     /// primera.
     ///
-    /// Este test fija el invariante desde el lado del hub ya desplegado: con TODAS las demás
-    /// migraciones ya registradas, un arranque nuevo **sí** aplica `print_queue`. Si alguien la
+    /// Este test fija el invariante desde el lado del hub ya desplegado: con todas las migraciones
+    /// ANTERIORES ya aplicadas, un arranque nuevo **sí** aplica `print_queue`. Si alguien la
     /// renumera por debajo de otra, aquí revienta (la tabla no existiría) en vez de en producción.
+    ///
+    /// El hub se para **justo antes** de la cola, no «en todas menos esta»: registrar también las
+    /// posteriores subiría el máximo aplicado por encima de la v18 y el test se saltaría a sí mismo
+    /// —exactamente el fallo que vigila— en cuanto llegase una migración más (pasó con la v19).
     #[tokio::test]
     async fn a_hub_already_migrated_still_receives_the_print_queue() {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db)
-            .await
-            .unwrap();
-        crate::identity::ensure_tables(&db).await.unwrap();
-        ensure_control_table(&db).await.unwrap();
-
-        // Un hub que ya pasó por TODO el catálogo salvo la cola de impresión.
-        for m in MIGRATIONS.iter().filter(|m| m.name != "print_queue") {
-            let mut p = Params::new();
-            p.insert("version".into(), json!(m.version));
-            p.insert("name".into(), json!(m.name));
-            p.insert("at".into(), json!(now_rfc3339()));
-            db.execute(
-                "INSERT INTO _hub_system_migrations (version, name, applied_at) \
-                 VALUES (:version, :name, :at)",
-                &p,
-            )
-            .await
-            .unwrap();
-        }
+        let print_queue = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "print_queue")
+            .expect("la cola de impresión sigue en el catálogo");
+        hub_deployed_through(&db, print_queue.version - 1).await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            print_queue.version - 1,
+            "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
+        );
 
         apply(&db, "hub-test").await.unwrap();
 
@@ -545,6 +598,50 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    /// El mismo invariante para la v19 (hub#436): un hub que ya pasó por todo lo anterior **sí**
+    /// recibe el backfill del email de acceso. Es el test que revienta si alguien la renumera por
+    /// debajo del máximo — donde se saltaría en silencio y las filas seguirían sin revocarse.
+    #[tokio::test]
+    async fn a_hub_already_migrated_still_receives_the_access_email_backfill() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let backfill = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_user_access_email_backfill")
+            .expect("el backfill sigue en el catálogo");
+        hub_deployed_through(&db, backfill.version - 1).await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            backfill.version - 1,
+            "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
+        );
+        // Una fila escrita por el alta anterior a hub#356: el email solo en el perfil.
+        db.execute_batch(
+            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+               VALUES ('u1', 'Ana Soto', '', 'admin', NULL, 1, '2026-08-01T10:00:00Z', '');\
+             INSERT INTO hub_user_profile \
+               (hub_id, user_id, first_name, last_name, email, avatar_path, updated_at) \
+               VALUES ('hub-test', 'u1', 'Ana', 'Soto', 'ana@example.com', '', '2026-08-01T10:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test").await.unwrap();
+
+        let row = db
+            .query(
+                "SELECT email FROM hub_user WHERE id = 'u1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            row.rows[0]["email"],
+            json!("ana@example.com"),
+            "el email llegó a la columna por la que se administra el ACCESO"
+        );
     }
 
     #[test]
@@ -829,29 +926,39 @@ mod tests {
     /// device-trust table (v17, hub#357) would otherwise fail against a hub that never had one —
     /// a hub that has never existed, since v2 creates it for everybody.
     async fn hub_deployed_before_the_slots(db: &dyn DatabaseAdapter) {
-        db.execute_batch(
-            "CREATE TABLE _hub_certificate (\
-               hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
-               uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
-               PRIMARY KEY (hub_id));\
-             CREATE TABLE hub_trusted_device (\
-               device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
-        )
-        .await
-        .unwrap();
+        hub_deployed_through(db, 13).await;
+    }
+
+    /// Un hub **realmente** desplegado hasta la migración `upto`: el baseline v0 más el SQL de cada
+    /// migración hasta esa versión, aplicado de verdad y registrado.
+    ///
+    /// Los fixtures de aquí abajo **declaraban** aplicadas unas versiones sin correr su SQL, y era
+    /// inofensivo mientras ninguna migración posterior leyera esas tablas. La v19 (hub#436) lee
+    /// `hub_user`, cuya columna `email` solo existe porque corrió la v9: un fixture que miente sobre
+    /// el esquema convierte un fallo de la migración en un test que pasa por el motivo equivocado.
+    /// Se replican, pues, de verdad.
+    async fn hub_deployed_through(db: &dyn DatabaseAdapter, upto: i64) {
+        crate::installer::ensure_hub_module_table(db).await.unwrap();
+        crate::identity::ensure_tables(db).await.unwrap();
         ensure_control_table(db).await.unwrap();
-        for v in 1..=13 {
-            let mut p = Params::new();
-            p.insert("version".into(), json!(v));
-            p.insert("name".into(), json!(format!("pre_slots_{v}")));
-            p.insert("applied_at".into(), json!("2026-01-01T00:00:00Z"));
-            db.execute(
+        let mut hub = Params::new();
+        hub.insert("hub_id".into(), json!("hub-test"));
+        for m in MIGRATIONS.iter().filter(|m| m.version <= upto) {
+            let mut ops: Vec<(String, Params)> = split_statements(m.postgres)
+                .into_iter()
+                .map(|stmt| (stmt, hub.clone()))
+                .collect();
+            let mut record = Params::new();
+            record.insert("version".into(), json!(m.version));
+            record.insert("name".into(), json!(m.name));
+            record.insert("applied_at".into(), json!(now_rfc3339()));
+            ops.push((
                 "INSERT INTO _hub_system_migrations (version, name, applied_at) \
-                 VALUES (:version, :name, :applied_at)",
-                &p,
-            )
-            .await
-            .unwrap();
+                 VALUES (:version, :name, :applied_at)"
+                    .to_string(),
+                record,
+            ));
+            db.execute_tx(&ops).await.unwrap();
         }
     }
 
@@ -945,28 +1052,13 @@ mod tests {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
         // Un hub anterior a la v17: la tabla del device-trust (v2) SIN las columnas del modo.
+        hub_deployed_through(&db, 16).await;
         db.execute_batch(
-            "CREATE TABLE hub_trusted_device (\
-               device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);\
-             INSERT INTO hub_trusted_device (device_id, label, trusted_at) \
+            "INSERT INTO hub_trusted_device (device_id, label, trusted_at) \
              VALUES ('till-1', 'Caja 1', '2026-01-01T00:00:00Z');",
         )
         .await
         .unwrap();
-        ensure_control_table(&db).await.unwrap();
-        for v in 1..=16 {
-            let mut p = Params::new();
-            p.insert("version".into(), json!(v));
-            p.insert("name".into(), json!(format!("pre_device_mode_{v}")));
-            p.insert("applied_at".into(), json!("2026-01-01T00:00:00Z"));
-            db.execute(
-                "INSERT INTO _hub_system_migrations (version, name, applied_at) \
-                 VALUES (:version, :name, :applied_at)",
-                &p,
-            )
-            .await
-            .unwrap();
-        }
 
         apply(&db, "hub-test").await.unwrap();
         assert!(

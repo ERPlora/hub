@@ -12,6 +12,7 @@ use std::sync::Arc;
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::Value as Json;
 
+pub mod access_email;
 pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
@@ -665,6 +666,17 @@ impl Runtime {
         // céntimos) se auto-marca `money_unit=cents` para que el backfill jamás la convierta. Un
         // hub VIEJO en euros NO se auto-marca aquí — espera a `--backfill-money` (que convierte).
         money_backfill::seed_marker_if_cents(self.db.as_ref()).await?;
+        // 4) Lo que el backfill de la v19 NO pudo decidir (hub#436): filas cuyo email vive solo en
+        // el perfil y choca con otra identidad, así que su baja **no revoca** nada. No se adivina
+        // —fusionar dos personas es peor que dejar una fila señalada—: se imprime en cada arranque
+        // para que alguien lo mire. Consulta VIVA, no una foto: se calla sola al resolverse.
+        //
+        // **No aborta el arranque.** Es un aviso, no un paso del bootstrap: un hub que no abre es
+        // una tienda que no cobra, y eso es mucho peor que un aviso que falta. Si la consulta
+        // revienta se dice y se sigue.
+        if let Err(e) = access_email::report_unresolved(self.db.as_ref(), &self.hub_id).await {
+            eprintln!("[access-email] no se pudo comprobar los emails de acceso (hub#436): {e}");
+        }
         Ok(())
     }
 
@@ -834,6 +846,15 @@ impl Runtime {
     /// Lista los usuarios-login del hub (los `hub_user` con email) para el panel admin.
     pub async fn list_login_users(&self) -> Result<Vec<identity::LoginUser>> {
         identity::list_login_users(self.db.as_ref()).await
+    }
+
+    /// Personas cuyo email **solo** está en su perfil y no se pudo llevar a donde se administra el
+    /// acceso (hub#436): su baja NO revoca su membresía hasta que alguien decida qué fila es quién.
+    /// Vacío es la respuesta normal. Ver [`access_email`].
+    pub async fn unresolved_access_emails(
+        &self,
+    ) -> Result<Vec<access_email::UnresolvedAccessEmail>> {
+        access_email::unresolved(self.db.as_ref(), &self.hub_id).await
     }
 
     /// Fija (o cambia) el PIN de un usuario existente por id (alta de PIN tras login cloud).
