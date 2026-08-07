@@ -141,6 +141,12 @@ pub async fn import_sections(
     // accounts of hub#331 and the settings of hub#405.
     let same_hub = is_same_hub(manifest, target_hub_id);
     for section in &manifest.sections {
+        // The role set of the vertical is NOT a section of data (hub#354): it travels as keys in
+        // `manifest.active_roles` and is applied once, after this loop, through the role catalogue's
+        // own write door. Skipped here so it does not also report a hollow `Skipped` row.
+        if section == crate::export::ROLES_SECTION {
+            continue;
+        }
         let (status, discarded_rows) = match ignored_by_purpose(manifest, section)
             .or_else(|| identity_not_portable(manifest, section, target_hub_id))
             .or_else(|| chain_not_portable(manifest, section, target_hub_id))
@@ -155,7 +161,60 @@ pub async fn import_sections(
         };
         report.sections.push(SectionResult { section: section.clone(), status, discarded_rows });
     }
+
+    // ── The role set of the vertical (paso 2b, hub#354) ─────────────────────
+    // AFTER the sections on purpose: the modules that DECLARE these roles are installed by the
+    // server before the engine runs, and a key nobody declares is refused — so the later this is
+    // asked, the more of the vertical is already standing. Driven by `active_roles` (the data) and
+    // not by the presence of the `roles` section (the label): a hand-made bundle that forgets to
+    // list the section gets the same guards, and a bundle that lists it with no keys reports nothing.
+    if !manifest.active_roles.is_empty() {
+        let (status, discarded_rows) = apply_role_activation(rt, manifest, target_hub_id).await;
+        report.sections.push(SectionResult {
+            section: crate::export::ROLES_SECTION.to_string(),
+            status,
+            discarded_rows,
+        });
+    }
     Ok(report)
+}
+
+/// Switches on the roles the blueprint asked for and turns the outcome into a row of the report.
+///
+/// The policy lives in [`crate::roles::pre_activate`] — this only decides how to SAY it, and the
+/// three states are the ones the report already has: everything landed (`Applied`), part of it did
+/// (`PartiallyApplied`, the same shape `hub_settings` uses when it keeps the configuration and drops
+/// the identity) or none of it did (`Ignored`). The count is of ROLES left out, which is what
+/// `discarded_rows` means for a section whose rows are keys.
+///
+/// A database failure is `Failed`, never a discard: the import stays best-effort, and «I could not
+/// write» must not be reported as «this hub said no».
+async fn apply_role_activation(
+    rt: &Runtime,
+    manifest: &BlueprintManifest,
+    target_hub_id: &str,
+) -> (SectionStatus, u32) {
+    let outcome = crate::roles::pre_activate(
+        rt.db(),
+        rt.registry(),
+        target_hub_id,
+        &manifest.active_roles,
+    )
+    .await;
+    match outcome {
+        Ok(outcome) => {
+            let discarded = outcome.refused.len() as u32;
+            let status = if outcome.refused.is_empty() {
+                SectionStatus::Applied
+            } else if outcome.activated.is_empty() {
+                SectionStatus::Ignored(ignore_reason::ROLES_NOT_ACTIVATABLE.into())
+            } else {
+                SectionStatus::PartiallyApplied(ignore_reason::ROLES_NOT_ACTIVATABLE.into())
+            };
+            (status, discarded)
+        }
+        Err(e) => (SectionStatus::Failed(e.to_string()), 0),
+    }
 }
 
 /// Stable reason codes carried by [`SectionStatus::Ignored`] — a CONTRACT with the shell, which
@@ -172,6 +231,12 @@ pub mod ignore_reason {
     /// the fiscal identity of its business, its contacts or a security switch (ADR-0195 §4 —
     /// hub#405). Only the configuration keys of that section were applied.
     pub const SETTINGS_NOT_PORTABLE: &str = "settings_not_portable";
+    /// The bundle asked to pre-activate role keys this hub cannot switch on (paso 2b, hub#354):
+    /// keys **no installed module declares** — the blueprint of another vertical, or a module that
+    /// failed to install — and the **base/administrative** keys, which a package may never touch.
+    /// One code for both, because the answer to the user is the same one: those roles are not part
+    /// of this hub's catalogue, so nothing was switched on for them.
+    pub const ROLES_NOT_ACTIVATABLE: &str = "roles_not_activatable";
 }
 
 /// Is this bundle a restore of the destination hub's OWN state?
@@ -875,6 +940,7 @@ mod tests {
             created_at: "2026-08-06T00:00:00Z".into(),
             modules: Vec::new(),
             sections: vec!["hub_users".into()],
+            active_roles: Vec::new(),
             sha256: BTreeMap::new(),
         }
     }

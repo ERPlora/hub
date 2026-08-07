@@ -32,10 +32,25 @@
       "items": { "$ref": "#/$defs/manifestModule" },
       "description": "Módulos referenciados por el bundle. Al importar, el server instala los que falten (flujo `install_from_cloud`) ANTES de aplicar los datos."
     },
+    "purpose": {
+      "enum": ["backup", "template"],
+      "default": "backup",
+      "description": "Para qué es el bundle (ADR-0195). `backup` = copia privada del mismo dueño (lleva identidades y fiscal); `template` = plantilla publicable (no las lleva). Ausente ⇒ `backup`, que es lo que son los bundles anteriores al campo."
+    },
     "sections": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Secciones presentes en el bundle: `hub_users`, `hub_settings`, `fiscal`, `media` y `modules/<id>` por cada módulo con datos."
+      "description": "Secciones presentes en el bundle: `hub_users`, `hub_settings`, `fiscal`, `media`, `modules/<id>` por cada módulo con datos y `roles` si el bundle trae juego de roles."
+    },
+    "active_roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "description": "Clave de un rol declarado por un módulo (`roles[].key` de module.schema.json)."
+      },
+      "default": [],
+      "description": "Juego de roles del vertical que el hub ENCIENDE al importar (hub#354): `waiter`, `kitchen`, `stylist`… Son CLAVES, nunca filas de `hub_role_activation`: el import las pasa por la misma puerta que el administrador (`roles::set_active`), así que un blueprint no puede acuñar un rol que ningún módulo instalado declare ni tocar los base/administrativos (`admin`/`owner`/`manager`/`employee`), que se rechazan. Aditivo: nunca apaga un rol que el hub ya tuviera encendido. Ausente ⇒ no preactiva nada."
     },
     "sha256": {
       "type": "object",

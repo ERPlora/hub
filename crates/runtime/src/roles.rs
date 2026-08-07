@@ -317,6 +317,66 @@ pub async fn set_active(
     Ok(())
 }
 
+/// Who switched a role on when the switch came from a **blueprint**, not from a person
+/// (`hub_role_activation.activated_by`). The column is an audit trail, and «the template did it»
+/// is the honest answer: no `hub_user` decided this.
+pub const BLUEPRINT_ACTOR: &str = "blueprint";
+
+/// What the hub did with the role set a blueprint asked for (paso 2b, hub#354).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PreActivation {
+    /// Keys that are live now.
+    pub activated: Vec<String>,
+    /// Keys the hub **refused**: no installed module declares them, or they are base keys a
+    /// package may not touch. Kept BY NAME and not merely counted — the report only shows how
+    /// many, but a caller that wants to say *which* ones has them here.
+    pub refused: Vec<String>,
+}
+
+/// Pre-activate the role set of a vertical: what makes a new restaurant open with `Waiter` and
+/// `Kitchen` live instead of with three generic roles somebody has to guess at (paso 2b, hub#354).
+///
+/// Three things this is NOT, and each one is deliberate:
+///
+/// - **It is not a second door.** Every key goes through [`set_active`], the same one the
+///   administrator's click uses, so a downloaded file gets exactly the guards a click gets: it
+///   cannot mint a role no installed module declares, and it cannot touch a base or administrative
+///   one (hub#347/#351/#352). Pre-activating is granting capability with nobody pressing anything,
+///   so it had better not be the lenient path.
+/// - **It never switches anything OFF.** The set is additive: a role this hub already had live and
+///   the blueprint does not name stays live. Mirroring the template exactly would mean a downloaded
+///   file could strip a working hub of a role its people are already carrying — and
+///   [`ensure_assignable`] would then refuse to hand it out.
+/// - **It is not all-or-nothing.** A key the hub refuses is skipped and reported; the rest still
+///   land. A blueprint whose kitchen module failed to install must still open the dining room.
+///
+/// A refusal ([`RuntimeError::InvalidPayload`], what [`set_active`] raises) is policy and lands in
+/// [`PreActivation::refused`]; anything else is the database failing and propagates, because
+/// «the row could not be written» must never read as «the hub said no».
+///
+/// Duplicated keys count once: a template naming `waiter` twice brings one role, not two.
+pub async fn pre_activate(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    keys: &[String],
+) -> Result<PreActivation> {
+    let mut out = PreActivation::default();
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    for key in keys {
+        let key = key.trim().to_string();
+        if !seen.insert(key.clone()) {
+            continue;
+        }
+        match set_active(db, registry, hub_id, &key, true, BLUEPRINT_ACTOR).await {
+            Ok(()) => out.activated.push(key),
+            Err(RuntimeError::InvalidPayload { .. }) => out.refused.push(key),
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(out)
+}
+
 /// Forget the activation of `keys` in this hub. Called by `installer::uninstall` for the roles the
 /// module declared that **no other installed module** declares any more.
 ///

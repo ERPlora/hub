@@ -687,6 +687,7 @@ function sectionLabel(section: string): string {
     settings: t('importPage.sectionSettings'),
     fiscal: t('importPage.sectionFiscal'),
     media: t('importPage.sectionMedia'),
+    roles: t('importPage.sectionRoles'),
   };
   return map[section] ?? section;
 }
@@ -781,6 +782,7 @@ const moduleInstallRows = computed<ReportRow[]>(() =>
 const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
   identity_not_portable: (n) => t('importPage.reasonIdentityNotPortable', { n }),
   settings_not_portable: (n) => t('importPage.reasonSettingsNotPortable', { n }),
+  roles_not_activatable: (n) => t('importPage.reasonRolesNotActivatable', { n }),
 };
 
 /** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */

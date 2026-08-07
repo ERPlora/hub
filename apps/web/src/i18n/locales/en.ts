@@ -846,6 +846,9 @@ export default {
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'VeriFactu configuration and the company certificate (.p12)',
     sectionMedia: 'Images and media',
+    // hub#354 — the job titles the template switches on (Waiter, Kitchen…). A vertical brings its
+    // own role set; the people who fill it are never in the file.
+    sectionRoles: 'Roles',
     sectionModule: 'Module {id}',
     modulesTitle: 'Modules',
     withData: 'includes data',
@@ -875,6 +878,11 @@ export default {
     // matters: with someone else's, this hub would invoice under their name.
     reasonSettingsNotPortable:
       'Country, currency and language were applied. Settings discarded: {n} — tax id, legal name and other details belong to the business that created the file; yours stay as they are.',
+    // hub#354 — the template asked for roles this hub does not have in its catalogue: they belong
+    // to a module that is not installed, or they are the administrative roles, which no file may
+    // switch on. Nothing was created and nobody gained access.
+    reasonRolesNotActivatable:
+      'Roles not switched on: {n}. A template can only switch on roles the modules installed here provide, and never the administrative ones.',
     done: 'Go to home',
   },
   moduleView: {

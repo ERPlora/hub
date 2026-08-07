@@ -61,6 +61,7 @@ fn bundle(sql: &str) -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
         created_at: "2026-07-31T00:00:00Z".into(),
         modules: vec![],
         sections: vec!["hub_settings".into()],
+        active_roles: Vec::new(),
         sha256,
     };
     (manifest, files)

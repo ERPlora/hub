@@ -58,6 +58,12 @@ describe('sectionDiscardCode · motivo traducible vs prosa heredada', () => {
     expect(sectionDiscardCode('settings_not_portable')).toBe('settings_not_portable');
   });
 
+  // hub#354 — la plantilla pidió activar roles que este hub no puede encender (los trae un módulo
+  // que no está instalado, o son los administrativos). Es un descarte con su código, no prosa.
+  it('reconoce el código de unos roles que el hub no puede activar', () => {
+    expect(sectionDiscardCode('roles_not_activatable')).toBe('roles_not_activatable');
+  });
+
   it('un motivo en prosa NO es un código: se pinta tal cual', () => {
     const prosa = 'una plantilla no aplica identidades: la sección `hub_users` se ha descartado';
     expect(sectionDiscardCode(prosa)).toBeNull();
