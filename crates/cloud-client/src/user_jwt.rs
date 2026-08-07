@@ -8,20 +8,27 @@
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::Deserialize;
 
-/// Pertenencia a un hub declarada en el JWT (claim *coarse* `hubs`, ADR-0157). El Hub solo mira
-/// `id` para su **gate de presencia** (`hub_id ∈ payload.hubs`); `org` es informativo (a qué
-/// organización del SaaS pertenece ese hub) y no lo usa el gate.
+/// Hub membership declared in the JWT (the *coarse* `hubs` claim, ADR-0157). The Hub reads `id` for
+/// its **presence gate** (`hub_id ∈ payload.hubs`) and `role` for the ACCOUNT role in that hub;
+/// `org` is the legacy bridge that crosses with `organizations[]` (see
+/// [`UserClaims::role_keys_for_hub`]) and the gate does not use it.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct HubMembership {
     pub id: String,
     #[serde(default)]
     pub org: String,
+    /// ACCOUNT role in THIS hub (`hubs[].role`, ADR-0201: membership is per hub). This is the
+    /// **new** key of the contract: the SaaS already emits it, and it will be the only one left
+    /// once the `organizations[]` mirror is retired (saas#1177). **`#[serde(default)]`**: a token
+    /// that does not carry it → empty string, and the role is looked up through the legacy path.
+    #[serde(default)]
+    pub role: String,
 }
 
-/// Pertenencia a una organización del SaaS declarada en el JWT (claim `organizations`, ADR-0157):
-/// `{id, role}` con el rol del usuario EN esa organización (owner/admin/…). El SaaS ya lo emite
-/// (`CustomTokenObtainPairSerializer.get_token`); es lo que permite al Hub saber con qué rol entra
-/// alguien sin preguntar nada.
+/// Membership declared in the **legacy** claim `organizations: [{id, role}]` (ADR-0157). It was born
+/// as "the user's role in the SaaS organization"; since ADR-0201 the organization no longer exists
+/// and the SaaS emits it as a **per-hub mirror** (`id` = the hub's own id) so that already deployed
+/// runtimes — pinned to an image digest, with no way to read `hubs[].role` — keep resolving the role.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct OrgMembership {
     pub id: String,
@@ -71,28 +78,57 @@ impl UserClaims {
         self.hubs.iter().any(|h| h.id == hub_id)
     }
 
-    /// Rol del usuario en la ORGANIZACIÓN dueña de `hub_id`, si el token lo dice.
+    /// **Every** role key this token carries for `hub_id`, in BOTH shapes of the contract, in wire
+    /// order: the **new** one first (`hubs[].role`), then the **legacy** one
+    /// (`organizations[].role`, reached by crossing `hubs[].org`).
     ///
-    /// El SaaS manda las dos piezas por separado —`hubs: [{id, org}]` y
-    /// `organizations: [{id, role}]`— y cruzarlas da el rol sin tocar el SaaS. Hasta ahora el Hub
-    /// solo leía `hubs`, así que el rol se perdía y **un admin de la organización entraba en su
-    /// propio hub con el rol de mínimo privilegio**, sin poder administrarlo ni arreglarlo desde
-    /// dentro (solo el email sembrado al desplegar tenía privilegio).
+    /// The SaaS signs the role **twice** today (`CustomTokenObtainPairSerializer.get_token`), and
+    /// not for fun: the deployed fleet is pinned to an image digest and can only read the mirror,
+    /// so retiring it (saas#1177) before the Hub reads the new key would drop **every** account
+    /// owner/admin to `HUB_DEFAULT_ROLE` on their next login, inside their own hub and with no way
+    /// to fix it from within. Accepting both at once is what makes the deployment order possible:
+    /// the Hub first, the SaaS after.
     ///
-    /// Devuelve `None` —y el llamador cae al rol por defecto— cuando el hub no está en el token
-    /// (el gate de presencia ya lo rechaza), cuando su `org` no figura en `organizations`, o
-    /// cuando el token es de un SaaS anterior que no manda el claim. Es deliberado: sin saber el
-    /// rol, lo seguro es no conceder nada.
-    pub fn role_for_hub(&self, hub_id: &str) -> Option<String> {
-        let org = &self.hubs.iter().find(|h| h.id == hub_id)?.org;
-        if org.is_empty() {
-            return None;
+    /// Differences between the two shapes, beyond the name of the key:
+    ///  - the **new** one needs no `org` — the role lives inside the hub membership itself;
+    ///  - the **legacy** one requires `hubs[].org` to appear in `organizations[]` (before ADR-0201
+    ///    that was the organization owning the hub; today the SaaS puts the hub's own id there).
+    ///
+    /// **This layer does not decide what a role grants**: it reports what the token says. When the
+    /// two shapes say different things it returns both, and whoever knows what each key grants —
+    /// `server::auth::role_floor_for_cloud_login`, which asks `hub_users::is_admin_role` — resolves
+    /// that conservatively. Keeping a second "who administers" criterion here would be exactly the
+    /// divergence hub#349 avoided by leaving a single definition.
+    ///
+    /// Returns an **empty** list — and the caller falls back to the default role — when the hub is
+    /// not in the token (the presence gate already rejects it), when neither shape carries the
+    /// role, or when the token comes from an older SaaS that sends neither claim. That is
+    /// deliberate: without knowing the role, the safe answer is to grant nothing.
+    pub fn role_keys_for_hub(&self, hub_id: &str) -> Vec<String> {
+        let Some(hub) = self.hubs.iter().find(|h| h.id == hub_id) else {
+            return Vec::new();
+        };
+        let mut keys = Vec::with_capacity(2);
+        if !hub.role.is_empty() {
+            keys.push(hub.role.clone());
         }
-        self.organizations
-            .iter()
-            .find(|o| &o.id == org)
-            .map(|o| o.role.clone())
-            .filter(|r| !r.is_empty())
+        if !hub.org.is_empty() {
+            if let Some(mirrored) = self
+                .organizations
+                .iter()
+                .find(|o| o.id == hub.org)
+                .map(|o| o.role.as_str())
+                .filter(|r| !r.is_empty())
+            {
+                // The same answer written twice is reported once: the caller weighs distinct keys,
+                // not distinct spellings of one. The role gate compares case-insensitively
+                // (`is_admin_role`), so the deduplication here does too.
+                if !keys.iter().any(|k| k.eq_ignore_ascii_case(mirrored)) {
+                    keys.push(mirrored.to_string());
+                }
+            }
+        }
+        keys
     }
 }
 
@@ -227,12 +263,12 @@ nQIDAQAB
     }
 
 
-    /// El SaaS **ya manda** el rol: `organizations: [{id, role}]` junto a `hubs: [{id, org}]`
-    /// (`CustomTokenObtainPairSerializer.get_token`). El Hub no lo leía, así que un admin de la
-    /// organización entraba con el rol de mínimo privilegio y no podía administrar su propio hub.
-    /// Cruzando el `org` del hub con `organizations` sale el rol sin tocar el SaaS.
+    /// The LEGACY wire shape, which is all a deployed hub reads today: the SaaS sends the role in
+    /// `organizations: [{id, role}]` next to `hubs: [{id, org}]`, and crossing them yields the role.
+    /// The Hub used to ignore it entirely, so an account admin walked into their own hub with least
+    /// privilege and could not administer it.
     #[test]
-    fn role_for_hub_cruza_el_org_del_hub_con_las_organizaciones() {
+    fn the_legacy_organizations_mirror_is_read_by_crossing_the_hub_org() {
         let token = sign(json!({
             "user_id": 7,
             "token_type": "access",
@@ -241,48 +277,116 @@ nQIDAQAB
             "hubs": [{"id": "hub-a", "org": "org-1"}, {"id": "hub-b", "org": "org-2"}],
         }));
         let claims = verify_user_jwt(&token, PUB).unwrap();
-        assert_eq!(claims.role_for_hub("hub-a").as_deref(), Some("admin"));
-        assert_eq!(claims.role_for_hub("hub-b").as_deref(), Some("employee"));
+        assert_eq!(claims.role_keys_for_hub("hub-a"), vec!["admin".to_string()]);
+        assert_eq!(claims.role_keys_for_hub("hub-b"), vec!["employee".to_string()]);
     }
 
-    /// Un hub que no está en el token no da rol: el gate de presencia ya lo rechaza, y devolver
-    /// algo aquí sería conceder privilegio a un hub del que no se es miembro.
+    /// The NEW wire shape (hub#350): the role rides inside the hub membership itself. This is the
+    /// only shape left once the `organizations[]` mirror is retired (saas#1177), so it has to
+    /// resolve entirely on its own — including for a membership with no `org` at all, which the
+    /// legacy cross needs and this one does not.
     #[test]
-    fn role_for_hub_de_un_hub_ajeno_no_da_nada() {
+    fn the_new_hubs_role_key_is_read_on_its_own() {
+        let token = sign(json!({
+            "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
+            "hubs": [{"id": "hub-a", "org": "hub-a", "role": "admin"}, {"id": "hub-b", "role": "member"}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert_eq!(claims.role_keys_for_hub("hub-a"), vec!["admin".to_string()]);
+        assert_eq!(
+            claims.role_keys_for_hub("hub-b"),
+            vec!["member".to_string()],
+            "the new key needs no `org` to resolve",
+        );
+    }
+
+    /// The transition window: today's SaaS emits BOTH, built from the same membership row, so they
+    /// say the same thing. The same answer twice is reported once — the caller must not have to
+    /// deduplicate spellings to know the token is self-consistent.
+    #[test]
+    fn the_two_shapes_agreeing_are_reported_once() {
+        let token = sign(json!({
+            "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
+            "organizations": [{"id": "hub-a", "role": "Admin"}],
+            "hubs": [{"id": "hub-a", "org": "hub-a", "role": "admin"}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert_eq!(
+            claims.role_keys_for_hub("hub-a"),
+            vec!["admin".to_string()],
+            "same key in both shapes (any capitalisation) → one answer",
+        );
+    }
+
+    /// When they disagree, BOTH are reported, new key first. Deciding which one wins is not this
+    /// layer's job: the token says two things and the caller — the only place that knows what a
+    /// role grants — resolves that conservatively (`server::auth::role_floor_for_cloud_login`).
+    #[test]
+    fn the_two_shapes_disagreeing_are_both_reported_new_key_first() {
+        let token = sign(json!({
+            "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
+            "organizations": [{"id": "hub-a", "role": "owner"}],
+            "hubs": [{"id": "hub-a", "org": "hub-a", "role": "member"}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert_eq!(
+            claims.role_keys_for_hub("hub-a"),
+            vec!["member".to_string(), "owner".to_string()],
+        );
+    }
+
+    /// A hub that is not in the token yields nothing: the presence gate already rejects it, and
+    /// answering here would be handing out privilege on a hub you are not a member of.
+    #[test]
+    fn a_foreign_hub_yields_no_role_key() {
         let token = sign(json!({
             "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
             "organizations": [{"id": "org-1", "role": "owner"}],
-            "hubs": [{"id": "hub-a", "org": "org-1"}],
+            "hubs": [{"id": "hub-a", "org": "org-1", "role": "owner"}],
         }));
         let claims = verify_user_jwt(&token, PUB).unwrap();
-        assert_eq!(claims.role_for_hub("hub-de-otro"), None);
+        assert!(claims.role_keys_for_hub("hub-de-otro").is_empty());
     }
 
-    /// Retrocompat: un token sin `organizations` (SaaS anterior) parsea igual y no da rol, así que
-    /// se cae al rol por defecto de siempre. Nunca debe romper el login.
+    /// Backwards compatibility: a token from an older SaaS carries neither shape. It must parse,
+    /// pass the presence gate and simply say nothing about the role — never break the login.
     #[test]
-    fn sin_claim_organizations_no_hay_rol_pero_el_token_vale() {
+    fn a_token_with_neither_shape_says_nothing_but_still_logs_in() {
         let token = sign(json!({
             "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
             "hubs": [{"id": "hub-a", "org": "org-1"}],
         }));
         let claims = verify_user_jwt(&token, PUB).unwrap();
         assert!(claims.organizations.is_empty());
-        assert_eq!(claims.role_for_hub("hub-a"), None);
-        assert!(claims.is_member_of_hub("hub-a"), "el gate de presencia sigue funcionando");
+        assert!(claims.role_keys_for_hub("hub-a").is_empty());
+        assert!(claims.is_member_of_hub("hub-a"), "the presence gate still works");
     }
 
-    /// Un hub cuyo `org` no figura en `organizations` tampoco da rol: sin saber el rol, lo seguro
-    /// es no conceder nada y dejar que decida el rol por defecto.
+    /// An `org` that is not listed under `organizations` yields nothing through the legacy shape:
+    /// without knowing the role, the safe answer is to say nothing and let the default decide.
     #[test]
-    fn un_org_desconocido_no_concede_rol() {
+    fn an_unknown_org_yields_no_role_key() {
         let token = sign(json!({
             "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
             "organizations": [{"id": "otra", "role": "owner"}],
             "hubs": [{"id": "hub-a", "org": "org-1"}],
         }));
         let claims = verify_user_jwt(&token, PUB).unwrap();
-        assert_eq!(claims.role_for_hub("hub-a"), None);
+        assert!(claims.role_keys_for_hub("hub-a").is_empty());
+    }
+
+    /// An empty string is not a role key. Either shape may carry one — a membership row whose role
+    /// was never written, a mirror entry built from it — and reporting it would make the caller
+    /// weigh a value that says nothing.
+    #[test]
+    fn empty_role_keys_are_not_reported() {
+        let token = sign(json!({
+            "user_id": 7, "token_type": "access", "exp": 9_999_999_999_i64,
+            "organizations": [{"id": "hub-a", "role": ""}],
+            "hubs": [{"id": "hub-a", "org": "hub-a", "role": ""}],
+        }));
+        let claims = verify_user_jwt(&token, PUB).unwrap();
+        assert!(claims.role_keys_for_hub("hub-a").is_empty());
     }
 
     /// Retrocompat: un token viejo (SaaS previo a ADR-0157) NO trae `hubs`. Debe parsear igual

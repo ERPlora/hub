@@ -267,123 +267,153 @@ pub fn hub_scoped_auth(headers: &HeaderMap, st: &AppState) -> Option<cloud_clien
     machine_auth(st).or_else(|| st.is_demo().then(|| user_auth(headers, &hub_id)).flatten())
 }
 
-/// Rol LOCAL con el que se provisiona a alguien que entra por primera vez desde el Cloud.
+/// LOCAL role somebody is provisioned with the first time they come in from the Cloud.
 ///
-/// El SaaS ya manda el rol del usuario en la organización dueña del hub (claim `organizations`,
-/// cruzado con `hubs[].org` — ver `UserClaims::role_for_hub`). Hasta ahora el Hub lo ignoraba y
-/// provisionaba a TODO el mundo con el mínimo privilegio, así que **un admin de la organización
-/// entraba en su propio hub como `employee`**: no podía importar un blueprint, ni gestionar
-/// usuarios, ni arreglarlo desde dentro. Solo el email sembrado al desplegar (`HUB_OWNER_EMAIL`)
-/// tenía privilegio, de modo que un segundo socio, o el mismo dueño entrando con otra cuenta,
-/// quedaba fuera sin remedio.
+/// The SaaS already sends the user's role in THIS hub, and it sends it twice for as long as the
+/// transition lasts: the new key `hubs[].role` and the legacy `organizations[].role` mirror
+/// (crossed with `hubs[].org`) — see `UserClaims::role_keys_for_hub`, hub#350. The Hub used to
+/// ignore it and provision EVERYBODY with least privilege, so **an account admin walked into their
+/// own hub as an `employee`**: unable to import a blueprint, manage users, or fix it from inside.
+/// Only the email seeded at deploy time (`HUB_OWNER_EMAIL`) had privilege, so a second partner — or
+/// the owner themselves signing in with another account — was locked out with no remedy.
 ///
-/// Solo ascienden los dos roles que el propio Hub reconoce como administrativos
-/// ([`is_admin_role`]), y **siempre a `admin`, NUNCA a `owner`**. Cualquier otro —`manager`,
-/// `employee`, uno desconocido o ninguno— cae al rol por defecto, que sigue siendo el mínimo
-/// privilegio.
+/// Only the two roles the Hub itself recognises as administrative rise ([`is_admin_role`]), and
+/// **always to `admin`, NEVER to `owner`**. Anything else — `manager`, `member`, `employee`, an
+/// unknown one or none at all — falls back to the default role, which is still least privilege.
 ///
-/// Que el owner de la organización entre como `admin` y no como `owner` es deliberado: ADR-0157
-/// fijó que **el owner del hub sale del env sembrado al desplegar (`HUB_OWNER_EMAIL`), no de un
-/// claim**, y esa invariante se conserva entera. `admin` ya resuelve el problema real —importar
-/// blueprints, gestionar usuarios, administrar el hub— sin que la propiedad del hub pueda
-/// derivarse de un token.
+/// That the account owner comes in as `admin` and not as `owner` is deliberate: ADR-0157 fixed that
+/// **hub ownership comes from the env seeded at deploy time (`HUB_OWNER_EMAIL`), not from a claim**,
+/// and that invariant is kept whole. `admin` already solves the real problem — importing blueprints,
+/// managing users, administering the hub — without hub ownership being derivable from a token.
 ///
-/// Tampoco reabre el auto-admin que cerró ADR-0157: aquello ascendía a CUALQUIER usuario del SaaS
-/// con un token válido; esto exige ser owner/admin **de la organización dueña de este hub**,
-/// firmado por el SaaS.
+/// It does not reopen the auto-admin ADR-0157 closed either: that promoted ANY SaaS user holding a
+/// valid token; this requires being owner/admin **of this very hub**, signed by the SaaS.
 ///
-/// Se aplica en CADA login, no solo en el primer enlace: el rol de la cuenta es un **suelo**
-/// reevaluado cada vez ([`role_floor_for_cloud_login`], hub#347). Para una fila que ya existe, el
-/// suelo solo **sube**; nunca baja el rol local ni concede `owner`.
-pub fn local_role_for_cloud_login(saas_role: Option<&str>, default_role: &str) -> String {
-    role_floor_for_cloud_login(saas_role)
+/// It applies on EVERY login, not only on the first link: the account role is a **floor**
+/// re-evaluated each time ([`role_floor_for_cloud_login`], hub#347). For a row that already exists
+/// the floor only **rises**; it never lowers the local role and never grants `owner`.
+///
+/// `saas_roles` is **every** key the token carries for this hub
+/// (`UserClaims::role_keys_for_hub`, hub#350): the contract travels in two shapes during the
+/// transition and both are read. Empty = the token says nothing → default role.
+pub fn local_role_for_cloud_login(saas_roles: &[String], default_role: &str) -> String {
+    role_floor_for_cloud_login(saas_roles)
         .unwrap_or(default_role)
         .to_string()
 }
 
-/// **Suelo** que el rol de la CUENTA impone sobre el rol local del hub, reevaluado en **cada**
-/// login (paso 2b regla C, hub#347). `None` = esta cuenta no impone ningún suelo.
+/// **Floor** the ACCOUNT role imposes on the hub's local role, re-evaluated on **every** login
+/// (plan step 2b rule C, hub#347). `None` = this account imposes no floor at all.
 ///
-/// Hasta ahora el rol local era una foto del momento en que se creó la fila: `get_or_link_cloud_user`
-/// devolvía la fila existente intacta, así que ascender a alguien en el SaaS no llegaba nunca al
-/// hub. Quien entró una vez antes de ser ascendido se quedaba `employee` para siempre, sin poder
-/// importar un blueprint ni arreglarlo desde dentro.
+/// The local role used to be a snapshot of the moment the row was created: `get_or_link_cloud_user`
+/// returned the existing row untouched, so promoting somebody in the SaaS never reached the hub.
+/// Whoever logged in once before being promoted stayed an `employee` forever, unable to import a
+/// blueprint or to fix it from inside.
 ///
-/// Los dos planos siguen siendo **ortogonales** (ADR-0157 §6): el rol de la cuenta manda en la
-/// CUENTA (comprar, pagar, invitar) y el rol local manda en el NEGOCIO (vender, descontar, cerrar
-/// caja). El puente entre ambos es un suelo, **no una sincronización**: sube al mínimo pactado y
-/// deja libre todo lo que esté por encima, para no pisar en cada login las decisiones del hub.
+/// The two planes remain **orthogonal** (ADR-0157 §6): the account role rules the ACCOUNT (buying,
+/// paying, inviting) and the local role rules the BUSINESS (selling, discounting, closing the till).
+/// The bridge between them is a floor, **not a synchronisation**: it raises to the agreed minimum
+/// and leaves everything above it alone, so a login never overwrites the hub's own decisions.
 ///
-/// Tres invariantes, todas conservadoras:
+/// Four invariants, all on the conservative side:
 ///
-/// 1. **Solo suben owner/admin** ([`is_admin_role`]) del hub al que se entra (ADR-0201: la
-///    membresía es por hub). `manager`, `member`, `employee`, uno desconocido, uno vacío o ninguno
-///    → `None`: pertenecer al hub no basta para administrarlo, que es el auto-admin que cerró
-///    ADR-0157.
-/// 2. **El suelo es `admin`, NUNCA `owner`.** La propiedad del hub sale del env sembrado al
-///    desplegar (`HUB_OWNER_EMAIL`, ADR-0157) y no puede derivarse de un token. `admin` ya resuelve
-///    el problema real —importar, gestionar usuarios, administrar el hub—.
-/// 3. **`HUB_DEFAULT_ROLE` no es un suelo.** El rol por defecto solo se usa al provisionar una fila
-///    nueva ([`local_role_for_cloud_login`]); si actuara como suelo, configurarlo a `admin`
-///    ascendería en cada login a cualquier miembro, incluido uno degradado a mano.
-pub fn role_floor_for_cloud_login(saas_role: Option<&str>) -> Option<&'static str> {
-    match saas_role {
-        Some(r) if is_admin_role(r) => Some(erplora_runtime::hub_users::CLOUD_ROLE_FLOOR),
-        _ => None,
-    }
+/// 1. **Only owner/admin rise** ([`is_admin_role`]) of the hub being entered (ADR-0201: membership
+///    is per hub). `manager`, `member`, `employee`, an unknown one, an empty one or none → `None`:
+///    belonging to the hub is not enough to administer it, which is the auto-admin ADR-0157 closed.
+/// 2. **The floor is `admin`, NEVER `owner`.** Hub ownership comes from the env seeded at deploy
+///    time (`HUB_OWNER_EMAIL`, ADR-0157) and cannot be derived from a token. `admin` already solves
+///    the real problem — importing, managing users, administering the hub.
+/// 3. **`HUB_DEFAULT_ROLE` is not a floor.** The default role is only used when provisioning a brand
+///    new row ([`local_role_for_cloud_login`]); if it acted as a floor, setting it to `admin` would
+///    re-promote on every login anybody the hub had deliberately demoted.
+/// 4. **With both shapes of the contract in flight, ALL of them must grant** (hub#350). The token
+///    carries the role under the new key (`hubs[].role`) and under the legacy mirror
+///    (`organizations[].role`), and `UserClaims::role_keys_for_hub` reports both. The floor is
+///    granted only if **every** key present is administrative: no shape may grant more than the
+///    other allows. A token that administers through one and not the other is not a promotion — it
+///    is a token the Hub cannot read as administration — so it administers nothing. `owner` vs
+///    `admin` is **not** that case: both administer (the ACCOUNT plane keeps both, hub#349), so a
+///    rename in flight that spells the same membership differently under each shape **still opens
+///    the hub** — refusing would lock the owner out of their own business mid-rollout.
+///
+/// Empty list = the token says nothing about the role (older SaaS, or a hub with no role under
+/// either shape) → no floor.
+pub fn role_floor_for_cloud_login(saas_roles: &[String]) -> Option<&'static str> {
+    let administers_everywhere =
+        !saas_roles.is_empty() && saas_roles.iter().all(|r| is_admin_role(r));
+    administers_everywhere.then_some(erplora_runtime::hub_users::CLOUD_ROLE_FLOOR)
 }
 
 #[cfg(test)]
 mod local_role_tests {
-    use super::local_role_for_cloud_login as role;
+    /// One role key, the shape every test below the transition cares about.
+    fn role(saas_role: &str, default_role: &str) -> String {
+        super::local_role_for_cloud_login(&[saas_role.to_string()], default_role)
+    }
 
     #[test]
     fn the_owner_and_the_admin_of_the_account_come_in_as_admin() {
         // The case that was broken: account admin → `employee` inside their own hub.
-        assert_eq!(role(Some("admin"), "employee"), "admin");
+        assert_eq!(role("admin", "employee"), "admin");
         // The account OWNER also comes in as `admin`, NOT as `owner`: hub ownership is fixed by the
         // env seeded at deploy time (ADR-0157) and cannot be derived from a token.
-        assert_eq!(role(Some("owner"), "employee"), "admin");
+        assert_eq!(role("owner", "employee"), "admin");
     }
 
     #[test]
     fn the_cloud_role_is_accepted_in_any_capitalisation() {
-        assert_eq!(role(Some("Owner"), "employee"), "admin");
-        assert_eq!(role(Some("ADMIN"), "employee"), "admin");
+        assert_eq!(role("Owner", "employee"), "admin");
+        assert_eq!(role("ADMIN", "employee"), "admin");
     }
 
     #[test]
     fn every_other_role_stays_at_least_privilege() {
-        // `manager` runs their day in the SaaS, but that is NOT administering the hub.
+        // `manager` runs their day in the SaaS, but that is NOT administering the hub. `member` is
+        // the key that replaces `manager`/`employee` on the account plane (saas#1158, hub#350) and
+        // it is no more administrative than they were.
         for r in ["manager", "employee", "member", "whatever"] {
-            assert_eq!(role(Some(r), "employee"), "employee", "{r} must not rise");
+            assert_eq!(role(r, "employee"), "employee", "{r} must not rise");
         }
     }
 
     #[test]
     fn without_a_role_in_the_token_the_default_wins() {
         // Token from an older SaaS, or a hub whose `org` is not listed: nothing is granted.
-        assert_eq!(role(None, "employee"), "employee");
-        assert_eq!(role(None, "cashier"), "cashier", "honours HUB_DEFAULT_ROLE");
+        assert_eq!(super::local_role_for_cloud_login(&[], "employee"), "employee");
+        assert_eq!(
+            super::local_role_for_cloud_login(&[], "cashier"),
+            "cashier",
+            "honours HUB_DEFAULT_ROLE"
+        );
     }
 
     #[test]
     fn an_empty_role_does_not_rise() {
-        assert_eq!(role(Some(""), "employee"), "employee");
+        assert_eq!(role("", "employee"), "employee");
     }
 }
 
 #[cfg(test)]
 mod role_floor_tests {
-    use super::role_floor_for_cloud_login as floor;
+    /// One role key — a token from before the rename, or from after the mirror is retired.
+    fn floor(saas_role: &str) -> Option<&'static str> {
+        super::role_floor_for_cloud_login(&[saas_role.to_string()])
+    }
+
+    /// Every role key a token carries for this hub (hub#350): the new `hubs[].role` and the legacy
+    /// `organizations[].role` mirror, as `UserClaims::role_keys_for_hub` reports them.
+    fn floor_of(keys: &[&str]) -> Option<&'static str> {
+        let owned: Vec<String> = keys.iter().map(|k| (*k).to_string()).collect();
+        super::role_floor_for_cloud_login(&owned)
+    }
 
     #[test]
     fn owner_and_admin_of_the_hub_impose_an_admin_floor() {
         // Rule C (hub#347): owner/admin of the hub in the cloud means *at least* `admin` locally,
         // re-evaluated on every login — this is what makes a promotion reach the hub.
-        assert_eq!(floor(Some("admin")), Some("admin"));
-        assert_eq!(floor(Some("owner")), Some("admin"));
-        assert_eq!(floor(Some("Owner")), Some("admin"), "case-insensitive");
+        assert_eq!(floor("admin"), Some("admin"));
+        assert_eq!(floor("owner"), Some("admin"));
+        assert_eq!(floor("Owner"), Some("admin"), "case-insensitive");
     }
 
     #[test]
@@ -391,19 +421,19 @@ mod role_floor_tests {
         // Even for an account owner. Hub ownership comes from `HUB_OWNER_EMAIL` (ADR-0157): a
         // token must never be able to write `owner` into `hub_user`.
         for r in ["owner", "OWNER", "admin"] {
-            assert_ne!(floor(Some(r)), Some("owner"), "{r} must not grant ownership");
+            assert_ne!(floor(r), Some("owner"), "{r} must not grant ownership");
         }
     }
 
     #[test]
     fn no_administrative_role_imposes_no_floor_at_all() {
         // Belonging to the hub is not administering it — that is the auto-admin ADR-0157 closed.
-        // `member` is the new key for the old `employee` (see hub#350); neither grants a floor.
+        // `member` is the new key for the old `manager`/`employee` (hub#350); none grants a floor.
         for r in ["manager", "member", "employee", "cashier", "", "whatever"] {
-            assert_eq!(floor(Some(r)), None, "{r} must not impose a floor");
+            assert_eq!(floor(r), None, "{r} must not impose a floor");
         }
         // Token from an older SaaS, or a hub whose role is not in the token: nothing is granted.
-        assert_eq!(floor(None), None);
+        assert_eq!(floor_of(&[]), None);
     }
 
     #[test]
@@ -411,7 +441,42 @@ mod role_floor_tests {
         // `HUB_DEFAULT_ROLE` only decides how a BRAND NEW row is provisioned. If it leaked into the
         // floor, setting it to `admin` would silently re-promote, on every login, anybody the hub
         // had deliberately demoted. The floor never reads it: the two are computed apart.
-        assert_eq!(floor(Some("employee")), None);
-        assert_eq!(super::local_role_for_cloud_login(Some("employee"), "admin"), "admin");
+        assert_eq!(floor("employee"), None);
+        assert_eq!(
+            super::local_role_for_cloud_login(&["employee".to_string()], "admin"),
+            "admin"
+        );
+    }
+
+    // ── Two wire shapes at once (hub#350) ──────────────────────────────────────────────────────
+
+    #[test]
+    fn the_floor_needs_every_key_the_token_carries_to_be_administrative() {
+        // The conservative rule. A token that administers under one key and does not under the
+        // other cannot be read as a promotion: neither shape may grant more than the other allows,
+        // so the answer is the least of the two, whichever key carries the higher role.
+        assert_eq!(floor_of(&["member", "owner"]), None);
+        assert_eq!(floor_of(&["owner", "member"]), None);
+        assert_eq!(floor_of(&["admin", "employee"]), None);
+        assert_eq!(floor_of(&["", "admin"]), None, "an empty key is not administrative");
+    }
+
+    #[test]
+    fn two_administrative_spellings_of_the_same_membership_still_impose_the_floor() {
+        // The disagreement that is not an anomaly: the account plane keeps `owner` AND `admin` as
+        // live keys that both administer, so a rename in flight spelling the same membership
+        // differently under each shape must still open the hub. Refusing would lock the account
+        // owner out of their own business mid-rollout.
+        assert_eq!(floor_of(&["owner", "admin"]), Some("admin"));
+        assert_eq!(floor_of(&["admin", "Owner"]), Some("admin"));
+    }
+
+    #[test]
+    fn either_shape_alone_imposes_the_floor_it_always_did() {
+        // The whole point of the deployment order: a token that carries the role under only ONE
+        // shape — the legacy mirror today, the new key after saas#1177 — resolves identically.
+        assert_eq!(floor_of(&["admin"]), Some("admin"));
+        assert_eq!(floor_of(&["owner"]), Some("admin"));
+        assert_eq!(floor_of(&["member"]), None);
     }
 }
