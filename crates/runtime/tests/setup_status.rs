@@ -72,13 +72,15 @@ fn must<'a>(doc: &'a Json, key: &str) -> &'a Json {
     item(doc, key).unwrap_or_else(|| panic!("item `{key}` missing from {:?}", keys(doc)))
 }
 
-/// Writes a throwaway module package: `module.json` plus its query files.
+/// Writes a throwaway module package: `module.json` plus its query/command files.
 fn module_fixture(manifest: Json, sql_files: &[(&str, &str)]) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("erplora-setup-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(dir.join("queries")).unwrap();
     std::fs::write(dir.join("module.json"), manifest.to_string()).unwrap();
     for (rel, sql) in sql_files {
-        std::fs::write(dir.join(rel), sql).unwrap();
+        let path = dir.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, sql).unwrap();
     }
     dir
 }
@@ -120,6 +122,61 @@ fn setup_module(id: &str, configured: bool, extra: Json) -> PathBuf {
     )
 }
 
+/// A module that asks the host for the business certificate — the shape ADR-0203 keys on when it
+/// decides whether the certificate is part of the fiscal precondition. Its check NEVER passes, so
+/// the item stays pending across the whole test and only its LEVEL can move.
+fn certificate_module(id: &str) -> PathBuf {
+    module_fixture(
+        json!({
+            "id": id,
+            "name": id,
+            "version": "1.0.0",
+            "capabilities": { "certificate": { "purpose": "fiscal-sign" } },
+            "permissions": [format!("{id}.configure")],
+            "queries": {
+                format!("{id}.config.get"): {
+                    "permission": format!("{id}.configure"),
+                    "sql": "queries/config_get.sql"
+                }
+            },
+            "setup": {
+                "query": format!("{id}.config.get"),
+                "configured_when": [{ "field": "ready", "truthy": true }],
+                "title": format!("Configure {id}"),
+                "route": format!("/m/{id}/settings"),
+                "permission": format!("{id}.configure"),
+                "order": 60
+            }
+        }),
+        &[("queries/config_get.sql", "SELECT 0 AS ready")],
+    )
+}
+
+/// Puts the business certificate in the hub, straight into the system table the gate reads
+/// (`_hub_certificate`, ADR-0081). Going through `set_business_certificate` would need the
+/// process-global `HUB_SECRETS_KEY`, and what both the gate and the checklist look at is the
+/// PRESENCE of the row, never its contents.
+async fn load_certificate(rt: &Runtime, hub_id: &str) {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    rt.db()
+        .execute(
+            "INSERT INTO _hub_certificate (hub_id, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES (:hub_id, 'v1:ciphertext', 'v1:ciphertext', '2026-08-07T09:00:00Z', 'hub_user:1')",
+            &p,
+        )
+        .await
+        .expect("the business certificate is stored in the hub");
+}
+
+/// Sets the two settings the fiscal precondition of ADR-0203 demands.
+async fn set_business_identity(rt: &Runtime) {
+    let mut updates = serde_json::Map::new();
+    updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
+    updates.insert("business_tax_id".into(), json!("B12345678"));
+    rt.set_settings(&updates, "u1").await.unwrap();
+}
+
 // ── The core half: a hub with nothing installed still has a checklist ─────────────────────────
 
 #[tokio::test]
@@ -146,8 +203,8 @@ async fn a_hub_with_no_modules_at_all_still_gets_its_core_checklist() {
     assert_eq!(doc["total"], 3);
     assert_eq!(doc["pending"], 3);
     assert_eq!(
-        doc["blocking_pending"], 0,
-        "the ⛔ list is core-owned and still empty (hub#370 fills it)"
+        doc["blocking_pending"], 1,
+        "of the three, only the business identity has a gate behind it (ADR-0203)"
     );
 }
 
@@ -607,6 +664,7 @@ async fn the_document_and_the_item_carry_exactly_the_contracted_keys() {
                 "description",
                 "icon",
                 "key",
+                "level",
                 "module_id",
                 "order",
                 "required",
@@ -652,6 +710,249 @@ async fn every_item_travels_with_the_ways_of_getting_it_done() {
             it["key"]
         );
     }
+}
+
+// ── The three levels: ⛔ legal · 🔴 functional · 🟡 recommended (hub#370) ───────────────────────
+
+#[tokio::test]
+async fn the_core_puts_each_of_its_items_on_one_of_the_three_levels() {
+    // `required` was never enough: it has two values and the checklist needs three. The one that
+    // cannot be a boolean is ⛔ — "the runtime rejects this", which is a fact about the runtime and
+    // not an opinion about importance.
+    let rt = runtime("hub-setup").await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+
+    assert_eq!(
+        must(&doc, "business_identity")["level"],
+        "legal",
+        "no legal name ∧ tax id ⇒ ADR-0203 refuses to emit the document"
+    );
+    assert_eq!(
+        must(&doc, "apps")["level"],
+        "functional",
+        "an empty hub sells nothing, but nothing REJECTS it either"
+    );
+    assert_eq!(must(&doc, "team")["level"], "recommended");
+}
+
+#[tokio::test]
+async fn the_level_of_an_item_does_not_move_when_it_gets_done() {
+    // The level says what KIND of item it is, the state says whether it is left to do. Folding the
+    // two would make `blocking_pending` unreadable: hub#374 asks "is anything blocking pending?",
+    // which only means something if being done is a different axis from being blocking.
+    let rt = runtime("hub-setup").await;
+    let c = ctx("hub-setup", &[SESSION]);
+    set_business_identity(&rt).await;
+
+    let doc = status(&rt, &c).await;
+    assert_eq!(must(&doc, "business_identity")["state"], "done");
+    assert_eq!(must(&doc, "business_identity")["level"], "legal");
+    assert_eq!(
+        doc["blocking_pending"], 0,
+        "nothing left that the runtime would reject"
+    );
+}
+
+#[tokio::test]
+async fn blocking_means_the_runtime_really_rejects_it_never_just_a_colour() {
+    // **The whole rule of hub#370, across two subsystems.** ⛔ is not a strong 🔴: it is the claim
+    // that the dispatcher will refuse. The blocking strip (hub#374) cuts the screen on the strength
+    // of this count, so if the claim were decorative the product would stop a sale for a label.
+    // Here the two are checked against each other: the same hub state that makes the item ⛔ makes
+    // `execute_command` fail, and clearing it clears both.
+    let mut rt = runtime("hub-setup").await;
+    let dir = module_fixture(
+        json!({
+            "id": "billing",
+            "name": "billing",
+            "version": "1.0.0",
+            "permissions": ["billing.issue"],
+            "commands": {
+                "billing.issue": {
+                    "permission": "billing.issue",
+                    "sql": ["commands/issue.sql"]
+                }
+            }
+        }),
+        &[(
+            "commands/issue.sql",
+            // Stamping the hub's business identity into a document IS emitting a fiscal document:
+            // the structural trigger of ADR-0203, no manifest flag involved.
+            "INSERT INTO billing_doc (issuer_nif, issuer_name) \
+             VALUES (:business_tax_id, :business_legal_name)",
+        )],
+    );
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    rt.db()
+        .execute_batch("CREATE TABLE billing_doc (issuer_nif TEXT, issuer_name TEXT);")
+        .await
+        .unwrap();
+    let c = ctx("hub-setup", &[SESSION, "billing.issue"]);
+
+    let doc = status(&rt, &c).await;
+    assert_eq!(must(&doc, "business_identity")["level"], "legal");
+    assert_eq!(doc["blocking_pending"], 1);
+    let err = rt
+        .execute_command("billing.issue", &Params::new(), &c)
+        .await
+        .expect_err("the checklist says ⛔, so the dispatcher MUST reject")
+        .to_string();
+    assert!(
+        err.contains("business_tax_id") && err.contains("business_legal_name"),
+        "the gate must name what the ⛔ item is asking for: {err}"
+    );
+
+    // And the other direction: the moment the item is no longer blocking, the command goes through.
+    set_business_identity(&rt).await;
+    assert_eq!(status(&rt, &c).await["blocking_pending"], 0);
+    rt.execute_command("billing.issue", &Params::new(), &c)
+        .await
+        .expect("nothing blocking left ⇒ the document is emitted");
+}
+
+#[tokio::test]
+async fn a_module_never_reaches_the_blocking_level_whatever_its_manifest_says() {
+    // The point of keeping the ⛔ list in the core: a third-party module cannot make itself a
+    // condition for selling. `required` has exactly two destinations, and neither is ⛔ — including
+    // for a module sitting in `order` 50, a slot the plan first sketched as legal.
+    let mut rt = runtime("hub-setup").await;
+    for (id, extra) in [
+        ("invoice_series", json!({ "order": 50, "required": true })),
+        ("printing", json!({ "order": 70, "required": false })),
+        // A manifest that tries to award itself the level outright. The runtime does not read a
+        // `level` from a module at all, so the attempt is not even rejected: it is invisible.
+        ("greedy", json!({ "level": "legal", "required": true })),
+    ] {
+        let dir = setup_module(id, false, extra);
+        rt.install_from_dir(&dir).await.unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    let doc = status(
+        &rt,
+        &ctx(
+            "hub-setup",
+            &[
+                SESSION,
+                "invoice_series.configure",
+                "printing.configure",
+                "greedy.configure",
+            ],
+        ),
+    )
+    .await;
+
+    assert_eq!(must(&doc, "invoice_series.setup")["level"], "functional");
+    assert_eq!(must(&doc, "printing.setup")["level"], "recommended");
+    assert_eq!(must(&doc, "greedy.setup")["level"], "functional");
+    assert_eq!(
+        doc["blocking_pending"], 1,
+        "only the core item counts; three modules asked for nothing"
+    );
+}
+
+#[tokio::test]
+async fn the_certificate_arm_of_the_gate_blocks_through_whoever_carries_the_capability() {
+    // ADR-0203 has TWO arms, and the second one is not the core's to hold: while a module declaring
+    // the `certificate` capability is installed, the gate also demands the loaded certificate. The
+    // core decides the level (the module never does) but hangs it on the item that can clear it —
+    // otherwise the strip would be silent about a rejection that is going to happen.
+    let mut rt = runtime("hub-setup").await;
+    let dir = certificate_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    set_business_identity(&rt).await;
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "verifactu.configure"])).await;
+    assert_eq!(must(&doc, "verifactu.setup")["level"], "legal");
+    assert_eq!(
+        doc["blocking_pending"], 1,
+        "the identity is done; what is left blocking is the certificate"
+    );
+}
+
+#[tokio::test]
+async fn the_certificate_item_drops_to_functional_the_moment_the_certificate_is_there() {
+    // The other half, and the reason the arm is EVALUATED instead of listed: with the certificate
+    // loaded the runtime accepts the document, so the item is still pending (it is not switched on
+    // yet) but it no longer blocks anything. A ⛔ that does not block is exactly the colour this
+    // issue exists to avoid.
+    let mut rt = runtime("hub-setup").await;
+    let dir = certificate_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    set_business_identity(&rt).await;
+    load_certificate(&rt, "hub-setup").await;
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "verifactu.configure"])).await;
+    assert_eq!(
+        must(&doc, "verifactu.setup")["state"],
+        "pending",
+        "still not configured — the level moved, the state did not"
+    );
+    assert_eq!(must(&doc, "verifactu.setup")["level"], "functional");
+    assert_eq!(doc["blocking_pending"], 0);
+}
+
+#[tokio::test]
+async fn the_blocking_level_follows_the_capability_and_never_a_module_name() {
+    // Same principle ADR-0203 applied to the gate: the condition names the CAPABILITY, not
+    // `verifactu`. A runtime that hardcoded the id would block the wrong hub in every country that
+    // is not Spain, and would miss the module that actually holds the certificate.
+    let mut rt = runtime("hub-setup").await;
+    for dir in [
+        // Carries the capability under a different name → it carries the ⛔ too.
+        certificate_module("fattura"),
+        // Called `verifactu` but asks the host for nothing → nothing to block on.
+        setup_module("verifactu", false, json!({ "order": 60 })),
+    ] {
+        rt.install_from_dir(&dir).await.unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+    set_business_identity(&rt).await;
+
+    let doc = status(
+        &rt,
+        &ctx(
+            "hub-setup",
+            &[SESSION, "fattura.configure", "verifactu.configure"],
+        ),
+    )
+    .await;
+    assert_eq!(must(&doc, "fattura.setup")["level"], "legal");
+    assert_eq!(must(&doc, "verifactu.setup")["level"], "functional");
+    assert_eq!(doc["blocking_pending"], 1);
+}
+
+#[tokio::test]
+async fn blocking_pending_counts_the_pending_legal_items_and_only_those() {
+    // The single number hub#374 reads. It has to be the count of what the runtime would reject —
+    // not of everything pending (the strip would never go away) and not of everything legal
+    // (it would never appear once the hub is set up).
+    let mut rt = runtime("hub-setup").await;
+    let dir = certificate_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    let c = ctx("hub-setup", &[SESSION, "verifactu.configure"]);
+
+    let doc = status(&rt, &c).await;
+    assert_eq!(doc["blocking_pending"], 2, "identity AND certificate");
+    assert!(
+        doc["pending"].as_u64().unwrap() > doc["blocking_pending"].as_u64().unwrap(),
+        "the pending count is the whole checklist, the blocking one is the gate: {doc}"
+    );
+
+    set_business_identity(&rt).await;
+    assert_eq!(status(&rt, &c).await["blocking_pending"], 1);
+
+    load_certificate(&rt, "hub-setup").await;
+    let doc = status(&rt, &c).await;
+    assert_eq!(doc["blocking_pending"], 0);
+    assert!(
+        doc["pending"].as_u64().unwrap() > 0,
+        "there is still work left — it just no longer blocks the till"
+    );
 }
 
 // ── The gate ──────────────────────────────────────────────────────────────────────────────────
