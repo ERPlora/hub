@@ -35,7 +35,7 @@ async fn fixture() -> Fixture {
     let rt = Runtime::with_hub_id(Box::new(db), "hub-users");
     rt.ensure_system_tables().await.unwrap();
     let owner = rt
-        .get_or_link_cloud_user("cloud-1", "Ioan Beilic", "owner", None, None)
+        .get_or_link_cloud_user("cloud-1", "Ioan Beilic", "admin", None, None)
         .await
         .unwrap();
     let cashier = rt
@@ -125,7 +125,7 @@ async fn lists_every_hub_user_including_the_owner_for_any_session() {
         .find(|u| u["id"] == f.owner_id.as_str())
         .expect("el owner/administrador tiene que salir aunque no tenga PIN");
     assert_eq!(owner["name"], "Ioan Beilic");
-    assert_eq!(owner["role"], "owner");
+    assert_eq!(owner["role"], "admin");
     assert_eq!(owner["has_pin"], false);
     assert_eq!(owner["is_active"], true);
     assert_eq!(owner["cloud_user_id"], "cloud-1");
@@ -301,12 +301,18 @@ async fn roles_are_served_by_the_core_without_any_module() {
     let body = body_json(response).await;
     let roles = body["data"].as_array().unwrap();
     let names: Vec<&str> = roles.iter().filter_map(|r| r["name"].as_str()).collect();
-    for base in ["owner", "admin", "manager", "employee"] {
+    for base in ["admin", "manager", "employee"] {
         assert!(names.contains(&base), "falta el rol base {base} en {names:?}");
     }
-    let owner = roles.iter().find(|r| r["name"] == "owner").unwrap();
-    assert_eq!(owner["members"], 1);
-    assert!(owner["permissions"].is_number());
+    // `owner` salió del catálogo base (hub#349): es del plano CUENTA, no del de NEGOCIO, y ningún
+    // módulo le concede nada. Nadie lo lleva en este hub, así que la API no lo ofrece.
+    assert!(
+        !names.contains(&"owner"),
+        "`owner` ya no es un rol del hub: {names:?}"
+    );
+    let admin = roles.iter().find(|r| r["name"] == "admin").unwrap();
+    assert_eq!(admin["members"], 1);
+    assert!(admin["permissions"].is_number());
     std::fs::remove_dir_all(f.media).ok();
 }
 

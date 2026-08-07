@@ -211,7 +211,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
 #[tokio::test]
 async fn roles_are_core_and_count_their_members() {
     let rt = runtime("hub-roles").await;
-    rt.get_or_link_cloud_user("cloud-1", "Ioan", "owner", None, None)
+    rt.get_or_link_cloud_user("cloud-1", "Ioan", "admin", None, None)
         .await
         .unwrap();
     rt.create_user("Marta", "1111", "cashier", None)
@@ -224,16 +224,16 @@ async fn roles_are_core_and_count_their_members() {
     let roles = rt.list_hub_roles().await.unwrap();
 
     // Catálogo base del core: existe aunque no haya ningún módulo instalado.
-    for base in ["owner", "admin", "manager", "employee"] {
+    for base in ["admin", "manager", "employee"] {
         assert!(
             roles.iter().any(|r| r.name == base),
             "falta el rol base {base}"
         );
     }
     assert_eq!(
-        roles.iter().find(|r| r.name == "owner").unwrap().members,
+        roles.iter().find(|r| r.name == "admin").unwrap().members,
         1,
-        "el owner cuenta como miembro"
+        "el administrador cuenta como miembro"
     );
     let cashier = roles
         .iter()
@@ -241,10 +241,64 @@ async fn roles_are_core_and_count_their_members() {
         .expect("un rol en uso sale aunque no esté en el catálogo base");
     assert_eq!(cashier.members, 2);
     assert_eq!(
-        roles.iter().find(|r| r.name == "admin").unwrap().members,
+        roles.iter().find(|r| r.name == "manager").unwrap().members,
         0,
         "un rol del catálogo sin usuarios sale con 0"
     );
+}
+
+// ── The business plane tops out at `admin` (plan step 2b, hub#349) ────────────────────────────
+//
+// `owner` was a name collision between the two planes — the ACCOUNT role (SaaS) and the BUSINESS
+// role (hub) shared the word — and it only ever worked because the core gate treated it as an
+// admin: **no** module grants it anything (24/24 declare only admin/manager/employee). So it
+// leaves the base catalogue and `admin` becomes the top of the business plane.
+//
+// What must NOT change is what somebody who already carries `owner` can do. Real hubs seeded it
+// (`identity::seed_owner`, ADR-0157), so the rows exist; the v12 system migration renames them to
+// `admin` — same effective permissions, since the gate already answered "yes" to both and
+// `permissions_for_role` already aliased `owner` to `admin` — and the gate keeps recognising the
+// old spelling for any row that arrives without going through the migration.
+
+#[tokio::test]
+async fn owner_is_no_longer_offered_as_a_base_role() {
+    assert_eq!(
+        erplora_runtime::hub_users::BASE_ROLES,
+        ["admin", "manager", "employee"].as_slice(),
+        "the business plane tops out at `admin`; `owner` belongs to the account plane"
+    );
+
+    // And it is not in the catalogue a fresh hub offers, so nobody can be given it from Personal.
+    let rt = runtime("hub-roles-base").await;
+    let roles = rt.list_hub_roles().await.unwrap();
+    assert!(
+        !roles.iter().any(|r| r.name == "owner"),
+        "a hub where nobody carries `owner` must not offer it: {:?}",
+        roles.iter().map(|r| &r.name).collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn a_row_that_still_carries_owner_keeps_every_administrative_power() {
+    // Legacy compatibility, resolved on the conservative side: a row that reaches the hub without
+    // going through the v12 migration — a restored backup, an import, a runtime still pinned to an
+    // older image writing into the hub database — must not silently lose the hub. The gate keeps
+    // saying yes, and the catalogue keeps listing the role because somebody is using it.
+    assert!(
+        erplora_runtime::hub_users::is_admin_role("owner"),
+        "a legacy `owner` still administers the hub"
+    );
+
+    let rt = runtime("hub-roles-legacy").await;
+    let legacy = rt.create_user("Boss", "9876", "owner", None).await.unwrap();
+    assert_eq!(row(&rt, &legacy).await.role, "owner");
+
+    let roles = rt.list_hub_roles().await.unwrap();
+    let owner = roles
+        .iter()
+        .find(|r| r.name == "owner")
+        .expect("a role in use is listed even when it left the base catalogue");
+    assert_eq!(owner.members, 1);
 }
 
 // ── El core como proveedor del dispatcher: namespace reservado `hub.` ───────────────────────

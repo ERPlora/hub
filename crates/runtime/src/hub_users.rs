@@ -40,24 +40,59 @@ pub const VIEW_USERS_PERMISSION: &str = "hub.users.view";
 /// Queries del core disponibles en el dispatcher (`hub.<algo>`).
 const CORE_QUERIES: &[&str] = &["users.list", "roles.list"];
 
-/// Roles que el core conoce siempre, aunque no haya ningún módulo instalado. `owner`/`admin` son
-/// además los que abren el gate de administración del Hub ([`is_admin_role`]); `manager` y
-/// `employee` son los que declaran los `role_permissions` de los módulos.
-pub const BASE_ROLES: &[&str] = &["owner", "admin", "manager", "employee"];
+/// Rol más alto del plano de **NEGOCIO**: administra el hub (identidad fiscal, plan, instalar
+/// módulos, reset) y es lo que se siembra al crear el hub ([`identity::seed_owner`]) y el techo del
+/// suelo que impone la cuenta ([`CLOUD_ROLE_FLOOR`]). Un único sitio donde está escrito el nombre,
+/// para que esos tres usos no puedan divergir.
+pub const ADMIN_ROLE: &str = "admin";
+
+/// Roles que el core conoce siempre, aunque no haya ningún módulo instalado. Son **los tres** que
+/// declaran los `role_permissions` de los módulos (24/24 del catálogo: `admin`/`manager`/
+/// `employee`), y `admin` es además el que abre el gate de administración del Hub
+/// ([`is_admin_role`]).
+///
+/// **`owner` NO está aquí** (paso 2b, hub#349). Era una **colisión de nombres** entre los dos
+/// planos —el rol de la CUENTA en el SaaS y el rol del NEGOCIO en el hub compartían la palabra— y
+/// solo funcionaba porque el gate del core lo trataba como `admin`: **ningún** módulo le concede
+/// nada. `admin` pasa a ser lo más alto del plano de negocio, y la propiedad del hub sigue siendo
+/// del plano de la cuenta (`HUB_OWNER_EMAIL`, ADR-0157), donde siempre estuvo.
+///
+/// Lo que ya llevaba `owner` **no pierde nada**: la migración de sistema **v12** lo renombra a
+/// `admin` (mismo conjunto efectivo de permisos, ver [`is_admin_role`] y
+/// [`identity::permissions_for_role`]), y el gate sigue reconociendo la grafía vieja para
+/// cualquier fila que llegue sin pasar por la migración.
+pub const BASE_ROLES: &[&str] = &[ADMIN_ROLE, "manager", "employee"];
 
 /// Rol al que asciende el **suelo** que impone el rol de la cuenta en el Cloud (paso 2b regla C,
-/// hub#347). Es `admin` y solo `admin`: la propiedad del hub sale del env sembrado al desplegar
-/// (`HUB_OWNER_EMAIL`, ADR-0157) y **nunca** de un token, así que ningún login puede escribir
-/// `owner`. Vive aquí, junto a [`BASE_ROLES`], porque el catálogo de roles es del runtime.
-pub const CLOUD_ROLE_FLOOR: &str = "admin";
+/// hub#347). Es [`ADMIN_ROLE`] y solo ese: la propiedad del hub sale del env sembrado al desplegar
+/// (`HUB_OWNER_EMAIL`, ADR-0157) y **nunca** de un token. Vive aquí, junto a [`BASE_ROLES`], porque
+/// el catálogo de roles es del runtime.
+pub const CLOUD_ROLE_FLOOR: &str = ADMIN_ROLE;
 
-/// ¿Este rol **administra el hub**? `owner`/`admin`, insensible a mayúsculas. Conjunto cerrado y
-/// conservador (ADR-0057 §6: "gestionado por owner/admin").
+/// ¿Este rol **administra el hub**? `admin` —y `owner`, que es su alias **legacy**—, insensible a
+/// mayúsculas. Conjunto cerrado y conservador (ADR-0057 §6).
 ///
 /// Una única definición para los tres sitios que la necesitan, para que no puedan divergir: el gate
 /// de administración HTTP y las API keys (`server::auth`), la gestión de usuarios-login
 /// (`server::hub_users`) y el suelo de rol del login cloud (`identity::get_or_link_cloud_user`),
 /// que la usa para saber si el rol local ya está en el suelo o hay que subirlo.
+///
+/// **`owner` sigue aquí aunque haya salido de [`BASE_ROLES`]** (hub#349), por DOS motivos, y el
+/// segundo no es legacy:
+///
+/// 1. **Filas del hub sin migrar.** La migración de sistema v12 renombra a `admin` las filas que lo
+///    llevaban, pero una fila puede llegar al hub sin pasar por ella —un backup restaurado, una
+///    importación, un runtime clavado a una imagen anterior escribiendo en la BD—. Resuelto por el
+///    lado conservador: reconocerla no concede nada nuevo (`admin` ya concede exactamente lo mismo)
+///    y **no** reconocerla dejaría al dueño de un hub sin migrar fuera de su propio negocio, sin
+///    nadie que pueda reabrirle la puerta desde dentro.
+/// 2. **El plano de la CUENTA conserva `owner`.** `server::auth::role_floor_for_cloud_login` usa
+///    esta misma función sobre el rol que firma el SaaS (`owner`/`admin`/`member`), donde `owner`
+///    es un valor vigente, no una reliquia: quitarlo de aquí dejaría al dueño de la cuenta sin
+///    suelo en su propio hub. Solo `owner` salió del plano de NEGOCIO; el de la cuenta no cambia.
+///
+/// Que la misma pregunta sirva para los dos planos es deliberado —el conjunto es idéntico— pero es
+/// el único punto donde se tocan: si algún día divergen, se parte en dos predicados.
 ///
 /// Un rol **custom** de un módulo (`bartender`, `kitchen`…) devuelve `false` aunque su
 /// `role_permissions` sea generoso: los permisos que declara un manifest no son la propiedad
@@ -444,6 +479,11 @@ mod tests {
         // Single, closed definition shared by the HTTP admin gate, the API keys, the login-user
         // panel and the cloud role floor (hub#347). Widening it grants administration everywhere
         // at once, so it stays an explicit two-role list.
+        //
+        // `owner` stays on that list after hub#349: it left the hub role CATALOGUE (`BASE_ROLES`),
+        // but it is still a live role on the ACCOUNT plane —`role_floor_for_cloud_login` asks this
+        // very question about the role the SaaS signs— and it is still the spelling carried by any
+        // hub row that never went through the v12 rename.
         for r in ["owner", "admin", "Owner", "ADMIN"] {
             assert!(is_admin_role(r), "{r} administra el hub");
         }

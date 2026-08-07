@@ -271,10 +271,12 @@ async fn member_present_in_hubs_claim_links_and_opens_session() {
 }
 
 #[tokio::test]
-async fn seeded_owner_is_linked_by_email_keeping_owner_role() {
+async fn seeded_creator_is_linked_by_email_keeping_its_role() {
     // ADR-0157 (corrección Ioan): el owner es el CREADOR, **sembrado del env** (`HUB_OWNER_EMAIL`)
     // ANTES del primer login — NO «el primero que entra». En su primer login se ENLAZA por email
-    // (el token trae `email`), conservando role=owner. `auth_cloud` ya NO decide el owner.
+    // (el token trae `email`), conservando el rol sembrado. `auth_cloud` ya NO decide el owner.
+    // Desde hub#349 ese rol es `admin`: `owner` salió del catálogo del hub (es del plano CUENTA) y
+    // `admin` es lo más alto del plano de NEGOCIO — concede exactamente lo mismo que concedía.
     let (router, state, temp) = fixture().await;
     // El provisioning del SaaS sembró al owner (aquí lo simulamos con el mismo seam que usa `serve`).
     state
@@ -291,8 +293,8 @@ async fn seeded_owner_is_linked_by_email_keeping_owner_role() {
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
         cloud_user_role(&state, "1").await.as_deref(),
-        Some("owner"),
-        "el owner sembrado se enlaza por email conservando su rol"
+        Some("admin"),
+        "el creador sembrado se enlaza por email conservando su rol"
     );
     std::fs::remove_dir_all(temp).ok();
 }
@@ -417,10 +419,12 @@ async fn losing_the_cloud_admin_role_does_not_lower_the_local_role() {
 }
 
 #[tokio::test]
-async fn the_cloud_floor_never_overwrites_the_seeded_owner() {
-    // `owner` is already above the `admin` floor, so the floor is a no-op for the seeded owner.
-    // Hub ownership comes from `HUB_OWNER_EMAIL` (ADR-0157) and the floor must not rewrite it —
-    // neither up (it never grants `owner`) nor down (it would demote the owner of the hub).
+async fn the_cloud_floor_never_writes_owner_over_the_seeded_creator() {
+    // The seeded creator is already at the floor, so the floor is a no-op for them. Hub ownership
+    // comes from `HUB_OWNER_EMAIL` (ADR-0157) and the floor must not rewrite it — and since
+    // hub#349 there is no `owner` role in the hub at all, so a token that claims `owner` on the
+    // ACCOUNT plane must still land on `admin` on the BUSINESS plane, on the first login and on
+    // every re-evaluation after it.
     let (router, state, temp) = fixture().await;
     state
         .runtime
@@ -436,8 +440,8 @@ async fn the_cloud_floor_never_overwrites_the_seeded_owner() {
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
         cloud_user_role(&state, "9").await.as_deref(),
-        Some("owner"),
-        "first login links the seeded owner by email and keeps `owner`",
+        Some("admin"),
+        "first login links the seeded creator by email and keeps `admin`",
     );
 
     let resp = app(state.clone())
@@ -447,8 +451,8 @@ async fn the_cloud_floor_never_overwrites_the_seeded_owner() {
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
         cloud_user_role(&state, "9").await.as_deref(),
-        Some("owner"),
-        "re-evaluating the floor must not demote the owner to `admin`",
+        Some("admin"),
+        "re-evaluating the floor must not write `owner` over the creator",
     );
     std::fs::remove_dir_all(temp).ok();
 }

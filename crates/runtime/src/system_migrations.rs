@@ -228,6 +228,27 @@ CREATE TABLE hub_api_key_rate_window (\
         name: "hub_user_cloud_revoked_at",
         postgres: "ALTER TABLE hub_user ADD COLUMN cloud_revoked_at TEXT NOT NULL DEFAULT '';",
     },
+    // ── v12 — hub#349 (paso 2b): `owner` sale del catálogo de roles del hub ──────────────────────
+    // `owner` era la MISMA palabra en los dos planos —el rol de la CUENTA en el SaaS y el rol del
+    // NEGOCIO en el hub— y solo funcionaba como rol del hub porque el gate del core lo trataba como
+    // `admin`: **ningún** módulo del catálogo declara `role_permissions.owner` (24/24 solo conocen
+    // admin/manager/employee). `admin` pasa a ser lo más alto del plano de negocio.
+    //
+    // Los hubs ya desplegados SÍ tienen filas con `owner` (el provisioning sembraba al creador con
+    // ese rol, `identity::seed_owner`), así que hay que renombrarlas o se quedarían con un rol que
+    // ya no está en el catálogo. Es un **renombrado, no una degradación**: el conjunto efectivo de
+    // permisos antes y después es idéntico —`is_admin_role` ya decía que sí a los dos y
+    // `permissions_for_role` ya resolvía `owner` como `admin`—, así que nadie gana ni pierde nada.
+    //
+    // `lower(role)` porque el gate compara sin mayúsculas: una fila `Owner`/`OWNER` administraba el
+    // hub igual y tiene que migrar igual. Alcanza también a las filas INACTIVAS: si no, una
+    // reincorporación futura resucitaría el rol viejo. Idempotente por naturaleza (tras correr no
+    // queda ninguna fila que casar) y además registrada, como el resto.
+    SystemMigration {
+        version: 12,
+        name: "hub_user_owner_role_to_admin",
+        postgres: "UPDATE hub_user SET role = 'admin' WHERE lower(role) = 'owner';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -490,6 +511,72 @@ mod tests {
 
         // Idempotente: re-aplicar NO re-ALTERa (no falla por 'duplicate column').
         apply(&db, "hub-test").await.unwrap();
+    }
+
+    /// Role stored for a `hub_user`, read straight from the database.
+    async fn stored_role(db: &dyn DatabaseAdapter, id: &str) -> String {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        let res = db
+            .query("SELECT role FROM hub_user WHERE id = :id", &p)
+            .await
+            .unwrap();
+        res.rows[0]["role"].as_str().unwrap().to_string()
+    }
+
+    #[tokio::test]
+    async fn apply_renames_the_legacy_owner_role_to_admin_v12() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        // A hub deployed BEFORE hub#349: the creator was seeded with `owner`, and the gate only
+        // treated it as an administrator because `is_admin_role` said so. The rename must reach
+        // those rows, whatever the casing, and must not touch anybody else.
+        db.execute_batch(
+            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-owner', 'Boss', '', 'owner', 'cloud-1', 1, '2026-01-01T00:00:00Z');\
+             INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-shout', 'Shout', '', 'OWNER', NULL, 1, '2026-01-01T00:00:00Z');\
+             INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-cash', 'Marta', '', 'cashier', NULL, 1, '2026-01-01T00:00:00Z');\
+             INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-gone', 'Baja', '', 'owner', NULL, 0, '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test").await.unwrap();
+        assert!(
+            max_applied_version(&db).await.unwrap() >= 12,
+            "v12 registrada"
+        );
+
+        assert_eq!(
+            stored_role(&db, "u-owner").await,
+            "admin",
+            "el creador legacy pasa a `admin`, que concede exactamente lo mismo"
+        );
+        assert_eq!(
+            stored_role(&db, "u-shout").await,
+            "admin",
+            "el gate compara sin mayúsculas: la migración también"
+        );
+        assert_eq!(
+            stored_role(&db, "u-gone").await,
+            "admin",
+            "también las filas inactivas: una reincorporación no puede resucitar el rol viejo"
+        );
+        assert_eq!(
+            stored_role(&db, "u-cash").await,
+            "cashier",
+            "no toca ningún otro rol"
+        );
+
+        // Idempotente: re-aplicar no vuelve a correr el UPDATE ni cambia nada.
+        apply(&db, "hub-test").await.unwrap();
+        assert_eq!(stored_role(&db, "u-owner").await, "admin");
+        assert_eq!(stored_role(&db, "u-cash").await, "cashier");
     }
 
     #[tokio::test]
