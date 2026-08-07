@@ -415,7 +415,7 @@
     },
     "setup": {
       "type": "object",
-      "description": "Chequeo de CONFIGURACIÓN del módulo (ADR-0063). El shell evalúa, para cada módulo instalado, si está configurado: corre `query` (lectura del módulo), toma la 1ª fila y comprueba `configured_when`; si NO lo está, lo surfacea como alerta (campana + dashboard) con un CTA a `route`. Genérico: el Hub no conoce módulos concretos; cada uno se autodeclara. El Hub solo TRANSPORTA este bloque (lo lee el shell del `module.json` crudo, igual que `widgets`/`navigation`).",
+      "description": "Chequeo de CONFIGURACIÓN del módulo (ADR-0063, extendido por hub#369). El RUNTIME evalúa, para cada módulo instalado y activo, si está configurado: corre `query` (lectura del propio módulo, con los permisos de quien llama), toma la 1ª fila y comprueba `configured_when`. El resultado sale como un ítem de la query core `hub.setup.status`, que el widget de la checklist y el asistente leen (una fuente, dos superficies). Genérico: el Hub no conoce módulos concretos; cada uno se autodeclara. ⚠️ Ya NO es un bloque que el Hub solo transporta: lo parsea el runtime (`crates/runtime/src/manifest.rs`, `SetupDef`). Lo que el módulo NO declara es su importancia: `required` mapea a 🔴 funcional / 🟡 recomendado y el nivel ⛔ bloqueante lo mantiene el core, para que un módulo de terceros no pueda autoproclamarse bloqueante de la venta. Contrato completo en `architecture/hub/setup-status.md`.",
       "required": [
         "query",
         "configured_when",
@@ -427,7 +427,7 @@
         "required": {
           "type": "boolean",
           "default": true,
-          "description": "Si true (por defecto) la configuración pendiente alerta en el DASHBOARD; si false es opcional y NO alerta."
+          "description": "`true` (por defecto) = 🔴 funcional: sin esto el módulo no hace su trabajo. `false` = 🟡 recomendado: el negocio funciona, se nota. NUNCA ⛔ bloqueante — esa lista la mantiene el core. Ojo: `required: false` YA NO se omite de la checklist (antes sí, cuando la única superficie era una alerta); sale como ítem recomendado y el widget lo pliega tras «Ver todo»."
         },
         "query": {
           "type": "string",
@@ -479,7 +479,20 @@
         },
         "permission": {
           "type": "string",
-          "description": "Permiso para configurarlo (solo se alerta a quien puede)."
+          "description": "Permiso para CONFIGURARLO (solo se le ofrece el ítem a quien puede actuar). Es deliberadamente más estrecho que el permiso de LEER la query: quien solo mira no recibe una tarea que no puede completar."
+        },
+        "countries": {
+          "type": "array",
+          "description": "Países (ISO-3166-1 alfa-2) donde aplica el ítem. Ausente o vacío = todos. Existe porque el Hub es internacional y no puede tener cableado «VeriFactu no sale fuera de España»: quien lleva una obligación nacional declara dónde aplica. Un hub sin `country_code` no puede responder la pregunta, así que el ítem se omite.",
+          "default": [],
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{2}$"
+          }
+        },
+        "order": {
+          "type": "integer",
+          "description": "Puesto del ítem en la checklist. La ESCALA es del core, que reserva los huecos de sus propios ítems (apps=10, datos del negocio=40, equipo=80) y asigna a cada módulo el suyo — ver la tabla de `architecture/hub/setup-status.md`. Ausente = 500, detrás de todo lo que el core colocó. No lo elijas tú: usa el que te asigna la tabla."
         }
       }
     },
