@@ -205,7 +205,8 @@ CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
     SystemMigration {
         version: 10,
         name: "api_key_rate_limit",
-        postgres: "\
+        postgres:
+            "\
 ALTER TABLE hub_api_key ADD COLUMN rate_limit_per_minute INTEGER NOT NULL DEFAULT 60;\
 CREATE TABLE hub_api_key_rate_window (\
   api_key_id TEXT PRIMARY KEY, window_epoch_minute BIGINT NOT NULL, request_count BIGINT NOT NULL);",
@@ -318,10 +319,14 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     // rotación central que numerar, y un `0` por defecto haría que un hub con certificado propio
     // reportase «tengo la v0 de ERPlora» en vez de «no tengo ninguna».
     //
-    // ⚠️ El hueco en la v15 es DELIBERADO: la reserva hub#341 (cola de impresión), que ya la había
-    // publicado en `architecture/hub/print-queue.md` cuando esto se escribió. Pisar un número que
-    // otra PR abierta ya anunció cuesta más que dejarlo libre — `apply` compara `version >` el
-    // máximo aplicado y el test de orden solo exige que crezcan, así que un salto no rompe nada.
+    // ⚠️ El hueco de la v15 queda VACÍO PARA SIEMPRE, y no reserva nada. Se dejó para hub#341
+    // (la cola de impresión), pero un hueco NO es una reserva: `apply` compara contra el
+    // MÁXIMO aplicado, así que una migración numerada por debajo de él se salta EN SILENCIO.
+    // Cuando esta v16 (y la v17) llegaron a `develop` antes que hub#341, cualquier hub
+    // desplegado desde ahí quedó en max=17 y jamás habría corrido una v15 → la cola se fue a
+    // la v18. Un número libre en medio es inofensivo (el test de orden solo exige que crezcan);
+    // lo que no se puede es RELLENARLO después. La única regla segura: coge el siguiente
+    // número POR ENCIMA del máximo del catálogo.
     SystemMigration {
         version: 16,
         name: "hub_certificate_delegated_version",
@@ -356,6 +361,46 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
 ALTER TABLE hub_trusted_device ADD COLUMN mode TEXT NOT NULL DEFAULT 'shared';\
 ALTER TABLE hub_trusted_device ADD COLUMN mode_set_at TEXT NOT NULL DEFAULT '';\
 ALTER TABLE hub_trusted_device ADD COLUMN mode_set_by TEXT NOT NULL DEFAULT '';",
+    },
+    // ── v18 — hub#341 / ADR-0196 §6: the print queue lives in the HUB ───────────────────────
+    // ⚠️ **v18 and not the v15 hub#317 left free for this.** A gap does NOT reserve a number:
+    // `apply` compares against the MAXIMUM applied version, so anything numbered at or below it
+    // is skipped IN SILENCE — the hub boots believing it is up to date, with the table missing
+    // and nothing logged. v16/v17 reached `develop` before this branch, so any hub deployed
+    // from it is already at max=17 and would never have run a v15. The gap stays open (empty
+    // numbers are harmless: the order test only requires growth); the queue takes the next
+    // number above the maximum. `a_hub_already_migrated_still_receives_the_print_queue` is the
+    // test that caught this — it failed on v15 for exactly this reason.
+    // Any device (the PWA included) enqueues `{role, html, jobId}` here; the device that has the
+    // installable app and sits on the printer's network drains it as the PRINT HOST of that
+    // `role`. The queue used to live in the device's Bridge process: with nobody running the app
+    // the job was not queued anywhere — it was lost. Here it waits.
+    //
+    // `PRIMARY KEY (hub_id, job_id)` **is** the idempotency guarantee: `job_id` is chosen by the
+    // producer, and a second `INSERT … ON CONFLICT DO NOTHING` with the same id writes nothing, so
+    // a retry (a lost HTTP response, a double tap on "print", a reconnect) never produces a second
+    // ticket. It is the PK and not a separate unique index because that IS the contract's key.
+    //
+    // `seq BIGSERIAL` gives the hand-out ORDER. `created_at` is not enough: two jobs queued in the
+    // same instant tie, and the order that came in first could be printed second.
+    //
+    // `lease_expires_at` bounds what a host takes away: if the device dies between the claim and
+    // the confirmation, the expiry returns the job to the queue instead of stranding it. Like
+    // `_event_outbox`, instants are TEXT RFC3339 (lexicographically comparable in UTC) for
+    // consistency with the rest of the system schema.
+    SystemMigration {
+        version: 18,
+        name: "print_queue",
+        postgres: "\
+CREATE TABLE _print_queue (\
+  hub_id TEXT NOT NULL, job_id TEXT NOT NULL, seq BIGSERIAL NOT NULL, \
+  role TEXT NOT NULL, html TEXT NOT NULL, format TEXT NOT NULL DEFAULT 'receipt', \
+  status TEXT NOT NULL DEFAULT 'pending', attempts BIGINT NOT NULL DEFAULT 0, \
+  claimed_by TEXT NOT NULL DEFAULT '', lease_expires_at TEXT NOT NULL DEFAULT '', \
+  last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, completed_at TEXT, \
+  PRIMARY KEY (hub_id, job_id));\
+CREATE INDEX ix_print_queue_next ON _print_queue (hub_id, role, status, seq);\
+CREATE INDEX ix_print_queue_lease ON _print_queue (hub_id, status, lease_expires_at);",
     },
 ];
 
@@ -456,6 +501,52 @@ mod tests {
         }
     }
 
+    /// **El número de una migración de sistema NO es cosmético (hub#341 vs hub#316).** [`apply`]
+    /// compara contra el **máximo** aplicado, así que una migración numerada por debajo de él se
+    /// salta **EN SILENCIO**: el hub arranca creyendo que está al día y le falta la tabla. No
+    /// falla, no avisa. Dos ramas paralelas eligieron el mismo `version: 14` y, de mergearse tal
+    /// cual, la segunda en llegar habría desaparecido en los hubs que ya hubieran pasado por la
+    /// primera.
+    ///
+    /// Este test fija el invariante desde el lado del hub ya desplegado: con TODAS las demás
+    /// migraciones ya registradas, un arranque nuevo **sí** aplica `print_queue`. Si alguien la
+    /// renumera por debajo de otra, aquí revienta (la tabla no existiría) en vez de en producción.
+    #[tokio::test]
+    async fn a_hub_already_migrated_still_receives_the_print_queue() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        ensure_control_table(&db).await.unwrap();
+
+        // Un hub que ya pasó por TODO el catálogo salvo la cola de impresión.
+        for m in MIGRATIONS.iter().filter(|m| m.name != "print_queue") {
+            let mut p = Params::new();
+            p.insert("version".into(), json!(m.version));
+            p.insert("name".into(), json!(m.name));
+            p.insert("at".into(), json!(now_rfc3339()));
+            db.execute(
+                "INSERT INTO _hub_system_migrations (version, name, applied_at) \
+                 VALUES (:version, :name, :at)",
+                &p,
+            )
+            .await
+            .unwrap();
+        }
+
+        apply(&db, "hub-test").await.unwrap();
+
+        // La cola existe: la migración NO se saltó por llegar «por debajo» del máximo aplicado.
+        db.execute_batch(
+            "INSERT INTO _print_queue (hub_id, job_id, role, html, created_at) \
+             VALUES ('h1', 'j1', 'receipt', '<p>t</p>', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+    }
+
     #[test]
     fn split_statements_keeps_each_terminated() {
         let stmts = split_statements("CREATE TABLE a (x);  DROP TABLE b; ");
@@ -524,7 +615,9 @@ mod tests {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
         // Baseline v0: hub_module (necesaria para v1) + hub_session SIN device_id (identity v0).
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         // Sesión legacy YA existente (BD que sobrevive a un update): sin la columna device_id.
         db.execute_batch(
@@ -535,7 +628,10 @@ mod tests {
         .unwrap();
 
         apply(&db, "hub-test").await.unwrap();
-        assert!(max_applied_version(&db).await.unwrap() >= 8, "v8 registrada");
+        assert!(
+            max_applied_version(&db).await.unwrap() >= 8,
+            "v8 registrada"
+        );
 
         // La fila legacy sobrevive con device_id = NULL (columna nullable, ADITIVA).
         let legacy = db
@@ -577,7 +673,9 @@ mod tests {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
         // Baseline v0: hub_module (necesaria para v1) + hub_user SIN email (identity v0).
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         // Usuario legacy YA existente (BD que sobrevive a un update): sin la columna email.
         db.execute_batch(
@@ -588,7 +686,10 @@ mod tests {
         .unwrap();
 
         apply(&db, "hub-test").await.unwrap();
-        assert!(max_applied_version(&db).await.unwrap() >= 9, "v9 registrada");
+        assert!(
+            max_applied_version(&db).await.unwrap() >= 9,
+            "v9 registrada"
+        );
 
         // La fila legacy sobrevive con email = '' (columna con default, ADITIVA).
         let legacy = db
@@ -636,7 +737,9 @@ mod tests {
     async fn apply_renames_the_legacy_owner_role_to_admin_v12() {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         // A hub deployed BEFORE hub#349: the creator was seeded with `owner`, and the gate only
         // treated it as an administrator because `is_admin_role` said so. The rename must reach
@@ -770,7 +873,10 @@ mod tests {
         .unwrap();
 
         apply(&db, "hub-test").await.unwrap();
-        assert!(max_applied_version(&db).await.unwrap() >= 14, "v14 registrada");
+        assert!(
+            max_applied_version(&db).await.unwrap() >= 14,
+            "v14 registrada"
+        );
 
         let row = db
             .query(
@@ -780,8 +886,16 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(row.rows.len(), 1, "la fila legacy sobrevive");
-        assert_eq!(row.rows[0]["kind"], json!("own"), "sellada como PROPIA del negocio");
-        assert_eq!(row.rows[0]["pkcs12_b64"], json!("TEVHQUNZ"), "sus bytes intactos");
+        assert_eq!(
+            row.rows[0]["kind"],
+            json!("own"),
+            "sellada como PROPIA del negocio"
+        );
+        assert_eq!(
+            row.rows[0]["pkcs12_b64"],
+            json!("TEVHQUNZ"),
+            "sus bytes intactos"
+        );
 
         // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').
         apply(&db, "hub-test").await.unwrap();
@@ -812,8 +926,11 @@ mod tests {
             )
             .await
             .unwrap();
-        let kinds: Vec<&str> =
-            rows.rows.iter().filter_map(|r| r["kind"].as_str()).collect();
+        let kinds: Vec<&str> = rows
+            .rows
+            .iter()
+            .filter_map(|r| r["kind"].as_str())
+            .collect();
         assert_eq!(kinds, vec!["delegated", "own"], "los dos slots conviven");
     }
 
@@ -852,7 +969,10 @@ mod tests {
         }
 
         apply(&db, "hub-test").await.unwrap();
-        assert!(max_applied_version(&db).await.unwrap() >= 17, "v17 registrada");
+        assert!(
+            max_applied_version(&db).await.unwrap() >= 17,
+            "v17 registrada"
+        );
 
         let row = db
             .query(
@@ -862,7 +982,11 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(row.rows.len(), 1, "el dispositivo de confianza sobrevive");
-        assert_eq!(row.rows[0]["mode"], json!("shared"), "hereda la fricción, no su ausencia");
+        assert_eq!(
+            row.rows[0]["mode"],
+            json!("shared"),
+            "hereda la fricción, no su ausencia"
+        );
         assert_eq!(row.rows[0]["label"], json!("Caja 1"), "su etiqueta intacta");
 
         // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').

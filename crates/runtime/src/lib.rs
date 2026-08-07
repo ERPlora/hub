@@ -38,6 +38,7 @@ pub mod money_backfill;
 pub mod native;
 pub mod outbox;
 pub mod permissions;
+pub mod print_queue;
 pub mod queries;
 pub mod registry;
 pub mod reset;
@@ -681,6 +682,29 @@ impl Runtime {
     /// sentencias aplicó. Lo llama el host al arrancar si hay `HUB_SEED_SQL`/`HUB_SEED_SQL_PATH`.
     pub async fn apply_seed(&self, sql: &str) -> Result<usize> {
         seed::apply(self.db.as_ref(), sql).await
+    }
+
+    // ── Print queue of the hub (ADR-0196 §6, hub#341) ──────────────────────────────────────────
+
+    /// Enqueues a document for a printer role, **idempotently by `jobId`**: repeating the same id
+    /// never produces a second ticket (see [`print_queue`]). Scoped to the deployment's `hub_id`.
+    /// With no print host connected the job **waits** — late, not lost.
+    pub async fn enqueue_print_job(
+        &self,
+        job: &print_queue::NewPrintJob,
+    ) -> Result<print_queue::EnqueueOutcome> {
+        print_queue::enqueue(self.db.as_ref(), &self.hub_id, job).await
+    }
+
+    /// The hub's print queue in hand-out order (optional role/status filters). This is the
+    /// observable view: what is waiting, what is printing and what died (and why).
+    pub async fn print_queue(
+        &self,
+        role: Option<&str>,
+        status: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<print_queue::PrintJob>> {
+        print_queue::list(self.db.as_ref(), &self.hub_id, role, status, limit).await
     }
 
     // ── Identidad local (usuarios/PIN/sesiones; §2.9). La autoridad de permisos es local. ──

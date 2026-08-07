@@ -143,7 +143,10 @@ Tauri vía `invoke` — ADR-0196; la **cola de impresión se muda al hub**, ADR-
   impresión al renovar DHCP. → tarea async en `crates/peripherals`.
 - **Config de impresoras por terminal** (IP, rol recibo/cocina/barra), persistida.
 - **Cola de impresión + reintentos** (impresora apagada / sin papel) — la cola vive en el hub
-  (ADR-0196 §6); el dispositivo la drena.
+  (ADR-0196 §6); el dispositivo la drena. **As-built (hub#341):** tabla `_print_queue` (migración
+  de sistema v18) + `crates/runtime/src/print_queue.rs` + `POST/GET /api/print/jobs`, idempotente
+  por `jobId`. Falta quien la drene (hub#342/#343) y que `sdk.print` encole (hub#344). Diseño en
+  [architecture/hub/print-queue.md](../architecture/hub/print-queue.md).
 - **Enrutado por rol** (recibo vs cocina) cuando un terminal tiene varias configuradas.
 
 El escáner por HID lo maneja el SO/navegador como teclado.
