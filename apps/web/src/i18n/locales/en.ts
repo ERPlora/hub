@@ -157,10 +157,12 @@ export default {
     },
   },
   dashboard: {
-    // Contextual greeting by time of day (zone 1 — header). Name is interpolated.
-    greetingMorning: 'Good morning, {name}',
-    greetingAfternoon: 'Good afternoon, {name}',
-    greetingEvening: 'Good evening, {name}',
+    // Contextual greeting by time of day (zone 1 — header). It stands in for the BUSINESS NAME
+    // while the hub has none yet, so nobody is interpolated: greeting a person here is what put an
+    // account address in the `<h1>` (hub#366).
+    greetingMorning: 'Good morning',
+    greetingAfternoon: 'Good afternoon',
+    greetingEvening: 'Good evening',
     // Today label; the full date is formatted by the browser locale.
     todayLabel: 'Today',
     loading: 'Loading…',

@@ -158,10 +158,12 @@ export default {
     },
   },
   dashboard: {
-    // Saludo contextual por franja horaria (zona 1 — cabecera). El nombre se interpola.
-    greetingMorning: 'Buenos días, {name}',
-    greetingAfternoon: 'Buenas tardes, {name}',
-    greetingEvening: 'Buenas noches, {name}',
+    // Contextual greeting by time of day (zone 1 — header). It stands in for the BUSINESS NAME
+    // while the hub has none yet, so nobody is interpolated: greeting a person here is what put an
+    // account address in the `<h1>` (hub#366).
+    greetingMorning: 'Buenos días',
+    greetingAfternoon: 'Buenas tardes',
+    greetingEvening: 'Buenas noches',
     // Fecha larga del día, formateada por el locale del navegador (p. ej. «martes, 22 de julio»).
     todayLabel: 'Hoy',
     loading: 'Cargando…',
