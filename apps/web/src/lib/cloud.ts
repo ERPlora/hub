@@ -386,9 +386,11 @@ export async function runtimeLogout(sessionToken: string): Promise<void> {
   }
 }
 
-// --- Entitlement de módulos (gate de arranque, ARQUITECTURA.md §2.10) -------
-// Camino WEB (online): pide directamente el endpoint del Cloud. El camino TAURI usa el
-// comando `validate_entitlement` (caché offline + gracia) — ver lib/entitlement.ts.
+// --- Module entitlement (boot gate, ARQUITECTURA.md §2.10) -------
+// ONE path, online: ask the Cloud endpoint. There is no longer a separate Tauri path — the
+// `validate_entitlement` command (offline cache + grace window) went away with the local product
+// (ADR-0154, hub#336), so inside the thin shell this gate is EXACTLY the browser's. See
+// lib/entitlement.ts.
 export interface EntitledModuleInfo {
   moduleId: string;
   tier: string;

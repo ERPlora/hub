@@ -2,8 +2,9 @@
 # ERPlora Hub App (Tauri) — Build & Upload to S3
 # ==============================================================================
 #
-# La app de escritorio/móvil del Hub (`apps/tauri`, front Vue `@erplora/web` empaquetado con
-# Tauri v2). Espejo de `bridge-release.yml`: build por plataforma → S3 con el rol OIDC.
+# La app de escritorio/móvil del Hub (`apps/tauri`, cliente fino Tauri v2). El bundle NO lleva la
+# PWA: `frontendDist` empaqueta `shell-dist/` (página de respaldo commiteada) y la UI real la sirve
+# el hub cloud (ADR-0154/0159). Espejo de `bridge-release.yml`: build por plataforma → S3.
 #
 # Pipeline (build pesado: Windows ×2 de facturación → NO en cada push a main, ADR-CI 2026-07-10):
 #   push tag v*        ─► build + build-android ─► S3 app/v{version}/ + latest/
@@ -127,8 +128,10 @@ jobs:
           V="${GITHUB_REF_NAME#v}"
           node -e "const f='apps/tauri/src-tauri/tauri.conf.json';const c=require('./'+f);c.version='${V}';require('fs').writeFileSync(f, JSON.stringify(c,null,2)+'\n');console.log('version →','${V}')"
 
-      # tauri-action instala el CLI de Tauri, ejecuta `beforeBuildCommand` (build del front) y
-      # genera los bundles. Sin `tagName` solo compila (no crea release de GitHub); subimos a S3.
+      # tauri-action instala el CLI de Tauri y genera los bundles. NO hay `beforeBuildCommand`: el
+      # front empaquetado es `shell-dist/`, estático y commiteado (ADR-0154), así que no se
+      # construye nada de JS para bundlear. Sin `tagName` solo compila (no crea release de
+      # GitHub); subimos a S3.
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:

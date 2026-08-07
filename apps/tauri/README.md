@@ -1,19 +1,30 @@
 # apps/tauri
 
-Empaquetado **desktop/móvil** (Tauri v2) del mismo shell + runtime Rust. ARQUITECTURA.md §1, §3.
+La app **de escritorio y Android** (Tauri v2). Es un **cliente fino** (ADR-0159): ARQUITECTURA.md §1, §3.
 
-Arranca el **runtime embebido** (`erplora_server::serve` en un hilo tokio dedicado, loopback
-`127.0.0.1:8787`) y expone por `invoke` el gate de arranque + identidad de dispositivo/máquina
-(`validate_entitlement`, `device_context`, `enroll_device`, `rotate_machine_token`). DB local =
-SQLite en `app_data_dir`. Sin red salvo marketplace/AI/primer-login (§2.8).
+La ventana arranca en el SaaS (`erplora.com/shell/`), **captura** a qué hub apunta esta instalación
+(ADR-0243) y a partir de ahí abre ese hub a pantalla completa en cada arranque. **No hay runtime
+embebido ni base de datos local**: los datos viajan por HTTP+WS al hub cloud. Lo que la app aporta
+—y su razón de existir— es el **hardware** de la caja: impresoras ESC/POS y cajón por `invoke` sobre
+`crates/peripherals`, más la identidad de dispositivo (`device_context` → `X-Device-Id`, sesión única
+ADR-0154) y las notificaciones del SO.
 
-**Estado**: **compila** — `crates/cloud-client/src/entitlement.rs` (RS256 offline) + `src-tauri/`
-(gate + keychain del SO para el token de máquina). Es **miembro del workspace raíz**;
-`cargo check -p erplora-tauri` pasa en verde.
+> **ADR-0154 retiró el producto local**, y con él tres cosas que este README describía y ya no
+> existen: el runtime embebido (`erplora_server::serve` en loopback `:8787` + SQLite en
+> `app_data_dir`), el gate `validate_entitlement` (verificación RS256 **offline** de un token
+> cacheado, con ventana de gracia) y `frontendDist` apuntando a `../../web/dist`. Quién decide hoy
+> el entitlement está más abajo. Las guardas que impiden que vuelvan viven en
+> `src-tauri/tests/shell_surface.rs` (hub#336).
+
+**Estado**: miembro del workspace raíz. `cargo test -p erplora-tauri` pasa en verde; su CI propio es
+[`test-shell.yml`](../../.github/workflows/test-shell.yml), que se dispara **solo** cuando cambia el
+shell (el `cargo test --workspace` del gate principal lo excluye: tauri/wry arrastra GTK/webkit2gtk).
 
 **Para construir el binario** (`cargo tauri build`):
 1. Toolchain Tauri v2 + WebView del SO (macOS WKWebView / Windows WebView2 / Linux webkit2gtk).
-2. Frontend: `pnpm -F @erplora/web build` (genera el `dist` que referencia `tauri.conf.json`).
+2. Frontend: **nada que construir**. `tauri.conf.json` empaqueta `shell-dist/`, una página estática
+   commiteada (la pantalla degradada que se ve cuando todavía no hay hub, o cuando no carga). La PWA
+   del hub **la sirve el hub**, no el instalador.
 3. Iconos de bundle completos: el set vive en `src-tauri/icons/` y lo genera el pipeline propio
    `scripts/gen-tauri-icon.py` (icono de **app** real: fondo de marca + safe-area + forma por
    plataforma), a partir del asset fuente `branding/app-icon-source.png`. El arte de marca
@@ -40,29 +51,28 @@ entonces con la clave documentada que corresponda).
 > máquina limpia que NSIS crea ambos accesos, que el MSIX solo aparece en Menú Inicio y que
 > el `.deb` registra la entrada de menú.
 
-## Gate de arranque por entitlement (la app Tauri es GRATIS)
+## Entitlement: la app NO decide (ADR-0154)
 
-Ya scaffoldeado en `src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/lib.rs`). La app de
-escritorio/Android **no se compra**: es la versión ligera (basic + compliance) para captar
-clientes. Lo que desbloquea módulos es un **entitlement por tiers** servido por el SaaS.
+La app de escritorio/Android **no se compra**: se descarga gratis y lo que desbloquea módulos es el
+**entitlement por tiers** que emite el SaaS. Lo que cambió con ADR-0154 no es *qué* se decide, sino
+**dónde**: la app dejó de tener su propia copia de la decisión.
 
-Flujo (`src/lib.rs::EntitlementGate`):
+El shell **no** tiene ya ningún comando de entitlement. Quién decide hoy, y contra qué:
 
-1. El frontend (`apps/web`), tras el login, llama a `invoke('validate_entitlement', { hubId, accessToken })`.
-2. El gate pide al SaaS la clave pública (`/api/v1/auth/public-key/`) + el token firmado
-   (`/api/v1/hub/device/entitlement/`), lo **verifica** (`erplora-cloud-client::verify_entitlement`,
-   RS256) y lo **cachea** en `app_data_dir` (`entitlement.jwt` + `cloud_public_key.pem`).
-3. **Sin red**: verifica el token cacheado **offline** y sigue dentro de la ventana de gracia
-   (`grace_until`, lo emite el SaaS — `saas/apps/public/modules/entitlement.py`).
-4. Devuelve `GateOutcome`: `unlocked { modules, deployment_mode, offline }` → el frontend monta
-   SOLO esos módulos; o `needs_activation { reason }` → pantalla de login/activación, sin negocio.
+| Capa | Dónde | Qué hace |
+| --- | --- | --- |
+| **Cloud (fuente de verdad)** | SaaS, `/api/v1/hub/device/entitlement/` | emite el entitlement firmado RS256 por hub |
+| **Runtime del hub (el que manda)** | [`crates/server/src/entitlement.rs`](../../crates/server/src/entitlement.rs) | revalidación híbrida (ADR-0114 §6): verifica la firma con `erplora-cloud-client::verify_entitlement` y el dispatcher responde **402** a las queries/commands de un módulo de pago bloqueado |
+| **UI** | [`apps/web/src/lib/entitlement.ts`](../web/src/lib/entitlement.ts) | `GET /api/entitlement` filtra qué módulos se montan y deshabilita los bloqueados con CTA de suscripción |
 
-`HUB_CLOUD_API_URL` sobreescribe la base del SaaS (por defecto `https://erplora.com`).
+Es decir: el gate sigue vivo y **más fuerte** que antes, porque la negativa la aplica el servidor en
+cada llamada, no un chequeo de arranque en el cliente. Lo que se retiró fue el camino Tauri
+(`validate_entitlement`): un veredicto **offline** sobre un token cacheado en `app_data_dir` con
+ventana de gracia. En un cliente fino ese camino es una segunda respuesta, más débil, a una pregunta
+que el Cloud ya contesta — y es justo la que el usuario puede editar en su propio disco.
 
-> Histórico (ya resuelto): en su día `apps/tauri/src-tauri` no estaba en `members` del
-> workspace raíz. Hoy **sí lo está** (ver `../../Cargo.toml`); `cargo check -p erplora-tauri`
-> pasa en verde (línea 12 arriba). La lógica criptográfica/gracia (verificable con `cargo test -p
-> erplora-cloud-client`) vive en `crates/cloud-client/src/entitlement.rs`.
+> `crates/cloud-client/src/entitlement.rs` **sigue en uso** (lo llama la revalidación del runtime);
+> lo que desapareció es su llamador Tauri. No lo borres pensando que es código muerto.
 
 ## Hardware local = sidecar de `erplora-peripherals` (§2.7)
 
@@ -72,13 +82,13 @@ Flujo (`src/lib.rs::EntitlementGate`):
 > `apps/bridge` siga en el árbol, lo de abajo describe el camino Tauri, que es el que
 > sobrevive. Para saber si la retirada ya ocurrió, mira si existe `apps/bridge/`.
 
-En el producto **Hub Local** (Tauri), el shell **es el bridge**: no hay proceso aparte ni segundo install. La
-lógica de hardware ya vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS
-sobre TCP:9100), el mismo que usa el bridge standalone (`apps/bridge`) en **Hub Cloud**.
+En la app, el shell **es el bridge**: no hay proceso aparte ni segundo install. La lógica de
+hardware vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS sobre TCP:9100), el
+mismo que usa el bridge standalone (`apps/bridge`).
 
-Los DATOS NO van por `invoke` (ADR-0050): el front habla HTTP+WS al runtime Axum embebido. `invoke`
-queda solo para lo nativo y para el HARDWARE — handlers que delegan en `erplora-peripherals` (en vez
-del servidor WebSocket que monta `apps/bridge`):
+Los DATOS NO van por `invoke` (ADR-0050): el front habla HTTP+WS **con su hub cloud** (no hay
+runtime embebido — ADR-0154). `invoke` queda solo para lo nativo y para el HARDWARE — handlers que
+delegan en `erplora-peripherals` (en vez del servidor WebSocket que monta `apps/bridge`):
 
 | `invoke`                     | Llama a                                              |
 |------------------------------|-----------------------------------------------------|
