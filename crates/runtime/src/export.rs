@@ -79,6 +79,36 @@ impl BundlePurpose {
     }
 }
 
+/// Keys of `hub_settings` that may travel to a hub OTHER than the one that produced the bundle
+/// (ADR-0195 §4 — hub#405). Plain configuration: what kind of business this is, where it operates,
+/// in which language and money it works, how it looks.
+///
+/// It is an ALLOWLIST, and that is the whole point: `hub_settings` is a key/value table that grows
+/// by adding a row, so a denylist would leak every setting invented after it was written, until
+/// someone remembered to go back and forbid it. Here a new key is born NON-portable and travels
+/// only once somebody decides it is configuration — the cost of the mistake is «my template did not
+/// bring the palette», not «this hub is invoicing under another company's tax id».
+///
+/// Deliberately OUT: `business_tax_id` / `business_legal_name` / `business_address` (the fiscal
+/// identity of ONE business — and exactly what the dispatcher's fiscal gate reads to decide the hub
+/// may issue, ADR-0203), `notify_allowed_recipients` (the origin's own contacts, and the allowlist
+/// that authorises sending to them) and `api_docs_enabled` (a security switch of the destination:
+/// a file someone downloaded must not open this hub's API docs).
+pub const PORTABLE_SETTING_KEYS: [&str; 6] = [
+    "country_code",
+    "region_code",
+    "currency",
+    "currency_decimals",
+    "language",
+    "theme_palette",
+];
+
+/// Is this `hub_settings` key plain configuration, i.e. may it travel to another hub?
+/// See [`PORTABLE_SETTING_KEYS`] — anything not listed is not portable.
+pub fn is_portable_setting(key: &str) -> bool {
+    PORTABLE_SETTING_KEYS.contains(&key)
+}
+
 /// `manifest.json` del bundle — fuente de verdad del contenido (a prueba de renombres del zip).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BlueprintManifest {
@@ -162,11 +192,11 @@ pub async fn export_hub(
     // «desmarcan» — no entran en el bundle, decida lo que decida el formulario. Una casilla no es
     // un control: la plantilla `restaurante` publicada llevaba 4 cuentas con rol y `pin_hash`
     // legacy con la sal DENTRO del zip descargable (Demo/admin, PIN `0000`).
-    let identidades = selection.purpose.allows_identity_sections();
+    let carries_identity = selection.purpose.allows_identity_sections();
     // `fiscal` EFECTIVO: el certificado y la identidad fiscal del negocio (NIF, entorno,
     // auto_transmit) son del hub de ORIGEN, así que siguen la misma regla.
-    let fiscal = selection.fiscal && identidades;
-    if selection.users && identidades {
+    let fiscal = selection.fiscal && carries_identity;
+    if selection.users && carries_identity {
         // `hub_user` NO lleva hub_id (identidad por despliegue, identity.rs): se vuelca entera.
         let mut rows = fetch_rows(db, "hub_user", None).await.unwrap_or_default();
         // …pero DESVINCULADA de las cuentas Cloud. `cloud_user_id` es la identidad de una
@@ -193,6 +223,22 @@ pub async fn export_hub(
         if let Some(keys) = &selection.settings_items {
             // Paso de ajustes ítem a ítem: solo las claves marcadas.
             rows.retain(|r| r.get("key").and_then(|k| k.as_str()).map(|k| keys.iter().any(|w| w == k)).unwrap_or(false));
+        }
+        // ADR-0195 §4 (hub#405): a TEMPLATE only carries CONFIGURATION. `hub_settings` holds, in
+        // the same table, what a sector template is for (country, currency, language, palette) and
+        // the fiscal identity of ONE business — tax id, legal name, address — plus its contacts and
+        // switches. Dumping it whole put the origin's NIF inside a published artefact, and the hub
+        // that imported it went on to issue documents under that NIF (ADR-0203 reads exactly those
+        // keys to let a sale be invoiced).
+        //
+        // The allowlist runs HERE, in the engine, and not on `settings_items`: the caller narrows,
+        // it never widens. The shell sends `settings_items: null` («all of them»), which is fine
+        // precisely because «all of them» is now decided by the rule and not by the form — the same
+        // lesson as the identity sections above: a checkbox is not a control.
+        if !carries_identity {
+            rows.retain(|r| {
+                r.get("key").and_then(|k| k.as_str()).map(is_portable_setting).unwrap_or(false)
+            });
         }
         files.insert("data/hub_settings.sql".into(), rows_to_sql("hub_settings", &rows, hub_id).into_bytes());
         sections.push("hub_settings".into());
@@ -741,6 +787,32 @@ mod tests {
             2,
             "created_by/updated_by deben conservar su valor 'local', no convertirse en placeholder:\n{sql}"
         );
+    }
+
+    /// ADR-0195 §4 (hub#405): of `hub_settings`, only CONFIGURATION leaves the hub that owns it.
+    /// The identity of the business — and the switches that guard it — stay behind, and a key
+    /// nobody has classified stays behind too: the list is an allowlist, so a setting added
+    /// tomorrow is born non-portable instead of leaking until someone remembers it.
+    #[test]
+    fn only_configuration_settings_are_portable() {
+        for key in PORTABLE_SETTING_KEYS {
+            assert!(is_portable_setting(key), "`{key}` is plain configuration and must travel");
+        }
+        for key in [
+            "business_tax_id",
+            "business_legal_name",
+            "business_address",
+            crate::host_notify::ALLOWED_RECIPIENTS_SETTING,
+            "api_docs_enabled",
+        ] {
+            assert!(
+                !is_portable_setting(key),
+                "`{key}` is identity, a contact of the origin business or a security switch: it must NOT travel"
+            );
+        }
+        // A key nobody classified — a printer address, a module's API key, tomorrow's setting.
+        assert!(!is_portable_setting("printer_ip"), "an unknown key is not portable by default");
+        assert!(!is_portable_setting(""), "an empty key is not portable either");
     }
 
     /// Constraint names are only unique PER SCHEMA: two schemas holding the same tables carry

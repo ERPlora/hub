@@ -88,7 +88,12 @@
           <!-- Ajustes del hub (data/hub_settings.sql). La subselección ítem a ítem
                (ExportSelection.settings_items) requiere un endpoint que enumere los settings
                presentes — aún no existe. TODO(ADR-0113): desglosar ítem a ítem cuando el runtime
-               exponga la lista; hasta entonces checkbox simple = todos (settings_items: null). -->
+               exponga la lista; hasta entonces checkbox simple = `settings_items: null`.
+               ⚠️ `null` NO significa «todos pase lo que pase» (ADR-0195 §4, hub#405): con
+               `purpose: template` el RUNTIME filtra a las claves de configuración
+               (`export::PORTABLE_SETTING_KEYS`) y el NIF, la razón social y la dirección no entran
+               en el zip. El control está en el motor a propósito — una casilla no es un control, y
+               este `null` sale del formulario. -->
           <ion-item>
             <ion-checkbox
               data-testid="export-section-settings"
@@ -98,7 +103,12 @@
               alignment="start"
             >
               <h2 class="cb-title">{{ t('exportPage.sectionSettings') }}</h2>
-              <p class="cb-desc">{{ t('exportPage.sectionSettingsDesc') }}</p>
+              <!-- La descripción NO puede prometer lo mismo en los dos casos: en una plantilla la
+                   identidad de negocio se queda fuera (hub#405), y decir «incluye la identidad»
+                   sería exactamente la promesa que el motor incumple. -->
+              <p class="cb-desc">
+                {{ esPlantilla ? t('exportPage.sectionSettingsDescTemplate') : t('exportPage.sectionSettingsDesc') }}
+              </p>
             </ion-checkbox>
           </ion-item>
 

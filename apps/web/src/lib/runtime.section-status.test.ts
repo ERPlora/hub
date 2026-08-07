@@ -25,6 +25,17 @@ describe('sectionStatusInfo · formas serde del enum', () => {
     expect(sectionStatusInfo({ Ignored: motivo })).toEqual({ kind: 'ignored', reason: motivo });
   });
 
+  // ADR-0195 §4 / hub#405: `hub_settings` es la única sección que mezcla lo que SÍ puede viajar
+  // (país, moneda, idioma) con lo que no (el NIF y la razón social de UN negocio), así que de un
+  // bundle ajeno se aplica en parte. Ni «Aplicado» —diría que entró todo— ni «Descartado» —diría
+  // que no entró nada, y la configuración sí entró—: estado propio, con su motivo.
+  it('PartiallyApplied(motivo) es un estado propio, no un aplicado ni un descarte', () => {
+    expect(sectionStatusInfo({ PartiallyApplied: 'settings_not_portable' })).toEqual({
+      kind: 'partial',
+      reason: 'settings_not_portable',
+    });
+  });
+
   // La razón por la que este test existe: antes de #305 una forma desconocida caía a `failed` con
   // el JSON crudo de motivo. Pintar un ✗ rojo con `{"Ignored":"…"}` delante de un hostelero es
   // exactamente el tipo de informe deshonesto que el resto de esta pantalla evita.
@@ -41,6 +52,10 @@ describe('sectionStatusInfo · formas serde del enum', () => {
 describe('sectionDiscardCode · motivo traducible vs prosa heredada', () => {
   it('reconoce el código de un descarte de identidades', () => {
     expect(sectionDiscardCode('identity_not_portable')).toBe('identity_not_portable');
+  });
+
+  it('reconoce el código de un descarte de ajustes no portables', () => {
+    expect(sectionDiscardCode('settings_not_portable')).toBe('settings_not_portable');
   });
 
   it('un motivo en prosa NO es un código: se pinta tal cual', () => {

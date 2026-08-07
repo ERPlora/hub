@@ -691,6 +691,9 @@ export default {
     sectionUsersDesc: 'Employees, roles and permissions',
     sectionSettings: 'Settings',
     sectionSettingsDesc: 'Hub settings: currency, language, business identity',
+    // hub#405 — a template carries the configuration of the sector, never the identity of the
+    // business that made it: its tax id would make another hub invoice under this company's name.
+    sectionSettingsDescTemplate: 'Hub settings: country, currency, language and theme. Never the tax id or the legal name.',
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'VeriFactu configuration and the company certificate',
     fiscalWarning: 'Includes the certificate: the .p12 travels as-is and keeps its own password. Share the file only with people you trust.',
@@ -759,12 +762,17 @@ export default {
     statusApplied: 'Applied',
     statusSkipped: 'Skipped',
     statusIgnored: 'Discarded',
+    statusPartial: 'Applied in part',
     statusFailed: 'Failed',
     mediaFailed: '{n} not copied',
     // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
     // identity of ONE hub: only that hub restoring its own backup gets them back.
     reasonIdentityNotPortable:
       'Users, roles and PINs belong to the hub that created them. Accounts discarded: {n}. Nobody was given access to your hub.',
+    // hub#405 — the settings that came in and the ones that did not. The tax id is the one that
+    // matters: with someone else's, this hub would invoice under their name.
+    reasonSettingsNotPortable:
+      'Country, currency and language were applied. Settings discarded: {n} — tax id, legal name and other details belong to the business that created the file; yours stay as they are.',
     done: 'Go to home',
   },
   moduleView: {

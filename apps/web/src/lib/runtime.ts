@@ -543,15 +543,21 @@ export interface ImportSelection {
  * llegan como string; `Failed(motivo)` e `Ignored(motivo)` como objeto `{"Failed": "motivo"}` /
  * `{"Ignored": "motivo"}`. Tolerar ambas formas.
  */
-export type SectionStatus = 'Applied' | 'Skipped' | { Failed: string } | { Ignored: string };
+export type SectionStatus =
+  | 'Applied'
+  | 'Skipped'
+  | { Failed: string }
+  | { Ignored: string }
+  | { PartiallyApplied: string };
 
 /** Una entrada del informe: sección (`hub_users`, `media`, `modules/<id>`, …) + estado. */
 export interface SectionResult {
   section: string;
   status: SectionStatus;
   /**
-   * Filas que el motor se negó a aplicar cuando descartó la sección (hub#331); 0 si no descartó
-   * nada. Ausente en informes de un runtime anterior al campo → se lee como 0.
+   * Filas que el motor se negó a aplicar: la sección entera cuando la descartó (hub#331) o solo
+   * las no portables cuando la aplicó en parte (hub#405); 0 si no descartó nada. Ausente en
+   * informes de un runtime anterior al campo → se lee como 0.
    */
   discarded_rows?: number;
 }
@@ -562,7 +568,7 @@ export interface SectionResult {
  * prosa y se pintan tal cual, así que hay que distinguir unos de otros — traducir es SUSTITUIR el
  * texto, y sustituir lo que no es un código borraría el motivo.
  */
-export const SECTION_DISCARD_CODES = ['identity_not_portable'] as const;
+export const SECTION_DISCARD_CODES = ['identity_not_portable', 'settings_not_portable'] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */
 export type SectionDiscardCode = (typeof SECTION_DISCARD_CODES)[number];
@@ -613,8 +619,8 @@ export interface ModuleInstallResult {
 
 /** Estado normalizado de una sección del informe, listo para pintar. */
 export interface SectionStatusInfo {
-  kind: 'applied' | 'skipped' | 'ignored' | 'failed';
-  /** Motivo — de un `failed`, o de por qué se descartó un `ignored`. */
+  kind: 'applied' | 'skipped' | 'ignored' | 'partial' | 'failed';
+  /** Motivo — de un `failed`, o de por qué se descartó (del todo o en parte) una sección. */
   reason?: string;
 }
 
@@ -637,6 +643,12 @@ export function sectionStatusInfo(status: SectionStatus | Record<string, unknown
     // Ni un fallo —no se intentó nada— ni un «saltado» mudo, que sería indistinguible de «no la
     // marqué». Lleva siempre su motivo, y ese motivo es lo que la pantalla enseña.
     if ('Ignored' in obj) return { kind: 'ignored', reason: String(obj.Ignored ?? '') };
+    // ADR-0195 §4 / hub#405: entró parte de la sección. `hub_settings` mezcla la configuración que
+    // SÍ viaja con la identidad fiscal que no, así que de un bundle ajeno se aplica a medias —
+    // decirlo «Aplicado» ocultaría el descarte, y «Descartado» negaría lo que sí entró.
+    if ('PartiallyApplied' in obj) {
+      return { kind: 'partial', reason: String(obj.PartiallyApplied ?? '') };
+    }
     if ('Applied' in obj) return { kind: 'applied' };
     if ('Skipped' in obj) return { kind: 'skipped' };
   }

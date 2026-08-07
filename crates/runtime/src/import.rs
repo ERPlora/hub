@@ -46,6 +46,15 @@ pub enum SectionStatus {
     /// aplicarla y tiene que decir por qué. Sin este estado, ignorar en silencio sería
     /// indistinguible de no haberla marcado.
     Ignored(String),
+    /// Applied — but not whole: the engine dropped part of its rows on purpose, and says why with
+    /// the same stable code an [`Ignored`](Self::Ignored) carries (hub#405).
+    ///
+    /// It exists because ONE section can legitimately mix what may travel with what may not:
+    /// `hub_settings` holds the configuration a template is for AND the fiscal identity of a
+    /// single business. Reporting that as `Applied` would tell the user everything landed, and as
+    /// `Ignored` would hide that the configuration did land — both are lies about the same row of
+    /// the report. The count of what was dropped is in [`SectionResult::discarded_rows`].
+    PartiallyApplied(String),
     /// Falló; el motivo es legible para el informe de la UI. El resto del import continuó.
     Failed(String),
 }
@@ -127,22 +136,22 @@ pub async fn import_sections(
     let batch_id = crate::reset::begin_batch(rt, target_hub_id, &manifest.name).await.ok();
 
     let mut report = ImportReport::default();
+    // Whose hub is this? Asked ONCE: it is what tells a same-hub restore (which may write back the
+    // identity it exported — ADR-0113 §1) from any other bundle (which may not), for both the
+    // accounts of hub#331 and the settings of hub#405.
+    let same_hub = is_same_hub(manifest, target_hub_id);
     for section in &manifest.sections {
-        let status = match ignored_by_purpose(manifest, section)
+        let (status, discarded_rows) = match ignored_by_purpose(manifest, section)
             .or_else(|| identity_not_portable(manifest, section, target_hub_id))
             .or_else(|| chain_not_portable(manifest, section, target_hub_id))
         {
-            Some(motivo) => SectionStatus::Ignored(motivo),
+            // A discard reports HOW MANY rows it dropped: «4 accounts kept out» is what turns a
+            // status the user skims past into something they can act on (hub#331).
+            Some(motivo) => (SectionStatus::Ignored(motivo), rows_in_section(section, files)),
             None => {
-                apply_section(rt, section, files, selection, target_hub_id, batch_id.as_deref())
+                apply_section(rt, section, files, selection, target_hub_id, same_hub, batch_id.as_deref())
                     .await
             }
-        };
-        // A discard reports HOW MANY rows it dropped: «4 accounts kept out» is what turns a status
-        // the user skims past into something they can act on (hub#331).
-        let discarded_rows = match &status {
-            SectionStatus::Ignored(_) => rows_in_section(section, files),
-            _ => 0,
         };
         report.sections.push(SectionResult { section: section.clone(), status, discarded_rows });
     }
@@ -159,6 +168,10 @@ pub async fn import_sections(
 pub mod ignore_reason {
     /// A bundle produced by ANOTHER hub carried `hub_user` rows (ADR-0195 §3 — hub#331).
     pub const IDENTITY_NOT_PORTABLE: &str = "identity_not_portable";
+    /// A bundle produced by ANOTHER hub carried `hub_settings` rows that are not configuration:
+    /// the fiscal identity of its business, its contacts or a security switch (ADR-0195 §4 —
+    /// hub#405). Only the configuration keys of that section were applied.
+    pub const SETTINGS_NOT_PORTABLE: &str = "settings_not_portable";
 }
 
 /// Is this bundle a restore of the destination hub's OWN state?
@@ -282,15 +295,17 @@ fn chain_not_portable(
     )
 }
 
-/// Aplica una sección; cualquier fallo queda contenido en su `SectionStatus::Failed`.
+/// Aplica una sección; cualquier fallo queda contenido en su `SectionStatus::Failed`. Devuelve
+/// además cuántas filas se quedaron fuera a propósito (0 salvo descarte parcial — hub#405).
 async fn apply_section(
     rt: &Runtime,
     section: &str,
     files: &BTreeMap<String, Vec<u8>>,
     selection: &ImportSelection,
     target_hub_id: &str,
+    same_hub: bool,
     batch_id: Option<&str>,
-) -> SectionStatus {
+) -> (SectionStatus, u32) {
     // ¿Está marcada en el formulario de import?
     let selected = match section {
         "hub_users" => selection.users,
@@ -302,33 +317,58 @@ async fn apply_section(
     };
     let path = data_file_for_section(section);
     if !selected {
-        return SectionStatus::Skipped;
+        return (SectionStatus::Skipped, 0);
     }
 
     // Un módulo del manifest debe estar instalado en destino (lo instala el server ANTES).
     if let Some(id) = section.strip_prefix("modules/") {
         if !rt.registry().is_installed(id) {
-            return SectionStatus::Failed(format!("módulo `{id}` no instalado en el hub destino"));
+            return (SectionStatus::Failed(format!("módulo `{id}` no instalado en el hub destino")), 0);
         }
     }
 
-    let Some(path) = path else { return SectionStatus::Skipped };
+    let Some(path) = path else { return (SectionStatus::Skipped, 0) };
     let Some(bytes) = files.get(&path) else {
-        return SectionStatus::Failed(format!("fichero {path} ausente del bundle"));
+        return (SectionStatus::Failed(format!("fichero {path} ausente del bundle")), 0);
     };
     let sql = match std::str::from_utf8(bytes) {
         Ok(s) => s.replace(crate::export::HUB_ID_PLACEHOLDER, target_hub_id),
-        Err(_) => return SectionStatus::Failed(format!("{path} no es UTF-8 válido")),
+        Err(_) => return (SectionStatus::Failed(format!("{path} no es UTF-8 válido")), 0),
     };
     if sql.trim().is_empty() {
-        return SectionStatus::Applied; // sección presente pero sin filas: nada que hacer
+        return (SectionStatus::Applied, 0); // sección presente pero sin filas: nada que hacer
     }
     // Subconjunto SQL del import (hub#239): la sección se valida ENTERA antes de ejecutar su
     // primera fila (solo `INSERT INTO` en sus propias tablas). Validar y ejecutar viven en la
     // misma función para que lo validado sea EXACTAMENTE lo ejecutado (mismo troceo).
     let Some(scope) = crate::import_sql::scope_for_data_file(&path) else {
-        return SectionStatus::Failed(format!("{path} no corresponde a ninguna sección conocida"));
+        return (SectionStatus::Failed(format!("{path} no corresponde a ninguna sección conocida")), 0);
     };
+    // ADR-0195 §4 (hub#405): the settings of a bundle that is NOT this hub's own are filtered to
+    // the configuration keys. `hub_settings` is the one section that legitimately mixes what may
+    // travel (country, currency, language) with what may not (the tax id and legal name of ONE
+    // business), so it is filtered row by row instead of discarded whole — discarding it would
+    // strip a sector template of the only thing it is for.
+    //
+    // Same question as hub#331, not a new one: not «what does this bundle claim to be» but «whose
+    // hub is this». A hub restoring its own backup writes its own identity back (ADR-0113 §1);
+    // everyone else's stays out, whatever the manifest says about itself.
+    let (sql, discarded) = if section == "hub_settings" && !same_hub {
+        match keep_portable_settings(&sql, &scope) {
+            Ok(filtered) => filtered,
+            // Invalid section: it fails WHOLE and without touching the BD, exactly as it did
+            // before this filter existed (hub#239). The filter narrows a valid section; it is not
+            // a way to salvage a broken one.
+            Err(e) => return (SectionStatus::Failed(e), 0),
+        }
+    } else {
+        (sql, 0)
+    };
+    if sql.trim().is_empty() {
+        // Nothing survived the filter: the section was identity and nothing else. Reporting that
+        // as `Applied` over zero rows would read as «I did what you asked».
+        return (SectionStatus::Ignored(ignore_reason::SETTINGS_NOT_PORTABLE.into()), discarded);
+    }
     // REGENERAR los `id` del bundle por el hub DESTINO y acotar la guarda por (hub_id, id)
     // (hub#260): en una BD COMPARTIDA por varios hubs de una misma org, los `id` del hub ORIGEN
     // ya existen (bajo un hub hermano) y el INSERT chocaba contra la PK global, o el guard por
@@ -350,9 +390,66 @@ async fn apply_section(
         None => crate::import_sql::apply(rt.db(), &sql, &scope).await,
     };
     match applied {
-        Ok(_) => SectionStatus::Applied,
-        Err(e) => SectionStatus::Failed(e.to_string()),
+        // Applied — but say so honestly when part of it was left out on purpose (hub#405).
+        Ok(_) if discarded > 0 => (
+            SectionStatus::PartiallyApplied(ignore_reason::SETTINGS_NOT_PORTABLE.into()),
+            discarded,
+        ),
+        Ok(_) => (SectionStatus::Applied, 0),
+        // A section that failed applied nothing, so nothing was «discarded»: the filter's count
+        // would be a number about rows that were never going to land anyway.
+        Err(e) => (SectionStatus::Failed(e.to_string()), 0),
     }
+}
+
+/// Keeps only the statements of a `hub_settings` section that write a PORTABLE configuration key,
+/// returning the surviving SQL and how many rows were dropped (ADR-0195 §4 — hub#405).
+///
+/// This is the consumer half of the rule, and the only one that reaches a file nobody vetted: the
+/// producer gate covers what THIS runtime exports as a template, and the SaaS gate covers what is
+/// published, but «upload from file» goes through neither — and a bundle that is honestly someone
+/// else's backup carries their tax id with every right to. What it must not do is write it here.
+///
+/// The section is VALIDATED FIRST and filtered second, and the order is the whole point: an invalid
+/// section must keep failing WHOLE, without touching the BD (hub#239). Filtering first would have
+/// quietly dropped the `DROP TABLE` — or the `SELECT pin_hash FROM hub_user` — and applied the rest,
+/// turning a bundle the user must be told about into a partial import nobody reads. So `Err` here
+/// means exactly what it meant before this filter existed: `Failed`, nothing applied.
+///
+/// After validation every statement is an `INSERT` of literals into `hub_settings`, so a key that
+/// still cannot be read is an exotic-but-legal shape the export never emits (a multi-row `VALUES`,
+/// a row with no `key` column). Those are DROPPED, not applied: fail-closed, because letting
+/// through what the filter cannot read is how an allowlist stops being one.
+fn keep_portable_settings(
+    sql: &str,
+    scope: &crate::import_sql::TableScope,
+) -> std::result::Result<(String, u32), String> {
+    let stmts = crate::import_sql::validate(sql, scope)?;
+    let mut kept = String::with_capacity(sql.len());
+    let mut dropped = 0u32;
+    for stmt in &stmts {
+        if writes_a_portable_setting(stmt) {
+            kept.push_str(stmt.trim());
+            kept.push('\n');
+        } else {
+            dropped += 1;
+        }
+    }
+    Ok((kept, dropped))
+}
+
+/// Does this statement write a `hub_settings` row whose key is portable configuration?
+/// `false` for anything that cannot be read as one — see the fail-closed note above.
+fn writes_a_portable_setting(stmt: &str) -> bool {
+    let Some(parsed) = parse_insert(stmt) else { return false };
+    if parsed.table != "hub_settings" {
+        return false;
+    }
+    let Some(i) = parsed.cols.iter().position(|c| c == "key") else { return false };
+    let Some(key) = parsed.vals.get(i).and_then(|v| unquote_string_literal(v)) else {
+        return false;
+    };
+    crate::export::is_portable_setting(&key)
 }
 
 /// Reescribe los `id` del SQL de una sección del bundle por ids NUEVOS derivados del hub DESTINO
@@ -405,7 +502,6 @@ fn remap_section_ids(sql: &str, target_hub_id: &str) -> String {
 /// Sentencia INSERT parseada a su tabla, columnas y literales (la forma que emite `rows_to_sql`).
 /// `None` si no casa con esa forma (se deja intacta).
 struct ParsedInsert<'a> {
-    #[allow(dead_code)]
     table: &'a str,
     cols: Vec<String>,
     vals: Vec<String>,
@@ -835,6 +931,81 @@ mod tests {
         // An unparseable file must not turn the count into a second failure path.
         files.insert("data/hub_users.sql".into(), b"INSERT INTO hub_user SELECT 'unclosed".to_vec());
         assert_eq!(rows_in_section("hub_users", &files), 0);
+    }
+
+    /// A `hub_settings` statement, in the exact shape `export::rows_to_sql` emits.
+    fn settings_row(key: &str, value: &str) -> String {
+        format!(
+            "INSERT INTO hub_settings (\"hub_id\", \"key\", \"value\", \"updated_at\", \"updated_by\") \
+             SELECT 'h2', '{key}', '{value}', '2026-08-06T10:00:00Z', 'system' \
+             WHERE NOT EXISTS (SELECT 1 FROM hub_settings WHERE \"key\" = '{key}' AND hub_id = 'h2');\n"
+        )
+    }
+
+    fn settings_scope() -> crate::import_sql::TableScope {
+        crate::import_sql::scope_for_data_file("data/hub_settings.sql").expect("settings scope")
+    }
+
+    /// 🔴 ADR-0195 §4 (hub#405): of a FOREIGN bundle's settings, only the configuration survives.
+    /// The tax id is the row that matters — the dispatcher's fiscal gate (ADR-0203) reads exactly
+    /// that key to decide the hub may issue, so injecting it does not just mislabel a screen: it
+    /// makes this hub invoice, and chain to the AEAT, under another company's NIF.
+    #[test]
+    fn a_foreign_settings_section_keeps_only_the_configuration() {
+        let sql = format!(
+            "{}{}{}{}",
+            settings_row("country_code", "ES"),
+            settings_row("business_tax_id", "B12345678"),
+            settings_row("language", "es"),
+            settings_row("business_legal_name", "Bar Pepe SL"),
+        );
+        let (kept, dropped) = keep_portable_settings(&sql, &settings_scope()).expect("valid section");
+
+        assert_eq!(dropped, 2, "two identity rows had to be dropped:\n{kept}");
+        assert!(kept.contains("'country_code'") && kept.contains("'language'"), "the configuration must survive:\n{kept}");
+        assert!(!kept.contains("business_tax_id"), "the tax id of another business must not be written:\n{kept}");
+        assert!(!kept.contains("B12345678"), "…nor its value:\n{kept}");
+        assert!(!kept.contains("Bar Pepe SL"), "…nor the legal name:\n{kept}");
+        // What survives is still exactly what the import will validate and run (same grammar).
+        assert!(
+            crate::import_sql::validate(&kept, &settings_scope()).is_ok(),
+            "the surviving SQL must still pass the import subset:\n{kept}"
+        );
+    }
+
+    /// An unclassified key is dropped, and so is a legal-but-unreadable row (here: no `key` column
+    /// at all). The filter only lets through what it can positively identify as configuration —
+    /// letting through what it cannot read is how an allowlist stops being one.
+    #[test]
+    fn an_unreadable_or_unknown_settings_row_does_not_get_through() {
+        let sql = format!(
+            "{}{}",
+            settings_row("printer_ip", "192.168.1.50"),
+            "INSERT INTO hub_settings (\"hub_id\", \"value\") SELECT 'h2', 'x';\n",
+        );
+        let (kept, dropped) = keep_portable_settings(&sql, &settings_scope()).expect("valid section");
+        assert_eq!(dropped, 2, "both rows had to be dropped:\n{kept}");
+        assert!(kept.trim().is_empty(), "nothing may survive:\n{kept}");
+    }
+
+    /// 🔴 An INVALID section still fails WHOLE (hub#239): the filter runs AFTER the grammar, never
+    /// instead of it. Filtering first would have dropped the `DROP TABLE` on the floor and applied
+    /// the rest — a bundle the user has to be warned about, turned into a quiet partial import.
+    #[test]
+    fn an_invalid_settings_section_still_fails_whole_instead_of_being_trimmed() {
+        for payload in [
+            "DROP TABLE hub_settings;",
+            "INSERT INTO hub_user (\"id\", \"name\") SELECT 'x', 'y';",
+            // Exfiltration: lexically an INSERT into its own section, reading another table.
+            "INSERT INTO hub_settings (\"hub_id\", \"key\", \"value\") SELECT 'h2', 'leak', pin_hash FROM hub_user;",
+            "INSERT INTO hub_settings (\"key\") SELECT 'unclosed",
+        ] {
+            let sql = format!("{}{payload}", settings_row("country_code", "ES"));
+            assert!(
+                keep_portable_settings(&sql, &settings_scope()).is_err(),
+                "`{payload}` had to fail the whole section, not be filtered away"
+            );
+        }
     }
 
     /// `derive_id` es determinista: mismo `(hub, id)` → mismo id, siempre (la idempotencia del

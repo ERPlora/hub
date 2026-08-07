@@ -706,6 +706,10 @@ const visual = {
   // un fallo, pero el usuario TIENE que verlo — es la diferencia entre «esta plantilla traía
   // usuarios ajenos y no los he metido» y un «Saltado» gris que nadie lee.
   ignored: { icon: 'shield-checkmark-outline', color: 'warning', label: () => t('importPage.statusIgnored') },
+  // hub#405: entró, pero no entera. Mismo escudo y mismo `warning` que un descarte —porque parte
+  // de la sección se descartó— con su propia etiqueta: un ✓ verde diría que entró todo, y lo que
+  // se quedó fuera es justamente la identidad fiscal de otro negocio.
+  partial: { icon: 'shield-checkmark-outline', color: 'warning', label: () => t('importPage.statusPartial') },
   failed: { icon: 'close-circle-outline', color: 'danger', label: () => t('importPage.statusFailed') },
 } as const;
 
@@ -749,6 +753,7 @@ const moduleInstallRows = computed<ReportRow[]>(() =>
 // no es un código es prosa de un runtime anterior: se pinta tal cual, nunca se borra.
 const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
   identity_not_portable: (n) => t('importPage.reasonIdentityNotPortable', { n }),
+  settings_not_portable: (n) => t('importPage.reasonSettingsNotPortable', { n }),
 };
 
 /** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */
