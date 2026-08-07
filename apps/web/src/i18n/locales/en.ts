@@ -483,6 +483,20 @@ export default {
     pinHelp: 'Between 4 and 8 digits. Leave blank to sign in with an online account.',
     pinSetHelp: 'Type a new PIN to change it; leave blank to keep the current one.',
     clearPin: 'Remove PIN',
+    localUser: 'Local user',
+    localUserHelp:
+      'Works this hub with a PIN only: no email and no ERPlora account. Turn it off to give them an account later, keeping their history.',
+    localPinHelp: 'Between 4 and 8 digits. Required: it is how this person signs in.',
+    // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
+    errors: {
+      local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
+      pin_length: 'The PIN must be between 4 and 8 digits.',
+      pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
+      pin_in_use: 'Another active user already has this PIN. A PIN says who is at the till, so no two people can share one.',
+      local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
+      local_has_email: 'A local user has no email. Turn off «Local user» to invite them as an account user.',
+      name_taken: 'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',
+    },
     activeUser: 'Active user',
     required: 'Required field',
     invalidEmail: 'Enter a valid email',

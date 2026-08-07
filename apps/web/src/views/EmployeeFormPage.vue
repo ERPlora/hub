@@ -45,6 +45,7 @@
               required
             />
             <ion-input
+              v-if="!isLocal"
               v-model="form.email"
               :label="t('employeeForm.email')"
               label-placement="floating"
@@ -74,9 +75,26 @@
               fill="outline"
               inputmode="numeric"
               :maxlength="8"
-              :helper-text="hasPin ? t('employeeForm.pinSetHelp') : t('employeeForm.pinHelp')"
+              :helper-text="pinHelp"
+              :error-text="localIssue ? t(`employeeForm.errors.${localIssue}`) : ''"
+              :class="{ 'ion-invalid ion-touched': Boolean(localIssue) }"
             />
           </div>
+
+          <!-- «Local user» (hub#355): nombre + PIN, sin email y sin nada en el SaaS. Solo en el
+               ALTA: sobre una ficha existente la vía de acceso se cambia con el email y el PIN,
+               no volviendo a decidir qué clase de identidad es. -->
+          <ion-toggle
+            v-if="!isEdit"
+            :checked="form.local"
+            label-placement="start"
+            justify="space-between"
+            class="active-toggle"
+            @ion-change="form.local = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
+          >
+            {{ t('employeeForm.localUser') }}
+          </ion-toggle>
+          <p v-if="!isEdit" class="toggle-help">{{ t('employeeForm.localUserHelp') }}</p>
 
           <ion-toggle
             :checked="form.isActive"
@@ -133,10 +151,13 @@ import {
 import AppPage from '../components/AppPage.vue';
 import {
   createHubUser,
+  hubUserErrorKey,
   listHubRoles,
   listHubUsers,
+  localUserIssue,
   updateHubUser,
   type HubRole,
+  type HubUser,
   type HubUserPatch,
 } from '../lib/hub-users';
 import { toast } from '../lib/toast';
@@ -152,9 +173,12 @@ const form = reactive({
   role: 'employee',
   pin: '',
   isActive: true,
+  /** Casilla «Local user» (hub#355). Solo cuenta en el alta; una ficha existente no la usa. */
+  local: false,
 });
 
 const roles = ref<HubRole[]>([]);
+const users = ref<HubUser[]>([]);
 const hasPin = ref(false);
 const loading = ref(true);
 const saving = ref(false);
@@ -169,7 +193,24 @@ let initial = { name: '', email: '', role: '', isActive: true };
 const emailValid = computed(() =>
   !form.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()),
 );
-const canSubmit = computed(() => Boolean(form.name.trim() && emailValid.value));
+/** Alta de usuario LOCAL: solo se decide al crear (hub#355). */
+const isLocal = computed(() => !isEdit.value && form.local);
+/**
+ * Motivo por el que el runtime rechazaría este alta local, adelantado aquí. El runtime revalida y
+ * es la autoridad; `pin_in_use` solo lo sabe él (los PIN están hasheados) y llega en la respuesta.
+ */
+const localIssue = computed(() =>
+  isLocal.value
+    ? localUserIssue({ name: form.name, role: form.role, pin: form.pin }, users.value)
+    : '',
+);
+const pinHelp = computed(() => {
+  if (isLocal.value) return t('employeeForm.localPinHelp');
+  return hasPin.value ? t('employeeForm.pinSetHelp') : t('employeeForm.pinHelp');
+});
+const canSubmit = computed(
+  () => Boolean(form.name.trim() && emailValid.value) && !localIssue.value,
+);
 
 /** Etiqueta traducida de un rol conocido; los que aporta un módulo se muestran tal cual. */
 function roleLabel(role: string): string {
@@ -191,10 +232,12 @@ async function load(): Promise<void> {
   loading.value = true;
   loadError.value = false;
   try {
-    roles.value = await listHubRoles();
+    // El censo lo necesitan las dos caras: la edición para leer la ficha, y el alta local para
+    // adelantar «este hub ya conoce a alguien con ese nombre» sin ir al servidor.
+    [roles.value, users.value] = await Promise.all([listHubRoles(), listHubUsers()]);
     if (isEdit.value) {
       const id = String(route.params.id);
-      const target = (await listHubUsers()).find((u) => u.id === id);
+      const target = users.value.find((u) => u.id === id);
       if (!target) throw new Error(t('employeeForm.notFound'));
       hasPin.value = target.has_pin;
       Object.assign(form, {
@@ -247,13 +290,25 @@ async function onSave(): Promise<void> {
       else if (!hasPin.value) patch.pin = '';
       await updateHubUser(String(route.params.id), patch);
     } else {
-      await createHubUser({ name, email, role: form.role || 'employee', pin });
+      await createHubUser({
+        name,
+        // Un usuario local no lleva email: el runtime rechaza el alta si viene uno.
+        email: isLocal.value ? '' : email,
+        role: form.role || 'employee',
+        pin,
+        local: isLocal.value,
+      });
     }
     markClean();
     void toast(isEdit.value ? t('employees.updated') : t('employees.created'), 'success');
     await router.replace('/employees');
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : t('employees.saveError');
+    const key = hubUserErrorKey(error);
+    saveError.value = key
+      ? t(`employeeForm.errors.${key}`)
+      : error instanceof Error
+        ? error.message
+        : t('employees.saveError');
   } finally {
     saving.value = false;
   }
@@ -310,6 +365,12 @@ watch(form, () => {
 .active-toggle {
   width: 100%;
   padding-block: 0.25rem;
+}
+
+.toggle-help {
+  margin: -0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ion-color-medium);
 }
 
 .clear-pin {

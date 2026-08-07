@@ -275,7 +275,7 @@ async fn the_hub_can_never_be_left_without_an_administrator() {
             "POST",
             "/api/hub/users",
             &f.owner,
-            json!({ "name": "Ana Soto", "role": "admin", "pin": "9999" }),
+            json!({ "name": "Ana Soto", "role": "admin", "pin": "9042" }),
         )
         .await,
     )
@@ -416,6 +416,96 @@ async fn deactivating_a_cloud_user_revokes_the_access_too() {
         .find(|u| u["name"] == "Ana Soto")
         .unwrap();
     assert_eq!(ana["is_active"], false);
+    std::fs::remove_dir_all(f.media).ok();
+}
+
+// ── Local user alta: name + PIN, nothing in the SaaS (plan step 2b, hub#355) ───────────────────
+// The alta of somebody who can work the till, so the HTTP door matters as much as the rules: only
+// an administrator opens it, and it never talks to the SaaS — there is no account to invite.
+
+#[tokio::test]
+async fn only_an_administrator_creates_a_local_user() {
+    // Resolved on the conservative side (hub#355): the write gate of Personal stays
+    // `require_admin_session`, the same one that guards settings, files, API keys and the module
+    // lifecycle. The role matrix of the plan hands local staff to the `manager` too, but widening
+    // the gate GRANTS access, so it belongs to the step that builds `manager` deliberately — not
+    // to this one as a side effect.
+    let f = fixture().await;
+    let response = send(
+        &f.router,
+        "POST",
+        "/api/hub/users",
+        &f.cashier,
+        json!({ "name": "Luis Prat", "role": "employee", "pin": "5390", "local": true }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let users = body_json(get(&f.router, "/api/hub/users", Some(&f.owner)).await).await;
+    assert_eq!(
+        users["data"].as_array().unwrap().len(),
+        2,
+        "a rejected alta creates nobody"
+    );
+    std::fs::remove_dir_all(f.media).ok();
+}
+
+#[tokio::test]
+async fn a_local_user_is_created_without_ever_calling_the_saas() {
+    // The fixture points at an unreachable SaaS on purpose: an alta that tried to invite anybody
+    // would answer `502 cloud_unreachable`, like the alta with email does. A local user has no
+    // account, so the call must not happen at all.
+    let f = fixture().await;
+    let res = send(
+        &f.router,
+        "POST",
+        "/api/hub/users",
+        &f.owner,
+        json!({ "name": "Luis Prat", "role": "employee", "pin": "5390", "local": true }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let created = body_json(res).await;
+    assert_eq!(created["data"]["has_pin"], true);
+    assert_eq!(created["data"]["email"], "");
+    assert!(created["data"]["cloud_user_id"].is_null());
+    std::fs::remove_dir_all(f.media).ok();
+}
+
+#[tokio::test]
+async fn a_rejected_local_alta_answers_with_a_stable_code() {
+    // The UI has to know WHY, not just that it failed: a duplicate PIN is fixed by typing another
+    // one, an administrative role is not fixable at all. `RuntimeError::Domain` carries the code
+    // verbatim (409) so the shell translates it instead of showing a runtime sentence.
+    let f = fixture().await;
+    for (payload, expected) in [
+        (
+            json!({ "name": "Luis Prat", "role": "admin", "pin": "5390", "local": true }),
+            "hub.users.local_cannot_administer",
+        ),
+        (
+            json!({ "name": "Luis Prat", "role": "employee", "pin": "", "local": true }),
+            "hub.users.local_needs_pin",
+        ),
+        (
+            json!({ "name": "Luis Prat", "role": "employee", "pin": "1111", "local": true }),
+            "hub.users.pin_too_simple",
+        ),
+        (
+            json!({ "name": "Marta Ruiz", "role": "employee", "pin": "5390", "local": true }),
+            "hub.users.name_taken",
+        ),
+        (
+            json!({
+                "name": "Luis Prat", "role": "employee", "pin": "5390",
+                "email": "luis@example.com", "local": true
+            }),
+            "hub.users.local_has_email",
+        ),
+    ] {
+        let res = send(&f.router, "POST", "/api/hub/users", &f.owner, payload).await;
+        assert_eq!(res.status(), StatusCode::CONFLICT);
+        assert_eq!(body_json(res).await["error"]["code"], expected);
+    }
     std::fs::remove_dir_all(f.media).ok();
 }
 

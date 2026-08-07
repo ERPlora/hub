@@ -281,6 +281,67 @@ pub async fn list_pin_users(db: &dyn DatabaseAdapter) -> Result<Vec<(String, Str
         .collect())
 }
 
+/// `true` if `pin` already opens the session of **another active** user of this hub (plan step 2b,
+/// hub#355). `excluding_id` is the user being edited, so re-typing your own PIN is not a clash.
+///
+/// A PIN is an **attribution** mechanism, not authentication: the pinpad resolves NAME + PIN
+/// ([`verify_pin`]), so two people behind the same four digits means the sale is attributed to
+/// whoever was tapped on the grid, and whoever actually typed is invisible. This is the only guard
+/// that can catch it, and only at the moment the hub sees the digits in clear: the hashes are
+/// argon2id with a random salt each, so two equal PINs do NOT produce equal hashes and there is
+/// nothing to compare in SQL. Hence the linear scan verifying the candidate against each stored
+/// hash — an alta is rare and the staff of a hub is tens of rows.
+///
+/// **Active users only.** A deactivated row cannot sign in, so it holds no digits hostage; the
+/// alternative would burn PINs forever and leak that a given PIN once belonged to somebody.
+pub async fn pin_is_taken(
+    db: &dyn DatabaseAdapter,
+    pin: &str,
+    excluding_id: Option<&str>,
+) -> Result<bool> {
+    if pin.is_empty() {
+        return Ok(false); // no PIN, no collision.
+    }
+    let res = db
+        .query(
+            "SELECT id, pin_hash FROM hub_user \
+              WHERE is_active = 1 AND pin_hash IS NOT NULL AND pin_hash != ''",
+            &Params::new(),
+        )
+        .await?;
+    for row in &res.rows {
+        let id = row["id"].as_str().unwrap_or_default();
+        if excluding_id.is_some_and(|excluded| excluded == id) {
+            continue;
+        }
+        if check_pin(row["pin_hash"].as_str().unwrap_or_default(), pin) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// `true` if this hub already knows somebody by this name — **active or not**, ignoring case (plan
+/// step 2b, hub#355). Used by the local-user alta; the generic alta and the edit keep asking only
+/// about active rows ([`crate::hub_users`]), because that is what makes the pinpad ambiguous.
+///
+/// The extra reach is the point: a deactivated row is a door the hub (or the SaaS, hub#348) closed,
+/// and creating a namesake next to it hands a working PIN to somebody who was locked out, leaving
+/// two identities for one person. Reopening it is [`crate::hub_users::update`] — an explicit,
+/// audited decision — not a second alta.
+///
+/// Case-insensitive because the pinpad is: `marta ruiz` and `Marta Ruiz` are two rows the cashier
+/// cannot tell apart on the login grid, and "which of the two Martas is this?" is exactly the
+/// question a PIN exists to answer.
+pub async fn name_is_known(db: &dyn DatabaseAdapter, name: &str) -> Result<bool> {
+    let mut p = Params::new();
+    p.insert("name".into(), json!(name.trim().to_lowercase()));
+    let res = db
+        .query("SELECT id FROM hub_user WHERE LOWER(name) = :name", &p)
+        .await?;
+    Ok(!res.rows.is_empty())
+}
+
 /// Nombre legible por defecto derivado de un email (la parte local antes de `@`). Para dar un
 /// `name` mostrable al `hub_user` sembrado/invitado por email antes de su primer login (el usuario
 /// puede editarlo luego en su Perfil). `""` → `"owner"`/lo que pase el llamador.

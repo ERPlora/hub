@@ -63,7 +63,8 @@ async fn a_staff_member_is_linked_to_a_hub_user() {
             name: "Marta Ruiz".into(),
             email: "marta@example.com".into(),
             role: "employee".into(),
-            pin: "1234".into(),
+            pin: "4821".into(),
+            local: false,
         })
         .await
         .unwrap();
@@ -112,6 +113,7 @@ async fn the_link_can_be_set_and_cleared_later() {
             email: String::new(),
             role: "employee".into(),
             pin: String::new(),
+            local: false,
         })
         .await
         .unwrap();
@@ -188,6 +190,7 @@ async fn the_module_reaches_the_hub_users_through_the_dispatcher() {
         email: String::new(),
         role: "manager".into(),
         pin: "4242".into(),
+        local: false,
     })
     .await
     .unwrap();
