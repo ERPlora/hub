@@ -6,11 +6,12 @@
     "till.view_sale",
     "till.add_sale",
     "till.take_payment",
+    "till.void_sale",
     "till.manage_settings"
   ],
   "role_permissions": {
     "admin": ["*"],
-    "manager": ["till.view_sale", "till.add_sale", "till.take_payment"],
+    "manager": ["till.view_sale", "till.add_sale", "till.take_payment", "till.void_sale"],
     "employee": ["till.view_sale", "till.add_sale"]
   },
   "navigation": [],
@@ -30,6 +31,11 @@
     },
     "till.sale.take_payment": {
       "permission": "till.take_payment",
+      "transaction": true,
+      "sql": ["commands/sale_create.sql"]
+    },
+    "till.sale.void": {
+      "permission": "till.void_sale",
       "transaction": true,
       "sql": ["commands/sale_create.sql"]
     },

@@ -3,7 +3,7 @@
   "name": "Catalog",
   "version": "1.0.0",
   "permissions": ["catalog.read", "catalog.write", "catalog.secret"],
-  "role_permissions": { "admin": ["*"] },
+  "role_permissions": { "admin": ["*"], "manager": ["catalog.write"] },
   "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
   "queries": {
     "catalog.items.list": {

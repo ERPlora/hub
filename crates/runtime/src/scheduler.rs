@@ -214,6 +214,8 @@ async fn run_task(
             0,
             &[advance],
             commands::Origin::Internal,
+            // A scheduled task runs with nobody at the till (hub#361): no approval to spend.
+            None,
         )
         .await?;
         Ok(true)

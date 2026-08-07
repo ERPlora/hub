@@ -210,6 +210,9 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
             depth,
             &extra,
             commands::Origin::Internal,
+            // The relay is the runtime delivering to itself: there is no cashier and no manager,
+            // so there is no approval to spend (hub#361).
+            None,
         )
         .await
         {
@@ -384,6 +387,7 @@ async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elevation::Grants;
     use crate::manifest::CommandDef;
     use crate::registry::{ModuleStatus, RegisteredCommand};
     use erplora_db::{testutil::fresh_db, PgAdapter};
@@ -435,7 +439,7 @@ mod tests {
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
 
         // Emisor: inserta su fila (99) + persiste el evento en el outbox, pero NO corre el listener.
-        crate::commands::execute(&db, &reg, "m.fire", &Params::new(), &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "m.fire", &Params::new(), &ctx, &Grants::new()).await.unwrap();
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 0, "listener no inline");
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await,
@@ -482,7 +486,7 @@ mod tests {
         reg.listeners.insert("sale.voided".into(), vec!["cash_register._reverse_sale".into()]);
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx, &Grants::new()).await.unwrap();
 
         drain(&db, &reg).await.unwrap();
         assert_eq!(
@@ -566,7 +570,7 @@ mod tests {
         authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
             .await
             .unwrap();
         assert!(transport.sent().is_empty(), "no se envía inline; va por el relay");
@@ -602,7 +606,7 @@ mod tests {
         reg.notify_transport = Some(transport.clone());
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
             .await
             .unwrap();
         drain(&db, &reg).await.unwrap();
@@ -638,7 +642,7 @@ mod tests {
             &reg,
             "appt.remind",
             &reminder_payload("atacante@evil.com"),
-            &ctx,
+            &ctx, &Grants::new(),
         )
         .await
         .unwrap();
@@ -664,7 +668,7 @@ mod tests {
         authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx)
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
             .await
             .unwrap();
 
@@ -724,7 +728,7 @@ mod tests {
         );
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx, &Grants::new()).await.unwrap();
 
         // Un solo ciclo del relay: "good.listener" se entrega AUNQUE "bad.listener" falla antes.
         process_once(&db, &reg).await.unwrap();
@@ -809,8 +813,8 @@ mod tests {
         reg.listeners.insert("ok.e".into(), vec!["ok.listener".into()]);
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "poison.fire", &Params::new(), &ctx).await.unwrap();
-        crate::commands::execute(&db, &reg, "ok.fire", &Params::new(), &ctx).await.unwrap();
+        crate::commands::execute(&db, &reg, "poison.fire", &Params::new(), &ctx, &Grants::new()).await.unwrap();
+        crate::commands::execute(&db, &reg, "ok.fire", &Params::new(), &ctx, &Grants::new()).await.unwrap();
 
         // Un solo ciclo del relay procesa AMBAS filas (BATCH=50). La venenosa falla y se difiere;
         // la sana se entrega igual. Sin el fix, "ok.listener" no correría (n=1 sería 0 aquí).

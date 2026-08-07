@@ -425,6 +425,37 @@ pub struct RequestContext {
     /// Subdivisión ISO-3166-2 (`ES-CN`…) o vacío = todo el país. Una regla con región gana a la del
     /// país (Canarias/IGIC, Ceuta y Melilla/IPSI).
     pub region_code: String,
+    /// **Who is behind this request**: a person, or a machine (hub#361). See [`Principal`].
+    pub principal: Principal,
+    /// Reference to a **step-up approval** this runtime is holding (hub#361), if the caller
+    /// presented one (`X-Elevation-Token`). It is a lookup key into
+    /// [`crate::elevation::Grants`] — **never** a claim: an unknown, expired or foreign token is
+    /// indistinguishable from no token at all, and the payload is never read for it.
+    pub elevation_token: Option<String>,
+    /// `hub_user.id` of the manager whose approval let this command past the permission gate.
+    /// Filled by the dispatcher **after** spending a grant, so it is a fact about what happened,
+    /// not something a caller can assert. This is the seam hub#362 writes next to the cashier's
+    /// `created_by` — the double attribution is the whole point of approving instead of sharing a
+    /// password.
+    pub approved_by: Option<String>,
+}
+
+/// Who is behind a request. The distinction only exists because of what it forbids.
+///
+/// A **machine** principal (an API key, ADR-0057) has nobody standing at it: telling a nightly
+/// integration to «ask a manager to type their PIN» is an instruction nothing can follow. Before
+/// hub#361 that was merely an absurd message; now that an approval GRANTS, it would be a second,
+/// quieter way in for a credential that is stored, copied and long-lived. So a machine principal
+/// is **never offered** elevation ([`crate::permissions::check_command`]) and can **never be
+/// approved** ([`crate::Runtime::approve_elevation`]).
+///
+/// [`Principal::Human`] is the default on purpose: a surface that forgets to say what it is gets
+/// the ordinary behaviour, and the only thing `Machine` ever does is take capability away.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Principal {
+    #[default]
+    Human,
+    Machine,
 }
 
 impl RequestContext {
@@ -443,7 +474,37 @@ impl RequestContext {
             business_legal_name: String::new(),
             business_address: String::new(),
             has_certificate: false,
+            principal: Principal::Human,
+            elevation_token: None,
+            approved_by: None,
         }
+    }
+
+    /// Marks this context as a **machine** principal (an API key — [`Principal::Machine`]). Only
+    /// ever takes capability away: it cannot be offered elevation, and it cannot be approved.
+    pub fn as_machine(mut self) -> Self {
+        self.principal = Principal::Machine;
+        self
+    }
+
+    /// Attaches the step-up approval token the caller presented (hub#361). The HTTP layer reads it
+    /// from `X-Elevation-Token` — **out of band, never from the payload**, so the body of a
+    /// command stays pure data and a hostile client cannot smuggle authority through it.
+    pub fn with_elevation_token(mut self, token: impl Into<String>) -> Self {
+        self.elevation_token = Some(token.into());
+        self
+    }
+
+    /// Copy that has **spent** an approval: it records who approved and drops the token, so the
+    /// reference cannot be looked at twice further down the call chain.
+    ///
+    /// Note what it does **not** do: it never adds the permission to [`Self::permissions`]. The
+    /// approval authorises passing **one gate**, not holding the permission — anything downstream
+    /// that asks again must ask again.
+    pub(crate) fn spent_approval_of(mut self, approver_id: impl Into<String>) -> Self {
+        self.approved_by = Some(approver_id.into());
+        self.elevation_token = None;
+        self
     }
 
     /// Devuelve una copia con la identidad de negocio global rellena (la usa el dispatcher tras leer
@@ -562,5 +623,50 @@ mod tests {
         let reg = registry_with("pricing.set_default", true, false);
         assert_eq!(reg.exposed_commands("pricing").len(), 1);
         assert!(reg.is_command_exposed("pricing", "pricing.set_default"));
+    }
+
+    /// hub#361: spending an approval opens **one gate**, it does not hand out the permission.
+    ///
+    /// This is the property that keeps an approval from spreading. Nothing downstream of the gate
+    /// re-asks the RBAC question — a handler resolves its own module's SQL under the command that
+    /// invoked it (§5.3), the fiscal and capability gates ask different questions — so if the
+    /// elevated context simply *held* `till.take_payment`, an approval would silently become the
+    /// permission for the rest of the call. It never enters the set.
+    #[test]
+    fn spending_an_approval_records_who_approved_without_granting_anything() {
+        let ctx = RequestContext::new("h1", "u-cashier", ["till.add_sale".to_string()])
+            .with_elevation_token("t-1");
+        assert_eq!(ctx.elevation_token.as_deref(), Some("t-1"));
+        assert_eq!(ctx.approved_by, None);
+
+        let spent = ctx.clone().spent_approval_of("u-manager");
+        assert_eq!(spent.approved_by.as_deref(), Some("u-manager"));
+        assert_eq!(
+            spent.permissions, ctx.permissions,
+            "the approval must not add the permission it approved — nor any other"
+        );
+        assert_eq!(
+            spent.elevation_token, None,
+            "the reference is dropped with the grant, so nothing further down can look twice"
+        );
+        assert_eq!(
+            spent.user_id, "u-cashier",
+            "who was at the till does not change"
+        );
+    }
+
+    /// The default side of [`Principal`] is not decoration: it decides what a context that never
+    /// says what it is may do. `Machine` only ever takes capability away, so the default has to be
+    /// `Human` — and nothing else in the crate asserts it, because `RequestContext::new` spells it
+    /// out. The day somebody derives `Default` for a context, or builds one with `..Default`,
+    /// this is what stops the elevation dialog from silently disappearing for everyone.
+    #[test]
+    fn the_default_principal_is_the_human_one() {
+        assert_eq!(Principal::default(), Principal::Human);
+        assert_eq!(
+            RequestContext::new("h1", "u1", Vec::<String>::new()).principal,
+            Principal::default(),
+            "`new` and the derive must not drift apart"
+        );
     }
 }
