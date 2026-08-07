@@ -30,7 +30,7 @@ async fn lists_every_user_of_the_hub_including_the_cloud_owner_without_pin() {
     let rt = runtime("hub-staff").await;
     // Owner: se provisiona en el primer login cloud, sin PIN local.
     let owner = rt
-        .get_or_link_cloud_user("cloud-1", "Ioan Beilic", "owner", None)
+        .get_or_link_cloud_user("cloud-1", "Ioan Beilic", "owner", None, None)
         .await
         .unwrap();
     // Cajera: solo-local, con PIN.
@@ -211,7 +211,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
 #[tokio::test]
 async fn roles_are_core_and_count_their_members() {
     let rt = runtime("hub-roles").await;
-    rt.get_or_link_cloud_user("cloud-1", "Ioan", "owner", None)
+    rt.get_or_link_cloud_user("cloud-1", "Ioan", "owner", None, None)
         .await
         .unwrap();
     rt.create_user("Marta", "1111", "cashier", None)
@@ -255,7 +255,7 @@ async fn roles_are_core_and_count_their_members() {
 #[tokio::test]
 async fn a_module_reads_the_hub_users_through_the_dispatcher() {
     let rt = runtime("hub-dispatch").await;
-    rt.get_or_link_cloud_user("cloud-1", "Ioan Beilic", "owner", None)
+    rt.get_or_link_cloud_user("cloud-1", "Ioan Beilic", "owner", None, None)
         .await
         .unwrap();
     rt.create_hub_user(&NewHubUser {

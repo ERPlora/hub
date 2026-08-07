@@ -191,6 +191,20 @@ async fn cloud_user_role(state: &AppState, cloud_user_id: &str) -> Option<String
         .map(|r| r["role"].as_str().unwrap_or_default().to_string())
 }
 
+/// How many `hub_user` rows are linked to `cloud_user_id`. Re-evaluating the role floor must raise
+/// the row the user already has, never provision a second one alongside it.
+async fn cloud_user_rows(state: &AppState, cloud_user_id: &str) -> usize {
+    let rt = state.runtime.lock().await;
+    let mut p = erplora_db::Params::new();
+    p.insert("cuid".to_string(), json!(cloud_user_id));
+    rt.db_for_test()
+        .query("SELECT id FROM hub_user WHERE cloud_user_id = :cuid", &p)
+        .await
+        .unwrap()
+        .rows
+        .len()
+}
+
 #[tokio::test]
 async fn member_present_in_hubs_claim_links_and_opens_session() {
     // El hub de esta máquina (HUB_ID) figura en `hubs[]` → el usuario ENTRA y se provisiona local.
@@ -278,6 +292,142 @@ async fn member_sin_rol_administrativo_en_la_org_se_queda_en_minimo_privilegio()
         cloud_user_role(&state, "3").await.as_deref(),
         Some("employee"),
         "sin rol administrativo en la org → mínimo privilegio"
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+// ── The cloud role is a FLOOR re-evaluated on EVERY login (hub#347, plan step 2b rule C) ────────
+//
+// Until now the local role was a snapshot taken when the `hub_user` row was created:
+// `get_or_link_cloud_user` returned the existing row untouched. Promote somebody in the SaaS and
+// the hub never found out, so an account admin who happened to log in before being promoted was
+// stuck as `employee` forever, unable to import a blueprint or to fix it from inside.
+//
+// The bridge between the two role planes is a FLOOR, not a synchronisation: owner/admin of the hub
+// in the cloud means *at least* `admin` locally, checked on every login; above the floor the local
+// role is left alone, and the floor never lowers anything and never grants `owner`.
+
+#[tokio::test]
+async fn a_cloud_promotion_reaches_the_hub_on_the_next_login() {
+    // The bug this issue fixes: first login as a plain member, promoted in the SaaS afterwards.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let before = sign_user_jwt_role(7, "socio@bar.com", member.clone(), "employee");
+    let resp = router.oneshot(cloud_login_bare(&before)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "7").await.as_deref(),
+        Some("employee"),
+        "first login: no administrative role in the cloud → least privilege",
+    );
+
+    // The account owner promotes them in the SaaS; their next token carries the new role.
+    let after = sign_user_jwt_role(7, "socio@bar.com", member, "admin");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&after))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "7").await.as_deref(),
+        Some("admin"),
+        "the floor is re-evaluated on every login, so the promotion reaches the hub",
+    );
+    assert_eq!(
+        cloud_user_rows(&state, "7").await,
+        1,
+        "the SAME row is raised: the login must not create a second `hub_user`",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn losing_the_cloud_admin_role_does_not_lower_the_local_role() {
+    // A floor raises, it never lowers: dropping somebody to `employee` in the SaaS must not strip
+    // the local role they were given inside the hub. Taking access away is a different operation —
+    // deactivating the `hub_user` (rule D, hub#348) — and doing it by silent demotion would leave
+    // them logged in with a role nobody chose.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let admin = sign_user_jwt_role(8, "jefa@bar.com", member.clone(), "admin");
+    let resp = router.oneshot(cloud_login_bare(&admin)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(cloud_user_role(&state, "8").await.as_deref(), Some("admin"));
+
+    let demoted = sign_user_jwt_role(8, "jefa@bar.com", member, "employee");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&demoted))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "8").await.as_deref(),
+        Some("admin"),
+        "no floor from the cloud leaves the local role exactly as the hub set it",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn the_cloud_floor_never_overwrites_the_seeded_owner() {
+    // `owner` is already above the `admin` floor, so the floor is a no-op for the seeded owner.
+    // Hub ownership comes from `HUB_OWNER_EMAIL` (ADR-0157) and the floor must not rewrite it —
+    // neither up (it never grants `owner`) nor down (it would demote the owner of the hub).
+    let (router, state, temp) = fixture().await;
+    state
+        .runtime
+        .lock()
+        .await
+        .seed_owner("boss@bar.com")
+        .await
+        .unwrap();
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let owner = sign_user_jwt_role(9, "boss@bar.com", member.clone(), "owner");
+    let resp = router.oneshot(cloud_login_bare(&owner)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "9").await.as_deref(),
+        Some("owner"),
+        "first login links the seeded owner by email and keeps `owner`",
+    );
+
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&owner))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "9").await.as_deref(),
+        Some("owner"),
+        "re-evaluating the floor must not demote the owner to `admin`",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn the_raised_role_is_the_one_the_session_gets() {
+    // Raising the row is only half the fix: the session opened by that very login must already
+    // carry the admin permissions, otherwise the promoted user still sees the hub as an employee
+    // until they log in a third time.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let before = sign_user_jwt_role(10, "socia@bar.com", member.clone(), "employee");
+    router.oneshot(cloud_login_bare(&before)).await.unwrap();
+
+    let after = sign_user_jwt_role(10, "socia@bar.com", member, "admin");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&after))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = json_body(resp).await;
+    assert_eq!(
+        body["user"]["role"], "admin",
+        "the login response reports the raised role, not the stale one",
     );
     std::fs::remove_dir_all(temp).ok();
 }

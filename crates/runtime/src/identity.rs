@@ -325,6 +325,49 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
     Ok(true)
 }
 
+/// Sube el rol de un `hub_user` **al suelo** que impone el rol de su cuenta en el Cloud, si aún no
+/// llega (paso 2b regla C, hub#347). Devuelve el usuario tal y como queda.
+///
+/// Es un **suelo**, no una sincronización, y por eso solo sube:
+///  - Si el rol local ya **administra el hub** (`owner` o `admin`, [`hub_users::is_admin_role`]) no
+///    toca nada. Ese es el caso que impide que reevaluar el suelo **degrade al owner** a `admin`.
+///  - Cualquier otro rol —`manager`, `employee` o uno **custom** de un módulo— no acredita
+///    administrar el hub, así que se sube a [`hub_users::CLOUD_ROLE_FLOOR`]. Es deliberado: los
+///    permisos que declara el manifest de un módulo no son la propiedad "administra el hub", y sin
+///    subirlo un owner de la cuenta puede quedarse fuera de su propio hub, que es justo lo que la
+///    regla C existe para evitar.
+///  - `floor` es siempre `admin` en el llamador real (`server::auth::role_floor_for_cloud_login`);
+///    aquí se **acota igualmente** a `CLOUD_ROLE_FLOOR` como defensa en profundidad: un login
+///    NUNCA puede escribir `owner`, venga como venga el parámetro (ADR-0157: la propiedad del hub
+///    sale de `HUB_OWNER_EMAIL`, no de un token).
+async fn raise_role_to_floor(
+    db: &dyn DatabaseAdapter,
+    user: HubUser,
+    floor: Option<&str>,
+) -> Result<HubUser> {
+    let Some(floor) = floor.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(user); // sin suelo: el rol local queda EXACTAMENTE como lo dejó el hub.
+    };
+    if crate::hub_users::is_admin_role(&user.role) {
+        return Ok(user); // ya está en el suelo o por encima.
+    }
+    // Acota el suelo: `admin` y nada más, aunque el llamador pida otra cosa.
+    let floor = if crate::hub_users::is_admin_role(floor) {
+        crate::hub_users::CLOUD_ROLE_FLOOR
+    } else {
+        return Ok(user); // un "suelo" que no administra el hub no es un suelo: no asciende nada.
+    };
+    let mut p = Params::new();
+    p.insert("id".into(), json!(user.id));
+    p.insert("role".into(), json!(floor));
+    db.execute("UPDATE hub_user SET role = :role WHERE id = :id", &p)
+        .await?;
+    Ok(HubUser {
+        role: floor.to_string(),
+        ..user
+    })
+}
+
 /// Resuelve (o crea/enlaza) el `hub_user` vinculado a una identidad cloud. Adaptador del **JWT de
 /// usuario**: tras verificar el token (server), se mapea a un usuario local. La resolución es en
 /// dos pasos (ADR-0157):
@@ -335,12 +378,19 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
 ///     email. Así el owner mantiene `owner` (no cae a `employee`) en su primer login.
 ///  3. Si no hay coincidencia → se **provisiona** con `default_role` (red de seguridad para un
 ///     miembro que pasa el gate de presencia sin fila local; rol de mínimo privilegio).
+///
+/// En los dos primeros casos —fila que YA existe— se aplica además el **suelo de rol**
+/// (`role_floor`, paso 2b regla C, hub#347): el rol de la cuenta en el Cloud se reevalúa en **cada**
+/// login y sube el rol local si se ha quedado corto, sin bajarlo nunca. Antes el rol era una foto
+/// del primer login y ascender a alguien en el SaaS no llegaba jamás al hub. Ver
+/// [`raise_role_to_floor`]. `role_floor = None` → la fila se devuelve intacta.
 pub async fn get_or_link_cloud_user(
     db: &dyn DatabaseAdapter,
     cloud_user_id: &str,
     default_name: &str,
     default_role: &str,
     email: Option<&str>,
+    role_floor: Option<&str>,
 ) -> Result<HubUser> {
     // 1) Por cloud_user_id (ya enlazado).
     let mut p = Params::new();
@@ -353,7 +403,7 @@ pub async fn get_or_link_cloud_user(
         )
         .await?;
     if let Some(row) = res.rows.first() {
-        return Ok(row_to_user(row));
+        return raise_role_to_floor(db, row_to_user(row), role_floor).await;
     }
     // 2) Por email: fila pre-provisionada (owner sembrado / invitado) sin cloud_user_id → enlazar.
     if let Some(email) = email.map(str::trim).filter(|s| !s.is_empty()) {
@@ -376,22 +426,28 @@ pub async fn get_or_link_cloud_user(
                 &up,
             )
             .await?;
-            return Ok(HubUser {
+            let linked = HubUser {
                 cloud_user_id: Some(cloud_user_id.to_string()),
                 ..user
-            });
+            };
+            return raise_role_to_floor(db, linked, role_floor).await;
         }
     }
-    // 3) Provisiona una fila nueva (rol de mínimo privilegio) con su email si vino.
+    // 3) Provisiona una fila nueva (rol de mínimo privilegio) con su email si vino. El suelo se
+    //    aplica también aquí para que la invariante sea la MISMA en los tres caminos: al salir, el
+    //    rol nunca está por debajo del suelo. El llamador real ya calcula `default_role` con el
+    //    mismo rol de cuenta, así que en la práctica es un no-op; lo que evita es que un llamador
+    //    futuro pase un suelo y se olvide del rol por defecto y la fila nueva nazca por debajo.
     let email = email.map(str::trim).unwrap_or("");
     let id = create_login_user_row(db, &new_id(), default_name, "", default_role, Some(cloud_user_id), email).await?;
-    Ok(HubUser {
+    let created = HubUser {
         id,
         name: default_name.to_string(),
         role: default_role.to_string(),
         cloud_user_id: Some(cloud_user_id.to_string()),
         is_active: true,
-    })
+    };
+    raise_role_to_floor(db, created, role_floor).await
 }
 
 /// INSERT de bajo nivel de un `hub_user` con `email` explícito (lo comparten el provisioning por
@@ -897,7 +953,7 @@ mod tests {
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
         // Cloud-linked user provisioned without a PIN (first online login).
-        let user = get_or_link_cloud_user(&db, "7", "Ada", "admin", None)
+        let user = get_or_link_cloud_user(&db, "7", "Ada", "admin", None, None)
             .await
             .unwrap();
         assert!(
@@ -963,7 +1019,7 @@ mod tests {
         seed_owner(&db, "boss@bar.com").await.unwrap();
 
         // Primer login: enlaza por email → owner.
-        let user = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"))
+        let user = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"), None)
             .await
             .unwrap();
         assert_eq!(user.role, "owner", "el owner sembrado conserva su rol");
@@ -975,7 +1031,7 @@ mod tests {
         );
 
         // Segundo login (ya enlazado): resuelve por cloud_user_id, mismo usuario/rol.
-        let again = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"))
+        let again = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"), None)
             .await
             .unwrap();
         assert_eq!(again.id, user.id);
@@ -989,7 +1045,7 @@ mod tests {
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
 
-        let user = get_or_link_cloud_user(&db, "5", "Nuevo", "employee", Some("nuevo@bar.com"))
+        let user = get_or_link_cloud_user(&db, "5", "Nuevo", "employee", Some("nuevo@bar.com"), None)
             .await
             .unwrap();
         assert_eq!(user.role, "employee");
@@ -1002,10 +1058,10 @@ mod tests {
     async fn cloud_user_link_is_idempotent() {
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let a = get_or_link_cloud_user(&db, "42", "Demo", "cashier", None)
+        let a = get_or_link_cloud_user(&db, "42", "Demo", "cashier", None, None)
             .await
             .unwrap();
-        let b = get_or_link_cloud_user(&db, "42", "OtroNombre", "admin", None)
+        let b = get_or_link_cloud_user(&db, "42", "OtroNombre", "admin", None, None)
             .await
             .unwrap();
         assert_eq!(a.id, b.id, "el mismo cloud_user_id reusa el hub_user");
@@ -1013,6 +1069,172 @@ mod tests {
             b.role, "cashier",
             "no re-provisiona ni cambia el rol existente"
         );
+    }
+
+    // ── Role floor re-evaluated on every login (hub#347, plan step 2b rule C) ────────────────
+    //
+    // `default_role` decides how a BRAND NEW row is provisioned; `role_floor` is the minimum the
+    // cloud account imposes on a row that ALREADY exists. They are separate parameters on purpose:
+    // conflating them would turn `HUB_DEFAULT_ROLE` into a floor and re-promote, on every login,
+    // anybody the hub had deliberately demoted.
+
+    /// Rol actual de un `hub_user` leído de la BD (no del valor devuelto): así los tests comprueban
+    /// que el suelo se **persiste**, no solo que se reporta bien en la respuesta del login.
+    async fn stored_role(db: &dyn DatabaseAdapter, id: &str) -> String {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        let res = db
+            .query("SELECT role FROM hub_user WHERE id = :id", &p)
+            .await
+            .unwrap();
+        res.rows[0]["role"].as_str().unwrap().to_string()
+    }
+
+    #[tokio::test]
+    async fn the_floor_raises_an_existing_employee_on_a_later_login() {
+        // The bug: the role was a snapshot of the first login, so a promotion in the SaaS never
+        // reached the hub. Same row, raised — not a second user.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        let first = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, None)
+            .await
+            .unwrap();
+        assert_eq!(first.role, "employee");
+
+        let second = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, Some("admin"))
+            .await
+            .unwrap();
+        assert_eq!(second.id, first.id, "misma fila, no una nueva");
+        assert_eq!(second.role, "admin", "el suelo sube el rol local");
+        assert_eq!(
+            stored_role(&db, &first.id).await,
+            "admin",
+            "y queda persistido, no solo devuelto"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_floor_never_lowers_an_owner() {
+        // Re-evaluating an `admin` floor must not demote the hub owner: `owner` is already above
+        // it. Otherwise every login of the owner would quietly strip their ownership.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        seed_owner(&db, "boss@bar.com").await.unwrap();
+        let linked = get_or_link_cloud_user(&db, "1", "Boss", "employee", Some("boss@bar.com"), Some("admin"))
+            .await
+            .unwrap();
+        assert_eq!(linked.role, "owner", "el owner sembrado sigue siendo owner");
+        assert_eq!(stored_role(&db, &linked.id).await, "owner");
+    }
+
+    #[tokio::test]
+    async fn without_a_floor_the_local_role_is_left_exactly_as_it_was() {
+        // Losing the administrative role in the cloud does NOT lower the local role: the bridge is
+        // a floor, not a synchronisation. Taking access away is deactivating the `hub_user`
+        // (rule D, hub#348), never a silent demotion.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        // As the real caller does it: an account admin gets both the default role AND the floor.
+        let raised = get_or_link_cloud_user(&db, "42", "Ada", "admin", None, Some("admin"))
+            .await
+            .unwrap();
+        assert_eq!(raised.role, "admin");
+
+        // Demoted in the cloud: no floor any more, and the local role stays untouched.
+        let demoted_in_cloud = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, None)
+            .await
+            .unwrap();
+        assert_eq!(demoted_in_cloud.role, "admin", "el suelo sube, nunca baja");
+        assert_eq!(stored_role(&db, &raised.id).await, "admin");
+    }
+
+    #[tokio::test]
+    async fn a_brand_new_row_is_never_created_below_the_floor() {
+        // Same invariant on the three paths: on the way out the role is never under the floor.
+        // The real caller derives `default_role` from the same cloud role, so this is a no-op for
+        // it; it guards a future caller that passes a floor and forgets the default.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        let user = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, Some("admin"))
+            .await
+            .unwrap();
+        assert_eq!(user.role, "admin");
+        assert_eq!(stored_role(&db, &user.id).await, "admin");
+    }
+
+    #[tokio::test]
+    async fn the_floor_applies_when_linking_an_invited_row_by_email() {
+        // An invited user whose row was created as `employee` and who is an admin of the account:
+        // the floor applies on the very login that links the row, not only from the second one on.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        create_login_user(&db, "socia@bar.com", "employee").await.unwrap();
+
+        let linked = get_or_link_cloud_user(&db, "77", "Socia", "employee", Some("socia@bar.com"), Some("admin"))
+            .await
+            .unwrap();
+        assert_eq!(linked.role, "admin");
+        assert_eq!(linked.cloud_user_id.as_deref(), Some("77"), "queda enlazada");
+        assert_eq!(
+            list_login_users(&db).await.unwrap().len(),
+            1,
+            "reusa la fila invitada, no crea otra"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_custom_module_role_does_not_satisfy_the_admin_floor() {
+        // A custom role declared by a module (`bartender`, `kitchen`…) may carry a generous
+        // `role_permissions`, but that is not the "administers the hub" property. Assuming it did
+        // would leave an account owner locked out of their own hub — the very thing rule C exists
+        // to prevent — so an unranked role is raised.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        let user = get_or_link_cloud_user(&db, "42", "Ada", "bartender", None, None)
+            .await
+            .unwrap();
+        assert_eq!(user.role, "bartender");
+
+        let raised = get_or_link_cloud_user(&db, "42", "Ada", "bartender", None, Some("admin"))
+            .await
+            .unwrap();
+        assert_eq!(raised.role, "admin");
+    }
+
+    #[tokio::test]
+    async fn a_login_can_never_write_owner_however_the_floor_arrives() {
+        // Defence in depth: the only caller passes `admin`, but the runtime clamps the floor too.
+        // Hub ownership comes from `HUB_OWNER_EMAIL` (ADR-0157) and no token may grant it.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        get_or_link_cloud_user(&db, "42", "Ada", "employee", None, None)
+            .await
+            .unwrap();
+
+        let user = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, Some("owner"))
+            .await
+            .unwrap();
+        assert_eq!(user.role, "admin", "un suelo `owner` se acota a `admin`");
+        assert_eq!(stored_role(&db, &user.id).await, "admin");
+    }
+
+    #[tokio::test]
+    async fn a_floor_that_does_not_administer_the_hub_raises_nothing() {
+        // A non-administrative "floor" is not a floor: it must not overwrite the local role, in
+        // either direction. Guards against a future caller passing the raw cloud role through.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        let first = get_or_link_cloud_user(&db, "42", "Ada", "cashier", None, None)
+            .await
+            .unwrap();
+
+        for bogus in ["manager", "employee", "member", ""] {
+            let user = get_or_link_cloud_user(&db, "42", "Ada", "cashier", None, Some(bogus))
+                .await
+                .unwrap();
+            assert_eq!(user.role, "cashier", "`{bogus}` no es un suelo");
+        }
+        assert_eq!(stored_role(&db, &first.id).await, "cashier");
     }
 
     #[tokio::test]
