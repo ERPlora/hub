@@ -74,6 +74,22 @@ pub trait NativeHost: Send + Sync {
     }
 }
 
+/// Work a native engine still owes an EXTERNAL authority, reported by
+/// [`NativeHandler::pending_obligations`] (hub#314, ADR-0202 guard R2). The runtime turns it
+/// into the refusal that keeps the module in place; the engine owns the numbers and the words
+/// because only it knows what "not handed over yet" means in its domain.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingObligation {
+    /// How many units are still owed. The operator is told this number, so it must be the same
+    /// one the module's own UI shows (for `verifactu`: the pending-records KPI).
+    pub count: u64,
+    /// Stable domain code, `<module>.<snake_case>` in the engine's OWN namespace — same public
+    /// ABI as `expect_rows` (hub#139). The UI programs and translates against it.
+    pub code: String,
+    /// Human fallback, already carrying the count. Never the only channel: the code is.
+    pub message: String,
+}
+
 /// Un plugin nativo first-party: el motor de un módulo, horneado en el runtime y
 /// registrado por `module_id` ([`crate::Runtime::register_native`]). `function` es el
 /// nombre declarado en `module.json` (`handler.function`); una función desconocida debe
@@ -81,6 +97,22 @@ pub trait NativeHost: Send + Sync {
 #[async_trait::async_trait]
 pub trait NativeHandler: Send + Sync + std::fmt::Debug {
     async fn call(&self, function: &str, input: &Json, host: &dyn NativeHost) -> Result<Output>;
+
+    /// **Retention gate (hub#314, ADR-0202 guard R2).** What this engine still owes an external
+    /// authority for `hub_id`, or `None` when it owes nothing. The runtime asks BEFORE
+    /// deactivating or uninstalling the module (and before dragging it down in a cascade) and
+    /// refuses while something is owed — otherwise the work is stranded with nobody left to
+    /// drain it (VeriFactu FAQ §5: an invoice whose record never reached the AEAT).
+    ///
+    /// Reads go through `host` (SELECT only), like every other native read. Default: engines
+    /// owe nothing, so the lifecycle is unchanged for every plugin that does not opt in.
+    async fn pending_obligations(
+        &self,
+        _hub_id: &str,
+        _host: &dyn NativeHost,
+    ) -> Result<Option<PendingObligation>> {
+        Ok(None)
+    }
 }
 
 /// [`NativeHost`] real sobre el adaptador de BD del runtime.

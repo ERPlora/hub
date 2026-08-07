@@ -1,0 +1,8 @@
+{
+  "id": "rowing",
+  "name": "Retention Owing",
+  "version": "1.0.0",
+  "permissions": [],
+  "depends_on": ["rbase"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] }
+}

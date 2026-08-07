@@ -268,6 +268,48 @@ fn load_schema(dir: &Path, name: &str, rel: Option<&str>) -> Result<Option<Compi
     Ok(Some(compiled))
 }
 
+/// **Retention gate (hub#314, ADR-0202 guard R2).** Refuses to let a module go while its native
+/// engine still owes work to an external authority.
+///
+/// `uninstall` used to delete the `hub_module` row without looking at the queue, and `deactivate`
+/// silenced the module the same way through a quieter door: the VeriFactu records left unsent
+/// became literal orphans — no scheduled task, no UI, nobody left to drain them, so the invoices
+/// stayed outside the AEAT chain (VeriFactu FAQ §5). The runtime asks the engine first and
+/// rejects with its stable domain code, so the refusal is programmable and translatable instead
+/// of a mute no-op.
+///
+/// Structural, not a hardcoded module id: any first-party engine ([`NativeHandler`]) may report
+/// what it owes, and one that reports nothing (the default) keeps the lifecycle it always had.
+/// The code must live in the engine's OWN namespace — same ABI as `expect_rows` (hub#139); a
+/// foreign one is a first-party bug, so it is surfaced as a broken contract and still blocks
+/// (failing closed is the safe direction when the thing at stake is a fiscal record).
+pub(crate) async fn ensure_no_pending_obligations(
+    host: &dyn crate::native::NativeHost,
+    registry: &Registry,
+    hub_id: &str,
+    module_id: &str,
+) -> Result<()> {
+    let Some(engine) = registry.native.get(module_id).cloned() else {
+        return Ok(()); // Declarative module: it owes nothing to anyone.
+    };
+    let Some(owed) = engine.pending_obligations(hub_id, host).await? else {
+        return Ok(());
+    };
+    if owed.count == 0 {
+        return Ok(());
+    }
+    if !crate::errors::valid_domain_code(module_id, &owed.code) {
+        return Err(RuntimeError::Other(format!(
+            "el motor de `{module_id}` reportó {} obligación(es) pendiente(s) con el código inválido `{}`; se esperaba `{module_id}.<snake_case>`",
+            owed.count, owed.code
+        )));
+    }
+    Err(RuntimeError::Domain {
+        code: owed.code,
+        message: owed.message,
+    })
+}
+
 /// Cambia el estado (activar/desactivar) de un módulo instalado y lo persiste para `hub_id`.
 pub async fn set_status(
     db: &dyn DatabaseAdapter,
@@ -475,6 +517,142 @@ async fn persist_status(
         &p,
     ).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod retention_gate_tests {
+    //! hub#314 (ADR-0202 phase 1, guard R2): a module whose native engine still owes work to an
+    //! external authority can be neither disabled nor uninstalled. Without the gate, `uninstall`
+    //! deleted the `hub_module` row while VeriFactu records sat unsent — nobody drains them
+    //! afterwards, so the invoices stay outside the AEAT chain (VeriFactu FAQ §5).
+    use std::sync::Arc;
+
+    use erplora_wasm_host::Output;
+    use serde_json::Value as Json;
+
+    use super::*;
+    use crate::native::{NativeHandler, NativeHost, PendingObligation};
+
+    /// A native engine reporting `count` units of work still owed. `call` is unreachable on
+    /// purpose: the gate must ask through its own door, never by dispatching a command.
+    #[derive(Debug)]
+    struct OwingEngine {
+        count: u64,
+        code: &'static str,
+    }
+
+    #[async_trait::async_trait]
+    impl NativeHandler for OwingEngine {
+        async fn call(
+            &self,
+            _function: &str,
+            _input: &Json,
+            _host: &dyn NativeHost,
+        ) -> Result<Output> {
+            unreachable!("the retention gate must not dispatch commands")
+        }
+
+        async fn pending_obligations(
+            &self,
+            _hub_id: &str,
+            _host: &dyn NativeHost,
+        ) -> Result<Option<PendingObligation>> {
+            Ok((self.count > 0).then(|| PendingObligation {
+                count: self.count,
+                code: self.code.to_string(),
+                message: format!("{} record(s) still unsent", self.count),
+            }))
+        }
+    }
+
+    /// Host that reads nothing: these engines answer from their own state, so a read would only
+    /// hide which door the gate actually used.
+    struct SilentHost;
+
+    #[async_trait::async_trait]
+    impl NativeHost for SilentHost {
+        async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+            Ok(Vec::new())
+        }
+    }
+
+    fn registry_with(module_id: &str, engine: OwingEngine) -> Registry {
+        let mut registry = Registry::new();
+        registry
+            .native
+            .insert(module_id.to_string(), Arc::new(engine));
+        registry
+    }
+
+    #[tokio::test]
+    async fn a_module_still_owing_records_is_blocked_and_says_how_many() {
+        let registry = registry_with(
+            "verifactu",
+            OwingEngine {
+                count: 3,
+                code: "verifactu.unsent_records",
+            },
+        );
+        let err = ensure_no_pending_obligations(&SilentHost, &registry, "hub-1", "verifactu")
+            .await
+            .expect_err("3 unsent records must keep the module in place");
+        match err {
+            RuntimeError::Domain { code, message } => {
+                assert_eq!(
+                    code, "verifactu.unsent_records",
+                    "the UI programs and translates against the stable namespaced code"
+                );
+                assert!(
+                    message.contains('3'),
+                    "the rejection must say how many are left, got `{message}`"
+                );
+            }
+            other => panic!("expected a translatable domain rejection, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_module_owing_nothing_is_free_to_go() {
+        let registry = registry_with(
+            "verifactu",
+            OwingEngine {
+                count: 0,
+                code: "verifactu.unsent_records",
+            },
+        );
+        ensure_no_pending_obligations(&SilentHost, &registry, "hub-1", "verifactu")
+            .await
+            .expect("with everything handed over the module must be removable");
+    }
+
+    #[tokio::test]
+    async fn a_module_without_a_native_engine_is_never_gated() {
+        let registry = Registry::new();
+        ensure_no_pending_obligations(&SilentHost, &registry, "hub-1", "inventory")
+            .await
+            .expect("a declarative module owes nothing to anyone");
+    }
+
+    #[tokio::test]
+    async fn a_foreign_error_code_is_a_broken_contract_and_still_blocks() {
+        // Same ABI as `expect_rows` (hub#139): an engine may only mint codes in its own
+        // namespace. A foreign code is a first-party bug — it must never pass as a domain
+        // rejection the UI would translate, and it must still stop the removal.
+        let registry = registry_with(
+            "verifactu",
+            OwingEngine {
+                count: 1,
+                code: "sales.unsent_records",
+            },
+        );
+        let err = ensure_no_pending_obligations(&SilentHost, &registry, "hub-1", "verifactu")
+            .await
+            .expect_err("a broken contract must not open the gate");
+        assert!(
+            !matches!(err, RuntimeError::Domain { .. }),
+            "a code minted in another module's namespace is not a valid domain rejection"
+        );
+    }
 }
 
 #[cfg(test)]

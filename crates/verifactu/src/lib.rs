@@ -20,7 +20,7 @@
 //!
 //! [ADR-0009]: ../../../architecture/00-overview/decision-log.md
 use erplora_db::Params;
-use erplora_runtime::native::{NativeHandler, NativeHost};
+use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
 use erplora_runtime::{Result, RuntimeError};
 use erplora_wasm_host::{Operation, Output};
 use serde_json::{json, Value as Json};
@@ -73,6 +73,50 @@ impl NativeHandler for VerifactuEngine {
                 "función desconocida del plugin verifactu: `{other}`"
             ))),
         }
+    }
+
+    /// **Retention gate (hub#314, ADR-0202 guard R2).** Records the AEAT does NOT have yet.
+    /// While this is non-zero the runtime refuses to deactivate or uninstall the module: those
+    /// records are the only proof pending for invoices already issued, and nothing outside this
+    /// module can transmit them (VeriFactu FAQ §5).
+    ///
+    /// The counted states are exactly the module's own `compliance_summary` KPI —
+    /// `pending`/`retry`/`error`/`rejected`, everything short of `accepted` — so the number in
+    /// the refusal is the same one the operator already sees on the dashboard, and clearing the
+    /// KPI is literally the way out. `rejected` counts too: the AEAT rejected the record, so the
+    /// invoice is still unregistered and needs a corrected one before the module may go
+    /// (`is_chainable_status`: a rejected link is not in the chain either).
+    async fn pending_obligations(
+        &self,
+        hub_id: &str,
+        host: &dyn NativeHost,
+    ) -> Result<Option<PendingObligation>> {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        let rows = host
+            .read(
+                "SELECT COUNT(*) AS pending_count FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND is_deleted = 0 \
+                   AND status IN ('pending', 'retry', 'error', 'rejected')",
+                &p,
+            )
+            .await?;
+        let count = rows
+            .first()
+            .map(|r| int_field(r, "pending_count", 0))
+            .unwrap_or(0)
+            .max(0) as u64;
+        if count == 0 {
+            return Ok(None);
+        }
+        Ok(Some(PendingObligation {
+            count,
+            code: "verifactu.unsent_records".to_string(),
+            // English source string; the UI translates against the stable code (ADR-0055).
+            message: format!(
+                "{count} VeriFactu record(s) have not reached the AEAT yet: send them before disabling or removing the module"
+            ),
+        }))
     }
 }
 
@@ -2563,6 +2607,95 @@ mod environment_chain_tests {
             params.get("environment"),
             Some(&json!("testing")),
             "the RECORD's environment scopes the lookup, not the current config's"
+        );
+    }
+}
+
+#[cfg(test)]
+mod retention_gate_tests {
+    //! ADR-0202 phase 1, guard R2 (hub#314): while records are still unsent, the module cannot
+    //! be disabled or uninstalled. The runtime owns the refusal; the engine owns the COUNT and
+    //! the stable code, because only it knows which record states mean "the AEAT does not have
+    //! this invoice yet".
+
+    use super::*;
+    use erplora_runtime::native::NativeHandler;
+    use std::sync::Mutex;
+
+    const HUB: &str = "7b2f8a44-9c1d-4e2f-8a3b-944445555666";
+
+    /// Answers the gate's COUNT with a fixed number and records the SQL it was asked, so the
+    /// test can assert WHICH records the engine considers still owed to the AEAT.
+    struct CountingHost {
+        pending: i64,
+        reads: Mutex<Vec<String>>,
+    }
+
+    impl CountingHost {
+        fn with(pending: i64) -> Self {
+            CountingHost {
+                pending,
+                reads: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl NativeHost for CountingHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            self.reads.lock().unwrap().push(sql.to_string());
+            Ok(vec![json!({ "pending_count": self.pending })])
+        }
+    }
+
+    #[tokio::test]
+    async fn unsent_records_are_reported_as_a_pending_obligation() {
+        let host = CountingHost::with(4);
+        let owed = VerifactuEngine
+            .pending_obligations(HUB, &host)
+            .await
+            .expect("counting what is owed must not fail")
+            .expect("4 unsent records are an obligation");
+
+        assert_eq!(owed.count, 4, "the operator must be told how many are left");
+        assert_eq!(
+            owed.code, "verifactu.unsent_records",
+            "the stable code lives in the module's own namespace (hub#139 ABI)"
+        );
+        assert!(
+            owed.message.contains('4'),
+            "the human fallback must carry the count, got `{}`",
+            owed.message
+        );
+
+        let reads = host.reads.lock().unwrap();
+        let sql = reads.first().expect("the engine must ask the database");
+        assert!(
+            sql.contains("verifactu_record") && sql.contains("hub_id = :hub_id"),
+            "the count is scoped to this hub's records: {sql}"
+        );
+        for state in ["pending", "retry", "error", "rejected"] {
+            assert!(
+                sql.contains(state),
+                "`{state}` means the AEAT does not have the invoice yet — it must be counted: {sql}"
+            );
+        }
+        assert!(
+            sql.contains("is_deleted = 0"),
+            "a soft-deleted record is not an obligation: {sql}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_fully_handed_over_chain_owes_nothing() {
+        let host = CountingHost::with(0);
+        let owed = VerifactuEngine
+            .pending_obligations(HUB, &host)
+            .await
+            .expect("counting what is owed must not fail");
+        assert!(
+            owed.is_none(),
+            "with every record accepted by the AEAT the module is free to be removed"
         );
     }
 }

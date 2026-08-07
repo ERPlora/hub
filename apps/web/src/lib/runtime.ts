@@ -228,15 +228,39 @@ export async function listInstalledModules(): Promise<InstalledModule[]> {
   return env.ok && env.data ? env.data : [];
 }
 
+/**
+ * Fallo de una acción de módulo que CONSERVA el código estable del runtime (hub#139).
+ *
+ * `code` presente = el runtime dio un motivo de negocio que el usuario puede accionar — p. ej.
+ * `verifactu.unsent_records` (hub#314: quedan N registros sin remitir a la AEAT, así que el módulo
+ * no se desactiva ni se desinstala). Sin `code` es un fallo de transporte/servidor y no hay motivo
+ * que enseñar: la UI se queda con su mensaje genérico.
+ */
+export class ModuleActionError extends Error {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'ModuleActionError';
+    this.code = code;
+  }
+}
+
 /** Activa / desactiva / desinstala un módulo en el runtime (hot-plug). Lanza si el runtime falla. */
 async function moduleAction(id: string, action: 'activate' | 'deactivate' | 'uninstall'): Promise<void> {
   const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(id)}/${action}`, {
     method: 'POST',
     headers: runtimeHeaders(),
   });
-  const env = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: { message?: string } };
+  const env = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: { code?: string; message?: string };
+  };
   if (!res.ok || env.ok === false) {
-    throw new Error(env.error?.message ?? `${action} ${id} → ${res.status}`);
+    throw new ModuleActionError(
+      env.error?.message ?? `${action} ${id} → ${res.status}`,
+      env.error?.code,
+    );
   }
 }
 
