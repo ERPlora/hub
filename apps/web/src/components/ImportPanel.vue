@@ -286,11 +286,13 @@ import {
   inspectBlueprint,
   importBlueprint,
   sectionStatusInfo,
+  sectionDiscardCode,
   fetchBlueprintCatalog,
   downloadBlueprint,
   type BlueprintManifest,
   type CatalogBlueprint,
   type ImportReport,
+  type SectionDiscardCode,
 } from '../lib/runtime';
 
 const { t, locale } = useI18n();
@@ -742,6 +744,19 @@ const moduleInstallRows = computed<ReportRow[]>(() =>
   }),
 );
 
+// hub#331 — el motivo de un descarte nuevo llega como CÓDIGO ESTABLE y la frase la pone aquí,
+// traducida (inglés fuente + su `es`), con el número de filas que se quedaron fuera. Un motivo que
+// no es un código es prosa de un runtime anterior: se pinta tal cual, nunca se borra.
+const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
+  identity_not_portable: (n) => t('importPage.reasonIdentityNotPortable', { n }),
+};
+
+/** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */
+function reportReason(status: { reason?: string }, discardedRows: number): string | undefined {
+  const code = sectionDiscardCode(status.reason);
+  return code ? discardMessage[code](discardedRows) : status.reason;
+}
+
 const reportRows = computed<ReportRow[]>(() =>
   (report.value?.sections ?? []).map((s) => {
     const media = report.value?.media;
@@ -754,7 +769,7 @@ const reportRows = computed<ReportRow[]>(() =>
       icon: v.icon,
       color: v.color,
       statusLabel: v.label(),
-      reason: info.reason,
+      reason: reportReason(info, s.discarded_rows ?? 0),
     };
   }),
 );

@@ -199,8 +199,16 @@ async fn unselected_sections_are_skipped() {
     assert!(matches!(inv.status, SectionStatus::Applied));
     let taxes = report.sections.iter().find(|s| s.section == "modules/taxes").expect("taxes en informe");
     assert!(matches!(taxes.status, SectionStatus::Skipped), "taxes debía saltarse: {:?}", taxes.status);
+    // `hub_users` es la excepción, y a propósito (hub#331): el bundle es de OTRO hub, así que sus
+    // identidades se descartan mirando el manifest, no la casilla — el resultado para el usuario es
+    // el mismo (no se aplica nada), pero el informe dice que el bundle traía cuentas en vez de
+    // callarlo detrás de un «Saltado» que solo significa «no la marqué».
     let users = report.sections.iter().find(|s| s.section == "hub_users").expect("hub_users en informe");
-    assert!(matches!(users.status, SectionStatus::Skipped));
+    assert!(
+        matches!(users.status, SectionStatus::Ignored(_)),
+        "las identidades de un bundle ajeno se descartan marque o no el usuario: {:?}",
+        users.status
+    );
 
     // Los productos sí llegaron.
     let names = product_names(&b, "h2").await;
@@ -280,11 +288,106 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
     assert!(names.contains(&"Café".to_string()), "la plantilla no aplicó sus datos: {names:?}");
 }
 
-/// El espejo, y es la mitad que impide arreglar el agujero rompiendo los backups: restaurar una
-/// COPIA sí debe traer sus usuarios. Sin ellos se pierden roles y PINs, y `get_or_link_cloud_user`
-/// recrearía a un `employee` como admin (ADR-0113 §1). Un bundle sin `purpose` es `backup`.
+/// 🔴 [ADR-0195 §3, hub#331] **Third defense — the consumer one, and the only one that holds for a
+/// bundle that never went through the SaaS.** Identities do NOT land in a hub that is not their
+/// own, whatever the bundle says about itself.
+///
+/// The purpose gate (hub#305) only catches a bundle that DECLARES `template`. The four blueprints
+/// published today were produced before the `purpose` field existed, so they read as `backup` —
+/// their four accounts (`Demo`/**admin**, PIN `0000`, recoverable from the zip itself in 0.00 s)
+/// were applied. A bundle is a file the user supplies: what it claims about itself is not a
+/// control. The only thing the import can trust is which hub it is running for.
 #[tokio::test]
-async fn un_backup_si_importa_sus_identidades() {
+async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    // Origin hub: exactly what the published blueprint carries — accounts with a role and a PIN.
+    let a = fresh().await;
+    for (name, role, pin) in [("Demo", "admin", "0000"), ("Manager", "manager", "1111")] {
+        erplora_runtime::hub_users::create(
+            a.db(),
+            "h1",
+            &erplora_runtime::hub_users::NewHubUser {
+                name: name.into(),
+                role: role.into(),
+                pin: pin.into(),
+                email: String::new(),
+            },
+        )
+        .await
+        .unwrap_or_else(|e| panic!("create {name} in the origin hub: {e}"));
+    }
+    create_product(&a, "h1", "Café", "CAF").await;
+
+    let bundle = export_hub(&a, "h1", &full_selection(), "restaurante", "es", CREATED_AT)
+        .await
+        .expect("export A");
+    // The artefact we are after: it says "backup" (or says nothing, which reads the same) and
+    // carries identities inside. Without both, this test proves nothing.
+    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "the bundle must claim to be a backup");
+    assert!(bundle.files.contains_key("data/hub_users.sql"), "the bundle must carry identities");
+
+    // Destination: ANOTHER hub, with its own legitimate user already in place.
+    let mut b = fresh().await;
+    erplora_runtime::hub_users::create(
+        b.db(),
+        "h2",
+        &erplora_runtime::hub_users::NewHubUser {
+            name: "Encargada".into(),
+            role: "manager".into(),
+            pin: "4821".into(),
+            email: String::new(),
+        },
+    )
+    .await
+    .expect("create the destination hub's own user");
+
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("import of the foreign bundle");
+
+    // 1. Not one identity row landed, and the hub's own user is untouched (same role, same PIN).
+    let users = erplora_runtime::hub_users::list(b.db(), "h2").await.expect("list h2 users");
+    assert_eq!(
+        users.len(),
+        1,
+        "a foreign bundle handed out accounts in this hub: {:?}",
+        users.iter().map(|u| (&u.name, &u.role, u.has_pin)).collect::<Vec<_>>()
+    );
+    assert_eq!(users[0].name, "Encargada", "the hub's own user was replaced");
+    assert_eq!(users[0].role, "manager", "the import altered the role of an existing user");
+    assert!(users[0].has_pin, "the import altered the PIN of an existing user");
+
+    // 2. And the report SAYS it: `Ignored` with its reason and the number of discarded rows —
+    //    never `Failed` (a `column "hub_id" does not exist` in the Usuarios section, seen live on
+    //    2026-08-03, told the user nothing about what had just been kept out).
+    let section = report
+        .sections
+        .iter()
+        .find(|s| s.section == "hub_users")
+        .expect("hub_users in the report");
+    let SectionStatus::Ignored(reason) = &section.status else {
+        panic!("hub_users had to be reported as Ignored, and came out as {:?}", section.status);
+    };
+    assert!(!reason.trim().is_empty(), "an empty reason is a silent discard");
+    assert_eq!(
+        section.discarded_rows, 2,
+        "the report must say HOW MANY identity rows were discarded: {section:?}"
+    );
+
+    // 3. The rest of the bundle still lands: this is a filter, not a rejection.
+    let names = product_names(&b, "h2").await;
+    assert!(names.contains(&"Café".to_string()), "the business data did not land: {names:?}");
+}
+
+/// The mirror, and the half that stops the fix from breaking backups: a hub restoring **its own**
+/// copy does get its users back. Without them a restore loses roles and PINs, and
+/// `get_or_link_cloud_user` would bring an `employee` back as admin (ADR-0113 §1) — which is why
+/// ADR-0195 explicitly rejected banning `hub_users` outright.
+///
+/// What hub#331 changes is WHICH restore that is: the same installation
+/// (`manifest.hub.hub_id` == the destination hub), not "any bundle that calls itself a backup".
+#[tokio::test]
+async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let a = fresh().await;
     erplora_runtime::hub_users::create(
@@ -298,36 +401,38 @@ async fn un_backup_si_importa_sus_identidades() {
         },
     )
     .await
-    .expect("crear la encargada en el hub de origen");
+    .expect("create the manager in the origin hub");
 
     let bundle = export_hub(&a, "h1", &full_selection(), "copia", "es", CREATED_AT)
         .await
         .expect("export A");
-    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "el default es backup");
+    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "backup is the default");
+    assert_eq!(bundle.manifest.hub.hub_id, "h1", "the bundle must record its origin hub");
 
+    // Same hub, rebuilt from scratch (a redeploy restoring its own backup): the destination is h1.
     let mut b = fresh().await;
-    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h1")
         .await
-        .expect("import del backup");
+        .expect("restore of its own backup");
 
-    let seccion = report
+    let section = report
         .sections
         .iter()
         .find(|s| s.section == "hub_users")
-        .expect("hub_users en el informe");
+        .expect("hub_users in the report");
     assert!(
-        matches!(seccion.status, SectionStatus::Applied),
-        "un backup debe aplicar sus identidades: {:?}",
-        seccion.status
+        matches!(section.status, SectionStatus::Applied),
+        "a hub restoring its own backup must get its identities back: {:?}",
+        section.status
     );
 
-    let users = erplora_runtime::hub_users::list(b.db(), "h2").await.expect("listar usuarios de h2");
-    let encargada = users
+    let users = erplora_runtime::hub_users::list(b.db(), "h1").await.expect("list h1 users");
+    let manager = users
         .iter()
         .find(|u| u.name == "Encargada")
-        .expect("la encargada no sobrevivió a la restauración");
-    assert_eq!(encargada.role, "manager", "el rol se perdió al restaurar");
-    assert!(encargada.has_pin, "el PIN se perdió al restaurar");
+        .expect("the manager did not survive the restore");
+    assert_eq!(manager.role, "manager", "the role was lost on restore");
+    assert!(manager.has_pin, "the PIN was lost on restore");
 }
 
 #[tokio::test]

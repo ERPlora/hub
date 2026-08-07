@@ -55,6 +55,12 @@ pub enum SectionStatus {
 pub struct SectionResult {
     pub section: String,
     pub status: SectionStatus,
+    /// Rows the engine refused to apply, when [`SectionStatus::Ignored`] discarded the section
+    /// (0 otherwise). A discard that does not say HOW MUCH it dropped is barely less mute than
+    /// no discard at all: «4 accounts kept out» is what tells the user something happened
+    /// (hub#331). `#[serde(default)]` ⇒ an older report deserialises as 0.
+    #[serde(default)]
+    pub discarded_rows: u32,
 }
 
 /// Informe final del import: una entrada por sección del bundle (la UI lo pinta tal cual).
@@ -123,6 +129,7 @@ pub async fn import_sections(
     let mut report = ImportReport::default();
     for section in &manifest.sections {
         let status = match ignored_by_purpose(manifest, section)
+            .or_else(|| identity_not_portable(manifest, section, target_hub_id))
             .or_else(|| chain_not_portable(manifest, section, target_hub_id))
         {
             Some(motivo) => SectionStatus::Ignored(motivo),
@@ -131,9 +138,93 @@ pub async fn import_sections(
                     .await
             }
         };
-        report.sections.push(SectionResult { section: section.clone(), status });
+        // A discard reports HOW MANY rows it dropped: «4 accounts kept out» is what turns a status
+        // the user skims past into something they can act on (hub#331).
+        let discarded_rows = match &status {
+            SectionStatus::Ignored(_) => rows_in_section(section, files),
+            _ => 0,
+        };
+        report.sections.push(SectionResult { section: section.clone(), status, discarded_rows });
     }
     Ok(report)
+}
+
+/// Stable reason codes carried by [`SectionStatus::Ignored`] — a CONTRACT with the shell, which
+/// turns each one into a translated sentence (same lesson as the domain-error channel, hub#139:
+/// a code that never changes, plus a message that can live in i18n, instead of prose that the UI
+/// can only print raw in whatever language the runtime happened to be written in).
+///
+/// Reasons produced before this module travel as prose; the shell prints an unknown reason as it
+/// comes, so both forms keep working while they migrate.
+pub mod ignore_reason {
+    /// A bundle produced by ANOTHER hub carried `hub_user` rows (ADR-0195 §3 — hub#331).
+    pub const IDENTITY_NOT_PORTABLE: &str = "identity_not_portable";
+}
+
+/// Is this bundle a restore of the destination hub's OWN state?
+///
+/// The origin travels in `manifest.hub.hub_id` (hub#312). An EMPTY origin is not a match, ever:
+/// bundles older than that field read as unknown origin, and treating «unknown == unknown» as the
+/// same hub would hand exactly the artefacts this defends against (the blueprints published before
+/// the field existed) the one answer that lets their rows through.
+fn is_same_hub(manifest: &BlueprintManifest, target_hub_id: &str) -> bool {
+    !manifest.hub.hub_id.is_empty() && manifest.hub.hub_id == target_hub_id
+}
+
+/// Identities NEVER land in a hub that is not their own (ADR-0195 §3, consumer plane — hub#331).
+///
+/// This is the third defense, and the only one that holds for a bundle that never went through the
+/// SaaS. The other two read what the bundle SAYS: the producer gate excludes identities when the
+/// export is asked for a `template`, and the publisher gate rejects the upload of a bundle carrying
+/// forbidden sections. Neither is on the path of «Subir desde archivo», and neither catches the
+/// artefacts already out there: the four blueprints published today were built before `purpose`
+/// existed, so they read as `backup` — and their `Demo`/**admin** account, whose PIN `0000` is
+/// recoverable in 0.00 s from the salt shipped inside the zip itself, was applied to every hub that
+/// imported one. A bundle is a file the user supplies; what it claims about itself is not a control.
+///
+/// So the rule does not ask the bundle what it is for — it asks whose hub this is. Users, roles and
+/// PINs are the identity of ONE installation; the only import that may write them is that same
+/// installation restoring itself (a redeploy over its own backup), which is what keeps the other
+/// half of the engine alive: ADR-0195 explicitly rejected banning `hub_users` outright because a
+/// restore without them loses every role and PIN, and `get_or_link_cloud_user` would bring an
+/// `employee` back as admin (ADR-0113 §1).
+///
+/// Sections are matched on the manifest, not on the selection: a checkbox is not a control either.
+fn identity_not_portable(
+    manifest: &BlueprintManifest,
+    section: &str,
+    target_hub_id: &str,
+) -> Option<String> {
+    if section != "hub_users" || is_same_hub(manifest, target_hub_id) {
+        return None;
+    }
+    Some(ignore_reason::IDENTITY_NOT_PORTABLE.into())
+}
+
+/// How many rows a section brought — i.e. how many were dropped when it is discarded.
+///
+/// One statement per row is exactly what `export::rows_to_sql` emits, and the count comes from the
+/// SAME splitter the import validates with (`import_sql`), so it can never disagree with what would
+/// have been applied. A file that does not parse counts as 0: this is a number for the report, and
+/// it must not turn into a second way for a broken bundle to fail.
+fn rows_in_section(section: &str, files: &BTreeMap<String, Vec<u8>>) -> u32 {
+    let Some(path) = data_file_for_section(section) else { return 0 };
+    let Some(bytes) = files.get(&path) else { return 0 };
+    let Ok(sql) = std::str::from_utf8(bytes) else { return 0 };
+    crate::import_sql::split_statements(sql).map(|s| s.len() as u32).unwrap_or(0)
+}
+
+/// The `data/*.sql` a section is applied from, or `None` for the sections with no SQL of their own
+/// (`fiscal`/`media`, materialised by the server, and anything the manifest invents).
+fn data_file_for_section(section: &str) -> Option<String> {
+    match section {
+        "hub_users" => Some("data/hub_users.sql".into()),
+        "hub_settings" => Some("data/hub_settings.sql".into()),
+        // fiscal/media las materializa el SERVER (certificado por su endpoint, imágenes por el
+        // gestor media); a nivel runtime se registran como Skipped y el server sobrescribe.
+        "fiscal" | "media" => None,
+        s => s.strip_prefix("modules/").map(|id| format!("data/{id}.sql")),
+    }
 }
 
 /// Secciones de IDENTIDAD que un bundle público no puede transportar: los usuarios del hub (con su
@@ -180,7 +271,7 @@ fn chain_not_portable(
     section: &str,
     target_hub_id: &str,
 ) -> Option<String> {
-    if section != "modules/verifactu" || manifest.hub.hub_id == target_hub_id {
+    if section != "modules/verifactu" || is_same_hub(manifest, target_hub_id) {
         return None;
     }
     Some(
@@ -201,21 +292,15 @@ async fn apply_section(
     batch_id: Option<&str>,
 ) -> SectionStatus {
     // ¿Está marcada en el formulario de import?
-    let (selected, path): (bool, Option<String>) = match section {
-        "hub_users" => (selection.users, Some("data/hub_users.sql".into())),
-        "hub_settings" => (selection.settings, Some("data/hub_settings.sql".into())),
-        // fiscal/media las materializa el SERVER (certificado por su endpoint, imágenes por el
-        // gestor media); a nivel runtime se registran como Skipped y el server sobrescribe.
-        "fiscal" => (false, None),
-        "media" => (false, None),
-        s => {
-            if let Some(id) = s.strip_prefix("modules/") {
-                (selection.modules.iter().any(|m| m == id), Some(format!("data/{id}.sql")))
-            } else {
-                (false, None)
-            }
-        }
+    let selected = match section {
+        "hub_users" => selection.users,
+        "hub_settings" => selection.settings,
+        s => match s.strip_prefix("modules/") {
+            Some(id) => selection.modules.iter().any(|m| m == id),
+            None => false, // fiscal/media (las materializa el server) y secciones desconocidas
+        },
     };
+    let path = data_file_for_section(section);
     if !selected {
         return SectionStatus::Skipped;
     }
@@ -656,17 +741,100 @@ mod tests {
     fn report_serde_round_trip() {
         let r = ImportReport {
             sections: vec![
-                SectionResult { section: "modules/taxes".into(), status: SectionStatus::Applied },
-                SectionResult { section: "hub_users".into(), status: SectionStatus::Skipped },
+                SectionResult {
+                    section: "modules/taxes".into(),
+                    status: SectionStatus::Applied,
+                    discarded_rows: 0,
+                },
+                SectionResult {
+                    section: "hub_users".into(),
+                    status: SectionStatus::Ignored("identity_not_portable".into()),
+                    discarded_rows: 4,
+                },
                 SectionResult {
                     section: "modules/inventory".into(),
                     status: SectionStatus::Failed("módulo no instalado".into()),
+                    discarded_rows: 0,
                 },
             ],
         };
         let json = serde_json::to_string(&r).unwrap();
         let back: ImportReport = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
+    }
+
+    /// A manifest whose only interesting part is where it comes from (hub#331 gate).
+    fn manifest_from(origin_hub_id: &str) -> BlueprintManifest {
+        BlueprintManifest {
+            schema_version: crate::export::SCHEMA_VERSION,
+            purpose: crate::export::BundlePurpose::Backup,
+            name: "restaurante".into(),
+            locale: "es".into(),
+            hub: crate::export::HubMeta {
+                name: "Bar Pepe".into(),
+                country: "ES".into(),
+                currency: "EUR".into(),
+                hub_id: origin_hub_id.into(),
+            },
+            created_at: "2026-08-06T00:00:00Z".into(),
+            modules: Vec::new(),
+            sections: vec!["hub_users".into()],
+            sha256: BTreeMap::new(),
+        }
+    }
+
+    /// Identities belong to ONE installation: only that installation restoring itself may write
+    /// them (hub#331). Everything else — a published blueprint, another hub's backup, a hand-made
+    /// zip — is discarded whatever its `purpose` says.
+    #[test]
+    fn identities_travel_only_within_the_same_hub() {
+        assert_eq!(
+            identity_not_portable(&manifest_from("h1"), "hub_users", "h1"),
+            None,
+            "a hub restoring its own backup keeps its users (ADR-0113 §1)"
+        );
+        assert_eq!(
+            identity_not_portable(&manifest_from("h1"), "hub_users", "h2").as_deref(),
+            Some(ignore_reason::IDENTITY_NOT_PORTABLE),
+            "another hub's identities must never be applied here"
+        );
+        // The gate is about identities: the rest of the bundle is not its business.
+        assert_eq!(identity_not_portable(&manifest_from("h1"), "modules/inventory", "h2"), None);
+        assert_eq!(identity_not_portable(&manifest_from("h1"), "hub_settings", "h2"), None);
+    }
+
+    /// 🔴 An UNKNOWN origin is not «the same hub». Bundles older than `manifest.hub.hub_id`
+    /// (hub#312) read as an empty origin, and those are precisely the artefacts this defends
+    /// against — the four blueprints published with `Demo`/admin inside. If an empty origin could
+    /// ever match, a bundle would only need to omit the field to get its accounts in.
+    #[test]
+    fn an_unknown_origin_is_never_the_same_hub() {
+        assert!(!is_same_hub(&manifest_from(""), ""), "unknown origin must not match anything");
+        assert_eq!(
+            identity_not_portable(&manifest_from(""), "hub_users", "").as_deref(),
+            Some(ignore_reason::IDENTITY_NOT_PORTABLE)
+        );
+        assert_eq!(
+            identity_not_portable(&manifest_from(""), "hub_users", "h2").as_deref(),
+            Some(ignore_reason::IDENTITY_NOT_PORTABLE)
+        );
+    }
+
+    /// The report says HOW MANY rows a discard dropped, counted with the SAME splitter the import
+    /// validates with — so the number can never disagree with what would have been applied.
+    #[test]
+    fn a_discard_counts_the_rows_it_dropped() {
+        let sql = "INSERT INTO hub_user (\"id\", \"name\") SELECT 'u1', 'Demo';\n\
+                   INSERT INTO hub_user (\"id\", \"name\") SELECT 'u2', 'Manager';\n";
+        let mut files: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        files.insert("data/hub_users.sql".into(), sql.as_bytes().to_vec());
+        assert_eq!(rows_in_section("hub_users", &files), 2);
+        // A section with no file of its own, or absent from the bundle, counts as nothing dropped.
+        assert_eq!(rows_in_section("fiscal", &files), 0);
+        assert_eq!(rows_in_section("modules/inventory", &files), 0);
+        // An unparseable file must not turn the count into a second failure path.
+        files.insert("data/hub_users.sql".into(), b"INSERT INTO hub_user SELECT 'unclosed".to_vec());
+        assert_eq!(rows_in_section("hub_users", &files), 0);
     }
 
     /// `derive_id` es determinista: mismo `(hub, id)` → mismo id, siempre (la idempotencia del

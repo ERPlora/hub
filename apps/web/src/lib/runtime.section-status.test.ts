@@ -3,7 +3,7 @@
 // usuario qué entró y qué no en su hub, así que no puede mentir ni en un sentido ni en el otro.
 import { describe, it, expect } from 'vitest';
 
-import { sectionStatusInfo } from './runtime';
+import { sectionDiscardCode, sectionStatusInfo } from './runtime';
 
 describe('sectionStatusInfo · formas serde del enum', () => {
   it('Applied y Skipped llegan como string', () => {
@@ -31,5 +31,25 @@ describe('sectionStatusInfo · formas serde del enum', () => {
   it('una forma DESCONOCIDA sigue cayendo a fallo, sin inventar un éxito', () => {
     const info = sectionStatusInfo({ Vaporware: 'algo' } as unknown as Record<string, unknown>);
     expect(info.kind).toBe('failed');
+  });
+});
+
+// hub#331: los descartes nuevos viajan como CÓDIGO ESTABLE y la frase la pone el shell traducida
+// (inglés fuente + su `es`), en vez de prosa fabricada en el runtime. Los motivos anteriores siguen
+// llegando como texto, así que el mapeo tiene que saber cuál es cuál: traducir es sustituir el
+// texto, y sustituir un motivo que NO es un código lo borraría.
+describe('sectionDiscardCode · motivo traducible vs prosa heredada', () => {
+  it('reconoce el código de un descarte de identidades', () => {
+    expect(sectionDiscardCode('identity_not_portable')).toBe('identity_not_portable');
+  });
+
+  it('un motivo en prosa NO es un código: se pinta tal cual', () => {
+    const prosa = 'una plantilla no aplica identidades: la sección `hub_users` se ha descartado';
+    expect(sectionDiscardCode(prosa)).toBeNull();
+  });
+
+  it('sin motivo no hay nada que traducir', () => {
+    expect(sectionDiscardCode(undefined)).toBeNull();
+    expect(sectionDiscardCode('')).toBeNull();
   });
 });
