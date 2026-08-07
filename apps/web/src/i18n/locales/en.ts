@@ -345,6 +345,8 @@ export default {
     installing: 'Installing {name}…',
     installSuccess: '{name} installed successfully.',
     installError: 'Could not start installation of {name}.',
+    // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
+    installBlocked: '{name} needs modules you have not subscribed to yet: {missing}. Nothing has been installed.',
     purchaseInBrowser: '{name} is a paid module — complete the purchase in your browser and come back.',
     purchaseOpenError: 'Could not open the purchase page. Please try again.',
     deactivated: '{name} deactivated.',

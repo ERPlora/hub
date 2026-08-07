@@ -646,7 +646,10 @@ async fn run_import(
                             "phase": phase,
                         }));
                     };
-                    match install::install_from_cloud(
+                    // ADR-0060 (hub#68): `install_from_cloud` pide el PLAN al Cloud y lo ejecuta,
+                    // así que un módulo del blueprint arrastra sus dependencias transitivas
+                    // (p. ej. `invoice` → `taxes`, `sales`) aunque el manifest no las liste.
+                    let outcome = install::install_from_cloud(
                         &st.http,
                         &st.config.cloud_base_url,
                         &st.config.module_cache,
@@ -657,19 +660,16 @@ async fn run_import(
                         &on_progress,
                         &st.config.signature_policy(),
                     )
-                    .await
-                    {
-                        Ok(inst) => {
-                            st.broadcast(
-                                json!({ "type": "module.installed", "module_id": inst.module_id }),
-                            );
-                            json!({ "id": inst.module_id, "version": inst.version, "status": "installed" })
-                        }
+                    .await;
+                    match &outcome {
+                        Ok(inst) => st.broadcast(
+                            json!({ "type": "module.installed", "module_id": inst.module_id }),
+                        ),
                         Err(e) => {
-                            tracing::warn!(module_id = %m.id, error = %e, "import: instalación de módulo del blueprint falló (best-effort, se sigue)");
-                            json!({ "id": m.id, "version": m.version, "status": "failed", "error": e.to_string() })
+                            tracing::warn!(module_id = %m.id, code = %e.code(), error = %e, "import: instalación de módulo del blueprint falló (best-effort, se sigue)")
                         }
                     }
+                    module_install_entry(&m.id, &m.version, outcome)
                 }
             };
             installed_modules.push(entry);
@@ -754,6 +754,57 @@ async fn run_import(
         },
     });
     Ok(report_v)
+}
+
+/// Entrada de `report.installed_modules[]` para UN módulo del blueprint.
+///
+/// El import es best-effort («migrate»): si un módulo no se puede instalar, el resto sigue. Pero
+/// **no puede ser mudo** — la pantalla de import PROMETE dejar el hub funcionando, así que cada
+/// entrada dice qué pasó con un `code` estable (hub#139) contra el que la UI programa y traduce.
+///
+/// `blocked` (ADR-0060) es un estado propio, NO un `failed`: el módulo no se instaló porque el
+/// plan exige comprar una dependencia — es una decisión del usuario, no una avería. Se nombran
+/// `blocked_on` + `purchase` para que la UI ofrezca la compra en vez de un error opaco.
+fn module_install_entry(
+    module_id: &str,
+    manifest_version: &str,
+    result: Result<install::Installed, install::InstallError>,
+) -> Value {
+    match result {
+        Ok(inst) => json!({
+            "id": inst.module_id,
+            "version": inst.version,
+            "status": "installed",
+        }),
+        Err(install::InstallError::Blocked {
+            blocked_on,
+            purchase,
+            ..
+        }) => json!({
+            "id": module_id,
+            "version": manifest_version,
+            "status": "blocked",
+            "code": "install_blocked",
+            "blocked_on": blocked_on,
+            "purchase": purchase
+                .iter()
+                .map(|p| json!({
+                    "module_id": p.module_id,
+                    "module_type": p.module_type,
+                    "price": p.price,
+                    "currency": p.currency,
+                    "purchase_url": p.purchase_url,
+                }))
+                .collect::<Vec<_>>(),
+        }),
+        Err(e) => json!({
+            "id": module_id,
+            "version": manifest_version,
+            "status": "failed",
+            "code": e.code(),
+            "error": e.to_string(),
+        }),
+    }
 }
 
 /// Prepara (creando las carpetas intermedias) el destino de un `media/<rel>` del bundle,
@@ -925,6 +976,66 @@ mod tests {
         assert_eq!(prepare_media_target(&root, ""), None);
         assert_eq!(prepare_media_target(&root, "."), None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // ── ADR-0060 (hub#68): el informe del import no puede ser mudo ─────────────
+
+    /// Un módulo del blueprint que se instala sale en el informe como `installed`.
+    #[test]
+    fn el_informe_marca_installed_el_modulo_que_se_instalo() {
+        let entry = module_install_entry(
+            "inventory",
+            "1.0.0",
+            Ok(install::Installed {
+                module_id: "inventory".into(),
+                version: "1.2.0".into(),
+                dir: PathBuf::from("/tmp/x"),
+            }),
+        );
+        assert_eq!(entry["status"], "installed");
+        assert_eq!(entry["id"], "inventory");
+        assert_eq!(entry["version"], "1.2.0", "gana la versión realmente instalada");
+    }
+
+    /// Un fallo genérico viaja con su CÓDIGO estable (hub#139), no solo con el texto: la UI
+    /// programa contra el código y el usuario ve por qué el blueprint no pudo cumplirse.
+    #[test]
+    fn el_informe_lleva_el_codigo_estable_del_fallo() {
+        let entry = module_install_entry(
+            "inventory",
+            "1.0.0",
+            Err(install::InstallError::Cloud("boom".into())),
+        );
+        assert_eq!(entry["status"], "failed");
+        assert_eq!(entry["code"], "install_cloud_unavailable");
+        assert!(entry["error"].as_str().unwrap().contains("boom"));
+    }
+
+    /// El caso de ADR-0060: el plan exige comprar una dependencia. El informe lo distingue de un
+    /// fallo (`blocked`, no `failed`) y NOMBRA qué falta comprar — la promesa del blueprint no se
+    /// rompe en silencio, se explica.
+    #[test]
+    fn el_informe_distingue_bloqueado_por_compra_y_nombra_la_dependencia() {
+        let entry = module_install_entry(
+            "verifactu",
+            "1.0.0",
+            Err(install::InstallError::Blocked {
+                requested: "verifactu".into(),
+                blocked_on: vec!["invoice".into()],
+                purchase: vec![install::BlockedPurchase {
+                    module_id: "invoice".into(),
+                    module_type: "premium".into(),
+                    price: "9.00".into(),
+                    currency: "EUR".into(),
+                    purchase_url: "/marketplace/invoice/".into(),
+                }],
+            }),
+        );
+        assert_eq!(entry["status"], "blocked");
+        assert_eq!(entry["code"], "install_blocked");
+        assert_eq!(entry["blocked_on"][0], "invoice");
+        assert_eq!(entry["purchase"][0]["module_id"], "invoice");
+        assert_eq!(entry["purchase"][0]["price"], "9.00");
     }
 
     /// `safe_join` sigue descartando lo evidente (por si el bundle llegara por otra vía).

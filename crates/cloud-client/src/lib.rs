@@ -329,6 +329,40 @@ impl CloudClient {
         )
     }
 
+    /// **ADR-0060 (hub#68), paso 0** — pide el PLAN DE INSTALACIÓN de un módulo.
+    /// `POST /api/v1/marketplace/install-plan/` (verificado contra
+    /// `saas/apps/public/modules/api_views.py::InstallPlanAPIView` →
+    /// `install_plan.py::resolve_hub_install_plan`).
+    ///
+    /// El Cloud es quien tiene el grafo fresco (`Module.dependencies`) y la verdad del
+    /// entitlement, así que resuelve el **cierre transitivo topo-ordenado** y el Hub solo lo
+    /// ejecuta. `installed` es el set REAL del registry del runtime (el runtime es la autoridad):
+    /// lo que ya está se devuelve en `already_satisfied` y no entra en el plan.
+    ///
+    /// `version` vacío o `"latest"` viaja como **ausente**: la elige el Cloud (versión activa).
+    pub fn install_plan(
+        &self,
+        auth: &Auth,
+        module_id: &str,
+        version: &str,
+        installed: &[String],
+    ) -> PreparedInstallPlan {
+        PreparedInstallPlan {
+            request: PreparedRequest {
+                method: "POST",
+                url: format!("{}/api/v1/marketplace/install-plan/", self.base_url),
+                headers: auth.headers(),
+            },
+            body: InstallPlanRequest {
+                module_id: module_id.to_string(),
+                version: Some(version)
+                    .filter(|v| !v.is_empty() && *v != "latest")
+                    .map(str::to_string),
+                installed: installed.to_vec(),
+            },
+        }
+    }
+
     /// **Flujo real de instalación, paso 3** — registra la instalación en el Cloud.
     /// `POST /api/v1/marketplace/modules/{module_id}/mark_installed/` con body
     /// `{"version":"…"}` (verificado en `api_views.py::mark_installed`). §2.2.
@@ -450,6 +484,93 @@ pub struct ModuleVersion {
 impl ModuleVersion {
     /// Parsea la lista JSON del endpoint `versions/`.
     pub fn parse_list(json: &str) -> Result<Vec<ModuleVersion>, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+// ─────────────────── Install plan (ADR-0060, hub#68) ───────────────────
+
+/// Body de `POST /api/v1/marketplace/install-plan/`. `version` ausente ⇒ el Cloud elige la activa.
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+pub struct InstallPlanRequest {
+    pub module_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Set REAL de módulos instalados en el hub (registry del runtime = autoridad).
+    pub installed: Vec<String>,
+}
+
+/// Petición del plan lista para ejecutar: cabeceras + body JSON (el I/O lo hace el llamador).
+#[derive(Debug, Clone)]
+pub struct PreparedInstallPlan {
+    pub request: PreparedRequest,
+    pub body: InstallPlanRequest,
+}
+
+/// Precio + puntero de compra que la UI enseña para un nodo NO entitled.
+/// **Nunca se auto-cobra** (ADR-0060): el Hub solo muestra a dónde ir.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct InstallPlanPurchase {
+    #[serde(default)]
+    pub module_type: String,
+    #[serde(default)]
+    pub price: String,
+    #[serde(default)]
+    pub currency: String,
+    #[serde(default)]
+    pub purchase_url: String,
+}
+
+/// Un módulo del plan: SIEMPRE trae `version` + `sha256` (por eso el Hub se salta el
+/// round-trip a `versions/`) más su entitlement.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct InstallPlanNode {
+    pub module_id: String,
+    pub version: String,
+    /// SHA256 hex esperado del zip. Puede venir vacío si el Cloud aún no lo tiene publicado
+    /// para esa versión; el llamador aplica su política (ADR-0015: sin hash no se instala).
+    #[serde(default)]
+    pub sha256: String,
+    #[serde(default)]
+    pub tier: String,
+    #[serde(default)]
+    pub entitled: bool,
+    #[serde(default)]
+    pub requires_purchase: bool,
+    /// `"requested"` (el módulo pedido) o `"dependency"`.
+    #[serde(default)]
+    pub reason: String,
+    #[serde(default)]
+    pub purchase: Option<InstallPlanPurchase>,
+    /// Firma ed25519 detached del zip. El serializer del Cloud **aún no la expone** en el plan
+    /// (igual que `versions/`, ADR-0194): se parsea por compatibilidad hacia delante. Bajo
+    /// `SignaturePolicy::Enforce` un `None` obliga al llamador a resolverla por `versions/` en
+    /// vez de degradar en silencio.
+    #[serde(default)]
+    pub signature: Option<ModuleSignature>,
+}
+
+/// Plan topo-ordenado (dependencias primero, lo ya instalado excluido) — ADR-0060.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct InstallPlan {
+    #[serde(default)]
+    pub requested: String,
+    /// Nodos a instalar, **en orden**. El Hub lo ejecuta tal cual: no reordena.
+    #[serde(default)]
+    pub plan: Vec<InstallPlanNode>,
+    /// Lo que el hub ya tenía y por tanto NO entra en el plan.
+    #[serde(default)]
+    pub already_satisfied: Vec<String>,
+    /// `true` si algún nodo exige compra: el Hub **no instala nada**.
+    #[serde(default)]
+    pub blocked: bool,
+    #[serde(default)]
+    pub blocked_on: Vec<String>,
+}
+
+impl InstallPlan {
+    /// Parsea la respuesta JSON de `install-plan/`.
+    pub fn parse(json: &str) -> Result<InstallPlan, serde_json::Error> {
         serde_json::from_str(json)
     }
 }
@@ -890,5 +1011,89 @@ mod tests {
         assert_eq!(g.module_id, "inventory");
         assert!(g.verify(bytes).is_ok());
         assert!(g.verify(b"otros-bytes").is_err());
+    }
+
+    // ── ADR-0060: install plan (hub#68) ────────────────────────────────────────
+
+    /// The request carries the hub's real installed set so the Cloud can drop what is already
+    /// there, and `latest`/empty is sent as *absent* (the Cloud resolves the active version).
+    #[test]
+    fn install_plan_request_is_a_post_with_the_installed_set() {
+        let c = CloudClient::new("https://erplora.com/");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
+        let p = c.install_plan(&auth, "verifactu", "latest", &["taxes".to_string()]);
+        assert_eq!(p.request.method, "POST");
+        assert_eq!(
+            p.request.url,
+            "https://erplora.com/api/v1/marketplace/install-plan/"
+        );
+        assert!(p.request.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        assert_eq!(p.body.module_id, "verifactu");
+        assert_eq!(
+            p.body.version, None,
+            "`latest` is omitted: the Cloud picks the active version"
+        );
+        assert_eq!(p.body.installed, ["taxes"]);
+
+        // A pinned version travels as-is.
+        let pinned = c.install_plan(&auth, "verifactu", "1.3.0", &[]);
+        assert_eq!(pinned.body.version.as_deref(), Some("1.3.0"));
+    }
+
+    /// The response shape of `resolve_hub_install_plan` (saas `install_plan.py`): topo-ordered
+    /// `plan`, `already_satisfied` excluded, and per-node entitlement with `purchase`.
+    #[test]
+    fn install_plan_response_parses_topo_order_and_purchase() {
+        let body = r#"{
+            "requested": "verifactu",
+            "plan": [
+              {"module_id":"taxes","version":"1.2.0","sha256":"aa","tier":"free",
+               "entitled":true,"requires_purchase":false,"reason":"dependency"},
+              {"module_id":"verifactu","version":"2.0.0","sha256":"bb","tier":"premium",
+               "entitled":true,"requires_purchase":false,"reason":"requested"}
+            ],
+            "already_satisfied": ["sales"],
+            "blocked": false,
+            "blocked_on": []
+        }"#;
+        let plan = InstallPlan::parse(body).unwrap();
+        assert_eq!(plan.requested, "verifactu");
+        assert!(!plan.blocked);
+        assert_eq!(plan.already_satisfied, ["sales"]);
+        // Topo order is the Cloud's; the Hub executes it verbatim (dependency BEFORE requested).
+        let ids: Vec<&str> = plan.plan.iter().map(|n| n.module_id.as_str()).collect();
+        assert_eq!(ids, ["taxes", "verifactu"]);
+        assert_eq!(plan.plan[0].reason, "dependency");
+        assert_eq!(plan.plan[1].version, "2.0.0");
+        assert_eq!(plan.plan[1].sha256, "bb");
+        assert!(plan.plan[0].purchase.is_none());
+    }
+
+    /// A premium dependency the hub has not bought makes the whole plan `blocked` and carries the
+    /// `purchase` pointer the UI needs. Never auto-charge (ADR-0060).
+    #[test]
+    fn install_plan_response_parses_blocked_with_purchase_pointer() {
+        let body = r#"{
+            "requested": "verifactu",
+            "plan": [
+              {"module_id":"invoice","version":"1.0.0","sha256":"aa","tier":"premium",
+               "entitled":false,"requires_purchase":true,"reason":"dependency",
+               "purchase":{"module_type":"premium","price":"9.00","currency":"EUR",
+                           "purchase_url":"/marketplace/invoice/"}}
+            ],
+            "already_satisfied": [],
+            "blocked": true,
+            "blocked_on": ["invoice"]
+        }"#;
+        let plan = InstallPlan::parse(body).unwrap();
+        assert!(plan.blocked);
+        assert_eq!(plan.blocked_on, ["invoice"]);
+        let purchase = plan.plan[0].purchase.as_ref().expect("purchase pointer");
+        assert_eq!(purchase.price, "9.00");
+        assert_eq!(purchase.currency, "EUR");
+        assert_eq!(purchase.purchase_url, "/marketplace/invoice/");
     }
 }
