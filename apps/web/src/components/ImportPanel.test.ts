@@ -9,13 +9,19 @@ import { createI18n } from 'vue-i18n';
 const fetchBlueprintCatalog = vi.fn();
 const downloadBlueprint = vi.fn();
 
-vi.mock('../lib/runtime', () => ({
-  fetchBlueprintCatalog: (...a: unknown[]) => fetchBlueprintCatalog(...a),
-  downloadBlueprint: (...a: unknown[]) => downloadBlueprint(...a),
-  inspectBlueprint: vi.fn(),
-  importBlueprint: vi.fn(),
-  sectionStatusInfo: vi.fn(() => ({ color: '', label: '' })),
-}));
+vi.mock('../lib/runtime', async () => {
+  const actual = await vi.importActual<typeof import('../lib/runtime')>('../lib/runtime');
+  return {
+    fetchBlueprintCatalog: (...a: unknown[]) => fetchBlueprintCatalog(...a),
+    downloadBlueprint: (...a: unknown[]) => downloadBlueprint(...a),
+    inspectBlueprint: vi.fn(),
+    importBlueprint: vi.fn(),
+    sectionStatusInfo: vi.fn(() => ({ color: '', label: '' })),
+    // hub#409: esta NO se stubea — es la que decide si la fila de un módulo se pinta bloqueada o
+    // roja, justo el contrato bajo prueba.
+    moduleInstallStatusInfo: actual.moduleInstallStatusInfo,
+  };
+});
 // Ref mutable: varios tests necesitan alternar owner/admin ↔ sin permiso.
 const isAdminRef = vi.hoisted(() => ({ value: true }));
 vi.mock('../lib/session', () => ({ isAdmin: isAdminRef }));
@@ -26,6 +32,8 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import ImportPanel from './ImportPanel.vue';
+// Real English catalogue: the blocked row is tested through the sentence the user reads.
+import en from '../i18n/locales/en';
 
 const i18n = createI18n({
   legacy: false,
@@ -160,5 +168,115 @@ describe('ImportPanel · informe: instalación de módulos', () => {
     expect(texto).toContain('tables');
     // El motivo REAL del motor, tal cual: sin él el usuario no puede ni reportar el fallo.
     expect(texto).toContain('módulo sin firma');
+  });
+});
+
+// hub#409 — the engine already reports `blocked` (ADR-0060): the module was not installed because
+// the plan requires subscribing to a dependency. That is a purchase decision, not a breakage, and
+// the report was painting it as a mute red failure. Real translations here (the shared i18n above
+// returns keys on purpose) because what is under test is the sentence the user actually reads.
+describe('ImportPanel · report: a module blocked by entitlement (ADR-0060)', () => {
+  const i18nReal = createI18n({
+    legacy: false,
+    locale: 'en',
+    missingWarn: false,
+    fallbackWarn: false,
+    messages: { en },
+  });
+
+  /** One entry of `installed_modules[]` exactly as `module_install_entry` serializes it. */
+  const blockedEntry = {
+    id: 'verifactu',
+    version: '1.0.0',
+    status: 'blocked',
+    code: 'install_blocked',
+    blocked_on: ['invoice'],
+    purchase: [
+      {
+        module_id: 'invoice',
+        module_type: 'premium',
+        price: '9.00',
+        currency: 'EUR',
+        purchase_url: '/marketplace/invoice/',
+      },
+    ],
+  };
+
+  async function reportWithBlockedModule() {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const w = mount(ImportPanel, {
+      shallow: true,
+      global: { plugins: [i18nReal], renderStubDefaultSlot: true },
+    });
+    await flushPromises();
+    const vm = w.vm as unknown as Record<string, unknown>;
+    vm.report = { sections: [], installed_modules: [blockedEntry] };
+    vm.step = 'report';
+    await flushPromises();
+    return w.get('[data-testid="import-report"]');
+  }
+
+  it('is NOT painted as a failure', async () => {
+    const report = await reportWithBlockedModule();
+    expect(report.text()).not.toContain(en.importPage.statusFailed);
+    // A discard's warning, not a breakage's red.
+    expect(report.html()).not.toContain('danger');
+    expect(report.html()).toContain('warning');
+  });
+
+  it('says what has to be subscribed to, with the price the engine sent', async () => {
+    const report = await reportWithBlockedModule();
+    const text = report.text();
+    expect(text).toContain(en.importPage.statusBlocked);
+    // Naming the blocking module is the whole point: «failed» told the user nothing.
+    expect(text).toContain('invoice');
+    // Price formatted for the active locale (9,00 € / €9.00), never invented.
+    expect(text).toMatch(/9[.,]00/);
+  });
+
+  it('without the list of blocking modules it does not print a dangling sentence', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const w = mount(ImportPanel, {
+      shallow: true,
+      global: { plugins: [i18nReal], renderStubDefaultSlot: true },
+    });
+    await flushPromises();
+    const vm = w.vm as unknown as Record<string, unknown>;
+    vm.report = {
+      sections: [],
+      installed_modules: [{ id: 'verifactu', version: '1.0.0', status: 'blocked' }],
+    };
+    vm.step = 'report';
+    await flushPromises();
+    const text = w.get('[data-testid="import-report"]').text();
+    // Still blocked, never a failure — but a sentence naming an EMPTY list names nothing.
+    expect(text).toContain(en.importPage.statusBlocked);
+    expect(text).not.toContain(en.importPage.statusFailed);
+    expect(text).not.toContain('Subscribe to them');
+  });
+
+  it('the other three states keep their visual', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const w = mount(ImportPanel, {
+      shallow: true,
+      global: { plugins: [i18nReal], renderStubDefaultSlot: true },
+    });
+    await flushPromises();
+    const vm = w.vm as unknown as Record<string, unknown>;
+    vm.report = {
+      sections: [],
+      installed_modules: [
+        { id: 'inventory', version: '1.2.16', status: 'installed' },
+        { id: 'sales', version: '2.12.8', status: 'already_installed' },
+        { id: 'tables', version: '1.4.0', status: 'failed', error: 'unsigned module' },
+      ],
+    };
+    vm.step = 'report';
+    await flushPromises();
+    const text = w.get('[data-testid="import-report"]').text();
+    expect(text).toContain(en.importPage.statusApplied);
+    expect(text).toContain(en.importPage.statusSkipped);
+    expect(text).toContain(en.importPage.statusFailed);
+    expect(text).toContain('unsigned module');
   });
 });
