@@ -44,6 +44,7 @@ pub mod scheduler;
 pub mod secret_box;
 pub mod seed;
 pub mod settings;
+pub mod setup_status;
 pub mod system_migrations;
 pub mod ui;
 pub mod user_profile;

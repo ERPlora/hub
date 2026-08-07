@@ -38,7 +38,11 @@ pub const CORE_NAMESPACE: &str = "hub.";
 pub const VIEW_USERS_PERMISSION: &str = "hub.users.view";
 
 /// Queries del core disponibles en el dispatcher (`hub.<algo>`).
-const CORE_QUERIES: &[&str] = &["users.list", "roles.list"];
+///
+/// `setup.status` (hub#369) no es de personal: es el estado de configuración del hub. Vive en
+/// [`crate::setup_status`] y solo se DESPACHA aquí, que es donde el runtime resuelve el namespace
+/// reservado.
+const CORE_QUERIES: &[&str] = &["users.list", "roles.list", "setup.status"];
 
 /// Rol más alto del plano de **NEGOCIO**: administra el hub (identidad fiscal, plan, instalar
 /// módulos, reset) y es lo que se siembra al crear el hub ([`identity::seed_owner`]) y el techo del
@@ -496,6 +500,12 @@ pub async fn core_query(
     }
     crate::permissions::check(ctx, VIEW_USERS_PERMISSION)?;
     match rest {
+        // Estado de configuración del hub (hub#369): UN documento con los ítems del core unidos a
+        // los que declaran los módulos instalados. El gate es el mismo del namespace — tener sesión
+        // local —; qué ítems ve cada sesión lo filtra el `permission` de cada uno.
+        "setup.status" => Ok(vec![
+            crate::setup_status::status(db, registry, hub_id, ctx).await?,
+        ]),
         "users.list" => Ok(list(db, hub_id)
             .await?
             .into_iter()

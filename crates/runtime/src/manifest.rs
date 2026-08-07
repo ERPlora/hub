@@ -75,6 +75,17 @@ pub struct Manifest {
     /// `module.json` crudo, igual que `widgets`). Ausente = el módulo no expone ajustes declarativos.
     #[serde(default)]
     pub settings: Option<SettingsDef>,
+    /// **Is this module configured?** (ADR-0063, extended by hub#369). The module declares a read
+    /// query of its own plus the conditions its first row must meet; the runtime evaluates it and
+    /// surfaces the result as one item of `hub.setup.status`.
+    ///
+    /// It used to be transported and nothing else — the shell fetched the raw `module.json` and ran
+    /// the loop in the browser. The computation moved to the runtime, so the block is now PARSED
+    /// here: one query, one source of truth, and the assistant and the checklist read the same
+    /// thing. Absent = the module contributes no checklist item (the shape of 22 of the 24
+    /// published manifests, which must keep installing untouched).
+    #[serde(default)]
+    pub setup: Option<SetupDef>,
     #[serde(default)]
     pub events: Events,
     /// Resumen del módulo para el routing del asistente (nivel 1). ARQUITECTURA.md §9.2b.
@@ -355,6 +366,79 @@ pub struct SettingsDef {
     /// Escape-hatch: Web Component propio que el shell pinta en vez del form genérico (lo estructural).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub component: Option<String>,
+}
+
+/// `setup` block of the manifest: the module's own answer to "am I configured?" (ADR-0063, extended
+/// by hub#369). Mirror of `setup` in `schemas/module.schema.json`.
+///
+/// The runtime runs [`query`](Self::query) through the dispatcher — with the caller's permissions,
+/// against real data, zero mocks — takes the FIRST row and evaluates
+/// [`configured_when`](Self::configured_when). All checks pass ⇒ configured; a missing row ⇒ not
+/// configured. The result becomes one item of `hub.setup.status`.
+///
+/// What a module may NOT declare is how important it is. `required` maps to 🔴 functional / 🟡
+/// recommended, and the ⛔ blocking level stays core-owned (`setup_status`), so a third-party module
+/// cannot proclaim itself a blocker of the sale.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SetupDef {
+    /// Namespaced read query of the module itself that reports the configuration state.
+    pub query: String,
+    /// Static params for [`query`](Self::query).
+    #[serde(default)]
+    pub params: serde_json::Map<String, serde_json::Value>,
+    /// Configured ⇔ ALL of these pass on the first row. Empty ⇒ merely having a row is enough.
+    #[serde(default)]
+    pub configured_when: Vec<SetupCheck>,
+    /// Alert title, **English canonical** (ADR-0055) — the translation travels in
+    /// `locales/<lang>.json` under `setup.title`.
+    pub title: String,
+    /// Short help text, English canonical (`locales/<lang>.json` → `setup.description`).
+    #[serde(default)]
+    pub description: String,
+    /// Ionicons name for the item.
+    #[serde(default)]
+    pub icon: String,
+    /// Screen that completes the item.
+    pub route: String,
+    /// Permission needed to configure it. Only whoever can act is told about it: an item a cashier
+    /// cannot clear is noise, and the query would reject them anyway.
+    #[serde(default)]
+    pub permission: String,
+    /// Countries this item applies to (ISO-3166-1 alpha-2). Empty = every country.
+    ///
+    /// The Hub is international and knows no concrete module, so "VeriFactu does not show outside
+    /// Spain" cannot be a rule hardcoded in the core: the module that carries a national obligation
+    /// declares where it applies.
+    #[serde(default)]
+    pub countries: Vec<String>,
+    /// Slot in the checklist. The scale belongs to the core (see `setup_status`), which reserves
+    /// the positions of its own items; a module takes the slot the core assigned to it. Absent =
+    /// after everything the core placed.
+    #[serde(default)]
+    pub order: Option<i64>,
+    /// `true` (the default) = 🔴 functional; `false` = 🟡 recommended. Never ⛔: that list is
+    /// core-owned.
+    #[serde(default = "default_true")]
+    pub required: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// One check of [`SetupDef::configured_when`] against a column of the first row. Exactly one of
+/// `truthy`/`equals` per entry; neither ⇒ the check never passes (a half-written contract must not
+/// silently tick the item as done).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SetupCheck {
+    /// Column of the result to evaluate.
+    pub field: String,
+    /// Passes when the field is truthy (`truthy: false` inverts it).
+    #[serde(default)]
+    pub truthy: Option<bool>,
+    /// Passes when the field equals this value (lax, compared as text).
+    #[serde(default)]
+    pub equals: Option<serde_json::Value>,
 }
 
 /// Bloque `agent` del manifest: descripción del módulo (en inglés) para el routing del
