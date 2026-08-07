@@ -426,7 +426,8 @@ export default {
     sourceModule: '{module}',
     sourceInUse: 'Module removed',
     alwaysOn: 'Always on',
-    notDeclared: 'No installed app brings this role in any more. It is only listed so you can move the people who still have it.',
+    // Va DENTRO de la celda, al lado del interruptor: tiene que caber en una línea.
+    notDeclared: 'No app brings it in',
     adminOnly: 'Only an administrator can switch roles on or off.',
     activated: '“{role}” can now be assigned.',
     deactivated: '“{role}” can no longer be assigned.',

@@ -427,7 +427,8 @@ export default {
     sourceModule: '{module}',
     sourceInUse: 'App desinstalada',
     alwaysOn: 'Siempre disponible',
-    notDeclared: 'Ninguna app instalada trae ya este rol. Solo aparece para que puedas cambiar de rol a quien todavía lo tiene.',
+    // Va DENTRO de la celda, al lado del interruptor: tiene que caber en una línea.
+    notDeclared: 'Ninguna app lo trae',
     adminOnly: 'Solo un administrador puede encender o apagar roles.',
     activated: 'Ya puedes asignar «{role}».',
     deactivated: 'Ya no se puede asignar «{role}».',
