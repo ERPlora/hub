@@ -37,6 +37,26 @@
                 <!-- AndroidTV support -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+
+            <!-- Deep link `erplora://hub/<host>` (ADR-0196 §7). Es lo que hace que un enlace del
+                 SaaS —«Open Terminal», el correo de invitación— abra la APP en vez del navegador.
+
+                 Android solo entrega un enlace a una activity con las tres piezas juntas: acción
+                 VIEW, categoría BROWSABLE (sin ella el sistema NO se lo da a un enlace venido de
+                 un navegador o de un cliente de correo) y el `data` con el esquema. Si falta
+                 cualquiera, el intent no se entrega nunca y NADIE lo reporta: el usuario toca el
+                 enlace y no pasa nada.
+
+                 SIN `android:autoVerify`: eso es para App Links `https`, que exigen publicar un
+                 assetlinks.json; este es un esquema propio y no se verifica contra ningún dominio.
+                 El `launchMode="singleTask"` de arriba es lo que hace que un segundo enlace
+                 reutilice la app abierta en vez de apilar otra instancia encima del TPV. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="erplora" />
+            </intent-filter>
         </activity>
 
         <provider

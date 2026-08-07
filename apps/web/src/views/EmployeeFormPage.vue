@@ -41,10 +41,14 @@
               fill="outline"
               autocomplete="name"
               :maxlength="150"
-              :error-text="submitted && !form.name.trim() ? t('employeeForm.required') : ''"
+              :error-text="nameError"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(NAME_ISSUES)) }"
               required
             />
+            <!-- Sin la casilla, el email ES la identidad (hub#356): es por lo que el SaaS manda la
+                 invitación y por lo que su primer login encuentra esta ficha. -->
             <ion-input
+              v-if="!isLocal"
               v-model="form.email"
               :label="t('employeeForm.email')"
               label-placement="floating"
@@ -52,7 +56,9 @@
               type="email"
               autocomplete="email"
               :maxlength="254"
-              :error-text="submitted && !emailValid ? t('employeeForm.invalidEmail') : ''"
+              :helper-text="isEdit ? '' : t('employeeForm.accountEmailHelp')"
+              :error-text="emailError"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(EMAIL_ISSUES)) }"
             />
             <ion-select
               v-model="form.role"
@@ -60,6 +66,8 @@
               label-placement="floating"
               fill="outline"
               interface="popover"
+              :error-text="issueOn(ROLE_ISSUES) ? t(`employeeForm.errors.${issueOn(ROLE_ISSUES)}`) : ''"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(ROLE_ISSUES)) }"
             >
               <ion-select-option v-for="role in roles" :key="role.name" :value="role.name">
                 {{ roleLabel(role.name) }}
@@ -74,9 +82,26 @@
               fill="outline"
               inputmode="numeric"
               :maxlength="8"
-              :helper-text="hasPin ? t('employeeForm.pinSetHelp') : t('employeeForm.pinHelp')"
+              :helper-text="pinHelp"
+              :error-text="pinError"
+              :class="{ 'ion-invalid ion-touched': Boolean(issueOn(PIN_ISSUES)) }"
             />
           </div>
+
+          <!-- «Local user» (hub#355): nombre + PIN, sin email y sin nada en el SaaS. Solo en el
+               ALTA: sobre una ficha existente la vía de acceso se cambia con el email y el PIN,
+               no volviendo a decidir qué clase de identidad es. -->
+          <ion-toggle
+            v-if="!isEdit"
+            :checked="form.local"
+            label-placement="start"
+            justify="space-between"
+            class="active-toggle"
+            @ion-change="form.local = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
+          >
+            {{ t('employeeForm.localUser') }}
+          </ion-toggle>
+          <p v-if="!isEdit" class="toggle-help">{{ t('employeeForm.localUserHelp') }}</p>
 
           <ion-toggle
             :checked="form.isActive"
@@ -132,11 +157,15 @@ import {
 } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
 import {
+  accountUserIssue,
   createHubUser,
+  hubUserErrorKey,
   listHubRoles,
   listHubUsers,
+  localUserIssue,
   updateHubUser,
   type HubRole,
+  type HubUser,
   type HubUserPatch,
 } from '../lib/hub-users';
 import { toast } from '../lib/toast';
@@ -152,9 +181,12 @@ const form = reactive({
   role: 'employee',
   pin: '',
   isActive: true,
+  /** Casilla «Local user» (hub#355). Solo cuenta en el alta; una ficha existente no la usa. */
+  local: false,
 });
 
 const roles = ref<HubRole[]>([]);
+const users = ref<HubUser[]>([]);
 const hasPin = ref(false);
 const loading = ref(true);
 const saving = ref(false);
@@ -169,7 +201,62 @@ let initial = { name: '', email: '', role: '', isActive: true };
 const emailValid = computed(() =>
   !form.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()),
 );
-const canSubmit = computed(() => Boolean(form.name.trim() && emailValid.value));
+/** Alta de usuario LOCAL: solo se decide al crear (hub#355). */
+const isLocal = computed(() => !isEdit.value && form.local);
+/**
+ * Motivo por el que el runtime rechazaría este alta, adelantado aquí. Cada identidad tiene el suyo
+ * —`localUserIssue` (hub#355) y `accountUserIssue` (hub#356)—, y el runtime revalida y es la
+ * autoridad: `pin_in_use` solo lo sabe él (los PIN están hasheados) y llega en la respuesta.
+ */
+const altaIssue = computed(() => {
+  if (isEdit.value) return '';
+  return isLocal.value
+    ? localUserIssue({ name: form.name, role: form.role, pin: form.pin }, users.value)
+    : accountUserIssue({ email: form.email, role: form.role, pin: form.pin }, users.value);
+});
+
+/** Qué campo se lleva cada motivo, para que el error salga donde se arregla. */
+const NAME_ISSUES = ['name_taken'];
+const EMAIL_ISSUES = ['account_needs_email', 'invalid_email', 'email_taken', 'local_has_email'];
+const ROLE_ISSUES = ['account_role_not_grantable', 'local_cannot_administer'];
+const PIN_ISSUES = ['local_needs_pin', 'pin_length', 'pin_too_simple'];
+/**
+ * «Falta el email» es el estado NORMAL de un formulario recién abierto —el alta de cuenta es la
+ * que sale por defecto—, así que ese motivo espera a que se pulse «Guardar»; los demás salen en
+ * cuanto se pueden ver, que es de lo que sirve adelantarlos.
+ */
+const ISSUES_THAT_WAIT_FOR_SUBMIT = ['account_needs_email'];
+
+/** El motivo actual si pertenece a este campo (y ya toca enseñarlo), o `''`. */
+function issueOn(field: string[]): string {
+  const issue = altaIssue.value;
+  if (!issue || !field.includes(issue)) return '';
+  return !submitted.value && ISSUES_THAT_WAIT_FOR_SUBMIT.includes(issue) ? '' : issue;
+}
+
+const nameError = computed(() => {
+  if (submitted.value && !form.name.trim()) return t('employeeForm.required');
+  const issue = issueOn(NAME_ISSUES);
+  return issue ? t(`employeeForm.errors.${issue}`) : '';
+});
+const emailError = computed(() => {
+  const issue = issueOn(EMAIL_ISSUES);
+  if (issue) return t(`employeeForm.errors.${issue}`);
+  return submitted.value && !emailValid.value ? t('employeeForm.invalidEmail') : '';
+});
+const pinError = computed(() => {
+  const issue = issueOn(PIN_ISSUES);
+  return issue ? t(`employeeForm.errors.${issue}`) : '';
+});
+const pinHelp = computed(() => {
+  if (isLocal.value) return t('employeeForm.localPinHelp');
+  if (hasPin.value) return t('employeeForm.pinSetHelp');
+  // En el alta de cuenta el PIN es un extra —entra con su cuenta—, no la vía de acceso.
+  return isEdit.value ? t('employeeForm.pinHelp') : t('employeeForm.accountPinHelp');
+});
+const canSubmit = computed(
+  () => Boolean(form.name.trim() && emailValid.value) && !altaIssue.value,
+);
 
 /** Etiqueta traducida de un rol conocido; los que aporta un módulo se muestran tal cual. */
 function roleLabel(role: string): string {
@@ -191,10 +278,12 @@ async function load(): Promise<void> {
   loading.value = true;
   loadError.value = false;
   try {
-    roles.value = await listHubRoles();
+    // El censo lo necesitan las dos caras: la edición para leer la ficha, y el alta local para
+    // adelantar «este hub ya conoce a alguien con ese nombre» sin ir al servidor.
+    [roles.value, users.value] = await Promise.all([listHubRoles(), listHubUsers()]);
     if (isEdit.value) {
       const id = String(route.params.id);
-      const target = (await listHubUsers()).find((u) => u.id === id);
+      const target = users.value.find((u) => u.id === id);
       if (!target) throw new Error(t('employeeForm.notFound'));
       hasPin.value = target.has_pin;
       Object.assign(form, {
@@ -247,13 +336,25 @@ async function onSave(): Promise<void> {
       else if (!hasPin.value) patch.pin = '';
       await updateHubUser(String(route.params.id), patch);
     } else {
-      await createHubUser({ name, email, role: form.role || 'employee', pin });
+      await createHubUser({
+        name,
+        // Un usuario local no lleva email: el runtime rechaza el alta si viene uno.
+        email: isLocal.value ? '' : email,
+        role: form.role || 'employee',
+        pin,
+        local: isLocal.value,
+      });
     }
     markClean();
     void toast(isEdit.value ? t('employees.updated') : t('employees.created'), 'success');
     await router.replace('/employees');
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : t('employees.saveError');
+    const key = hubUserErrorKey(error);
+    saveError.value = key
+      ? t(`employeeForm.errors.${key}`)
+      : error instanceof Error
+        ? error.message
+        : t('employees.saveError');
   } finally {
     saving.value = false;
   }
@@ -310,6 +411,12 @@ watch(form, () => {
 .active-toggle {
   width: 100%;
   padding-block: 0.25rem;
+}
+
+.toggle-help {
+  margin: -0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ion-color-medium);
 }
 
 .clear-pin {

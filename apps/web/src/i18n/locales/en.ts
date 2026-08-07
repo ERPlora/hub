@@ -114,11 +114,49 @@ export default {
     previewUnsupportedBody: 'This file type cannot be shown here. Download it to open it with an app on your device.',
     previewPdfTruncated: 'Showing the first {shown} of {total} pages. Download the file to read it in full.',
   },
+  // The configuration checklist — the dashboard surface of `hub.setup.status` (hub#372).
+  // `items.<key>` covers the CORE items only: a core item's key IS its i18n key, while a module's
+  // title travels in English inside its manifest and is used as-is (setup-status.md §7).
+  setup: {
+    title: 'Finish setting up your hub',
+    progress: '{done} of {total} done',
+    viewAll: 'View all',
+    viewLess: 'Show less',
+    configure: 'Set up',
+    review: 'Ask the assistant',
+    doneLabel: 'Done',
+    // The three levels, said as what they mean for the business — not as a severity word.
+    levelLegal: 'Needed to invoice',
+    levelFunctional: 'Needed to sell',
+    levelRecommended: 'Recommended',
+    // The third state: OUR breakdown, not the user's task. It must not read as a chore.
+    unavailableLabel: 'Not available yet',
+    unavailableHint: 'This one is on us: there is nothing on your side to do yet. We are on it.',
+    completeTitle: 'Your hub is ready',
+    completeBody: 'Everything on the checklist is done.',
+    // The blocking strip (hub#374): the surface for the screens the checklist is not on. It says the
+    // CONSEQUENCE, not the severity — ⛔ means the runtime refuses the document, so that is what it
+    // announces. It never says "error": nothing is broken, something is missing.
+    blocking: {
+      title: 'You cannot issue invoices yet',
+      body: 'The hub will refuse to issue a sales document until this is set up:',
+    },
+    items: {
+      apps: {
+        title: 'Your apps',
+        description: 'Install at least one business app so the hub has something to do.',
+      },
+      business_identity: {
+        title: 'Your business details',
+        description: 'Legal name and tax id: without them the hub cannot issue an invoice.',
+      },
+      team: {
+        title: 'Your team',
+        description: 'Add the people who will use the till, each with their own way in.',
+      },
+    },
+  },
   dashboard: {
-    setupTitle: '{n} module(s) need configuration',
-    configure: 'Configure',
-    setupHint: 'Review what is missing and the assistant will guide you step by step to get it ready.',
-    reviewConfig: 'Review configuration',
     // Contextual greeting by time of day (zone 1 — header). Name is interpolated.
     greetingMorning: 'Good morning, {name}',
     greetingAfternoon: 'Good afternoon, {name}',
@@ -502,6 +540,29 @@ export default {
     pinHelp: 'Between 4 and 8 digits. Leave blank to sign in with an online account.',
     pinSetHelp: 'Type a new PIN to change it; leave blank to keep the current one.',
     clearPin: 'Remove PIN',
+    localUser: 'Local user',
+    localUserHelp:
+      'Works this hub with a PIN only: no email and no ERPlora account. Turn it off to give them an account later, keeping their history.',
+    localPinHelp: 'Between 4 and 8 digits. Required: it is how this person signs in.',
+    accountEmailHelp:
+      'We email them an invitation to this hub. They choose their own password — you never see it.',
+    accountPinHelp:
+      'Optional: between 4 and 8 digits. Only needed if they also work a shared till in this hub.',
+    // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
+    errors: {
+      local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
+      account_needs_email: 'An account user signs in with their ERPlora account, so an email is required. Tick «Local user» to create somebody who works this hub with a PIN.',
+      account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
+      email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
+      role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
+      invalid_email: 'Enter a valid email.',
+      pin_length: 'The PIN must be between 4 and 8 digits.',
+      pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
+      pin_in_use: 'Another active user already has this PIN. A PIN says who is at the till, so no two people can share one.',
+      local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
+      local_has_email: 'A local user has no email. Turn off «Local user» to invite them as an account user.',
+      name_taken: 'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',
+    },
     activeUser: 'Active user',
     required: 'Required field',
     invalidEmail: 'Enter a valid email',

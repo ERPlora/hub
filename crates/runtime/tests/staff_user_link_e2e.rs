@@ -63,7 +63,8 @@ async fn a_staff_member_is_linked_to_a_hub_user() {
             name: "Marta Ruiz".into(),
             email: "marta@example.com".into(),
             role: "employee".into(),
-            pin: "1234".into(),
+            pin: "4821".into(),
+            local: false,
         })
         .await
         .unwrap();
@@ -109,9 +110,11 @@ async fn the_link_can_be_set_and_cleared_later() {
     let luis = rt
         .create_hub_user(&NewHubUser {
             name: "Luis Prat".into(),
-            email: String::new(),
+            // Usuario de CUENTA: entra con su cuenta de ERPlora, sin PIN (hub#356).
+            email: "luis@example.com".into(),
             role: "employee".into(),
             pin: String::new(),
+            local: false,
         })
         .await
         .unwrap();
@@ -185,9 +188,11 @@ async fn the_module_reaches_the_hub_users_through_the_dispatcher() {
     let rt = rt_staff().await;
     rt.create_hub_user(&NewHubUser {
         name: "Ana Soto".into(),
-        email: String::new(),
         role: "manager".into(),
         pin: "4242".into(),
+        // Personal de barra: nombre + PIN y nada en el SaaS (hub#355).
+        local: true,
+        ..NewHubUser::default()
     })
     .await
     .unwrap();

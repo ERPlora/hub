@@ -59,12 +59,24 @@ export interface HubRole {
   members: number;
 }
 
-/** Alta: `pin` vacío = sin PIN (entra por Cloud); `email` vacío = sin email. */
+/**
+ * Alta. Es **exhaustiva** (plan paso 2b): la casilla `local` elige cuál de las dos identidades se
+ * crea, y las dos son la MISMA fila `hub_user`.
+ *
+ *  - `local: true` (hub#355) → esta persona existe solo en la BD de este hub: **nombre + PIN**, sin
+ *    email y sin nada en el SaaS. Guardas: PIN obligatorio, ningún rol administrativo y un nombre
+ *    que el hub no conozca ya.
+ *  - `local` ausente/`false` (hub#356) → **usuario de cuenta**: el **email es obligatorio**, el
+ *    SaaS le manda la invitación y la contraseña la pone él (el administrador no la conoce jamás).
+ *    El `pin` sigue siendo opcional —lo necesita quien además atiende la barra— y, si se teclea,
+ *    pasa por las mismas reglas que el del usuario local.
+ */
 export interface NewHubUser {
   name: string;
   email: string;
   role: string;
   pin: string;
+  local?: boolean;
 }
 
 /** Edición parcial: solo viaja lo que se toca. `pin: ''` retira el PIN. */
@@ -79,7 +91,19 @@ export interface HubUserPatch {
 interface Envelope<T> {
   ok?: boolean;
   data?: T;
-  error?: { message?: string } | string;
+  error?: { message?: string; code?: string } | string;
+}
+
+/**
+ * Rechazo del runtime con su **código estable** (`hub.users.pin_in_use`, …) cuando lo trae. El
+ * mensaje del runtime está en inglés y es solo el respaldo: lo que se enseña se traduce por i18n
+ * contra el código (ver [`hubUserErrorKey`]).
+ */
+export class HubUsersError extends Error {
+  constructor(message: string, readonly code?: string) {
+    super(message);
+    this.name = 'HubUsersError';
+  }
 }
 
 /** Mensaje legible del envelope de error del runtime (`{ok:false,error:{message}}` o string). */
@@ -90,14 +114,24 @@ function errorMessage(body: unknown, fallback: string): string {
   return error?.message ?? fallback;
 }
 
+/** Código estable del envelope, si el error viene del namespace del core (`hub.users.*`). */
+function errorCode(body: unknown): string | undefined {
+  const error = (body as Envelope<unknown> | undefined)?.error;
+  return typeof error === 'string' ? undefined : error?.code;
+}
+
+function failed(body: unknown, fallback: string): HubUsersError {
+  return new HubUsersError(errorMessage(body, fallback), errorCode(body));
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { ...runtimeHeaders() };
   if (init?.body) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${RUNTIME_URL}${path}`, { ...init, headers });
   const body = await res.json().catch(() => undefined);
-  if (!res.ok) throw new Error(errorMessage(body, `${path} → ${res.status}`));
+  if (!res.ok) throw failed(body, `${path} → ${res.status}`);
   const env = body as Envelope<T>;
-  if (env?.ok === false) throw new Error(errorMessage(body, `${path} → error`));
+  if (env?.ok === false) throw failed(body, `${path} → error`);
   return (env?.data ?? (body as T)) as T;
 }
 
@@ -207,8 +241,109 @@ export function accessOf(user: HubUser): HubAccess {
   return user.cloud_user_id ? 'cloud' : 'none';
 }
 
+// ── Alta de usuario LOCAL (plan paso 2b, hub#355) ─────────────────────────────────────────────
+
 /** Roles que administran el hub (mismo conjunto que `is_admin_role` en el runtime). */
 const ADMIN_ROLES = ['owner', 'admin'];
+
+/** Prefijo de los códigos de rechazo del core en `/api/hub/users` (namespace reservado, ADR-0192). */
+const HUB_USERS_ERROR_PREFIX = 'hub.users.';
+
+/**
+ * Clave i18n del motivo de un rechazo del runtime (`hub.users.pin_in_use` → `pin_in_use`), o
+ * `undefined` si el error no trae uno (fallo de red, 401 del gate, un error del navegador).
+ *
+ * Es lo que permite enseñar el motivo **traducido**: el runtime responde en inglés a propósito
+ * (regla del código en inglés) y el Hub se ve en español.
+ */
+export function hubUserErrorKey(error: unknown): string | undefined {
+  const code = error instanceof HubUsersError ? error.code : undefined;
+  return code?.startsWith(HUB_USERS_ERROR_PREFIX)
+    ? code.slice(HUB_USERS_ERROR_PREFIX.length)
+    : undefined;
+}
+
+/**
+ * ¿Es este uno de los PIN que se prueban primero? Todo el mismo dígito (`0000`) o una cuesta
+ * seguida, arriba o abajo (`1234`, `4321`). **Espejo** de `is_guessable_pin` del runtime, que es
+ * quien manda; aquí solo sirve para no hacer pulsar «Crear» para enterarse.
+ */
+function isGuessablePin(pin: string): boolean {
+  const digits = [...pin].map(Number);
+  if (digits.length < 2 || digits.some(Number.isNaN)) return true;
+  const stepIs = (step: number) => digits.every((d, i) => i === 0 || d - digits[i - 1] === step);
+  return stepIs(0) || stepIs(1) || stepIs(-1);
+}
+
+/**
+ * Motivo por el que el runtime rechazaría este alta **local**, o `''` si es admisible. Espejo EN UI
+ * de `ensure_local_identity` (`crates/runtime/src/hub_users.rs`), igual que [`canDeactivate`] lo es
+ * del guard de la baja: la autoridad sigue siendo el runtime, que revalida y responde 409.
+ *
+ * `pin_in_use` **no** se puede adelantar desde aquí: los PIN se guardan hasheados (argon2id con sal
+ * propia) y el shell no los ve nunca. Ese motivo llega del servidor, por [`hubUserErrorKey`].
+ */
+export function localUserIssue(
+  input: { name: string; role: string; pin: string },
+  users: HubUser[],
+): string {
+  const pin = input.pin.trim();
+  if (!pin) return 'local_needs_pin';
+  if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) return 'pin_length';
+  if (isGuessablePin(pin)) return 'pin_too_simple';
+  if (ADMIN_ROLES.includes(input.role.trim().toLowerCase())) return 'local_cannot_administer';
+  // Activos e inactivos: una persona = una fila, y un homónimo al lado de quien fue dado de baja
+  // le devuelve por la espalda un PIN que funciona (hub#348).
+  const name = input.name.trim().toLowerCase();
+  if (users.some((u) => u.name.trim().toLowerCase() === name)) return 'name_taken';
+  return '';
+}
+
+// ── Alta de usuario de CUENTA (plan paso 2b, hub#356) ─────────────────────────────────────────
+
+/**
+ * Roles que el **SaaS** sabe poner en una membresía (su `HUB_ROLES`) y, por tanto, los únicos que
+ * puede llevar un usuario de cuenta. Espejo de `is_grantable_account_role` en el runtime.
+ *
+ * `owner` **no** está: la propiedad del hub sale de `HUB_OWNER_EMAIL` (ADR-0157), no de una
+ * invitación. Y un rol que declara un módulo (`kitchen`, `waiter`…) es de ESTE hub y de ninguno
+ * más, así que es del personal local.
+ */
+const ACCOUNT_ROLES = ['admin', 'manager', 'employee'];
+
+/** Forma mínima de un email (la misma que valida el runtime). */
+function looksLikeEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/**
+ * Motivo por el que el runtime rechazaría este alta **de cuenta**, o `''` si es admisible. Gemelo
+ * de [`localUserIssue`] para la otra identidad del paso 2b: la autoridad sigue siendo el runtime,
+ * que revalida y responde 409.
+ *
+ * Aquí sí se puede adelantar el email duplicado —el censo que pinta Personal ya trae el email de
+ * cada fila, activos e inactivos—, y merece la pena: es el rechazo que significa «esta persona ya
+ * existe, reincorpórala», no «vuelve a intentarlo».
+ */
+export function accountUserIssue(
+  input: { email: string; role: string; pin: string },
+  users: HubUser[],
+): string {
+  const email = input.email.trim().toLowerCase();
+  if (!email) return 'account_needs_email';
+  if (!looksLikeEmail(email)) return 'invalid_email';
+  if (!ACCOUNT_ROLES.includes(input.role.trim().toLowerCase())) return 'account_role_not_grantable';
+  // Activos e inactivos: una persona = una fila, y volver a invitar a quien fue dado de baja
+  // resucitaría por la espalda una membresía que alguien revocó (hub#348).
+  if (users.some((u) => u.email.trim().toLowerCase() === email)) return 'email_taken';
+  // El PIN es OPCIONAL para un usuario de cuenta —entra con su cuenta— pero, si lo teclea, es la
+  // misma credencial que la del usuario local y pasa por las mismas reglas.
+  const pin = input.pin.trim();
+  if (!pin) return '';
+  if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) return 'pin_length';
+  if (isGuessablePin(pin)) return 'pin_too_simple';
+  return '';
+}
 
 /** ¿Este usuario administra el hub y está activo? */
 function isActiveAdmin(user: HubUser): boolean {

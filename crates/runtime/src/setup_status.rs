@@ -34,17 +34,63 @@
 //!    half-applied migration) its item is **omitted** rather than reported as pending. A false "you
 //!    are missing X" sends the user to fix something that may already be fine — worse than a gap.
 //!
+//! # Three levels, and the ⛔ one is a fact about the runtime (hub#370)
+//!
+//! `required` is a boolean and the checklist needs three answers: ⛔ legal · 🔴 functional · 🟡
+//! recommended. The one that cannot be a boolean is ⛔, because it is **not a stronger 🔴**: it is
+//! the claim that the dispatcher will refuse the operation. Saying it the other way round —
+//! painting ⛔ on something merely important — promises a protection that does not exist, and the
+//! blocking strip (hub#374) cuts the screen on the strength of that claim.
+//!
+//! So the level is derived, never declared:
+//!
+//! * **⛔ [`LEVEL_LEGAL`] = the gate of ADR-0203**, read from the other side. That gate has two
+//!   arms and so does this list: [`BLOCKING_KEYS`] (the business identity, a fixed core key) and
+//!   [`certificate_arm`] (the business certificate, which hangs on whichever installed module
+//!   declares the `certificate` capability). Nothing else is on it — an entry without a gate behind
+//!   it is a colour pretending to be a rule.
+//! * **🔴 [`LEVEL_FUNCTIONAL`] / 🟡 [`LEVEL_RECOMMENDED`] = the module's `required`.** A
+//!   third-party manifest gets to say how much its own configuration matters, and nothing more: it
+//!   can never make itself a condition for selling.
+//!
+//! The level is **orthogonal to the state**. A done item keeps its level; what the strip reads is
+//! `blocking_pending`, the count of items that are ⛔ *and* still pending.
+//!
+//! # Three states, because "you have not done it" and "you cannot do it" are different (hub#371)
+//!
+//! The apps item asks for something the hub does not own: a module from the marketplace. So it is
+//! the one item that can be impossible — the catalogue lists nothing, because nobody ran
+//! `publish_core_modules.py` in production, or because the entitlement lets this hub install none
+//! of what it lists. That is **our breakdown, not the user's task**, and it gets its own state
+//! ([`STATE_UNAVAILABLE`]) instead of borrowing one that lies:
+//!
+//! * not **pending** — a pending item is a job with a screen behind it. Sending someone to an
+//!   empty catalogue hands them a chore they cannot finish and blames them for the gap.
+//! * not **omitted** — omission is for a check we could not make (the best-effort rule above). This
+//!   one we made perfectly: we know the hub is empty *and* we know why it cannot be filled. Hiding
+//!   the only item an empty hub has would be the false "done" that buries a task forever.
+//! * not **done** — obviously; the hub still cannot sell anything.
+//!
+//! The marketplace is not reachable from here (this crate has no cloud client, by design), and it
+//! must not be: this query is read by the dashboard, by the assistant and by a strip on every
+//! screen, so a round-trip to the control plane would put the SaaS on the critical path of every
+//! page. Instead the host **records what the catalogue answered** ([`record_catalog_response`]) and
+//! the checklist reads that. Two rules keep the recorded fact from lying:
+//!
+//! * **Only a real answer is recorded.** A refused or unreachable catalogue is not news, so it
+//!   leaves the previous answer alone. Otherwise a five-minute outage would invent a breakdown.
+//! * **An answer expires** ([`CATALOG_OFFER_TTL_SECS`]). A stale "there is nothing to install"
+//!   would argue the user out of visiting `/apps` — the one screen that refreshes the answer — and
+//!   the checklist would have talked itself into being permanently wrong.
+//!
 //! # What deliberately is NOT here
 //!
-//! The three levels (⛔ legal · 🔴 functional · 🟡 recommended) are hub#370. This module carries the
-//! seam they plug into — [`BLOCKING_KEYS`], the core-owned ⛔ list, empty for now — and nothing
-//! else. Emitting a `level` today would promise a gate that only ADR-0203 makes true, and "blocks"
-//! that does not block is how a checklist becomes decorative. Likewise the third state of the apps
-//! item ("unavailable", hub#371): [`STATE_DONE`]/[`STATE_PENDING`] are strings precisely so that
-//! adding a third value is an addition, not a break.
+//! The surfaces — the dashboard card (hub#372), the assistant (hub#373), the blocking strip
+//! (hub#374). This query paints nothing.
 use std::future::Future;
 use std::pin::Pin;
 
+use chrono::{DateTime, Utc};
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
@@ -64,15 +110,45 @@ pub const ITEM_TEAM: &str = "team";
 pub const STATE_DONE: &str = "done";
 /// The item is still the user's to do.
 pub const STATE_PENDING: &str = "pending";
+/// The item cannot be completed right now, and not because of anything the user did (hub#371).
+/// Only [`ITEM_APPS`] reaches it: it is the only item whose screen depends on something outside
+/// this hub. See the module docs for why this is neither *pending* nor an omission.
+pub const STATE_UNAVAILABLE: &str = "unavailable";
+
+/// `_hub_meta` key under which the host records what the marketplace last offered THIS hub.
+///
+/// It lives in `_hub_meta` and not in `hub_settings` for the reason that table exists: it is a fact
+/// about this installation that the host remembers across restarts, not business configuration the
+/// user edits or that travels in a bundle.
+pub const CATALOG_OFFER_KEY: &str = "setup.catalog_offer";
+
+/// How long a catalogue answer is still an answer, in seconds.
+///
+/// One hour: long enough that the item does not flicker while somebody works, short enough that a
+/// marketplace we fixed —or a SaaS that came back— heals the checklist on its own. Past it the hub
+/// goes back to *not knowing*, which is [`STATE_PENDING`]: the state that sends the user to the
+/// screen which refreshes the answer. A permanent "there is nothing to install" would be the one
+/// wrong answer that prevents its own correction.
+pub const CATALOG_OFFER_TTL_SECS: i64 = 3600;
+
+/// ⛔ legal — the runtime rejects the operation. *"You need this in order to invoice."*
+pub const LEVEL_LEGAL: &str = "legal";
+/// 🔴 functional — no gate, but the till cannot do its job. *"Without this you cannot sell."*
+pub const LEVEL_FUNCTIONAL: &str = "functional";
+/// 🟡 recommended — the business runs; you notice it is missing. Never alerts.
+pub const LEVEL_RECOMMENDED: &str = "recommended";
 
 /// **The ⛔ list, and it belongs to the core.** A blocking item is one the runtime actually rejects
 /// — the fiscal precondition of ADR-0203 read from the other side — so it can never be something a
 /// third-party manifest declares about itself.
 ///
-/// Empty until hub#370 fills it, and empty is the honest value: `blocking_pending` counts these, so
-/// today it is 0 and the blocking strip (hub#374) stays silent instead of blocking a sale over a
-/// label with no gate behind it.
-pub const BLOCKING_KEYS: &[&str] = &[];
+/// This is the *fixed* half: the business identity, whose two settings are literally the ones
+/// `enforce_fiscal_precondition` reads. The other arm of the same gate depends on what is installed
+/// and is resolved per call by [`certificate_arm`].
+///
+/// Only keys of [`CORE_ITEMS`] may appear here. A module item is keyed `<module_id>.setup`, so
+/// putting one on this list would hand a third-party manifest the power to stop a sale.
+pub const BLOCKING_KEYS: &[&str] = &[ITEM_BUSINESS_IDENTITY];
 
 /// Where an item that declares no `order` lands: after everything the core placed, never in front
 /// of it. The core owns the scale; a module takes the slot the core assigned it.
@@ -169,16 +245,32 @@ pub async fn status(
             .to_string()
     };
     let country = setting("country_code").to_uppercase();
+    // The second arm of ADR-0203, resolved against THIS hub. Read here for the same reason the
+    // settings are: the reserved `hub.` path answers before the dispatcher enriches the context,
+    // so `ctx.has_certificate` is not populated yet. Degrading to "absent" matches the gate, which
+    // degrades the same way and would therefore reject — so ⛔ stays honest either way.
+    //
+    // ⚠️ This is deliberately the SAME read `queries::execute_page` uses to fill
+    // `ctx.has_certificate`, which is what the gate then checks. The two must answer identically:
+    // if the checklist and the gate disagree about the certificate, ⛔ starts lying in one
+    // direction or the other. Move one, move the other.
+    let certificate_present = crate::certificate::status(db, hub_id)
+        .await
+        .ok()
+        .and_then(|s| s.get("present").and_then(Json::as_bool))
+        .unwrap_or(false);
+    let certificate_arm = certificate_arm(registry, certificate_present);
 
     let mut items: Vec<Json> = Vec::new();
     for core in CORE_ITEMS {
-        if let Some(done) = core_item_done(db, registry, hub_id, core, &setting).await {
+        if let Some(state) = core_item_state(db, registry, hub_id, core, &setting).await {
             items.push(item_json(
                 core.key,
                 "core",
                 None,
-                done,
+                state,
                 core.required,
+                level_of(core.key, core.required, &certificate_arm),
                 core.title,
                 core.description,
                 core.icon,
@@ -207,12 +299,19 @@ pub async fn status(
         let Some(done) = module_item_done(db, registry, def, ctx).await else {
             continue;
         };
+        let key = item_key(&manifest.id);
         items.push(item_json(
-            &item_key(&manifest.id),
+            &key,
             "module",
             Some(&manifest.id),
-            done,
+            // A module item never reaches the third state: its screen is inside this hub, so there
+            // is nothing outside that could make it impossible. Not evaluable ⇒ omitted (above);
+            // not configured ⇒ pending.
+            done_or_pending(done),
             def.required,
+            // The manifest declares `required`, never the level: the core decides, and the only way
+            // a module item reaches ⛔ is the core hanging a gate arm on it.
+            level_of(&key, def.required, &certificate_arm),
             &def.title,
             &def.description,
             if def.icon.is_empty() {
@@ -237,23 +336,122 @@ pub async fn status(
         order(a).cmp(&order(b)).then_with(|| key(a).cmp(&key(b)))
     });
 
+    // What is left on the USER's pile. An unavailable item is not on it — they cannot clear it —
+    // which is why it needs its own counter rather than quietly vanishing from the arithmetic:
+    // with three states and two counters, `total - pending` reads as "done" and a consumer would
+    // book our own breakdown as a success.
     let pending = items.iter().filter(|i| i["state"] == STATE_PENDING).count();
+    let unavailable = items
+        .iter()
+        .filter(|i| i["state"] == STATE_UNAVAILABLE)
+        .count();
+    // What hub#374 reads, and the only number it reads: pending AND ⛔. Counting everything pending
+    // would leave the strip up forever; counting every ⛔ item would leave it up on a hub that is
+    // already configured. The third state does not enter here at all: it is a different axis, and
+    // no item that carries it is one the fiscal gate rejects.
     let blocking_pending = items
         .iter()
-        .filter(|i| {
-            i["state"] == STATE_PENDING
-                && i["key"]
-                    .as_str()
-                    .is_some_and(|k| BLOCKING_KEYS.contains(&k))
-        })
+        .filter(|i| i["state"] == STATE_PENDING && i["level"] == LEVEL_LEGAL)
         .count();
 
     Ok(json!({
         "total": items.len(),
         "pending": pending,
+        "unavailable": unavailable,
         "blocking_pending": blocking_pending,
         "items": items,
     }))
+}
+
+/// Records what a marketplace catalogue response says this hub can install.
+///
+/// The host calls this from the catalogue proxy with whatever came back, and **the whole rule of
+/// what counts as news lives here**, not in the proxy: a non-2xx, a body that does not parse, or a
+/// shape that is not a catalogue records *nothing* and leaves the previous answer standing. A
+/// refused or unreachable marketplace is not evidence that there is nothing to install — treating
+/// it as such would let a brief outage tell the customer the product is broken.
+pub async fn record_catalog_response(
+    db: &dyn DatabaseAdapter,
+    status: u16,
+    body: &[u8],
+) -> Result<()> {
+    if !(200..300).contains(&status) {
+        return Ok(());
+    }
+    let Some(installable) = serde_json::from_slice::<Json>(body)
+        .ok()
+        .as_ref()
+        .and_then(installable_modules)
+    else {
+        return Ok(());
+    };
+    crate::hub_meta::set(
+        db,
+        CATALOG_OFFER_KEY,
+        &catalog_offer_marker(installable, Utc::now()),
+    )
+    .await
+}
+
+/// How many modules a marketplace payload says this hub could install **right now**.
+///
+/// `None` = the payload is not a catalogue, so there is nothing to record.
+///
+/// Deliberately the same verdict the catalogue screen puts on its own Install button
+/// (`apps/web/src/views/AppsPage.vue`, via `normalizeMarketplaceModule` in
+/// `apps/web/src/lib/cloud.ts`): `can_install ?? is_active ?? true`, minus what is only announced.
+/// The checklist and the screen it sends you to have to agree about what is installable, or the
+/// item promises a page that offers nothing.
+fn installable_modules(payload: &Json) -> Option<u64> {
+    let entries = match payload {
+        Json::Array(entries) => entries,
+        Json::Object(_) => payload
+            .get("results")
+            .or_else(|| payload.get("modules"))
+            .and_then(Json::as_array)?,
+        _ => return None,
+    };
+    Some(entries.iter().filter(|e| is_installable(e)).count() as u64)
+}
+
+/// Can this catalogue entry be installed right now? See [`installable_modules`] for the twin.
+fn is_installable(entry: &Json) -> bool {
+    if !entry.is_object() {
+        return false;
+    }
+    // `??` in the shell is null-coalescing: a declared `false` wins, an absent flag falls through,
+    // and a catalogue that declares neither is installable (that is what the marketplace served
+    // before either flag existed).
+    let declared = ["can_install", "is_active"]
+        .iter()
+        .find_map(|k| entry.get(*k).filter(|v| !v.is_null()));
+    // `is_coming_soon !== true` — only the literal flag hides a module, never a stray value.
+    declared.map(truthy).unwrap_or(true) && entry.get("is_coming_soon") != Some(&Json::Bool(true))
+}
+
+/// The recorded answer, `None` when there is none or it is too old to still be one.
+///
+/// Best-effort like everything else here: a read that fails degrades to "we do not know", never to
+/// "unavailable". We only ever claim a breakdown we have actually observed.
+async fn catalog_offer(db: &dyn DatabaseAdapter) -> Option<u64> {
+    let marker = crate::hub_meta::get(db, CATALOG_OFFER_KEY).await.ok()??;
+    catalog_offer_at(&marker, Utc::now())
+}
+
+/// The stored marker: the count **and** when it was learnt, because a count without its age cannot
+/// be expired and an unexpirable answer is one that outlives its own truth.
+fn catalog_offer_marker(installable: u64, at: DateTime<Utc>) -> String {
+    json!({ "installable": installable, "at": at.to_rfc3339() }).to_string()
+}
+
+/// Reads a marker back, or `None` if it is unreadable or older than [`CATALOG_OFFER_TTL_SECS`].
+fn catalog_offer_at(marker: &str, now: DateTime<Utc>) -> Option<u64> {
+    let marker: Json = serde_json::from_str(marker).ok()?;
+    let installable = marker.get("installable")?.as_u64()?;
+    let at = DateTime::parse_from_rfc3339(marker.get("at")?.as_str()?).ok()?;
+    // `abs`: a timestamp from the future is a broken clock, not a fresh answer.
+    let age = now.signed_duration_since(at.with_timezone(&Utc)).num_seconds();
+    (age.abs() <= CATALOG_OFFER_TTL_SECS).then_some(installable)
 }
 
 /// Key of a module item. Derived by the core from the module id, never declared: the ⛔ list of
@@ -263,6 +461,46 @@ fn item_key(module_id: &str) -> String {
     format!("{module_id}.setup")
 }
 
+/// The ⛔ arm of ADR-0203 that is not the core's to hold: the business certificate.
+///
+/// The gate demands it **while any INSTALLED module declares the `certificate` capability** — today
+/// verifactu, tomorrow whatever a second country needs — so the ⛔ hangs on the item of that same
+/// module, which is the one that can clear it. Two properties this owes the rule:
+///
+/// * **Keyed on the capability, never on a module id.** Hardcoding `verifactu` would put the
+///   business back inside a runtime that has none, block the wrong hub outside Spain, and miss the
+///   module that actually carries the certificate. It is also not a self-declaration: a manifest
+///   asking for this capability is asking the gate to demand a certificate of the whole hub, and
+///   the checklist merely says so out loud.
+/// * **Evaluated, not listed.** With the certificate loaded the runtime accepts, so the arm
+///   disappears even though the module may still be half-configured — its item stays 🔴 pending. A
+///   ⛔ that does not block is the colour this whole design exists to avoid.
+fn certificate_arm(registry: &Registry, certificate_present: bool) -> Vec<String> {
+    if certificate_present {
+        return Vec::new();
+    }
+    registry
+        .installed
+        .iter()
+        .filter(|m| m.capabilities.certificate.is_some())
+        .map(|m| item_key(&m.id))
+        .collect()
+}
+
+/// The level of an item: ⛔ if the runtime rejects without it, else what the module asked for.
+///
+/// ⛔ wins over `required` because they answer different questions — `required` is an opinion about
+/// importance, ⛔ is a fact about the dispatcher — and a fact does not lose to an opinion.
+fn level_of(key: &str, required: bool, certificate_arm: &[String]) -> &'static str {
+    if BLOCKING_KEYS.contains(&key) || certificate_arm.iter().any(|k| k == key) {
+        LEVEL_LEGAL
+    } else if required {
+        LEVEL_FUNCTIONAL
+    } else {
+        LEVEL_RECOMMENDED
+    }
+}
+
 /// Every item carries every key (with `module_id` null for a core item), so a consumer never has to
 /// branch on whether a field is present.
 #[allow(clippy::too_many_arguments)]
@@ -270,8 +508,9 @@ fn item_json(
     key: &str,
     source: &str,
     module_id: Option<&str>,
-    done: bool,
+    state: &str,
     required: bool,
+    level: &str,
     title: &str,
     description: &str,
     icon: &str,
@@ -283,8 +522,12 @@ fn item_json(
         "key": key,
         "source": source,
         "module_id": module_id,
-        "state": if done { STATE_DONE } else { STATE_PENDING },
+        "state": state,
+        // What the module declared…
         "required": required,
+        // …and the core's verdict, which is what every surface must read: `required` cannot express
+        // ⛔ and no consumer should be re-deriving the level for itself.
+        "level": level,
         "title": title,
         "description": description,
         "icon": icon,
@@ -295,31 +538,54 @@ fn item_json(
 }
 
 /// Evaluates a core item. `None` = the check could not be made ⇒ the item is omitted (best-effort).
-async fn core_item_done(
+async fn core_item_state(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     hub_id: &str,
     core: &CoreItem,
     setting: &impl Fn(&str) -> String,
-) -> Option<bool> {
+) -> Option<&'static str> {
     match core.key {
         // At least one business app. Nothing else can be asked of the registry: the Hub is
         // international and knows no concrete module, so "an app" is "something installed and
         // active" — and the reserved `hub` id can never be a module (the installer refuses it).
-        ITEM_APPS => Some(registry.installed.iter().any(|m| registry.is_active(&m.id))),
+        ITEM_APPS => {
+            if registry.installed.iter().any(|m| registry.is_active(&m.id)) {
+                return Some(STATE_DONE);
+            }
+            // Only an EMPTY hub ever asks what the marketplace had on offer, so the ordinary hub
+            // never pays for this, and no catalogue answer can un-do an app that is already
+            // running. `Some(0)` is the one answer that means "we know you cannot fill this hub".
+            Some(match catalog_offer(db).await {
+                Some(0) => STATE_UNAVAILABLE,
+                _ => STATE_PENDING,
+            })
+        }
         // The SAME two settings the fiscal precondition reads (ADR-0203). Reading them from the
         // other side is what keeps "it blocks ⇔ the runtime rejects it" true instead of a colour.
         // Half an identity is not an identity: both halves or nothing.
-        ITEM_BUSINESS_IDENTITY => Some(
+        ITEM_BUSINESS_IDENTITY => Some(done_or_pending(
             !setting("business_legal_name").is_empty() && !setting("business_tax_id").is_empty(),
-        ),
+        )),
         // At least one hub user besides the administrator. A solo business legitimately has one,
         // which is why this item is 🟡 recommended and never nags.
         ITEM_TEAM => {
             let users = crate::hub_users::list(db, hub_id).await.ok()?;
-            Some(users.iter().filter(|u| u.is_active).count() > 1)
+            Some(done_or_pending(
+                users.iter().filter(|u| u.is_active).count() > 1,
+            ))
         }
         _ => None,
+    }
+}
+
+/// The two states any item can be in. The third one is not reachable from a boolean, which is the
+/// whole point of hub#371: "not done" and "cannot be done" are different answers.
+fn done_or_pending(done: bool) -> &'static str {
+    if done {
+        STATE_DONE
+    } else {
+        STATE_PENDING
     }
 }
 
@@ -537,15 +803,233 @@ mod tests {
     }
 
     #[test]
-    fn the_blocking_list_is_core_owned_and_still_empty() {
-        // hub#370 fills it, and not before ADR-0203 makes ⛔ true. An entry here without a gate
-        // behind it would be a colour pretending to be a rule.
-        assert!(BLOCKING_KEYS.is_empty());
+    fn the_blocking_list_only_ever_holds_keys_of_the_core() {
+        // A module key is `<id>.setup`, so the dot is the boundary: a core key can never have one.
+        // If a module id ever landed here, a third-party manifest would decide what blocks a sale.
+        for key in BLOCKING_KEYS {
+            assert!(
+                !key.contains('.'),
+                "`{key}` looks like a module item, and the ⛔ list is the core's"
+            );
+            assert!(
+                CORE_ITEMS.iter().any(|c| c.key == *key),
+                "`{key}` is on the ⛔ list but is not an item the core emits"
+            );
+        }
+    }
+
+    #[test]
+    fn the_static_blocking_list_is_exactly_the_identity_half_of_the_fiscal_gate() {
+        // ADR-0203 rejects on legal name ∧ tax id, and `business_identity` reads those same two
+        // settings. Anything else added here would be a colour with no gate behind it.
+        assert_eq!(BLOCKING_KEYS, [ITEM_BUSINESS_IDENTITY]);
+    }
+
+    #[test]
+    fn the_three_levels_and_nothing_else() {
+        // ⛔ beats 🔴 beats 🟡, and `required` can only reach the last two.
+        assert_eq!(level_of(ITEM_BUSINESS_IDENTITY, false, &[]), LEVEL_LEGAL);
+        assert_eq!(
+            level_of(ITEM_BUSINESS_IDENTITY, true, &[]),
+            LEVEL_LEGAL,
+            "the ⛔ list wins over whatever `required` says"
+        );
+        assert_eq!(level_of(ITEM_APPS, true, &[]), LEVEL_FUNCTIONAL);
+        assert_eq!(level_of(ITEM_TEAM, false, &[]), LEVEL_RECOMMENDED);
+    }
+
+    #[test]
+    fn a_module_key_only_becomes_legal_when_the_core_hands_it_the_arm() {
+        // The only way a module item reaches ⛔: the core resolved a gate arm onto it. A manifest
+        // has no say — `required` is the only thing it declares, and it maps to 🔴/🟡.
+        let arm = vec!["verifactu.setup".to_string()];
+        assert_eq!(level_of("verifactu.setup", true, &[]), LEVEL_FUNCTIONAL);
+        assert_eq!(level_of("verifactu.setup", true, &arm), LEVEL_LEGAL);
+        assert_eq!(level_of("printing.setup", false, &arm), LEVEL_RECOMMENDED);
+    }
+
+    #[test]
+    fn every_core_item_lands_on_one_of_the_three_levels() {
+        for core in CORE_ITEMS {
+            let level = level_of(core.key, core.required, &[]);
+            assert!(
+                [LEVEL_LEGAL, LEVEL_FUNCTIONAL, LEVEL_RECOMMENDED].contains(&level),
+                "{} got `{level}`, which no surface knows how to paint",
+                core.key
+            );
+        }
+    }
+
+    #[test]
+    fn the_certificate_arm_disappears_once_the_certificate_is_loaded() {
+        // With the certificate in the hub the gate accepts, so there is nothing left to block on —
+        // even though the module that carries it may still be half-configured.
+        let mut registry = Registry::new();
+        registry
+            .installed
+            .push(certificate_manifest("verifactu"));
+        assert_eq!(certificate_arm(&registry, false), vec!["verifactu.setup"]);
+        assert!(certificate_arm(&registry, true).is_empty());
+    }
+
+    #[test]
+    fn the_certificate_arm_is_keyed_on_the_capability_not_on_a_module_id() {
+        // Same reason ADR-0203 never names `verifactu`: the runtime carries no business inside.
+        let mut registry = Registry::new();
+        registry.installed.push(certificate_manifest("fattura"));
+        registry.installed.push(plain_manifest("verifactu"));
+        assert_eq!(certificate_arm(&registry, false), vec!["fattura.setup"]);
+    }
+
+    #[test]
+    fn a_hub_with_no_certificate_module_has_no_certificate_arm() {
+        // The gate only demands the certificate WHILE such a module is installed, so a hub outside
+        // Spain must not be told it is blocked by something nothing will ever ask it for.
+        let mut registry = Registry::new();
+        registry.installed.push(plain_manifest("inventory"));
+        assert!(certificate_arm(&registry, false).is_empty());
+    }
+
+    fn certificate_manifest(id: &str) -> crate::manifest::Manifest {
+        serde_json::from_value(json!({
+            "id": id, "name": id, "version": "1.0.0",
+            "capabilities": { "certificate": { "purpose": "fiscal-sign" } }
+        }))
+        .unwrap()
+    }
+
+    fn plain_manifest(id: &str) -> crate::manifest::Manifest {
+        serde_json::from_value(json!({ "id": id, "name": id, "version": "1.0.0" })).unwrap()
     }
 
     #[test]
     fn a_module_item_key_is_derived_never_declared() {
         // Keyed by the core so a manifest cannot rename itself out of the ⛔ list.
         assert_eq!(item_key("verifactu"), "verifactu.setup");
+    }
+
+    // ── The third state of the apps item (hub#371) ─────────────────────────────────────────────
+
+    #[test]
+    fn an_empty_catalogue_is_an_answer_and_the_answer_is_nothing() {
+        // `publish_core_modules.py` never ran in production: the marketplace replies, correctly,
+        // with an empty list. That IS an answer, and it is the one that makes the item unavailable.
+        assert_eq!(installable_modules(&json!([])), Some(0));
+        assert_eq!(installable_modules(&json!({ "results": [] })), Some(0));
+    }
+
+    #[test]
+    fn the_catalogue_shapes_the_saas_actually_returns_are_all_understood() {
+        // Bare array, DRF pagination and the `modules` envelope — the three the shell already
+        // normalises (`apps/web/src/lib/cloud.ts`, `cloudMarketplaceModules`). Reading one of them
+        // and not the others would silently turn a full catalogue into "nothing to install".
+        let m = json!([{ "id": "inventory" }, { "id": "sales" }]);
+        assert_eq!(installable_modules(&m), Some(2));
+        assert_eq!(installable_modules(&json!({ "results": m })), Some(2));
+        assert_eq!(installable_modules(&json!({ "modules": m })), Some(2));
+    }
+
+    #[test]
+    fn a_catalogue_you_are_not_allowed_to_install_from_offers_nothing() {
+        // The other half of hub#371: the marketplace lists everything and lets you install none of
+        // it (the entitlement 403). To the person in front of the hub that is the same wall as an
+        // empty catalogue, so it has to reach the same state.
+        let forbidden = json!([
+            { "id": "inventory", "can_install": false },
+            { "id": "sales", "can_install": false },
+        ]);
+        assert_eq!(installable_modules(&forbidden), Some(0));
+    }
+
+    #[test]
+    fn a_module_that_is_only_announced_is_not_something_you_can_install() {
+        // Same rule the catalogue screen already applies to its Install button
+        // (`AppsPage.vue`: `disabled: row.state !== 'available'`). If the checklist counted a
+        // coming-soon card it would send the user to a button that is greyed out.
+        let announced = json!([{ "id": "loyalty", "is_coming_soon": true }]);
+        assert_eq!(installable_modules(&announced), Some(0));
+        let mixed = json!([{ "id": "loyalty", "is_coming_soon": true }, { "id": "sales" }]);
+        assert_eq!(installable_modules(&mixed), Some(1));
+    }
+
+    #[test]
+    fn a_module_that_declares_no_flags_at_all_counts_as_installable() {
+        // The shell reads these as `can_install ?? is_active ?? true`. Defaulting the other way
+        // would make every catalogue that predates the flags look broken.
+        assert_eq!(installable_modules(&json!([{ "id": "sales" }])), Some(1));
+        assert_eq!(
+            installable_modules(&json!([{ "id": "sales", "is_active": false }])),
+            Some(0)
+        );
+        assert_eq!(
+            installable_modules(&json!([{ "id": "sales", "can_install": true, "is_active": false }])),
+            Some(1),
+            "`can_install` is the SaaS's verdict for this hub and it wins over the generic flag"
+        );
+    }
+
+    #[test]
+    fn a_payload_that_is_not_a_catalogue_is_not_an_answer_at_all() {
+        // An error body, a redirect page, a shape we do not know. Counting zero here would let a
+        // broken response invent a breakdown; `None` means "nothing to record", so the hub keeps
+        // whatever it last really knew.
+        for not_a_catalogue in [
+            json!({ "detail": "Authentication credentials were not provided." }),
+            json!("<html>"),
+            json!(null),
+            json!(7),
+        ] {
+            assert_eq!(
+                installable_modules(&not_a_catalogue),
+                None,
+                "{not_a_catalogue} is not a catalogue"
+            );
+        }
+    }
+
+    #[test]
+    fn a_recorded_answer_is_read_back_as_it_was_written() {
+        let now = chrono::Utc::now();
+        let marker = catalog_offer_marker(0, now);
+        assert_eq!(catalog_offer_at(&marker, now), Some(0));
+        assert_eq!(catalog_offer_at(&catalog_offer_marker(26, now), now), Some(26));
+    }
+
+    #[test]
+    fn an_answer_older_than_the_ttl_is_no_longer_an_answer() {
+        // The trap: an empty marketplace (or a SaaS that was down) an hour ago must not freeze the
+        // checklist into "there is nothing to install" — that state argues the user out of the one
+        // screen that would refresh it. Past the TTL the hub goes back to not knowing, which is
+        // pending, which is the state that sends them to look.
+        let now = chrono::Utc::now();
+        let marker = catalog_offer_marker(0, now - chrono::Duration::seconds(CATALOG_OFFER_TTL_SECS + 1));
+        assert_eq!(catalog_offer_at(&marker, now), None);
+        let fresh = catalog_offer_marker(0, now - chrono::Duration::seconds(CATALOG_OFFER_TTL_SECS - 1));
+        assert_eq!(catalog_offer_at(&fresh, now), Some(0));
+    }
+
+    #[test]
+    fn a_marker_that_cannot_be_read_never_invents_a_breakdown() {
+        // Garbage, a marker from an older build, a timestamp we cannot parse: every unreadable
+        // shape degrades to "we do not know", never to "unavailable".
+        let now = chrono::Utc::now();
+        for bad in [
+            "",
+            "0",
+            "{}",
+            r#"{"installable": 0}"#,
+            r#"{"at": "2026-08-07T09:00:00Z"}"#,
+            r#"{"installable": 0, "at": "yesterday"}"#,
+            r#"{"installable": "none", "at": "2026-08-07T09:00:00Z"}"#,
+        ] {
+            assert_eq!(catalog_offer_at(bad, now), None, "`{bad}` is not a marker");
+        }
+    }
+
+    #[test]
+    fn the_third_state_is_a_third_string_not_a_second_boolean() {
+        // `state` was already a string precisely so this could be an addition (hub#369 §7). Pinning
+        // the three values keeps a rename from silently splitting the surfaces.
+        assert_eq!([STATE_DONE, STATE_PENDING, STATE_UNAVAILABLE], ["done", "pending", "unavailable"]);
     }
 }

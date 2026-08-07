@@ -108,6 +108,114 @@ fn device_context(app: tauri::AppHandle) -> Result<DeviceContext, ShellError> {
     })
 }
 
+// ── Deep link `erplora://` (ADR-0196 §7) ─────────────────────────────────────────────────────────
+//
+// A link is the one thing that lets a page OUTSIDE the app steer the app, so it is a trust
+// boundary and not a convenience: whoever writes the link picks the destination, and the
+// destination is the window that owns the hardware handlers (ADR-0221). The app therefore never
+// opens what the link says — it RESOLVES it, and only a hub of ours resolves at all. Anything else
+// returns `None`, and `None` means "leave the window where it is": the browser that issued the
+// link is the one that owns the fallback (see `architecture/hub/apps/tauri.md`).
+
+/// Scheme of the installable app's deep link, registered against the single app identity
+/// `com.erplora.app` (ADR-0160).
+pub const DEEP_LINK_SCHEME: &str = "erplora";
+
+/// The only action of the grammar: `erplora://hub/<host>`.
+const DEEP_LINK_HUB_ACTION: &str = "hub";
+
+/// Registrable domain every ERPlora hub lives under (`{slug}.{aura}.erplora.com`).
+const HUB_DOMAIN_SUFFIX: &str = ".erplora.com";
+
+/// Is this a plain DNS label? Deliberately narrower than the RFC: lowercase ASCII only, so a
+/// percent-escape, a homograph or a stray `@` can never pass for a label.
+fn is_dns_label(label: &str) -> bool {
+    !label.is_empty()
+        && label.len() <= 63
+        && !label.starts_with('-')
+        && !label.ends_with('-')
+        && label
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
+/// The trust boundary: which destinations the app is willing to open for a link.
+///
+/// Mirrors `remote.urls` of the hardware capability (`https://*.erplora.com/*` + loopback dev,
+/// ADR-0221) on purpose. A destination the capabilities would not trust must not be reachable
+/// through a link either — and the reverse would be just as bad: opening a page that cannot
+/// `invoke` leaves a till that looks fine and cannot print.
+///
+/// Auras are matched by WILDCARD and never enumerated: hubs live at `{slug}.{aura}.erplora.com`
+/// with auras by letter on Hetzner and by number on the AWS fallback, so a list would turn
+/// "open a new aura" into "ship a new app to every till".
+fn hub_url_for_host(raw_host: &str) -> Option<String> {
+    let host = raw_host.trim().to_ascii_lowercase();
+
+    // Development: the hub is plain http on loopback. Not reachable from another machine, so a
+    // third party cannot steer it — but the port must be digits and nothing else, or
+    // `127.0.0.1:8787@evil.com` would walk straight through.
+    for prefix in ["127.0.0.1:", "localhost:"] {
+        if let Some(port) = host.strip_prefix(prefix) {
+            if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            return Some(format!("http://{host}/?shell=1"));
+        }
+    }
+
+    // Production: `<label>[.<label>…].erplora.com`. The apex has no leading dot to strip, which is
+    // exactly why it is excluded: `erplora.com` also serves marketing, billing and a third-party
+    // checkout, and is deliberately kept out of the hardware capability (ADR-0221).
+    let subdomain = host.strip_suffix(HUB_DOMAIN_SUFFIX)?;
+    if subdomain.is_empty() || !subdomain.split('.').all(is_dns_label) {
+        return None;
+    }
+    Some(format!("https://{host}/?shell=1"))
+}
+
+/// Resolves a deep link into the URL the window must navigate to. `None` = not a link of ours, or
+/// not a destination of ours → **do not navigate**.
+///
+/// The destination is rebuilt from the host alone, so query and fragment are ignored by
+/// construction and no parameter can smuggle a second URL in. The `?shell=1` marker is the
+/// existing capture contract (ADR-0159): navigating with it is what makes the shell remember this
+/// hub as `hub.url`, so a link opens the app AND leaves it pointing at the right hub next time.
+pub fn resolve_deep_link(raw: &str) -> Option<String> {
+    let url: tauri::Url = raw.trim().parse().ok()?;
+    if url.scheme() != DEEP_LINK_SCHEME {
+        return None;
+    }
+    // Case-insensitive on purpose: for a non-special scheme the host is an OPAQUE host, so the URL
+    // parser does NOT lowercase it the way it would for `https`. A link typed or reflowed in
+    // uppercase by a mail client is still the same link.
+    if !url.host_str()?.eq_ignore_ascii_case(DEEP_LINK_HUB_ACTION) {
+        return None;
+    }
+    // Credentials or a port on the action are not part of the grammar. They carry no meaning here,
+    // so accepting them would only add shapes of the same link that have to be reasoned about.
+    if !url.username().is_empty() || url.password().is_some() || url.port().is_some() {
+        return None;
+    }
+    let mut segments = url.path_segments()?;
+    let target = segments.next()?;
+    // Exactly one segment. A single empty tail is the trailing slash of `…/erplora.com/`.
+    if segments.any(|s| !s.is_empty()) {
+        return None;
+    }
+    hub_url_for_host(target)
+}
+
+/// Picks the deep link out of the process arguments — the cold start path on Windows and Linux,
+/// where the OS launches the executable with the URL appended instead of delivering an event.
+///
+/// Every argument goes through [`resolve_deep_link`], so a hostile one is refused here too: this
+/// list is attacker-reachable, since whatever the browser hands the registered handler lands in it
+/// verbatim.
+pub fn deep_link_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter().find_map(|arg| resolve_deep_link(&arg))
+}
+
 // ── Estado del shell: captura y persistencia del hub_url (ADR-0159) ──────────────────────────────
 
 /// Normaliza la base del SaaS: sin espacios ni `/` final.
@@ -205,9 +313,23 @@ fn should_forget_hub(probe: HubProbe) -> bool {
     }
 }
 
-/// URL inicial de la ventana, por precedencia: override dev ([`ENV_SHELL_URL`]) → `hub.url`
-/// persistido (modo app) → onboarding del SaaS. Pura para poder testearla.
-fn initial_url_for(override_url: Option<&str>, persisted: Option<&str>, saas_base: &str) -> String {
+/// URL inicial de la ventana, por precedencia: deep link del arranque (ADR-0196 §7) → override dev
+/// ([`ENV_SHELL_URL`]) → `hub.url` persistido (modo app) → onboarding del SaaS. Pura para poder
+/// testearla.
+///
+/// El deep link va **primero** porque es lo que el usuario está pidiendo AHORA: el override es
+/// configuración estática y el hub persistido es lo de la última vez. Si ganase cualquiera de los
+/// dos, pulsar «Open Terminal» del hub B desde un TPV que recuerda el A abriría el A —el negocio
+/// equivocado— sin un solo error que lo delate.
+fn initial_url_for(
+    deep_link: Option<&str>,
+    override_url: Option<&str>,
+    persisted: Option<&str>,
+    saas_base: &str,
+) -> String {
+    if let Some(target) = deep_link {
+        return target.to_string();
+    }
     if let Some(dev) = override_url {
         return dev.to_string();
     }
@@ -287,6 +409,24 @@ fn spawn_hub_liveness_check(app: tauri::AppHandle, cache_dir: PathBuf, origin: S
     });
 }
 
+/// Lleva la ventana principal a `url`. Best-effort a propósito: sin ventana (o con una URL que no
+/// parsea) no hay nada que dirigir, y un enlace no puede tumbar la app.
+fn navigate_main_window(app: &tauri::AppHandle, url: &str) {
+    use tauri::Manager;
+    let Some(window) = app.get_webview_window("main") else {
+        log::warn!("shell: llega un enlace pero aún no hay ventana que dirigir ({url})");
+        return;
+    };
+    match url.parse::<tauri::Url>() {
+        Ok(parsed) => {
+            if let Err(e) = window.navigate(parsed) {
+                log::warn!("shell: no se pudo abrir el enlace ({url}): {e}");
+            }
+        }
+        Err(e) => log::warn!("shell: destino de enlace ilegible ({url}): {e}"),
+    }
+}
+
 /// Crea la ventana principal apuntando a [`initial_url_for`] y registra el `on_navigation` que
 /// captura `?shell=1` → persiste el origen como `hub.url` (una sola escritura por cambio).
 fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Result<()> {
@@ -296,7 +436,16 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
     let override_url = std::env::var(ENV_SHELL_URL)
         .ok()
         .filter(|v| !v.trim().is_empty());
-    let initial = initial_url_for(override_url.as_deref(), persisted.as_deref(), &saas_base_url());
+    // Arranque EN FRÍO por deep link: en Windows y Linux el sistema contesta a un enlace lanzando
+    // el ejecutable otra vez con la URL como argumento, así que aquí es donde llega. En macOS/iOS/
+    // Android llega como evento y lo recoge `on_open_url` (ver `run`).
+    let deep_link = deep_link_from_args(std::env::args());
+    let initial = initial_url_for(
+        deep_link.as_deref(),
+        override_url.as_deref(),
+        persisted.as_deref(),
+        &saas_base_url(),
+    );
     let url = match initial.parse::<tauri::Url>() {
         Ok(u) => WebviewUrl::External(u),
         Err(e) => {
@@ -310,7 +459,11 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
     // Si se arranca contra un hub recordado, hay que comprobar que sigue existiendo — pero DESPUÉS
     // de abrir la ventana, no antes: bloquear el arranque de un TPV por una petición de red sería
     // peor que la pantalla que se intenta evitar.
-    if override_url.is_none() {
+    //
+    // Con deep link NO se comprueba: la ventana está en el hub del ENLACE, no en el recordado, y
+    // este chequeo termina navegando al onboarding — se llevaría por delante justo lo que el
+    // usuario acaba de pedir. El `?shell=1` del enlace ya reemplaza el `hub.url` recordado.
+    if override_url.is_none() && deep_link.is_none() {
         if let (Some(dir), Some(origin)) = (cache_dir.clone(), persisted.clone()) {
             spawn_hub_liveness_check(app.handle().clone(), dir, origin);
         }
@@ -564,11 +717,54 @@ fn erplora_notify(app: tauri::AppHandle, title: String, body: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // Escritorio: el sistema contesta a un `erplora://` LANZANDO el ejecutable otra vez. Sin esto,
+    // pulsar un enlace con la app abierta arrancaría un SEGUNDO TPV encima del primero (dos
+    // ventanas, dos colas de impresión, dos watchdogs). Con esto, la segunda instancia muere al
+    // nacer y le pasa sus argumentos a la que ya está viva, que es la que navega.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        if let Some(target) = deep_link_from_args(argv) {
+            navigate_main_window(app, &target);
+        }
+    }));
+
+    builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_erplora_android::init())
+        // Deep link `erplora://` (ADR-0196 §7): registro del esquema por plataforma + entrega de la
+        // URL. Va DESPUÉS de single-instance a propósito: el orden que documenta el propio plugin.
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             use tauri::Manager;
+            use tauri_plugin_deep_link::DeepLinkExt;
+
+            // Enlace con la app YA abierta (macOS, iOS y Android lo entregan como evento; en
+            // escritorio lo reinyecta single-instance). El de arranque en frío no pasa por aquí:
+            // ese llega por argumentos y lo resuelve `open_main_window`.
+            //
+            // Un enlace que NO resuelve no hace nada, a propósito: el fallback es del navegador que
+            // lo lanzó, y navegar «a algo» sería peor que quedarse quieto.
+            let handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                // Mismo filtro que el arranque en frío: un solo enlace por gesto y, si llegaran
+                // varios, manda el primero que resuelva.
+                let urls = event.urls().into_iter().map(String::from);
+                match deep_link_from_args(urls) {
+                    Some(target) => navigate_main_window(&handle, &target),
+                    None => log::warn!("shell: enlace ignorado, no apunta a un hub nuestro"),
+                }
+            });
+
+            // Windows y Linux aprenden el esquema al INSTALAR (registro / handler `.desktop`), así
+            // que en una ejecución de desarrollo —sin instalador— no está registrado y el enlace no
+            // se puede ni probar. Registrarlo aquí solo afecta a esa ejecución.
+            #[cfg(any(windows, target_os = "linux"))]
+            if let Err(e) = app.deep_link().register_all() {
+                log::warn!("shell: no se pudo registrar el esquema {DEEP_LINK_SCHEME}://: {e}");
+            }
+
             // Raíz de datos por-instalación: device.id + hub.url + devices.json. Si no se puede
             // resolver, el shell arranca igualmente (sin persistencia) — cliente fino, sin BD.
             let cache_dir = match app.path().app_data_dir() {
@@ -722,6 +918,7 @@ mod tests {
         // Override de desarrollo gana siempre.
         assert_eq!(
             initial_url_for(
+                None,
                 Some("http://127.0.0.1:8001/shell/"),
                 Some("https://demo.erplora.com"),
                 "https://erplora.com"
@@ -730,13 +927,41 @@ mod tests {
         );
         // Hub persistido → modo app (origen + "/").
         assert_eq!(
-            initial_url_for(None, Some("https://demo.erplora.com"), "https://erplora.com"),
+            initial_url_for(None, None, Some("https://demo.erplora.com"), "https://erplora.com"),
             "https://demo.erplora.com/"
         );
         // Nada persistido → onboarding del SaaS.
         assert_eq!(
-            initial_url_for(None, None, "https://erplora.com"),
+            initial_url_for(None, None, None, "https://erplora.com"),
             "https://erplora.com/shell/"
+        );
+    }
+
+    #[test]
+    fn a_cold_start_through_a_link_opens_the_hub_the_link_named() {
+        // Windows and Linux answer a link by launching the executable with the URL appended, so at
+        // a COLD start the link is all there is. If the persisted hub won, clicking "Open Terminal"
+        // for hub B from a till that remembers hub A would quietly open A — the wrong business,
+        // and with no error to notice it by.
+        assert_eq!(
+            initial_url_for(
+                Some("https://demo.b.erplora.com/?shell=1"),
+                None,
+                Some("https://demo.a.erplora.com"),
+                "https://erplora.com"
+            ),
+            "https://demo.b.erplora.com/?shell=1"
+        );
+        // It also beats the dev override: the override is static configuration, the link is what
+        // the user is asking for right now.
+        assert_eq!(
+            initial_url_for(
+                Some("https://demo.b.erplora.com/?shell=1"),
+                Some("http://127.0.0.1:8001/shell/"),
+                None,
+                "https://erplora.com"
+            ),
+            "https://demo.b.erplora.com/?shell=1"
         );
     }
 
@@ -788,7 +1013,7 @@ mod tests {
     fn onboarding_url_normaliza_la_base() {
         assert_eq!(onboarding_url("https://erplora.com"), "https://erplora.com/shell/");
         assert_eq!(
-            initial_url_for(None, None, "https://erplora.com/"),
+            initial_url_for(None, None, None, "https://erplora.com/"),
             "https://erplora.com/shell/"
         );
         assert_eq!(normalize_base("  https://erplora.com/  "), "https://erplora.com");

@@ -277,6 +277,86 @@ CREATE TABLE hub_role_activation (\
   activated_at TEXT NOT NULL, activated_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, role_key));",
     },
+    // ── v14 — hub#316 / ADR-0202 §2.1: `_hub_certificate` deja de ser singleton — DOS SLOTS ──────
+    // Un hub podía tener UN certificado fiscal: el que su dueño sube en Ajustes → Negocio. La fase 2
+    // de VeriFactu añade un segundo origen —el certificado DELEGADO de ERPlora, que reparte el plano
+    // de control (saas#1124/#1125)— y los dos tienen que convivir: el propio no se puede borrar para
+    // hacerle sitio al delegado (es la identidad del negocio, y su renovación siempre fue del
+    // cliente) ni al revés (el delegado lo rota ERPlora, sin pasar por el hub).
+    //
+    // Por eso la PK pasa de `hub_id` a `(hub_id, kind)`: la fila deja de ser «el certificado del
+    // hub» y pasa a ser «el certificado de ESTE origen en este hub». El `kind` es un slot, NO una
+    // preferencia — cuál se usa lo decide la regla de selección del core (propio si está subido, si
+    // no el delegado), no una columna que alguien pueda cambiar.
+    //
+    // ADITIVA y conservadora: `DEFAULT 'own'` sella como PROPIAS las filas de los hubs ya
+    // desplegados, que es exactamente lo que son (las subió su dueño por `PUT /api/business/
+    // certificate`). Si el default fuese `delegated`, un hub ya en producción se encontraría de
+    // pronto con que su certificado «es de ERPlora»: dejaría de exportarse en su backup y quedaría
+    // a merced de una rotación central que nunca pidió.
+    SystemMigration {
+        version: 14,
+        name: "hub_certificate_slots",
+        postgres: "\
+ALTER TABLE _hub_certificate ADD COLUMN kind TEXT NOT NULL DEFAULT 'own';\
+ALTER TABLE _hub_certificate DROP CONSTRAINT _hub_certificate_pkey;\
+ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
+    },
+    // ── v16 — hub#317 / ADR-0202 §2: el certificado DELEGADO guarda la VERSIÓN con la que llegó ──
+    // El plano de control reparte su `.p12` con un entero monótono (`DelegatedCertificate.version`,
+    // saas#1124) y la convergencia de la flota entera se apoya en él: el heartbeat anuncia la
+    // versión del plano de control, el hub la compara con la suya y refetchea si difieren (#318), y
+    // la reporta de vuelta para que el panel pueda decir «987/1000 en v4» (saas#1126/#1127).
+    //
+    // Va en ESTA tabla, en la fila del certificado, y no en `hub_settings`: el número describe unos
+    // bytes concretos, así que tiene que moverse en el MISMO upsert que ellos. Separados, una
+    // escritura a medias deja la fila con el `.p12` nuevo bajo el número viejo — y un hub que
+    // reporta una versión que no tiene es un hub al que el panel da por al día mientras firma con
+    // una clave superada (en el peor caso, revocada).
+    //
+    // NULLable a propósito: el slot `own` NO tiene versión. Lo sube y lo renueva su dueño, no hay
+    // rotación central que numerar, y un `0` por defecto haría que un hub con certificado propio
+    // reportase «tengo la v0 de ERPlora» en vez de «no tengo ninguna».
+    //
+    // ⚠️ El hueco en la v15 es DELIBERADO: la reserva hub#341 (cola de impresión), que ya la había
+    // publicado en `architecture/hub/print-queue.md` cuando esto se escribió. Pisar un número que
+    // otra PR abierta ya anunció cuesta más que dejarlo libre — `apply` compara `version >` el
+    // máximo aplicado y el test de orden solo exige que crezcan, así que un salto no rompe nada.
+    SystemMigration {
+        version: 16,
+        name: "hub_certificate_delegated_version",
+        postgres: "ALTER TABLE _hub_certificate ADD COLUMN cert_version BIGINT;",
+    },
+    // ── v17 — hub#357 (paso 2b): QUÉ CLASE de dispositivo es este — `shared` vs `personal` ───────
+    // El mismo negocio tiene el TPV del mostrador (varias personas se turnan) y el portátil del
+    // despacho (de una sola), y la MISMA persona usa los dos. Así que no puede ser un ajuste del
+    // hub: es del dispositivo, y la clave ya existe (`X-Device-Id`, ADR-0154). De aquí cuelgan el
+    // pinpad condicionado (hub#358) y el ajuste «Pedir PIN: siempre / turno / nunca» (hub#359).
+    //
+    // Va en `hub_trusted_device` y no en una tabla nueva, y ese es el punto de SEGURIDAD del
+    // diseño: `personal` es el modo LAXO (sin pinpad, sesión larga) y el `device_id` es un
+    // identificador que el cliente manda en claro, no una credencial. Colgando el modo de la fila
+    // del device-trust (§2.9, hub#330), un dispositivo solo puede tener modo si ya probó identidad
+    // con un login ONLINE — y `untrust_device` (portátil robado) BORRA la fila, así que se lleva el
+    // modo laxo con ella sin ninguna cascada que recordar. Con una tabla aparte, olvidar esa
+    // cascada dejaría al ladrón el dispositivo «personal».
+    //
+    // `DEFAULT 'shared'` sella como COMPARTIDOS los dispositivos ya de confianza de un hub
+    // desplegado, que es la lectura conservadora: lo que se hereda es la fricción, nunca su
+    // ausencia. `mode_set_by` audita quién lo decidió (como `activated_by` en la v13): bajar la
+    // fricción de identidad de un terminal es una decisión que tiene que dejar rastro.
+    //
+    // ⚠️ La v15 sigue RESERVADA por hub#341 (cola de impresión, `architecture/hub/print-queue.md`)
+    // igual que cuando se escribió la v16: esta PR salta a la 17 en vez de ocupar el hueco. `apply`
+    // compara `version >` el máximo aplicado y el test de orden solo exige que crezcan.
+    SystemMigration {
+        version: 17,
+        name: "hub_trusted_device_mode",
+        postgres: "\
+ALTER TABLE hub_trusted_device ADD COLUMN mode TEXT NOT NULL DEFAULT 'shared';\
+ALTER TABLE hub_trusted_device ADD COLUMN mode_set_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_trusted_device ADD COLUMN mode_set_by TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -633,6 +713,159 @@ mod tests {
             max_applied_version(&db).await.unwrap() >= 7,
             "v7 registrada"
         );
+        apply(&db, "hub-test").await.unwrap();
+    }
+
+    /// A hub deployed BEFORE hub#316: `_hub_certificate` in its v6 shape (singleton, PK `hub_id`)
+    /// with the certificate its owner uploaded in Ajustes → Negocio, and every migration up to v13
+    /// already registered. Reproduces the only state v14 has to survive — an ALTER cannot be tested
+    /// against a table the same run has just created in its post-migration shape.
+    ///
+    /// `hub_trusted_device` (v2) belongs to that state too: this fixture jumps straight from v13 to
+    /// the end of the catalogue, so **every** later migration runs over it, and one that ALTERs the
+    /// device-trust table (v17, hub#357) would otherwise fail against a hub that never had one —
+    /// a hub that has never existed, since v2 creates it for everybody.
+    async fn hub_deployed_before_the_slots(db: &dyn DatabaseAdapter) {
+        db.execute_batch(
+            "CREATE TABLE _hub_certificate (\
+               hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
+               uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
+               PRIMARY KEY (hub_id));\
+             CREATE TABLE hub_trusted_device (\
+               device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
+        )
+        .await
+        .unwrap();
+        ensure_control_table(db).await.unwrap();
+        for v in 1..=13 {
+            let mut p = Params::new();
+            p.insert("version".into(), json!(v));
+            p.insert("name".into(), json!(format!("pre_slots_{v}")));
+            p.insert("applied_at".into(), json!("2026-01-01T00:00:00Z"));
+            db.execute(
+                "INSERT INTO _hub_system_migrations (version, name, applied_at) \
+                 VALUES (:version, :name, :applied_at)",
+                &p,
+            )
+            .await
+            .unwrap();
+        }
+    }
+
+    /// The certificate a deployed hub already had is the BUSINESS's own one, and v14 must say so.
+    ///
+    /// The default of the new column is the whole safety of this migration: sealed as `delegated`,
+    /// a hub in production would suddenly hold «ERPlora's certificate» — dropped from its own
+    /// backup and exposed to a central rotation it never asked for.
+    #[tokio::test]
+    async fn the_certificate_a_deployed_hub_already_had_becomes_its_own_slot_v14() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        hub_deployed_before_the_slots(&db).await;
+        db.execute_batch(
+            "INSERT INTO _hub_certificate (hub_id, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES ('hub-test', 'TEVHQUNZ', 'pw', '2026-01-01T00:00:00Z', 'hub_user:admin');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test").await.unwrap();
+        assert!(max_applied_version(&db).await.unwrap() >= 14, "v14 registrada");
+
+        let row = db
+            .query(
+                "SELECT kind, pkcs12_b64 FROM _hub_certificate WHERE hub_id = 'hub-test'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.rows.len(), 1, "la fila legacy sobrevive");
+        assert_eq!(row.rows[0]["kind"], json!("own"), "sellada como PROPIA del negocio");
+        assert_eq!(row.rows[0]["pkcs12_b64"], json!("TEVHQUNZ"), "sus bytes intactos");
+
+        // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').
+        apply(&db, "hub-test").await.unwrap();
+    }
+
+    /// After v14 the two slots are two ROWS of the same hub: the PK is `(hub_id, kind)`, so storing
+    /// the delegated certificate cannot evict the business's own one (nor the other way round).
+    #[tokio::test]
+    async fn after_v14_both_slots_fit_in_the_same_hub() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        hub_deployed_before_the_slots(&db).await;
+        apply(&db, "hub-test").await.unwrap();
+
+        db.execute_batch(
+            "INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES ('hub-test', 'own', 'T1dO', 'pw1', '2026-01-01T00:00:00Z', 'hub_user:admin');\
+             INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES ('hub-test', 'delegated', 'REVM', 'pw2', '2026-01-02T00:00:00Z', 'cloud');",
+        )
+        .await
+        .unwrap();
+
+        let rows = db
+            .query(
+                "SELECT kind FROM _hub_certificate WHERE hub_id = 'hub-test' ORDER BY kind",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        let kinds: Vec<&str> =
+            rows.rows.iter().filter_map(|r| r["kind"].as_str()).collect();
+        assert_eq!(kinds, vec!["delegated", "own"], "los dos slots conviven");
+    }
+
+    /// v17 (hub#357): los dispositivos de confianza que YA existen heredan el modo **estricto**.
+    ///
+    /// Es toda la seguridad de esta migración. `personal` significa «sin pinpad, sesión larga»: si
+    /// el default fuese ese, cada TPV de mostrador ya enrolado de la flota amanecería sin pedir
+    /// quién está detrás de la caja, y nadie lo habría decidido. Lo que se hereda es la fricción,
+    /// nunca su ausencia.
+    #[tokio::test]
+    async fn the_devices_a_deployed_hub_already_trusted_inherit_the_strict_mode_v17() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        // Un hub anterior a la v17: la tabla del device-trust (v2) SIN las columnas del modo.
+        db.execute_batch(
+            "CREATE TABLE hub_trusted_device (\
+               device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);\
+             INSERT INTO hub_trusted_device (device_id, label, trusted_at) \
+             VALUES ('till-1', 'Caja 1', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+        ensure_control_table(&db).await.unwrap();
+        for v in 1..=16 {
+            let mut p = Params::new();
+            p.insert("version".into(), json!(v));
+            p.insert("name".into(), json!(format!("pre_device_mode_{v}")));
+            p.insert("applied_at".into(), json!("2026-01-01T00:00:00Z"));
+            db.execute(
+                "INSERT INTO _hub_system_migrations (version, name, applied_at) \
+                 VALUES (:version, :name, :applied_at)",
+                &p,
+            )
+            .await
+            .unwrap();
+        }
+
+        apply(&db, "hub-test").await.unwrap();
+        assert!(max_applied_version(&db).await.unwrap() >= 17, "v17 registrada");
+
+        let row = db
+            .query(
+                "SELECT mode, label FROM hub_trusted_device WHERE device_id = 'till-1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.rows.len(), 1, "el dispositivo de confianza sobrevive");
+        assert_eq!(row.rows[0]["mode"], json!("shared"), "hereda la fricción, no su ausencia");
+        assert_eq!(row.rows[0]["label"], json!("Caja 1"), "su etiqueta intacta");
+
+        // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').
         apply(&db, "hub-test").await.unwrap();
     }
 }

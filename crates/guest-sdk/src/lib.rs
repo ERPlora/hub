@@ -68,6 +68,11 @@ use serde_json::{Map, Value};
 /// distinción entre dinero, tasa y cantidad. Antes vivía copiada en 7 handlers.
 pub mod currency;
 pub mod money;
+
+/// **La resolución de la regla de impuesto** (hub#295). Qué tipo se aplica a
+/// `(país, región, categoría, fecha)` y cómo se califica la operación. Antes vivía copiada en
+/// `taxes`, `sales` e `invoice` — y con ella la posibilidad de cobrar una cosa y declarar otra.
+pub mod tax;
 pub mod units;
 
 /// Entrada arbitraria que el host pasa al handler WASM.

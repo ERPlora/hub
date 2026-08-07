@@ -115,11 +115,49 @@ export default {
     previewUnsupportedBody: 'Este tipo de archivo no se puede mostrar aquí. Descárgalo para abrirlo con una aplicación de tu dispositivo.',
     previewPdfTruncated: 'Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.',
   },
-  dashboard: {
-    setupTitle: '{n} módulo(s) requieren configuración',
+  // La checklist de configuración — la superficie del panel de `hub.setup.status` (hub#372).
+  // `items.<key>` cubre SOLO los ítems del core: la clave de un ítem del core es también su clave
+  // i18n; el título de un módulo viaja en inglés en su manifest y se pinta tal cual.
+  setup: {
+    title: 'Termina de configurar tu hub',
+    progress: '{done} de {total} hechos',
+    viewAll: 'Ver todo',
+    viewLess: 'Ver menos',
     configure: 'Configurar',
-    setupHint: 'Revisa qué falta y el asistente te guiará paso a paso para dejarlo listo.',
-    reviewConfig: 'Revisar configuración',
+    review: 'Pedírselo al asistente',
+    doneLabel: 'Hecho',
+    // Los tres niveles, dichos por lo que significan para el negocio, no por su gravedad.
+    levelLegal: 'Necesario para facturar',
+    levelFunctional: 'Necesario para vender',
+    levelRecommended: 'Recomendado',
+    // El tercer estado: una avería NUESTRA, no una tarea suya. No puede sonar a deber.
+    unavailableLabel: 'Todavía no disponible',
+    unavailableHint: 'Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.',
+    completeTitle: 'Tu hub está listo',
+    completeBody: 'No queda nada pendiente en la checklist.',
+    // La franja bloqueante (hub#374): la superficie de las pantallas donde no está la checklist.
+    // Dice la CONSECUENCIA, no la gravedad — ⛔ significa que el runtime rechaza el documento, así
+    // que eso es lo que anuncia. Nunca dice «error»: no hay nada roto, hay algo que falta.
+    blocking: {
+      title: 'Todavía no puedes facturar',
+      body: 'El hub rechazará emitir un documento de venta hasta que configures esto:',
+    },
+    items: {
+      apps: {
+        title: 'Tus apps',
+        description: 'Instala al menos una app de negocio para que el hub tenga algo que hacer.',
+      },
+      business_identity: {
+        title: 'Los datos de tu negocio',
+        description: 'Razón social y NIF: sin ellos el hub no puede emitir una factura.',
+      },
+      team: {
+        title: 'Tu equipo',
+        description: 'Añade a las personas que usarán el TPV, cada una con su forma de entrar.',
+      },
+    },
+  },
+  dashboard: {
     // Saludo contextual por franja horaria (zona 1 — cabecera). El nombre se interpola.
     greetingMorning: 'Buenos días, {name}',
     greetingAfternoon: 'Buenas tardes, {name}',
@@ -503,6 +541,28 @@ export default {
     pinHelp: 'Entre 4 y 8 dígitos. En blanco, entra con su cuenta online.',
     pinSetHelp: 'Escribe un PIN nuevo para cambiarlo; déjalo en blanco y se queda como está.',
     clearPin: 'Retirar el PIN',
+    localUser: 'Usuario local',
+    localUserHelp:
+      'Trabaja en este hub solo con un PIN: sin email y sin cuenta de ERPlora. Desmárcalo para darle una cuenta más adelante, sin perder su historial.',
+    localPinHelp: 'Entre 4 y 8 dígitos. Obligatorio: es cómo entra esta persona.',
+    accountEmailHelp:
+      'Le mandamos por email una invitación a este hub. La contraseña la elige él: tú no la ves nunca.',
+    accountPinHelp:
+      'Opcional: entre 4 y 8 dígitos. Solo si además atiende una caja compartida de este hub.',
+    errors: {
+      local_needs_pin: 'Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.',
+      account_needs_email: 'Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.',
+      account_role_not_grantable: 'A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.',
+      email_taken: 'Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.',
+      role_above_inviter: 'No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.',
+      invalid_email: 'Introduce un email válido.',
+      pin_length: 'El PIN debe tener entre 4 y 8 dígitos.',
+      pin_too_simple: 'Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).',
+      pin_in_use: 'Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.',
+      local_cannot_administer: 'Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.',
+      local_has_email: 'Un usuario local no lleva email. Desmarca «Usuario local» para invitarlo como usuario de cuenta.',
+      name_taken: 'Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.',
+    },
     activeUser: 'Usuario activo',
     required: 'Campo obligatorio',
     invalidEmail: 'Introduce un email válido',

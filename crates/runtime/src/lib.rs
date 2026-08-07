@@ -16,6 +16,7 @@ pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
 pub mod commands;
+pub mod device_mode;
 pub mod e2e_support;
 pub mod error_registry;
 pub mod errors;
@@ -56,7 +57,10 @@ pub use manifest::Manifest;
 pub use registry::{EventSink, ModuleStatus, NavEntry, Registry, RequestContext};
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
-pub use e2e_support::require_modules_workspace;
+// `modules_root` travels with the guard on purpose: a test that resolves module paths by hand
+// diverges from the guard and reintroduces hub#253 (the guard says "run", every path is wrong,
+// the test skips itself and still reports `ok`).
+pub use e2e_support::{modules_root, require_modules_workspace};
 
 /// Descripción de un módulo instalado (para `/api/modules`).
 #[derive(Debug, Clone, serde::Serialize)]
@@ -877,9 +881,28 @@ impl Runtime {
         identity::is_device_trusted(self.db.as_ref(), device_id).await
     }
 
-    /// Revoca la confianza de un dispositivo (perdido/robado). Idempotente (§2.9).
+    /// Revoca la confianza de un dispositivo (perdido/robado). Idempotente (§2.9). Se lleva con
+    /// ella el **modo** del dispositivo (hub#357): la fila borrada es donde vivía.
     pub async fn untrust_device(&self, device_id: &str) -> Result<()> {
         identity::untrust_device(self.db.as_ref(), device_id).await
+    }
+
+    /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
+    /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
+    pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {
+        device_mode::mode(self.db.as_ref(), device_id).await
+    }
+
+    /// Fija el modo de un dispositivo **ya conocido** (hub#357). `actor` = el `hub_user.id` que lo
+    /// decidió; la puerta HTTP exige sesión **admin**. Rechaza un `device_id` que el hub nunca vio:
+    /// esto registra una decisión sobre un dispositivo, no lo da de alta.
+    pub async fn set_device_mode(
+        &self,
+        device_id: &str,
+        mode: device_mode::DeviceMode,
+        actor: &str,
+    ) -> Result<()> {
+        device_mode::set_mode(self.db.as_ref(), device_id, mode, actor).await
     }
 
     /// Permisos de una **sesión** con ese rol: los de los módulos + el permiso del core
@@ -983,24 +1006,42 @@ impl Runtime {
         .await
     }
 
-    /// Sube/reemplaza el certificado fiscal del negocio (ADR-0079). `by` = `hub_user:<id>` admin.
+    /// Sube/reemplaza el certificado fiscal **del negocio** (ADR-0079). `by` = `hub_user:<id>` admin.
+    ///
+    /// Ata el slot [`certificate::CertificateKind::Own`] en el ÚNICO punto por el que entra un `.p12`
+    /// del cliente (`PUT /api/business/certificate`): el certificado delegado de ERPlora lo escribe
+    /// el plano de control por su propia vía (hub#317), nunca esta.
     pub async fn set_business_certificate(
         &self,
         pkcs12_b64: &str,
         password: &str,
         by: &str,
     ) -> Result<()> {
-        certificate::set(self.db.as_ref(), &self.hub_id, pkcs12_b64, password, by).await
+        certificate::set(
+            self.db.as_ref(),
+            &self.hub_id,
+            certificate::CertificateKind::Own,
+            pkcs12_b64,
+            password,
+            by,
+            // Sin versión: la del plano de control describe la ROTACIÓN CENTRAL del certificado
+            // delegado (ADR-0202 §2.5). El del negocio lo sube y lo renueva su dueño, así que no hay
+            // número de flota que le corresponda y ponerle uno haría que este hub reportase como
+            // instalada una versión de ERPlora que no tiene.
+            None,
+        )
+        .await
     }
 
-    /// Estado del certificado del negocio (presente/ausente + metadatos; sin bytes ni contraseña).
+    /// Estado de los certificados del hub (sin bytes ni contraseña): el del negocio en la raíz —
+    /// como siempre— más `slots`/`active` (ADR-0202 §2.1).
     pub async fn business_certificate_status(&self) -> Result<Json> {
         certificate::status(self.db.as_ref(), &self.hub_id).await
     }
 
-    /// Elimina el certificado del negocio.
+    /// Elimina el certificado **del negocio**. El delegado no se toca: no es del cliente.
     pub async fn delete_business_certificate(&self) -> Result<()> {
-        certificate::delete(self.db.as_ref(), &self.hub_id).await
+        certificate::delete(self.db.as_ref(), &self.hub_id, certificate::CertificateKind::Own).await
     }
 
     /// Un ciclo del relay de eventos: entrega los eventos vencidos del outbox a sus listeners.

@@ -54,6 +54,17 @@ fn rejected(message: &str) -> Response {
         .into_response()
 }
 
+/// `403` de una barandilla de **quién** puede hacer algo (hub#356). Lleva el **código estable** del
+/// core, no el `rejected` genérico: la UI tiene que poder traducir el motivo, y «tú no puedes
+/// conceder eso» no se arregla cambiando el formulario.
+fn forbidden(code: &str, message: &str) -> Response {
+    (
+        StatusCode::FORBIDDEN,
+        Json(json!({ "ok": false, "error": { "code": code, "message": message } })),
+    )
+        .into_response()
+}
+
 fn not_found() -> Response {
     (
         StatusCode::NOT_FOUND,
@@ -149,7 +160,12 @@ pub async fn set_role_activation(
     }
 }
 
-/// POST /api/hub/users — alta `{name, email?, role, pin?}`. Auth = sesión admin.
+/// POST /api/hub/users — alta `{name, email?, role, pin?, local?}`. Auth = sesión admin.
+///
+/// Desde hub#356 el alta es **exhaustiva** (ver `hub_users::create` en el runtime): `local: true` es
+/// el personal solo-PIN, y sin la casilla es un **usuario de cuenta** — email obligatorio, y esta
+/// capa es la que dispara la **invitación** (`notify_member_added`, credencial de máquina). Quién
+/// puede invitar sigue siendo `admin`; **con qué rol**, lo acota [`grant_decision`].
 pub async fn create_user(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -160,8 +176,13 @@ pub async fn create_user(
         Err(response) => return response,
     };
     let rt = arc.lock().await;
-    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return unauthorized(e);
+    let actor = match auth::require_admin_session(&headers, &st.config, &rt).await {
+        Ok(user) => user,
+        Err(e) => return unauthorized(e),
+    };
+    // Antes de escribir nada: nadie reparte un rol por encima del suyo (hub#356).
+    if let Some(Guard::Forbidden(message)) = grant_decision(&actor.role, &input.role) {
+        return forbidden(ROLE_ABOVE_INVITER, message);
     }
     let id = match rt.create_hub_user(&input).await {
         Ok(id) => id,
@@ -200,7 +221,7 @@ pub async fn update_user(
         Ok(user) => user,
         Err(e) => return unauthorized(e),
     };
-    if let Some(response) = guard(&rt, &admin.id, &id, &input).await {
+    if let Some(response) = guard(&rt, &admin, &id, &input).await {
         return response;
     }
     let row = match rt.update_hub_user(&id, &input).await {
@@ -235,7 +256,7 @@ pub async fn deactivate_user(
         is_active: Some(false),
         ..UpdateHubUser::default()
     };
-    if let Some(response) = guard(&rt, &admin.id, &id, &input).await {
+    if let Some(response) = guard(&rt, &admin, &id, &input).await {
         return response;
     }
     let row = match rt.update_hub_user(&id, &input).await {
@@ -271,7 +292,7 @@ async fn find(rt: &Runtime, id: &str) -> erplora_runtime::Result<Option<HubUserR
 /// Lee el estado actual y aplica [`guard_decision`]. `Some(response)` = rechazado.
 async fn guard(
     rt: &Runtime,
-    actor_id: &str,
+    actor: &erplora_runtime::identity::HubUser,
     target_id: &str,
     input: &UpdateHubUser,
 ) -> Option<Response> {
@@ -279,9 +300,10 @@ async fn guard(
         Ok(users) => users,
         Err(e) => return Some(crate::err_response(e)),
     };
-    match guard_decision(&users, actor_id, target_id, input) {
+    match guard_decision(&users, &actor.id, &actor.role, target_id, input) {
         Some(Guard::NotFound) => Some(not_found()),
         Some(Guard::Rejected(message)) => Some(rejected(message)),
+        Some(Guard::Forbidden(message)) => Some(forbidden(ROLE_ABOVE_INVITER, message)),
         None => None,
     }
 }
@@ -291,6 +313,39 @@ async fn guard(
 enum Guard {
     NotFound,
     Rejected(&'static str),
+    /// Lo que se pide es legítimo, pero **no para quien lo pide** (hub#356). Sale como `403` con el
+    /// código estable del core para que la UI lo traduzca, no como el `400 rejected` de las otras
+    /// dos barandillas: aquellas dicen «esto dejaría el hub inservible», esta dice «tú no».
+    Forbidden(&'static str),
+}
+
+/// Código estable del rechazo de [`grant_decision`] (namespace reservado del core, ADR-0192).
+const ROLE_ABOVE_INVITER: &str = "hub.users.role_above_inviter";
+
+/// **Nadie concede un rol por encima del suyo** (hub#356). `None` = admisible.
+///
+/// Tiene que vivir **aquí**, y aquí es el único sitio donde puede: el runtime habla con el SaaS con
+/// la **credencial de máquina**, a la que `assert_can_manage_hub_member` trata con rango de owner,
+/// así que el SaaS no puede saber si quien pulsó fue el administrador o la cajera. O el hub vigila
+/// qué puede repartir cada uno de los suyos, o no lo vigila nadie.
+///
+/// El rango es el único que el core posee de verdad: **administra el hub o no** ([`is_admin_role`]).
+/// Un orden total sobre los roles que declaran los módulos no existe —`bartender` no está ni por
+/// encima ni por debajo de `kitchen`— e inventarlo aquí sería una segunda respuesta, discrepante,
+/// a lo que hub#351 ya resolvió. Así que la regla se lee: **administrar solo lo concede quien ya
+/// administra**, que es la misma puerta que cerraron hub#347 (el suelo del login cloud) y hub#351
+/// (un manifest nunca acuña administradores), vista desde la invitación.
+///
+/// Con el gate en `require_admin_session` el actor SIEMPRE administra, así que hoy no rechaza nada:
+/// es la guarda que hace que ensanchar el gate al `manager` —lo que el modelo de roles del paso 2b
+/// quiere— sea un cambio y no una catástrofe.
+fn grant_decision(actor_role: &str, granted_role: &str) -> Option<Guard> {
+    if is_admin_role(granted_role) && !is_admin_role(actor_role) {
+        return Some(Guard::Forbidden(
+            "only somebody who administers this hub can hand out administration",
+        ));
+    }
+    None
 }
 
 /// Decide si un cambio sobre `target_id` es admisible, dado el censo actual y quién lo pide.
@@ -298,12 +353,24 @@ enum Guard {
 fn guard_decision(
     users: &[HubUserRow],
     actor_id: &str,
+    actor_role: &str,
     target_id: &str,
     input: &UpdateHubUser,
 ) -> Option<Guard> {
     let Some(target) = users.iter().find(|u| u.id == target_id) else {
         return Some(Guard::NotFound);
     };
+
+    // La misma regla de rango que la invitación (hub#356), aquí porque sin esta mitad la otra es
+    // teatro: se invita como `employee` y se asciende a `admin` un segundo después. El rol del
+    // actor lo trae la SESIÓN, no el censo: quien pregunta es quien está autenticado, y buscarlo en
+    // la lista daría «rol vacío» —y por tanto un 403— para una sesión que no tiene fila propia
+    // (`AuthMode::Dev`, donde la identidad la aportan las cabeceras).
+    if let Some(role) = input.role.as_deref() {
+        if let Some(forbidden) = grant_decision(actor_role, role) {
+            return Some(forbidden);
+        }
+    }
 
     if input.is_active == Some(false) && target_id == actor_id {
         return Some(Guard::Rejected(
@@ -364,7 +431,7 @@ mod tests {
     fn unknown_target_is_not_found() {
         let census = [user("owner", "owner", true)];
         assert_eq!(
-            guard_decision(&census, "owner", "fantasma", &deactivate()),
+            guard_decision(&census, "owner", "admin", "fantasma", &deactivate()),
             Some(Guard::NotFound)
         );
     }
@@ -374,11 +441,11 @@ mod tests {
         let census = [user("owner", "owner", true), user("admin", "admin", true)];
         // Hay otro admin, así que lo único que lo bloquea es que sea uno mismo.
         assert!(matches!(
-            guard_decision(&census, "owner", "owner", &deactivate()),
+            guard_decision(&census, "owner", "admin", "owner", &deactivate()),
             Some(Guard::Rejected(msg)) if msg.contains("ti mismo")
         ));
         assert_eq!(
-            guard_decision(&census, "owner", "admin", &deactivate()),
+            guard_decision(&census, "owner", "admin", "admin", &deactivate()),
             None
         );
     }
@@ -387,11 +454,11 @@ mod tests {
     fn the_last_admin_can_be_neither_deactivated_nor_demoted() {
         let census = [user("owner", "owner", true), user("caja", "cashier", true)];
         assert!(matches!(
-            guard_decision(&census, "caja", "owner", &deactivate()),
+            guard_decision(&census, "caja", "cashier", "owner", &deactivate()),
             Some(Guard::Rejected(msg)) if msg.contains("administrador")
         ));
         assert!(matches!(
-            guard_decision(&census, "owner", "owner", &set_role("employee")),
+            guard_decision(&census, "owner", "admin", "owner", &set_role("employee")),
             Some(Guard::Rejected(msg)) if msg.contains("administrador")
         ));
         // Un admin INACTIVO no cuenta como relevo.
@@ -400,20 +467,81 @@ mod tests {
             user("ex", "admin", false),
             user("caja", "cashier", true),
         ];
-        assert!(guard_decision(&census, "owner", "owner", &set_role("employee")).is_some());
+        assert!(guard_decision(&census, "owner", "admin", "owner", &set_role("employee")).is_some());
+    }
+
+    /// hub#356 — **nobody hands out a role above their own.**
+    ///
+    /// This has to live in the hub, and it is the only place it can: the runtime talks to the SaaS
+    /// with the **machine credential**, which `assert_can_manage_hub_member` treats as owner rank,
+    /// so the SaaS cannot tell whether the person who clicked was the administrator or the cashier.
+    /// Either the hub polices which of its own people may grant what, or nobody does.
+    ///
+    /// The rank is the only one the core actually owns: *administers the hub* or not
+    /// (`is_admin_role`). A total order over module-declared roles does not exist — `bartender` is
+    /// neither above nor below `kitchen` — and inventing one here would be a second, disagreeing
+    /// answer to a question hub#351 already settled.
+    #[test]
+    fn nobody_grants_a_role_above_their_own() {
+        // Administration is granted only by somebody who already administers. This is the same
+        // door hub#347 (the cloud role floor) and hub#351 (a manifest never mints administrators)
+        // closed, seen from the invitation.
+        for granted in ["admin", "owner", "ADMIN"] {
+            assert!(
+                matches!(grant_decision("manager", granted), Some(Guard::Forbidden(_))),
+                "a manager cannot hand out `{granted}`"
+            );
+            assert!(matches!(
+                grant_decision("employee", granted),
+                Some(Guard::Forbidden(_))
+            ));
+            // …and an administrator can: inviting another administrator is the legitimate door of
+            // ADR-0157 §7, and refusing it would leave a hub unable to name a second owner.
+            assert_eq!(grant_decision("admin", granted), None);
+            assert_eq!(grant_decision("owner", granted), None);
+        }
+        // Anything that does not administer is grantable by anyone who got through the gate: this
+        // guard is about the administrative step, not about ranking the shop floor.
+        for granted in ["manager", "employee", "bartender", "kitchen", ""] {
+            assert_eq!(grant_decision("employee", granted), None, "{granted}");
+            assert_eq!(grant_decision("admin", granted), None, "{granted}");
+        }
+    }
+
+    /// The same rule on the **edit**, or the first half is theatre: invite as `employee`, promote
+    /// to `admin` one second later. It is the argument that made hub#355 check the PIN on change
+    /// as well as on create.
+    #[test]
+    fn the_same_rank_rule_applies_when_a_role_is_changed() {
+        let census = [user("owner", "admin", true), user("caja", "employee", true)];
+        // A non-administrator promoting somebody to administrator, through the edit door.
+        assert!(matches!(
+            guard_decision(&census, "caja", "employee", "caja", &set_role("admin")),
+            Some(Guard::Forbidden(_))
+        ));
+        // An administrator doing the same thing is the ordinary way to name a second one.
+        assert_eq!(
+            guard_decision(&census, "owner", "admin", "caja", &set_role("admin")),
+            None
+        );
+        // An edit that does not touch the role never asks the question.
+        assert_eq!(
+            guard_decision(&census, "caja", "employee", "caja", &UpdateHubUser::default()),
+            None
+        );
     }
 
     #[test]
     fn with_a_second_admin_the_change_goes_through() {
         let census = [user("owner", "owner", true), user("ana", "admin", true)];
         assert_eq!(
-            guard_decision(&census, "owner", "owner", &set_role("employee")),
+            guard_decision(&census, "owner", "admin", "owner", &set_role("employee")),
             None
         );
         // Y tocar a alguien que nunca fue admin nunca dispara la barandilla.
         let census = [user("owner", "owner", true), user("caja", "cashier", true)];
         assert_eq!(
-            guard_decision(&census, "owner", "caja", &set_role("employee")),
+            guard_decision(&census, "owner", "admin", "caja", &set_role("employee")),
             None
         );
     }

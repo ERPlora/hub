@@ -179,6 +179,16 @@ pub struct NewHubUser {
     pub role: String,
     #[serde(default)]
     pub pin: String,
+    /// The **«Local user»** checkbox of the alta (plan step 2b, hub#355): this person exists only
+    /// in this hub's database — name + PIN, no email, nothing created in the SaaS.
+    ///
+    /// It is an explicit intent, not something inferred from an empty email, because the two
+    /// mistakes it prevents are silent: an alta meant to be local that forgets the PIN produces a
+    /// person who can never sign in, and an alta meant to be an account user that forgets the
+    /// email produces a person the SaaS never invited. `false` (the default) keeps the generic
+    /// alta exactly as it was — the account-user half is hub#356.
+    #[serde(default)]
+    pub local: bool,
 }
 
 /// Edición parcial: solo se toca lo que viene. `pin: Some("")` **retira** el PIN;
@@ -196,6 +206,21 @@ fn invalid(detail: impl Into<String>) -> RuntimeError {
     RuntimeError::InvalidPayload {
         name: "hub.users".into(),
         detail: detail.into(),
+    }
+}
+
+/// A **stable** rejection of the alta/edit of a hub user (hub#139 `Domain`, HTTP 409): `code` is
+/// what the shell programs and translates against, the message is only the English fallback.
+///
+/// Separate from [`invalid`] on purpose. `InvalidPayload` collapses every reason into a single
+/// `invalid_payload` code, which is enough for "this field has the wrong shape" but not for the
+/// rejections of the local-user alta (hub#355): the administrator has to be told **why** — a
+/// duplicate PIN is fixed by typing another one, an administrative role is not fixable here at all,
+/// and a name already known means "reinstate that person, do not create a second identity".
+fn reject(code: &str, message: impl Into<String>) -> RuntimeError {
+    RuntimeError::Domain {
+        code: format!("{CORE_NAMESPACE}users.{code}"),
+        message: message.into(),
     }
 }
 
@@ -229,7 +254,8 @@ fn clean_role(value: &str) -> Result<String> {
     Ok(role.to_string())
 }
 
-/// PIN: vacío (sin PIN) o entre 4 y 8 **dígitos** — lo que acepta el pinpad del login.
+/// PIN: vacío (sin PIN) o entre 4 y 8 **dígitos** — lo que acepta el pinpad del login — y que no
+/// sea de los que se adivinan a la primera ([`is_guessable_pin`], hub#355).
 fn clean_pin(value: &str) -> Result<String> {
     let pin = value.trim();
     if pin.is_empty() {
@@ -238,7 +264,30 @@ fn clean_pin(value: &str) -> Result<String> {
     if !pin.chars().all(|c| c.is_ascii_digit()) || !PIN_LEN.contains(&pin.chars().count()) {
         return Err(invalid("el PIN debe tener entre 4 y 8 dígitos"));
     }
+    if is_guessable_pin(pin) {
+        return Err(reject(
+            "pin_too_simple",
+            "this PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234)",
+        ));
+    }
     Ok(pin.to_string())
+}
+
+/// The two PIN shapes anybody tries first: **all the same digit** (`0000`, `9999`) and a **straight
+/// run** up or down (`1234`, `4321`, `345678`). With four digits typed in front of customers these
+/// are not a PIN, they are a formality — and the PIN is what attributes a sale to a person.
+///
+/// Checked at the only moment the hub ever sees the digits in clear (an alta or a PIN change from
+/// Personal); afterwards they are a salted argon2id hash. Deliberately a **short, closed list** and
+/// not a dictionary: a longer blacklist buys little and starts rejecting PINs people can remember,
+/// which pushes the shop back to sharing one.
+fn is_guessable_pin(pin: &str) -> bool {
+    let digits: Vec<i64> = pin.chars().filter_map(|c| c.to_digit(10)).map(i64::from).collect();
+    if digits.len() < 2 {
+        return true;
+    }
+    let step_is = |step: i64| digits.windows(2).all(|pair| pair[1] - pair[0] == step);
+    step_is(0) || step_is(1) || step_is(-1)
 }
 
 /// Email: vacío u opcional con forma mínima válida (misma regla que el perfil propio).
@@ -289,6 +338,166 @@ async fn ensure_name_is_free(
     }
 }
 
+/// Rechaza un PIN que ya abre la sesión de **otro usuario activo** (hub#355). Se comprueba en el
+/// alta y en cada cambio de PIN: sin la segunda mitad, la primera es decorativa (se da de alta con
+/// un PIN libre y se edita acto seguido al del encargado). Ver
+/// [`identity::pin_is_taken`] para por qué no se puede resolver con una restricción de la BD.
+async fn ensure_pin_is_free(
+    db: &dyn DatabaseAdapter,
+    pin: &str,
+    excluding_id: Option<&str>,
+) -> Result<()> {
+    if identity::pin_is_taken(db, pin, excluding_id).await? {
+        return Err(reject(
+            "pin_in_use",
+            "another active user already has this PIN: a PIN says who is at the till, so no two \
+             people can share one",
+        ));
+    }
+    Ok(())
+}
+
+/// Lo que hace admisible el alta de un **usuario LOCAL** (plan paso 2b, hub#355) — la casilla
+/// «Local user»: alguien que existe solo en la BD de este hub y que, en cuanto entra, puede operar
+/// la caja. Cuatro guardas, todas resueltas por el lado conservador:
+///
+/// 1. **Sin email.** Un email aquí sería una cuenta de ERPlora que nadie invitó: el SaaS es la
+///    fuente de verdad del ACCESO (ADR-0157 §7) y este alta no lo llama nunca. Pedir la cuenta es
+///    otro alta (hub#356), no un campo que se rellena sin querer.
+/// 2. **Con PIN, obligatorio.** Un usuario local sin PIN no puede entrar por ningún sitio: sería
+///    una ficha muda. En el alta genérica un usuario sin PIN y sin cuenta es un estado legítimo
+///    («persona que no inicia sesión»); marcar «Local user» dice justo lo contrario.
+/// 3. **Nunca administra el hub.** Administrar —identidad fiscal, plan, instalar módulos, borrar
+///    los datos— es del plano de la CUENTA: se siembra desde `HUB_OWNER_EMAIL` (ADR-0157) y lo sube
+///    el suelo del login cloud (hub#347), y hub#351 ya impide que un manifest acuñe administradores.
+///    Cuatro dígitos tecleados delante de clientes no pueden ser la tercera vía.
+/// 4. **Un nombre que el hub no conozca ya**, ni siquiera desactivado. Es la puerta de atrás de la
+///    regla D (hub#348): dar de alta un homónimo al lado de quien acaba de ser desactivado —por el
+///    admin o por el SaaS— le devuelve un PIN que funciona y deja DOS identidades para una persona,
+///    justo lo que «una persona = una fila `hub_user`» existe para evitar. Se reincorpora la fila,
+///    que es una decisión explícita y auditada del administrador.
+async fn ensure_local_identity(
+    db: &dyn DatabaseAdapter,
+    name: &str,
+    email: &str,
+    pin: &str,
+    role: &str,
+) -> Result<()> {
+    if !email.is_empty() {
+        return Err(reject(
+            "local_has_email",
+            "a local user has no email: they exist only in this hub. Invite them as an account \
+             user instead",
+        ));
+    }
+    if pin.is_empty() {
+        return Err(reject(
+            "local_needs_pin",
+            "a local user signs in with a PIN: without one, nobody could ever use this account",
+        ));
+    }
+    if is_admin_role(role) {
+        return Err(reject(
+            "local_cannot_administer",
+            "a local user cannot administer the hub: administration comes from an ERPlora account, \
+             never from a PIN",
+        ));
+    }
+    if identity::name_is_known(db, name).await? {
+        return Err(reject(
+            "name_taken",
+            format!(
+                "this hub already knows somebody called «{name}»: edit that user — reinstate them \
+                 if they were deactivated — instead of creating a second identity for one person"
+            ),
+        ));
+    }
+    Ok(())
+}
+
+/// ¿Puede el SaaS poner este rol en una membresía? Exactamente [`BASE_ROLES`], insensible a
+/// mayúsculas (plan paso 2b, hub#356).
+///
+/// **No** se deriva de [`is_base_role`] a propósito: aquel admite además la grafía **legacy**
+/// `owner`, y `owner` es justo lo que el SaaS nunca concede — la propiedad del hub sale de
+/// `HUB_OWNER_EMAIL` (ADR-0157), no de una invitación. Este conjunto es el espejo del `HUB_ROLES`
+/// del SaaS (`services/members.py`), que responde **400** a cualquier otra cosa.
+///
+/// Un rol **declarado por un módulo** (`kitchen`, `waiter`…) es un rol de ESTE hub y de ninguno
+/// más: el SaaS no lo conoce, así que una invitación con él no llega a existir. Es lo que hace que
+/// los roles de módulo sean del personal LOCAL y el usuario de cuenta lleve uno de los tres.
+pub fn is_grantable_account_role(role: &str) -> bool {
+    BASE_ROLES.iter().any(|base| base.eq_ignore_ascii_case(role))
+}
+
+/// [`is_grantable_account_role`] como guarda: el rechazo estable que comparten las **dos** puertas
+/// del alta de un usuario de cuenta — `POST /api/hub/users` (Personal) y `POST /api/members`
+/// (ADR-0157 §7, vía [`identity::create_login_user`]).
+///
+/// Se rechaza **antes** de escribir nada. Dejarlo pasar significaría crear la fila local, llamar al
+/// SaaS y llevarse un 400: una persona con ficha, con email, sin membresía y sin invitación — y sin
+/// forma de entrar. Media provisión es peor que ninguna.
+pub(crate) fn ensure_account_role_is_grantable(role: &str) -> Result<()> {
+    if is_grantable_account_role(role) {
+        return Ok(());
+    }
+    Err(reject(
+        "account_role_not_grantable",
+        format!(
+            "«{role}» is not a role an ERPlora account can carry in this hub: invite them as \
+             admin, manager or employee — roles a module declares belong to local staff"
+        ),
+    ))
+}
+
+/// Lo que hace admisible el alta de un **usuario de CUENTA** (plan paso 2b, hub#356) — la casilla
+/// «Local user» SIN marcar: alguien que entra con su cuenta de ERPlora, a quien el SaaS invita por
+/// email. Es la frontera con el SaaS, así que las tres guardas se resuelven por su lado:
+///
+/// 1. **Email obligatorio.** Sin la casilla, el email ES la identidad: es por lo que el SaaS crea la
+///    cuenta, manda la invitación y enlaza la membresía, y por lo que el primer login encuentra
+///    esta fila. Un alta de cuenta sin email produce a alguien a quien nadie invitó y que no puede
+///    entrar por ningún sitio — el descuido silencioso que la casilla explícita existe para evitar
+///    (el otro, un local sin PIN, lo cierra [`ensure_local_identity`]).
+/// 2. **Un rol que el SaaS pueda conceder** ([`ensure_account_role_is_grantable`]).
+/// 3. **Un email que el hub no conozca ya**, activo **o dado de baja**, ignorando mayúsculas. Es el
+///    gemelo de `name_taken` y cierra la misma puerta de atrás por el otro lado: el SaaS **borra la
+///    fila** al revocar una membresía, así que para él una segunda invitación es una membresía
+///    nueva y limpia — nada allí puede notar que este hub había cerrado esa puerta (regla D,
+///    hub#348). Reincorporar es [`update`]: una decisión explícita y auditada del administrador,
+///    no el efecto de volver a teclear un email.
+async fn ensure_account_identity(db: &dyn DatabaseAdapter, email: &str, role: &str) -> Result<()> {
+    if email.is_empty() {
+        return Err(reject(
+            "account_needs_email",
+            "an account user signs in with their ERPlora account: without an email there is \
+             nobody to invite. Tick «Local user» to create somebody who works this hub with a PIN",
+        ));
+    }
+    ensure_account_role_is_grantable(role)?;
+    ensure_email_is_free(db, email, None).await
+}
+
+/// Rechaza un email que este hub ya conoce (activo o no). Compartido por el alta y la edición: sin
+/// la segunda mitad la primera es teatro —dos altas con emails distintos y una editada al del
+/// otro— y el hub acaba con dos filas peleándose por una sola membresía.
+async fn ensure_email_is_free(
+    db: &dyn DatabaseAdapter,
+    email: &str,
+    excluding_id: Option<&str>,
+) -> Result<()> {
+    if !identity::email_is_known(db, email, excluding_id).await? {
+        return Ok(());
+    }
+    Err(reject(
+        "email_taken",
+        format!(
+            "this hub already knows «{email}»: edit that user — reinstate them if they were \
+             deactivated — instead of inviting a second identity for one person"
+        ),
+    ))
+}
+
 /// Todos los usuarios del hub, activos primero y por nombre. Incluye al owner cloud (sin PIN) y a
 /// los desactivados (marcados `is_active = false`) — la pantalla de Personal los muestra todos.
 pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserRow>> {
@@ -296,10 +505,15 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
     p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
+            // `hub_user.email` PRIMERO, el perfil como respaldo (hub#356). Leer solo el perfil
+            // dejaba sin email en pantalla al owner sembrado desde `HUB_OWNER_EMAIL` (ADR-0157) y a
+            // todo el que entrase por `/api/members` —que escriben la columna de identidad y no el
+            // perfil—, y eso NO era cosmético: `sync_access` se salta la llamada al SaaS cuando la
+            // fila trae el email vacío, así que su BAJA nunca revocaba su membresía.
             "SELECT u.id AS id, u.name AS name, u.role AS role, u.cloud_user_id AS cloud_user_id, \
                     u.is_active AS is_active, u.created_at AS created_at, \
                     CASE WHEN u.pin_hash IS NULL OR u.pin_hash = '' THEN 0 ELSE 1 END AS has_pin, \
-                    p.email AS email \
+                    COALESCE(NULLIF(u.email, ''), p.email, '') AS email \
                FROM hub_user u \
                LEFT JOIN hub_user_profile p ON p.user_id = u.id AND p.hub_id = :hub_id \
               ORDER BY u.is_active DESC, u.name",
@@ -332,7 +546,26 @@ pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, user_id: &str) -> Resul
     Ok(list(db, hub_id).await?.into_iter().find(|u| u.id == user_id))
 }
 
-/// Alta de usuario: valida, crea la identidad (con PIN si lo trae) y guarda su email en el perfil.
+/// Alta de usuario: valida, crea la identidad (con PIN si lo trae) y guarda su email.
+///
+/// El alta es **exhaustiva** desde hub#356: la casilla **«Local user»** (`input.local`) elige entre
+/// las dos identidades del paso 2b, y las dos son la MISMA fila `hub_user`.
+///
+///  - `local: true` → nombre + PIN y nada más, con las guardas de [`ensure_local_identity`]
+///    (hub#355). No se llama al SaaS: no hay cuenta que invitar.
+///  - `local: false` → **usuario de cuenta**: email obligatorio, con las guardas de
+///    [`ensure_account_identity`]. La invitación la manda el SaaS; quien la dispara es la capa HTTP
+///    (`server::hub_users::create_user` → `members::notify_member_added`), que es la que tiene la
+///    credencial de máquina. La **contraseña la pone el invitado**: el hub nunca la ve ni la manda.
+///
+/// Ya no queda un tercer estado creable —«sin PIN y sin cuenta»—, que es el que el plan llama
+/// descuido silencioso: una ficha que no puede entrar por ningún sitio y que nada en pantalla
+/// distingue de un alta correcta. Las filas que ya lo están (a las que se les retiró el PIN, p. ej.)
+/// siguen existiendo y se siguen editando.
+///
+/// El PIN es **opcional en las dos** —un usuario de cuenta que atiende la barra lo necesita en el
+/// dispositivo compartido— y, si viene, pasa por el mismo embudo: forma, no adivinable
+/// ([`clean_pin`]) y **suyo** ([`ensure_pin_is_free`]).
 pub async fn create(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
@@ -344,14 +577,35 @@ pub async fn create(
     let pin = clean_pin(&input.pin)?;
     let email = clean_email(&input.email)?;
     crate::roles::ensure_assignable(db, registry, hub_id, &role).await?;
-    ensure_name_is_free(db, &name, None).await?;
+    if input.local {
+        ensure_local_identity(db, &name, &email, &pin, &role).await?;
+    } else {
+        ensure_account_identity(db, &email, &role).await?;
+        ensure_name_is_free(db, &name, None).await?;
+    }
+    ensure_pin_is_free(db, &pin, None).await?;
 
     let id = identity::create_user(db, &name, &pin, &role, None).await?;
     if !email.is_empty() {
-        let (first, last) = split_name(&name);
-        user_profile::set_identity(db, hub_id, &id, &first, &last, &email).await?;
+        write_email(db, hub_id, &id, &name, &email).await?;
     }
     Ok(id)
+}
+
+/// Guarda el email en los **dos** sitios que lo necesitan, siempre a la vez: `hub_user.email` —la
+/// clave por la que se administra el ACCESO (login por email, revocación, `/api/members`)— y
+/// `hub_user_profile` —lo que la persona ve en su perfil—. Son campos distintos, y escribir uno
+/// solo es un desacuerdo silencioso: la pantalla enseña un email y el SaaS trabaja con otro.
+async fn write_email(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    user_id: &str,
+    name: &str,
+    email: &str,
+) -> Result<()> {
+    identity::set_email(db, user_id, email).await?;
+    let (first, last) = split_name(name);
+    user_profile::set_identity(db, hub_id, user_id, &first, &last, email).await
 }
 
 /// Edición parcial de un usuario existente. Devuelve la fila resultante.
@@ -392,6 +646,17 @@ pub async fn update(
     if is_active && name != current.name {
         ensure_name_is_free(db, &name, Some(user_id)).await?;
     }
+    // Un PIN nuevo tiene que seguir siendo suyo (hub#355). Se comprueba ANTES de escribir nada:
+    // si el alta rechaza el PIN del encargado pero la edición lo acepta, la guarda no existe.
+    if let Some(pin) = pin.as_deref() {
+        ensure_pin_is_free(db, pin, Some(user_id)).await?;
+    }
+    // Y un email nuevo tiene que seguir siendo suyo, por lo mismo (hub#356): mover el email de una
+    // ficha al de otra dejaría dos filas peleándose por una sola membresía del SaaS, y el login por
+    // email resolvería a la que devolviese primero la BD.
+    if let Some(email) = email.as_deref().filter(|e| !e.is_empty()) {
+        ensure_email_is_free(db, email, Some(user_id)).await?;
+    }
 
     let mut p = Params::new();
     p.insert("id".into(), json!(user_id));
@@ -417,8 +682,7 @@ pub async fn update(
     .await?;
 
     if let Some(email) = email {
-        let (first, last) = split_name(&name);
-        user_profile::set_identity(db, hub_id, user_id, &first, &last, &email).await?;
+        write_email(db, hub_id, user_id, &name, &email).await?;
     }
     if let Some(pin) = pin {
         identity::set_pin(db, user_id, &pin).await?;
@@ -600,14 +864,31 @@ mod tests {
         assert_eq!(clean_name("  Ana  ").unwrap(), "Ana");
         assert!(clean_role("").is_err());
         assert_eq!(clean_pin("").unwrap(), "");
-        assert_eq!(clean_pin("1234").unwrap(), "1234");
+        assert_eq!(clean_pin("4821").unwrap(), "4821");
         assert!(clean_pin("12").is_err(), "menos de 4 dígitos");
         assert!(clean_pin("123456789").is_err(), "más de 8 dígitos");
         assert!(clean_pin("12ab").is_err(), "solo dígitos");
+        // hub#355: la forma ya no basta, el PIN tampoco puede ser de los que se adivinan a la
+        // primera. `1234` era el ejemplo de este test justamente por ser el primero que se prueba.
+        assert!(clean_pin("1234").is_err(), "una cuesta arriba no es un PIN");
         assert_eq!(clean_email("").unwrap(), "");
         assert!(clean_email("ana@example.com").is_ok());
         assert!(clean_email("ana.example.com").is_err());
         assert!(clean_email("@example.com").is_err());
+    }
+
+    /// hub#355 — the closed list of PIN shapes the hub refuses, and its edges.
+    #[test]
+    fn a_pin_that_is_all_one_digit_or_a_straight_run_is_guessable() {
+        for weak in ["0000", "1111", "9999", "1234", "4321", "345678", "98765"] {
+            assert!(is_guessable_pin(weak), "`{weak}` is guessable");
+        }
+        // A run has to be strictly consecutive: a jump of two, a repeat inside, or a wrap-around
+        // are ordinary PINs. Rejecting them would start refusing digits people can remember, which
+        // is what pushes a shop back to sharing one PIN.
+        for good in ["4821", "5390", "13579", "90210", "1233", "9012"] {
+            assert!(!is_guessable_pin(good), "`{good}` is a legitimate PIN");
+        }
     }
 
     #[test]

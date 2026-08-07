@@ -240,8 +240,9 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
         &erplora_runtime::hub_users::NewHubUser {
             name: "Demo".into(),
             role: "admin".into(),
-            pin: "0000".into(),
-            email: String::new(),
+            pin: "4821".into(),
+            email: "demo@example.com".into(),
+            local: false,
         },
     )
     .await
@@ -305,7 +306,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
     if !erplora_runtime::require_modules_workspace() { return; }
     // Origin hub: exactly what the published blueprint carries — accounts with a role and a PIN.
     let a = fresh().await;
-    for (name, role, pin) in [("Demo", "admin", "0000"), ("Manager", "manager", "1111")] {
+    for (name, role, pin) in [("Demo", "admin", "4821"), ("Manager", "manager", "5390")] {
         erplora_runtime::hub_users::create(
             a.db(),
             &erplora_runtime::Registry::new(),
@@ -314,7 +315,9 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
                 name: name.into(),
                 role: role.into(),
                 pin: pin.into(),
-                email: String::new(),
+                // Usuario de CUENTA: sin la casilla «Local user» el alta pide email (hub#356).
+                email: format!("{}@example.com", name.to_lowercase()),
+                local: false,
             },
         )
         .await
@@ -342,7 +345,8 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
             name: "Encargada".into(),
             role: "manager".into(),
             pin: "4821".into(),
-            email: String::new(),
+            email: "encargada@example.com".into(),
+            local: false,
         },
     )
     .await
@@ -407,7 +411,8 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
             name: "Encargada".into(),
             role: "manager".into(),
             pin: "4821".into(),
-            email: String::new(),
+            email: "encargada@example.com".into(),
+            local: false,
         },
     )
     .await

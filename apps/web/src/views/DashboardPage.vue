@@ -1,5 +1,9 @@
 <template>
-  <AppPage :title="t('nav.home')">
+  <!-- `setup-checklist-on-screen`: mientras la tarjeta de la checklist esté a la vista, la franja
+       bloqueante (hub#374) se retira — la tarjeta dice más de lo mismo, con la misma vía de entrada,
+       una pantalla más abajo. Es la MISMA condición que pinta la tarjeta (la pestaña Resumen): dos
+       condiciones distintas para una sola pantalla acabarían enseñándolo dos veces, o ninguna. -->
+  <AppPage :title="t('nav.home')" :setup-checklist-on-screen="tab === 'resumen'">
       <!-- ── Resumen ── -->
       <template v-if="tab === 'resumen'">
         <!-- Zona 1 — Cabecera contextual: saludo por franja horaria + fecha del día. Da contexto al
@@ -10,26 +14,17 @@
           <p class="dash-hero-date">{{ todayLabel }}</p>
         </header>
 
-        <!-- Zona 2 — Tareas pendientes: módulos instalados SIN configurar (ADR-0063, lib/setup-status).
-             Solo admin; cada módulo declara su chequeo `setup` en module.json. CTA → ajustes del
-             módulo. Tono WARNING (tarea pendiente), no danger (no es un error). -->
-        <section v-if="pendingSetups.length" class="setup-banner">
-          <div class="setup-banner-text">
-            <h2 class="setup-banner-title">{{ t('dashboard.setupTitle', { n: pendingSetups.length }) }}</h2>
-            <p class="setup-banner-hint">{{ t('dashboard.setupHint') }}</p>
-            <!-- Resumen de qué falta: título de cada módulo pendiente (el detalle lo da el asistente). -->
-            <div class="setup-banner-chips">
-              <span v-for="s in pendingSetups" :key="s.moduleId" class="setup-chip">
-                <HubIcon :name="s.icon" />
-                {{ s.title.replace(/^Configura\s+/i, '') }}
-              </span>
-            </div>
-          </div>
-          <ion-button class="setup-banner-cta" @click="reviewSetup">
-            <HubIcon slot="start" name="sparkles-outline" />
-            {{ t('dashboard.reviewConfig') }}
-          </ion-button>
-        </section>
+        <!-- Zone 2 — The configuration checklist: ONE read of `hub.setup.status` (hub#372,
+             `architecture/hub/setup-status.md`). It used to be a banner fed by a loop in the
+             browser that only knew about modules; now the runtime returns the whole document —the
+             core and the modules, already ordered and already filtered by country and permission—
+             and this only paints it. Decision 1 of the plan: while the apps card is in sight, the
+             checklist starts at item 2 so the same thing is not offered twice on one screen. -->
+        <SetupChecklistCard
+          :status="setupStatus"
+          :already-on-screen="appsCardVisible ? ['apps'] : []"
+          @review="reviewSetup"
+        />
 
         <!-- Zona 3 — Superficie principal: tablero de widgets que los MÓDULOS instalados declaran en su
              module.json (campo `widgets`, ADR-0054) + el widget CORE de export/import (ADR-0113;
@@ -42,7 +37,7 @@
              un estado guiado (instala tu primer módulo) ENCIMA del board. El board sigue en el DOM
              (visible con su widget core) para cumplir el contrato del test e2e y porque el CTA de
              configuración del hub vive ahí. No se reemplaza, se complementa. -->
-        <section v-if="!loadingWidgets && !hasModuleWidgets" class="dash-onboarding">
+        <section v-if="appsCardVisible" class="dash-onboarding">
           <ok-empty-state
             icon="grid-outline"
             :heading="t('dashboard.onboardingTitle')"
@@ -152,12 +147,13 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import SetupChecklistCard from '../components/SetupChecklistCard.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
 import { getClient, getHubSector } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
-import { pendingSetups, refreshSetupStatus, seedSetupContext } from '../lib/setup-status';
-import { openAssistantWithContext } from '../lib/shell';
+import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
+import { openAssistantForSetup } from '../lib/shell';
 import { detectBridge } from '../lib/bridge-client';
 import { user } from '../lib/session';
 import { formatAmount } from '../lib/money';
@@ -212,6 +208,12 @@ const loadingWidgets = ref<boolean>(true);
 // ¿Hay MÓDULOS instalados que aporten widgets? Si solo queda el widget core (blueprint), el hub
 // está vacío → mostramos un onboarding guiado en vez del board con un único widget solitario.
 const hasModuleWidgets = ref<boolean>(false);
+
+// Is the card that already offers installing apps in sight? One condition for both surfaces: the
+// card is painted with it and the checklist deduplicates its item with it (decision 1 of step 10).
+// With two separate conditions, the «Your apps» item would end up showing twice on one screen — or
+// never.
+const appsCardVisible = computed<boolean>(() => !loadingWidgets.value && !hasModuleWidgets.value);
 
 // ── Widget CORE de export/import (ADR-0113 §4; decisión humano 2026-07-12) ──────────────────
 // Es un widget DEL BOARD como los de módulo: entra en el catálogo y en TODOS los presets (sin
@@ -385,11 +387,11 @@ async function loadActivity(): Promise<void> {
   }
 }
 
-// Abre el asistente sembrado con el estado de configuración real (setup-status). El LLM explica
-// qué falta, cómo configurar cada módulo y ofrece navegar a su pantalla. Antes cada fila del banner
-// iba directo a la ruta del módulo; ahora el asistente guía el proceso completo.
+// The card's «ask the assistant» path. The panel says WHAT ABOUT and nothing more: the assistant
+// reads `hub.setup.status` itself (hub#373), so the chat cannot describe a hub the card does not.
+// Every item also keeps its own screen, so a dead assistant never leaves one without a way through.
 function reviewSetup(): void {
-  openAssistantWithContext(seedSetupContext());
+  openAssistantForSetup();
 }
 
 onMounted(async () => {
@@ -399,7 +401,7 @@ onMounted(async () => {
   void loadWidgets();
   void loadSystemHealth();
   void loadActivity();
-  void refreshSetupStatus(client); // módulos sin configurar (ADR-0063): banner (solo admin)
+  void refreshSetupStatus(client); // `hub.setup.status`: the configuration checklist (hub#372)
 
   // #267 — tras importar un blueprint el catálogo de widgets y los datos cambian, pero Vue
   // reutiliza esta instancia (onMounted no vuelve a dispararse). ImportPanel emite este evento al
@@ -416,6 +418,9 @@ function onModulesChanged(): void {
   void loadWidgets();
   void loadSystemHealth();
   void loadActivity();
+  // Installing an app (or importing a blueprint) ticks the first item of the checklist and may tick
+  // several more: without re-reading it, the card would keep asking for what the user just did.
+  void refreshSetupStatus(client);
 }
 </script>
 
@@ -484,68 +489,4 @@ function onModulesChanged(): void {
   border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
 }
 
-/* Banner de configuración pendiente (Zona 2). Antes era un ion-list con un botón por módulo;
-   ahora es un CTA único "Revisar configuración" que abre el asistente con contexto. Tono WARNING
-   (tarea pendiente, no error). En desktop el CTA va a la derecha; en móvil se apila. */
-.setup-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin: 0.25rem 0 1rem;
-  padding: 1rem 1.1rem;
-  border-radius: var(--ok-radius, 12px);
-  background: color-mix(in srgb, var(--ion-color-warning, #ffc409) 9%, var(--ion-card-background, #fff));
-  border: 1px solid color-mix(in srgb, var(--ion-color-warning, #ffc409) 40%, transparent);
-}
-.setup-banner-text {
-  flex: 1;
-  min-width: 16rem;
-}
-.setup-banner-title {
-  margin: 0 0 0.2rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--ion-text-color);
-}
-.setup-banner-hint {
-  margin: 0 0 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--ion-color-medium);
-}
-.setup-banner-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-.setup-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: var(--ok-radius-pill, 999px);
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: var(--ion-card-background, #fff);
-  border: 1px solid var(--ion-border-color, #ececec);
-  color: var(--ion-text-color);
-}
-.setup-chip ion-icon {
-  font-size: 0.95rem;
-  color: var(--ion-color-warning, #ffc409);
-}
-.setup-banner-cta {
-  flex: none;
-  white-space: nowrap;
-}
-@media (max-width: 540px) {
-  .setup-banner-cta { width: 100%; }
-}
-@media (max-width: 540px) {
-  /* Móvil: el CTA ocupa todo el ancho debajo del texto. */
-  .setup-banner-cta {
-    width: 100%;
-  }
-}
 </style>
