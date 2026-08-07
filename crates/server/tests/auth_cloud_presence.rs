@@ -205,6 +205,20 @@ async fn cloud_user_rows(state: &AppState, cloud_user_id: &str) -> usize {
         .len()
 }
 
+/// How many `hub_user` rows carry `email`. The invited row must be REUSED by the login that links
+/// it, never left behind next to a freshly provisioned twin.
+async fn rows_with_email(state: &AppState, email: &str) -> usize {
+    let rt = state.runtime.lock().await;
+    let mut p = erplora_db::Params::new();
+    p.insert("email".to_string(), json!(email));
+    rt.db_for_test()
+        .query("SELECT id FROM hub_user WHERE email = :email", &p)
+        .await
+        .unwrap()
+        .rows
+        .len()
+}
+
 #[tokio::test]
 async fn member_present_in_hubs_claim_links_and_opens_session() {
     // El hub de esta máquina (HUB_ID) figura en `hubs[]` → el usuario ENTRA y se provisiona local.
@@ -428,6 +442,60 @@ async fn the_raised_role_is_the_one_the_session_gets() {
     assert_eq!(
         body["user"]["role"], "admin",
         "the login response reports the raised role, not the stale one",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn an_invited_admin_does_not_land_as_an_employee() {
+    // Plan step 7 ("somebody invites you"), the trap it flagged for verification: a partner is
+    // invited to run the business, and lands inside it unable to administer anything.
+    //
+    // The hub already knows their email —the owner had added them as a login user before the SaaS
+    // invitation named them admin— so this login takes the *link by email* path, where the row
+    // exists and its role was written once, when it was created. That is where the defect lived:
+    // `get_or_link_cloud_user` handed the existing row back untouched, so the invited admin landed
+    // as `employee` and had no way to fix it from inside.
+    //
+    // hub#347 made the cloud role a floor re-evaluated on every login; this walks the invitation
+    // path end to end —cloud role in the JWT → floor → the invited row— which no e2e covered: the
+    // one e2e that links by email seeds an `owner`, for whom the floor is a no-op.
+    let (router, state, temp) = fixture().await;
+
+    // The owner had already given them a way in, with the role they had at the time.
+    state
+        .runtime
+        .lock()
+        .await
+        .create_login_user("socia@bar.com", "employee")
+        .await
+        .unwrap();
+
+    // The SaaS invitation makes them an admin of THIS hub; their token carries that role.
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+    let invited = sign_user_jwt_role(11, "socia@bar.com", member, "admin");
+    let resp = router.oneshot(cloud_login_bare(&invited)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "the invitee gets in");
+
+    let body = json_body(resp).await;
+    assert_eq!(
+        body["user"]["role"], "admin",
+        "the session that the invitation opens is an admin session, not an employee one",
+    );
+    assert_eq!(
+        cloud_user_role(&state, "11").await.as_deref(),
+        Some("admin"),
+        "the invited row is raised on the very login that links it, not from the second one on",
+    );
+    assert_eq!(
+        rows_with_email(&state, "socia@bar.com").await,
+        1,
+        "the invited row is REUSED: linking must not leave a second `hub_user` behind",
+    );
+    assert_eq!(
+        cloud_user_rows(&state, "11").await,
+        1,
+        "and the cloud account is linked to exactly that one row",
     );
     std::fs::remove_dir_all(temp).ok();
 }
