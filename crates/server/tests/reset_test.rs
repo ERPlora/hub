@@ -171,6 +171,64 @@ async fn reset_reports_deleted_rows_per_section() {
     assert!(s["rows_deleted"].is_i64(), "el informe debe traer rows_deleted: {s}");
 }
 
+// ── El juego de roles del hub (hub#417) ─────────────────────────────────────────────────
+
+/// El plan ofrece la sección `roles` — el espejo de lo que el export ya se lleva (ADR-0242): sin
+/// ella el panel no puede pintarla y el dueño no tiene forma de RETIRAR un rol que encendió una
+/// plantilla, salvo desinstalando el módulo que lo declara.
+#[tokio::test]
+async fn plan_offers_the_role_set_as_its_own_section() {
+    let app = make_app(AuthMode::Dev, "plan_roles").await;
+    let resp = app.oneshot(post_json("/api/hub/reset/plan", json!({}))).await.unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    let sections = body["plan"]["sections"].as_array().expect("plan.sections");
+    let names: Vec<&str> = sections.iter().filter_map(|s| s["section"].as_str()).collect();
+    assert!(names.contains(&"roles"), "falta `roles` en el plan: {names:?}");
+}
+
+/// El booleano cruza el CABLE. `ResetSelectionReq` es un espejo serde a mano de `ResetSelection`:
+/// un campo que se añade al motor y se olvida aquí deja la sección muerta en silencio —el body
+/// llega, el servidor lo ignora y responde `ok: true` sin haber apagado nada—. Se comprueba por
+/// el efecto (la fila de la sección en el informe), no por el tipo.
+#[tokio::test]
+async fn the_role_set_can_be_reset_over_http() {
+    let app = make_app(AuthMode::Dev, "reset_roles").await;
+    let resp = app
+        .oneshot(post_json("/api/hub/reset", json!({ "selection": { "roles": true } })))
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    let sections = body["report"]["sections"].as_array().expect("report.sections");
+    assert!(
+        sections.iter().any(|s| s["section"] == json!("roles")),
+        "pedir `roles` tiene que llegar al motor: {sections:?}"
+    );
+}
+
+/// Y no al revés: un body que NO nombra los roles no los apaga. `#[serde(default)]` en todo el
+/// espejo existe para eso — un shell anterior al campo, o un cliente que manda medio body, nunca
+/// puede AMPLIAR lo que se borra.
+#[tokio::test]
+async fn a_body_that_does_not_name_the_roles_leaves_them_alone() {
+    let app = make_app(AuthMode::Dev, "reset_roles_off").await;
+    let resp = app
+        .oneshot(post_json("/api/hub/reset", json!({ "selection": { "settings": true } })))
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    let sections = body["report"]["sections"].as_array().expect("report.sections");
+    assert!(
+        !sections.iter().any(|s| s["section"] == json!("roles")),
+        "nadie pidió los roles: no pueden aparecer en el informe: {sections:?}"
+    );
+}
+
 // ── Lotes de importación: listar y deshacer (ADR-0170) ──────────────────────────────────
 
 /// Listar las importaciones enseña qué trajo cada blueprint: es información del negocio y va

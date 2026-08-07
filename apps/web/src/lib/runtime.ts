@@ -960,7 +960,7 @@ export async function bootHubContext(): Promise<HubContext | null> {
 
 /** Una sección en el dry-run: cuántas filas se llevaría y, si aplica, por qué NO se puede. */
 export interface ResetSectionPlan {
-  /** `hub_settings` · `hub_users` · `media` · `fiscal` · `modules/<id>`. */
+  /** `hub_settings` · `hub_users` · `roles` · `media` · `fiscal` · `modules/<id>`. */
   section: string;
   /** Filas reales que se borrarían. Es la cifra que se enseña al usuario. */
   rows: number;
@@ -979,6 +979,13 @@ export interface ResetSelection {
   users: boolean;
   media: boolean;
   fiscal: boolean;
+  /**
+   * Juego de roles del hub (`hub_role_activation`, hub#417): cuáles de los roles que DECLARAN los
+   * módulos instalados están vivos aquí. Es el espejo de lo que el export se lleva (ADR-0242) y la
+   * única forma que tiene el dueño de retirar un rol que encendió una plantilla sin desinstalar el
+   * módulo que lo declara.
+   */
+  roles: boolean;
   /** Ids de módulo cuyos datos de usuario se borran. */
   modules: string[];
 }

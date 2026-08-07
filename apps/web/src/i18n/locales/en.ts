@@ -351,6 +351,7 @@ export default {
     reset_hub_users: 'Employees',
     reset_media: 'Files and images',
     reset_fiscal: 'Tax configuration',
+    reset_roles: 'Active roles',
     permissionsTitle: 'Module permissions',
     permissionsDesc: 'Grant or revoke the permissions each module requests (internet access, certificate, printer, notifications). For safety, everything is denied until you grant it.',
     permissionsAdminOnly: 'Only an administrator can change permissions.',

@@ -52,6 +52,10 @@ pub struct ResetSelectionReq {
     media: bool,
     #[serde(default)]
     fiscal: bool,
+    /// The hub's role set (`hub_role_activation`, hub#417). `#[serde(default)]` like the rest: an
+    /// older shell that does not send the field switches nothing off.
+    #[serde(default)]
+    roles: bool,
     #[serde(default)]
     modules: Vec<String>,
 }
@@ -63,6 +67,7 @@ impl ResetSelectionReq {
             users: self.users,
             media: self.media,
             fiscal: self.fiscal,
+            roles: self.roles,
             modules: self.modules,
         }
     }
