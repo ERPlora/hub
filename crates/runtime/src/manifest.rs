@@ -16,6 +16,26 @@ pub struct Manifest {
     pub permissions: Vec<String>,
     #[serde(default)]
     pub role_permissions: HashMap<String, Vec<String>>,
+    /// Business roles the module DECLARES for the vertical it serves (paso 2b, hub#351).
+    ///
+    /// The base catalogue of the hub is frozen at three keys (`admin`/`manager`/`employee`,
+    /// [`crate::hub_users::BASE_ROLES`]) because renaming one would cost 24 repos, 24 version
+    /// bumps and 24 republications. So a vertical does not rename the base: it adds on top of it.
+    /// A restaurant needs Waiter · Bartender · Kitchen · Cashier; a salon needs Receptionist ·
+    /// Stylist; both may want Accountant. Each of those is declared here by the module that
+    /// invents it, and every one of them hangs from a base role through `extends`.
+    ///
+    /// Absent = the module declares no role of its own, which is the shape of the ~24 already
+    /// published manifests: the block is **optional** and adding it never invalidates them.
+    ///
+    /// `role_permissions` is what actually GRANTS: a role's effective permissions are the union of
+    /// what the installed modules give to that key, so a module may grant to a key another module
+    /// declared (`sales` gives `waiter` `add_sale` but not `take_payment`). Declaring is naming a
+    /// role; granting is a separate axis on purpose.
+    ///
+    /// Validated at install time by `installer::validate_role_declarations`.
+    #[serde(default)]
+    pub roles: Vec<RoleDef>,
     #[serde(default)]
     pub navigation: Vec<Nav>,
     #[serde(default)]
@@ -112,6 +132,28 @@ impl UserFileAction {
 
     /// Todas las acciones, para construir la política de una carpeta sin módulo dueño.
     pub const ALL: [Self; 3] = [Self::Upload, Self::Rename, Self::Delete];
+}
+
+/// A business role declared by a module (`roles[]`, paso 2b / hub#351). Mirror of `$defs/role` in
+/// `schemas/module.schema.json`; the three fields are required there and here, so a half-declared
+/// role never reaches the validation.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RoleDef {
+    /// Stable identifier of the role (`waiter`, `shift_lead`). It is the key `role_permissions`
+    /// grants against and the value stored in `hub_user.role`, so it is an identifier, not a
+    /// label: snake_case ASCII, and never one of the base keys.
+    pub key: String,
+    /// Human name shown to the administrator who activates the role. **English canonical**
+    /// (ADR-0055): the translation travels in `locales/<lang>.json`, like `navigation[].label`.
+    pub label: String,
+    /// Base role this one hangs from — the reason the frozen three-key contract survives: every
+    /// declared role resolves to a base one, so the core gate and the 24 published modules keep
+    /// working without a republish or a migration.
+    ///
+    /// Only the NON-administrative base roles can be extended (`manager`, `employee`). See
+    /// `installer::validate_role_declarations`: administering the hub is granted by the hub, never
+    /// by a manifest (hub#347).
+    pub extends: String,
 }
 
 /// Almacenamiento persistente declarado por un módulo.
@@ -973,6 +1015,79 @@ mod tests {
         assert_eq!(
             serde_json::to_value(WidgetKind::BarList).unwrap(),
             serde_json::Value::String("bar-list".to_string())
+        );
+    }
+
+    /// hub#351 (paso 2b): a module declares its own business roles on top of the frozen base
+    /// catalogue. The three fields land verbatim; `extends` says which base role it hangs from.
+    #[test]
+    fn parses_the_declared_roles_block() {
+        let json = r#"{
+            "id": "kitchen",
+            "name": "Kitchen",
+            "version": "2.3.1",
+            "roles": [
+                { "key": "kitchen", "label": "Kitchen", "extends": "employee" },
+                { "key": "shift_lead", "label": "Shift lead", "extends": "manager" }
+            ],
+            "role_permissions": {
+                "kitchen": ["kitchen.view_ticket", "kitchen.bump_ticket"]
+            }
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        assert_eq!(manifest.roles.len(), 2);
+        assert_eq!(manifest.roles[0].key, "kitchen");
+        assert_eq!(manifest.roles[0].label, "Kitchen");
+        assert_eq!(manifest.roles[0].extends, "employee");
+        assert_eq!(manifest.roles[1].key, "shift_lead");
+        assert_eq!(manifest.roles[1].extends, "manager");
+        // The block is additive: `role_permissions` keeps working exactly as before, and may now
+        // grant to a declared key as well as to the three base ones.
+        assert_eq!(manifest.role_permissions["kitchen"].len(), 2);
+    }
+
+    /// The ~24 published modules do NOT carry a `roles` block, and adding the field must not make
+    /// a single one of them unparseable: absent = the module declares no role of its own.
+    #[test]
+    fn a_manifest_without_the_roles_block_declares_none() {
+        let json = r#"{
+            "id": "inventory",
+            "name": "Inventory",
+            "version": "1.0.0",
+            "role_permissions": {
+                "admin": ["*"],
+                "manager": ["inventory.view_product"],
+                "employee": ["inventory.view_product"]
+            }
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        assert!(
+            manifest.roles.is_empty(),
+            "no `roles` block = no declared role, never a parse error"
+        );
+        assert_eq!(manifest.role_permissions.len(), 3);
+    }
+
+    /// A role is `key` + `label` + `extends`, the three of them: the struct mirrors the `required`
+    /// of `schemas/module.schema.json`, so a half-declared role never reaches the validation — it
+    /// dies at parse time with an error that names the missing field.
+    #[test]
+    fn a_role_missing_one_of_its_three_fields_does_not_parse() {
+        let json = r#"{
+            "id": "kitchen",
+            "name": "Kitchen",
+            "version": "2.3.1",
+            "roles": [{ "key": "kitchen", "extends": "employee" }]
+        }"#;
+
+        let error = serde_json::from_str::<Manifest>(json)
+            .expect_err("a role without `label` is not a role")
+            .to_string();
+        assert!(
+            error.contains("label"),
+            "the error must name the missing field: {error}"
         );
     }
 
