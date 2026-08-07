@@ -298,8 +298,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
 
     // **Owner sembrado del env** (ADR-0157, corrección de Ioan): el owner es el CREADOR del hub y el
     // despliegue lo trae ya inyectado por el provisioning del SaaS como `HUB_OWNER_EMAIL`. Se siembra
-    // un `hub_user` role=owner (cloud_user_id NULL, sin PIN) tras las tablas de sistema; en su primer
-    // login `auth_cloud` lo enlaza por email. **Idempotente** (no duplica ni pisa un owner existente),
+    // un `hub_user` role=admin (cloud_user_id NULL, sin PIN) tras las tablas de sistema —`admin` es
+    // lo más alto del plano de NEGOCIO desde hub#349; la PROPIEDAD sigue siendo del plano de la
+    // cuenta—; en su primer login `auth_cloud` lo enlaza por email. **Idempotente** (no duplica ni
+    // pisa un rol existente),
     // así que es seguro en cada arranque. Sin el env (dev/local) es un no-op silencioso. Sustituye al
     // bootstrap «primer login = owner» (retirado): el owner ya no depende de quién entre primero.
     if let Some(owner_email) = std::env::var("HUB_OWNER_EMAIL")

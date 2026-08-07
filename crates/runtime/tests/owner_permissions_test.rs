@@ -1,23 +1,29 @@
-//! ERPlora/hub#257 (P0): el PROPIETARIO del hub no veía ningún dato de módulo.
+//! ERPlora/hub#257 (P0): the hub OWNER could not see a single row of module data.
 //!
-//! El provisioning siembra al creador con rol `owner` (`identity::seed_owner`, ADR-0157) y
-//! `auth.rs` ya lo trata como admin para el gate FUERTE (ajustes, certificado, import/export).
-//! Pero **ningún** módulo del catálogo declara `role_permissions.owner` —los 24 solo conocen
-//! `admin`/`manager`/`employee`—, así que `identity::permissions_for_role(reg, "owner")`
-//! devolvía el conjunto **vacío** y toda query de módulo respondía `permission_denied` (21 x
-//! `403 POST /api/query` en consola tras importar un blueprint con 280 productos).
+//! Provisioning used to seed the creator with the `owner` role (`identity::seed_owner`, ADR-0157)
+//! and `auth.rs` already treated it as an admin for the STRONG gate (settings, certificate,
+//! import/export). But **no** module in the catalogue declares `role_permissions.owner` — the 24 of
+//! them only know `admin`/`manager`/`employee` — so `identity::permissions_for_role(reg, "owner")`
+//! returned the **empty** set and every module query answered `permission_denied` (21 x
+//! `403 POST /api/query` in the console after importing a blueprint with 280 products).
 //!
-//! `permissions_for_role` ahora resuelve `owner` como `admin`: no amplía privilegios, es
-//! estrictamente menos de lo que ya le concede el gate admin. Estos tests lo fijan.
+//! `permissions_for_role` resolves `owner` as `admin`: it does not widen anything, it is strictly
+//! less than what the admin gate already grants. These tests pin that down.
+//!
+//! Since hub#349 the role is **legacy**: `owner` left the hub role catalogue (`hub_users::
+//! BASE_ROLES`), new hubs are seeded with `admin` and system migration v12 renames the rows that
+//! carried it. The alias stays for the rows that reach the hub without going through the migration
+//! — a restored backup, an import, a runtime still pinned to an older image — because dropping it
+//! would take the hub away from an owner nobody can let back in.
 
 use erplora_runtime::identity::permissions_for_role;
 use erplora_runtime::manifest::Manifest;
 use erplora_runtime::registry::{ModuleStatus, Registry};
 
-/// Manifiesto como los 24 reales del catálogo: conceden permisos a
-/// `admin`/`manager`/`employee`, NINGUNO declara `owner`. Se parsea como un `module.json` real
-/// (la única forma pública de construir un `Manifest`).
-fn modulo_con_roles_habituales() -> Registry {
+/// A manifest like the 24 real ones in the catalogue: it grants permissions to
+/// `admin`/`manager`/`employee`, and NONE of them declares `owner`. Parsed as a real `module.json`
+/// (the only public way to build a `Manifest`).
+fn module_with_the_usual_roles() -> Registry {
     let manifest: Manifest = serde_json::from_value(serde_json::json!({
         "id": "inventory",
         "name": "Inventory",
@@ -28,79 +34,79 @@ fn modulo_con_roles_habituales() -> Registry {
             "employee": ["inventory.view_product"],
         },
     }))
-    .expect("manifiesto de prueba");
+    .expect("test manifest");
     let mut reg = Registry::new();
-    reg.status
-        .insert("inventory".into(), ModuleStatus::Active);
+    reg.status.insert("inventory".into(), ModuleStatus::Active);
     reg.installed.push(manifest);
     reg
 }
 
-/// El PROPIETARIO del hub ve exactamente lo mismo que un admin: `permissions_for_role` resuelve
-/// `owner` como `admin`. Sin este alias el dueño se quedaba con el conjunto vacío (ningún módulo
-/// declara `role_permissions.owner`) y toda query de módulo le respondía `permission_denied`.
+/// A row that still carries `owner` sees exactly what an admin sees: `permissions_for_role`
+/// resolves it as `admin`. Without the alias the owner was left with the empty set (no module
+/// declares `role_permissions.owner`) and every module query answered `permission_denied`.
 #[test]
 fn owner_inherits_admin_module_permissions() {
-    let reg = modulo_con_roles_habituales();
+    let reg = module_with_the_usual_roles();
 
     let admin = permissions_for_role(&reg, "admin");
     let owner = permissions_for_role(&reg, "owner");
 
-    assert!(!admin.is_empty(), "el fixture debe conceder permisos a admin");
+    assert!(!admin.is_empty(), "the fixture must grant permissions to admin");
     assert_eq!(
         owner, admin,
-        "el owner debe ver el mismo conjunto de permisos de módulo que un admin"
+        "an owner must see the same set of module permissions as an admin"
     );
-    // El permiso canónico que fallaba en el informe del cliente (21 x 403 POST /api/query).
+    // The canonical permission that failed in the customer report (21 x 403 POST /api/query).
     assert!(
         owner.contains("inventory.view_product"),
-        "el owner debe tener inventory.view_product (la query que devolvía permission_denied)"
+        "the owner must have inventory.view_product (the query that answered permission_denied)"
     );
 }
 
-/// El alias es insensible a mayúsculas/minúsculas (consistente con el gate owner/admin de
-/// `auth.rs`, que compara con `to_ascii_lowercase`).
+/// The alias is case-insensitive (consistent with the owner/admin gate in `hub_users::
+/// is_admin_role`, which compares with `to_ascii_lowercase`), and so is the v12 migration that
+/// renames those rows.
 #[test]
 fn owner_alias_is_case_insensitive() {
-    let reg = modulo_con_roles_habituales();
+    let reg = module_with_the_usual_roles();
     let admin = permissions_for_role(&reg, "admin");
 
     for variant in ["owner", "Owner", "OWNER"] {
         assert_eq!(
             permissions_for_role(&reg, variant),
             admin,
-            "`{variant}` debe resolverse como admin"
+            "`{variant}` must resolve as admin"
         );
     }
 }
 
-/// `owner` es el ÚNICO alias: el resto de roles no cambia. Un rol que ningún módulo declara
-/// (p. ej. `cajero`) sigue sin permisos — esto no abre una barra libre.
+/// `owner` is the ONLY alias: every other role is unchanged. A role no module declares (say
+/// `cashier`) still gets nothing — this does not open a free-for-all.
 #[test]
 fn only_owner_is_aliased_other_roles_unchanged() {
-    let reg = modulo_con_roles_habituales();
+    let reg = module_with_the_usual_roles();
 
     assert_eq!(
         permissions_for_role(&reg, "manager").len(),
         1,
-        "manager sigue con su conjunto habitual (1 permiso)"
+        "manager keeps its usual set (1 permission)"
     );
     assert!(
         permissions_for_role(&reg, "employee").contains("inventory.view_product"),
-        "employee mantiene su permiso de visualización"
+        "employee keeps its view permission"
     );
     assert!(
-        permissions_for_role(&reg, "cajero").is_empty(),
-        "un rol que ningún módulo declara no recibe permisos (owner es el único alias)"
+        permissions_for_role(&reg, "cashier").is_empty(),
+        "a role no module declares gets no permissions (owner is the only alias)"
     );
 }
 
-/// Un módulo **inactivo** no aporta permisos aunque declare el rol: `permissions_for_role` solo
-/// agrega los de los módulos ACTIVOS (ARQUITECTURA.md §9.2). El alias owner→admin no lo cambia.
+/// An **inactive** module grants nothing even if it declares the role: `permissions_for_role` only
+/// aggregates ACTIVE modules (ARQUITECTURA.md §9.2). The owner→admin alias does not change that.
 #[test]
 fn inactive_module_grants_nothing_even_for_owner() {
-    let reg = modulo_con_roles_habituales();
-    // Desactivamos el único módulo del fixture.
+    let reg = module_with_the_usual_roles();
+    // Deactivate the only module in the fixture.
     let mut inactive = reg;
     inactive
         .status
@@ -108,10 +114,10 @@ fn inactive_module_grants_nothing_even_for_owner() {
 
     assert!(
         permissions_for_role(&inactive, "owner").is_empty(),
-        "un módulo inactivo no concede permisos (ni al owner)"
+        "an inactive module grants nothing (not even to an owner)"
     );
     assert!(
         permissions_for_role(&inactive, "admin").is_empty(),
-        "un módulo inactivo no concede permisos (ni al admin)"
+        "an inactive module grants nothing (not even to an admin)"
     );
 }

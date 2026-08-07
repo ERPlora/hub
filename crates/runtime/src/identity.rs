@@ -294,10 +294,18 @@ fn name_from_email(email: &str) -> String {
         .to_string()
 }
 
-/// **Siembra el owner del hub** desde el env del provisioning del SaaS (ADR-0157, corrección de
+/// **Siembra al creador del hub** desde el env del provisioning del SaaS (ADR-0157, corrección de
 /// Ioan 2026-07-26): el owner es el **CREADOR** del hub y el despliegue lo trae ya inyectado como
-/// `HUB_OWNER_EMAIL`. Crea un `hub_user` con rol `owner`, ese `email` y `cloud_user_id = NULL`
-/// (aún no ha hecho login: al primer login `get_or_link_cloud_user` lo enlaza por email). Sin PIN.
+/// `HUB_OWNER_EMAIL`. Crea un `hub_user` con rol [`crate::hub_users::ADMIN_ROLE`], ese
+/// `email` y `cloud_user_id = NULL` (aún no ha hecho login: al primer login
+/// `get_or_link_cloud_user` lo enlaza por email). Sin PIN.
+///
+/// **Se siembra `admin`, no `owner`** (paso 2b, hub#349): `owner` salió del catálogo de roles del
+/// hub porque era la misma palabra en los dos planos y ningún módulo le concedía nada, y `admin`
+/// es lo más alto del plano de NEGOCIO. **Quién** es el propietario no cambia —sigue saliendo del
+/// env, nunca de un token (ADR-0157)— y **qué puede** tampoco: `admin` concede exactamente lo que
+/// concedía `owner` (el gate ya trataba igual a los dos y `permissions_for_role` ya resolvía
+/// `owner` como `admin`).
 ///
 /// **Idempotente**: si ya existe un `hub_user` con ese email, **no hace nada** (no duplica ni pisa
 /// un rol/estado existente). Devuelve `true` si sembró una fila nueva, `false` si ya existía.
@@ -321,10 +329,11 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
     ins.insert("id".into(), json!(id));
     ins.insert("name".into(), json!(name_from_email(email)));
     ins.insert("email".into(), json!(email));
+    ins.insert("role".into(), json!(crate::hub_users::ADMIN_ROLE));
     ins.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-          VALUES (:id, :name, '', 'owner', NULL, 1, :now, :email)",
+          VALUES (:id, :name, '', :role, NULL, 1, :now, :email)",
         &ins,
     )
     .await?;
@@ -335,8 +344,10 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
 /// llega (paso 2b regla C, hub#347). Devuelve el usuario tal y como queda.
 ///
 /// Es un **suelo**, no una sincronización, y por eso solo sube:
-///  - Si el rol local ya **administra el hub** (`owner` o `admin`, [`hub_users::is_admin_role`]) no
-///    toca nada. Ese es el caso que impide que reevaluar el suelo **degrade al owner** a `admin`.
+///  - Si el rol local ya **administra el hub** ([`crate::hub_users::is_admin_role`]: `admin` o su
+///    alias legacy `owner`) no toca nada. Ese es el caso que impide que reevaluar el suelo
+///    **degrade** a quien ya está arriba — incluida una fila `owner` de un hub que aún no pasó por
+///    la migración v12 (hub#349).
 ///  - Cualquier otro rol —`manager`, `employee` o uno **custom** de un módulo— no acredita
 ///    administrar el hub, así que se sube a [`hub_users::CLOUD_ROLE_FLOOR`]. Es deliberado: los
 ///    permisos que declara el manifest de un módulo no son la propiedad "administra el hub", y sin
@@ -498,9 +509,9 @@ fn was_revoked_by_cloud(row: &serde_json::Value) -> bool {
 /// dos pasos (ADR-0157):
 ///  1. Por **`cloud_user_id`** (usuario ya enlazado en un login previo).
 ///  2. Por **`email`** (si viene y no está vacío): una fila **pre-provisionada sin `cloud_user_id`**
-///     — el **owner sembrado** (`seed_owner`) o un usuario **invitado** por el admin (`create_login_user`).
-///     Se **enlaza** (fija `cloud_user_id`) conservando su rol (owner / rol de la invitación) y su
-///     email. Así el owner mantiene `owner` (no cae a `employee`) en su primer login.
+///     — el **creador sembrado** (`seed_owner`) o un usuario **invitado** por el admin (`create_login_user`).
+///     Se **enlaza** (fija `cloud_user_id`) conservando su rol (el sembrado / el de la invitación) y
+///     su email. Así el creador del hub mantiene su `admin` (no cae a `employee`) en su primer login.
 ///  3. Si no hay coincidencia → se **provisiona** con `default_role` (red de seguridad para un
 ///     miembro que pasa el gate de presencia sin fila local; rol de mínimo privilegio).
 ///
@@ -888,8 +899,8 @@ pub async fn untrust_device(db: &dyn DatabaseAdapter, device_id: &str) -> Result
 /// Permisos efectivos de un `role`: unión de `role_permissions[role]` de **todos los módulos
 /// activos** (ARQUITECTURA.md §2.5/§9.2). Si algún módulo concede `*` al rol, el usuario tiene `*`.
 ///
-/// `owner` se resuelve como `admin`: el provisioning siembra al creador del hub con ese rol
-/// ([`seed_owner`], ADR-0157) y `auth.rs` ya lo trata como admin para el gate FUERTE (ajustes,
+/// `owner` se resuelve como `admin`. El provisioning **sembraba** al creador del hub con ese rol
+/// ([`seed_owner`], ADR-0157) y `auth.rs` ya lo trataba como admin para el gate FUERTE (ajustes,
 /// certificado, import/export), pero **ningún** módulo del catálogo declara
 /// `role_permissions.owner` —los 24 solo conocen `admin`/`manager`/`employee`—, así que el
 /// PROPIETARIO del hub se quedaba con el conjunto VACÍO y toda query de módulo le respondía
@@ -897,6 +908,11 @@ pub async fn untrust_device(db: &dyn DatabaseAdapter, device_id: &str) -> Result
 /// restaurante (280 productos, 26 mesas), el dueño veía el hub vacío, los KPIs en «No
 /// disponible» y ni una sección de módulo en el menú. No amplía privilegios: es estrictamente
 /// menos de lo que ya le concede el gate admin.
+///
+/// Desde hub#349 el alias es **legacy**: `owner` salió del catálogo ([`crate::hub_users::
+/// BASE_ROLES`]), la siembra escribe `admin` y la migración de sistema v12 renombra las filas que
+/// lo llevaban. Se conserva por lo mismo que [`crate::hub_users::is_admin_role`]: una fila puede
+/// llegar sin pasar por la migración, y quitarlo la dejaría sin ver un solo dato de módulo.
 pub fn permissions_for_role(registry: &Registry, role: &str) -> HashSet<String> {
     let role = if role.eq_ignore_ascii_case("owner") { "admin" } else { role };
     let mut perms = HashSet::new();
@@ -1181,10 +1197,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn seed_owner_is_idempotent_and_creates_owner() {
+    async fn seed_owner_is_idempotent_and_seeds_the_hub_administrator() {
         // ADR-0157 (corrección Ioan): el owner es el CREADOR, sembrado del env `HUB_OWNER_EMAIL`.
-        // `seed_owner` crea un `hub_user` role=owner con ese email y cloud_user_id NULL; re-sembrar
-        // (mismo email) es no-op (no duplica ni cambia).
+        // `seed_owner` crea un `hub_user` con ese email y cloud_user_id NULL; re-sembrar (mismo
+        // email) es no-op (no duplica ni cambia). Desde hub#349 se siembra con el rol **`admin`**:
+        // `owner` salió del catálogo base y `admin` es lo más alto del plano de NEGOCIO. Quién es
+        // el propietario no cambia (sigue siendo el email del env, ADR-0157); cambia cómo se
+        // deletrea su rol local, y `admin` ya concede exactamente lo mismo que concedía `owner`.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
 
@@ -1193,9 +1212,9 @@ mod tests {
             "primera siembra → true (fila nueva)"
         );
         let users = list_login_users(&db).await.unwrap();
-        assert_eq!(users.len(), 1, "un único owner sembrado");
+        assert_eq!(users.len(), 1, "un único creador sembrado");
         assert_eq!(users[0].email, "boss@bar.com");
-        assert_eq!(users[0].role, "owner", "sembrado como owner");
+        assert_eq!(users[0].role, "admin", "sembrado como admin, nunca `owner`");
 
         // Idempotente: re-sembrar el MISMO email no duplica ni cambia.
         assert!(
@@ -1205,7 +1224,7 @@ mod tests {
         assert_eq!(
             list_login_users(&db).await.unwrap().len(),
             1,
-            "sigue habiendo un solo owner (no duplica)"
+            "sigue habiendo un solo creador (no duplica)"
         );
 
         // Email vacío = no-op (no siembra nada).
@@ -1214,23 +1233,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn login_links_seeded_owner_by_email_keeping_owner_role() {
-        // El owner sembrado (cloud_user_id NULL) se ENLAZA en su primer login por email,
-        // conservando role=owner (NO cae a `employee`). Un segundo login usa el cloud_user_id.
+    async fn login_links_the_seeded_creator_by_email_keeping_its_admin_role() {
+        // La fila sembrada (cloud_user_id NULL) se ENLAZA en su primer login por email,
+        // conservando su rol (NO cae a `employee`). Un segundo login usa el cloud_user_id.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
         seed_owner(&db, "boss@bar.com").await.unwrap();
 
-        // Primer login: enlaza por email → owner.
+        // Primer login: enlaza por email → conserva el rol sembrado.
         let user = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"), None)
             .await
             .unwrap();
-        assert_eq!(user.role, "owner", "el owner sembrado conserva su rol");
+        assert_eq!(user.role, "admin", "el creador sembrado conserva su rol");
         assert_eq!(user.cloud_user_id.as_deref(), Some("99"), "queda enlazado");
         assert_eq!(
             list_login_users(&db).await.unwrap().len(),
             1,
-            "NO crea una segunda fila: reusa el owner sembrado"
+            "NO crea una segunda fila: reusa la fila sembrada"
         );
 
         // Segundo login (ya enlazado): resuelve por cloud_user_id, mismo usuario/rol.
@@ -1238,7 +1257,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(again.id, user.id);
-        assert_eq!(again.role, "owner");
+        assert_eq!(again.role, "admin");
     }
 
     #[tokio::test]
@@ -1317,16 +1336,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_floor_never_lowers_an_owner() {
-        // Re-evaluating an `admin` floor must not demote the hub owner: `owner` is already above
-        // it. Otherwise every login of the owner would quietly strip their ownership.
+    async fn the_floor_never_lowers_the_seeded_creator() {
+        // Re-evaluating the floor on every login must not touch the hub creator seeded from
+        // `HUB_OWNER_EMAIL`: they are already at the top of the business plane. Otherwise every
+        // login of the owner would quietly rewrite their role.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
         seed_owner(&db, "boss@bar.com").await.unwrap();
         let linked = get_or_link_cloud_user(&db, "1", "Boss", "employee", Some("boss@bar.com"), Some("admin"))
             .await
             .unwrap();
-        assert_eq!(linked.role, "owner", "el owner sembrado sigue siendo owner");
+        assert_eq!(linked.role, "admin", "el creador sembrado sigue siendo admin");
+        assert_eq!(stored_role(&db, &linked.id).await, "admin");
+    }
+
+    #[tokio::test]
+    async fn the_floor_never_lowers_a_legacy_owner() {
+        // `owner` left the base catalogue in hub#349 and the v12 migration renames the rows that
+        // carry it, but the gate still recognises the old spelling. A row that reaches the hub
+        // without going through the migration — a restored backup, an import, a runtime still
+        // pinned to an older image — must NOT be demoted to `admin` by the floor: re-evaluating it
+        // on every login would otherwise strip the owner of a hub that was never migrated.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        create_login_user(&db, "legacy@bar.com", "owner").await.unwrap();
+
+        let linked =
+            get_or_link_cloud_user(&db, "1", "Boss", "employee", Some("legacy@bar.com"), Some("admin"))
+                .await
+                .unwrap();
+        assert_eq!(linked.role, "owner", "un `owner` legacy no se degrada");
         assert_eq!(stored_role(&db, &linked.id).await, "owner");
     }
 
