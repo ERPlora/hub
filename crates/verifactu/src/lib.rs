@@ -315,17 +315,45 @@ pub async fn can_sign(host: &dyn NativeHost, hub_id: &str) -> Result<bool> {
 /// Con **cuál** de los dos se firma: `"own"`, `"delegated"`, o `""` si no hay ninguno
 /// (ADR-0202 §2.1 — hub#319).
 ///
-/// ⚠️ **Esta es la respuesta que tienen que leer [hub#320] (endpoint AEAT `www1` vs `www10`) y
-/// [hub#321] (bloque `Representante`), NO una segunda consulta a `_hub_certificate`.** La selección
-/// arrastra el endpoint y el `Representante`, así que resolverla otra vez por su cuenta es cómo
-/// vuelve el defecto que hub#317 y hub#318 ya arreglaron dos veces: dos lecturas de la misma
-/// pregunta que pueden contestar distinto. Hasta que esos dos aterricen, un hub que firme con el
-/// delegado transmite contra el endpoint del titular y sin `Representante`.
+/// ⚠️ **Esta es la respuesta que lee el endpoint AEAT (`www1` vs `www10`, hub#320) y la que tiene
+/// que leer [hub#321] (bloque `Representante`), NO una segunda consulta a `_hub_certificate`.** La
+/// selección arrastra el endpoint y el `Representante`, así que resolverla otra vez por su cuenta
+/// es cómo vuelve el defecto que hub#317 y hub#318 ya arreglaron dos veces: dos lecturas de la
+/// misma pregunta que pueden contestar distinto. Hasta que hub#321 aterrice, un hub que firme con
+/// el delegado transmite por el endpoint correcto pero **sin `Representante`**.
 ///
-/// [hub#320]: https://github.com/ERPlora/hub/issues/320
 /// [hub#321]: https://github.com/ERPlora/hub/issues/321
 fn signing_kind(config: &Json) -> String {
     str_field(config, "certificate_kind")
+}
+
+/// **El endpoint AEAT de este hub AHORA MISMO** — los dos ejes (`environment` y certificado que
+/// firma) resueltos de la MISMA lectura de la config (ADR-0202 §2.1 — hub#320).
+///
+/// Existe para que ningún sitio los multiplique por su cuenta. Son dos ejes y fallan distinto: un
+/// certificado en la puerta equivocada se rechaza (ruidoso, recuperable a mano); un entorno
+/// equivocado se **acepta** en el sistema que no era, y un registro remitido no se reenvía ni se
+/// borra (ADR-0189). ⚠️ El eje del **entorno** sale de la config, no del registro, así que un
+/// registro encolado en `testing` y drenado tras un go-live sale hacia la AEAT real:
+/// [hub#471](https://github.com/ERPlora/hub/issues/471) (pendiente, va con la guarda R1).
+///
+/// **El endpoint acompaña al CERTIFICADO, no al XML.** La AEAT segrega la puerta por el certificado
+/// que se presenta en el handshake TLS, así que un registro que lleva días en contingencia se
+/// transmite por la puerta del certificado que firma **hoy**, no por la del que firmaba cuando se
+/// generó: presentar el sello de ERPlora en `www1` falla siempre, diga lo que diga el XML
+/// archivado. ⚠️ La otra mitad de esa pareja —el `Representante`, que sí viaja DENTRO del
+/// `xml_content` congelado del reintento— es de [hub#321](https://github.com/ERPlora/hub/issues/321):
+/// si el hub cambió de certificado mientras el registro esperaba en la cola, ese XML describe al
+/// firmante anterior y habrá que reconstruirlo.
+fn transmission_endpoint(config: &Json) -> &'static str {
+    aeat::endpoint(&environment_of(config), &signing_kind(config))
+}
+
+/// El endpoint de **consulta** de este hub ahora mismo. Es el mismo que el de alta (el WSDL publica
+/// las dos operaciones en `VerifactuSOAP`, hub#287) y por eso se deriva igual, con los dos ejes de
+/// la misma lectura: recuperar la cadena tiene que hablar con la misma puerta que la emitió.
+fn consult_endpoint_of(config: &Json) -> &'static str {
+    aeat::consult_endpoint(&environment_of(config), &signing_kind(config))
 }
 
 /// **Tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4 — hub#318): un fallo del
@@ -1050,7 +1078,7 @@ async fn transmit_one(
     // Identity mTLS: cert del core (opaca, bytes en el core) o legacy. Ver `build_identity`.
     let identity = build_identity(host, &ctx.hub_id, config).await?;
 
-    match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
+    match aeat::post_soap(transmission_endpoint(config), identity, &xml).await {
         Ok(body) => {
             let resp = aeat::parse_response(&body);
 
@@ -1334,7 +1362,7 @@ async fn auto_rechain_and_retry(
     );
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
     let identity = build_identity(host, &ctx.hub_id, config).await?;
-    let body = aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await?;
+    let body = aeat::post_soap(transmission_endpoint(config), identity, &xml).await?;
     let resp = aeat::parse_response(&body);
 
     let note = format!(
@@ -1636,7 +1664,7 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
                     aeat =
                         json!({ "ok": false, "error": format!("XML no conforme al esquema: {e}") });
                 } else {
-                    match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
+                    match aeat::post_soap(transmission_endpoint(&config), identity, &xml).await {
                         Ok(body) => {
                             let r = aeat::parse_response(&body);
                             let accepted = r.estado_registro == "Correcto"
@@ -1798,12 +1826,7 @@ async fn run_consult(
     // Se construye ANTES de abrir la conexión: si falta la razón social del obligado, el sobre
     // no es válido y no tiene sentido hablar con Hacienda para llevarse un 4102.
     let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo)?;
-    let body = aeat::post_soap(
-        aeat::consult_endpoint(&environment_of(config)),
-        identity,
-        &xml,
-    )
-    .await?;
+    let body = aeat::post_soap(consult_endpoint_of(config), identity, &xml).await?;
     Ok(aeat::parse_consult_response(&body)?)
 }
 
@@ -2389,6 +2412,86 @@ mod cert_source_tests {
         let cfg = read_config(&host, "h1").await.unwrap().unwrap();
         assert!(!has_certificate(&cfg));
         assert_eq!(signing_kind(&cfg), "");
+    }
+
+    /// **The AEAT entry point follows the certificate the CORE selected** (ADR-0202 §2.1 — hub#320).
+    ///
+    /// The whole chain in one assertion — core → `read_config` → `certificate_kind` → URL — because
+    /// that is the seam hub#317/#318/#319 kept having to repair: the answer is fetched ONCE and
+    /// travels, instead of being re-derived from `_hub_certificate` by whoever needs it next. A
+    /// delegated hub POSTing to `prewww1` had every record rejected, and a rejection is not a link
+    /// in the chain (ADR-0189).
+    #[tokio::test]
+    async fn the_entry_point_follows_the_certificate_the_core_selected() {
+        let delegated = read_config(&SlotHost::new(Some("delegated"), vec![]), "h1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            transmission_endpoint(&delegated),
+            "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+
+        let own = read_config(&SlotHost::new(Some("own"), vec![]), "h1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            transmission_endpoint(&own),
+            "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+    }
+
+    /// **The seam multiplies the two axes, and neither one is allowed to swallow the other.** The
+    /// certificate decides the door; the environment decides the tax agency that is actually
+    /// listening. Getting the door wrong is a rejection; getting the environment wrong is a real
+    /// invoice accepted where it does not belong, and a remitted record is never re-sent (ADR-0189).
+    #[test]
+    fn the_seam_resolves_the_environment_and_the_certificate_from_the_same_config() {
+        let config = |environment: &str, kind: &str| {
+            json!({ "environment": environment, "certificate_source": "core", "certificate_kind": kind })
+        };
+        assert_eq!(
+            transmission_endpoint(&config("production", "delegated")),
+            "https://www10.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+        assert_eq!(
+            transmission_endpoint(&config("production", "own")),
+            "https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+        assert_eq!(
+            transmission_endpoint(&config("testing", "delegated")),
+            "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+        assert_eq!(
+            transmission_endpoint(&config("testing", "own")),
+            "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+        // An unconfigured `environment` is preproduction, on BOTH doors (`environment_of`).
+        assert_eq!(
+            transmission_endpoint(&json!({ "certificate_kind": "delegated" })),
+            "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+        assert_eq!(
+            transmission_endpoint(&json!({})),
+            "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+    }
+
+    /// Recovering the chain has to talk to the door that issued it: the consult resolves its entry
+    /// point from the same two axes as the alta, so a delegated hub can also re-anchor (hub#287).
+    #[test]
+    fn the_consult_and_the_transmission_share_the_entry_point() {
+        for environment in ["testing", "production"] {
+            for kind in ["own", "delegated"] {
+                let cfg = json!({ "environment": environment, "certificate_kind": kind });
+                assert_eq!(
+                    consult_endpoint_of(&cfg),
+                    transmission_endpoint(&cfg),
+                    "({environment}, {kind})"
+                );
+            }
+        }
     }
 
     /// **The engine asks the CORE which certificate signs; it does not read the table.**

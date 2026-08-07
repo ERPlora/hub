@@ -42,26 +42,34 @@ const SOAP_FAULT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 
 // ── 1. El endpoint ────────────────────────────────────────────────────────────────────────
 
-/// La operación de consulta se publica en el MISMO endpoint que el alta. La ruta
-/// `.../SistemaFacturacion/ConsultaFactuSistemaFacturacion` no existe: da 404 (saas#1081).
+/// The consult operation is published on the SAME endpoint as the alta. The path
+/// `.../SistemaFacturacion/ConsultaFactuSistemaFacturacion` does not exist: 404 (saas#1081).
+///
+/// Both axes since hub#320 — the entry point also depends on the certificate that signs, and a
+/// delegated hub has to be able to recover its chain through its own door
+/// (`entry_point_by_certificate.rs`).
 #[test]
-fn la_consulta_va_al_mismo_endpoint_que_el_alta() {
+fn the_consult_uses_the_same_endpoint_as_the_alta() {
     for env in ["testing", "production"] {
-        assert_eq!(
-            aeat::consult_endpoint(env),
-            aeat::endpoint(env),
-            "el WSDL publica ConsultaFactuSistemaFacturacion en VerifactuSOAP ({env})"
-        );
+        for kind in ["own", "delegated"] {
+            assert_eq!(
+                aeat::consult_endpoint(env, kind),
+                aeat::endpoint(env, kind),
+                "the WSDL publishes ConsultaFactuSistemaFacturacion on VerifactuSOAP ({env}, {kind})"
+            );
+        }
     }
 }
 
 #[test]
-fn el_endpoint_de_consulta_ya_no_lleva_la_ruta_inventada() {
+fn the_consult_endpoint_no_longer_carries_the_invented_path() {
     for env in ["testing", "production"] {
-        assert!(
-            !aeat::consult_endpoint(env).contains("ConsultaFactu"),
-            "esa ruta no existe en la AEAT: 404 verificado con certificado real"
-        );
+        for kind in ["own", "delegated"] {
+            assert!(
+                !aeat::consult_endpoint(env, kind).contains("ConsultaFactu"),
+                "that path does not exist at the AEAT: 404 verified with a real certificate"
+            );
+        }
     }
 }
 
