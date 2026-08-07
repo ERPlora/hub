@@ -2429,6 +2429,38 @@ mod cert_source_tests {
         );
     }
 
+    /// **Un host que no implementa la capacidad NO puede firmar — falla CERRADO.**
+    ///
+    /// El default de `NativeHost::certificate_signing_kind` es `None` a propósito, y esa decisión es
+    /// de seguridad, no de comodidad: `read_config` marca `certificate_source = "core"` ante
+    /// **cualquier** `Some`, así que un default con nombre —vacío o inventado— le diría al motor que
+    /// puede transmitir a la AEAT sobre un host que ni siquiera sabe entregarle una identidad. Lo
+    /// encontró la corrida de mutación: sustituir el default por `Ok(Some(""))` o `Ok(Some("xyzzy"))`
+    /// no rompía nada.
+    #[tokio::test]
+    async fn a_host_without_the_certificate_capability_cannot_sign() {
+        /// Lo mínimo que exige el trait: `read` y nada más.
+        struct BareHost;
+        #[async_trait::async_trait]
+        impl NativeHost for BareHost {
+            async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+                if sql.contains("verifactu_config") {
+                    Ok(vec![json!({ "hub_id": "h1", "environment": "testing" })])
+                } else {
+                    Ok(vec![])
+                }
+            }
+        }
+
+        assert!(
+            !can_sign(&BareHost, "h1").await.unwrap(),
+            "sin la capacidad no hay con qué firmar: el motor NO transmite"
+        );
+        let cfg = read_config(&BareHost, "h1").await.unwrap().unwrap();
+        assert!(cfg.get("certificate_source").is_none(), "y no se marca un certificado que no hay");
+        assert!(build_identity(&BareHost, "h1", &cfg).await.is_err());
+    }
+
     /// **`can_sign` IS `build_identity`'s gate, and it is pinned here too.**
     ///
     /// Its only consumer is the coherence e2e of hub#319, which lives in the `erplora-runtime`
