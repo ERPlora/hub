@@ -900,4 +900,14 @@ export default {
       past_due: 'There is a pending payment on your subscription.',
     },
   },
+
+  // Hardware (printers, cash drawer). The two sentences below are the whole point of hub#338:
+  // a scan can end with no printers for two OPPOSITE reasons, and each one asks the user for a
+  // different thing. Showing the wrong one sends them to fix something that was never broken.
+  hardware: {
+    printersBlocked:
+      'ERPlora could not search this network: the system has not given the app permission to reach local devices. Grant local network access to ERPlora in your device settings and search again.',
+    printersNone:
+      'No printer found on this network. Check that the printer is switched on and connected to the same network as this device, then search again.',
+  },
 } as const;

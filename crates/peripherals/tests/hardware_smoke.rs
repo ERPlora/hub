@@ -12,7 +12,7 @@
 //! Gasta papel: `smoke_imprime_pagina_de_prueba` solo imprime si se pide con
 //! `ERPLORA_SMOKE_PRINT=1`, para poder buscar la impresora sin dejar tiques por el suelo.
 
-use erplora_peripherals::discovery::{discover_printers, parse_printer_id};
+use erplora_peripherals::discovery::{discover_printers, parse_printer_id, LocalNetworkAccess};
 use erplora_peripherals::escpos::render_test_page;
 use erplora_peripherals::printer::NetworkPrinter;
 use erplora_peripherals::registry::DeviceRegistry;
@@ -30,7 +30,14 @@ fn registro_temporal(nombre: &str) -> DeviceRegistry {
 async fn smoke_descubre_la_impresora_de_la_lan() {
     let registry = registro_temporal("descubre");
 
-    let encontradas = discover_printers(&registry).await.expect("el descubrimiento no debe fallar");
+    // Con una impresora delante el permiso está concedido por definición; si no lo estuviera, el
+    // outcome lo diría en vez de devolver una lista vacía (hub#338).
+    let encontradas = discover_printers(&registry, LocalNetworkAccess::Granted)
+        .await
+        .expect("el descubrimiento no debe fallar")
+        .scanned_printers()
+        .expect("con permiso concedido el escaneo SÍ corre")
+        .to_vec();
 
     for p in &encontradas {
         println!("  · {} — {} [{}] {}mm", p.id, p.name, p.category, p.paper_width);
@@ -56,7 +63,12 @@ async fn smoke_el_descubrimiento_registra_los_dispositivos() {
     // impresión inservible y sin un solo error que lo explique.
     let registry = registro_temporal("registra");
 
-    let encontradas = discover_printers(&registry).await.expect("descubrimiento");
+    let encontradas = discover_printers(&registry, LocalNetworkAccess::Granted)
+        .await
+        .expect("descubrimiento")
+        .scanned_printers()
+        .expect("con permiso concedido el escaneo SÍ corre")
+        .to_vec();
     assert!(!encontradas.is_empty(), "sin impresora no se puede comprobar el registro");
 
     let registrados = registry.get_all();
@@ -79,7 +91,12 @@ async fn smoke_imprime_pagina_de_prueba() {
         return;
     }
     let registry = registro_temporal("imprime");
-    let encontradas = discover_printers(&registry).await.expect("descubrimiento");
+    let encontradas = discover_printers(&registry, LocalNetworkAccess::Granted)
+        .await
+        .expect("descubrimiento")
+        .scanned_printers()
+        .expect("con permiso concedido el escaneo SÍ corre")
+        .to_vec();
     let destino = encontradas
         .iter()
         // Una A4 de oficina también escucha en el 9100 pero habla PCL/PostScript: mandarle ESC/POS

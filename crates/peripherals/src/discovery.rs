@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio::task::JoinSet;
 
@@ -72,9 +73,95 @@ pub fn parse_printer_id(printer_id: &str) -> Result<NetworkTarget> {
     Ok(NetworkTarget { host, port })
 }
 
-/// Descubre todas las impresoras de red (mDNS + escaneo de subred), deduplica, enriquece con
-/// MAC y registra en `registry`. Porta `discover_all(registry)`.
-pub async fn discover_printers(registry: &DeviceRegistry) -> Result<Vec<PrinterInfo>> {
+/// What the OS lets this process do on the local network — the one thing printer discovery cannot
+/// work around, and the one every platform gates somewhere else: an Android runtime permission
+/// (`ACCESS_LOCAL_NETWORK`, API 37+) or the macOS 15 local-network consent. This library cannot ask
+/// the OS itself, so the shell that *can* states it here, on the way in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LocalNetworkAccess {
+    /// Granted, or the platform has no such gate at all. The scan runs.
+    Granted,
+    /// The OS refused. The scan is deliberately NOT run: it could only ever come back empty, and
+    /// an empty list reads exactly like "this venue has no printers".
+    Denied { permission: String },
+}
+
+impl LocalNetworkAccess {
+    /// The permission standing between us and the printers, if any. `None` = go ahead and look.
+    pub fn blocked_by(&self) -> Option<&str> {
+        match self {
+            Self::Granted => None,
+            Self::Denied { permission } => Some(permission),
+        }
+    }
+}
+
+/// Outcome of a discovery run.
+///
+/// It exists because `Vec<PrinterInfo>` cannot answer the only question that matters when it comes
+/// back empty: did we look and find nothing, or were we never allowed to look? Those two need
+/// **opposite** things from the user — plug a printer in, versus grant the app a permission — so
+/// the difference has to survive all the way to the screen. Logging it is not enough.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum PrinterDiscovery {
+    /// The scan ran. `printers` is the honest answer, empty or not.
+    Scanned { printers: Vec<PrinterInfo> },
+    /// The scan never ran: the OS denied the permission it needs. `permission` names it so the
+    /// screen can point at the exact toggle instead of guessing.
+    #[serde(rename = "local_network_permission_denied")]
+    PermissionDenied { permission: String },
+}
+
+/// The one wire string that means "the OS blocked the scan": the `status` of the outcome on the
+/// invoke path and the `code` of the bridge's WS error frame. One literal for both transports, so
+/// a screen only has to learn to branch once.
+pub const LOCAL_NETWORK_PERMISSION_DENIED: &str = "local_network_permission_denied";
+
+impl PrinterDiscovery {
+    /// The printers found — `None` when the scan never ran, so an empty list can never be mistaken
+    /// for "there are no printers here". That `Some(&[]) != None` is the whole point of the type.
+    pub fn scanned_printers(&self) -> Option<&[PrinterInfo]> {
+        match self {
+            Self::Scanned { printers } => Some(printers),
+            Self::PermissionDenied { .. } => None,
+        }
+    }
+
+    /// The permission the OS refused, if that is what happened.
+    pub fn denied_permission(&self) -> Option<&str> {
+        match self {
+            Self::Scanned { .. } => None,
+            Self::PermissionDenied { permission } => Some(permission),
+        }
+    }
+}
+
+/// Discovers every network printer (mDNS + subnet sweep), deduplicates, enriches with the MAC and
+/// registers them in `registry`. Ports `discover_all(registry)`.
+///
+/// `access` is not decoration: with the permission denied the sweep is 254 silent timeouts and an
+/// mDNS window that resolves nothing, so it is skipped and the caller is told **why** there is no
+/// list — instead of being handed an empty one it cannot tell from an empty venue.
+pub async fn discover_printers(
+    registry: &DeviceRegistry,
+    access: LocalNetworkAccess,
+) -> Result<PrinterDiscovery> {
+    if let LocalNetworkAccess::Denied { permission } = access {
+        tracing::warn!(
+            %permission,
+            "printer discovery skipped: the OS denies this app access to the local network"
+        );
+        return Ok(PrinterDiscovery::PermissionDenied { permission });
+    }
+
+    Ok(PrinterDiscovery::Scanned {
+        printers: scan_network(registry).await?,
+    })
+}
+
+/// The scan itself: mDNS + subnet sweep, deduplicated, MAC-enriched and registered.
+async fn scan_network(registry: &DeviceRegistry) -> Result<Vec<PrinterInfo>> {
     // mDNS gana ante colisión de IP → se inserta primero y el escaneo solo añade IDs nuevos.
     let mut printers = discover_mdns().await?;
 
@@ -325,5 +412,134 @@ mod tests {
         assert!(parse_printer_id("bluetooth:AA:BB:CC:DD:EE:FF").is_err());
         assert!(parse_printer_id("usb:001:002").is_err());
         assert!(parse_printer_id("network:10.0.0.5:9100").is_ok());
+    }
+
+    // ── "No permission" is not "no printers" (hub#338) ────────────────────────────────────────
+    //
+    // Without local network access the sweep is 254 silent timeouts and the mDNS window resolves
+    // nothing, so discovery came back with an empty list and no error whatsoever — the worst
+    // failure mode a till can have. The two states send the user in OPPOSITE directions ("connect
+    // a printer" vs "grant this app permission"), so they must stay apart in the return value.
+
+    const ANDROID_LOCAL_NETWORK: &str = "android.permission.ACCESS_LOCAL_NETWORK";
+
+    fn denied() -> LocalNetworkAccess {
+        LocalNetworkAccess::Denied {
+            permission: ANDROID_LOCAL_NETWORK.to_string(),
+        }
+    }
+
+    /// Registry on a temp path: a test must never touch the machine's real `devices.json`.
+    fn temp_registry(name: &str) -> DeviceRegistry {
+        let dir = std::env::temp_dir().join(format!(
+            "erplora-discovery-test-{}-{name}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        DeviceRegistry::load(dir.join(format!("{name}.json")))
+    }
+
+    #[test]
+    fn granted_access_blocks_nothing() {
+        assert_eq!(LocalNetworkAccess::Granted.blocked_by(), None);
+    }
+
+    #[test]
+    fn denied_access_names_the_permission_the_user_has_to_grant() {
+        // The name is what lets the screen point at one toggle instead of listing every setting.
+        assert_eq!(denied().blocked_by(), Some(ANDROID_LOCAL_NETWORK));
+    }
+
+    #[test]
+    fn an_empty_scan_is_an_answer_but_a_blocked_scan_is_not() {
+        // `Some(&[])` vs `None` — the ONLY difference between "we looked, nothing there" and "we
+        // were never allowed to look". Collapsing both into an empty Vec is the bug.
+        assert_eq!(
+            PrinterDiscovery::Scanned {
+                printers: Vec::new()
+            }
+            .scanned_printers(),
+            Some(&[][..])
+        );
+        assert_eq!(
+            PrinterDiscovery::PermissionDenied {
+                permission: ANDROID_LOCAL_NETWORK.to_string(),
+            }
+            .scanned_printers(),
+            None
+        );
+    }
+
+    #[test]
+    fn only_a_blocked_run_names_a_permission() {
+        assert_eq!(
+            PrinterDiscovery::Scanned {
+                printers: Vec::new()
+            }
+            .denied_permission(),
+            None
+        );
+        assert_eq!(
+            PrinterDiscovery::PermissionDenied {
+                permission: ANDROID_LOCAL_NETWORK.to_string(),
+            }
+            .denied_permission(),
+            Some(ANDROID_LOCAL_NETWORK)
+        );
+    }
+
+    #[test]
+    fn the_wire_carries_the_status_so_the_screen_can_branch_on_it() {
+        // The shell command and the module SDK read `status`. If the difference only existed in a
+        // log line, the user would still be looking at the same two identical screens.
+        let blocked = serde_json::to_value(PrinterDiscovery::PermissionDenied {
+            permission: ANDROID_LOCAL_NETWORK.to_string(),
+        })
+        .expect("serializable");
+        assert_eq!(blocked["status"], LOCAL_NETWORK_PERMISSION_DENIED);
+        assert_eq!(blocked["permission"], ANDROID_LOCAL_NETWORK);
+
+        let empty = serde_json::to_value(PrinterDiscovery::Scanned {
+            printers: Vec::new(),
+        })
+        .expect("serializable");
+        assert_eq!(empty["status"], "scanned");
+        assert_eq!(empty["printers"], serde_json::json!([]));
+        assert!(
+            empty.get("permission").is_none(),
+            "an honest zero must not name a permission: there is nothing to grant"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_denied_permission_skips_the_scan_instead_of_reporting_zero_printers() {
+        // Not merely a different return value: with the permission denied the sweep can ONLY come
+        // back empty, so running it burns the 1.5 s mDNS window to learn nothing. Answering well
+        // inside that window is the proof that we never looked.
+        let registry = temp_registry("denied");
+
+        let outcome = tokio::time::timeout(
+            Duration::from_millis(200),
+            discover_printers(&registry, denied()),
+        )
+        .await
+        .expect("a blocked scan must answer at once, not after the mDNS window")
+        .expect("a denied permission is a state, not a transport failure");
+
+        assert_eq!(
+            outcome,
+            PrinterDiscovery::PermissionDenied {
+                permission: ANDROID_LOCAL_NETWORK.to_string(),
+            }
+        );
+        assert_eq!(
+            outcome.scanned_printers(),
+            None,
+            "an empty list here would be the very lie this type exists to prevent"
+        );
+        assert!(
+            registry.get_all().is_empty(),
+            "a scan that never ran must not register a single device"
+        );
     }
 }

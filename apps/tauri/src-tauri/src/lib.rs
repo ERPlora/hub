@@ -496,8 +496,8 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
 // El shell ES el bridge (no hay proceso bridge aparte, §2.7): el hardware se expone por handlers
 // `invoke` que delegan en `erplora-peripherals`, el mismo crate que usa el bridge standalone
 // (`apps/bridge`) vía WebSocket. El contrato de datos es idéntico al de las frames WS del bridge:
-// `discoverPrinters`/`getDevices` devuelven el array de `protocol::{PrinterInfo,Device}`
-// (serde-serializado igual que `BridgePrinter`/`BridgeDevice` del SDK);
+// `getDevices` devuelve el array de `protocol::Device` y `discoverPrinters` el outcome
+// `PrinterDiscovery` (serde-serializado igual que `BridgeDevice`/`PrinterDiscovery` del SDK);
 // `print`/`testPrint`/`openDrawer` no devuelven nada.
 //
 // El `Watchdog` del registry corre como tarea async del shell (auto-recuperación de IP por DHCP),
@@ -505,10 +505,10 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
 // y eventos del watchdog se loguean (en el bridge standalone viajan por WS; aquí el canal a la UI
 // se cablearía con eventos Tauri en una fase posterior — columna del humano).
 
-use erplora_peripherals::discovery::{self, parse_printer_id};
+use erplora_peripherals::discovery::{self, parse_printer_id, LocalNetworkAccess, PrinterDiscovery};
 use erplora_peripherals::drawer;
 use erplora_peripherals::escpos::{self, DocumentType};
-use erplora_peripherals::protocol::{Device, PrinterInfo};
+use erplora_peripherals::protocol::Device;
 use erplora_peripherals::queue::{JobOutcome, PrintJob, PrintQueue, RetryPolicy};
 use erplora_peripherals::registry::DeviceRegistry;
 
@@ -597,13 +597,53 @@ fn erplora_bridge_status() -> serde_json::Value {
     serde_json::json!({ "version": env!("CARGO_PKG_VERSION") })
 }
 
+/// Reads the Android runtime-permission map and says whether the printer sweep may run.
+///
+/// Pure on purpose: an emulator is the only other way to reach this branch, and a state that
+/// decides between two opposite messages to the user has to be provable on a laptop.
+///
+/// A permission the map does not mention is one this platform does not gate — desktop answers with
+/// an empty map, and so does an Android older than the release that introduced it. Reading that
+/// silence as "denied" would ground a till that can see its printer perfectly well.
+fn local_network_access(status: &std::collections::HashMap<String, bool>) -> LocalNetworkAccess {
+    match status.get(tauri_plugin_erplora_android::ACCESS_LOCAL_NETWORK) {
+        Some(false) => LocalNetworkAccess::Denied {
+            permission: tauri_plugin_erplora_android::ACCESS_LOCAL_NETWORK.to_string(),
+        },
+        _ => LocalNetworkAccess::Granted,
+    }
+}
+
+/// What the OS allows right now — asked without prompting: the PWA already requested the
+/// permission before invoking this, so here we only read the answer it gave.
+fn shell_local_network_access<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> LocalNetworkAccess {
+    use tauri_plugin_erplora_android::ErploraAndroidExt;
+
+    match app.erplora_android().check_permissions() {
+        Ok(status) => local_network_access(&status),
+        // The CHECK failing is not a denial — on desktop there is no Android activity to ask. If
+        // we treated it as one, the shell would start claiming "no permission" on the platform
+        // that has no such permission, which is the same lie pointing the other way.
+        Err(e) => {
+            log::warn!("shell: could not read the local network permission ({e}); scanning anyway");
+            LocalNetworkAccess::Granted
+        }
+    }
+}
+
 /// `erplora_discover_printers` — re-escanea la red (mDNS + subred), registra y devuelve las
-/// impresoras. Espejo de `Command::DiscoverPrinters` del bridge; devuelve el array directo.
+/// impresoras. Espejo de `Command::DiscoverPrinters` del bridge.
+///
+/// Devuelve el OUTCOME (`{status, …}`), no el array pelado: sin permiso de red local no hay lista
+/// vacía que devolver, hay una razón — y «conecta una impresora» y «da permiso a la app» son
+/// instrucciones opuestas para el usuario (hub#338).
 #[tauri::command]
 async fn erplora_discover_printers(
+    app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
-) -> Result<Vec<PrinterInfo>, HardwareError> {
-    Ok(discovery::discover_printers(&state.registry).await?)
+) -> Result<PrinterDiscovery, HardwareError> {
+    let access = shell_local_network_access(&app);
+    Ok(discovery::discover_printers(&state.registry, access).await?)
 }
 
 /// `erplora_get_devices` — contenido del registro persistente de dispositivos (con sus roles).
@@ -1029,5 +1069,80 @@ mod tests {
         assert_eq!(a, b);
         assert!(!a.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── hub#338: "the OS won't let me look" is not "there are no printers" ───────────────────
+    //
+    // The shell is where the two states are told apart, because it is the only layer that can ask
+    // Android what it granted. Get this wrong in either direction and the till hands the user the
+    // opposite instruction to the one that would fix it.
+
+    use erplora_peripherals::discovery::LocalNetworkAccess;
+    use std::collections::HashMap;
+    use tauri_plugin_erplora_android::{ACCESS_LOCAL_NETWORK, POST_NOTIFICATIONS};
+
+    fn permission_status(pairs: &[(&str, bool)]) -> HashMap<String, bool> {
+        pairs.iter().map(|(k, v)| ((*k).to_string(), *v)).collect()
+    }
+
+    #[test]
+    fn a_platform_that_never_answers_is_not_a_platform_that_said_no() {
+        // Desktop returns an empty map — there is no such permission on Windows/macOS/Linux, and
+        // Android below API 37 does not know it either. Reading that silence as a denial would
+        // ground a till whose printer is right there.
+        assert_eq!(
+            local_network_access(&HashMap::new()),
+            LocalNetworkAccess::Granted
+        );
+    }
+
+    #[test]
+    fn a_granted_permission_lets_the_scan_run() {
+        assert_eq!(
+            local_network_access(&permission_status(&[(ACCESS_LOCAL_NETWORK, true)])),
+            LocalNetworkAccess::Granted
+        );
+    }
+
+    #[test]
+    fn a_denied_permission_names_itself_instead_of_faking_an_empty_venue() {
+        // The name is what turns a dead end into an instruction: the screen can say which toggle
+        // to flip rather than inviting the user to go hunting for a printer that is already on.
+        assert_eq!(
+            local_network_access(&permission_status(&[(ACCESS_LOCAL_NETWORK, false)])),
+            LocalNetworkAccess::Denied {
+                permission: ACCESS_LOCAL_NETWORK.to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn saying_no_to_notifications_does_not_ground_printer_discovery() {
+        // Two independent permissions asked in the same dialog run. Refusing the notifications one
+        // must not make the till claim it cannot reach a network it can reach.
+        assert_eq!(
+            local_network_access(&permission_status(&[
+                (POST_NOTIFICATIONS, false),
+                (ACCESS_LOCAL_NETWORK, true),
+            ])),
+            LocalNetworkAccess::Granted
+        );
+        assert_eq!(
+            local_network_access(&permission_status(&[(POST_NOTIFICATIONS, false)])),
+            LocalNetworkAccess::Granted
+        );
+    }
+
+    #[test]
+    fn denying_both_still_blames_the_permission_that_actually_blocks_the_printers() {
+        assert_eq!(
+            local_network_access(&permission_status(&[
+                (POST_NOTIFICATIONS, false),
+                (ACCESS_LOCAL_NETWORK, false),
+            ])),
+            LocalNetworkAccess::Denied {
+                permission: ACCESS_LOCAL_NETWORK.to_string(),
+            }
+        );
     }
 }

@@ -26,7 +26,9 @@ use axum::{Json, Router};
 use auth::{AuthOutcome, BridgeAuth};
 use pairing::Pairing;
 
-use erplora_peripherals::discovery::{self, parse_printer_id};
+use erplora_peripherals::discovery::{
+    self, parse_printer_id, LocalNetworkAccess, PrinterDiscovery, LOCAL_NETWORK_PERMISSION_DENIED,
+};
 use erplora_peripherals::drawer;
 use erplora_peripherals::escpos::{self, DocumentType};
 use erplora_peripherals::protocol::{Command, Event};
@@ -513,10 +515,15 @@ async fn dispatch(cmd: Command, state: &AppState) -> Option<Event> {
     match cmd {
         Command::GetStatus => Some(initial_status()),
 
-        Command::DiscoverPrinters => Some(match discovery::discover_printers(&state.registry).await {
-            Ok(printers) => Event::Printers { printers },
-            Err(e) => err_event(&e),
-        }),
+        // Binario de ESCRITORIO: aquí no hay permiso de runtime que consultar (el consentimiento de
+        // red local de macOS 15 lo gestiona el SO sin API). Se declara `Granted` explícitamente —
+        // la firma obliga a decirlo, que es justo lo que impide volver a suponerlo en silencio.
+        Command::DiscoverPrinters => Some(
+            match discovery::discover_printers(&state.registry, LocalNetworkAccess::Granted).await {
+                Ok(outcome) => discovery_event(outcome),
+                Err(e) => err_event(&e),
+            },
+        ),
 
         Command::Print { printer_id, document_type, data, job_id } => {
             print_job(state, &printer_id, DocumentType::from_wire(&document_type), &data, job_id).await
@@ -621,6 +628,21 @@ fn devices_after(result: erplora_peripherals::Result<()>, state: &AppState) -> E
 
 fn err_event(e: &erplora_peripherals::PeripheralError) -> Event {
     Event::Error { message: e.to_string(), code: "peripheral_error".into() }
+}
+
+/// Traduce el resultado de un descubrimiento a la frame WS que espera el Hub.
+///
+/// Pura para poder probar la rama que NO se puede provocar desde aquí: si el SO bloqueó el
+/// escaneo, la respuesta NO puede ser una lista vacía —«no hay impresoras» y «no me dejan
+/// buscarlas» le piden al usuario cosas opuestas—, sino un error con `code` propio (hub#338).
+fn discovery_event(outcome: PrinterDiscovery) -> Event {
+    match outcome {
+        PrinterDiscovery::Scanned { printers } => Event::Printers { printers },
+        PrinterDiscovery::PermissionDenied { permission } => Event::Error {
+            message: format!("the OS denies access to the local network ({permission})"),
+            code: LOCAL_NETWORK_PERMISSION_DENIED.into(),
+        },
+    }
 }
 
 /// Resuelve dónde vive `devices.json` (hub#121). Pura para poder testearla sin tocar el entorno:
@@ -848,6 +870,43 @@ mod integration_tests {
         }
         // Sanity: una acción legítima de hardware SÍ deserializa.
         assert!(serde_json::from_str::<Command>(r#"{"action":"discover_printers"}"#).is_ok());
+    }
+
+    // ── hub#338: a blocked scan is not an empty venue ────────────────────────────────────────
+
+    #[test]
+    fn a_scan_that_found_nothing_answers_with_an_empty_printer_list() {
+        // Zero printers IS an answer when we were allowed to look, and the Hub must keep seeing it
+        // as one: it means "connect a printer", not "something went wrong".
+        let frame = serde_json::to_value(discovery_event(PrinterDiscovery::Scanned {
+            printers: Vec::new(),
+        }))
+        .expect("serializable");
+        assert_eq!(frame["event"], "printers");
+        assert_eq!(frame["printers"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn a_blocked_scan_answers_with_its_own_error_code_not_an_empty_list() {
+        // Same empty result, opposite instruction to the user. The `code` is what lets the Hub
+        // tell them apart without parsing prose.
+        let frame = serde_json::to_value(discovery_event(PrinterDiscovery::PermissionDenied {
+            permission: "android.permission.ACCESS_LOCAL_NETWORK".to_string(),
+        }))
+        .expect("serializable");
+        assert_eq!(frame["event"], "error");
+        assert_eq!(frame["code"], LOCAL_NETWORK_PERMISSION_DENIED);
+        assert_ne!(
+            frame["code"], "peripheral_error",
+            "a denied permission is not a transport failure: retrying it changes nothing"
+        );
+        assert!(
+            frame["message"]
+                .as_str()
+                .expect("message")
+                .contains("ACCESS_LOCAL_NETWORK"),
+            "the message must name the permission so the log points at the toggle"
+        );
     }
 
     // ── A (e2e): `Host` de rebinding rechazado en `/ws` y `/status` ──────────
