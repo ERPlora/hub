@@ -35,12 +35,19 @@ async fn consulta_real_contra_preproduccion() {
     let ejercicio = std::env::var("ERPLORA_EJERCICIO").unwrap_or_else(|_| "2026".into());
     let periodo = std::env::var("ERPLORA_PERIODO").unwrap_or_else(|_| "08".into());
 
-    let endpoint = aeat::consult_endpoint("testing");
+    // El `.p12` de este ensayo es el de REPRESENTANTE de ERPlora (`…_R_…`), es decir la forma del
+    // slot `own`: puerta `prewww1` (hub#320). Con un Sello de Entidad habría que pasar
+    // `"delegated"` aquí y el ensayo iría contra `prewww10`.
+    let certificate_kind = "own";
+    let endpoint = aeat::consult_endpoint("testing", certificate_kind);
     println!("ENDPOINT DE CONSULTA : {endpoint}");
-    println!("ENDPOINT DE ALTA     : {}", aeat::endpoint("testing"));
+    println!(
+        "ENDPOINT DE ALTA     : {}",
+        aeat::endpoint("testing", certificate_kind)
+    );
     assert_eq!(
         endpoint,
-        aeat::endpoint("testing"),
+        aeat::endpoint("testing", certificate_kind),
         "el WSDL publica la consulta en el endpoint del alta; si difieren, vuelve el 404"
     );
 

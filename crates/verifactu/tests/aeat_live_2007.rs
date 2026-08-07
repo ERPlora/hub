@@ -29,6 +29,10 @@ fn env(k: &str) -> String {
     std::env::var(k).unwrap_or_else(|_| panic!("falta la variable de entorno {k}"))
 }
 
+/// El `.p12` de este ensayo es el de REPRESENTANTE de ERPlora (`…_R_…`), o sea la forma del slot
+/// `own`: puerta `prewww1` (hub#320). Con un Sello de Entidad iría `"delegated"` → `prewww10`.
+const CERTIFICATE_KIND: &str = "own";
+
 /// Identidad mTLS nueva por petición (`reqwest::Identity` se consume al postear).
 fn identity() -> reqwest::Identity {
     let der = std::fs::read(env("ERPLORA_CERT_P12")).expect("no se pudo leer el .p12");
@@ -96,7 +100,7 @@ async fn send_alta(record: &Json, prev: Option<&Json>, label: &str) -> (String, 
         Err(e) => panic!("[XSD] INVÁLIDO, no se envía a Hacienda: {e}"),
     }
 
-    let body = aeat::post_soap(aeat::endpoint("testing"), identity(), &xml)
+    let body = aeat::post_soap(aeat::endpoint("testing", CERTIFICATE_KIND), identity(), &xml)
         .await
         .expect("la AEAT debe responder 200");
     banner(&format!("{label} — RESPUESTA CRUDA DE LA AEAT"));
@@ -161,7 +165,7 @@ async fn ciclo_2007_rechain_reintento_contra_preproduccion() {
     let name = env("ERPLORA_ISSUER_NAME");
     let consult = aeat::build_consult_soap(&nif, &name, &now.format("%Y").to_string(), &now.format("%m").to_string())
         .expect("envelope de consulta");
-    let body = aeat::post_soap(aeat::consult_endpoint("testing"), identity(), &consult)
+    let body = aeat::post_soap(aeat::consult_endpoint("testing", CERTIFICATE_KIND), identity(), &consult)
         .await
         .expect("la consulta debe responder 200");
     banner("PASO 2 · CONSULTA tras el 2007 — RESPUESTA CRUDA");
@@ -212,7 +216,7 @@ async fn ciclo_2007_rechain_reintento_contra_preproduccion() {
     println!("Descripcion .......... {:?}", resp2.descripcion_error);
 
     // ── PASO 4 — consultar de nuevo: ¿duplicado, sustituido o rechazado? ───────────────────
-    let body = aeat::post_soap(aeat::consult_endpoint("testing"), identity(), &aeat::build_consult_soap(&nif, &name, &now.format("%Y").to_string(), &now.format("%m").to_string()).unwrap())
+    let body = aeat::post_soap(aeat::consult_endpoint("testing", CERTIFICATE_KIND), identity(), &aeat::build_consult_soap(&nif, &name, &now.format("%Y").to_string(), &now.format("%m").to_string()).unwrap())
         .await
         .expect("la consulta debe responder 200");
     banner("PASO 4 · CONSULTA FINAL — RESPUESTA CRUDA");

@@ -11,16 +11,56 @@ use serde_json::Value as Json;
 use crate::chain::{format_amount, format_date};
 use crate::VerifactuError;
 
-/// Endpoint SOAP del sistema de facturación VERI*FACTU por entorno.
-/// `testing` (prewww1.aeat.es) es el **default** del módulo (config.environment).
-pub fn endpoint(environment: &str) -> &'static str {
-    match environment {
-        "production" => {
+/// Endpoint SOAP del sistema de facturación VERI*FACTU. **Dos ejes, y hay que acertar los dos**:
+/// el `environment` y el CERTIFICADO que va a identificarnos en el handshake TLS
+/// (ADR-0202 §2.1 — hub#320).
+///
+/// | | `own` (titular/representante) | `delegated` (Sello de Entidad de ERPlora) |
+/// |---|---|---|
+/// | `testing` (**default**) | `prewww1.aeat.es` | `prewww10.aeat.es` |
+/// | `production` | `www1.agenciatributaria.gob.es` | `www10.agenciatributaria.gob.es` |
+///
+/// La AEAT **segrega la puerta por el tipo de certificado** —igual que en el SII—: `www1` admite
+/// certificados de persona/representante (llevan un NIF dentro) y `www10` admite **sellos de
+/// entidad**, que no cuelgan del DNI de nadie (confirmado en
+/// [OCA/l10n-spain#4597](https://github.com/OCA/l10n-spain/discussions/4597)). El certificado
+/// delegado de ERPlora es ese sello: firma por cada hub bajo apoderamiento (ADR-0202 §2, ZP01).
+/// Mientras esto solo miró el entorno, un hub cuyo único certificado era el delegado presentaba el
+/// sello en la puerta del titular y la AEAT **rechazaba todos sus registros** — y un rechazo no es
+/// eslabón de cadena (ADR-0189), así que había que corregirlos uno a uno.
+///
+/// **Los dos ejes fallan distinto, y por eso ninguno tiene un default «cómodo»:**
+///
+/// - Un `certificate_kind` desconocido cae a la puerta del **titular**, no a la del sello. La
+///   selección la resuelve el core y el motor ni siquiera transmite sin certificado
+///   (`build_identity`), así que aquí solo llega un slot que este binario no conoce: degradarlo al
+///   comportamiento anterior a hub#320 es preferible a mandar a la flota entera a una puerta nueva.
+/// - Un `environment` que no sea literalmente `production` se queda en **preproducción**. Un
+///   rechazo es ruidoso y se corrige; una factura real **aceptada** en el sistema equivocado no se
+///   reenvía ni se borra (ADR-0189).
+///
+/// ⚠️ **`delegated` describe la PROCEDENCIA del certificado (quién lo repartió), no su tipo.** Que
+/// el slot delegado sea un Sello de Entidad es una premisa de ADR-0202, no un dato que viaje por la
+/// frontera: `GET /api/v1/hub/device/fiscal/certificate/` sirve `{version, pkcs12_b64, password,
+/// not_after}` y **no dice qué tipo de certificado es**. Si el plano de control instalase ahí un
+/// certificado de representante, este mapa lo mandaría a `www10` y fallaría todo
+/// ([hub#470](https://github.com/ERPlora/hub/issues/470)).
+pub fn endpoint(environment: &str, certificate_kind: &str) -> &'static str {
+    match (environment == PRODUCTION, certificate_kind == crate::DELEGATED_SLOT) {
+        (false, false) => "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
+        (false, true) => "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
+        (true, false) => {
             "https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         }
-        _ => "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
+        (true, true) => {
+            "https://www10.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        }
     }
 }
+
+/// El único valor de `config.environment` que saca a un hub de preproducción. Constante para que la
+/// comparación esté escrita UNA vez: es la que decide si una factura sale hacia la AEAT de verdad.
+const PRODUCTION: &str = "production";
 
 /// Endpoint SOAP del **servicio de consulta** VERI*FACTU (`ConsultaFactuSistemaFacturacion`).
 ///
@@ -32,8 +72,12 @@ pub fn endpoint(environment: &str) -> &'static str {
 /// por eso toda consulta —y con ella `recover_from_aeat`, la única recuperación automática de la
 /// cadena— devolvía 404 desde siempre (hub#287; el SaaS traía el mismo fallo, saas#1081).
 /// Sondeadas ocho rutas con el certificado real contra preproducción: todas 404, y la del alta 200.
-pub fn consult_endpoint(environment: &str) -> &'static str {
-    endpoint(environment)
+///
+/// Toma los **mismos dos ejes** que [`endpoint`] (hub#320): recuperar la cadena tiene que hablar
+/// con la misma puerta por la que se emitió, y un hub que firma con el delegado consulta por
+/// `www10` como transmite por `www10`.
+pub fn consult_endpoint(environment: &str, certificate_kind: &str) -> &'static str {
+    endpoint(environment, certificate_kind)
 }
 
 /// Escapa texto para XML.
