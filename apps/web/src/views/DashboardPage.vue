@@ -1,5 +1,9 @@
 <template>
-  <AppPage :title="t('nav.home')">
+  <!-- `setup-checklist-on-screen`: mientras la tarjeta de la checklist esté a la vista, la franja
+       bloqueante (hub#374) se retira — la tarjeta dice más de lo mismo, con la misma vía de entrada,
+       una pantalla más abajo. Es la MISMA condición que pinta la tarjeta (la pestaña Resumen): dos
+       condiciones distintas para una sola pantalla acabarían enseñándolo dos veces, o ninguna. -->
+  <AppPage :title="t('nav.home')" :setup-checklist-on-screen="tab === 'resumen'">
       <!-- ── Resumen ── -->
       <template v-if="tab === 'resumen'">
         <!-- Zona 1 — Cabecera contextual: saludo por franja horaria + fecha del día. Da contexto al
