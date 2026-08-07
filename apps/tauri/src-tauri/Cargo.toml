@@ -46,8 +46,26 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 # El `eprintln!` de Rust NO llega a logcat en Android: sin esto, un fallo del chequeo del
 # hub recordado es invisible, que es justo como se coló que no corría.
 log = "0.4"
+# Deep link `erplora://` (ADR-0196 §7). Registration is what makes a link from the SaaS open the
+# APP, and each platform learns about the scheme somewhere else: Windows from a registry key and
+# Linux from a `.desktop` handler, both written by the BUNDLER at install time from
+# `plugins.deep-link.desktop.schemes`; macOS/iOS from `CFBundleURLTypes` in the bundle; Android
+# from the intent filter in `AndroidManifest.xml`. Doing that by hand is where the plugin earns its
+# place — and it is also the only portable way to receive the URL once the app is running.
+tauri-plugin-deep-link = "2"
 
 [dev-dependencies]
 # `tests/remote_acl.rs` valida los patrones de `capabilities/default.json` con el MISMO motor que
 # Tauri usa en runtime (`RemoteUrlPattern`), en vez de reimplementar el matching en el test.
 tauri-utils = "2"
+
+# Desktop only. On Windows and Linux the OS answers a link by LAUNCHING the executable again with
+# the URL appended, so without this a click would start a SECOND till on top of the first one
+# instead of steering the one already open. Mobile has no such thing (`singleTask` + the intent
+# does it), hence the target gate.
+#
+# The cfg is spelled out per-OS and not as `cfg(desktop)`: that alias is a rustc cfg emitted by
+# `tauri-build`, and Cargo does not know it when resolving dependencies — it would silently drop
+# the crate and the `#[cfg(desktop)]` code would stop compiling.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
