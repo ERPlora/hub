@@ -1248,24 +1248,29 @@ fn cloud_get_error_response(e: CloudGetError) -> Response {
     }
 }
 
-/// GET hub-scoped al Cloud y devuelve el JSON tal cual (ver [`cloud_get_raw`]).
+/// Hub-scoped GET to the Cloud, returning its JSON untouched (see [`cloud_get_raw`]).
 async fn proxy_cloud_get(
     st: &AppState,
     headers: &HeaderMap,
     req: cloud_client::PreparedRequest,
 ) -> Response {
     match cloud_get_raw(st, headers, req).await {
-        Ok((status, body)) => (
-            status,
-            [
-                (axum::http::header::CONTENT_TYPE, "application/json"),
-                (axum::http::header::CACHE_CONTROL, "no-store"),
-            ],
-            body,
-        )
-            .into_response(),
+        Ok((status, body)) => cloud_json_passthrough(status, body),
         Err(e) => cloud_get_error_response(e),
     }
+}
+
+/// Hands the front the Cloud's JSON as it came: same status, `no-store`, nothing reinterpreted.
+fn cloud_json_passthrough(status: StatusCode, body: axum::body::Bytes) -> Response {
+    (
+        status,
+        [
+            (axum::http::header::CONTENT_TYPE, "application/json"),
+            (axum::http::header::CACHE_CONTROL, "no-store"),
+        ],
+        body,
+    )
+        .into_response()
 }
 
 /// GET público al Cloud. Solo se usa para metadatos publicados del catálogo Demo; nunca para
@@ -1386,11 +1391,22 @@ async fn proxy_bridge_token(State(st): State<AppState>, headers: HeaderMap) -> R
     proxy_cloud_get(&st, &headers, cloud.bridge_token(&placeholder)).await
 }
 
-/// GET /api/marketplace/catalog — catálogo real del marketplace.
+/// GET /api/marketplace/catalog — the real marketplace catalogue.
 ///
-/// Un Hub registrado usa `/api/v1/marketplace/modules/` con su token de máquina para recibir el
-/// contexto de ese Hub. Demo, única excepción al registro, consume el catálogo público de metadatos
-/// `/api/v1/marketplace/catalog/`; ninguna operación protegida se vuelve pública.
+/// A registered Hub uses `/api/v1/marketplace/modules/` with its machine token so the answer is
+/// scoped to that Hub. Demo, the one exception to registration, consumes the public metadata
+/// catalogue `/api/v1/marketplace/catalog/`; no protected operation ever becomes public.
+///
+/// **On the way through it records what the marketplace offered** (hub#371). This is the only time
+/// the hub ever sees the catalogue, and the "your apps" item of `hub.setup.status` needs it to tell
+/// *"you still have to install an app"* apart from *"there is nothing you can install"* — which is
+/// not the user's task but our own breakdown. The query cannot ask for itself: it is read by the
+/// dashboard, by the assistant and by a strip on every screen, so a round-trip to the SaaS would put
+/// the control plane on the critical path of every page. The whole rule of what counts as an answer
+/// lives in `setup_status::record_catalog_response`, not here: a 403 or an odd body records nothing.
+///
+/// Demo is deliberately left out: its public catalogue is SaaS metadata, not *"what THIS hub can
+/// install"*, so counting its rows would answer a different question.
 async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
     {
         let rt = st.runtime.lock().await;
@@ -1406,7 +1422,22 @@ async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMa
         hub_id: st.hub_id(),
         token: String::new(),
     };
-    proxy_cloud_get(&st, &headers, cloud.marketplace_modules(&placeholder)).await
+    match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder)).await {
+        Ok((status, body)) => {
+            let rt = st.runtime.lock().await;
+            if let Err(e) =
+                erplora_runtime::setup_status::record_catalog_response(rt.db(), status.as_u16(), &body)
+                    .await
+            {
+                // Recording is a side effect of the proxy: if it fails the catalogue is served all
+                // the same and the checklist is left not knowing — which is "pending", never a
+                // false "unavailable".
+                tracing::warn!(error = %e, "could not record the catalogue offer for the checklist");
+            }
+            cloud_json_passthrough(status, body)
+        }
+        Err(e) => cloud_get_error_response(e),
+    }
 }
 
 /// GET /api/blueprints/catalog — catálogo de blueprints (proxy de `/api/v1/catalog/blueprints/`).
