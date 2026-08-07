@@ -127,6 +127,30 @@ const DEEP_LINK_HUB_ACTION: &str = "hub";
 /// Registrable domain every ERPlora hub lives under (`{slug}.{aura}.erplora.com`).
 const HUB_DOMAIN_SUFFIX: &str = ".erplora.com";
 
+/// Is this host a hub of ours — `<label>[.<label>…].erplora.com`?
+///
+/// The apex has no leading dot to strip, which is exactly why it is excluded: `erplora.com` also
+/// serves marketing, billing and a third-party checkout, and is deliberately kept out of the
+/// hardware capability (ADR-0221). Auras are matched by WILDCARD and never enumerated: hubs live at
+/// `{slug}.{aura}.erplora.com` with auras by letter on Hetzner and by number on the AWS fallback,
+/// so a list would turn "open a new aura" into "ship a new app to every till".
+///
+/// Expects an already-lowercased host — for `https` the URL parser guarantees it, and
+/// [`hub_url_for_host`] lowercases the opaque host of a deep link before asking.
+fn is_hub_domain(host: &str) -> bool {
+    match host.strip_suffix(HUB_DOMAIN_SUFFIX) {
+        Some(subdomain) => !subdomain.is_empty() && subdomain.split('.').all(is_dns_label),
+        None => false,
+    }
+}
+
+/// Is this host THIS machine? Loopback is the development exemption: nothing outside the machine
+/// can serve it, so nobody else can steer a window that points there.
+fn is_loopback_host(host: &str) -> bool {
+    // `[::1]` with brackets is how `Url::host_str` serializes the IPv6 loopback.
+    matches!(host, "127.0.0.1" | "localhost" | "[::1]")
+}
+
 /// Is this a plain DNS label? Deliberately narrower than the RFC: lowercase ASCII only, so a
 /// percent-escape, a homograph or a stray `@` can never pass for a label.
 fn is_dns_label(label: &str) -> bool {
@@ -146,9 +170,8 @@ fn is_dns_label(label: &str) -> bool {
 /// through a link either — and the reverse would be just as bad: opening a page that cannot
 /// `invoke` leaves a till that looks fine and cannot print.
 ///
-/// Auras are matched by WILDCARD and never enumerated: hubs live at `{slug}.{aura}.erplora.com`
-/// with auras by letter on Hetzner and by number on the AWS fallback, so a list would turn
-/// "open a new aura" into "ship a new app to every till".
+/// The production half of the rule lives in [`is_hub_domain`], shared with what the shell is
+/// willing to REMEMBER ([`trusted_hub_origin`]): one predicate, so the two cannot drift apart.
 fn hub_url_for_host(raw_host: &str) -> Option<String> {
     let host = raw_host.trim().to_ascii_lowercase();
 
@@ -164,11 +187,8 @@ fn hub_url_for_host(raw_host: &str) -> Option<String> {
         }
     }
 
-    // Production: `<label>[.<label>…].erplora.com`. The apex has no leading dot to strip, which is
-    // exactly why it is excluded: `erplora.com` also serves marketing, billing and a third-party
-    // checkout, and is deliberately kept out of the hardware capability (ADR-0221).
-    let subdomain = host.strip_suffix(HUB_DOMAIN_SUFFIX)?;
-    if subdomain.is_empty() || !subdomain.split('.').all(is_dns_label) {
+    // Production: the same rule the capture applies to what it is willing to remember (hub#335).
+    if !is_hub_domain(&host) {
         return None;
     }
     Some(format!("https://{host}/?shell=1"))
@@ -238,38 +258,85 @@ fn saas_base_url() -> String {
     )
 }
 
-/// Contrato de captura (ADR-0159): si la navegación lleva el marcador `?shell=1`, devuelve el
-/// ORIGEN a persistir como `hub_url`. Solo `https` — o `http` a loopback (dev). Cualquier otra
-/// cosa (esquemas raros, http remoto, sin marcador) → `None`.
-fn shell_capture_origin(url: &tauri::Url) -> Option<String> {
+/// The ORIGIN this installation may enter "app mode" on, or `None` if it may not.
+///
+/// The trust boundary of `hub.url`, and the reason it is a boundary at all: whatever ends up in
+/// that file is what the window opens FULL-SCREEN, chrome-less and titled "ERPlora" on every cold
+/// start from then on. So the destination is checked, not merely parsed — a hub of ours, or the
+/// loopback of this machine, and nothing else.
+///
+/// It is deliberately the SAME rule as [`hub_url_for_host`] (what a deep link may open, ADR-0225)
+/// and as `capabilities/*.json` (what may drive the hardware, ADR-0221); `tests/remote_acl.rs`
+/// asserts the capture and the capabilities agree origin by origin. They have to: remembering an
+/// origin the capabilities refuse produces a till that looks fine and cannot print, because every
+/// `invoke` from it — down to `device_context` — is rejected by Tauri's ACL.
+///
+/// `https` everywhere, plus plain `http` on loopback for development. There is no opaque-origin
+/// case left to reject: only `http`/`https` get here, and both are special schemes whose origin is
+/// always a tuple.
+fn trusted_hub_origin(url: &tauri::Url) -> Option<String> {
+    // EQUIVALENT UNDER MUTATION, and kept anyway: replacing this `?` with any default changes no
+    // outcome, because the scheme gate below only ever lets `http`/`https` through and neither
+    // parses without a host — so the `None` branch is unreachable from here. It stays so the
+    // function is total on its own terms instead of by depending on the order of the two checks.
+    let host = url.host_str()?;
+    let allowed = match url.scheme() {
+        "https" => is_hub_domain(host) || is_loopback_host(host),
+        // The cloud hub is always https; plain http is the development exemption.
+        "http" => is_loopback_host(host),
+        _ => false,
+    };
+    if !allowed {
+        return None;
+    }
+    Some(url.origin().ascii_serialization())
+}
+
+/// Contrato de captura (ADR-0159): si la navegación lleva el marcador `?shell=1` **y** el destino
+/// es uno de los nuestros ([`trusted_hub_origin`]), devuelve el ORIGEN a persistir como `hub_url`.
+///
+/// El marcador dice «recuérdame», no «soy de fiar»: lo lleva la URL a la que se navega, y el shell
+/// nunca bloquea una navegación (`on_navigation` devuelve siempre `true`), así que sin el segundo
+/// filtro basta un enlace para dejar el TPV arrancando en la página de otro — para siempre.
+pub fn shell_capture_origin(url: &tauri::Url) -> Option<String> {
     let has_marker = url.query_pairs().any(|(k, v)| k == "shell" && v == "1");
     if !has_marker {
         return None;
     }
-    match url.scheme() {
-        "https" => {}
-        "http" => {
-            // http SOLO a loopback (desarrollo): el hub cloud es siempre https.
-            let loopback = matches!(url.host_str(), Some("127.0.0.1") | Some("localhost") | Some("[::1]"));
-            if !loopback {
-                return None;
-            }
-        }
-        _ => return None,
+    let captured = trusted_hub_origin(url);
+    if captured.is_none() {
+        log::warn!(
+            "shell: {} pide ser recordado y no es un hub nuestro; no se captura",
+            url.origin().ascii_serialization()
+        );
     }
-    let origin = url.origin();
-    if !origin.is_tuple() {
-        return None; // origen opaco (data:, blob:, …) — nada que persistir
-    }
-    Some(origin.ascii_serialization())
+    captured
 }
 
-/// Lee el `hub.url` persistido (origen de la PWA), si existe y no está vacío.
+/// Lee el `hub.url` persistido, reducido a su ORIGEN y pasado por [`trusted_hub_origin`].
+///
+/// Se revalida al LEER, no solo al escribir, porque proteger la captura solo protege a los TPV que
+/// aún no han capturado nada: el que ya corrió una build sin el filtro lleva el origen ajeno en el
+/// fichero, y una actualización que se lo crea otra vez no arregla justo el caso que importa. Es
+/// además un fichero de texto en el directorio de datos del usuario: nada impide editarlo.
 fn load_hub_url(cache_dir: &Path) -> Option<String> {
-    std::fs::read_to_string(cache_dir.join(HUB_URL_FILE))
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    let raw = std::fs::read_to_string(cache_dir.join(HUB_URL_FILE)).ok()?;
+    // No `is_empty` guard: an empty (or blank) file does not parse as a URL, so the `?` below is
+    // the same rejection written once instead of twice.
+    //
+    // The `trim` is EQUIVALENT UNDER MUTATION — the WHATWG parser strips leading and trailing C0
+    // and space itself, so dropping it changes no outcome today. It stays because `hub.url` is OUR
+    // file format: normalizing it here says so, instead of leaning on a parsing detail of a
+    // dependency to make our own writes readable.
+    let trimmed = raw.trim();
+    let parsed: tauri::Url = trimmed.parse().ok()?;
+    let trusted = trusted_hub_origin(&parsed);
+    if trusted.is_none() {
+        log::warn!(
+            "shell: el hub recordado ({trimmed}) no es un hub nuestro; vuelvo al onboarding"
+        );
+    }
+    trusted
 }
 
 /// Persiste el origen capturado como `hub.url` (crea `cache_dir` si no existe).
@@ -891,14 +958,6 @@ mod tests {
     }
 
     #[test]
-    fn capture_conserva_el_puerto_no_default() {
-        assert_eq!(
-            shell_capture_origin(&url("https://hub.example.com:8443/?shell=1")),
-            Some("https://hub.example.com:8443".to_string())
-        );
-    }
-
-    #[test]
     fn capture_http_solo_loopback() {
         // http remoto NO se captura (el hub cloud es siempre https).
         assert_eq!(shell_capture_origin(&url("http://evil.com/?shell=1")), None);
@@ -917,6 +976,135 @@ mod tests {
     fn capture_rechaza_esquemas_no_http() {
         assert_eq!(shell_capture_origin(&url("tauri://localhost/?shell=1")), None);
         assert_eq!(shell_capture_origin(&url("file:///tmp/x?shell=1")), None);
+    }
+
+    // ── hub#335: the marker says "remember me"; it does not say WHO may ask ───────────────────
+    //
+    // `?shell=1` was the whole capture contract, so ANY https origin that carried it became the
+    // origin this installation boots at, for good. The shell never blocks a navigation
+    // (`on_navigation` always returns `true`), so one link is enough: an open redirect on the SaaS,
+    // an injection into the third-party checkout the same window loads, or simply a link a user
+    // taps. From then on the till opens full-screen, chrome-less and titled "ERPlora" on somebody
+    // else's page, and the operator types the hub password into it.
+    //
+    // The destination rule is therefore the SAME one the deep link already applies (ADR-0225) and
+    // the same one `capabilities/*.json` declares (ADR-0221): only a hub of ours, or the loopback
+    // of this machine. The three must agree — an origin the capabilities refuse is a till that
+    // looks fine and cannot print, which is the failure `remote_acl.rs` exists to prevent.
+
+    #[test]
+    fn capture_refuses_an_origin_that_is_not_a_hub_of_ours() {
+        // The one the old suite ENSHRINED: `capture_conserva_el_puerto_no_default` asserted that
+        // `https://hub.example.com:8443/?shell=1` was captured. Preserving a non-default port is
+        // right; treating a stranger's domain as this till's hub never was.
+        assert_eq!(
+            shell_capture_origin(&url("https://hub.example.com:8443/?shell=1")),
+            None
+        );
+        assert_eq!(shell_capture_origin(&url("https://evil.com/?shell=1")), None);
+    }
+
+    #[test]
+    fn capture_refuses_the_saas_apex() {
+        // `erplora.com` is where the app BOOTS, not a hub — and it is deliberately kept out of the
+        // hardware capability (ADR-0221). Remembering it would pin the till to the marketing site
+        // on every cold start, with the onboarding one redirect further away than before.
+        assert_eq!(shell_capture_origin(&url("https://erplora.com/?shell=1")), None);
+        assert_eq!(
+            shell_capture_origin(&url("https://erplora.com/shell/?shell=1")),
+            None
+        );
+    }
+
+    #[test]
+    fn capture_refuses_the_domains_that_only_look_like_ours() {
+        // Same three shapes `remote_acl.rs` rejects at the ACL, checked here at the capture: a
+        // boundary that only holds in one of the two places holds nowhere.
+        assert_eq!(
+            shell_capture_origin(&url("https://demo.a.erplora.com.attacker.com/?shell=1")),
+            None
+        );
+        assert_eq!(shell_capture_origin(&url("https://myerplora.com/?shell=1")), None);
+        // Reads as ours to a human; the host is `evil.com`.
+        assert_eq!(
+            shell_capture_origin(&url("https://demo.a.erplora.com@evil.com/?shell=1")),
+            None
+        );
+    }
+
+    #[test]
+    fn capture_accepts_every_shape_a_real_cloud_hub_takes() {
+        // Lettered aura (Hetzner) and numbered aura (AWS fallback) — TWO labels under the
+        // registrable domain. A rule that only allowed one would kill the app in production.
+        assert_eq!(
+            shell_capture_origin(&url("https://panaderia.a.erplora.com/pos?shell=1&x=2")),
+            Some("https://panaderia.a.erplora.com".to_string())
+        );
+        assert_eq!(
+            shell_capture_origin(&url("https://panaderia.3.erplora.com/?shell=1")),
+            Some("https://panaderia.3.erplora.com".to_string())
+        );
+    }
+
+    #[test]
+    fn capture_accepts_loopback_over_tls_too() {
+        // A dev PWA served over TLS (`vite --https`) is the same machine as the plain-http one, so
+        // the loopback exemption belongs to the HOST, not to the scheme.
+        assert_eq!(
+            shell_capture_origin(&url("https://127.0.0.1:5173/?shell=1")),
+            Some("https://127.0.0.1:5173".to_string())
+        );
+    }
+
+    // ── hub#335: an install poisoned by an older build must not stay poisoned ─────────────────
+
+    #[test]
+    fn a_persisted_origin_that_is_not_a_hub_of_ours_is_refused_on_load() {
+        // Refusing at the capture only protects installs that have not been captured yet. Every
+        // till that already ran a build without the check carries the foreign origin in
+        // `hub.url`, and an upgrade that keeps reading it blindly fixes nothing where it matters.
+        // `None` sends the window back to the onboarding, which is the one screen it can leave.
+        let dir = tempdir();
+        std::fs::write(dir.join(HUB_URL_FILE), "https://evil.com").expect("write");
+        assert_eq!(load_hub_url(&dir), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_persisted_value_that_is_not_even_a_url_is_refused_on_load() {
+        // `hub.url` is a plain file in the user's data dir: nothing stops it being edited, or
+        // truncated by a crash. `initial_url_for` used to hand whatever it said to the webview.
+        let dir = tempdir();
+        std::fs::write(dir.join(HUB_URL_FILE), "not a url").expect("write");
+        assert_eq!(load_hub_url(&dir), None);
+        std::fs::write(dir.join(HUB_URL_FILE), "javascript:alert(1)").expect("write");
+        assert_eq!(load_hub_url(&dir), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_persisted_hub_loads_reduced_to_its_ORIGIN() {
+        // Whatever ends up in the file, what boots is the origin: a stored path or query would
+        // otherwise be replayed on every cold start.
+        let dir = tempdir();
+        std::fs::write(dir.join(HUB_URL_FILE), "https://demo.a.erplora.com/pos?x=1\n").expect("write");
+        assert_eq!(load_hub_url(&dir), Some("https://demo.a.erplora.com".to_string()));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── hub#335: a user with SEVERAL hubs ─────────────────────────────────────────────────────
+
+    #[test]
+    fn capturing_a_second_hub_replaces_the_first() {
+        // How switching hubs works, and the reason it needs no extra machinery: `/shell/?choose=1`
+        // lists the user's hubs and 302s into the chosen one carrying the marker, so the capture
+        // that persists hub B is the same one that persisted hub A. Were the first capture sticky,
+        // a till moved to another business would keep opening the old one.
+        let dir = tempdir();
+        persist_hub_url(&dir, "https://a.a.erplora.com").expect("first");
+        persist_hub_url(&dir, "https://b.a.erplora.com").expect("second");
+        assert_eq!(load_hub_url(&dir), Some("https://b.a.erplora.com".to_string()));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     // ── persistencia de hub.url ──────────────────────────────────────────────────────────────

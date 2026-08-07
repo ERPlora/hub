@@ -279,6 +279,51 @@ fn the_saas_origin_cannot_drive_the_hardware() {
     }
 }
 
+// ── The capture contract and the ACL are ONE boundary (hub#335) ─────────────────────────────────
+
+/// Does some capability hand this origin the hardware — i.e. can a till actually run there?
+fn can_drive_the_hardware(raw: &str) -> bool {
+    permissions_granted_to(raw)
+        .into_iter()
+        .any(|(_, permission)| permission == "allow-erplora-print")
+}
+
+#[test]
+fn the_shell_only_remembers_origins_that_can_drive_the_till() {
+    // `?shell=1` is what makes the shell persist an origin as `hub.url` and boot there for good
+    // (ADR-0159), and `remote.urls` is what decides whether that origin may touch the hardware
+    // (ADR-0221). They are two halves of the SAME decision, written in two files, and every way
+    // they can disagree is a bug with no error message:
+    //
+    // - remembered but not authorized → the till boots into a page whose every `invoke` is refused:
+    //   it cannot even ask for `device_context`, so it looks fine and cannot print;
+    // - authorized but not remembered → the app never enters "app mode" on a hub it fully trusts
+    //   and walks the user through the onboarding at every cold start.
+    //
+    // Loopback is deliberately out of the table: the capabilities pin the dev ports (:5173/:8787)
+    // while the capture takes any port of this machine, and an origin only this machine can serve
+    // is nobody else's to steer.
+    for origin in [
+        "https://panaderia.a.erplora.com", // Hetzner, lettered aura
+        "https://panaderia.3.erplora.com", // AWS fallback, numbered aura
+        "https://erplora.com",             // the SaaS apex: boots the app, is not a hub
+        "https://evil.com",
+        "https://hub.example.com:8443", // a hub-shaped host that is not ours
+        "https://erplora.com.attacker.com",
+        "https://myerplora.com",
+        "https://panaderia.a.erplora.com@evil.com",
+    ] {
+        let marked = format!("{origin}/?shell=1");
+        let remembered = erplora_tauri_lib::shell_capture_origin(&url(&marked)).is_some();
+        let authorized = can_drive_the_hardware(&marked);
+        assert_eq!(
+            remembered, authorized,
+            "`{origin}` is remembered={remembered} but authorized={authorized}: the capture \
+             contract and the capabilities disagree about the same origin"
+        );
+    }
+}
+
 #[test]
 fn no_capability_declares_an_origin_outside_our_domain() {
     // Structural guard: rejecting today's known attackers is not enough, because the next widening
