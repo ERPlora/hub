@@ -102,8 +102,9 @@ fn sign_user_jwt(user_id: i64, hubs: Value) -> String {
 
 /// JWT de usuario firmado con un `email` explícito (ADR-0157: el Hub enlaza el login con el
 /// `hub_user` sembrado/invitado por email). `hubs` = claim *coarse* de presencia.
-/// Como [`sign_user_jwt_email`] pero fijando el ROL del usuario en la organización `org-A`.
-/// El Hub lo lee (`organizations` × `hubs[].org`) para decidir con qué rol local se provisiona.
+/// Como [`sign_user_jwt_email`] pero fijando el ROL del usuario en la organización `org-A`, en la
+/// forma **legacy** del contrato (`organizations` × `hubs[].org`) — la única que un hub desplegado
+/// sabe leer. Para controlar las dos formas por separado, ver [`sign_user_jwt_role_keys`] (hub#350).
 fn sign_user_jwt_role(user_id: i64, email: &str, hubs: Value, org_role: &str) -> String {
     let claims = json!({
         "user_id": user_id,
@@ -113,6 +114,40 @@ fn sign_user_jwt_role(user_id: i64, email: &str, hubs: Value, org_role: &str) ->
         "organizations": [{"id": "org-A", "role": org_role}],
         "hubs": hubs,
     });
+    let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
+    encode(&Header::new(Algorithm::RS256), &claims, &key).unwrap()
+}
+
+/// Signed JWT carrying the account role in the two wire shapes **independently** (hub#350), so a
+/// test can reproduce any point of the SaaS rollout:
+///
+///  - `new_role` → the NEW key `hubs[].role`, which the SaaS already emits and which will be the
+///    only one left once the `organizations[]` mirror is retired (saas#1177);
+///  - `legacy_role` → the LEGACY `organizations[].role`, resolved by crossing `hubs[].org`, which
+///    is all a deployed hub reads today.
+///
+/// `None` leaves that shape out of the token entirely — the difference between "the SaaS does not
+/// send it" and "the SaaS sends it empty".
+fn sign_user_jwt_role_keys(
+    user_id: i64,
+    email: &str,
+    new_role: Option<&str>,
+    legacy_role: Option<&str>,
+) -> String {
+    let mut hub = json!({ "id": HUB_ID, "org": "org-A" });
+    if let Some(role) = new_role {
+        hub["role"] = json!(role);
+    }
+    let mut claims = json!({
+        "user_id": user_id,
+        "email": email,
+        "token_type": "access",
+        "exp": 9_999_999_999_i64,
+        "hubs": [hub],
+    });
+    if let Some(role) = legacy_role {
+        claims["organizations"] = json!([{ "id": "org-A", "role": role }]);
+    }
     let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
     encode(&Header::new(Algorithm::RS256), &claims, &key).unwrap()
 }
@@ -833,5 +868,197 @@ async fn legacy_token_without_hubs_claim_is_rejected() {
         !cloud_user_exists(&state, "789").await,
         "token legacy tampoco provisiona"
     );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+// ── The role key travels in TWO wire shapes, and both are accepted (hub#350, plan step 2b) ──────
+//
+// The SaaS signs the account role for this hub twice: under the NEW key `hubs[].role` and under the
+// LEGACY `organizations[].role` mirror, which a hub resolves by crossing `hubs[].org`. The mirror
+// exists only because the deployed fleet is pinned to an image digest and cannot read the new key —
+// retiring it (saas#1177) with the fleet still on the old runtime would silently drop EVERY account
+// owner/admin to `HUB_DEFAULT_ROLE` on their next login, inside their own hub, with no way to fix it
+// from within. This is the change that makes that retirement safe: the hub reads both.
+//
+// The rule when a token carries both: the floor is granted only if EVERY key the token carries is
+// administrative. Two shapes that disagree are an anomaly, and the hub resolves an anomaly by
+// granting the least of what it was told, never the most.
+
+#[tokio::test]
+async fn the_new_hubs_role_key_administers_on_its_own() {
+    // What saas#1177 needs: a token with the role ONLY under `hubs[].role` and no mirror at all.
+    // Before hub#350 the hub read nothing here and the account admin landed as an `employee`.
+    let (router, state, temp) = fixture().await;
+    let token = sign_user_jwt_role_keys(30, "jefa@bar.com", Some("admin"), None);
+
+    let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "30").await.as_deref(),
+        Some("admin"),
+        "the new key alone must grant the same floor the mirror grants today",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn the_legacy_organizations_mirror_still_resolves_on_its_own() {
+    // The other side of the promise: a token from a SaaS that has not started emitting the new key
+    // must keep resolving EXACTLY as it does today. This is the fleet that is already deployed.
+    let (router, state, temp) = fixture().await;
+    let token = sign_user_jwt_role_keys(31, "jefe@bar.com", None, Some("owner"));
+
+    let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "31").await.as_deref(),
+        Some("admin"),
+        "the legacy mirror resolves as it always did — and still never writes `owner`",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn both_shapes_agreeing_resolve_exactly_once() {
+    // The transition window itself: today's SaaS emits both, built from the same membership row, so
+    // they always agree. Reading both must not double-count nor contradict itself.
+    let (router, state, temp) = fixture().await;
+
+    let admin = sign_user_jwt_role_keys(32, "jefa2@bar.com", Some("admin"), Some("admin"));
+    let resp = router.oneshot(cloud_login_bare(&admin)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(cloud_user_role(&state, "32").await.as_deref(), Some("admin"));
+
+    // …and the same for the key that grants nothing, old spelling and new spelling alike.
+    let plain = sign_user_jwt_role_keys(33, "curra2@bar.com", Some("member"), Some("employee"));
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&plain))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "33").await.as_deref(),
+        Some("employee"),
+        "`member` (new) and `employee` (legacy) are the same non-administrative answer",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn when_the_two_shapes_disagree_the_hub_grants_the_least_of_the_two() {
+    // Neither shape may grant MORE than the other allows. A token that says `owner` under one key
+    // and `member` under the other is not a promotion — it is a token the hub cannot trust to mean
+    // administration, so it administers nothing. Deterministic and symmetric: the answer does not
+    // depend on which key happens to carry the higher role.
+    let (router, state, temp) = fixture().await;
+
+    let mirror_higher = sign_user_jwt_role_keys(34, "a@bar.com", Some("member"), Some("owner"));
+    let resp = router.oneshot(cloud_login_bare(&mirror_higher)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "34").await.as_deref(),
+        Some("employee"),
+        "the legacy mirror alone must not administer when the new key says otherwise",
+    );
+
+    let new_key_higher = sign_user_jwt_role_keys(35, "b@bar.com", Some("owner"), Some("member"));
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&new_key_higher))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "35").await.as_deref(),
+        Some("employee"),
+        "and neither must the new key when the mirror says otherwise",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn two_administrative_spellings_of_the_same_membership_still_administer() {
+    // The one disagreement that is NOT an anomaly: the account plane keeps `owner` and `admin` as
+    // two live keys that both administer (`hub_users::is_admin_role`), so a rename in flight that
+    // spells the same membership differently under each key must still open the hub. Refusing here
+    // would lock the account owner out of their own business mid-rollout — the exact failure
+    // hub#347 and hub#349 were written to avoid.
+    let (router, state, temp) = fixture().await;
+    let token = sign_user_jwt_role_keys(36, "duena@bar.com", Some("owner"), Some("admin"));
+
+    let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "36").await.as_deref(),
+        Some("admin"),
+        "both keys administer → the floor holds, and it is still `admin`, never `owner`",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn a_token_with_no_role_in_either_shape_grants_nothing() {
+    // Neither key present: the hub knows nothing about this membership beyond the fact that it
+    // exists, and belonging to a hub has never been enough to administer it (ADR-0157).
+    let (router, state, temp) = fixture().await;
+    let token = sign_user_jwt_role_keys(37, "nadie@bar.com", None, None);
+
+    let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "the presence gate still lets them in");
+    assert_eq!(
+        cloud_user_role(&state, "37").await.as_deref(),
+        Some("employee"),
+        "no role key anywhere → least privilege",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn the_floor_is_re_evaluated_on_every_login_through_the_new_key_too() {
+    // Rule C (hub#347) must survive the rename untouched: a promotion in the SaaS reaches the hub on
+    // the next login whichever shape carries it. Here the whole rollout happens on the new key, with
+    // the mirror already gone — which is what every hub will see after saas#1177.
+    let (router, state, temp) = fixture().await;
+
+    let before = sign_user_jwt_role_keys(38, "socio2@bar.com", Some("member"), None);
+    let resp = router.oneshot(cloud_login_bare(&before)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "38").await.as_deref(),
+        Some("employee"),
+        "`member` is the new spelling of «belongs here», and it grants no floor",
+    );
+
+    let after = sign_user_jwt_role_keys(38, "socio2@bar.com", Some("admin"), None);
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&after))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        cloud_user_role(&state, "38").await.as_deref(),
+        Some("admin"),
+        "the floor is re-evaluated on every login, reading the new key",
+    );
+    assert_eq!(
+        cloud_user_rows(&state, "38").await,
+        1,
+        "the SAME row is raised: reading a second shape must not provision a twin",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn the_new_key_can_never_write_owner_into_the_hub() {
+    // ADR-0157's invariant, re-pinned on the new wire shape: hub ownership comes from the env seeded
+    // at deploy time (`HUB_OWNER_EMAIL`) and no token may write `owner` into `hub_user` — least of
+    // all through a key that did not exist when that rule was written.
+    let (router, state, temp) = fixture().await;
+    let token = sign_user_jwt_role_keys(39, "duena2@bar.com", Some("owner"), None);
+
+    let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let role = cloud_user_role(&state, "39").await;
+    assert_ne!(role.as_deref(), Some("owner"), "ownership is never derived from a token");
+    assert_eq!(role.as_deref(), Some("admin"), "the account owner administers, as `admin`");
     std::fs::remove_dir_all(temp).ok();
 }
