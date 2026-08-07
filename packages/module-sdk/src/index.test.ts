@@ -16,7 +16,27 @@ import {
   majorToMinor,
   minorToMajor,
   dataTableLabels,
+  QUANTITY_SCALE,
+  toMicro,
+  fromMicro,
+  parseQuantity,
+  formatQuantity,
+  onGrid,
 } from './index.ts';
+
+// The barrel re-exports the quantity contract (ADR-0147) from `./quantity.ts`. Asserting the
+// symbols HERE — through `./index.ts`, not through `./quantity.ts` — is what pins the re-export
+// specifier: this runner is `node:test` over ESM (`--experimental-transform-types`), which demands
+// a fully specified relative path. Drop the `.ts` from the barrel's `from './quantity.ts'` and the
+// whole file stops resolving. `quantity.test.ts` cannot catch that: it imports the module directly.
+test('the barrel re-exports the quantity contract (ADR-0147)', () => {
+  assert.equal(QUANTITY_SCALE, 1_000_000);
+  assert.equal(toMicro(1.5), 1_500_000);
+  assert.equal(fromMicro(1_500_000), 1.5);
+  assert.equal(parseQuantity('1,5'), 1_500_000);
+  assert.equal(formatQuantity(1_500_000), '1.5');
+  assert.equal(onGrid(1_500_000, 500_000), true);
+});
 
 test('dataTableLabels traduce todo el chrome compartido de las tablas', () => {
   const es = dataTableLabels('es-ES');

@@ -1,0 +1,87 @@
+# ==============================================================================
+# ERPlora Hub (JS/TS) — typecheck + unit tests of the web shell and the packages
+# ==============================================================================
+#
+# WHY THIS EXISTS (hub#422). The only required gate of this repo was
+# `cargo test --workspace` (test-hub.yml) — Rust only. Everything under `apps/web`
+# and `packages/` merged with nothing checking it, so `vue-tsc` sat RED on `develop`
+# for three days without anyone noticing, and a permanently red typecheck stops
+# being a signal: nobody can tell "I broke it" from "it was already broken".
+#
+# WHY IT DOES NOT COST EXTRA MINUTES (pm#61 — Actions is on overage, $0.006/min).
+# The typecheck was ALREADY billed, just at the worst possible moment: the image
+# build (`build-hub.yml`) runs `pnpm -F @erplora/web build`, which is
+# `vue-tsc --noEmit && vite build`. When the typecheck fails there, the run burns
+# ~20 min of Docker build and publishes NO image — `ghcr.io/erplora/hub:latest`,
+# the tag real hubs pull, silently goes stale. That is exactly what happened on
+# 2026-08-04 (run 30910968169). This job spends ~2 min (~$0.012) to catch the same
+# error BEFORE the merge, so one prevented broken `main` build pays for ~10 runs.
+#
+# The `paths` filter (same trick as test-shell.yml) keeps Rust-only PRs at zero
+# cost: they never trigger this workflow.
+#
+# Cheaper alternative if the budget ever demands it: this job is one command,
+# `pnpm verify` (root) — move it to the local pre-push hook and delete this file.
+# ==============================================================================
+
+name: Web tests (typecheck · vitest)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/test-web.yml"
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/test-web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: test-web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: pnpm verify (vue-tsc + vitest + module-sdk)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      CI: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Same runtime as the image build (docker/Dockerfile: node:22-bookworm-slim + corepack),
+      # so a green run here means the `vue-tsc` inside `build-hub.yml` is green too.
+      - name: Node 22 + pnpm (pinned by package.json `packageManager`)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `pnpm verify` = vue-tsc --noEmit + vitest run (@erplora/web) + node:test (@erplora/module-sdk).
+      # The SDK suite is what pins the `.ts` specifiers of its ESM barrel: its runner
+      # (`node --experimental-transform-types --test`) demands fully specified relative paths, so
+      # "fixing" a TS5097 by deleting an extension turns this job red instead of shipping broken.
+      - name: pnpm verify
+        run: pnpm verify
