@@ -205,6 +205,10 @@ function buildSelection() {
     users: ids.includes('hub_users'),
     media: ids.includes('media'),
     fiscal: ids.includes('fiscal'),
+    // hub#417 — el juego de roles del hub (`hub_role_activation`): sección propia, nunca un efecto
+    // colateral de otra. Encender un rol lo hace asignable a una persona, así que apagarlo se marca
+    // a la vista de su cifra, igual que el resto.
+    roles: ids.includes('roles'),
     modules: ids.filter((s) => s.startsWith('modules/')).map((s) => s.slice('modules/'.length)),
   };
 }

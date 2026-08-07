@@ -19,8 +19,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::export::{foreign_keys, has_column, list_tables, safe_ident, table_owner};
+use crate::export::{foreign_keys, has_column, list_tables, safe_ident, table_owner, ROLES_SECTION};
 use crate::Runtime;
+
+/// Table behind the `roles` section (system migration v13). Named once, next to the section it
+/// backs, so the mirror of the export cannot drift into clearing something else.
+const ROLES_TABLE: &str = "hub_role_activation";
 
 /// Qué secciones se borran. Todo `false`/vacío por defecto: el reset nunca hace de más.
 #[derive(Debug, Clone, Default)]
@@ -33,6 +37,10 @@ pub struct ResetSelection {
     pub media: bool,
     /// Configuración fiscal + certificado. Bloqueada si hay facturas remitidas a la AEAT.
     pub fiscal: bool,
+    /// The hub's role set (`hub_role_activation`, hub#417): which of the roles the installed
+    /// modules DECLARE are live here. Off by default like everything else — switching a role off
+    /// makes it unassignable, so it is never a side effect of clearing something else.
+    pub roles: bool,
     /// Ids de módulos instalados cuyos datos de usuario se borran.
     pub modules: Vec<String>,
 }
@@ -83,6 +91,14 @@ pub async fn plan_reset(rt: &Runtime, hub_id: &str) -> crate::Result<ResetPlan> 
     sections.push(SectionPlan {
         section: "hub_users".into(),
         rows: count_raw(rt, "SELECT count(*) AS n FROM hub_user", hub_id).await,
+        blocked_by: None,
+    });
+    // The role set (hub#417). Counted from the table and not from the catalogue: the catalogue
+    // hides a row whose module is deactivated, and the reset takes the ROWS — so a figure read off
+    // the catalogue would under-count exactly what the owner is about to delete.
+    sections.push(SectionPlan {
+        section: ROLES_SECTION.into(),
+        rows: count_where(rt, ROLES_TABLE, "TRUE", hub_id).await,
         blocked_by: None,
     });
 
@@ -187,6 +203,23 @@ pub async fn execute_reset(
             "hub_users".into(),
             "hub_user".into(),
             "DELETE FROM hub_user WHERE id <> :actor".into(),
+        ));
+    }
+    // The role set (hub#417) — the half of the mirror the reset never had. Once the export learned
+    // to carry which roles this hub has live (ADR-0242), the reset had to learn to clear them, or
+    // «lo que el hub sabe exportar es exactamente lo que sabe borrar» stopped being true.
+    //
+    // It matters beyond symmetry: a switched-on role is a role that can be HANDED to a person
+    // (`roles::ensure_assignable`), a bundle can switch one on, and until now the only way to take
+    // that back was to uninstall the module that declared it. This is the owner's door in the other
+    // direction — and it only ever DELETEs, so it can never be a way to grant.
+    //
+    // Base roles are not here to be protected: they are live by construction and have no row.
+    if selection.roles && existing.iter().any(|t| t == ROLES_TABLE) {
+        ops.push((
+            ROLES_SECTION.into(),
+            ROLES_TABLE.into(),
+            format!("DELETE FROM {ROLES_TABLE} WHERE hub_id = :hub_id"),
         ));
     }
 

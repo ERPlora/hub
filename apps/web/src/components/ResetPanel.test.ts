@@ -61,6 +61,7 @@ const i18n = createI18n({
         resetConfirm: 'Delete permanently',
         reset_hub_settings: 'Hub settings',
         reset_hub_users: 'Employees',
+        reset_roles: 'Active roles',
       },
     },
   },
@@ -80,6 +81,9 @@ const PLAN = {
       blocked_by: '12 facturas remitidas a la AEAT: inalterables por RD 1007/2023, no se pueden borrar',
     },
     { section: 'hub_settings', rows: 7, blocked_by: null },
+    // hub#417: the role set of the hub — the roles the installed modules declare that are LIVE
+    // here. It is a section like any other, so the owner picks it deliberately.
+    { section: 'roles', rows: 4, blocked_by: null },
   ],
 };
 
@@ -217,6 +221,56 @@ describe('ResetPanel', () => {
 
     // Ni se abre el alert: no hay nada seleccionable que borrar.
     expect(resetHub).not.toHaveBeenCalled();
+  });
+
+  // hub#417 — el juego de roles del hub es una sección propia, no un efecto colateral de otra.
+  // Encenderlo hace el rol asignable a una persona, así que apagarlo tiene que ser una decisión
+  // que el dueño toma a la vista de su cifra, no algo que se lleva por delante «Ajustes del hub».
+  it('el juego de roles se marca aparte y viaja como `roles` al runtime', async () => {
+    const w = mountPanel();
+    await flush(w);
+
+    const roles = w.find('[data-testid="reset-section-roles"]');
+    expect(roles.exists()).toBe(true);
+    expect(w.html()).toContain('4');
+
+    await w.vm.toggle('roles');
+    await w.vm.submit();
+
+    expect(resetHub).toHaveBeenCalledTimes(1);
+    const sent = resetHub.mock.calls[0][0] as Record<string, unknown>;
+    expect(sent.roles).toBe(true);
+    // Y NADA más: marcar los roles no puede arrastrar los ajustes ni a los empleados.
+    expect(sent.settings).toBe(false);
+    expect(sent.users).toBe(false);
+  });
+
+  it('no marcar los roles los deja intactos: el reset nunca hace de más', async () => {
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.toggle('hub_settings');
+    await w.vm.submit();
+
+    const sent = resetHub.mock.calls[0][0] as Record<string, unknown>;
+    expect(sent.roles).toBe(false);
+  });
+
+  // La sección se pinta con `t('settings.reset_<section>')`: sin la cadena, el panel enseña la
+  // clave en crudo. El inglés es la fuente y el español SIEMPRE se traduce (ADR-0055/0199), así
+  // que las dos tienen que existir — no basta con la que use el test.
+  it('la sección de roles tiene su cadena en inglés Y en español', async () => {
+    const [en, es] = await Promise.all([
+      import('../i18n/locales/en'),
+      import('../i18n/locales/es'),
+    ]);
+    for (const [lang, mod] of [['en', en], ['es', es]] as const) {
+      // Los locales son objetos `as const` profundamente anidados; se leen aquí como un mapa
+      // genérico para poder preguntar por la clave SIN que el tipo la dé por hecha (que es
+      // justo lo que este test tiene que comprobar).
+      const messages = mod.default as unknown as Record<string, Record<string, string>>;
+      expect(messages.settings?.reset_roles, `falta settings.reset_roles en ${lang}`).toBeTruthy();
+    }
   });
 
   it('ofrece exportar antes de borrar (red de seguridad de un clic)', async () => {
