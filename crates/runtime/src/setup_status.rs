@@ -46,9 +46,10 @@
 //!
 //! * **⛔ [`LEVEL_LEGAL`] = the gate of ADR-0203**, read from the other side. That gate has two
 //!   arms and so does this list: [`BLOCKING_KEYS`] (the business identity, a fixed core key) and
-//!   [`certificate_arm`] (the business certificate, which hangs on whichever installed module
-//!   declares the `certificate` capability). Nothing else is on it — an entry without a gate behind
-//!   it is a colour pretending to be a rule.
+//!   [`certificate_arm`] (a certificate to sign with — the business's own or ERPlora's delegated
+//!   one, [`crate::certificate::can_sign`] — which hangs on whichever installed module declares the
+//!   `certificate` capability). Nothing else is on it — an entry without a gate behind it is a
+//!   colour pretending to be a rule.
 //! * **🔴 [`LEVEL_FUNCTIONAL`] / 🟡 [`LEVEL_RECOMMENDED`] = the module's `required`.** A
 //!   third-party manifest gets to say how much its own configuration matters, and nothing more: it
 //!   can never make itself a condition for selling.
@@ -250,15 +251,16 @@ pub async fn status(
     // so `ctx.has_certificate` is not populated yet. Degrading to "absent" matches the gate, which
     // degrades the same way and would therefore reject — so ⛔ stays honest either way.
     //
-    // ⚠️ This is deliberately the SAME read `queries::execute_page` uses to fill
+    // ⚠️ This is deliberately the SAME read `commands::execute`/`queries::execute_page` use to fill
     // `ctx.has_certificate`, which is what the gate then checks. The two must answer identically:
     // if the checklist and the gate disagree about the certificate, ⛔ starts lying in one
-    // direction or the other. Move one, move the other.
-    let certificate_present = crate::certificate::status(db, hub_id)
-        .await
-        .ok()
-        .and_then(|s| s.get("present").and_then(Json::as_bool))
-        .unwrap_or(false);
+    // direction or the other. That is why the question has a NAME (`certificate::can_sign`) instead
+    // of three call sites spelling it out — move one, you moved all three (hub#319).
+    //
+    // It answers «own OR delegated» (ADR-0202 §2.1): a hub whose only certificate is the one
+    // ERPlora handed down CAN invoice, so painting ⛔ on it would block a screen over a rejection
+    // that is not going to happen.
+    let certificate_present = crate::certificate::can_sign(db, hub_id).await.unwrap_or(false);
     let certificate_arm = certificate_arm(registry, certificate_present);
 
     let mut items: Vec<Json> = Vec::new();
@@ -475,6 +477,11 @@ fn item_key(module_id: &str) -> String {
 /// * **Evaluated, not listed.** With the certificate loaded the runtime accepts, so the arm
 ///   disappears even though the module may still be half-configured — its item stays 🔴 pending. A
 ///   ⛔ that does not block is the colour this whole design exists to avoid.
+///
+/// `certificate_present` is [`crate::certificate::can_sign`] — «the hub has SOMETHING to sign with»,
+/// its own certificate or ERPlora's delegated one (ADR-0202 §2.1, hub#319). A hub running on the
+/// delegated certificate has nothing pending here: it invoices, so painting ⛔ would promise a
+/// rejection that is not going to happen.
 fn certificate_arm(registry: &Registry, certificate_present: bool) -> Vec<String> {
     if certificate_present {
         return Vec::new();

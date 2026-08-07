@@ -39,6 +39,26 @@ pub trait NativeHost: Send + Sync {
         Ok(None)
     }
 
+    /// **Which of the hub's certificates signs** — `"own"`, `"delegated"` or `None` when the hub
+    /// holds neither (ADR-0202 §2.1 — hub#319). The name is
+    /// [`CertificateKind::as_str`](crate::certificate::CertificateKind::as_str)'s, i.e. the value
+    /// stored in `_hub_certificate.kind`.
+    ///
+    /// **The selection rule belongs to the core, and this is how a module borrows it instead of
+    /// re-deriving it.** `verifactu` used to answer «do I have a certificate?» with its own
+    /// `SELECT pkcs12_b64, password FROM _hub_certificate … LIMIT 1`: slot-blind (with two rows it
+    /// took whichever the database returned first), blind to the kinds the core refuses to select,
+    /// and it pulled the certificate's password into the module just to test it for emptiness —
+    /// which is exactly what ADR-0079 exists to prevent. One question, one owner.
+    ///
+    /// Never touches `pkcs12_b64`/`password`: answering «which one signs?» must not drag a private
+    /// key through memory, let alone decrypt one.
+    ///
+    /// Default: `Ok(None)` — a host without certificates has nothing signing.
+    async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+        Ok(None)
+    }
+
     /// Igual que [`certificate_identity`](Self::certificate_identity) pero sobre un `.p12` **provisto
     /// en memoria** (DER + contraseña) — validar/usar un certificado recién subido. La cripto PKCS#12
     /// (OpenSSL) vive SOLO en el core; el módulo no la implementa. Default = la cripto del core.
@@ -116,7 +136,13 @@ pub trait NativeHandler: Send + Sync + std::fmt::Debug {
 }
 
 /// [`NativeHost`] real sobre el adaptador de BD del runtime.
-pub(crate) struct DbHost<'a> {
+///
+/// `pub` para que un test pueda preguntarle a un motor nativo lo mismo que le pregunta el
+/// dispatcher, **con el host de verdad**: la coherencia de hub#319 (el gate fiscal, el ⛔ de la
+/// checklist y el `build_identity` del motor contestan lo mismo) no se puede comprobar contra un
+/// host de mentira, porque un gemelo escrito a mano es justo la forma en que dos lecturas de la
+/// misma pregunta empiezan a divergir.
+pub struct DbHost<'a> {
     pub db: &'a dyn DatabaseAdapter,
     pub storage: Option<&'a dyn crate::module_storage::ModuleStorage>,
     pub hub_id: &'a str,
@@ -141,6 +167,12 @@ impl NativeHost for DbHost<'_> {
 
     async fn certificate_expiry(&self, hub_id: &str) -> Result<Option<String>> {
         crate::certificate::expiry(self.db, hub_id).await
+    }
+
+    async fn certificate_signing_kind(&self, hub_id: &str) -> Result<Option<String>> {
+        Ok(crate::certificate::active_kind(self.db, hub_id)
+            .await?
+            .map(|k| k.as_str().to_string()))
     }
 
     async fn write_static_file(
