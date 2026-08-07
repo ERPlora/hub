@@ -38,8 +38,13 @@
 //! account) they do not have. What the mode changes is **friction**, never authorisation.
 //!
 //! Persistence: columns `mode`/`mode_set_at`/`mode_set_by` of `hub_trusted_device`, **system
-//! migration v15**. `mode_set_by` audits who decided, like `activated_by` in the role catalogue:
-//! lowering the identity friction of a terminal is a decision that has to leave a trace.
+//! migration v17** (v15 was reserved by the print queue, hub#341). `mode_set_by` audits who
+//! decided, like `activated_by` in the role catalogue: lowering the identity friction of a terminal
+//! is a decision that has to leave a trace.
+//!
+//! What HANGS off the mode (hub#358): the login screen only offers the pinpad on a `shared` device
+//! ([`crate::device_mode::DeviceMode::session_ttl_secs`] is the other half) and the session it opens
+//! expires within the shift instead of lasting a month.
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 
@@ -97,6 +102,22 @@ impl DeviceMode {
         }
     }
 
+    /// How long a session opened on this kind of device lives, in seconds (hub#358).
+    ///
+    /// This is the other half of the mode, and the half that makes the first one worth anything: a
+    /// pinpad in front of a session that lasts a month asks who is at the till once and then never
+    /// again. `shared` therefore expires within the shift it opened; `personal` keeps the long
+    /// session the hub has always had — that is what "remember me" means on your own device.
+    ///
+    /// hub#359 turns this into a setting ("ask for a PIN: always / per shift / never"); until then
+    /// the pair is the dial.
+    pub fn session_ttl_secs(self) -> i64 {
+        match self {
+            DeviceMode::Shared => SHARED_SESSION_TTL_SECS,
+            DeviceMode::Personal => crate::identity::DEFAULT_SESSION_TTL_SECS,
+        }
+    }
+
     /// Read a mode back from storage, **failing closed**: a value this build cannot parse — a
     /// hand-run `UPDATE`, a restored backup, a column written by a newer version — is the strict
     /// mode, never the lax one.
@@ -109,6 +130,13 @@ impl DeviceMode {
 
 /// `name` of the `InvalidPayload` rejections of this door (the malformed-request half).
 const MODE_PAYLOAD: &str = "hub.device.mode";
+
+/// How long a session lasts on a **shared** device: twelve hours — one shift.
+///
+/// Deliberately shorter than a day: a till whose session survived the night would be an unattended
+/// open till every morning, which is the exact situation the pinpad exists to prevent. Long enough
+/// that nobody is re-typing a PIN mid-service.
+pub const SHARED_SESSION_TTL_SECS: i64 = 60 * 60 * 12;
 
 /// Stable rejection of the device-mode door (`hub.device.*`), so the UI can tell the admin **why**
 /// instead of showing a generic failure: an unknown device is fixed by signing in online on it

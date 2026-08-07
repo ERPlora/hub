@@ -85,8 +85,10 @@
                   <ion-input-password-toggle slot="end"></ion-input-password-toggle>
                 </ion-input>
 
-                <!-- Checkbox "confiar en este dispositivo" + popover informativo -->
-                <div class="trust-row">
+                <!-- Checkbox "confiar en este dispositivo" + popover informativo. Solo donde el PIN
+                     se va a pedir: en un dispositivo `personal` la pregunta ya está contestada —lo
+                     marcó un administrador— y ofrecerla haría creer que la casilla cambia algo. -->
+                <div v-if="pinAvailable" class="trust-row">
                   <ion-checkbox
                     :checked="trust"
                     label-placement="end"
@@ -116,6 +118,12 @@
                     </div>
                   </ion-popover>
                 </div>
+
+                <!-- Dispositivo `personal` (hub#358): la sesión dura y no se pide PIN. Se dice, en
+                     vez de callarlo, porque es lo que hay que saber si el dispositivo se pierde. -->
+                <ion-text v-else color="medium" class="setup-hint">
+                  <p>{{ t('login.personalDeviceNote') }}</p>
+                </ion-text>
 
                 <ion-note v-if="emailError" color="danger" class="error-note">
                   {{ emailError }}
@@ -154,8 +162,9 @@
                   </template>
                 </ion-button>
 
+                <!-- Atajo al pinpad: solo donde hay pinpad que ofrecer (hub#358). -->
                 <ion-button
-                  v-if="trusted && !showTabs"
+                  v-if="pinAvailable && !showTabs"
                   fill="clear"
                   size="small"
                   @click="step = 'pin'"
@@ -346,6 +355,7 @@ import {
   machineRegistrationRequired,
   pinUsers,
 } from '../lib/runtime';
+import { deviceMode, loadDeviceMode, offersPinLogin } from '../lib/device-mode';
 import { isDark, toggleTheme } from '../lib/theme';
 import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
 
@@ -409,8 +419,15 @@ const trustedUsers = ref<TrustedUser[]>(readTrustedUsers());
 // ---------------------------------------------------------------------------
 // Flujo de pasos
 // ---------------------------------------------------------------------------
-const step = ref<Step>(trusted.value ? 'pin' : 'email');
-const showTabs = computed(() => trusted.value && step.value !== 'setup' && step.value !== 'twoFactor');
+// ¿Ofrece esta pantalla el pinpad? Lo decide el MODO DEL DISPOSITIVO (hub#357/#358), no lo que
+// haya en este navegador: el mostrador —donde varias personas se turnan— pregunta quién está
+// delante; el equipo propio del dueño entra con su cuenta y no le pide cuatro dígitos cada mañana.
+// La regla vive entera en `offersPinLogin` (shared **y** dispositivo de confianza): duplicarla aquí
+// la haría derivar. Hasta que el hub responde, `deviceMode` vale `shared` → el pinpad es el estado
+// por defecto, que es el lado seguro.
+const pinAvailable = computed(() => offersPinLogin(deviceMode.value, trusted.value));
+const step = ref<Step>(pinAvailable.value ? 'pin' : 'email');
+const showTabs = computed(() => pinAvailable.value && step.value !== 'setup' && step.value !== 'twoFactor');
 
 // El RUNTIME (`GET /api/hub/context` → pin_users) es la AUTORIDAD de quién puede hacer login local
 // por PIN. localStorage NO añade usuarios: solo **decora** con email/iniciales (hub_user no guarda
@@ -418,8 +435,10 @@ const showTabs = computed(() => trusted.value && step.value !== 'setup' && step.
 // "conservaban" los de localStorage ausentes del runtime → podía resucitar usuarios obsoletos
 // (drift); ya no. El flujo de seguridad (§2.9) NO cambia: esto solo decide qué pestaña se muestra;
 // la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
+// `deviceMode` entra como fuente porque el hub responde DESPUÉS del montaje: sin ella, un portátil
+// marcado `personal` se quedaría con el pinpad ya pintado hasta recargar.
 watch(
-  [pinUsers, hubContextReady, machineRegistrationRequired],
+  [pinUsers, hubContextReady, machineRegistrationRequired, deviceMode],
   ([users, contextReady, registrationRequired]) => {
     if (!contextReady || step.value === 'setup' || step.value === 'twoFactor') return;
     // Una máquina real sin vínculo no puede entrar por un PIN heredado/cacheado: primero debe
@@ -451,7 +470,10 @@ watch(
     saveTrustedUsers(trustedUsers.value);
     saveTrustedFlag(true);
     trusted.value = true;
-    step.value = 'pin';
+    // El dispositivo puede entrar por PIN, pero solo el mostrador lo OFRECE. En un equipo personal
+    // los usuarios con PIN se conservan (volver a `shared` devuelve las mismas caras): lo que el
+    // modo cambia es la puerta que se enseña, no lo que el hub sabe.
+    step.value = pinAvailable.value ? 'pin' : 'email';
   },
   { immediate: true },
 );
@@ -550,8 +572,12 @@ async function finalizeCloudLogin(result: LoginResult): Promise<void> {
     saveTrustedUsers(trustedUsers.value);
     saveTrustedFlag(true);
     trusted.value = true;
-    step.value = 'setup';
-    return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
+    // El alta de PIN solo tiene sentido donde el PIN se va a pedir. En un dispositivo `personal`
+    // sería un callejón sin salida: cuatro dígitos que nadie volvería a preguntar (hub#358).
+    if (pinAvailable.value) {
+      step.value = 'setup';
+      return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
+    }
   }
 
   await router.replace(redirectTarget());
@@ -686,6 +712,10 @@ async function handleGoogleCallback(): Promise<void> {
 
 onMounted(() => {
   void handleGoogleCallback();
+  // Qué clase de dispositivo es este lo dice el HUB (hub#357). Se pregunta aquí, antes de que
+  // exista sesión alguna —esta pantalla ES quien decide si se pinta el pinpad—, y la respuesta
+  // solo puede quitar fricción: mientras no llegue, o si falla, el dispositivo es `shared`.
+  void loadDeviceMode();
 });
 
 // ---------------------------------------------------------------------------

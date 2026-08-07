@@ -206,6 +206,50 @@ async fn the_mode_survives_a_restart_of_the_runtime() {
     assert_eq!(rt.device_mode("laptop-1").await.unwrap(), DeviceMode::Personal);
 }
 
+#[tokio::test]
+async fn the_till_asks_again_next_shift_and_the_personal_laptop_does_not() {
+    // hub#358: the mode is not only about the pinpad — it is about how long a session lives.
+    // A till whose session lasted a month would show the pinpad once and then never again, and the
+    // "who is standing at it" question the shared mode exists to ask would be decorative.
+    let rt = runtime("hub-dm").await;
+    rt.trust_device("till-1", "Counter till").await.unwrap();
+    rt.trust_device("laptop-1", "Office laptop").await.unwrap();
+    rt.set_device_mode("laptop-1", DeviceMode::Personal, "hub_user:admin")
+        .await
+        .unwrap();
+
+    assert!(
+        DeviceMode::Shared.session_ttl_secs() < DeviceMode::Personal.session_ttl_secs(),
+        "the whole point of the pair: the shared device forgets sooner"
+    );
+    assert!(
+        DeviceMode::Shared.session_ttl_secs() <= 60 * 60 * 24,
+        "a shift, not a month: a till that stays open overnight is an unattended open till"
+    );
+
+    assert_eq!(
+        rt.session_ttl_for_device("till-1").await.unwrap(),
+        DeviceMode::Shared.session_ttl_secs()
+    );
+    assert_eq!(
+        rt.session_ttl_for_device("laptop-1").await.unwrap(),
+        DeviceMode::Personal.session_ttl_secs()
+    );
+
+    // Same fail-closed rule as the mode itself: not knowing means the short session, never the
+    // long one. An unenrolled id and a client that names no device at all are the same thing.
+    assert_eq!(
+        rt.session_ttl_for_device("a-device-nobody-enrolled")
+            .await
+            .unwrap(),
+        DeviceMode::Shared.session_ttl_secs()
+    );
+    assert_eq!(
+        rt.session_ttl_for_device("").await.unwrap(),
+        DeviceMode::Shared.session_ttl_secs()
+    );
+}
+
 #[test]
 fn a_mode_the_hub_does_not_know_is_refused_and_never_resolves_to_personal() {
     // A spelling outside the pair is a MALFORMED request (422), not a business conflict: the UI
