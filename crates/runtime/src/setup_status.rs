@@ -34,14 +34,34 @@
 //!    half-applied migration) its item is **omitted** rather than reported as pending. A false "you
 //!    are missing X" sends the user to fix something that may already be fine — worse than a gap.
 //!
+//! # Three levels, and the ⛔ one is a fact about the runtime (hub#370)
+//!
+//! `required` is a boolean and the checklist needs three answers: ⛔ legal · 🔴 functional · 🟡
+//! recommended. The one that cannot be a boolean is ⛔, because it is **not a stronger 🔴**: it is
+//! the claim that the dispatcher will refuse the operation. Saying it the other way round —
+//! painting ⛔ on something merely important — promises a protection that does not exist, and the
+//! blocking strip (hub#374) cuts the screen on the strength of that claim.
+//!
+//! So the level is derived, never declared:
+//!
+//! * **⛔ [`LEVEL_LEGAL`] = the gate of ADR-0203**, read from the other side. That gate has two
+//!   arms and so does this list: [`BLOCKING_KEYS`] (the business identity, a fixed core key) and
+//!   [`certificate_arm`] (the business certificate, which hangs on whichever installed module
+//!   declares the `certificate` capability). Nothing else is on it — an entry without a gate behind
+//!   it is a colour pretending to be a rule.
+//! * **🔴 [`LEVEL_FUNCTIONAL`] / 🟡 [`LEVEL_RECOMMENDED`] = the module's `required`.** A
+//!   third-party manifest gets to say how much its own configuration matters, and nothing more: it
+//!   can never make itself a condition for selling.
+//!
+//! The level is **orthogonal to the state**. A done item keeps its level; what the strip reads is
+//! `blocking_pending`, the count of items that are ⛔ *and* still pending.
+//!
 //! # What deliberately is NOT here
 //!
-//! The three levels (⛔ legal · 🔴 functional · 🟡 recommended) are hub#370. This module carries the
-//! seam they plug into — [`BLOCKING_KEYS`], the core-owned ⛔ list, empty for now — and nothing
-//! else. Emitting a `level` today would promise a gate that only ADR-0203 makes true, and "blocks"
-//! that does not block is how a checklist becomes decorative. Likewise the third state of the apps
-//! item ("unavailable", hub#371): [`STATE_DONE`]/[`STATE_PENDING`] are strings precisely so that
-//! adding a third value is an addition, not a break.
+//! The third state of the apps item ("unavailable", hub#371): [`STATE_DONE`]/[`STATE_PENDING`] are
+//! strings precisely so that adding a third value is an addition, not a break. And the surfaces —
+//! the dashboard card (hub#372), the assistant (hub#373), the blocking strip (hub#374). This query
+//! paints nothing.
 use std::future::Future;
 use std::pin::Pin;
 
@@ -65,14 +85,24 @@ pub const STATE_DONE: &str = "done";
 /// The item is still the user's to do.
 pub const STATE_PENDING: &str = "pending";
 
+/// ⛔ legal — the runtime rejects the operation. *"You need this in order to invoice."*
+pub const LEVEL_LEGAL: &str = "legal";
+/// 🔴 functional — no gate, but the till cannot do its job. *"Without this you cannot sell."*
+pub const LEVEL_FUNCTIONAL: &str = "functional";
+/// 🟡 recommended — the business runs; you notice it is missing. Never alerts.
+pub const LEVEL_RECOMMENDED: &str = "recommended";
+
 /// **The ⛔ list, and it belongs to the core.** A blocking item is one the runtime actually rejects
 /// — the fiscal precondition of ADR-0203 read from the other side — so it can never be something a
 /// third-party manifest declares about itself.
 ///
-/// Empty until hub#370 fills it, and empty is the honest value: `blocking_pending` counts these, so
-/// today it is 0 and the blocking strip (hub#374) stays silent instead of blocking a sale over a
-/// label with no gate behind it.
-pub const BLOCKING_KEYS: &[&str] = &[];
+/// This is the *fixed* half: the business identity, whose two settings are literally the ones
+/// `enforce_fiscal_precondition` reads. The other arm of the same gate depends on what is installed
+/// and is resolved per call by [`certificate_arm`].
+///
+/// Only keys of [`CORE_ITEMS`] may appear here. A module item is keyed `<module_id>.setup`, so
+/// putting one on this list would hand a third-party manifest the power to stop a sale.
+pub const BLOCKING_KEYS: &[&str] = &[ITEM_BUSINESS_IDENTITY];
 
 /// Where an item that declares no `order` lands: after everything the core placed, never in front
 /// of it. The core owns the scale; a module takes the slot the core assigned it.
@@ -169,6 +199,21 @@ pub async fn status(
             .to_string()
     };
     let country = setting("country_code").to_uppercase();
+    // The second arm of ADR-0203, resolved against THIS hub. Read here for the same reason the
+    // settings are: the reserved `hub.` path answers before the dispatcher enriches the context,
+    // so `ctx.has_certificate` is not populated yet. Degrading to "absent" matches the gate, which
+    // degrades the same way and would therefore reject — so ⛔ stays honest either way.
+    //
+    // ⚠️ This is deliberately the SAME read `queries::execute_page` uses to fill
+    // `ctx.has_certificate`, which is what the gate then checks. The two must answer identically:
+    // if the checklist and the gate disagree about the certificate, ⛔ starts lying in one
+    // direction or the other. Move one, move the other.
+    let certificate_present = crate::certificate::status(db, hub_id)
+        .await
+        .ok()
+        .and_then(|s| s.get("present").and_then(Json::as_bool))
+        .unwrap_or(false);
+    let certificate_arm = certificate_arm(registry, certificate_present);
 
     let mut items: Vec<Json> = Vec::new();
     for core in CORE_ITEMS {
@@ -179,6 +224,7 @@ pub async fn status(
                 None,
                 done,
                 core.required,
+                level_of(core.key, core.required, &certificate_arm),
                 core.title,
                 core.description,
                 core.icon,
@@ -207,12 +253,16 @@ pub async fn status(
         let Some(done) = module_item_done(db, registry, def, ctx).await else {
             continue;
         };
+        let key = item_key(&manifest.id);
         items.push(item_json(
-            &item_key(&manifest.id),
+            &key,
             "module",
             Some(&manifest.id),
             done,
             def.required,
+            // The manifest declares `required`, never the level: the core decides, and the only way
+            // a module item reaches ⛔ is the core hanging a gate arm on it.
+            level_of(&key, def.required, &certificate_arm),
             &def.title,
             &def.description,
             if def.icon.is_empty() {
@@ -238,14 +288,12 @@ pub async fn status(
     });
 
     let pending = items.iter().filter(|i| i["state"] == STATE_PENDING).count();
+    // What hub#374 reads, and the only number it reads: pending AND ⛔. Counting everything pending
+    // would leave the strip up forever; counting every ⛔ item would leave it up on a hub that is
+    // already configured.
     let blocking_pending = items
         .iter()
-        .filter(|i| {
-            i["state"] == STATE_PENDING
-                && i["key"]
-                    .as_str()
-                    .is_some_and(|k| BLOCKING_KEYS.contains(&k))
-        })
+        .filter(|i| i["state"] == STATE_PENDING && i["level"] == LEVEL_LEGAL)
         .count();
 
     Ok(json!({
@@ -263,6 +311,46 @@ fn item_key(module_id: &str) -> String {
     format!("{module_id}.setup")
 }
 
+/// The ⛔ arm of ADR-0203 that is not the core's to hold: the business certificate.
+///
+/// The gate demands it **while any INSTALLED module declares the `certificate` capability** — today
+/// verifactu, tomorrow whatever a second country needs — so the ⛔ hangs on the item of that same
+/// module, which is the one that can clear it. Two properties this owes the rule:
+///
+/// * **Keyed on the capability, never on a module id.** Hardcoding `verifactu` would put the
+///   business back inside a runtime that has none, block the wrong hub outside Spain, and miss the
+///   module that actually carries the certificate. It is also not a self-declaration: a manifest
+///   asking for this capability is asking the gate to demand a certificate of the whole hub, and
+///   the checklist merely says so out loud.
+/// * **Evaluated, not listed.** With the certificate loaded the runtime accepts, so the arm
+///   disappears even though the module may still be half-configured — its item stays 🔴 pending. A
+///   ⛔ that does not block is the colour this whole design exists to avoid.
+fn certificate_arm(registry: &Registry, certificate_present: bool) -> Vec<String> {
+    if certificate_present {
+        return Vec::new();
+    }
+    registry
+        .installed
+        .iter()
+        .filter(|m| m.capabilities.certificate.is_some())
+        .map(|m| item_key(&m.id))
+        .collect()
+}
+
+/// The level of an item: ⛔ if the runtime rejects without it, else what the module asked for.
+///
+/// ⛔ wins over `required` because they answer different questions — `required` is an opinion about
+/// importance, ⛔ is a fact about the dispatcher — and a fact does not lose to an opinion.
+fn level_of(key: &str, required: bool, certificate_arm: &[String]) -> &'static str {
+    if BLOCKING_KEYS.contains(&key) || certificate_arm.iter().any(|k| k == key) {
+        LEVEL_LEGAL
+    } else if required {
+        LEVEL_FUNCTIONAL
+    } else {
+        LEVEL_RECOMMENDED
+    }
+}
+
 /// Every item carries every key (with `module_id` null for a core item), so a consumer never has to
 /// branch on whether a field is present.
 #[allow(clippy::too_many_arguments)]
@@ -272,6 +360,7 @@ fn item_json(
     module_id: Option<&str>,
     done: bool,
     required: bool,
+    level: &str,
     title: &str,
     description: &str,
     icon: &str,
@@ -284,7 +373,11 @@ fn item_json(
         "source": source,
         "module_id": module_id,
         "state": if done { STATE_DONE } else { STATE_PENDING },
+        // What the module declared…
         "required": required,
+        // …and the core's verdict, which is what every surface must read: `required` cannot express
+        // ⛔ and no consumer should be re-deriving the level for itself.
+        "level": level,
         "title": title,
         "description": description,
         "icon": icon,
@@ -537,10 +630,103 @@ mod tests {
     }
 
     #[test]
-    fn the_blocking_list_is_core_owned_and_still_empty() {
-        // hub#370 fills it, and not before ADR-0203 makes ⛔ true. An entry here without a gate
-        // behind it would be a colour pretending to be a rule.
-        assert!(BLOCKING_KEYS.is_empty());
+    fn the_blocking_list_only_ever_holds_keys_of_the_core() {
+        // A module key is `<id>.setup`, so the dot is the boundary: a core key can never have one.
+        // If a module id ever landed here, a third-party manifest would decide what blocks a sale.
+        for key in BLOCKING_KEYS {
+            assert!(
+                !key.contains('.'),
+                "`{key}` looks like a module item, and the ⛔ list is the core's"
+            );
+            assert!(
+                CORE_ITEMS.iter().any(|c| c.key == *key),
+                "`{key}` is on the ⛔ list but is not an item the core emits"
+            );
+        }
+    }
+
+    #[test]
+    fn the_static_blocking_list_is_exactly_the_identity_half_of_the_fiscal_gate() {
+        // ADR-0203 rejects on legal name ∧ tax id, and `business_identity` reads those same two
+        // settings. Anything else added here would be a colour with no gate behind it.
+        assert_eq!(BLOCKING_KEYS, [ITEM_BUSINESS_IDENTITY]);
+    }
+
+    #[test]
+    fn the_three_levels_and_nothing_else() {
+        // ⛔ beats 🔴 beats 🟡, and `required` can only reach the last two.
+        assert_eq!(level_of(ITEM_BUSINESS_IDENTITY, false, &[]), LEVEL_LEGAL);
+        assert_eq!(
+            level_of(ITEM_BUSINESS_IDENTITY, true, &[]),
+            LEVEL_LEGAL,
+            "the ⛔ list wins over whatever `required` says"
+        );
+        assert_eq!(level_of(ITEM_APPS, true, &[]), LEVEL_FUNCTIONAL);
+        assert_eq!(level_of(ITEM_TEAM, false, &[]), LEVEL_RECOMMENDED);
+    }
+
+    #[test]
+    fn a_module_key_only_becomes_legal_when_the_core_hands_it_the_arm() {
+        // The only way a module item reaches ⛔: the core resolved a gate arm onto it. A manifest
+        // has no say — `required` is the only thing it declares, and it maps to 🔴/🟡.
+        let arm = vec!["verifactu.setup".to_string()];
+        assert_eq!(level_of("verifactu.setup", true, &[]), LEVEL_FUNCTIONAL);
+        assert_eq!(level_of("verifactu.setup", true, &arm), LEVEL_LEGAL);
+        assert_eq!(level_of("printing.setup", false, &arm), LEVEL_RECOMMENDED);
+    }
+
+    #[test]
+    fn every_core_item_lands_on_one_of_the_three_levels() {
+        for core in CORE_ITEMS {
+            let level = level_of(core.key, core.required, &[]);
+            assert!(
+                [LEVEL_LEGAL, LEVEL_FUNCTIONAL, LEVEL_RECOMMENDED].contains(&level),
+                "{} got `{level}`, which no surface knows how to paint",
+                core.key
+            );
+        }
+    }
+
+    #[test]
+    fn the_certificate_arm_disappears_once_the_certificate_is_loaded() {
+        // With the certificate in the hub the gate accepts, so there is nothing left to block on —
+        // even though the module that carries it may still be half-configured.
+        let mut registry = Registry::new();
+        registry
+            .installed
+            .push(certificate_manifest("verifactu"));
+        assert_eq!(certificate_arm(&registry, false), vec!["verifactu.setup"]);
+        assert!(certificate_arm(&registry, true).is_empty());
+    }
+
+    #[test]
+    fn the_certificate_arm_is_keyed_on_the_capability_not_on_a_module_id() {
+        // Same reason ADR-0203 never names `verifactu`: the runtime carries no business inside.
+        let mut registry = Registry::new();
+        registry.installed.push(certificate_manifest("fattura"));
+        registry.installed.push(plain_manifest("verifactu"));
+        assert_eq!(certificate_arm(&registry, false), vec!["fattura.setup"]);
+    }
+
+    #[test]
+    fn a_hub_with_no_certificate_module_has_no_certificate_arm() {
+        // The gate only demands the certificate WHILE such a module is installed, so a hub outside
+        // Spain must not be told it is blocked by something nothing will ever ask it for.
+        let mut registry = Registry::new();
+        registry.installed.push(plain_manifest("inventory"));
+        assert!(certificate_arm(&registry, false).is_empty());
+    }
+
+    fn certificate_manifest(id: &str) -> crate::manifest::Manifest {
+        serde_json::from_value(json!({
+            "id": id, "name": id, "version": "1.0.0",
+            "capabilities": { "certificate": { "purpose": "fiscal-sign" } }
+        }))
+        .unwrap()
+    }
+
+    fn plain_manifest(id: &str) -> crate::manifest::Manifest {
+        serde_json::from_value(json!({ "id": id, "name": id, "version": "1.0.0" })).unwrap()
     }
 
     #[test]
