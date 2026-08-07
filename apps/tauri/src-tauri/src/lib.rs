@@ -35,6 +35,14 @@ const DEFAULT_SAAS_URL: &str = "https://erplora.com";
 pub enum ShellError {
     #[error("io error: {0}")]
     Io(String),
+    /// The address is not one this app will hand to a browser ([`external_browser_url`]).
+    #[error("external_url_refused")]
+    ExternalUrlRefused,
+    /// There is a browser to ask for and it said no — or there is none at all (an Android with no
+    /// browser installed answers `ActivityNotFoundException`). Either way the trip did not happen,
+    /// and the page has to say so instead of pretending it did (hub#475).
+    #[error("external_url_unavailable: {0}")]
+    ExternalUrlUnavailable(String),
 }
 
 impl Serialize for ShellError {
@@ -126,6 +134,11 @@ const DEEP_LINK_HUB_ACTION: &str = "hub";
 
 /// Registrable domain every ERPlora hub lives under (`{slug}.{aura}.erplora.com`).
 const HUB_DOMAIN_SUFFIX: &str = ".erplora.com";
+
+/// The apex itself — the SaaS: marketing, the dashboard, billing and the module checkout. It is
+/// [`HUB_DOMAIN_SUFFIX`] without the leading dot that makes that one a suffix match, and it is
+/// deliberately NOT a hub: only [`external_browser_url`] accepts it.
+const ERPLORA_DOMAIN: &str = "erplora.com";
 
 /// Is this host a hub of ours — `<label>[.<label>…].erplora.com`?
 ///
@@ -234,6 +247,57 @@ pub fn resolve_deep_link(raw: &str) -> Option<String> {
 /// verbatim.
 pub fn deep_link_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
     args.into_iter().find_map(|arg| resolve_deep_link(&arg))
+}
+
+// ── The way OUT: the user's own browser (hub#475) ────────────────────────────────────────────────
+
+/// The address `openExternal` may hand to the SYSTEM browser, normalized — or `None`.
+///
+/// The web app has one door out of the till, and behind it are the buttons that CHARGE: the module
+/// checkout that ADR-0114 §4 moved to the SaaS *because Google Play does not allow paying for
+/// digital goods inside the app*, the plans page, the billing portal, the plan-limit upsell. In the
+/// browser that door is a new tab; inside the installed app it was `window.open`, which opens
+/// nothing at all — no plugin is exposed to the page and the webview spawns no window.
+///
+/// Letting the page ask for a browser is a frontier of its own: an unchecked opener turns the till
+/// into a launcher for any address the page names — a phishing page wearing the trust of an
+/// installed app, a `file://` path handed to whatever the desktop associates with it, or a custom
+/// scheme that starts another program. So the destination is checked here, like ADR-0221 checks who
+/// may drive the hardware and ADR-0225 what a link may open.
+///
+/// **The apex is IN, and that is the difference from the other two boundaries.** [`is_hub_domain`]
+/// and [`trusted_hub_origin`] refuse `erplora.com` on purpose, because they answer "may this page
+/// open the cash drawer / become this till's home?". This one answers "may the user's browser be
+/// sent here?" — and the apex is the SaaS, where all eight destinations live. A visit grants
+/// nothing: the page opens in the browser's own sandbox, with no `invoke` and no way back in.
+pub fn external_browser_url(raw: &str) -> Option<String> {
+    // EQUIVALENT UNDER MUTATION, and kept anyway (same call as `resolve_deep_link`): the WHATWG
+    // parser already strips leading and trailing spaces, so dropping `trim` changes no outcome —
+    // `hands_the_browser_a_PARSED_address_not_the_page_s_text` passes either way. It stays because
+    // reading "trim, then parse" should not require knowing that clause of the URL spec.
+    let url: tauri::Url = raw.trim().parse().ok()?;
+
+    // Credentials are the oldest confusion trick there is, and the dangerous half is the one the
+    // host check cannot catch: `https://support%40evil.example@erplora.com/` really is our host,
+    // and the browser would show a page nobody at ERPlora wrote under an address that reads like
+    // support.
+    if !url.username().is_empty() || url.password().is_some() {
+        return None;
+    }
+
+    let host = url.host_str()?;
+    let allowed = match url.scheme() {
+        // Everything we serve: the SaaS at the apex plus every hub, auras by wildcard.
+        "https" => host == ERPLORA_DOMAIN || is_hub_domain(host),
+        // Development against a local SaaS (`VITE_CLOUD_API_URL=http://127.0.0.1:8001`). Nothing
+        // outside this machine can serve loopback, so nobody else can steer it.
+        "http" => is_loopback_host(host),
+        // Nothing else. `file:`, `javascript:` and custom schemes are not "a web address the user
+        // wanted": they are instructions to the operating system.
+        _ => false,
+    };
+
+    allowed.then(|| url.to_string())
 }
 
 // ── Estado del shell: captura y persistencia del hub_url (ADR-0159) ──────────────────────────────
@@ -423,6 +487,31 @@ fn forget_hub(app: tauri::AppHandle) -> Result<(), ShellError> {
         }
     }
     Ok(())
+}
+
+/// `open_external_url` — hands `url` to the user's OWN browser, leaving the till where it is.
+///
+/// This is what the web app's `openExternal` calls inside the installed app (hub#475). It is a
+/// separate program, not a tab of ours, and that is the point on two counts: the till stays exactly
+/// as the user left it while they pay, and the payment happens **outside** the app — the shape
+/// ADR-0114 §4 chose so the Android build can ship (Play does not allow digital goods to be paid
+/// for inside the app).
+///
+/// A refusal is returned, never swallowed: the page turns it into something the user can read. A
+/// button that does nothing when pressed is the defect this command exists to end.
+#[tauri::command]
+fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(), ShellError> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let Some(target) = external_browser_url(&url) else {
+        log::warn!("shell: refused to open {url} externally — not an address of ours");
+        return Err(ShellError::ExternalUrlRefused);
+    };
+    // `None` for `with`, deliberately: the plugin's `"inAppBrowser"` opens an Android Custom Tab,
+    // which is chrome our app hosts. What is wanted here is the browser as its own app.
+    app.opener()
+        .open_url(target, None::<&str>)
+        .map_err(|e| ShellError::ExternalUrlUnavailable(e.to_string()))
 }
 
 /// Pregunta en segundo plano si el hub recordado sigue existiendo y, si no, lo olvida y devuelve
@@ -840,6 +929,11 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_erplora_android::init())
+        // The user's own browser (hub#475). Registered for its RUST api only: no `opener:*`
+        // permission is granted to any origin (`tests/remote_acl.rs`), so the page cannot reach the
+        // plugin's own commands — which take any address, and two of which open FILES. What the
+        // page gets is `open_external_url`, which checks the destination first.
+        .plugin(tauri_plugin_opener::init())
         // Deep link `erplora://` (ADR-0196 §7): registro del esquema por plataforma + entrega de la
         // URL. Va DESPUÉS de single-instance a propósito: el orden que documenta el propio plugin.
         .plugin(tauri_plugin_deep_link::init())
@@ -901,6 +995,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             device_context,
             forget_hub,
+            open_external_url,
             // Datos: NO van por `invoke` (ADR-0050) — la PWA habla HTTP+WS con su hub cloud.
             // Camino de hardware: impresoras de red ESC/POS + cajón → peripherals.
             erplora_bridge_status,

@@ -12,6 +12,9 @@ fn main() {
             // Identidad de dispositivo (X-Device-Id, sesión única ADR-0154) + olvido del hub.
             "device_context",
             "forget_hub",
+            // The way OUT to the user's own browser: the SaaS checkout, the plans page, the
+            // billing portal (hub#475). `window.open` opens nothing inside the webview.
+            "open_external_url",
             // Hardware (el shell ES el bridge, §2.7).
             "erplora_bridge_status",
             "erplora_discover_printers",

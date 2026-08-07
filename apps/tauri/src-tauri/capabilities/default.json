@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The HUB origins of the 'main' window (ADR-0159, thin client) — the only capability that hands out the hardware. The webview loads REMOTE origins: the cloud hub PWA (https://*.erplora.com) and, in dev, the local PWA (Vite :5173 or the runtime :8787). Without these remote.urls Tauri's ACL refuses every invoke from the PWA and the till cannot print. The wildcard crosses labels on purpose: hubs live at {slug}.{aura}.erplora.com, with lettered auras on Hetzner and numbered ones on the AWS fallback, so enumerating auras would mean shipping a new app to every till the day a new aura opens. The SaaS apex is NOT covered by this pattern and lives in `onboarding.json` with no hardware. CUSTOM hub domains get no hardware in v1 (they cannot be enumerated here — see ADR-0159). local:true keeps tauri:// authorized (transient boots / degraded page).",
+  "description": "The HUB origins of the 'main' window (ADR-0159, thin client) — the only capability that hands out the hardware. The webview loads REMOTE origins: the cloud hub PWA (https://*.erplora.com) and, in dev, the local PWA (Vite :5173 or the runtime :8787). Without these remote.urls Tauri's ACL refuses every invoke from the PWA and the till cannot print. The wildcard crosses labels on purpose: hubs live at {slug}.{aura}.erplora.com, with lettered auras on Hetzner and numbered ones on the AWS fallback, so enumerating auras would mean shipping a new app to every till the day a new aura opens. The SaaS apex is NOT covered by this pattern and lives in `onboarding.json` with no hardware. CUSTOM hub domains get no hardware in v1 (they cannot be enumerated here — see ADR-0159). local:true keeps tauri:// authorized (transient boots / degraded page). Besides the hardware it grants `allow-open-external-url`, the way OUT to the user's own browser (hub#475): the till PWA is where the buttons that CHARGE live, and `window.open` opens nothing in a webview. The raw `opener:*` permissions are NEVER granted — they take any address and two of them open files.",
   "local": true,
   "remote": {
     "urls": [
@@ -15,6 +15,7 @@
     "core:default",
     "allow-device-context",
     "allow-forget-hub",
+    "allow-open-external-url",
     "allow-erplora-bridge-status",
     "allow-erplora-discover-printers",
     "allow-erplora-get-devices",
