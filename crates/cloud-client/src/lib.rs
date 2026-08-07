@@ -208,9 +208,23 @@ impl CloudClient {
     /// `sha256`. `GET /api/v1/catalog/blueprints/{slug}/download/`. El runtime baja el zip de esa
     /// URL y **verifica el sha256 ANTES de aplicar nada** (mismo contrato que el install de
     /// módulos: ruta inmutable + hash). [ADR-0121]
-    pub fn blueprint_download(&self, slug: &str, auth: &Auth) -> PreparedRequest {
+    ///
+    /// El `slug` es único **por idioma** (`restaurante` puede existir en `es` y en `fr`), así que
+    /// el endpoint contesta **400** ante uno ambiguo sin `?locale=`: elegir al azar sembraría el
+    /// hub en el idioma equivocado. Por eso el blueprint declarado por el SaaS viaja como
+    /// **slug + locale** (ADR-0212), y ese locale llega aquí.
+    pub fn blueprint_download(
+        &self,
+        slug: &str,
+        locale: Option<&str>,
+        auth: &Auth,
+    ) -> PreparedRequest {
+        let query = match locale.map(str::trim).filter(|l| !l.is_empty()) {
+            Some(locale) => format!("?locale={}", encode_path_segment(locale)),
+            None => String::new(),
+        };
         self.get(
-            &format!("/api/v1/catalog/blueprints/{slug}/download/"),
+            &format!("/api/v1/catalog/blueprints/{slug}/download/{query}"),
             auth,
         )
     }
@@ -792,12 +806,26 @@ mod tests {
         assert!(list.headers.contains(&("X-Hub-Token", "tok".to_string())));
         assert!(list.headers.contains(&("X-Hub-Id", "h1".to_string())));
 
-        let dl = c.blueprint_download("barberia-basica", &auth);
+        let dl = c.blueprint_download("barberia-basica", None, &auth);
         assert_eq!(
             dl.url,
             "https://erplora.com/api/v1/catalog/blueprints/barberia-basica/download/"
         );
         assert!(dl.headers.contains(&("X-Hub-Token", "tok".to_string())));
+
+        // ADR-0212: el slug es único POR IDIOMA, así que el locale declarado tiene que viajar —
+        // sin él el endpoint contesta 400 ante un slug que existe en dos idiomas.
+        let localized = c.blueprint_download("restaurante", Some("es"), &auth);
+        assert_eq!(
+            localized.url,
+            "https://erplora.com/api/v1/catalog/blueprints/restaurante/download/?locale=es"
+        );
+        // Un locale en blanco no ensucia la URL con un parámetro vacío.
+        let blank = c.blueprint_download("restaurante", Some("  "), &auth);
+        assert_eq!(
+            blank.url,
+            "https://erplora.com/api/v1/catalog/blueprints/restaurante/download/"
+        );
     }
 
     #[test]

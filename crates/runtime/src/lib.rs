@@ -22,6 +22,7 @@ pub mod errors;
 pub mod events;
 pub mod export;
 pub mod host_notify;
+pub mod hub_meta;
 pub mod hub_users;
 pub mod identity;
 pub mod import;

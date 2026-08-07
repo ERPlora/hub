@@ -34,6 +34,7 @@ pub mod activity;
 pub mod api_keys;
 pub mod assistant;
 pub mod auth;
+pub mod bootstrap;
 pub mod daily_usage;
 pub mod embed;
 pub mod entitlement;
@@ -496,6 +497,16 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             }
         });
     }
+
+    // Import del blueprint que el SaaS DECLARÓ para este hub (ADR-0212, hub#406): lo que hace que
+    // un hub recién provisionado —la demo— nazca con catálogo en vez de con el asistente de setup.
+    //
+    // 🔴 Va en su propia task, NO en el camino de arranque. El seed de arriba se aplica con `?` y
+    // un seed roto aborta el boot a propósito; esto no puede: un blueprint que no se pueda importar
+    // debe dejar un hub que FUNCIONA (degradado, sin catálogo), nunca un visitante sin hub. Por eso
+    // `spawn_declared_blueprint_import` devuelve un handle y no un Result — no hay nada que `?`
+    // pueda propagar hasta aquí. Sin las claves de env no lanza nada y no toca el Cloud.
+    bootstrap::spawn_declared_blueprint_import(&state);
 
     // Router de API + (opcional) frontend estático en el MISMO origen (`cfg.web_dir`). En ECS/binario
     // lo vuelca `from_env` desde `HUB_WEB_DIR`; en Tauri (Hub Local, ADR-0050) lo fija el shell con la
@@ -1430,48 +1441,125 @@ async fn download_blueprint(
             return unauthorized(e);
         }
     }
-    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    let placeholder = cloud_client::Auth::HubToken {
-        hub_id: st.hub_id(),
-        token: String::new(),
+    // Credencial hub-scoped: el token de máquina NUNCA llega al navegador (ADR-0003).
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return cloud_get_error_response(CloudGetError::NoCredential);
     };
-
-    // 1) El SaaS nos da URL firmada + sha256 (hub-scoped: se autentica el runtime, no el usuario).
-    let (status, body) =
-        match cloud_get_raw(&st, &headers, cloud.blueprint_download(&slug, &placeholder)).await {
-            Ok(pair) => pair,
-            Err(e) => return cloud_get_error_response(e),
-        };
-    if !status.is_success() {
-        return (
+    // El panel de import baja por slug sin idioma: si el catálogo tuviera ese slug en dos idiomas,
+    // el SaaS contesta 400 y el front lo enseña — elegir uno al azar sería peor.
+    match fetch_blueprint(&st, &auth, &slug, None).await {
+        Ok(fetched) => (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, "application/zip")],
+            fetched.zip,
+        )
+            .into_response(),
+        Err(BlueprintFetchError::Cloud { status, body }) => (
             status,
             [(axum::http::header::CONTENT_TYPE, "application/json")],
             body,
         )
-            .into_response();
+            .into_response(),
+        Err(BlueprintFetchError::Network(msg)) => {
+            cloud_get_error_response(CloudGetError::Network(msg))
+        }
+        Err(BlueprintFetchError::Other(msg)) => bad_gateway(msg),
+    }
+}
+
+/// Un `.blueprint.zip` ya descargado y **verificado**, con la versión que dijo el SaaS.
+pub(crate) struct FetchedBlueprint {
+    pub zip: axum::body::Bytes,
+    pub version: String,
+}
+
+/// Por qué no se pudo traer un blueprint. Separa lo que el SaaS contestó (se reenvía tal cual al
+/// front) de lo que pasó de camino, para que el llamador HTTP conserve su contrato de error.
+pub(crate) enum BlueprintFetchError {
+    /// El SaaS contestó un status de error (404 sin bundle, 400 slug ambiguo, 5xx…).
+    Cloud {
+        status: StatusCode,
+        body: axum::body::Bytes,
+    },
+    /// No se pudo hablar con el Cloud / con Object Storage.
+    Network(String),
+    /// Respuesta ilegible o **integridad rota**: el mensaje ya es legible.
+    Other(String),
+}
+
+impl BlueprintFetchError {
+    /// Motivo en una línea (log, informe de error al Cloud).
+    pub fn message(&self) -> String {
+        match self {
+            BlueprintFetchError::Cloud { status, body } => format!(
+                "el SaaS contestó {status} al resolver el blueprint: {}",
+                String::from_utf8_lossy(body)
+            ),
+            BlueprintFetchError::Network(msg) => msg.clone(),
+            BlueprintFetchError::Other(msg) => msg.clone(),
+        }
+    }
+}
+
+/// Resuelve, descarga y **verifica** un `.blueprint.zip` del catálogo del SaaS.
+///
+/// Es el cuerpo de [`download_blueprint`] sin el guard de sesión de usuario, porque el arranque
+/// (ADR-0212) hace exactamente esto **sin nadie logueado**: se autentica con el token de máquina.
+/// El orden no es negociable (ADR-0015/ADR-0121): 1) el SaaS da URL firmada + `sha256`, 2) se baja
+/// el zip de Object Storage, 3) **se verifica el hash ANTES de devolver un solo byte**.
+pub(crate) async fn fetch_blueprint(
+    st: &AppState,
+    auth: &cloud_client::Auth,
+    slug: &str,
+    locale: Option<&str>,
+) -> Result<FetchedBlueprint, BlueprintFetchError> {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let req = cloud.blueprint_download(slug, locale, auth);
+
+    // 1) URL firmada + sha256 + versión (hub-scoped: se autentica el runtime, no el usuario).
+    let mut r = st.http.get(&req.url);
+    for (k, v) in auth.headers() {
+        r = r.header(k, v);
+    }
+    let resp = r
+        .send()
+        .await
+        .map_err(|e| BlueprintFetchError::Network(e.to_string()))?;
+    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let body = resp
+        .bytes()
+        .await
+        .map_err(|e| BlueprintFetchError::Network(e.to_string()))?;
+    if !status.is_success() {
+        return Err(BlueprintFetchError::Cloud { status, body });
     }
 
-    let info: Value = match serde_json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => return bad_gateway(format!("respuesta de blueprint ilegible: {e}")),
-    };
+    let info: Value = serde_json::from_slice(&body)
+        .map_err(|e| BlueprintFetchError::Other(format!("respuesta de blueprint ilegible: {e}")))?;
     let (Some(url), Some(expected)) = (info["url"].as_str(), info["sha256"].as_str()) else {
-        return bad_gateway("el SaaS no expuso url/sha256 del blueprint".to_string());
+        return Err(BlueprintFetchError::Other(
+            "el SaaS no expuso url/sha256 del blueprint".to_string(),
+        ));
     };
+    let version = info["version"].as_str().unwrap_or_default().to_string();
 
     // 2) Descarga directa de Object Storage (URL prefirmada: sin credenciales nuestras).
     let zip = match st.http.get(url).send().await {
-        Ok(r) if r.status().is_success() => match r.bytes().await {
-            Ok(b) => b,
-            Err(e) => return bad_gateway(format!("descarga del blueprint interrumpida: {e}")),
-        },
+        Ok(r) if r.status().is_success() => r
+            .bytes()
+            .await
+            .map_err(|e| BlueprintFetchError::Network(format!("descarga interrumpida: {e}")))?,
         Ok(r) => {
-            return bad_gateway(format!(
+            return Err(BlueprintFetchError::Other(format!(
                 "Object Storage devolvió {} al bajar el blueprint",
                 r.status()
-            ))
+            )))
         }
-        Err(e) => return bad_gateway(format!("no se pudo descargar el blueprint: {e}")),
+        Err(e) => {
+            return Err(BlueprintFetchError::Network(format!(
+                "no se pudo descargar el blueprint: {e}"
+            )))
+        }
     };
 
     // 3) 🔴 Integridad NO-SALTABLE (ADR-0015): si el hash no casa, no se entrega ni un byte.
@@ -1482,17 +1570,12 @@ async fn download_blueprint(
         format!("{:x}", h.finalize())
     };
     if actual != expected {
-        return bad_gateway(format!(
+        return Err(BlueprintFetchError::Other(format!(
             "integridad del blueprint «{slug}»: sha256 esperado {expected}, obtenido {actual} — import abortado"
-        ));
+        )));
     }
 
-    (
-        StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "application/zip")],
-        zip,
-    )
-        .into_response()
+    Ok(FetchedBlueprint { zip, version })
 }
 
 /// 502 con el motivo en JSON (contrato de error del resto de proxies).

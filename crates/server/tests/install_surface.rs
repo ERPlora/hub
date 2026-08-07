@@ -68,6 +68,7 @@ fn config(base: &Path, dev_mode: bool) -> HubConfig {
         dev_mode,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
+        bootstrap_blueprint: None,
     }
 }
 

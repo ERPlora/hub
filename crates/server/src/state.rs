@@ -128,6 +128,17 @@ pub struct HubConfig {
     /// los tests pueden inyectarlas directamente aquí (sin tocar el env global del proceso).
     /// Vacío ⇒ anillo vacío ⇒ **deny-all** bajo [`Self::signature_policy`] en producción.
     pub module_trusted_keys: Vec<String>,
+    /// Blueprint que el SaaS DECLARA para este hub (ADR-0212): `HUB_BOOTSTRAP_BLUEPRINT` (slug) +
+    /// `HUB_BOOTSTRAP_BLUEPRINT_LOCALE`. `None` ⇒ el hub no importa nada al arrancar.
+    ///
+    /// Viaja la **identidad** del bundle, nunca su URL prefirmada: esa lleva credencial, acaba en
+    /// un log de deploy y caduca en 1 h — menos de lo que vive una task que se reprograma. El hub
+    /// resuelve versión y `sha256` con su token de máquina y verifica el hash antes de aplicar.
+    ///
+    /// El nombre es genérico a propósito (`BOOTSTRAP`, no `DEMO`), como `HUB_SEED_SQL`: el
+    /// mecanismo es del runtime y el SaaS decide quién lo recibe. Ojo, `is_demo()` aquí significa
+    /// **modo `dev`**, otra cosa: esto no se ata a ese flag.
+    pub bootstrap_blueprint: Option<crate::bootstrap::BootstrapBlueprint>,
 }
 
 /// UUID fijo de desarrollo si no se inyecta `HUB_ID` (decisión tomada — flag para humano).
@@ -200,6 +211,17 @@ impl HubConfig {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        // Blueprint declarado por el SaaS para este hub (ADR-0212). Hermano de `HUB_SECTOR`:
+        // ausente o en blanco ⇒ `None` y el arranque no importa nada.
+        //
+        // Sin locale NO se desactiva: un slug declarado sin idioma sigue siendo una declaración, y
+        // callar sería repetir el contrato muerto de `HUB_COUNTRY`. El SaaS contesta 400 si el slug
+        // es ambiguo, y eso es un fallo REPORTADO en vez de un hub que se queda vacío en silencio.
+        let bootstrap_blueprint =
+            crate::bootstrap::BootstrapBlueprint::from_env_values(
+                std::env::var("HUB_BOOTSTRAP_BLUEPRINT").ok().as_deref(),
+                std::env::var("HUB_BOOTSTRAP_BLUEPRINT_LOCALE").ok().as_deref(),
+            );
         Self {
             hub_id,
             cloud_base_url,
@@ -213,6 +235,7 @@ impl HubConfig {
             dev_mode,
             dev_modules_dir,
             module_trusted_keys,
+            bootstrap_blueprint,
         }
     }
 
@@ -303,6 +326,7 @@ mod staging_tests {
             dev_mode,
             dev_modules_dir: Some(PathBuf::from("/tmp/modules")),
             module_trusted_keys,
+            bootstrap_blueprint: None,
         }
     }
 
