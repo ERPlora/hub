@@ -6,11 +6,14 @@
   <AppPage :title="t('nav.home')" :setup-checklist-on-screen="tab === 'resumen'">
       <!-- ── Resumen ── -->
       <template v-if="tab === 'resumen'">
-        <!-- Zona 1 — Cabecera contextual: saludo por franja horaria + fecha del día. Da contexto al
-             entrar (qué día es, quién soy) sin duplicar el título de la topbar. Sin_estado (loading)
-             muestra el saludo en cuanto hay sesión; el nombre degrada a '—' si falta. -->
+        <!-- Zone 1 — The header: the BUSINESS the hub belongs to + today's date (hub#366, PLAN
+             step 10). It used to greet the session user by name, and for a cloud login that name is
+             the account address («Good morning, ioanbeilic@gmail.com»): plumbing of the account, not
+             a business. The person is one tap away in the account menu of the sidebar — one place,
+             not two. While the hub still has no name (day one of every hub) the `<h1>` greets the
+             hour instead of guessing a person: `lib/dashboard-heading.ts`. -->
         <header class="dash-hero">
-          <h1 class="dash-hero-title">{{ greeting }}</h1>
+          <h1 class="dash-hero-title">{{ heading }}</h1>
           <p class="dash-hero-date">{{ todayLabel }}</p>
         </header>
 
@@ -176,7 +179,8 @@ import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
 import { openAssistantForSetup } from '../lib/shell';
 import { detectBridge, type BridgeStatus } from '../lib/bridge-client';
 import { printerLine, probeFromBridge, type HealthLine } from '../lib/system-health';
-import { user } from '../lib/session';
+import { GREETING_KEY, panelHeading } from '../lib/dashboard-heading';
+import { hubSettings } from '../lib/hub-settings';
 import { formatAmount } from '../lib/money';
 import type { WidgetDef, WidgetPreset, OkWidgetBoardLabels } from '@erplora/outfitkit';
 
@@ -291,15 +295,15 @@ async function loadWidgets(): Promise<void> {
 // unidades mayores. Sin decimales para los KPI, con 2 para el feed.
 const eur = (n: number, dec = 0): string => formatAmount(n, { maximumFractionDigits: dec });
 
-// ── Zona 1 — Cabecera contextual: saludo por franja horaria + fecha del día ───────────────────
-// El saludo interpola el nombre del usuario en sesión; si no hay nombre, degrada a '—'. La fecha
-// sigue el locale de la APP (vue-i18n), no el del navegador (#273): app `es` + navegador `en-US`
-// producía «lunes, July 2026». Mismo `locale.value === 'en' ? 'en-GB' : 'es-ES'` que fmtDateTime.
-const greeting = computed<string>(() => {
-  const h = new Date().getHours();
-  const name = user.value?.name?.trim() || '—';
-  const key = h < 12 ? 'dashboard.greetingMorning' : h < 20 ? 'dashboard.greetingAfternoon' : 'dashboard.greetingEvening';
-  return t(key, { name });
+// ── Zone 1 — The header: the business + today's date ─────────────────────────────────────────
+// The `<h1>` is the hub's business name (`business_legal_name`, the single business identity of
+// ADR-0061), and the hour of the day while the hub still has no name — never the session user, who
+// is what printed an email here. The rule (and its fallback) lives in `lib/dashboard-heading.ts`.
+// The date follows the locale of the APP (vue-i18n), not the browser's (#273): app `es` + browser
+// `en-US` produced «lunes, July 2026». Same `locale.value === 'en' ? 'en-GB' : 'es-ES'` as fmtDateTime.
+const heading = computed<string>(() => {
+  const resolved = panelHeading(hubSettings.value?.business_legal_name, new Date().getHours());
+  return resolved.kind === 'business' ? resolved.name : t(GREETING_KEY[resolved.slot]);
 });
 const todayLabel = computed<string>(() => {
   const today = new Date().toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
@@ -457,7 +461,7 @@ function onModulesChanged(): void {
 
 /* Zona 1 — Cabecera contextual. Da contexto al entrar (saludo + fecha) sin duplicar la topbar.
    Tipografía sobre tokens Ionic (mismo lienzo que el resto del shell); margen inferior de
-   respiración antes del banner/tablero. clamp() para que el saludo escale en móvil sin quedar
+   respiración antes del banner/tablero. clamp() para que la cabecera escale en móvil sin quedar
    ni gigante (390px) ni tímido en desktop. */
 .dash-hero {
   margin: 0.25rem 0 1rem;
@@ -469,6 +473,9 @@ function onModulesChanged(): void {
   letter-spacing: -0.01em;
   line-height: 1.2;
   color: var(--ion-text-color, #1a1a1a);
+  /* The title is now the BUSINESS NAME the owner typed: any length, no guaranteed spaces. It wraps
+     — truncating a business name would be worse than a second line. */
+  overflow-wrap: anywhere;
 }
 .dash-hero-date {
   margin: 0.2rem 0 0;
