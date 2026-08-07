@@ -445,17 +445,33 @@ pub async fn set_status(
 
 /// Desinstala: quita capacidades del registro y borra la fila de `hub_module` **de este hub**
 /// (no toca el mismo módulo en otros hubs de la BD compartida). No borra datos.
+///
+/// **Los roles que declaraba salen del catálogo con él** (paso 2b, hub#352) y su activación se
+/// olvida, salvo que otro módulo instalado declare la misma clave. Lo que NO se toca es la gente:
+/// un usuario que llevara ese rol conserva su fila y su rol —reasignar a alguien por la espalda
+/// sería peor que un rol huérfano—, y lo único que pierde son los permisos que concedía el módulo
+/// que se va, que es estrictamente menos, nunca más.
 pub async fn uninstall(
     db: &dyn DatabaseAdapter,
     registry: &mut Registry,
     hub_id: &str,
     module_id: &str,
 ) -> Result<()> {
+    // Se leen ANTES de quitarlo del registro: después ya no hay manifest al que preguntar.
+    let declared = registry
+        .installed
+        .iter()
+        .find(|m| m.id == module_id)
+        .map(crate::roles::declared_by)
+        .unwrap_or_default();
+
     if !registry.remove_module(module_id) {
         return Err(RuntimeError::CommandNotFound(format!(
             "módulo no instalado: {module_id}"
         )));
     }
+    let orphaned = crate::roles::no_longer_declared(registry, &declared);
+    crate::roles::clear_activation(db, hub_id, &orphaned).await?;
     // Quita las scheduled tasks del módulo (ADR-0011): sus capacidades dejan de existir.
     crate::scheduler::remove_module_tasks(db, module_id).await?;
     let mut p = Params::new();

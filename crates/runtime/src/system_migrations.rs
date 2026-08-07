@@ -249,6 +249,34 @@ CREATE TABLE hub_api_key_rate_window (\
         name: "hub_user_owner_role_to_admin",
         postgres: "UPDATE hub_user SET role = 'admin' WHERE lower(role) = 'owner';",
     },
+    // ── v13 — hub#352 (paso 2b): qué roles del catálogo están ACTIVOS en este hub ────────────────
+    // hub#351 dejó que un módulo DECLARE sus roles de negocio (`roles[]`); el catálogo que sale de
+    // agregarlos con los tres roles base es el mismo para cualquier hub que instale esos módulos,
+    // pero **qué roles usa este negocio** no lo decide el paquete: lo decide su administrador. Un
+    // restaurante quiere Waiter · Bartender · Kitchen · Cashier; una peluquería, Receptionist ·
+    // Stylist. Esa decisión es lo que vive aquí.
+    //
+    // **La fila ES la activación** (presente = activo, ausente = inactivo), y por tanto el default
+    // es OPT-IN: instalar un módulo nunca enciende sus roles solo. Es lo conservador —nadie recibe
+    // un rol que no pidió— y es lo que deja hueco a que el blueprint pre-active el juego correcto
+    // por vertical (hub#354) en vez de que todo hub herede todos los roles de todo lo que instala.
+    //
+    // Los roles BASE (`admin`/`manager`/`employee`) **no se guardan aquí**: son el contrato
+    // congelado, están siempre activos y no se pueden apagar. Guardarlos abriría la puerta a un
+    // hub sin ningún rol vivo, que es un hub en el que no puede trabajar nadie.
+    //
+    // `hub_id` como el resto del esquema de sistema (en BD compartida por org, dos hubs tienen sets
+    // distintos). `activated_by` audita QUIÉN lo encendió — la traza importa: activar un rol es
+    // decidir que existe una figura con acceso en el negocio.
+    SystemMigration {
+        version: 13,
+        name: "hub_role_activation",
+        postgres: "\
+CREATE TABLE hub_role_activation (\
+  hub_id TEXT NOT NULL, role_key TEXT NOT NULL, \
+  activated_at TEXT NOT NULL, activated_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id, role_key));",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
