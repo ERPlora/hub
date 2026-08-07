@@ -35,7 +35,7 @@ async fn fixture() -> Fixture {
     let rt = Runtime::with_hub_id(Box::new(db), "hub-users");
     rt.ensure_system_tables().await.unwrap();
     let owner = rt
-        .get_or_link_cloud_user("cloud-1", "Ioan Beilic", "owner", None)
+        .get_or_link_cloud_user("cloud-1", "Ioan Beilic", "owner", None, None)
         .await
         .unwrap();
     let cashier = rt

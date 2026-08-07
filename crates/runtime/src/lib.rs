@@ -738,12 +738,17 @@ impl Runtime {
 
     /// Resuelve (o enlaza/provisiona) el `hub_user` de una identidad cloud (mapeo del JWT). Enlaza
     /// por `cloud_user_id`, si no por `email` (owner sembrado / invitado), si no crea con el rol dado.
+    ///
+    /// `role_floor` es el **suelo** que impone el rol de la cuenta en el Cloud, reevaluado en cada
+    /// login (paso 2b regla C, hub#347): sube el rol de una fila existente si se ha quedado corto,
+    /// nunca lo baja y nunca concede `owner`. `None` = sin suelo, la fila se devuelve intacta.
     pub async fn get_or_link_cloud_user(
         &self,
         cloud_user_id: &str,
         default_name: &str,
         default_role: &str,
         email: Option<&str>,
+        role_floor: Option<&str>,
     ) -> Result<identity::HubUser> {
         identity::get_or_link_cloud_user(
             self.db.as_ref(),
@@ -751,6 +756,7 @@ impl Runtime {
             default_name,
             default_role,
             email,
+            role_floor,
         )
         .await
     }

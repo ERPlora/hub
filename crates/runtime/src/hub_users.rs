@@ -41,9 +41,30 @@ pub const VIEW_USERS_PERMISSION: &str = "hub.users.view";
 const CORE_QUERIES: &[&str] = &["users.list", "roles.list"];
 
 /// Roles que el core conoce siempre, aunque no haya ningún módulo instalado. `owner`/`admin` son
-/// además los que abren el gate de administración del Hub (`is_admin_role`, server); `manager` y
+/// además los que abren el gate de administración del Hub ([`is_admin_role`]); `manager` y
 /// `employee` son los que declaran los `role_permissions` de los módulos.
 pub const BASE_ROLES: &[&str] = &["owner", "admin", "manager", "employee"];
+
+/// Rol al que asciende el **suelo** que impone el rol de la cuenta en el Cloud (paso 2b regla C,
+/// hub#347). Es `admin` y solo `admin`: la propiedad del hub sale del env sembrado al desplegar
+/// (`HUB_OWNER_EMAIL`, ADR-0157) y **nunca** de un token, así que ningún login puede escribir
+/// `owner`. Vive aquí, junto a [`BASE_ROLES`], porque el catálogo de roles es del runtime.
+pub const CLOUD_ROLE_FLOOR: &str = "admin";
+
+/// ¿Este rol **administra el hub**? `owner`/`admin`, insensible a mayúsculas. Conjunto cerrado y
+/// conservador (ADR-0057 §6: "gestionado por owner/admin").
+///
+/// Una única definición para los tres sitios que la necesitan, para que no puedan divergir: el gate
+/// de administración HTTP y las API keys (`server::auth`), la gestión de usuarios-login
+/// (`server::hub_users`) y el suelo de rol del login cloud (`identity::get_or_link_cloud_user`),
+/// que la usa para saber si el rol local ya está en el suelo o hay que subirlo.
+///
+/// Un rol **custom** de un módulo (`bartender`, `kitchen`…) devuelve `false` aunque su
+/// `role_permissions` sea generoso: los permisos que declara un manifest no son la propiedad
+/// "administra el hub", y darla por supuesta concedería administración sin que nadie la conceda.
+pub fn is_admin_role(role: &str) -> bool {
+    matches!(role.to_ascii_lowercase().as_str(), "owner" | "admin")
+}
 
 /// Longitud válida de un PIN local (dígitos). El login es un pinpad numérico.
 const PIN_LEN: std::ops::RangeInclusive<usize> = 4..=8;
@@ -404,6 +425,25 @@ mod tests {
         let db = fresh_db().await;
         identity::ensure_tables(&db).await.unwrap();
         db
+    }
+
+    #[test]
+    fn only_owner_and_admin_administer_the_hub() {
+        // Single, closed definition shared by the HTTP admin gate, the API keys, the login-user
+        // panel and the cloud role floor (hub#347). Widening it grants administration everywhere
+        // at once, so it stays an explicit two-role list.
+        for r in ["owner", "admin", "Owner", "ADMIN"] {
+            assert!(is_admin_role(r), "{r} administra el hub");
+        }
+        // A custom role from a module never administers the hub, however generous its
+        // `role_permissions`: that property is granted by the hub, not declared by a manifest.
+        for r in ["manager", "employee", "member", "bartender", "kitchen", ""] {
+            assert!(!is_admin_role(r), "{r} NO administra el hub");
+        }
+        // The floor the cloud login can impose is `admin` — never `owner` (ADR-0157: hub ownership
+        // comes from `HUB_OWNER_EMAIL`, never from a token).
+        assert_eq!(CLOUD_ROLE_FLOOR, "admin");
+        assert!(is_admin_role(CLOUD_ROLE_FLOOR));
     }
 
     #[test]
