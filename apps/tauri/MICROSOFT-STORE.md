@@ -23,9 +23,11 @@ bridge headless NO tiene ficha de Store — ver la última sección.
 - [`src-tauri/msix/Package.appxmanifest`](src-tauri/msix/Package.appxmanifest) — manifest con
   tokens `__MSIX_*__` que se sustituyen en build-time con la identidad de Partner Center.
 - [`../../scripts/pack-msix.ps1`](../../scripts/pack-msix.ps1) — post-build **puro** (no toca
-  Tauri): stagea el exe de `target/release`, `apps/web/dist` (mismo layout que instala NSIS)
-  y los iconos de Store; parchea el manifest y corre `winapp pack` (CLI oficial de Microsoft,
+  Tauri): stagea el exe de `target/release` y los iconos de Store (mismo layout que instala NSIS:
+  exe + `Assets/`); parchea el manifest y corre `winapp pack` (CLI oficial de Microsoft,
   `winget install microsoft.winappcli`). Sin `-Cert` = sin firmar (lo que exige la submission).
+  **No stagea ningún `dist/` de frontend**: la UI la sirve el hub cloud y la página de respaldo va
+  dentro del propio exe (`frontendDist` = `shell-dist/`, ADR-0154).
 - [`../../.github/workflows/tauri-release.yml`](../../.github/workflows/tauri-release.yml) —
   en el leg Windows del build (tag `v*`): pack MSIX → artifact `app-msix` → job
   `publish-store` (`msstore publish`). Todo **gated por Variables del repo**: hasta que
