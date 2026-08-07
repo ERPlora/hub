@@ -13,6 +13,7 @@
 // el GET solo exige sesión; el PUT lo revalida el runtime contra owner/admin (la UI gatea con
 // `isAdmin` solo para mostrar/ocultar, la autoridad es el runtime).
 import { ref } from 'vue';
+import { publishPinPolicy, type PinPolicy } from './pin-policy';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 import { setHubPalette } from './theme';
 
@@ -44,6 +45,10 @@ export interface HubSettings {
    *  palettes.css; 'erplora' = marca por defecto. El override POR USUARIO vive en
    *  `hub_user_pref` y gana a esta. */
   theme_palette: string;
+  /** Cada cuánto pregunta el hub QUIÉN está en la caja (hub#359). `never` = no se pregunta y las
+   *  ventas dejan de llevar el nombre de quien las hizo. Se compone con el modo del DISPOSITIVO
+   *  (hub#358) por el lado restrictivo, y esa composición la hace el runtime, no el navegador. */
+  pin_policy: PinPolicy;
 }
 
 /**
@@ -72,6 +77,10 @@ function setHubSettings(raw: unknown): HubSettings {
     business_legal_name: typeof r.business_legal_name === 'string' ? r.business_legal_name : '',
     business_address: typeof r.business_address === 'string' ? r.business_address : '',
     theme_palette: typeof r.theme_palette === 'string' && r.theme_palette.trim() ? r.theme_palette.trim() : 'erplora',
+    // El dial «pedir PIN» (hub#359). Lo normaliza `publishPinPolicy` —cerrado, sin trim ni
+    // minúsculas— porque lo que NO se puede leer no puede degradar a `never`: esa es la posición
+    // que deja de atribuir las ventas a una persona.
+    pin_policy: publishPinPolicy(r.pin_policy),
   };
   hubSettings.value = next;
   // La paleta global se refleja en el shell al momento (theme.ts decide si hay override local).

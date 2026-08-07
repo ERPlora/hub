@@ -260,6 +260,22 @@ export default {
     adminOnly: 'Solo un administrador puede cambiar cómo entra la gente en este dispositivo.',
     saveError: 'No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
   },
+  pinPolicy: {
+    title: 'Preguntar quién vende',
+    intro:
+      'Cada cuánto pregunta este hub qué persona está en la caja. Vale para todo el negocio: además, cada dispositivo decide por su cuenta, arriba.',
+    always: 'Cada hora',
+    alwaysConsequence:
+      'La caja olvida quién la estaba usando al cabo de una hora, así que la siguiente persona vuelve a identificarse. Es el que más nombres deja en los tickets, y el que más obliga a teclear.',
+    perShift: 'Una vez por turno',
+    perShiftConsequence:
+      'Quien empieza se identifica y la caja lo recuerda durante las 12 horas siguientes. Cada venta sigue llevando un nombre. Es lo que hace un hub mientras no lo cambies.',
+    never: 'Nunca',
+    neverConsequence:
+      'Nadie teclea un PIN. Quien abriera la caja por la mañana es el nombre de todas las ventas hasta que acabe el turno, las hiciera quien las hiciera: no podrás saber quién vendió qué ni quién hizo un descuento. El personal que solo tiene PIN y no tiene cuenta no podrá entrar.',
+    adminOnly: 'Solo un administrador puede cambiar cada cuánto pregunta el hub.',
+    saveError: 'No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.',
+  },
   settings: {
     hubWide: 'Ajustes del Hub',
     currency: 'Moneda',

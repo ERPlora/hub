@@ -22,6 +22,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use erplora_runtime::device_mode::DeviceMode;
+use erplora_runtime::pin_policy::PinPolicy;
 use serde_json::json;
 
 use crate::auth;
@@ -42,8 +43,18 @@ fn device_id_of(headers: &HeaderMap) -> &str {
         .trim()
 }
 
-fn ok(mode: DeviceMode) -> Response {
-    Json(json!({ "ok": true, "data": { "mode": mode.as_str() } })).into_response()
+/// The answer of the read door: what this device asks of the person in front of it.
+///
+/// It carries **both** controls (hub#358 + hub#359) because both are needed to decide whether the
+/// pinpad is painted, and the login screen has one chance to ask: splitting them across two
+/// requests would mean a window in which the screen has half an answer and has to guess the rest.
+/// The write doors stay separate — the mode is of the device, the policy is of the hub.
+fn ok(mode: DeviceMode, policy: PinPolicy) -> Response {
+    Json(json!({
+        "ok": true,
+        "data": { "mode": mode.as_str(), "pin_policy": policy.as_str() },
+    }))
+    .into_response()
 }
 
 fn unauthorized(e: auth::AuthError) -> Response {
@@ -73,8 +84,16 @@ pub async fn get_device_mode(State(st): State<AppState>, headers: HeaderMap) -> 
         Err(response) => return response,
     };
     let rt = arc.lock().await;
-    match rt.device_mode(device_id_of(&headers)).await {
-        Ok(mode) => ok(mode),
+    let mode = match rt.device_mode(device_id_of(&headers)).await {
+        Ok(mode) => mode,
+        Err(e) => return crate::err_response(e),
+    };
+    // The dial the business chose (hub#359). It travels on THIS door, and not on `/api/settings`,
+    // for one reason: the screen that needs it has no session. Nothing is given away by saying it
+    // — the login screen would show the same thing by simply not painting a pinpad — and the value
+    // that matters is only ever *reported* here; writing it is the admin door of the settings.
+    match rt.pin_policy().await {
+        Ok(policy) => ok(mode, policy),
         Err(e) => crate::err_response(e),
     }
 }
@@ -122,7 +141,12 @@ pub async fn put_device_mode(
     if let Err(e) = rt.set_device_mode(target, mode, &admin.id).await {
         return crate::err_response(e);
     }
-    ok(mode)
+    // The answer describes the device AFTER the write, dial included — this door does not touch the
+    // dial, so it is read back rather than assumed.
+    match rt.pin_policy().await {
+        Ok(policy) => ok(mode, policy),
+        Err(e) => crate::err_response(e),
+    }
 }
 
 #[cfg(test)]

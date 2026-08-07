@@ -131,6 +131,21 @@ const KNOWN: &[Setting] = &[
         validate: validate_text,
         parse_stored: |s| json!(s),
     },
+    // ¿Cada cuánto pregunta el hub QUIÉN está en la caja? (`always` | `per_shift` | `never`,
+    // hub#359). Es del NEGOCIO —una afirmación sobre si se identifica a quien vende—, mientras que
+    // el modo del dispositivo (hub#357/#358) es de cada terminal; se componen por el lado
+    // restrictivo en `crate::pin_policy::effective_session_ttl_secs`.
+    //
+    // Vive aquí y no en una tabla nueva porque esta puerta ya tiene lo que hace falta: escritura
+    // tras **sesión admin** (`PUT /api/settings`), validación por clave y auditoría de quién
+    // cambió qué. El default y las grafías los pone `PinPolicy`, no este registro: dos definiciones
+    // del valor «que no pregunta» serían dos sitios donde equivocarse.
+    Setting {
+        key: crate::pin_policy::PIN_POLICY_SETTING,
+        default: || json!(crate::pin_policy::PinPolicy::default().as_str()),
+        validate: validate_pin_policy,
+        parse_stored: |s| json!(s),
+    },
 ];
 
 /// Locales soportados por el hub (espejo del contrato del frontend, ADR-0055).
@@ -282,6 +297,20 @@ const THEME_PALETTES: &[&str] = &[
 ];
 
 /// `theme_palette`: una de las paletas de OutfitKit. Se normaliza a minúsculas al persistir.
+/// Valida el dial «pedir PIN» delegando en [`crate::pin_policy::PinPolicy::parse`] — la MISMA
+/// puerta cerrada que usa el resto del runtime. Sin `trim` y sin bajar mayúsculas a propósito
+/// (aquí sí lo hacen otras claves): el valor que se colaría por una grafía casi-correcta es
+/// siempre el laxo, y el laxo de esta clave es el que deja de atribuir las ventas a una persona.
+/// Un tipo que no es string tampoco se interpreta: `true`, `0` o `null` no son posiciones del dial.
+fn validate_pin_policy(v: &Value) -> std::result::Result<String, String> {
+    let s = v
+        .as_str()
+        .ok_or("debe ser un string: `always`, `per_shift` o `never`")?;
+    crate::pin_policy::PinPolicy::parse(s)
+        .map(|p| p.as_str().to_string())
+        .map_err(|e| e.to_string())
+}
+
 fn validate_theme_palette(v: &Value) -> std::result::Result<String, String> {
     let s = v
         .as_str()

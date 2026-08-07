@@ -132,6 +132,13 @@
         <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('deviceMode.title') }}</h2>
         <DeviceModeCard />
 
+        <!-- «Preguntar quién vende» (hub#359): el segundo control sobre la misma decisión. Este SÍ
+             es del hub —vale para todo el negocio—, así que va justo DEBAJO del del dispositivo:
+             se leen juntos, y quien pone «nunca» tiene que ver antes de qué dispositivo habla. El
+             runtime los compone por el lado restrictivo; ninguno afloja lo que el otro apretó. -->
+        <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('pinPolicy.title') }}</h2>
+        <PinPolicyCard />
+
         <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('settings.hardware') }}</h2>
 
         <!-- ERPlora Bridge -->
@@ -425,6 +432,7 @@ import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import DataPanel from '../components/DataPanel.vue';
 import DeviceModeCard from '../components/DeviceModeCard.vue';
+import PinPolicyCard from '../components/PinPolicyCard.vue';
 import { bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';

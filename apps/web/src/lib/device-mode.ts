@@ -22,6 +22,7 @@
 import { ref } from 'vue';
 
 import { resolveDeviceId } from './device';
+import { asksForPin, publishPinPolicy, type PinPolicy } from './pin-policy';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
 /** How much identity friction a device asks for. The pair is CLOSED (mirror of the runtime). */
@@ -83,26 +84,39 @@ function rejection(body: unknown, status: number): DeviceModeError {
  * is answered `shared` anyway, and asking would only invite reading something into the silence.
  */
 export async function loadDeviceMode(): Promise<DeviceMode> {
-  const mode = await readDeviceMode();
-  deviceMode.value = mode;
+  const answer = await readDeviceAnswer();
+  deviceMode.value = answer.mode;
+  // The hub's dial travels on the SAME answer (hub#359) and is published from the same place, so
+  // the two halves of the pinpad decision can never be out of step by one request. `publishPinPolicy`
+  // overwrites unconditionally, which is what takes a previously granted `never` back on a failure.
+  publishPinPolicy(answer.policy);
   deviceModeReady.value = true;
-  return mode;
+  return answer.mode;
 }
 
-async function readDeviceMode(): Promise<DeviceMode> {
+/** What the hub said about this device: its mode (hub#358) and the hub's dial (hub#359). */
+interface DeviceAnswer {
+  mode: DeviceMode;
+  /** `undefined` when the hub did not say — `publishPinPolicy` reads that as "keep asking". */
+  policy?: unknown;
+}
+
+async function readDeviceAnswer(): Promise<DeviceAnswer> {
   const deviceId = await resolveDeviceId().catch(() => null);
-  if (!deviceId) return STRICT;
+  if (!deviceId) return { mode: STRICT };
   try {
     const res = await fetch(`${RUNTIME_URL}/api/device/mode`, {
       method: 'GET',
       headers: { 'X-Device-Id': deviceId },
     });
-    if (!res.ok) return STRICT;
-    const body = (await res.json()) as { data?: { mode?: unknown } };
-    return parseMode(body?.data?.mode) ?? STRICT;
+    // The status is checked FIRST: a 500 from a proxy or a half-written handler must not be read
+    // for a mode or a policy, however valid-looking the body it carries is.
+    if (!res.ok) return { mode: STRICT };
+    const body = (await res.json()) as { data?: { mode?: unknown; pin_policy?: unknown } };
+    return { mode: parseMode(body?.data?.mode) ?? STRICT, policy: body?.data?.pin_policy };
   } catch {
-    // Offline, 502, malformed body: the hub did not say `personal`, so it is not personal.
-    return STRICT;
+    // Offline, 502, malformed body: the hub did not say `personal` and did not say `never`.
+    return { mode: STRICT };
   }
 }
 
@@ -141,11 +155,21 @@ export async function setDeviceMode(mode: DeviceMode, deviceId?: string): Promis
 /**
  * Does the login screen offer the pinpad? The whole decision, in one place.
  *
- * Both halves are required and neither substitutes for the other: `shared` is what makes four
- * digits the right question (several people take turns at this device), and device-trust is what
- * makes them *usable at all* — a PIN only works where an online login already happened (§2.9,
- * hub#330). An untrusted device offers the account route and nothing else.
+ * Three conditions, an AND, and none of them substitutes for another:
+ *
+ *  - **`shared`** is what makes four digits the right question — several people take turns at this
+ *    device (hub#358);
+ *  - **device-trust** is what makes them *usable at all* — a PIN only works where an online login
+ *    already happened (§2.9, hub#330);
+ *  - **the dial still asks** — `never` is the one-person shop that decided not to identify who
+ *    sells (hub#359).
+ *
+ * Not offering the pinpad never grants anything: what remains is the account route, which is
+ * strictly stronger. That is why this can be an AND without being a way in.
+ *
+ * The parameter is required on purpose. A default would let a caller keep the old, dial-blind
+ * behaviour by simply not knowing about it — and the caller that forgets is the login screen.
  */
-export function offersPinLogin(mode: DeviceMode, trusted: boolean): boolean {
-  return mode === 'shared' && trusted;
+export function offersPinLogin(mode: DeviceMode, trusted: boolean, policy: PinPolicy): boolean {
+  return mode === 'shared' && trusted && asksForPin(policy);
 }
