@@ -277,13 +277,18 @@ fn ensure_section(sections: &mut Vec<String>, section: &str) {
     }
 }
 
-/// Bytes DEScifrados del PKCS#12 del negocio (`_hub_certificate.pkcs12_b64`, ADR-0079/ADR-0016)
-/// del hub, o `None` si no hay certificado (o falla el descifrado/no hay master key). La
-/// contraseña NO se lee: no viaja (decisión d). Desde ERPlora/hub#114 la columna va cifrada
-/// at-rest — pasa por `erplora_runtime::certificate::der_bytes` en vez de leer/decodificar el
-/// base64 crudo de la fila.
+/// Bytes DEScifrados del PKCS#12 que el bundle PUEDE llevar, o `None` si el hub no tiene ninguno
+/// exportable (o falla el descifrado/no hay master key). La contraseña NO se lee: no viaja
+/// (decisión d). Desde ERPlora/hub#114 la columna va cifrada at-rest, así que pasa por el core en
+/// vez de leer/decodificar el base64 crudo de la fila.
+///
+/// **Qué slot sale lo decide el core, no esta capa** (ADR-0202 §2.1, hub#316): un hub tiene hasta
+/// dos certificados y el DELEGADO —la clave privada con la que ERPlora se identifica ante la AEAT
+/// por apoderamiento— nunca entra en un bundle. `exportable_der_bytes` es la única puerta por la
+/// que salen bytes de `.p12` en crudo, y la regla vive dentro de ella: aquí no hay filtro que
+/// alguien pueda olvidarse de repetir la próxima vez que se toque el export.
 async fn read_certificate_p12(rt: &Runtime, hub_id: &str) -> Option<Vec<u8>> {
-    erplora_runtime::certificate::der_bytes(rt.db(), hub_id).await.ok().flatten()
+    erplora_runtime::certificate::exportable_der_bytes(rt.db(), hub_id).await.ok().flatten()
 }
 
 /// Recorre `media/` y devuelve `(ruta "media/<rel>", bytes)` por fichero. No sigue symlinks
