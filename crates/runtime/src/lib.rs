@@ -15,6 +15,7 @@ use serde_json::Value as Json;
 pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
+pub mod certificate_refetch;
 pub mod commands;
 pub mod device_mode;
 pub mod e2e_support;

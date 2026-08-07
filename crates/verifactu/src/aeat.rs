@@ -974,7 +974,10 @@ pub async fn post_soap(
         .body(xml.to_string())
         .send()
         .await
-        .map_err(|e| VerifactuError::Transmission(format!("conexión AEAT: {e}")))?;
+        // Classified HERE, where the error chain is still intact. One level up it is a `String`,
+        // and `reqwest::Error`'s own message says nothing about TLS — the reason lives in its
+        // sources. See `transport_error` (ADR-0202 §2 point 4, hub#318).
+        .map_err(|e| transport_error(&e, format!("conexión AEAT: {e}")))?;
     let status = resp.status();
     let body = resp
         .text()
@@ -987,6 +990,161 @@ pub async fn post_soap(
         )));
     }
     Ok(body)
+}
+
+/// Words that only show up when the failure was the SECURE CHANNEL, not the network under it.
+///
+/// `rustls` reports refusals as `invalid peer certificate: Expired`, `received fatal alert:
+/// CertificateRevoked` or `tls handshake eof`; a hub that cannot resolve DNS, that times out or
+/// that gets its connection refused says none of these.
+const TLS_MARKERS: [&str; 4] = ["tls", "certificate", "handshake", "alert"];
+
+/// Did this transport failure come from the TLS layer? (ADR-0202 §2 point 4 — hub#318)
+///
+/// **The third refetch trigger depends on this answer, so it has to be narrow in both directions.**
+/// A false positive spends the hub's refetch allowance on a network outage, and the allowance is
+/// what the hub needs when the certificate really is the problem. A false negative leaves a hub
+/// signing with a revoked certificate until somebody notices by hand.
+///
+/// It reads the error's **causes and not the error itself**. `reqwest`'s own message is
+/// `error sending request for url (…)` — it carries the ENDPOINT, which is the one string in the
+/// chain that must never be matched (an AEAT path containing «certificado» would turn every
+/// timeout into a rejected certificate), and it carries nothing else useful. Everything that says
+/// what actually happened is below it.
+pub fn is_tls_failure(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut cause = error.source();
+    while let Some(current) = cause {
+        let text = current.to_string().to_ascii_lowercase();
+        if TLS_MARKERS.iter().any(|marker| text.contains(marker)) {
+            return true;
+        }
+        cause = current.source();
+    }
+    false
+}
+
+/// Turns a transport failure into the right [`VerifactuError`] variant, which is what decides
+/// whether the hub refetches its certificate (ADR-0202 §2 point 4 — hub#318).
+///
+/// A function of its own so the decision is testable without a live handshake against the AEAT:
+/// inside the `map_err` closure it would only be reachable through a real rejected certificate.
+fn transport_error(error: &(dyn std::error::Error + 'static), message: String) -> VerifactuError {
+    if is_tls_failure(error) {
+        VerifactuError::Tls(message)
+    } else {
+        VerifactuError::Transmission(message)
+    }
+}
+
+#[cfg(test)]
+mod tls_classification_tests {
+    use super::{is_tls_failure, VerifactuError};
+
+    /// A link in a synthetic error chain — the only way to assert this without a live handshake
+    /// against the AEAT.
+    #[derive(Debug)]
+    struct Chained {
+        message: &'static str,
+        source: Option<Box<Chained>>,
+    }
+
+    impl std::fmt::Display for Chained {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.message)
+        }
+    }
+
+    impl std::error::Error for Chained {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            self.source.as_deref().map(|e| e as &(dyn std::error::Error + 'static))
+        }
+    }
+
+    /// Builds the chain outermost-first, the way `reqwest` hands it over.
+    fn chain(links: &[&'static str]) -> Chained {
+        let mut current: Option<Box<Chained>> = None;
+        for message in links.iter().rev() {
+            current = Some(Box::new(Chained {
+                message,
+                source: current,
+            }));
+        }
+        *current.expect("al menos un eslabón")
+    }
+
+    /// The refusals that actually mean «our certificate is the problem» — the ones the third
+    /// trigger exists for.
+    ///
+    /// Every case is picked so that **one marker alone** carries it, and between them they cover
+    /// all four: dropping any single marker from `TLS_MARKERS` turns this test red instead of
+    /// leaving a hub silently signing with a revoked certificate.
+    #[test]
+    fn a_refused_client_certificate_is_a_tls_failure() {
+        for cause in [
+            "invalid peer certificate: Expired",   // «certificate»
+            "invalid peer certificate: UnknownIssuer",
+            "received fatal alert: AccessDenied",  // «alert»
+            "unexpected eof during handshake",     // «handshake»
+            "tls connection init failed",          // «tls»
+            "received fatal alert: CertificateRevoked",
+            "tls handshake eof",
+        ] {
+            let error = chain(&["error sending request for url (…)", "client error (Connect)", cause]);
+            assert!(is_tls_failure(&error), "no clasificado como TLS: {cause}");
+        }
+    }
+
+    /// The classification is what picks the variant, and the variant is what the engine matches on
+    /// to decide whether to ask for a new certificate. Tested here because inside `post_soap`'s
+    /// `map_err` it would take a real rejected handshake against the AEAT to reach.
+    #[test]
+    fn only_a_tls_failure_becomes_the_variant_that_triggers_a_refetch() {
+        let tls = chain(&["error sending request", "invalid peer certificate: Expired"]);
+        assert!(matches!(
+            super::transport_error(&tls, "conexión AEAT: …".into()),
+            VerifactuError::Tls(_)
+        ));
+
+        let network = chain(&["error sending request", "operation timed out"]);
+        assert!(matches!(
+            super::transport_error(&network, "conexión AEAT: …".into()),
+            VerifactuError::Transmission(_)
+        ));
+    }
+
+    /// 🔒 **The AEAT being unreachable must NOT spend the refetch allowance.** These are the
+    /// failures a hub sees on a bad day at the till, they arrive once per record the contingency
+    /// queue drains, and none of them is fixed by downloading a private key again.
+    #[test]
+    fn a_network_failure_is_not_a_tls_failure() {
+        for cause in [
+            "tcp connect error: Connection refused (os error 61)",
+            "failed to lookup address information: nodename nor servname provided",
+            "operation timed out",
+            "connection closed before message completed",
+        ] {
+            let error = chain(&["error sending request for url (…)", "client error (Connect)", cause]);
+            assert!(!is_tls_failure(&error), "clasificado como TLS sin serlo: {cause}");
+        }
+    }
+
+    /// 🔒 **The URL is not evidence.** It is the one part of the chain `reqwest` puts in its own
+    /// message, and an endpoint path is chosen by the AEAT, not by us: matching it would let a
+    /// future URL turn every timeout into a certificate rotation.
+    #[test]
+    fn the_endpoint_url_is_never_what_classifies_the_failure() {
+        let error = chain(&[
+            "error sending request for url (https://prewww1.aeat.es/certificado/tls/handshake)",
+            "operation timed out",
+        ]);
+        assert!(!is_tls_failure(&error));
+    }
+
+    /// A failure with no cause at all says nothing, so it is not a TLS failure.
+    #[test]
+    fn an_error_without_a_cause_is_not_a_tls_failure() {
+        assert!(!is_tls_failure(&chain(&["algo ha fallado"])));
+    }
 }
 
 #[cfg(test)]

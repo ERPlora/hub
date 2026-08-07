@@ -20,6 +20,7 @@
 //!
 //! [ADR-0009]: ../../../architecture/00-overview/decision-log.md
 use erplora_db::Params;
+use erplora_runtime::certificate_refetch::RefetchSignal;
 use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
 use erplora_runtime::{Result, RuntimeError};
 use erplora_wasm_host::{Operation, Output};
@@ -38,6 +39,14 @@ pub enum VerifactuError {
     Certificate(String),
     #[error("transmisión AEAT: {0}")]
     Transmission(String),
+    /// El canal TLS con la AEAT falló: nuestro certificado de cliente fue rechazado, caducó, fue
+    /// revocado, o el handshake no llegó a cerrarse (`aeat::is_tls_failure`).
+    ///
+    /// Variante propia porque **es el tercer disparador de refetch** (ADR-0202 §2 punto 4): si el
+    /// certificado con el que nos identificamos dejó de valer, la respuesta es pedir el vigente al
+    /// plano de control, no reintentar el mismo. Un fallo de red se reintenta; este se **arregla**.
+    #[error("transmisión AEAT (TLS): {0}")]
+    Tls(String),
     /// La AEAT respondió a la **consulta** con un fallo (SOAP Fault). Es un error propio y no
     /// una lista vacía: «0 registros» se leería como «no hay nada que recuperar», que es la
     /// lectura que rompe la recuperación de la cadena (hub#287).
@@ -283,6 +292,26 @@ async fn build_identity(
 /// `_hub_certificate`.
 fn has_certificate(config: &Json) -> bool {
     str_field(config, "certificate_source") == "core"
+}
+
+/// **Tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4 — hub#318): un fallo del
+/// canal TLS contra la AEAT pide al plano de control el certificado vigente.
+///
+/// El motor **no descarga nada**. No tiene la credencial de máquina del hub y no debe tenerla: la
+/// clave privada delegada es de ERPlora y su única puerta de entrada vive en el server
+/// (`erplora-server::fiscal_certificate`). Aquí solo se levanta la señal; quién la sirve, cuándo, y
+/// con cuánto presupuesto, es decisión del server.
+///
+/// Solo el TLS. Un timeout o un DNS caído se reintentan por la cola de contingencia (5/10/20/40/60
+/// min) y **no** se arreglan bajando otra vez una clave privada: pedirla en cada registro varado
+/// agotaría el presupuesto de 20/h del endpoint justo cuando el hub más lo necesita.
+///
+/// El `signal` es un parámetro —y no el global directamente— para que esto sea comprobable sin
+/// tocar estado de proceso compartido entre tests.
+fn request_certificate_refetch_on_tls(error: &VerifactuError, signal: &RefetchSignal) {
+    if matches!(error, VerifactuError::Tls(_)) {
+        signal.request();
+    }
 }
 
 // ── create_record (issue verifactu#2) ────────────────────────────────────────
@@ -1042,6 +1071,13 @@ async fn transmit_one(
             ))
         }
         Err(err) => {
+            // **Tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4): si lo que
+            // falló fue el canal TLS, el certificado con el que nos identificamos es el sospechoso
+            // y hay que pedirle al plano de control el vigente. El motor no lo baja —no tiene
+            // credencial de máquina ni debe tenerla—: lo PIDE, y el servicio de refetch del server
+            // decide. Va justo aquí, encolando la contingencia, porque el fallo ES el disparador:
+            // así se converge sin polling.
+            request_certificate_refetch_on_tls(&err, RefetchSignal::global());
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
             let queue = host
                 .read(
@@ -2697,5 +2733,59 @@ mod retention_gate_tests {
             owed.is_none(),
             "with every record accepted by the AEAT the module is free to be removed"
         );
+    }
+}
+
+#[cfg(test)]
+mod certificate_refetch_trigger_tests {
+    use super::{request_certificate_refetch_on_tls, VerifactuError};
+    use erplora_runtime::certificate_refetch::RefetchSignal;
+
+    /// 🔒 The failure IS the trigger (ADR-0202 §2 point 4). A rejected client certificate is the
+    /// one transport failure that a retry cannot fix and a refetch can.
+    #[test]
+    fn a_tls_failure_asks_for_the_certificate_to_be_refetched() {
+        let signal = RefetchSignal::new();
+        request_certificate_refetch_on_tls(
+            &VerifactuError::Tls("conexión AEAT: invalid peer certificate".into()),
+            &signal,
+        );
+        assert!(signal.take(), "un rechazo del certificado tiene que pedir el vigente");
+    }
+
+    /// 🔒 **The AEAT being down does not make the hub ask for a private key.** These arrive once
+    /// per record the contingency queue drains, and asking on each one would spend the control
+    /// plane's 20/h allowance on an outage that a refetch cannot fix.
+    #[test]
+    fn a_network_failure_does_not() {
+        let signal = RefetchSignal::new();
+        for error in [
+            VerifactuError::Transmission("conexión AEAT: operation timed out".into()),
+            VerifactuError::Transmission("AEAT HTTP 503: servicio no disponible".into()),
+            VerifactuError::Certificate("certificado del negocio no configurado".into()),
+            VerifactuError::Consult("SOAP Fault".into()),
+        ] {
+            request_certificate_refetch_on_tls(&error, &signal);
+        }
+        assert!(
+            !signal.take(),
+            "solo el fallo del canal TLS dispara el refetch; los demás se reintentan por la cola \
+             de contingencia"
+        );
+    }
+
+    /// Many stranded records, one broken certificate, ONE refetch: the signal coalesces, which is
+    /// what keeps a queue drain from emptying the hourly allowance in a single pass.
+    #[test]
+    fn a_whole_queue_drain_failing_the_same_handshake_asks_once() {
+        let signal = RefetchSignal::new();
+        for _ in 0..200 {
+            request_certificate_refetch_on_tls(
+                &VerifactuError::Tls("conexión AEAT: received fatal alert: CertificateRevoked".into()),
+                &signal,
+            );
+        }
+        assert!(signal.take());
+        assert!(!signal.take(), "200 registros varados piden UN refetch, no 200");
     }
 }
