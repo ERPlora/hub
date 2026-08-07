@@ -1193,20 +1193,33 @@ export class IpcBridgeTransport implements BridgeTransport {
     return this.tauri.invoke('erplora_get_devices', {}) as Promise<BridgeDevice[]>;
   }
 
+  /**
+   * Prints. Asks for the permission FIRST, exactly like discovery does (hub#337).
+   *
+   * Scanning used to be the only operation that asked, but a till hardly ever scans: the printer
+   * is assigned to a role once and remembered, so a freshly installed device goes install → sell
+   * → print with no discovery anywhere in it. The job leaves through a TCP socket on the LAN,
+   * which Android blocks below the API level: it times out, the ticket never comes out, and
+   * nothing is reported anywhere.
+   */
   async print(
     printerId: string,
     documentType: string,
     data: Record<string, unknown>,
     jobId?: string,
   ): Promise<void> {
+    await this.ensurePermissions();
     await this.tauri.invoke('erplora_print', { printerId, documentType, data, jobId: jobId ?? null });
   }
 
   async testPrint(printerId: string): Promise<void> {
+    await this.ensurePermissions();
     await this.tauri.invoke('erplora_test_print', { printerId });
   }
 
+  /** The drawer opens through the printer's ESC/POS kick — so it goes over the local network too. */
   async openDrawer(printerId: string, pin = 2): Promise<void> {
+    await this.ensurePermissions();
     await this.tauri.invoke('erplora_open_drawer', { printerId, pin });
   }
 

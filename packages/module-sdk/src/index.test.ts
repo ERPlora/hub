@@ -446,6 +446,60 @@ test('un error CUALQUIERA del bridge sigue siendo un Error normal', async () => 
   });
 });
 
+// ── hub#337: the permission is asked for whenever the LAN is about to be used ───────────
+//
+// Scanning was the only operation that asked. But a till hardly ever scans: the printer is
+// assigned to a role once and remembered, so the everyday sequence on a fresh device is
+// install → sell → print, with no discovery anywhere in it. The print then goes to a TCP socket
+// on the LAN, which Android blocks below the API level: the socket times out, the ticket never
+// comes out, and nothing is reported anywhere. Asking is idempotent on the native side — already
+// granted means no dialog — so the cost of asking here is nothing and the cost of not asking is
+// a till that silently stops printing.
+
+const REACHES_THE_PRINTER: Array<[string, (t: IpcBridgeTransport) => Promise<unknown>]> = [
+  // Discovery is the one that already asked (hub#338), kept here so the whole set of operations
+  // that touch the LAN is asserted in one place — the SDK is where the asking lives, and a guard
+  // that only exists in the shell's tests leaves the SDK free to drop it.
+  ['erplora_discover_printers', (t) => t.discoverPrinters()],
+  ['erplora_print', (t) => t.print('network:192.168.1.50:9100', 'receipt', { total: 100 })],
+  ['erplora_test_print', (t) => t.testPrint('network:192.168.1.50:9100')],
+  ['erplora_open_drawer', (t) => t.openDrawer('network:192.168.1.50:9100')],
+];
+
+for (const [command, run] of REACHES_THE_PRINTER) {
+  test(`${command} asks for the local network permission before reaching the printer`, async () => {
+    const { transport, calls } = fakeShell({ status: 'scanned', printers: [] });
+
+    await run(transport);
+
+    const asked = calls.indexOf('plugin:erplora-android|request_permissions');
+    assert.notEqual(asked, -1, `${command} never asks for the permission it needs`);
+    assert.ok(
+      asked < calls.indexOf(command),
+      `${command} talks to the printer before asking: ${JSON.stringify(calls)}`,
+    );
+  });
+}
+
+test('a refused permission does not stop the till from trying to print', async () => {
+  // A "no" is an answer, not a crash — and the user may have granted it in the system settings
+  // since. Failing here would turn a permission the till does not strictly need on this Android
+  // version into a till that cannot sell.
+  const calls: string[] = [];
+  const tauri = {
+    invoke: async (cmd: string) => {
+      calls.push(cmd);
+      if (cmd === 'plugin:erplora-android|request_permissions') throw new Error('denied');
+      return {};
+    },
+    listen: async () => () => {},
+  };
+
+  await new IpcBridgeTransport(tauri).print('network:192.168.1.50:9100', 'receipt', {});
+
+  assert.ok(calls.includes('erplora_print'));
+});
+
 // ── La frontera EUROS ↔ CÉNTIMOS (ADR-0123) ─────────────────────────────────────────────
 //
 // El dinero es un INTEGER de céntimos, pero un humano teclea EUROS: un `<input step="0.01">`, un

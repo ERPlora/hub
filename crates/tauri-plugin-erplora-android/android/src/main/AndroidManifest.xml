@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android permissions of the till, declared where a GENERATOR CANNOT REACH THEM (hub#337).
+
+  The app manifest lives in `apps/tauri/src-tauri/gen/android`, and that project is generated.
+  Measured with tauri-cli 2.11.2: `cargo tauri android init` leaves the manifest alone if it is
+  there, but writes Tauri's template back if it is MISSING — INTERNET and nothing else, without
+  the four hardware permissions and without the `erplora://` intent filter. So a permission typed
+  into that file by hand is one lost file away from gone: a `rm -rf gen/android` to unstick
+  Gradle, a merge that drops it. And nothing complains: the APK builds, installs and runs; only
+  the printers stop existing, because Android blocks the LAN below the API level and a blocked
+  socket is a timeout, not an error.
+
+  This file is the durable half. The Android manifest merger folds a library module's
+  `<uses-permission>` tags into the app at build time, and this module is a hand-written crate, so
+  regenerating the Android project cannot take the declaration with it. The app manifest keeps its
+  own copy on purpose (the lesson of hub#345, where Android alone needed the deep-link scheme
+  declared twice); guards in `crates/tauri-plugin-erplora-android/src/lib.rs` and
+  `apps/tauri/src-tauri/tests/android_local_network.rs` fail loudly if either copy loses one, and
+  the release job reads the list back off the built APK, which is the only place the MERGED
+  manifest exists at all.
+
+  No `package` attribute on purpose: the namespace comes from `android.namespace` in
+  `build.gradle.kts`, and AGP 8 fails the build if a manifest declares it as well.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Reaching a printer at all. Also what implicitly allowed the LAN on Android 16 and below,
+         which is exactly why losing the rest of this list stays invisible on an older device. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Which network the till is on, so the sweep knows the subnet to walk. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- mDNS. Android drops multicast packets unless a multicast lock is held, and taking that
+         lock needs this permission: without it the Bonjour half of discovery finds nothing and
+         only the port-9100 sweep is left. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+    <!-- Local Network Protection (Android 17 / API 37). A RUNTIME permission: declaring it is
+         only what makes it possible to ask for it — `ErploraAndroidPlugin.requestPermissions`
+         does the asking. Without the declaration the request is answered DENIED with no dialog,
+         forever, and the user is told to grant something the settings screen never offers. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!-- Telling the kitchen an order came in when nobody is looking at the screen. Runtime
+         permission since Android 13 (API 33). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+</manifest>
