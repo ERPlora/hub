@@ -1037,6 +1037,15 @@ pub fn permissions_for_role(registry: &Registry, role: &str) -> HashSet<String> 
         }
         if let Some(list) = m.role_permissions.get(role) {
             for perm in list {
+                // **El namespace del core no se concede desde un manifest** (misma regla de
+                // propiedad que `permissions::is_elevable`, hub#351: un módulo solo habla de lo
+                // suyo). Si contase, un `module.zip` de terceros podría escribir
+                // `role_permissions.employee = ["hub.administer"]` y volver a poner la checklist
+                // de administración delante del camarero — el agujero que hub#435 cierra —, o
+                // acuñar cualquier otro permiso del core con tres líneas de JSON.
+                if perm.starts_with(crate::hub_users::CORE_NAMESPACE) {
+                    continue;
+                }
                 perms.insert(perm.clone());
             }
         }
@@ -1056,6 +1065,14 @@ pub fn permissions_for_role(registry: &Registry, role: &str) -> HashSet<String> 
 pub fn session_permissions(registry: &Registry, role: &str) -> HashSet<String> {
     let mut perms = permissions_for_role(registry, role);
     perms.insert(crate::hub_users::VIEW_USERS_PERMISSION.to_string());
+    // Y el permiso de ADMINISTRAR el hub (hub#435), para los mismos roles que reconoce el gate HTTP
+    // (`server::auth::require_admin_session` → [`crate::hub_users::is_admin_role`]). Se concede
+    // aquí y no en el catálogo de roles por lo mismo que el de arriba: lo decide el ROL de la
+    // sesión, no lo que conceda un manifest — y en un hub VACÍO, que es cuando la checklist más
+    // vale, ningún módulo concede nada y el administrador se quedaría sin sus propios ítems.
+    if crate::hub_users::is_admin_role(role) {
+        perms.insert(crate::hub_users::ADMINISTER_PERMISSION.to_string());
+    }
     perms
 }
 
@@ -1176,6 +1193,71 @@ mod tests {
 
         assert!(!de_admin.is_empty(), "el fixture debe conceder permisos a admin");
         assert_eq!(de_owner, de_admin, "el owner debe ver al menos lo que ve un admin");
+    }
+
+    /// Who administers the hub is decided by the ROLE, and only the roles the gate itself accepts
+    /// get the permission that says so (hub#435).
+    ///
+    /// It has to work on an EMPTY hub — the moment the onboarding checklist is worth the most — so
+    /// it cannot come from `permissions_for_role`, which with no modules installed grants nothing
+    /// to anybody, administrator included.
+    #[test]
+    fn only_an_administrator_session_carries_the_core_administration_permission() {
+        let empty = Registry::new();
+        for role in ["admin", "ADMIN", "owner", "Owner"] {
+            let perms = session_permissions(&empty, role);
+            assert!(
+                perms.contains(crate::hub_users::ADMINISTER_PERMISSION),
+                "{role} administra el hub y el gate HTTP le deja pasar"
+            );
+            assert!(perms.contains(crate::hub_users::VIEW_USERS_PERMISSION));
+        }
+        for role in ["manager", "employee", "bartender", ""] {
+            assert!(
+                !session_permissions(&empty, role).contains(crate::hub_users::ADMINISTER_PERMISSION),
+                "{role} NO administra el hub"
+            );
+        }
+        // Y sigue sin ensuciar el catálogo de roles: lo concede la SESIÓN, no los módulos.
+        assert!(permissions_for_role(&empty, "admin").is_empty());
+    }
+
+    /// Un `module.zip` no puede acuñar permisos del core.
+    ///
+    /// Misma regla de propiedad que `permissions::is_elevable` (hub#351): un módulo solo habla de
+    /// su namespace. Sin esta guarda, tres líneas de JSON en un manifest de terceros
+    /// (`role_permissions.employee = ["hub.administer"]`) volverían a poner la checklist de
+    /// administración —y su botón a `/settings`— delante del camarero, que es el agujero de
+    /// hub#435 reabierto por la puerta de al lado.
+    #[test]
+    fn un_manifest_no_puede_conceder_permisos_del_core() {
+        let manifest: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "greedy",
+            "name": "Greedy",
+            "version": "1.0.0",
+            "role_permissions": {
+                "employee": [
+                    crate::hub_users::ADMINISTER_PERMISSION,
+                    crate::hub_users::VIEW_USERS_PERMISSION,
+                    "greedy.ok"
+                ]
+            }
+        }))
+        .expect("manifiesto de prueba");
+        let mut reg = Registry::new();
+        reg.status.insert("greedy".into(), crate::registry::ModuleStatus::Active);
+        reg.installed.push(manifest);
+
+        let perms = permissions_for_role(&reg, "employee");
+        assert!(!perms.contains(crate::hub_users::ADMINISTER_PERMISSION));
+        assert!(!perms.contains(crate::hub_users::VIEW_USERS_PERMISSION));
+        assert!(perms.contains("greedy.ok"), "lo suyo sí lo concede");
+
+        // Y la sesión tampoco lo hereda por la puerta de atrás: un empleado sigue sin administrar,
+        // aunque conserva el permiso de namespace que toda sesión local tiene de todas formas.
+        let session = session_permissions(&reg, "employee");
+        assert!(!session.contains(crate::hub_users::ADMINISTER_PERMISSION));
+        assert!(session.contains(crate::hub_users::VIEW_USERS_PERMISSION));
     }
 
     /// El resto de roles no cambia: `owner` es el único alias, no una barra libre.
