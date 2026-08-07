@@ -40,6 +40,8 @@ pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
 pub mod export_import;
+/// ERPlora's DELEGATED fiscal certificate, fetched from the control plane (ADR-0202 §2 — hub#317).
+pub mod fiscal_certificate;
 pub mod hub_users;
 pub mod login_throttle;
 pub mod reset;
