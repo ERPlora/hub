@@ -191,9 +191,9 @@ export default {
     blueprintTitle: 'Configura tu hub',
     blueprintBody: 'Carga una plantilla para tu negocio o restaura una copia para empezar.',
     blueprintCta: 'Configurar',
-    // Zona 4 — salud del sistema: pill discreta con el estado del Bridge (hardware local).
-    systemOk: 'Sistema conectado',
-    systemOff: 'Sistema desconectado',
+    // Zona 4 — lo que el hub cuenta de sí mismo. La copy de la pill vive en `system.health.*`
+    // (hub#375); «Sistema conectado/desconectado» se ha ido a propósito: era un veredicto sobre
+    // todo sacado de una sonda que solo sabía del equipo de la impresora.
     openSystem: 'Ver sistema',
   },
   profile: {
@@ -565,13 +565,11 @@ export default {
     connections: 'Conexiones',
     connectionsOf: 'de {limit}',
     connectionsActive: 'activas',
-    bridgeConnection: 'Conexión Bridge',
-    connected: 'Conectado',
-    disconnected: 'Desconectado',
+    // El titular de la tarjeta de la impresora, su palabra de estado y su frase vivían aquí, y
+    // nombraban un proceso («Bridge») en vez de lo que hay sobre el mostrador. Ahora salen de
+    // `system.health.*` (hub#375). Lo que queda abajo es el flujo de INSTALACIÓN, que sí va de un
+    // programa y lo dice a propósito.
     recheck: 'Recomprobar',
-    bridgeRunning: 'Bridge está corriendo en este equipo',
-    bridgeRunningHint: 'Tus impresoras, cajón y escáneres se gestionan desde aquí.',
-    bridgeOffline: 'El cliente Bridge no está corriendo en este equipo. Vincula un Bridge abajo para gestionar el hardware — tus impresoras, cajón y escáneres aparecerán aquí.',
     downloadBridge: 'Descargar ERPlora Bridge',
     downloadBridgeHint: 'Bridge es una pequeña app nativa que conecta este hub con tus impresoras, cajón y escáneres. Elige tu sistema para continuar.',
     stepDownload: 'Descargar',
@@ -611,6 +609,22 @@ export default {
     colLevel: 'Nivel',
     colEvent: 'Evento',
     toastDownloadingBridge: 'Descargando Bridge para {os}…',
+    // Lo que el hub cuenta de sí mismo, al que lleva el bar (hub#375). Cada frase nombra algo que
+    // esa persona reconoce —la impresora— y, cuando hay algo que hacer, qué hacer. El tercer estado
+    // es el honesto: no hemos podido comprobarlo. Nunca se disfraza de «va bien».
+    health: {
+      printerTitle: 'Tu impresora',
+      printerReady: 'Impresora lista',
+      printerReadyDetail: 'Los tiques salen solos al cobrar.',
+      printerOffline: 'Impresora sin conectar',
+      printerOfflineDetail:
+        'Puedes seguir cobrando: el tique sale en esta pantalla y lo imprimes desde aquí.',
+      printerAction: 'Configurar la impresión',
+      printerUnknown: 'No hemos podido comprobar la impresora',
+      printerUnknownDetail:
+        'No sabemos si está conectada; no afecta a nada más. Volveremos a comprobarlo solos.',
+      notMeasured: 'No hemos podido leerlo',
+    },
   },
   planLimits: {
     currentPlan: 'Plan actual',

@@ -116,6 +116,7 @@ import logoGoogle from "~icons/ion/logo-google?raw";
 // salía VACÍO. Ahora hay uno solo, y `src/lib/icons.test.ts` verifica que no falte ninguno.
 import add from "~icons/ion/add?raw";
 import alertCircleOutline from "~icons/ion/alert-circle-outline?raw";
+import helpCircleOutline from "~icons/ion/help-circle-outline?raw";
 import arrowForwardCircleOutline from "~icons/ion/arrow-forward-circle-outline?raw";
 import appsOutline from "~icons/ion/apps-outline?raw";
 import archiveOutline from "~icons/ion/archive-outline?raw";
@@ -268,6 +269,10 @@ const SVGS: Record<string, string> = {
   // imports de arriba.
   add,
   "alert-circle-outline": alertCircleOutline,
+  // «No lo hemos podido leer» (hub#375): la interrogación es la señal de que falta el DATO, no de
+  // que el dato sea malo — un triángulo de alerta diría que algo va mal, que es justo lo que no
+  // sabemos.
+  "help-circle-outline": helpCircleOutline,
   "arrow-forward-circle-outline": arrowForwardCircleOutline,
   "apps-outline": appsOutline,
   "archive-outline": archiveOutline,

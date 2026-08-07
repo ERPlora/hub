@@ -190,9 +190,9 @@ export default {
     blueprintTitle: 'Set up your hub',
     blueprintBody: 'Load a template for your business or restore a backup to get started.',
     blueprintCta: 'Set up',
-    // Zone 4 — system health: discreet pill with the Bridge (local hardware) status.
-    systemOk: 'System connected',
-    systemOff: 'System disconnected',
+    // Zone 4 — what the hub says about itself. The badge's own copy lives in `system.health.*`
+    // (hub#375); «System connected/disconnected» is gone on purpose — it was a verdict about
+    // everything drawn from a probe that only ever knew about the printer host.
     openSystem: 'View system',
   },
   profile: {
@@ -565,13 +565,11 @@ export default {
     connections: 'Connections',
     connectionsOf: 'of {limit}',
     connectionsActive: 'active',
-    bridgeConnection: 'Bridge connection',
-    connected: 'Connected',
-    disconnected: 'Disconnected',
+    // The printer card's headline, status word and status sentence used to live here, naming a
+    // process («Bridge») instead of the thing on the counter. They now come from `system.health.*`
+    // (hub#375). What is left below is the INSTALL flow, which is still about a piece of software
+    // and says so on purpose.
     recheck: 'Recheck',
-    bridgeRunning: 'Bridge is running on this device',
-    bridgeRunningHint: 'Your printers, cash drawer and scanners are managed from here.',
-    bridgeOffline: 'The Bridge client is not running on this device. Pair a Bridge below to manage hardware — your printers, cash drawer and scanners will appear here.',
     downloadBridge: 'Download ERPlora Bridge',
     downloadBridgeHint: 'Bridge is a small native app that connects this hub with your printers, cash drawer and scanners. Choose your system to continue.',
     stepDownload: 'Download',
@@ -611,6 +609,22 @@ export default {
     colLevel: 'Level',
     colEvent: 'Event',
     toastDownloadingBridge: 'Downloading Bridge for {os}…',
+    // What the hub says about itself, to the person who owns the bar (hub#375). Every sentence
+    // names a thing they recognise —the printer— and, when there is something to do, what to do.
+    // The third state is the honest one: we could not check. It is never dressed up as "fine".
+    health: {
+      printerTitle: 'Your printer',
+      printerReady: 'Printer ready',
+      printerReadyDetail: 'Receipts come out on their own when you charge.',
+      printerOffline: 'Printer not connected',
+      printerOfflineDetail:
+        'You can keep charging: the receipt opens on this screen and you print it from here.',
+      printerAction: 'Set up printing',
+      printerUnknown: "We couldn't check the printer",
+      printerUnknownDetail:
+        "We don't know whether it is connected — nothing else is affected. We will check again on our own.",
+      notMeasured: "We couldn't read this",
+    },
   },
   planLimits: {
     currentPlan: 'Current plan',

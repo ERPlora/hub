@@ -31,22 +31,42 @@
           <h3 class="block-header__title">{{ resourcesTitle }}</h3>
           <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
         </div>
+        <!-- A metric nobody reported is NOT 0% (hub#375). A ring sitting green at zero reads as
+             «measured, and all is well» — which is how a memory figure from the wrong cgroup shipped
+             as «64 MB» and nobody blinked (hub#229). When the runtime did not report it, the card
+             says so where the number would have been. -->
         <ion-grid class="ion-no-padding resources-grid">
           <ion-row>
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content">
-                  <ok-gauge type="ring" label="CPU" :value="cpuPct" unit="%" :thresholds="usageThresholds"
-                    size="128"></ok-gauge>
+                <ion-card-content
+                  :class="['metric-card__content', { 'metric-stat': !cpuReading.known }]"
+                >
+                  <ok-gauge v-if="cpuReading.known" type="ring" label="CPU" :value="cpuReading.value" unit="%"
+                    :thresholds="usageThresholds" size="128"></ok-gauge>
+                  <template v-else>
+                    <HubIcon name="help-circle-outline" class="metric-stat__icon" />
+                    <div class="metric-stat__label">CPU</div>
+                    <div class="metric-stat__value">—</div>
+                    <div class="metric-stat__sub">{{ t('system.health.notMeasured') }}</div>
+                  </template>
                 </ion-card-content>
               </ion-card>
             </ion-col>
 
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content">
-                  <ok-gauge type="ring" :label="t('system.memory')" :value="memPct" unit="%" :thresholds="usageThresholds"
-                    size="128"></ok-gauge>
+                <ion-card-content
+                  :class="['metric-card__content', { 'metric-stat': !memReading.known }]"
+                >
+                  <ok-gauge v-if="memReading.known" type="ring" :label="t('system.memory')" :value="memReading.value"
+                    unit="%" :thresholds="usageThresholds" size="128"></ok-gauge>
+                  <template v-else>
+                    <HubIcon name="help-circle-outline" class="metric-stat__icon" />
+                    <div class="metric-stat__label">{{ t('system.memory') }}</div>
+                    <div class="metric-stat__value">—</div>
+                    <div class="metric-stat__sub">{{ t('system.health.notMeasured') }}</div>
+                  </template>
                 </ion-card-content>
               </ion-card>
             </ion-col>
@@ -64,41 +84,62 @@
               </ion-card>
             </ion-col>
 
-            <!-- Conexiones BD reales (pool / pg_stat_activity). Un hub mínimo en reposo ≈ 0. -->
+            <!-- Conexiones BD reales (pool / pg_stat_activity). Un hub mínimo en reposo ≈ 0 — pero
+                 un cero REAL y un cero por no haber podido preguntar no son el mismo cero. -->
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content">
-                  <ok-gauge type="ring" :label="t('system.connections')" :value="dbConnections" unit="" :max="connectionsMax"
+                <ion-card-content
+                  :class="['metric-card__content', { 'metric-stat': !connectionsReading.known }]"
+                >
+                  <ok-gauge v-if="connectionsReading.known" type="ring" :label="t('system.connections')"
+                    :value="connectionsReading.value" unit="" :max="connectionsMax"
                     color="var(--ion-color-primary)" :sublabel="connectionsLimitLabel" size="128"></ok-gauge>
+                  <template v-else>
+                    <HubIcon name="help-circle-outline" class="metric-stat__icon" />
+                    <div class="metric-stat__label">{{ t('system.connections') }}</div>
+                    <div class="metric-stat__value">—</div>
+                    <div class="metric-stat__sub">{{ t('system.health.notMeasured') }}</div>
+                  </template>
                 </ion-card-content>
               </ion-card>
             </ion-col>
           </ion-row>
         </ion-grid>
 
-        <!-- ── Bloque Bridge — hardware local (impresoras/cajón) ──────────────────────
-             Se muestra siempre SALVO en cloud-sin-bridge (caso "solo PWA": solo métricas). Así local
-             y el arranque sin contrato muestran el bloque, con CTA de instalación si está offline. -->
-        <ion-card v-if="showBridgeBlock" class="ion-no-margin">
+        <!-- ── Your printer ──────────────────────────────────────────────────────────
+             Same sentence as the panel badge (hub#375), from the same `printerLine`: the headline
+             is «Your printer», not «Bridge connection» — nobody who runs a bar knows what a bridge
+             is — and the card is only here when a printing module is installed and running. No
+             printing module, no card: this hub has no printer to have an opinion about, and the
+             install steps below would be asking someone to set up hardware for nothing. -->
+        <ion-card v-if="printerHealth" class="ion-no-margin">
           <ion-card-content>
             <div class="bridge-head">
-              <h3 class="bridge-title">{{ t('system.bridgeConnection') }}</h3>
+              <h3 class="bridge-title">{{ t('system.health.printerTitle') }}</h3>
               <div class="bridge-head-actions">
-                <ok-status-pill :tone="bridge.online ? 'success' : 'neutral'" dot>
-                  {{ bridge.online ? t('system.connected') : t('system.disconnected') }}
+                <ok-status-pill :tone="printerHealth.tone" dot>
+                  {{ t(printerHealth.titleKey) }}
                 </ok-status-pill>
                 <ion-button fill="clear" size="small" :aria-label="t('system.recheck')" @click="refreshBridge">
                   <HubIcon slot="icon-only" name="refresh-outline" />
                 </ion-button>
               </div>
             </div>
-            <p v-if="bridge.online" class="muted-note">
-              {{ t('system.bridgeRunning') }}<span v-if="bridge.version"> · v{{ bridge.version }}</span>.
-              {{ t('system.bridgeRunningHint') }}
+            <p class="muted-note">
+              {{ t(printerHealth.detailKey) }}
+              <span v-if="bridge.online && bridge.version"> · v{{ bridge.version }}</span>
             </p>
-            <p v-else class="muted-note">
-              {{ t('system.bridgeOffline') }}
-            </p>
+            <div v-if="printerHealth.action" class="printer-action">
+              <ion-button
+                size="small"
+                fill="outline"
+                :router-link="printerHealth.action.route"
+                router-direction="forward"
+              >
+                <HubIcon slot="start" name="print-outline" />
+                {{ t(printerHealth.action.labelKey) }}
+              </ion-button>
+            </div>
 
             <ol v-if="!bridge.online" class="bridge-steps">
               <li v-for="(s, i) in bridgeSteps" :key="s" class="bridge-step">
@@ -261,8 +302,16 @@ import AppPage from '../components/AppPage.vue';
 import PlanLimitsPanel from '../components/PlanLimitsPanel.vue';
 import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';
 import { fetchSystemInfo, type SystemInfo } from '../lib/system';
+import {
+  printerLine,
+  probeFromBridge,
+  reportedCount,
+  usagePercent,
+  type HealthLine,
+  type Reading,
+} from '../lib/system-health';
 import { dataTableLabels } from '../lib/data-table-labels';
-import { RUNTIME_URL, runtimeHeaders } from '../lib/runtime';
+import { RUNTIME_URL, runtimeHeaders, listInstalledModules, type InstalledModule } from '../lib/runtime';
 import {
   isLegacyBackupsHash,
   resolveSystemTab,
@@ -331,6 +380,10 @@ const loadFailed = ref(false);
 const info = ref<SystemInfo | null>(null);
 // Estado real del Bridge local (GET localhost:12321/status), independiente del runtime.
 const bridge = ref<BridgeStatus>({ online: false });
+// The two readings behind the printer sentence (hub#375). `null` in either of them means «we have
+// not been able to ask», which is a different answer from «no» and is never dressed up as one.
+const printerProbe = ref<BridgeStatus | null>(null);
+const installedModules = ref<InstalledModule[] | null>(null);
 
 const bridgeSteps = computed<string[]>(() => [
   t('system.stepDownload'),
@@ -361,7 +414,10 @@ const resourcesTitle = computed<string>(() =>
 const resourcesSource = computed<string | null>(() =>
   info.value?.backend === 'cloud' ? t('system.sourceCloud') : null
 );
-const showBridgeBlock = computed<boolean>(() => bridge.value.online || info.value?.backend !== 'cloud');
+/** The one sentence about the printer, or `null` when this hub has nothing that prints (hub#375). */
+const printerHealth = computed<HealthLine | null>(() =>
+  printerLine(probeFromBridge(printerProbe.value), installedModules.value),
+);
 
 const dbEngineLabel = computed<string>(() => {
   const e = info.value?.database.engine ?? '';
@@ -377,8 +433,9 @@ const cpu = computed(() => info.value?.cpu ?? null);
 const memory = computed(() => info.value?.memory ?? null);
 
 // Gauges: SOLO el % de uso (sin valores absolutos de vCPU/RAM — el cliente ve % de capacidad).
-const cpuPct = computed<number>(() => Math.round((cpu.value?.fraction ?? 0) * 100));
-const memPct = computed<number>(() => Math.round((memory.value?.fraction ?? 0) * 100));
+// `known: false` = el runtime NO reportó la métrica → la tarjeta lo dice, no pinta un 0% verde.
+const cpuReading = computed<Reading>(() => usagePercent(cpu.value));
+const memReading = computed<Reading>(() => usagePercent(memory.value));
 // Zonas de color del gauge de uso (verde→ámbar→rojo). Tokens de Ionic: conmutan en dark y
 // el SVG resuelve el `var()` al pintar el fill. Antes eran hex sueltos (#2dd36f/#ffc409/#eb445a).
 const usageThresholds = [
@@ -399,12 +456,14 @@ const dbValue = computed<string>(() => {
 });
 const dbSub = computed<string>(() => {
   const db = info.value?.database;
-  if (!db) return '—';
+  // Sin respuesta del runtime no sabemos NADA de la BD: decirlo, en vez de un guion mudo que se
+  // lee igual que «no aplica».
+  if (!db) return t('system.health.notMeasured');
   // Si ya mostramos el motor como headline, la subetiqueta describe el tenancy compartido.
   if (!db.sizeLabel) return t('system.databaseShared');
   return dbEngineLabel.value;
 });
-const dbConnections = computed<number>(() => info.value?.database?.connections ?? 0);
+const connectionsReading = computed<Reading>(() => reportedCount(info.value?.database?.connections));
 const connectionsMax = computed<number>(() => info.value?.database?.connectionsLimit ?? 100);
 const connectionsLimitLabel = computed<string>(() =>
   info.value?.database?.connectionsLimit != null
@@ -504,8 +563,26 @@ function handleBridgeDownload(os: BridgeOs): void {
   window.open(bridgeDownloadUrl(os.platform), '_blank', 'noopener');
 }
 
+/**
+ * Re-reads the two things behind the printer sentence (hub#375).
+ *
+ * Each one fails on its own and each failure is kept as `null` — «we could not ask», which is not
+ * «no». `bridge` keeps the raw probe because the install steps below still key off it.
+ */
 async function refreshBridge(): Promise<void> {
-  bridge.value = await detectBridge();
+  try {
+    const status = await detectBridge();
+    printerProbe.value = status;
+    bridge.value = status;
+  } catch {
+    printerProbe.value = null;
+    bridge.value = { online: false };
+  }
+  try {
+    installedModules.value = await listInstalledModules();
+  } catch {
+    installedModules.value = null; // we do not know what is installed → the card stays quiet
+  }
 }
 
 // `rowAction` es camelCase; Vue lo baja a minúsculas en plantilla → se engancha con ref + listener.
@@ -645,6 +722,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* La acción de la frase de la impresora: separada del texto, antes de los pasos de instalación. */
+.printer-action {
+  margin: 0 0 16px;
 }
 /* Pasos de instalación del Bridge: lista horizontal numerada. */
 .bridge-steps {

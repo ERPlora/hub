@@ -63,16 +63,36 @@
           storage-key="dashboard-hub"
         />
 
-        <!-- Zona 5 — Salud del sistema: pill discreta con el estado del Bridge (hardware local).
-             La info completa (versión, reinstalación, recheck) vive en /system; aquí solo la señal
-             always-visible. El bridge es el único "health" que existe hoy (sin agregado runtime/DB). -->
+        <!-- Zone 5 — what the hub says about itself (hub#375). It used to say «System disconnected»
+             on a perfectly working hub: the only thing behind the badge was the Bridge probe on
+             localhost, which in a browser is silent BY DESIGN. It now names the PRINTER, only when
+             a printing module is installed and running, and it carries the way to fix it. When
+             there is nothing to say —no printing module, or a module list we could not read— the
+             badge is simply not there; the link to /system stays, because that is navigation, not
+             a claim about anything. -->
+
         <div class="dash-health">
-          <ok-status-pill
-            class="dash-health-pill"
-            :tone="systemOnline ? 'success' : 'neutral'"
-            dot
-            :label="systemOnline ? t('dashboard.systemOk') : t('dashboard.systemOff')"
-          />
+          <!-- The sentence and its way out travel together: a status the owner cannot act on is
+               half a message. Grouped so `space-between` keeps them side by side on the left. -->
+          <div class="dash-health-status">
+            <ok-status-pill
+              v-if="printerHealth"
+              class="dash-health-pill"
+              :tone="printerHealth.tone"
+              dot
+              :label="t(printerHealth.titleKey)"
+            />
+            <ion-button
+              v-if="printerHealth?.action"
+              fill="clear"
+              size="small"
+              :router-link="printerHealth.action.route"
+              router-direction="forward"
+              class="dash-health-link"
+            >
+              {{ t(printerHealth.action.labelKey) }}
+            </ion-button>
+          </div>
           <ion-button
             fill="clear"
             size="small"
@@ -148,13 +168,14 @@ import AppPage from '../components/AppPage.vue';
 import MyAppsCard from '../components/MyAppsCard.vue';
 import SetupChecklistCard from '../components/SetupChecklistCard.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
-import { getClient, getHubSector } from '../lib/runtime';
+import { getClient, getHubSector, listInstalledModules, type InstalledModule } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { moduleNav } from '../lib/nav';
 import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
 import { openAssistantForSetup } from '../lib/shell';
-import { detectBridge } from '../lib/bridge-client';
+import { detectBridge, type BridgeStatus } from '../lib/bridge-client';
+import { printerLine, probeFromBridge, type HealthLine } from '../lib/system-health';
 import { user } from '../lib/session';
 import { formatAmount } from '../lib/money';
 import type { WidgetDef, WidgetPreset, OkWidgetBoardLabels } from '@erplora/outfitkit';
@@ -287,18 +308,32 @@ const todayLabel = computed<string>(() => {
   return `${t('dashboard.todayLabel')}, ${today}`;
 });
 
-// ── Zona 5 — Salud del sistema: estado del Bridge (hardware local) ────────────────────────────
-// El detalle completo (versión, reinstalación, recheck manual) vive en /system; aquí solo la
-// señal always-visible. null = aún no sondado → se trata como "desconocido" (neutral, no error).
-const systemOnline = ref<boolean | null>(null);
+// ── Zone 5 — what the hub says about itself (hub#375) ─────────────────────────────────────────
+// The shape of the sentence lives in `lib/system-health.ts`; this only reads the two things it
+// needs and paints the answer. The two readings are kept as «not answered yet» (`null`) until they
+// answer, because that is exactly what they are: a probe that has not come back is not a printer
+// that is off, and a module list we could not read is not a hub without a printer.
+const printerProbe = ref<BridgeStatus | null>(null);
+const installedModules = ref<InstalledModule[] | null>(null);
+
+/** The one sentence, or `null` when there is nothing honest to say. */
+const printerHealth = computed<HealthLine | null>(() =>
+  printerLine(probeFromBridge(printerProbe.value), installedModules.value),
+);
 
 async function loadSystemHealth(): Promise<void> {
-  // detectBridge hace GET http://localhost:12321/status con timeout corto (800 ms): el Bridge
-  // responde al instante; si no hay nadie escuchando, aborta rápido para no bloquear la UI.
+  // Both fail on their own: printing installed but unreachable is a different sentence from «we do
+  // not even know whether this hub prints», and neither may borrow the other's answer.
+  // `detectBridge` does GET http://localhost:12321/status with a short timeout (800 ms).
   try {
-    systemOnline.value = (await detectBridge()).online;
+    printerProbe.value = await detectBridge();
   } catch {
-    systemOnline.value = false;
+    printerProbe.value = null; // we could not ask — NOT «it is off»
+  }
+  try {
+    installedModules.value = await listInstalledModules();
+  } catch {
+    installedModules.value = null; // we do not know what is installed → the badge stays quiet
   }
 }
 
@@ -452,6 +487,11 @@ function onModulesChanged(): void {
   margin-top: 1.25rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
+}
+.dash-health-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 .dash-health-pill {
   /* ok-status-pill hereda el font-size del contenedor; lo fijamos pequeño para leerse como nota. */
