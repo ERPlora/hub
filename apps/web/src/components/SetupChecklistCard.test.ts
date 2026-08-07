@@ -46,6 +46,7 @@ const i18n = createI18n({
         levelRecommended: 'Recommended',
         unavailableLabel: 'Not available yet',
         unavailableHint: 'This one is on us. There is nothing to do here yet.',
+        delegatedHint: 'An administrator of this hub sets this up.',
         completeTitle: 'Your hub is ready',
         completeBody: 'Everything on the list is done.',
         items: {
@@ -212,6 +213,56 @@ describe('`unavailable` offers no action', () => {
     const w = mountCard({ status: status([item('team', { state: 'done' })]), expandedByDefault: true });
 
     expect(w.find('[data-testid="setup-action-team"]').exists()).toBe(false);
+  });
+});
+
+describe('a wall somebody ELSE has to bring down (hub#435)', () => {
+  it('offers no way in: this session would be refused on the other side', () => {
+    const w = mountCard({
+      status: status([item('business_identity', { level: 'legal', actionable: false, route: '/settings' })]),
+    });
+
+    const row = w.find('[data-testid="setup-item-business_identity"]');
+    expect(row.exists()).toBe(true);
+    expect(w.find('[data-testid="setup-action-business_identity"]').exists()).toBe(false);
+    expect(row.html()).not.toContain('/settings');
+  });
+
+  it('and it says WHO can: naming nobody leaves the user with a wall and no door', () => {
+    const w = mountCard({
+      status: status([item('business_identity', { level: 'legal', actionable: false })]),
+    });
+
+    expect(w.find('[data-testid="setup-note-business_identity"]').exists()).toBe(true);
+    expect(w.text()).toContain('administrator');
+  });
+
+  it('it keeps its ⛔ pill: it is still what the runtime is going to reject', () => {
+    const w = mountCard({
+      status: status([item('business_identity', { level: 'legal', actionable: false })]),
+    });
+
+    expect(w.find('[data-testid="setup-item-business_identity"] ok-status-pill').attributes('tone')).toBe('danger');
+  });
+
+  it('it is not read as our breakdown: `unavailable` says something else entirely', () => {
+    // Their administrator has to type a tax id; nothing is broken on our side. Borrowing that state
+    // would tell the user to wait for a fix that is never coming.
+    const w = mountCard({
+      status: status([item('business_identity', { level: 'legal', actionable: false })]),
+    });
+
+    expect(w.text()).not.toContain('on us');
+    expect(w.find('[data-testid="setup-item-business_identity"]').attributes('data-state')).toBe('pending');
+  });
+
+  it('an actionable pending item keeps its button, of course', () => {
+    const w = mountCard({
+      status: status([item('business_identity', { level: 'legal', actionable: true, route: '/settings' })]),
+    });
+
+    expect(w.find('[data-testid="setup-action-business_identity"]').exists()).toBe(true);
+    expect(w.find('[data-testid="setup-note-business_identity"]').exists()).toBe(false);
   });
 });
 

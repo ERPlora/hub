@@ -193,6 +193,65 @@ describe('an `unavailable` item is never handed to the user', () => {
   });
 });
 
+describe('a wall that is not the user’s to bring down (hub#435)', () => {
+  const doc = status([
+    item('business_identity', {
+      level: 'legal',
+      actionable: false,
+      title: 'Your business details',
+      route: '/settings',
+    }),
+    item('team', { title: 'Your team', route: '/employees' }),
+  ]);
+
+  it('is never handed over as a task: they would be refused on the other side', () => {
+    expect(assistantTasks(doc).map((i) => i.key)).toEqual(['team']);
+    expect(todoSection(brief(doc))).not.toContain('Your business details');
+  });
+
+  it('its screen is not named: sending them there is sending them into a refusal', () => {
+    expect(brief(doc)).not.toContain('/settings');
+  });
+
+  it('but it IS said, and said as a block: silence would leave the refusal unexplained', () => {
+    const text = brief(doc);
+
+    expect(text).toContain('Your business details');
+    expect(text).toContain('BLOCKS INVOICING');
+  });
+
+  it('and it says who can do it, so the answer is not a dead end', () => {
+    expect(brief(doc)).toContain('administrator');
+  });
+
+  it('it is not «on us»: nothing of ours is broken, somebody else just has to type it', () => {
+    const text = brief(doc);
+    const onUs = text.slice(text.indexOf('ON US'));
+
+    expect(text.includes('ON US') && onUs.includes('Your business details')).toBe(false);
+  });
+
+  it('the counter matches the lines that follow it: 1 task, not 2', () => {
+    // The delegated item is still `pending` for the runtime, so `status.pending` is 2. Printing that
+    // above a single line would have the model announce a task it cannot name.
+    const text = brief(doc);
+
+    expect(text).toContain('1 of 2');
+    // …and the wall is still counted where it is counted: the ⛔ figure is the query's.
+    expect(text).toContain('blocking invoicing: 1');
+  });
+
+  it('with nothing left BUT the delegated wall, the hub is not called finished', () => {
+    const onlyWall = status([
+      item('business_identity', { level: 'legal', actionable: false, title: 'Your business details' }),
+    ]);
+    const text = brief(onlyWall);
+
+    expect(text).not.toContain('every item of the checklist is done');
+    expect(text).toContain('Your business details');
+  });
+});
+
 describe('⛔ is a rejection of the runtime, not a strong recommendation', () => {
   const legal = status([item('business_identity', { level: 'legal' })]);
   const recommended = status([item('team', { level: 'recommended' })]);
