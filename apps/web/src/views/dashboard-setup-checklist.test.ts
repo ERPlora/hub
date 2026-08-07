@@ -21,17 +21,16 @@ describe('the panel reads the one query', () => {
     expect(dashboard).not.toContain('setup-banner');
   });
 
-  it('decision 1: while the apps card is in sight, the checklist does not repeat it', () => {
+  it('decision 1: the apps card is on this screen, so the checklist does not repeat it', () => {
     const start = dashboard.indexOf('<SetupChecklistCard');
     const card = dashboard.slice(start, dashboard.indexOf('/>', start));
     expect(card, 'the card was not found in the template').toBeTruthy();
 
-    // The deduplicated item is the apps one, and the condition is the SAME one that decides the
-    // apps card: two separate conditions for one screen would end up showing the item twice (or
-    // never).
-    expect(card).toMatch(/already-on-screen="appsCardVisible \? \['apps'\] : \[\]"/);
-    const onboarding = dashboard.slice(dashboard.indexOf('dash-onboarding') - 200, dashboard.indexOf('dash-onboarding') + 60);
-    expect(onboarding).toContain('appsCardVisible');
+    // The deduplication has no condition left to depend on: since hub#367 the apps card is the
+    // panel's first widget and cannot be removed, so the item it offers is ALWAYS on this screen.
+    // That is also the row this card buys back to keep both ⛔ in sight (`setup-blocking.test.ts`).
+    expect(card).toMatch(/already-on-screen="\['apps'\]"/);
+    expect(dashboard, 'the card that justifies deduplicating `apps`').toContain('<MyAppsCard');
   });
 
   it('re-reads the checklist when the set of installed modules changes (#267)', () => {

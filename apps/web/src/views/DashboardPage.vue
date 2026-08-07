@@ -14,41 +14,39 @@
           <p class="dash-hero-date">{{ todayLabel }}</p>
         </header>
 
-        <!-- Zone 2 — The configuration checklist: ONE read of `hub.setup.status` (hub#372,
+        <!-- Zone 2 — The launcher: «My apps» (hub#367). ERPlora is an ERP, not a till: what the
+             owner has in front are THEIR apps. Everything below this line is a report, and a report
+             needs a history nobody has on day one — so the launcher goes FIRST and cannot be
+             removed. It is the only widget that works with zero data. Same source as the topbar
+             launcher (`moduleNav` ← `/api/navigation`): one list of installed apps, not two. -->
+        <MyAppsCard :apps="moduleNav" />
+
+        <!-- Zone 3 — The configuration checklist: ONE read of `hub.setup.status` (hub#372,
              `architecture/hub/setup-status.md`). It used to be a banner fed by a loop in the
              browser that only knew about modules; now the runtime returns the whole document —the
              core and the modules, already ordered and already filtered by country and permission—
-             and this only paints it. Decision 1 of the plan: while the apps card is in sight, the
-             checklist starts at item 2 so the same thing is not offered twice on one screen. -->
+             and this only paints it. Decision 1 of the plan: the apps card above already offers
+             installing apps, so the checklist starts at item 2 and does not offer it twice on one
+             screen. It is unconditional because that card is (hub#367), and it is the row that
+             keeps both ⛔ in sight when the blocking strip yields (hub#374). -->
         <SetupChecklistCard
           :status="setupStatus"
-          :already-on-screen="appsCardVisible ? ['apps'] : []"
+          :already-on-screen="['apps']"
           @review="reviewSetup"
         />
 
-        <!-- Zona 3 — Superficie principal: tablero de widgets que los MÓDULOS instalados declaran en su
+        <!-- Zona 4 — Superficie principal: tablero de widgets que los MÓDULOS instalados declaran en su
              module.json (campo `widgets`, ADR-0054) + el widget CORE de export/import (ADR-0113;
              decisión humano 2026-07-12: entra en el CATÁLOGO del board como uno más — en todos los
              presets y ocultable desde el picker — en vez de tarjeta fija encima). Con el widget
              core siempre en catálogo, el board se pinta también en un hub sin módulos. Datos
              REALES de las queries declaradas; degrada a vacío/muted (nunca datos inventados). -->
 
-        <!-- Onboarding para hub vacío: si NO hay módulos instalados que aporten widgets, mostramos
-             un estado guiado (instala tu primer módulo) ENCIMA del board. El board sigue en el DOM
-             (visible con su widget core) para cumplir el contrato del test e2e y porque el CTA de
-             configuración del hub vive ahí. No se reemplaza, se complementa. -->
-        <section v-if="appsCardVisible" class="dash-onboarding">
-          <ok-empty-state
-            icon="grid-outline"
-            :heading="t('dashboard.onboardingTitle')"
-            :message="t('dashboard.onboardingBody')"
-          >
-            <ion-button slot="action" router-link="/apps" router-direction="forward">
-              <HubIcon slot="start" name="storefront-outline" />
-              {{ t('dashboard.onboardingCta') }}
-            </ion-button>
-          </ok-empty-state>
-        </section>
+        <!-- El hub vacío ya NO recibe aquí un «instala tu primer módulo»: esa frase le pedía a un
+             hostelero entender nuestra arquitectura antes de servir un café. Su sitio lo ocupan el
+             lanzador de arriba (con su baldosa ＋ Añadir apps) y la tarjeta de configuración
+             (hub#367, regla del PLAN paso 10). El board se queda: con cero módulos sigue trayendo
+             su widget core. -->
 
         <ion-list v-if="loadingWidgets" inset>
           <ion-item lines="none">
@@ -65,7 +63,7 @@
           storage-key="dashboard-hub"
         />
 
-        <!-- Zona 4 — Salud del sistema: pill discreta con el estado del Bridge (hardware local).
+        <!-- Zona 5 — Salud del sistema: pill discreta con el estado del Bridge (hardware local).
              La info completa (versión, reinstalación, recheck) vive en /system; aquí solo la señal
              always-visible. El bridge es el único "health" que existe hoy (sin agregado runtime/DB). -->
         <div class="dash-health">
@@ -147,11 +145,13 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import MyAppsCard from '../components/MyAppsCard.vue';
 import SetupChecklistCard from '../components/SetupChecklistCard.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
 import { getClient, getHubSector } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
+import { moduleNav } from '../lib/nav';
 import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
 import { openAssistantForSetup } from '../lib/shell';
 import { detectBridge } from '../lib/bridge-client';
@@ -205,15 +205,6 @@ type WidgetBoardEl = HTMLElement & {
 };
 const board = ref<WidgetBoardEl | null>(null);
 const loadingWidgets = ref<boolean>(true);
-// ¿Hay MÓDULOS instalados que aporten widgets? Si solo queda el widget core (blueprint), el hub
-// está vacío → mostramos un onboarding guiado en vez del board con un único widget solitario.
-const hasModuleWidgets = ref<boolean>(false);
-
-// Is the card that already offers installing apps in sight? One condition for both surfaces: the
-// card is painted with it and the checklist deduplicates its item with it (decision 1 of step 10).
-// With two separate conditions, the «Your apps» item would end up showing twice on one screen — or
-// never.
-const appsCardVisible = computed<boolean>(() => !loadingWidgets.value && !hasModuleWidgets.value);
 
 // ── Widget CORE de export/import (ADR-0113 §4; decisión humano 2026-07-12) ──────────────────
 // Es un widget DEL BOARD como los de módulo: entra en el catálogo y en TODOS los presets (sin
@@ -256,8 +247,6 @@ async function loadWidgets(): Promise<void> {
     });
     widgets = [...widgets, ...collected.widgets];
     presets = collected.presets.map((p) => ({ ...p, widgets: [CORE_BLUEPRINT_ID, ...p.widgets] }));
-    // Marcamos si hay widgets DE MÓDULOS (no solo el core) para mostrar el board o el onboarding.
-    hasModuleWidgets.value = collected.widgets.length > 0;
   } catch {
     /* degrada: solo el widget core */
   }
@@ -298,7 +287,7 @@ const todayLabel = computed<string>(() => {
   return `${t('dashboard.todayLabel')}, ${today}`;
 });
 
-// ── Zona 4 — Salud del sistema: estado del Bridge (hardware local) ────────────────────────────
+// ── Zona 5 — Salud del sistema: estado del Bridge (hardware local) ────────────────────────────
 // El detalle completo (versión, reinstalación, recheck manual) vive en /system; aquí solo la
 // señal always-visible. null = aún no sondado → se trata como "desconocido" (neutral, no error).
 const systemOnline = ref<boolean | null>(null);
@@ -452,7 +441,7 @@ function onModulesChanged(): void {
   color: var(--ion-color-medium, #92949c);
 }
 
-/* Zona 4 — Salud del sistema. Fila discreta al pie del Resumen: pill de estado (always-visible)
+/* Zona 5 — Salud del sistema. Fila discreta al pie del Resumen: pill de estado (always-visible)
    + enlace a /system. No compite con los KPIs: usa texto pequeño y color muted. En móvil la pill
    y el enlace pueden quedar pegados → un poco más de gap y touch-friendly. */
 .dash-health {
@@ -476,17 +465,6 @@ function onModulesChanged(): void {
 .dash-health-link ion-icon {
   font-size: 1rem;
   margin-inline-start: 0.1rem;
-}
-
-/* Onboarding del hub vacío: superficie destacada (no un card más) que invita a instalar el
-   primer módulo. ok-empty-state aporta el layout centrado (icono + título + mensaje); aquí le
-   damos aire y un fondo suave para que se distinga del tablero. */
-.dash-onboarding {
-  margin: 0.5rem 0 1.25rem;
-  padding: 1.5rem 1rem;
-  border-radius: var(--ok-radius, 12px);
-  background: var(--ion-color-step-50, rgba(var(--ion-color-primary-rgb, 0,145,206), 0.04));
-  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
 }
 
 </style>

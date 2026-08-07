@@ -183,10 +183,10 @@ export default {
     noWidgets: 'No installed module offers widgets yet.',
     widgetEmpty: 'No data',
     widgetError: 'Unavailable',
-    // Onboarding for an empty hub (no modules installed): invites to install the first one.
-    onboardingTitle: 'Your panel is ready',
-    onboardingBody: 'Install your first module and we will start showing your sales, stock and activity here.',
-    onboardingCta: 'Browse modules',
+    // «My apps» card (hub#367): the launcher of the panel. Its title reuses `topbar.apps` — same
+    // name for the same thing on both surfaces.
+    appsAdd: 'Add apps',
+    appsEmpty: 'Your apps will show up here. Add the ones your business needs.',
     blueprintTitle: 'Set up your hub',
     blueprintBody: 'Load a template for your business or restore a backup to get started.',
     blueprintCta: 'Set up',
