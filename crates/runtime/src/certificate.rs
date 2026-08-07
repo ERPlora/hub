@@ -463,10 +463,29 @@ pub async fn identity(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<reqwest:
     identity_from_der(&der, &password)
 }
 
-/// Expiry (notAfter) of the certificate this hub signs with, as ISO `YYYY-MM-DD`. `Ok(None)` if
-/// there is none or the date cannot be interpreted.
+/// Expiry (notAfter) of the certificate this hub **signs with**, as ISO `YYYY-MM-DD`. `Ok(None)` if
+/// there is none. This is the one the user is shown: it describes the certificate in use.
 pub async fn expiry(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<String>> {
-    match load_active_pkcs12(db, hub_id).await? {
+    match active_kind(db, hub_id).await? {
+        Some(kind) => slot_expiry(db, hub_id, kind).await,
+        None => Ok(None),
+    }
+}
+
+/// Expiry (notAfter) of ONE slot, **whether or not it is the one that signs** (hub#317).
+///
+/// Needed because the two questions are genuinely different. What the hub REPORTS to the control
+/// plane (`reported_cert_not_after`, ADR-0202 §2.5) is always the **delegated** slot's date — the
+/// SaaS compares it against the `not_after` of the `.p12` it custodies to spot a hub that is not
+/// really running our certificate. A hub with its own certificate uploaded still has to report its
+/// delegated fallback, so answering with [`expiry`] there would report a date that has nothing to do
+/// with ERPlora's and light up the mismatch alarm across the healthy half of the fleet.
+pub async fn slot_expiry(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    kind: CertificateKind,
+) -> Result<Option<String>> {
+    match load_pkcs12(db, hub_id, kind).await? {
         Some((der, password)) => expiry_from_der(&der, &password),
         None => Ok(None),
     }
@@ -1117,6 +1136,86 @@ mod tests {
         let st = slot_status(&db, "hub-test", CertificateKind::Delegated).await.unwrap();
         assert_eq!(st["uploaded_by"], json!(CONTROL_PLANE));
         assert!(!st["uploaded_by"].as_str().unwrap().contains("hub_user"));
+    }
+
+    /// **The expiry the hub REPORTS is the delegated slot's, even when the own one is signing.**
+    ///
+    /// The heartbeat's `reported_cert_not_after` describes the delegated slot and only that
+    /// (ADR-0202 §2.5: «un hub con certificado `own` puesto sigue reportando su slot delegado»), and
+    /// the control plane compares it against the `not_after` of the `.p12` IT custodies to catch a
+    /// hub that is not really running our certificate. Answering with the active slot's date would
+    /// make every hub that has its own certificate report a date that has nothing to do with
+    /// ERPlora's — and the mismatch alarm would fire on the whole healthy half of the fleet.
+    ///
+    /// The two certificates here are deliberately asymmetric: the delegated one is a REAL PKCS#12
+    /// (so it has a readable date) and the own one is not (so it has none). That is what makes the
+    /// difference between «read the active slot» and «read the delegated slot» visible at all.
+    #[tokio::test]
+    async fn the_delegated_expiry_is_reported_even_when_the_own_certificate_signs() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(20));
+        let db = db_ready().await;
+
+        let (delegated_b64, delegated_pw, expected_date) = real_pkcs12(365);
+        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None)
+            .await
+            .unwrap();
+
+        // El propio MANDA para firmar (regla de hub#316) y no es un `.p12` legible, así que la
+        // caducidad "activa" no se sabe (`.ok().flatten()` = lo que el llamador observa).
+        assert_eq!(active_kind(&db, "hub-test").await.unwrap(), Some(CertificateKind::Own));
+        assert_eq!(expiry(&db, "hub-test").await.ok().flatten(), None);
+        // ...pero la del slot delegado sí, y es la que se reporta.
+        assert_eq!(
+            slot_expiry(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
+            Some(expected_date)
+        );
+    }
+
+    /// A self-signed PKCS#12 that really parses, so a test can assert a DATE and not just a `None`.
+    /// Returns `(base64 of the container, password, expected ISO notAfter)`.
+    fn real_pkcs12(valid_for_days: u32) -> (String, String, String) {
+        use base64::Engine as _;
+        use openssl::asn1::Asn1Time;
+        use openssl::hash::MessageDigest;
+        use openssl::pkey::PKey;
+        use openssl::rsa::Rsa;
+        use openssl::x509::{X509NameBuilder, X509};
+
+        ensure_legacy_provider();
+        let key = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+        let mut name = X509NameBuilder::new().unwrap();
+        name.append_entry_by_text("CN", "ERPlora test").unwrap();
+        let name = name.build();
+
+        let not_after = Asn1Time::days_from_now(valid_for_days).unwrap();
+        let mut cert = X509::builder().unwrap();
+        cert.set_version(2).unwrap();
+        cert.set_subject_name(&name).unwrap();
+        cert.set_issuer_name(&name).unwrap();
+        cert.set_pubkey(&key).unwrap();
+        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
+        cert.set_not_after(&not_after).unwrap();
+        cert.sign(&key, MessageDigest::sha256()).unwrap();
+        let cert = cert.build();
+
+        let password = "delegated-pw".to_string();
+        let der = openssl::pkcs12::Pkcs12::builder()
+            .name("erplora")
+            .pkey(&key)
+            .cert(&cert)
+            .build2(&password)
+            .unwrap()
+            .to_der()
+            .unwrap();
+
+        let expected = asn1_time_to_iso(&not_after.to_string()).expect("fecha legible");
+        (
+            base64::engine::general_purpose::STANDARD.encode(&der),
+            password,
+            expected,
+        )
     }
 
     /// ⚠️ **PIN of the inconsistency hub#319 has to close, deliberately left standing here.**

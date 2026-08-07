@@ -99,7 +99,17 @@ pub async fn install_delegated_certificate(
     certificate::set_delegated(db, hub_id, &cert.pkcs12_b64, &cert.password, cert.version)
         .await
         .map_err(|error| error.to_string())?;
-    let not_after = certificate::expiry(db, hub_id).await.ok().flatten();
+    // The DELEGATED slot's date, not the active one's (ADR-0202 §2.5): this is what the heartbeat
+    // reports, and the SaaS compares it against the `not_after` of the `.p12` it custodies. A hub
+    // with its own certificate uploaded signs with THAT one but must still report its delegated
+    // fallback — `certificate::expiry` would answer about the wrong certificate there.
+    //
+    // Read back from the container that was actually stored, never copied from `cert.not_after`: the
+    // hub trusts the bytes it holds, not the metadata that came with them.
+    let not_after = certificate::slot_expiry(db, hub_id, certificate::CertificateKind::Delegated)
+        .await
+        .ok()
+        .flatten();
     Ok(DelegatedCertificateOutcome::Installed {
         version: cert.version,
         not_after,
@@ -484,6 +494,62 @@ mod tests {
             .unwrap()
             .expect("HUB_SECRETS_KEY");
         erplora_runtime::secret_box::decrypt_or_legacy(Some(&key), stored).unwrap()
+    }
+
+    /// A **real** self-signed PKCS#12 (`CN=ERPlora delegated test`, `notAfter` 2036-01-01, password
+    /// `delegated-pw`), so a test can assert a DATE and not merely a `None`. Generated once with
+    /// `openssl req -x509` + `openssl pkcs12 -export`; it holds no secret worth protecting.
+    const REAL_P12_B64: &str = include_str!("../tests/fixtures/delegated_test_cert.p12.b64");
+    const REAL_P12_PASSWORD: &str = "delegated-pw";
+    const REAL_P12_NOT_AFTER: &str = "2036-01-01";
+
+    /// **The reported expiry describes the DELEGATED slot, even when the own certificate signs.**
+    ///
+    /// End-to-end half of the runtime's `the_delegated_expiry_is_reported_even_when_the_own_
+    /// certificate_signs`. The heartbeat's `reported_cert_not_after` is the delegated slot's date and
+    /// only that (ADR-0202 §2.5): the SaaS compares it against the `not_after` of the `.p12` it
+    /// custodies, so a hub that answered with its OWN certificate's date would trip the mismatch
+    /// alarm while being perfectly healthy.
+    ///
+    /// The two slots are deliberately asymmetric — the delegated one is a real container and the own
+    /// one is not — because that is what makes «which slot did you read?» observable.
+    #[tokio::test]
+    async fn the_reported_expiry_is_the_delegated_slots_even_when_the_own_certificate_signs() {
+        ensure_master_key();
+        let db = db_ready().await;
+        seed_own_certificate(&db).await; // no es un `.p12` legible, y además MANDA para firmar
+
+        let body = format!(
+            r#"{{"version": 9, "pkcs12_b64": "{}", "password": "{REAL_P12_PASSWORD}"}}"#,
+            REAL_P12_B64.trim()
+        );
+        let (base, _seen, server) = cloud_stub(StatusCode::OK, body).await;
+
+        let outcome = install_delegated_certificate(
+            &reqwest::Client::new(),
+            &base,
+            &machine_auth(),
+            &db,
+            "hub-test",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            outcome,
+            DelegatedCertificateOutcome::Installed {
+                version: 9,
+                not_after: Some(REAL_P12_NOT_AFTER.to_string()),
+            }
+        );
+        // El que firma sigue siendo el PROPIO (regla de hub#316) — y su fecha no se sabe leer, que
+        // es justo lo que demuestra que la reportada NO sale de ahí.
+        assert_eq!(
+            certificate::active_kind(&db, "hub-test").await.unwrap(),
+            Some(certificate::CertificateKind::Own)
+        );
+        assert_eq!(certificate::expiry(&db, "hub-test").await.ok().flatten(), None);
+        server.abort();
     }
 
     /// A rotation replaces bytes AND number together, so the hub never reports a version whose bytes
