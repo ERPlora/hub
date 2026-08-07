@@ -27,6 +27,7 @@ import {
   offersPinLogin,
   setDeviceMode,
 } from './device-mode';
+import { STRICT_PIN_POLICY, pinPolicy } from './pin-policy';
 
 /** A `fetch` double answering once with `status` + `body`. */
 function respondWith(status: number, body: unknown): ReturnType<typeof vi.fn> {
@@ -50,6 +51,7 @@ beforeEach(() => {
   resolveDeviceId.mockResolvedValue('till-1');
   deviceMode.value = 'shared';
   deviceModeReady.value = false;
+  pinPolicy.value = STRICT_PIN_POLICY;
 });
 
 afterEach(() => {
@@ -205,13 +207,82 @@ describe('setDeviceMode', () => {
 
 describe('offersPinLogin', () => {
   it('is the whole decision: the pinpad belongs to a shared device that proved itself', () => {
-    expect(offersPinLogin('shared', true)).toBe(true);
+    expect(offersPinLogin('shared', true, 'per_shift')).toBe(true);
     // Somebody's own laptop signs in with the account, not with four digits typed in front of a
     // queue. That is the point of the mode.
-    expect(offersPinLogin('personal', true)).toBe(false);
+    expect(offersPinLogin('personal', true, 'per_shift')).toBe(false);
     // And no mode substitutes for device-trust: a PIN is only usable where an online login already
     // happened (§2.9, hub#330), so an untrusted device offers the account route and nothing else.
-    expect(offersPinLogin('shared', false)).toBe(false);
-    expect(offersPinLogin('personal', false)).toBe(false);
+    expect(offersPinLogin('shared', false, 'per_shift')).toBe(false);
+    expect(offersPinLogin('personal', false, 'per_shift')).toBe(false);
+  });
+
+  it('also obeys the dial the business set (hub#359), and every part can veto', () => {
+    // The third half. `never` is the one-person shop saying "do not ask who is selling"; it takes
+    // the pinpad away on a device that would otherwise have one. Note what it does NOT do: the
+    // session still expires when the DEVICE says it does (the runtime composes both by the shorter
+    // window), so this gives up attribution, never the lock.
+    expect(offersPinLogin('shared', true, 'never')).toBe(false);
+    expect(offersPinLogin('shared', true, 'always')).toBe(true);
+
+    // Three conditions, and it is an AND: not offering the pinpad always means the account route
+    // instead, which is stricter — never a way in that was not there before.
+    expect(offersPinLogin('personal', true, 'never')).toBe(false);
+    expect(offersPinLogin('shared', false, 'never')).toBe(false);
+  });
+});
+
+describe('the dial travels on the same answer as the mode', () => {
+  it('publishes what the hub says about both, from one read', async () => {
+    // One request, because the login screen has one chance to ask before it paints. Two would mean
+    // a window in which the screen holds half an answer and has to guess the other half.
+    respondWith(200, { ok: true, data: { mode: 'shared', pin_policy: 'never' } });
+
+    await loadDeviceMode();
+
+    expect(deviceMode.value).toBe('shared');
+    expect(pinPolicy.value).toBe('never');
+  });
+
+  it('keeps asking when the hub says nothing about the dial', async () => {
+    // An older runtime, or a body that lost the field on the way. Silence is not permission.
+    respondWith(200, { ok: true, data: { mode: 'shared' } });
+
+    await loadDeviceMode();
+
+    expect(pinPolicy.value).toBe('per_shift');
+  });
+
+  it('takes a granted «never» back when a later read fails', async () => {
+    respondWith(200, { ok: true, data: { mode: 'shared', pin_policy: 'never' } });
+    await loadDeviceMode();
+    expect(pinPolicy.value).toBe('never');
+
+    // Same reasoning as the mode: the decision behind `never` lives in the hub and can be taken
+    // back there. A client that kept the last good answer would keep the pinpad off after the
+    // owner turned it back on.
+    failWith(new TypeError('Failed to fetch'));
+    await loadDeviceMode();
+
+    expect(pinPolicy.value).toBe('per_shift');
+    expect(deviceMode.value).toBe('shared');
+  });
+
+  it('does not let an error body lower the friction, whatever it claims', async () => {
+    respondWith(500, { ok: false, data: { mode: 'personal', pin_policy: 'never' } });
+
+    await loadDeviceMode();
+
+    expect(pinPolicy.value).toBe('per_shift');
+    expect(deviceMode.value).toBe('shared');
+  });
+
+  it('does not cache the dial anywhere the browser could edit it', async () => {
+    respondWith(200, { ok: true, data: { mode: 'shared', pin_policy: 'never' } });
+    localStorage.clear();
+
+    await loadDeviceMode();
+
+    expect(localStorage.length).toBe(0);
   });
 });

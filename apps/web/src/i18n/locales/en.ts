@@ -260,6 +260,27 @@ export default {
     adminOnly: 'Only an administrator can change how this device signs people in.',
     saveError: 'This device could not be changed. Check the connection and try again.',
   },
+  // hub#359 — the dial the OWNER turns, on top of the device mode above. Every option says what it
+  // does to the business, never what it is called: "never" means nothing to a shopkeeper, "whoever
+  // opened the till is the name on every sale" does. The hour and the twelve hours are spelled out
+  // because the hub really does enforce them, and a promise it cannot keep would be worse than no
+  // setting at all.
+  pinPolicy: {
+    title: 'Asking who is selling',
+    intro:
+      'How often this hub asks which person is at the till. It applies to the whole business — each device also decides for itself, above.',
+    always: 'Every hour',
+    alwaysConsequence:
+      'The till forgets who was using it after an hour, so the next person signs in again. The most names on your receipts, and the most typing.',
+    perShift: 'Once per shift',
+    perShiftConsequence:
+      'Somebody signs in when they start and the till remembers them for the next 12 hours. Every sale still carries a name. This is what a hub does unless you change it.',
+    never: 'Never',
+    neverConsequence:
+      'Nobody types a PIN. Whoever opened the till in the morning is the name on every sale until the shift ends, whoever actually made them — so you cannot tell who sold what, or who gave a discount. Staff who only have a PIN and no account will not be able to sign in.',
+    adminOnly: 'Only an administrator can change how often this hub asks.',
+    saveError: 'This could not be changed. Check the connection and try again.',
+  },
   settings: {
     hubWide: 'Hub settings',
     currency: 'Currency',

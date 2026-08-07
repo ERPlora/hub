@@ -23,6 +23,7 @@ import { beginRequest, endRequest } from './shell';
 import { getLocale, bootHubLanguage } from '../i18n';
 import { hubSettings } from './hub-settings';
 import { hubCurrency, publishHubCurrency } from './money';
+import { STRICT_PIN_POLICY } from './pin-policy';
 import { setRuntimeDeviceContext } from './device';
 
 /**
@@ -904,6 +905,11 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     // La paleta global tampoco viaja en el context: la trae el GET completo (que además
     // la refleja en el shell vía theme.ts). Aquí solo se preserva la cache.
     theme_palette: hubSettings.value?.theme_palette ?? 'erplora',
+    // El dial «pedir PIN» (hub#359) tampoco viaja en el context. Se preserva lo cacheado y, sin
+    // cache, el valor que SIGUE preguntando: sembrar la cache con `never` porque el context calló
+    // sería quitar el pinpad por una lectura que no habla de él. La autoridad son el GET completo
+    // y `GET /api/device/mode` (que es el que lee la pantalla de login, sin sesión).
+    pin_policy: hubSettings.value?.pin_policy ?? STRICT_PIN_POLICY,
   };
   // Publica la moneda a `globalThis.__erploraCurrency` para los Web Components de módulo (ADR-0059):
   // el SDK la lee de ahí como fallback cuando el shell no inyecta el getter (mirror de cómo `locale`

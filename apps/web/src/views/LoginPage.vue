@@ -356,6 +356,7 @@ import {
   pinUsers,
 } from '../lib/runtime';
 import { deviceMode, loadDeviceMode, offersPinLogin } from '../lib/device-mode';
+import { pinPolicy } from '../lib/pin-policy';
 import { isDark, toggleTheme } from '../lib/theme';
 import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
 
@@ -419,13 +420,17 @@ const trustedUsers = ref<TrustedUser[]>(readTrustedUsers());
 // ---------------------------------------------------------------------------
 // Flujo de pasos
 // ---------------------------------------------------------------------------
-// ¿Ofrece esta pantalla el pinpad? Lo decide el MODO DEL DISPOSITIVO (hub#357/#358), no lo que
-// haya en este navegador: el mostrador —donde varias personas se turnan— pregunta quién está
-// delante; el equipo propio del dueño entra con su cuenta y no le pide cuatro dígitos cada mañana.
-// La regla vive entera en `offersPinLogin` (shared **y** dispositivo de confianza): duplicarla aquí
-// la haría derivar. Hasta que el hub responde, `deviceMode` vale `shared` → el pinpad es el estado
-// por defecto, que es el lado seguro.
-const pinAvailable = computed(() => offersPinLogin(deviceMode.value, trusted.value));
+// ¿Ofrece esta pantalla el pinpad? Lo deciden el MODO DEL DISPOSITIVO (hub#357/#358) y el DIAL DEL
+// NEGOCIO (hub#359), no lo que haya en este navegador: el mostrador —donde varias personas se
+// turnan— pregunta quién está delante; el equipo propio del dueño entra con su cuenta; y la tienda
+// de una sola persona puede decir que no se pregunte («nunca»), asumiendo que las ventas dejan de
+// llevar el nombre de quien las hizo.
+//
+// La regla vive entera en `offersPinLogin` (shared **y** dispositivo de confianza **y** un dial que
+// sigue preguntando): duplicarla aquí la haría derivar. Hasta que el hub responde, `deviceMode`
+// vale `shared` y `pinPolicy` vale `per_shift` → el pinpad es el estado por defecto, que es el lado
+// seguro. Esta pantalla solo LEE las dos: escribirlas exige sesión admin.
+const pinAvailable = computed(() => offersPinLogin(deviceMode.value, trusted.value, pinPolicy.value));
 const step = ref<Step>(pinAvailable.value ? 'pin' : 'email');
 const showTabs = computed(() => pinAvailable.value && step.value !== 'setup' && step.value !== 'twoFactor');
 
@@ -435,10 +440,11 @@ const showTabs = computed(() => pinAvailable.value && step.value !== 'setup' && 
 // "conservaban" los de localStorage ausentes del runtime → podía resucitar usuarios obsoletos
 // (drift); ya no. El flujo de seguridad (§2.9) NO cambia: esto solo decide qué pestaña se muestra;
 // la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
-// `deviceMode` entra como fuente porque el hub responde DESPUÉS del montaje: sin ella, un portátil
-// marcado `personal` se quedaría con el pinpad ya pintado hasta recargar.
+// `deviceMode` y `pinPolicy` entran como fuentes porque el hub responde DESPUÉS del montaje: sin
+// ellas, un portátil marcado `personal` —o un hub cuyo dial dice «nunca»— se quedaría con el pinpad
+// ya pintado hasta recargar, y una pantalla de login no la recarga nadie.
 watch(
-  [pinUsers, hubContextReady, machineRegistrationRequired, deviceMode],
+  [pinUsers, hubContextReady, machineRegistrationRequired, deviceMode, pinPolicy],
   ([users, contextReady, registrationRequired]) => {
     if (!contextReady || step.value === 'setup' || step.value === 'twoFactor') return;
     // Una máquina real sin vínculo no puede entrar por un PIN heredado/cacheado: primero debe

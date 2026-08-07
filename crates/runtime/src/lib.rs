@@ -39,6 +39,7 @@ pub mod money_backfill;
 pub mod native;
 pub mod outbox;
 pub mod permissions;
+pub mod pin_policy;
 pub mod print_queue;
 pub mod queries;
 pub mod registry;
@@ -939,12 +940,36 @@ impl Runtime {
         device_mode::mode(self.db.as_ref(), device_id).await
     }
 
-    /// Cuánto dura una sesión abierta **en este dispositivo** (segundos), hub#358: un mostrador
-    /// caduca dentro del turno que abrió; el equipo propio conserva la sesión larga de siempre
-    /// («recordarme»). Fail-closed igual que el modo: un dispositivo que el hub no conoce —o un
-    /// cliente que no dice cuál es— recibe la sesión **corta**, nunca la larga.
+    /// Cuánto dura una sesión abierta **en este dispositivo** (segundos), hub#358 + hub#359.
+    ///
+    /// Lo deciden los **dos** controles a la vez, y gana **el más restrictivo**
+    /// ([`pin_policy::effective_session_ttl_secs`], un `min`): el modo del dispositivo dice cuánto
+    /// aguanta esta terminal (mostrador = el turno, equipo propio = «recordarme») y el dial del
+    /// negocio dice cada cuánto se pregunta quién está en la caja. Ninguno puede **alargar** lo que
+    /// el otro acortó: «nunca» no le compra al mostrador la sesión larga de un equipo personal, y
+    /// marcar un equipo como personal no lo saca de la política estricta que eligió el negocio.
+    ///
+    /// Fail-closed igual que el modo: un dispositivo que el hub no conoce —o un cliente que no dice
+    /// cuál es— recibe la sesión **corta**, nunca la larga.
     pub async fn session_ttl_for_device(&self, device_id: &str) -> Result<i64> {
-        Ok(self.device_mode(device_id).await?.session_ttl_secs())
+        Ok(pin_policy::effective_session_ttl_secs(
+            self.device_mode(device_id).await?,
+            self.pin_policy().await?,
+        ))
+    }
+
+    /// Cada cuánto pregunta este hub QUIÉN está en la caja (`always` | `per_shift` | `never`,
+    /// hub#359). Un hub que no eligió —o cuyo valor almacenado no se puede leer— **sigue
+    /// preguntando**: el default nunca es `never`.
+    pub async fn pin_policy(&self) -> Result<pin_policy::PinPolicy> {
+        pin_policy::policy(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Fija el dial del hub. `actor` = quién lo decidió (auditoría); la puerta HTTP
+    /// (`PUT /api/settings`) exige sesión **admin**. Escribe por el store de settings, que es la
+    /// única puerta de escritura de esta clave.
+    pub async fn set_pin_policy(&self, policy: pin_policy::PinPolicy, actor: &str) -> Result<()> {
+        pin_policy::set_policy(self.db.as_ref(), &self.hub_id, policy, actor).await
     }
 
     /// Fija el modo de un dispositivo **ya conocido** (hub#357). `actor` = el `hub_user.id` que lo
