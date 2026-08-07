@@ -58,6 +58,20 @@ pub enum RuntimeError {
     Domain { code: String, message: String },
     #[error("permiso denegado: requiere `{0}`")]
     PermissionDenied(String),
+    /// The same refusal as [`RuntimeError::PermissionDenied`], reported as one a **manager**
+    /// could approve (hub#360, PLAN paso 2b rule 1). It is a LABEL on a denial, never a permit:
+    /// nothing ran, nothing was written, and this issue adds no way in — the PIN that actually
+    /// authorises is hub#361. What it buys is that the caller can tell "ask the manager" from
+    /// "this is not for you", which a flat `403` cannot.
+    ///
+    /// `permission` is the missing permission, carried as a **field** because both the dialog
+    /// (hub#363) and the re-check (hub#361) must name it exactly — never parse it out of a
+    /// sentence.
+    ///
+    /// Only the `manager` level reaches here (rule 5): `admin` territory — fiscal identity, plan,
+    /// deletion, installing apps — is never approved by a four-digit PIN in front of customers.
+    #[error("requires elevation: `{permission}` needs approval from a manager")]
+    RequiresElevation { permission: String },
     /// El módulo necesita una **capability** (ADR-0079: red/certificado/impresora/notify) que el
     /// usuario NO ha concedido (default-deny). Distinto de `PermissionDenied` (RBAC de usuario):
     /// esto es el permiso módulo→host, gestionado en Settings → Permisos.

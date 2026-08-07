@@ -322,6 +322,13 @@ export class ErploraError extends Error {
   constructor(
     public readonly code: string,
     message: string,
+    /**
+     * The missing permission, present only on `requires_elevation` (hub#360): the refusal the
+     * dispatcher reports when a **manager** could approve the action. It is what the approval
+     * dialog names and what the runtime re-checks — read the field, never parse the message.
+     * A flat `permission_denied` leaves it `undefined` on purpose: it is not an offer to elevate.
+     */
+    public readonly permission?: string,
   ) {
     super(message);
     this.name = 'ErploraError';
@@ -332,13 +339,13 @@ export class ErploraError extends Error {
 interface Envelope {
   ok: boolean;
   data?: unknown;
-  error?: { code: string; message: string };
+  error?: { code: string; message: string; permission?: string };
 }
 
 function unwrap(env: Envelope): unknown {
   if (!env.ok) {
     const e = env.error;
-    throw new ErploraError(e?.code ?? 'error', e?.message ?? 'unknown error');
+    throw new ErploraError(e?.code ?? 'error', e?.message ?? 'unknown error', e?.permission);
   }
   return env.data;
 }

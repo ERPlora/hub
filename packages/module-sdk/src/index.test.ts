@@ -71,6 +71,43 @@ test('un sobre {ok:false} lanza ErploraError con el code del server', async () =
   );
 });
 
+test('requires_elevation carries the missing permission through to the caller (hub#360)', async () => {
+  // The dispatcher names the permission a manager would have to approve. It must survive the
+  // envelope as a FIELD: the dialog of hub#363 has to name it and hub#361 has to re-check it —
+  // neither may parse it out of the message.
+  const fetchImpl = (async () => ({
+    json: async () => ({
+      ok: false,
+      error: {
+        code: 'requires_elevation',
+        message: 'requires elevation: `sales.take_payment` needs approval from a manager',
+        permission: 'sales.take_payment',
+      },
+    }),
+  })) as unknown as typeof fetch;
+
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.command('sales.sale.take_payment'),
+    (e: unknown) =>
+      e instanceof ErploraError &&
+      e.code === 'requires_elevation' &&
+      e.permission === 'sales.take_payment',
+  );
+});
+
+test('a flat permission_denied carries no permission (it is not an offer to elevate)', async () => {
+  const fetchImpl = (async () => ({
+    json: async () => ({ ok: false, error: { code: 'permission_denied', message: 'no' } }),
+  })) as unknown as typeof fetch;
+
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.command('x.y'),
+    (e: unknown) => e instanceof ErploraError && e.permission === undefined,
+  );
+});
+
 test('headers() se inyectan en cada POST (auth X-Hub-Id, etc.)', async () => {
   let hdrs: Record<string, string> = {};
   const fetchImpl = (async (_u: string, init: RequestInit) => {
