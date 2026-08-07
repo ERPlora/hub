@@ -327,6 +327,36 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
         name: "hub_certificate_delegated_version",
         postgres: "ALTER TABLE _hub_certificate ADD COLUMN cert_version BIGINT;",
     },
+    // ── v17 — hub#357 (paso 2b): QUÉ CLASE de dispositivo es este — `shared` vs `personal` ───────
+    // El mismo negocio tiene el TPV del mostrador (varias personas se turnan) y el portátil del
+    // despacho (de una sola), y la MISMA persona usa los dos. Así que no puede ser un ajuste del
+    // hub: es del dispositivo, y la clave ya existe (`X-Device-Id`, ADR-0154). De aquí cuelgan el
+    // pinpad condicionado (hub#358) y el ajuste «Pedir PIN: siempre / turno / nunca» (hub#359).
+    //
+    // Va en `hub_trusted_device` y no en una tabla nueva, y ese es el punto de SEGURIDAD del
+    // diseño: `personal` es el modo LAXO (sin pinpad, sesión larga) y el `device_id` es un
+    // identificador que el cliente manda en claro, no una credencial. Colgando el modo de la fila
+    // del device-trust (§2.9, hub#330), un dispositivo solo puede tener modo si ya probó identidad
+    // con un login ONLINE — y `untrust_device` (portátil robado) BORRA la fila, así que se lleva el
+    // modo laxo con ella sin ninguna cascada que recordar. Con una tabla aparte, olvidar esa
+    // cascada dejaría al ladrón el dispositivo «personal».
+    //
+    // `DEFAULT 'shared'` sella como COMPARTIDOS los dispositivos ya de confianza de un hub
+    // desplegado, que es la lectura conservadora: lo que se hereda es la fricción, nunca su
+    // ausencia. `mode_set_by` audita quién lo decidió (como `activated_by` en la v13): bajar la
+    // fricción de identidad de un terminal es una decisión que tiene que dejar rastro.
+    //
+    // ⚠️ La v15 sigue RESERVADA por hub#341 (cola de impresión, `architecture/hub/print-queue.md`)
+    // igual que cuando se escribió la v16: esta PR salta a la 17 en vez de ocupar el hueco. `apply`
+    // compara `version >` el máximo aplicado y el test de orden solo exige que crezcan.
+    SystemMigration {
+        version: 17,
+        name: "hub_trusted_device_mode",
+        postgres: "\
+ALTER TABLE hub_trusted_device ADD COLUMN mode TEXT NOT NULL DEFAULT 'shared';\
+ALTER TABLE hub_trusted_device ADD COLUMN mode_set_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_trusted_device ADD COLUMN mode_set_by TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -690,12 +720,19 @@ mod tests {
     /// with the certificate its owner uploaded in Ajustes → Negocio, and every migration up to v13
     /// already registered. Reproduces the only state v14 has to survive — an ALTER cannot be tested
     /// against a table the same run has just created in its post-migration shape.
+    ///
+    /// `hub_trusted_device` (v2) belongs to that state too: this fixture jumps straight from v13 to
+    /// the end of the catalogue, so **every** later migration runs over it, and one that ALTERs the
+    /// device-trust table (v17, hub#357) would otherwise fail against a hub that never had one —
+    /// a hub that has never existed, since v2 creates it for everybody.
     async fn hub_deployed_before_the_slots(db: &dyn DatabaseAdapter) {
         db.execute_batch(
             "CREATE TABLE _hub_certificate (\
                hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
                uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
-               PRIMARY KEY (hub_id));",
+               PRIMARY KEY (hub_id));\
+             CREATE TABLE hub_trusted_device (\
+               device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
         )
         .await
         .unwrap();
@@ -778,5 +815,57 @@ mod tests {
         let kinds: Vec<&str> =
             rows.rows.iter().filter_map(|r| r["kind"].as_str()).collect();
         assert_eq!(kinds, vec!["delegated", "own"], "los dos slots conviven");
+    }
+
+    /// v17 (hub#357): los dispositivos de confianza que YA existen heredan el modo **estricto**.
+    ///
+    /// Es toda la seguridad de esta migración. `personal` significa «sin pinpad, sesión larga»: si
+    /// el default fuese ese, cada TPV de mostrador ya enrolado de la flota amanecería sin pedir
+    /// quién está detrás de la caja, y nadie lo habría decidido. Lo que se hereda es la fricción,
+    /// nunca su ausencia.
+    #[tokio::test]
+    async fn the_devices_a_deployed_hub_already_trusted_inherit_the_strict_mode_v17() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        // Un hub anterior a la v17: la tabla del device-trust (v2) SIN las columnas del modo.
+        db.execute_batch(
+            "CREATE TABLE hub_trusted_device (\
+               device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);\
+             INSERT INTO hub_trusted_device (device_id, label, trusted_at) \
+             VALUES ('till-1', 'Caja 1', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+        ensure_control_table(&db).await.unwrap();
+        for v in 1..=16 {
+            let mut p = Params::new();
+            p.insert("version".into(), json!(v));
+            p.insert("name".into(), json!(format!("pre_device_mode_{v}")));
+            p.insert("applied_at".into(), json!("2026-01-01T00:00:00Z"));
+            db.execute(
+                "INSERT INTO _hub_system_migrations (version, name, applied_at) \
+                 VALUES (:version, :name, :applied_at)",
+                &p,
+            )
+            .await
+            .unwrap();
+        }
+
+        apply(&db, "hub-test").await.unwrap();
+        assert!(max_applied_version(&db).await.unwrap() >= 17, "v17 registrada");
+
+        let row = db
+            .query(
+                "SELECT mode, label FROM hub_trusted_device WHERE device_id = 'till-1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.rows.len(), 1, "el dispositivo de confianza sobrevive");
+        assert_eq!(row.rows[0]["mode"], json!("shared"), "hereda la fricción, no su ausencia");
+        assert_eq!(row.rows[0]["label"], json!("Caja 1"), "su etiqueta intacta");
+
+        // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').
+        apply(&db, "hub-test").await.unwrap();
     }
 }

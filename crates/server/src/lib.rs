@@ -36,6 +36,8 @@ pub mod assistant;
 pub mod auth;
 pub mod bootstrap;
 pub mod daily_usage;
+/// `shared` (counter till) vs `personal` (somebody's own device) — plan step 2b, hub#357.
+pub mod device_mode;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
@@ -648,6 +650,14 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/hub/roles/:key",
             axum::routing::put(hub_users::set_role_activation),
+        )
+        // Modo del DISPOSITIVO (paso 2b, hub#357): `shared` (mostrador) vs `personal` (equipo
+        // propio). GET = **sin sesión** (lo lee la pantalla de login, que es anterior a cualquier
+        // sesión) y un dispositivo desconocido recibe `shared`; PUT = sesión **admin**, como
+        // ajustes o el catálogo de roles. Ver `crate::device_mode`.
+        .route(
+            "/api/device/mode",
+            get(device_mode::get_device_mode).put(device_mode::put_device_mode),
         )
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
