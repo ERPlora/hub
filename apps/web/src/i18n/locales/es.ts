@@ -115,11 +115,42 @@ export default {
     previewUnsupportedBody: 'Este tipo de archivo no se puede mostrar aquí. Descárgalo para abrirlo con una aplicación de tu dispositivo.',
     previewPdfTruncated: 'Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.',
   },
-  dashboard: {
-    setupTitle: '{n} módulo(s) requieren configuración',
+  // La checklist de configuración — la superficie del panel de `hub.setup.status` (hub#372).
+  // `items.<key>` cubre SOLO los ítems del core: la clave de un ítem del core es también su clave
+  // i18n; el título de un módulo viaja en inglés en su manifest y se pinta tal cual.
+  setup: {
+    title: 'Termina de configurar tu hub',
+    progress: '{done} de {total} hechos',
+    viewAll: 'Ver todo',
+    viewLess: 'Ver menos',
     configure: 'Configurar',
-    setupHint: 'Revisa qué falta y el asistente te guiará paso a paso para dejarlo listo.',
-    reviewConfig: 'Revisar configuración',
+    review: 'Pedírselo al asistente',
+    doneLabel: 'Hecho',
+    // Los tres niveles, dichos por lo que significan para el negocio, no por su gravedad.
+    levelLegal: 'Necesario para facturar',
+    levelFunctional: 'Necesario para vender',
+    levelRecommended: 'Recomendado',
+    // El tercer estado: una avería NUESTRA, no una tarea suya. No puede sonar a deber.
+    unavailableLabel: 'Todavía no disponible',
+    unavailableHint: 'Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.',
+    completeTitle: 'Tu hub está listo',
+    completeBody: 'No queda nada pendiente en la checklist.',
+    items: {
+      apps: {
+        title: 'Tus apps',
+        description: 'Instala al menos una app de negocio para que el hub tenga algo que hacer.',
+      },
+      business_identity: {
+        title: 'Los datos de tu negocio',
+        description: 'Razón social y NIF: sin ellos el hub no puede emitir una factura.',
+      },
+      team: {
+        title: 'Tu equipo',
+        description: 'Añade a las personas que usarán el TPV, cada una con su forma de entrar.',
+      },
+    },
+  },
+  dashboard: {
     // Saludo contextual por franja horaria (zona 1 — cabecera). El nombre se interpola.
     greetingMorning: 'Buenos días, {name}',
     greetingAfternoon: 'Buenas tardes, {name}',
