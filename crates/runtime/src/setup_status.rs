@@ -34,6 +34,22 @@
 //!    half-applied migration) its item is **omitted** rather than reported as pending. A false "you
 //!    are missing X" sends the user to fix something that may already be fine — worse than a gap.
 //!
+//! # Whose task is it, and the one thing that is nobody's task (hub#435)
+//!
+//! Every item declares the permission to CONFIGURE it — a module in its `setup` block, the core in
+//! [`CORE_ITEMS`] — and a session that does not hold it is not shown the item. Not hidden from the
+//! surfaces: **dropped from the answer**, counters included. It is not their job, so it is not on
+//! their list; before this, a waiter was shown "your business details" with a button to a screen the
+//! server refuses them.
+//!
+//! **A wall is the exception, and it is the whole subtlety.** An item that is ⛔ *and* still pending
+//! ([`is_wall`]) is not a task: it is the statement that `enforce_fiscal_precondition` is going to
+//! refuse **this** session's sale, whoever ends up clearing it. Dropping it would take the blocking
+//! strip (hub#374) down for exactly the person it was built for — the one at the till, who is
+//! precisely the one who cannot fix it — and would turn their "nothing pending" into the false
+//! "done" this whole design keeps failing away from. So a wall stays, carries `actionable: false`,
+//! and the surfaces name it and say who can clear it instead of offering it.
+//!
 //! # Three levels, and the ⛔ one is a fact about the runtime (hub#370)
 //!
 //! `required` is a boolean and the checklist needs three answers: ⛔ legal · 🔴 functional · 🟡
@@ -173,6 +189,10 @@ struct CoreItem {
     /// `true` = 🔴 functional, `false` = 🟡 recommended (hub#370 turns this into the real level).
     required: bool,
     actions: &'static [&'static str],
+    /// Who may CONFIGURE it — the same meaning the `permission` of a module's `setup` block has
+    /// (hub#435). The three of them are [`crate::hub_users::ADMINISTER_PERMISSION`], because the
+    /// three are guarded by the one gate the core owns (`server::auth::require_admin_session`).
+    permission: &'static str,
 }
 
 /// The core items, in the order the business needs them.
@@ -195,6 +215,7 @@ const CORE_ITEMS: &[CoreItem] = &[
         // You do not fill an empty hub by hand: you start from a sector blueprint or from the
         // catalogue. Offering "do it manually" here would be offering the slowest of the paths.
         actions: &["template", "catalog"],
+        permission: crate::hub_users::ADMINISTER_PERMISSION,
     },
     CoreItem {
         key: ITEM_BUSINESS_IDENTITY,
@@ -205,6 +226,7 @@ const CORE_ITEMS: &[CoreItem] = &[
         route: "/settings",
         required: true,
         actions: &["manual", "assistant"],
+        permission: crate::hub_users::ADMINISTER_PERMISSION,
     },
     CoreItem {
         key: ITEM_TEAM,
@@ -217,6 +239,7 @@ const CORE_ITEMS: &[CoreItem] = &[
         // A blueprint activates ROLES, it never creates users: credentials do not travel in a
         // template (ADR-0195 §5). So there is no `template` action here on purpose.
         actions: &["manual"],
+        permission: crate::hub_users::ADMINISTER_PERMISSION,
     },
 ];
 
@@ -265,22 +288,39 @@ pub async fn status(
 
     let mut items: Vec<Json> = Vec::new();
     for core in CORE_ITEMS {
-        if let Some(state) = core_item_state(db, registry, hub_id, core, &setting).await {
-            items.push(item_json(
-                core.key,
-                "core",
-                None,
-                state,
-                core.required,
-                level_of(core.key, core.required, &certificate_arm),
-                core.title,
-                core.description,
-                core.icon,
-                core.route,
-                core.order,
-                core.actions,
-            ));
+        // Who this item is FOR (hub#435). Same meaning as a module's `setup.permission`: the one to
+        // configure, not the one to read — and for the core that is the single administrative rank
+        // the hub really has.
+        let actionable = crate::permissions::has(ctx, core.permission);
+        let level = level_of(core.key, core.required, &certificate_arm);
+        // Not theirs and not a wall ⇒ not on their list. Checked before the state is computed so a
+        // session that has no business with the item does not pay for reading it either.
+        if !actionable && level != LEVEL_LEGAL {
+            continue;
         }
+        let Some(state) = core_item_state(db, registry, hub_id, core, &setting).await else {
+            continue;
+        };
+        // …and the other half of the wall: ⛔ but already cleared blocks nobody, so the ordinary
+        // rule takes over and the item leaves the list of whoever cannot act on it.
+        if !actionable && state != STATE_PENDING {
+            continue;
+        }
+        items.push(item_json(
+            core.key,
+            "core",
+            None,
+            state,
+            core.required,
+            level,
+            core.title,
+            core.description,
+            core.icon,
+            core.route,
+            core.order,
+            core.actions,
+            actionable,
+        ));
     }
 
     for manifest in &registry.installed {
@@ -293,27 +333,37 @@ pub async fn status(
         if !applies_to_country(&def.countries, &country) {
             continue;
         }
-        // Only tell whoever can act. The module's query would reject anyone else anyway, so this is
-        // the cheap half of a gate the dispatcher enforces for real.
-        if !def.permission.is_empty() && !crate::permissions::has(ctx, &def.permission) {
+        let key = item_key(&manifest.id);
+        // The manifest declares `required`, never the level: the core decides, and the only way a
+        // module item reaches ⛔ is the core hanging a gate arm on it.
+        let level = level_of(&key, def.required, &certificate_arm);
+        // Only tell whoever can act — a module that declares no `permission` says nothing about who
+        // that is, so nothing is assumed. The exception is the same as for a core item (hub#435): a
+        // ⛔ is not a task but a wall, and the wall stops this session whoever ends up clearing it.
+        // Without it the ⛔ the core hangs on the certificate module would vanish from exactly the
+        // session the fiscal gate is about to refuse (`verifactu` reads with `view` and configures
+        // with `configure`, and an employee holds only the first).
+        let actionable = def.permission.is_empty() || crate::permissions::has(ctx, &def.permission);
+        if !actionable && level != LEVEL_LEGAL {
             continue;
         }
         let Some(done) = module_item_done(db, registry, def, ctx).await else {
             continue;
         };
-        let key = item_key(&manifest.id);
+        // A module item never reaches the third state: its screen is inside this hub, so there is
+        // nothing outside that could make it impossible. Not evaluable ⇒ omitted (above); not
+        // configured ⇒ pending.
+        let state = done_or_pending(done);
+        if !actionable && state != STATE_PENDING {
+            continue;
+        }
         items.push(item_json(
             &key,
             "module",
             Some(&manifest.id),
-            // A module item never reaches the third state: its screen is inside this hub, so there
-            // is nothing outside that could make it impossible. Not evaluable ⇒ omitted (above);
-            // not configured ⇒ pending.
-            done_or_pending(done),
+            state,
             def.required,
-            // The manifest declares `required`, never the level: the core decides, and the only way
-            // a module item reaches ⛔ is the core hanging a gate arm on it.
-            level_of(&key, def.required, &certificate_arm),
+            level,
             &def.title,
             &def.description,
             if def.icon.is_empty() {
@@ -327,6 +377,7 @@ pub async fn status(
             // module's settings. `template`/`file` are not offered per module yet: no manifest can
             // say today which blueprint section fills it.
             &["manual", "assistant"],
+            actionable,
         ));
     }
 
@@ -351,9 +402,18 @@ pub async fn status(
     // would leave the strip up forever; counting every ⛔ item would leave it up on a hub that is
     // already configured. The third state does not enter here at all: it is a different axis, and
     // no item that carries it is one the fiscal gate rejects.
+    //
+    // The SAME predicate that lets an item past the permission filter (hub#435), on purpose: what
+    // survives because it is a wall is exactly what the strip is going to count, so the two cannot
+    // drift into a band that names nothing or a name with no band.
     let blocking_pending = items
         .iter()
-        .filter(|i| i["state"] == STATE_PENDING && i["level"] == LEVEL_LEGAL)
+        .filter(|i| {
+            is_wall(
+                i["level"].as_str().unwrap_or_default(),
+                i["state"].as_str().unwrap_or_default(),
+            )
+        })
         .count();
 
     Ok(json!({
@@ -508,6 +568,16 @@ fn level_of(key: &str, required: bool, certificate_arm: &[String]) -> &'static s
     }
 }
 
+/// Is this item a **wall**? ⛔ *and* still pending — the runtime is going to refuse the operation.
+///
+/// One predicate for the two places that must agree: what the permission filter lets past even
+/// though the session cannot act on it (hub#435), and what `blocking_pending` counts for the strip
+/// (hub#374). Two copies would eventually disagree, and each direction is its own bug: a band that
+/// names nothing (it stays down, §6quater) or a name with no band.
+fn is_wall(level: &str, state: &str) -> bool {
+    level == LEVEL_LEGAL && state == STATE_PENDING
+}
+
 /// Every item carries every key (with `module_id` null for a core item), so a consumer never has to
 /// branch on whether a field is present.
 #[allow(clippy::too_many_arguments)]
@@ -524,6 +594,7 @@ fn item_json(
     route: &str,
     order: i64,
     actions: &[&str],
+    actionable: bool,
 ) -> Json {
     json!({
         "key": key,
@@ -541,6 +612,11 @@ fn item_json(
         "route": route,
         "order": order,
         "actions": actions,
+        // …and whether THIS session may take them (hub#435). The counterpart of `actions`, and the
+        // only field of the payload that is about the session: `actions` says what ways exist, this
+        // says whether they are open to whoever is asking. A `false` only ever reaches a consumer on
+        // a wall — everything else the session cannot do was dropped from the list.
+        "actionable": actionable,
     })
 }
 
@@ -798,6 +874,36 @@ mod tests {
             orders.iter().all(|o| *o < DEFAULT_ORDER),
             "an item that declares no order lands after everything the core placed"
         );
+    }
+
+    #[test]
+    fn a_wall_is_blocking_AND_still_pending_and_nothing_else() {
+        // The predicate the permission filter and `blocking_pending` share (hub#435/hub#374). Every
+        // other combination is either a task (which the filter may drop) or something already
+        // cleared (which blocks nobody) — and a ⛔ that does not block is the colour this design
+        // exists to avoid.
+        assert!(is_wall(LEVEL_LEGAL, STATE_PENDING));
+        assert!(!is_wall(LEVEL_LEGAL, STATE_DONE));
+        assert!(!is_wall(LEVEL_LEGAL, STATE_UNAVAILABLE));
+        assert!(!is_wall(LEVEL_FUNCTIONAL, STATE_PENDING));
+        assert!(!is_wall(LEVEL_RECOMMENDED, STATE_PENDING));
+        assert!(!is_wall("", ""));
+    }
+
+    #[test]
+    fn every_core_item_says_who_may_configure_it() {
+        // The three are guarded by the one gate the core owns (`require_admin_session`), so they
+        // declare the one permission that mirrors it. An item with an empty `permission` would be
+        // back to reaching every session — the bug hub#435 opened on.
+        for core in CORE_ITEMS {
+            assert_eq!(
+                core.permission,
+                crate::hub_users::ADMINISTER_PERMISSION,
+                "{} must be gated on the rank the hub actually enforces",
+                core.key
+            );
+            assert!(!core.permission.is_empty());
+        }
     }
 
     #[test]

@@ -18,6 +18,9 @@
 //   the assistant and the blocking strip describe.
 // * **`unavailable` is not an action.** It is our breakdown, not the user's task, so it is painted
 //   and never offered: a CTA there sends someone to a screen where nothing can be done.
+// * **Neither is a wall that is not yours** (`actionable: false`, hub#435). The runtime drops the
+//   tasks this session cannot do; what it keeps is what is going to stop them anyway. Painted and
+//   named — with WHO can clear it — but never offered, for the same reason as above.
 import { computed, ref } from 'vue';
 import type { ErploraClient } from '@erplora/module-sdk';
 
@@ -70,6 +73,17 @@ export interface SetupItem {
   order: number;
   /** `template` · `catalog` · `manual` · `assistant` — of the ITEM, not of the session. */
   actions: string[];
+  /**
+   * May **this session** take those ways in? (hub#435.)
+   *
+   * The counterpart of `actions`, and the only field here that is about the session rather than the
+   * item. The runtime drops what this session cannot configure, so almost everything arrives `true`;
+   * what survives the drop at `false` is a **wall** — ⛔ and pending — which is going to stop this
+   * session whoever ends up clearing it. It is named, it is counted, and it is not offered.
+   *
+   * Independent of `state`: `state` says whether anything is left to do, this says whose it is.
+   */
+  actionable: boolean;
 }
 
 /** The document: one row with the whole answer, counters included. */
@@ -221,13 +235,17 @@ export function isBlocking(item: SetupItem): boolean {
 }
 
 /**
- * Does this item offer the user something to do? **Only a pending one.**
+ * Does this item offer **this session** something to do? Pending **and** theirs.
  *
- * `done` has nothing left; `unavailable` has nothing the user can do at all — and a state this
- * shell does not know is not one it may turn into a call to action on a guess.
+ * Two independent reasons not to offer a call to action, and both have to be ruled out:
+ *
+ * * the ITEM has nothing left to do — `done` is finished, `unavailable` cannot be attempted at all,
+ *   and a state this shell does not know is not one it may turn into a CTA on a guess;
+ * * the SESSION cannot do it (`actionable`, hub#435) — the button would lead to a screen that
+ *   refuses them, which is the whole complaint the field exists to answer.
  */
 export function isActionable(item: SetupItem): boolean {
-  return item.state === STATE_PENDING;
+  return item.state === STATE_PENDING && item.actionable;
 }
 
 /**
@@ -254,6 +272,9 @@ function toItem(raw: Record<string, unknown>): SetupItem {
     route: str(raw.route),
     order: int(raw.order, 0),
     actions: Array.isArray(raw.actions) ? raw.actions.filter((a): a is string => typeof a === 'string') : [],
+    // Absent ⇒ actionable, which is what every item was before hub#435: only a runtime that knows
+    // about the field can say no, and a shell reading an older one must not mute its own card.
+    actionable: raw.actionable !== false,
   };
 }
 

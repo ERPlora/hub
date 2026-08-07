@@ -25,6 +25,7 @@
         <!-- One way in PER thing missing. There are at most two gates (the business identity and the
              certificate), so picking a «primary» one would hide the other behind a guess. -->
         <ion-button
+          v-if="isActionable(item)"
           class="setup-strip-cta"
           size="small"
           fill="outline"
@@ -35,6 +36,11 @@
         >
           {{ t('setup.configure') }}
         </ion-button>
+        <!-- …and when the way in is not THIS session's to take (hub#435), who can take it. The band
+             cannot be dismissed, so a name with neither a button nor an errand is a dead end. -->
+        <span v-else class="setup-strip-note" :data-testid="`setup-strip-note-${item.key}`">
+          {{ t('setup.delegatedHint') }}
+        </span>
       </li>
     </ul>
   </ok-inline-feedback>
@@ -54,13 +60,15 @@
 //   not there when it matters.
 // * **It names what is missing and leads to it.** It cannot be dismissed, so a strip without a way
 //   out would be a permanent dead end. If the payload cannot be named, it stays down (`blockingView`).
+//   When the way out is not this session's to take (hub#435) the way out is a NAME, not a button:
+//   whoever is at the till cannot type the tax id, but the refusal is going to land on them.
 // * **It does not repeat the panel's card.** Same items, same call to action, one screenful apart.
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IonButton } from '@ionic/vue';
 
 import HubIcon from './HubIcon.vue';
-import { blockingView, type SetupItem, type SetupStatus } from '../lib/setup-status';
+import { blockingView, isActionable, type SetupItem, type SetupStatus } from '../lib/setup-status';
 
 const props = withDefaults(
   defineProps<{
@@ -127,5 +135,12 @@ function titleOf(item: SetupItem): string {
   flex: none;
   white-space: nowrap;
   text-transform: none;
+}
+/* The stand-in for the button when the errand is somebody else's: same row, plainly not pressable. */
+.setup-strip-note {
+  flex: none;
+  font-size: 0.8125rem;
+  font-style: italic;
+  opacity: 0.85;
 }
 </style>

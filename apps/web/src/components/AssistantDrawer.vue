@@ -217,7 +217,11 @@ function navigateTo(url: string): void {
 // that gets configured mid-chat stops being described as unconfigured.
 const setupChat = computed<boolean>(() => assistantIntent.value?.topic === 'setup');
 
-/** The chips: PENDING items only, straight from the document — `assistantTasks` decides, not this. */
+/**
+ * The chips: what is pending AND this session's to do, straight from the document —
+ * `assistantTasks` decides, not this. A wall somebody else has to bring down (hub#435) is named in
+ * the briefing but never becomes a chip: a chip is an offer, and that one would end in a refusal.
+ */
 const quickTasks = computed<SetupItem[]>(() => assistantTasks(setupStatus.value).slice(0, 4));
 
 /** The item as the CHECKLIST names it: same key convention, same name in both surfaces. */

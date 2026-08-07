@@ -38,19 +38,16 @@
         <div class="setup-row-text">
           <p class="setup-row-title">{{ titleOf(item) }}</p>
           <p v-if="descriptionOf(item)" class="setup-row-desc">{{ descriptionOf(item) }}</p>
-          <!-- An `unavailable` item says WHY out loud. A row that offers nothing and explains
-               nothing reads as a broken product instead of as a job that is ours. -->
-          <p
-            v-if="item.state === STATE_UNAVAILABLE"
-            class="setup-row-note"
-            :data-testid="`setup-note-${item.key}`"
-          >
-            {{ t('setup.unavailableHint') }}
+          <!-- A row with no button says WHY out loud. One that offers nothing and explains nothing
+               reads as a broken product instead of as a job that belongs to somebody else. -->
+          <p v-if="noteOf(item)" class="setup-row-note" :data-testid="`setup-note-${item.key}`">
+            {{ noteOf(item) }}
           </p>
         </div>
         <ok-status-pill class="setup-row-pill" :tone="pillTone(item)" :label="pillLabel(item)" dot />
-        <!-- ONLY a pending item gets a way in. Sending someone to the screen of an `unavailable`
-             item hands them our breakdown as a chore they cannot finish. -->
+        <!-- ONLY a pending item THIS session can do gets a way in. The screen of an `unavailable`
+             hands them our breakdown as a chore they cannot finish; the screen of a wall that is
+             not theirs (hub#435) refuses them on arrival. -->
         <ion-button
           v-if="isActionable(item)"
           class="setup-row-cta"
@@ -102,6 +99,7 @@ import {
   LEVEL_LEGAL,
   LEVEL_RECOMMENDED,
   STATE_DONE,
+  STATE_PENDING,
   STATE_UNAVAILABLE,
   checklistView,
   isActionable,
@@ -172,6 +170,20 @@ function pillTone(item: SetupItem): string {
   if (item.level === LEVEL_LEGAL) return 'danger';
   if (item.level === LEVEL_RECOMMENDED) return 'neutral';
   return 'warning';
+}
+
+/**
+ * Why this row has no button — empty when it does have one.
+ *
+ * A row without a call to action and without a sentence is the worst of the three: the user reads
+ * «pending» and finds nothing to press. The two reasons are different and must not be said alike —
+ * `unavailable` is **ours** to fix and nothing is expected of anybody in the hub; a wall that is not
+ * theirs (hub#435) is somebody else's to type, and saying WHO turns a dead end into an errand.
+ */
+function noteOf(item: SetupItem): string {
+  if (item.state === STATE_UNAVAILABLE) return t('setup.unavailableHint');
+  if (item.state === STATE_PENDING && !isActionable(item)) return t('setup.delegatedHint');
+  return '';
 }
 
 function pillLabel(item: SetupItem): string {

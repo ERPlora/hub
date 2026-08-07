@@ -153,6 +153,48 @@ describe('it says what is missing and leads to it', () => {
   });
 });
 
+describe('a wall the person in front of it cannot bring down (hub#435)', () => {
+  it('is still up: the strip exists FOR the session that gets the sale refused', () => {
+    // The cashier cannot type the tax id, but `enforce_fiscal_precondition` refuses THEIR sale all
+    // the same. Hiding the band from them would leave the refusal arriving out of nowhere.
+    const w = mountStrip({ status: status([item('business_identity', { actionable: false })]) });
+
+    expect(w.find('[data-testid="setup-strip"]').exists()).toBe(true);
+    expect(w.find('[data-testid="setup-strip-item-business_identity"]').exists()).toBe(true);
+  });
+
+  it('but it leads nowhere: that screen would refuse them too', () => {
+    const w = mountStrip({
+      status: status([item('business_identity', { actionable: false, route: '/settings' })]),
+    });
+
+    expect(w.find('[data-testid="setup-strip-action-business_identity"]').exists()).toBe(false);
+    expect(w.find('[data-testid="setup-strip-item-business_identity"]').html()).not.toContain('/settings');
+  });
+
+  it('and it says who can, so the band is not a dead end', () => {
+    const w = mountStrip({ status: status([item('business_identity', { actionable: false })]) });
+
+    expect(w.find('[data-testid="setup-strip-note-business_identity"]').exists()).toBe(true);
+    expect(w.text()).toContain('administrator');
+  });
+
+  it('each item answers for itself: one delegated wall does not mute the other one’s way in', () => {
+    const w = mountStrip({
+      status: status([
+        item('business_identity', { actionable: false, route: '/settings' }),
+        item('verifactu.setup', { title: 'Configure VeriFactu', route: '/m/verifactu' }),
+      ]),
+    });
+
+    expect(w.find('[data-testid="setup-strip-action-business_identity"]').exists()).toBe(false);
+    expect(w.find('[data-testid="setup-strip-action-verifactu.setup"]').attributes('routerlink')).toBe(
+      '/m/verifactu',
+    );
+    expect(w.find('[data-testid="setup-strip-note-verifactu.setup"]').exists()).toBe(false);
+  });
+});
+
 describe('not twice on the same screen', () => {
   it('stands down where the panel already paints the whole checklist', () => {
     const w = mountStrip({ status: status([item('business_identity')]), checklistOnScreen: true });

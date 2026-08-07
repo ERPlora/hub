@@ -28,6 +28,17 @@ use serde_json::{json, Value as Json};
 /// (`identity::session_permissions`), an API key never does.
 const SESSION: &str = "hub.users.view";
 
+/// What the CORE items are gated on (hub#435): the one administrative rank the core owns. Granted
+/// by `identity::session_permissions` to exactly the roles `hub_users::is_admin_role` accepts —
+/// which is the very predicate `server::auth::require_admin_session` asks before letting anybody
+/// write a setting, install an app or add a user.
+const ADMINISTER: &str = erplora_runtime::hub_users::ADMINISTER_PERMISSION;
+
+/// A session that administers the hub. Most tests here are about WHAT the checklist says, so they
+/// run as the person the core items are actually for; the ones about WHO sees what use `[SESSION]`
+/// on its own, which is the waiter's session.
+const ADMIN_SESSION: &[&str] = &[SESSION, ADMINISTER];
+
 async fn runtime(hub_id: &str) -> Runtime {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), hub_id);
@@ -218,7 +229,7 @@ async fn a_hub_with_no_modules_at_all_still_gets_its_core_checklist() {
     // customer sees. The three core items are declared in Rust precisely so they do not depend on
     // anybody having installed anything.
     let rt = runtime("hub-setup").await;
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
 
     assert_eq!(
         keys(&doc),
@@ -244,7 +255,7 @@ async fn a_hub_with_no_modules_at_all_still_gets_its_core_checklist() {
 #[tokio::test]
 async fn the_core_items_flip_to_done_when_the_hub_is_actually_set_up() {
     let rt = runtime("hub-setup").await;
-    let ctx = ctx("hub-setup", &[SESSION]);
+    let ctx = ctx("hub-setup", ADMIN_SESSION);
 
     // 1 · Your apps — at least one installed module.
     let dir = setup_module("inventory", true, json!({}));
@@ -287,7 +298,7 @@ async fn the_business_identity_item_needs_both_halves_like_the_fiscal_gate_does(
     // Half an identity is not an identity: the precondition of ADR-0203 demands legal name AND tax
     // id, so a checklist that ticked on either one would lie about what the runtime will accept.
     let rt = runtime("hub-setup").await;
-    let ctx = ctx("hub-setup", &[SESSION]);
+    let ctx = ctx("hub-setup", ADMIN_SESSION);
 
     let mut only_name = serde_json::Map::new();
     only_name.insert("business_legal_name".into(), json!("Bar Manolo SL"));
@@ -316,7 +327,7 @@ async fn an_installed_module_setup_block_joins_the_core_items() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "pricing.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
     let pricing = must(&doc, "pricing.setup");
 
     assert_eq!(
@@ -341,7 +352,7 @@ async fn the_module_item_is_done_when_its_own_query_says_so() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "pricing.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
     assert_eq!(must(&doc, "pricing.setup")["state"], "done");
 }
 
@@ -356,7 +367,7 @@ async fn an_optional_module_item_is_listed_too_and_says_it_is_optional() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "printing.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "printing.configure"])).await;
     assert_eq!(must(&doc, "printing.setup")["required"], false);
 }
 
@@ -372,7 +383,7 @@ async fn a_module_without_a_setup_block_contributes_nothing_but_still_counts_as_
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(keys(&doc), vec!["apps", "business_identity", "team"]);
     assert_eq!(must(&doc, "apps")["state"], "done");
 }
@@ -387,7 +398,7 @@ async fn a_module_that_is_installed_but_inactive_does_not_contribute_its_item() 
     std::fs::remove_dir_all(&dir).ok();
     rt.deactivate("pricing").await.unwrap();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "pricing.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
     assert!(
         item(&doc, "pricing.setup").is_none(),
         "an inactive module has no pending configuration: {:?}",
@@ -405,7 +416,7 @@ async fn an_item_outside_the_country_of_the_hub_never_shows_up() {
     let dir = setup_module("verifactu", false, json!({ "countries": ["ES"] }));
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
-    let ctx = ctx("hub-setup", &[SESSION, "verifactu.configure"]);
+    let ctx = ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]);
 
     // The hub default is ES, so it applies…
     assert!(
@@ -438,7 +449,7 @@ async fn an_item_without_a_declared_country_applies_everywhere() {
     updates.insert("country_code".into(), json!("FR"));
     rt.set_settings(&updates, "u1").await.unwrap();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "inventory.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "inventory.configure"])).await;
     assert!(item(&doc, "inventory.setup").is_some(), "{:?}", keys(&doc));
 }
 
@@ -451,7 +462,7 @@ async fn an_item_the_session_cannot_configure_is_not_offered() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert!(
         item(&doc, "pricing.setup").is_none(),
         "no `pricing.configure` permission → the item is not offered: {:?}",
@@ -494,7 +505,7 @@ async fn reading_the_check_is_not_the_same_as_being_able_to_fix_it() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let viewer = ctx("hub-setup", &[SESSION, "pricing.view"]);
+    let viewer = ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.view"]);
     assert!(
         rt.execute_query("pricing.config.get", &Params::new(), &viewer)
             .await
@@ -509,7 +520,7 @@ async fn reading_the_check_is_not_the_same_as_being_able_to_fix_it() {
     );
 
     // And whoever can configure it does get it.
-    let admin = ctx("hub-setup", &[SESSION, "pricing.view", "pricing.configure"]);
+    let admin = ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.view", "pricing.configure"]);
     assert!(item(&status(&rt, &admin).await, "pricing.setup").is_some());
 }
 
@@ -549,7 +560,7 @@ async fn a_module_whose_setup_query_fails_is_omitted_instead_of_reported_as_pend
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "broken.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "broken.configure"])).await;
     assert!(
         item(&doc, "broken.setup").is_none(),
         "a failing check omits its item, it never invents a pending one: {:?}",
@@ -583,7 +594,7 @@ async fn a_setup_block_pointing_at_a_query_that_does_not_exist_is_omitted_too() 
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert!(item(&doc, "typo.setup").is_none(), "{:?}", keys(&doc));
 }
 
@@ -620,7 +631,7 @@ async fn a_check_with_no_row_at_all_is_pending_not_omitted() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "empty.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "empty.configure"])).await;
     assert_eq!(must(&doc, "empty.setup")["state"], "pending");
 }
 
@@ -648,6 +659,7 @@ async fn the_list_comes_back_already_ordered_by_the_core() {
             "hub-setup",
             &[
                 SESSION,
+                ADMINISTER,
                 "pricing.configure",
                 "cash_register.configure",
                 "unknown_module.configure",
@@ -681,7 +693,7 @@ async fn the_document_and_the_item_carry_exactly_the_contracted_keys() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "pricing.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
 
     let mut doc_keys: Vec<&str> = doc.as_object().unwrap().keys().map(String::as_str).collect();
     doc_keys.sort_unstable();
@@ -697,6 +709,9 @@ async fn the_document_and_the_item_carry_exactly_the_contracted_keys() {
         assert_eq!(
             item_keys,
             [
+                // Whether THIS session may take those `actions` (hub#435) — the one field of the
+                // payload that is about the session and not about the item.
+                "actionable",
                 "actions",
                 "description",
                 "icon",
@@ -724,7 +739,7 @@ async fn every_item_travels_with_the_ways_of_getting_it_done() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "pricing.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
 
     assert_eq!(
         must(&doc, "apps")["actions"],
@@ -757,7 +772,7 @@ async fn the_core_puts_each_of_its_items_on_one_of_the_three_levels() {
     // cannot be a boolean is ⛔ — "the runtime rejects this", which is a fact about the runtime and
     // not an opinion about importance.
     let rt = runtime("hub-setup").await;
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
 
     assert_eq!(
         must(&doc, "business_identity")["level"],
@@ -778,7 +793,7 @@ async fn the_level_of_an_item_does_not_move_when_it_gets_done() {
     // two would make `blocking_pending` unreadable: hub#374 asks "is anything blocking pending?",
     // which only means something if being done is a different axis from being blocking.
     let rt = runtime("hub-setup").await;
-    let c = ctx("hub-setup", &[SESSION]);
+    let c = ctx("hub-setup", ADMIN_SESSION);
     set_business_identity(&rt).await;
 
     let doc = status(&rt, &c).await;
@@ -825,7 +840,7 @@ async fn blocking_means_the_runtime_really_rejects_it_never_just_a_colour() {
         .execute_batch("CREATE TABLE billing_doc (issuer_nif TEXT, issuer_name TEXT);")
         .await
         .unwrap();
-    let c = ctx("hub-setup", &[SESSION, "billing.issue"]);
+    let c = ctx("hub-setup", &[SESSION, ADMINISTER, "billing.issue"]);
 
     let doc = status(&rt, &c).await;
     assert_eq!(must(&doc, "business_identity")["level"], "legal");
@@ -901,7 +916,7 @@ async fn the_certificate_arm_of_the_gate_blocks_through_whoever_carries_the_capa
     std::fs::remove_dir_all(&dir).ok();
     set_business_identity(&rt).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "verifactu.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
     assert_eq!(must(&doc, "verifactu.setup")["level"], "legal");
     assert_eq!(
         doc["blocking_pending"], 1,
@@ -922,7 +937,7 @@ async fn the_certificate_item_drops_to_functional_the_moment_the_certificate_is_
     set_business_identity(&rt).await;
     load_certificate(&rt, "hub-setup").await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "verifactu.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
     assert_eq!(
         must(&doc, "verifactu.setup")["state"],
         "pending",
@@ -953,7 +968,7 @@ async fn the_blocking_level_follows_the_capability_and_never_a_module_name() {
         &rt,
         &ctx(
             "hub-setup",
-            &[SESSION, "fattura.configure", "verifactu.configure"],
+            &[SESSION, ADMINISTER, "fattura.configure", "verifactu.configure"],
         ),
     )
     .await;
@@ -971,7 +986,7 @@ async fn blocking_pending_counts_the_pending_legal_items_and_only_those() {
     let dir = certificate_module("verifactu");
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
-    let c = ctx("hub-setup", &[SESSION, "verifactu.configure"]);
+    let c = ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]);
 
     let doc = status(&rt, &c).await;
     assert_eq!(doc["blocking_pending"], 2, "identity AND certificate");
@@ -1003,7 +1018,7 @@ async fn the_apps_item_is_unavailable_when_the_catalogue_had_nothing_to_offer() 
     let rt = runtime("hub-setup").await;
     catalogue_offered(&rt, 0).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(must(&doc, "apps")["state"], "unavailable");
 }
 
@@ -1014,7 +1029,7 @@ async fn the_apps_item_stays_pending_while_the_catalogue_has_something_to_instal
     let rt = runtime("hub-setup").await;
     catalogue_offered(&rt, 26).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(must(&doc, "apps")["state"], "pending");
 }
 
@@ -1034,7 +1049,7 @@ async fn a_catalogue_that_lists_modules_you_may_not_install_is_just_as_unavailab
     )
     .await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(must(&doc, "apps")["state"], "unavailable");
 }
 
@@ -1046,7 +1061,7 @@ async fn a_marketplace_that_refuses_to_answer_is_not_news_and_overwrites_nothing
     let rt = runtime("hub-setup").await;
     catalogue_offered(&rt, 26).await;
     assert_eq!(
-        must(&status(&rt, &ctx("hub-setup", &[SESSION])).await, "apps")["state"],
+        must(&status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await, "apps")["state"],
         "pending"
     );
 
@@ -1062,7 +1077,7 @@ async fn a_marketplace_that_refuses_to_answer_is_not_news_and_overwrites_nothing
     ] {
         catalogue_answered(&rt, code, &body).await;
         assert_eq!(
-            must(&status(&rt, &ctx("hub-setup", &[SESSION])).await, "apps")["state"],
+            must(&status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await, "apps")["state"],
             "pending",
             "a {code} answering {body} must leave the last real answer standing"
         );
@@ -1076,7 +1091,7 @@ async fn a_hub_that_never_asked_the_catalogue_is_not_told_the_catalogue_is_broke
     // and it would talk the user out of the one screen that refreshes the answer.
     let rt = runtime("hub-setup").await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(must(&doc, "apps")["state"], "pending");
 }
 
@@ -1090,7 +1105,7 @@ async fn a_catalogue_answer_too_old_to_be_an_answer_stops_making_the_item_unavai
     let rt = runtime("hub-setup").await;
     catalogue_offered_hours_ago(&rt, 0, 5).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(must(&doc, "apps")["state"], "pending");
 }
 
@@ -1103,7 +1118,7 @@ async fn an_unavailable_item_stays_on_the_list_instead_of_being_omitted() {
     let rt = runtime("hub-setup").await;
     catalogue_offered(&rt, 0).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(
         keys(&doc),
         vec!["apps", "business_identity", "team"],
@@ -1120,7 +1135,7 @@ async fn an_unavailable_item_is_not_work_the_user_still_has_to_do() {
     let rt = runtime("hub-setup").await;
     catalogue_offered(&rt, 0).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(doc["pending"], 2, "the identity and the team, not the apps");
     assert_eq!(doc["unavailable"], 1);
     let done = items(&doc).iter().filter(|i| i["state"] == "done").count();
@@ -1137,7 +1152,7 @@ async fn the_third_state_leaves_blocking_pending_exactly_where_it_was() {
     // catalogue does not change that answer in either direction. The count is the same hub state
     // with and without the marker.
     let rt = runtime("hub-setup").await;
-    let c = ctx("hub-setup", &[SESSION]);
+    let c = ctx("hub-setup", ADMIN_SESSION);
     let before = status(&rt, &c).await["blocking_pending"].clone();
 
     catalogue_offered(&rt, 0).await;
@@ -1163,7 +1178,7 @@ async fn an_installed_app_beats_whatever_the_catalogue_last_said() {
     std::fs::remove_dir_all(&dir).ok();
     catalogue_offered(&rt, 0).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "inventory.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "inventory.configure"])).await;
     assert_eq!(must(&doc, "apps")["state"], "done");
     assert_eq!(doc["unavailable"], 0);
 }
@@ -1180,12 +1195,240 @@ async fn only_the_apps_item_can_be_unavailable_a_module_item_never_is() {
     std::fs::remove_dir_all(&dir).ok();
     catalogue_offered(&rt, 0).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "pricing.configure"])).await;
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
     assert_eq!(must(&doc, "pricing.setup")["state"], "pending");
     for it in items(&doc) {
         assert!(
             it["state"] != "unavailable" || it["key"] == "apps",
             "only the apps item reaches the third state: {it}"
+        );
+    }
+}
+
+// ── Whose task is it: the core items declare their permission too (hub#435) ───────────────────
+//
+// The three core items reached EVERY session, because the only gate was the namespace one
+// (`hub.users.view`), which `identity::session_permissions` grants to every local session. A waiter
+// was shown «Your business details» with a button to `/settings`, where the server refuses them.
+//
+// The rule that replaces it has two halves, and the second is the one that is easy to get wrong:
+//
+//  1. A task this session cannot do is **not on its list** — nor in its counters. It is not theirs.
+//  2. A **wall** is not a task: ⛔ and still pending means `enforce_fiscal_precondition` is going to
+//     refuse THIS session's sale, whoever ends up clearing it. Dropping it would take the blocking
+//     strip down for exactly the person it was built for, and turn «nothing pending» into a lie.
+
+/// A module shaped like `verifactu` in production: it asks the host for the business certificate,
+/// its check is READABLE by an employee (`view`) but only `configure` may act on it, and it is never
+/// configured. That combination is what puts the ⛔ certificate arm on a session that cannot clear it.
+fn certificate_module_readable_by_all(id: &str) -> PathBuf {
+    module_fixture(
+        json!({
+            "id": id,
+            "name": id,
+            "version": "1.0.0",
+            "capabilities": { "certificate": { "purpose": "fiscal-sign" } },
+            "permissions": [format!("{id}.view"), format!("{id}.configure")],
+            "queries": {
+                format!("{id}.config.get"): {
+                    "permission": format!("{id}.view"),
+                    "sql": "queries/config_get.sql"
+                }
+            },
+            "setup": {
+                "query": format!("{id}.config.get"),
+                "configured_when": [{ "field": "ready", "truthy": true }],
+                "title": format!("Configure {id}"),
+                "route": format!("/m/{id}/settings"),
+                "permission": format!("{id}.configure"),
+                "order": 60
+            }
+        }),
+        &[("queries/config_get.sql", "SELECT 0 AS ready")],
+    )
+}
+
+#[tokio::test]
+async fn a_waiter_is_not_handed_the_administrator_s_tasks() {
+    // The bug, reproduced: a hub that is set up enough to sell and invoice. Everything left on it
+    // is somebody else's job, so the waiter's checklist is EMPTY — which the card paints as
+    // silence (no card at all), never as «you are all done».
+    let mut rt = runtime("hub-setup").await;
+    set_business_identity(&rt).await;
+    let dir = setup_module("inventory", true, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+
+    assert!(
+        keys(&doc).is_empty(),
+        "nothing here is the waiter's to do: {:?}",
+        keys(&doc)
+    );
+    assert_eq!(doc["total"], 0);
+    assert_eq!(doc["pending"], 0);
+    assert_eq!(doc["blocking_pending"], 0, "the hub can invoice: no wall");
+}
+
+#[tokio::test]
+async fn the_wall_stays_on_the_list_of_whoever_cannot_bring_it_down() {
+    // The half that must NOT be filtered. The cashier cannot type the tax id, but ADR-0203 refuses
+    // THEIR sale until somebody does — so the item is named, counted and raises the strip. What it
+    // does not do is offer itself: `actionable` is false and the surfaces drop the call to action.
+    let rt = runtime("hub-setup").await;
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+
+    assert_eq!(
+        keys(&doc),
+        vec!["business_identity"],
+        "the 🔴 and the 🟡 are not theirs; the ⛔ is going to stop them"
+    );
+    let wall = must(&doc, "business_identity");
+    assert_eq!(wall["state"], "pending");
+    assert_eq!(wall["level"], "legal");
+    assert_eq!(wall["actionable"], false, "it is not theirs to clear");
+    assert_eq!(
+        doc["blocking_pending"], 1,
+        "the strip has to rise for the very session the sale is refused to"
+    );
+    assert_eq!(doc["pending"], 1);
+    assert_eq!(doc["total"], 1);
+}
+
+#[tokio::test]
+async fn a_wall_already_down_is_not_kept_on_a_list_it_never_belonged_to() {
+    // A ⛔ that is DONE blocks nothing, so the exception that carried it does not apply any more and
+    // the ordinary rule takes over: not this session's task, not on this session's list. Keeping it
+    // would put an item on the waiter's checklist that is neither theirs nor pending.
+    let rt = runtime("hub-setup").await;
+    set_business_identity(&rt).await;
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION])).await;
+
+    assert!(
+        item(&doc, "business_identity").is_none(),
+        "a cleared wall is nobody's task: {:?}",
+        keys(&doc)
+    );
+}
+
+#[tokio::test]
+async fn whoever_administers_the_hub_gets_the_three_core_items_and_can_act_on_every_one() {
+    // The other side of the same filter: nothing is taken away from the person the items are for.
+    let rt = runtime("hub-setup").await;
+
+    let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
+
+    assert_eq!(keys(&doc), vec!["apps", "business_identity", "team"]);
+    for key in ["apps", "business_identity", "team"] {
+        assert_eq!(
+            must(&doc, key)["actionable"],
+            true,
+            "{key} is this session's to do"
+        );
+    }
+    assert_eq!(doc["total"], 3);
+    assert_eq!(doc["pending"], 3);
+}
+
+#[tokio::test]
+async fn every_item_carries_the_field_so_nobody_branches_on_its_absence() {
+    // Same contract as the rest of the payload (§4): all the keys on all the items, core and module
+    // alike. A consumer that had to test for presence would be deciding the answer itself.
+    let mut rt = runtime("hub-setup").await;
+    let dir = setup_module("inventory", true, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "inventory.configure"]),
+    )
+    .await;
+
+    assert!(items(&doc).len() >= 4);
+    for it in items(&doc) {
+        assert_eq!(
+            it["actionable"], true,
+            "this session can act on everything it was given: {it}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_module_wall_reaches_the_session_that_cannot_clear_it_either() {
+    // The ⛔ the core hangs on a MODULE item — the certificate arm — is the same wall as the fiscal
+    // identity: the gate refuses everybody while it is missing. `verifactu` is exactly this shape
+    // (its check needs `view`, its `setup` declares `configure`, and the employee role holds only
+    // `view`), so before hub#435 the cashier lost that ⛔ to the module filter and got no strip.
+    let mut rt = runtime("hub-setup").await;
+    set_business_identity(&rt).await;
+    let dir = certificate_module_readable_by_all("fiscal");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let viewer = ctx("hub-setup", &[SESSION, "fiscal.view"]);
+    let doc = status(&rt, &viewer).await;
+
+    assert_eq!(keys(&doc), vec!["fiscal.setup"], "{:?}", keys(&doc));
+    let wall = must(&doc, "fiscal.setup");
+    assert_eq!(wall["level"], "legal");
+    assert_eq!(wall["state"], "pending");
+    assert_eq!(wall["actionable"], false);
+    assert_eq!(doc["blocking_pending"], 1);
+}
+
+#[tokio::test]
+async fn a_module_item_that_stops_being_a_wall_goes_back_to_being_somebody_else_s_business() {
+    // Load the certificate and the gate accepts, so the arm disappears (§4: it is EVALUATED, not
+    // listed). The item drops to 🔴 — still not configured — and with it the reason it was on this
+    // session's list at all. A ⛔ that does not block is the colour this design exists to avoid.
+    let mut rt = runtime("hub-setup").await;
+    set_business_identity(&rt).await;
+    let dir = certificate_module_readable_by_all("fiscal");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    load_certificate(&rt, "hub-setup").await;
+
+    let viewer = ctx("hub-setup", &[SESSION, "fiscal.view"]);
+    let doc = status(&rt, &viewer).await;
+
+    assert!(
+        item(&doc, "fiscal.setup").is_none(),
+        "nothing blocks any more, so it is just a task that is not theirs: {:?}",
+        keys(&doc)
+    );
+    assert_eq!(doc["blocking_pending"], 0);
+    // …and whoever CAN configure it still has it, as a 🔴 and actionable.
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, "fiscal.view", "fiscal.configure"]),
+    )
+    .await;
+    assert_eq!(must(&doc, "fiscal.setup")["level"], "functional");
+    assert_eq!(must(&doc, "fiscal.setup")["actionable"], true);
+}
+
+#[tokio::test]
+async fn the_core_items_are_gated_on_what_an_administrator_session_really_carries() {
+    // The filter and the server gate must not be able to disagree about who administers the hub.
+    // `require_admin_session` asks `is_admin_role`; this permission is granted by
+    // `session_permissions` to exactly those roles and to no other — so «the checklist offered it»
+    // and «the server would accept it» are the same sentence.
+    let rt = runtime("hub-setup").await;
+
+    for role in ["admin", "ADMIN", "owner"] {
+        assert!(
+            rt.session_permissions(role).contains(ADMINISTER),
+            "{role} administers the hub"
+        );
+    }
+    for role in ["manager", "employee", "bartender", ""] {
+        assert!(
+            !rt.session_permissions(role).contains(ADMINISTER),
+            "{role} does NOT administer the hub"
         );
     }
 }

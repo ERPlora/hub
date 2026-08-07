@@ -16,6 +16,7 @@ vi.mock('./module-loader', () => ({
 import {
   MAX_VISIBLE_ROWS,
   SETUP_STATUS_QUERY,
+  blockingView,
   checklistView,
   isActionable,
   parseSetupStatus,
@@ -298,6 +299,57 @@ describe('`unavailable`: neither a pending to attempt nor a done', () => {
     const future = parseSetupStatus([doc([item('apps', { state: 'quarantined' })])])!.items[0];
 
     expect(isActionable(future)).toBe(false);
+  });
+});
+
+describe('`actionable`: whose task it is, told by the runtime (hub#435)', () => {
+  it('a task this session cannot complete is never offered as one', () => {
+    // The waiter's session: the runtime answered that this item is not theirs to clear. A CTA here
+    // would send them to a screen that refuses them — the bug hub#435 opened on.
+    const theirs = parseSetupStatus([
+      doc([item('business_identity', { level: 'legal', actionable: false })]),
+    ])!.items[0];
+
+    expect(theirs.actionable).toBe(false);
+    expect(isActionable(theirs)).toBe(false);
+  });
+
+  it('but it still RAISES the strip: the wall stops this session too', () => {
+    // The whole reason a wall survives the permission filter. If it did not, the person at the till
+    // — who cannot fix it and is the one the sale gets refused to — would be told nothing at all.
+    const status = parseSetupStatus([
+      doc([item('business_identity', { level: 'legal', actionable: false })]),
+    ]);
+
+    expect(blockingView(status).visible).toBe(true);
+    expect(blockingView(status).items.map((i) => i.key)).toEqual(['business_identity']);
+  });
+
+  it('and it still counts, so «all done» can never be said while a wall stands', () => {
+    const view = checklistView(
+      parseSetupStatus([doc([item('business_identity', { level: 'legal', actionable: false })])]),
+    );
+
+    expect(view.complete).toBe(false);
+    expect(view.pending).toBe(1);
+    expect(view.rows.map((r) => r.key)).toEqual(['business_identity']);
+  });
+
+  it('an answer that does not carry the field is actionable, exactly as before', () => {
+    // Every item the runtime used to return was one the session could act on: an absent field must
+    // not silently mute the card of a hub running a build that predates it.
+    const plain = parseSetupStatus([doc([item('team')])])!.items[0];
+
+    expect(plain.actionable).toBe(true);
+    expect(isActionable(plain)).toBe(true);
+  });
+
+  it('a done item is not offered either, whoever it belongs to', () => {
+    // The two axes are independent: `state` says whether there is anything left, `actionable` says
+    // whether it is this session's to do. Neither one alone makes a call to action.
+    const done = parseSetupStatus([doc([item('team', { state: 'done', actionable: true })])])!.items[0];
+
+    expect(isActionable(done)).toBe(false);
   });
 });
 

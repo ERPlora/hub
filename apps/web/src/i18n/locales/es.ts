@@ -133,6 +133,9 @@ export default {
     // El tercer estado: una avería NUESTRA, no una tarea suya. No puede sonar a deber.
     unavailableLabel: 'Todavía no disponible',
     unavailableHint: 'Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.',
+    // Un muro que no te toca a ti derribar (hub#435). Dice QUIÉN puede — nunca el nombre de un
+    // permiso —, porque un bloqueo sin dueño deja al usuario sin ningún sitio al que ir.
+    delegatedHint: 'Esto lo tiene que configurar un administrador del hub.',
     completeTitle: 'Tu hub está listo',
     completeBody: 'No queda nada pendiente en la checklist.',
     // La franja bloqueante (hub#374): la superficie de las pantallas donde no está la checklist.

@@ -37,6 +37,24 @@ pub const CORE_NAMESPACE: &str = "hub.";
 /// de módulos que le dio el admin, y un tercero no lista el personal.
 pub const VIEW_USERS_PERMISSION: &str = "hub.users.view";
 
+/// Permiso que dice que una sesión **administra el hub**: identidad fiscal, plan, instalar apps,
+/// alta y baja de personal. Lo concede [`crate::identity::session_permissions`] a exactamente los
+/// roles que acepta [`is_admin_role`] — y nadie más puede darlo (ver la guarda del namespace del
+/// core en [`crate::identity::permissions_for_role`]).
+///
+/// **Existe para poder FILTRAR con la misma regla con la que el servidor RECHAZA** (hub#435). El
+/// rango que el core posee de verdad es uno solo —administra el hub o no—, y hasta ahora vivía
+/// únicamente como una pregunta sobre el ROL (`server::auth::require_admin_session`), que
+/// [`crate::registry::RequestContext`] no lleva. Sin él, `hub.setup.status` no tenía forma de saber
+/// que «los datos de tu negocio» no son tarea de un camarero, y se los ofrecía con un botón a una
+/// pantalla que le rechaza.
+///
+/// **No es una granularidad nueva.** Inventar tres permisos (ajustes, módulos, personal) fingiría
+/// una división que ningún gate del hub aplica: los tres los guarda `require_admin_session`. Tres
+/// nombres serían una segunda fuente de verdad sobre quién puede qué, que es justo lo que este
+/// subsistema existe para cerrar.
+pub const ADMINISTER_PERMISSION: &str = "hub.administer";
+
 /// Queries del core disponibles en el dispatcher (`hub.<algo>`).
 ///
 /// `setup.status` (hub#369) no es de personal: es el estado de configuración del hub. Vive en
