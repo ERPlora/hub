@@ -26,6 +26,14 @@
       </template>
     </AppTopbar>
 
+    <!-- Franja bloqueante (hub#374): la tercera superficie de `hub.setup.status`. Va AQUÍ —entre la
+         topbar y el scroller, no dentro del ion-content— porque un aviso que se va con el scroll no
+         es un aviso; y va en AppPage y no en cada vista porque este es el layout ÚNICO del shell,
+         así que la heredan las 12 pantallas, incluida la del TPV (ModuleView). Las pantallas sin
+         sesión (LoginPage/ActivationPage) no usan AppPage, así que no la heredan: correcto, antes de
+         entrar no hay nada que configurar. -->
+    <SetupBlockingStrip :status="setupStatus" :checklist-on-screen="setupChecklistOnScreen" />
+
     <!-- fullscreen=false: el ion-content se asienta ESTRICTAMENTE entre la topbar y el tabbar
          (no scrollea por detrás de ellos). Necesario para la tarjeta redondeada del shell
          (polish.css): con fullscreen las 2 esquinas superiores quedaban ocultas tras la topbar
@@ -50,6 +58,8 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IonPage, IonContent } from '@ionic/vue';
 import { bindTabbar } from '@erplora/outfitkit/tabbar';
 import AppTopbar from './AppTopbar.vue';
+import SetupBlockingStrip from './SetupBlockingStrip.vue';
+import { setupStatus } from '../lib/setup-status';
 
 withDefaults(
   defineProps<{
@@ -59,9 +69,16 @@ withDefaults(
     backHref?: string;
     /** Anchura interior: fluida para datos/tablas; centrada para lectura, formularios y ajustes. */
     contentLayout?: 'fluid' | 'detail' | 'detail-fill';
+    /**
+     * Esta pantalla ya pinta la checklist entera (la tarjeta del panel, hub#372): la franja se
+     * retira ahí. Lo dice la vista, no la franja: si la condición la adivinase la franja por la
+     * ruta, serían dos verdades sobre una misma pantalla y acabarían discrepando.
+     */
+    setupChecklistOnScreen?: boolean;
   }>(),
   {
     contentLayout: 'fluid',
+    setupChecklistOnScreen: false,
   },
 );
 

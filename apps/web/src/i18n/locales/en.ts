@@ -134,6 +134,13 @@ export default {
     unavailableHint: 'This one is on us: there is nothing on your side to do yet. We are on it.',
     completeTitle: 'Your hub is ready',
     completeBody: 'Everything on the checklist is done.',
+    // The blocking strip (hub#374): the surface for the screens the checklist is not on. It says the
+    // CONSEQUENCE, not the severity — ⛔ means the runtime refuses the document, so that is what it
+    // announces. It never says "error": nothing is broken, something is missing.
+    blocking: {
+      title: 'You cannot issue invoices yet',
+      body: 'The hub will refuse to issue a sales document until this is set up:',
+    },
     items: {
       apps: {
         title: 'Your apps',

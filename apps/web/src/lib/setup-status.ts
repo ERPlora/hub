@@ -177,6 +177,48 @@ export function checklistView(status: SetupStatus | null, opts: ChecklistOptions
   return { ...counters, rows, hidden: items.length - rows.length, complete, empty };
 }
 
+/** What the blocking strip paints for a document (hub#374). */
+export interface BlockingView {
+  /** Paint the strip at all. */
+  visible: boolean;
+  /** The ⛔ items still pending, in the query's order — exactly what the runtime will reject. */
+  items: SetupItem[];
+  /** The query's `blocking_pending`, never a recount of the rows above. */
+  count: number;
+}
+
+export interface BlockingOptions {
+  /**
+   * This screen already paints the whole checklist (the panel's card). The strip stands down there:
+   * the card says strictly more about the same items, with the same way in, a screenful below.
+   */
+  checklistOnScreen?: boolean;
+}
+
+/**
+ * The strip's shape.
+ *
+ * `blocking_pending` is what raises it — the count of items that are ⛔ **and** pending, which is the
+ * runtime's own statement that `enforce_fiscal_precondition` (ADR-0203) is going to say no. The list
+ * is what it can name; and it only rises if it CAN name something, because a band that cannot be
+ * dismissed and does not say what to do or where to go is a dead end on every screen of the product.
+ */
+export function blockingView(status: SetupStatus | null, opts: BlockingOptions = {}): BlockingView {
+  const items = (status?.items ?? []).filter(isBlocking);
+  const count = status?.blockingPending ?? 0;
+  return { visible: count > 0 && items.length > 0 && !opts.checklistOnScreen, items, count };
+}
+
+/**
+ * Is this item one of the gates? ⛔ **and** still pending.
+ *
+ * The two axes stay separate on purpose: an item keeps its level once it is done, so fusing them
+ * would give a counter that either never disappears or never appears.
+ */
+export function isBlocking(item: SetupItem): boolean {
+  return item.level === LEVEL_LEGAL && item.state === STATE_PENDING;
+}
+
 /**
  * Does this item offer the user something to do? **Only a pending one.**
  *

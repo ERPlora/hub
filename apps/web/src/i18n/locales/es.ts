@@ -135,6 +135,13 @@ export default {
     unavailableHint: 'Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.',
     completeTitle: 'Tu hub está listo',
     completeBody: 'No queda nada pendiente en la checklist.',
+    // La franja bloqueante (hub#374): la superficie de las pantallas donde no está la checklist.
+    // Dice la CONSECUENCIA, no la gravedad — ⛔ significa que el runtime rechaza el documento, así
+    // que eso es lo que anuncia. Nunca dice «error»: no hay nada roto, hay algo que falta.
+    blocking: {
+      title: 'Todavía no puedes facturar',
+      body: 'El hub rechazará emitir un documento de venta hasta que configures esto:',
+    },
     items: {
       apps: {
         title: 'Tus apps',

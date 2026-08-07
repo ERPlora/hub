@@ -141,6 +141,8 @@ import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
 import { bootHubLanguage } from './i18n';
 import { getUserProfile } from './lib/user-profile';
+import { getClient } from './lib/runtime';
+import { refreshSetupStatus } from './lib/setup-status';
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }
@@ -210,6 +212,10 @@ async function gateAndRefresh(): Promise<void> {
   // Después de intentar resolver los defaults del Hub, carga la fila del usuario y aplica sus
   // overrides. Si no tiene ninguno, user-profile hereda exactamente los valores disponibles.
   await getUserProfile().catch(() => null);
+  // `hub.setup.status`: UNA lectura para todo el hub (hub#374). Antes la única la hacía el panel, así
+  // que quien entraba directo al TPV llevaba una franja alimentada por nada. Best-effort: si falla,
+  // no hay franja — una lectura rota no es una respuesta.
+  void refreshSetupStatus(getClient());
 }
 onMounted(() => {
   if (isAuthed.value) void gateAndRefresh();
@@ -226,6 +232,17 @@ watch(
     if (entered) maybeShowInstallModal();
   },
   { immediate: true },
+);
+// La franja bloqueante NO se puede descartar (hub#374): la única forma de que desaparezca es que el
+// hub deje de estar bloqueado, así que el documento se relee al navegar. Es también lo que detecta
+// un gate que APARECE a mitad de sesión —instalar el módulo que pide certificado añade un ⛔ que en
+// el login no existía—. El coste es una query LOCAL del runtime (no hay viaje al SaaS: el catálogo
+// lo anota el host, §4bis) y solo se paga al cambiar de pantalla.
+watch(
+  () => route.path,
+  () => {
+    if (isAuthed.value) void refreshSetupStatus(getClient());
+  },
 );
 // Si el entitlement resulta `needs_activation` (Tauri offline sin token cacheado, hub sin
 // derecho…), saca al usuario del negocio → pantalla de activación.
