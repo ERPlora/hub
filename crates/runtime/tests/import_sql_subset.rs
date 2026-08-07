@@ -77,6 +77,14 @@ fn only_settings() -> ImportSelection {
 }
 
 /// SQL tal y como lo emite el export (`rows_to_sql`): INSERT idempotente con guard NOT EXISTS.
+///
+/// ⚠️ La `key` de estos fixtures tiene que ser una **clave de configuración portable**
+/// (`language`, `currency`, `country_code`… — `export::PORTABLE_SETTING_KEYS`). Estos bundles
+/// vienen de un origen desconocido, y desde ADR-0195 §4 (hub#405) un bundle ajeno solo puede
+/// escribir configuración: con la `business_name` de antes, la fila legítima se descartaría y estos
+/// tests dejarían de comprobar lo suyo —que el SUBCONJUNTO SQL deja pasar lo legítimo y para lo
+/// demás— para comprobar por accidente la lista blanca de claves (que tiene sus propios tests en
+/// `settings_portability_e2e.rs`).
 fn legit_sql(key: &str, value: &str) -> String {
     format!(
         "INSERT INTO hub_settings (\"hub_id\", \"key\", \"value\", \"updated_at\", \"updated_by\") \
@@ -116,7 +124,7 @@ async fn settings_table_exists(rt: &Runtime) -> bool {
 #[tokio::test]
 async fn un_bundle_legitimo_se_aplica() {
     let mut rt = fresh().await;
-    let (manifest, files) = bundle(&legit_sql("business_name", "Bar Paco"));
+    let (manifest, files) = bundle(&legit_sql("language", "en"));
     let report = import_sections(&mut rt, &manifest, &files, &only_settings(), "h2")
         .await
         .expect("el bundle legítimo se importa");
@@ -131,8 +139,8 @@ async fn un_bundle_legitimo_se_aplica() {
         section.status
     );
     assert_eq!(
-        setting_value(&rt, "h2", "business_name").await.as_deref(),
-        Some("Bar Paco"),
+        setting_value(&rt, "h2", "language").await.as_deref(),
+        Some("en"),
         "la fila aterriza bajo el hub_id destino"
     );
 }
@@ -162,7 +170,7 @@ async fn el_ddl_no_se_ejecuta_y_deja_la_seccion_en_failed() {
         "GRANT ALL ON hub_settings TO PUBLIC;",
     ] {
         let mut rt = fresh().await;
-        let sql = format!("{}\n{payload}", legit_sql("business_name", "Bar Paco"));
+        let sql = format!("{}\n{payload}", legit_sql("language", "en"));
         let (manifest, files) = bundle(&sql);
         let report = import_sections(&mut rt, &manifest, &files, &only_settings(), "h2")
             .await
@@ -177,7 +185,7 @@ async fn el_ddl_no_se_ejecuta_y_deja_la_seccion_en_failed() {
             "`{payload}`: la tabla sigue existiendo"
         );
         assert_eq!(
-            setting_value(&rt, "h2", "business_name").await,
+            setting_value(&rt, "h2", "language").await,
             None,
             "`{payload}`: no se ejecuta NADA de la sección (ni la parte legítima)"
         );
@@ -267,7 +275,7 @@ async fn un_cte_que_borra_no_se_ejecuta() {
 #[tokio::test]
 async fn un_fichero_de_datos_no_referenciado_nunca_se_ejecuta() {
     let mut rt = fresh().await;
-    let (mut manifest, mut files) = bundle(&legit_sql("business_name", "Bar Paco"));
+    let (mut manifest, mut files) = bundle(&legit_sql("language", "en"));
     let extra = b"DROP TABLE hub_settings;".to_vec();
     manifest
         .sha256
@@ -283,8 +291,8 @@ async fn un_fichero_de_datos_no_referenciado_nunca_se_ejecuta() {
     );
     assert!(settings_table_exists(&rt).await, "el DROP no se ejecutó");
     assert_eq!(
-        setting_value(&rt, "h2", "business_name").await.as_deref(),
-        Some("Bar Paco"),
+        setting_value(&rt, "h2", "language").await.as_deref(),
+        Some("en"),
         "la sección legítima sí se aplicó"
     );
 }

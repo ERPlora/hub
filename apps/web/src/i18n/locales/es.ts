@@ -692,6 +692,7 @@ export default {
     sectionUsersDesc: 'Empleados, roles y permisos',
     sectionSettings: 'Ajustes',
     sectionSettingsDesc: 'Ajustes del hub: moneda, idioma, identidad de negocio',
+    sectionSettingsDescTemplate: 'Ajustes del hub: país, moneda, idioma y tema. Nunca el NIF ni la razón social.',
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'Configuración VeriFactu y el certificado de empresa',
     fiscalWarning: 'Incluye el certificado: el .p12 viaja tal cual y conserva su contraseña. Comparte el fichero solo con gente de confianza.',
@@ -760,10 +761,13 @@ export default {
     statusApplied: 'Aplicado',
     statusSkipped: 'Saltado',
     statusIgnored: 'Descartado',
+    statusPartial: 'Aplicado en parte',
     statusFailed: 'Falló',
     mediaFailed: '{n} sin copiar',
     reasonIdentityNotPortable:
       'Los usuarios, roles y PIN son del hub que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso a tu hub.',
+    reasonSettingsNotPortable:
+      'Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.',
     done: 'Ir al inicio',
   },
   moduleView: {
