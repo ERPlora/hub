@@ -2,19 +2,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Hardware POS: hablar con las impresoras de red de la LAN (ESC/POS por TCP:9100 + mDNS).
-         Verificado en el emulador API 37: con solo INTERNET, `erplora_discover_printers` devuelve
-         [] SIN error — el bloqueo de red local de Android es SILENCIOSO (timeouts, no excepciones),
-         así que es indistinguible de «este local no tiene impresoras».
+    <!-- POS hardware: reaching the LAN printers (ESC/POS over TCP:9100 + mDNS).
+         Verified on the API 37 emulator: with INTERNET alone, `erplora_discover_printers` returns
+         [] with NO error — Android's local network block is SILENT (timeouts, not exceptions), so
+         it is indistinguishable from "this venue has no printers".
 
-         ACCESS_LOCAL_NETWORK es permiso de RUNTIME desde Android 17 (API 37) y obligatorio al
-         apuntar a targetSdk 37+: declararlo no basta, hay que PEDIRLO — y para pedirlo hace falta
-         un plugin Kotlin, porque el callback aterriza en la Activity. Ver el plan de migración. -->
+         ACCESS_LOCAL_NETWORK is a RUNTIME permission from Android 17 (API 37) and mandatory once
+         targetSdk reaches 37: declaring it is not enough, it has to be ASKED for — and asking
+         needs Kotlin, because the callback lands on the Activity. That is
+         `ErploraAndroidPlugin.requestPermissions`, and the shell asks before every scan and every
+         print (hub#337).
+
+         ⚠️ THIS FILE IS GENERATED. Measured with tauri-cli 2.11.2: `cargo tauri android init`
+         leaves it alone while it exists, but if it is MISSING it writes Tauri's template back —
+         INTERNET only, no hardware permissions and no erplora:// intent filter. The durable copy
+         of this list therefore lives outside the generated project, in
+         `crates/tauri-plugin-erplora-android/android/src/main/AndroidManifest.xml`; the manifest
+         merger folds it back in, verified by stripping this file down to INTERNET and rebuilding.
+         Both copies are guarded by `apps/tauri/src-tauri/tests/android_local_network.rs`. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
-    <!-- Avisar cuando NADIE mira la pantalla (comanda → cocina). Runtime desde Android 13. -->
+    <!-- Telling the kitchen an order came in when NOBODY is looking at the screen.
+         Runtime permission since Android 13. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- AndroidTV support -->

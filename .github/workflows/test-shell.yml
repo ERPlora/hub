@@ -18,11 +18,19 @@ on:
       - "apps/tauri/**"
       - "crates/tauri-plugin-erplora-android/**"
       - ".github/workflows/test-shell.yml"
+      # `android_local_network.rs` lee este workflow: comprueba que el job de release sigue
+      # leyendo los permisos DEL APK construido (hub#337). Sin esta ruta, un PR que solo tocase
+      # el release podría quitar ese paso sin que la guarda llegase a correr.
+      - ".github/workflows/tauri-release.yml"
   pull_request:
     paths:
       - "apps/tauri/**"
       - "crates/tauri-plugin-erplora-android/**"
       - ".github/workflows/test-shell.yml"
+      # `android_local_network.rs` lee este workflow: comprueba que el job de release sigue
+      # leyendo los permisos DEL APK construido (hub#337). Sin esta ruta, un PR que solo tocase
+      # el release podría quitar ese paso sin que la guarda llegase a correr.
+      - ".github/workflows/tauri-release.yml"
   workflow_dispatch:
 
 concurrency:

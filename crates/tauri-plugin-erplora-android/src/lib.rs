@@ -155,6 +155,98 @@ mod tests {
         }
     }
 
+    /// Every `android.permission.*` the Kotlin policy names, read out of its source.
+    ///
+    /// Read rather than listed so the guards below cannot drift from the one place that decides
+    /// what the shell ASKS for: a permission added there and forgotten everywhere else is the bug
+    /// this file is about.
+    fn permissions_the_plugin_can_ask_for() -> Vec<&'static str> {
+        PERMISSION_POLICY_KT
+            .match_indices("\"android.permission.")
+            .filter_map(|(at, _)| PERMISSION_POLICY_KT[at + 1..].split('"').next())
+            .collect()
+    }
+
+    /// Everything outside XML comments. Commenting a tag out is the easiest way to "temporarily"
+    /// drop a permission, and the edit nobody remembers to undo.
+    fn without_comments(xml: &str) -> String {
+        let mut out = String::new();
+        let mut rest = xml;
+        while let Some(start) = rest.find("<!--") {
+            out.push_str(&rest[..start]);
+            let Some(end) = rest[start..].find("-->") else { return out };
+            rest = &rest[start + end + "-->".len()..];
+        }
+        out.push_str(rest);
+        out
+    }
+
+    /// Permissions actually DECLARED by a manifest, read out of its live `<uses-permission>` tags.
+    ///
+    /// Not a text search: manifests here carry long comments naming the permissions and explaining
+    /// why they are there, so `contains()` would keep passing on the prose after the tag itself was
+    /// deleted — a guard that goes green on the wreckage is worse than no guard.
+    fn declared_permissions(manifest: &str) -> Vec<String> {
+        without_comments(manifest)
+            .split("<uses-permission")
+            .skip(1)
+            .filter_map(|tag| {
+                tag.split("android:name=\"")
+                    .nth(1)
+                    .and_then(|value| value.split('"').next())
+                    .map(str::to_owned)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_commented_out_permission_does_not_count_as_declared() {
+        // How a permission usually disappears: someone comments it out "for a minute". The prose
+        // around it still names it, so a text search would call it declared and let the guard
+        // below wave the regression through.
+        let manifest = r#"<manifest>
+            <uses-permission android:name="android.permission.INTERNET" />
+            <!-- <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" /> -->
+        </manifest>"#;
+
+        assert_eq!(declared_permissions(manifest), ["android.permission.INTERNET"]);
+    }
+
+    /// Asking for a permission the merged manifest never declared is not a dialog the user can
+    /// say yes to: Android answers DENIED at once, forever, and shows nothing. The till would
+    /// then tell the user to grant local network access in the system settings (hub#338) and send
+    /// them looking for a toggle that does not exist.
+    ///
+    /// The plugin declares them in its OWN Android library manifest, which the manifest merger
+    /// folds into the app at build time. That is what makes the declaration survive
+    /// `cargo tauri android init` — the generator rewrites `apps/tauri/src-tauri/gen/android`, it
+    /// does not reach into `crates/` (hub#337).
+    #[test]
+    fn the_plugin_declares_every_permission_it_can_ask_for() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/android/src/main/AndroidManifest.xml");
+        let manifest = std::fs::read_to_string(path).unwrap_or_else(|e| {
+            panic!(
+                "{path}: {e}\n\
+                 The plugin ships no Android manifest, so these permissions exist only in the \
+                 GENERATED gen/android project. Lose that file and `cargo tauri android init` \
+                 writes Tauri's template back — INTERNET and nothing else — and the till stops \
+                 finding printers with a perfectly green build."
+            )
+        });
+
+        let declared = declared_permissions(&manifest);
+        let asked_for = permissions_the_plugin_can_ask_for();
+        assert!(!asked_for.is_empty(), "PermissionPolicy.kt names no permission at all");
+        for permission in asked_for {
+            assert!(
+                declared.iter().any(|d| d == permission),
+                "PermissionPolicy asks for {permission}, but no manifest of this plugin declares \
+                 it: Android would answer that request DENIED without ever showing a dialog.\n\
+                 Declared right now: {declared:?}"
+            );
+        }
+    }
+
     #[test]
     fn el_error_llega_al_frontend_como_texto_plano() {
         // Mismo patrón que el resto del shell: la promesa se rechaza con un mensaje legible.

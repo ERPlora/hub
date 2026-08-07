@@ -346,6 +346,30 @@ jobs:
           [ "$VC" = "$ESPERADO" ] \
             || { echo "::error::versionCode $VC != $ESPERADO (fórmula de ADR-0160)"; exit 1; }
 
+      # Los permisos, LEÍDOS DEL APK (hub#337). Es el único sitio donde existe el manifest
+      # FUSIONADO: los tests de Rust comprueban los dos ficheros fuente —el del proyecto generado
+      # `gen/android` y el del módulo Android del plugin, que es la copia que `cargo tauri android
+      # init` no puede llevarse—, pero que el manifest merger los junte de verdad solo se ve aquí.
+      #
+      # Sin ACCESS_LOCAL_NETWORK, Android bloquea la LAN POR DEBAJO de la API: el barrido del 9100
+      # son timeouts, no errores. Se instala, arranca y no encuentra una impresora encendida — y
+      # nadie lo reporta. Por eso se comprueba en el artefacto que se publica, no en la config.
+      - name: Verificar permisos de hardware en el APK
+        run: |
+          set -euo pipefail
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort | tail -1)
+          APK=$(find . -name '*.apk' -path '*release*' | head -1)
+          PERMISOS=$("$AAPT" dump permissions "$APK")
+          echo "$PERMISOS"
+          for P in android.permission.INTERNET \
+                   android.permission.ACCESS_NETWORK_STATE \
+                   android.permission.CHANGE_WIFI_MULTICAST_STATE \
+                   android.permission.ACCESS_LOCAL_NETWORK \
+                   android.permission.POST_NOTIFICATIONS; do
+            echo "$PERMISOS" | grep -q "name='$P'" \
+              || { echo "::error::el APK NO declara $P — el hardware moriría EN SILENCIO (hub#337)"; exit 1; }
+          done
+
       - name: Stage artifacts
         run: |
           mkdir -p dist
