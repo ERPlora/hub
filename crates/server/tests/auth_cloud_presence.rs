@@ -205,6 +205,38 @@ async fn cloud_user_rows(state: &AppState, cloud_user_id: &str) -> usize {
         .len()
 }
 
+/// Is the `hub_user` linked to `cloud_user_id` still active? Rule D (hub#348) turns revoking the
+/// membership in the SaaS into `is_active = 0` locally, so this is what "the door is shut" looks
+/// like in the database.
+async fn cloud_user_is_active(state: &AppState, cloud_user_id: &str) -> bool {
+    let rt = state.runtime.lock().await;
+    let mut p = erplora_db::Params::new();
+    p.insert("cuid".to_string(), json!(cloud_user_id));
+    let res = rt
+        .db_for_test()
+        .query(
+            "SELECT is_active FROM hub_user WHERE cloud_user_id = :cuid",
+            &p,
+        )
+        .await
+        .unwrap();
+    res.rows
+        .first()
+        .map(|r| r["is_active"].as_i64().unwrap_or(0) != 0)
+        .unwrap_or(false)
+}
+
+/// An authenticated request with a hub session token (`X-Hub-Session`), to check whether a session
+/// opened before a revocation still resolves afterwards.
+fn authed_get(path: &str, session: &str) -> Request<Body> {
+    Request::builder()
+        .method("GET")
+        .uri(path)
+        .header("x-hub-session", session)
+        .body(Body::empty())
+        .unwrap()
+}
+
 /// How many `hub_user` rows carry `email`. The invited row must be REUSED by the login that links
 /// it, never left behind next to a freshly provisioned twin.
 async fn rows_with_email(state: &AppState, email: &str) -> usize {
@@ -496,6 +528,259 @@ async fn an_invited_admin_does_not_land_as_an_employee() {
         cloud_user_rows(&state, "11").await,
         1,
         "and the cloud account is linked to exactly that one row",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+// ── Revoking the membership SHUTS THE DOOR (hub#348, plan step 2b rule D) ───────────────────────
+//
+// Rule C made the cloud role a floor that only ever RISES, on purpose: losing the administrative
+// role in the SaaS must not silently demote somebody inside the hub. Taking access away is this
+// other half — the `hub_user` is DEACTIVATED — and until now it did not exist at all: a revoked
+// member kept their local row, their PIN, their trusted device and their open session, and the only
+// thing they lost was the ability to open a *new* cloud session.
+//
+// Deactivating is what actually shuts every door: `resolve_session` joins on `is_active = 1` (open
+// sessions die), `verify_pin` and `list_pin_users` filter the same way (no PIN login, gone from the
+// pinpad grid), and the device-trust flag is per device, not a way in by itself.
+
+#[tokio::test]
+async fn losing_the_membership_deactivates_the_local_user() {
+    // The account owner removes somebody from this hub in the SaaS. Their next token no longer
+    // lists the hub, and that token is the hub's notice: the local row must be closed, not just
+    // refused a new session.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let token = sign_user_jwt_role(20, "socio@bar.com", member, "employee");
+    let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(cloud_user_is_active(&state, "20").await, "starts out inside");
+
+    let elsewhere = json!([{ "id": "hub-9", "org": "org-B" }]);
+    let revoked = sign_user_jwt_role(20, "socio@bar.com", elsewhere, "employee");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&revoked))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN, "no longer a member");
+    assert_eq!(json_body(resp).await["code"], json!("not_a_member"));
+
+    assert!(
+        !cloud_user_is_active(&state, "20").await,
+        "rule D: the revoked membership DEACTIVATES the local user, it does not merely bounce them",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn losing_the_membership_cuts_a_session_that_is_already_open() {
+    // The side door that makes the whole rule worth having: a session lives 30 days, so bouncing
+    // the *login* leaves the revoked user working normally until it expires. The session must die
+    // with the membership, on the next request, without waiting for the TTL.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let token = sign_user_jwt_role(21, "curra@bar.com", member, "employee");
+    let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let session = json_body(resp).await["token"].as_str().unwrap().to_string();
+
+    let resp = app(state.clone())
+        .oneshot(authed_get("/api/hub/users", &session))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "the session works before");
+
+    let elsewhere = json!([{ "id": "hub-9", "org": "org-B" }]);
+    let revoked = sign_user_jwt_role(21, "curra@bar.com", elsewhere, "employee");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&revoked))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    let resp = app(state.clone())
+        .oneshot(authed_get("/api/hub/users", &session))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::UNAUTHORIZED,
+        "the session opened before the revocation stops resolving immediately",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn insisting_with_a_revoked_token_provisions_nothing_and_leaves_the_row_shut() {
+    // Rule D must be a ratchet, not a one-off: retrying with a token that still does not list the
+    // hub keeps bouncing them, keeps the row closed and never creates anything. (The hole where a
+    // deactivated row was answered with a brand new twin is guarded by the two tests below, which
+    // walk the paths where a login actually gets as far as `get_or_link_cloud_user`.)
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let token = sign_user_jwt_role(22, "vuelve@bar.com", member.clone(), "employee");
+    router.oneshot(cloud_login_bare(&token)).await.unwrap();
+
+    let elsewhere = json!([{ "id": "hub-9", "org": "org-B" }]);
+    let revoked = sign_user_jwt_role(22, "vuelve@bar.com", elsewhere, "employee");
+    app(state.clone())
+        .oneshot(cloud_login_bare(&revoked))
+        .await
+        .unwrap();
+    assert!(!cloud_user_is_active(&state, "22").await);
+
+    // They try again with the very same revoked token: still out, and still ONE row.
+    let revoked_again = sign_user_jwt_role(22, "vuelve@bar.com", json!([]), "employee");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&revoked_again))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        cloud_user_rows(&state, "22").await,
+        1,
+        "a rejected login never provisions a second `hub_user`",
+    );
+    assert_eq!(
+        rows_with_email(&state, "vuelve@bar.com").await,
+        1,
+        "nor a twin sharing the email",
+    );
+    assert!(
+        !cloud_user_is_active(&state, "22").await,
+        "and the row stays closed",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn regaining_the_membership_reuses_the_row_without_resurrecting_the_role() {
+    // Re-admission is an admission, not an undo: the SaaS grants the membership again, so the door
+    // rule D closed opens again — on the SAME row, never a duplicate — but the user comes back with
+    // the role their CURRENT membership grants, not the one they held when they were shown out.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let boss = sign_user_jwt_role(23, "jefa@bar.com", member.clone(), "admin");
+    let resp = router.oneshot(cloud_login_bare(&boss)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(cloud_user_role(&state, "23").await.as_deref(), Some("admin"));
+
+    let revoked = sign_user_jwt_role(23, "jefa@bar.com", json!([]), "admin");
+    app(state.clone())
+        .oneshot(cloud_login_bare(&revoked))
+        .await
+        .unwrap();
+    assert!(!cloud_user_is_active(&state, "23").await);
+
+    // Re-added in the SaaS, this time as a plain member.
+    let back = sign_user_jwt_role(23, "jefa@bar.com", member, "employee");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&back))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "the membership lets them in again");
+    assert!(cloud_user_is_active(&state, "23").await, "the row is reinstated");
+    assert_eq!(
+        cloud_user_rows(&state, "23").await,
+        1,
+        "the SAME row is reused: no duplicate identity, no orphan history",
+    );
+    assert_eq!(
+        cloud_user_role(&state, "23").await.as_deref(),
+        Some("employee"),
+        "coming back does NOT resurrect the admin role they no longer have",
+    );
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn editing_a_revoked_user_without_deciding_about_the_door_keeps_the_revocation_theirs() {
+    // Who closed a door is state, and state is easy to lose by accident. Personal writes name, role
+    // and `is_active` in one UPDATE, so renaming somebody the SaaS had revoked must not quietly
+    // relabel that revocation as a decision of the hub — it would strand them: their membership
+    // could come back and the door would stay shut with nobody knowing why. Only an edit that
+    // actually *decides* about the door (`is_active` present) touches the mark.
+    let (router, state, temp) = fixture().await;
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+
+    let token = sign_user_jwt_role(25, "marta@bar.com", member.clone(), "employee");
+    router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    let revoked = sign_user_jwt_role(25, "marta@bar.com", json!([]), "employee");
+    app(state.clone())
+        .oneshot(cloud_login_bare(&revoked))
+        .await
+        .unwrap();
+    assert!(!cloud_user_is_active(&state, "25").await);
+
+    // An admin tidies up the name from Personal. They said nothing about the door.
+    let user_id = {
+        let rt = state.runtime.lock().await;
+        let id = rt
+            .list_hub_users()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|u| u.email == "marta@bar.com" || u.name.starts_with("user:25"))
+            .expect("the revoked row is still listed")
+            .id;
+        rt.update_hub_user(
+            &id,
+            &erplora_runtime::hub_users::UpdateHubUser {
+                name: Some("Marta Ruiz".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        id
+    };
+    assert!(!user_id.is_empty());
+
+    // The SaaS grants the membership again: the door it closed still opens.
+    let back = sign_user_jwt_role(25, "marta@bar.com", member, "employee");
+    let resp = app(state.clone())
+        .oneshot(cloud_login_bare(&back))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "an unrelated edit must not strand a cloud revocation as a hub baja",
+    );
+    assert!(cloud_user_is_active(&state, "25").await);
+    std::fs::remove_dir_all(temp).ok();
+}
+
+#[tokio::test]
+async fn a_user_the_hub_itself_deactivated_is_not_let_back_in_by_a_token() {
+    // The other reason a row can be inactive: the hub's own admin showed them the door (ADR-0157
+    // §7 / the Personal screen). That decision belongs to the hub, so a token must never undo it —
+    // and the SaaS mirror can lag, because `remove_member` keeps the local baja even when the call
+    // to the SaaS fails. Rejected with a stable code, and still without a duplicate row.
+    let (router, state, temp) = fixture().await;
+    {
+        let rt = state.runtime.lock().await;
+        rt.create_login_user("ana@bar.com", "manager").await.unwrap();
+        assert!(rt.deactivate_login_user("ana@bar.com").await.unwrap());
+    }
+
+    let member = json!([{ "id": HUB_ID, "org": "org-A" }]);
+    let token = sign_user_jwt_role(24, "ana@bar.com", member, "employee");
+    let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "a valid membership does not reopen a door the hub closed",
+    );
+    assert_eq!(json_body(resp).await["code"], json!("user_deactivated"));
+    assert_eq!(
+        rows_with_email(&state, "ana@bar.com").await,
+        1,
+        "and the rejected login provisions nothing",
     );
     std::fs::remove_dir_all(temp).ok();
 }

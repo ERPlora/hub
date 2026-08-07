@@ -21,6 +21,12 @@ use crate::registry::{new_id, now_rfc3339, Registry};
 /// Duración por defecto de una sesión (segundos). 30 días — el día a día es por PIN/sesión local.
 pub const DEFAULT_SESSION_TTL_SECS: i64 = 60 * 60 * 24 * 30;
 
+/// Código de error **estable** (hub#139) con el que el login rechaza a un `hub_user` desactivado
+/// por el propio hub (paso 2b regla D, hub#348). La UI programa y traduce contra este código, no
+/// contra el mensaje. Es distinto de `not_a_member`: aquel dice «el SaaS no te reconoce en este
+/// hub»; este dice «el hub te cerró la puerta», y solo el hub la reabre.
+pub const DEACTIVATED_ERROR_CODE: &str = "user_deactivated";
+
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS hub_user (\
   id TEXT PRIMARY KEY, name TEXT NOT NULL, pin_hash TEXT NOT NULL DEFAULT '', \
@@ -368,6 +374,125 @@ async fn raise_role_to_floor(
     })
 }
 
+/// **Cierra el acceso local de una identidad cloud** cuando el SaaS revoca su membresía en este hub
+/// (paso 2b regla D, hub#348). Quitar el acceso NO es bajar el rol (eso es la regla C, que solo
+/// sube): es desactivar el `hub_user`, que es lo único que cierra **todas** las puertas a la vez —
+/// `resolve_session` hace `JOIN … AND u.is_active = 1` (una sesión abierta deja de resolver en la
+/// siguiente petición), `verify_pin` y `list_pin_users` filtran igual (ni login por PIN ni presencia
+/// en el pinpad) y el dispositivo de confianza no es por sí solo una vía de entrada.
+///
+/// Además **borra sus sesiones**, como la baja del admin en Personal (`hub_users::update`): que el
+/// `JOIN` ya las invalide no basta, porque una reincorporación futura devolvería a la vida tokens
+/// emitidos antes de la revocación (TTL de 30 días).
+///
+/// Alcanza tanto la fila ya enlazada (`cloud_user_id`) como la **pre-provisionada por email** que
+/// aún no ha hecho login (invitación/owner sembrado): el email del JWT está autenticado (firma del
+/// SaaS) y es la misma clave con la que `get_or_link_cloud_user` enlaza, así que no amplía la
+/// confianza. Idempotente: solo toca filas activas. Devuelve cuántas cerró.
+pub async fn revoke_cloud_access(
+    db: &dyn DatabaseAdapter,
+    cloud_user_id: &str,
+    email: Option<&str>,
+) -> Result<usize> {
+    let mut ids: Vec<String> = Vec::new();
+    let mut by_cloud_id = Params::new();
+    by_cloud_id.insert("cuid".into(), json!(cloud_user_id));
+    let linked = db
+        .query(
+            "SELECT id FROM hub_user WHERE cloud_user_id = :cuid AND is_active = 1",
+            &by_cloud_id,
+        )
+        .await?;
+    push_ids(&linked, &mut ids);
+    if let Some(email) = email.map(str::trim).filter(|s| !s.is_empty()) {
+        let mut by_email = Params::new();
+        by_email.insert("email".into(), json!(email));
+        let invited = db
+            .query(
+                "SELECT id FROM hub_user WHERE email = :email AND is_active = 1",
+                &by_email,
+            )
+            .await?;
+        push_ids(&invited, &mut ids);
+    }
+    let now = now_rfc3339();
+    for id in &ids {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("now".into(), json!(now));
+        db.execute(
+            "UPDATE hub_user SET is_active = 0, cloud_revoked_at = :now WHERE id = :id",
+            &p,
+        )
+        .await?;
+        db.execute("DELETE FROM hub_session WHERE user_id = :id", &p)
+            .await?;
+    }
+    Ok(ids.len())
+}
+
+/// Acumula los `id` de un resultado en `out` sin repetir (las dos búsquedas de
+/// [`revoke_cloud_access`] —por `cloud_user_id` y por email— pueden devolver la misma fila).
+fn push_ids(res: &erplora_db::QueryResult, out: &mut Vec<String>) {
+    for row in &res.rows {
+        let id = row["id"].as_str().unwrap_or_default().to_string();
+        if !id.is_empty() && !out.contains(&id) {
+            out.push(id);
+        }
+    }
+}
+
+/// Qué hacer con una fila **desactivada** que vuelve a presentarse con una membresía válida
+/// (paso 2b regla D, hub#348). Hay dos autoridades que cierran una puerta y solo una la reabre:
+///
+///  - **La cerró el SaaS** (`cloud_revoked_at` no vacío, la escribió [`revoke_cloud_access`]): la
+///    causa era la membresía y la membresía ha vuelto, así que la fila se **reincorpora**. Se
+///    reutiliza la MISMA fila —el historial, la auditoría y las ventas apuntan a ese id— y se
+///    vuelve al rol que concede la membresía de HOY (`default_role`, luego el suelo de la regla C):
+///    reincorporar es admitir de nuevo, no deshacer, y no resucita permisos que ya no le tocan.
+///  - **La cerró el hub** (`cloud_revoked_at` vacío: baja del admin en Personal o en `/api/members`,
+///    ADR-0157 §7): un token **no** la reabre. Esa decisión es del hub y el espejo del SaaS puede ir
+///    retrasado —`remove_member` conserva la baja local aunque falle la llamada al SaaS—, así que
+///    dejar que una membresía rancia reactivase sería devolver dentro a quien el hub echó. Se
+///    rechaza con [`DEACTIVATED_ERROR_CODE`] **sin** provisionar nada.
+async fn reinstate_or_reject(
+    db: &dyn DatabaseAdapter,
+    user: HubUser,
+    revoked_by_cloud: bool,
+    default_role: &str,
+) -> Result<HubUser> {
+    if !revoked_by_cloud {
+        return Err(crate::errors::RuntimeError::Domain {
+            code: DEACTIVATED_ERROR_CODE.to_string(),
+            message: "this account is deactivated in this hub: ask an administrator to reinstate it"
+                .to_string(),
+        });
+    }
+    let mut p = Params::new();
+    p.insert("id".into(), json!(user.id));
+    p.insert("role".into(), json!(default_role));
+    db.execute(
+        "UPDATE hub_user SET is_active = 1, cloud_revoked_at = '', role = :role WHERE id = :id",
+        &p,
+    )
+    .await?;
+    Ok(HubUser {
+        role: default_role.to_string(),
+        is_active: true,
+        ..user
+    })
+}
+
+/// `true` si la fila la cerró el SaaS (regla D) y no el hub. Lee la columna de la v11; una fila de
+/// una BD sin migrar devuelve `false` = «la cerró el hub», que es el lado conservador.
+fn was_revoked_by_cloud(row: &serde_json::Value) -> bool {
+    !row["cloud_revoked_at"]
+        .as_str()
+        .unwrap_or_default()
+        .trim()
+        .is_empty()
+}
+
 /// Resuelve (o crea/enlaza) el `hub_user` vinculado a una identidad cloud. Adaptador del **JWT de
 /// usuario**: tras verificar el token (server), se mapea a un usuario local. La resolución es en
 /// dos pasos (ADR-0157):
@@ -384,6 +509,13 @@ async fn raise_role_to_floor(
 /// login y sube el rol local si se ha quedado corto, sin bajarlo nunca. Antes el rol era una foto
 /// del primer login y ascender a alguien en el SaaS no llegaba jamás al hub. Ver
 /// [`raise_role_to_floor`]. `role_floor = None` → la fila se devuelve intacta.
+///
+/// **Las dos búsquedas miran también las filas DESACTIVADAS** (paso 2b regla D, hub#348). Antes
+/// filtraban `is_active = 1`, así que una fila cerrada sencillamente no casaba y el paso 3
+/// provisionaba una **segunda fila** al lado, activa y con el rol por defecto: desactivar a alguien
+/// no servía de nada porque su siguiente login le fabricaba una identidad nueva. Ahora la fila se
+/// reutiliza siempre y [`reinstate_or_reject`] decide si se reincorpora (la cerró el SaaS y la
+/// membresía ha vuelto) o se rechaza (la cerró el hub).
 pub async fn get_or_link_cloud_user(
     db: &dyn DatabaseAdapter,
     cloud_user_id: &str,
@@ -392,18 +524,24 @@ pub async fn get_or_link_cloud_user(
     email: Option<&str>,
     role_floor: Option<&str>,
 ) -> Result<HubUser> {
-    // 1) Por cloud_user_id (ya enlazado).
+    // 1) Por cloud_user_id (ya enlazado), activa o no.
     let mut p = Params::new();
     p.insert("cuid".into(), json!(cloud_user_id));
     let res = db
         .query(
-            "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
-              WHERE cloud_user_id = :cuid AND is_active = 1",
+            "SELECT id, name, role, cloud_user_id, is_active, cloud_revoked_at FROM hub_user \
+              WHERE cloud_user_id = :cuid",
             &p,
         )
         .await?;
     if let Some(row) = res.rows.first() {
-        return raise_role_to_floor(db, row_to_user(row), role_floor).await;
+        let user = row_to_user(row);
+        let user = if user.is_active {
+            user
+        } else {
+            reinstate_or_reject(db, user, was_revoked_by_cloud(row), default_role).await?
+        };
+        return raise_role_to_floor(db, user, role_floor).await;
     }
     // 2) Por email: fila pre-provisionada (owner sembrado / invitado) sin cloud_user_id → enlazar.
     if let Some(email) = email.map(str::trim).filter(|s| !s.is_empty()) {
@@ -411,13 +549,20 @@ pub async fn get_or_link_cloud_user(
         pe.insert("email".into(), json!(email));
         let by_email = db
             .query(
-                "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
-                  WHERE email = :email AND cloud_user_id IS NULL AND is_active = 1",
+                "SELECT id, name, role, cloud_user_id, is_active, cloud_revoked_at FROM hub_user \
+                  WHERE email = :email AND cloud_user_id IS NULL",
                 &pe,
             )
             .await?;
         if let Some(row) = by_email.rows.first() {
             let user = row_to_user(row);
+            // La reincorporación va ANTES del enlace: si la puerta la cerró el hub, el rechazo no
+            // debe dejar la fila enlazada a la cuenta cloud que acaba de ser rechazada.
+            let user = if user.is_active {
+                user
+            } else {
+                reinstate_or_reject(db, user, was_revoked_by_cloud(row), default_role).await?
+            };
             let mut up = Params::new();
             up.insert("id".into(), json!(user.id));
             up.insert("cuid".into(), json!(cloud_user_id));
@@ -507,8 +652,11 @@ pub async fn create_login_user(
         let mut up = Params::new();
         up.insert("id".into(), json!(user.id));
         up.insert("role".into(), json!(role));
+        // `cloud_revoked_at = ''`: reactivar cierra el episodio de la regla D (hub#348). Si no se
+        // limpiase, una baja POSTERIOR del admin heredaría la marca del cloud y un login podría
+        // reabrirla — el hub dejaría de ser dueño de su propia baja.
         db.execute(
-            "UPDATE hub_user SET role = :role, is_active = 1 WHERE id = :id",
+            "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' WHERE id = :id",
             &up,
         )
         .await?;
@@ -530,20 +678,36 @@ pub async fn create_login_user(
 }
 
 /// **Baja de un usuario-login** por email (flujo admin, ADR-0157 §7 — la simetría del alta). Marca
-/// `is_active = 0` (no borra: audit + posible re-alta); una sesión abierta deja de resolver
-/// (`resolve_session` filtra `is_active = 1`). Idempotente. Devuelve `true` si afectó a alguna fila
-/// activa. La revocación de la membresía en el SaaS (`members_remove`) la hace el server.
+/// `is_active = 0` (no borra: audit + posible re-alta) y **borra sus sesiones abiertas**, igual que
+/// la baja desde Personal (`hub_users::update`): que `resolve_session` filtre `is_active = 1` ya la
+/// invalida, pero borrarlas evita que una re-alta futura devuelva a la vida tokens emitidos antes
+/// de la baja (TTL de 30 días). Idempotente. Devuelve `true` si afectó a alguna fila activa. La
+/// revocación de la membresía en el SaaS (`members_remove`) la hace el server.
+///
+/// Escribe `cloud_revoked_at = ''` a propósito: **esta baja es del hub**, no del SaaS, así que
+/// ningún login la reabre (paso 2b regla D, hub#348 — ver [`reinstate_or_reject`]). Solo el hub la
+/// levanta, con el alta/re-invitación ([`create_login_user`]).
 pub async fn deactivate_login_user(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
     let email = email.trim();
     let mut p = Params::new();
     p.insert("email".into(), json!(email));
     let res = db
         .execute(
-            "UPDATE hub_user SET is_active = 0 WHERE email = :email AND is_active = 1",
+            "UPDATE hub_user SET is_active = 0, cloud_revoked_at = '' \
+              WHERE email = :email AND is_active = 1",
             &p,
         )
         .await?;
-    Ok(res.affected > 0)
+    if res.affected == 0 {
+        return Ok(false);
+    }
+    db.execute(
+        "DELETE FROM hub_session WHERE user_id IN \
+          (SELECT id FROM hub_user WHERE email = :email)",
+        &p,
+    )
+    .await?;
+    Ok(true)
 }
 
 /// Lista los **usuarios-login** del hub (los `hub_user` con email = cuenta cloud) para el panel
@@ -779,14 +943,53 @@ mod tests {
             .unwrap();
     }
 
-    /// `ensure_tables` + la columna `hub_user.email` (**migración de sistema v9**, ADR-0157),
-    /// montada a mano — igual que `setup_identity` monta el `device_id` (v8). Para los tests del
-    /// owner sembrado / enlace por email / alta-baja de usuarios-login, sin pasar por el boot real.
+    /// `ensure_tables` + las columnas que el login cloud necesita y el baseline v0 no trae:
+    /// `hub_user.email` (**migración de sistema v9**, ADR-0157) y `hub_user.cloud_revoked_at`
+    /// (**v11**, regla D de hub#348), montadas a mano — igual que `setup_identity` monta el
+    /// `device_id` (v8). Para los tests del owner sembrado / enlace por email / alta-baja de
+    /// usuarios-login / revocación, sin pasar por el boot real.
     async fn ensure_identity_email(db: &PgAdapter) {
         ensure_tables(db).await.unwrap();
-        db.execute_batch("ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';")
+        db.execute_batch(
+            "ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';\
+             ALTER TABLE hub_user ADD COLUMN cloud_revoked_at TEXT NOT NULL DEFAULT '';",
+        )
+        .await
+        .unwrap();
+    }
+
+    /// Como [`ensure_identity_email`] pero además con `hub_session.device_id` (v8), para los tests
+    /// de revocación que abren una sesión de verdad y comprueban que muere con la membresía.
+    async fn ensure_identity_with_sessions(db: &PgAdapter) {
+        ensure_identity_email(db).await;
+        db.execute_batch("ALTER TABLE hub_session ADD COLUMN device_id TEXT;")
             .await
             .unwrap();
+    }
+
+    /// `true` si el `hub_user` sigue activo.
+    async fn stored_is_active(db: &PgAdapter, id: &str) -> bool {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        let res = db
+            .query("SELECT is_active FROM hub_user WHERE id = :id", &p)
+            .await
+            .unwrap();
+        res.rows
+            .first()
+            .map(|r| r["is_active"].as_i64().unwrap_or(0) != 0)
+            .unwrap_or(false)
+    }
+
+    /// Cuántas filas de `hub_user` llevan este email (una revocación no debe dejar gemelas).
+    async fn rows_with_email(db: &PgAdapter, email: &str) -> usize {
+        let mut p = Params::new();
+        p.insert("email".into(), json!(email));
+        db.query("SELECT id FROM hub_user WHERE email = :email", &p)
+            .await
+            .unwrap()
+            .rows
+            .len()
     }
 
     /// `device_id` persistido en la sesión `token` (o `None` si la fila no existe / es NULL).
@@ -1235,6 +1438,192 @@ mod tests {
             assert_eq!(user.role, "cashier", "`{bogus}` no es un suelo");
         }
         assert_eq!(stored_role(&db, &first.id).await, "cashier");
+    }
+
+    // ── Rule D (hub#348): revoking the membership SHUTS THE DOOR, and it stays shut ─────────────
+
+    #[tokio::test]
+    async fn revoking_the_membership_closes_every_local_door_at_once() {
+        // Deactivating is not bookkeeping: it is what makes the revocation real. The open session,
+        // the PIN and the pinpad entry all hang off `is_active`, and the sessions are deleted so a
+        // future readmission cannot revive a token minted before the revocation (TTL 30 days).
+        let db = fresh_db().await;
+        ensure_identity_with_sessions(&db).await;
+        let user = get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+            .await
+            .unwrap();
+        set_pin(&db, &user.id, "1234").await.unwrap();
+        let token = create_session(&db, &user.id, 3600, None).await.unwrap();
+        assert!(resolve_session(&db, &token).await.unwrap().is_some());
+
+        assert_eq!(
+            revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap(),
+            1,
+            "closes the one row of that cloud identity",
+        );
+
+        assert!(!stored_is_active(&db, &user.id).await, "the row is deactivated");
+        assert!(
+            resolve_session(&db, &token).await.unwrap().is_none(),
+            "the session opened before the revocation is gone",
+        );
+        assert!(
+            verify_pin(&db, "Ada", "1234").await.unwrap().is_none(),
+            "the PIN is not a side door around the revocation",
+        );
+        assert!(
+            list_pin_users(&db).await.unwrap().is_empty(),
+            "and they disappear from the pinpad grid",
+        );
+        assert_eq!(
+            session_rows(&db, &user.id).await,
+            0,
+            "the session rows are deleted, not merely invalidated by the JOIN",
+        );
+        assert_eq!(
+            revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap(),
+            0,
+            "idempotent: a second revocation touches nothing",
+        );
+    }
+
+    #[tokio::test]
+    async fn revoking_reaches_a_row_that_has_never_logged_in() {
+        // The invited row (or the seeded owner) has no `cloud_user_id` yet: the SaaS can revoke an
+        // invitation before it is ever used, and the email in the JWT is authenticated by the same
+        // signature the presence gate trusts, so it is the key that finds them.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        create_login_user(&db, "socia@bar.com", "admin").await.unwrap();
+
+        assert_eq!(
+            revoke_cloud_access(&db, "99", Some("socia@bar.com")).await.unwrap(),
+            1,
+        );
+        assert!(!list_login_users(&db).await.unwrap()[0].is_active);
+    }
+
+    #[tokio::test]
+    async fn a_revoked_row_is_reused_and_never_duplicated() {
+        // The hole that made deactivating pointless: both lookups filtered `is_active = 1`, so the
+        // closed row did not match and a SECOND one was provisioned beside it — active, with the
+        // default role. Shutting the door has to survive the next login.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        let user = get_or_link_cloud_user(&db, "42", "Ada", "manager", Some("ada@bar.com"), None)
+            .await
+            .unwrap();
+        revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap();
+
+        let back = get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+            .await
+            .unwrap();
+        assert_eq!(back.id, user.id, "the SAME row comes back, not a twin");
+        assert_eq!(rows_with_email(&db, "ada@bar.com").await, 1);
+    }
+
+    #[tokio::test]
+    async fn a_readmission_comes_back_at_the_role_the_membership_grants_today() {
+        // Readmission is an admission, not an undo. Coming back must not resurrect a role the
+        // current membership no longer justifies — and, with the floor of rule C, an account admin
+        // still comes back as `admin` on the very same login.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        get_or_link_cloud_user(&db, "42", "Ada", "manager", Some("ada@bar.com"), None)
+            .await
+            .unwrap();
+        revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap();
+
+        let back = get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+            .await
+            .unwrap();
+        assert!(back.is_active, "the membership reopens the door it closed");
+        assert_eq!(back.role, "employee", "`manager` is NOT resurrected");
+        assert_eq!(stored_role(&db, &back.id).await, "employee");
+
+        revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap();
+        let as_admin =
+            get_or_link_cloud_user(&db, "42", "Ada", "admin", Some("ada@bar.com"), Some("admin"))
+                .await
+                .unwrap();
+        assert_eq!(as_admin.role, "admin", "the floor of rule C applies on readmission too");
+    }
+
+    #[tokio::test]
+    async fn a_baja_decided_by_the_hub_is_never_undone_by_a_token() {
+        // The other authority that shuts a door: the hub's own admin (ADR-0157 §7 / Personal). A
+        // membership must not reopen it — `remove_member` keeps the local baja even when the call
+        // to the SaaS fails, so the mirror can lag, and "still a member in the SaaS" would then
+        // walk somebody the hub threw out straight back in.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        let user = create_login_user(&db, "ana@bar.com", "manager").await.unwrap();
+        assert!(deactivate_login_user(&db, "ana@bar.com").await.unwrap());
+
+        let err = get_or_link_cloud_user(&db, "42", "Ana", "employee", Some("ana@bar.com"), None)
+            .await
+            .unwrap_err();
+        match err {
+            crate::errors::RuntimeError::Domain { code, .. } => {
+                assert_eq!(code, DEACTIVATED_ERROR_CODE, "a stable code, never a silent pass");
+            }
+            other => panic!("expected a domain rejection, got {other:?}"),
+        }
+        assert_eq!(rows_with_email(&db, "ana@bar.com").await, 1, "and nothing is provisioned");
+        assert!(!stored_is_active(&db, &user.id).await, "the row stays closed");
+        assert_eq!(
+            linked_cloud_user_id(&db, &user.id).await,
+            None,
+            "a rejected login does not leave the row linked to the account it just refused",
+        );
+    }
+
+    #[tokio::test]
+    async fn reactivating_clears_the_cloud_revocation_mark() {
+        // Otherwise the mark outlives its episode: the admin readmits somebody the SaaS had
+        // revoked, later shows them the door themselves, and a stale `cloud_revoked_at` would let
+        // the next login walk back in. Both alta paths (re-invitation and Personal) clear it.
+        let db = fresh_db().await;
+        ensure_identity_email(&db).await;
+        get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+            .await
+            .unwrap();
+        revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap();
+
+        create_login_user(&db, "ada@bar.com", "employee").await.unwrap();
+        assert!(deactivate_login_user(&db, "ada@bar.com").await.unwrap());
+
+        let err = get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, crate::errors::RuntimeError::Domain { ref code, .. } if code == DEACTIVATED_ERROR_CODE),
+            "the hub's baja wins: the old cloud mark must not reopen the door",
+        );
+    }
+
+    /// Cuántas sesiones tiene abiertas un usuario.
+    async fn session_rows(db: &PgAdapter, user_id: &str) -> usize {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(user_id));
+        db.query("SELECT token FROM hub_session WHERE user_id = :id", &p)
+            .await
+            .unwrap()
+            .rows
+            .len()
+    }
+
+    /// `cloud_user_id` de una fila (o `None` si sigue sin enlazar).
+    async fn linked_cloud_user_id(db: &PgAdapter, id: &str) -> Option<String> {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        let res = db
+            .query("SELECT cloud_user_id FROM hub_user WHERE id = :id", &p)
+            .await
+            .unwrap();
+        res.rows
+            .first()
+            .and_then(|r| r["cloud_user_id"].as_str().map(|s| s.to_string()))
     }
 
     #[tokio::test]

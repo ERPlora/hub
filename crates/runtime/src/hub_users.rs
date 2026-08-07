@@ -308,8 +308,20 @@ pub async fn update(
     p.insert("name".into(), json!(name));
     p.insert("role".into(), json!(role));
     p.insert("is_active".into(), json!(i64::from(is_active)));
+    // `cloud_revoked_at` (paso 2b regla D, hub#348) solo se toca cuando la edición **decide sobre
+    // la puerta** (`is_active` presente): dar de baja desde aquí es una decisión **del hub**, que
+    // ningún login reabre, y reactivar cierra un episodio de revocación del SaaS para que la marca
+    // no sobreviva a una baja posterior. Una edición que NO habla de la puerta —renombrar, cambiar
+    // el rol— la deja como está: reetiquetar de paso una revocación del cloud como baja del hub
+    // dejaría al usuario varado, con su membresía de vuelta y la puerta cerrada sin motivo visible.
+    let touches_the_door = input.is_active.is_some();
     db.execute(
-        "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active WHERE id = :id",
+        if touches_the_door {
+            "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active, \
+               cloud_revoked_at = '' WHERE id = :id"
+        } else {
+            "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active WHERE id = :id"
+        },
         &p,
     )
     .await?;
