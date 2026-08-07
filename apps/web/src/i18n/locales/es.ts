@@ -239,6 +239,21 @@ export default {
       'Esta identidad pertenece únicamente al Hub actual. El Hub no conoce ni muestra otros negocios o Hubs.',
     manageInSaas: 'Gestionar cuenta en SaaS',
   },
+  // hub#358 — «este dispositivo»: si esta terminal pregunta quién la está usando. El texto dice la
+  // CONSECUENCIA de cada modo, nunca su nombre técnico: el dueño de un bar tiene que poder deducir,
+  // solo de la frase, que uno de los dos significa «quien coja esto ya ha entrado como yo».
+  deviceMode: {
+    title: 'Este dispositivo',
+    intro: 'Cómo pregunta este dispositivo quién lo está usando. Cada dispositivo del negocio se decide por separado.',
+    shared: 'Compartido — una caja o tablet que usan varias personas',
+    sharedConsequence:
+      'Pide PIN al entrar y la olvida al acabar el turno, así que cada venta queda atribuida a quien la hizo.',
+    personal: 'Personal — un dispositivo que solo usas tú',
+    personalConsequence:
+      'La sesión se queda abierta y nunca pide PIN: quien lo coja ya eres tú. Elígelo solo para un dispositivo que no toca nadie más, y vuelve a cambiarlo si lo pierdes.',
+    adminOnly: 'Solo un administrador puede cambiar cómo entra la gente en este dispositivo.',
+    saveError: 'No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
+  },
   settings: {
     hubWide: 'Ajustes del Hub',
     currency: 'Moneda',
@@ -728,6 +743,11 @@ export default {
     passwordLabel: 'Contraseña',
     trustDevice: 'Confiar en este dispositivo',
     trustInfoAria: 'Más información sobre dispositivos de confianza',
+    // hub#358: sustituye a la casilla «confiar en este dispositivo» cuando un administrador marcó
+    // el dispositivo como personal. Dice la CONSECUENCIA (la sesión se queda abierta) —lo que
+    // importa si el dispositivo se pierde— y dónde vive la decisión.
+    personalDeviceNote:
+      'Este dispositivo está configurado como personal: la sesión se queda abierta y nunca pide PIN. Un administrador puede cambiarlo en Ajustes › Hub.',
     popoverTitle: 'Acceso por PIN',
     popoverBody: 'Marca esta casilla para poder entrar con un <strong>PIN</strong> en este dispositivo la próxima vez, sin escribir email y contraseña. Si no la marcas, siempre tendrás que iniciar sesión con email.',
     signIn: 'Entrar',

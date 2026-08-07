@@ -50,6 +50,7 @@ import serverOutline from "~icons/ion/server-outline?raw";
 import shieldCheckmarkOutline from "~icons/ion/shield-checkmark-outline?raw";
 import speedometerOutline from "~icons/ion/speedometer-outline?raw";
 import storefrontOutline from "~icons/ion/storefront-outline?raw";
+import tabletPortraitOutline from "~icons/ion/tablet-portrait-outline?raw";
 import ticketOutline from "~icons/ion/ticket-outline?raw";
 import trendingDownOutline from "~icons/ion/trending-down-outline?raw";
 import trendingUpOutline from "~icons/ion/trending-up-outline?raw";
@@ -207,6 +208,7 @@ const SVGS: Record<string, string> = {
   "shield-checkmark-outline": shieldCheckmarkOutline,
   "speedometer-outline": speedometerOutline,
   "storefront-outline": storefrontOutline,
+  "tablet-portrait-outline": tabletPortraitOutline,
   "ticket-outline": ticketOutline,
   "trending-down-outline": trendingDownOutline,
   "trending-up-outline": trendingUpOutline,

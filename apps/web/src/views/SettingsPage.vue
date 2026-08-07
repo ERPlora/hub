@@ -126,6 +126,12 @@
           </ion-card-content>
         </ion-card>
 
+        <!-- «Este dispositivo» (hub#358): si esta terminal pide PIN. Es del DISPOSITIVO, no del hub
+             —el mostrador y el portátil del despacho conviven en el mismo negocio—, así que va bajo
+             su propio encabezado y no entre los ajustes globales de arriba. -->
+        <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('deviceMode.title') }}</h2>
+        <DeviceModeCard />
+
         <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('settings.hardware') }}</h2>
 
         <!-- ERPlora Bridge -->
@@ -418,6 +424,7 @@ import {
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import DataPanel from '../components/DataPanel.vue';
+import DeviceModeCard from '../components/DeviceModeCard.vue';
 import { bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';

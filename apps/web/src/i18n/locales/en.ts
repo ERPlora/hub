@@ -238,6 +238,22 @@ export default {
       'This identity only belongs to the current Hub. The Hub does not know about or show other businesses or Hubs.',
     manageInSaas: 'Manage account in SaaS',
   },
+  // hub#358 — «this device»: whether this terminal asks who is using it. The copy says the
+  // CONSEQUENCE of each mode, never its technical name: the owner of a bar has to be able to tell,
+  // from the sentence alone, that one of the two means "whoever picks this up is already signed in
+  // as me". Source language; `es.ts` carries the translation.
+  deviceMode: {
+    title: 'This device',
+    intro: 'How this device asks who is using it. Each device in your business decides separately.',
+    shared: 'Shared — a till or tablet several people use',
+    sharedConsequence:
+      'It asks for a PIN when somebody signs in and forgets it at the end of the shift, so every sale is attributed to whoever made it.',
+    personal: 'Personal — a device only you use',
+    personalConsequence:
+      'It stays signed in and never asks for a PIN: anyone who picks it up is already you. Only choose this for a device nobody else touches, and change it back if you lose it.',
+    adminOnly: 'Only an administrator can change how this device signs people in.',
+    saveError: 'This device could not be changed. Check the connection and try again.',
+  },
   settings: {
     hubWide: 'Hub settings',
     currency: 'Currency',
@@ -728,6 +744,11 @@ export default {
     passwordLabel: 'Password',
     trustDevice: 'Trust this device',
     trustInfoAria: 'More information about trusted devices',
+    // hub#358: shown instead of the "trust this device" box when an administrator marked this
+    // device as personal. It states the CONSEQUENCE (it stays signed in), which is what matters if
+    // the device is ever lost, and says where the decision lives.
+    personalDeviceNote:
+      'This device is set up as personal: it stays signed in and never asks for a PIN. An administrator can change that in Settings › Hub.',
     popoverTitle: 'PIN access',
     popoverBody: 'Check this box to sign in with a <strong>PIN</strong> on this device next time, without typing your email and password. If you leave it unchecked, you will always have to sign in with your email.',
     signIn: 'Sign in',

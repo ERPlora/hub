@@ -324,15 +324,22 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
 }
 
 /** Abre una sesión local en el runtime a partir del JWT del usuario (login cloud). `name` se usa
- *  para el `hub_user` local (y para el posterior login por PIN, que resuelve por nombre). */
+ *  para el `hub_user` local (y para el posterior login por PIN, que resuelve por nombre).
+ *
+ *  Va con el `device_id` que este cliente pueda acreditar: **este** es el login ONLINE que gana la
+ *  confianza del dispositivo (§2.9, hub#330) — el hub escribe la fila de `hub_trusted_device` a
+ *  partir de él. Sin mandarlo, el navegador nunca dejaba fila: el gate del PIN por device-trust
+ *  rechazaría todo si se activara, y el modo del dispositivo (que vive en esa fila, hub#357) era
+ *  imposible de fijar. Ausente = se omite el campo, nunca `null`. */
 export async function runtimeCloudSession(
   access: string,
   name: string,
   email?: string,
 ): Promise<HubSessionResult> {
+  const deviceId = await resolveDeviceId();
   return runtimePost<HubSessionResult>(
     '/api/auth/cloud',
-    { name, email },
+    { name, email, ...(deviceId ? { device_id: deviceId } : {}) },
     { Authorization: `Bearer ${access}` },
   );
 }

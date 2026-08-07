@@ -2693,14 +2693,18 @@ async fn mint_session_with_extra(
     if let Err(e) = rt.enforce_device_limit(max_devices, device_id).await {
         return err_response(e);
     }
-    match rt
-        .create_session(
-            &user.id,
-            erplora_runtime::identity::DEFAULT_SESSION_TTL_SECS,
-            device_id,
-        )
+    // Cuánto vive la sesión lo decide el MODO DEL DISPOSITIVO (hub#358), no una constante global:
+    // un mostrador caduca dentro del turno que abrió y el equipo propio conserva la sesión larga.
+    // Sin `device_id` (cliente que no dice cuál es) sale la **corta** — la misma dirección
+    // fail-closed que el propio modo: no identificarse nunca compra la sesión larga.
+    let ttl_secs = match rt
+        .session_ttl_for_device(device_id.unwrap_or_default())
         .await
     {
+        Ok(ttl) => ttl,
+        Err(e) => return err_response(e),
+    };
+    match rt.create_session(&user.id, ttl_secs, device_id).await {
         Ok(token) => {
             let permissions = rt.session_permissions(&user.role);
             let mut payload = json!({

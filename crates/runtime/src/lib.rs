@@ -918,6 +918,14 @@ impl Runtime {
         device_mode::mode(self.db.as_ref(), device_id).await
     }
 
+    /// Cuánto dura una sesión abierta **en este dispositivo** (segundos), hub#358: un mostrador
+    /// caduca dentro del turno que abrió; el equipo propio conserva la sesión larga de siempre
+    /// («recordarme»). Fail-closed igual que el modo: un dispositivo que el hub no conoce —o un
+    /// cliente que no dice cuál es— recibe la sesión **corta**, nunca la larga.
+    pub async fn session_ttl_for_device(&self, device_id: &str) -> Result<i64> {
+        Ok(self.device_mode(device_id).await?.session_ttl_secs())
+    }
+
     /// Fija el modo de un dispositivo **ya conocido** (hub#357). `actor` = el `hub_user.id` que lo
     /// decidió; la puerta HTTP exige sesión **admin**. Rechaza un `device_id` que el hub nunca vio:
     /// esto registra una decisión sobre un dispositivo, no lo da de alta.
