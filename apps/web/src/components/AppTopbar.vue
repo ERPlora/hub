@@ -59,6 +59,26 @@
           @ok-app-select="onAppSelect"
         ></ok-app-launcher>
 
+        <!-- Management (hub#364, PLAN step 8, ADR-0251): the door to the SaaS panel — plans,
+             invoices and businesses are NOT screens of this app, so this LINKS (it does not write).
+             Only whoever administers the hub sees it (`hub.administer`, ADR-0248): a filter, not a
+             wall, because it refuses a cashier nothing — it simply is not their task. `open-outline`
+             is the mark the shell already uses for "this leads to the SaaS" (Billing, Profile,
+             ModuleView). The accessible name says the destination out loud: it is all an icon-only
+             action has, and this one crosses the product boundary. Opens in THIS tab — the reasons
+             live in management-link.ts. Note: the labels of the login→till path ("Mi plan", "Añadir
+             funciones") belong to hub#365; this only names its own button. -->
+        <ion-button
+          v-if="canOpenManagement"
+          data-testid="topbar-manage"
+          fill="clear"
+          :aria-label="t('topbar.manage')"
+          :title="t('topbar.manage')"
+          @click="openManagement"
+        >
+          <HubIcon slot="icon-only" name="open-outline" />
+        </ion-button>
+
         <!-- Asistente (sparkles): visible cuando la capacidad está disponible. Abre el drawer. -->
         <ion-button
           v-if="assistantAvailable"
@@ -117,6 +137,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { assistantAvailable, toggleAssistant, notificationCount, isLoading, railCollapsed } from '../lib/shell';
+import { canOpenManagement, openManagement } from '../lib/management-link';
 import { moduleNav } from '../lib/nav';
 import { resolveIcon } from '../lib/icons';
 

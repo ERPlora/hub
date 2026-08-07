@@ -31,6 +31,9 @@ export default {
     appsEmpty: 'No modules installed yet. Open Apps to add some.',
     appsClose: 'Close',
     assistant: 'Assistant',
+    // The way out to management (hub#364). It is the only affordance an icon-only action has, and
+    // it crosses a product boundary, so it names the destination out loud.
+    manage: 'Manage your business at erplora.com',
     notifications: 'Notifications',
     noNotifications: 'All caught up. No notifications.',
     configure: 'Configure',
