@@ -43,9 +43,16 @@ impl DeclaredCapability {
         let json: serde_json::Value =
             serde_json::from_str(raw).unwrap_or_else(|e| panic!("{file} is not valid JSON: {e}"));
 
-        let patterns = json["remote"]["urls"]
-            .as_array()
-            .unwrap_or_else(|| panic!("{file} must declare remote.urls as an array"))
+        // A capability with no `remote` block is local-only (`tauri://`), which is legitimate and
+        // outside this guard: it declares no remote origin, so it grants nothing to the cloud.
+        let declared_urls = match json.get("remote") {
+            None => Vec::new(),
+            Some(remote) => remote["urls"]
+                .as_array()
+                .unwrap_or_else(|| panic!("{file} must declare remote.urls as an array"))
+                .clone(),
+        };
+        let patterns = declared_urls
             .iter()
             .map(|value| {
                 let declared = value
