@@ -761,6 +761,17 @@ impl Runtime {
         .await
     }
 
+    /// **Cierra el acceso local** de una identidad cloud cuyo membresía ha revocado el SaaS (paso 2b
+    /// regla D, hub#348): desactiva su `hub_user` (sesión abierta, PIN y pinpad caen con él) y borra
+    /// sus sesiones. Idempotente; devuelve cuántas filas cerró.
+    pub async fn revoke_cloud_access(
+        &self,
+        cloud_user_id: &str,
+        email: Option<&str>,
+    ) -> Result<usize> {
+        identity::revoke_cloud_access(self.db.as_ref(), cloud_user_id, email).await
+    }
+
     /// **Alta** de un usuario-login por email + rol (flujo admin, ADR-0157 §7). Upsert por email.
     pub async fn create_login_user(&self, email: &str, role: &str) -> Result<identity::HubUser> {
         identity::create_login_user(self.db.as_ref(), email, role).await

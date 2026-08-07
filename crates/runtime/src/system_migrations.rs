@@ -210,6 +210,24 @@ ALTER TABLE hub_api_key ADD COLUMN rate_limit_per_minute INTEGER NOT NULL DEFAUL
 CREATE TABLE hub_api_key_rate_window (\
   api_key_id TEXT PRIMARY KEY, window_epoch_minute BIGINT NOT NULL, request_count BIGINT NOT NULL);",
     },
+    // ── v11 — hub#348 (paso 2b regla D): POR QUÉ está cerrada la puerta de un `hub_user` ─────────
+    // Revocar la membresía en el SaaS DESACTIVA el `hub_user` (`is_active = 0`). Pero `is_active`
+    // solo dice que está cerrada, no **quién** la cerró, y hay dos autoridades distintas: el propio
+    // hub (baja del admin en Personal / `/api/members`, ADR-0157 §7) y el SaaS (esta regla D). Sin
+    // distinguirlas hay que elegir entre dos fallos: si un login puede reactivar, una membresía
+    // rancia deshace la baja que decidió el admin del hub; si no puede, una revocación por error
+    // deja al dueño fuera de su propio hub para siempre.
+    //
+    // `cloud_revoked_at` guarda el instante en que la regla D cerró la fila (`''` = no la cerró el
+    // cloud). Solo esas filas las reabre un login, y solo si el SaaS vuelve a acreditar la
+    // membresía; cualquier otra baja sigue siendo del hub y solo el hub la levanta. Columna
+    // ADITIVA (`NOT NULL DEFAULT ''`): las filas existentes quedan como «no revocada por el cloud»,
+    // que es la lectura conservadora para un hub ya desplegado.
+    SystemMigration {
+        version: 11,
+        name: "hub_user_cloud_revoked_at",
+        postgres: "ALTER TABLE hub_user ADD COLUMN cloud_revoked_at TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).

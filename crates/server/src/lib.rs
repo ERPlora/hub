@@ -2277,24 +2277,7 @@ async fn open_cloud_session(
                 .into_response()
         }
     };
-    // ── Gate de presencia (ADR-0157 §5) ──────────────────────────────────────────────────────
-    // La autenticación (¿es un JWT válido del SaaS?) NO implica autorización (¿pertenece a ESTE
-    // hub?). El token lleva el claim *coarse* `hubs: [{id, org}]`; el Hub solo deja entrar si el
-    // `hub_id` de esta máquina figura ahí. Sustituye al viejo get-or-create como admin: cierra el
-    // hueco por el que cualquier usuario del SaaS con un JWT válido quedaba admin local. Un token
-    // sin el claim (SaaS legacy) trae `hubs` vacío → no es miembro → se rechaza (pide invitación).
     let hub_id = st.hub_id();
-    if !claims.is_member_of_hub(&hub_id) {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({
-                "ok": false,
-                "error": "no eres miembro de este hub: pide una invitación al administrador",
-                "code": "not_a_member",
-            })),
-        )
-            .into_response();
-    }
     let cloud_user_id = claims.user_id_str();
     let device_id = body.as_ref().and_then(|b| b.device_id.clone());
     let email = body.as_ref().and_then(|b| b.email.clone());
@@ -2334,6 +2317,35 @@ async fn open_cloud_session(
         email.clone()
     };
     let rt = st.runtime.lock().await;
+    // ── Gate de presencia (ADR-0157 §5) + regla D (hub#348) ──────────────────────────────────
+    // La autenticación (¿es un JWT válido del SaaS?) NO implica autorización (¿pertenece a ESTE
+    // hub?). El token lleva el claim *coarse* `hubs: [{id, org}]` y el Hub solo deja entrar si el
+    // `hub_id` de esta máquina figura ahí. Eso cerró el auto-admin (cualquier JWT válido quedaba
+    // admin local); un token sin el claim (SaaS legacy) trae `hubs` vacío → no es miembro.
+    //
+    // Rechazar el login era solo la mitad: al miembro revocado le quedaban intactas la sesión ya
+    // abierta (TTL 30 días), el PIN y su sitio en el pinpad, así que seguía trabajando como si
+    // nada. La otra mitad —regla D— es **cerrar el `hub_user`**: desactivarlo cae de una vez sobre
+    // todas esas puertas. Se hace ANTES de responder y con el mismo token autenticado que prueba
+    // la revocación.
+    if !claims.is_member_of_hub(&hub_id) {
+        if let Err(e) = rt
+            .revoke_cloud_access(&cloud_user_id, login_email.as_deref())
+            .await
+        {
+            // El cierre local falló, pero el rechazo no se negocia: se registra y se sigue.
+            tracing::error!(error = %e, "rule D: could not deactivate the revoked hub_user");
+        }
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "ok": false,
+                "error": "you are not a member of this hub: ask an administrator for an invitation",
+                "code": "not_a_member",
+            })),
+        )
+            .into_response();
+    }
     match rt
         .get_or_link_cloud_user(
             &cloud_user_id,
@@ -2380,6 +2392,19 @@ async fn open_cloud_session(
                 cloud_tokens,
             )
             .await
+        }
+        // Puerta cerrada POR EL HUB (regla D, hub#348): el `hub_user` está desactivado y la
+        // membresía no lo reabre. Es un rechazo de acceso, no un conflicto de estado, así que sale
+        // como `403` con el mismo formato plano que `not_a_member` —el que ya lee el shell— en vez
+        // del `409` genérico de un error de dominio.
+        Err(erplora_runtime::RuntimeError::Domain { code, message })
+            if code == erplora_runtime::identity::DEACTIVATED_ERROR_CODE =>
+        {
+            (
+                StatusCode::FORBIDDEN,
+                Json(json!({ "ok": false, "error": message, "code": code })),
+            )
+                .into_response()
         }
         Err(e) => err_response(e),
     }
