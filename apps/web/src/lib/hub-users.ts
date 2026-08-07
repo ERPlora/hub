@@ -113,6 +113,68 @@ export async function listHubRoles(): Promise<HubRole[]> {
   return Array.isArray(data) ? data : [];
 }
 
+/**
+ * Rechazo de la activación de un rol que CONSERVA el motivo del runtime (hub#352/hub#353).
+ *
+ * El runtime rechaza por dos razones distintas —«es un rol base, siempre está encendido» y «no lo
+ * declara ningún módulo instalado»— y cada una pide algo distinto del administrador: la primera es
+ * un límite del producto, la segunda se resuelve instalando el módulo que trae ese rol. Aplanarlas
+ * a «no se pudo activar» convierte la guarda en un interruptor mudo. Mismo contrato que
+ * `ModuleActionError` (hub#314): `code` presente = hay un motivo que enseñar; sin él es un fallo de
+ * transporte y la UI se queda con su mensaje genérico.
+ */
+export class RoleActivationError extends Error {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'RoleActivationError';
+    this.code = code;
+  }
+}
+
+/**
+ * Enciende o apaga un rol del catálogo **en este hub**. Requiere sesión owner/admin.
+ *
+ * Devuelve el catálogo YA actualizado (lo que responde el endpoint): la pantalla se queda con el
+ * estado que afirma el servidor en vez de pintar un optimismo local que un rechazo dejaría mintiendo.
+ */
+export async function setRoleActivation(key: string, active: boolean): Promise<HubRole[]> {
+  const res = await fetch(`${RUNTIME_URL}/api/hub/roles/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    headers: { ...runtimeHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active }),
+  });
+  const env = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    data?: HubRole[];
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok || env.ok === false) {
+    throw new RoleActivationError(
+      env.error?.message ?? `roles/${key} → ${res.status}`,
+      env.error?.code,
+    );
+  }
+  return Array.isArray(env.data) ? env.data : [];
+}
+
+/**
+ * De un catálogo, los roles que se le pueden DAR hoy a una persona en este hub.
+ *
+ * Espejo EN UI de `roles::ensure_assignable` del runtime, que sigue siendo la autoridad y
+ * revalida: un rol **declarado por un módulo** solo se asigna si el hub lo ha encendido. Los
+ * demás no se estrechan — un rol **base** es el contrato congelado del core, y uno **huérfano**
+ * (tecleado a mano antes de que hubiera catálogo, o el resto de un módulo desinstalado) hay que
+ * poder seguir reasignándolo o se rompen hubs que funcionan.
+ *
+ * Sirve para no ofrecer en el alta lo que el servidor va a rechazar: un desplegable con roles
+ * inasignables hace que apagar un rol parezca que no hace nada.
+ */
+export function assignableRoles(roles: HubRole[]): HubRole[] {
+  return roles.filter((role) => role.source?.kind !== 'module' || role.active);
+}
+
 /** Alta de usuario. Requiere sesión owner/admin. */
 export function createHubUser(input: NewHubUser): Promise<HubUser> {
   return request<HubUser>('/api/hub/users', { method: 'POST', body: JSON.stringify(input) });
