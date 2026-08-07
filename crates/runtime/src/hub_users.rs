@@ -207,8 +207,13 @@ fn clean_name(value: &str) -> Result<String> {
     Ok(name.to_string())
 }
 
-/// Rol: obligatorio. NO se valida contra un catálogo cerrado — un módulo puede declarar roles
-/// propios en `role_permissions` y el hub debe poder asignarlos.
+/// Rol: obligatorio y acotado. Esto es solo la **forma**; quién puede llevarlo lo decide
+/// [`crate::roles::ensure_assignable`] (hub#352), que es donde vive el catálogo.
+///
+/// Sigue sin validarse contra un catálogo **cerrado**, a propósito: un módulo puede conceder
+/// contra una clave que inventó otro, y hay hubs con roles tecleados a mano de antes de que
+/// existiera el catálogo. Lo que la guarda estrecha es lo nuevo — un rol **declarado** que este
+/// hub no ha encendido —, no todo lo que no reconozca.
 fn clean_role(value: &str) -> Result<String> {
     let role = value.trim();
     if role.is_empty() {
