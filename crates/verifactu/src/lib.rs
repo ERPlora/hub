@@ -2429,6 +2429,33 @@ mod cert_source_tests {
         );
     }
 
+    /// **`can_sign` IS `build_identity`'s gate, and it is pinned here too.**
+    ///
+    /// Its only consumer is the coherence e2e of hub#319, which lives in the `erplora-runtime`
+    /// package — so a mutation run scoped to THIS package leaves it alive with nothing to say. That
+    /// is a hole in the evidence, not in the code: a `pub` predicate that decides whether a hub
+    /// transmits to the AEAT has to be pinned where it is defined, so it survives whatever the
+    /// cross-package test does later.
+    #[tokio::test]
+    async fn can_sign_answers_exactly_what_build_identity_gates_on() {
+        for (signing, expected) in [(Some("delegated"), true), (Some("own"), true), (None, false)] {
+            let host = SlotHost::new(signing, vec![]);
+            assert_eq!(
+                can_sign(&host, "h1").await.unwrap(),
+                expected,
+                "can_sign con el slot {signing:?}"
+            );
+            // Y es literalmente el predicado del gate sobre la misma config: si los dos pudieran
+            // diferir, el motor rechazaría lo que el runtime ya dio por bueno.
+            let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+            assert_eq!(
+                can_sign(&host, "h1").await.unwrap(),
+                has_certificate(&cfg),
+                "can_sign y el gate de build_identity tienen que ser la MISMA respuesta ({signing:?})"
+            );
+        }
+    }
+
     /// **The error names the real cause.** «Súbelo en Ajustes → Negocio» is only half the story once
     /// a delegated certificate exists: reaching here means the business uploaded none **and** the
     /// control plane never handed one down. Telling the user only about their half sends them to a
