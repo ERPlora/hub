@@ -844,6 +844,7 @@ export default {
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'Configuración VeriFactu y el certificado de empresa (.p12)',
     sectionMedia: 'Imágenes y media',
+    sectionRoles: 'Roles',
     sectionModule: 'Módulo {id}',
     modulesTitle: 'Módulos',
     withData: 'incluye datos',
@@ -869,6 +870,8 @@ export default {
       'Los usuarios, roles y PIN son del hub que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso a tu hub.',
     reasonSettingsNotPortable:
       'Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.',
+    reasonRolesNotActivatable:
+      'Roles sin activar: {n}. Una plantilla solo puede activar roles que traigan los módulos instalados aquí, y nunca los administrativos.',
     done: 'Ir al inicio',
   },
   moduleView: {

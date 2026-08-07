@@ -23,6 +23,12 @@ pub const SCHEMA_VERSION: u32 = 1;
 /// `hub_id` destino antes de aplicar (patrón ADR-0072, sustitución de hub_id).
 pub const HUB_ID_PLACEHOLDER: &str = "__HUB_ID__";
 
+/// Section that carries the role set of a vertical (paso 2b, hub#354). It has **no `data/*.sql`**:
+/// the keys travel in [`BlueprintManifest::active_roles`] and the import applies them through
+/// `roles::set_active`, never as SQL. Listed in `sections` so the inventory the user confirms
+/// before importing shows that the bundle brings a role set.
+pub const ROLES_SECTION: &str = "roles";
+
 /// Metadatos del hub de origen (informativos; el import NO los aplica como datos).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HubMeta {
@@ -127,8 +133,22 @@ pub struct BlueprintManifest {
     pub created_at: String,
     pub modules: Vec<ManifestModule>,
     /// Secciones presentes en el bundle (`hub_users`, `hub_settings`, `fiscal`, `media`,
-    /// `modules/<id>` por cada módulo con datos).
+    /// `modules/<id>` por cada módulo con datos, [`ROLES_SECTION`] si trae juego de roles).
     pub sections: Vec<String>,
+    /// Role keys the vertical switches ON in the hub that imports it (paso 2b, hub#354).
+    ///
+    /// Declarative on purpose — a LIST OF KEYS, never rows of `hub_role_activation`. The import
+    /// walks it through the same door the administrator uses (`roles::set_active`), so the guards
+    /// of hub#352 apply to a downloaded file exactly as they apply to a click: a key no installed
+    /// module declares is refused, and a base or administrative one is refused too. Shipping it as
+    /// a `data/roles.sql` section would have handed a bundle raw INSERTs into the table that
+    /// decides which roles are live — the one place where "the write door is not somewhere to
+    /// invent role keys" has to hold.
+    ///
+    /// `#[serde(default)]` ⇒ a bundle older than this field pre-activates nothing, which is what
+    /// the four published blueprints do today.
+    #[serde(default)]
+    pub active_roles: Vec<String>,
     /// SHA256 hex por fichero del bundle (ruta relativa → hash). Verificado al importar.
     pub sha256: BTreeMap<String, String>,
 }
@@ -315,6 +335,30 @@ pub async fn export_hub(
         sections.push(format!("modules/{}", m.module_id));
     }
 
+    // ── El juego de ROLES del vertical (paso 2b, hub#354) ────────────────────
+    // Las CLAVES que este hub tiene encendidas, declarativas en el manifest: nunca filas de
+    // `hub_role_activation` en un `data/*.sql`. Así el bundle no puede escribir a mano en la tabla
+    // que decide qué roles están vivos — al importar, cada clave pasa por `roles::set_active`, la
+    // misma puerta que usa el administrador, y ahí es donde se rechaza lo que nadie declara y lo
+    // administrativo.
+    //
+    // Sin casilla, a propósito, y en las dos puntas: el juego de roles es lo que ES el vertical, no
+    // un extra que se marca (y una casilla nunca ha sido un control aquí — ADR-0195). Tampoco lo
+    // filtra `purpose`: un rol es vocabulario del negocio, no la identidad de nadie — de hecho es
+    // la mitad de ADR-0195 §5 que SÍ viaja («una plantilla activa ROLES, nunca crea usuarios»).
+    //
+    // Se vuelca lo que el hub tiene encendido, sin comprobar si sigue declarado: quien decide es el
+    // CONSUMIDOR (mismo criterio que las identidades y la cadena fiscal), que además es el único
+    // que sabe qué módulos acabará teniendo instalados.
+    let active_roles: Vec<String> = crate::roles::active_keys(db, hub_id)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+    if !active_roles.is_empty() {
+        sections.push(ROLES_SECTION.to_string());
+    }
+
     // ── Manifest (fuente de verdad) + integridad ─────────────────────────────
     let mut sha256 = BTreeMap::new();
     for (path, bytes) in &files {
@@ -334,6 +378,7 @@ pub async fn export_hub(
         created_at: created_at.to_string(),
         modules: manifest_modules,
         sections,
+        active_roles,
         sha256,
     };
     Ok(ExportBundle { manifest, files })
@@ -749,6 +794,7 @@ mod tests {
             created_at: "2026-07-11T18:00:00Z".into(),
             modules: vec![ManifestModule { id: "taxes".into(), version: "2.1.1".into(), with_data: true }],
             sections: vec!["hub_settings".into(), "modules/taxes".into()],
+            active_roles: Vec::new(),
             sha256: BTreeMap::from([("data/taxes.sql".into(), "ab".repeat(32))]),
         };
         let json = serde_json::to_string(&m).unwrap();

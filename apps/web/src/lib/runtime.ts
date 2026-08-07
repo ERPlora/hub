@@ -568,7 +568,11 @@ export interface SectionResult {
  * prosa y se pintan tal cual, así que hay que distinguir unos de otros — traducir es SUSTITUIR el
  * texto, y sustituir lo que no es un código borraría el motivo.
  */
-export const SECTION_DISCARD_CODES = ['identity_not_portable', 'settings_not_portable'] as const;
+export const SECTION_DISCARD_CODES = [
+  'identity_not_portable',
+  'settings_not_portable',
+  'roles_not_activatable',
+] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */
 export type SectionDiscardCode = (typeof SECTION_DISCARD_CODES)[number];

@@ -298,6 +298,7 @@ async fn an_unknown_settings_key_from_a_foreign_bundle_is_not_written() {
         created_at: CREATED_AT.into(),
         modules: Vec::new(),
         sections: vec!["hub_settings".into()],
+        active_roles: Vec::new(),
         sha256,
     };
 
