@@ -17,7 +17,8 @@
     "deep-link": {
       "desktop": {
         "schemes": ["erplora"]
-      }
+      },
+      "mobile": [{ "scheme": ["erplora"], "host": "hub" }]
     }
   },
   "bundle": {

@@ -301,3 +301,35 @@ fn android_registers_the_scheme_as_a_browsable_intent() {
     // instance on top of the till.
     assert!(ANDROID_MANIFEST.contains("android:launchMode=\"singleTask\""));
 }
+
+#[test]
+fn android_declares_the_scheme_where_the_plugin_filters_it_too() {
+    // The intent filter gets the URL as far as the plugin, and the plugin drops it there. Read in
+    // tauri-plugin-deep-link 2.4.9 (`DeepLinkPlugin.kt`): `isDeepLink` returns FALSE outright when
+    // `plugins.deep-link.mobile` is empty, and otherwise only matches a configured scheme/host. So
+    // `desktop.schemes` alone gets Android to hand us the intent and then throws it away —
+    // silently, and only on Android, which is the hardest place to notice it.
+    let conf: serde_json::Value = serde_json::from_str(TAURI_CONF).expect("tauri.conf.json parses");
+    let mobile = conf
+        .pointer("/plugins/deep-link/mobile")
+        .and_then(|v| v.as_array())
+        .expect("plugins.deep-link.mobile must be declared or Android drops every link");
+    let matches_our_links = mobile.iter().any(|entry| {
+        let schemes = entry.pointer("/scheme").and_then(|v| v.as_array());
+        let declares_scheme = schemes.is_some_and(|s| {
+            s.iter()
+                .any(|v| v.as_str().is_some_and(|s| s.eq_ignore_ascii_case(DEEP_LINK_SCHEME)))
+        });
+        // The host is the ACTION of the grammar (`erplora://hub/…`), so an entry that names a
+        // different one would filter out exactly the links we issue.
+        let host_fits = match entry.pointer("/host").and_then(|v| v.as_str()) {
+            Some(host) => host.eq_ignore_ascii_case("hub"),
+            None => true,
+        };
+        declares_scheme && host_fits
+    });
+    assert!(
+        matches_our_links,
+        "no entry in plugins.deep-link.mobile matches {DEEP_LINK_SCHEME}://hub/… : {mobile:?}"
+    );
+}
