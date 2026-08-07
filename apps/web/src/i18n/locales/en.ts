@@ -114,11 +114,42 @@ export default {
     previewUnsupportedBody: 'This file type cannot be shown here. Download it to open it with an app on your device.',
     previewPdfTruncated: 'Showing the first {shown} of {total} pages. Download the file to read it in full.',
   },
+  // The configuration checklist — the dashboard surface of `hub.setup.status` (hub#372).
+  // `items.<key>` covers the CORE items only: a core item's key IS its i18n key, while a module's
+  // title travels in English inside its manifest and is used as-is (setup-status.md §7).
+  setup: {
+    title: 'Finish setting up your hub',
+    progress: '{done} of {total} done',
+    viewAll: 'View all',
+    viewLess: 'Show less',
+    configure: 'Set up',
+    review: 'Ask the assistant',
+    doneLabel: 'Done',
+    // The three levels, said as what they mean for the business — not as a severity word.
+    levelLegal: 'Needed to invoice',
+    levelFunctional: 'Needed to sell',
+    levelRecommended: 'Recommended',
+    // The third state: OUR breakdown, not the user's task. It must not read as a chore.
+    unavailableLabel: 'Not available yet',
+    unavailableHint: 'This one is on us: there is nothing on your side to do yet. We are on it.',
+    completeTitle: 'Your hub is ready',
+    completeBody: 'Everything on the checklist is done.',
+    items: {
+      apps: {
+        title: 'Your apps',
+        description: 'Install at least one business app so the hub has something to do.',
+      },
+      business_identity: {
+        title: 'Your business details',
+        description: 'Legal name and tax id: without them the hub cannot issue an invoice.',
+      },
+      team: {
+        title: 'Your team',
+        description: 'Add the people who will use the till, each with their own way in.',
+      },
+    },
+  },
   dashboard: {
-    setupTitle: '{n} module(s) need configuration',
-    configure: 'Configure',
-    setupHint: 'Review what is missing and the assistant will guide you step by step to get it ready.',
-    reviewConfig: 'Review configuration',
     // Contextual greeting by time of day (zone 1 — header). Name is interpolated.
     greetingMorning: 'Good morning, {name}',
     greetingAfternoon: 'Good afternoon, {name}',
