@@ -6,6 +6,17 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
+    // The workspace packages below are consumed as RAW TypeScript SOURCE (see `paths`: they point
+    // at `src/index.ts`, not at a build output), and their own test runner is `node:test` over ESM
+    // (`--experimental-transform-types`), which demands fully specified relative specifiers — hence
+    // `packages/module-sdk/src/index.ts` re-exporting `from './quantity.ts'`. Without this flag TS
+    // rejects that extension (TS5097) and `vue-tsc --noEmit` fails on a file this app does not own,
+    // which is exactly what left the typecheck permanently red on `develop` (hub#422) and, since
+    // `pnpm -F @erplora/web build` runs `vue-tsc` first, blocked the Docker image build too.
+    // Legal because this project is `noEmit` — nothing here ever emits JS; Vite/esbuild resolve the
+    // `.ts` specifier natively. Dropping the extension instead is NOT the fix: it takes down the
+    // SDK's whole `index.test.ts` (commit c5614de).
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
