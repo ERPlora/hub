@@ -241,7 +241,7 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
             name: "Demo".into(),
             role: "admin".into(),
             pin: "4821".into(),
-            email: String::new(),
+            email: "demo@example.com".into(),
             local: false,
         },
     )
@@ -315,7 +315,8 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
                 name: name.into(),
                 role: role.into(),
                 pin: pin.into(),
-                email: String::new(),
+                // Usuario de CUENTA: sin la casilla «Local user» el alta pide email (hub#356).
+                email: format!("{}@example.com", name.to_lowercase()),
                 local: false,
             },
         )
@@ -344,7 +345,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
             name: "Encargada".into(),
             role: "manager".into(),
             pin: "4821".into(),
-            email: String::new(),
+            email: "encargada@example.com".into(),
             local: false,
         },
     )
@@ -410,7 +411,7 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
             name: "Encargada".into(),
             role: "manager".into(),
             pin: "4821".into(),
-            email: String::new(),
+            email: "encargada@example.com".into(),
             local: false,
         },
     )

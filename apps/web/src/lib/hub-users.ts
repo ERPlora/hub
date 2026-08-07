@@ -59,18 +59,23 @@ export interface HubRole {
   members: number;
 }
 
-/** Alta: `pin` vacío = sin PIN (entra por Cloud); `email` vacío = sin email. */
+/**
+ * Alta. Es **exhaustiva** (plan paso 2b): la casilla `local` elige cuál de las dos identidades se
+ * crea, y las dos son la MISMA fila `hub_user`.
+ *
+ *  - `local: true` (hub#355) → esta persona existe solo en la BD de este hub: **nombre + PIN**, sin
+ *    email y sin nada en el SaaS. Guardas: PIN obligatorio, ningún rol administrativo y un nombre
+ *    que el hub no conozca ya.
+ *  - `local` ausente/`false` (hub#356) → **usuario de cuenta**: el **email es obligatorio**, el
+ *    SaaS le manda la invitación y la contraseña la pone él (el administrador no la conoce jamás).
+ *    El `pin` sigue siendo opcional —lo necesita quien además atiende la barra— y, si se teclea,
+ *    pasa por las mismas reglas que el del usuario local.
+ */
 export interface NewHubUser {
   name: string;
   email: string;
   role: string;
   pin: string;
-  /**
-   * La casilla **«Local user»** (plan paso 2b, hub#355): esta persona existe solo en la BD de este
-   * hub — nombre + PIN, sin email y sin nada en el SaaS. El runtime aplica entonces las guardas de
-   * un usuario local (PIN obligatorio, ningún rol administrativo, un nombre que el hub no conozca
-   * ya). Ausente/`false` = el alta de siempre.
-   */
   local?: boolean;
 }
 
@@ -229,6 +234,52 @@ export function localUserIssue(
   // le devuelve por la espalda un PIN que funciona (hub#348).
   const name = input.name.trim().toLowerCase();
   if (users.some((u) => u.name.trim().toLowerCase() === name)) return 'name_taken';
+  return '';
+}
+
+// ── Alta de usuario de CUENTA (plan paso 2b, hub#356) ─────────────────────────────────────────
+
+/**
+ * Roles que el **SaaS** sabe poner en una membresía (su `HUB_ROLES`) y, por tanto, los únicos que
+ * puede llevar un usuario de cuenta. Espejo de `is_grantable_account_role` en el runtime.
+ *
+ * `owner` **no** está: la propiedad del hub sale de `HUB_OWNER_EMAIL` (ADR-0157), no de una
+ * invitación. Y un rol que declara un módulo (`kitchen`, `waiter`…) es de ESTE hub y de ninguno
+ * más, así que es del personal local.
+ */
+const ACCOUNT_ROLES = ['admin', 'manager', 'employee'];
+
+/** Forma mínima de un email (la misma que valida el runtime). */
+function looksLikeEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/**
+ * Motivo por el que el runtime rechazaría este alta **de cuenta**, o `''` si es admisible. Gemelo
+ * de [`localUserIssue`] para la otra identidad del paso 2b: la autoridad sigue siendo el runtime,
+ * que revalida y responde 409.
+ *
+ * Aquí sí se puede adelantar el email duplicado —el censo que pinta Personal ya trae el email de
+ * cada fila, activos e inactivos—, y merece la pena: es el rechazo que significa «esta persona ya
+ * existe, reincorpórala», no «vuelve a intentarlo».
+ */
+export function accountUserIssue(
+  input: { email: string; role: string; pin: string },
+  users: HubUser[],
+): string {
+  const email = input.email.trim().toLowerCase();
+  if (!email) return 'account_needs_email';
+  if (!looksLikeEmail(email)) return 'invalid_email';
+  if (!ACCOUNT_ROLES.includes(input.role.trim().toLowerCase())) return 'account_role_not_grantable';
+  // Activos e inactivos: una persona = una fila, y volver a invitar a quien fue dado de baja
+  // resucitaría por la espalda una membresía que alguien revocó (hub#348).
+  if (users.some((u) => u.email.trim().toLowerCase() === email)) return 'email_taken';
+  // El PIN es OPCIONAL para un usuario de cuenta —entra con su cuenta— pero, si lo teclea, es la
+  // misma credencial que la del usuario local y pasa por las mismas reglas.
+  const pin = input.pin.trim();
+  if (!pin) return '';
+  if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) return 'pin_length';
+  if (isGuessablePin(pin)) return 'pin_too_simple';
   return '';
 }
 
