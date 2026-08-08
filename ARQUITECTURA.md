@@ -151,7 +151,7 @@ Tauri vía `invoke` — ADR-0196; la **cola de impresión se muda al hub**, ADR-
   último latido (sin noticias durante 3 latidos = no vivo), y el registro sobrevive al reinicio
   porque es configuración, no sesión. `coverage` responde «cuánto espera y cuántos hosts vivos hay»
   por rol. **As-built (hub#343):** el drenaje por `GET /ws/print` (ADR-0262) — `print_drain.rs` +
-  `print_ws.rs` + `apps/web/src/lib/print-drain.ts`. **As-built (hub#501, ADR-0263):** el documento
+  `print_ws.rs` + `apps/web/src/lib/print-drain.ts`. **As-built (hub#501, ADR-0265):** el documento
   viaja **ESTRUCTURADO** (`documentType` + `document`, migración de sistema **v25**; el `html` se
   borró) y **no se guarda: se regenera desde la venta**; `apps/web/src/lib/print-host.ts` lo entrega
   a `erplora_print` y el ciclo tique → host → papel está probado contra una térmica real
