@@ -920,6 +920,31 @@ export default {
     twoFactorIncorrect: 'Incorrect or expired code. We sent a new code — try again.',
     twoFactorError: 'Could not verify the code. Please try again.',
   },
+  // hub#363 — the manager's approval, asked for without closing the cashier's session. Every line
+  // here is read out loud across a counter with a queue behind it, so it says what to DO. Guarded
+  // by `i18n/elevation-copy.test.ts`, including the one thing it must never say: WHICH of unknown
+  // name / wrong PIN / deactivated user it was. The runtime answers those three identically on
+  // purpose, so that a dialog anybody can open is not the way to learn who works here.
+  elevation: {
+    title: 'Approval needed',
+    lead: 'Ask a manager to enter their PIN to approve this.',
+    chooseApprover: 'Who is approving?',
+    approverName: 'Their name',
+    approverNamePlaceholder: 'Type their name',
+    continue: 'Continue',
+    cancel: 'Cancel',
+    changeApprover: 'Someone else',
+    // The confirmation the cashier gets: the action went through, and under whose name it is now
+    // recorded. Saying it out loud is half of what keeps the trail honest.
+    approvedBy: 'Approved by {name}',
+    rejected: 'Those details do not approve this. Check the name and the PIN, and try again.',
+    approverCannot: 'That person cannot approve this. Ask someone who could do it themselves.',
+    notElevable:
+      'This one is not approved with a PIN. Whoever runs your business has to sign in with their own account to do it.',
+    notRequired: 'This no longer needs approval. Close this and try again.',
+    tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
+    failed: 'The approval could not be sent. Check the connection and try again.',
+  },
   activation: {
     title: 'Activation required',
     lead: 'This device has to check your apps with erplora.com before it can open your business. Connect to the internet and try again.',

@@ -905,6 +905,32 @@ export default {
     twoFactorIncorrect: 'Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.',
     twoFactorError: 'No se pudo verificar el código. Inténtalo de nuevo.',
   },
+  // hub#363 — la aprobación del encargado, pedida sin cerrar la sesión del cajero. Cada línea se
+  // lee en voz alta sobre el mostrador con una cola detrás, así que dice QUÉ HACER. La guarda
+  // `i18n/elevation-copy.test.ts`, incluido lo único que no puede decir nunca: CUÁL de los tres
+  // rechazos fue (nombre desconocido / PIN incorrecto / usuario desactivado). El runtime responde
+  // a los tres igual a propósito, para que un diálogo que abre cualquiera no sirva para averiguar
+  // quién trabaja aquí.
+  elevation: {
+    title: 'Hace falta una aprobación',
+    lead: 'Pide a un encargado que introduzca su PIN para aprobarlo.',
+    chooseApprover: '¿Quién lo aprueba?',
+    approverName: 'Su nombre',
+    approverNamePlaceholder: 'Escribe su nombre',
+    continue: 'Continuar',
+    cancel: 'Cancelar',
+    changeApprover: 'Otra persona',
+    // La confirmación que ve el cajero: la acción salió, y a nombre de quién queda registrada.
+    // Decirlo en voz alta es la mitad de lo que mantiene honesta la trazabilidad.
+    approvedBy: 'Aprobado por {name}',
+    rejected: 'Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a intentarlo.',
+    approverCannot: 'Esa persona no puede aprobarlo. Pídeselo a alguien que pueda hacerlo por sí mismo.',
+    notElevable:
+      'Esto no se aprueba con un PIN. Tiene que hacerlo quien dirige tu negocio, entrando con su propia cuenta.',
+    notRequired: 'Esto ya no necesita aprobación. Cierra esta ventana y vuelve a intentarlo.',
+    tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
+    failed: 'No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.',
+  },
   activation: {
     title: 'Activación requerida',
     lead: 'Este dispositivo tiene que comprobar tus apps en erplora.com antes de poder abrir tu negocio. Conéctate a internet y vuelve a intentarlo.',
