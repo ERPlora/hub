@@ -738,6 +738,24 @@ pub struct DelegatedCertificate {
     /// or missing value here cannot make a hub believe a certificate is valid for longer than it is.
     #[serde(default)]
     pub not_after: Option<String>,
+    /// **What kind of certificate this is** — `"seal"` (Sello de Entidad) or `"representative"`
+    /// (ADR-0202 §2.1 — hub#470). The AEAT segregates its VERI\*FACTU entry point by this, and by
+    /// nothing else: `www1`/`prewww1` for a natural person, `www10`/`prewww10` for a seal.
+    ///
+    /// **It exists because the slot does not answer it.** `delegated` says the control plane handed
+    /// the container down, not what is inside it — and the `.p12` ERPlora invoices with today is a
+    /// *representative* certificate, so treating the slot as the type would have sent the whole
+    /// delegated fleet to `www10` and had every record rejected.
+    ///
+    /// Like `not_after`, it is **checked, not trusted**: `certificate::set_delegated` derives the
+    /// same fact from the container and refuses to install when the two disagree. Unlike
+    /// `not_after`, a value the hub cannot derive on its own is honoured — the declaration is what
+    /// keeps a real seal working on a build whose classifier could not recognise it.
+    ///
+    /// `None` = an older control plane that says nothing (this field landed with hub#470). Then the
+    /// container answers alone, and «cannot tell» routes to the holder's entry point.
+    #[serde(default)]
+    pub certificate_type: Option<String>,
 }
 
 /// Redacted on purpose — the derived `Debug` would print ERPlora's private key and its passphrase
@@ -753,6 +771,7 @@ impl std::fmt::Debug for DelegatedCertificate {
             .field("pkcs12_b64", &"«···»")
             .field("password", &"«···»")
             .field("not_after", &self.not_after)
+            .field("certificate_type", &self.certificate_type)
             .finish()
     }
 }

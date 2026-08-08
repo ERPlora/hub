@@ -60,6 +60,46 @@ pub enum CertificateKind {
     Delegated,
 }
 
+/// **What the certificate IS** — which is the axis the AEAT segregates its VERI\*FACTU service by
+/// (ADR-0202 §2.1 — hub#470).
+///
+/// Not to be confused with [`CertificateKind`], which says **whose** it is. `delegated` means «the
+/// control plane handed it down», and that says nothing about the container: the `.p12` ERPlora
+/// invoices with today is a *representative* certificate, and had it been uploaded to the delegated
+/// slot the whole delegated fleet would have POSTed to the seal's entry point and been rejected,
+/// record by record, with nothing to warn anybody. Two words for two questions, so the confusion
+/// cannot come back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CertificateType {
+    /// **Sello de entidad** — an eIDAS electronic *seal*: it belongs to a legal person and hangs off
+    /// no human's DNI. Enters the AEAT through `www10` / `prewww10`.
+    Seal,
+    /// A certificate carrying a **natural person** (the taxpayer, or somebody representing them).
+    /// Enters through `www1` / `prewww1` — where every certificate in the field goes today.
+    Representative,
+}
+
+impl CertificateType {
+    /// Value stored in `_hub_certificate.certificate_type` and travelled across the border. Stable:
+    /// it is a column of a deployed hub AND a field of the control plane's payload.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Seal => "seal",
+            Self::Representative => "representative",
+        }
+    }
+
+    /// Reads back what [`as_str`](Self::as_str) wrote. `None` for anything else — including a
+    /// spelling a NEWER control plane might invent. An unrecognised word is «this build cannot tell
+    /// what that is», never a guess, and [`resolve_certificate_type`] treats it as if nothing had
+    /// been declared.
+    pub fn parse(s: &str) -> Option<Self> {
+        [Self::Seal, Self::Representative]
+            .into_iter()
+            .find(|t| t.as_str() == s)
+    }
+}
+
 /// Every slot a hub can hold, **in selection order**: the own certificate first, the delegated one
 /// as the fallback behind it (ADR-0202 §2.1).
 ///
@@ -133,6 +173,12 @@ fn load_master_key() -> Result<Option<SecretsKey>> {
 /// hub that reports a version it does not have is a hub the fleet panel calls up to date while it
 /// signs with a superseded — possibly revoked — key.
 ///
+/// **`certificate_type` travels in the SAME upsert too**, and for the same reason (hub#470): it
+/// describes THESE bytes, so a row holding a new `.p12` under the previous container's type would
+/// pick the AEAT entry point of a certificate it no longer has. `None` writes the empty string —
+/// «this hub cannot tell», which routes to the holder's door like everything else it cannot vouch
+/// for.
+///
 /// **Fail-closed:** without `HUB_SECRETS_KEY` it fails — a new `.p12`/password is NEVER persisted in
 /// the clear, nor is a key generated and stored in the same database (that would protect nothing).
 /// The Hub is Postgres-only/cloud-only since ADR-0154 (there is no Local/Cloud split that could
@@ -145,6 +191,7 @@ pub(crate) async fn set(
     password: &str,
     by: &str,
     version: Option<i64>,
+    certificate_type: Option<CertificateType>,
 ) -> Result<()> {
     let key = load_master_key()?.ok_or_else(|| {
         RuntimeError::Certificate(format!(
@@ -166,18 +213,68 @@ pub(crate) async fn set(
     p.insert("uploaded_at".into(), json!(now_rfc3339()));
     p.insert("uploaded_by".into(), json!(by));
     p.insert("cert_version".into(), json!(version));
+    p.insert(
+        "certificate_type".into(),
+        json!(certificate_type.map(CertificateType::as_str).unwrap_or("")),
+    );
     db.execute(
         "INSERT INTO _hub_certificate \
-           (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by, cert_version) \
-         VALUES (:hub_id, :kind, :pkcs12_b64, :password, :uploaded_at, :uploaded_by, :cert_version) \
+           (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by, cert_version, \
+            certificate_type) \
+         VALUES (:hub_id, :kind, :pkcs12_b64, :password, :uploaded_at, :uploaded_by, \
+                 :cert_version, :certificate_type) \
          ON CONFLICT (hub_id, kind) DO UPDATE SET \
            pkcs12_b64 = excluded.pkcs12_b64, password = excluded.password, \
            uploaded_at = excluded.uploaded_at, uploaded_by = excluded.uploaded_by, \
-           cert_version = excluded.cert_version",
+           cert_version = excluded.cert_version, \
+           certificate_type = excluded.certificate_type",
         &p,
     )
     .await?;
     Ok(())
+}
+
+/// **What the hub concludes a container is, from the two things that can say so** (hub#470).
+///
+/// `declared` is what the control plane put in the payload; `derived` is what the hub read out of
+/// the bytes it is about to store. The whole point of having both is that this function can catch
+/// them disagreeing — that is the failure this issue exists for, and it is the same shape as the
+/// three that came before it in this chain (#317 the wrong slot, #318 the wrong format, #319 who
+/// signed): one certificate fact crossing the border and meaning something different on each side.
+///
+/// | declared | derived | result |
+/// |---|---|---|
+/// | seal | seal | that type |
+/// | seal | representative | **`Err`** — contested |
+/// | seal | *(unclassifiable)* | the declaration stands |
+/// | *(none)* | representative | the bytes answer |
+/// | *(none)* | *(none)* | unknown → the holder's door |
+///
+/// **Contested is an error and not a "pick one" on purpose.** The caller ([`set_delegated`]) turns
+/// it into a refusal to install, so the hub keeps the certificate it already had — which is a
+/// certificate that WORKS — and the operator gets a loud line naming both values. Every other way
+/// out is worse: trusting the declaration can send the fleet to a door where every record is
+/// rejected (ADR-0189 — a rejection is not a link, so each one is corrected by hand), and trusting
+/// the derivation silently overrides the control plane with a heuristic.
+///
+/// **A declaration this build cannot spell is treated as no declaration**, not as an error: a newer
+/// control plane inventing a third word must not brick the hubs that have not been redeployed yet.
+/// It degrades to the derived value, and to the holder's door if there is none.
+pub(crate) fn resolve_certificate_type(
+    declared: Option<CertificateType>,
+    derived: Option<CertificateType>,
+) -> Result<Option<CertificateType>> {
+    match (declared, derived) {
+        (Some(d), Some(v)) if d != v => Err(RuntimeError::Certificate(format!(
+            "el plano de control declara un certificado `{}` pero el contenedor que ha servido es \
+             `{}` (hub#470): no se instala — la puerta de la AEAT la elige el TIPO, y con el \
+             equivocado la AEAT rechaza todos los registros, uno a uno",
+            d.as_str(),
+            v.as_str(),
+        ))),
+        (Some(d), _) => Ok(Some(d)),
+        (None, derived) => Ok(derived),
+    }
 }
 
 /// `uploaded_by` of the delegated slot. Not a user: nobody in this hub uploaded ERPlora's key — the
@@ -193,13 +290,34 @@ pub const CONTROL_PLANE: &str = "cloud";
 /// pinned HERE, once, so no call site can land on the wrong one by passing a default. Encryption at
 /// rest and the fail-closed rule are [`set`]'s, unchanged — this is ERPlora's private key, and it
 /// gets exactly the same treatment as the customer's.
+///
+/// # `declared_type` is the border's word, and it gets checked (hub#470)
+///
+/// The control plane says what it is handing down (`certificate_type` in the payload); this function
+/// **derives the same fact from the container itself** and refuses to install when the two disagree
+/// (see [`resolve_certificate_type`]). Deriving alone would let a heuristic override the control
+/// plane; declaring alone is what hub#470 is about — the premise that the delegated slot holds a
+/// Sello de Entidad never travelled, and ERPlora's real `.p12` is a representative certificate.
+///
+/// A refusal leaves the hub exactly as it was, which is the recoverable failure: it keeps signing
+/// with the certificate it already had while the operator sees the line. Installing a container
+/// whose type nobody agrees on is the expensive one — every record POSTed to the wrong door comes
+/// back rejected, and a rejection is not a link in the chain (ADR-0189), so they are corrected one
+/// by one, by hand.
+///
+/// `None` = an older control plane that declares nothing. Then the bytes answer on their own; there
+/// is nothing to contradict.
 pub async fn set_delegated(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     pkcs12_b64: &str,
     password: &str,
     version: i64,
+    declared_type: Option<&str>,
 ) -> Result<()> {
+    let derived = derive_certificate_type(pkcs12_b64, password);
+    let certificate_type =
+        resolve_certificate_type(declared_type.and_then(CertificateType::parse), derived)?;
     set(
         db,
         hub_id,
@@ -208,8 +326,28 @@ pub async fn set_delegated(
         password,
         CONTROL_PLANE,
         Some(version),
+        certificate_type,
     )
     .await
+}
+
+/// [`certificate_type_from_der`] over a base64 container, with **every failure collapsing into
+/// «cannot tell»** (hub#470).
+///
+/// Unreadable base64, a container that is not a PKCS#12, a wrong passphrase, a build without
+/// OpenSSL (Android): none of them is an answer about the certificate's type, and none of them is
+/// this function's problem to report. Storing an unusable container has always been allowed — it
+/// fails later, loudly, at the TLS handshake — and turning that into a refusal HERE would be a new
+/// way for the control plane to lock a hub out of a rotation.
+///
+/// «Cannot tell» is the safe value: it routes to the holder's entry point, where every certificate
+/// in the field already goes.
+pub(crate) fn derive_certificate_type(pkcs12_b64: &str, password: &str) -> Option<CertificateType> {
+    use base64::Engine as _;
+    let der = base64::engine::general_purpose::STANDARD
+        .decode(pkcs12_b64.trim())
+        .ok()?;
+    certificate_type_from_der(&der, password).ok().flatten()
 }
 
 /// The `version` of the delegated certificate this hub currently holds — what the heartbeat reports
@@ -376,6 +514,70 @@ pub async fn active_kind(
     hub_id: &str,
 ) -> Result<Option<CertificateKind>> {
     Ok(occupied_slots(db, hub_id).await?.first().map(|(k, _)| *k))
+}
+
+/// **What the certificate this hub signs with IS** — the axis that picks the AEAT entry point
+/// (ADR-0202 §2.1 — hub#470). `None` when the hub holds no certificate, or holds one it cannot
+/// vouch for.
+///
+/// Reads the column that [`set`] wrote in the same upsert as the bytes. When that column is empty
+/// it **derives the answer from the container itself**, and that is the whole migration story for
+/// the hubs that were already deployed when the column arrived: their rows have no type, and
+/// nothing backfills one. A blind backfill would be a guess about what somebody's certificate is,
+/// and this chain has already been bitten by exactly that (hub#436, where the tempting backfill
+/// would have handed one person another's access). Parsing the bytes the row actually holds is a
+/// reading, not a guess — and it costs a decrypt plus a PKCS#12 parse **only** until the next
+/// upload or refetch writes the column.
+///
+/// It is deliberately NOT written back. Self-healing on a read path would put a write behind every
+/// config read of the fiscal engine, and the two legitimate writers (the owner's upload and the
+/// control plane's refetch) already converge every hub that is doing anything at all.
+///
+/// ⚠️ Unlike [`active_kind`], answering this **can** decrypt the container (only for a row with no
+/// type stored). Nothing about the key leaves the core: what crosses to a module is one of the two
+/// words of [`CertificateType::as_str`].
+pub async fn active_type(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Option<CertificateType>> {
+    let Some(kind) = active_kind(db, hub_id).await? else {
+        return Ok(None);
+    };
+    slot_type(db, hub_id, kind).await
+}
+
+/// [`active_type`] for ONE slot, whichever it is.
+pub async fn slot_type(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    kind: CertificateKind,
+) -> Result<Option<CertificateType>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("kind".into(), json!(kind.as_str()));
+    let res = db
+        .query(
+            "SELECT certificate_type FROM _hub_certificate \
+             WHERE hub_id = :hub_id AND kind = :kind AND pkcs12_b64 <> '' LIMIT 1",
+            &p,
+        )
+        .await?;
+    let Some(row) = res.rows.into_iter().next() else {
+        return Ok(None);
+    };
+    let stored = row
+        .get("certificate_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if let Some(known) = CertificateType::parse(stored) {
+        return Ok(Some(known));
+    }
+    // Empty (a row written before the column existed) or a word this build does not know: read the
+    // container. `load_pkcs12` already decrypts and un-base64s it.
+    let Some((der, password)) = load_pkcs12(db, hub_id, kind).await? else {
+        return Ok(None);
+    };
+    Ok(certificate_type_from_der(&der, &password).unwrap_or(None))
 }
 
 /// **«Can this hub issue?» — the one function that answers it** (ADR-0202 §2.1 — hub#319).
@@ -622,6 +824,126 @@ pub fn expiry_from_der(_der: &[u8], _password: &str) -> Result<Option<String>> {
     Ok(None)
 }
 
+/// **What a PKCS#12 in DER IS** — an entity seal or a natural person's certificate (hub#470).
+/// `Ok(None)` = this build cannot tell, which is an answer and not a failure.
+///
+/// `pub` for the same reason as its neighbours: the PKCS#12 crypto lives in the core, in ONE place,
+/// and a caller holding a container in memory (a fresh upload, a just-fetched delegated key) asks
+/// here instead of growing its own parser.
+#[cfg(not(target_os = "android"))]
+pub fn certificate_type_from_der(der: &[u8], password: &str) -> Result<Option<CertificateType>> {
+    ensure_legacy_provider();
+    let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
+    let parsed = pkcs12
+        .parse2(password)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    let Some(cert) = parsed.cert else {
+        return Ok(None);
+    };
+    let cert_der = cert
+        .to_der()
+        .map_err(|e| RuntimeError::Certificate(format!("certificado: {e}")))?;
+    Ok(certificate_type_of_x509(&cert_der, cert.subject_name()))
+}
+
+/// Stub Android: sin OpenSSL no se puede parsear el `.p12` (ver `Cargo.toml`).
+///
+/// ⚠️ **MUTANTE EQUIVALENTE CONOCIDO** (`cargo mutants`, hub#470): sustituir este cuerpo por
+/// `Ok(Some(…))` **sobrevive**, y no se puede matar desde aquí. La función está detrás de
+/// `#[cfg(target_os = "android")]`, así que en la plataforma donde corren los tests (y donde corre
+/// el gate) **no se compila**: mutarla no cambia el binario que se prueba. Matarlo exigiría una
+/// suite cross-compilada a Android, que este workspace no tiene — y el shell Android tampoco hace
+/// transmisión fiscal todavía (mismo motivo por el que existe el stub). Sus gemelos
+/// `identity_from_der`, `expiry_from_der` y `expiry_instant_from_der` están exactamente igual.
+#[cfg(target_os = "android")]
+pub fn certificate_type_from_der(
+    _der: &[u8],
+    _password: &str,
+) -> Result<Option<CertificateType>> {
+    Ok(None)
+}
+
+/// The eIDAS `QcType` statement (ETSI EN 319 412-5), DER-encoded, as it appears inside the
+/// `qcStatements` extension (`1.3.6.1.5.5.7.1.3`) of a qualified certificate.
+///
+/// `0.4.0.1862.1.6.2` = *eSeal*: the certificate belongs to a legal person and hangs off nobody's
+/// DNI — the Sello de Entidad the AEAT routes to `www10`.
+#[cfg(not(target_os = "android"))]
+const QC_TYPE_ESEAL_DER: [u8; 9] = [0x06, 0x07, 0x04, 0x00, 0x8E, 0x46, 0x01, 0x06, 0x02];
+
+/// `0.4.0.1862.1.6.1` = *eSign*: a natural person's signature certificate — the taxpayer or their
+/// representative, which the AEAT routes to `www1`.
+#[cfg(not(target_os = "android"))]
+const QC_TYPE_ESIGN_DER: [u8; 9] = [0x06, 0x07, 0x04, 0x00, 0x8E, 0x46, 0x01, 0x06, 0x01];
+
+/// Classifies an X.509 certificate from its DER and its subject.
+///
+/// # Two signals, and only one of them can conclude «seal»
+///
+/// 1. **The eIDAS `QcType`** ([`QC_TYPE_ESEAL_DER`] / [`QC_TYPE_ESIGN_DER`]). This is the standard
+///    answer and the only positive evidence of a seal: FNMT's *Sello de entidad* is a qualified
+///    eSeal and carries it, and so does every qualified certificate issued in the EU since EN
+///    319 412 became the norm.
+/// 2. **A natural person in the subject** (`givenName` + `surname`). Only ever concludes
+///    *representative*, never *seal*.
+///
+/// **The asymmetry is the safety property.** Concluding «seal» takes evidence; the ABSENCE of
+/// evidence must never open the seal's door, because that is the expensive mistake — a fleet POSTing
+/// to `www10` gets every record rejected and a rejection is not a link in the chain (ADR-0189).
+/// Falling back to «cannot tell» sends the certificate to `www1`, which is where every certificate
+/// in the field already goes.
+///
+/// A container declaring **both** QcTypes contradicts itself, and a self-contradictory certificate
+/// is not resolved by looking at its subject: it answers «cannot tell» outright.
+///
+/// # Why the DER is scanned instead of walked
+///
+/// The `openssl` crate exposes typed accessors for a handful of extensions and no generic one, and
+/// `qcStatements` is not among them. Scanning for the 9-byte DER encoding of the OID is exact in the
+/// direction that matters: a false positive needs those nine bytes to appear verbatim somewhere else
+/// in the certificate, and a false NEGATIVE degrades to «cannot tell» — the safe side, and the side
+/// the control plane's declaration covers ([`resolve_certificate_type`]).
+#[cfg(not(target_os = "android"))]
+fn certificate_type_of_x509(
+    cert_der: &[u8],
+    subject: &openssl::x509::X509NameRef,
+) -> Option<CertificateType> {
+    let seal = contains_subslice(cert_der, &QC_TYPE_ESEAL_DER);
+    let esign = contains_subslice(cert_der, &QC_TYPE_ESIGN_DER);
+    match (seal, esign) {
+        (true, false) => Some(CertificateType::Seal),
+        (false, true) => Some(CertificateType::Representative),
+        // Declares both: the container contradicts itself and nothing is inferred from it.
+        (true, true) => None,
+        (false, false) => subject_holds_a_natural_person(subject).then_some(CertificateType::Representative),
+    }
+}
+
+/// Does the subject name a HUMAN? `givenName` + `surname` are what a Spanish *certificado de
+/// representante* carries and what a *sello de entidad* never does.
+///
+/// **Both, not either.** An organisation whose name happens to land in one of the two must not be
+/// read as a person; and every certificate that really belongs to somebody carries the pair.
+/// (MUTATION CANARY: turning the `&&` below into `||` must turn
+/// `one_natural_person_attribute_alone_does_not_make_a_person` red.)
+#[cfg(not(target_os = "android"))]
+fn subject_holds_a_natural_person(subject: &openssl::x509::X509NameRef) -> bool {
+    use openssl::nid::Nid;
+    let has = |nid: Nid| {
+        subject
+            .entries_by_nid(nid)
+            .any(|e| !e.data().as_slice().is_empty())
+    };
+    has(Nid::GIVENNAME) && has(Nid::SURNAME)
+}
+
+/// `haystack.contains(needle)` for bytes — `[u8]` has no such method on stable.
+#[cfg(not(target_os = "android"))]
+fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack.windows(needle.len()).any(|w| w == needle)
+}
+
 /// `notAfter` de un PKCS#12 en DER como **instante** RFC 3339 UTC (`2028-06-10T09:12:33Z`).
 /// Gemelo de [`expiry_from_der`] sin truncar el día — ver [`slot_expiry_instant`] para el porqué.
 #[cfg(not(target_os = "android"))]
@@ -800,7 +1122,7 @@ mod tests {
         // Ausente.
         assert_eq!(status(&db, "hub-test").await.unwrap()["present"], json!(false));
         // Subir.
-        set(&db, "hub-test", CertificateKind::Own, "QkFTRTY0", "secret", "hub_user:admin", None)
+        set(&db, "hub-test", CertificateKind::Own, "QkFTRTY0", "secret", "hub_user:admin", None, None)
             .await
             .unwrap();
         let st = status(&db, "hub-test").await.unwrap();
@@ -809,7 +1131,7 @@ mod tests {
         // status NO expone bytes ni password.
         assert!(st.get("pkcs12_b64").is_none() && st.get("password").is_none());
         // Reemplazar (upsert, no duplica).
-        set(&db, "hub-test", CertificateKind::Own, "TkVX", "p2", "hub_user:admin", None).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Own, "TkVX", "p2", "hub_user:admin", None, None).await.unwrap();
         assert_eq!(status(&db, "hub-test").await.unwrap()["present"], json!(true));
         // Borrar.
         delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
@@ -831,7 +1153,7 @@ mod tests {
             "TVVZLVNFQ1JFVE8tUEtDUzEy",
             "s3cr3t-p12-password",
             "hub_user:admin",
-            None,
+            None, None,
         )
         .await
         .unwrap();
@@ -855,7 +1177,7 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(7));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "erplora-pw", "cloud", None)
+        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "erplora-pw", "cloud", None, None)
             .await
             .unwrap();
 
@@ -872,7 +1194,7 @@ mod tests {
         let db = db_ready().await;
 
         let original_b64 = "TVVZLVNFQ1JFVE8tUEtDUzEy"; // base64("MUY-SECRETO-PKCS12")
-        set(&db, "hub-test", CertificateKind::Own, original_b64, "mi-contraseña-real", "hub_user:admin", None)
+        set(&db, "hub-test", CertificateKind::Own, original_b64, "mi-contraseña-real", "hub_user:admin", None, None)
             .await
             .unwrap();
 
@@ -893,7 +1215,7 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(6));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "no-debe-viajar", "hub_user:admin", None)
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "no-debe-viajar", "hub_user:admin", None, None)
             .await
             .unwrap();
 
@@ -939,7 +1261,7 @@ mod tests {
         let _guard = EnvVarGuard::unset();
         let db = db_ready().await;
 
-        let err = set(&db, "hub-test", CertificateKind::Own, "cGtjczEy", "password", "hub_user:admin", None)
+        let err = set(&db, "hub-test", CertificateKind::Own, "cGtjczEy", "password", "hub_user:admin", None, None)
             .await
             .unwrap_err();
         let msg = err.to_string();
@@ -954,7 +1276,7 @@ mod tests {
         let db = {
             let _guard = EnvVarGuard::set(&test_key_b64(4));
             let db = db_ready().await;
-            set(&db, "hub-test", CertificateKind::Own, "cGtjczEy", "password", "hub_user:admin", None)
+            set(&db, "hub-test", CertificateKind::Own, "cGtjczEy", "password", "hub_user:admin", None, None)
                 .await
                 .unwrap();
             db
@@ -976,8 +1298,8 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(8));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None).await.unwrap();
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None)
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
             .await
             .unwrap();
 
@@ -1009,7 +1331,7 @@ mod tests {
         assert_eq!(active_kind(&db, "hub-test").await.unwrap(), None, "sin certificado no firma nada");
         assert!(!can_sign(&db, "hub-test").await.unwrap(), "…y por tanto no puede facturar");
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None)
+        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
             .await
             .unwrap();
         assert_eq!(
@@ -1022,7 +1344,7 @@ mod tests {
             "y con el delegado el hub SÍ factura: ERPlora firma en su nombre (hub#319)"
         );
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
         assert_eq!(
             active_kind(&db, "hub-test").await.unwrap(),
             Some(CertificateKind::Own),
@@ -1050,7 +1372,7 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(10));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None)
+        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
             .await
             .unwrap();
         let st = status(&db, "hub-test").await.unwrap();
@@ -1059,7 +1381,7 @@ mod tests {
         assert_eq!(st["slots"]["delegated"]["present"], json!(true));
         assert_eq!(st["slots"]["own"]["present"], json!(false));
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
         let st = status(&db, "hub-test").await.unwrap();
         assert_eq!(st["present"], json!(true));
         assert_eq!(st["active"], json!("own"));
@@ -1081,7 +1403,7 @@ mod tests {
         let db = db_ready().await;
 
         // Un hub que SOLO tiene el delegado no exporta certificado alguno.
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None)
+        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
             .await
             .unwrap();
         assert_eq!(
@@ -1091,7 +1413,7 @@ mod tests {
         );
 
         // Con los dos, sale el PROPIO — nunca el delegado.
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
         let der = exportable_der_bytes(&db, "hub-test").await.unwrap().expect("el propio sí viaja");
         assert_eq!(der, decoded(OWN_B64));
         assert_ne!(der, decoded(DELEGATED_B64));
@@ -1109,7 +1431,7 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(12));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None)
+        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
             .await
             .unwrap();
         assert_eq!(active_kind(&db, "hub-test").await.unwrap(), Some(CertificateKind::Delegated));
@@ -1142,7 +1464,7 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(13));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
 
         let (stored_b64, stored_password) = raw_row(&db, "hub-test", CertificateKind::Delegated).await;
         assert!(
@@ -1171,7 +1493,7 @@ mod tests {
         let _guard = EnvVarGuard::unset();
         let db = db_ready().await;
 
-        let err = set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4).await.unwrap_err();
+        let err = set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap_err();
         assert!(
             err.to_string().contains(secret_box::MASTER_KEY_ENV),
             "el error debería nombrar la clave que falta: {err}"
@@ -1192,12 +1514,12 @@ mod tests {
 
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), None);
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(4));
 
         // Una rotación reemplaza bytes Y número a la vez: nunca queda el número viejo sobre los
         // bytes nuevos (ni al revés), que es justo lo que rompería la convergencia.
-        set_delegated(&db, "hub-test", OWN_B64, "pw-rotated", 5).await.unwrap();
+        set_delegated(&db, "hub-test", OWN_B64, "pw-rotated", 5, None).await.unwrap();
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(5));
         assert_eq!(
             load_pkcs12(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
@@ -1216,7 +1538,7 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(19));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
         let mut p = Params::new();
         p.insert("hub_id".into(), json!("hub-test"));
         db.execute(
@@ -1243,8 +1565,8 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(15));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 7).await.unwrap();
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 7, None).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
 
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(7));
         // Los dos slots siguen ahí y el propio manda (la regla de selección de hub#316, intacta).
@@ -1267,14 +1589,14 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(16));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
         assert_eq!(
             exportable_der_bytes(&db, "hub-test").await.unwrap(),
             None,
             "la clave privada de ERPlora no sale del hub ni llegando por el plano de control"
         );
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
         assert_eq!(
             exportable_der_bytes(&db, "hub-test").await.unwrap(),
             Some(decoded(OWN_B64))
@@ -1290,7 +1612,7 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(17));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
         let st = slot_status(&db, "hub-test", CertificateKind::Delegated).await.unwrap();
         assert_eq!(st["uploaded_by"], json!(CONTROL_PLANE));
         assert!(!st["uploaded_by"].as_str().unwrap().contains("hub_user"));
@@ -1315,8 +1637,8 @@ mod tests {
         let db = db_ready().await;
 
         let (delegated_b64, delegated_pw, expected_date) = real_pkcs12(365);
-        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4).await.unwrap();
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None)
+        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4, None).await.unwrap();
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None)
             .await
             .unwrap();
 
@@ -1342,7 +1664,7 @@ mod tests {
         let db = db_ready().await;
 
         let (delegated_b64, delegated_pw, expected_day) = real_pkcs12(365);
-        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4).await.unwrap();
+        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4, None).await.unwrap();
 
         let instant = slot_expiry_instant(&db, "hub-test", CertificateKind::Delegated)
             .await
@@ -1431,7 +1753,7 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(18));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
 
         assert!(
             can_sign(&db, "hub-test").await.unwrap(),
@@ -1467,12 +1789,12 @@ mod tests {
             delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
             delete(&db, "hub-test", CertificateKind::Delegated).await.unwrap();
             if own {
-                set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw", "hub_user:a", None)
+                set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw", "hub_user:a", None, None)
                     .await
                     .unwrap();
             }
             if delegated {
-                set_delegated(&db, "hub-test", DELEGATED_B64, "pw", 4).await.unwrap();
+                set_delegated(&db, "hub-test", DELEGATED_B64, "pw", 4, None).await.unwrap();
             }
 
             let kind = active_kind(&db, "hub-test").await.unwrap();
@@ -1485,4 +1807,494 @@ mod tests {
         }
     }
 
+    // ── hub#470: what the certificate IS, declared at the border and checked against the bytes ───
+
+    /// What a test certificate should look like. Named rather than a pile of booleans because each
+    /// shape stands for a real certificate that exists in the wild.
+    enum Shape {
+        /// A qualified **eSeal** — an FNMT *Sello de entidad*. Carries the eIDAS `QcType` eSeal
+        /// statement and no natural person.
+        EntitySeal,
+        /// A qualified **eSign** for a natural person — a *certificado de representante*, which is
+        /// what ERPlora's own `.p12` is.
+        QualifiedRepresentative,
+        /// No `qcStatements` at all, but a human in the subject: the older Spanish certificates,
+        /// and anything issued outside the EN 319 412 profile.
+        PersonWithoutQcStatements,
+        /// Neither. A self-signed `CN=…` — what every fixture in this file has always built, and
+        /// what the hub genuinely cannot classify.
+        Anonymous,
+        /// **Only ONE** of the two natural-person attributes, and no `qcStatements`. Certificates
+        /// issued to organisations do land text in `givenName` on their own now and then; one
+        /// attribute is not a human.
+        HalfAPerson,
+        /// Declares BOTH `QcType`s. Does not exist honestly; it is what a malformed or crafted
+        /// container looks like, and it must not be resolved by falling back to the subject.
+        ContradictsItself,
+    }
+
+    /// Builds a real, parseable PKCS#12 of a given [`Shape`]. Returns `(base64, password)`.
+    ///
+    /// Everything is generated here: no `.p12` is committed to the repository, and in particular not
+    /// ERPlora's real one — the container this whole issue is about holds the private key that
+    /// identifies the company before the AEAT.
+    fn pkcs12_shaped(shape: Shape) -> (String, String) {
+        use base64::Engine as _;
+        use openssl::asn1::{Asn1Object, Asn1OctetString, Asn1Time};
+        use openssl::hash::MessageDigest;
+        use openssl::pkey::PKey;
+        use openssl::rsa::Rsa;
+        use openssl::x509::{X509Extension, X509NameBuilder, X509};
+
+        ensure_legacy_provider();
+        let key = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+
+        let mut name = X509NameBuilder::new().unwrap();
+        name.append_entry_by_text("CN", "ERPlora test").unwrap();
+        if matches!(
+            shape,
+            Shape::QualifiedRepresentative | Shape::PersonWithoutQcStatements
+        ) {
+            name.append_entry_by_text("GN", "NOMBRE").unwrap();
+            name.append_entry_by_text("SN", "APELLIDO").unwrap();
+        }
+        if matches!(shape, Shape::HalfAPerson) {
+            name.append_entry_by_text("GN", "NOMBRE").unwrap();
+        }
+        let name = name.build();
+
+        let mut cert = X509::builder().unwrap();
+        cert.set_version(2).unwrap();
+        cert.set_subject_name(&name).unwrap();
+        cert.set_issuer_name(&name).unwrap();
+        cert.set_pubkey(&key).unwrap();
+        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
+        cert.set_not_after(&Asn1Time::days_from_now(365).unwrap()).unwrap();
+
+        // The `qcStatements` extension (RFC 3739 `1.3.6.1.5.5.7.1.3`), hand-encoded: a SEQUENCE of
+        // QCStatement, each `{ statementId, statementInfo }`. Here one statement — ETSI's
+        // `id-etsi-qcs-QcType` (`0.4.0.1862.1.6`) — whose info is a SEQUENCE OF the type OIDs.
+        let qc_types: &[&[u8]] = match shape {
+            Shape::EntitySeal => &[&QC_TYPE_ESEAL_DER],
+            Shape::QualifiedRepresentative => &[&QC_TYPE_ESIGN_DER],
+            Shape::ContradictsItself => &[&QC_TYPE_ESEAL_DER, &QC_TYPE_ESIGN_DER],
+            Shape::PersonWithoutQcStatements | Shape::Anonymous | Shape::HalfAPerson => &[],
+        };
+        if !qc_types.is_empty() {
+            let types: Vec<u8> = qc_types.concat();
+            let type_seq = der_sequence(&types);
+            // statementId = 0.4.0.1862.1.6
+            let statement_id = [0x06u8, 0x06, 0x04, 0x00, 0x8E, 0x46, 0x01, 0x06];
+            let mut statement = statement_id.to_vec();
+            statement.extend_from_slice(&type_seq);
+            let extension_value = der_sequence(&der_sequence(&statement));
+
+            let oid = Asn1Object::from_str("1.3.6.1.5.5.7.1.3").unwrap();
+            let value = Asn1OctetString::new_from_bytes(&extension_value).unwrap();
+            let ext = X509Extension::new_from_der(&oid, false, &value).unwrap();
+            cert.append_extension(ext).unwrap();
+        }
+
+        cert.sign(&key, MessageDigest::sha256()).unwrap();
+        let cert = cert.build();
+
+        let password = "shape-pw".to_string();
+        let der = openssl::pkcs12::Pkcs12::builder()
+            .name("erplora")
+            .pkey(&key)
+            .cert(&cert)
+            .build2(&password)
+            .unwrap()
+            .to_der()
+            .unwrap();
+        (
+            base64::engine::general_purpose::STANDARD.encode(&der),
+            password,
+        )
+    }
+
+    /// Wraps DER contents in a SEQUENCE. Only short forms are needed here (test certificates), so
+    /// the length is the one-byte encoding up to 127 and the two-byte `0x81` form beyond it.
+    fn der_sequence(contents: &[u8]) -> Vec<u8> {
+        let mut out = vec![0x30u8];
+        if contents.len() < 0x80 {
+            out.push(contents.len() as u8);
+        } else {
+            out.push(0x81);
+            out.push(contents.len() as u8);
+        }
+        out.extend_from_slice(contents);
+        out
+    }
+
+    fn type_of(shape: Shape) -> Option<CertificateType> {
+        let (b64, pw) = pkcs12_shaped(shape);
+        derive_certificate_type(&b64, &pw)
+    }
+
+    /// **An entity seal is recognised by its eIDAS `QcType`** — the standard, and the only positive
+    /// evidence that opens the AEAT's `www10` door.
+    #[test]
+    fn an_entity_seal_is_recognised_by_its_eidas_qc_type() {
+        assert_eq!(type_of(Shape::EntitySeal), Some(CertificateType::Seal));
+    }
+
+    /// A qualified certificate for a natural person is a representative's, wherever it was issued.
+    #[test]
+    fn a_qualified_natural_person_certificate_is_a_representative() {
+        assert_eq!(
+            type_of(Shape::QualifiedRepresentative),
+            Some(CertificateType::Representative)
+        );
+    }
+
+    /// Without `qcStatements`, a human in the subject still answers the question. This is the older
+    /// Spanish profile, and it is the shape most likely to turn up in the field.
+    #[test]
+    fn a_person_in_the_subject_is_a_representative_even_without_qc_statements() {
+        assert_eq!(
+            type_of(Shape::PersonWithoutQcStatements),
+            Some(CertificateType::Representative)
+        );
+    }
+
+    /// 🔒 **The absence of evidence is never read as a seal.** A container with nothing to go on
+    /// answers «cannot tell», which routes to the holder's entry point — where every certificate in
+    /// the field already goes. Concluding «seal» from «no person found» would send an unclassifiable
+    /// certificate to `www10` and have the AEAT reject every record it signs.
+    #[test]
+    fn a_container_with_nothing_to_go_on_is_not_guessed_to_be_a_seal() {
+        assert_eq!(type_of(Shape::Anonymous), None);
+    }
+
+    /// 🔒 **One natural-person attribute alone is not a person.** `givenName` **and** `surname`, both
+    /// of them: an organisation with text in only one of the two must not be read as a human, and
+    /// every certificate that really belongs to somebody carries the pair.
+    ///
+    /// It matters in the direction that costs: read as a person, such a container would be a
+    /// *representative* — which is right by luck here, but the same laxity is what turns «I found no
+    /// person» into evidence, and the absence of a person is the ONLY thing standing between an
+    /// unclassifiable certificate and the seal's door. Found by mutation (`&&` → `||` survived).
+    #[test]
+    fn one_natural_person_attribute_alone_does_not_make_a_person() {
+        assert_eq!(type_of(Shape::HalfAPerson), None);
+    }
+
+    /// A container declaring both `QcType`s contradicts itself, and a contradiction is not resolved
+    /// by looking somewhere else: it answers «cannot tell» outright.
+    #[test]
+    fn a_container_declaring_both_qc_types_is_not_classified() {
+        assert_eq!(type_of(Shape::ContradictsItself), None);
+    }
+
+    /// Garbage in, «cannot tell» out — never an error and never a guess. Storing an unusable
+    /// container has always been allowed (it fails at the TLS handshake, loudly); refusing it here
+    /// would be a new way for the control plane to lock a hub out of a rotation.
+    #[test]
+    fn an_unreadable_container_answers_that_it_cannot_tell() {
+        assert_eq!(derive_certificate_type("not base64 at all!!", "pw"), None);
+        assert_eq!(derive_certificate_type("QUJD", "pw"), None); // valid base64, not a PKCS#12
+        let (b64, _pw) = pkcs12_shaped(Shape::EntitySeal);
+        assert_eq!(
+            derive_certificate_type(&b64, "the-wrong-password"),
+            None,
+            "a wrong passphrase is not an answer about the type"
+        );
+    }
+
+    /// 🔴 **The bug hub#470 closes, at the door the control plane writes through.** A REPRESENTATIVE
+    /// container installed in the DELEGATED slot — precisely what would happen the day ERPlora's own
+    /// `.p12` (`…_R_…`) were uploaded to the control plane — must not make the hub behave like a
+    /// seal. Before this the slot WAS the answer, so every delegated hub would have POSTed to
+    /// `www10` and had all of its records rejected, one by one (ADR-0189).
+    #[tokio::test]
+    async fn a_representative_container_in_the_delegated_slot_is_not_a_seal() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(20));
+        let db = db_ready().await;
+        let (b64, pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
+
+        set_delegated(&db, "hub-test", &b64, &pw, 4, None).await.unwrap();
+
+        assert_eq!(
+            active_kind(&db, "hub-test").await.unwrap(),
+            Some(CertificateKind::Delegated),
+            "the slot is unchanged: it still says whose the certificate is"
+        );
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Representative),
+            "and the TYPE comes from the container, not from the slot"
+        );
+    }
+
+    /// The other half: a real seal in that slot IS a seal, so hub#320's fix survives.
+    #[tokio::test]
+    async fn a_seal_in_the_delegated_slot_is_a_seal() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(21));
+        let db = db_ready().await;
+        let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
+        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal")).await.unwrap();
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Seal)
+        );
+    }
+
+    /// 🔒 **A declaration that contradicts the container is refused, and the hub keeps what it had.**
+    ///
+    /// This is the loud, recoverable failure of hub#470: the hub goes on signing with a certificate
+    /// that WORKS while the operator gets the line naming both values. Installing it instead would
+    /// route every record to the wrong door, and a rejection is not a link in the chain (ADR-0189),
+    /// so each one is corrected by hand.
+    #[tokio::test]
+    async fn a_declaration_that_contradicts_the_container_is_refused() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(22));
+        let db = db_ready().await;
+        let (good_b64, good_pw) = pkcs12_shaped(Shape::EntitySeal);
+        set_delegated(&db, "hub-test", &good_b64, &good_pw, 4, Some("seal")).await.unwrap();
+
+        let (bad_b64, bad_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
+        let err = set_delegated(&db, "hub-test", &bad_b64, &bad_pw, 5, Some("seal"))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("seal") && err.contains("representative"), "{err}");
+
+        assert_eq!(
+            delegated_version(&db, "hub-test").await.unwrap(),
+            Some(4),
+            "the refused install must not have touched the certificate the hub was using"
+        );
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Seal)
+        );
+    }
+
+    /// **An older control plane declares nothing, and the bytes answer alone.** This is what every
+    /// hub sees until the SaaS half of hub#470 is deployed, and it must install exactly as before.
+    #[tokio::test]
+    async fn an_undeclared_certificate_gets_its_type_from_the_container() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(23));
+        let db = db_ready().await;
+        let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
+        set_delegated(&db, "hub-test", &b64, &pw, 4, None).await.unwrap();
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Seal)
+        );
+    }
+
+    /// **When the hub cannot classify the container, the border's word stands.** This is what keeps
+    /// a REAL Sello de Entidad working on a build whose classifier does not recognise it: the
+    /// declaration can only ever be contradicted by a positive reading, never by silence.
+    #[tokio::test]
+    async fn a_declaration_stands_when_the_hub_cannot_classify_the_container() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(24));
+        let db = db_ready().await;
+        let (b64, pw) = pkcs12_shaped(Shape::Anonymous);
+        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal")).await.unwrap();
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Seal)
+        );
+    }
+
+    /// **A word this build does not know is treated as no declaration, not as an error.** A newer
+    /// control plane inventing a third type must not brick the hubs that have not been redeployed.
+    #[tokio::test]
+    async fn a_declaration_this_build_cannot_spell_degrades_to_the_container() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(25));
+        let db = db_ready().await;
+        let (b64, pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
+        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("qualified-eseal-v2"))
+            .await
+            .unwrap();
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Representative)
+        );
+    }
+
+    /// The resolution table, on its own, including the branch no `set_delegated` test can reach
+    /// twice over: agreement.
+    #[test]
+    fn the_resolution_table_is_exactly_these_five_answers() {
+        use CertificateType::{Representative, Seal};
+        assert_eq!(
+            resolve_certificate_type(Some(Seal), Some(Seal)).unwrap(),
+            Some(Seal)
+        );
+        assert_eq!(
+            resolve_certificate_type(Some(Representative), Some(Representative)).unwrap(),
+            Some(Representative)
+        );
+        assert_eq!(
+            resolve_certificate_type(Some(Representative), None).unwrap(),
+            Some(Representative)
+        );
+        assert_eq!(
+            resolve_certificate_type(None, Some(Seal)).unwrap(),
+            Some(Seal)
+        );
+        assert_eq!(resolve_certificate_type(None, None).unwrap(), None);
+        // Contested, in BOTH directions: neither side gets to be the one that wins by default.
+        assert!(resolve_certificate_type(Some(Seal), Some(Representative)).is_err());
+        assert!(resolve_certificate_type(Some(Representative), Some(Seal)).is_err());
+    }
+
+    /// **The business's own certificate gets its type from its own bytes too**, so a business that
+    /// uploads an entity seal reaches `www10` without anybody configuring anything. There is no
+    /// border here: the owner uploads the container directly, so there is nothing to cross-check.
+    #[tokio::test]
+    async fn the_business_certificate_gets_its_type_from_its_own_bytes() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(26));
+        let db = db_ready().await;
+        let (seal_b64, seal_pw) = pkcs12_shaped(Shape::EntitySeal);
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            &seal_b64,
+            &seal_pw,
+            "hub_user:admin",
+            None,
+            derive_certificate_type(&seal_b64, &seal_pw),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Seal)
+        );
+    }
+
+    /// **The type follows the slot that SIGNS.** Uploading the business's own certificate takes over
+    /// from the delegated one on the next signature (ADR-0202 §2.1), and the entry point has to move
+    /// with it — otherwise a hub would present one certificate at the door of another.
+    #[tokio::test]
+    async fn the_type_reported_is_the_one_of_the_certificate_that_signs() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(27));
+        let db = db_ready().await;
+        let (seal_b64, seal_pw) = pkcs12_shaped(Shape::EntitySeal);
+        set_delegated(&db, "hub-test", &seal_b64, &seal_pw, 4, Some("seal")).await.unwrap();
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Seal)
+        );
+
+        let (own_b64, own_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            &own_b64,
+            &own_pw,
+            "hub_user:admin",
+            None,
+            derive_certificate_type(&own_b64, &own_pw),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Representative),
+            "the own certificate wins the fallback, so its type is the one that picks the door"
+        );
+
+        delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Seal),
+            "and deleting it hands the hub back to the delegated one, door included"
+        );
+    }
+
+    /// A hub with no certificate has no type either.
+    #[tokio::test]
+    async fn a_hub_with_no_certificate_has_no_type() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(28));
+        let db = db_ready().await;
+        assert_eq!(active_type(&db, "hub-test").await.unwrap(), None);
+        assert_eq!(
+            slot_type(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
+            None
+        );
+    }
+
+    /// 🔒 **A row written before the column existed is READ, never guessed.** The hubs that were
+    /// already deployed have `certificate_type = ''` and nothing backfills it (that would be
+    /// guessing what somebody's certificate is — the trap v19/hub#436 walked around). Parsing the
+    /// container the row actually holds is a reading, and it is what keeps those hubs on the right
+    /// door until their next upload or refetch writes the column.
+    #[tokio::test]
+    async fn a_row_without_a_stored_type_is_classified_from_its_own_container() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(29));
+        let db = db_ready().await;
+        let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
+        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal")).await.unwrap();
+
+        // Exactly the state of a hub deployed before v21: bytes, no type.
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!("hub-test"));
+        db.execute(
+            "UPDATE _hub_certificate SET certificate_type = '' WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Seal),
+            "the stored container answers when the column does not"
+        );
+    }
+
+    /// **The type is written in the SAME upsert as the bytes** (like `cert_version`, v16). A
+    /// rotation that replaced the container but left the previous type behind would pick the AEAT
+    /// door of a certificate the hub no longer holds.
+    #[tokio::test]
+    async fn replacing_the_container_replaces_its_type_in_the_same_write() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(30));
+        let db = db_ready().await;
+        let (seal_b64, seal_pw) = pkcs12_shaped(Shape::EntitySeal);
+        set_delegated(&db, "hub-test", &seal_b64, &seal_pw, 4, Some("seal")).await.unwrap();
+
+        let (rep_b64, rep_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
+        set_delegated(&db, "hub-test", &rep_b64, &rep_pw, 5, Some("representative"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            active_type(&db, "hub-test").await.unwrap(),
+            Some(CertificateType::Representative)
+        );
+        assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(5));
+    }
+
+    /// The two words are a CONTRACT (a column of a deployed hub and a field of the control plane's
+    /// payload), so they are pinned literally and they round-trip.
+    #[test]
+    fn the_type_names_are_stable_and_round_trip() {
+        assert_eq!(CertificateType::Seal.as_str(), "seal");
+        assert_eq!(CertificateType::Representative.as_str(), "representative");
+        for t in [CertificateType::Seal, CertificateType::Representative] {
+            assert_eq!(CertificateType::parse(t.as_str()), Some(t));
+        }
+        for unknown in ["", " ", "Seal", "seal ", "sello", "own", "delegated", "future"] {
+            assert_eq!(CertificateType::parse(unknown), None, "{unknown:?}");
+        }
+    }
 }

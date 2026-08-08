@@ -255,10 +255,22 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
         .await
         .unwrap_or_default()
     {
+        // **Y QUÉ es**, que es otra pregunta (hub#470): el slot dice de quién es el certificado, el
+        // tipo dice por qué puerta de la AEAT entra. Se lee del MISMO sitio y en la misma pasada que
+        // el slot —el core— para que no haya dos lecturas de «con qué firmo» que puedan contestar
+        // distinto: ese desdoblamiento es exactamente cómo se estropearon #317, #318 y #319.
+        // `None` (el core no puede jurarlo, o un host sin la capacidad) deja el marcador vacío, que
+        // es la puerta del titular.
+        let certificate_type = host
+            .certificate_signing_type(hub_id)
+            .await
+            .unwrap_or_default()
+            .unwrap_or_default();
         let obj = config.get_or_insert_with(|| json!({}));
         if let Some(m) = obj.as_object_mut() {
             m.insert("certificate_source".into(), json!("core"));
             m.insert("certificate_kind".into(), json!(kind));
+            m.insert("certificate_type".into(), json!(certificate_type));
         }
     }
     Ok(config)
@@ -327,6 +339,21 @@ fn signing_kind(config: &Json) -> String {
     str_field(config, "certificate_kind")
 }
 
+/// **QUÉ es** el certificado que firma: `"seal"`, `"representative"`, o `""` si el core no puede
+/// jurarlo (ADR-0202 §2.1 — hub#470).
+///
+/// El gemelo de [`signing_kind`], y la distinción es el fondo de hub#470: el slot dice **de quién**
+/// es el certificado —lo que decide el fallback y lo que necesitará el bloque `Representante` de
+/// hub#321— y el tipo dice **qué** es, que es lo único por lo que la AEAT segrega la puerta. Leer
+/// el slot como si fuera el tipo mandaba a `www10` a cualquier certificado repartido por el plano
+/// de control, fuese un sello o no.
+///
+/// Lo pone [`read_config`] con lo que contestó el core. El motor no vuelve a preguntar a
+/// `_hub_certificate`: una sola lectura, un solo dueño.
+fn signing_type(config: &Json) -> String {
+    str_field(config, "certificate_type")
+}
+
 /// **El endpoint AEAT de este hub AHORA MISMO** — los dos ejes (`environment` y certificado que
 /// firma) resueltos de la MISMA lectura de la config (ADR-0202 §2.1 — hub#320).
 ///
@@ -346,14 +373,30 @@ fn signing_kind(config: &Json) -> String {
 /// si el hub cambió de certificado mientras el registro esperaba en la cola, ese XML describe al
 /// firmante anterior y habrá que reconstruirlo.
 fn transmission_endpoint(config: &Json) -> &'static str {
-    aeat::endpoint(&environment_of(config), &signing_kind(config))
+    aeat::endpoint(&environment_of(config), &signing_type(config))
+}
+
+/// **Por qué puerta de la AEAT transmite este hub AHORA MISMO**, resuelto desde el host — los dos
+/// ejes de la MISMA lectura de la config, sin que el llamante los multiplique por su cuenta.
+///
+/// `pub` a propósito, por el mismo motivo que [`can_sign`] (hub#319): la cadena core → `read_config`
+/// → tipo de certificado → URL cruza dos crates, y la familia de defectos de #317/#318/#319/#470 es
+/// justamente la de un dato de certificado que se lee distinto a cada lado. Con la cadena entera
+/// accesible se comprueba en UN test de punta a punta, en vez de en dos tests que pueden
+/// separarse sin que nada avise.
+pub async fn transmission_endpoint_for(
+    host: &dyn NativeHost,
+    hub_id: &str,
+) -> Result<&'static str> {
+    let config = read_config(host, hub_id).await?.unwrap_or_else(|| json!({}));
+    Ok(transmission_endpoint(&config))
 }
 
 /// El endpoint de **consulta** de este hub ahora mismo. Es el mismo que el de alta (el WSDL publica
 /// las dos operaciones en `VerifactuSOAP`, hub#287) y por eso se deriva igual, con los dos ejes de
 /// la misma lectura: recuperar la cadena tiene que hablar con la misma puerta que la emitió.
 fn consult_endpoint_of(config: &Json) -> &'static str {
-    aeat::consult_endpoint(&environment_of(config), &signing_kind(config))
+    aeat::consult_endpoint(&environment_of(config), &signing_type(config))
 }
 
 /// **Where ONE record's transmission is going** — resolved once and then shared by the POST, by
@@ -412,6 +455,12 @@ fn record_environment(record: &Json) -> Option<String> {
 /// REJECTED — loud, and recoverable one record at a time — while the wrong environment is
 /// ACCEPTED by a tax agency that was never meant to receive it, and an accepted record is
 /// neither resent nor deleted (ADR-0189).
+///
+/// ⚠️ The certificate axis is [`signing_type`], **not** [`signing_kind`] (hub#470): the AEAT
+/// segregates by what the certificate IS, and the slot only says whose it is. This function is the
+/// second place in the engine that multiplies the two axes, so it is also the second place that has
+/// to read the same value as [`transmission_endpoint`] — reading one from the type and the other
+/// from the slot is exactly the shape of defect this whole chain keeps producing.
 fn destination_of(record: &Json, config: &Json) -> std::result::Result<Destination, String> {
     let hub_environment = environment_of(config);
     let Some(environment) = record_environment(record) else {
@@ -421,7 +470,7 @@ fn destination_of(record: &Json, config: &Json) -> std::result::Result<Destinati
         ));
     };
     Ok(Destination {
-        endpoint: aeat::endpoint(&environment, &signing_kind(config)),
+        endpoint: aeat::endpoint(&environment, &signing_type(config)),
         // Only when they differ: `Some` IS the drift, so nothing downstream has to compare.
         hub_environment: (environment != hub_environment).then_some(hub_environment),
         environment,
@@ -463,6 +512,15 @@ fn request_certificate_refetch_on_tls(
 /// (`certificate::CertificateKind::as_str`). Constante para que la comparación no se escriba a mano
 /// en cada sitio y pueda equivocarse en uno.
 const DELEGATED_SLOT: &str = "delegated";
+
+/// Nombre del tipo **sello de entidad** tal y como lo devuelve el core
+/// (`certificate::CertificateType::as_str`). El ÚNICO valor que abre la puerta `www10` de la AEAT
+/// (`aeat::endpoint`); todo lo demás cae a la del titular.
+///
+/// ⚠️ Es una constante distinta de [`DELEGATED_SLOT`] a propósito, y no un alias suyo: son las dos
+/// palabras que hub#470 separó —de quién es el certificado vs. qué es— y colapsarlas otra vez
+/// devuelve el defecto.
+pub(crate) const SEAL_TYPE: &str = "seal";
 
 // ── create_record (issue verifactu#2) ────────────────────────────────────────
 
@@ -2550,6 +2608,10 @@ mod cert_source_tests {
     /// **not** ask the database for.
     struct SlotHost {
         signing: Option<&'static str>,
+        /// What the core says the signing certificate IS (hub#470) — independent of the slot, which
+        /// is the whole point: `new` leaves it `None` («cannot tell»), and the tests that care set
+        /// it explicitly.
+        signing_type: Option<&'static str>,
         /// Rows `_hub_certificate` would return to a module that went behind the core's back.
         stored_rows: Vec<Json>,
         seen_sql: std::sync::Mutex<Vec<String>>,
@@ -2557,7 +2619,19 @@ mod cert_source_tests {
 
     impl SlotHost {
         fn new(signing: Option<&'static str>, stored_rows: Vec<Json>) -> Self {
-            Self { signing, stored_rows, seen_sql: std::sync::Mutex::new(Vec::new()) }
+            Self {
+                signing,
+                signing_type: None,
+                stored_rows,
+                seen_sql: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        /// The core also knows what the container IS. Chained so a test reads as «this slot, holding
+        /// this kind of certificate».
+        fn holding(mut self, certificate_type: &'static str) -> Self {
+            self.signing_type = Some(certificate_type);
+            self
         }
         fn sql_touching_the_certificate_table(&self) -> Vec<String> {
             self.seen_sql
@@ -2584,6 +2658,9 @@ mod cert_source_tests {
         }
         async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
             Ok(self.signing.map(str::to_string))
+        }
+        async fn certificate_signing_type(&self, _hub_id: &str) -> Result<Option<String>> {
+            Ok(self.signing_type.map(str::to_string))
         }
     }
 
@@ -2619,30 +2696,91 @@ mod cert_source_tests {
         assert_eq!(signing_kind(&cfg), "");
     }
 
-    /// **The AEAT entry point follows the certificate the CORE selected** (ADR-0202 §2.1 — hub#320).
+    /// **The AEAT entry point follows what the certificate IS, as the CORE read it**
+    /// (ADR-0202 §2.1 — hub#320, corrected by hub#470).
     ///
-    /// The whole chain in one assertion — core → `read_config` → `certificate_kind` → URL — because
-    /// that is the seam hub#317/#318/#319 kept having to repair: the answer is fetched ONCE and
-    /// travels, instead of being re-derived from `_hub_certificate` by whoever needs it next. A
-    /// delegated hub POSTing to `prewww1` had every record rejected, and a rejection is not a link
-    /// in the chain (ADR-0189).
+    /// The whole chain in one assertion — core → `read_config` → `certificate_type` → URL — because
+    /// that is the seam #317/#318/#319 kept having to repair: the answer is fetched ONCE and
+    /// travels, instead of being re-derived from `_hub_certificate` by whoever needs it next. A hub
+    /// POSTing to the wrong door has every record rejected, and a rejection is not a link in the
+    /// chain (ADR-0189).
     #[tokio::test]
-    async fn the_entry_point_follows_the_certificate_the_core_selected() {
-        let delegated = read_config(&SlotHost::new(Some("delegated"), vec![]), "h1")
+    async fn the_entry_point_follows_what_the_certificate_is() {
+        let seal = read_config(&SlotHost::new(Some("delegated"), vec![]).holding("seal"), "h1")
             .await
             .unwrap()
             .unwrap();
         assert_eq!(
-            transmission_endpoint(&delegated),
+            transmission_endpoint(&seal),
             "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         );
 
-        let own = read_config(&SlotHost::new(Some("own"), vec![]), "h1")
+        let representative = read_config(
+            &SlotHost::new(Some("own"), vec![]).holding("representative"),
+            "h1",
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            transmission_endpoint(&representative),
+            "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
+    }
+
+    /// 🔴 **The bug hub#470 closes, through the whole seam.** A hub whose DELEGATED slot holds a
+    /// *representative* container — which is exactly what would happen the day ERPlora's own
+    /// `.p12` (`…_R_…`) were uploaded to the control plane — must transmit through the holder's
+    /// door. Routing on the slot sent it to `www10`, where the AEAT would have rejected every
+    /// record of every delegated hub, one at a time and with nothing to warn anybody.
+    ///
+    /// And the mirror: a business that uploads its OWN entity seal reaches the seal's door. The
+    /// slot no longer decides in either direction.
+    #[tokio::test]
+    async fn the_slot_does_not_decide_the_entry_point_in_either_direction() {
+        let delegated_representative = read_config(
+            &SlotHost::new(Some("delegated"), vec![]).holding("representative"),
+            "h1",
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            signing_kind(&delegated_representative),
+            "delegated",
+            "the slot is still reported — it is what picks the fallback and the `Representante`"
+        );
+        assert_eq!(
+            transmission_endpoint(&delegated_representative),
+            "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
+            "a representative certificate goes to the holder's door even from the delegated slot"
+        );
+
+        let own_seal = read_config(&SlotHost::new(Some("own"), vec![]).holding("seal"), "h1")
             .await
             .unwrap()
             .unwrap();
         assert_eq!(
-            transmission_endpoint(&own),
+            transmission_endpoint(&own_seal),
+            "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
+            "a business's own entity seal goes to the seal's door"
+        );
+    }
+
+    /// **A core that cannot vouch for the type routes to the holder's door**, and it still reports
+    /// that it can sign. That is the state of every hub deployed before hub#470 whose row has no
+    /// type stored and whose container the classifier cannot read — and `prewww1` is where all of
+    /// them already went.
+    #[tokio::test]
+    async fn a_certificate_the_core_cannot_classify_keeps_the_holder_entry_point() {
+        let cfg = read_config(&SlotHost::new(Some("delegated"), vec![]), "h1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(has_certificate(&cfg), "not knowing the type does not stop it signing");
+        assert_eq!(signing_type(&cfg), "");
+        assert_eq!(
+            transmission_endpoint(&cfg),
             "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         );
     }
@@ -2653,49 +2791,80 @@ mod cert_source_tests {
     /// invoice accepted where it does not belong, and a remitted record is never re-sent (ADR-0189).
     #[test]
     fn the_seam_resolves_the_environment_and_the_certificate_from_the_same_config() {
-        let config = |environment: &str, kind: &str| {
-            json!({ "environment": environment, "certificate_source": "core", "certificate_kind": kind })
+        let config = |environment: &str, certificate_type: &str| {
+            json!({
+                "environment": environment,
+                "certificate_source": "core",
+                "certificate_type": certificate_type,
+            })
         };
         assert_eq!(
-            transmission_endpoint(&config("production", "delegated")),
+            transmission_endpoint(&config("production", "seal")),
             "https://www10.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         );
         assert_eq!(
-            transmission_endpoint(&config("production", "own")),
+            transmission_endpoint(&config("production", "representative")),
             "https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         );
         assert_eq!(
-            transmission_endpoint(&config("testing", "delegated")),
+            transmission_endpoint(&config("testing", "seal")),
             "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         );
         assert_eq!(
-            transmission_endpoint(&config("testing", "own")),
+            transmission_endpoint(&config("testing", "representative")),
             "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         );
         // An unconfigured `environment` is preproduction, on BOTH doors (`environment_of`).
         assert_eq!(
-            transmission_endpoint(&json!({ "certificate_kind": "delegated" })),
+            transmission_endpoint(&json!({ "certificate_type": "seal" })),
             "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         );
         assert_eq!(
             transmission_endpoint(&json!({})),
             "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
         );
+        // And the SLOT is not the axis: a config carrying only `certificate_kind` says nothing
+        // about the door, which is the confusion hub#470 removed.
+        assert_eq!(
+            transmission_endpoint(&json!({ "certificate_kind": "delegated" })),
+            "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
+        );
     }
 
     /// Recovering the chain has to talk to the door that issued it: the consult resolves its entry
-    /// point from the same two axes as the alta, so a delegated hub can also re-anchor (hub#287).
+    /// point from the same two axes as the alta, so a hub signing with a seal can also re-anchor
+    /// (hub#287).
     #[test]
     fn the_consult_and_the_transmission_share_the_entry_point() {
         for environment in ["testing", "production"] {
-            for kind in ["own", "delegated"] {
-                let cfg = json!({ "environment": environment, "certificate_kind": kind });
+            for certificate_type in ["representative", "seal", "", "delegated"] {
+                let cfg = json!({
+                    "environment": environment,
+                    "certificate_type": certificate_type,
+                });
                 assert_eq!(
                     consult_endpoint_of(&cfg),
                     transmission_endpoint(&cfg),
-                    "({environment}, {kind})"
+                    "({environment}, {certificate_type})"
                 );
             }
+        }
+    }
+
+    /// **`transmission_endpoint_for` is the same answer, from the host** — the public entry the
+    /// cross-crate e2e uses (`crates/runtime/tests/certificate_type_e2e.rs`). If it ever stopped
+    /// agreeing with the internal one, that e2e would be pinning a second implementation instead of
+    /// the real path.
+    #[tokio::test]
+    async fn the_public_entry_point_helper_agrees_with_the_internal_one() {
+        for certificate_type in ["seal", "representative"] {
+            let host = SlotHost::new(Some("delegated"), vec![]).holding(certificate_type);
+            let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+            assert_eq!(
+                transmission_endpoint_for(&host, "h1").await.unwrap(),
+                transmission_endpoint(&cfg),
+                "{certificate_type}"
+            );
         }
     }
 
@@ -3277,10 +3446,15 @@ mod environment_chain_tests {
     /// environment from the record (its chain), the door from the certificate signing TODAY
     /// (hub#320 — the AEAT segregates by the certificate presented in the TLS handshake, so a
     /// record that waited days goes through the door of whatever signs now).
+    ///
+    /// The door axis is the certificate's **TYPE**, not the slot it came from (hub#470): `delegated`
+    /// says the control plane handed the container down, and ERPlora's own `.p12` is a
+    /// *representative* certificate — routing on the slot would have sent the whole delegated fleet
+    /// to `www10` and had every record rejected.
     #[test]
     fn the_door_follows_todays_certificate_while_the_environment_follows_the_record() {
         let mut config = config_row("production");
-        config["certificate_kind"] = json!("delegated");
+        config["certificate_type"] = json!("seal");
 
         let destination = destination_of(&queued_testing_record(), &config)
             .expect("a record that carries its environment resolves");
@@ -3288,6 +3462,18 @@ mod environment_chain_tests {
         assert_eq!(
             destination.endpoint, PREPRODUCTION_SEAL,
             "preproduction because of the RECORD, the seal door because of TODAY's certificate"
+        );
+
+        // And the SLOT alone moves nothing: a delegated container that is not a seal keeps the
+        // holder's door, on the very same record.
+        let mut slot_only = config_row("production");
+        slot_only["certificate_kind"] = json!("delegated");
+        assert_eq!(
+            destination_of(&queued_testing_record(), &slot_only)
+                .expect("a record that carries its environment resolves")
+                .endpoint,
+            PREPRODUCTION_HOLDER,
+            "the slot is not the door axis (hub#470)"
         );
     }
 

@@ -1144,6 +1144,13 @@ impl Runtime {
     /// Ata el slot [`certificate::CertificateKind::Own`] en el ÚNICO punto por el que entra un `.p12`
     /// del cliente (`PUT /api/business/certificate`): el certificado delegado de ERPlora lo escribe
     /// el plano de control por su propia vía (hub#317), nunca esta.
+    ///
+    /// **El TIPO sale de los bytes, y aquí no hay nada con lo que contrastarlo** (hub#470). Al
+    /// certificado delegado lo acompaña una declaración del plano de control que
+    /// [`certificate::set_delegated`] comprueba; este lo sube su dueño directamente, así que no hay
+    /// frontera que cruzar ni segunda opinión que discrepe: el contenedor es la única fuente. Un
+    /// negocio que suba un **sello de entidad** propio entra por `www10` sin tocar nada, que es
+    /// justamente lo que la AEAT segrega.
     pub async fn set_business_certificate(
         &self,
         pkcs12_b64: &str,
@@ -1162,6 +1169,7 @@ impl Runtime {
             // número de flota que le corresponda y ponerle uno haría que este hub reportase como
             // instalada una versión de ERPlora que no tiene.
             None,
+            certificate::derive_certificate_type(pkcs12_b64, password),
         )
         .await
     }
