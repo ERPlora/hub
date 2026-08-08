@@ -26,8 +26,9 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 
+/// Same resolution as the `require_modules_workspace` guard — it honours `$ERPLORA_MODULES_DIR`.
 fn modules_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
+    erplora_runtime::e2e_support::modules_root()
 }
 
 fn ctx(hub: &str) -> RequestContext {
@@ -619,9 +620,7 @@ async fn product_with_category(rt: &Runtime, hub: &str, name: &str, sku: &str, c
 /// `inventory_product_categories`) se remapean, y una re-importación sobre B no duplica.
 #[tokio::test]
 async fn importar_en_otro_hub_de_la_misma_bd_inserta_sus_filas_con_ids_nuevos() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
 
     // UN esquema Postgres compartido entre los dos hubs (como en prod: una BD por organización).
     let shared = TestDb::new().await;
@@ -713,9 +712,7 @@ async fn importar_en_otro_hub_de_la_misma_bd_inserta_sus_filas_con_ids_nuevos() 
 /// verdad y B ve las filas. Este test clava ese contrato sobre el escenario real del bug.
 #[tokio::test]
 async fn cross_hub_en_bd_compartida_applied_implica_filas_reales_bajo_el_destino() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     let shared = TestDb::new().await;
     let a = fresh_over(&shared, "h1").await;
     create_product(&a, "h1", "Café", "CAF").await;

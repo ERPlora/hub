@@ -38,9 +38,7 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 fn mdir(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules")
-        .join(name)
+    erplora_runtime::e2e_support::modules_root().join(name)
 }
 fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])

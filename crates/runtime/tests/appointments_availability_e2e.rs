@@ -32,9 +32,7 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 fn mdir(n: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules")
-        .join(n)
+    erplora_runtime::e2e_support::modules_root().join(n)
 }
 /// Los módulos reales viven en `modules-workspace/` (repos hermanos), ausentes en CI aislado. Si
 /// el handler no está presente, los tests que instalan módulos se OMITEN (mismo patrón que el

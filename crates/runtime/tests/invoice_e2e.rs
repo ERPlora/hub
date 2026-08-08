@@ -8,7 +8,7 @@ use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
 fn params(v: serde_json::Value) -> Params { v.as_object().cloned().unwrap_or_default() }
-fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(n) }
+fn mdir(n: &str) -> PathBuf { erplora_runtime::e2e_support::modules_root().join(n) }
 // The ctx shares the Runtime's hub_id (DEV_HUB_ID) so `set_business_identity` and the dispatcher's
 // enricher read the SAME `hub_settings` row — required since the fiscal precondition gate
 // (hub#328, ADR-0203): issuing an invoice needs the hub's business identity configured.
@@ -223,9 +223,7 @@ async fn auto_f2_propagates_business_issuer_via_outbox() {
 /// serie TICKET NO se consume (la primera factura válida posterior sale con `-000001`).
 #[tokio::test]
 async fn create_from_sale_nonexistent_sale_id_fails_and_creates_no_invoice() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm() { eprintln!("SKIP: invoice handler.wasm ausente"); return; }
     let rt = rt_invoice().await;
     let ctx = admin();
@@ -267,9 +265,7 @@ async fn create_from_sale_nonexistent_sale_id_fails_and_creates_no_invoice() {
 /// correcta, enlazada al source y con los importes de la venta.
 #[tokio::test]
 async fn create_from_sale_with_real_sale_creates_correct_invoice() {
-    if !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules").exists()
-    { eprintln!("SKIP: modules-workspace not present (CI)"); return; }
+    if !erplora_runtime::require_modules_workspace() { return; }
     if !wasm() { eprintln!("SKIP: invoice handler.wasm ausente"); return; }
     let rt = rt_invoice().await;
     let ctx = admin();

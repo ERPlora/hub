@@ -23,7 +23,7 @@ fn params(v: serde_json::Value) -> Params {
 }
 
 fn inventory_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/inventory")
+    erplora_runtime::e2e_support::modules_root().join("inventory")
 }
 
 fn admin_ctx() -> RequestContext {

@@ -19,7 +19,7 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 fn services_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/services")
+    erplora_runtime::e2e_support::modules_root().join("services")
 }
 fn taxes_dir() -> PathBuf {
     services_dir().parent().unwrap().join("taxes")
