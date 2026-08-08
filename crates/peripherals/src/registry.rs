@@ -681,7 +681,7 @@ mod tests {
     #[test]
     fn las_mutaciones_aceptan_indistintamente_la_mac_o_la_clave() {
         // El protocolo JSON llama `mac` a este parámetro (`SetDeviceRole { mac }`) y los
-        // llamadores existentes (apps/bridge, apps/tauri) le pasan lo que tengan a mano.
+        // llamadores existentes (apps/tauri) le pasan lo que tengan a mano.
         let (registry, _) = temp_registry("mac-o-clave");
         registry
             .register(Some("AA:BB:CC:DD:EE:F3"), "10.0.0.9", 9100, "Caja", "network")

@@ -802,7 +802,6 @@ pub fn app(state: AppState) -> Router {
         .route("/modules/:id/*path", get(serve_module_asset))
         // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
         .route("/api/entitlement", get(proxy_entitlement))
-        .route("/api/bridge/token", get(proxy_bridge_token))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
         // Which build of the installable app the Cloud publishes (hub#400). The page cannot ask
         // erplora.com itself: `connect-src 'self' ipc:` kills it, and silently.
@@ -1503,24 +1502,6 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
             .into_response(),
         Err(e) => cloud_get_error_response(e),
     }
-}
-
-/// Proxya al SaaS la emisión del **token del Bridge** (`GET /api/v1/hub/device/bridge-token/`). El
-/// `cloud_api_token` firma la llamada aquí (nunca en el navegador); la app pega a esta ruta y recibe
-/// un JWT dedicado (`aud=erplora-bridge` + `hub_id`, exp corto) que presenta al Bridge local. ADR-0050 §2.7.
-async fn proxy_bridge_token(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    {
-        let rt = st.runtime.lock().await;
-        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
-            return unauthorized(e);
-        }
-    }
-    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    let placeholder = cloud_client::Auth::HubToken {
-        hub_id: st.hub_id(),
-        token: String::new(),
-    };
-    proxy_cloud_get(&st, &headers, cloud.bridge_token(&placeholder)).await
 }
 
 /// GET /api/marketplace/catalog — the real marketplace catalogue.

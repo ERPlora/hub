@@ -76,19 +76,16 @@ que el Cloud ya contesta — y es justo la que el usuario puede editar en su pro
 
 ## Hardware local = sidecar de `erplora-peripherals` (§2.7)
 
-> **ADR-0196 (2026-08-03) deroga el reparto de esta sección, y todavía NO se ha ejecutado.**
-> Decide que `apps/bridge` (WS `:12321`) y la app Kotlin desaparecen: queda `isTauri()` →
-> `invoke` in-process y nada más, y la cola de impresión se muda al Hub. Mientras el código de
-> `apps/bridge` siga en el árbol, lo de abajo describe el camino Tauri, que es el que
-> sobrevive. Para saber si la retirada ya ocurrió, mira si existe `apps/bridge/`.
+> **ADR-0196 (2026-08-03), EJECUTADO en hub#340 (2026-08-08).** `apps/bridge` (WS `:12321`) y la
+> app Kotlin ya no existen: queda `isTauri()` → `invoke` in-process y nada más, y la cola de
+> impresión vive en el Hub. Lo de abajo describe el único camino que hay.
 
 En la app, el shell **es el bridge**: no hay proceso aparte ni segundo install. La lógica de
-hardware vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS sobre TCP:9100), el
-mismo que usa el bridge standalone (`apps/bridge`).
+hardware vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS sobre TCP:9100).
 
 Los DATOS NO van por `invoke` (ADR-0050): el front habla HTTP+WS **con su hub cloud** (no hay
 runtime embebido — ADR-0154). `invoke` queda solo para lo nativo y para el HARDWARE — handlers que
-delegan en `erplora-peripherals` (en vez del servidor WebSocket que monta `apps/bridge`):
+delegan en `erplora-peripherals` (donde antes había un servidor WebSocket aparte):
 
 | `invoke`                     | Llama a                                              |
 |------------------------------|-----------------------------------------------------|
@@ -99,6 +96,7 @@ delegan en `erplora-peripherals` (en vez del servidor WebSocket que monta `apps/
 | `erplora_get_devices` / role/name/remove | `peripherals::registry::DeviceRegistry`  |
 
 El watchdog (`registry::Watchdog`) corre como tarea async del shell. Para el HARDWARE el frontend usa
-`IpcBridgeTransport` del `module-sdk` (los datos van aparte por `HttpWsTransport`); el contrato es
-idéntico al WS de `apps/bridge`, así que la UI no distingue el transporte de hardware. Ver
+`IpcBridgeTransport` del `module-sdk` (los datos van aparte por `HttpWsTransport`). En un navegador
+sin la app el transporte es `UnavailableBridgeTransport` (hub#339): `detect()` contesta
+`{online:false}` y toda operación de hardware rechaza con `hardware_unavailable`. Ver
 `crates/peripherals/README.md`.

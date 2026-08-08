@@ -30,8 +30,9 @@ pub enum DocumentType {
 impl DocumentType {
     /// Maps the protocol string; unknown → `Generic` (same as Python's `else`).
     ///
-    /// ⚠️ **Lenient on purpose, and only for the retired standalone Bridge** (`apps/bridge`), whose
-    /// wire this behaviour came from. Anything new must use [`DocumentType::parse`]: see why there.
+    /// ⚠️ **Lenient, and now for NOBODY.** Its only production caller was the standalone Bridge,
+    /// whose wire this behaviour came from, and hub#340 deleted it — so today this is a permissive
+    /// door with no client. Use [`DocumentType::parse`]; removing this one is **hub#578**.
     pub fn from_wire(s: &str) -> Self {
         Self::parse(s).unwrap_or(Self::Generic)
     }
@@ -648,9 +649,9 @@ mod tests {
                 "`{unknown}` is not a document this printer renders"
             );
         }
-        // And the lenient door is still lenient, deliberately: `apps/bridge` (🪦 standalone) speaks
-        // that wire and is not being changed. If both behaved the same, one of them would be dead
-        // code nobody would miss.
+        // The lenient door is still lenient — but no longer deliberately: the wire it served was
+        // the standalone Bridge's, and hub#340 deleted it. This assertion now pins behaviour that
+        // has zero production callers; it goes away with `from_wire` itself in hub#578.
         assert_eq!(DocumentType::from_wire("kitchn"), DocumentType::Generic);
     }
 

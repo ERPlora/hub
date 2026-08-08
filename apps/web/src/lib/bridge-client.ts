@@ -1,102 +1,27 @@
-// Cliente del Bridge local (combo cloud + web-PWA). ARQUITECTURA.md §2.7.
+// Sonda de hardware local + URLs de descarga que aún usan las pantallas de Sistema y Panel.
 //
-// El navegador NO puede abrir TCP crudo al puerto 9100 de la impresora; el Bridge sí. La PWA
-// detecta el Bridge en `localhost:12321` (GET /status, timeout corto) y, cuando no está, ofrece
-// descargarlo desde el Cloud Portal (`/bridge/download/<platform>/`, que redirige a S3 latest).
+// 🪦 **Lo que ya no está** (ADR-0196, ejecutado en hub#340): el Bridge standalone. Con él se fueron
+// el canal `WS /ws` de `localhost:12321`, su **token de emparejamiento** (`localStorage` +
+// `?token=` en la URL del WebSocket, la única vía por la que un `WebSocket` de navegador podía
+// presentar credenciales) y el refresco cada 12 min contra `GET /api/bridge/token`. hub#339 había
+// quitado ya el único cliente que presentaba ese token; el refresco siguió vivo hasta aquí, y una
+// credencial que nadie lee no es peso muerto: es un secreto con caducidad y sin dueño.
 //
-// El protocolo WS lo sirve el binario Rust `hub/apps/bridge` (mismo contrato JSON que el crate
-// `crates/peripherals`). Este módulo es solo detección + URLs de descarga; el canal WS de
-// comandos/eventos (print/open_drawer/…) se añadirá con el transporte de hardware del module-sdk.
+// El acceso al hardware vive hoy en la **app instalada** (`erplora.peripherals` → `invoke`
+// in-process, sin puerto local y sin token). Lo que queda en este fichero es la sonda `GET /status`
+// y el enlace de descarga:
+//
+// ⚠️ Ambos siguen mirando al producto retirado y tienen issue propia — **no se arreglan aquí**:
+//   - `detectBridge()` pregunta a `:12321`, donde ya no escucha nadie, así que dentro de la app
+//     instalada contesta `{online:false}` aunque haya impresora → **hub#524** (la pregunta debe ir
+//     por la misma puerta que los módulos, `getClient().peripherals.detect()`).
+//   - `bridgeDownloadUrl()` apunta a `/bridge/download/`, que sirve el binario del Bridge en vez de
+//     la app → **hub#507** (repuntar a `/app/download/`, que el Cloud ya sirve desde saas#1242).
 
 import { config } from './config';
-import { getHubSession } from './session';
 
-/** Host del Bridge local. Puerto fijo `BRIDGE_WS_PORT` (crates/peripherals/src/lib.rs). */
+/** Host del Bridge local (retirado). Lo conserva la sonda de `detectBridge` hasta hub#524. */
 export const BRIDGE_HOST = 'http://localhost:12321';
-
-/** Clave de `localStorage` donde la app guarda el token de emparejamiento del Bridge. */
-const BRIDGE_TOKEN_KEY = 'erplora.bridge.token';
-
-/**
- * Token de emparejamiento guardado, o `null` si aún no se emparejó (ADR-0050 §seguridad).
- * El Bridge muestra el código una vez al arrancar; el usuario lo introduce en Ajustes → Bridge,
- * que llama a {@link setBridgeToken}. El token NO es necesario para `GET /status` (abierto), solo
- * para abrir el canal `WS /ws` que maneja hardware.
- */
-export function getBridgeToken(): string | null {
-  try {
-    const t = localStorage.getItem(BRIDGE_TOKEN_KEY);
-    return t && t.trim() ? t.trim() : null;
-  } catch {
-    return null; // localStorage no disponible (SSR / modo restringido)
-  }
-}
-
-/** Guarda (o borra, con `null`) el token de emparejamiento del Bridge. Lo llama la UI de Ajustes. */
-export function setBridgeToken(token: string | null): void {
-  try {
-    if (token && token.trim()) localStorage.setItem(BRIDGE_TOKEN_KEY, token.trim());
-    else localStorage.removeItem(BRIDGE_TOKEN_KEY);
-  } catch {
-    /* localStorage no disponible: no-op */
-  }
-}
-
-/**
- * URL del canal WebSocket del Bridge (`ws://localhost:12321/ws`) con el token de emparejamiento
- * como query param (`?token=…`) — única vía por la que un `WebSocket` de navegador puede presentar
- * credenciales (no puede fijar cabeceras). La consumirá el transporte de hardware cuando se cablee
- * (hoy `bridge-client.ts` solo hace detección). Sin token emparejado, el Bridge responderá 401.
- */
-export function bridgeWsUrl(): string {
-  const ws = BRIDGE_HOST.replace(/^http/, 'ws');
-  const token = getBridgeToken();
-  return token ? `${ws}/ws?token=${encodeURIComponent(token)}` : `${ws}/ws`;
-}
-
-/**
- * Pide al **runtime** el token dedicado del Bridge (`GET /api/bridge/token`) y lo guarda, para que
- * el cliente WS del SDK lo presentara — **ya no existe ninguno** (ADR-0196 §3 / hub#339): esto se
- * retira entero con el pairing en hub#340. El runtime firma la llamada al SaaS con su `cloud_api_token`
- * (nunca expuesto al navegador) y devuelve un JWT `aud=erplora-bridge` + `hub_id` (exp corto) que el
- * Bridge verifica offline contra la clave pública del SaaS (ADR-0050 §2.7). Ruta RELATIVA a propósito
- * (mismo origen que /api; evita un import circular con `runtime.ts`). `true` si se guardó un token.
- */
-export async function refreshBridgeToken(): Promise<boolean> {
-  try {
-    const session = getHubSession();
-    const res = await fetch('/api/bridge/token', {
-      headers: {
-        accept: 'application/json',
-        ...(session ? { 'X-Hub-Session': session } : {}),
-      },
-    });
-    if (!res.ok) return false;
-    const body = (await res.json()) as { token?: string };
-    if (body.token && body.token.trim()) {
-      setBridgeToken(body.token);
-      return true;
-    }
-    return false;
-  } catch {
-    return false; // runtime no enrolado / offline: el hardware degrada, no rompe el arranque
-  }
-}
-
-/** TTL del bridge-token = 15 min; refrescamos con margen (12 min) para no caducar en mitad del turno. */
-const BRIDGE_TOKEN_REFRESH_MS = 12 * 60 * 1000;
-let bridgeRefreshTimer: ReturnType<typeof setInterval> | undefined;
-
-/**
- * Mantiene fresco el token del Bridge: lo pide una vez y luego cada 12 min (< TTL de 15). Idempotente
- * (un solo timer). Lo arranca el shell en el boot. **Nadie lee ya el token**: el transporte WS que
- * lo presentaba salió del SDK con ADR-0196 §3 (hub#339) y esto se retira en hub#340.
- */
-export function startBridgeTokenRefresh(): void {
-  void refreshBridgeToken();
-  if (bridgeRefreshTimer) return;
-  bridgeRefreshTimer = setInterval(() => void refreshBridgeToken(), BRIDGE_TOKEN_REFRESH_MS);
-}
 
 /** Plataformas de descarga expuestas por el Cloud (macOS es solo desarrollo local → fuera). */
 export type BridgePlatform = 'windows' | 'linux' | 'android';

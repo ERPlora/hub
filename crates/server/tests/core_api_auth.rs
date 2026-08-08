@@ -64,7 +64,6 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
         "/api/navigation",
         "/api/modules",
         "/api/entitlement",
-        "/api/bridge/token",
         "/api/marketplace/catalog",
         "/api/app/release",
         "/api/blueprints/catalog",
@@ -86,6 +85,38 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
             .unwrap();
         assert_eq!(authenticated.status(), StatusCode::OK, "{uri}");
     }
+    std::fs::remove_dir_all(temp).ok();
+}
+
+/// The bridge-token proxy is **gone from the router**, not merely guarded (ADR-0196 §3, hub#340).
+///
+/// The distinction is the whole point, so it is asserted on both sides of the guard:
+///
+///   * anonymous → a route that still existed would answer `401` (that is what every other proxy
+///     in the list above answers); only a route the router does not know answers `404`;
+///   * with a **valid admin session** → a route that still existed would get past the guard and
+///     try to reach the SaaS (`https://example.invalid`), i.e. `502`. It can never answer `404`.
+///
+/// So no single guard can make this test pass: it fails unless the door itself was removed. What
+/// it protects is not tidiness — the route minted a machine credential (`aud=erplora-bridge`,
+/// short exp) that, since hub#339 took the WS transport out of the SDK, **no client presents**.
+#[tokio::test]
+async fn the_bridge_token_proxy_is_gone_from_the_router_not_merely_guarded() {
+    let (router, admin, _employee, temp) = fixture().await;
+
+    for session in [None, Some(admin.as_str())] {
+        let response = router
+            .clone()
+            .oneshot(request("GET", "/api/bridge/token", session, None))
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::NOT_FOUND,
+            "/api/bridge/token still answers (session: {session:?})"
+        );
+    }
+
     std::fs::remove_dir_all(temp).ok();
 }
 

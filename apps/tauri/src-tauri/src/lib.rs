@@ -830,16 +830,14 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
 // ── Camino de hardware: handlers `invoke` → erplora-peripherals ──────────────────────────────────
 //
 // El shell ES el bridge (no hay proceso bridge aparte, §2.7): el hardware se expone por handlers
-// `invoke` que delegan en `erplora-peripherals`, el mismo crate que usa el bridge standalone
-// (`apps/bridge`) vía WebSocket. El contrato de datos es idéntico al de las frames WS del bridge:
-// `getDevices` devuelve el array de `protocol::Device` y `discoverPrinters` el outcome
-// `PrinterDiscovery` (serde-serializado igual que `BridgeDevice`/`PrinterDiscovery` del SDK);
-// `print`/`testPrint`/`openDrawer` no devuelven nada.
+// `invoke` que delegan en `erplora-peripherals`. El contrato de datos lo heredó de las frames WS
+// del bridge standalone (retirado en hub#340) y no cambió: `getDevices` devuelve el array de
+// `protocol::Device` y `discoverPrinters` el outcome `PrinterDiscovery` (serde-serializado igual
+// que `BridgeDevice`/`PrinterDiscovery` del SDK); `print`/`testPrint`/`openDrawer` no devuelven nada.
 //
 // El `Watchdog` del registry corre como tarea async del shell (auto-recuperación de IP por DHCP),
-// y la `PrintQueue` con reintentos drena en segundo plano — igual que `apps/bridge`. Los outcomes
-// y eventos del watchdog se loguean (en el bridge standalone viajan por WS; aquí el canal a la UI
-// se cablearía con eventos Tauri en una fase posterior — columna del humano).
+// y la `PrintQueue` con reintentos drena en segundo plano. Los outcomes y eventos del watchdog se
+// loguean; el canal hacia la UI se cablearía con eventos Tauri en una fase posterior.
 
 use erplora_peripherals::discovery::{self, parse_printer_id, LocalNetworkAccess, PrinterDiscovery};
 use erplora_peripherals::drawer;
@@ -860,7 +858,7 @@ struct PeripheralsState {
 /// Construye el estado de hardware y **lanza** las tareas de fondo en el runtime tokio actual:
 ///   - worker de la `PrintQueue` (envío con reintentos; cada `JobOutcome` se loguea),
 ///   - `Watchdog` del registry (health-check + recovery por MAC ante cambio de IP DHCP).
-/// Espejo de `spawn_queue_worker`/`spawn_watchdog` del bridge standalone (`apps/bridge/src/main.rs`).
+/// Heredado de `spawn_queue_worker`/`spawn_watchdog` del bridge standalone (retirado en hub#340).
 fn build_peripherals_state(devices_path: PathBuf) -> PeripheralsState {
     let registry = std::sync::Arc::new(DeviceRegistry::load(devices_path));
     let queue = std::sync::Arc::new(PrintQueue::new(RetryPolicy::default()));
@@ -1085,8 +1083,8 @@ fn erplora_remove_device(
 /// comanda — entra un pedido y cocina tiene que enterarse aunque la tablet esté en otra vista o
 /// bloqueada. Un toast de la app no sirve ahí.
 ///
-/// Lo expone el SHELL y no `apps/bridge` porque en Tauri el shell **es** el bridge (ADR-0050 §2.7);
-/// el binario suelto ya lo hacía con `notify_rust` para el caso «PWA en Chrome». El protocolo lo
+/// Lo expone el SHELL porque en Tauri el shell **es** el bridge (ADR-0050 §2.7); el binario suelto
+/// (retirado en hub#340) lo hacía con `notify_rust` para el caso «PWA en Chrome». El protocolo lo
 /// declaraba desde el principio (`Command::SendNotification`) y este era el lado que faltaba: sin
 /// él, ningún módulo podía avisar de nada desde la app.
 ///

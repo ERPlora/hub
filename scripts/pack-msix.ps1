@@ -1,12 +1,10 @@
 <#
 .SYNOPSIS
-  Empaqueta el build Windows del Bridge como MSIX para Microsoft Store (ADR-0136 · hub#120).
+  Empaqueta el build Windows de la app como MSIX para Microsoft Store (ADR-0136 · hub#120).
 
 .DESCRIPTION
-  Paso POST-BUILD puro: no toca cómo compila Cargo. Un solo sabor (-Flavor):
-
-    bridge (default) — ERPlora Bridge (apps/bridge, binario erplora-bridge). Requiere
-           `cargo build --release -p erplora-bridge`. Sin front que stagear.
+  Paso POST-BUILD puro: no toca cómo compila Tauri/Cargo. Empaqueta **la app** (`apps/tauri`,
+  ficha única «ERPlora» / `com.erplora.app` — ADR-0160). Requiere un `tauri build` de release.
 
   1. Stage: exe + Assets/ (iconos que referencia el manifest).
   2. Patch: tokens __MSIX_*__ del Package.appxmanifest con la identidad real
@@ -14,13 +12,21 @@
   3. Pack: `winapp pack` (CLI oficial: winget install microsoft.winappcli).
      SIN -Cert ⇒ MSIX sin firmar, que es lo que exige la submission (la Store firma).
 
+  🪦 Hasta hub#340 el único preset era el del **Bridge standalone** (`-Flavor bridge`,
+  `erplora-bridge.exe`), y `tauri-release.yml` llamaba a este script SIN `-Flavor`, así que caía
+  en ese preset: buscaba el exe del bridge y escribía `erplora-bridge.msix`, mientras el workflow
+  subía `dist-msix/erplora-app.msix`. El paso nunca llegó a correr —está detrás del gate
+  `vars.MSIX_IDENTITY_NAME`, que sigue vacío—, pero era un paso roto. Con el bridge retirado ya no
+  hay dos sabores: queda **uno**, el de la app, que es lo que el workflow siempre quiso empaquetar.
+  ⚠️ Sigue **sin verificar en Windows** (hub#577).
+
 .EXAMPLE
-  pwsh scripts/pack-msix.ps1 -Flavor bridge -Version 0.2.0 `
-    -IdentityName "12345Erplora.ERPloraBridge" -Publisher "CN=xxxx-..." `
+  pwsh scripts/pack-msix.ps1 -Version 1.2.3 `
+    -IdentityName "12345Erplora.ERPlora" -Publisher "CN=xxxx-..." `
     -PublisherDisplay "Erplora" -OutDir dist-msix
 
 .NOTES
-  Solo Windows (winapp CLI). En CI corre en el leg windows de bridge-release.yml.
+  Solo Windows (winapp CLI). En CI corre en el leg windows de tauri-release.yml.
   Para probar la INSTALACIÓN local (no la submission) añade -Cert con un devcert:
   `winapp cert generate` + `winapp cert install`.
 #>
@@ -29,7 +35,6 @@ param(
   [Parameter(Mandatory = $true)][string]$IdentityName,
   [Parameter(Mandatory = $true)][string]$Publisher,
   [Parameter(Mandatory = $true)][string]$PublisherDisplay,
-  [ValidateSet("bridge")][string]$Flavor = "bridge",
   [string]$OutDir = "dist-msix",
   [string]$Cert = ""
 )
@@ -37,17 +42,19 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot   # hub/
 
-# --- Presets por sabor ---
-$presets = @{
-  bridge = @{
-    ExeCandidates = @("$repoRoot/target/release/erplora-bridge.exe")
-    ExeName       = "erplora-bridge.exe"
-    Manifest      = "$repoRoot/apps/bridge/msix/Package.appxmanifest"
-    AssetsDir     = "$repoRoot/apps/bridge/msix/Assets"
-    OutName       = "erplora-bridge.msix"
-  }
+# --- La app instalable. El nombre del exe lo fija `productName` de tauri.conf.json ("ERPlora"),
+# que es también el `Executable=` del manifest; se buscan los dos target-dir posibles porque
+# `tauri build` puede correr desde la raíz del workspace o desde apps/tauri/src-tauri. ---
+$p = @{
+  ExeCandidates = @(
+    "$repoRoot/target/release/ERPlora.exe",
+    "$repoRoot/apps/tauri/src-tauri/target/release/ERPlora.exe"
+  )
+  ExeName       = "ERPlora.exe"
+  Manifest      = "$repoRoot/apps/tauri/src-tauri/msix/Package.appxmanifest"
+  AssetsDir     = "$repoRoot/apps/tauri/src-tauri/icons"
+  OutName       = "erplora-app.msix"
 }
-$p = $presets[$Flavor]
 
 # --- Versión: la Store exige 4 partes con revisión 0 (v1.2.3 → 1.2.3.0). ---
 $v = $Version.TrimStart("v")
@@ -56,10 +63,10 @@ if ($v -match '^\d+\.\d+\.\d+$') { $v = "$v.0" }
 
 # --- Localizar el exe de release. ---
 $exe = $p.ExeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $exe) { throw "No hay exe en target/release/ para el sabor '$Flavor' — corre antes su build." }
+if (-not $exe) { throw "No hay $($p.ExeName) en target/release/ — corre antes 'tauri build --release'." }
 
 # --- Stage: mismo layout que instala NSIS ($INSTDIR): exe + Assets/. ---
-$stage = "$repoRoot/target/msix-stage-$Flavor"
+$stage = "$repoRoot/target/msix-stage-app"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path "$stage/Assets" | Out-Null
 Copy-Item $exe "$stage/$($p.ExeName)"
@@ -94,4 +101,4 @@ try {
 }
 finally { Pop-Location }
 
-Write-Host "MSIX listo: $out/$($p.OutName) (sabor $Flavor, versión $v, sin firmar — la Store firma)"
+Write-Host "MSIX listo: $out/$($p.OutName) (versión $v, sin firmar — la Store firma)"

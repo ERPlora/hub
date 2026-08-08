@@ -16,7 +16,6 @@ members = [
     "crates/sync",
     "crates/vector",
     "crates/peripherals",
-    "apps/bridge",
     "apps/tauri/src-tauri",
     "crates/tauri-plugin-erplora-android",
 ]
