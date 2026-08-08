@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+# pre-push — LOCAL test gate for the Hub.
+#
+# Replaces the `pull_request` trigger of "Hub tests (Rust · Postgres)"
+# (.github/workflows/test-hub.yml), which was burning ~96% of the repo's Actions
+# minutes: 127 runs / 1.647 min in three days. The same suite runs here instead,
+# and nothing reaches the remote unless it is green.
+#
+# Parity with the workflow it replaces — same excludes, same Postgres:
+#   cargo test --workspace --no-fail-fast \
+#              --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+# `--no-fail-fast` matters: without it cargo stops at the first failing binary
+# and the run reports one failure when there may be twenty.
+#
+# Two properties keep this survivable with the autonomous fleet (~19 worktrees
+# sharing this hook):
+#   · a per-tree cache — the same tree is only ever compiled once, so the second
+#     push of an unchanged tree is instant;
+#   · a lock — suites run one at a time instead of melting the machine.
+#
+# On green it publishes a `local-gate/hub-tests` commit status on the pushed
+# sha, so `merge-pr.sh` still sees a check and keeps refusing to merge on
+# silence (pm#58/#60). The status is an ATTESTATION that the suite ran here —
+# it is not an independent verification.
+#
+# ── ARMING ───────────────────────────────────────────────────────────────────
+#     git config --bool hooks.hubPrepushGate true      # arm
+#     git config --bool hooks.hubPrepushGate false     # disarm
+# Disarmed by default: .git/hooks is shared by every worktree, so arming it
+# arms the whole fleet at once.
+#
+# Bypass:  SKIP_HUB_TESTS=1 git push     (this gate only)
+#          git push --no-verify          (every hook)
+#
+# Injection points, used by scripts/prepush-gate.test.sh:
+#   HUB_GATE_TEST_CMD · HUB_GATE_STATUS_CMD · HUB_GATE_STATE_DIR · HUB_GATE_LOCK_WAIT
+# ─────────────────────────────────────────────────────────────────────────────
+set -uo pipefail
+
+ZERO=0000000000000000000000000000000000000000
+CONTEXT=local-gate/hub-tests
+PG_CONTAINER=erplora-test-pg-5433
+PG_DSN=postgres://postgres:test@localhost:5433/hub_test
+
+armed="$(git config --bool hooks.hubPrepushGate 2>/dev/null || echo false)"
+if [ "$armed" != "true" ]; then
+    echo "ℹ️  pre-push: Hub test gate DISARMED → letting the push through." >&2
+    echo "    Arm it with:  git config --bool hooks.hubPrepushGate true" >&2
+    exit 0
+fi
+
+if [ "${SKIP_HUB_TESTS:-0}" = "1" ]; then
+    echo "⏭️  pre-push: SKIP_HUB_TESTS=1 → skipping the Hub test gate." >&2
+    exit 0
+fi
+
+# git feeds us "<local ref> <local sha> <remote ref> <remote sha>" per ref.
+# A pure branch deletion carries no tree to test.
+pushed_sha=""
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+    [ -n "${local_sha:-}" ] || continue
+    [ "$local_sha" = "$ZERO" ] && continue
+    pushed_sha="$local_sha"
+done
+if [ -z "$pushed_sha" ]; then
+    exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+STATE_DIR="${HUB_GATE_STATE_DIR:-$(git rev-parse --git-common-dir)/hub-gate}"
+mkdir -p "$STATE_DIR"
+
+# The cache key is the TREE, not the commit: a reworded commit or a rebase that
+# does not change a single byte of content must not pay for the suite twice.
+tree="$(git rev-parse "${pushed_sha}^{tree}" 2>/dev/null)" || exit 1
+green="$STATE_DIR/$tree.green"
+
+# Publish the attestation in the background: the commit does not exist on the
+# remote until the push we are gating actually lands.
+publish_status() {
+    local sha=$1
+    if [ -n "${HUB_GATE_STATUS_CMD:-}" ]; then
+        ( set -- "$sha"; eval "$HUB_GATE_STATUS_CMD" ) >/dev/null 2>&1 &
+        return 0
+    fi
+    (
+        local repo tries=0
+        repo="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)" || exit 0
+        while [ "$tries" -lt 24 ]; do
+            gh api "repos/$repo/commits/$sha" >/dev/null 2>&1 && break
+            sleep 5
+            tries=$((tries + 1))
+        done
+        gh api -X POST "repos/$repo/statuses/$sha" \
+            -f state=success \
+            -f context="$CONTEXT" \
+            -f description="cargo test --workspace green on the pusher's machine" \
+            >/dev/null 2>&1
+    ) >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+}
+
+if [ -f "$green" ]; then
+    echo "✅ pre-push: this tree already passed the suite → skipping the rebuild." >&2
+    publish_status "$pushed_sha"
+    exit 0
+fi
+
+# mkdir is atomic on every filesystem we care about; flock is not on macOS.
+LOCK="$STATE_DIR/lock"
+lock_wait="${HUB_GATE_LOCK_WAIT:-3600}"
+waited=0
+while ! mkdir "$LOCK" 2>/dev/null; do
+    if [ "$waited" -ge "$lock_wait" ]; then
+        echo "❌ pre-push: another suite has held the gate lock for ${lock_wait}s." >&2
+        echo "   If it died, remove $LOCK by hand." >&2
+        exit 1
+    fi
+    [ "$waited" = 0 ] && echo "⏳ pre-push: another push is running the suite — waiting for the lock…" >&2
+    sleep 2
+    waited=$((waited + 2))
+done
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+
+# Whoever held the lock may have just turned this very tree green.
+if [ -f "$green" ]; then
+    echo "✅ pre-push: another push just validated this tree → skipping the rebuild." >&2
+    publish_status "$pushed_sha"
+    exit 0
+fi
+
+# Bring up the Postgres the suite needs, unless the caller pinned the command
+# (the tests do) or already exported a DSN.
+ensure_postgres() {
+    [ -n "${DATABASE_URL:-}" ] && return 0
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "❌ pre-push: the suite is Postgres-only (ADR-0154) and docker is not on PATH." >&2
+        echo "   Export DATABASE_URL yourself, or install/start Docker." >&2
+        return 1
+    fi
+    if ! docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+        if docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+            docker start "$PG_CONTAINER" >/dev/null
+        else
+            docker run -d --name "$PG_CONTAINER" -p 5433:5432 \
+                -e POSTGRES_PASSWORD=test -e POSTGRES_DB=hub_test postgres:18 >/dev/null
+        fi
+        local tries=0
+        until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
+            tries=$((tries + 1))
+            [ "$tries" -gt 30 ] && { echo "❌ pre-push: $PG_CONTAINER never became ready." >&2; return 1; }
+            sleep 1
+        done
+    fi
+    export DATABASE_URL="$PG_DSN"
+}
+
+# The module e2e — the ones that install real modules from `modules-workspace` — are the one
+# place where "run what CI ran" needs saying out loud, because CI does NOT run them: the guard
+# sees `CI=true` and takes a legitimate skip (hub#253). On a clean develop they are 120 failures
+# across 25 targets (stale module builds), so running them by default would block every push,
+# and it would also make "we replaced the CI gate" a false claim.
+#
+# Default is therefore parity: skip, exactly as CI does. `HUB_GATE_WITH_MODULES=1` opts into the
+# stricter run — worth turning on the day those 120 are fixed, since it covers ground CI never has.
+resolve_modules_dir() {
+    if [ "${HUB_GATE_WITH_MODULES:-0}" != "1" ]; then
+        export ERPLORA_E2E_ALLOW_SKIP=1
+        return 0
+    fi
+    [ -n "${ERPLORA_MODULES_DIR:-}" ] && return 0
+    # The relative path the tests use only resolves from a checkout inside the monorepo, and the
+    # fleet works out of /private/tmp worktrees — so resolve it here rather than leave it to luck.
+    local candidate
+    for candidate in \
+        "$(git rev-parse --show-toplevel)/../modules-workspace/modules" \
+        "${HOME:-}/workspace/code/ERPlora/modules-workspace/modules"
+    do
+        if [ -d "$candidate" ]; then
+            ERPLORA_MODULES_DIR="$(cd "$candidate" && pwd)"
+            export ERPLORA_MODULES_DIR
+            return 0
+        fi
+    done
+    echo "⚠️  pre-push: HUB_GATE_WITH_MODULES=1 but modules-workspace is nowhere — skipping them." >&2
+    export ERPLORA_E2E_ALLOW_SKIP=1
+}
+resolve_modules_dir
+
+if [ -n "${HUB_GATE_TEST_CMD:-}" ]; then
+    test_cmd="$HUB_GATE_TEST_CMD"
+else
+    ensure_postgres || exit 1
+    command -v cargo >/dev/null 2>&1 || {
+        echo "❌ pre-push: 'cargo' is not on PATH." >&2
+        exit 1
+    }
+    test_cmd="cargo test --workspace --no-fail-fast --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
+fi
+
+echo "🧪 pre-push: running the Hub suite locally (this replaces the CI gate)…" >&2
+if ! eval "$test_cmd"; then
+    echo "" >&2
+    echo "❌ pre-push: the Hub suite is RED → push ABORTED." >&2
+    echo "   Fix it and retry, or bypass with 'SKIP_HUB_TESTS=1 git push'." >&2
+    exit 1
+fi
+
+: > "$green"
+echo "✅ pre-push: suite green → pushing, and attesting it as $CONTEXT." >&2
+publish_status "$pushed_sha"
+exit 0
