@@ -50,6 +50,7 @@ async fn fixture() -> (axum::Router, String, String) {
 
     let temp = std::env::temp_dir().join(format!("erplora-device-mode-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-dm".into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

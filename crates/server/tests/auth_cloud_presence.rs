@@ -69,6 +69,7 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
     rt.ensure_system_tables().await.unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-auth-presence-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: HUB_ID.into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

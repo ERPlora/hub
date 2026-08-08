@@ -44,6 +44,7 @@ async fn fixture() -> (axum::Router, TestDb) {
 
     let temp = std::env::temp_dir().join(format!("erplora-session-ttl-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-ttl".into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

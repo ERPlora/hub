@@ -50,6 +50,7 @@ async fn fixture() -> Fixture {
         owner.id
     ));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-users".into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: media.join("modules"),

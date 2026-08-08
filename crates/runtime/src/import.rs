@@ -418,7 +418,14 @@ async fn apply_section(
     // Same question as hub#331, not a new one: not «what does this bundle claim to be» but «whose
     // hub is this». A hub restoring its own backup writes its own identity back (ADR-0113 §1);
     // everyone else's stays out, whatever the manifest says about itself.
-    let (sql, discarded) = if section == "hub_settings" && !same_hub {
+    // hub#376: en un hub de DEMO el filtro se aplica SIEMPRE, venga el bundle de donde venga. El
+    // `same_hub` de arriba se lee del `manifest.json` que va DENTRO del zip, y en una demo el
+    // visitante conoce su propio `hub_id` (está en el subdominio y en `/api/hub/context`): un
+    // bundle hecho a mano que se declare «de este mismo hub» pasaría el filtro y escribiría un NIF
+    // ajeno, dejando en nada el cierre de `settings::set_many`. Una demo no tiene identidad fiscal
+    // propia por ninguna puerta (ADR-0197 §4).
+    let demo_hub = rt.registry().demo_hub;
+    let (sql, discarded) = if section == "hub_settings" && (!same_hub || demo_hub) {
         match keep_portable_settings(&sql, &scope) {
             Ok(filtered) => filtered,
             // Invalid section: it fails WHOLE and without touching the BD, exactly as it did

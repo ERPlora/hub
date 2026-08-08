@@ -86,6 +86,7 @@ async fn fixture(enforce: bool, trusted_device: Option<&str>) -> axum::Router {
     }
     let temp = std::env::temp_dir().join(format!("erplora-device-trust-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: HUB_ID.into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),
@@ -118,6 +119,7 @@ async fn fixture_with_revoked(device_id: &str) -> axum::Router {
     rt.untrust_device(device_id).await.unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-device-trust-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: HUB_ID.into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

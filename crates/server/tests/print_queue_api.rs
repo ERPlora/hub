@@ -26,6 +26,7 @@ async fn fixture() -> (axum::Router, String) {
     let session = rt.create_session(&user, 3600, None).await.unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-print-queue-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: HUB_ID.into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

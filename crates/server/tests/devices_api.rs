@@ -76,6 +76,7 @@ async fn fixture_with_state(hub_id: &str) -> (axum::Router, Sessions, AppState) 
 
     let temp = std::env::temp_dir().join(format!("erplora-devices-{}-{}", hub_id, std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: hub_id.into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

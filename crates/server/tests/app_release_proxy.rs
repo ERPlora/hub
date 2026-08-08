@@ -27,6 +27,7 @@ const RELEASE_URI: &str = "/api/app/release";
 fn config(hub_id: &str, cloud_base_url: String, tag: &str) -> HubConfig {
     let temp = std::env::temp_dir().join(format!("erplora-app-release-{tag}-{}", std::process::id()));
     HubConfig {
+        demo: false,
         hub_id: hub_id.into(),
         cloud_base_url,
         module_cache: temp.join("modules-cache"),

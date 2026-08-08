@@ -55,6 +55,7 @@ fn tree(tag: &str) -> PathBuf {
 
 fn config(base: &Path, dev_mode: bool) -> HubConfig {
     HubConfig {
+        demo: false,
         hub_id: "hub-install".into(),
         cloud_base_url: "http://127.0.0.1:1".into(),
         module_cache: base.join("module_cache"),

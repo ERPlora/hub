@@ -17,6 +17,7 @@ async fn state_with_token(token: Option<&str>) -> AppState {
     let rt = Runtime::with_hub_id(Box::new(db), "hub-1");
     let temp = std::env::temp_dir().join(format!("erplora-members-test-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-1".into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),
@@ -131,6 +132,7 @@ async fn admin_state(cloud_base_url: &str) -> AppState {
     rt.ensure_system_tables().await.unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-members-http-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-1".into(),
         cloud_base_url: cloud_base_url.to_string(),
         module_cache: temp.join("modules-cache"),

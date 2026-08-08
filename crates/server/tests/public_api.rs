@@ -20,6 +20,7 @@ fn fixture() -> PathBuf {
 
 fn dev_config() -> HubConfig {
     HubConfig {
+        demo: false,
         hub_id: HUB_ID.into(),
         cloud_base_url: "https://erplora.com".into(),
         module_cache: std::env::temp_dir().join("erplora-pubapi-cache"),

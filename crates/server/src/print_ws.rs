@@ -397,6 +397,7 @@ mod tests {
     fn config(hub_id: &str) -> crate::HubConfig {
         let temp = std::env::temp_dir().join(format!("erplora-print-ws-{}", std::process::id()));
         crate::HubConfig {
+            demo: false,
             hub_id: hub_id.into(),
             cloud_base_url: "https://example.invalid".into(),
             module_cache: temp.join("modules-cache"),

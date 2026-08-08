@@ -60,7 +60,7 @@ pub mod user_profile;
 pub mod wasm;
 
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
-pub use errors::{Result, RuntimeError};
+pub use errors::{DemoLock, Result, RuntimeError};
 pub use manifest::Manifest;
 pub use registry::{EventSink, ModuleStatus, NavEntry, Principal, Registry, RequestContext};
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
@@ -517,6 +517,33 @@ impl Runtime {
     /// se entregan a sus listeners de módulo pero el envío externo es no-op.
     pub fn set_notify_transport(&mut self, transport: Arc<dyn host_notify::NotifyTransport>) {
         self.registry.notify_transport = Some(transport);
+    }
+
+    /// Sella que este despliegue es un hub de **DEMO efímera** (ADR-0197, hub#376). Lo llama el
+    /// host UNA vez al arrancar con `HubConfig.demo` (env `HUB_DEMO`, que solo escribe el
+    /// provisioning del SaaS), igual que sella el `event_sink` o el `notify_transport`.
+    ///
+    /// Es `&mut self` a propósito: se pone mientras se construye el runtime, antes de servir. No
+    /// hay endpoint, comando ni setting que lo cambie después — ni para encenderlo (un hub real que
+    /// se declarase demo dejaría de remitir sus ventas) ni para apagarlo (una demo que se declarase
+    /// real remitiría a la AEAT de verdad).
+    pub fn set_demo_hub(&mut self, demo: bool) {
+        self.registry.demo_hub = demo;
+    }
+
+    /// ¿Es este despliegue un hub de demo efímera? (ADR-0197). Lectura del marcador que selló el
+    /// host; el server la expone en `/api/hub/context` para que la UI se explique.
+    pub fn is_demo_hub(&self) -> bool {
+        self.registry.demo_hub
+    }
+
+    /// Cierra una puerta en un hub de demo (ADR-0197 §4). Devuelve el error con el SUJETO del
+    /// cierre, para que el cliente sepa cuál de los tres se negó.
+    fn refuse_if_demo(&self, lock: DemoLock) -> Result<()> {
+        if self.registry.demo_hub {
+            return Err(RuntimeError::DemoLocked { lock });
+        }
+        Ok(())
     }
 
     /// Registra el backend persistente de módulos. El server lo resuelve a disco (Local) o al
@@ -1353,7 +1380,14 @@ impl Runtime {
         updates: &serde_json::Map<String, Json>,
         updated_by: &str,
     ) -> Result<Json> {
-        settings::set_many(self.db.as_ref(), &self.hub_id, updates, updated_by).await
+        settings::set_many(
+            self.db.as_ref(),
+            &self.hub_id,
+            updates,
+            updated_by,
+            self.registry.demo_hub,
+        )
+        .await
     }
 
     /// Capabilities DECLARADAS por un módulo con su estado de grant (ADR-0079). Para
@@ -1395,12 +1429,17 @@ impl Runtime {
     /// frontera que cruzar ni segunda opinión que discrepe: el contenedor es la única fuente. Un
     /// negocio que suba un **sello de entidad** propio entra por `www10` sin tocar nada, que es
     /// justamente lo que la AEAT segrega.
+    /// **Un hub de DEMO no sube certificado** (ADR-0197 §4, hub#376). El cierre va aquí, en la
+    /// puerta del `own`, y NO en [`certificate::set`]: el certificado **delegado** de ERPlora sigue
+    /// llegando por su vía (`set_delegated`, hub#317) — es la distribución normal de la flota y una
+    /// demo la recibe como cualquier otro hub. Lo que no puede es tener identidad fiscal PROPIA.
     pub async fn set_business_certificate(
         &self,
         pkcs12_b64: &str,
         password: &str,
         by: &str,
     ) -> Result<()> {
+        self.refuse_if_demo(DemoLock::BusinessCertificate)?;
         certificate::set(
             self.db.as_ref(),
             &self.hub_id,
@@ -1425,7 +1464,11 @@ impl Runtime {
     }
 
     /// Elimina el certificado **del negocio**. El delegado no se toca: no es del cliente.
+    ///
+    /// Cerrado también en una demo (hub#376): «no reemplazable» sin «no borrable» sería un
+    /// reemplazo en dos pasos.
     pub async fn delete_business_certificate(&self) -> Result<()> {
+        self.refuse_if_demo(DemoLock::BusinessCertificate)?;
         certificate::delete(self.db.as_ref(), &self.hub_id, certificate::CertificateKind::Own).await
     }
 
@@ -1591,5 +1634,87 @@ mod tests {
             .or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64))
             .unwrap_or(-1);
         assert_eq!(c, 1, "el SQL del command interno debe haberse ejecutado");
+    }
+
+    // ── Certificado del negocio CERRADO en una demo (ADR-0197 §4 · hub#376) ────────────────
+
+    /// 🔴 Por la puerta que la APLICA: `set_business_certificate` es lo que llama
+    /// `PUT /api/business/certificate`. Y falla ANTES de la clave maestra: la demo no llega
+    /// siquiera a intentar cifrar (`HUB_SECRETS_KEY` ni hace falta).
+    #[tokio::test]
+    async fn a_demo_hub_cannot_upload_a_business_certificate() {
+        let mut rt = Runtime::new(Box::new(fresh_db().await));
+        rt.set_demo_hub(true);
+        let err = rt
+            .set_business_certificate("Zm9v", "s3cret", "hub_user:1")
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                RuntimeError::DemoLocked {
+                    lock: DemoLock::BusinessCertificate
+                }
+            ),
+            "got {err:?}"
+        );
+    }
+
+    /// «No reemplazable» sin «no borrable» sería un reemplazo en dos pasos: borrar y subir.
+    #[tokio::test]
+    async fn a_demo_hub_cannot_delete_the_business_certificate_either() {
+        let mut rt = Runtime::new(Box::new(fresh_db().await));
+        rt.set_demo_hub(true);
+        let err = rt.delete_business_certificate().await.unwrap_err();
+        assert!(
+            matches!(
+                err,
+                RuntimeError::DemoLocked {
+                    lock: DemoLock::BusinessCertificate
+                }
+            ),
+            "got {err:?}"
+        );
+    }
+
+    /// 🔴 La otra dirección: un hub REAL sube su `.p12` como siempre. Si esta guarda se escapase a
+    /// un hub de pago, el negocio no podría remitir a la AEAT — el peor fallo posible, y mudo.
+    /// (Aquí falla por la clave maestra ausente, que es la guarda de al lado: lo que importa es
+    /// que NO es `DemoLocked`, o sea que la puerta está abierta para él.)
+    #[tokio::test]
+    async fn a_real_hub_uploads_its_certificate_as_always() {
+        let rt = Runtime::new(Box::new(fresh_db().await));
+        assert!(!rt.is_demo_hub(), "el default de un runtime es hub normal");
+        let err = rt
+            .set_business_certificate("Zm9v", "s3cret", "hub_user:1")
+            .await
+            .unwrap_err();
+        assert!(
+            !matches!(err, RuntimeError::DemoLocked { .. }),
+            "un hub real no puede toparse con el cierre de la demo: {err:?}"
+        );
+    }
+
+    /// Leer el estado del certificado NO se cierra: la demo tiene que poder EXPLICAR que no tiene
+    /// uno (es media pantalla de VeriFactu). El cierre es de escritura, no un modo ciego.
+    #[tokio::test]
+    async fn a_demo_hub_still_reads_its_certificate_status() {
+        let mut rt = Runtime::new(Box::new(fresh_db().await));
+        rt.ensure_system_tables().await.expect("system tables");
+        rt.set_demo_hub(true);
+        let status = rt
+            .business_certificate_status()
+            .await
+            .expect("el estado del certificado se lee siempre");
+        assert_eq!(status["present"], serde_json::json!(false));
+    }
+
+    /// El marcador lo sella el host y no lo mueve nadie más: el default es hub normal.
+    #[tokio::test]
+    async fn the_demo_marker_is_off_until_the_host_seals_it() {
+        let mut rt = Runtime::new(Box::new(fresh_db().await));
+        assert!(!rt.is_demo_hub());
+        rt.set_demo_hub(true);
+        assert!(rt.is_demo_hub());
     }
 }

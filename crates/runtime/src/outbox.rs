@@ -548,7 +548,7 @@ mod tests {
             crate::host_notify::ALLOWED_RECIPIENTS_SETTING.into(),
             json!(to),
         );
-        crate::settings::set_many(db, "h1", &s, "hub_user:admin")
+        crate::settings::set_many(db, "h1", &s, "hub_user:admin", false)
             .await
             .unwrap();
     }

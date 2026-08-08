@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value};
 
-use crate::errors::{Result, RuntimeError};
+use crate::errors::{DemoLock, Result, RuntimeError};
 use crate::registry::now_rfc3339;
 
 /// Una clave de setting conocida: su nombre, el valor por defecto (JSON) y un validador que, dado
@@ -364,6 +364,36 @@ fn validate_recipient_list(v: &Value) -> std::result::Result<String, String> {
     Ok(out.join(","))
 }
 
+/// Las claves de `hub_settings` que SON la identidad fiscal del obligado tributario (ADR-0061).
+///
+/// Mismos dos nombres que `commands::FISCAL_IDENTITY_PARAMS` — y no es coincidencia: el dispatcher
+/// los inyecta como `:business_tax_id`/`:business_legal_name` leyéndolos de AQUÍ, así que la clave
+/// y el parámetro son literalmente el mismo dato visto desde los dos lados. `business_address` se
+/// queda fuera, igual que allí: no identifica a nadie.
+pub(crate) const FISCAL_IDENTITY_SETTINGS: [&str; 2] = ["business_tax_id", "business_legal_name"];
+
+/// La identidad fiscal de un hub de DEMO es de SOLO LECTURA (ADR-0197 §4, hub#376).
+///
+/// Un hub de demo es anónimo, sin registro y dura una hora: el NIF y la razón social que se
+/// tecleen ahí no son de nadie. Dejarlos escribir tiene dos consecuencias concretas, no teóricas:
+/// los documentos que emita la demo saldrían a nombre de un negocio real que no ha pedido nada, y
+/// `POST /api/business/fiscal-identity` publicaría ese NIF como `BillingProfile` en el SaaS
+/// (ADR-0201 decisión 5) — un desconocido escribiendo en la facturación de ERPlora.
+///
+/// La guarda es al REVÉS de lo que parece: no protege a la demo, protege al negocio cuyo NIF
+/// alguien teclearía en ella.
+fn enforce_demo_fiscal_identity_lock(
+    updates: &serde_json::Map<String, Value>,
+    demo_hub: bool,
+) -> Result<()> {
+    if demo_hub && FISCAL_IDENTITY_SETTINGS.iter().any(|k| updates.contains_key(*k)) {
+        return Err(RuntimeError::DemoLocked {
+            lock: DemoLock::FiscalIdentity,
+        });
+    }
+    Ok(())
+}
+
 /// Lee TODOS los settings conocidos de `hub_id`: las filas persistidas mezcladas sobre los defaults
 /// (claves sin fila → su default). Una fila cuya clave ya no es conocida se ignora; una fila cuyo
 /// valor ya no valida degrada al default (lectura nunca rompe). Devuelve un objeto JSON
@@ -458,7 +488,13 @@ pub async fn set_many(
     hub_id: &str,
     updates: &serde_json::Map<String, Value>,
     updated_by: &str,
+    demo_hub: bool,
 ) -> Result<Value> {
+    // 0) Fiscal identity is READ-ONLY in a demo hub (ADR-0197 §4, hub#376). Before validation and
+    //    before the DB, and the whole PUT is refused, not the offending key: settings are already
+    //    atomic here, and a partial apply would leave the caller guessing which half landed.
+    enforce_demo_fiscal_identity_lock(updates, demo_hub)?;
+
     // 1) Validación de TODO el lote antes de tocar la BD (rechazo total si algo no cuadra).
     let mut normalized: Vec<(&'static str, String)> = Vec::with_capacity(updates.len());
     for (key, value) in updates {
@@ -620,7 +656,7 @@ mod tests {
         ] {
             let mut updates = serde_json::Map::new();
             updates.insert("theme_palette".into(), json!(id));
-            let result = set_many(&db, "hub-1", &updates, "hub_user:1")
+            let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
                 .await
                 .unwrap();
             assert_eq!(result["theme_palette"], json!(id));
@@ -629,7 +665,7 @@ mod tests {
         // Un id que no existe en palettes.css se rechaza (p. ej. el set viejo del Cloud).
         let mut updates = serde_json::Map::new();
         updates.insert("theme_palette".into(), json!("glass"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
             .await
             .unwrap_err();
         assert!(
@@ -647,7 +683,7 @@ mod tests {
         updates.insert("currency".into(), json!("usd")); // se normaliza a USD
         updates.insert("language".into(), json!("en"));
         updates.insert("api_docs_enabled".into(), json!(true));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
             .await
             .unwrap();
         assert_eq!(result["currency"], json!("USD"));
@@ -657,7 +693,7 @@ mod tests {
         // Persistido: una nueva lectura lo refleja, y un PUT parcial sólo cambia su clave.
         let mut partial = serde_json::Map::new();
         partial.insert("language".into(), json!("es"));
-        let result = set_many(&db, "hub-1", &partial, "hub_user:1")
+        let result = set_many(&db, "hub-1", &partial, "hub_user:1", false)
             .await
             .unwrap();
         assert_eq!(result["language"], json!("es"));
@@ -675,7 +711,7 @@ mod tests {
         ensure_table(&db).await;
         let mut updates = serde_json::Map::new();
         updates.insert("not_a_setting".into(), json!("x"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
             .await
             .unwrap_err();
         assert!(
@@ -694,7 +730,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("GBP"));
         updates.insert("language".into(), json!("fr")); // no soportado
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
             .await
             .unwrap_err();
         assert!(
@@ -728,10 +764,125 @@ mod tests {
         ensure_table(&db).await;
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("USD"));
-        set_many(&db, "hub-a", &updates, "x").await.unwrap();
+        set_many(&db, "hub-a", &updates, "x", false).await.unwrap();
 
         // El hub B no ve los settings del hub A (sigue en sus defaults).
         let b = get_all(&db, "hub-b").await.unwrap();
         assert_eq!(b["currency"], json!("EUR"));
+    }
+
+    // ── Identidad fiscal de SOLO LECTURA en un hub de DEMO (ADR-0197 §4 · hub#376) ─────────
+
+    /// 🔴 La guarda, por la puerta que la APLICA: `set_many` es lo que llama
+    /// `PUT /api/settings`, no un helper de siembra.
+    #[tokio::test]
+    async fn a_demo_hub_cannot_write_its_fiscal_identity() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        for key in ["business_tax_id", "business_legal_name"] {
+            let mut updates = serde_json::Map::new();
+            updates.insert(key.into(), json!("B12345678"));
+            let err = set_many(&db, "hub-1", &updates, "hub_user:1", true)
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(
+                    err,
+                    RuntimeError::DemoLocked {
+                        lock: DemoLock::FiscalIdentity
+                    }
+                ),
+                "`{key}` must stay read-only in a demo: {err:?}"
+            );
+            // Y NO se escribió: el rechazo es antes de tocar la BD.
+            let all = get_all(&db, "hub-1").await.unwrap();
+            assert_eq!(all[key], json!(""), "`{key}` must still be empty");
+        }
+    }
+
+    /// Colar la identidad dentro de un lote con claves inocentes tampoco cuela — y el lote entero
+    /// se rechaza, así que la moneda que iba de acompañante tampoco se aplica.
+    #[tokio::test]
+    async fn the_lock_survives_being_hidden_in_a_batch() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("currency".into(), json!("USD"));
+        updates.insert("business_tax_id".into(), json!("B12345678"));
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1", true)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                RuntimeError::DemoLocked {
+                    lock: DemoLock::FiscalIdentity
+                }
+            ),
+            "got {err:?}"
+        );
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["currency"], json!("EUR"), "the batch is refused whole");
+        assert_eq!(all["business_tax_id"], json!(""));
+    }
+
+    /// La demo sigue siendo un hub USABLE: todo lo que no es la identidad fiscal se configura
+    /// igual (el visitante elige idioma, paleta, moneda…). La bandera no es un modo de solo
+    /// lectura, es un cierre de tres cosas concretas.
+    #[tokio::test]
+    async fn a_demo_hub_configures_everything_else_normally() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("currency".into(), json!("USD"));
+        updates.insert("language".into(), json!("en"));
+        updates.insert("theme_palette".into(), json!("ocean"));
+        updates.insert("business_address".into(), json!("Calle Falsa 123"));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", true)
+            .await
+            .expect("a demo hub is a hub: only its fiscal identity is frozen");
+        assert_eq!(result["currency"], json!("USD"));
+        assert_eq!(result["business_address"], json!("Calle Falsa 123"));
+    }
+
+    /// 🔴 La otra dirección: un hub REAL escribe su identidad fiscal como siempre. Si la guarda se
+    /// escapara a un hub de pago, el negocio no podría configurar el NIF con el que factura.
+    #[tokio::test]
+    async fn a_real_hub_writes_its_fiscal_identity_as_always() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_tax_id".into(), json!("B12345678"));
+        updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .expect("a real hub configures the tax id it invoices with");
+        assert_eq!(result["business_tax_id"], json!("B12345678"));
+        assert_eq!(result["business_legal_name"], json!("Bar Manolo SL"));
+    }
+
+    /// 🔴 Un hub REAL no puede DECLARARSE demo. Ser demo no es un setting: no hay clave que
+    /// escribir, así que el intento muere en «clave desconocida». Si lo fuera, cualquier admin
+    /// podría apagar sus propias obligaciones fiscales desde Ajustes.
+    #[tokio::test]
+    async fn being_a_demo_is_not_something_a_hub_can_switch_on() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        for key in ["demo", "is_demo", "demo_hub"] {
+            let mut updates = serde_json::Map::new();
+            updates.insert(key.into(), json!(true));
+            let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(err, RuntimeError::InvalidPayload { .. }),
+                "`{key}` must not be a setting: {err:?}"
+            );
+        }
+        assert!(
+            !KNOWN.iter().any(|s| s.key.contains("demo")),
+            "the demo marker is the deployment's (HUB_DEMO), never a row anyone can write"
+        );
     }
 }

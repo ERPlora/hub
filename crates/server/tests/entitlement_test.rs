@@ -153,6 +153,7 @@ async fn proxy_entitlement_incluye_revalidation_aunque_el_cloud_no_responda() {
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture()).await.unwrap();
     let cfg = HubConfig {
+        demo: false,
         hub_id: "h1".into(),
         cloud_base_url: "http://127.0.0.1:9".into(), // puerto discard: rechazo inmediato
         module_cache: std::env::temp_dir().join("erplora-test-cache"),
