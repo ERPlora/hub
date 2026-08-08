@@ -700,7 +700,7 @@ impl Runtime {
     /// config (no es "modo demo"); la idempotencia la garantiza el propio SQL. Devuelve cuántas
     /// sentencias aplicó. Lo llama el host al arrancar si hay `HUB_SEED_SQL`/`HUB_SEED_SQL_PATH`.
     pub async fn apply_seed(&self, sql: &str) -> Result<usize> {
-        seed::apply(self.db.as_ref(), sql).await
+        seed::apply(self.db.as_ref(), sql, &self.hub_id).await
     }
 
     // ── Print queue of the hub (ADR-0196 §6, hub#341) ──────────────────────────────────────────
@@ -989,18 +989,40 @@ impl Runtime {
         (device_id != self.hub_id).then_some(device_id)
     }
 
+    /// El **hub** al que pertenecen las filas de device-trust, o `None` si este despliegue no dice
+    /// cuál es (hub#489).
+    ///
+    /// `hub_id = ''` es el valor que la migración v23 reserva para «esta fila no nombra hub»: son
+    /// las filas anteriores a la columna, y se borran en vez de regalárselas a quien arranque
+    /// primero. Devolver `None` aquí es lo que impide que el runtime vuelva a escribirlas —
+    /// un hub arrancado sin `HUB_ID` re-crearía justo lo que la migración quita, y una
+    /// re-aplicación de la migración borraría entonces confianza viva.
+    fn hub_scope(&self) -> Option<&str> {
+        (!self.hub_id.is_empty()).then_some(self.hub_id.as_str())
+    }
+
+    /// El par `(hub, dispositivo)` que nombra una llamada, o `None` si no nombra un dispositivo
+    /// **de este hub**. Falla cerrado por los dos lados: sin hub no hay confianza que conceder, y
+    /// el `hub_id` no es un dispositivo (hub#454).
+    fn device_of_this_hub<'a>(&'a self, device_id: &'a str) -> Option<(&'a str, &'a str)> {
+        Some((self.hub_scope()?, self.device_named(device_id)?))
+    }
+
     /// Marca un dispositivo como de confianza (tras el primer login online). Idempotente (§2.9).
+    /// La confianza es **de este hub** (hub#489): la misma tablet puede serlo en dos negocios.
     pub async fn trust_device(&self, device_id: &str, label: &str) -> Result<()> {
-        match self.device_named(device_id) {
-            Some(id) => identity::trust_device(self.db.as_ref(), id, label).await,
+        match self.device_of_this_hub(device_id) {
+            Some((hub_id, id)) => {
+                identity::trust_device(self.db.as_ref(), hub_id, id, label).await
+            }
             None => Ok(()), // nothing to trust: naming the hub names no device.
         }
     }
 
-    /// `true` si el dispositivo es de confianza (gate del login por PIN, §2.9).
+    /// `true` si el dispositivo es de confianza **de este hub** (gate del login por PIN, §2.9).
     pub async fn is_device_trusted(&self, device_id: &str) -> Result<bool> {
-        match self.device_named(device_id) {
-            Some(id) => identity::is_device_trusted(self.db.as_ref(), id).await,
+        match self.device_of_this_hub(device_id) {
+            Some((hub_id, id)) => identity::is_device_trusted(self.db.as_ref(), hub_id, id).await,
             None => Ok(false),
         }
     }
@@ -1008,7 +1030,7 @@ impl Runtime {
     /// Revoca la confianza de un dispositivo (perdido/robado). Idempotente (§2.9). Se lleva con
     /// ella el **modo** del dispositivo (hub#357): la fila borrada es donde vivía.
     pub async fn untrust_device(&self, device_id: &str) -> Result<()> {
-        identity::untrust_device(self.db.as_ref(), device_id).await
+        identity::untrust_device(self.db.as_ref(), &self.hub_id, device_id).await
     }
 
     /// Los dispositivos que este hub conoce, con lo que permite reconocerlos a ojo (hub#455).
@@ -1018,7 +1040,7 @@ impl Runtime {
     /// confió, el modo y su auditoría, las sesiones abiertas— lo escribió el hub. Ver
     /// [`devices::TrustedDevice`].
     pub async fn list_devices(&self) -> Result<Vec<devices::TrustedDevice>> {
-        devices::list(self.db.as_ref()).await
+        devices::list(self.db.as_ref(), &self.hub_id).await
     }
 
     /// **Corta** un dispositivo perdido (hub#455): cierra sus sesiones abiertas y le retira la
@@ -1030,14 +1052,14 @@ impl Runtime {
     /// se le nombre —revocar solo quita privilegio—, incluida una fila heredada cuyo id fuese el
     /// del propio hub (hub#454).
     pub async fn revoke_device(&self, device_id: &str) -> Result<devices::Revocation> {
-        devices::revoke(self.db.as_ref(), device_id).await
+        devices::revoke(self.db.as_ref(), &self.hub_id, device_id).await
     }
 
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
     /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
     pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {
-        match self.device_named(device_id) {
-            Some(id) => device_mode::mode(self.db.as_ref(), id).await,
+        match self.device_of_this_hub(device_id) {
+            Some((hub_id, id)) => device_mode::mode(self.db.as_ref(), hub_id, id).await,
             None => Ok(device_mode::DeviceMode::default()),
         }
     }
@@ -1083,8 +1105,10 @@ impl Runtime {
         mode: device_mode::DeviceMode,
         actor: &str,
     ) -> Result<()> {
-        match self.device_named(device_id) {
-            Some(id) => device_mode::set_mode(self.db.as_ref(), id, mode, actor).await,
+        match self.device_of_this_hub(device_id) {
+            Some((hub_id, id)) => {
+                device_mode::set_mode(self.db.as_ref(), hub_id, id, mode, actor).await
+            }
             None => Err(device_mode::unknown_device(device_id)),
         }
     }

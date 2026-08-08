@@ -42,6 +42,11 @@
 //! decided, like `activated_by` in the role catalogue: lowering the identity friction of a terminal
 //! is a decision that has to leave a trace.
 //!
+//! Since **v23** (hub#489) that row is keyed `(hub_id, device_id)`, so both doors below take the
+//! hub as well: a mode is a decision **one business** made about **its** terminal. Before it, on a
+//! database shared by several hubs, an administrator could lower the friction of a device next
+//! door — property 1 above ("the hub decides") held for the *client* and not for the *tenant*.
+//!
 //! What HANGS off the mode (hub#358): the login screen only offers the pinpad on a `shared` device
 //! ([`crate::device_mode::DeviceMode::session_ttl_secs`] is the other half) and the session it opens
 //! expires within the shift instead of lasting a month.
@@ -166,15 +171,17 @@ pub(crate) fn unknown_device(device_id: &str) -> RuntimeError {
 ///
 /// Deliberately infallible in the "unknown" direction: this is read by the **login screen**, with
 /// no session, from whatever id the client presents.
-pub async fn mode(db: &dyn DatabaseAdapter, device_id: &str) -> Result<DeviceMode> {
+pub async fn mode(db: &dyn DatabaseAdapter, hub_id: &str, device_id: &str) -> Result<DeviceMode> {
     if device_id.is_empty() {
         return Ok(DeviceMode::Shared);
     }
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     let res = db
         .query(
-            "SELECT mode FROM hub_trusted_device WHERE device_id = :device_id",
+            "SELECT mode FROM hub_trusted_device \
+              WHERE hub_id = :hub_id AND device_id = :device_id",
             &p,
         )
         .await?;
@@ -191,6 +198,7 @@ pub async fn mode(db: &dyn DatabaseAdapter, device_id: &str) -> Result<DeviceMod
 /// and the id in question is a string the caller chose.
 pub async fn set_mode(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     device_id: &str,
     mode: DeviceMode,
     actor: &str,
@@ -202,17 +210,22 @@ pub async fn set_mode(
         });
     }
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     p.insert("mode".into(), json!(mode.as_str()));
     p.insert("now".into(), json!(now_rfc3339()));
     p.insert("actor".into(), json!(actor));
     // UPDATE, never UPSERT: the row has to exist already, and letting the write door create it
     // would turn "this device is mine" into a way to trust an arbitrary id.
+    //
+    // Scoped by `hub_id` too (hub#489): a device the hub NEXT DOOR knows is, from here, a device
+    // nobody knows — same `unknown_device` refusal as any other stranger, deliberately, so the
+    // answer cannot be read as "that id exists, just not for you".
     let res = db
         .execute(
             "UPDATE hub_trusted_device \
                 SET mode = :mode, mode_set_at = :now, mode_set_by = :actor \
-              WHERE device_id = :device_id",
+              WHERE hub_id = :hub_id AND device_id = :device_id",
             &p,
         )
         .await?;

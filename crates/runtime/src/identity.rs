@@ -968,29 +968,47 @@ pub async fn delete_session(db: &dyn DatabaseAdapter, token: &str) -> Result<()>
 
 /// Marca un dispositivo como **de confianza** (idempotente). Lo llama el server tras un login online
 /// (cloud) correcto. `label` es un nombre legible opcional (p. ej. "Caja 1").
-pub async fn trust_device(db: &dyn DatabaseAdapter, device_id: &str, label: &str) -> Result<()> {
+///
+/// Scoped por `hub_id` (hub#489, migración de sistema v23): la confianza es de **un hub**, no de la
+/// base de datos. La clave `(hub_id, device_id)` deja además que la MISMA tablet sea de confianza en
+/// dos negocios a la vez —el caso real de quien trabaja en dos sitios—, cada uno con su etiqueta y
+/// su modo, sin que el login de uno pise el del otro.
+pub async fn trust_device(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    device_id: &str,
+    label: &str,
+) -> Result<()> {
     // INSERT … ON CONFLICT: re-marcar un dispositivo ya de confianza no falla ni duplica.
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     p.insert("label".into(), json!(label));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
-        "INSERT INTO hub_trusted_device (device_id, label, trusted_at) \
-          VALUES (:device_id, :label, :now) \
-          ON CONFLICT (device_id) DO UPDATE SET label = excluded.label",
+        "INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at) \
+          VALUES (:hub_id, :device_id, :label, :now) \
+          ON CONFLICT (hub_id, device_id) DO UPDATE SET label = excluded.label",
         &p,
     )
     .await?;
     Ok(())
 }
 
-/// `true` si `device_id` está marcado como de confianza (gate del login por PIN, §2.9).
-pub async fn is_device_trusted(db: &dyn DatabaseAdapter, device_id: &str) -> Result<bool> {
+/// `true` si `device_id` está marcado como de confianza **de este hub** (gate del login por PIN,
+/// §2.9). La confianza ganada en el hub de al lado no abre esta puerta (hub#489).
+pub async fn is_device_trusted(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    device_id: &str,
+) -> Result<bool> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     let res = db
         .query(
-            "SELECT 1 AS ok FROM hub_trusted_device WHERE device_id = :device_id",
+            "SELECT 1 AS ok FROM hub_trusted_device \
+              WHERE hub_id = :hub_id AND device_id = :device_id",
             &p,
         )
         .await?;
@@ -1008,9 +1026,11 @@ pub async fn is_device_trusted(db: &dyn DatabaseAdapter, device_id: &str) -> Res
 /// restored from a backup taken before this change (pgBackRest is the only real copy of a hub,
 /// ADR-0213), and re-running a `DELETE` of an id that is not a device is a no-op by construction.
 ///
-/// Scoped to `hub_id` alone: `hub_trusted_device` is keyed by `device_id` with no `hub_id` column,
-/// so in a database shared by several hubs (the pre-ADR-0201 shape) the table is common ground —
-/// each hub sweeps exactly its own id and nothing of its neighbour's.
+/// Scoped **twice** to `hub_id`, since hub#489 gave the table its own tenant column: a hub sweeps
+/// the row whose *device* is its own id, and only among its **own** rows. Before that column the
+/// scope was the device side alone, because the table was common ground in a database shared by
+/// several hubs (the pre-ADR-0201 shape) — now a neighbour that happens to know a device by this
+/// hub's id keeps it, which is its business and not this hub's to decide.
 pub async fn forget_hub_id_as_device(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
     if hub_id.is_empty() {
         return Ok(());
@@ -1018,19 +1038,25 @@ pub async fn forget_hub_id_as_device(db: &dyn DatabaseAdapter, hub_id: &str) -> 
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     db.execute(
-        "DELETE FROM hub_trusted_device WHERE device_id = :hub_id",
+        "DELETE FROM hub_trusted_device WHERE hub_id = :hub_id AND device_id = :hub_id",
         &p,
     )
     .await?;
     Ok(())
 }
 
-/// Revoca la confianza de un dispositivo (dispositivo perdido/robado). Idempotente.
-pub async fn untrust_device(db: &dyn DatabaseAdapter, device_id: &str) -> Result<()> {
+/// Revoca la confianza de un dispositivo **de este hub** (perdido/robado). Idempotente (hub#489: no
+/// alcanza la fila del hub de al lado que conozca un dispositivo con ese mismo id).
+pub async fn untrust_device(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    device_id: &str,
+) -> Result<()> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     db.execute(
-        "DELETE FROM hub_trusted_device WHERE device_id = :device_id",
+        "DELETE FROM hub_trusted_device WHERE hub_id = :hub_id AND device_id = :device_id",
         &p,
     )
     .await?;
@@ -1957,30 +1983,37 @@ mod tests {
     async fn device_trust_gate() {
         let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
-        // La tabla la crea la migración de sistema v2; en el test la creamos a mano (sin hub_id).
+        // La tabla la crean las migraciones de sistema v2 + v23 (que le añade el `hub_id` y
+        // recompone la PK, hub#489); en el test la creamos a mano ya en su forma final.
         db.execute_batch(
-            "CREATE TABLE hub_trusted_device (device_id TEXT PRIMARY KEY, \
-              label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
+            "CREATE TABLE hub_trusted_device (hub_id TEXT NOT NULL, device_id TEXT NOT NULL, \
+              label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL, \
+              PRIMARY KEY (hub_id, device_id));",
         )
         .await
         .unwrap();
 
         assert!(
-            !is_device_trusted(&db, "dev-1").await.unwrap(),
+            !is_device_trusted(&db, "hub-1", "dev-1").await.unwrap(),
             "desconocido = no confianza"
         );
-        trust_device(&db, "dev-1", "Caja 1").await.unwrap();
+        trust_device(&db, "hub-1", "dev-1", "Caja 1").await.unwrap();
         assert!(
-            is_device_trusted(&db, "dev-1").await.unwrap(),
+            is_device_trusted(&db, "hub-1", "dev-1").await.unwrap(),
             "marcado = de confianza"
         );
         // Idempotente (re-marcar no falla).
-        trust_device(&db, "dev-1", "Caja 1 (renombrada)")
+        trust_device(&db, "hub-1", "dev-1", "Caja 1 (renombrada)")
             .await
             .unwrap();
-        assert!(is_device_trusted(&db, "dev-1").await.unwrap());
+        assert!(is_device_trusted(&db, "hub-1", "dev-1").await.unwrap());
+        // Y es confianza de ESTE hub: el de al lado, sobre la misma BD, no la hereda (hub#489).
+        assert!(
+            !is_device_trusted(&db, "hub-2", "dev-1").await.unwrap(),
+            "la confianza es de un hub, no de la base de datos"
+        );
         // Revocar lo quita.
-        untrust_device(&db, "dev-1").await.unwrap();
-        assert!(!is_device_trusted(&db, "dev-1").await.unwrap());
+        untrust_device(&db, "hub-1", "dev-1").await.unwrap();
+        assert!(!is_device_trusted(&db, "hub-1", "dev-1").await.unwrap());
     }
 }
