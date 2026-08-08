@@ -3,12 +3,13 @@
 //! Two endpoints, both mounted in [`crate::app`] and both behind a **user session** (the same gate
 //! as the rest of the core API — enqueueing is not anonymous):
 //!
-//!  - `POST /api/print/jobs` → body `{ jobId, role, html, format? }`. Enqueues the document for the
-//!    print host of that `role`. **Idempotent by `jobId`**: a retry answers `200` with
-//!    `status: "duplicate"` instead of queueing a second ticket.
+//!  - `POST /api/print/jobs` → body `{ jobId, role, documentType, document, format? }`. Enqueues
+//!    the document for the print host of that `role`. **Idempotent by `jobId`**: a retry answers
+//!    `200` with `status: "duplicate"` instead of queueing a second ticket. The document travels
+//!    **structured** — the shape `escpos::render_document` reads — never as HTML (hub#501).
 //!  - `GET  /api/print/jobs?role=&status=&limit=` → the queue as a **status view**: what is waiting,
-//!    what is printing, what died and why. It deliberately omits the document; the HTML travels to
-//!    the print host that claims the job (hub#343), not to whoever polls the queue.
+//!    what is printing, what died and why. It deliberately omits the document, which travels to the
+//!    print host that claims the job (hub#343), not to whoever polls the queue.
 //!
 //! And three more for the **print host registry** (hub#342), the other half of ADR-0196 §6 — who
 //! is going to take the job out:
@@ -65,10 +66,15 @@ fn unauthorized(e: auth::AuthError) -> Response {
 }
 
 /// A queued job as the listing reports it: everything **except** the document.
+///
+/// `documentType` is state, not content — "a kitchen order is waiting" is exactly what the screen
+/// showing a stuck queue has to say — while `document` is the ticket itself and only ever leaves
+/// through the drain, past both of its guards.
 fn summary(job: &PrintJob) -> Value {
     json!({
         "jobId": job.job_id,
         "role": job.role,
+        "documentType": job.document_type,
         "format": job.format,
         "status": job.status,
         "attempts": job.attempts,
@@ -88,7 +94,10 @@ pub async fn enqueue_job(
             StatusCode::UNPROCESSABLE_ENTITY,
             Json(json!({
                 "ok": false,
-                "error": { "code": "invalid_payload", "message": "expected { jobId, role, html }" }
+                "error": {
+                    "code": "invalid_payload",
+                    "message": "expected { jobId, role, documentType, document }"
+                }
             })),
         )
             .into_response();
@@ -397,7 +406,8 @@ mod tests {
         PrintJob {
             job_id: "j1".into(),
             role: "kitchen".into(),
-            html: "<p>secret order</p>".into(),
+            document_type: "kitchen_order".into(),
+            document: json!({ "receipt_id": "K-1", "items": [{ "name": "Bacalao" }] }),
             format: print_queue::FORMAT_RECEIPT.into(),
             status: print_queue::STATUS_PENDING.into(),
             attempts: 0,
@@ -407,17 +417,22 @@ mod tests {
     }
 
     /// The listing view carries the state of the job and **not** its document: a screen polling the
-    /// queue does not need every ticket's HTML, and the print host gets it another way (hub#343).
+    /// queue does not need every ticket's lines and totals, and the print host gets them another way
+    /// (hub#343). What it DOES carry is which kind of document is stuck, because that is the thing
+    /// the owner needs to read.
     #[test]
     fn the_listing_view_reports_state_without_the_document() {
         let v = summary(&job());
         assert_eq!(v["jobId"], json!("j1"));
         assert_eq!(v["role"], json!("kitchen"));
+        assert_eq!(v["documentType"], json!("kitchen_order"));
         assert_eq!(v["status"], json!("pending"));
         assert_eq!(v["attempts"], json!(0));
-        assert!(
-            v.get("html").is_none(),
-            "the document never travels in the listing"
-        );
+        for leak in ["document", "html"] {
+            assert!(
+                v.get(leak).is_none(),
+                "the document never travels in the listing (`{leak}`)"
+            );
+        }
     }
 }

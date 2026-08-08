@@ -28,17 +28,36 @@ pub enum DocumentType {
 }
 
 impl DocumentType {
-    /// Mapea el string del protocolo; desconocido → `Generic` (igual que el `else` de Python).
+    /// Maps the protocol string; unknown → `Generic` (same as Python's `else`).
+    ///
+    /// ⚠️ **Lenient on purpose, and only for the retired standalone Bridge** (`apps/bridge`), whose
+    /// wire this behaviour came from. Anything new must use [`DocumentType::parse`]: see why there.
     pub fn from_wire(s: &str) -> Self {
-        match s {
+        Self::parse(s).unwrap_or(Self::Generic)
+    }
+
+    /// Maps the protocol string, **refusing what it does not know** (hub#501).
+    ///
+    /// This is the strict half of [`from_wire`], and it exists because the lenient one hides the
+    /// most expensive kind of failure: a `Kitchen` or a `kitchn` used to render as `Generic` — a
+    /// nameless dump of key/value pairs — so the kitchen got a piece of paper that was not an order
+    /// and **nobody found out until the plate was missing**. A ticket that fails loudly is cheaper
+    /// than one that fails quietly, so the caller gets a `None` it has to deal with.
+    ///
+    /// It is deliberately the same vocabulary the hub's queue accepts
+    /// (`erplora_runtime::print_queue::DOCUMENT_TYPES`) — two guards, two layers, different
+    /// messages, so neither can be deleted with the suite still green.
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
             "receipt" => Self::Receipt,
             "kitchen_order" => Self::KitchenOrder,
             "invoice" => Self::Invoice,
             "delivery_note" => Self::DeliveryNote,
             "barcode_label" => Self::BarcodeLabel,
             "cash_session_report" => Self::CashSessionReport,
-            _ => Self::Generic,
-        }
+            "generic" => Self::Generic,
+            _ => return None,
+        })
     }
 }
 
@@ -193,9 +212,27 @@ impl EscposBuilder {
     }
 }
 
-/// Render principal: documento → bytes ESC/POS listos para el socket.
-/// Despacha por `DocumentType` igual que `PrinterManager.print_document`.
+/// Main render: document → ESC/POS bytes ready for the socket.
+/// Dispatches on `DocumentType` like `PrinterManager.print_document`.
+///
+/// **A `data` that is not an object is refused** (hub#501). Every renderer below reads its fields
+/// by key (`data.get("items")`, `data.get("total")`); handed an array, a string or a `null` it finds
+/// none of them, takes every default and cuts a **blank ticket** without erroring. That is a silent
+/// failure at the very end of the chain — the one place where nobody is watching — so it stops here
+/// and the print host reports it instead.
 pub fn render_document(doc: DocumentType, data: &serde_json::Value) -> Result<Vec<u8>> {
+    if !data.is_object() {
+        return Err(crate::PeripheralError::InvalidPayload(format!(
+            "a document is a JSON object of fields to print, not {}",
+            match data {
+                serde_json::Value::Null => "null",
+                serde_json::Value::Bool(_) => "a boolean",
+                serde_json::Value::Number(_) => "a number",
+                serde_json::Value::String(_) => "a string",
+                _ => "an array",
+            }
+        )));
+    }
     let mut b = EscposBuilder::new();
     match doc {
         // invoice == receipt (`_print_invoice` delega en `_print_receipt`).
@@ -564,6 +601,98 @@ fn render_generic(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     b.text("================================\n\n");
     b.cut();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// **The wire vocabulary, pinned from this side.** The hub's queue keeps the same seven names
+    /// (`erplora_runtime::print_queue::DOCUMENT_TYPES`) and refuses anything else at the door; the
+    /// two lists are duplicated on purpose (the hub server has no business linking the hardware
+    /// crate), so each side pins its own or they drift and the printer starts degrading real
+    /// documents to `Generic` in silence.
+    #[test]
+    fn the_wire_vocabulary_is_exactly_these_seven() {
+        let vocabulary = [
+            ("receipt", DocumentType::Receipt),
+            ("kitchen_order", DocumentType::KitchenOrder),
+            ("invoice", DocumentType::Invoice),
+            ("delivery_note", DocumentType::DeliveryNote),
+            ("barcode_label", DocumentType::BarcodeLabel),
+            ("cash_session_report", DocumentType::CashSessionReport),
+            ("generic", DocumentType::Generic),
+        ];
+        for (wire, expected) in vocabulary {
+            assert_eq!(DocumentType::parse(wire), Some(expected), "`{wire}`");
+            // The serde spelling is the same one: the queue stores this string and the frame
+            // carries it, so a rename here would break the wire without touching this list.
+            assert_eq!(
+                serde_json::to_value(expected).unwrap(),
+                json!(wire),
+                "`{wire}` must serialise as itself"
+            );
+        }
+    }
+
+    /// **A document type nobody knows is refused, not printed as `Generic`.** This is the guard the
+    /// lenient `from_wire` never had: a typo used to reach the paper as a nameless key/value dump,
+    /// and the kitchen only noticed when the plate did not arrive.
+    #[test]
+    fn an_unknown_document_type_is_refused_instead_of_degraded() {
+        for unknown in ["Kitchen", "kitchn", "", "html", "KITCHEN_ORDER"] {
+            assert_eq!(
+                DocumentType::parse(unknown),
+                None,
+                "`{unknown}` is not a document this printer renders"
+            );
+        }
+        // And the lenient door is still lenient, deliberately: `apps/bridge` (🪦 standalone) speaks
+        // that wire and is not being changed. If both behaved the same, one of them would be dead
+        // code nobody would miss.
+        assert_eq!(DocumentType::from_wire("kitchn"), DocumentType::Generic);
+    }
+
+    /// **A `data` that is not an object is refused before it becomes blank paper.** Every renderer
+    /// reads by key, so an array or a string produces a ticket with nothing on it — and a cut.
+    #[test]
+    fn a_document_that_is_not_an_object_is_refused() {
+        for bad in [json!(null), json!("<p>ticket</p>"), json!([1, 2]), json!(7)] {
+            let err = render_document(DocumentType::Receipt, &bad)
+                .expect_err("{bad} is not a document");
+            assert!(
+                matches!(err, crate::PeripheralError::InvalidPayload(_)),
+                "the refusal says the payload is wrong, not that the printer is: {err}"
+            );
+        }
+    }
+
+    /// The guard above rejects **shape**, never content: a real ticket still renders, and what comes
+    /// out carries what was asked for. Without this, refusing everything would pass the test above.
+    #[test]
+    fn a_real_receipt_still_renders_its_lines_and_total() {
+        let bytes = render_document(
+            DocumentType::Receipt,
+            &json!({
+                "business_name": "Bar Manolo",
+                "receipt_id": "T-42",
+                "items": [{ "name": "Cafe", "quantity": 2, "total": 2.4 }],
+                "total": 2.4,
+            }),
+        )
+        .expect("a well-formed receipt renders");
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(text.contains("Bar Manolo"), "the business name is on the paper");
+        assert!(text.contains("T-42"), "the ticket number is on the paper");
+        assert!(text.contains("2x Cafe"), "the line is on the paper");
+        assert!(text.contains("TOTAL"), "the total is on the paper");
+        assert_eq!(
+            &bytes[bytes.len() - 3..],
+            &[0x1d, 0x56, 0x01],
+            "and the paper is cut, or the next ticket comes out attached to this one"
+        );
+    }
 }
 
 /// Formatea la cantidad como lo hace `f"{qty}x …"` en Python: si el JSON trae un entero

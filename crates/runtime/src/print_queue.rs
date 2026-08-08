@@ -1,9 +1,9 @@
 //! Print queue **in the hub** (ADR-0196 §6, hub#341).
 //!
-//! Any device — the PWA in a phone included — enqueues `{ role, html, jobId }` here. The device
-//! that has the installable app and sits on the printer's network registers as the **print host**
-//! of that `role` and drains the queue over the runtime's WS (hub#342/#343). Because the queue
-//! lives in the hub and not in the device:
+//! Any device — the PWA in a phone included — enqueues `{ role, documentType, document, jobId }`
+//! here. The device that has the installable app and sits on the printer's network registers as the
+//! **print host** of that `role` and drains the queue over the runtime's WS (hub#342/#343). Because
+//! the queue lives in the hub and not in the device:
 //!
 //!  - **`jobId` gives idempotency.** Re-sending the same job (a retried HTTP call, a double tap on
 //!    "print", a reconnect) never produces a second ticket: the row is keyed by `(hub_id, job_id)`
@@ -13,6 +13,26 @@
 //!  - **The queue survives a restart of the runtime**, because it is a table and not an in-memory
 //!    channel. That is the substantive difference with [`erplora_peripherals::PrintQueue`], whose
 //!    retry/backoff shape this module mirrors: what changes is *where the queue lives*.
+//!
+//! ## The document travels STRUCTURED, never as HTML (hub#501)
+//!
+//! The queue used to store the ticket as a self-contained `html` string. It could not become paper:
+//! `erplora_peripherals::escpos::render_document` renders **documents**, a `document_type` plus a
+//! JSON body, and there is no entry that takes HTML. Ioan's decision (2026-08-08) is that the
+//! document travels structured and **the HTML→ESC/POS translator is not written** — not now and not
+//! as a stopgap:
+//!
+//!  - a structured document can be rendered to whatever is needed — screen, 58mm paper, 80mm paper,
+//!    PDF — and **re-rendered tomorrow**, when the business changes printer or wants the ticket
+//!    somewhere else;
+//!  - frozen HTML is a photograph tied to the paper width of the day it was produced, and for every
+//!    other destination it is useless. A ticket has to be **re-printable** and **viewable from the
+//!    hub**, and neither works from a photograph.
+//!
+//! Consequence for this module: `document_type` is checked against the **closed vocabulary the
+//! renderer knows** ([`DOCUMENT_TYPES`]) at the door, and `document` must be a JSON **object**. A
+//! kitchen ticket that fails quietly is worse than one that never queues: nobody finds out until
+//! the plate is missing.
 //!
 //! ## State machine
 //!
@@ -63,9 +83,30 @@ pub const FORMAT_RECEIPT: &str = "receipt";
 /// A4 paper (invoices, delivery notes).
 pub const FORMAT_A4: &str = "a4";
 
-/// Upper bound for the document of a single job. A print job is a ticket or an invoice, not a
-/// file upload: without a bound, any session could push arbitrary blobs into the hub's database.
-pub const MAX_HTML_BYTES: usize = 512 * 1024;
+/// Upper bound for the document of a single job, measured on its serialised JSON. A print job is a
+/// ticket or an invoice, not a file upload: without a bound, any session could push arbitrary blobs
+/// into the hub's database.
+pub const MAX_DOCUMENT_BYTES: usize = 512 * 1024;
+
+/// **The document vocabulary of the queue** — the wire strings
+/// `erplora_peripherals::escpos::DocumentType` renders, and nothing else.
+///
+/// It is duplicated here on purpose rather than imported: `erplora-peripherals` is the *device's*
+/// crate (mDNS, TCP sockets, hardware discovery) and the hub server has no business linking it in
+/// to know the name of a document. What keeps the two honest is a test on **each** side —
+/// [`tests::the_queue_vocabulary_is_the_one_the_renderer_knows`] here, and
+/// `escpos::tests::the_wire_vocabulary_is_exactly_these_seven` there — plus the strict parse at the
+/// printer, which refuses anything that got past this list instead of silently printing it as
+/// `Generic`. Two guards, at two layers, with **different** messages: neither can mask the other.
+pub const DOCUMENT_TYPES: [&str; 7] = [
+    "receipt",
+    "kitchen_order",
+    "invoice",
+    "delivery_note",
+    "barcode_label",
+    "cash_session_report",
+    "generic",
+];
 
 /// What [`enqueue`] did. `Duplicate` is a **success**, not an error: it is the whole point of
 /// `jobId`, and the caller reports "queued" to the user either way.
@@ -79,15 +120,22 @@ pub enum EnqueueOutcome {
 
 /// A job as the producer submits it. Field names are camelCase over the wire to match the shell's
 /// `PrintRequest` (`apps/web/src/lib/print.ts`), which is the producer that already exists.
+///
+/// `deny_unknown_fields` is the **retirement of `html`** made loud: a producer still sending the
+/// old shape is told so at the door instead of having its ticket silently queued with an empty
+/// document and discovered missing at the printer.
 #[derive(Debug, Clone, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NewPrintJob {
     /// Idempotency key chosen by the producer. Two enqueues with the same one are one job.
     pub job_id: String,
     /// Printer role: `receipt` (default of the shell), `kitchen`, `bar`, …
     pub role: String,
-    /// Self-contained HTML of the document (no web components, no app CSS).
-    pub html: String,
+    /// Which document this is, from [`DOCUMENT_TYPES`]. Not the same axis as `role`: the role says
+    /// *which printer*, this says *what shape* — an `invoice` can come out of the receipt printer.
+    pub document_type: String,
+    /// The document itself, structured: the JSON object `escpos::render_document` reads.
+    pub document: serde_json::Value,
     /// Paper format. Defaults to [`FORMAT_RECEIPT`].
     #[serde(default = "default_format")]
     pub format: String,
@@ -97,14 +145,15 @@ fn default_format() -> String {
     FORMAT_RECEIPT.to_string()
 }
 
-/// A queued job as the hub stores it. `html` is included because the print host needs it to render;
-/// [`list`] is the observability view and returns the same shape.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+/// A queued job as the hub stores it. The document is included because the print host needs it to
+/// render; [`list`] is the observability view and returns the same shape.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrintJob {
     pub job_id: String,
     pub role: String,
-    pub html: String,
+    pub document_type: String,
+    pub document: serde_json::Value,
     pub format: String,
     pub status: String,
     pub attempts: i64,
@@ -113,7 +162,8 @@ pub struct PrintJob {
 }
 
 /// Columns every read of the queue returns, in the order [`row_to_job`] expects.
-const JOB_COLUMNS: &str = "job_id, role, html, format, status, attempts, created_at, last_error";
+const JOB_COLUMNS: &str =
+    "job_id, role, document_type, document, format, status, attempts, created_at, last_error";
 
 /// Rejection of a malformed job, before it reaches the database.
 fn invalid(detail: impl Into<String>) -> RuntimeError {
@@ -142,13 +192,33 @@ pub async fn enqueue(
     if role.is_empty() {
         return Err(invalid("role is required (which printer prints this)"));
     }
-    if job.html.trim().is_empty() {
-        return Err(invalid("html is required (there is no document to print)"));
-    }
-    if job.html.len() > MAX_HTML_BYTES {
+    let document_type = job.document_type.trim();
+    // The vocabulary is CLOSED, and that is the point of this guard. `DocumentType::from_wire` maps
+    // anything it does not know to `Generic`, so a typo (`kitchn`) used to print a nameless list of
+    // key/value pairs where the kitchen expected an order — a failure nobody sees until the plate is
+    // missing. Here it is a refusal, with the accepted names in the message.
+    if !DOCUMENT_TYPES.contains(&document_type) {
         return Err(invalid(format!(
-            "html is {} bytes, over the {MAX_HTML_BYTES} byte cap for a print job",
-            job.html.len()
+            "unknown document type `{document_type}` (expected one of {})",
+            DOCUMENT_TYPES.join(", ")
+        )));
+    }
+    // The renderer reads the document BY KEY (`data.get("items")`, `data.get("total")`). Handed an
+    // array, a string or a number it finds nothing, renders every default and prints a blank ticket
+    // without erroring — the same silent failure one layer down.
+    let Some(fields) = job.document.as_object() else {
+        return Err(invalid(
+            "document must be a JSON object (the fields the printer renders)",
+        ));
+    };
+    if fields.is_empty() {
+        return Err(invalid("document is empty (there is nothing to print)"));
+    }
+    let document = job.document.to_string();
+    if document.len() > MAX_DOCUMENT_BYTES {
+        return Err(invalid(format!(
+            "document is {} bytes, over the {MAX_DOCUMENT_BYTES} byte cap for a print job",
+            document.len()
         )));
     }
     if job.format != FORMAT_RECEIPT && job.format != FORMAT_A4 {
@@ -162,7 +232,8 @@ pub async fn enqueue(
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("job_id".into(), json!(job_id));
     p.insert("role".into(), json!(role));
-    p.insert("html".into(), json!(job.html));
+    p.insert("document_type".into(), json!(document_type));
+    p.insert("document".into(), json!(document));
     p.insert("format".into(), json!(job.format));
     p.insert("now".into(), json!(now_rfc3339()));
     // `ON CONFLICT DO NOTHING` (and not `DO UPDATE`) IS the idempotency guard: a repeated jobId
@@ -170,8 +241,8 @@ pub async fn enqueue(
     let res = db
         .execute(
             "INSERT INTO _print_queue \
-             (hub_id, job_id, role, html, format, status, attempts, created_at) \
-             VALUES (:hub_id, :job_id, :role, :html, :format, 'pending', 0, :now) \
+             (hub_id, job_id, role, document_type, document, format, status, attempts, created_at) \
+             VALUES (:hub_id, :job_id, :role, :document_type, :document, :format, 'pending', 0, :now) \
              ON CONFLICT (hub_id, job_id) DO NOTHING",
             &p,
         )
@@ -344,12 +415,18 @@ pub async fn role_of(
 }
 
 /// Row of [`JOB_COLUMNS`] → [`PrintJob`].
+///
+/// The document is stored as JSON **text** and parsed back here. A row that does not parse becomes
+/// `Value::Null`, which is not a silent recovery: `null` is not an object, so the printer's own
+/// guard refuses it and the job is reported `failed` with a reason instead of coming out blank.
+/// Nothing written through [`enqueue`] can be in that state — only a row edited by hand.
 fn row_to_job(row: &serde_json::Value) -> PrintJob {
     let s = |k: &str| row[k].as_str().unwrap_or_default().to_string();
     PrintJob {
         job_id: s("job_id"),
         role: s("role"),
-        html: s("html"),
+        document_type: s("document_type"),
+        document: serde_json::from_str(&s("document")).unwrap_or(serde_json::Value::Null),
         format: s("format"),
         status: s("status"),
         attempts: row["attempts"].as_i64().unwrap_or(0),
@@ -375,11 +452,13 @@ mod tests {
         db
     }
 
-    fn job(job_id: &str, role: &str, html: &str) -> NewPrintJob {
+    /// A ticket whose only distinguishing mark is `marker`, so a test can tell two documents apart.
+    fn job(job_id: &str, role: &str, marker: &str) -> NewPrintJob {
         NewPrintJob {
             job_id: job_id.into(),
             role: role.into(),
-            html: html.into(),
+            document_type: "receipt".into(),
+            document: json!({ "receipt_id": marker, "total": 12.5 }),
             format: FORMAT_RECEIPT.into(),
         }
     }
@@ -395,13 +474,13 @@ mod tests {
     async fn enqueueing_the_same_job_id_twice_does_not_duplicate_the_job() {
         let db = queue_db().await;
 
-        let first = enqueue(&db, "h1", &job("j1", "receipt", "<p>ticket</p>"))
+        let first = enqueue(&db, "h1", &job("j1", "receipt", "T-first"))
             .await
             .unwrap();
         assert_eq!(first, EnqueueOutcome::Queued);
 
         // Same jobId, different body: the retry of a request whose response got lost.
-        let second = enqueue(&db, "h1", &job("j1", "receipt", "<p>OTHER</p>"))
+        let second = enqueue(&db, "h1", &job("j1", "receipt", "T-OTHER"))
             .await
             .unwrap();
         assert_eq!(
@@ -413,7 +492,7 @@ mod tests {
         let jobs = all(&db, "h1").await;
         assert_eq!(jobs.len(), 1, "one jobId, one ticket");
         assert_eq!(
-            jobs[0].html, "<p>ticket</p>",
+            jobs[0].document["receipt_id"], "T-first",
             "the queued document is the first one; a retry never rewrites it"
         );
     }
@@ -431,7 +510,7 @@ mod tests {
                 .unwrap();
             crate::identity::ensure_tables(&db).await.unwrap();
             crate::system_migrations::apply(&db, "h1").await.unwrap();
-            enqueue(&db, "h1", &job("j1", "kitchen", "<p>order</p>"))
+            enqueue(&db, "h1", &job("j1", "kitchen", "K-order"))
                 .await
                 .unwrap();
         }
@@ -445,14 +524,15 @@ mod tests {
             .unwrap()
             .expect("the job waited across the restart");
         assert_eq!(claimed.job_id, "j1");
-        assert_eq!(claimed.html, "<p>order</p>");
+        assert_eq!(claimed.document["receipt_id"], "K-order");
+        assert_eq!(claimed.document_type, "receipt");
     }
 
     /// A job already claimed by a print host is not handed to a second one while its lease holds.
     #[tokio::test]
     async fn a_claimed_job_is_not_handed_out_again() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j1", "receipt", "<p>t</p>"))
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
 
@@ -471,7 +551,7 @@ mod tests {
     #[tokio::test]
     async fn a_drained_job_is_never_handed_out_again() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j1", "receipt", "<p>t</p>"))
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
         claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
@@ -492,13 +572,65 @@ mod tests {
         assert_eq!(all(&db, "h1").await[0].status, STATUS_DONE);
     }
 
+    /// **Confirming a job this hub does not have is a plain `false`, not a shrug.** The return value
+    /// is the whole contract of `mark_done` — the drain answers `{"confirmed": …}` with it, and the
+    /// host reads that to decide whether the debt is paid. A `mark_done` that always said "yes"
+    /// would let a host tick off a ticket that was never queued here (another hub's `jobId`, a
+    /// typo), and the frame it gets back would be a lie.
+    ///
+    /// Its positive twin is `a_drained_job_is_never_handed_out_again`. Both are needed: with only
+    /// the positive one, "always true" passes.
+    #[tokio::test]
+    async fn confirming_a_job_this_hub_does_not_have_is_a_plain_no() {
+        let db = queue_db().await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        enqueue(&db, "h2", &job("j-next-door", "receipt", "T-h2"))
+            .await
+            .unwrap();
+
+        assert!(
+            !mark_done(&db, "h1", "never-existed").await.unwrap(),
+            "an id this hub never had is not a confirmation"
+        );
+        assert!(
+            !mark_done(&db, "h1", "j-next-door").await.unwrap(),
+            "and neither is another hub's job, which from here is simply not a job"
+        );
+
+        // The neighbour is untouched throughout: its ticket is still waiting for its own host.
+        assert_eq!(
+            list(&db, "h2", None, None, 10).await.unwrap()[0].status,
+            STATUS_PENDING,
+            "confirming from the wrong hub must not close somebody else's ticket"
+        );
+    }
+
+    /// A job that already reached a **terminal** state is not confirmable a second time either —
+    /// which is what keeps the answer meaningful when a host re-sends its debt after a reconnect.
+    #[tokio::test]
+    async fn confirming_an_already_terminal_job_is_also_a_no() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1")).await.unwrap();
+        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(mark_done(&db, "h1", "j1").await.unwrap(), "the first one counts");
+        assert!(
+            !mark_done(&db, "h1", "j1").await.unwrap(),
+            "the second one changed nothing, and says so"
+        );
+        assert_eq!(all(&db, "h1").await[0].status, STATUS_DONE);
+    }
+
     /// Even re-enqueueing the same `jobId` after it printed does not print it twice: the row still
     /// exists, so the idempotency key still holds. This is the double-tap the cashier does when the
     /// ticket is slow to come out.
     #[tokio::test]
     async fn re_enqueueing_a_job_id_that_already_printed_does_not_print_it_again() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j1", "receipt", "<p>t</p>"))
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
         claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
@@ -507,7 +639,7 @@ mod tests {
             .unwrap();
         mark_done(&db, "h1", "j1").await.unwrap();
 
-        let again = enqueue(&db, "h1", &job("j1", "receipt", "<p>t</p>"))
+        let again = enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
         assert_eq!(again, EnqueueOutcome::Duplicate);
@@ -524,7 +656,7 @@ mod tests {
     async fn jobs_are_handed_out_in_enqueue_order() {
         let db = queue_db().await;
         for id in ["j1", "j2", "j3"] {
-            enqueue(&db, "h1", &job(id, "kitchen", "<p>o</p>"))
+            enqueue(&db, "h1", &job(id, "kitchen", "K-1"))
                 .await
                 .unwrap();
         }
@@ -546,7 +678,7 @@ mod tests {
     #[tokio::test]
     async fn a_host_only_claims_jobs_of_its_own_role() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j1", "kitchen", "<p>o</p>"))
+        enqueue(&db, "h1", &job("j1", "kitchen", "K-1"))
             .await
             .unwrap();
 
@@ -570,7 +702,7 @@ mod tests {
     #[tokio::test]
     async fn a_lease_that_expires_returns_the_job_to_the_queue() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j1", "receipt", "<p>t</p>"))
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
 
@@ -601,7 +733,7 @@ mod tests {
     #[tokio::test]
     async fn a_failing_job_is_requeued_and_then_dead_lettered() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j1", "receipt", "<p>t</p>"))
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
 
@@ -645,11 +777,11 @@ mod tests {
         let db = queue_db().await;
         crate::system_migrations::apply(&db, "h2").await.unwrap();
 
-        enqueue(&db, "h1", &job("j1", "receipt", "<p>h1</p>"))
+        enqueue(&db, "h1", &job("j1", "receipt", "T-h1"))
             .await
             .unwrap();
         assert_eq!(
-            enqueue(&db, "h2", &job("j1", "receipt", "<p>h2</p>"))
+            enqueue(&db, "h2", &job("j1", "receipt", "T-h2"))
                 .await
                 .unwrap(),
             EnqueueOutcome::Queued,
@@ -666,17 +798,61 @@ mod tests {
             .await
             .unwrap()
             .expect("h1 still has its own job");
-        assert_eq!(h1.html, "<p>h1</p>");
+        assert_eq!(h1.document["receipt_id"], "T-h1");
+    }
+
+    /// **Which role a job belongs to — the answer the drain's authorisation is built on.**
+    ///
+    /// `role_of` is what lets `print_drain` refuse a host that reaches for somebody else's queue, so
+    /// it has to be right in three different ways and each one protects something different: the
+    /// **real** role (or the guard compares against nothing), `None` for an id that does not exist
+    /// (or the confirmation door doubles as a directory of `jobId`s), and `None` for **another
+    /// hub's** job (or a neighbour's ticket becomes closable from here).
+    ///
+    /// The neighbour is **alive and holding its ticket** for the whole test, and is asserted
+    /// untouched at the end: retiring its row first would let a query with no `hub_id` pass.
+    #[tokio::test]
+    async fn the_role_of_a_job_is_reported_only_for_this_hubs_own_jobs() {
+        let db = queue_db().await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        enqueue(&db, "h1", &job("j-mine", "kitchen", "K-1"))
+            .await
+            .unwrap();
+        enqueue(&db, "h2", &job("j-next-door", "bar", "B-1"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            role_of(&db, "h1", "j-mine").await.unwrap(),
+            Some("kitchen".to_string()),
+            "the real role, or the drain's guard compares against nothing"
+        );
+        assert_eq!(
+            role_of(&db, "h1", "never-existed").await.unwrap(),
+            None,
+            "an id nobody queued is not a job"
+        );
+        assert_eq!(
+            role_of(&db, "h1", "j-next-door").await.unwrap(),
+            None,
+            "another hub's job is, from here, not a job at all"
+        );
+
+        // …and asking about it did not disturb it: it is still waiting for its own bar host.
+        let neighbour = list(&db, "h2", None, None, 10).await.unwrap();
+        assert_eq!(neighbour.len(), 1);
+        assert_eq!(neighbour[0].status, STATUS_PENDING);
+        assert_eq!(neighbour[0].role, "bar");
     }
 
     /// The queue view can be filtered by role and status (what the print host and the UI ask for).
     #[tokio::test]
     async fn the_queue_can_be_filtered_by_role_and_status() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j1", "receipt", "<p>t</p>"))
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
-        enqueue(&db, "h1", &job("j2", "kitchen", "<p>o</p>"))
+        enqueue(&db, "h1", &job("j2", "kitchen", "K-2"))
             .await
             .unwrap();
         claim_next(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
@@ -707,9 +883,15 @@ mod tests {
         let db = queue_db().await;
 
         for bad in [
-            job("", "receipt", "<p>t</p>"),
-            job("j1", "", "<p>t</p>"),
-            job("j1", "receipt", ""),
+            job("", "receipt", "T-1"),
+            job("j1", "", "T-1"),
+            NewPrintJob {
+                job_id: "j1".into(),
+                role: "receipt".into(),
+                document_type: "receipt".into(),
+                document: json!({}),
+                format: FORMAT_RECEIPT.into(),
+            },
         ] {
             assert!(
                 enqueue(&db, "h1", &bad).await.is_err(),
@@ -723,11 +905,243 @@ mod tests {
     #[tokio::test]
     async fn a_document_over_the_size_cap_is_rejected() {
         let db = queue_db().await;
-        let huge = "x".repeat(MAX_HTML_BYTES + 1);
+        let huge = "x".repeat(MAX_DOCUMENT_BYTES + 1);
         assert!(enqueue(&db, "h1", &job("j1", "receipt", &huge))
             .await
             .is_err());
         assert!(all(&db, "h1").await.is_empty());
+    }
+
+    // ── The document travels structured (hub#501) ─────────────────────────────────────────────
+
+    /// **The whole point of hub#501.** What comes out of the queue is the same structured document
+    /// that went in — the shape `escpos::render_document` reads — and not a rendering of it. That is
+    /// what lets the same ticket go to 58mm paper, 80mm paper, a PDF or a screen, today and next
+    /// year, instead of being a photograph of one printer's width.
+    #[tokio::test]
+    async fn the_document_reaches_the_print_host_structured_and_unchanged() {
+        let db = queue_db().await;
+        let document = json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-42",
+            "items": [{ "name": "Cafe", "quantity": 2, "total": 2.4 }],
+            "total": 2.4,
+        });
+        enqueue(
+            &db,
+            "h1",
+            &NewPrintJob {
+                job_id: "j1".into(),
+                role: "receipt".into(),
+                document_type: "receipt".into(),
+                document: document.clone(),
+                format: FORMAT_RECEIPT.into(),
+            },
+        )
+        .await
+        .unwrap();
+
+        let claimed = claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            .await
+            .unwrap()
+            .expect("the host claims the ticket");
+        assert_eq!(
+            claimed.document, document,
+            "the host receives the document it can render, byte for byte the one queued"
+        );
+        assert_eq!(claimed.document_type, "receipt");
+    }
+
+    /// **A document type the renderer does not know is refused at the door.** `from_wire` maps
+    /// anything unknown to `Generic`, so a typo used to print a nameless key/value dump where the
+    /// kitchen expected an order — and nobody found out until the plate was missing. The refusal
+    /// names the accepted vocabulary so the producer can fix it.
+    #[tokio::test]
+    async fn a_document_type_the_printer_does_not_know_is_rejected() {
+        let db = queue_db().await;
+
+        // `Kitchen` and `kitchn` are the two ways this goes wrong in practice: wrong case, and a
+        // typo. Both used to become `Generic` in silence.
+        for bad in ["Kitchen", "kitchn", "", "html"] {
+            let err = enqueue(
+                &db,
+                "h1",
+                &NewPrintJob {
+                    job_id: "j1".into(),
+                    role: "kitchen".into(),
+                    document_type: bad.into(),
+                    document: json!({ "receipt_id": "K-1" }),
+                    format: FORMAT_RECEIPT.into(),
+                },
+            )
+            .await
+            .expect_err("an unprintable document type never reaches the queue");
+            assert!(
+                err.to_string().contains("kitchen_order"),
+                "the refusal says what IS accepted, or the producer cannot fix it: {err}"
+            );
+        }
+        assert!(all(&db, "h1").await.is_empty());
+    }
+
+    /// Every name in the vocabulary is actually accepted — otherwise the guard above could be a
+    /// blanket refusal and no test would notice.
+    #[tokio::test]
+    async fn every_document_type_of_the_vocabulary_is_accepted() {
+        let db = queue_db().await;
+        for (i, kind) in DOCUMENT_TYPES.iter().enumerate() {
+            enqueue(
+                &db,
+                "h1",
+                &NewPrintJob {
+                    job_id: format!("j{i}"),
+                    role: "receipt".into(),
+                    document_type: (*kind).into(),
+                    document: json!({ "receipt_id": kind }),
+                    format: FORMAT_RECEIPT.into(),
+                },
+            )
+            .await
+            .unwrap_or_else(|e| panic!("`{kind}` is in the vocabulary and must queue: {e}"));
+        }
+        assert_eq!(all(&db, "h1").await.len(), DOCUMENT_TYPES.len());
+    }
+
+    /// The queue's vocabulary is **the renderer's**, spelled the way the wire spells it. The
+    /// counterpart lives in `escpos` (`the_wire_vocabulary_is_exactly_these_seven`); this side pins
+    /// that nobody adds a name here that the printer would silently degrade to `Generic`.
+    #[test]
+    fn the_queue_vocabulary_is_the_one_the_renderer_knows() {
+        assert_eq!(
+            DOCUMENT_TYPES.len(),
+            7,
+            "adding a document type means adding it to escpos::DocumentType too"
+        );
+        for name in DOCUMENT_TYPES {
+            assert_eq!(
+                name,
+                name.to_lowercase(),
+                "the wire spelling is snake_case: `{name}` would not deserialise"
+            );
+        }
+    }
+
+    /// **A document that is not a JSON object is refused.** The renderer reads it by key, so an
+    /// array or a string finds nothing, takes every default and prints a blank ticket without
+    /// erroring — the same silent failure the type guard above prevents, one layer along.
+    #[tokio::test]
+    async fn a_document_that_is_not_an_object_is_rejected() {
+        let db = queue_db().await;
+
+        for bad in [
+            json!("<p>ticket</p>"),
+            json!([{ "name": "Cafe" }]),
+            json!(42),
+            json!(null),
+            json!({}),
+        ] {
+            assert!(
+                enqueue(
+                    &db,
+                    "h1",
+                    &NewPrintJob {
+                        job_id: "j1".into(),
+                        role: "receipt".into(),
+                        document_type: "receipt".into(),
+                        document: bad.clone(),
+                        format: FORMAT_RECEIPT.into(),
+                    },
+                )
+                .await
+                .is_err(),
+                "{bad} is not a document the printer can render"
+            );
+        }
+        assert!(all(&db, "h1").await.is_empty());
+    }
+
+    /// **The retired `html` field is refused, not ignored.** A producer that never got the memo
+    /// would otherwise have its ticket queued with whatever else it sent and discover the loss at
+    /// the printer; here it is told at the door.
+    #[test]
+    fn a_job_still_sending_the_retired_html_field_is_refused() {
+        let err = serde_json::from_value::<NewPrintJob>(json!({
+            "jobId": "j1",
+            "role": "receipt",
+            "html": "<p>ticket</p>",
+        }))
+        .expect_err("the old shape is not a job any more");
+        assert!(
+            err.to_string().contains("html"),
+            "the refusal names the field that no longer exists: {err}"
+        );
+    }
+
+    /// The cap is a limit, not an off-by-one: a document of **exactly** the maximum is a document.
+    /// Without this, moving the comparison one notch would go unnoticed and a ticket right on the
+    /// boundary would stop printing for no reason anybody could explain.
+    #[tokio::test]
+    async fn a_document_of_exactly_the_size_cap_is_accepted() {
+        let db = queue_db().await;
+        // Pad the ticket id until the serialised document weighs exactly the cap.
+        let skeleton = json!({ "receipt_id": "" }).to_string().len();
+        let exact = NewPrintJob {
+            job_id: "j1".into(),
+            role: "receipt".into(),
+            document_type: "receipt".into(),
+            document: json!({ "receipt_id": "x".repeat(MAX_DOCUMENT_BYTES - skeleton) }),
+            format: FORMAT_RECEIPT.into(),
+        };
+        assert_eq!(exact.document.to_string().len(), MAX_DOCUMENT_BYTES);
+
+        assert_eq!(
+            enqueue(&db, "h1", &exact).await.unwrap(),
+            EnqueueOutcome::Queued,
+            "judged by what it weighs, and the cap is a weight it may reach"
+        );
+    }
+
+    /// **The cap is pinned from both ends**, because neither number follows from the other:
+    ///
+    ///  - **big enough for a real ticket**: an invoice with two hundred lines and notes on half of
+    ///    them is still only text. A cap that refused one would stop a legitimate sale from
+    ///    printing, which is worse than anything it is defending against;
+    ///  - **still a bound**: this lands in the hub's database and **any session can post to it**, so
+    ///    it has to stay visibly nowhere near a file upload.
+    ///
+    /// Pinned in absolute numbers on purpose. Expressed against the constant, this test would move
+    /// with it — and a cap silently reduced to 1.5 KiB would pass everything.
+    #[test]
+    fn the_document_cap_fits_a_real_ticket_and_is_still_a_bound() {
+        assert!(
+            MAX_DOCUMENT_BYTES >= 64 * 1024,
+            "a long invoice must never be too big to print"
+        );
+        assert!(
+            MAX_DOCUMENT_BYTES <= 1024 * 1024,
+            "the print queue is not an upload endpoint"
+        );
+    }
+
+    /// **A ticket omits `format`**, because 80mm paper is what a ticket is; only an invoice has to
+    /// say otherwise. The default is part of the producer contract (`PrintRequest` in the shell
+    /// leaves it out), so it is deserialised here rather than assumed.
+    #[tokio::test]
+    async fn a_job_that_does_not_say_its_paper_defaults_to_a_ticket() {
+        let db = queue_db().await;
+        let job: NewPrintJob = serde_json::from_value(json!({
+            "jobId": "j1",
+            "role": "receipt",
+            "documentType": "receipt",
+            "document": { "receipt_id": "T-1" },
+        }))
+        .expect("a job without `format` is a complete job");
+        assert_eq!(job.format, FORMAT_RECEIPT);
+
+        enqueue(&db, "h1", &job)
+            .await
+            .expect("and it queues: the default has to be a format the queue accepts");
+        assert_eq!(all(&db, "h1").await[0].format, FORMAT_RECEIPT);
     }
 
     /// An unknown paper format is rejected: the print host would not know what to render.
@@ -737,7 +1151,8 @@ mod tests {
         let bad = NewPrintJob {
             job_id: "j1".into(),
             role: "receipt".into(),
-            html: "<p>t</p>".into(),
+            document_type: "receipt".into(),
+            document: json!({ "receipt_id": "T-1" }),
             format: "a3".into(),
         };
         assert!(enqueue(&db, "h1", &bad).await.is_err());

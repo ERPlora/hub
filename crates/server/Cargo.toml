@@ -71,3 +71,8 @@ hex = "0.4"
 # atado de verdad, no solo el manejador de frames. Misma versión que ya trae `axum` con `ws`, así
 # que no añade nada al árbol de dependencias.
 tokio-tungstenite = "0.24"
+# El ESC/POS del DISPOSITIVO, para el test manual contra la impresora real
+# (`tests/print_to_real_printer.rs`, hub#501). El servidor NO depende de este crate en producción —
+# el hub no toca hardware (ARQUITECTURA.md §2.7)—: aquí el test hace de host de impresión, que es
+# justamente quien sí lo usa, y sin él «sale por papel» seguiría sin poder comprobarse.
+erplora-peripherals = { path = "../peripherals" }

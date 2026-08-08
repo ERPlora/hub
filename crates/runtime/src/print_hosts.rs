@@ -363,7 +363,8 @@ mod tests {
             &crate::print_queue::NewPrintJob {
                 job_id: job_id.into(),
                 role: role.into(),
-                html: "<p>t</p>".into(),
+                document_type: "receipt".into(),
+                document: serde_json::json!({ "receipt_id": "T-1" }),
                 format: crate::print_queue::FORMAT_RECEIPT.into(),
             },
         )

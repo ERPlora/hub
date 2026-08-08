@@ -219,7 +219,8 @@ mod tests {
             &print_queue::NewPrintJob {
                 job_id: job_id.into(),
                 role: role.into(),
-                html: format!("<p>{job_id}</p>"),
+                document_type: "receipt".into(),
+                document: serde_json::json!({ "receipt_id": job_id }),
                 format: print_queue::FORMAT_RECEIPT.into(),
             },
         )
@@ -491,7 +492,11 @@ mod tests {
             .unwrap()
             .expect("the registered host is handed the ticket");
         assert_eq!(job.job_id, "j1");
-        assert_eq!(job.html, "<p>j1</p>", "the document travels to the host");
+        assert_eq!(
+            job.document,
+            serde_json::json!({ "receipt_id": "j1" }),
+            "the structured document travels to the host"
+        );
 
         assert!(confirm(&db, "h1", "till-1", "j1").await.unwrap());
         assert_eq!(status_of(&db, "h1", "j1").await, print_queue::STATUS_DONE);
@@ -551,7 +556,7 @@ mod tests {
             .unwrap()
             .expect("late and duplicated beats lost");
         assert_eq!(second.job_id, "j1");
-        assert_eq!(second.html, first.html);
+        assert_eq!(second.document, first.document);
         assert_eq!(
             second.attempts, 2,
             "the reprint is counted, so it cannot go round for ever"

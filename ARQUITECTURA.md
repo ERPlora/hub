@@ -146,12 +146,17 @@ Tauri vía `invoke` — ADR-0196; la **cola de impresión se muda al hub**, ADR-
   (ADR-0196 §6); el dispositivo la drena. **As-built (hub#341):** tabla `_print_queue` (migración
   de sistema v18) + `crates/runtime/src/print_queue.rs` + `POST/GET /api/print/jobs`, idempotente
   por `jobId`. **As-built (hub#342):** registro de **hosts** de impresión — tabla `_print_host`
-  (migración de sistema v19) + `crates/runtime/src/print_hosts.rs` + `/api/print/hosts`. Un rol
+  (migración de sistema **v22**) + `crates/runtime/src/print_hosts.rs` + `/api/print/hosts`. Un rol
   admite **varios** hosts y un equipo varios roles; la vivacidad **no se almacena**, se deriva del
   último latido (sin noticias durante 3 latidos = no vivo), y el registro sobrevive al reinicio
   porque es configuración, no sesión. `coverage` responde «cuánto espera y cuántos hosts vivos hay»
-  por rol. Falta el drenaje por el WS (hub#343) y que `sdk.print` encole (hub#344). Diseño en
-  [architecture/hub/print-queue.md](../architecture/hub/print-queue.md).
+  por rol. **As-built (hub#343):** el drenaje por `GET /ws/print` (ADR-0262) — `print_drain.rs` +
+  `print_ws.rs` + `apps/web/src/lib/print-drain.ts`. **As-built (hub#501, ADR-0265):** el documento
+  viaja **ESTRUCTURADO** (`documentType` + `document`, migración de sistema **v25**; el `html` se
+  borró) y **no se guarda: se regenera desde la venta**; `apps/web/src/lib/print-host.ts` lo entrega
+  a `erplora_print` y el ciclo tique → host → papel está probado contra una térmica real
+  (`crates/server/tests/print_to_real_printer.rs`). Falta que `sdk.print` encole (hub#344). Diseño
+  en [architecture/hub/print-queue.md](../architecture/hub/print-queue.md).
 - **Enrutado por rol** (recibo vs cocina) cuando un terminal tiene varias configuradas.
 
 El escáner por HID lo maneja el SO/navegador como teclado.

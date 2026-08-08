@@ -53,7 +53,7 @@
 //!    │  {"type":"hello","session":…,"deviceId":…}  ─▶
 //!    ◀─ {"type":"ready","deviceId":…,"roles":[…],"heartbeatSeconds":30}
 //!    │  {"type":"claim","role":"kitchen"}          ─▶
-//!    ◀─ {"type":"job","jobId":…,"role":…,"html":…,"format":…,"attempts":1}
+//!    ◀─ {"type":"job","jobId":…,"role":…,"documentType":…,"document":{…},"format":…,"attempts":1}
 //!    │      … prints via crates/peripherals …
 //!    │  {"type":"done","jobId":…}                  ─▶
 //!    ◀─ {"type":"ack","jobId":…,"confirmed":true}
@@ -74,8 +74,8 @@ use crate::auth;
 use crate::state::AppState;
 
 /// Longest client→server frame accepted. These frames carry ids and a role, never a document — the
-/// HTML only ever travels hub→host. Bounded because the socket accepts bytes **before** anybody has
-/// proved who they are.
+/// document only ever travels hub→host. Bounded because the socket accepts bytes **before** anybody
+/// has proved who they are.
 pub const MAX_FRAME_BYTES: usize = 8 * 1024;
 
 /// How long a socket may stay silent before saying `hello`. A connection that never authenticates
@@ -279,8 +279,12 @@ pub(crate) async fn handle_frame(st: &AppState, conn: &mut DrainConnection, raw:
                     "type": "job",
                     "jobId": job.job_id,
                     "role": job.role,
-                    // The ONLY frame that carries the document, and only after both guards.
-                    "html": job.html,
+                    // The ONLY frame that carries the document, and only after both guards. It
+                    // travels STRUCTURED (hub#501): `documentType` picks the renderer and
+                    // `document` is the object it reads, which is what makes the same ticket
+                    // printable on 58mm, on 80mm or as a PDF — and re-printable tomorrow.
+                    "documentType": job.document_type,
+                    "document": job.document,
                     "format": job.format,
                     "attempts": job.attempts,
                 })),
@@ -457,7 +461,8 @@ mod tests {
         rt.enqueue_print_job(&NewPrintJob {
             job_id: job_id.into(),
             role: role.into(),
-            html: format!("<p>{job_id}</p>"),
+            document_type: "receipt".into(),
+            document: json!({ "receipt_id": job_id }),
             format: print_queue::FORMAT_RECEIPT.into(),
         })
         .await
@@ -678,7 +683,7 @@ mod tests {
     ///    lock a legitimate till out of printing, which is worse than anything it is defending
     ///    against;
     ///  - **far smaller than a document**: the whole reason it exists is that nothing travelling in
-    ///    this direction is ever a ticket. If it grew to `MAX_HTML_BYTES` it would stop meaning
+    ///    this direction is ever a ticket. If it grew to `MAX_DOCUMENT_BYTES` it would stop meaning
     ///    anything.
     #[test]
     fn the_frame_cap_fits_a_handshake_and_is_nowhere_near_a_document() {
@@ -687,7 +692,7 @@ mod tests {
             "a session token plus a device id must never be too big to say hello with"
         );
         assert!(
-            MAX_FRAME_BYTES < erplora_runtime::print_queue::MAX_HTML_BYTES,
+            MAX_FRAME_BYTES < erplora_runtime::print_queue::MAX_DOCUMENT_BYTES,
             "a client frame is not a document: the cap has to be visibly smaller than one"
         );
     }
@@ -727,8 +732,17 @@ mod tests {
         assert_eq!(job.frame["type"], "job");
         assert_eq!(job.frame["jobId"], "j1");
         assert_eq!(
-            job.frame["html"], "<p>j1</p>",
-            "the document travels to the host that claimed it, and only there"
+            job.frame["document"],
+            json!({ "receipt_id": "j1" }),
+            "the STRUCTURED document travels to the host that claimed it, and only there"
+        );
+        assert_eq!(
+            job.frame["documentType"], "receipt",
+            "…together with which renderer turns it into paper"
+        );
+        assert!(
+            job.frame.get("html").is_none(),
+            "the retired HTML field is gone from the wire, not merely empty"
         );
         assert_eq!(job.frame["format"], print_queue::FORMAT_RECEIPT);
 

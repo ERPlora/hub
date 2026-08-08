@@ -1746,6 +1746,7 @@ dependencies = [
  "chrono",
  "erplora-cloud-client",
  "erplora-db",
+ "erplora-peripherals",
  "erplora-runtime",
  "erplora-source",
  "erplora-vector",
