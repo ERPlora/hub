@@ -164,12 +164,30 @@ pub(crate) async fn execute_at(
     // one. And it does not add the permission to the context, so it opens this gate and nothing
     // else. Everything downstream (the fiscal precondition, the capability gate, a handler's
     // operations) sees the same cashier it always saw, plus a note of who approved.
+    //
+    // hub#362 (rule 3) is the third: the two attributions the approval exists to produce —
+    // `created_by`, the cashier who was at the till, and `approved_by`, the manager who allowed
+    // it — are written to the runtime's own record right here, BEFORE the command runs. Not by
+    // the module: a module that never declares an `approved_by` column would lose the trace in
+    // silence, and today that is every module in the catalogue.
     let elevated_ctx;
     let ctx = match permissions::check_command(registry, ctx, &cmd.def.permission) {
         Ok(()) => ctx,
         Err(RuntimeError::RequiresElevation { permission }) => {
             match spend_approval(grants, ctx, name, payload, &permission) {
-                Some(approved_by) => {
+                Some((approved_by, fingerprint)) => {
+                    // No receipt, no elevated action: swallowing this would make «break the
+                    // audit» a way to run a manager-level command leaving no trace at all.
+                    crate::elevation::record_spend(
+                        db,
+                        &ctx.hub_id,
+                        name,
+                        &permission,
+                        &ctx.user_id,
+                        &approved_by,
+                        &fingerprint,
+                    )
+                    .await?;
                     elevated_ctx = ctx.clone().spent_approval_of(approved_by);
                     &elevated_ctx
                 }
@@ -788,7 +806,8 @@ pub(crate) fn validate_handler_event(
 }
 
 /// Spends the step-up approval that authorises `command(payload)` for this context, if there is
-/// one, returning the `hub_user.id` that approved (hub#361).
+/// one, returning the `hub_user.id` that approved and the **fingerprint** the grant was matched
+/// against (hub#361, hub#362).
 ///
 /// Everything the answer depends on is server-side: the token is a **lookup key** into the
 /// runtime's own store and the binding is rebuilt here from the context, the command name and the
@@ -800,7 +819,7 @@ fn spend_approval(
     command: &str,
     payload: &Params,
     permission: &str,
-) -> Option<String> {
+) -> Option<(String, String)> {
     // The token comes from the CONTEXT and from nowhere else — the HTTP layer put it there from
     // `X-Elevation-Token`. Reading it from `payload` instead would be the whole vulnerability:
     // the body of a command is caller-controlled data that already gets validated, defaulted and
@@ -813,16 +832,23 @@ fn spend_approval(
     // simply miss and return `None`, exactly as the short circuit does. It is kept as `?` because
     // "no token, no question asked" is cheaper and says what it means.
     let token = ctx.elevation_token.as_deref()?;
-    grants?.spend(
+    let grants = grants?;
+    // The fingerprint of the payload the manager was shown is computed ONCE and handed back with
+    // the approver, so the receipt hub#362 writes names the very same action the grant was
+    // matched against. Recomputing it at the call site would let the two drift apart — the record
+    // would then describe an action nobody actually approved.
+    let fingerprint = crate::elevation::fingerprint(payload);
+    let approved_by = grants.spend(
         token,
         &crate::elevation::Binding {
             hub_id: ctx.hub_id.clone(),
             requester: ctx.user_id.clone(),
             command: command.to_string(),
-            fingerprint: crate::elevation::fingerprint(payload),
+            fingerprint: fingerprint.clone(),
             permission: permission.to_string(),
         },
-    )
+    )?;
+    Some((approved_by, fingerprint))
 }
 
 /// Valida una intención del handler y la resuelve a su(s) SQL.

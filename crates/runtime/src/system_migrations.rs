@@ -647,6 +647,31 @@ UPDATE _print_queue SET status = 'dead', \
   WHERE document_type = '' AND status IN ('pending', 'printing');\
 ALTER TABLE _print_queue DROP COLUMN IF EXISTS html;",
     },
+    // ── v26 — hub#362 / ADR-0265: the receipt of a spent step-up approval ────────────────────
+    // Rule 3 of the PIN elevation plan: `created_by` is the cashier who was at the till,
+    // `approved_by` the manager who authorised. hub#361 exposed the manager as the system
+    // parameter `:approved_by`, but a parameter only becomes a record if somebody writes it —
+    // and leaving that to each module means a module that never declares the column loses the
+    // attribution IN SILENCE (today, none of the 24 published modules declares one).
+    //
+    // So the runtime keeps the record itself, here: it is the only component that knows an
+    // approval happened at all. Note the deliberate contrast with the grant, which ADR-0246 keeps
+    // out of the database on purpose — a grant is a *spendable credential* and must not survive a
+    // restart or travel in a dump; this is a *receipt* for something that already happened, and
+    // must survive precisely that.
+    //
+    // No soft-delete: an audit trail with an `is_deleted` flag is not an audit trail. `hub_id`
+    // stays per row (row contract, ADR-0201) even though each hub now owns its database.
+    SystemMigration {
+        version: 26,
+        name: "elevation_audit",
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _elevation_audit (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, command TEXT NOT NULL, permission TEXT NOT NULL, \
+  created_by TEXT NOT NULL, approved_by TEXT NOT NULL, payload_fingerprint TEXT NOT NULL, \
+  created_at TEXT NOT NULL, PRIMARY KEY (hub_id, id));\
+CREATE INDEX IF NOT EXISTS idx_elevation_audit_when ON _elevation_audit (hub_id, created_at);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -1181,6 +1206,100 @@ mod tests {
         assert!(
             duplicated.is_err(),
             "dentro de un hub el dispositivo sigue siendo único: la PK es compuesta, no ausente"
+        );
+    }
+
+    /// El mismo invariante para el **recibo de la elevación** (hub#362, v24): un hub que ya pasó
+    /// por todo lo anterior **sí** recibe la tabla. Es el test que revienta si alguien la renumera
+    /// por debajo del máximo —v15 y v20 están libres y son **inalcanzables**—, donde se saltaría
+    /// EN SILENCIO: el hub arrancaría creyéndose al día, y la primera acción que un encargado
+    /// aprobase moriría con un 42P01… o, peor, si algún día alguien "arregla" eso tragándose el
+    /// error, se ejecutaría sin dejar rastro. Que es exactamente lo que hub#362 existe para evitar.
+    #[tokio::test]
+    async fn a_hub_already_migrated_still_receives_the_elevation_audit() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let audit = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "elevation_audit")
+            .expect("el recibo de la elevación sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(audit.version)).await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            previous_version_of(audit.version),
+            "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
+        );
+
+        apply(&db, "hub-test").await.unwrap();
+
+        // Las dos atribuciones, en la misma fila: quién estaba en la caja y quién lo autorizó.
+        db.execute_batch(
+            "INSERT INTO _elevation_audit (id, hub_id, command, permission, created_by, \
+             approved_by, payload_fingerprint, created_at) \
+             VALUES ('e1', 'h1', 'till.sale.void', 'till.void_sale', 'u-cashier', 'u-manager', \
+             'abc123', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+    }
+
+    /// **La v24 se puede RE-EJECUTAR sobre una base donde su tabla ya existe.**
+    ///
+    /// El control guarda *versiones*, no esquema: cualquier cosa que borre filas de
+    /// `_hub_system_migrations` hace que [`apply`] vuelva a lanzar el SQL contra objetos que ya
+    /// están (`tests/access_email_backfill.rs` rebobina `version >= 19` y se lleva por delante
+    /// **toda** migración posterior — esta). Con un `CREATE TABLE` a secas el segundo pase muere
+    /// con 42P07 y tumba 15 tests de esa suite (hub#483); con `IF NOT EXISTS` es una no-op.
+    ///
+    /// Y comprueba lo que en una tabla de auditoría es la mitad importante: re-aplicar **no puede
+    /// recrear la tabla vacía**. Un registro de quién aprobó qué que se borra solo al rebobinar
+    /// una migración no es un registro de nada.
+    #[tokio::test]
+    async fn the_elevation_audit_can_be_applied_twice() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+
+        db.execute_batch(
+            "INSERT INTO _elevation_audit (id, hub_id, command, permission, created_by, \
+             approved_by, payload_fingerprint, created_at) \
+             VALUES ('e1', 'h1', 'till.sale.void', 'till.void_sale', 'u-cashier', 'u-manager', \
+             'abc123', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        let audit = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "elevation_audit")
+            .expect("el recibo de la elevación sigue en el catálogo");
+        let mut p = Params::new();
+        p.insert("version".into(), json!(audit.version));
+        db.execute(
+            "DELETE FROM _hub_system_migrations WHERE version >= :version",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test")
+            .await
+            .expect("la v24 se re-aplica sobre su propia tabla sin romper");
+
+        let rows = db
+            .query(
+                "SELECT approved_by FROM _elevation_audit WHERE id = 'e1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1, "re-aplicar no recrea la tabla vacía");
+        assert_eq!(
+            rows.rows[0]["approved_by"],
+            json!("u-manager"),
+            "ni pierde quién aprobó: una auditoría que se borra sola no es una auditoría"
         );
     }
 
