@@ -220,7 +220,7 @@ export const appUpdateDestination = ref<string | null>(null);
  * `hub.administer` — nothing new is minted here.
  *
  * ⚠️ The wildcard rule below is the THIRD copy of the same two lines (`lib/management-link.ts`,
- * `lib/runtime.ts`). Hoisting it into one place is hub#500, kept out of this change on purpose.
+ * `lib/runtime.ts`). Hoisting it into one place is hub#506, kept out of this change on purpose.
  */
 export const canUpdateApp: ComputedRef<boolean> = computed(() => {
   const granted = user.value?.permissions ?? [];
