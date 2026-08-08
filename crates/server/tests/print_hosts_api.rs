@@ -510,7 +510,12 @@ async fn the_registry_reports_work_waiting_with_nobody_to_print_it() {
             "/api/print/jobs",
             Some(&employee),
             Some("phone-1"),
-            Some(json!({ "jobId": "j1", "role": "kitchen", "html": "<p>order</p>" })),
+            Some(json!({
+                "jobId": "j1",
+                "role": "kitchen",
+                "documentType": "kitchen_order",
+                "document": { "receipt_id": "K-1" },
+            })),
         ))
         .await
         .unwrap();

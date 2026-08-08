@@ -63,7 +63,12 @@ async fn body_json(resp: axum::response::Response) -> Value {
 }
 
 fn ticket(job_id: &str, role: &str) -> Value {
-    json!({ "jobId": job_id, "role": role, "html": "<p>ticket</p>" })
+    json!({
+        "jobId": job_id,
+        "role": role,
+        "documentType": "receipt",
+        "document": { "receipt_id": job_id, "total": 12.5 },
+    })
 }
 
 /// Enqueueing is not anonymous: the print queue is hub data behind the same session gate as the
@@ -188,9 +193,81 @@ async fn the_queue_listing_does_not_carry_the_document() {
         .unwrap();
     let body = body_json(resp).await;
     assert!(
-        body["jobs"][0].get("html").is_none(),
+        body["jobs"][0].get("document").is_none(),
         "the queue listing is a status view, not a document dump"
     );
+}
+
+/// **A producer still sending the retired `html` field is refused at the door** (hub#501), not
+/// quietly accepted with an empty document that fails at the printer where nobody is watching. The
+/// queue stores the document **structured** now, and there is no HTML→ESC/POS translator by
+/// decision — so an HTML body is not a ticket that needs converting, it is a ticket that cannot be
+/// printed at all, and saying so here is the cheapest place to find out.
+#[tokio::test]
+async fn a_job_still_sending_the_retired_html_field_is_refused() {
+    let (router, session) = fixture().await;
+
+    let resp = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/print/jobs",
+            Some(&session),
+            Some(json!({ "jobId": "j1", "role": "receipt", "html": "<p>ticket</p>" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let resp = router
+        .oneshot(request("GET", "/api/print/jobs", Some(&session), None))
+        .await
+        .unwrap();
+    assert!(
+        body_json(resp).await["jobs"].as_array().unwrap().is_empty(),
+        "nothing unprintable reached the queue"
+    );
+}
+
+/// **A document type the printer does not know is refused, with the vocabulary in the message.**
+/// It used to degrade to `Generic` and print a nameless key/value dump: the kitchen got a piece of
+/// paper that was not an order, and the failure surfaced as a missing plate.
+#[tokio::test]
+async fn a_document_type_the_printer_does_not_know_is_refused() {
+    let (router, session) = fixture().await;
+
+    let resp = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/print/jobs",
+            Some(&session),
+            Some(json!({
+                "jobId": "j1",
+                "role": "kitchen",
+                "documentType": "kitchn",
+                "document": { "receipt_id": "K-1" },
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = body_json(resp).await;
+    assert_eq!(body["error"]["code"], json!("invalid_payload"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("kitchen_order"),
+        "the refusal says what IS accepted: {}",
+        body["error"]["message"]
+    );
+
+    let resp = router
+        .oneshot(request("GET", "/api/print/jobs", Some(&session), None))
+        .await
+        .unwrap();
+    assert!(body_json(resp).await["jobs"].as_array().unwrap().is_empty());
 }
 
 /// The listing can be narrowed to one role — what a print host asks about its own work.
@@ -236,7 +313,7 @@ async fn an_incomplete_job_is_rejected_and_queues_nothing() {
             "POST",
             "/api/print/jobs",
             Some(&session),
-            Some(json!({ "jobId": "j1", "role": "receipt", "html": "" })),
+            Some(json!({ "jobId": "j1", "role": "receipt", "documentType": "receipt" })),
         ))
         .await
         .unwrap();

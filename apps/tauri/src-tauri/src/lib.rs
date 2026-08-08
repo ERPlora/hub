@@ -988,9 +988,15 @@ fn erplora_get_devices(state: tauri::State<'_, PeripheralsState>) -> Vec<Device>
     state.registry.get_all()
 }
 
-/// `erplora_print` — renderiza el documento ESC/POS y lo **encola** para envío con reintentos
-/// (mismo flujo que `Command::Print` del bridge). Errores previos al encolado (printer_id/payload
-/// inválidos) se devuelven; el resultado del envío llega por el worker de la cola (log).
+/// `erplora_print` — renders the ESC/POS document and **queues** it for sending with retries (same
+/// flow as the bridge's `Command::Print`). Errors before the enqueue (bad printer_id/payload) come
+/// back to the caller; the outcome of the send arrives through the queue's worker (log).
+///
+/// **An unknown `document_type` is refused, not printed as `Generic`** (hub#501). This is the end of
+/// the chain: the queue in the hub already checks the vocabulary, but a document that got past it —
+/// a job written by hand, a producer talking straight to this command — would otherwise reach the
+/// paper as a nameless key/value dump, and a kitchen order that comes out wrong is only discovered
+/// when the plate is missing. Failing here turns that into a `failed` the print host reports.
 #[tauri::command]
 fn erplora_print(
     state: tauri::State<'_, PeripheralsState>,
@@ -1000,7 +1006,12 @@ fn erplora_print(
     job_id: Option<String>,
 ) -> Result<(), HardwareError> {
     let target = parse_printer_id(&printer_id)?;
-    let payload = escpos::render_document(DocumentType::from_wire(&document_type), &data)?;
+    let doc = DocumentType::parse(&document_type).ok_or_else(|| {
+        HardwareError::from(erplora_peripherals::PeripheralError::UnknownDocumentType(
+            document_type.clone(),
+        ))
+    })?;
+    let payload = escpos::render_document(doc, &data)?;
     state.queue.enqueue(PrintJob {
         job_id,
         target,

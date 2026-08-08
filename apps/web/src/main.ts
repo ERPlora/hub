@@ -12,6 +12,7 @@ import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
+import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
 import { createPrintService } from './lib/print';
 import { loadSlotComponents } from './lib/module-loader';
@@ -145,6 +146,14 @@ const erploraClient = getClient();
 
 // Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
 bootPrintOnSale(getClient());
+
+// HOST DE IMPRESIÓN (ADR-0196 §6, hub#343 + hub#501): este equipo drena la cola del hub y saca el
+// papel por la impresora de su red. Se arranca SIEMPRE y en todos los dispositivos a propósito: el
+// hub responde `print.host_not_registered` a cualquiera que no esté dado de alta como host, y el
+// drenaje trata esa negativa como un hecho de configuración —para, no reintenta—, así que el móvil
+// con la PWA gasta un socket rechazado y nada más. La pantalla que avisa de «nadie está imprimiendo
+// lo de cocina» va con hub#344, junto al productor.
+void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0]);
 
 // Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque
 // tiene que imprimir siempre, no solo con el KDS montado: la cocina caliente suele ser solo papel.

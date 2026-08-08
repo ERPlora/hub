@@ -599,6 +599,49 @@ ALTER TABLE hub_trusted_device DROP CONSTRAINT IF EXISTS hub_trusted_device_pkey
 ALTER TABLE hub_trusted_device ADD CONSTRAINT hub_trusted_device_pkey \
   PRIMARY KEY (hub_id, device_id);",
     },
+    // ── v25 — hub#501: el documento de la cola pasa a ser ESTRUCTURADO, y el HTML se retira ─────
+    // Decisión de Ioan (2026-08-08). La cola guardaba `html`, un documento autocontenido, y
+    // `escpos::render_document` renderiza `document_type` + un JSON con la forma de cada documento:
+    // **no había forma de convertir lo uno en lo otro**, así que el ciclo tique → host → papel no se
+    // podía cerrar. Se decide que viaje ESTRUCTURADO y que el traductor HTML→ESC/POS **no se
+    // escriba** — ni ahora ni como puente. Con un dato estructurado el mismo tique se renderiza a
+    // 58 mm, a 80 mm, a PDF o a una pantalla, y se puede **volver a renderizar mañana**; con un HTML
+    // congelado tienes una foto atada al ancho de impresora de aquel día.
+    //
+    // **Se BORRA la columna `html`, no se deja de escribir.** Lo que guardaba es inservible por
+    // construcción: sin traductor, ningún host puede sacarlo por papel, y conservarla dejaría en el
+    // esquema una columna que el contrato declara muerta — la clase de resto sobre la que alguien
+    // vuelve a escribir dentro de seis meses.
+    //
+    // **Y los trabajos que ya estaban encolados se DEJAN MUERTOS con su motivo.** Un `pending` en el
+    // formato viejo no se puede imprimir: dejarlo ahí lo haría reclamar por un host que no tiene con
+    // qué renderizarlo, quemar sus cinco entregas y morir con un error que no explica nada. Aquí
+    // muere una vez, con la frase que dice qué hacer (volver a imprimirlo desde la venta). En la
+    // práctica alcanza a cero filas —hoy ningún productor encola de verdad, `sdk.print` sigue siendo
+    // hub#344—, y por eso mismo es barato hacerlo bien.
+    //
+    // ⚠️ **Re-ejecutable** (regla de hub#342/#483): `ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF
+    // EXISTS` y un `UPDATE` acotado a `document_type = ''` — que solo pueden cumplir las filas
+    // heredadas, porque toda fila nueva pasa por `enqueue`, que exige un tipo del vocabulario. El
+    // segundo pase es un no-op. Sin eso, rebobinar el control (lo que hace
+    // `tests/access_email_backfill.rs` con su `version >= 19`) la mata y se lleva la suite de otro.
+    //
+    // ⚠️ **v25 y no un hueco.** `apply` compara contra el **máximo** aplicado: cualquier número en o
+    // por debajo se salta EN SILENCIO. Los huecos v15 y v20 siguen libres e **inalcanzables**, y
+    // cogerlos ES ese fallo mudo. Esta nació v24 y se renumeró a la v25 porque hub#362 reclamó la
+    // 24 estando esta sin mergear — el máximo del catálogo se re-comprueba **al rebasar**, no al
+    // empezar. Renumerar es gratis; **renombrar rompe** (los fixtures rebobinan por `name`).
+    SystemMigration {
+        version: 25,
+        name: "print_queue_structured_document",
+        postgres: "\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS document_type TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS document TEXT NOT NULL DEFAULT '';\
+UPDATE _print_queue SET status = 'dead', \
+  last_error = 'queued as HTML, which no printer could ever render (hub#501): print it again from the sale' \
+  WHERE document_type = '' AND status IN ('pending', 'printing');\
+ALTER TABLE _print_queue DROP COLUMN IF EXISTS html;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -730,12 +773,154 @@ mod tests {
         apply(&db, "hub-test").await.unwrap();
 
         // La cola existe: la migración NO se saltó por llegar «por debajo» del máximo aplicado.
+        // (Se inserta con la forma de HOY —documento estructurado, v24— porque `apply` corre el
+        // catálogo ENTERO: la columna `html` con la que nació la v18 ya no existe al terminar.)
         db.execute_batch(
-            "INSERT INTO _print_queue (hub_id, job_id, role, html, created_at) \
-             VALUES ('h1', 'j1', 'receipt', '<p>t</p>', '2026-01-01T00:00:00Z');",
+            "INSERT INTO _print_queue (hub_id, job_id, role, document_type, document, created_at) \
+             VALUES ('h1', 'j1', 'receipt', 'receipt', '{\"receipt_id\":\"T-1\"}', '2026-01-01T00:00:00Z');",
         )
         .await
         .unwrap();
+    }
+
+    /// El mismo invariante para la **v25** (hub#501): un hub que ya pasó por todo lo anterior **sí**
+    /// recibe las columnas del documento estructurado. Si alguien la renumera por debajo del máximo
+    /// se saltaría en silencio y el hub arrancaría con una cola que `enqueue` no puede escribir —
+    /// con el tique fallando en el sitio más caro, el mostrador.
+    #[tokio::test]
+    async fn a_hub_already_migrated_still_receives_the_structured_document_columns() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let structured = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "print_queue_structured_document")
+            .expect("el documento estructurado sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(structured.version)).await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            previous_version_of(structured.version),
+            "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
+        );
+
+        apply(&db, "hub-test").await.unwrap();
+
+        db.execute_batch(
+            "INSERT INTO _print_queue (hub_id, job_id, role, document_type, document, created_at) \
+             VALUES ('h1', 'j1', 'receipt', 'receipt', '{\"receipt_id\":\"T-1\"}', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .expect("la cola acepta el documento estructurado");
+    }
+
+    /// **Un trabajo encolado en el formato retirado muere con su motivo, no en silencio.**
+    ///
+    /// Sin esto, un `pending` heredado se lo llevaría un host que no tiene con qué renderizarlo:
+    /// cinco entregas quemadas y un `dead` con un error que no explica nada. Aquí muere una vez y la
+    /// fila dice qué hacer. Y el vecino **estructurado sigue vivo durante todo el proceso**: si la
+    /// migración se llevase por delante la cola entera, este test lo vería.
+    #[tokio::test]
+    async fn a_job_queued_in_the_retired_html_format_is_dead_lettered_with_its_reason() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let structured = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "print_queue_structured_document")
+            .expect("el documento estructurado sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(structured.version)).await;
+        // Dos trabajos del formato viejo (uno esperando, otro ya reclamado) y uno TERMINAL, que no
+        // debe tocarse: un tique ya impreso no se «mata».
+        db.execute_batch(
+            "INSERT INTO _print_queue (hub_id, job_id, role, html, status, created_at) VALUES \
+               ('h1', 'j-pending',  'receipt', '<p>t</p>', 'pending',  '2026-01-01T00:00:00Z'), \
+               ('h1', 'j-printing', 'kitchen', '<p>o</p>', 'printing', '2026-01-01T00:00:01Z'), \
+               ('h1', 'j-done',     'receipt', '<p>d</p>', 'done',     '2026-01-01T00:00:02Z');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test").await.unwrap();
+
+        let rows = db
+            .query(
+                "SELECT job_id, status, last_error FROM _print_queue WHERE hub_id = 'h1' ORDER BY job_id",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        let by_id = |id: &str| {
+            rows.rows
+                .iter()
+                .find(|r| r["job_id"] == json!(id))
+                .unwrap_or_else(|| panic!("{id} sigue en la cola: morir no es desaparecer"))
+                .clone()
+        };
+        for id in ["j-pending", "j-printing"] {
+            let row = by_id(id);
+            assert_eq!(row["status"], json!("dead"), "{id} no se puede imprimir");
+            assert!(
+                row["last_error"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("hub#501"),
+                "la fila dice POR QUÉ murió y qué hacer: {}",
+                row["last_error"]
+            );
+        }
+        assert_eq!(
+            by_id("j-done")["status"],
+            json!("done"),
+            "un tique que ya salió por la impresora no se re-mata"
+        );
+
+        // Y la cola sigue siendo una cola: lo estructurado entra con normalidad.
+        db.execute_batch(
+            "INSERT INTO _print_queue (hub_id, job_id, role, document_type, document, created_at) \
+             VALUES ('h1', 'j-new', 'receipt', 'receipt', '{\"receipt_id\":\"T-1\"}', '2026-01-02T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+    }
+
+    /// 🔒 **La v25 puede RE-EJECUTARSE sobre su propio resultado** (regla hub#342/#483). El `UPDATE`
+    /// del dead-letter es la parte delicada: acotado a `document_type = ''`, que **ninguna** fila
+    /// nueva puede cumplir, así que un segundo pase no puede matar un tique legítimo que esté
+    /// esperando. Esto es lo que revienta si alguien afloja esa condición.
+    #[tokio::test]
+    async fn the_structured_document_migration_can_run_a_second_time() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        hub_deployed_through(&db, MIGRATIONS.last().expect("catálogo no vacío").version).await;
+        db.execute_batch(
+            "INSERT INTO _print_queue (hub_id, job_id, role, document_type, document, status, created_at) \
+             VALUES ('h1', 'j-waiting', 'receipt', 'receipt', '{\"receipt_id\":\"T-1\"}', 'pending', '2026-01-02T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+        let structured = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "print_queue_structured_document")
+            .expect("el documento estructurado sigue en el catálogo");
+
+        let mut hub = Params::new();
+        hub.insert("hub_id".into(), json!("hub-test"));
+        for stmt in split_statements(structured.postgres) {
+            db.execute(&stmt, &hub)
+                .await
+                .expect("la v25 tiene que poder correr sobre un esquema que ya la tiene");
+        }
+
+        let row = db
+            .query(
+                "SELECT status FROM _print_queue WHERE job_id = 'j-waiting'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            row.rows[0]["status"],
+            json!("pending"),
+            "un segundo pase no puede matar un tique que está esperando de verdad"
+        );
     }
 
     /// El mismo invariante para la v19 (hub#436): un hub que ya pasó por todo lo anterior **sí**

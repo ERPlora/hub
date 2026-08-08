@@ -3,8 +3,8 @@
 // The queue lives in the hub (hub#341) and the hub knows which device drains which role (hub#342).
 // This is the loop that actually takes the paper out: connect, say who we are, claim, print,
 // confirm. It is deliberately transport-only — **how** a document becomes paper is injected
-// (`printJob`), because that is the part that differs between a thermal printer on the network and
-// the browser's print dialog, and because it is the only part this file cannot test.
+// (`printJob`), because that is the part that touches hardware and the only part this file cannot
+// test. The implementation that closes the circle lives in `print-host.ts` (hub#501).
 //
 // ## The one decision worth reading
 //
@@ -30,8 +30,19 @@
 export interface DrainJob {
   jobId: string;
   role: string;
-  /** Self-contained document. This is what has to become paper. */
-  html: string;
+  /**
+   * Which renderer turns this into paper (`receipt`, `kitchen_order`, …). The hub only ever queues
+   * one of the names `escpos::DocumentType` knows, so this is safe to hand straight to the hardware.
+   */
+  documentType: string;
+  /**
+   * **The document, structured** (hub#501). This is what has to become paper — the object
+   * `escpos::render_document` reads, not a rendering of it. It used to be self-contained HTML, and
+   * that could not become paper at all: there is no HTML→ESC/POS entry, and by decision there never
+   * will be. Structured, the same ticket goes to 58mm, to 80mm, to a PDF or to a screen, and can be
+   * rendered again the day the business changes printer.
+   */
+  document: Record<string, unknown>;
   format: 'receipt' | 'a4';
   /** How many times the hub has handed this job out. `> 1` means somebody already had a go. */
   attempts: number;
@@ -230,7 +241,11 @@ export function createPrintDrain(options: PrintDrainOptions): PrintDrain {
         void handleJob({
           jobId: String(frame.jobId ?? ''),
           role: String(frame.role ?? ''),
-          html: String(frame.html ?? ''),
+          documentType: String(frame.documentType ?? ''),
+          // Passed along as it came. A frame whose `document` is not an object is not repaired into
+          // an empty one here: the printer refuses it and the hub is told, which is how a corrupt
+          // row surfaces instead of cutting blank paper.
+          document: (frame.document ?? {}) as Record<string, unknown>,
           format: frame.format === 'a4' ? 'a4' : 'receipt',
           attempts: Number(frame.attempts) || 0,
         });

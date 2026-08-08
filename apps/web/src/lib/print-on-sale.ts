@@ -16,22 +16,11 @@
 // `printing.print_kitchen` y `printing.routing.*` quedan OBSOLETOS: no los lee nadie.
 import type { BridgeDevice, ErploraClient } from '@erplora/module-sdk';
 import { printerIdForRole } from './print';
+import { buildReceiptDocument, type ReceiptSettings, type SaleLine } from './receipt-document';
 
-interface PrintingSettings {
-  receipt_header?: string;
-  receipt_footer?: string;
+interface PrintingSettings extends ReceiptSettings {
   auto_print_on_sale?: number;
   open_drawer_on_sale?: number;
-}
-
-interface SaleLine {
-  name?: string;
-  product_name?: string;
-  quantity?: number;
-  total?: number;
-  line_total?: number;
-  is_service?: number | boolean;
-  notes?: string;
 }
 
 /** Arranca el escuchador en el boot del shell. Devuelve la función para cancelar. */
@@ -84,7 +73,7 @@ async function onSaleCompleted(client: ErploraClient, payload: unknown): Promise
 
   if (autoPrint && receiptPrinterId) {
     await client.peripherals
-      .print(receiptPrinterId, 'receipt', buildReceipt(settings, sale, lines), `sale-${saleId}`)
+      .print(receiptPrinterId, 'receipt', buildReceiptDocument(settings, sale, lines), `sale-${saleId}`)
       .catch((e) => console.warn('[print-on-sale] ticket', e));
   }
 
@@ -108,34 +97,4 @@ function first<T>(v: T[] | T | undefined): T | undefined {
 
 function flag(v: unknown): boolean {
   return v === true || Number(v ?? 0) === 1;
-}
-
-function num(v: unknown): number {
-  return typeof v === 'number' ? v : Number(v ?? 0) || 0;
-}
-
-function buildReceipt(
-  settings: PrintingSettings,
-  sale: Record<string, unknown>,
-  lines: SaleLine[],
-): Record<string, unknown> {
-  return {
-    business_name: settings.receipt_header || 'ERPlora',
-    receipt_id: String(sale.sale_number ?? sale.id ?? ''),
-    customer_name: (sale.customer_name as string) || undefined,
-    items: (lines ?? []).map((l) => ({
-      name: l.name ?? l.product_name ?? '',
-      quantity: num(l.quantity ?? 1),
-      total: num(l.total ?? l.line_total),
-      notes: l.notes,
-    })),
-    subtotal: num(sale.subtotal),
-    tax_amount: num(sale.tax_amount),
-    discount: sale.discount_amount != null ? num(sale.discount_amount) : undefined,
-    total: num(sale.total),
-    payment_method: String(sale.payment_method_name ?? sale.payment_method ?? ''),
-    paid: sale.amount_tendered != null ? num(sale.amount_tendered) : undefined,
-    change: sale.change_due != null ? num(sale.change_due) : undefined,
-    receipt_footer: settings.receipt_footer || undefined,
-  };
 }

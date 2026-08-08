@@ -115,7 +115,12 @@ async fn enqueue_over_http(srv: &Server, job_id: &str, role: &str) {
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
-    let body = json!({ "jobId": job_id, "role": role, "html": format!("<p>{job_id}</p>") });
+    let body = json!({
+        "jobId": job_id,
+        "role": role,
+        "documentType": "receipt",
+        "document": { "receipt_id": job_id },
+    });
     let resp = app(srv.state.clone())
         .oneshot(
             Request::builder()
@@ -200,7 +205,8 @@ async fn a_ticket_queued_over_http_is_drained_and_confirmed_over_the_socket() {
     let job = recv(&mut socket).await;
     assert_eq!(job["type"], "job");
     assert_eq!(job["jobId"], "j1");
-    assert_eq!(job["html"], "<p>j1</p>");
+    assert_eq!(job["documentType"], "receipt");
+    assert_eq!(job["document"], json!({ "receipt_id": "j1" }));
 
     send(&mut socket, json!({ "type": "done", "jobId": "j1" })).await;
     let ack = recv(&mut socket).await;
@@ -234,7 +240,7 @@ async fn an_idle_host_is_woken_when_a_ticket_is_queued_for_its_role() {
     assert_eq!(wake["type"], "wake");
     assert_eq!(wake["role"], "receipt");
     assert!(
-        wake.get("html").is_none(),
+        wake.get("document").is_none(),
         "a nudge is not a delivery: the document goes through the guarded claim"
     );
 
@@ -257,7 +263,7 @@ async fn a_socket_that_claims_before_hello_is_refused_and_hung_up_on() {
     assert_eq!(refusal["type"], "error");
     assert_eq!(refusal["code"], "print.not_ready");
     assert!(
-        refusal.get("html").is_none(),
+        refusal.get("document").is_none(),
         "not a byte of the ticket left the hub"
     );
 

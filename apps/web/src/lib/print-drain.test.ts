@@ -161,16 +161,19 @@ describe('print drain — the shell end of /ws/print', () => {
 
   it('prints the job it is handed and confirms it by jobId', async () => {
     const s = connect(h);
-    s.deliver({ type: 'job', jobId: 'j1', role: 'receipt', html: '<p>t</p>', format: 'receipt', attempts: 1 });
+    s.deliver({ type: 'job', jobId: 'j1', role: 'receipt', documentType: 'receipt', document: { receipt_id: 't' }, format: 'receipt', attempts: 1 });
     await vi.waitFor(() => expect(h.printed).toHaveLength(1));
 
-    expect(h.printed[0].html).toBe('<p>t</p>');
+    // The STRUCTURED document reaches the printer as it left the hub — that is the whole of
+    // hub#501: nothing between the queue and the paper reinterprets the ticket.
+    expect(h.printed[0].document).toEqual({ receipt_id: 't' });
+    expect(h.printed[0].documentType).toBe('receipt');
     expect(s.framesOfType('done')).toEqual([{ type: 'done', jobId: 'j1' }]);
   });
 
   it('keeps pulling after each ticket until the hub says there is nothing left', async () => {
     const s = connect(h);
-    s.deliver({ type: 'job', jobId: 'j1', role: 'receipt', html: '<p>1</p>', format: 'receipt', attempts: 1 });
+    s.deliver({ type: 'job', jobId: 'j1', role: 'receipt', documentType: 'receipt', document: { receipt_id: '1' }, format: 'receipt', attempts: 1 });
     await vi.waitFor(() => expect(s.framesOfType('claim')).toHaveLength(2));
 
     s.deliver({ type: 'idle', role: 'receipt' });
@@ -191,7 +194,7 @@ describe('print drain — the shell end of /ws/print', () => {
   // confirmations would make the business pay a duplicate for every dropped connection.
   it('re-confirms a ticket it printed but could not confirm, as soon as there is a socket again', async () => {
     const first = connect(h);
-    first.deliver({ type: 'job', jobId: 'j1', role: 'receipt', html: '<p>t</p>', format: 'receipt', attempts: 1 });
+    first.deliver({ type: 'job', jobId: 'j1', role: 'receipt', documentType: 'receipt', document: { receipt_id: 't' }, format: 'receipt', attempts: 1 });
     await vi.waitFor(() => expect(first.framesOfType('done')).toHaveLength(1));
     // The `done` went into a socket that was already dying: the hub never acknowledged it.
     expect(h.drain.pendingConfirmations()).toEqual(['j1']);
@@ -212,7 +215,7 @@ describe('print drain — the shell end of /ws/print', () => {
 
   it('forgets a confirmation once the hub acknowledges it', async () => {
     const s = connect(h);
-    s.deliver({ type: 'job', jobId: 'j1', role: 'receipt', html: '<p>t</p>', format: 'receipt', attempts: 1 });
+    s.deliver({ type: 'job', jobId: 'j1', role: 'receipt', documentType: 'receipt', document: { receipt_id: 't' }, format: 'receipt', attempts: 1 });
     await vi.waitFor(() => expect(h.drain.pendingConfirmations()).toEqual(['j1']));
 
     s.deliver({ type: 'ack', jobId: 'j1', confirmed: true });
@@ -229,7 +232,7 @@ describe('print drain — the shell end of /ws/print', () => {
     });
     const s = connect(broken);
     const claimsBefore = s.framesOfType('claim').length;
-    s.deliver({ type: 'job', jobId: 'j1', role: 'receipt', html: '<p>t</p>', format: 'receipt', attempts: 1 });
+    s.deliver({ type: 'job', jobId: 'j1', role: 'receipt', documentType: 'receipt', document: { receipt_id: 't' }, format: 'receipt', attempts: 1 });
 
     await vi.waitFor(() => expect(s.framesOfType('failed')).toHaveLength(1));
     expect(s.framesOfType('failed')[0]).toEqual({
