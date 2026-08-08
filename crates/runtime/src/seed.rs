@@ -21,13 +21,20 @@ use crate::errors::{Result, RuntimeError};
 /// Devuelve cuántas sentencias aplicó. Se asume que el SQL es **idempotente** (el llamador lo
 /// garantiza con `WHERE NOT EXISTS`/`ON CONFLICT`); este módulo NO añade guardas: solo ejecuta.
 ///
+/// Liga `:hub_id`, como [`apply_module_seed`] (hub#489). Un seed se aplica **sobre un hub**, y
+/// desde la migración de sistema v23 las tablas que siembra —`hub_trusted_device` la primera— van
+/// acotadas por él: sin el bind, el seed escribiría filas que no nombran hub y que ningún hub
+/// vería. El `hub_id` lo aporta el despliegue, no el fichero.
+///
 /// Si una sentencia falla, devuelve un error claro (con el índice de la sentencia) para que el
 /// host aborte el arranque — un seed roto debe ser visible, no silencioso.
-pub async fn apply(db: &dyn DatabaseAdapter, sql: &str) -> Result<usize> {
+pub async fn apply(db: &dyn DatabaseAdapter, sql: &str, hub_id: &str) -> Result<usize> {
+    let mut params = erplora_db::Params::new();
+    params.insert("hub_id".into(), serde_json::json!(hub_id));
     let stmts = split_statements(sql);
     let mut applied = 0usize;
     for (i, stmt) in stmts.iter().enumerate() {
-        db.execute_batch(stmt).await.map_err(|e| {
+        db.execute(stmt, &params).await.map_err(|e| {
             RuntimeError::Other(format!(
                 "seed: fallo en la sentencia #{} de {}: {e}\n  SQL: {stmt}",
                 i + 1,
@@ -79,7 +86,7 @@ pub async fn apply_module_seed(
 /// [`crate::system_migrations`] (SQL horneado sin comentarios), un fichero de seed lo escribe un
 /// humano y suele llevar comentarios `--`, que pueden contener `;` y romperían el split ingenuo;
 /// por eso primero se **descartan las líneas de comentario `--`**. El seed es DDL/DML simple sin
-/// literales con `;` embebidos. Cada sentencia se ejecuta por separado vía `execute_batch`.
+/// literales con `;` embebidos. Cada sentencia se ejecuta por separado, ligando `:hub_id`.
 pub(crate) fn split_statements(sql: &str) -> Vec<String> {
     let without_comments: String = sql
         .lines()
@@ -113,11 +120,11 @@ mod tests {
 CREATE TABLE IF NOT EXISTS t (id TEXT PRIMARY KEY, v TEXT);\
 INSERT INTO t (id, v) SELECT 'a', '1' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id = 'a');\
 INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id = 'b');";
-        let n = apply(&db, sql).await.unwrap();
+        let n = apply(&db, sql, "hub-test").await.unwrap();
         assert_eq!(n, 3, "tres sentencias aplicadas");
 
         // Re-aplicar no duplica ni falla (idempotente por el propio SQL).
-        apply(&db, sql).await.unwrap();
+        apply(&db, sql, "hub-test").await.unwrap();
         let res = db
             .query("SELECT COUNT(*) AS c FROM t", &erplora_db::Params::new())
             .await
@@ -140,7 +147,9 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
     #[tokio::test]
     async fn apply_reports_clear_error_on_bad_statement() {
         let db = fresh_db().await;
-        let err = apply(&db, "SELECT * FROM no_such_table;").await.unwrap_err();
+        let err = apply(&db, "SELECT * FROM no_such_table;", "hub-test")
+            .await
+            .unwrap_err();
         assert!(format!("{err}").contains("seed:"), "error de seed claro: {err}");
     }
 
@@ -154,7 +163,10 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
         let runtime = crate::Runtime::new(Box::new(db));
         // Mismo orden que en el server: tablas de sistema primero, luego seed.
         runtime.ensure_system_tables().await.unwrap();
-        let n = apply(runtime.db_for_test(), DEMO_SEED).await.unwrap();
+        // Por `Runtime::apply_seed`, que es como lo llama el host (`HUB_SEED_SQL`, server/lib.rs) y
+        // quien pone el `hub_id` del despliegue: llamar a `apply` a pelo dejaría sin probar
+        // justamente el punto donde se decide de qué hub es lo que se siembra (hub#489).
+        let n = runtime.apply_seed(DEMO_SEED).await.unwrap();
         assert!(n >= 2, "el seed del demo aplica al menos usuario + dispositivo, fue {n}");
 
         // El PIN "0000" del usuario "Demo" verifica (valida el formato del hash).
@@ -174,7 +186,7 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
         );
 
         // Re-aplicar el seed es idempotente (no crea un segundo "Demo" ni falla).
-        apply(runtime.db_for_test(), DEMO_SEED).await.unwrap();
+        runtime.apply_seed(DEMO_SEED).await.unwrap();
         let res = identity_count_demo(&runtime).await;
         assert_eq!(res, 1, "el seed no duplica el usuario Demo al re-aplicarse");
     }

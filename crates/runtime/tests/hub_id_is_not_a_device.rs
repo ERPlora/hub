@@ -35,12 +35,17 @@ fn code_of(error: &erplora_runtime::RuntimeError) -> String {
     }
 }
 
-/// Rows of `hub_trusted_device` as `(device_id, label, mode)`, ordered — the whole table, so a test
-/// can assert both what went and what stayed.
-async fn devices(db: &dyn DatabaseAdapter) -> Vec<(String, String, String)> {
+/// Rows of `hub_trusted_device` as `(hub_id, device_id, label, mode)`, ordered — the whole table,
+/// across every tenant in the database, so a test can assert both what went and what stayed.
+///
+/// The owning hub is part of the tuple since hub#489 gave the table its tenant column: the sweep
+/// below is scoped by it, and a test that could not see it could not tell "A swept its own row"
+/// from "A swept every row that named A's id".
+async fn devices(db: &dyn DatabaseAdapter) -> Vec<(String, String, String, String)> {
     let res = db
         .query(
-            "SELECT device_id, label, mode FROM hub_trusted_device ORDER BY device_id",
+            "SELECT hub_id, device_id, label, mode FROM hub_trusted_device \
+              ORDER BY hub_id, device_id",
             &Params::new(),
         )
         .await
@@ -49,6 +54,7 @@ async fn devices(db: &dyn DatabaseAdapter) -> Vec<(String, String, String)> {
         .iter()
         .map(|r| {
             (
+                r["hub_id"].as_str().unwrap_or_default().to_string(),
                 r["device_id"].as_str().unwrap_or_default().to_string(),
                 r["label"].as_str().unwrap_or_default().to_string(),
                 r["mode"].as_str().unwrap_or_default().to_string(),
@@ -62,10 +68,10 @@ async fn devices(db: &dyn DatabaseAdapter) -> Vec<(String, String, String)> {
 /// marked `personal`, which is what took the pinpad off everything at once.
 async fn a_hub_deployed_before_this_fix(db: &dyn DatabaseAdapter) {
     db.execute_batch(&format!(
-        "INSERT INTO hub_trusted_device (device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
-           VALUES ('till-1', 'Counter till', '2026-08-01T09:00:00Z', 'shared', '', '');\
-         INSERT INTO hub_trusted_device (device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
-           VALUES ('{HUB_ID}', 'Marta Ruiz', '2026-08-02T10:00:00Z', 'personal', \
+        "INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
+           VALUES ('{HUB_ID}', 'till-1', 'Counter till', '2026-08-01T09:00:00Z', 'shared', '', '');\
+         INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
+           VALUES ('{HUB_ID}', '{HUB_ID}', 'Marta Ruiz', '2026-08-02T10:00:00Z', 'personal', \
                    '2026-08-02T11:00:00Z', 'hub_user:admin');"
     ))
     .await
@@ -86,6 +92,7 @@ async fn booting_sweeps_the_row_the_shared_identity_left_behind_and_touches_noth
     assert_eq!(
         devices(&db).await,
         vec![(
+            HUB_ID.to_string(),
             "till-1".to_string(),
             "Counter till".to_string(),
             "shared".to_string()
@@ -104,12 +111,12 @@ async fn one_hub_sweeping_its_own_id_does_not_touch_another_hub_sharing_the_data
     hub_a.ensure_system_tables().await.unwrap();
     let db = test_db.adapter().await;
     db.execute_batch(
-        "INSERT INTO hub_trusted_device (device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
-           VALUES ('hub-a', 'Legacy of A', '2026-08-01T09:00:00Z', 'personal', '', '');\
-         INSERT INTO hub_trusted_device (device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
-           VALUES ('hub-b', 'Legacy of B', '2026-08-01T09:00:00Z', 'personal', '', '');\
-         INSERT INTO hub_trusted_device (device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
-           VALUES ('till-of-b', 'Till of B', '2026-08-01T09:00:00Z', 'personal', '', '');",
+        "INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
+           VALUES ('hub-a', 'hub-a', 'Legacy of A', '2026-08-01T09:00:00Z', 'personal', '', '');\
+         INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
+           VALUES ('hub-b', 'hub-b', 'Legacy of B', '2026-08-01T09:00:00Z', 'personal', '', '');\
+         INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
+           VALUES ('hub-b', 'till-of-b', 'Till of B', '2026-08-01T09:00:00Z', 'personal', '', '');",
     )
     .await
     .unwrap();
@@ -119,8 +126,8 @@ async fn one_hub_sweeping_its_own_id_does_not_touch_another_hub_sharing_the_data
     assert_eq!(
         devices(&db).await,
         vec![
-            ("hub-b".to_string(), "Legacy of B".to_string(), "personal".to_string()),
-            ("till-of-b".to_string(), "Till of B".to_string(), "personal".to_string()),
+            ("hub-b".to_string(), "hub-b".to_string(), "Legacy of B".to_string(), "personal".to_string()),
+            ("hub-b".to_string(), "till-of-b".to_string(), "Till of B".to_string(), "personal".to_string()),
         ],
         "A swept A's row and nothing of B's — not its legacy row, not its personal till"
     );
@@ -150,6 +157,7 @@ async fn a_stale_client_presenting_the_hub_id_never_becomes_a_trusted_device() {
     assert_eq!(
         devices(&db).await,
         vec![(
+            HUB_ID.to_string(),
             "till-1".to_string(),
             "Counter till".to_string(),
             "shared".to_string()
@@ -202,8 +210,8 @@ async fn an_administrator_cannot_mark_the_hub_itself_personal() {
     assert_eq!(
         devices(&db).await,
         vec![
-            (HUB_ID.to_string(), "Marta Ruiz".to_string(), "personal".to_string()),
-            ("till-1".to_string(), "Counter till".to_string(), "shared".to_string()),
+            (HUB_ID.to_string(), HUB_ID.to_string(), "Marta Ruiz".to_string(), "personal".to_string()),
+            (HUB_ID.to_string(), "till-1".to_string(), "Counter till".to_string(), "shared".to_string()),
         ],
         "a refused write changes nothing — not even the row it was aimed at"
     );

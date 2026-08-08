@@ -549,6 +549,56 @@ CREATE TABLE IF NOT EXISTS _print_host (\
   PRIMARY KEY (hub_id, device_id, role));\
 CREATE INDEX IF NOT EXISTS ix_print_host_role ON _print_host (hub_id, role, last_seen_at);",
     },
+    // ── v23 — hub#489 / ADR-0261: el device-trust pasa a ser POR HUB (PK compuesta) ────────────
+    //
+    // `hub_trusted_device` nació (v2) con la clave `device_id` **a secas**, la única tabla de
+    // sistema sin `hub_id` — `hub_settings`, `hub_api_key`, `hub_module` y `_print_host` van todas
+    // `(hub_id, …)`. En la forma **pre-ADR-0201**, con varios hubs sobre una misma BD, eso hacía de
+    // la tabla terreno común: la confianza ganada en el hub A abría el gate de PIN del hub B
+    // (§2.9), un admin de A podía marcar `personal` o revocar un dispositivo de B, y desde hub#455
+    // la pantalla de dispositivos **le enseñaba** a A los de B — etiqueta, último uso y sesiones
+    // abiertas. Pasó de fuga silenciosa a exposición entre inquilinos.
+    //
+    // ⚠️ **Número: el SIGUIENTE POR ENCIMA DEL MÁXIMO (22), no el hueco más bajo.** [`apply`]
+    // compara contra el **máximo** aplicado, así que v15 y v20 están libres y son **inalcanzables**:
+    // cogerlas es el fallo mudo que ya renumeró hub#341, hub#342 (dos veces) y hub#470. Re-comprobar
+    // al rebasar.
+    //
+    // 🔴 **Las filas que ya existen NO se atribuyen a nadie — se van.** Es la única decisión de esta
+    // migración, y va por el lado conservador:
+    //
+    //  - una fila anterior a esta columna **no dice de qué hub es**. En una BD compartida, sellarla
+    //    con `:hub_id` se la regalaría al hub que **arranque primero** (el control
+    //    `_hub_system_migrations` tampoco es per-hub: la migración corre UNA vez por base de datos),
+    //    y ese regalo es exactamente el privilegio que esta issue quita — la trampa que hub#436
+    //    acaba de pagar con un backfill a ciegas;
+    //  - lo que se pierde es **fricción, nunca autorización**: sin fila, el dispositivo vuelve a ser
+    //    desconocido → modo `shared` (pinpad) y sin login por PIN hasta que alguien haga UN login
+    //    online en él, que reescribe la fila ya con su hub. `label`/`trusted_at`/`mode` son
+    //    recuperables por ese camino; adivinar el dueño no se deshace.
+    //  - el censo real es pequeño: tras hub#454 (ADR-0257) el barrido de cada arranque ya borra la
+    //    fila cuyo id era el del hub, que en un hub servido por navegador —el caso normal, ADR-0154
+    //    cloud-first— era **la única** que existía. Lo que queda son instalaciones Tauri.
+    //
+    // `hub_id = ''` es, pues, el valor reservado de «esta fila no nombra hub». El runtime no lo
+    // escribe nunca (`Runtime::hub_scope` falla cerrado con un `hub_id` vacío), así que el `DELETE`
+    // de abajo solo puede alcanzar filas heredadas — y por eso es seguro RE-EJECUTARLO.
+    //
+    // ⚠️ **Re-ejecutable** (regla de hub#342/#483): `ADD COLUMN IF NOT EXISTS`, el `DELETE` acotado
+    // al centinela y el par `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` con **nombre explícito**
+    // (el que Postgres le habría puesto igualmente) hacen del segundo pase un no-op. Sin eso,
+    // rebobinar el control —lo que hace `tests/access_email_backfill.rs`— la mata con un 42701/42P16
+    // y se lleva por delante la suite entera.
+    SystemMigration {
+        version: 23,
+        name: "hub_trusted_device_hub_scoped",
+        postgres: "\
+ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS hub_id TEXT NOT NULL DEFAULT '';\
+DELETE FROM hub_trusted_device WHERE hub_id = '';\
+ALTER TABLE hub_trusted_device DROP CONSTRAINT IF EXISTS hub_trusted_device_pkey;\
+ALTER TABLE hub_trusted_device ADD CONSTRAINT hub_trusted_device_pkey \
+  PRIMARY KEY (hub_id, device_id);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -901,6 +951,158 @@ mod tests {
         );
     }
 
+    /// El mismo invariante para el **device-trust por hub** (hub#489, v23): un hub que ya pasó por
+    /// todo lo anterior **sí** recibe la columna `hub_id`. Es el test que revienta si alguien la
+    /// renumera por debajo del máximo —v15 y v20 están libres y son **inalcanzables**—, donde se
+    /// saltaría en silencio y la tabla seguiría siendo terreno común entre inquilinos.
+    #[tokio::test]
+    async fn a_hub_already_migrated_still_receives_the_device_tenancy_column() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let scoped = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_trusted_device_hub_scoped")
+            .expect("el device-trust por hub sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(scoped.version)).await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            previous_version_of(scoped.version),
+            "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
+        );
+
+        apply(&db, "hub-test").await.unwrap();
+
+        // La columna existe **y es la clave**: la MISMA tablet cabe dos veces si son dos negocios,
+        // y no cabe dos veces dentro del mismo (la PK pasó de `device_id` a `(hub_id, device_id)`).
+        db.execute_batch(
+            "INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at) \
+               VALUES ('hub-a', 'tablet-1', 'Ana', '2026-01-01T00:00:00Z');\
+             INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at) \
+               VALUES ('hub-b', 'tablet-1', 'Bruno', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+        let duplicated = db
+            .execute_batch(
+                "INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at) \
+                   VALUES ('hub-a', 'tablet-1', 'Ana otra vez', '2026-01-02T00:00:00Z');",
+            )
+            .await;
+        assert!(
+            duplicated.is_err(),
+            "dentro de un hub el dispositivo sigue siendo único: la PK es compuesta, no ausente"
+        );
+    }
+
+    /// 🔴 **La decisión de la v23: la confianza que la BD no puede atribuir NO se le regala a
+    /// nadie** (hub#489).
+    ///
+    /// Una fila anterior a la columna no dice de qué hub es. Sellarla con `:hub_id` —lo que hizo la
+    /// v1 con `hub_module`— se la daría al hub que **arranque primero**, porque el control
+    /// `_hub_system_migrations` tampoco es per-hub y la migración corre UNA vez por base de datos.
+    /// En una BD compartida eso es regalarle a un negocio la tablet de confianza del vecino: el
+    /// backfill a ciegas de hub#436, otra vez. Lo que se pierde por el lado conservador es
+    /// **fricción** (un login online devuelve la fila, ya con su hub); lo que se perdería por el
+    /// otro es **autorización**, y eso no se deshace.
+    #[tokio::test]
+    async fn the_trust_a_shared_database_cannot_attribute_is_not_handed_to_whoever_boots_first() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let scoped = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_trusted_device_hub_scoped")
+            .expect("el device-trust por hub sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(scoped.version)).await;
+        // La forma pre-v23: filas sin hub. Una es de quien va a arrancar y la otra del vecino, y
+        // desde la tabla **no hay forma de saber cuál es cuál** — que es justo el punto.
+        db.execute_batch(
+            "INSERT INTO hub_trusted_device (device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
+               VALUES ('till-1', 'Caja 1', '2026-08-01T09:00:00Z', 'shared', '', '');\
+             INSERT INTO hub_trusted_device (device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
+               VALUES ('tablet-of-the-neighbour', 'Marta Ruiz', '2026-08-02T10:00:00Z', 'personal', \
+                       '2026-08-02T11:00:00Z', 'hub_user:admin');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-a").await.unwrap();
+
+        let rows = db
+            .query(
+                "SELECT hub_id, device_id FROM hub_trusted_device ORDER BY device_id",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.rows.len(),
+            0,
+            "ni una fila se selló con `hub-a`: la del vecino tampoco, y no había forma de \
+             distinguirlas — se van las dos y se vuelven a ganar con un login online"
+        );
+    }
+
+    /// **La v23 se puede RE-EJECUTAR sobre una base que ya la tiene** (regla de hub#342/#483).
+    ///
+    /// El control guarda *versiones*, no esquema: `tests/access_email_backfill.rs` rebobina
+    /// `version >= 19` y se lleva por delante toda migración posterior — esta. Sin `IF NOT EXISTS`
+    /// en el `ADD COLUMN` y sin el par `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT`, el segundo
+    /// pase muere (42701/42P16) y tumba la suite entera.
+    ///
+    /// Y comprueba lo que de verdad importa del segundo pase: que el `DELETE` del centinela
+    /// **no toca confianza viva**. Solo puede alcanzar `hub_id = ''`, que el runtime no escribe
+    /// nunca (`Runtime::hub_scope`).
+    #[tokio::test]
+    async fn the_device_tenancy_migration_can_be_applied_twice() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+
+        // Una tablet de confianza de verdad, con su modo: el segundo pase no puede perderla.
+        db.execute_batch(
+            "INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at, mode, mode_set_at, mode_set_by) \
+               VALUES ('hub-test', 'tablet-1', 'Ana Soto', '2026-08-01T09:00:00Z', 'personal', \
+                       '2026-08-01T10:00:00Z', 'hub_user:admin');",
+        )
+        .await
+        .unwrap();
+
+        // El rebobinado que hace la suite de hub#436: se borra el REGISTRO, no la tabla.
+        let scoped = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_trusted_device_hub_scoped")
+            .expect("el device-trust por hub sigue en el catálogo");
+        let mut p = Params::new();
+        p.insert("version".into(), json!(scoped.version));
+        db.execute(
+            "DELETE FROM _hub_system_migrations WHERE version >= :version",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test")
+            .await
+            .expect("la v23 se re-aplica sobre su propia columna sin romper");
+
+        let rows = db
+            .query(
+                "SELECT hub_id, label, mode FROM hub_trusted_device WHERE device_id = 'tablet-1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1, "re-aplicar no se lleva la confianza viva");
+        assert_eq!(rows.rows[0]["hub_id"], json!("hub-test"));
+        assert_eq!(
+            rows.rows[0]["mode"],
+            json!("personal"),
+            "ni el modo que un administrador ya había decidido"
+        );
+    }
+
     #[test]
     fn split_statements_keeps_each_terminated() {
         let stmts = split_statements("CREATE TABLE a (x);  DROP TABLE b; ");
@@ -1216,25 +1418,44 @@ mod tests {
         crate::installer::ensure_hub_module_table(db).await.unwrap();
         crate::identity::ensure_tables(db).await.unwrap();
         ensure_control_table(db).await.unwrap();
+        for m in MIGRATIONS.iter().filter(|m| m.version <= upto) {
+            run_and_record(db, m).await;
+        }
+    }
+
+    /// Aplica **una** migración del catálogo por su `name` (SQL + registro), como haría [`apply`]
+    /// al llegar a ella. Es lo que permite parar un fixture EN una migración concreta para medir su
+    /// efecto, en vez de correr el catálogo entero y medir el de la última.
+    ///
+    /// Por `name` y no por número a propósito: el número es un accidente del orden de merge (esta
+    /// tabla lo ha visto renumerarse cuatro veces), el nombre es el contrato.
+    async fn apply_one(db: &dyn DatabaseAdapter, name: &str) {
+        let m = MIGRATIONS
+            .iter()
+            .find(|m| m.name == name)
+            .unwrap_or_else(|| panic!("`{name}` sigue en el catálogo"));
+        run_and_record(db, m).await;
+    }
+
+    /// El SQL de `m` y su fila de control, en la misma transacción — igual que [`apply`].
+    async fn run_and_record(db: &dyn DatabaseAdapter, m: &SystemMigration) {
         let mut hub = Params::new();
         hub.insert("hub_id".into(), json!("hub-test"));
-        for m in MIGRATIONS.iter().filter(|m| m.version <= upto) {
-            let mut ops: Vec<(String, Params)> = split_statements(m.postgres)
-                .into_iter()
-                .map(|stmt| (stmt, hub.clone()))
-                .collect();
-            let mut record = Params::new();
-            record.insert("version".into(), json!(m.version));
-            record.insert("name".into(), json!(m.name));
-            record.insert("applied_at".into(), json!(now_rfc3339()));
-            ops.push((
-                "INSERT INTO _hub_system_migrations (version, name, applied_at) \
-                 VALUES (:version, :name, :applied_at)"
-                    .to_string(),
-                record,
-            ));
-            db.execute_tx(&ops).await.unwrap();
-        }
+        let mut ops: Vec<(String, Params)> = split_statements(m.postgres)
+            .into_iter()
+            .map(|stmt| (stmt, hub.clone()))
+            .collect();
+        let mut record = Params::new();
+        record.insert("version".into(), json!(m.version));
+        record.insert("name".into(), json!(m.name));
+        record.insert("applied_at".into(), json!(now_rfc3339()));
+        ops.push((
+            "INSERT INTO _hub_system_migrations (version, name, applied_at) \
+             VALUES (:version, :name, :applied_at)"
+                .to_string(),
+            record,
+        ));
+        db.execute_tx(&ops).await.unwrap();
     }
 
     /// The certificate a deployed hub already had is the BUSINESS's own one, and v14 must say so.
@@ -1322,6 +1543,10 @@ mod tests {
     /// el default fuese ese, cada TPV de mostrador ya enrolado de la flota amanecería sin pedir
     /// quién está detrás de la caja, y nadie lo habría decidido. Lo que se hereda es la fricción,
     /// nunca su ausencia.
+    ///
+    /// Se para **en la v17** en vez de correr el catálogo entero, y el segundo acto dice por qué:
+    /// la v23 (hub#489) se lleva esa misma fila, porque no dice de qué hub es. Las dos cosas son
+    /// ciertas y ninguna tapa a la otra — el modo que hereda mientras existe, y que deja de existir.
     #[tokio::test]
     async fn the_devices_a_deployed_hub_already_trusted_inherit_the_strict_mode_v17() {
         use erplora_db::testutil::fresh_db;
@@ -1335,10 +1560,11 @@ mod tests {
         .await
         .unwrap();
 
-        apply(&db, "hub-test").await.unwrap();
-        assert!(
-            max_applied_version(&db).await.unwrap() >= 17,
-            "v17 registrada"
+        apply_one(&db, "hub_trusted_device_mode").await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            17,
+            "el hub llega EXACTAMENTE a la v17: es su efecto lo que se mide"
         );
 
         let row = db
@@ -1355,6 +1581,23 @@ mod tests {
             "hereda la fricción, no su ausencia"
         );
         assert_eq!(row.rows[0]["label"], json!("Caja 1"), "su etiqueta intacta");
+
+        // Segundo acto: el resto del catálogo. La v23 (hub#489) retira esa confianza en vez de
+        // sellarla con el hub que arranque — ver
+        // `the_trust_a_shared_database_cannot_attribute_is_not_handed_to_whoever_boots_first`.
+        apply(&db, "hub-test").await.unwrap();
+        let after = db
+            .query(
+                "SELECT device_id FROM hub_trusted_device",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            after.rows.len(),
+            0,
+            "la fila que no nombra hub deja de conceder nada; se recupera con un login online"
+        );
 
         // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').
         apply(&db, "hub-test").await.unwrap();

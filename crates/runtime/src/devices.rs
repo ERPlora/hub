@@ -37,12 +37,21 @@
 //!
 //! ## Blast radius
 //!
-//! Both statements are keyed on one `device_id` and nothing else. Neither has an unbounded form, no
-//! `IS NULL` branch and no negation: a session that names **no** device (opened before hub#200
-//! added the column, or by a client that identifies none) is left alone, because "cut off the
-//! tablet" is not "sign out everybody I cannot place". Isolation between hubs is the database, per
-//! ADR-0201 — `hub_trusted_device` and `hub_session` carry no `hub_id` column, which is common
-//! ground only in the pre-ADR-0201 shared-database shape (hub#489, out of scope here).
+//! Both statements are keyed on one `device_id` (and, since hub#489, on this hub). Neither has an
+//! unbounded form, no `IS NULL` branch and no negation: a session that names **no** device (opened
+//! before hub#200 added the column, or by a client that identifies none) is left alone, because
+//! "cut off the tablet" is not "sign out everybody I cannot place".
+//!
+//! Isolation between hubs is the database (ADR-0201, one per hub) **and now also the row**: since
+//! hub#489 / system migration v23, `hub_trusted_device` is keyed `(hub_id, device_id)` and both
+//! doors here carry the hub. So the list enumerates one business, and a revocation cannot reach the
+//! trust of the business next door even where a database is shared.
+//!
+//! ⚠️ **What is still not scoped: `hub_session`** (and `hub_user` under it) carries no `hub_id`
+//! column. On a shared database the *sessions* half of a revocation therefore still crosses — and,
+//! worse, a token minted by one hub still resolves in the other. That is a bigger defect than this
+//! door and it has its own issue (hub#497); it is named here rather than papered over, and it does
+//! not weaken the trust half: privilege is what the trust row grants.
 use std::collections::HashMap;
 
 use erplora_db::{DatabaseAdapter, Params};
@@ -147,12 +156,17 @@ fn listed_mode(stored: Option<&str>) -> &'static str {
         .as_str()
 }
 
-/// Every device this hub knows, newest activity first.
+/// Every device **this hub** knows, newest activity first.
 ///
 /// Two statements instead of one `LEFT JOIN … GROUP BY`: the aggregation is then a pure fold that
 /// tests can pin down, and there is no dialect corner where Postgres and SQLite disagree about
 /// which columns a `GROUP BY` may carry. A hub has a handful of devices; this is not a hot path.
-pub async fn list(db: &dyn DatabaseAdapter) -> Result<Vec<TrustedDevice>> {
+///
+/// The device statement is scoped by `hub_id` (hub#489). The session one cannot be — `hub_session`
+/// has no such column — but it only ever *decorates* a device this hub listed, so the enumeration
+/// itself never leaks: at most a neighbour's session inflates the count of a device id both
+/// businesses happen to trust. Named in the module doc, hub#497.
+pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<TrustedDevice>> {
     let mut p = Params::new();
     p.insert("now".into(), json!(now_rfc3339()));
     // Open sessions only. An expired row is not somebody signed in, and counting it would tell the
@@ -175,11 +189,13 @@ pub async fn list(db: &dyn DatabaseAdapter) -> Result<Vec<TrustedDevice>> {
         );
     }
 
+    let mut scope = Params::new();
+    scope.insert("hub_id".into(), json!(hub_id));
     let devices = db
         .query(
             "SELECT device_id, label, trusted_at, mode, mode_set_at, mode_set_by \
-               FROM hub_trusted_device",
-            &Params::new(),
+               FROM hub_trusted_device WHERE hub_id = :hub_id",
+            &scope,
         )
         .await?;
     let mut listed: Vec<TrustedDevice> = devices
@@ -223,9 +239,17 @@ pub async fn list(db: &dyn DatabaseAdapter) -> Result<Vec<TrustedDevice>> {
 /// lost tablet is the normal case, and the second one must not be told that something went wrong.
 /// It still closes sessions for a device with no trust row: the row is why a device is *listed*,
 /// never why it is *connected*.
-pub async fn revoke(db: &dyn DatabaseAdapter, device_id: &str) -> Result<Revocation> {
+///
+/// The trust delete is scoped to `hub_id` (hub#489) so it cannot reach the row of the business next
+/// door; the session delete is not, because `hub_session` has no such column (hub#497).
+pub async fn revoke(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    device_id: &str,
+) -> Result<Revocation> {
     let device_id = named(device_id)?;
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     let closed = db
         .execute(
@@ -235,7 +259,7 @@ pub async fn revoke(db: &dyn DatabaseAdapter, device_id: &str) -> Result<Revocat
         .await?;
     let forgotten = db
         .execute(
-            "DELETE FROM hub_trusted_device WHERE device_id = :device_id",
+            "DELETE FROM hub_trusted_device WHERE hub_id = :hub_id AND device_id = :device_id",
             &p,
         )
         .await?;
