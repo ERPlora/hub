@@ -56,7 +56,8 @@ export function bridgeWsUrl(): string {
 
 /**
  * Pide al **runtime** el token dedicado del Bridge (`GET /api/bridge/token`) y lo guarda, para que
- * el `BridgeClient` del SDK lo presente. El runtime firma la llamada al SaaS con su `cloud_api_token`
+ * el cliente WS del SDK lo presentara — **ya no existe ninguno** (ADR-0196 §3 / hub#339): esto se
+ * retira entero con el pairing en hub#340. El runtime firma la llamada al SaaS con su `cloud_api_token`
  * (nunca expuesto al navegador) y devuelve un JWT `aud=erplora-bridge` + `hub_id` (exp corto) que el
  * Bridge verifica offline contra la clave pública del SaaS (ADR-0050 §2.7). Ruta RELATIVA a propósito
  * (mismo origen que /api; evita un import circular con `runtime.ts`). `true` si se guardó un token.
@@ -88,8 +89,8 @@ let bridgeRefreshTimer: ReturnType<typeof setInterval> | undefined;
 
 /**
  * Mantiene fresco el token del Bridge: lo pide una vez y luego cada 12 min (< TTL de 15). Idempotente
- * (un solo timer). Lo arranca el shell en el boot; el `BridgeClient` del SDK lee el token guardado en
- * cada conexión, así el refresco surte efecto sin recrear el cliente.
+ * (un solo timer). Lo arranca el shell en el boot. **Nadie lee ya el token**: el transporte WS que
+ * lo presentaba salió del SDK con ADR-0196 §3 (hub#339) y esto se retira en hub#340.
  */
 export function startBridgeTokenRefresh(): void {
   void refreshBridgeToken();

@@ -533,7 +533,7 @@ function deriveWsUrl(baseUrl: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Bridge nativo de Tauri (`invoke` + `listen`). ADR-0050: NO se usa para DATOS (eso va por
 // HttpWsTransport, mismo origen). Queda para lo genuinamente nativo sin equivalente HTTP — hoy el
-// HARDWARE en Hub Local (`IpcBridgeTransport`, más abajo: el shell Tauri ES el bridge, §2.7) y
+// HARDWARE (`IpcBridgeTransport`, más abajo: la app instalada ES el acceso al hardware, §2.7) y
 // caprichos nativos (keychain, device_id). El transporte de datos `IpcTransport` se ELIMINÓ.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -573,12 +573,17 @@ export class ErploraClient {
   }
 
   /**
-   * Hardware local (impresoras de red / cajón) — el módulo llama AQUÍ, nunca al Bridge directo.
-   * El shell decide el transporte (ws-localhost en web-PWA, invoke en Tauri); el módulo ni se
-   * entera. Igual que el WC nunca toca la BD, tampoco toca el Bridge (ARQUITECTURA.md §2.7).
+   * Hardware local (impresoras de red / cajón) — el módulo llama AQUÍ, nunca al hardware directo.
+   * El transporte lo elige el shell y lo inyecta; el módulo ni se entera. Igual que el WC nunca
+   * toca la BD, tampoco toca el hardware por su cuenta (ARQUITECTURA.md §2.7).
+   *
+   * Sin transporte inyectado NO se inventa uno: se degrada a «aquí no hay hardware»
+   * ({@link UnavailableBridgeTransport}). Antes el defecto era el cliente WS a `localhost:12321`,
+   * de modo que un navegador cualquiera sondeaba un puerto local aunque el shell hubiera decidido
+   * que no había hardware — justo lo que retira ADR-0196 §3.
    */
   get peripherals(): BridgeTransport {
-    return (this.bridge ??= new BridgeClient());
+    return (this.bridge ??= new UnavailableBridgeTransport());
   }
 
   /**
@@ -792,30 +797,35 @@ export type TransportKind = 'http+ws' | 'http+sse' | 'ws';
 
 /**
  * Fábrica: construye el cliente según el flag de transporte del boot. ADR-0050: los DATOS van
- * siempre por HTTP+WS (mismo origen que el runtime, embebido en loopback en Hub Local) — ya no hay
- * variante `ipc`. El transporte de HARDWARE en Tauri (`IpcBridgeTransport`, el shell ES el bridge)
- * lo compone el shell aparte; aquí el bridge por defecto es WS-localhost (combo PWA).
+ * siempre por HTTP+WS (mismo origen que el runtime) — ya no hay variante `ipc`. El transporte de
+ * HARDWARE lo compone el shell aparte (`IpcBridgeTransport` en la app instalada) y lo inyecta;
+ * aquí se deja el «sin hardware», que es la verdad en un navegador (ADR-0196 §3).
  */
 export function createClient(
   kind: TransportKind,
   deps: { http?: HttpWsOptions; tauri?: TauriBridge } = {},
   clientOpts?: ConstructorParameters<typeof ErploraClient>[1],
 ): ErploraClient {
-  // Datos por HTTP + push por WS (def.) o SSE (hub#19); hardware por WS-localhost (Bridge §2.7).
+  // Datos por HTTP + push por WS (def.) o SSE (hub#19); hardware solo si el shell lo inyecta.
+  //
+  // El tercer argumento es **equivalente a omitirlo** — el getter `peripherals` construye ese mismo
+  // objeto en cuanto alguien lo pide— y por eso ningún test lo mata (superviviente equivalente
+  // declarado de la campaña de mutación de hub#339, el único de 20). Se deja explícito a propósito:
+  // ESTA línea es la que cableaba `new BridgeClient()`, o sea el sitio exacto por el que el WS a
+  // `localhost:12321` entraba aunque el shell hubiera elegido bien su transporte. Verlo aquí es lo
+  // que impide que vuelva de tapadillo.
   const httpOpts: HttpWsOptions = { ...deps.http, push: kind === 'http+sse' ? 'sse' : (deps.http?.push ?? 'ws') };
-  return new ErploraClient(new HttpWsTransport(httpOpts), clientOpts, new BridgeClient());
+  return new ErploraClient(new HttpWsTransport(httpOpts), clientOpts, new UnavailableBridgeTransport());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bridge de hardware local (impresoras de red / cajón). Canal SEPARADO del
-// transporte de datos (ARQUITECTURA.md §2.7): el navegador no abre TCP a la
-// impresora, el Bridge sí. La PWA habla con el Bridge en localhost:12321
-// (GET /status + WS /ws). En el shell Tauri esto será `invoke` (pendiente).
+// Hardware local (impresoras de red / cajón). Canal SEPARADO del transporte de
+// datos (ARQUITECTURA.md §2.7): el navegador no abre TCP a la impresora; la app
+// instalada sí, en proceso (`invoke` → `erplora-peripherals`). ADR-0196 §3 dejó
+// ese camino como el ÚNICO: fuera el WS local `:12321` y su superficie.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const BRIDGE_DEFAULT_PORT = 12321;
-
-/** Impresora descubierta por el Bridge (`network:{ip}:{port}`). */
+/** Impresora descubierta por el hardware local (`network:{ip}:{port}`). */
 export interface BridgePrinter {
   id: string;
   name: string;
@@ -889,7 +899,7 @@ export type PrinterDiscoveryResult =
  */
 export class LocalNetworkPermissionDeniedError extends Error {
   readonly code = LOCAL_NETWORK_PERMISSION_DENIED;
-  /** El permiso que el SO denegó, si el transporte lo nombra (el WS del bridge no lo lleva). */
+  /** El permiso que el SO denegó, si el transporte lo nombra. */
   readonly permission?: string;
 
   constructor(permission?: string, message?: string) {
@@ -918,9 +928,9 @@ export function printersOrThrow(outcome: PrinterDiscoveryResult | BridgePrinter[
 
 /**
  * Transporte de hardware (periféricos) — abstracción intercambiable, igual que `ErploraTransport`
- * para los datos. El shell elige la implementación según Axis B (web-PWA → `WsBridgeTransport`
- * sobre `ws://localhost`; Tauri → `IpcBridgeTransport` sobre `invoke`). Los módulos consumen esto
- * vía `erplora.peripherals`, sin conocer el transporte.
+ * para los datos. El shell elige la implementación por entorno (app instalada →
+ * {@link IpcBridgeTransport} sobre `invoke`; navegador a secas → {@link UnavailableBridgeTransport},
+ * ADR-0196 §3). Los módulos consumen esto vía `erplora.peripherals`, sin conocer el transporte.
  */
 export interface BridgeTransport {
   detect(timeoutMs?: number): Promise<BridgeStatus>;
@@ -951,195 +961,84 @@ export interface BridgeTransport {
 }
 
 /**
- * Transporte de hardware por **WebSocket** (combo web-PWA). Detección por `GET /status` y
- * comandos por WS (un comando → primer evento esperado). Mismo contrato JSON que el binario Rust
- * `apps/bridge` y `bridge.js`. `BridgeClient` es un alias histórico de `WsBridgeTransport`.
+ * El `code` de «en ESTE dispositivo no hay hardware». Un módulo lo compara con esto, nunca con el
+ * texto: el mensaje lo pone el shell en el idioma del hub y por tanto cambia; el código no.
+ *
+ * No es lo mismo que {@link LOCAL_NETWORK_PERMISSION_DENIED}, y confundirlos le cuesta la tarde al
+ * usuario: allí hay hardware y falta un permiso que puede conceder; aquí no hay ningún camino a la
+ * impresora en este dispositivo y lo que toca es instalar la app.
  */
-export class BridgeClient implements BridgeTransport {
-  private readonly base: string;
-  private readonly wsBase: string;
-  private readonly token?: string | (() => string | null);
-  private readonly WebSocketImpl: typeof WebSocket;
-
-  /**
-   * @param host  `host:port` del Bridge (def. `localhost:12321`).
-   * @param opts.token  Token de emparejamiento (string o getter). El shell lo inyecta desde donde
-   *   lo guarde el usuario (web-PWA: `localStorage 'erplora.bridge.token'`). Un getter se relee en
-   *   cada conexión, así un emparejamiento posterior surte efecto sin recrear el cliente.
-   * @param opts.WebSocketImpl  Implementación de `WebSocket` (para tests); def. el global del navegador.
-   */
-  constructor(
-    host: string = `localhost:${BRIDGE_DEFAULT_PORT}`,
-    opts: { token?: string | (() => string | null); WebSocketImpl?: typeof WebSocket } = {},
-  ) {
-    this.base = `http://${host}`;
-    this.wsBase = `ws://${host}/ws`;
-    this.token = opts.token;
-    this.WebSocketImpl = opts.WebSocketImpl ?? WebSocket;
-  }
-
-  /**
-   * URL del canal WS con el token de emparejamiento como `?token=` — única vía por la que un
-   * `WebSocket` de navegador presenta credenciales (no puede fijar cabeceras). El Bridge es
-   * fail-closed (ADR-0050 §2.7): sin token válido responde 401 salvo en modo dev explícito. Se
-   * relee en cada conexión para recoger un emparejamiento posterior sin recrear el cliente.
-   */
-  private wsUrl(): string {
-    const t = typeof this.token === 'function' ? this.token() : this.token;
-    return t && t.trim() ? `${this.wsBase}?token=${encodeURIComponent(t.trim())}` : this.wsBase;
-  }
-
-  /** ¿Está el Bridge corriendo en este equipo? `GET /status` con timeout corto. */
-  async detect(timeoutMs = 800): Promise<BridgeStatus> {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetch(`${this.base}/status`, { signal: ctrl.signal });
-      if (!res.ok) return { online: false };
-      const b = (await res.json()) as { ok?: boolean; version?: string };
-      return { online: b.ok === true, version: b.version };
-    } catch {
-      return { online: false };
-    } finally {
-      clearTimeout(t);
-    }
-  }
-
-  /**
-   * El rechazo que corresponde a una frame `error` del bridge.
-   *
-   * El `code` del protocolo es lo único estable que trae: por él se distingue «el SO no me deja
-   * mirar la red» de un fallo cualquiera de hardware, que le pide al usuario cosas distintas
-   * (tocar un permiso vs revisar la impresora). Leerlo del texto sería adivinar (hub#338).
-   */
-  private bridgeErrorFor(msg: Record<string, unknown>, event: string): Error {
-    const message = (msg.error as string) || (msg.message as string) || event;
-    if (msg.code === LOCAL_NETWORK_PERMISSION_DENIED) {
-      return new LocalNetworkPermissionDeniedError(msg.permission as string | undefined, message);
-    }
-    return new Error(message);
-  }
-
-  /** Abre el WS, envía una acción y resuelve con el primer evento de `resolveOn`. */
-  private request(
-    action: Record<string, unknown>,
-    resolveOn: string[],
-    rejectOn: string[] = ['error'],
-    timeoutMs = 20000,
-  ): Promise<Record<string, unknown>> {
-    return new Promise((resolve, reject) => {
-      let ws: WebSocket;
-      try {
-        ws = new this.WebSocketImpl(this.wsUrl());
-      } catch (e) {
-        reject(e as Error);
-        return;
-      }
-      const done = (fn: () => void) => {
-        clearTimeout(timer);
-        try {
-          ws.close();
-        } catch {
-          /* noop */
-        }
-        fn();
-      };
-      const timer = setTimeout(() => done(() => reject(new Error('bridge timeout'))), timeoutMs);
-      ws.onmessage = (ev: MessageEvent) => {
-        let msg: Record<string, unknown>;
-        try {
-          msg = JSON.parse(String(ev.data));
-        } catch {
-          return;
-        }
-        const event = msg.event as string;
-        if (rejectOn.includes(event)) {
-          done(() => reject(this.bridgeErrorFor(msg, event)));
-        } else if (resolveOn.includes(event)) {
-          done(() => resolve(msg));
-        }
-      };
-      ws.onerror = () => done(() => reject(new Error('bridge ws error')));
-      ws.onopen = () => ws.send(JSON.stringify(action));
-    });
-  }
-
-  /**
-   * Re-escanea la red (subred 9100 + mDNS) y devuelve las impresoras.
-   *
-   * Un `error` del bridge RECHAZA (por el `rejectOn` por defecto de `request`), y desde hub#338 lo
-   * hace con el tipo correcto: un `code` de permiso denegado llega como
-   * {@link LocalNetworkPermissionDeniedError}, no como un `Error` cualquiera.
-   */
-  async discoverPrinters(): Promise<BridgePrinter[]> {
-    const r = await this.request({ action: 'discover_printers' }, ['printers']);
-    return (r.printers as BridgePrinter[]) ?? [];
-  }
-
-  /** Dispositivos del registro (con sus roles). */
-  async getDevices(): Promise<BridgeDevice[]> {
-    const r = await this.request({ action: 'get_devices' }, ['devices']);
-    return (r.devices as BridgeDevice[]) ?? [];
-  }
-
-  /** Página de prueba en la impresora indicada. */
-  async testPrint(printerId: string): Promise<void> {
-    await this.request({ action: 'test_print', printer_id: printerId }, ['print_complete'], [
-      'error',
-      'print_error',
-    ]);
-  }
-
-  /** Imprime un documento (`document_type` + `data`); el Bridge renderiza el ESC/POS. */
-  async print(
-    printerId: string,
-    documentType: string,
-    data: Record<string, unknown>,
-    jobId?: string,
-  ): Promise<void> {
-    await this.request(
-      { action: 'print', printer_id: printerId, document_type: documentType, data, job_id: jobId ?? null },
-      ['print_complete'],
-      ['error', 'print_error'],
-    );
-  }
-
-  /** Abre el cajón por el kick ESC/POS de la impresora. */
-  async openDrawer(printerId: string, pin = 2): Promise<void> {
-    await this.request({ action: 'open_drawer', printer_id: printerId, pin }, ['drawer_opened']);
-  }
-
-  /**
-   * Asigna un rol (receipt/kitchen/bar/label) a un dispositivo y devuelve el registro.
-   * `keyOrMac` viaja en el campo `mac` del protocolo (nombre histórico); el registro acepta
-   * indistintamente la clave o la MAC.
-   */
-  async setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]> {
-    const r = await this.request({ action: 'set_device_role', mac: keyOrMac, role }, ['devices']);
-    return (r.devices as BridgeDevice[]) ?? [];
-  }
-
-  /**
-   * Notificación del SO por el bridge. `send_notification` no responde con ningún evento —el
-   * bridge la muestra y sigue—, así que no se espera respuesta ni se propaga el fallo: una
-   * notificación que no sale no puede tumbar la comanda que la provocó.
-   */
-  async notify(title: string, body: string): Promise<void> {
-    try {
-      await this.request({ action: 'send_notification', title, body }, []);
-    } catch {
-      // best-effort: el bridge puede no estar, o la plataforma puede no permitirlo.
-    }
-  }
-}
-
-/** Alias semántico del transporte de hardware por WebSocket (combo web-PWA). */
-export { BridgeClient as WsBridgeTransport };
+export const HARDWARE_UNAVAILABLE = 'hardware_unavailable';
 
 /**
- * Transporte de hardware por Tauri **invoke** (combos Tauri). El shell Tauri delega en el crate
- * `erplora-peripherals` (ARQUITECTURA.md §2.7); no hay servidor localhost ni WS. Mismos
- * métodos que `WsBridgeTransport`, así que el módulo no distingue el transporte.
+ * El entorno NO tiene acceso al hardware — hoy, un navegador a secas (ADR-0196 §3).
+ *
+ * Es el precio explícito de retirar el bridge: hasta ahora la PWA llegaba a la impresora por un
+ * WebSocket a `localhost:12321` contra un segundo proceso, y con él venían PNA (Private Network
+ * Access), el mixed-content de una página `https` abriendo `ws://localhost` y la clave pública con
+ * la que se verificaba offline el token de emparejamiento. Queda **un solo** camino: la app
+ * instalada, en proceso, por `invoke` ({@link IpcBridgeTransport}).
+ *
+ * Por qué existe este objeto en vez de dejar `peripherals` sin valor: un `undefined` reventaría en
+ * el primer `erplora.peripherals.detect()` de cualquier módulo. Aquí la ausencia de hardware es una
+ * **respuesta**, no una excepción de programación.
+ *
+ * Y por qué `detect()` es la única que no rechaza: es la sonda con la que un módulo decide qué
+ * pintar. El módulo `printing` la llama SIN `try/catch` (`erp-printing-settings.ts →
+ * refreshBridge`), así que un rechazo ahí le tumbaría la pantalla de ajustes entera en vez de
+ * enseñar su estado «sin hardware». Las demás sí rechazan a propósito: resolver como si nada
+ * dejaría al TPV dando por impreso un tique que no ha salido.
+ */
+export class UnavailableBridgeTransport implements BridgeTransport {
+  /**
+   * @param message  La frase para el usuario. Por defecto va en inglés técnico (para el log,
+   *   igual que el resto de errores del SDK); el shell, que es quien tiene i18n, inyecta aquí la
+   *   traducida — mismo reparto que en el escaneo bloqueado de hub#338.
+   */
+  constructor(
+    private readonly message = 'hardware unavailable: install the ERPlora app on this device',
+  ) {}
+
+  private refuse(): Promise<never> {
+    return Promise.reject(new ErploraError(HARDWARE_UNAVAILABLE, this.message));
+  }
+
+  async detect(): Promise<BridgeStatus> {
+    return { online: false };
+  }
+
+  discoverPrinters(): Promise<BridgePrinter[]> {
+    return this.refuse();
+  }
+
+  getDevices(): Promise<BridgeDevice[]> {
+    return this.refuse();
+  }
+
+  print(): Promise<void> {
+    return this.refuse();
+  }
+
+  testPrint(): Promise<void> {
+    return this.refuse();
+  }
+
+  openDrawer(): Promise<void> {
+    return this.refuse();
+  }
+
+  setDeviceRole(): Promise<BridgeDevice[]> {
+    return this.refuse();
+  }
+
+  /** Best-effort por contrato: una notificación que no sale no puede tumbar la comanda. */
+  async notify(): Promise<void> {}
+}
+
+/**
+ * Transporte de hardware por Tauri **invoke** — la app instalada (`com.erplora.app`: escritorio,
+ * Android, iOS). Delega en el crate `erplora-peripherals` en proceso (ARQUITECTURA.md §2.7); no hay
+ * servidor local ni WebSocket. Desde ADR-0196 §3 es el **único** transporte que llega al hardware.
  */
 export class IpcBridgeTransport implements BridgeTransport {
   constructor(private readonly tauri: TauriBridge) {}

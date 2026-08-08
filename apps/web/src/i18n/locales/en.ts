@@ -1079,5 +1079,9 @@ export default {
       'ERPlora could not search this network: the system has not given the app permission to reach local devices. Grant local network access to ERPlora in your device settings and search again.',
     printersNone:
       'No printer found on this network. Check that the printer is switched on and connected to the same network as this device, then search again.',
+    // ADR-0196 §3: a browser on its own has no way to reach a printer. Naming the app is the
+    // whole point — this is the one sentence that turns "it does not work" into a next step.
+    unavailable:
+      'This device cannot reach printers from the browser. Install the ERPlora app on the device that is connected to the printer and open your business from there.',
   },
 } as const;
