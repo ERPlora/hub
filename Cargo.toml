@@ -22,5 +22,11 @@ members = [
 
 [workspace.package]
 edition = "2021"
-version = "0.0.0"
+# Versión semántica del hub (hub#515, ADR-0269 modelo de actualización). Fuente única de verdad:
+# todos los crates la heredan vía `version.workspace = true`, y el runtime la reporta vía
+# `env!("CARGO_PKG_VERSION")` (/api/system hubVersion, error-sink). El CI de release la reescribe
+# desde el tag `v*` antes del build (build-hub.yml), así que en una release publicada este valor es
+# el del último tag; en `main` entre releases es el "en desarrollo". Criterio MAJOR/MINOR/PATCH en
+# architecture/00-overview/update-model.md.
+version = "0.1.0"
 license = "MIT"
