@@ -327,6 +327,11 @@ pub(crate) async fn execute_at(
         TxGatedOutcome::Committed { .. } => {}
     }
 
+    // ADR-0259 D3 (hub#551): si esta transacción acaba de arrancar una cadena fiscal EN PRODUCCIÓN,
+    // el go-live queda cerrado para siempre. Se sella DESPUÉS del commit y solo si commiteó —
+    // sellar algo que revirtió cerraría la vuelta atrás por una venta que no existió.
+    seal_first_record_if_fiscal(db, ctx, &cmd.def.emit).await;
+
     // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
     // durable a listeners la hace el relay desde el outbox.
     for event in &cmd.def.emit {
@@ -985,6 +990,42 @@ fn enforce_fiscal_precondition<'a>(
         Ok(())
     } else {
         Err(RuntimeError::FiscalPrecondition { missing })
+    }
+}
+
+/// Seals `first_record_at` when a transaction that STARTS a fiscal chain has just committed while
+/// the hub files for real (ADR-0259 D3, hub#551).
+///
+/// This is what makes the go-live one-way **without asking any module anything**. The alternative
+/// —the provider reporting back that it filed— would put the irreversible half of a fiscal system
+/// in the hands of a module remembering to speak: one that forgets leaves the toggle reversible for
+/// ever, which is the hole this whole ADR exists to close.
+///
+/// The core does not need to be told. It already knows two things by itself: that the profile is in
+/// `production`, and that the events this command emits are among the ones the provider taught it
+/// start a fiscal chain while it was healthy ([`crate::fiscal_profile::FiscalProfile::fiscal_trigger_events`]).
+///
+/// **Best-effort on the read, strict on the meaning.** A failure here is logged and never turns a
+/// committed sale into an error — the money is already taken and the record is already on its way;
+/// refusing afterwards would help nobody. The seal is idempotent, so the next fiscal transaction
+/// catches up.
+async fn seal_first_record_if_fiscal(db: &dyn DatabaseAdapter, ctx: &RequestContext, emitted: &[String]) {
+    if emitted.is_empty() || ctx.fiscal_mode != Some(crate::fiscal_profile::FiscalMode::Active) {
+        return; // Nothing emitted, or this hub is not filing for real: nothing to seal.
+    }
+    let profile = match crate::fiscal_profile::load(db, &ctx.hub_id).await {
+        Ok(Some(p)) => p,
+        _ => return,
+    };
+    if profile.environment != crate::fiscal_profile::ENV_PRODUCTION
+        || !emitted
+            .iter()
+            .any(|e| profile.fiscal_trigger_events.iter().any(|t| t == e))
+    {
+        return;
+    }
+    if let Err(e) = crate::fiscal_profile::stamp_first_record(db, &ctx.hub_id).await {
+        eprintln!("⚠ fiscal: no se pudo sellar el primer registro en producción (ADR-0259): {e}");
     }
 }
 
