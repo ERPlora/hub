@@ -7,7 +7,6 @@ import {
   ErploraClient,
   ErploraError,
   createClient,
-  BridgeClient,
   IpcBridgeTransport,
   LocalNetworkPermissionDeniedError,
   LOCAL_NETWORK_PERMISSION_DENIED,
@@ -281,71 +280,115 @@ test('formatAmount formatea unidades; opts.currency sobreescribe la del hub', ()
   assert.equal(c.formatAmount(1234.5, { locale: 'en-US', currency: 'USD' }), '$1,234.50');
 });
 
-// ── BridgeClient: el WS presenta el token de emparejamiento como ?token= ─────
-// El Bridge es fail-closed (ADR-0050 §2.7): exige el token salvo en modo dev. Un `WebSocket`
-// de navegador no puede fijar cabeceras, así que la ÚNICA vía es el query param. Si el SDK no lo
-// pasa, `discoverPrinters`/`print` fallan con 401 contra un Bridge real (el gap que esto cierra).
+// ── ADR-0196 §3: el SDK ya NO lleva canal WS local de hardware ──────────────────────────
+//
+// El único camino a la impresora es la app instalada (`IpcBridgeTransport` sobre `invoke`,
+// in-process). Con el canal WS se van sus tres problemas de navegador: PNA (Private Network
+// Access), mixed-content (una página https abriendo `ws://localhost`) y la clave pública con la
+// que el bridge verificaba offline el token de emparejamiento.
+//
+// Se asertan las DOS mitades porque cada una sola miente. Que el símbolo desaparezca del barrel
+// es el contrato hacia los módulos; que el hardware POR DEFECTO no abra nada es el comportamiento.
+// Borrar solo el alias `WsBridgeTransport` dejando `BridgeClient` cableado en `peripherals`
+// pasaría la primera y no habría retirado nada.
 
-class FakeBridgeWs {
-  static last: FakeBridgeWs | undefined;
-  onopen: (() => void) | null = null;
-  onmessage: ((e: { data: string }) => void) | null = null;
-  onerror: (() => void) | null = null;
-  sent: string[] = [];
-  send = (d: string) => {
-    this.sent.push(d);
-  };
-  close = () => {};
-  constructor(public url: string) {
-    FakeBridgeWs.last = this;
+test('el barrel ya NO exporta el transporte WS de hardware (ADR-0196 §3)', async () => {
+  const sdk = await import('./index.ts');
+  for (const gone of ['WsBridgeTransport', 'BridgeClient', 'BRIDGE_DEFAULT_PORT']) {
+    assert.equal(gone in sdk, false, `${gone} sigue exportado por el SDK`);
+  }
+  // Lo que SÍ sigue siendo contrato: la interfaz y el transporte de la app instalada.
+  assert.equal('IpcBridgeTransport' in sdk, true);
+});
+
+/** Espía del `fetch` global: el WS-bridge sondeaba `http://localhost:12321/status` al detectar. */
+async function withFetchSpy<T>(run: () => Promise<T>): Promise<{ result: T; urls: string[] }> {
+  const urls: string[] = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (u: unknown) => {
+    urls.push(String(u));
+    throw new Error('ninguna llamada de red debería salir de aquí');
+  }) as typeof fetch;
+  try {
+    return { result: await run(), urls };
+  } finally {
+    globalThis.fetch = real;
   }
 }
 
-/** Dispara open+evento para resolver el `request()` interno del BridgeClient. */
-function driveBridge(event: Record<string, unknown>): void {
-  const ws = FakeBridgeWs.last!;
-  ws.onopen?.();
-  ws.onmessage?.({ data: JSON.stringify(event) });
+test('sin la app instalada, detect() dice «offline» y NO sondea localhost', async () => {
+  // `detect()` no puede rechazar: el módulo printing lo llama SIN try/catch
+  // (`erp-printing-settings.ts → refreshBridge`), así que un rechazo aquí le rompe la pantalla
+  // de ajustes entera en vez de enseñarle su estado «sin hardware».
+  const c = new ErploraClient({} as never, {});
+  const { result, urls } = await withFetchSpy(() => c.peripherals.detect());
+  assert.deepEqual(result, { online: false });
+  assert.deepEqual(urls, [], 'un navegador sin la app no llama a ningún puerto local');
+});
+
+// Cada operación que toca hardware, una a una: si alguna resolviera «bien» sin haber hecho nada,
+// el TPV daría por impreso un tique que no ha salido. Fallar es la respuesta correcta.
+const HARDWARE_OPS: Array<[string, (t: ErploraClient['peripherals']) => Promise<unknown>]> = [
+  ['discoverPrinters', (t) => t.discoverPrinters()],
+  ['getDevices', (t) => t.getDevices()],
+  ['print', (t) => t.print('network:192.168.1.50:9100', 'receipt', { total: 100 })],
+  ['testPrint', (t) => t.testPrint('network:192.168.1.50:9100')],
+  ['openDrawer', (t) => t.openDrawer('network:192.168.1.50:9100')],
+  ['setDeviceRole', (t) => t.setDeviceRole('aa:bb:cc:dd:ee:ff', 'receipt')],
+];
+
+for (const [name, run] of HARDWARE_OPS) {
+  test(`sin la app instalada, ${name}() rechaza con \`hardware_unavailable\``, async () => {
+    const c = new ErploraClient({} as never, {});
+    await assert.rejects(
+      () => run(c.peripherals),
+      (e: unknown) => {
+        // El código es lo estable: un módulo distingue «no hay hardware aquí» de «la impresora
+        // no responde» por él, nunca leyendo el texto.
+        assert.ok(e instanceof ErploraError, `${name} debe rechazar con ErploraError`);
+        assert.equal(e.code, 'hardware_unavailable');
+        return true;
+      },
+    );
+  });
 }
 
-test('BridgeClient sin token abre ws://host/ws (sin query)', async () => {
-  const c = new BridgeClient(undefined, {
-    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
-  });
-  const p = c.discoverPrinters();
-  assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws');
-  driveBridge({ event: 'printers', printers: [] });
-  await p;
+test('sin frase inyectada por el shell, el rechazo AÚN dice algo', async () => {
+  // El shell inyecta la frase traducida; el SDK se queda con la inglesa del log. Lo que no puede
+  // quedarse es sin mensaje: quien enseñe `error.message` pintaría un hueco.
+  const c = new ErploraClient({} as never, {});
+  await assert.rejects(
+    () => c.peripherals.testPrint('network:192.168.1.50:9100'),
+    (e: unknown) => {
+      assert.ok(e instanceof ErploraError);
+      assert.ok(e.message.trim().length > 0, 'el rechazo por defecto necesita mensaje');
+      return true;
+    },
+  );
 });
 
-test('BridgeClient con token emparejado lo presenta como ?token= (URL-encoded)', async () => {
-  const c = new BridgeClient(undefined, {
-    token: 'pair-42/x',
-    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
-  });
-  const p = c.discoverPrinters();
-  assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws?token=pair-42%2Fx');
-  driveBridge({ event: 'printers', printers: [] });
-  await p;
+test('notify() sin la app NO lanza: best-effort por contrato', async () => {
+  // Una notificación que no sale no puede tumbar la comanda que la provocó (contrato de
+  // `BridgeTransport.notify`), y los dos transportes que quedan lo cumplen igual.
+  const c = new ErploraClient({} as never, {});
+  await c.peripherals.notify('Nueva comanda', 'Mesa 4 · 3 platos');
 });
 
-test('BridgeClient acepta un getter de token (se relee tras emparejar, sin recrear el cliente)', async () => {
-  let tok: string | null = null;
-  const c = new BridgeClient(undefined, {
-    token: () => tok,
-    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
-  });
-  // Antes de emparejar: sin query.
-  let p = c.discoverPrinters();
-  assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws');
-  driveBridge({ event: 'printers', printers: [] });
-  await p;
-  // El usuario introduce el código en Ajustes → el MISMO cliente ya presenta el token.
-  tok = 'later-token';
-  p = c.discoverPrinters();
-  assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws?token=later-token');
-  driveBridge({ event: 'printers', printers: [] });
-  await p;
+test('createClient tampoco cablea el WS de hardware (ADR-0196 §3)', async () => {
+  // La fábrica pasaba `new BridgeClient()` como periféricos: el WS entraba por aquí aunque el
+  // shell eligiera bien su transporte.
+  const c = createClient('http+ws', { http: { baseUrl: 'http://h' } });
+  const { result, urls } = await withFetchSpy(() => c.peripherals.detect());
+  assert.deepEqual(result, { online: false });
+  assert.deepEqual(urls, []);
+});
+
+test('el transporte que inyecta el shell manda sobre el «sin hardware» por defecto', async () => {
+  // El defecto es la degradación, no una pared: el shell de la app instalada sigue inyectando su
+  // `IpcBridgeTransport` y ese es el que ven los módulos.
+  const injected = { detect: async () => ({ online: true, version: '9.9' }) } as never;
+  const c = new ErploraClient({} as never, {}, injected);
+  assert.deepEqual(await c.peripherals.detect(), { online: true, version: '9.9' });
 });
 
 // ── hub#338: «no encuentro impresoras» ≠ «no me dejan buscarlas» ────────────────────────
@@ -416,30 +459,19 @@ test('un shell de escritorio VIEJO devuelve el array pelado y sus impresoras no 
   assert.deepEqual(await transport.discoverPrinters(), [A_PRINTER]);
 });
 
-test('el bridge WS también distingue: `error` con el code del permiso', async () => {
-  const c = new BridgeClient(undefined, {
-    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
-  });
-  const p = c.discoverPrinters();
-  driveBridge({
-    event: 'error',
-    code: LOCAL_NETWORK_PERMISSION_DENIED,
-    message: 'the OS denies access to the local network',
+test('un fallo CUALQUIERA del escaneo sigue siendo un Error normal', async () => {
+  // Solo el permiso cambia de tipo: un fallo de hardware no debe mandar al usuario a los ajustes
+  // del sistema a tocar un permiso que ya tiene. Se aserta contra el transporte que QUEDA tras
+  // ADR-0196 §3 — la misma distinción que probaba el WS, ahora por la única puerta viva.
+  const transport = new IpcBridgeTransport({
+    invoke: async (cmd: string) => {
+      if (cmd === 'erplora_discover_printers') throw new Error('impresora inalcanzable');
+      return {};
+    },
+    listen: async () => () => {},
   });
 
-  await assert.rejects(p, (e: unknown) => e instanceof LocalNetworkPermissionDeniedError);
-});
-
-test('un error CUALQUIERA del bridge sigue siendo un Error normal', async () => {
-  // Solo el permiso cambia de tipo: un fallo de transporte no debe mandar al usuario a los
-  // ajustes del sistema a tocar un permiso que ya tiene.
-  const c = new BridgeClient(undefined, {
-    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
-  });
-  const p = c.discoverPrinters();
-  driveBridge({ event: 'error', code: 'peripheral_error', message: 'impresora inalcanzable' });
-
-  await assert.rejects(p, (e: unknown) => {
+  await assert.rejects(transport.discoverPrinters(), (e: unknown) => {
     assert.ok(e instanceof Error);
     assert.ok(!(e instanceof LocalNetworkPermissionDeniedError));
     return true;

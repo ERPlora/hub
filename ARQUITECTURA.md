@@ -162,11 +162,20 @@ El escáner por HID lo maneja el SO/navegador como teclado.
 
 #### 2.7.1 🪦 Bridge standalone — retirado (ADR-0196)
 
-> 🪦 **ADR-0196 retira este componente.** El standalone `apps/bridge` (binario Axum,
-> `GET /status` + `WS /ws` en `localhost:12321`), el pairing y `WsBridgeTransport` siguen en el
-> árbol **solo** porque hub#339/#340 están abiertas. **No construyas nada nuevo sobre esto**: el
-> modelo vigente es la **app instalable** con `invoke` in-process y la **cola de impresión en el
-> hub**. Ver [architecture/hub/apps/bridge.md](../architecture/hub/apps/bridge.md) y
+> 🪦 **ADR-0196 retira este componente.** `WsBridgeTransport` **ya no existe** (hub#339): el
+> `module-sdk` dejó de exportar el transporte de hardware por WebSocket, y con él se fueron PNA,
+> el mixed-content de una página `https` abriendo `ws://localhost` y la clave pública del
+> emparejamiento. En un navegador sin la app, `erplora.peripherals` es
+> `UnavailableBridgeTransport`: `detect()` contesta `{online:false}` y toda operación de hardware
+> rechaza con `hardware_unavailable` — nunca resuelve callando (un tique dado por impreso que no
+> ha salido sería el fallo caro).
+>
+> Siguen en el árbol, **solo** porque hub#340 está abierta: el standalone `apps/bridge` (binario
+> Axum, `GET /status` + `WS /ws` en `localhost:12321`), el pairing y las credenciales de máquina
+> del bridge (incluido el refresco de `GET /api/bridge/token` que el shell aún dispara en el boot,
+> ya sin nadie que presente el token). **No construyas nada nuevo sobre esto**: el modelo vigente
+> es la **app instalable** con `invoke` in-process y la **cola de impresión en el hub**. Ver
+> [architecture/hub/apps/bridge.md](../architecture/hub/apps/bridge.md) y
 > [architecture/hub/crates/peripherals.md](../architecture/hub/crates/peripherals.md).
 
 | Pieza | Elección | Nota |

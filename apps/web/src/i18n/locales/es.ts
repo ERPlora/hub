@@ -1058,5 +1058,9 @@ export default {
       'ERPlora no ha podido buscar en esta red: el sistema no le ha dado permiso a la app para acceder a los dispositivos de la red local. Concédele el acceso a la red local a ERPlora en los ajustes del dispositivo y vuelve a buscar.',
     printersNone:
       'No se ha encontrado ninguna impresora en esta red. Comprueba que la impresora está encendida y conectada a la misma red que este dispositivo, y vuelve a buscar.',
+    // ADR-0196 §3: desde el navegador, a secas, no hay forma de llegar a una impresora. Nombrar
+    // la app es lo importante: es la frase que convierte «no funciona» en un paso siguiente.
+    unavailable:
+      'Desde el navegador, este dispositivo no puede llegar a las impresoras. Instala la app de ERPlora en el dispositivo conectado a la impresora y abre tu negocio desde ahí.',
   },
 } as const;
