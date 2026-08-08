@@ -19,6 +19,7 @@ pub mod certificate;
 pub mod certificate_refetch;
 pub mod commands;
 pub mod device_mode;
+pub mod devices;
 pub mod e2e_support;
 pub mod error_registry;
 pub mod errors;
@@ -957,6 +958,28 @@ impl Runtime {
     /// ella el **modo** del dispositivo (hub#357): la fila borrada es donde vivía.
     pub async fn untrust_device(&self, device_id: &str) -> Result<()> {
         identity::untrust_device(self.db.as_ref(), device_id).await
+    }
+
+    /// Los dispositivos que este hub conoce, con lo que permite reconocerlos a ojo (hub#455).
+    ///
+    /// Ojo con lo que se puede creer: el `device_id` y la `label` los elige el **propio
+    /// dispositivo** (cabecera `X-Device-Id` y campo `name` del login cloud); el resto —cuándo se
+    /// confió, el modo y su auditoría, las sesiones abiertas— lo escribió el hub. Ver
+    /// [`devices::TrustedDevice`].
+    pub async fn list_devices(&self) -> Result<Vec<devices::TrustedDevice>> {
+        devices::list(self.db.as_ref()).await
+    }
+
+    /// **Corta** un dispositivo perdido (hub#455): cierra sus sesiones abiertas y le retira la
+    /// confianza —y con ella el modo `personal` y el login por PIN—. Idempotente.
+    ///
+    /// Es la pieza que faltaba: [`Self::untrust_device`] ya borraba la fila, pero dejaba viva la
+    /// sesión que el dispositivo tuviera abierta (hasta **30 días** en un `personal`, hub#358), que
+    /// es justo lo que sigue usando quien se llevó la tablet. Se ejecuta sobre **cualquier** id que
+    /// se le nombre —revocar solo quita privilegio—, incluida una fila heredada cuyo id fuese el
+    /// del propio hub (hub#454).
+    pub async fn revoke_device(&self, device_id: &str) -> Result<devices::Revocation> {
+        devices::revoke(self.db.as_ref(), device_id).await
     }
 
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),

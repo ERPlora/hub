@@ -35,7 +35,10 @@ const DEVICE_ID_HEADER: &str = "x-device-id";
 ///
 /// Trimmed on purpose: a header of blanks is a client that did not identify itself, and it must
 /// land on the same branch as no header at all (the strict mode), never on a lookup for `"  "`.
-fn device_id_of(headers: &HeaderMap) -> &str {
+///
+/// Shared with [`crate::devices`] (hub#455) rather than copied: two definitions of "which device is
+/// asking" that could drift is exactly how one door ends up trimming and the other one not.
+pub(crate) fn device_id_of(headers: &HeaderMap) -> &str {
     headers
         .get(DEVICE_ID_HEADER)
         .and_then(|v| v.to_str().ok())

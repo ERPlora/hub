@@ -263,6 +263,34 @@ export default {
     adminOnly: 'Only an administrator can change how this device signs people in.',
     saveError: 'This device could not be changed. Check the connection and try again.',
   },
+  // hub#455 — the "somebody walked off with the tablet" screen. Two rules the copy follows: it says
+  // WHEN the cut-off takes effect (right away — the owner has just reported a theft and needs to
+  // know), and it does not promise more than the hub delivers (removing a device is not a ban:
+  // anybody with an account can sign in on it again). No "hub" anywhere — ADR-0254.
+  devices: {
+    title: 'Devices',
+    intro:
+      'The devices somebody has signed in on. If you lose one, remove it here: its session closes right away and it can no longer sign in with a PIN.',
+    thisDevice: 'The one you are using',
+    unnamed: 'Unnamed device',
+    empty: 'Nobody has signed in on a device yet.',
+    inUse: 'In use right now',
+    lastUsed: 'Last used {when}',
+    neverUsed: 'Added {when}, never used since',
+    openUntil: 'Its session stays open until {when}',
+    modeShared: 'Asks for a PIN',
+    modePersonal: 'Stays signed in',
+    revoke: 'Remove this device',
+    cancel: 'Keep it',
+    confirm: 'Remove this device?',
+    confirmCurrent:
+      'This is the device you are using: removing it closes your session and you will have to sign in again.',
+    consequence:
+      'Its session closes right away. To use it again, somebody has to sign in on it with their account.',
+    adminOnly: 'Only an administrator can remove a device.',
+    loadError: 'The devices could not be loaded. Check the connection and try again.',
+    revokeError: 'This device could not be removed. Check the connection and try again.',
+  },
   // hub#359 — the dial the OWNER turns, on top of the device mode above. Every option says what it
   // does to the business, never what it is called: "never" means nothing to a shopkeeper, "whoever
   // opened the till is the name on every sale" does. The hour and the twelve hours are spelled out
