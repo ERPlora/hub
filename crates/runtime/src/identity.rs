@@ -997,6 +997,34 @@ pub async fn is_device_trusted(db: &dyn DatabaseAdapter, device_id: &str) -> Res
     Ok(!res.rows.is_empty())
 }
 
+/// Removes the trust row an id that names the **hub itself** left behind (hub#454).
+///
+/// Deployed hubs carry one: until this, a browser presented the `hub_id` as its `X-Device-Id`, so
+/// every browser shared a single row — and that id is published unauthenticated by
+/// `GET /api/hub/context`. A trusted row keyed on a value anyone can fetch, possibly carrying the
+/// lax `personal` mode, is the escalation; the client-side fix does not reach it.
+///
+/// Runs on **every boot**, not once as a versioned migration: it must also clean a database
+/// restored from a backup taken before this change (pgBackRest is the only real copy of a hub,
+/// ADR-0213), and re-running a `DELETE` of an id that is not a device is a no-op by construction.
+///
+/// Scoped to `hub_id` alone: `hub_trusted_device` is keyed by `device_id` with no `hub_id` column,
+/// so in a database shared by several hubs (the pre-ADR-0201 shape) the table is common ground —
+/// each hub sweeps exactly its own id and nothing of its neighbour's.
+pub async fn forget_hub_id_as_device(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
+    if hub_id.is_empty() {
+        return Ok(());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    db.execute(
+        "DELETE FROM hub_trusted_device WHERE device_id = :hub_id",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
 /// Revoca la confianza de un dispositivo (dispositivo perdido/robado). Idempotente.
 pub async fn untrust_device(db: &dyn DatabaseAdapter, device_id: &str) -> Result<()> {
     let mut p = Params::new();

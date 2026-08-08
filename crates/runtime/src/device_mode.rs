@@ -148,6 +148,20 @@ fn reject(code: &str, message: impl Into<String>) -> RuntimeError {
     }
 }
 
+/// The refusal for an id that names no device this hub knows — the one an **administrator** can
+/// legitimately hit, so it says what to do about it. Shared with the guard that refuses the hub's
+/// own id (hub#454): from the outside both are the same fact, «that is not a device of mine», and
+/// two different messages for it would only tell an attacker which of the two they hit.
+pub(crate) fn unknown_device(device_id: &str) -> RuntimeError {
+    reject(
+        "unknown_device",
+        format!(
+            "this hub does not know the device `{device_id}`: sign in online on it once \
+             before choosing how it identifies people"
+        ),
+    )
+}
+
 /// The mode of `device_id`, or [`DeviceMode::Shared`] when the hub has no idea what that is.
 ///
 /// Deliberately infallible in the "unknown" direction: this is read by the **login screen**, with
@@ -203,13 +217,7 @@ pub async fn set_mode(
         )
         .await?;
     if res.affected == 0 {
-        return Err(reject(
-            "unknown_device",
-            format!(
-                "this hub does not know the device `{device_id}`: sign in online on it once \
-                 before choosing how it identifies people"
-            ),
-        ));
+        return Err(unknown_device(device_id));
     }
     Ok(())
 }

@@ -663,6 +663,10 @@ impl Runtime {
         identity::ensure_tables(self.db.as_ref()).await?;
         // 2) Migraciones de sistema versionadas (≥ v1), scoped por hub_id del despliegue.
         system_migrations::apply(self.db.as_ref(), &self.hub_id).await?;
+        // 2b) The device row an id that names the HUB left behind (hub#454). Not a versioned
+        // migration on purpose: it is an invariant, not a schema change — it must also clean a
+        // database restored from a backup taken before the fix, and re-running it is a no-op.
+        identity::forget_hub_id_as_device(self.db.as_ref(), &self.hub_id).await?;
         // 3) Marcador de unidad monetaria (ADR-0007): una instalación NUEVA (esquema ya en
         // céntimos) se auto-marca `money_unit=cents` para que el backfill jamás la convierta. Un
         // hub VIEJO en euros NO se auto-marca aquí — espera a `--backfill-money` (que convierte).
@@ -918,14 +922,35 @@ impl Runtime {
         user_profile::set_avatar(self.db.as_ref(), &self.hub_id, user_id, avatar_path).await
     }
 
+    /// The device an id names, or `None` when it names none (hub#454).
+    ///
+    /// The one id it refuses is **this hub's own**. A device id is a string the client chooses, so
+    /// it can only ever NAME a device — but the `hub_id` was worse than an arbitrary string: the
+    /// web presented it as its `X-Device-Id`, making every browser one device, and
+    /// `GET /api/hub/context` publishes it without a session. Refusing it here is what stops a
+    /// browser still running a cached build from writing that shared row back, and what makes a
+    /// row restored from an old backup inert.
+    ///
+    /// Every caller fails closed on `None`, each in its own direction: nothing to trust, not
+    /// trusted, the strict mode, no write.
+    fn device_named<'a>(&self, device_id: &'a str) -> Option<&'a str> {
+        (device_id != self.hub_id).then_some(device_id)
+    }
+
     /// Marca un dispositivo como de confianza (tras el primer login online). Idempotente (§2.9).
     pub async fn trust_device(&self, device_id: &str, label: &str) -> Result<()> {
-        identity::trust_device(self.db.as_ref(), device_id, label).await
+        match self.device_named(device_id) {
+            Some(id) => identity::trust_device(self.db.as_ref(), id, label).await,
+            None => Ok(()), // nothing to trust: naming the hub names no device.
+        }
     }
 
     /// `true` si el dispositivo es de confianza (gate del login por PIN, §2.9).
     pub async fn is_device_trusted(&self, device_id: &str) -> Result<bool> {
-        identity::is_device_trusted(self.db.as_ref(), device_id).await
+        match self.device_named(device_id) {
+            Some(id) => identity::is_device_trusted(self.db.as_ref(), id).await,
+            None => Ok(false),
+        }
     }
 
     /// Revoca la confianza de un dispositivo (perdido/robado). Idempotente (§2.9). Se lleva con
@@ -937,7 +962,10 @@ impl Runtime {
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
     /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
     pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {
-        device_mode::mode(self.db.as_ref(), device_id).await
+        match self.device_named(device_id) {
+            Some(id) => device_mode::mode(self.db.as_ref(), id).await,
+            None => Ok(device_mode::DeviceMode::default()),
+        }
     }
 
     /// Cuánto dura una sesión abierta **en este dispositivo** (segundos), hub#358 + hub#359.
@@ -981,7 +1009,10 @@ impl Runtime {
         mode: device_mode::DeviceMode,
         actor: &str,
     ) -> Result<()> {
-        device_mode::set_mode(self.db.as_ref(), device_id, mode, actor).await
+        match self.device_named(device_id) {
+            Some(id) => device_mode::set_mode(self.db.as_ref(), id, mode, actor).await,
+            None => Err(device_mode::unknown_device(device_id)),
+        }
     }
 
     /// Permisos de una **sesión** con ese rol: los de los módulos + el permiso del core

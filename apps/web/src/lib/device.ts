@@ -1,10 +1,29 @@
-// Identidad de dispositivo para el caso "un hub por dispositivo" (ARQUITECTURA.md §2.9b).
+// **Which device is this?** — the identity every "per device" decision of the hub keys on
+// (ARQUITECTURA.md §2.9b, ADR-0154; the browser half is hub#454).
 //
-// El shell Tauri expone el comando `device_context` (con `withGlobalTauri` → accesible por
-// `window.__TAURI__.core.invoke`, sin necesidad de la dependencia npm `@tauri-apps/api`).
-// Devuelve un id estable por instalación (persistido en `app_data_dir` por el shell) + el
-// `client_type`. En una web-pwa pura no hay Tauri → `null`, y el login va como cliente `hub`
-// genérico.
+// Two hosts, two very different answers:
+//
+//  - **The Tauri shell** knows a real one. The `device_context` command (exposed through
+//    `withGlobalTauri` → `window.__TAURI__.core.invoke`, so no `@tauri-apps/api` dependency)
+//    returns an id per *installation*, persisted by the shell in `app_data_dir` — outside the
+//    webview, so clearing the site data does not touch it.
+//  - **A browser** has no serial number at all. The only identity available is one the browser
+//    **mints for itself and keeps** in its own site storage, which is what [`browserDeviceId`]
+//    does. A browser profile on a machine is therefore what "device" means here: another browser,
+//    another OS user, a private window or a wipe of the site data are all *another device*.
+//
+// **The identity is client-held, and that decides what may rest on it.** Whoever holds the browser
+// can read it, change it or copy it into another one, so it can only ever NAME a device — so the
+// owner recognises it, the hub keys the device mode (hub#357) on it and the device-trust row
+// (§2.9, hub#330) hangs off it. It is never a credential: no door opens because of the value here,
+// and every path that reads it fails closed when it is absent or unknown (`shared`, the short
+// session, and a refused PIN under `HUB_DEVICE_TRUST=enforce`).
+//
+// What it must never be is the **hub's** id. That was the bug hub#454 fixes: the web presented
+// `hub_id` as its device identity, so every browser in the world was one single device — marking
+// the owner's laptop `personal` took the pinpad off the till at the counter — and that id is
+// published unauthenticated by `GET /api/hub/context`, which put "this device is trusted" within
+// reach of anyone who could fetch one JSON.
 
 export interface DeviceContext {
   id: string;
@@ -12,13 +31,98 @@ export interface DeviceContext {
   platform?: 'android' | 'windows' | 'macos' | 'linux' | 'cloud' | 'desktop';
 }
 
-// Contexto aportado por el runtime web/Cloud. Tauri siempre gana porque su `device.id` vive fuera
-// del webview y sobrevive a limpiezas de caché; en Cloud el UUID del deployment identifica la
-// máquina lógica ya provisionada.
-let runtimeDeviceContext: DeviceContext | null = null;
+/**
+ * What the runtime can say about this client: what **kind** it is, never **which** one.
+ *
+ * The hub cannot see the browser in front of it, and the only stable id it owns names the *hub*.
+ * So this carries the client type and platform that travel to the Cloud on a login, and the device
+ * identity is resolved where it actually lives — the shell, or the browser's own storage. Making
+ * the id unrepresentable here is the point: it is the shape the previous bug needed.
+ */
+export interface ClientKind {
+  clientType: DeviceContext['clientType'];
+  platform?: DeviceContext['platform'];
+}
 
-export function setRuntimeDeviceContext(context: DeviceContext | null): void {
-  runtimeDeviceContext = context;
+let runtimeClientKind: ClientKind | null = null;
+
+/** Publish what kind of client this is, as the runtime reported it (`GET /api/hub/context`). */
+export function setRuntimeClientKind(kind: ClientKind | null): void {
+  runtimeClientKind = kind;
+}
+
+/** Where a browser keeps the identity it minted for itself. Per origin, so per hub. */
+const DEVICE_ID_STORAGE_KEY = 'erplora.device_id';
+
+/** Prefix of a browser-minted identity: legible in a log, obviously not a hub id or a user id. */
+const DEVICE_ID_PREFIX = 'dev_';
+
+/** The identity of THIS page load, once resolved. Also the fallback when storage refuses to keep it. */
+let browserIdentity: string | null = null;
+
+/** The id this browser wrote down, or `null` if it has none (or cannot read its own storage). */
+function storedDeviceId(): string | null {
+  try {
+    const stored = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    return stored && stored.trim() ? stored.trim() : null;
+  } catch {
+    return null; // storage unavailable (site data blocked, sandboxed frame, SSR).
+  }
+}
+
+/**
+ * Mint a fresh identity, or `null` when this browser has no CSPRNG.
+ *
+ * **`null` rather than something predictable.** `Math.random` would hand out ids an attacker can
+ * enumerate, and enumerable ids are exactly what device-trust and the device mode must not key on.
+ * A client with no identity is answered `shared` and refused a PIN under enforcement — annoying,
+ * and strictly safer than a guessable name.
+ *
+ * `randomUUID` is only exposed in secure contexts; `getRandomValues` is not, so a hub reached over
+ * plain http on a LAN still gets a real random identity instead of none.
+ */
+function mintDeviceId(): string | null {
+  const source = (globalThis as { crypto?: Crypto }).crypto;
+  if (typeof source?.randomUUID === 'function') {
+    return `${DEVICE_ID_PREFIX}${source.randomUUID().replaceAll('-', '')}`;
+  }
+  if (typeof source?.getRandomValues === 'function') {
+    const bytes = source.getRandomValues(new Uint8Array(16));
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `${DEVICE_ID_PREFIX}${hex}`;
+  }
+  return null;
+}
+
+/**
+ * The identity **this browser** minted for itself, kept in its site storage. `null` only when the
+ * browser cannot produce a random value at all (see {@link mintDeviceId}).
+ *
+ * What it survives, because it is what the owner is promised: closing the tab, reloading, quitting
+ * the browser, installing the PWA. What it does **not** survive: another browser or another OS
+ * user (a different profile, a different storage — a different device, correctly), clearing the
+ * site data, and a private window ending. A browser whose storage refuses writes keeps the
+ * identity for the life of the page — it is then never a *known* device, which is fail-closed.
+ *
+ * Scoped to the origin, so a browser presents a **different** identity to each hub: nothing here
+ * lets one hub correlate a device with another's.
+ */
+export function browserDeviceId(): string | null {
+  if (browserIdentity) return browserIdentity;
+  const stored = storedDeviceId();
+  if (stored) {
+    browserIdentity = stored;
+    return stored;
+  }
+  const minted = mintDeviceId();
+  if (!minted) return null;
+  try {
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, minted);
+  } catch {
+    /* cannot be kept: this identity lasts one page load, and the hub never knows it. */
+  }
+  browserIdentity = minted;
+  return minted;
 }
 
 interface TauriCore {
@@ -30,15 +134,15 @@ function tauriCore(): TauriCore | null {
   return g?.core?.invoke ? g.core : null;
 }
 
-/** True si corremos dentro del shell Tauri. */
+/** True when we run inside the Tauri shell. */
 export function isTauri(): boolean {
   return tauriCore() !== null;
 }
 
 /**
- * Invoca un comando Tauri vía el global `window.__TAURI__` (sin la dep npm `@tauri-apps/api`).
- * Devuelve `null` si NO corremos en Tauri (web-pwa) → el llamador degrada con elegancia.
- * Tauri v2 mapea las claves camelCase del objeto a los params snake_case del comando Rust.
+ * Invoke a Tauri command through the `window.__TAURI__` global (no `@tauri-apps/api` dependency).
+ * Returns `null` when we are NOT in Tauri (web-pwa) → the caller degrades gracefully.
+ * Tauri v2 maps the camelCase keys of the object to the snake_case params of the Rust command.
  */
 export async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   const core = tauriCore();
@@ -46,7 +150,7 @@ export async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>
   return (await core.invoke(cmd, args)) as T;
 }
 
-/** Lee la identidad de dispositivo del shell Tauri, o `null` en web-pwa pura. */
+/** The device identity of the Tauri shell, or `null` in a plain browser. */
 export async function getDeviceContext(): Promise<DeviceContext | null> {
   const core = tauriCore();
   if (!core?.invoke) return null;
@@ -61,32 +165,44 @@ export async function getDeviceContext(): Promise<DeviceContext | null> {
       return { id: ctx.id, clientType, platform: ctx.platform };
     }
   } catch {
-    /* ignore — degradar a web */
+    /* ignore — degrade to the browser identity */
   }
   return null;
 }
 
 /**
- * Id del dispositivo para el login, con la MISMA resolución que las cabeceras: Tauri primero (su
- * id vive fuera del webview), si no el contexto que aporta el runtime. `null` en una web pura sin
- * máquina registrada — el llamador degrada y el hub decide si eso basta (device-trust, hub#330).
+ * Which device is asking, with the same resolution the headers use: the **shell** first (its id
+ * lives outside the webview and survives a cleanup of the site data), otherwise the identity this
+ * **browser** minted for itself.
+ *
+ * `null` only for a client that can produce neither — the hub then decides whether that is enough
+ * (it is not, under device-trust: hub#330).
  */
 export async function resolveDeviceId(): Promise<string | null> {
-  const dev = (await getDeviceContext()) ?? runtimeDeviceContext;
-  return dev?.id ?? null;
+  const native = await getDeviceContext();
+  return native?.id ?? browserDeviceId();
 }
 
 /**
- * Cabeceras de identificación para el login. En Tauri manda `X-Client-Type` (desktop/local)
- * + `X-Device-Id` para que el Cloud cree/resuelva el hub de ESTE dispositivo (§2.9b). En web
- * pura cae a `X-Client-Type: hub` (no dispara el registro por dispositivo).
+ * Identification headers for the login **against the Cloud**. In Tauri `X-Client-Type`
+ * (desktop/local) + `X-Device-Id` name the installation (§2.9b). In a browser the client type is
+ * the one the runtime reported, and the id is the browser's own — a provisioned Cloud machine
+ * still says `hub-cloud`, but it no longer says that every browser is the same one.
  */
 export async function loginHeaders(): Promise<Record<string, string>> {
-  const dev = (await getDeviceContext()) ?? runtimeDeviceContext;
-  if (!dev) return { 'X-Client-Type': 'hub' };
+  const native = await getDeviceContext();
+  if (native) {
+    return {
+      'X-Client-Type': native.clientType,
+      'X-Device-Id': native.id,
+      ...(native.platform ? { 'X-Device-Platform': native.platform } : {}),
+    };
+  }
+  if (!runtimeClientKind) return { 'X-Client-Type': 'hub' };
+  const id = browserDeviceId();
   return {
-    'X-Client-Type': dev.clientType,
-    'X-Device-Id': dev.id,
-    ...(dev.platform ? { 'X-Device-Platform': dev.platform } : {}),
+    'X-Client-Type': runtimeClientKind.clientType,
+    ...(id ? { 'X-Device-Id': id } : {}),
+    ...(runtimeClientKind.platform ? { 'X-Device-Platform': runtimeClientKind.platform } : {}),
   };
 }
