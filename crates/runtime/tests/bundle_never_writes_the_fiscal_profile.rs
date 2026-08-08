@@ -1,4 +1,4 @@
-//! **A bundle NEVER writes the hub's fiscal profile** — ADR-0259 D8 (hub#560).
+//! **A bundle NEVER writes the hub's fiscal profile** — ADR-0273 D8 (hub#560).
 //!
 //! ADR-0252 drew the frontier of `purpose` with precision when it decided that the role set DOES
 //! travel: *«what `purpose` separates is who you are (tax id, accounts, certificate), not what you

@@ -120,7 +120,7 @@ pub(crate) async fn execute_at(
         let has_cert = crate::certificate::can_sign(db, &ctx.hub_id)
             .await
             .unwrap_or(false);
-        // What this hub OWES right now (ADR-0259 D2/D4): the mode plus the events the provider
+        // What this hub OWES right now (ADR-0273 D2/D4): the mode plus the events the provider
         // taught the core start a fiscal chain. Both come from the core's own tables — never from
         // anything the caller sent. Degrading to `Unconfigured` with no triggers on a read error
         // keeps a failed query from inventing "nothing owed"; the gate below treats a missing mode
@@ -153,7 +153,7 @@ pub(crate) async fn execute_at(
             // casa y el handler se cree el % que le mande el cliente.
             .with_fiscal(get("country_code"), get("region_code"))
             .with_certificate(has_cert)
-            // What this hub OWES right now (ADR-0259 D2, hub#550): resolved here, from the core's
+            // What this hub OWES right now (ADR-0273 D2, hub#550): resolved here, from the core's
             // own tables and the registry, next to the identity and the certificate — never from
             // anything the caller sent. Degrading to `Unconfigured` on a read error keeps this
             // side of the enrichment from inventing "nothing owed" out of a failed query; nothing
@@ -278,7 +278,7 @@ pub(crate) async fn execute_at(
     // Fiscal precondition gate (hub#328, ADR-0203): SQL that stamps the business identity
     // does not run while that identity (and the certificate, when required) is missing.
     enforce_fiscal_precondition(registry, ctx, cmd.sql.iter().map(|s| s.as_str()))?;
-    // ADR-0259 D4 (hub#556): la tercera rama. Distinto disparador que la de arriba —lo que aquí
+    // ADR-0273 D4 (hub#556): la tercera rama. Distinto disparador que la de arriba —lo que aquí
     // dispara es que la transacción ABRA una cadena fiscal— y por eso hace falta: ADR-0203 dice en
     // sus propias consecuencias que una venta sin identidad SIGUE cerrándose, y lo que muere es el
     // listener de la factura, en dead-letter. Cobrado y sin factura.
@@ -351,7 +351,7 @@ pub(crate) async fn execute_at(
         TxGatedOutcome::Committed { .. } => {}
     }
 
-    // ADR-0259 D3 (hub#551): si esta transacción acaba de arrancar una cadena fiscal EN PRODUCCIÓN,
+    // ADR-0273 D3 (hub#551): si esta transacción acaba de arrancar una cadena fiscal EN PRODUCCIÓN,
     // el go-live queda cerrado para siempre. Se sella DESPUÉS del commit y solo si commiteó —
     // sellar algo que revirtió cerraría la vuelta atrás por una venta que no existió.
     seal_first_record_if_fiscal(db, ctx, &cmd.def.emit).await;
@@ -682,7 +682,7 @@ async fn persist_handler_output(
     // the handler itself is pure (no DB side effects), so rejecting here still means
     // nothing was written. Same gate as the declarative path in `execute_at`.
     enforce_fiscal_precondition(registry, ctx, tx_ops.iter().map(|(sql, _)| sql.as_str()))?;
-    // ADR-0259 D4 (hub#556): el mismo embudo para las operaciones que resuelve un handler
+    // ADR-0273 D4 (hub#556): el mismo embudo para las operaciones que resuelve un handler
     // WASM/nativo — que es por donde pasan los listeners del relay del Outbox y las tareas
     // programadas. Un gate que solo cubriera el camino declarativo dejaría fuera justo la mitad por
     // la que viaja la cadena fiscal.
@@ -1023,7 +1023,7 @@ fn enforce_fiscal_precondition<'a>(
 }
 
 /// Seals `first_record_at` when a transaction that STARTS a fiscal chain has just committed while
-/// the hub files for real (ADR-0259 D3, hub#551).
+/// the hub files for real (ADR-0273 D3, hub#551).
 ///
 /// This is what makes the go-live one-way **without asking any module anything**. The alternative
 /// —the provider reporting back that it filed— would put the irreversible half of a fiscal system
@@ -1054,11 +1054,11 @@ async fn seal_first_record_if_fiscal(db: &dyn DatabaseAdapter, ctx: &RequestCont
         return;
     }
     if let Err(e) = crate::fiscal_profile::stamp_first_record(db, &ctx.hub_id).await {
-        eprintln!("⚠ fiscal: no se pudo sellar el primer registro en producción (ADR-0259): {e}");
+        eprintln!("⚠ fiscal: no se pudo sellar el primer registro en producción (ADR-0273): {e}");
     }
 }
 
-/// **The third branch of the fiscal gate: the core REFUSES** (ADR-0259 D4, hub#556).
+/// **The third branch of the fiscal gate: the core REFUSES** (ADR-0273 D4, hub#556).
 ///
 /// The two branches that already existed key on the hub's *identity* being stamped (ADR-0203).
 /// This one keys on something else, and it has to, because ADR-0203 says so in its own

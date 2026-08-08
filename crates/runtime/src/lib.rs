@@ -426,7 +426,7 @@ impl Runtime {
     /// si CUALQUIERA de los que caen aún debe registros sin remitir, no cae ninguno.
     pub async fn deactivate(&mut self, module_id: &str) -> Result<()> {
         let cascade = self.deactivation_cascade(module_id);
-        // ADR-0259 D5 (hub#553): **el candado del CORE va PRIMERO**, y sobre el conjunto entero.
+        // ADR-0273 D5 (hub#553): **el candado del CORE va PRIMERO**, y sobre el conjunto entero.
         // R2 le pregunta al motor cuánto debe; éste no pregunta a nadie, porque un módulo no puede
         // tener voto sobre si se le puede quitar. Y con la cola vacía R2 deja marchar al último
         // proveedor: la cola vacía protege el pasado, el daño lo hacen las ventas siguientes.
@@ -437,7 +437,7 @@ impl Runtime {
         self.deactivate_unchecked(module_id).await
     }
 
-    /// Comprueba el candado de proveedor fiscal (ADR-0259 D5) contra el conjunto que se va.
+    /// Comprueba el candado de proveedor fiscal (ADR-0273 D5) contra el conjunto que se va.
     ///
     /// Sin perfil todavía —un hub que nunca arrancó del todo— no hay nada que proteger: leer no
     /// puede ser la razón de que no se pueda desinstalar un módulo.
@@ -496,7 +496,7 @@ impl Runtime {
     /// hub#314: se rechaza mientras su motor deba trabajo a una autoridad externa — borrar la fila
     /// de `hub_module` con registros sin remitir los dejaba huérfanos (VeriFactu FAQ §5).
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
-        // ADR-0259 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
+        // ADR-0273 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
         // marchar al último proveedor, y desde ese momento el hub vende sin que nadie registre.
         self.ensure_fiscal_provider_remains(&[module_id.to_string()])
             .await?;
@@ -736,7 +736,7 @@ impl Runtime {
         // migration on purpose: it is an invariant, not a schema change — it must also clean a
         // database restored from a backup taken before the fix, and re-running it is a no-op.
         identity::forget_hub_id_as_device(self.db.as_ref(), &self.hub_id).await?;
-        // 2c) The hub's FISCAL PROFILE (ADR-0259, hub#549): what this hub owes, resolved from its
+        // 2c) The hub's FISCAL PROFILE (ADR-0273, hub#549): what this hub owes, resolved from its
         // country and persisted by the core. It runs here — on the boot path every hub takes —
         // precisely so that owing VeriFactu is never a consequence of having installed something.
         // It only resolves and records; nothing rejects anything yet (hub#550/#556).
@@ -1278,7 +1278,7 @@ impl Runtime {
         devices::revoke(self.db.as_ref(), &self.hub_id, device_id).await
     }
 
-    /// The hub's **fiscal profile** (ADR-0259, hub#549): what this hub owes, who it owes it as, and
+    /// The hub's **fiscal profile** (ADR-0273, hub#549): what this hub owes, who it owes it as, and
     /// how far along it is. `None` only before [`Runtime::ensure_system_tables`] has ever run —
     /// booting resolves it. The authority on the obligation lives here, in the core, so that no
     /// module can take it away by being uninstalled.
@@ -1286,7 +1286,7 @@ impl Runtime {
         fiscal_profile::load(self.db.as_ref(), &self.hub_id).await
     }
 
-    /// **What this hub owes right now** (ADR-0259 D2, hub#550): the stored status resolved against
+    /// **What this hub owes right now** (ADR-0273 D2, hub#550): the stored status resolved against
     /// what is actually mounted. This is where `BLOCKED` comes from — derived on every read, never
     /// stored, so it is fixed by fixing the fact and cannot outlive the bug that caused it.
     ///
@@ -1300,7 +1300,7 @@ impl Runtime {
         ))
     }
 
-    /// Resolves the fiscal profile against the world and returns the effective mode (ADR-0259
+    /// Resolves the fiscal profile against the world and returns the effective mode (ADR-0273
     /// D2/D4, hub#550). The host calls it at boot **after re-hydrating the registry** — that is the
     /// first instant both halves of the answer exist: what the hub owes, and who is mounted to
     /// comply. Idempotent, so every restart and every redeploy runs it.
@@ -1308,7 +1308,7 @@ impl Runtime {
         fiscal_profile::refresh(self.db.as_ref(), &self.registry, &self.hub_id).await
     }
 
-    /// **El go-live** (ADR-0259 D3, hub#551): `READY → ACTIVE`, que ES `testing → production`.
+    /// **El go-live** (ADR-0273 D3, hub#551): `READY → ACTIVE`, que ES `testing → production`.
     /// Una sola transición y un solo sitio donde se guarda. Exige que el perfil esté `READY` —la
     /// misma condición que enseña la checklist— y que el hub pueda hacerlo (una demo no).
     pub async fn fiscal_go_live(&self) -> Result<fiscal_profile::FiscalProfile> {
@@ -1316,7 +1316,7 @@ impl Runtime {
     }
 
     /// **Apaga el go-live**, y solo mientras no haya salido ni un registro hacia la Hacienda real
-    /// (ADR-0259 D3). Lo irreversible es el primer ENVÍO, no el clic: quien activa por error y se
+    /// (ADR-0273 D3). Lo irreversible es el primer ENVÍO, no el clic: quien activa por error y se
     /// da cuenta antes de facturar puede volver.
     pub async fn fiscal_stand_down(&self) -> Result<fiscal_profile::FiscalProfile> {
         fiscal_profile::stand_down(self.db.as_ref(), &self.hub_id).await

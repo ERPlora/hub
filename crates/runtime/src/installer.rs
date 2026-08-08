@@ -54,7 +54,7 @@ pub async fn install(
     // hub#351 (paso 2b): same door for the roles the module declares. A manifest may add roles to
     // the hub's catalogue, but it can neither redefine a base role nor hand out administration.
     validate_role_declarations(&manifest)?;
-    // ADR-0259 D6 (hub#555): same door for the regime a module claims to implement. What it
+    // ADR-0273 D6 (hub#555): same door for the regime a module claims to implement. What it
     // declares here is what the core will COUNT as a provider, so a malformed block must not be
     // stored — it would read as "no provider installed", which blocks a till.
     validate_fiscal_regime(&manifest)?;
@@ -291,7 +291,7 @@ const MAX_ROLE_KEY_LEN: usize = 32;
 /// may grant `waiter` (declared by `tables`) `add_sale` without `take_payment`. Requiring the
 /// declaration would force every module to know roles it did not invent — the opposite of the
 /// design — and would break manifests that already grant to keys of their own.
-/// Validates the optional `fiscal_regime` block of a manifest (ADR-0259 D6, hub#555).
+/// Validates the optional `fiscal_regime` block of a manifest (ADR-0273 D6, hub#555).
 ///
 /// The block is what makes a module count as a **provider** of the regime a hub owes, so it is
 /// checked at the hostile border (a third-party zip) and not only by the JSON Schema: a malformed
@@ -945,7 +945,7 @@ mod tests {
         assert!(super::validate_command_contracts(&valid).is_ok());
     }
 
-    // ── `fiscal_regime`: who says "I implement this regime" (ADR-0259 D6, hub#555) ─────────────
+    // ── `fiscal_regime`: who says "I implement this regime" (ADR-0273 D6, hub#555) ─────────────
 
     /// Builds a manifest carrying the given `fiscal_regime` block.
     fn with_regime(regime: serde_json::Value) -> crate::manifest::Manifest {

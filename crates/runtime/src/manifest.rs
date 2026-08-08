@@ -114,7 +114,7 @@ pub struct Manifest {
     /// concede explícitamente; el host media. Consolida los `network`/`notify` de ADR-0012.
     #[serde(default)]
     pub capabilities: Capabilities,
-    /// **The fiscal regime this module IMPLEMENTS** (ADR-0259 D6, hub#555). Only declared by
+    /// **The fiscal regime this module IMPLEMENTS** (ADR-0273 D6, hub#555). Only declared by
     /// whoever implements one; an inventory module declares nothing.
     ///
     /// It is the answer to the core's single question — *«is there any installed and active module
@@ -134,7 +134,7 @@ pub struct Manifest {
     pub fiscal_regime: Option<FiscalRegimeDef>,
 }
 
-/// Bloque `fiscal_regime` del manifest (ADR-0259 D6): qué régimen fiscal, y de qué país, cumple
+/// Bloque `fiscal_regime` del manifest (ADR-0273 D6): qué régimen fiscal, y de qué país, cumple
 /// este módulo. `{ "country": "ES", "regime": "verifactu" }`.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct FiscalRegimeDef {
@@ -369,7 +369,7 @@ impl Manifest {
         self.requested_capabilities().contains(&kind)
     }
 
-    /// Does this module fulfil `regime` for `country`? (ADR-0259 D6, hub#555.)
+    /// Does this module fulfil `regime` for `country`? (ADR-0273 D6, hub#555.)
     ///
     /// This is the predicate the fiscal profile **counts** with — never "is this module
     /// `verifactu`". The country is part of it on purpose: a French Factur-X provider is not a

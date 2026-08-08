@@ -405,7 +405,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
     }
 
-    // **Perfil fiscal** (ADR-0259 D2/D4, hub#550): qué debe este hub, resuelto contra lo que hay
+    // **Perfil fiscal** (ADR-0273 D2/D4, hub#550): qué debe este hub, resuelto contra lo que hay
     // montado de verdad. Va AQUÍ y no junto a `ensure_system_tables` por dos razones que son la
     // misma: el registry ya está re-hidratado (así se sabe si queda algún proveedor del régimen) y
     // el seed ya escribió el `country_code` (así se sabe qué régimen es). Antes de este punto las
@@ -418,7 +418,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         let rt = state.runtime.lock().await;
         match rt.refresh_fiscal_profile().await {
             Ok(mode) => eprintln!("fiscal: perfil del hub resuelto → {mode:?}"),
-            Err(e) => eprintln!("✗ fiscal: no se pudo resolver el perfil del hub (ADR-0259): {e}"),
+            Err(e) => eprintln!("✗ fiscal: no se pudo resolver el perfil del hub (ADR-0273): {e}"),
         }
     }
 

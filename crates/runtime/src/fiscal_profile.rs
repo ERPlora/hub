@@ -1,5 +1,10 @@
-//! **The hub's fiscal profile** — the CORE decides THAT there is an obligation (ADR-0259 D1/D6,
+//! **The hub's fiscal profile** — the CORE decides THAT there is an obligation (ADR-0273 D1/D6,
 //! hub#549).
+//!
+//! ⚠️ **The decision circulated as "ADR-0259" while it was a draft, and that number was already
+//! taken** (the installed app saving a download, merged the same day). Everything landed as
+//! **ADR-0273**; the first commits of this line still say 0259 in their messages, which cannot be
+//! rewritten. If you are following a reference from a commit, this is the one it means.
 //!
 //! The rule this module exists to enforce:
 //!
@@ -62,7 +67,7 @@ use crate::errors::{Result, RuntimeError};
 use crate::registry::Registry;
 use crate::registry::now_rfc3339;
 
-/// The state machine of the fiscal profile (ADR-0259 D2).
+/// The state machine of the fiscal profile (ADR-0273 D2).
 ///
 /// `BLOCKED` is **not** in this enum on purpose: it is derived on every boot and on every gate from
 /// `Active` ∧ (no mounted provider ∨ mismatched `system_id`), never persisted. A derived state that
@@ -148,7 +153,7 @@ pub struct FiscalProfile {
     pub needs_review: bool,
 }
 
-/// Why a hub that went live is not operating (ADR-0259 D2, hub#550). Derived, never stored.
+/// Why a hub that went live is not operating (ADR-0273 D2, hub#550). Derived, never stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockedReason {
     /// Nobody is left to comply: no installed **and active** module fulfils the hub's regime.
@@ -185,7 +190,7 @@ pub enum FiscalMode {
     Closed,
 }
 
-/// The installed **and active** modules that fulfil `regime` for `country` (ADR-0259 D5/D6).
+/// The installed **and active** modules that fulfil `regime` for `country` (ADR-0273 D5/D6).
 ///
 /// The core **counts**; it never picks. Two providers of one regime are a spare, not a conflict,
 /// and which one a hub uses is the user's business — hence a slice and not an `Option`.
@@ -208,7 +213,7 @@ pub fn providers_of<'a>(
 }
 
 /// The events a healthy provider says it listens to — what the core LEARNS while it can ask
-/// (ADR-0259 D4). Sorted and deduplicated so the stored set is stable and comparing it is cheap.
+/// (ADR-0273 D4). Sorted and deduplicated so the stored set is stable and comparing it is cheap.
 ///
 /// The runtime does not know what `invoice.created` means, and does not need to: it knows *the
 /// provider of this hub's regime said it was listening to it while it was healthy*. That is the
@@ -223,7 +228,7 @@ pub fn learned_trigger_events(registry: &Registry, country: &str, regime: &str) 
     events
 }
 
-/// Resolves the **effective** mode of `profile` against what is actually mounted (ADR-0259 D2/D4).
+/// Resolves the **effective** mode of `profile` against what is actually mounted (ADR-0273 D2/D4).
 ///
 /// Only a hub that went live can be [`FiscalMode::Blocked`]: before the go-live nothing is
 /// anchored, so a missing provider is a task, not an emergency. Turning a hub that never emitted
@@ -253,7 +258,7 @@ pub fn determine_fiscal_mode(
     }
 }
 
-/// Resolves the profile against the world and returns the effective mode (ADR-0259 D2/D4, hub#550).
+/// Resolves the profile against the world and returns the effective mode (ADR-0273 D2/D4, hub#550).
 ///
 /// Runs on every boot, after the registry has been rehydrated — that is the first moment the two
 /// halves of the answer (what the hub owes, and who is mounted to comply) are both available.
@@ -366,12 +371,12 @@ pub async fn refresh(
 pub const ENV_TESTING: &str = "testing";
 pub const ENV_PRODUCTION: &str = "production";
 
-/// Stable rejection codes of the go-live (ADR-0259 D3). ABI público: la UI programa contra ellos.
+/// Stable rejection codes of the go-live (ADR-0273 D3). ABI público: la UI programa contra ellos.
 pub const NOT_READY: &str = "fiscal.not_ready";
 pub const GO_LIVE_FORBIDDEN: &str = "fiscal.go_live_forbidden";
 pub const ALREADY_EMITTED: &str = "fiscal.already_emitted";
 
-/// **The go-live: `READY → ACTIVE` IS `testing → production`** (ADR-0259 D3).
+/// **The go-live: `READY → ACTIVE` IS `testing → production`** (ADR-0273 D3).
 ///
 /// They used to be two disconnected things — an `environment` that was a column of a module, and no
 /// concept of a go-live at all. Fusing them leaves one path and one place to store it, and takes
@@ -437,7 +442,7 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
 }
 
 /// **Stands the hub back down to the sandbox** — allowed *while nothing has left for the real tax
-/// authority* (ADR-0259 D3, decisión de Ioan del 2026-08-08).
+/// authority* (ADR-0273 D3, decisión de Ioan del 2026-08-08).
 ///
 /// > **Lo irreversible es el primer ENVÍO, no el clic.**
 ///
@@ -484,7 +489,7 @@ pub async fn stand_down(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Fiscal
     reload(db, hub_id).await
 }
 
-/// **Seals `first_record_at` the first time a fiscal chain starts for real** (ADR-0259 D3).
+/// **Seals `first_record_at` the first time a fiscal chain starts for real** (ADR-0273 D3).
 ///
 /// Write-once and idempotent: only the first one counts, and it is never moved afterwards.
 ///
@@ -497,7 +502,7 @@ pub async fn stand_down(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Fiscal
 ///
 /// It errs on the safe side on purpose: it seals at the sale that starts the chain, not at the tax
 /// authority's acknowledgement. So the go-live closes EARLIER than the record's round trip, never
-/// later — and the window ADR-0259 §2.5 pointed at (a record already down the wire whose answer has
+/// later — and the window ADR-0273 §2.5 pointed at (a record already down the wire whose answer has
 /// not come back, which `status = 'accepted'` alone would miss) is closed by construction.
 pub async fn stamp_first_record(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
     let mut p = Params::new();
@@ -513,11 +518,11 @@ pub async fn stamp_first_record(db: &dyn DatabaseAdapter, hub_id: &str) -> Resul
     Ok(())
 }
 
-/// The stable rejection code of the provider lock (ADR-0259 D5). ABI público: la UI programa
+/// The stable rejection code of the provider lock (ADR-0273 D5). ABI público: la UI programa
 /// contra el código, no contra el mensaje.
 pub const NO_PROVIDER_LEFT: &str = "fiscal.no_provider_left";
 
-/// **With the profile `ACTIVE`, the hub does not end up with NOBODY complying** (ADR-0259 D5).
+/// **With the profile `ACTIVE`, the hub does not end up with NOBODY complying** (ADR-0273 D5).
 ///
 /// `leaving` is the whole set that would go — the target of a deactivation **plus everything the
 /// cascade would drag with it** (ADR-0128). It is computed before touching anything, because
@@ -935,7 +940,7 @@ mod tests {
         assert_eq!(regime_for_country(&db, "FR").await.unwrap(), "");
     }
 
-    // ── The effective mode: what is derived, and why it is derived (ADR-0259 D2/D4, hub#550) ──
+    // ── The effective mode: what is derived, and why it is derived (ADR-0273 D2/D4, hub#550) ──
 
     /// A registry holding `modules`, each `(id, fiscal_regime_json, listens_to, active)`.
     fn registry_with(modules: &[(&str, Option<serde_json::Value>, &[&str], bool)]) -> Registry {
