@@ -99,8 +99,15 @@ async fn static_frontend_serves_index_and_keeps_api() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+/// hub#504: this test used to assert that `/api/events` answered `200 text/event-stream` **with no
+/// credential at all** — it consecrated the hole instead of catching it. What it pins now is the
+/// refusal; that the stream still streams for a key that may read is asserted in
+/// `tests/event_stream_ws.rs`, next to the WebSocket half of the same door.
+///
+/// Note the app here runs in `AuthMode::Dev`: the event channel asks for an API key regardless of
+/// the auth mode, exactly like the rest of the public API surface (ADR-0057).
 #[tokio::test]
-async fn sse_events_is_event_stream() {
+async fn sse_events_refuses_a_request_without_a_credential() {
     let resp = make_app()
         .await
         .oneshot(
@@ -111,15 +118,9 @@ async fn sse_events_is_event_stream() {
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let ct = resp
-        .headers()
-        .get("content-type")
-        .unwrap()
-        .to_str()
-        .unwrap();
-    assert!(ct.starts_with("text/event-stream"), "content-type = {ct}");
-    // El body es un stream infinito (keep-alive) → no se consume en el test.
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    let body = body_json(resp).await;
+    assert_eq!(body["error"]["code"], "unauthenticated");
 }
 
 #[tokio::test]

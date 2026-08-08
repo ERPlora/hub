@@ -126,12 +126,45 @@ export function runtimeHeaders(): Record<string, string> {
   return h;
 }
 
+/**
+ * **The shell's credential for the event channel** (hub#504). The hub pushes nothing to a
+ * connection that has not presented an API key of that hub with read access — including to us.
+ *
+ * So the app asks for one: `POST /api/events/ticket` is authenticated by the hub session and
+ * answers with a **single-use** ticket bound to the read-only key the hub issues to itself. We
+ * never hold the key: a long-lived `erpl_live_…` sitting in a browser tab would be liftable by any
+ * XSS and would open the whole read API, not just this channel.
+ *
+ * Returns `null` — never throws — when there is no session yet or the runtime is unreachable: this
+ * is called on every reconnect attempt, and a throw would kill the channel for good.
+ */
+export async function fetchStreamTicket(): Promise<string | null> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/events/ticket`, {
+      method: 'POST',
+      headers: runtimeHeaders(),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: { ticket?: string } };
+    return body?.data?.ticket ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Singleton del cliente SDK (HTTP RPC + WS eventos) apuntado al runtime local. */
 export function getClient(): ErploraClient {
   if (!_client) {
     const transport = new HttpWsTransport({
       baseUrl: RUNTIME_URL,
       headers: runtimeHeaders,
+      // hub#504: without this the socket connects and is told nothing — the live dashboard, the
+      // auto-print on a sale, the kitchen docket and the install progress all go silent.
+      streamCredential: fetchStreamTicket,
+      onStreamRefused: (code, message) => {
+        // A channel that goes quiet without a word is the failure nobody debugs. This one says so.
+        console.error(`[erplora] the event channel was refused (${code}): ${message}`);
+      },
     });
     // Inyecta la MONEDA DEL HUB (ADR-0059) al cliente que consumen los Web Components de módulo
     // (`globalThis.erplora.currency` / `formatMoney` / `formatAmount`). Misma fuente que el shell

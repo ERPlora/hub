@@ -257,6 +257,13 @@ mod ws {
     /// Abre una conexión WebSocket a `url` (`ws://…` o `wss://…`) y la envuelve en un
     /// [`WsStream`] listo para [`run_with_reconnect`].
     ///
+    /// ⚠️ **Sin credencial** (hub#504, ADR-0263): desde que `/ws` exige una API key del hub con
+    /// lectura, este `connect` abre el socket y **no recibe nada** — el hub lo cuelga al vencer la
+    /// ventana del handshake. Este cliente **no tiene llamadores** hoy (la feature `ws` está
+    /// apagada por defecto); cuando alguien lo use, tiene que presentar la key: como es un cliente
+    /// que SÍ controla cabeceras, le corresponde `Authorization: Bearer erpl_live_…` en el
+    /// handshake, no el frame del navegador. Ver `architecture/hub/auth.md`.
+    ///
     /// Pensado para usarse como el `connect` de `run_with_reconnect`:
     /// ```no_run
     /// # use erplora_sync::{Backoff, ThreadSleeper, EventStream, SyncError, connect_ws, run_with_reconnect};

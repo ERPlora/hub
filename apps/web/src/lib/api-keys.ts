@@ -29,6 +29,15 @@ export interface ApiKeyScopeEntry {
   write: boolean;
 }
 
+/**
+ * What a key may do (hub#504, ADR-0057 §7 extended). The SAME model a user has: full access ·
+ * read only · write only · or the per-module checkboxes (`custom`).
+ *
+ * The blanket modes are not sugar over the matrix: they also cover modules installed LATER, which
+ * is exactly what a static matrix cannot say.
+ */
+export type ApiKeyAccess = 'full' | 'read_only' | 'write_only' | 'custom';
+
 /** Una API key tal y como la lista el runtime (`GET /api/keys`). Sin el secreto (solo el prefijo). */
 export interface ApiKey {
   id: string;
@@ -38,6 +47,13 @@ export interface ApiKey {
   prefix: string;
   /** Scope = matriz módulo × {lectura, escritura}; solo los módulos con algún permiso. */
   scope: ApiKeyScopeEntry[];
+  /** Permission mode. Only with `custom` does the `scope` matrix decide. */
+  access?: ApiKeyAccess;
+  /**
+   * `true` = the hub issued it to itself (hub#504): it is what ERPlora reads live changes with.
+   * It cannot be rotated or revoked — the runtime refuses — so the screen offers no button.
+   */
+  system?: boolean;
   /** Estado de la credencial; `active` = utilizable, `revoked` = kill-switch aplicado. */
   status: 'active' | 'revoked';
   /** ISO-8601 de creación. */
@@ -56,13 +72,16 @@ export interface ApiKeyCreated {
   secret: string;
   prefix: string;
   scope: ApiKeyScopeEntry[];
+  access?: ApiKeyAccess;
   rate_limit_per_minute: number;
 }
 
-/** Payload de creación: nombre + matriz de scope (solo entradas con r y/o w marcados). */
+/** Create payload: name + mode + scope matrix (only entries with r and/or w ticked). */
 export interface CreateApiKeyInput {
   name: string;
   scope: ApiKeyScopeEntry[];
+  /** Permission mode; without it the runtime assumes `custom` (the matrix), as before hub#504. */
+  access?: ApiKeyAccess;
   rate_limit_per_minute: number;
 }
 

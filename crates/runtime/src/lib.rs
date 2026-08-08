@@ -1327,11 +1327,26 @@ impl Runtime {
     pub async fn create_api_key(
         &self,
         name: &str,
-        scope: &[api_keys::ScopeEntry],
+        scope: &api_keys::ApiKeyScope,
         rate_limit_per_minute: i64,
         created_by: &str,
     ) -> Result<api_keys::ApiKeySecret> {
         api_keys::create(self.db.as_ref(), &self.hub_id, name, scope, rate_limit_per_minute, created_by).await
+    }
+
+    /// The read-only key the hub issues to **itself** so our own app reads the event stream
+    /// through the same door as any integration (hub#504). Idempotent; re-issued after a restore.
+    pub async fn ensure_app_api_key(&self) -> Result<String> {
+        api_keys::ensure_app_key(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Resolves a key by **id** (no secret) — the redemption end of a stream ticket (hub#504).
+    /// Same refusals as [`Self::resolve_api_key`]: revoked, unknown or another hub's key → `None`.
+    pub async fn resolve_api_key_id(
+        &self,
+        key_id: &str,
+    ) -> Result<Option<api_keys::ApiKeyPrincipal>> {
+        api_keys::resolve_key_id(self.db.as_ref(), &self.registry, &self.hub_id, key_id).await
     }
 
     /// Lista las API keys del hub (sin secreto), recientes primero.

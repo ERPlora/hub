@@ -19,11 +19,9 @@
 //!   GET  /ws/print                           canal del host de impresión (bidireccional, hub#343)
 
 use axum::body::Body;
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::Next;
-use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -46,6 +44,7 @@ pub mod elevation;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
+pub mod event_stream;
 pub mod export_import;
 /// ERPlora's DELEGATED fiscal certificate, fetched from the control plane (ADR-0202 §2 — hub#317).
 pub mod fiscal_certificate;
@@ -879,17 +878,22 @@ pub fn app(state: AppState) -> Router {
             axum::routing::delete(members::remove_member),
         )
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
-        .route("/ws", get(ws_upgrade))
+        // The EVENT channel (hub#504): needs an API key of this hub that may read. See
+        // `event_stream` — the credential travels in the header, in the first frame (`/ws`) or as
+        // a single-use ticket (`/api/events`), never as a long-lived secret in the URL.
+        .route("/ws", get(event_stream::upgrade))
         // El canal del HOST DE IMPRESIÓN (ADR-0196 §6, hub#343): el primer WS cliente→servidor del
-        // hub. Ruta propia y no un frame más de `/ws` porque su contrato es otro — `/ws` es un
-        // fan-out anónimo de eventos y este exige sesión + registro de host, y por él viaja el
-        // DOCUMENTO del tique.
+        // hub. Ruta propia y no un frame más de `/ws` porque su contrato es otro — por `/ws/print`
+        // viaja el DOCUMENTO del tique y exige sesión + registro de host, mientras que `/ws` es un
+        // fan-out de eventos de dominio a cualquier key con lectura.
         .route("/ws/print", get(print_ws::upgrade))
         // SSE: alternativa a /ws para el MISMO canal de eventos (hub#19). Se suscribe al mismo
         // `AppState.events` (broadcast, N suscriptores), así que no duplica el fan-out. Da gratis
         // reconexión del navegador (EventSource) + keep-alive (idle timeout del ALB). Nombre de
         // ruta = decisión del humano (`/api/events` por defecto).
-        .route("/api/events", get(sse_events))
+        .route("/api/events", get(event_stream::sse))
+        // Where the app asks for its credential for the channel (session → single-use ticket).
+        .route("/api/events/ticket", post(event_stream::mint_ticket))
         // Log de cada request (método/ruta/estado/latencia) a INFO → consola + `media/_logs/`
         // (ADR-0047): la primera población real de la carpeta media. La respuesta se loguea a INFO;
         // los fallos del propio servidor a ERROR.
@@ -2849,51 +2853,6 @@ async fn mint_session_with_extra(
             Json(payload).into_response()
         }
         Err(e) => err_response(e),
-    }
-}
-
-async fn ws_upgrade(State(st): State<AppState>, ws: WebSocketUpgrade) -> Response {
-    ws.on_upgrade(move |socket| ws_loop(socket, st))
-}
-
-/// GET /api/events — el MISMO canal de eventos que `/ws`, servido como Server-Sent Events (hub#19).
-/// Se suscribe al broadcast compartido `AppState.events` (no duplica el fan-out) y emite cada
-/// evento como `data: <json>` (idéntico al frame que manda el WS). `KeepAlive` envía comentarios
-/// periódicos para sobrevivir al idle timeout del ALB; el navegador (`EventSource`) reconecta solo.
-async fn sse_events(
-    State(st): State<AppState>,
-) -> Sse<impl futures_util::stream::Stream<Item = Result<Event, std::convert::Infallible>>> {
-    let rx = st.events.subscribe();
-    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
-        loop {
-            match rx.recv().await {
-                Ok(ev) => {
-                    let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
-                    return Some((Ok(Event::default().data(data)), rx));
-                }
-                // Suscriptor lento: saltamos lo perdido y seguimos (igual que el WS).
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                // Canal cerrado: termina el stream.
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
-            }
-        }
-    });
-    Sse::new(stream).keep_alive(KeepAlive::default())
-}
-
-async fn ws_loop(mut socket: WebSocket, st: AppState) {
-    let mut rx = st.events.subscribe();
-    loop {
-        match rx.recv().await {
-            Ok(ev) => {
-                let text = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
-                if socket.send(Message::Text(text)).await.is_err() {
-                    break;
-                }
-            }
-            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-            Err(_) => break,
-        }
     }
 }
 

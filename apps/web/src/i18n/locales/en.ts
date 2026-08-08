@@ -624,6 +624,17 @@ export default {
     rateLimit: 'Requests per minute',
     rateLimitHint: 'Between 1 and 10,000. Enforced before command execution.',
     perMinute: '{count}/min',
+    // hub#504 — qué puede hacer una key (mismo modelo que el rol de un usuario)
+    accessTitle: 'What this key may do',
+    accessHint: 'The blanket modes cover every app of your business, including ones installed later.',
+    access: {
+      full: 'Full access',
+      read_only: 'Read only',
+      write_only: 'Write only',
+      custom: 'Per app',
+    },
+    systemKeyBadge: 'Issued by ERPlora',
+    systemKeyHint: 'ERPlora reads your live changes with this key. It cannot be rotated or deleted.',
     scopeTitle: 'Permissions per module',
     scopeHint: 'Toggle read and/or write for each installed module.',
     colModule: 'Module',

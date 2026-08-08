@@ -65,13 +65,36 @@
           </ion-item>
         </ion-list>
 
+        <!-- hub#504: what this key may do, with the SAME model a user's role has. The blanket
+             modes also cover apps installed later; the per-app matrix only shows up when
+             «per app» is chosen. -->
+        <ion-list lines="none">
+          <ion-item>
+            <ion-select
+              v-model="form.access"
+              data-testid="api-key-access"
+              :label="t('apiKeys.accessTitle')"
+              label-placement="floating"
+              interface="popover"
+            >
+              <ion-select-option value="full">{{ t('apiKeys.access.full') }}</ion-select-option>
+              <ion-select-option value="read_only">{{ t('apiKeys.access.read_only') }}</ion-select-option>
+              <ion-select-option value="write_only">{{ t('apiKeys.access.write_only') }}</ion-select-option>
+              <ion-select-option value="custom">{{ t('apiKeys.access.custom') }}</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-list>
+        <p class="matrix-hint access-hint">{{ t('apiKeys.accessHint') }}</p>
+
+        <!-- Matriz: solo módulos con API pública (ADR-0057) × {Lectura, Escritura}. Cabecera con
+             "todos" por columna. Un módulo sin op `expose_api` no concede nada → se omite (ruido).
+             Only makes sense with the «per app» mode: a blanket mode already says it all. -->
+        <template v-if="form.access === 'custom'">
         <div class="matrix-head">
           <span class="matrix-title">{{ t('apiKeys.scopeTitle') }}</span>
           <span class="matrix-hint">{{ t('apiKeys.scopeHint') }}</span>
         </div>
 
-        <!-- Matriz: solo módulos con API pública (ADR-0057) × {Lectura, Escritura}. Cabecera con
-             "todos" por columna. Un módulo sin op `expose_api` no concede nada → se omite (ruido). -->
         <div v-if="loadingModules" class="matrix-loading">
           <ion-spinner name="dots" />
           <span>{{ t('apiKeys.loadingModules') }}</span>
@@ -129,6 +152,7 @@
             </tr>
           </tbody>
         </table>
+        </template>
       </ion-content>
       <ion-footer class="ion-no-border">
         <ion-toolbar>
@@ -184,7 +208,8 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import {
   IonModal, IonHeader, IonFooter, IonToolbar, IonTitle, IonButtons, IonButton,
-  IonContent, IonList, IonItem, IonInput, IonCheckbox, IonSpinner, alertController,
+  IonContent, IonList, IonItem, IonInput, IonCheckbox, IonSelect, IonSelectOption,
+  IonSpinner, alertController,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
@@ -192,7 +217,7 @@ import { toastError, toastSuccess } from '../lib/toast';
 import { listInstalledModules, type InstalledModule } from '../lib/runtime';
 import {
   listApiKeys, createApiKey, rotateApiKey, revokeApiKey,
-  type ApiKey, type ApiKeyScopeEntry,
+  type ApiKey, type ApiKeyAccess, type ApiKeyScopeEntry,
 } from '../lib/api-keys';
 
 const { t, locale } = useI18n();
@@ -217,8 +242,14 @@ const creating = ref(false);
 const secret = ref<string | null>(null);
 const copied = ref(false);
 
-interface CreateForm { name: string; rate_limit_per_minute: number; scope: Record<string, { read: boolean; write: boolean }> }
-const form = reactive<CreateForm>({ name: '', rate_limit_per_minute: 60, scope: {} });
+interface CreateForm {
+  name: string;
+  rate_limit_per_minute: number;
+  /** hub#504: what this key may do, the same way a user's role says it. */
+  access: ApiKeyAccess;
+  scope: Record<string, { read: boolean; write: boolean }>;
+}
+const form = reactive<CreateForm>({ name: '', rate_limit_per_minute: 60, access: 'custom', scope: {} });
 
 const fmtDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -270,11 +301,15 @@ function actionsCell(row: Row): Node {
   const name = String(row.name ?? '');
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;gap:.25rem;justify-content:flex-end';
-  if (row.status === 'revoked') {
-    const dash = document.createElement('span');
-    dash.textContent = '—';
-    dash.style.cssText = 'opacity:.5';
-    wrap.appendChild(dash);
+  // hub#504: the key the hub issues to itself is neither rotated nor revoked (the runtime
+  // refuses). Offering the button would be promising something that is going to fail — and
+  // deleting it would leave ERPlora deaf to the live changes.
+  if (row.status === 'revoked' || row.system === true) {
+    const label = document.createElement('span');
+    label.textContent = row.system === true ? t('apiKeys.systemKeyBadge') : '—';
+    label.style.cssText = 'opacity:.6;font-size:.85em';
+    if (row.system === true) label.title = t('apiKeys.systemKeyHint');
+    wrap.appendChild(label);
     return wrap;
   }
   wrap.appendChild(actionBtn({
@@ -291,8 +326,12 @@ function actionsCell(row: Row): Node {
   return wrap;
 }
 
-/** Resumen legible del scope (p.ej. "inventory (L), invoice (L·E)"); "—" si está vacío. */
-function scopeSummary(scope: ApiKeyScopeEntry[]): string {
+/**
+ * Resumen legible del permiso: el MODO si es general (hub#504), y si no la matriz por módulo
+ * (p.ej. "inventory (L), invoice (L·E)"). "—" si no concede nada.
+ */
+function scopeSummary(scope: ApiKeyScopeEntry[], access?: ApiKeyAccess): string {
+  if (access && access !== 'custom') return t(`apiKeys.access.${access}`);
   if (!scope.length) return '—';
   return scope
     .filter((s) => s.read || s.write)
@@ -334,7 +373,8 @@ const rows = computed<Row[]>(() =>
     id: k.id,
     name: k.name,
     prefix: k.prefix,
-    scopeText: scopeSummary(k.scope),
+    scopeText: scopeSummary(k.scope, k.access),
+    system: k.system === true,
     status: k.status,
     createdText: k.created_at ? fmtDate(k.created_at) : '',
     lastUsedText: k.last_used_at ? fmtDate(k.last_used_at) : t('apiKeys.never'),
@@ -360,7 +400,9 @@ const canCreate = computed(() =>
   Number.isInteger(Number(form.rate_limit_per_minute)) &&
   Number(form.rate_limit_per_minute) >= 1 &&
   Number(form.rate_limit_per_minute) <= 10_000 &&
-  Object.values(form.scope).some((c) => c.read || c.write),
+  // A blanket mode already says what it grants; only `custom` needs at least one box ticked
+  // (a key that grants nothing is useless, and a live token created by mistake).
+  (form.access !== 'custom' || Object.values(form.scope).some((c) => c.read || c.write)),
 );
 
 function cellOf(moduleId: string): { read: boolean; write: boolean } {
@@ -409,14 +451,17 @@ function closeCreate(): void { createOpen.value = false; }
 async function onCreate(): Promise<void> {
   if (!canCreate.value || creating.value) return;
   // Matriz → scope: solo los módulos con al menos un permiso marcado (contrato POST /api/keys).
-  const scope: ApiKeyScopeEntry[] = modules.value
-    .map((m) => ({ module: m.id, read: !!form.scope[m.id]?.read, write: !!form.scope[m.id]?.write }))
-    .filter((s) => s.read || s.write);
+  const scope: ApiKeyScopeEntry[] = form.access !== 'custom'
+    ? []
+    : modules.value
+        .map((m) => ({ module: m.id, read: !!form.scope[m.id]?.read, write: !!form.scope[m.id]?.write }))
+        .filter((s) => s.read || s.write);
   creating.value = true;
   try {
     const created = await createApiKey({
       name: form.name.trim(),
       rate_limit_per_minute: Number(form.rate_limit_per_minute),
+      access: form.access,
       scope,
     });
     createOpen.value = false;

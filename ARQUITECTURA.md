@@ -61,7 +61,8 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    `VITE_RUNTIME_URL` (def `http://127.0.0.1:8787`) → **PostgreSQL** (`HUB_DATABASE_URL`, per-hub
    — una BD por hub (ADR-0201) — en cloud; el server falla duro sin él). `ModuleView` **inyecta el cliente** en el Web
    Component del módulo (`wc.client`) para que llame `client.query/command`. Endpoints del runtime:
-   `POST /api/query`, `POST /api/command`, `GET /api/navigation`, `GET /api/modules`, `GET /ws`.
+   `POST /api/query`, `POST /api/command`, `GET /api/navigation`, `GET /api/modules`, `GET /ws`
+   (este último exige una API key del hub con lectura desde hub#504 — ADR-0263).
    `[✓ verificado: query/command ejecutan SQL real con scoping hub_id]`
 
 3. **`hub_id` inyectado por despliegue (1 contenedor = 1 hub)** — el server lee `HUB_ID` del entorno
@@ -539,7 +540,7 @@ local.
 | Qué | Hub Cloud — Axum |
 |-----|------------------|
 | `query` / `command` (RPC) | **HTTP POST** (`/api/query`, `/api/command`) |
-| Eventos / push | **WebSocket** (`/ws`, solo push) |
+| Eventos / push | **WebSocket** (`/ws`, solo push) — credencial obligatoria (API key con lectura, ADR-0263) |
 | App Ionic + assets | **HTTP/CDN** |
 | Bundles UI de módulos | **HTTP/CDN** |
 | Descarga `module.zip` | **HTTP** (Object Storage) |
