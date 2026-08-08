@@ -132,6 +132,24 @@ pub struct Manifest {
     /// a fiscal provider", which is simply true of them.
     #[serde(default)]
     pub fiscal_regime: Option<FiscalRegimeDef>,
+    /// **The commercial terms the module declares** (`billing`, ADR-0007) — captured VERBATIM, the
+    /// way [`Manifest::ai_context`] is, and read for exactly one yes/no question.
+    ///
+    /// This block belongs to the Cloud: the schema says so in as many words («el Hub ignora
+    /// marketplace/billing») because it is what the SaaS turns into Stripe products, and the Hub
+    /// prices nothing. The runtime does not change that — it does not read a price, an interval or
+    /// a tier to decide anything about money. It asks [`Manifest::sold_under`], and only about a
+    /// module that declares [`Manifest::fiscal_regime`], to enforce ADR-0273 D7: **the module a
+    /// hub's legal compliance hangs from may not be something the hub can stop paying for**
+    /// (`installer::validate_fiscal_provider_is_free`, hub#559).
+    ///
+    /// It is kept as a raw `Value` on purpose. Until now `serde` simply dropped the block, so a
+    /// manifest whose `billing` has an odd shape (`"price": "9.99"`, a field nobody has documented)
+    /// installed regardless. Deserialising it into a typed struct would turn every one of those
+    /// into a module that no longer loads — a much larger blast radius than the rule is worth. A
+    /// `Value` cannot fail, so `Manifest::load` stays exactly as tolerant as it was.
+    #[serde(default)]
+    pub billing: Option<serde_json::Value>,
 }
 
 /// Bloque `fiscal_regime` del manifest (ADR-0259 D6): qué régimen fiscal, y de qué país, cumple
@@ -382,6 +400,81 @@ impl Manifest {
         self.fiscal_regime.as_ref().is_some_and(|f| {
             f.country.eq_ignore_ascii_case(country.trim()) && f.regime.trim() == regime.trim()
         })
+    }
+
+    /// **Is this module SOLD?** (ADR-0273 D7.) `None` = free; `Some(term)` names the term that
+    /// prices it, so the refusal can say which one instead of "somewhere in your billing block".
+    ///
+    /// Same reading as the SaaS's `_manifest_declares_paid` (ADR-0105 phase 1, which already bars a
+    /// third party from publishing a paid module), and deliberately so — a hub and the marketplace
+    /// disagreeing about whether a module is free would be worse than either rule alone:
+    ///
+    /// - `tier: premium` is monetised by definition (ADR-0006/ADR-0032 collapsed the rest to
+    ///   `free`), whether or not a price is filled in yet;
+    /// - a single price with `type` `one_time`/`subscription` and `price > 0`;
+    /// - any entry of `tiers[]` above zero — a free tier alongside a paid one is a paid module.
+    ///
+    /// **A block nobody can read counts as sold.** Not as free: the same direction as
+    /// [`crate::fiscal_profile::FiscalStatus::parse`], where an unreadable row must not be read as
+    /// "owes nothing". A `billing` that is not an object, or a price that is not a number, is a
+    /// manifest making a commercial claim the runtime cannot check — and the only module this is
+    /// ever asked about is the one a hub's compliance would hang from. It costs nothing today:
+    /// zero published manifests combine `fiscal_regime` with a `billing` block of any shape.
+    pub fn sold_under(&self) -> Option<String> {
+        let billing = self.billing.as_ref()?;
+        if billing.is_null() {
+            return None;
+        }
+        let Some(terms) = billing.as_object() else {
+            return Some("a `billing` block that is not an object".to_string());
+        };
+        if terms.is_empty() {
+            return None;
+        }
+        // `Some(false)` = readable and free, `None` = unreadable. Only `Some(true)` and `None` sell.
+        let priced = |value: Option<&serde_json::Value>| match value {
+            None => Some(false),
+            Some(v) if v.is_null() => Some(false),
+            Some(v) => v.as_f64().map(|n| n > 0.0),
+        };
+        match terms.get("tier").map(|t| t.as_str()) {
+            Some(Some("premium")) => return Some("`tier: premium`".to_string()),
+            Some(None) => return Some("a `tier` that is not a string".to_string()),
+            _ => {}
+        }
+        for (index, tier) in terms
+            .get("tiers")
+            .and_then(|t| t.as_array())
+            .map(|t| t.as_slice())
+            .unwrap_or_default()
+            .iter()
+            .enumerate()
+        {
+            match priced(tier.get("price")) {
+                Some(true) => return Some(format!("a priced entry in `tiers[{index}]`")),
+                None => return Some(format!("an unreadable `price` in `tiers[{index}]`")),
+                Some(false) => {}
+            }
+        }
+        match terms.get("type").map(|t| t.as_str()) {
+            // `type` alone does not sell: `subscription` with `price: 0` is how a manifest says
+            // "free, and renewed" — but a price that cannot be read under a paid `type` does.
+            Some(Some("one_time")) | Some(Some("subscription")) => match priced(terms.get("price"))
+            {
+                Some(true) => Some(format!(
+                    "`type: {}` with a price above zero",
+                    terms["type"].as_str().unwrap_or_default()
+                )),
+                None => Some("a `price` that is not a number".to_string()),
+                Some(false) => None,
+            },
+            Some(None) => Some("a `type` that is not a string".to_string()),
+            _ => match priced(terms.get("price")) {
+                Some(true) => Some("a `price` above zero".to_string()),
+                None => Some("a `price` that is not a number".to_string()),
+                Some(false) => None,
+            },
+        }
     }
 }
 
@@ -1278,5 +1371,97 @@ mod tests {
             !public_cmd.is_internal("cash_register.movement.add"),
             "sin prefijo `_` ni `internal:true` → NO es interno"
         );
+    }
+
+    // ── `billing`: the one question the runtime asks about it (ADR-0273 D7, hub#559) ───────────
+
+    /// A manifest carrying `billing`, or none at all when `terms` is `null`.
+    fn with_billing(terms: serde_json::Value) -> Manifest {
+        let mut manifest = serde_json::json!({ "id": "m", "name": "M", "version": "1.0.0" });
+        if !terms.is_null() {
+            manifest["billing"] = terms;
+        }
+        serde_json::from_value(manifest).expect("manifest parses")
+    }
+
+    /// **23 of the 24 published manifests carry no `billing` block**, and no fiscal provider ships
+    /// one today. Absence is free, which is what keeps this rule inert until somebody changes a
+    /// price.
+    #[test]
+    fn a_manifest_with_no_billing_block_is_free() {
+        assert_eq!(with_billing(serde_json::Value::Null).sold_under(), None);
+        assert_eq!(with_billing(serde_json::json!({})).sold_under(), None);
+    }
+
+    /// The explicitly-free shapes. `type: subscription` with `price: 0` is how a manifest says
+    /// "free, and renewed": the type alone never sells.
+    #[test]
+    fn a_zero_price_is_free_however_it_is_written() {
+        for terms in [
+            serde_json::json!({ "tier": "free" }),
+            serde_json::json!({ "tier": "free", "type": "free" }),
+            serde_json::json!({ "type": "subscription", "price": 0 }),
+            serde_json::json!({ "type": "subscription", "price": 0, "interval": "month" }),
+            serde_json::json!({ "tiers": [{ "slug": "free", "name": "Free", "price": 0 }] }),
+        ] {
+            assert_eq!(
+                with_billing(terms.clone()).sold_under(),
+                None,
+                "{terms} declares no money"
+            );
+        }
+    }
+
+    /// The paid shapes — the same three the SaaS's `_manifest_declares_paid` reads (ADR-0105), so a
+    /// hub and the marketplace cannot disagree about whether a module is free.
+    #[test]
+    fn a_module_is_sold_by_premium_tier_by_price_or_by_any_paid_tier() {
+        for terms in [
+            // Monetised by definition, price not filled in yet (ADR-0006/ADR-0032).
+            serde_json::json!({ "tier": "premium" }),
+            serde_json::json!({ "type": "subscription", "price": 9.99 }),
+            serde_json::json!({ "type": "one_time", "price": 49.99 }),
+            // A free tier next to a paid one is a paid module — the `whatsapp_inbox` shape.
+            serde_json::json!({ "tiers": [
+                { "slug": "free", "name": "Free", "price": 0 },
+                { "slug": "starter", "name": "Starter", "price": 14.99 }
+            ] }),
+        ] {
+            assert!(
+                with_billing(terms.clone()).sold_under().is_some(),
+                "{terms} prices the module"
+            );
+        }
+    }
+
+    /// **A block nobody can read counts as SOLD**, never as free — the same direction as
+    /// `FiscalStatus::parse`, where an unreadable row must not be read as "owes nothing". The only
+    /// module this is ever asked about is the one a hub's legal compliance would hang from.
+    #[test]
+    fn an_unreadable_billing_block_is_not_read_as_free() {
+        for terms in [
+            serde_json::json!("gratis"),
+            serde_json::json!({ "type": "subscription", "price": "9.99" }),
+            serde_json::json!({ "tier": 1 }),
+            serde_json::json!({ "tiers": [{ "slug": "starter", "price": "14.99" }] }),
+        ] {
+            assert!(
+                with_billing(terms.clone()).sold_under().is_some(),
+                "{terms} makes a commercial claim the runtime cannot check"
+            );
+        }
+    }
+
+    /// The block keeps being **captured verbatim**: an unknown or oddly-typed field inside it does
+    /// not stop the manifest from loading, because that is how every published module behaves today
+    /// and turning `billing` into a typed struct would have broken them.
+    #[test]
+    fn an_odd_billing_block_never_stops_a_manifest_from_loading() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"m","name":"M","version":"1.0.0",
+                "billing":{"price":"nine","undocumented":{"deep":[1,2]},"tiers":"none"}}"#,
+        )
+        .expect("an odd `billing` block must not break `Manifest::load`");
+        assert!(manifest.billing.is_some());
     }
 }
