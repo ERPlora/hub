@@ -44,6 +44,12 @@ struct Sessions {
 /// A business with a counter till and an office laptop, both trusted as an online login would have
 /// left them; the laptop is `personal`, the lax mode this issue is about.
 async fn fixture(hub_id: &str) -> (axum::Router, Sessions) {
+    let (router, sessions, _state) = fixture_with_state(hub_id).await;
+    (router, sessions)
+}
+
+/// The same business, keeping the `AppState` so a test can reach the runtime behind the router.
+async fn fixture_with_state(hub_id: &str) -> (axum::Router, Sessions, AppState) {
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), hub_id);
     rt.ensure_system_tables().await.unwrap();
     let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
@@ -84,7 +90,8 @@ async fn fixture(hub_id: &str) -> (axum::Router, Sessions) {
         module_trusted_keys: Vec::new(),
         bootstrap_blueprint: None,
     };
-    (app(AppState::with_config(rt, cfg)), sessions)
+    let state = AppState::with_config(rt, cfg);
+    (app(state.clone()), sessions, state)
 }
 
 /// A request with whatever the caller decided to present. `claims` are extra headers — the shape a
@@ -316,6 +323,46 @@ async fn nothing_is_current_when_the_caller_names_no_device() {
     for device in body["data"]["devices"].as_array().unwrap() {
         assert_eq!(device["current"], Value::Bool(false), "{device}");
     }
+}
+
+#[tokio::test]
+async fn a_row_with_no_id_is_never_the_device_you_are_holding() {
+    let (router, sessions, state) = fixture_with_state("hub-455").await;
+    // A trust row keyed on the empty string is writable, and a caller that names no device also
+    // presents `""`. Comparing the two would flag a row the owner is NOT holding as "the one you
+    // are using" — right next to the button that signs them out.
+    state.runtime.lock().await.trust_device("", "ghost").await.unwrap();
+
+    let response = call(&router, "GET", "/api/devices", Some(&sessions.admin), &[]).await;
+
+    let body = body_json(response).await;
+    let devices = body["data"]["devices"].as_array().unwrap();
+    assert_eq!(devices.len(), 3, "the nameless row is listed, it is just never current");
+    for device in devices {
+        assert_eq!(device["current"], Value::Bool(false), "{device}");
+    }
+}
+
+#[tokio::test]
+async fn a_path_segment_with_blanks_around_a_real_id_still_names_that_device() {
+    let (router, sessions) = fixture("hub-455").await;
+
+    let response = call(
+        &router,
+        "DELETE",
+        "/api/devices/%20laptop-1%20",
+        Some(&sessions.admin),
+        &[("x-device-id", "laptop-1")],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    // Trimmed in ONE place and used everywhere: the device revoked, the id reported back and the
+    // "was it the one I am holding" answer all have to be about the same device.
+    assert_eq!(body["data"]["device_id"], "laptop-1");
+    assert_eq!(body["data"]["was_current"], Value::Bool(true));
+    assert_eq!(listed_ids(&router, &sessions.admin).await, vec!["till-1".to_string()]);
 }
 
 #[tokio::test]

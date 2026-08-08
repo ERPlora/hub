@@ -141,6 +141,32 @@ describe('the list', () => {
     expect(wrapper.html()).toContain(i18n.global.t('devices.unnamed'));
   });
 
+  it('says when it was last used instead of claiming somebody is on it', async () => {
+    vi.mocked(listDevices).mockResolvedValue([
+      device({ openSessions: 0, mode: 'shared', signedInUntil: '' }),
+    ]);
+
+    const wrapper = await mountCard();
+
+    const html = wrapper.html();
+    expect(html).not.toContain(i18n.global.t('devices.inUse'));
+    expect(html).toContain('Last used');
+    // And the mode reads as its consequence, not as its name: "shared" means nothing to a landlord,
+    // "asks for a PIN" does.
+    expect(html).toContain(i18n.global.t('devices.modeShared'));
+    expect(html).not.toContain(i18n.global.t('devices.modePersonal'));
+  });
+
+  it('a device nobody has used since it was added says exactly that', async () => {
+    vi.mocked(listDevices).mockResolvedValue([
+      device({ openSessions: 0, lastSignIn: '', signedInUntil: '' }),
+    ]);
+
+    const wrapper = await mountCard();
+
+    expect(wrapper.html()).toContain('never used since');
+  });
+
   it('says the list is empty rather than showing nothing at all', async () => {
     vi.mocked(listDevices).mockResolvedValue([]);
 
@@ -204,6 +230,9 @@ describe('revoking', () => {
     // Reloaded, never patched locally: what the hub says is the truth, and the counts on the other
     // rows may have moved too.
     expect(vi.mocked(listDevices).mock.calls.length).toBe(2);
+    // And the confirmation closes. Leaving it open over a fresh list would put a "remove?" question
+    // in front of whatever row landed there next.
+    expect(wrapper.html()).not.toContain(i18n.global.t('devices.confirm'));
   });
 
   it('cutting off your own device sends you to the login instead of leaving a dead session', async () => {
@@ -258,6 +287,20 @@ describe('revoking', () => {
     expect(wrapper.find('[data-test="revoke-dev_abc"]').exists()).toBe(false);
     // The mirror stops here too, exactly like `DeviceModeCard.choose`; the runtime revalidates.
     expect(revokeDevice).not.toHaveBeenCalled();
+  });
+
+  it('the guard is in the handler, not only in the missing button', async () => {
+    (isAdmin as unknown as { value: boolean }).value = false;
+    const wrapper = await mountCard();
+
+    // Reached the way anything that is not the button would reach it. Hiding a control is a
+    // courtesy; the handler refusing is the mirror of the runtime's own gate (ADR-0248).
+    (wrapper.vm as unknown as { ask: (id: string) => void }).ask('dev_abc');
+    await (wrapper.vm as unknown as { revoke: (d: unknown) => Promise<void> }).revoke(device());
+    await flushPromises();
+
+    expect(revokeDevice).not.toHaveBeenCalled();
+    expect(wrapper.html()).not.toContain(i18n.global.t('devices.confirm'));
   });
 });
 

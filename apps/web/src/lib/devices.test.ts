@@ -119,10 +119,24 @@ describe('listDevices', () => {
     expect(listed.map((d) => d.mode)).toEqual(['shared', 'shared', 'personal']);
   });
 
+  it('a nonsense count is nobody signed in, never a negative number on screen', async () => {
+    answering(200, {
+      ok: true,
+      data: { devices: [device({ open_sessions: -3 }), device({ device_id: 'b', open_sessions: 'two' })] },
+    });
+
+    const listed = await listDevices();
+
+    expect(listed.map((d) => d.openSessions)).toEqual([0, 0]);
+  });
+
   it('a refusal is a refusal, with the hub reason attached', async () => {
     answering(401, { ok: false, error: 'se requiere rol owner/admin para gestionar el Hub' });
 
+    // The STATUS is what decides, and the reason travels: "the devices could not be read" and "you
+    // are not an administrator" are different problems with different fixes.
     await expect(listDevices()).rejects.toBeInstanceOf(DevicesError);
+    await expect(listDevices()).rejects.toThrow(/owner\/admin/);
   });
 
   it('an unreadable answer is not an empty business', async () => {

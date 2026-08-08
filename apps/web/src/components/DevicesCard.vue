@@ -228,7 +228,7 @@ onMounted(() => {
   void load();
 });
 
-defineExpose({ load, revoke, devices });
+defineExpose({ load, ask, revoke, devices });
 </script>
 
 <style scoped>

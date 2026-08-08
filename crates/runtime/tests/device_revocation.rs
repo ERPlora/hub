@@ -222,6 +222,27 @@ async fn the_list_carries_what_lets_a_person_recognise_the_device_they_lost() {
 }
 
 #[tokio::test]
+async fn the_device_used_most_recently_is_at_the_top() {
+    let rt = Runtime::with_hub_id(Box::new(fresh_db().await), "hub-455");
+    rt.ensure_system_tables().await.unwrap();
+    let admin = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    for id in ["till-1", "till-2", "till-3"] {
+        rt.trust_device(id, id).await.unwrap();
+    }
+    // `till-2` is the one somebody is on; `till-3` signed in earlier today; `till-1` not at all.
+    rt.create_session(&admin, 3600, Some("till-3")).await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    rt.create_session(&admin, 3600, Some("till-2")).await.unwrap();
+
+    let devices = rt.list_devices().await.unwrap();
+
+    // Order is part of the answer: an owner scanning for the device they lost five minutes ago
+    // should not have to read the whole list. Never-used devices sink, not disappear.
+    let ids: Vec<&str> = devices.iter().map(|d| d.device_id.as_str()).collect();
+    assert_eq!(ids, vec!["till-2", "till-3", "till-1"]);
+}
+
+#[tokio::test]
 async fn an_expired_session_is_not_somebody_signed_in() {
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), "hub-455");
     rt.ensure_system_tables().await.unwrap();
