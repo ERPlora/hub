@@ -6,7 +6,7 @@ import { iconRegistry } from './lib/icons';
 import App from './App.vue';
 import { router } from './router';
 import { i18n } from './i18n';
-import { getClient, clientInjectionKey, bootHubContext } from './lib/runtime';
+import { getClient, clientInjectionKey, bootHubContext, RUNTIME_URL, runtimeHeaders } from './lib/runtime';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
@@ -137,10 +137,32 @@ const erploraClient = getClient();
 (erploraClient as unknown as { loadSlot?: (slot: string) => Promise<{ component: string }[]> }).loadSlot =
   loadSlotComponents;
 // `print` (global): LA puerta de impresión para TODOS los módulos. Bridge si lo hay —por ROL de
-// impresora: receipt/kitchen/bar/…— y diálogo del navegador como respaldo. Ningún módulo abre el
-// Bridge ni llama a window.print() por su cuenta: se pisan entre sí y el hardware es del shell.
+// impresora: receipt/kitchen/bar/…—, COLA del hub si no hay Bridge (PWA, hub#344), y diálogo del
+// navegador como último respaldo. Ningún módulo abre el Bridge ni llama a window.print() por su
+// cuenta: se pisan entre sí y el hardware es del shell.
 (erploraClient as unknown as { print?: ReturnType<typeof createPrintService> }).print =
-  createPrintService(erploraClient as unknown as Parameters<typeof createPrintService>[0]);
+  createPrintService(erploraClient as unknown as Parameters<typeof createPrintService>[0], {
+    // Vía COLA (hub#344): sin Bridge, el tique térmico se encola en el hub y un print host del rol
+    // lo drene. Reusa el mismo baseURL + auth del resto de llamadas al runtime.
+    enqueue: async (job) => {
+      const res = await fetch(`${RUNTIME_URL}/api/print/jobs`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...runtimeHeaders() },
+        body: JSON.stringify({
+          jobId: job.jobId,
+          role: job.role,
+          documentType: job.documentType,
+          document: job.document,
+          format: job.format ?? 'receipt',
+        }),
+      });
+      // 200 con ok:true → encolado (nuevo o duplicado, ambos éxito). Cualquier otra cosa → false
+      // (la puerta cae al navegador: una venta no se cae por impresión).
+      if (!res.ok) return false;
+      const body = await res.json().catch(() => ({}));
+      return body?.ok === true;
+    },
+  });
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
 
 // Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
