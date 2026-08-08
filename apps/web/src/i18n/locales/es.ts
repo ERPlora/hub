@@ -719,8 +719,11 @@ export default {
     // `system.health.*` (hub#375). Lo que queda abajo es el flujo de INSTALACIÓN, que sí va de un
     // programa y lo dice a propósito.
     recheck: 'Recomprobar',
-    downloadBridge: 'Descargar ERPlora Bridge',
-    downloadBridgeHint: 'Bridge es una pequeña app nativa que conecta este hub con tus impresoras, cajón y escáneres. Elige tu sistema para continuar.',
+    // Un producto, un nombre (hub#500). «Descargar ERPlora Bridge» y luego «instala ERPlora» eran
+    // dos nombres para lo mismo, y uno de ellos era el de una app que ADR-0196 eliminó — «Bridge»
+    // es jerga de plataforma, justo el lado que ADR-0254 dejó fuera de las pantallas del hub.
+    downloadApp: 'Descargar la app de ERPlora',
+    downloadAppHint: 'La app de ERPlora es la que habla con tus impresoras, el cajón y los escáneres. Elige tu sistema para continuar.',
     stepDownload: 'Descargar',
     stepInstall: 'Instalar',
     stepPair: 'Vincular',
@@ -755,7 +758,7 @@ export default {
     colTime: 'Hora',
     colLevel: 'Nivel',
     colEvent: 'Evento',
-    toastDownloadingBridge: 'Descargando Bridge para {os}…',
+    toastDownloadingApp: 'Descargando ERPlora para {os}…',
     // Lo que el hub cuenta de sí mismo, al que lleva el bar (hub#375). Cada frase nombra algo que
     // esa persona reconoce —la impresora— y, cuando hay algo que hacer, qué hacer. El tercer estado
     // es el honesto: no hemos podido comprobarlo. Nunca se disfraza de «va bien».
