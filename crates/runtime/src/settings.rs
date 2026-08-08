@@ -394,6 +394,76 @@ fn enforce_demo_fiscal_identity_lock(
     Ok(())
 }
 
+/// El valor **persistido** de una clave (ya normalizado por su `validate`), o `""` si no hay fila.
+///
+/// Lectura de una sola clave, sin construir el mapa completo de [`get_all`]: la usa el congelado de
+/// abajo para comparar con lo que entra.
+async fn stored_value(db: &dyn DatabaseAdapter, hub_id: &str, key: &str) -> Result<String> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("key".into(), json!(key));
+    let res = db
+        .query(
+            "SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = :key",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["value"].as_str())
+        .unwrap_or_default()
+        .to_string())
+}
+
+/// **`business_tax_id` deja de ser editable una vez el hub ha EMITIDO** (hub#554).
+///
+/// La cadena VeriFactu está anclada por `(hub_id, issuer_nif, environment)` (guarda R4, hub#313):
+/// el ancla, la secuencia (`next_sequence`) y el `PrimerRegistro` se resuelven por ese NIF. Cambiarlo
+/// después de haber emitido **bifurca la cadena en silencio** —arranca una nueva desde 1 y abandona
+/// la vieja a mitad— y, para la AEAT, un NIF distinto es **otro obligado tributario**. Y el mismo
+/// dato viaja al SaaS como `BillingProfile` (ADR-0201 decisión 5), así que un cambio aquí también
+/// reescribe a quién factura ERPlora.
+///
+/// La puerta se cierra desde `_hub_fiscal_profile.first_record_at` (`""` = nunca), **no** desde el
+/// estado: lo que hace irreversible la salida a producción es el registro que salió, no un
+/// interruptor. `hub_settings` sigue siendo la fuente única y editable de la identidad de negocio
+/// (ADR-0061) — se cierra UNA clave, y solo cuando el daño sería real.
+///
+/// Dos decisiones que no son de detalle:
+///
+/// - **Reenviar el MISMO valor no es un cambio.** Ajustes → Negocio manda NIF + razón social +
+///   dirección en un único `PUT` (`saveTaxSettings`), así que rechazar el no-op congelaría el
+///   formulario entero: un hub que ya emitió no podría volver a corregir su dirección.
+/// - **Se compara con el valor ya normalizado**, no con el string crudo: `" b12345678 "` es el
+///   mismo obligado tributario que `B12345678`, y tratarlo como un cambio sería un 409 incomprensible.
+///
+/// `_hub_fiscal_profile.taxpayer_id` es la copia **congelada** con la que la cadena está anclada;
+/// esta guarda impide que las dos se separen más. Reconciliar una divergencia ya existente no se
+/// hace aquí: cuando divergen, el hub tiene un problema y hay que decirlo, no elegir en silencio.
+async fn enforce_tax_id_freeze(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    incoming: &str,
+) -> Result<()> {
+    // Sin perfil (hub aún sin arrancar del todo) no hay nada emitido: `ensure` corre en cada boot y
+    // es ESE el sitio donde se anota que algo salió.
+    let Some(profile) = crate::fiscal_profile::load(db, hub_id).await? else {
+        return Ok(());
+    };
+    if profile.first_record_at.is_empty() {
+        return Ok(()); // nada ha salido todavía: la identidad sigue siendo del dueño
+    }
+    let current = stored_value(db, hub_id, "business_tax_id").await?;
+    if incoming == current {
+        return Ok(());
+    }
+    Err(RuntimeError::BusinessTaxIdFrozen {
+        frozen_to: current,
+        since: profile.first_record_at,
+    })
+}
+
 /// Lee TODOS los settings conocidos de `hub_id`: las filas persistidas mezcladas sobre los defaults
 /// (claves sin fila → su default). Una fila cuya clave ya no es conocida se ignora; una fila cuyo
 /// valor ya no valida degrada al default (lectura nunca rompe). Devuelve un objeto JSON
@@ -513,6 +583,15 @@ pub async fn set_many(
                 })
             }
         }
+    }
+
+    // 1b) The tax id is FROZEN once this hub emitted its first fiscal record (hub#554). It runs
+    //     AFTER validation so the comparison is against the NORMALISED value (`" b1 "` is not a
+    //     different taxpayer from `B1`), and only when the batch actually carries the key: every
+    //     other settings write — currency, language, the PIN dial — must not pay for a read of the
+    //     fiscal profile, nor depend on it being readable.
+    if let Some((_, incoming)) = normalized.iter().find(|(k, _)| *k == "business_tax_id") {
+        enforce_tax_id_freeze(db, hub_id, incoming).await?;
     }
 
     // 2) Upsert por clave (mismo SQL en SQLite y Postgres: ON CONFLICT sobre la PK compuesta).
@@ -851,7 +930,9 @@ mod tests {
     #[tokio::test]
     async fn a_real_hub_writes_its_fiscal_identity_as_always() {
         let db = fresh_db().await;
-        ensure_table(&db).await;
+        // Boots the real system tables, not just `hub_settings`: a real hub also has its fiscal
+        // profile (v27), which is what the freeze of hub#554 reads on this very path.
+        booted(&db, "hub-1").await;
         let mut updates = serde_json::Map::new();
         updates.insert("business_tax_id".into(), json!("B12345678"));
         updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
@@ -860,6 +941,158 @@ mod tests {
             .expect("a real hub configures the tax id it invoices with");
         assert_eq!(result["business_tax_id"], json!("B12345678"));
         assert_eq!(result["business_legal_name"], json!("Bar Manolo SL"));
+    }
+
+    // ── The tax id stops being editable once the hub has EMITTED (hub#554) ────────────────
+    //
+    // The VeriFactu chain is anchored by `(hub_id, issuer_nif, environment)` (R4, hub#313). Change
+    // the tax id after the first record left and nothing complains: a SECOND chain starts from 1
+    // while the first is abandoned half-way. And to the tax authority a different tax id is a
+    // different taxpayer — the business would carry on issuing under an identity that may not be
+    // its own. So this door, which is the one that writes it, closes for that ONE key, and only
+    // once `_hub_fiscal_profile.first_record_at` says something really went out.
+
+    /// Boots the system tables the way `Runtime::ensure_system_tables` does, so these tests run
+    /// against the REAL `hub_settings` (v4) and `_hub_fiscal_profile` (v27) instead of a
+    /// hand-written copy that can drift away from the migration.
+    async fn booted(db: &PgAdapter, hub_id: &str) {
+        crate::installer::ensure_hub_module_table(db).await.unwrap();
+        crate::identity::ensure_tables(db).await.unwrap();
+        crate::system_migrations::apply(db, hub_id).await.unwrap();
+    }
+
+    /// Stamps the profile the way going live does: this hub emitted its first fiscal record, under
+    /// `taxpayer`, and the chain hangs from it.
+    async fn emitted(db: &PgAdapter, hub_id: &str, taxpayer: &str) {
+        crate::fiscal_profile::ensure(db, hub_id).await.unwrap();
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("taxpayer_id".into(), json!(taxpayer));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
+               activated_at = '2026-08-08T09:00:00Z', first_record_at = '2026-08-08T10:00:00Z', \
+               taxpayer_id = :taxpayer_id WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// Writes `business_tax_id` through the real door and returns the result.
+    async fn write_tax_id(db: &PgAdapter, hub_id: &str, value: &str) -> Result<Value> {
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_tax_id".into(), json!(value));
+        set_many(db, hub_id, &updates, "hub_user:1", false).await
+    }
+
+    /// 🔴 With a record already emitted, a DIFFERENT tax id is refused — and nothing moves.
+    #[tokio::test]
+    async fn a_hub_that_already_emitted_refuses_a_different_tax_id() {
+        let db = fresh_db().await;
+        booted(&db, "hub-1").await;
+        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
+        emitted(&db, "hub-1", "B12345678").await;
+
+        let err = write_tax_id(&db, "hub-1", "B99999999").await.unwrap_err();
+
+        assert_eq!(
+            crate::error_registry::error_code_of(&err),
+            "business_tax_id_frozen",
+            "the refusal needs its own stable code, not a generic one: {err:?}"
+        );
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(
+            all["business_tax_id"],
+            json!("B12345678"),
+            "the anchor of the emitted chain must not have moved"
+        );
+    }
+
+    /// The other half: **before** the first record the identity is still the owner's to fix. A
+    /// hub that is setting itself up mistypes its tax id all the time, and the freeze must not
+    /// reach that far — nothing is anchored yet.
+    #[tokio::test]
+    async fn before_the_first_record_the_tax_id_is_still_editable() {
+        let db = fresh_db().await;
+        booted(&db, "hub-1").await;
+        crate::fiscal_profile::ensure(&db, "hub-1").await.unwrap();
+
+        write_tax_id(&db, "hub-1", "B00000000").await.unwrap();
+        let result = write_tax_id(&db, "hub-1", "B12345678")
+            .await
+            .expect("nothing was emitted: the identity is still being set up");
+        assert_eq!(result["business_tax_id"], json!("B12345678"));
+    }
+
+    /// 🔴 **Re-sending the same tax id is not a change.** Ajustes → Negocio posts the tax id, the
+    /// legal name and the address in ONE `PUT` (`saveTaxSettings`), so a freeze that refused the
+    /// no-op would freeze the whole form: a hub that already emitted could never correct its
+    /// address again. And the comparison is against the NORMALISED value, not the raw string.
+    #[tokio::test]
+    async fn re_sending_the_same_tax_id_still_saves_the_rest_of_the_form() {
+        let db = fresh_db().await;
+        booted(&db, "hub-1").await;
+        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
+        emitted(&db, "hub-1", "B12345678").await;
+
+        let mut updates = serde_json::Map::new();
+        // The same identifier the user is looking at, as the form sends it (spaces, lower case).
+        updates.insert("business_tax_id".into(), json!(" b12345678 "));
+        updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
+        updates.insert("business_address".into(), json!("Calle Nueva 1"));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .expect("re-posting the same identifier is not a change of taxpayer");
+
+        assert_eq!(result["business_tax_id"], json!("B12345678"));
+        assert_eq!(result["business_legal_name"], json!("Bar Manolo SL"));
+        assert_eq!(result["business_address"], json!("Calle Nueva 1"));
+    }
+
+    /// The first record freezes the IDENTIFIER and nothing else. `business_legal_name` anchors
+    /// nothing —the chain does not hang from it— and a business that changes its trade name after
+    /// going live has to be able to say so.
+    #[tokio::test]
+    async fn the_first_record_freezes_the_identifier_and_nothing_else() {
+        let db = fresh_db().await;
+        booted(&db, "hub-1").await;
+        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
+        emitted(&db, "hub-1", "B12345678").await;
+
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_legal_name".into(), json!("Bar Manolo SLU"));
+        updates.insert("currency".into(), json!("USD"));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .expect("only the identifier is frozen");
+        assert_eq!(result["business_legal_name"], json!("Bar Manolo SLU"));
+        assert_eq!(result["currency"], json!("USD"));
+    }
+
+    /// 🔴 The refusal takes the WHOLE batch, like every other rejection in this door: hiding the
+    /// new tax id among innocent keys must not land half of them.
+    #[tokio::test]
+    async fn a_frozen_tax_id_refuses_the_whole_batch() {
+        let db = fresh_db().await;
+        booted(&db, "hub-1").await;
+        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
+        emitted(&db, "hub-1", "B12345678").await;
+
+        let mut updates = serde_json::Map::new();
+        updates.insert("currency".into(), json!("USD"));
+        updates.insert("business_tax_id".into(), json!("B99999999"));
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            crate::error_registry::error_code_of(&err),
+            "business_tax_id_frozen",
+            "{err:?}"
+        );
+
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["currency"], json!("EUR"), "the batch is refused whole");
+        assert_eq!(all["business_tax_id"], json!("B12345678"));
     }
 
     /// 🔴 Un hub REAL no puede DECLARARSE demo. Ser demo no es un setting: no hay clave que

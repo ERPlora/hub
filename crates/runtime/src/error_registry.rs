@@ -253,6 +253,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#376: a demo hub refusing to leave its sandbox is the deployment marker doing its
         // job (ADR-0197 §4) — expected, and never a Hub bug worth an issue.
         | E::DemoLocked { .. }
+        // hub#554: a hub that already emitted refusing to change taxpayer is the freeze doing its
+        // job — the state of the hub, not a bug of the Hub.
+        | E::BusinessTaxIdFrozen { .. }
         // hub#360: a cashier reaching for something a manager approves is the permission model
         // working, not a Hub bug. Same severity as the flat `PermissionDenied` it refines.
         | E::RequiresElevation { .. }
@@ -303,6 +306,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // hub#376: the SUBJECT is the stable code, one per demo lock — a client that only sees
         // `demo_locked` could not tell which of the three doors refused.
         E::DemoLocked { lock } => lock.as_str(),
+        // hub#554: its own code, NOT a flavour of `demo_fiscal_identity_locked`. Two guards on the
+        // same key that mean opposite things ("this hub is nobody's" vs "this hub already emitted
+        // and cannot change taxpayer"), and only one of them has a way out.
+        E::BusinessTaxIdFrozen { .. } => "business_tax_id_frozen",
         E::Other(_) => "other",
     })
 }
@@ -541,6 +548,38 @@ mod tests {
             // Y es cosa esperable del estado del hub, nunca un bug del Hub que abra una issue.
             assert_eq!(severity_of(&err), severity::USER);
         }
+    }
+
+    // ── El NIF CONGELADO de un hub que ya emitió (hub#554) ─────────────────────────────────
+
+    /// El congelado tiene **su propio** código estable y es cosa esperable del estado del hub, no
+    /// un bug que merezca una issue. Se afirma aquí, en el crate que lo DEFINE: si el único sitio
+    /// que lo mira estuviera en `erplora-server`, este crate podría cambiarlo con su suite en verde.
+    #[test]
+    fn a_frozen_tax_id_carries_its_own_stable_code() {
+        let err = RuntimeError::BusinessTaxIdFrozen {
+            frozen_to: "B12345678".into(),
+            since: "2026-08-08T10:00:00Z".into(),
+        };
+        assert_eq!(error_code_of(&err), "business_tax_id_frozen");
+        assert_eq!(severity_of(&err), severity::USER);
+        // Y NO es el cierre de la demo: dos guardas sobre la misma clave que significan cosas
+        // opuestas, y solo una de las dos tiene salida.
+        assert_ne!(error_code_of(&err), DemoLock::FiscalIdentity.as_str());
+    }
+
+    /// El mensaje dice **con qué identificador** está anclada la cadena y **desde cuándo**. Sin
+    /// eso, el que se topa con el 409 no sabe si el que sobra es el NIF que acaba de teclear o el
+    /// que el hub lleva dentro.
+    #[test]
+    fn a_frozen_tax_id_names_the_anchor_and_the_moment() {
+        let message = RuntimeError::BusinessTaxIdFrozen {
+            frozen_to: "B12345678".into(),
+            since: "2026-08-08T10:00:00Z".into(),
+        }
+        .to_string();
+        assert!(message.contains("B12345678"), "`{message}`");
+        assert!(message.contains("2026-08-08T10:00:00Z"), "`{message}`");
     }
 
     /// El mensaje humano no es el código: dice qué pasa Y la salida real («crea tu propio hub»),
