@@ -853,6 +853,16 @@ export default {
     signInWithEmail: 'Iniciar sesión con email',
     changeUser: 'Cambiar usuario',
     pinIncorrect: 'PIN incorrecto',
+    // hub#330. Sustituye a «PIN incorrecto» cuando lo que se rechazó fue el dispositivo, no los
+    // dígitos. Decirle «PIN incorrecto» a quien lo ha escrito bien es la peor respuesta posible: lo
+    // vuelve a teclear, y nada en pantalla nombra el gesto que lo arregla.
+    deviceNotEnrolled:
+      'En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.',
+    // El otro rechazo, y necesita sus propias palabras: este navegador no guarda nada entre cargas
+    // (ventana privada, o datos del sitio desactivados), así que entrar con la cuenta no serviría —
+    // la próxima visita volvería a ser un desconocido.
+    deviceUnidentified:
+      'Este navegador no puede recordar qué dispositivo es, así que aquí no se puede usar un PIN. Entra con tu cuenta, o permite que este sitio guarde datos y vuelve a intentarlo.',
     // ADR-0154: se muestra cuando la sesión de este dispositivo fue desalojada por un login en
     // otro dispositivo (plan de un solo dispositivo activo). Requiere el interceptor 401 (ver PR).
     sessionTakenOver: 'Sesión abierta en otro dispositivo',

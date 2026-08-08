@@ -863,6 +863,16 @@ export default {
     signInWithEmail: 'Sign in with email',
     changeUser: 'Change user',
     pinIncorrect: 'Incorrect PIN',
+    // hub#330. Shown INSTEAD of «Incorrect PIN» when the refusal was about the device, not the
+    // digits. Saying "incorrect PIN" to somebody whose PIN is correct is the worst answer available:
+    // they retype it, and nothing on the screen names the one gesture that fixes it.
+    deviceNotEnrolled:
+      'A PIN does not work on this device yet. Sign in once with your account here and it will from then on.',
+    // The other refusal, and it needs its own words: this browser keeps nothing between page loads
+    // (a private window, or site data turned off), so signing in with an account would not help —
+    // the next visit would be a stranger again.
+    deviceUnidentified:
+      'This browser cannot remember which device it is, so a PIN cannot be used here. Sign in with your account, or allow this site to store data and try again.',
     // ADR-0154: shown when this device's session was taken over by a sign-in on another device
     // (single active device plan). Surfacing it needs the runtime-session-401 interceptor (see PR).
     sessionTakenOver: 'Session opened on another device',
