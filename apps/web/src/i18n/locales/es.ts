@@ -7,11 +7,13 @@ export default {
   nav: {
     general: 'General',
     account: 'Cuenta',
-    modules: 'Módulos',
     home: 'Inicio',
     employees: 'Empleados',
     files: 'Archivos',
-    billing: 'Facturación',
+    // hub#365 — the money door, in the first person of the business. «Billing» names the ledger the
+    // SaaS keeps; from inside the till what the owner asks is which plan they are on. One label for
+    // two surfaces: this sidebar entry and the title of the page it opens.
+    billing: 'Mi plan',
     apps: 'Apps',
     system: 'Sistema',
     settings: 'Ajustes',
@@ -29,7 +31,7 @@ export default {
   topbar: {
     back: 'Atrás',
     apps: 'Mis apps',
-    appsEmpty: 'No tienes módulos instalados. Abre Apps para añadir.',
+    appsEmpty: 'Aquí aparecerán tus apps. Pulsa Apps para añadir las que necesite tu negocio.',
     appsClose: 'Cerrar',
     assistant: 'Asistente',
     // The way out to management (hub#364). It is the only affordance an icon-only action has, and
@@ -122,7 +124,7 @@ export default {
   // `items.<key>` cubre SOLO los ítems del core: la clave de un ítem del core es también su clave
   // i18n; el título de un módulo viaja en inglés en su manifest y se pinta tal cual.
   setup: {
-    title: 'Termina de configurar tu hub',
+    title: 'Termina de configurar tu negocio',
     progress: '{done} de {total} hechos',
     viewAll: 'Ver todo',
     viewLess: 'Ver menos',
@@ -138,24 +140,24 @@ export default {
     unavailableHint: 'Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.',
     // Un muro que no te toca a ti derribar (hub#435). Dice QUIÉN puede — nunca el nombre de un
     // permiso —, porque un bloqueo sin dueño deja al usuario sin ningún sitio al que ir.
-    delegatedHint: 'Esto lo tiene que configurar un administrador del hub.',
-    completeTitle: 'Tu hub está listo',
+    delegatedHint: 'Esto lo tiene que configurar un administrador.',
+    completeTitle: 'Tu negocio está listo',
     completeBody: 'No queda nada pendiente en la checklist.',
     // La franja bloqueante (hub#374): la superficie de las pantallas donde no está la checklist.
     // Dice la CONSECUENCIA, no la gravedad — ⛔ significa que el runtime rechaza el documento, así
     // que eso es lo que anuncia. Nunca dice «error»: no hay nada roto, hay algo que falta.
     blocking: {
       title: 'Todavía no puedes facturar',
-      body: 'El hub rechazará emitir un documento de venta hasta que configures esto:',
+      body: 'No se podrá emitir ningún ticket ni factura hasta que configures esto:',
     },
     items: {
       apps: {
         title: 'Tus apps',
-        description: 'Instala al menos una app de negocio para que el hub tenga algo que hacer.',
+        description: 'Instala al menos una app de negocio para que el TPV tenga algo que vender.',
       },
       business_identity: {
         title: 'Los datos de tu negocio',
-        description: 'Razón social y NIF: sin ellos el hub no puede emitir una factura.',
+        description: 'Razón social y NIF: sin ellos no puedes emitir una factura.',
       },
       team: {
         title: 'Tu equipo',
@@ -189,14 +191,14 @@ export default {
     activeWidgets: 'Activos · arrastra para reordenar',
     availableWidgets: 'Disponibles',
     emptyPanel: 'Panel vacío. Pulsa ⋮ para añadir widgets.',
-    noWidgets: 'Ningún módulo instalado ofrece widgets todavía.',
+    noWidgets: 'Ninguna app instalada ofrece widgets todavía.',
     widgetEmpty: 'Sin datos',
     widgetError: 'No disponible',
     // Tarjeta «Mis apps» (hub#367): el lanzador del panel. El título reutiliza `topbar.apps` — el
     // mismo nombre para lo mismo en las dos superficies.
     appsAdd: 'Añadir apps',
     appsEmpty: 'Aquí aparecerán tus apps. Añade las que necesite tu negocio.',
-    blueprintTitle: 'Configura tu hub',
+    blueprintTitle: 'Configura tu negocio',
     blueprintBody: 'Carga una plantilla para tu negocio o restaura una copia para empezar.',
     blueprintCta: 'Configurar',
     // Zona 4 — lo que el hub cuenta de sí mismo. La copy de la pill vive en `system.health.*`
@@ -381,20 +383,24 @@ export default {
     permissionRevoked: '{cap} revocado a {module}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
   },
+  // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
+  // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
+  // the manifest's word and renaming them would break nothing here and everything elsewhere.
   apps: {
-    searchInstalled: 'Buscar módulo instalado…',
-    searchCatalog: 'Buscar en el catálogo…',
-    tabMine: 'Mis módulos',
-    tabCatalog: 'Catálogo',
+    searchInstalled: 'Buscar en tus apps…',
+    searchCatalog: 'Buscar apps para añadir…',
+    tabMine: 'Mis apps',
+    // The same words as the ＋ tile on the panel (`dashboard.appsAdd`): one door, one name.
+    tabCatalog: 'Añadir apps',
     tabPaid: 'De pago',
-    emptyInstalled: 'Aún no tienes módulos instalados. Explora el catálogo para añadir el primero.',
-    emptyCatalog: 'No hay módulos que coincidan con tu búsqueda.',
+    emptyInstalled: 'Aún no tienes apps. Abre «Añadir apps» para instalar la primera.',
+    emptyCatalog: 'No hay apps que coincidan con tu búsqueda.',
     catalogLoadError:
-      'No se pudo cargar el catálogo desde la nube. Revisa la conexión o el registro de este dispositivo.',
+      'No se pudo cargar el catálogo. Revisa la conexión o el registro de este dispositivo.',
     retryCatalog: 'Reintentar',
-    demoCatalogReadOnly: 'Estás viendo el catálogo real de SaaS en modo demostración. Para instalar módulos, vincula un Hub real.',
-    adminOnly: 'Puedes consultar los módulos, pero solo un administrador puede instalarlos, activarlos o desinstalarlos.',
-    colModule: 'Módulo',
+    demoCatalogReadOnly: 'Estás viendo el catálogo real en modo demostración. Conecta un negocio real para instalar apps.',
+    adminOnly: 'Puedes ver las apps, pero solo un administrador puede instalarlas, activarlas o desinstalarlas.',
+    colModule: 'App',
     colVersion: 'Versión',
     colStatus: 'Estado',
     colCategory: 'Categoría',
@@ -425,8 +431,8 @@ export default {
     installSuccess: '{name} instalado correctamente.',
     installError: 'No se pudo iniciar la instalación de {name}.',
     // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
-    installBlocked: '{name} necesita módulos que aún no tienes contratados: {missing}. No se ha instalado nada.',
-    purchaseInBrowser: '{name} es un módulo de pago — completa la compra en el navegador y vuelve.',
+    installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
+    purchaseInBrowser: '{name} es una app de pago — completa la compra en el navegador y vuelve.',
     purchaseOpenError: 'No se pudo abrir la página de compra. Inténtalo de nuevo.',
     deactivated: '{name} desactivado.',
     activated: '{name} activado.',
@@ -438,14 +444,14 @@ export default {
     cascadeConfirm: 'Continuar',
     cascadeCancel: 'Cancelar',
     uninstallTitle: 'Desinstalar {name}',
-    uninstallBody: 'El módulo dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.',
+    uninstallBody: 'La app dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.',
     uninstallConfirm: 'Desinstalar',
     uninstalled: '{name} desinstalado.',
     uninstallError: 'No se pudo desinstalar {name}.',
     moduleInstalledNamed: '{name} instalado.',
-    moduleInstalled: 'Módulo instalado.',
+    moduleInstalled: 'App instalada.',
     consentTitle: 'Permisos solicitados',
-    consentIntro: 'Este módulo solicita estos permisos. Podrás revisarlos después en Ajustes → Permisos.',
+    consentIntro: 'Esta app solicita estos permisos. Podrás revisarlos después en Ajustes → Permisos.',
     consentInstallGrant: 'Instalar y conceder',
     consentCancel: 'Cancelar',
   },
@@ -754,11 +760,11 @@ export default {
     statusUncollectible: 'Incobrable',
   },
   login: {
-    logoAlt: 'Logotipo del Hub',
+    logoAlt: 'Logotipo del negocio',
     toggleTheme: 'Cambiar tema',
     subtitleSetup: 'Crea tu PIN de acceso',
     subtitlePin: 'Introduce tu PIN',
-    subtitleEmail: 'Inicia sesión en tu hub',
+    subtitleEmail: 'Entra en tu negocio',
     tabPin: 'PIN',
     tabEmail: 'Email',
     emailLabel: 'Email',
@@ -787,7 +793,7 @@ export default {
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
     setupSaveError: 'No se pudo guardar el PIN. Vuelve a intentarlo.',
     footerTrustedDevice: 'dispositivo de confianza',
-    footerSecureCloud: 'conexión segura con Cloud',
+    footerSecureCloud: 'conexión segura',
     errorSignIn: 'No se pudo iniciar sesión. Revisa tus credenciales o la conexión.',
     errorMachineRegistration:
       'La cuenta es válida, pero no se pudo registrar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
@@ -809,9 +815,9 @@ export default {
   },
   activation: {
     title: 'Activación requerida',
-    lead: 'Este dispositivo necesita validar su licencia de módulos con el Cloud para desbloquear el negocio. Conéctate a internet y reintenta.',
+    lead: 'Este dispositivo tiene que comprobar tus apps en erplora.com antes de poder abrir tu negocio. Conéctate a internet y vuelve a intentarlo.',
     retry: 'Reintentar',
-    retryError: 'La licencia todavía no se ha podido validar. Comprueba la conexión o inicia sesión con tu cuenta online.',
+    retryError: 'Todavía no se han podido comprobar tus apps. Comprueba la conexión o inicia sesión con tu cuenta de ERPlora.',
     logout: 'Cerrar sesión',
   },
   exportPage: {
