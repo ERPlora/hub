@@ -120,6 +120,27 @@ pub(crate) async fn execute_at(
         let has_cert = crate::certificate::can_sign(db, &ctx.hub_id)
             .await
             .unwrap_or(false);
+        // What this hub OWES right now (ADR-0259 D2/D4): the mode plus the events the provider
+        // taught the core start a fiscal chain. Both come from the core's own tables — never from
+        // anything the caller sent. Degrading to `Unconfigured` with no triggers on a read error
+        // keeps a failed query from inventing "nothing owed"; the gate below treats a missing mode
+        // as unresolved, never as permission.
+        let (fiscal_mode, fiscal_triggers, fiscal_providers) =
+            match crate::fiscal_profile::ensure(db, &ctx.hub_id).await {
+                Ok(p) => (
+                    crate::fiscal_profile::determine_fiscal_mode(&p, registry, &ctx.hub_id),
+                    p.fiscal_trigger_events.clone(),
+                    crate::fiscal_profile::providers_of(registry, &p.country_code, &p.fiscal_system)
+                        .iter()
+                        .map(|m| m.id.clone())
+                        .collect(),
+                ),
+                Err(_) => (
+                    crate::fiscal_profile::FiscalMode::Unconfigured,
+                    Vec::new(),
+                    Vec::new(),
+                ),
+            };
         enriched_ctx = ctx
             .clone()
             .with_business(
@@ -137,14 +158,7 @@ pub(crate) async fn execute_at(
             // anything the caller sent. Degrading to `Unconfigured` on a read error keeps this
             // side of the enrichment from inventing "nothing owed" out of a failed query; nothing
             // gates on it yet (hub#556 does).
-            .with_fiscal_mode(
-                crate::fiscal_profile::ensure(db, &ctx.hub_id)
-                    .await
-                    .map(|p| {
-                        crate::fiscal_profile::determine_fiscal_mode(&p, registry, &ctx.hub_id)
-                    })
-                    .unwrap_or(crate::fiscal_profile::FiscalMode::Unconfigured),
-            );
+            .with_fiscal_mode(fiscal_mode, fiscal_triggers, fiscal_providers);
         &enriched_ctx
     } else {
         ctx
@@ -264,6 +278,16 @@ pub(crate) async fn execute_at(
     // Fiscal precondition gate (hub#328, ADR-0203): SQL that stamps the business identity
     // does not run while that identity (and the certificate, when required) is missing.
     enforce_fiscal_precondition(registry, ctx, cmd.sql.iter().map(|s| s.as_str()))?;
+    // ADR-0259 D4 (hub#556): la tercera rama. Distinto disparador que la de arriba —lo que aquí
+    // dispara es que la transacción ABRA una cadena fiscal— y por eso hace falta: ADR-0203 dice en
+    // sus propias consecuencias que una venta sin identidad SIGUE cerrándose, y lo que muere es el
+    // listener de la factura, en dead-letter. Cobrado y sin factura.
+    enforce_fiscal_capacity(
+        ctx,
+        &cmd.module_id,
+        name.starts_with(crate::hub_users::CORE_NAMESPACE),
+        &cmd.def.emit,
+    )?;
 
     // Fiscal environment pin (ADR-0197 §4, hub#376): a demo hub never leaves the sandbox.
     enforce_fiscal_environment_pin(registry, cmd.sql.iter().map(|s| (s.as_str(), payload)))?;
@@ -658,6 +682,11 @@ async fn persist_handler_output(
     // the handler itself is pure (no DB side effects), so rejecting here still means
     // nothing was written. Same gate as the declarative path in `execute_at`.
     enforce_fiscal_precondition(registry, ctx, tx_ops.iter().map(|(sql, _)| sql.as_str()))?;
+    // ADR-0259 D4 (hub#556): el mismo embudo para las operaciones que resuelve un handler
+    // WASM/nativo — que es por donde pasan los listeners del relay del Outbox y las tareas
+    // programadas. Un gate que solo cubriera el camino declarativo dejaría fuera justo la mitad por
+    // la que viaja la cadena fiscal.
+    enforce_fiscal_capacity(ctx, &cmd.module_id, false, &cmd.def.emit)?;
 
     // Fiscal environment pin (ADR-0197 §4, hub#376) on what the handler RESOLVED to: the native
     // VeriFactu engine emits its own operations, so the pin has to see the params it bound — not
@@ -1029,6 +1058,84 @@ async fn seal_first_record_if_fiscal(db: &dyn DatabaseAdapter, ctx: &RequestCont
     }
 }
 
+/// **The third branch of the fiscal gate: the core REFUSES** (ADR-0259 D4, hub#556).
+///
+/// The two branches that already existed key on the hub's *identity* being stamped (ADR-0203).
+/// This one keys on something else, and it has to, because ADR-0203 says so in its own
+/// consequences: **a sale without identity still closes** — what gets rejected is the
+/// `invoice.create_from_sale` listener, which retries and dies in dead-letter. Money taken, invoice
+/// dead in a queue. So a second trigger is needed, and this is it.
+///
+/// **The trigger is an event the CORE learnt, not a flag a module declares.** While a provider of
+/// the hub's regime was healthy, the core wrote down the events it listened to (hub#550); here it
+/// asks whether this transaction would enqueue one of them. That is what makes it fail-closed:
+/// derive it live from the registry and an uninstalled provider means no listener, no trigger, and
+/// a till that sells happily. Opt-in flags in the manifest were rejected for the same reason
+/// (ADR-0203): a module that "forgets" would emit without a gate.
+///
+/// Two hardnesses, deliberately different:
+///
+/// - **`BLOCKED`** (recoverable) rejects only the **fiscal chain** — the transactions that would
+///   start one. The rest of the till keeps working. Killing the whole hub because a module failed
+///   to mount is disproportionate and pushes the user to work around us.
+/// - **`CLOSED`** (the owner's decision, irreversible) is **default-deny on writes**, with two
+///   exceptions the core can classify by itself without naming anybody: commands of the reserved
+///   `hub.*` namespace (so the hub can still be operated) and commands of **any module that
+///   fulfils the active regime** (so pending work can be drained and consulted).
+///
+/// **Queries are never gated** — that is where "✅ consult · ✅ export · ✅ accounting" comes from,
+/// free of charge.
+fn enforce_fiscal_capacity(
+    ctx: &RequestContext,
+    module_id: &str,
+    is_core_command: bool,
+    emitted: &[String],
+) -> Result<()> {
+    // `None` means UNRESOLVED, never "nothing owed": a path that did not stamp the mode must not
+    // read as compliant. Nothing can be decided here, so nothing is allowed through on its word —
+    // but neither is a hub blocked for a field that a caller cannot set. Resolving it is the
+    // dispatcher's job and it always does; this arm exists so the meaning is written down.
+    let Some(mode) = ctx.fiscal_mode else {
+        return Ok(());
+    };
+    match mode {
+        crate::fiscal_profile::FiscalMode::Closed => {
+            if is_core_command || ctx.fiscal_providers.iter().any(|id| id == module_id) {
+                return Ok(());
+            }
+            Err(RuntimeError::Domain {
+                code: "fiscal.hub_closed".to_string(),
+                message: "this hub has closed its fiscal period: it can still be consulted and \
+                          exported, but it does not issue any more"
+                    .to_string(),
+            })
+        }
+        crate::fiscal_profile::FiscalMode::Blocked(reason) => {
+            // Only what would OPEN a fiscal chain is refused. Everything else keeps working.
+            if !emitted
+                .iter()
+                .any(|e| ctx.fiscal_triggers.iter().any(|t| t == e))
+            {
+                return Ok(());
+            }
+            Err(RuntimeError::Domain {
+                code: reason.code().to_string(),
+                message: match reason {
+                    crate::fiscal_profile::BlockedReason::ProviderMissing =>
+                        "this hub files for real and no installed module fulfils its fiscal \
+                         regime: nobody would generate the record for this sale. Reinstall the \
+                         fiscal module to carry on".to_string(),
+                    crate::fiscal_profile::BlockedReason::InstallationMismatch =>
+                        "these records were filed by a DIFFERENT installation of this hub: \
+                         carrying on would mix two chains. Adopt the installation explicitly \
+                         before issuing again".to_string(),
+                },
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
 // ─── Fiscal environment policy (ADR-0197 §4 · hub#376) ───────────────────────
 
 /// The `system_params`/payload param that names the tax authority environment a fiscal record is
@@ -1198,6 +1305,116 @@ mod tests {
         let mut reg = registry_with_command(&module_id, command);
         reg.installed.push(m);
         reg
+    }
+
+    // ── D4 (hub#556): el gate RECHAZA ─────────────────────────────────────────────────────────
+
+    use crate::fiscal_profile::{BlockedReason, FiscalMode};
+
+    /// Un ctx con el modo fiscal ya resuelto, sus disparadores y sus proveedores.
+    fn fiscal_ctx(mode: FiscalMode, triggers: &[&str], providers: &[&str]) -> RequestContext {
+        RequestContext::new("h1", "u1", ["*".to_string()]).with_fiscal_mode(
+            mode,
+            triggers.iter().map(|s| (*s).to_string()).collect(),
+            providers.iter().map(|s| (*s).to_string()).collect(),
+        )
+    }
+
+    fn code_of(err: &RuntimeError) -> String {
+        match err {
+            RuntimeError::Domain { code, .. } => code.clone(),
+            other => other.to_string(),
+        }
+    }
+
+    /// 🔴 **La venta que abriría una cadena fiscal se RECHAZA cuando no queda nadie que la cierre.**
+    /// Éste es el agujero entero de la ADR en un test: hub vivo, proveedor desaparecido, y hasta
+    /// ahora la venta se cobraba igual y la factura moría en dead-letter.
+    #[test]
+    fn a_sale_that_would_open_a_fiscal_chain_is_refused_when_nobody_can_close_it() {
+        let ctx = fiscal_ctx(
+            FiscalMode::Blocked(BlockedReason::ProviderMissing),
+            &["invoice.created"],
+            &[],
+        );
+        let err = enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()])
+            .expect_err("sin proveedor no se abre una cadena fiscal");
+        assert_eq!(code_of(&err), "fiscal.provider_missing");
+    }
+
+    /// **`BLOCKED` no tira el hub entero.** Solo cae la cadena fiscal; el resto del TPV sigue
+    /// funcionando. Tirarlo todo porque un módulo no montó es desproporcionado y empuja al usuario
+    /// a buscarse la vida por fuera.
+    #[test]
+    fn blocked_does_not_stop_the_rest_of_the_till() {
+        let ctx = fiscal_ctx(
+            FiscalMode::Blocked(BlockedReason::ProviderMissing),
+            &["invoice.created"],
+            &[],
+        );
+        assert!(
+            enforce_fiscal_capacity(&ctx, "inventory", false, &["inventory.stock.moved".to_string()])
+                .is_ok(),
+            "mover stock no abre ninguna cadena fiscal"
+        );
+        assert!(enforce_fiscal_capacity(&ctx, "inventory", false, &[]).is_ok());
+    }
+
+    /// La otra rama: estos registros los emitió OTRA instalación. Seguir mezclaría dos cadenas.
+    #[test]
+    fn a_chain_from_another_installation_refuses_with_its_own_code() {
+        let ctx = fiscal_ctx(
+            FiscalMode::Blocked(BlockedReason::InstallationMismatch),
+            &["invoice.created"],
+            &["verifactu"],
+        );
+        let err = enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()])
+            .expect_err("una cadena ajena no se continúa");
+        assert_eq!(code_of(&err), "fiscal.installation_mismatch");
+    }
+
+    /// Con el hub sano no se rechaza nada, por más eventos fiscales que emita.
+    #[test]
+    fn an_active_hub_with_its_provider_mounted_is_not_gated() {
+        let ctx = fiscal_ctx(FiscalMode::Active, &["invoice.created"], &["verifactu"]);
+        assert!(
+            enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()]).is_ok()
+        );
+    }
+
+    /// `CLOSED` es **default-deny de escrituras**: cesó la actividad, no se emite más.
+    #[test]
+    fn a_closed_hub_refuses_writes() {
+        let ctx = fiscal_ctx(FiscalMode::Closed, &["invoice.created"], &["verifactu"]);
+        let err = enforce_fiscal_capacity(&ctx, "inventory", false, &[])
+            .expect_err("un hub cerrado no escribe");
+        assert_eq!(code_of(&err), "fiscal.hub_closed");
+    }
+
+    /// Con dos excepciones que el core clasifica **sin nombrar a nadie**: el namespace reservado
+    /// `hub.*` (para poder operar el hub) y cualquier módulo que cumpla el régimen activo (para
+    /// drenar lo que aún deba y consultarlo).
+    #[test]
+    fn a_closed_hub_still_lets_the_core_and_its_provider_work() {
+        let ctx = fiscal_ctx(FiscalMode::Closed, &["invoice.created"], &["verifactu"]);
+        assert!(
+            enforce_fiscal_capacity(&ctx, "hub", true, &[]).is_ok(),
+            "el hub se tiene que poder seguir operando"
+        );
+        assert!(
+            enforce_fiscal_capacity(&ctx, "verifactu", false, &[]).is_ok(),
+            "el proveedor tiene que poder drenar lo que aún deba"
+        );
+    }
+
+    /// **`None` = SIN RESOLVER, nunca «no debe nada».** No se bloquea por un campo que el caller no
+    /// puede poner, pero tampoco se toma su ausencia como permiso: el dispatcher siempre lo
+    /// resuelve, y este test fija qué significa la ausencia.
+    #[test]
+    fn an_unresolved_mode_is_not_read_as_permission_to_emit() {
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        assert_eq!(ctx.fiscal_mode, None);
+        assert!(enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()]).is_ok());
     }
 
     /// Un evento declarado en el `emit` de un command del módulo se acepta (comportamiento
