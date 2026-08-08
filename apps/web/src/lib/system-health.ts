@@ -160,6 +160,24 @@ export function printerLine(
 }
 
 /**
+ * The steps to get a printer answering, in the order the user takes them, for the surface they are
+ * standing on (hub#480).
+ *
+ * Inside the installed app the first two are already done: that app **is** the print host
+ * (ADR-0196), so "download it" and "install it" describe something the user finished before they
+ * could read the sentence. And the three buttons that offered the installer were `window.open`
+ * calls, which open nothing inside a webview — so the step could not even be taken by mistake.
+ *
+ * A step nobody can take is a dead end with a number in front of it, which is worse than no list.
+ */
+export function printerSetupStepKeys(inInstalledApp: boolean): string[] {
+  const onThisDevice = ['system.stepPair', 'system.stepConfigure'];
+  return inInstalledApp
+    ? onThisDevice
+    : ['system.stepDownload', 'system.stepInstall', ...onThisDevice];
+}
+
+/**
  * A usage fraction as whole percent — or the statement that nobody reported it.
  *
  * A missing `fraction` is **not** 0%: the gauge would sit green at zero and read as "measured, and

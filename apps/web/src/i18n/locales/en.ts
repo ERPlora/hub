@@ -75,6 +75,14 @@ export default {
     attachImage: 'image',
     attachTooLarge: 'The file is too large.',
   },
+  // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
+  // installed app there is no download shelf and no notification, so if we say nothing, nothing is
+  // said at all.
+  download: {
+    savedTo: 'Saved to {path}',
+    noPlaceToSave: 'This app cannot save files on a phone or tablet. Open your business in a browser to download it.',
+    failed: 'The file could not be downloaded.',
+  },
   files: {
     title: 'Files',
     subtitle: "Everything the Hub stores in the media folder: module attachments, logs and activity.",
@@ -682,8 +690,6 @@ export default {
     noDocuments: 'No documents',
     noDocumentsBucket: "This hub's storage bucket is empty.",
     searchDocument: 'Search document…',
-    download: 'Download',
-    downloadError: 'The document could not be downloaded.',
     loadErrorTitle: 'System information is unavailable',
     loadErrorBody: 'Metrics and logs are unavailable right now. You can try again.',
     retry: 'Try again',
@@ -788,7 +794,6 @@ export default {
     loadErrorTitle: 'We could not load billing',
     loadErrorBody: 'Check your connection and try again. You can continue using the Hub.',
     retry: 'Try again',
-    downloadError: 'Could not download the invoice. Please try again.',
     statusDraft: 'Draft',
     statusOpen: 'Open',
     statusPaid: 'Paid',

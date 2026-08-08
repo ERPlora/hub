@@ -372,6 +372,22 @@ fn the_hub_origin_can_leave_for_the_browser() {
 }
 
 #[test]
+fn the_hub_origin_can_save_a_file_where_the_user_will_find_it() {
+    // Same silent failure, one door along (hub#480). Without this grant `saveDownload` asks for
+    // `save_download`, the ACL refuses it because nothing hands it out, and «descargar» goes back to
+    // doing nothing at all — on the installed app only, which is the one surface no gate opens.
+    let granted: Vec<String> = permissions_granted_to("https://panaderia.a.erplora.com/files")
+        .into_iter()
+        .map(|(_, permission)| permission)
+        .collect();
+
+    assert!(
+        granted.iter().any(|p| p == "allow-save-download"),
+        "no capability lets the till PWA save a file; granted: {granted:?}"
+    );
+}
+
+#[test]
 fn no_capability_hands_a_page_the_raw_opener_plugin() {
     // The app links `tauri-plugin-opener` so the till can send the user to the SaaS checkout in
     // their own browser (hub#475). The plugin's OWN commands are not what the page gets: they take

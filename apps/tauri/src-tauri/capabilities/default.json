@@ -16,6 +16,7 @@
     "allow-device-context",
     "allow-forget-hub",
     "allow-open-external-url",
+    "allow-save-download",
     "allow-erplora-bridge-status",
     "allow-erplora-discover-printers",
     "allow-erplora-get-devices",

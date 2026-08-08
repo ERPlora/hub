@@ -150,7 +150,8 @@ import { openExternal } from '../lib/open-external';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
-import { toastError } from '../lib/toast';
+import { toastError, toastSuccess } from '../lib/toast';
+import { saveDownload, saveDownloadMessageKey } from '../lib/save-download';
 
 const { t, locale } = useI18n();
 import {
@@ -419,18 +420,14 @@ async function downloadInvoice(invoice: CloudInvoice): Promise<void> {
       }
     });
     if (!res.ok) throw new Error(String(res.status));
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
     const safeNumber = String(invoice.number || invoice.id).replace(/[^a-zA-Z0-9._-]+/g, '-');
-    a.download = `factura-${safeNumber}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-  } catch {
-    await toastError(t('billing.downloadError'));
+    const savedTo = await saveDownload(`factura-${safeNumber}.pdf`, await res.blob());
+    if (savedTo) await toastSuccess(t('download.savedTo', { path: savedTo }));
+  } catch (error) {
+    // The generic `billing.downloadError` only fits the fetch half. Inside the installed app the
+    // half that fails is the SAVE, and «this app cannot save files on a tablet» is the only
+    // sentence the user can act on (hub#480).
+    await toastError(t(saveDownloadMessageKey(error)));
   }
 }
 </script>

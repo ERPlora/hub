@@ -229,6 +229,7 @@ import { dataTableLabels } from '../lib/data-table-labels';
 import { isAdmin } from '../lib/session';
 import { availableLocales } from '../i18n';
 import { toastSuccess } from '../lib/toast';
+import { SaveDownloadError, saveDownload, saveDownloadMessageKey } from '../lib/save-download';
 import {
   listInstalledModules,
   exportHub,
@@ -395,19 +396,23 @@ async function doExport(): Promise<void> {
       exportLocale.value,
       selection,
     );
-    // Descarga del zip como blob → link temporal con download=<filename>.
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    await toastSuccess(t('exportPage.done', { filename }));
+    // Dónde acaba el zip NO es igual en las tres superficies (hub#480): en un navegador lo coge su
+    // gestor de descargas; dentro de la app instalada no hay gestor ninguno, así que lo guarda el
+    // shell y devuelve la RUTA — que es lo único que le dice al usuario que su copia existe.
+    const savedTo = await saveDownload(filename, blob);
+    await toastSuccess(
+      savedTo ? t('download.savedTo', { path: savedTo }) : t('exportPage.done', { filename }),
+    );
   } catch (e) {
-    // Mensaje HONESTO del server (exportHub ya extrajo el envelope/texto), no un genérico.
-    error.value = e instanceof Error ? e.message : String(e);
+    // Dos fallos distintos con la misma salida. El del EXPORT trae el mensaje HONESTO del server
+    // (exportHub ya extrajo el envelope/texto) y se conserva tal cual. El de la DESCARGA no es una
+    // frase — `save_download_failed: hub.zip` no le dice nada a nadie —, así que se traduce.
+    error.value =
+      e instanceof SaveDownloadError
+        ? t(saveDownloadMessageKey(e))
+        : e instanceof Error
+          ? e.message
+          : String(e);
   } finally {
     exporting.value = false;
   }

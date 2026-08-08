@@ -76,6 +76,14 @@ export default {
     attachImage: 'imagen',
     attachTooLarge: 'El archivo es demasiado grande.',
   },
+  // Lo que se le dice al usuario tras pulsar «descargar», lo pulse donde lo pulse (hub#480). Dentro
+  // de la app instalada no hay barra de descargas ni aviso del sistema: si no lo decimos nosotros,
+  // no lo dice nadie.
+  download: {
+    savedTo: 'Guardado en {path}',
+    noPlaceToSave: 'Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un navegador para descargarlo.',
+    failed: 'No se ha podido descargar el archivo.',
+  },
   files: {
     title: 'Archivos',
     subtitle: 'Todo lo que el Hub guarda en la carpeta media: adjuntos de módulos, registros y actividad.',
@@ -672,8 +680,6 @@ export default {
     noDocuments: 'Sin documentos',
     noDocumentsBucket: 'El bucket de almacenamiento de este hub está vacío.',
     searchDocument: 'Buscar documento…',
-    download: 'Descargar',
-    downloadError: 'No se pudo descargar el documento.',
     loadErrorTitle: 'No se pudo consultar el sistema',
     loadErrorBody: 'Las métricas y los registros no están disponibles ahora. Puedes volver a intentarlo.',
     retry: 'Reintentar',
@@ -778,7 +784,6 @@ export default {
     loadErrorTitle: 'No pudimos cargar la facturación',
     loadErrorBody: 'Comprueba la conexión e inténtalo de nuevo. Puedes seguir utilizando el Hub.',
     retry: 'Reintentar',
-    downloadError: 'No se pudo descargar la factura. Inténtalo de nuevo.',
     statusDraft: 'Borrador',
     statusOpen: 'Abierta',
     statusPaid: 'Pagada',

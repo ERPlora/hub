@@ -150,7 +150,11 @@
               </li>
             </ol>
 
-            <div v-if="!bridge.online">
+            <!-- The installer is offered to a BROWSER only (hub#480). Inside `com.erplora.app`
+                 this is the app offering to install itself: the steps above already skip
+                 «download» and «install», and the buttons themselves were `window.open` calls that
+                 open nothing in a webview. Updating the installed app is its own job (hub#400). -->
+            <div v-if="!bridge.online && !inInstalledApp">
               <div class="download-label">{{ t('system.downloadBridge') }}</div>
               <p class="muted-note">
                 {{ t('system.downloadBridgeHint') }}
@@ -212,7 +216,6 @@
               :columns="docColumns"
               :rows="documents"
               :searchKeys="['name', 'kind']"
-              :actions="docActions"
               :search-placeholder="t('system.searchDocument')"
               page-size="12"
               csv
@@ -289,7 +292,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -302,8 +305,11 @@ import AppPage from '../components/AppPage.vue';
 import PlanLimitsPanel from '../components/PlanLimitsPanel.vue';
 import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';
 import { fetchSystemInfo, type SystemInfo } from '../lib/system';
+import { isTauri } from '../lib/device';
+import { openExternal } from '../lib/open-external';
 import {
   printerLine,
+  printerSetupStepKeys,
   probeFromBridge,
   reportedCount,
   usagePercent,
@@ -311,7 +317,7 @@ import {
   type Reading,
 } from '../lib/system-health';
 import { dataTableLabels } from '../lib/data-table-labels';
-import { RUNTIME_URL, runtimeHeaders, listInstalledModules, type InstalledModule } from '../lib/runtime';
+import { listInstalledModules, type InstalledModule } from '../lib/runtime';
 import {
   isLegacyBackupsHash,
   resolveSystemTab,
@@ -340,13 +346,6 @@ interface DataTableColumn {
   filterType?: 'text' | 'select' | 'number' | 'date' | 'range' | 'daterange';
   format?: (row: Row) => string;
   render?: (row: Row) => Node | string;
-}
-interface DataTableAction {
-  id: string;
-  label: string;
-  icon?: string;
-  color?: string;
-  disabled?: (row: Row) => boolean;
 }
 
 // ── State ────────────────────────────────────────────────────────
@@ -385,12 +384,13 @@ const bridge = ref<BridgeStatus>({ online: false });
 const printerProbe = ref<BridgeStatus | null>(null);
 const installedModules = ref<InstalledModule[] | null>(null);
 
-const bridgeSteps = computed<string[]>(() => [
-  t('system.stepDownload'),
-  t('system.stepInstall'),
-  t('system.stepPair'),
-  t('system.stepConfigure'),
-]);
+// Are we inside `com.erplora.app`? It changes what there is left to do about a printer, and what
+// this screen is allowed to offer (hub#480). Read once: it cannot change while the page is open.
+const inInstalledApp = isTauri();
+
+const bridgeSteps = computed<string[]>(() =>
+  printerSetupStepKeys(inInstalledApp).map((key) => t(key)),
+);
 
 // macOS fuera (solo desarrollo local). El Cloud sirve Windows/Linux/Android.
 // Logos de marca por SO + primero en `solid`, igual que los botones de erplora.com/download/.
@@ -513,14 +513,13 @@ const docColumns = computed<DataTableColumn[]>(() => [
   { key: 'sizeLabel', header: t('system.colSize'), align: 'right' },
   { key: 'modified', header: t('system.colModified'), filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.modified)) },
 ]);
-const docActions = computed<DataTableAction[]>(() => [
-  {
-    id: 'download',
-    label: t('system.download'),
-    icon: 'download',
-    disabled: (row) => !row.url,
-  },
-]);
+// No row action here, on purpose (hub#480). There WAS one — «Download» — and it was greyed out on
+// every row of every hub since the day it was written: `crates/server/src/system.rs` builds each
+// document with a null address, and the action disabled itself whenever that address was missing,
+// which was always. A button that can never be pressed is a promise the API does not carry; this
+// tab lists what the bucket holds and `/files` is where files are handled. If the Cloud ever starts
+// exposing a document address, the action comes back through `saveDownload`, like every other
+// download in the app (hub#498).
 
 const logColumns = computed<DataTableColumn[]>(() => [
   { key: 'when', header: t('system.colTime'), format: (r) => fmtDateTime(String(r.when)) },
@@ -535,32 +534,22 @@ function showToast(message: string): void {
   toastOpen.value = true;
 }
 
-async function openUrl(url: string | null | undefined, name = 'documento'): Promise<void> {
-  if (!url) return;
-  if (/^https?:\/\//.test(url)) {
-    window.open(url, '_blank', 'noopener');
-    return;
-  }
+/**
+ * Fetches the installer of the app from the Cloud, in the user's own browser (hub#480).
+ *
+ * The address is the SaaS (`{cloud}/bridge/download/{platform}/`, which redirects to the release in
+ * Object Storage), so the boundary of ADR-0255 already covers it — nothing needed widening for
+ * this. `openExternal` and not `window.open` because this screen also runs inside the installed
+ * app: this block is hidden there (`inInstalledApp`), and the helper is what keeps the button
+ * honest anywhere it is ever shown again.
+ */
+async function handleBridgeDownload(os: BridgeOs): Promise<void> {
   try {
-    const response = await fetch(`${RUNTIME_URL}${url}`, { headers: runtimeHeaders() });
-    if (!response.ok) throw new Error(String(response.status));
-    const objectUrl = URL.createObjectURL(await response.blob());
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = name;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+    await openExternal(bridgeDownloadUrl(os.platform));
+    showToast(t('system.toastDownloadingBridge', { os: os.label }));
   } catch {
-    showToast(t('system.downloadError'));
+    showToast(t('download.failed'));
   }
-}
-
-function handleBridgeDownload(os: BridgeOs): void {
-  showToast(t('system.toastDownloadingBridge', { os: os.label }));
-  // El Cloud redirige a S3 latest; abrimos en una pestaña nueva para no perder el hub.
-  window.open(bridgeDownloadUrl(os.platform), '_blank', 'noopener');
 }
 
 /**
@@ -585,13 +574,8 @@ async function refreshBridge(): Promise<void> {
   }
 }
 
-// `rowAction` es camelCase; Vue lo baja a minúsculas en plantilla → se engancha con ref + listener.
 const docsTable = ref<HTMLElement | null>(null);
 const logsTable = ref<HTMLElement | null>(null);
-function handleDocAction(e: Event): void {
-  const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
-  if (actionId === 'download') void openUrl(row.url as string | undefined, String(row.name ?? 'documento'));
-}
 
 function applyTableLabels(): void {
   const labels = dataTableLabels(locale.value);
@@ -604,14 +588,10 @@ function applyTableLabels(): void {
 }
 
 // Las tablas solo están en el DOM cuando su pestaña está activa (v-else-if). Tras el render
-// aplicamos el idioma activo y cableamos la acción de descarga de forma idempotente.
-watch(tab, async (value) => {
+// aplicamos el idioma activo.
+watch(tab, async () => {
   await nextTick();
   applyTableLabels();
-  if (value === 'documents') {
-    docsTable.value?.removeEventListener('rowAction', handleDocAction);
-    docsTable.value?.addEventListener('rowAction', handleDocAction);
-  }
 });
 watch(locale, async () => {
   await nextTick();
@@ -630,9 +610,6 @@ async function loadSystemInfo(): Promise<void> {
 onMounted(() => {
   void refreshBridge();
   void loadSystemInfo();
-});
-onBeforeUnmount(() => {
-  docsTable.value?.removeEventListener('rowAction', handleDocAction);
 });
 </script>
 

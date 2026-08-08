@@ -32,6 +32,7 @@ import {
   STATE_UNKNOWN,
   isPrintingInstalled,
   printerLine,
+  printerSetupStepKeys,
   probeFromBridge,
   reportedCount,
   usagePercent,
@@ -288,5 +289,33 @@ describe('a number nobody reported is not zero', () => {
   it('names the unreadable metric instead of leaving a green gauge at zero', () => {
     expect(lookup(enCatalogue, 'system.health.notMeasured')).toBe("We couldn't read this");
     expect(lookup(esCatalogue, 'system.health.notMeasured')).toBe('No hemos podido leerlo');
+  });
+});
+
+// ── Getting a printer answering, from where the user actually is (hub#480) ──────────────────────
+
+describe('printerSetupStepKeys', () => {
+  it('walks a browser through downloading and installing the app first', () => {
+    expect(printerSetupStepKeys(false)).toEqual([
+      'system.stepDownload',
+      'system.stepInstall',
+      'system.stepPair',
+      'system.stepConfigure',
+    ]);
+  });
+
+  it('does not tell the installed app to go and install itself', () => {
+    // Inside `com.erplora.app` the first two steps are already done — that app IS the print host
+    // (ADR-0196) — and the three buttons offering its installer were `window.open` calls that open
+    // nothing there anyway. A step someone cannot take is a dead end with a number in front of it.
+    expect(printerSetupStepKeys(true)).toEqual(['system.stepPair', 'system.stepConfigure']);
+  });
+
+  it('keeps both lists ending at the same place, in both languages', () => {
+    for (const catalogue of [enCatalogue, esCatalogue]) {
+      for (const key of printerSetupStepKeys(false)) {
+        expect(lookup(catalogue, key), `${key} has no sentence`).toBeTruthy();
+      }
+    }
   });
 });
