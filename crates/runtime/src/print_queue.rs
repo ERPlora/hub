@@ -983,6 +983,73 @@ mod tests {
         );
     }
 
+    /// The cap is a limit, not an off-by-one: a document of **exactly** the maximum is a document.
+    /// Without this, moving the comparison one notch would go unnoticed and a ticket right on the
+    /// boundary would stop printing for no reason anybody could explain.
+    #[tokio::test]
+    async fn a_document_of_exactly_the_size_cap_is_accepted() {
+        let db = queue_db().await;
+        // Pad the ticket id until the serialised document weighs exactly the cap.
+        let skeleton = json!({ "receipt_id": "" }).to_string().len();
+        let exact = NewPrintJob {
+            job_id: "j1".into(),
+            role: "receipt".into(),
+            document_type: "receipt".into(),
+            document: json!({ "receipt_id": "x".repeat(MAX_DOCUMENT_BYTES - skeleton) }),
+            format: FORMAT_RECEIPT.into(),
+        };
+        assert_eq!(exact.document.to_string().len(), MAX_DOCUMENT_BYTES);
+
+        assert_eq!(
+            enqueue(&db, "h1", &exact).await.unwrap(),
+            EnqueueOutcome::Queued,
+            "judged by what it weighs, and the cap is a weight it may reach"
+        );
+    }
+
+    /// **The cap is pinned from both ends**, because neither number follows from the other:
+    ///
+    ///  - **big enough for a real ticket**: an invoice with two hundred lines and notes on half of
+    ///    them is still only text. A cap that refused one would stop a legitimate sale from
+    ///    printing, which is worse than anything it is defending against;
+    ///  - **still a bound**: this lands in the hub's database and **any session can post to it**, so
+    ///    it has to stay visibly nowhere near a file upload.
+    ///
+    /// Pinned in absolute numbers on purpose. Expressed against the constant, this test would move
+    /// with it — and a cap silently reduced to 1.5 KiB would pass everything.
+    #[test]
+    fn the_document_cap_fits_a_real_ticket_and_is_still_a_bound() {
+        assert!(
+            MAX_DOCUMENT_BYTES >= 64 * 1024,
+            "a long invoice must never be too big to print"
+        );
+        assert!(
+            MAX_DOCUMENT_BYTES <= 1024 * 1024,
+            "the print queue is not an upload endpoint"
+        );
+    }
+
+    /// **A ticket omits `format`**, because 80mm paper is what a ticket is; only an invoice has to
+    /// say otherwise. The default is part of the producer contract (`PrintRequest` in the shell
+    /// leaves it out), so it is deserialised here rather than assumed.
+    #[tokio::test]
+    async fn a_job_that_does_not_say_its_paper_defaults_to_a_ticket() {
+        let db = queue_db().await;
+        let job: NewPrintJob = serde_json::from_value(json!({
+            "jobId": "j1",
+            "role": "receipt",
+            "documentType": "receipt",
+            "document": { "receipt_id": "T-1" },
+        }))
+        .expect("a job without `format` is a complete job");
+        assert_eq!(job.format, FORMAT_RECEIPT);
+
+        enqueue(&db, "h1", &job)
+            .await
+            .expect("and it queues: the default has to be a format the queue accepts");
+        assert_eq!(all(&db, "h1").await[0].format, FORMAT_RECEIPT);
+    }
+
     /// An unknown paper format is rejected: the print host would not know what to render.
     #[tokio::test]
     async fn an_unknown_paper_format_is_rejected() {
