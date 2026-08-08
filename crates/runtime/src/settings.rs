@@ -440,7 +440,12 @@ async fn stored_value(db: &dyn DatabaseAdapter, hub_id: &str, key: &str) -> Resu
 ///
 /// `_hub_fiscal_profile.taxpayer_id` es la copia **congelada** con la que la cadena está anclada;
 /// esta guarda impide que las dos se separen más. Reconciliar una divergencia ya existente no se
-/// hace aquí: cuando divergen, el hub tiene un problema y hay que decirlo, no elegir en silencio.
+/// hace aquí —cuando divergen, el hub tiene un problema y hay que decirlo, no elegir en silencio—,
+/// pero sí se acepta **volver al ancla**: escribir exactamente el `taxpayer_id` con el que la cadena
+/// cuelga no es cambiar de obligado tributario, es dejar de divergir. Sin esa salida, un hub que se
+/// quedara con el setting vacío (p. ej. al restaurar una copia PROPIA anterior a haberlo puesto) no
+/// podría volver a ponerlo **nunca** — y con él vacío la guarda fiscal de ADR-0203 tampoco le deja
+/// facturar. Una guarda que deja al negocio sin poder cobrar no es una guarda, es una trampa.
 async fn enforce_tax_id_freeze(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -455,11 +460,18 @@ async fn enforce_tax_id_freeze(
         return Ok(()); // nada ha salido todavía: la identidad sigue siendo del dueño
     }
     let current = stored_value(db, hub_id, "business_tax_id").await?;
-    if incoming == current {
+    // El ancla es `taxpayer_id`; mientras no esté escrito (lo estampa la salida a producción), el
+    // ancla efectiva es lo que el hub tiene puesto.
+    let anchor = if profile.taxpayer_id.is_empty() {
+        current.clone()
+    } else {
+        profile.taxpayer_id.clone()
+    };
+    if incoming == current || incoming == anchor {
         return Ok(());
     }
     Err(RuntimeError::BusinessTaxIdFrozen {
-        frozen_to: current,
+        frozen_to: anchor,
         since: profile.first_record_at,
     })
 }
@@ -1067,6 +1079,41 @@ mod tests {
             .expect("only the identifier is frozen");
         assert_eq!(result["business_legal_name"], json!("Bar Manolo SLU"));
         assert_eq!(result["currency"], json!("USD"));
+    }
+
+    /// 🔴 **Volver al ancla se permite — si no, la guarda es una trampa.** A hub whose setting
+    /// ended up empty (restoring a PROPIA backup taken before it was filled in) could otherwise
+    /// never write it again… and with it empty the fiscal precondition of ADR-0203 refuses to
+    /// issue anything. Writing exactly the identifier the chain hangs from is not changing
+    /// taxpayer: it is stopping the divergence. A THIRD identifier is still refused.
+    #[tokio::test]
+    async fn a_hub_can_always_write_back_the_identifier_its_chain_is_anchored_to() {
+        let db = fresh_db().await;
+        booted(&db, "hub-1").await;
+        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
+        emitted(&db, "hub-1", "B12345678").await;
+        // The setting is gone; the anchor in the profile is not.
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!("hub-1"));
+        db.execute(
+            "DELETE FROM hub_settings WHERE hub_id = :hub_id AND key = 'business_tax_id'",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        let result = write_tax_id(&db, "hub-1", "B12345678")
+            .await
+            .expect("writing back the anchor is not a change of taxpayer");
+        assert_eq!(result["business_tax_id"], json!("B12345678"));
+
+        // …and a THIRD identifier is still refused: the way back is to the anchor, not anywhere.
+        let err = write_tax_id(&db, "hub-1", "B99999999").await.unwrap_err();
+        assert_eq!(
+            crate::error_registry::error_code_of(&err),
+            "business_tax_id_frozen",
+            "{err:?}"
+        );
     }
 
     /// 🔴 The refusal takes the WHOLE batch, like every other rejection in this door: hiding the
