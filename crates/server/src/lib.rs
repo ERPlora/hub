@@ -787,6 +787,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/entitlement", get(proxy_entitlement))
         .route("/api/bridge/token", get(proxy_bridge_token))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
+        // Which build of the installable app the Cloud publishes (hub#400). The page cannot ask
+        // erplora.com itself: `connect-src 'self' ipc:` kills it, and silently.
+        .route("/api/app/release", get(proxy_app_release))
         // Blueprints: «fuente nube» del import (Ajustes → Datos). ADR-0121.
         .route("/api/blueprints/catalog", get(proxy_blueprints_catalog))
         .route("/api/blueprints/:slug/download", get(download_blueprint))
@@ -1498,6 +1501,32 @@ async fn proxy_bridge_token(State(st): State<AppState>, headers: HeaderMap) -> R
 ///
 /// Demo is deliberately left out: its public catalogue is SaaS metadata, not *"what THIS hub can
 /// install"*, so counting its rows would answer a different question.
+/// Which build of the installable app the Cloud publishes right now (hub#400).
+///
+/// The page asks the runtime instead of the Cloud because it is served under
+/// `connect-src 'self' ipc:`: a cross-origin fetch dies in the browser, without a log the till
+/// could show. Here there is no CSP and the Cloud address is already configured.
+///
+/// **No credential travels.** The version of a public download is public (it is on the store
+/// listing), and asking anonymously is what lets a hub in demo, unenrolled or just woken up still
+/// tell its till that a newer app exists — with a token those hubs would get a 401, which the page
+/// reads as "nothing new". Note the asymmetry with the marketplace proxy right above: that one
+/// grants entitlements, this one reports a number.
+///
+/// A Cloud that does not answer produces an error status, never a version: the page turns anything
+/// that is not a version into `unknown` — silence — and a number invented here would point a till
+/// at an installer that does not exist.
+async fn proxy_app_release(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    proxy_public_cloud_get(&st, &headers, cloud.app_release()).await
+}
+
 async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
     {
         let rt = st.runtime.lock().await;

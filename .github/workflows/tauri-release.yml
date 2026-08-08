@@ -17,8 +17,14 @@
 #   │   ├── erplora-app-setup.exe   (Windows x64, instalador NSIS — SIN FIRMAR de momento)
 #   │   ├── erplora-app.msi         (Windows x64, MSI — SIN FIRMAR)
 #   │   ├── erplora-app.AppImage    (Linux x86_64, portable)
-#   │   └── erplora-app.deb         (Linux x86_64, Debian/Ubuntu)
+#   │   ├── erplora-app.deb         (Linux x86_64, Debian/Ubuntu)
+#   │   └── latest.json             {"version","published_at"} — LO ÚNICO que dice qué hay aquí
 #   └── v{version}/...
+#
+# `latest.json` es la fuente de verdad de «la última versión publicada» (hub#400): el Cloud la lee
+# (`GET /api/v1/app/release/`) y la app instalada la compara con la suya. Sin él no hay canal de
+# actualización y la flota se queda huérfana — que es la razón por la que esto va ANTES de publicar
+# en Play (hub#308) y en Microsoft Store (hub#392).
 #
 # NO se construye aquí:
 #   - macOS  → build local (`cargo tauri build`); no hay cert Apple Developer ID (decisión 2026-06-22).
@@ -407,6 +413,10 @@ jobs:
       AWS_DEFAULT_REGION: fsn1
       S3_ENDPOINT: ${{ secrets.HETZNER_S3_ENDPOINT }}
     steps:
+      # Solo para leer `tauri.conf.json`: en un dispatch manual la versión publicada es la del
+      # fichero (no hay tag del que sacarla) y el manifiesto tiene que decir la verdad.
+      - uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -430,6 +440,28 @@ jobs:
             fi
           done
 
+          # ── El manifiesto de versión (hub#400) ──────────────────────────────────────────────
+          # Un instalador NO dice qué versión es: el nombre del fichero es fijo (`latest/` los
+          # sobrescribe) y leer un .exe o un .deb para averiguarlo no es algo que el Cloud pueda
+          # hacer. Sin este JSON no hay NADA contra lo que la app instalada compare su versión, y
+          # cada TPV se queda en `unknown` para siempre — que es exactamente lo que hace un TPV sano
+          # sin noticias, así que el canal roto no se distingue del canal sano.
+          #
+          # Se escribe en el MISMO paso que sube los instaladores, a propósito: así el manifiesto y
+          # los binarios de `latest/` no pueden discrepar sobre qué hay ahí.
+          # `version` va SIN la `v` del tag, para que sea idéntica a la de `tauri.conf.json` — que
+          # es la que `plugin:app|version` devuelve en el dispositivo.
+          if [[ "$VERSION" == "latest" ]]; then
+            APP_VERSION="$(node -p "require('./apps/tauri/src-tauri/tauri.conf.json').version")"
+          else
+            APP_VERSION="${VERSION#v}"
+          fi
+          printf '{"version":"%s","published_at":"%s"}\n' \
+            "$APP_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > latest.json
+          cat latest.json
+          aws s3 cp latest.json "s3://erplora-saas/downloads/app/${VERSION}/latest.json" \
+            --endpoint-url "$S3_ENDPOINT" --content-type application/json
+
           # En tag push, además refresca latest/.
           if [[ "$VERSION" != "latest" ]]; then
             for f in $FILES; do
@@ -437,6 +469,10 @@ jobs:
                 "s3://erplora-saas/downloads/app/latest/$f" \
                 --endpoint-url "$S3_ENDPOINT" 2>/dev/null || true
             done
+            # El manifiesto NO lleva `|| true`: si `latest/` conserva el número anterior, la flota
+            # entera se pasa el día ofreciendo una actualización que ya tiene instalada.
+            aws s3 cp latest.json "s3://erplora-saas/downloads/app/latest/latest.json" \
+              --endpoint-url "$S3_ENDPOINT" --content-type application/json
           fi
 
           echo "Subido a s3://erplora-saas/downloads/app/${VERSION}/ (Hetzner Object Storage)"

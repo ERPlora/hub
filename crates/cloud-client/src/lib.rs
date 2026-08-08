@@ -139,6 +139,17 @@ impl CloudClient {
         self.public_get("/api/v1/marketplace/catalog/")
     }
 
+    /// Which build of the installable app the Cloud publishes right now (hub#400).
+    ///
+    /// **Public on purpose.** The version of a public download is not a secret — it is written on
+    /// the store listing — and asking for it without a credential is what lets a hub that is in
+    /// demo, unenrolled or asleep still tell its till that a newer app exists. With a credential,
+    /// those hubs would answer 401 and the till would read that as "nothing new", which is the
+    /// mute failure this whole feature is about.
+    pub fn app_release(&self) -> PreparedRequest {
+        self.public_get("/api/v1/app/release/")
+    }
+
     /// **Gate de arranque de la app Tauri** — entitlement firmado de módulos del hub
     /// (con JWT de usuario). `GET /api/v1/hub/device/entitlement/`. La respuesta es un
     /// [`EntitlementResponse`]; su `token` se verifica offline con
@@ -877,6 +888,31 @@ mod tests {
         let r = c.public_marketplace_modules();
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/catalog/");
         assert!(r.headers.is_empty());
+    }
+
+    /// hub#400: which build of the installable app the Cloud publishes. The version of a public
+    /// download is public knowledge — it is printed on the store listing — so this carries no
+    /// credential at all. That matters beyond tidiness: the answer has to reach a hub that is
+    /// asleep, unenrolled or in demo, and a credential would turn "no update news" into a silent
+    /// 401 on exactly those.
+    #[test]
+    fn the_published_app_release_is_asked_for_without_credentials() {
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.app_release();
+        assert_eq!(r.url, "https://erplora.com/api/v1/app/release/");
+        assert_eq!(r.method, "GET");
+        assert!(r.headers.is_empty());
+    }
+
+    /// The address is built from the configured Cloud, not baked: a hub pointed at a local SaaS
+    /// (dev) or at a staging one must ask THAT one, or the check answers about another fleet.
+    #[test]
+    fn the_release_question_follows_the_configured_cloud() {
+        let c = CloudClient::new("http://127.0.0.1:8001/");
+        assert_eq!(
+            c.app_release().url,
+            "http://127.0.0.1:8001/api/v1/app/release/"
+        );
     }
 
     /// ADR-0121: catálogo de blueprints (la «fuente nube» del import). Hub-scoped: el runtime

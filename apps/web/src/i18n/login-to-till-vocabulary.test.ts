@@ -30,6 +30,10 @@ const PATH_NAMESPACES = [
   'dashboard',
   'setup',
   'apps',
+  // hub#400. It paints in the sidebar, so it is chrome the owner meets everywhere — and it is the
+  // namespace most at risk of opening a fourth noun: the thing it updates is the app you install,
+  // while «apps» already names the things you add to your business. It says «ERPlora».
+  'appUpdate',
 ] as const;
 
 /**

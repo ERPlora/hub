@@ -65,6 +65,7 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
         "/api/entitlement",
         "/api/bridge/token",
         "/api/marketplace/catalog",
+        "/api/app/release",
         "/api/blueprints/catalog",
         "/api/blueprints/example/download",
     ];
