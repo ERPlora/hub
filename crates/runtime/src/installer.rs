@@ -54,6 +54,10 @@ pub async fn install(
     // hub#351 (paso 2b): same door for the roles the module declares. A manifest may add roles to
     // the hub's catalogue, but it can neither redefine a base role nor hand out administration.
     validate_role_declarations(&manifest)?;
+    // ADR-0259 D6 (hub#555): same door for the regime a module claims to implement. What it
+    // declares here is what the core will COUNT as a provider, so a malformed block must not be
+    // stored — it would read as "no provider installed", which blocks a till.
+    validate_fiscal_regime(&manifest)?;
 
     // `hub` es el namespace RESERVADO del core (ADR-0192): el dispatcher resuelve `hub.*` antes de
     // mirar el registry, así que un módulo con ese id tendría capacidades inalcanzables y aparentaría
@@ -287,6 +291,53 @@ const MAX_ROLE_KEY_LEN: usize = 32;
 /// may grant `waiter` (declared by `tables`) `add_sale` without `take_payment`. Requiring the
 /// declaration would force every module to know roles it did not invent — the opposite of the
 /// design — and would break manifests that already grant to keys of their own.
+/// Validates the optional `fiscal_regime` block of a manifest (ADR-0259 D6, hub#555).
+///
+/// The block is what makes a module count as a **provider** of the regime a hub owes, so it is
+/// checked at the hostile border (a third-party zip) and not only by the JSON Schema: a malformed
+/// declaration would join against nothing and read exactly like "nobody is complying" — which, once
+/// hub#556 lands, stops a till. Better to refuse the module than to install a provider that
+/// silently is not one.
+///
+/// Two checks and no more, because only two things are joined on:
+///
+/// 1. `country` is ISO-3166-1 alpha-2 — the shape of `hub_settings.country_code` and of
+///    `_hub_fiscal_regime_registry.country_code`. Free text never matches.
+/// 2. `regime` is non-empty — an empty key declares nothing while looking like a declaration.
+///
+/// What is deliberately NOT checked: that the regime exists in the core's registry. A module may
+/// legitimately ship before the country is seeded (the registry is data, and adding a country is a
+/// row), and refusing it here would make installing the provider depend on the very row the
+/// provider exists to serve.
+fn validate_fiscal_regime(manifest: &Manifest) -> Result<()> {
+    let Some(fiscal) = manifest.fiscal_regime.as_ref() else {
+        return Ok(()); // Not a fiscal provider — the shape of the 24 published manifests.
+    };
+    let reject = |detail: String| {
+        Err(RuntimeError::Other(format!(
+            "manifest `{}`: `fiscal_regime` {detail}",
+            manifest.id
+        )))
+    };
+    let country = fiscal.country.trim();
+    if country.len() != 2 || !country.bytes().all(|b| b.is_ascii_alphabetic()) {
+        return reject(format!(
+            "declares `country: {}`, which is not an ISO-3166-1 alpha-2 code (two ASCII letters, \
+             e.g. `ES`): it is joined against the hub's `country_code` and the core's regime \
+             registry, so anything else matches nothing",
+            fiscal.country
+        ));
+    }
+    if fiscal.regime.trim().is_empty() {
+        return reject(
+            "declares an empty `regime`: the key is what the core counts providers of, and an \
+             empty one declares nothing while looking like a declaration"
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
     let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
     for role in &manifest.roles {
@@ -892,6 +943,92 @@ mod tests {
         }))
         .unwrap();
         assert!(super::validate_command_contracts(&valid).is_ok());
+    }
+
+    // ── `fiscal_regime`: who says "I implement this regime" (ADR-0259 D6, hub#555) ─────────────
+
+    /// Builds a manifest carrying the given `fiscal_regime` block.
+    fn with_regime(regime: serde_json::Value) -> crate::manifest::Manifest {
+        serde_json::from_value(serde_json::json!({
+            "id": "verifactu", "name": "VeriFactu", "version": "1.5.6", "fiscal_regime": regime
+        }))
+        .expect("manifest parses")
+    }
+
+    /// The message of a rejected `fiscal_regime` block (panics if the block was accepted).
+    fn regime_rejection(regime: serde_json::Value) -> String {
+        super::validate_fiscal_regime(&with_regime(regime))
+            .expect_err("the block must be rejected")
+            .to_string()
+    }
+
+    /// The happy path: a module declares the regime it implements, and the predicate answers.
+    /// This is the core's only question — *«is there any installed and active module fulfilling MY
+    /// regime?»* — and the core **counts**, it does not choose: the marketplace may carry N modules
+    /// that do the same job.
+    #[test]
+    fn a_module_can_declare_the_regime_it_implements() {
+        let manifest = with_regime(serde_json::json!({ "country": "ES", "regime": "verifactu" }));
+        assert!(super::validate_fiscal_regime(&manifest).is_ok());
+        assert!(
+            manifest.fulfils_regime("ES", "verifactu"),
+            "this is the predicate the fiscal profile counts with"
+        );
+    }
+
+    /// The country is matched too. A French Factur-X module is not a VeriFactu provider for a
+    /// Spanish hub, however similar the regime keys of two countries might one day look.
+    #[test]
+    fn a_provider_of_another_country_does_not_fulfil_this_hubs_regime() {
+        let french = with_regime(serde_json::json!({ "country": "FR", "regime": "facturx" }));
+        assert!(!french.fulfils_regime("ES", "verifactu"));
+        assert!(french.fulfils_regime("FR", "facturx"));
+        // Case is an accident of typing, not a difference: `hub_settings.country_code` is
+        // normalised to upper case and a manifest is written by hand.
+        assert!(french.fulfils_regime("fr", "facturx"));
+    }
+
+    /// **The 24 published manifests carry no block, and that must keep being valid.** Absence is
+    /// not a failure to declare: it means "I am not a fiscal provider", which is true of an
+    /// inventory module — and is exactly why this is fail-closed rather than opt-in. A module that
+    /// does not declare simply does not COUNT as a provider; nothing gets unlocked by staying
+    /// silent.
+    #[test]
+    fn a_manifest_without_the_fiscal_regime_block_stays_valid_and_fulfils_nothing() {
+        let published: crate::manifest::Manifest = serde_json::from_value(serde_json::json!({
+            "id": "inventory", "name": "Inventory", "version": "1.0.0"
+        }))
+        .unwrap();
+        assert!(super::validate_fiscal_regime(&published).is_ok());
+        assert!(!published.fulfils_regime("ES", "verifactu"));
+    }
+
+    /// The country is an ISO-3166-1 alpha-2 code, because that is what it is joined against: the
+    /// hub's `country_code` and the core's regime registry. A free-text country would silently
+    /// never match, which reads exactly like "no provider installed" — the failure mode that
+    /// blocks a till.
+    #[test]
+    fn a_country_that_is_not_iso_3166_1_alpha_2_is_rejected() {
+        for bad in ["", "E", "ESP", "españa", "E5"] {
+            let message = regime_rejection(serde_json::json!({
+                "country": bad, "regime": "verifactu"
+            }));
+            assert!(
+                message.contains("ISO-3166-1"),
+                "the rejection has to say what a country looks like, got: {message}"
+            );
+        }
+    }
+
+    /// An empty regime key declares nothing while looking like a declaration. It is refused at the
+    /// border rather than stored as a provider of the "" regime.
+    #[test]
+    fn an_empty_regime_key_is_rejected() {
+        let message = regime_rejection(serde_json::json!({ "country": "ES", "regime": "  " }));
+        assert!(
+            message.contains("regime"),
+            "the rejection names the field, got: {message}"
+        );
     }
 
     /// Builds a manifest of module `kitchen` carrying the given `roles` block.

@@ -114,6 +114,35 @@ pub struct Manifest {
     /// concede explícitamente; el host media. Consolida los `network`/`notify` de ADR-0012.
     #[serde(default)]
     pub capabilities: Capabilities,
+    /// **The fiscal regime this module IMPLEMENTS** (ADR-0259 D6, hub#555). Only declared by
+    /// whoever implements one; an inventory module declares nothing.
+    ///
+    /// It is the answer to the core's single question — *«is there any installed and active module
+    /// fulfilling the regime THIS hub owes?»* ([`crate::fiscal_profile`]). The core **counts**, it
+    /// does not choose: the marketplace may carry N modules of one regime, swapping one for another
+    /// is the user's call, and the profile deliberately does not store which one is in use.
+    ///
+    /// **This is not the opt-in flag ADR-0203 rejected.** That one would have been a `fiscal: true`
+    /// a module could FORGET, emitting without a gate. Here the direction is inverted: declaring
+    /// turns nothing off — it is what the core *requires to exist*. A module that does not declare
+    /// simply does not count as a provider, and the hub stays blocked. Fail-closed, the same shape
+    /// as `capabilities.certificate`, which likewise makes the gate stricter rather than laxer.
+    ///
+    /// Absent in all 24 published manifests, and it must stay valid there: absence means "I am not
+    /// a fiscal provider", which is simply true of them.
+    #[serde(default)]
+    pub fiscal_regime: Option<FiscalRegimeDef>,
+}
+
+/// Bloque `fiscal_regime` del manifest (ADR-0259 D6): qué régimen fiscal, y de qué país, cumple
+/// este módulo. `{ "country": "ES", "regime": "verifactu" }`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct FiscalRegimeDef {
+    /// ISO-3166-1 alpha-2 — la misma forma con la que se compara: `hub_settings.country_code` y
+    /// `_hub_fiscal_regime_registry.country_code`.
+    pub country: String,
+    /// Clave del régimen (`verifactu`, `facturx`…), la misma que el registro de regímenes del core.
+    pub regime: String,
 }
 
 /// Acción que un **usuario** puede intentar sobre un fichero o carpeta desde la pantalla `/files`.
@@ -338,6 +367,21 @@ impl Manifest {
     /// ¿El módulo declara necesitar esta capability? (incluye los alias deprecados).
     pub fn requests_capability(&self, kind: CapabilityKind) -> bool {
         self.requested_capabilities().contains(&kind)
+    }
+
+    /// Does this module fulfil `regime` for `country`? (ADR-0259 D6, hub#555.)
+    ///
+    /// This is the predicate the fiscal profile **counts** with — never "is this module
+    /// `verifactu`". The country is part of it on purpose: a French Factur-X provider is not a
+    /// VeriFactu provider for a Spanish hub. Country comparison is case-insensitive because
+    /// `hub_settings.country_code` is normalised to upper case while a manifest is typed by hand.
+    ///
+    /// A module with no `fiscal_regime` block fulfils nothing, which is the whole fail-closed
+    /// property: staying silent never counts as complying.
+    pub fn fulfils_regime(&self, country: &str, regime: &str) -> bool {
+        self.fiscal_regime.as_ref().is_some_and(|f| {
+            f.country.eq_ignore_ascii_case(country.trim()) && f.regime.trim() == regime.trim()
+        })
     }
 }
 

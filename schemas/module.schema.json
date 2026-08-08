@@ -631,6 +631,27 @@
         }
       }
     },
+    "fiscal_regime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "country",
+        "regime"
+      ],
+      "description": "El régimen fiscal que este módulo IMPLEMENTA (ADR-0259 D6). Solo lo declara quien implementa uno: un módulo de inventario no declara nada. Es la respuesta a la única pregunta del core — «¿hay algún módulo instalado y activo que cumpla el régimen que debe ESTE hub?» —, y el core CUENTA, no elige: puede haber N módulos del mismo régimen en el marketplace. NO es el flag opt-in que ADR-0203 descartó: declararlo no apaga ninguna guarda, es lo que el core exige que exista, así que un módulo que no lo declare simplemente no cuenta como proveedor y el hub se queda bloqueado (fail-closed, misma forma que `capabilities.certificate`).",
+      "properties": {
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{2}$",
+          "description": "ISO-3166-1 alpha-2 (`ES`, `FR`…). Es la forma contra la que se compara: `hub_settings.country_code` y el registro de regímenes del core. Texto libre no casaría con nada, que se lee igual que «no hay proveedor»."
+        },
+        "regime": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Clave del régimen (`verifactu`, `facturx`…), la misma del registro de regímenes del core."
+        }
+      }
+    },
     "scheduled_tasks": {
       "type": "array",
       "description": "Tareas programadas del módulo (ADR-0011). Las ejecuta el Hub (no Cloud): se vuelcan a la tabla de sistema `_scheduled_tasks` al instalar y el barrido del relay corre el `command` al vencer el `cron`, sin usuario (contexto de sistema). Idempotentes por diseño (catch-up collapse tras un apagado).",
