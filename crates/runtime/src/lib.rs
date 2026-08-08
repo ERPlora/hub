@@ -26,6 +26,7 @@ pub mod error_registry;
 pub mod errors;
 pub mod events;
 pub mod export;
+pub mod fiscal_profile;
 pub mod host_notify;
 pub mod hub_meta;
 pub mod hub_users;
@@ -714,6 +715,11 @@ impl Runtime {
         // migration on purpose: it is an invariant, not a schema change — it must also clean a
         // database restored from a backup taken before the fix, and re-running it is a no-op.
         identity::forget_hub_id_as_device(self.db.as_ref(), &self.hub_id).await?;
+        // 2c) The hub's FISCAL PROFILE (ADR-0259, hub#549): what this hub owes, resolved from its
+        // country and persisted by the core. It runs here — on the boot path every hub takes —
+        // precisely so that owing VeriFactu is never a consequence of having installed something.
+        // It only resolves and records; nothing rejects anything yet (hub#550/#556).
+        fiscal_profile::ensure(self.db.as_ref(), &self.hub_id).await?;
         // 3) Marcador de unidad monetaria (ADR-0007): una instalación NUEVA (esquema ya en
         // céntimos) se auto-marca `money_unit=cents` para que el backfill jamás la convierta. Un
         // hub VIEJO en euros NO se auto-marca aquí — espera a `--backfill-money` (que convierte).
@@ -1249,6 +1255,14 @@ impl Runtime {
     /// del propio hub (hub#454).
     pub async fn revoke_device(&self, device_id: &str) -> Result<devices::Revocation> {
         devices::revoke(self.db.as_ref(), &self.hub_id, device_id).await
+    }
+
+    /// The hub's **fiscal profile** (ADR-0259, hub#549): what this hub owes, who it owes it as, and
+    /// how far along it is. `None` only before [`Runtime::ensure_system_tables`] has ever run —
+    /// booting resolves it. The authority on the obligation lives here, in the core, so that no
+    /// module can take it away by being uninstalled.
+    pub async fn fiscal_profile(&self) -> Result<Option<fiscal_profile::FiscalProfile>> {
+        fiscal_profile::load(self.db.as_ref(), &self.hub_id).await
     }
 
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
