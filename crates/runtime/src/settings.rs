@@ -451,10 +451,16 @@ async fn enforce_tax_id_freeze(
     hub_id: &str,
     incoming: &str,
 ) -> Result<()> {
-    // Sin perfil (hub aún sin arrancar del todo) no hay nada emitido: `ensure` corre en cada boot y
-    // es ESE el sitio donde se anota que algo salió.
-    let Some(profile) = crate::fiscal_profile::load(db, hub_id).await? else {
-        return Ok(());
+    // Sin perfil no hay nada emitido: `ensure` corre en cada boot y es ESE el sitio donde se anota
+    // que algo salió. Tolerante también si la TABLA no se puede leer (un hub a medio bootstrapear,
+    // igual que `country_code_of` de arriba): `first_record_at` vive ahí y en ningún otro sitio, así
+    // que un perfil ilegible no es «no sé si emitió», es que no consta que emitiera — no se está
+    // adivinando, se está usando la única información que existe. Y no regala nada a nadie: para
+    // que esa lectura falle hace falta acceso a la BD, y con acceso a la BD se escribe en
+    // `hub_settings` directamente sin pasar por esta puerta.
+    let profile = match crate::fiscal_profile::load(db, hub_id).await {
+        Ok(Some(p)) => p,
+        Ok(None) | Err(_) => return Ok(()),
     };
     if profile.first_record_at.is_empty() {
         return Ok(()); // nada ha salido todavía: la identidad sigue siendo del dueño
@@ -1114,6 +1120,22 @@ mod tests {
             "business_tax_id_frozen",
             "{err:?}"
         );
+    }
+
+    /// 🔴 **Un hub sin perfil fiscal escribe igual.** El congelado no puede convertirse en un
+    /// requisito nuevo para escribir settings: si `_hub_fiscal_profile` no existe todavía (un hub a
+    /// medio bootstrapear, o cualquier prueba que levante `hub_settings` a mano), la escritura pasa.
+    /// `first_record_at` vive en esa tabla y en ninguna otra, así que un perfil que no se puede leer
+    /// no es «no sé si emitió»: es que **no consta** que emitiera.
+    #[tokio::test]
+    async fn a_hub_with_no_fiscal_profile_yet_writes_its_tax_id() {
+        let db = fresh_db().await;
+        ensure_table(&db).await; // solo `hub_settings`, como antes de las migraciones de sistema
+
+        let result = write_tax_id(&db, "hub-1", "B12345678")
+            .await
+            .expect("the freeze must not become a new requirement to write settings");
+        assert_eq!(result["business_tax_id"], json!("B12345678"));
     }
 
     /// 🔴 The refusal takes the WHOLE batch, like every other rejection in this door: hiding the
