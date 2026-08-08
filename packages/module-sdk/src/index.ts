@@ -602,7 +602,7 @@ export class HttpWsTransport implements ErploraTransport {
     payload: Record<string, unknown>,
     refusal: ErploraError,
   ): Promise<unknown> {
-    const key = `${name} ${JSON.stringify(payload)}`;
+    const key = `${name} ${JSON.stringify(payload)}`;
     const joined = this.elevating.get(key);
     if (joined) return joined;
     const flow = (async () => {

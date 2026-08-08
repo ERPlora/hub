@@ -130,6 +130,17 @@ describe('what the cashier is shown', () => {
     expect(w.findAll('[data-testid="elevation-person"]')).toHaveLength(0);
     expect(w.find('[data-testid="elevation-name"]').exists()).toBe(true);
   });
+
+  it('will not go on with an empty name', async () => {
+    // An empty approver is not a nameless request, it is a request against the name `''` — and
+    // every refusal of it counts towards the brute-force guard keyed on exactly that name. One
+    // impatient tap on «Continue» and the till is throttling a person who does not exist.
+    void askForApproval(ask(approves));
+    const w = mountDialog();
+    await flushPromises();
+    const props = (w.getComponent('[data-testid="elevation-continue"]') as VueWrapper).props();
+    expect((props as Record<string, unknown>).disabled).toBe(true);
+  });
 });
 
 describe('the PIN', () => {

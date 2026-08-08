@@ -1212,3 +1212,28 @@ test('hub#363: a refused PIN throws the runtime\'s stable code, so the dialog ca
   assert.deepEqual(codes, ['hub.elevation.rejected']);
   assert.equal(calls.length, 4);
 });
+
+test('hub#363: the code alone decides — a refusal without the permission field still opens a dialog', async () => {
+  // The gate is `code === 'requires_elevation'`, and that is deliberate: `permission` is what the
+  // DIALOG is told, not what the approval needs. `POST /api/elevation/approve` carries the command
+  // and the payload and re-reads the permission from the registry itself, so a refusal that arrived
+  // without the field is still an action a manager can approve — and gating on the field would
+  // quietly turn it into one nobody can.
+  const { fetchImpl, calls } = scriptedFetch([
+    { ok: false, error: { code: 'requires_elevation', message: 'ask a manager' } },
+    WENT_THROUGH,
+  ]);
+  const asks: ElevationAsk[] = [];
+  const t = new HttpWsTransport({
+    fetchImpl,
+    elevationApprover: async (ask) => {
+      asks.push(ask);
+      return 'tok-abc';
+    },
+  });
+
+  assert.deepEqual(await t.command('till.sale.void', { sale_id: 's1' }), { voided: true });
+  assert.equal(asks.length, 1);
+  assert.equal(asks[0].permission, '', 'nothing invented for a field the runtime did not send');
+  assert.equal(calls[1].headers['X-Elevation-Token'], 'tok-abc');
+});
