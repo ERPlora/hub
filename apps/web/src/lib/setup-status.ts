@@ -38,7 +38,7 @@ export const STATE_PENDING = 'pending';
 export const STATE_UNAVAILABLE = 'unavailable';
 
 /** ⛔ the runtime rejects the operation without it. */
-/** Who put the data behind an item there (hub#536, ADR-0266). */
+/** Who put the data behind an item there (hub#536, ADR-0267). */
 export const ORIGIN_USER = 'user';
 export const ORIGIN_BLUEPRINT = 'blueprint';
 
@@ -90,7 +90,7 @@ export interface SetupItem {
   actionable: boolean;
   /**
    * Who put the data behind this item there: `user` (this business) or `blueprint` (a template
-   * somebody imported) — hub#536, ADR-0266. Orthogonal to `state`, exactly like `actionable`.
+   * somebody imported) — hub#536, ADR-0267. Orthogonal to `state`, exactly like `actionable`.
    */
   origin: string;
 }

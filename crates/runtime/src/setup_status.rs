@@ -171,7 +171,7 @@ pub const BLOCKING_KEYS: &[&str] = &[ITEM_BUSINESS_IDENTITY];
 /// of it. The core owns the scale; a module takes the slot the core assigned it.
 pub const DEFAULT_ORDER: i64 = 500;
 
-/// Who put the data behind this item there: the owner of this business (hub#536, ADR-0266).
+/// Who put the data behind this item there: the owner of this business (hub#536, ADR-0267).
 pub const ORIGIN_USER: &str = "user";
 /// …or a template that somebody imported.
 ///
@@ -645,7 +645,7 @@ fn item_json(
     })
 }
 
-/// Módulos cuyos datos los escribió una IMPORTACIÓN (hub#536, ADR-0266).
+/// Módulos cuyos datos los escribió una IMPORTACIÓN (hub#536, ADR-0267).
 ///
 /// Es un **hecho registrado, no una inferencia**: el motor de import apunta cada fila que inserta en
 /// `_hub_import_row` para poder deshacer el lote ([ADR-0170]), así que aquí no se adivina nada — se

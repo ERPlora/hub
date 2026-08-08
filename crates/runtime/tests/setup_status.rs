@@ -1455,7 +1455,7 @@ async fn only_a_principal_with_a_local_session_reads_the_setup_status() {
     assert!(err.to_lowercase().contains("permis"), "{err}");
 }
 
-// ── De dónde viene lo que ya está hecho (hub#536, ADR-0266) ───────────────────────────────────
+// ── De dónde viene lo que ya está hecho (hub#536, ADR-0267) ───────────────────────────────────
 
 /// Marca una fila de `<table>` como escrita por una importación, igual que hace el motor.
 async fn imported_row(rt: &Runtime, hub_id: &str, table: &str, row_id: &str) {
