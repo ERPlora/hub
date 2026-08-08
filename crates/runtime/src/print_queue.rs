@@ -572,6 +572,58 @@ mod tests {
         assert_eq!(all(&db, "h1").await[0].status, STATUS_DONE);
     }
 
+    /// **Confirming a job this hub does not have is a plain `false`, not a shrug.** The return value
+    /// is the whole contract of `mark_done` — the drain answers `{"confirmed": …}` with it, and the
+    /// host reads that to decide whether the debt is paid. A `mark_done` that always said "yes"
+    /// would let a host tick off a ticket that was never queued here (another hub's `jobId`, a
+    /// typo), and the frame it gets back would be a lie.
+    ///
+    /// Its positive twin is `a_drained_job_is_never_handed_out_again`. Both are needed: with only
+    /// the positive one, "always true" passes.
+    #[tokio::test]
+    async fn confirming_a_job_this_hub_does_not_have_is_a_plain_no() {
+        let db = queue_db().await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        enqueue(&db, "h2", &job("j-next-door", "receipt", "T-h2"))
+            .await
+            .unwrap();
+
+        assert!(
+            !mark_done(&db, "h1", "never-existed").await.unwrap(),
+            "an id this hub never had is not a confirmation"
+        );
+        assert!(
+            !mark_done(&db, "h1", "j-next-door").await.unwrap(),
+            "and neither is another hub's job, which from here is simply not a job"
+        );
+
+        // The neighbour is untouched throughout: its ticket is still waiting for its own host.
+        assert_eq!(
+            list(&db, "h2", None, None, 10).await.unwrap()[0].status,
+            STATUS_PENDING,
+            "confirming from the wrong hub must not close somebody else's ticket"
+        );
+    }
+
+    /// A job that already reached a **terminal** state is not confirmable a second time either —
+    /// which is what keeps the answer meaningful when a host re-sends its debt after a reconnect.
+    #[tokio::test]
+    async fn confirming_an_already_terminal_job_is_also_a_no() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1")).await.unwrap();
+        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(mark_done(&db, "h1", "j1").await.unwrap(), "the first one counts");
+        assert!(
+            !mark_done(&db, "h1", "j1").await.unwrap(),
+            "the second one changed nothing, and says so"
+        );
+        assert_eq!(all(&db, "h1").await[0].status, STATUS_DONE);
+    }
+
     /// Even re-enqueueing the same `jobId` after it printed does not print it twice: the row still
     /// exists, so the idempotency key still holds. This is the double-tap the cashier does when the
     /// ticket is slow to come out.
@@ -747,6 +799,50 @@ mod tests {
             .unwrap()
             .expect("h1 still has its own job");
         assert_eq!(h1.document["receipt_id"], "T-h1");
+    }
+
+    /// **Which role a job belongs to — the answer the drain's authorisation is built on.**
+    ///
+    /// `role_of` is what lets `print_drain` refuse a host that reaches for somebody else's queue, so
+    /// it has to be right in three different ways and each one protects something different: the
+    /// **real** role (or the guard compares against nothing), `None` for an id that does not exist
+    /// (or the confirmation door doubles as a directory of `jobId`s), and `None` for **another
+    /// hub's** job (or a neighbour's ticket becomes closable from here).
+    ///
+    /// The neighbour is **alive and holding its ticket** for the whole test, and is asserted
+    /// untouched at the end: retiring its row first would let a query with no `hub_id` pass.
+    #[tokio::test]
+    async fn the_role_of_a_job_is_reported_only_for_this_hubs_own_jobs() {
+        let db = queue_db().await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        enqueue(&db, "h1", &job("j-mine", "kitchen", "K-1"))
+            .await
+            .unwrap();
+        enqueue(&db, "h2", &job("j-next-door", "bar", "B-1"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            role_of(&db, "h1", "j-mine").await.unwrap(),
+            Some("kitchen".to_string()),
+            "the real role, or the drain's guard compares against nothing"
+        );
+        assert_eq!(
+            role_of(&db, "h1", "never-existed").await.unwrap(),
+            None,
+            "an id nobody queued is not a job"
+        );
+        assert_eq!(
+            role_of(&db, "h1", "j-next-door").await.unwrap(),
+            None,
+            "another hub's job is, from here, not a job at all"
+        );
+
+        // …and asking about it did not disturb it: it is still waiting for its own bar host.
+        let neighbour = list(&db, "h2", None, None, 10).await.unwrap();
+        assert_eq!(neighbour.len(), 1);
+        assert_eq!(neighbour[0].status, STATUS_PENDING);
+        assert_eq!(neighbour[0].role, "bar");
     }
 
     /// The queue view can be filtered by role and status (what the print host and the UI ask for).
