@@ -494,4 +494,61 @@ mod tests {
         assert_eq!(response.cert_version, None, "sin cuerpo legible, sin noticias");
         server.abort();
     }
+
+    /// The hub tells the control plane which version is running (hub#515).
+    ///
+    /// Without it, «is this hub up to date?» has no answer that does not involve guessing from a
+    /// digest — and a digest cannot say whether the jump ahead is a security patch or a new
+    /// version. It rides THIS request because the heartbeat is already the beat that carries the
+    /// machine credential at the right cadence; a second call would be a second thing to break.
+    ///
+    /// It is the same number `/system` shows and `error_sink` stamps on every reported error
+    /// ([`crate::version::HUB_VERSION`]), and it goes on the wire WITHOUT the `v` — the prefix is
+    /// for humans reading a panel, not for something the Cloud will compare.
+    #[test]
+    fn the_heartbeat_carries_the_running_hub_version() {
+        let body = DailyUsageHeartbeat {
+            orders_today: Some(3),
+            last_sale_at: None,
+            terminals: None,
+            last_user_activity_at: None,
+            cert_version: None,
+            cert_not_after: None,
+            hub_version: crate::version::HUB_VERSION.to_string(),
+        };
+
+        let wire = serde_json::to_value(&body).expect("el latido tiene que serializar");
+
+        assert_eq!(wire["hub_version"], crate::version::HUB_VERSION);
+        assert!(
+            !wire["hub_version"].as_str().unwrap().starts_with('v'),
+            "el `v` es para la pantalla, no para el cable"
+        );
+    }
+
+    /// It is always there — never «absent because I could not read it».
+    ///
+    /// Every other optional field on this body means a READ FAILURE when missing (`orders_today`,
+    /// `cert_version`…), and the Cloud stores that difference. The version is compiled in, so
+    /// there is no failure mode where it is unknown: making it optional would invent a third
+    /// state nobody can produce.
+    #[tokio::test]
+    async fn the_collected_heartbeat_already_knows_its_version() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE sales_sale (\
+               id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, status TEXT NOT NULL, \
+               is_deleted BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL\
+             );\
+             CREATE TABLE hub_session (\
+               token TEXT PRIMARY KEY, device_id TEXT, expires_at TEXT NOT NULL\
+             );",
+        )
+        .await
+        .unwrap();
+
+        let usage = collect_daily_usage(db.as_ref(), "hub-1", "2026-08-08T10:00:00Z").await;
+
+        assert_eq!(usage.hub_version, crate::version::HUB_VERSION);
+    }
 }

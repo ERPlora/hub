@@ -68,6 +68,7 @@ pub mod state;
 pub mod system;
 pub mod system_metrics;
 pub mod tenant;
+pub mod version;
 
 pub use state::{AppState, AuthMode, HubConfig, HubId, MachineToken, WsEvent, DEV_HUB_ID};
 pub use tenant::{
