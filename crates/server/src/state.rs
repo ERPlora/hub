@@ -70,6 +70,35 @@ pub fn parse_auth_mode(raw: Option<&str>) -> AuthMode {
     }
 }
 
+/// ¿Está **armada** la puerta de device-trust del login por PIN? (`HUB_DEVICE_TRUST`, hub#330.)
+///
+/// **Fail-closed, como su vecina de arriba**: sin variable, o con un valor que este build no
+/// conoce, la puerta queda **armada**. El único valor que la desarma es la palabra `off`, escrita
+/// a propósito por el despliegue.
+///
+/// Por qué el default cambió de lado: hasta ADR-0257 (hub#454) el navegador no tenía identidad
+/// propia —presentaba el `hub_id`, o nada—, así que armarla habría dejado un hub recién creado sin
+/// ningún login por PIN posible. Ya la tiene, y desde el primer arranque. Lo que queda al otro lado
+/// del interruptor es un PIN de **cuatro dígitos** contestando a internet entero en
+/// `{slug}.erplora.com`, con la lista de nombres publicada sin sesión por `GET /api/hub/context`:
+/// el device-trust es el segundo factor de *sitio* que hace que esos cuatro dígitos valgan algo.
+///
+/// `false`, `0` y `no` **arman** la puerta, aunque suenen a interruptor. Honrarlos daría tres
+/// grafías de «abierto» contra una de «cerrado», y la que se colara sería siempre la insegura.
+pub fn parse_device_trust(raw: Option<&str>) -> bool {
+    match raw.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
+        Some("off") => false,
+        Some("enforce") | None => true,
+        Some(other) => {
+            eprintln!(
+                "auth: HUB_DEVICE_TRUST=`{other}` no es un valor conocido (`enforce`|`off`) → \
+                 se mantiene armada (fail-closed)"
+            );
+            true
+        }
+    }
+}
+
 /// Configuración de despliegue del hub (ARQUITECTURA.md §2.3; decisiones del humano):
 ///  - `hub_id`: lo inyecta el despliegue vía env `HUB_ID` (sin selector de hub).
 ///  - `cloud_base_url`: el Cloud Portal contra el que se resuelven marketplace + asistente.
@@ -96,13 +125,15 @@ pub struct HubConfig {
     /// (relativo al CWD del proceso), creado de forma perezosa al primer acceso. En cloud (S3) el
     /// listado de objetos es follow-up del humano (igual que documentos en `system.rs`).
     pub media_dir: PathBuf,
-    /// **Device-trust** del login por PIN (§2.9, hub#15 · hub#330). Activo, el login por PIN exige
+    /// **Device-trust** del login por PIN (§2.9, hub#15 · hub#330). Armada, la puerta del PIN exige
     /// que el cliente identifique el dispositivo **y** que ese dispositivo sea de confianza (lo pasa
-    /// a serlo un login online cloud previo). Sin `device_id` se rechaza: omitirlo era el bypass.
-    /// Sigue siendo **opt-in** (`HUB_DEVICE_TRUST=enforce`), pero ya no por falta de identidad: el
-    /// navegador se acuña la suya y la conserva (hub#454), así que la tiene desde el primer arranque
-    /// y no depende de que la máquina esté registrada. Encenderlo por defecto es ahora una decisión
-    /// propia — hub#330.
+    /// a serlo un login online previo *en él*). Sin `device_id` se rechaza: omitirlo era el bypass.
+    ///
+    /// **Armada por defecto**; `HUB_DEVICE_TRUST=off` la desarma (ver [`parse_device_trust`]). Lo
+    /// que cambia para quien la encuentra cerrada: el PIN no vale todavía en ese dispositivo y hay
+    /// que entrar **una vez** con la cuenta ahí — la pantalla de login lo dice con esas palabras y
+    /// ofrece esa puerta, que es más fuerte, nunca más débil. Desarmarla es un gesto para un
+    /// despliegue que sepa por qué (p. ej. un banco de pruebas sin cuenta que acreditar).
     pub device_trust_enforce: bool,
     /// **Sector / tipo de negocio** del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`), lo
     /// inyecta el despliegue vía env `HUB_SECTOR` (hermano de `HUB_LANGUAGE`/`HUB_CURRENCY`). Lo
@@ -173,12 +204,10 @@ impl HubConfig {
         let cloud_api_token = std::env::var("HUB_CLOUD_API_TOKEN")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        // Still opt-in (hub#330), but no longer for lack of an identity: since hub#454 the browser
-        // mints and keeps its own device id, so a fresh Cloud hub has one to send on its very first
-        // run. Turning it on by default is a decision of its own now. The bypass is closed
-        // regardless of this flag's value.
+        // Armed by default (hub#330). The precondition that kept it opt-in — a browser with no
+        // identity of its own — went away with hub#454; see `parse_device_trust`.
         let device_trust_enforce =
-            matches!(std::env::var("HUB_DEVICE_TRUST").as_deref(), Ok("enforce"));
+            parse_device_trust(std::env::var("HUB_DEVICE_TRUST").ok().as_deref());
         // Sector / tipo de negocio del hub (preset "Recomendado" del dashboard, ADR-0054). Vacío o
         // ausente → `None` (degradación elegante; el board sigue funcionando sin preset).
         let sector = std::env::var("HUB_SECTOR")
@@ -619,6 +648,55 @@ mod tests {
                 parse_auth_mode(Some(raw)),
                 AuthMode::Session,
                 "`{raw}` no debe abrir el hub"
+            );
+        }
+    }
+
+    /// **The gate is armed by default (hub#330).** A deployment that never heard of
+    /// `HUB_DEVICE_TRUST` gets the protected behaviour, not the open one: the PIN door of a hub on
+    /// the public internet answers four digits, and until hub#454 gave every browser an identity
+    /// of its own there was no way to demand one. There is now, so the default flips.
+    #[test]
+    fn missing_env_arms_the_device_trust_gate() {
+        assert!(parse_device_trust(None));
+    }
+
+    /// Disarming it is a deliberate word, and the only one.
+    #[test]
+    fn off_is_the_word_that_disarms_it() {
+        assert!(!parse_device_trust(Some("off")));
+    }
+
+    /// `enforce` keeps meaning what it always meant: the deployments that already set it do not
+    /// change behaviour when the default flips under them.
+    #[test]
+    fn enforce_still_arms_it() {
+        assert!(parse_device_trust(Some("enforce")));
+    }
+
+    /// Surrounding blanks and capitals in an env var are the deployment's typing, not a decision:
+    /// `HUB_DEVICE_TRUST=OFF ` is somebody turning it off on purpose and must be obeyed. (The
+    /// mirror of `parse_dev_mode`, which trims and lowercases for the same reason.)
+    #[test]
+    fn off_is_read_through_blanks_and_capitals() {
+        for raw in [" off", "off ", " off ", "OFF", "Off", "\toff\n"] {
+            assert!(
+                !parse_device_trust(Some(raw)),
+                "`{raw}` is an operator saying off"
+            );
+        }
+    }
+
+    /// **Anything else arms it.** A typo must not be a silent way to open the PIN door — the same
+    /// direction as `parse_auth_mode`, where an unknown mode falls back to `Session`. Note `false`,
+    /// `0` and `no`: they read like a switch, and honouring them would mean three spellings of
+    /// "open" against one of "closed".
+    #[test]
+    fn a_typo_never_disarms_it() {
+        for raw in ["", " ", "0", "false", "no", "disabled", "of", "offf", "on", "enforced"] {
+            assert!(
+                parse_device_trust(Some(raw)),
+                "`{raw}` must not open the PIN door"
             );
         }
     }

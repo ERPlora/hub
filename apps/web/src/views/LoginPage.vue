@@ -282,7 +282,7 @@
                   </div>
 
                   <ion-note v-if="pinError" color="danger" class="error-note">
-                    {{ t('login.pinIncorrect') }}
+                    {{ t(pinErrorKey) }}
                   </ion-note>
                   <ion-button
                     v-if="!showTabs"
@@ -732,6 +732,8 @@ const pinUser = ref<TrustedUser | null>(
 );
 const pinValue = ref<string>('');
 const pinError = ref<boolean>(false);
+/** i18n key of the sentence under the pinpad when [`pinError`] is up. See [`pinRefusalKey`]. */
+const pinErrorKey = ref<string>('login.pinIncorrect');
 const pinLoading = ref(false);
 // Referencia al <ok-pinpad> del paso PIN (para limpiar su valor tras error / cambiar usuario).
 const mainPinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
@@ -766,9 +768,30 @@ function onPinToEmail(): void {
   pinError.value = false;
 }
 
+/**
+ * Which sentence a refused PIN gets (hub#330).
+ *
+ * Device-trust is armed by default, so «this did not work» now has three different causes and only
+ * one of them is the digits. Answering «Incorrect PIN» to a device the hub refused is the worst of
+ * the three: the PIN *is* right, so the person retypes it, and nothing on screen names the gesture
+ * that fixes it (sign in once with an account, here).
+ *
+ * **An unknown code falls back to «Incorrect PIN»**, on purpose: that sentence is merely unhelpful,
+ * while an instruction invented for a code this build has never seen would be actively wrong.
+ */
+function pinRefusalKey(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (code === 'device_untrusted') return 'login.deviceNotEnrolled';
+  if (code === 'device_unidentified') return 'login.deviceUnidentified';
+  return 'login.pinIncorrect';
+}
+
 async function checkPin(pin: string): Promise<void> {
   if (pin.length < 4 || !pinUser.value || pinLoading.value) return;
   pinLoading.value = true;
+  // A new attempt starts clean: the reason the LAST one failed may no longer be true (the owner
+  // just signed in with their account on this till, which is exactly what the message asked for).
+  pinError.value = false;
   try {
     // Login local por PIN contra el runtime (§2.9): verifica el PIN y abre sesión server-side.
     const u = pinUser.value;
@@ -783,7 +806,8 @@ async function checkPin(pin: string): Promise<void> {
       permissions: sess.permissions,
     });
     await router.replace(redirectTarget());
-  } catch {
+  } catch (err) {
+    pinErrorKey.value = pinRefusalKey(err);
     pinError.value = true;
     pinValue.value = '';
     // Limpia los círculos del ok-pinpad para reintentar.

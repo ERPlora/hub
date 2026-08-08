@@ -2364,22 +2364,37 @@ struct CloudLoginReq {
 }
 
 /// Login local por **PIN** → abre sesión. Body `{name, pin, device_id?}` → `{ok, token, user}`
-/// (401 si falla). Con **device-trust** activo (por defecto; `HUB_DEVICE_TRUST=off` lo apaga) el
+/// (401 si falla). Con **device-trust armado** (por defecto; `HUB_DEVICE_TRUST=off` lo desarma) el
 /// PIN se rechaza si el cliente no identifica el dispositivo o si ese dispositivo no es de
 /// confianza — no hubo login online previo en él (§2.9, hub#330).
+///
+/// **Los dos rechazos son distintos a propósito**, y no es un oráculo: el que llama ya sabe si mandó
+/// un id o no, así que separarlos no le dice nada que no supiera, y sí le dice a la pantalla cuál de
+/// las **dos** frases enseñar («este navegador no puede identificarse» ≠ «entra una vez con tu
+/// cuenta aquí»). Lo que sí se mantiene indistinguible es *desconocido* de *revocado*: los dos son
+/// `device_untrusted`, con el mismo texto, para que la puerta no confirme si alguien cortó un
+/// dispositivo perdido (ADR-0258).
 async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Response {
     let rt = st.runtime.lock().await;
-    // Gate de device-trust (opt-in): solo si está activo Y el cliente identifica el dispositivo.
+    // Qué dispositivo dice ser este cliente. **Se normaliza una sola vez** y de aquí sale todo lo
+    // demás: una cabecera de espacios es un cliente que no se identificó, y tiene que caer en la
+    // misma rama que no mandar nada — nunca en una búsqueda de `"  "` ni, con la puerta desarmada,
+    // en una sesión cuyo dispositivo es la cadena vacía. Espejo de `device_mode::device_id_of`.
+    let device_id = req
+        .device_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
     if st.config.device_trust_enforce {
         // No `device_id`, no bypass (hub#330): the check used to sit in an `if let Some(..)` with
         // no `else`, so leaving the field out walked past the gate entirely. The hub lives on the
         // public internet, so an unidentified device is the shape of the attack, not an oversight.
-        let Some(device_id) = req.device_id.as_deref() else {
+        let Some(device_id) = device_id else {
             return (
                 StatusCode::FORBIDDEN,
                 Json(json!({
                     "ok": false,
-                    "error": "este dispositivo no está identificado: inicia sesión online (cloud) primero",
+                    "error": "this client did not identify its device",
                     "code": "device_unidentified"
                 })),
             )
@@ -2392,7 +2407,7 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
                     StatusCode::FORBIDDEN,
                     Json(json!({
                         "ok": false,
-                        "error": "dispositivo no de confianza: inicia sesión online (cloud) primero",
+                        "error": "this device has not signed in with an account yet",
                         "code": "device_untrusted"
                     })),
                 )
@@ -2421,7 +2436,7 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
             // Límite de dispositivos del plan (ADR-0154): lo aporta el estado de entitlement del
             // server (fail-open a 0 = ilimitado si el lock está envenenado o aún no hubo refresh).
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
-            mint_session(&rt, user, req.device_id.as_deref(), max_devices).await
+            mint_session(&rt, user, device_id, max_devices).await
         }
         Ok(None) => {
             st.login_throttle.record_failure(&req.name);

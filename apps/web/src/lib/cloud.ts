@@ -301,6 +301,27 @@ export interface CourierSessionResult extends HubSessionResult {
   cloud_user: CloudUser;
 }
 
+/**
+ * A refusal from the runtime, carrying its stable `code` alongside the message.
+ *
+ * The `error` string is prose: it changes, and it is not in the reader's language. The `code` is the
+ * contract (`device_untrusted`, `too_many_attempts`, …), and it is the only thing a screen can
+ * safely branch on to say something useful — see `LoginPage.checkPin`, where every failure used to
+ * collapse into «Incorrect PIN». `undefined` when the runtime gave none, which is what an ordinary
+ * wrong PIN looks like.
+ *
+ * Mirrors `DeviceModeError` in `device-mode.ts` rather than inventing a second shape.
+ */
+export class RuntimeError extends Error {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'RuntimeError';
+    this.code = code;
+  }
+}
+
 async function runtimePost<T>(path: string, body: unknown, headers: Record<string, string>): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
@@ -312,9 +333,13 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
-    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string } & T;
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+      code?: string;
+    } & T;
     if (!res.ok || data.ok === false) {
-      throw new Error(data.error ?? `runtime ${path} → ${res.status}`);
+      throw new RuntimeError(data.error ?? `runtime ${path} → ${res.status}`, data.code);
     }
     return data;
   } finally {

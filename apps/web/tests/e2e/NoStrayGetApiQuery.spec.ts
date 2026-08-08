@@ -22,7 +22,12 @@ interface Session {
 /** Real runtime session via `/api/auth/pin` (Demo user / PIN 0000 from the dev seed). */
 async function loginByPin(): Promise<Session> {
   const api = await pwRequest.newContext();
-  const res = await api.post(`${RUNTIME}/api/auth/pin`, { data: { name: 'Demo', pin: '0000' } });
+  // Names the device the dev seed marked as trusted (`demo-trusted-device`). Device-trust is armed
+  // by default since hub#330: a PIN login that identifies no device is refused, which is exactly
+  // what a browser on a fresh till gets — so naming it here is the real contract, not a workaround.
+  const res = await api.post(`${RUNTIME}/api/auth/pin`, {
+    data: { name: 'Demo', pin: '0000', device_id: 'demo-trusted-device' },
+  });
   expect(res.ok(), `PIN login failed: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = await res.json();
   expect(body.token, 'the runtime returned no session token').toBeTruthy();

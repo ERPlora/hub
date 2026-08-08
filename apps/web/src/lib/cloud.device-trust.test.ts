@@ -22,7 +22,7 @@ vi.mock('./device', () => ({
 }));
 vi.mock('./shell', () => ({ beginRequest: vi.fn(), endRequest: vi.fn() }));
 
-import { runtimeCloudSession } from './cloud';
+import { runtimeCloudSession, runtimePinLogin } from './cloud';
 
 /** The body the runtime received, parsed. */
 function bodyOf(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
@@ -71,5 +71,55 @@ describe('runtimeCloudSession', () => {
     await runtimeCloudSession('jwt', 'Marta Ruiz');
 
     expect(bodyOf(fetchMock)).not.toHaveProperty('device_id');
+  });
+});
+
+// The gate is ARMED by default since hub#330, so a refusal is no longer a hypothetical: it is what
+// a device meets the first time somebody reaches for the pinpad on it. The screen has to tell the
+// two refusals apart from a mistyped PIN, and it can only do that if the runtime's stable `code`
+// survives the trip — the `error` prose is not a contract and is not in the reader's language.
+describe('runtimePinLogin, when the hub refuses the device', () => {
+  function refusingFetch(code: string): void {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ ok: false, error: 'refused', code }),
+      }),
+    );
+  }
+
+  it('carries the runtime code, not just a sentence', async () => {
+    refusingFetch('device_untrusted');
+
+    await expect(runtimePinLogin('Marta Ruiz', '1234')).rejects.toMatchObject({
+      code: 'device_untrusted',
+    });
+  });
+
+  it('tells the two refusals apart', async () => {
+    refusingFetch('device_unidentified');
+
+    await expect(runtimePinLogin('Marta Ruiz', '1234')).rejects.toMatchObject({
+      code: 'device_unidentified',
+    });
+  });
+
+  it('leaves the code undefined when the runtime did not give one', async () => {
+    // A wrong PIN is a plain 401 with no `code`. Inventing one here would make the screen show an
+    // enrolment message to somebody who simply fat-fingered a digit.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ ok: false, error: 'usuario o PIN incorrecto' }),
+      }),
+    );
+
+    await expect(runtimePinLogin('Marta Ruiz', '1234')).rejects.toMatchObject({
+      code: undefined,
+    });
   });
 });
