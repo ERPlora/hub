@@ -50,6 +50,14 @@ tokio = { version = "1", features = ["rt", "sync", "time"] }
 [target.'cfg(not(target_os = "android"))'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
 
+# El e2e de hub#470 (`tests/certificate_type_e2e.rs`) construye certificados de PRUEBA con la forma
+# real de un sello de entidad y de un certificado de representante (extensión `qcStatements` de
+# eIDAS incluida). Se generan en el test a propósito: en este repo NO vive ningún `.p12`, y menos el
+# de verdad de ERPlora, que es la clave privada con la que la empresa se identifica ante la AEAT.
+# Mismo `cfg` que la dependencia normal, por el mismo motivo (openssl-sys no cross-compila a Android).
+[target.'cfg(not(target_os = "android"))'.dev-dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
 [dev-dependencies]
 # Async test harness for the integration tests/example (db + runtime are async now).
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

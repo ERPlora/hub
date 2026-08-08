@@ -141,9 +141,22 @@ async fn store_delegated_certificate(
     hub_id: &str,
     cert: &DelegatedCertificate,
 ) -> Result<DelegatedCertificateOutcome, String> {
-    certificate::set_delegated(db, hub_id, &cert.pkcs12_b64, &cert.password, cert.version)
-        .await
-        .map_err(|error| error.to_string())?;
+    // `certificate_type` is the control plane's DECLARATION of what it is handing down (hub#470).
+    // The core cross-checks it against the container itself and refuses the install when the two
+    // disagree — the error surfaces here, the hub keeps the certificate it already had, and the
+    // refetch triggers keep asking until the control plane serves something coherent. Refusing is
+    // the recoverable failure: the alternative is every record POSTed to the wrong AEAT door and
+    // rejected one by one (ADR-0189).
+    certificate::set_delegated(
+        db,
+        hub_id,
+        &cert.pkcs12_b64,
+        &cert.password,
+        cert.version,
+        cert.certificate_type.as_deref(),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
     // The DELEGATED slot's date, not the active one's (ADR-0202 §2.5): this is what the heartbeat
     // reports, and the SaaS compares it against the `not_after` of the `.p12` it custodies. A hub
     // with its own certificate uploaded signs with THAT one but must still report its delegated
@@ -977,7 +990,7 @@ mod tests {
     async fn a_new_version_in_the_heartbeat_refetches_exactly_once() {
         ensure_master_key();
         let db = db_ready().await;
-        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4).await.unwrap();
+        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None).await.unwrap();
         let runtime = runtime_of(db);
         let (base, hits, server) = counting_stub(StatusCode::OK, served_body(5)).await;
         let budget = RefetchBudget::hourly();
@@ -1087,7 +1100,7 @@ mod tests {
     async fn a_hub_that_already_holds_a_certificate_does_not_ask_at_boot() {
         ensure_master_key();
         let db = db_ready().await;
-        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4).await.unwrap();
+        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None).await.unwrap();
         let runtime = runtime_of(db);
         let (base, hits, server) = counting_stub(StatusCode::OK, served_body(4)).await;
 
@@ -1173,7 +1186,7 @@ mod tests {
     async fn a_server_error_leaves_the_hub_with_the_certificate_it_had() {
         ensure_master_key();
         let db = db_ready().await;
-        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4).await.unwrap();
+        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None).await.unwrap();
         let runtime = runtime_of(db);
         let (base, _hits, server) = counting_stub(StatusCode::INTERNAL_SERVER_ERROR, "boom").await;
 
@@ -1204,7 +1217,7 @@ mod tests {
     async fn an_unreachable_control_plane_leaves_the_hub_with_the_certificate_it_had() {
         ensure_master_key();
         let db = db_ready().await;
-        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4).await.unwrap();
+        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None).await.unwrap();
         let runtime = runtime_of(db);
         // Puerto cerrado: nada escucha ahí.
         let outcome = refetch(
@@ -1357,7 +1370,7 @@ mod tests {
         ensure_master_key();
         let db = db_ready().await;
         seed_own_certificate(&db).await; // manda para firmar, y no es un `.p12` legible
-        certificate::set_delegated(&db, "hub-test", REAL_P12_B64.trim(), REAL_P12_PASSWORD, 9)
+        certificate::set_delegated(&db, "hub-test", REAL_P12_B64.trim(), REAL_P12_PASSWORD, 9, None)
             .await
             .unwrap();
         assert_eq!(

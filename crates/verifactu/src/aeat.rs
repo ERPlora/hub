@@ -12,41 +12,40 @@ use crate::chain::{format_amount, format_date};
 use crate::VerifactuError;
 
 /// Endpoint SOAP del sistema de facturación VERI*FACTU. **Dos ejes, y hay que acertar los dos**:
-/// el `environment` y el CERTIFICADO que va a identificarnos en el handshake TLS
-/// (ADR-0202 §2.1 — hub#320).
+/// el `environment` y el TIPO del certificado que va a identificarnos en el handshake TLS
+/// (ADR-0202 §2.1 — hub#320, corregido por hub#470).
 ///
-/// | | `own` (titular/representante) | `delegated` (Sello de Entidad de ERPlora) |
+/// | | `representative` (persona/representante) | `seal` (Sello de Entidad) |
 /// |---|---|---|
 /// | `testing` (**default**) | `prewww1.aeat.es` | `prewww10.aeat.es` |
 /// | `production` | `www1.agenciatributaria.gob.es` | `www10.agenciatributaria.gob.es` |
 ///
-/// La AEAT **segrega la puerta por el tipo de certificado** —igual que en el SII—: `www1` admite
+/// La AEAT **segrega la puerta por el TIPO de certificado** —igual que en el SII—: `www1` admite
 /// certificados de persona/representante (llevan un NIF dentro) y `www10` admite **sellos de
 /// entidad**, que no cuelgan del DNI de nadie (confirmado en
-/// [OCA/l10n-spain#4597](https://github.com/OCA/l10n-spain/discussions/4597)). El certificado
-/// delegado de ERPlora es ese sello: firma por cada hub bajo apoderamiento (ADR-0202 §2, ZP01).
-/// Mientras esto solo miró el entorno, un hub cuyo único certificado era el delegado presentaba el
-/// sello en la puerta del titular y la AEAT **rechazaba todos sus registros** — y un rechazo no es
-/// eslabón de cadena (ADR-0189), así que había que corregirlos uno a uno.
+/// [OCA/l10n-spain#4597](https://github.com/OCA/l10n-spain/discussions/4597)).
+///
+/// ⚠️ **El eje NO es el slot, y confundirlos fue el cuarto defecto de frontera de esta cadena**
+/// ([hub#470](https://github.com/ERPlora/hub/issues/470)). hub#320 enrutaba por `own`/`delegated`,
+/// que dicen **de quién** es el certificado: que el slot delegado contenga un sello era una premisa
+/// de ADR-0202 que no viajaba por ningún sitio, y el `.p12` con el que ERPlora factura hoy es de
+/// **representante**. Subido como delegado, este mapa habría mandado a `www10` a toda la flota
+/// delegada y la AEAT habría rechazado **todos** sus registros — y un rechazo no es eslabón de
+/// cadena (ADR-0189), así que habría que corregirlos uno a uno. Ahora el tipo lo declara el plano
+/// de control **y** lo deriva el hub del contenedor que guarda, y el core los contrasta antes de
+/// instalar (`certificate::resolve_certificate_type`).
 ///
 /// **Los dos ejes fallan distinto, y por eso ninguno tiene un default «cómodo»:**
 ///
-/// - Un `certificate_kind` desconocido cae a la puerta del **titular**, no a la del sello. La
-///   selección la resuelve el core y el motor ni siquiera transmite sin certificado
-///   (`build_identity`), así que aquí solo llega un slot que este binario no conoce: degradarlo al
-///   comportamiento anterior a hub#320 es preferible a mandar a la flota entera a una puerta nueva.
+/// - Solo un certificado del que consta que es **sello** entra por la puerta del sello. Todo lo
+///   demás —vacío, un nombre de slot, una palabra que este binario no conoce, un contenedor que el
+///   core no supo clasificar— cae a la del **titular**, que es donde va hoy todo el parque
+///   instalado. Identificar un sello exige evidencia; la AUSENCIA de evidencia no abre esa puerta.
 /// - Un `environment` que no sea literalmente `production` se queda en **preproducción**. Un
 ///   rechazo es ruidoso y se corrige; una factura real **aceptada** en el sistema equivocado no se
 ///   reenvía ni se borra (ADR-0189).
-///
-/// ⚠️ **`delegated` describe la PROCEDENCIA del certificado (quién lo repartió), no su tipo.** Que
-/// el slot delegado sea un Sello de Entidad es una premisa de ADR-0202, no un dato que viaje por la
-/// frontera: `GET /api/v1/hub/device/fiscal/certificate/` sirve `{version, pkcs12_b64, password,
-/// not_after}` y **no dice qué tipo de certificado es**. Si el plano de control instalase ahí un
-/// certificado de representante, este mapa lo mandaría a `www10` y fallaría todo
-/// ([hub#470](https://github.com/ERPlora/hub/issues/470)).
-pub fn endpoint(environment: &str, certificate_kind: &str) -> &'static str {
-    match (environment == PRODUCTION, certificate_kind == crate::DELEGATED_SLOT) {
+pub fn endpoint(environment: &str, certificate_type: &str) -> &'static str {
+    match (environment == PRODUCTION, certificate_type == crate::SEAL_TYPE) {
         (false, false) => "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
         (false, true) => "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
         (true, false) => {
@@ -73,11 +72,11 @@ const PRODUCTION: &str = "production";
 /// cadena— devolvía 404 desde siempre (hub#287; el SaaS traía el mismo fallo, saas#1081).
 /// Sondeadas ocho rutas con el certificado real contra preproducción: todas 404, y la del alta 200.
 ///
-/// Toma los **mismos dos ejes** que [`endpoint`] (hub#320): recuperar la cadena tiene que hablar
-/// con la misma puerta por la que se emitió, y un hub que firma con el delegado consulta por
+/// Toma los **mismos dos ejes** que [`endpoint`] (hub#320/#470): recuperar la cadena tiene que
+/// hablar con la misma puerta por la que se emitió, y un hub que firma con un sello consulta por
 /// `www10` como transmite por `www10`.
-pub fn consult_endpoint(environment: &str, certificate_kind: &str) -> &'static str {
-    endpoint(environment, certificate_kind)
+pub fn consult_endpoint(environment: &str, certificate_type: &str) -> &'static str {
+    endpoint(environment, certificate_type)
 }
 
 /// Escapa texto para XML.

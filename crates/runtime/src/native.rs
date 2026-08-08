@@ -59,6 +59,25 @@ pub trait NativeHost: Send + Sync {
         Ok(None)
     }
 
+    /// **What the signing certificate IS** — `"seal"` or `"representative"`
+    /// ([`CertificateType::as_str`](crate::certificate::CertificateType::as_str)), `None` when the
+    /// hub holds no certificate or holds one it cannot vouch for (ADR-0202 §2.1 — hub#470).
+    ///
+    /// The companion of [`certificate_signing_kind`](Self::certificate_signing_kind), and NOT a
+    /// synonym: that one says **whose** the certificate is (which is what picks the fallback and
+    /// what the `Representante` block of hub#321 hangs off), this one says **what** it is, which is
+    /// the axis the AEAT segregates its entry point by. Reading the slot as if it were the type is
+    /// the defect hub#470 closes.
+    ///
+    /// **The core answers, and the module does not re-derive it.** Same rule as the slot: one
+    /// question, one owner. `verifactu` never touches `_hub_certificate` — the private key does not
+    /// cross into a module, and only these two words do.
+    ///
+    /// Default: `Ok(None)` — «cannot tell», which routes to the holder's entry point.
+    async fn certificate_signing_type(&self, _hub_id: &str) -> Result<Option<String>> {
+        Ok(None)
+    }
+
     /// Igual que [`certificate_identity`](Self::certificate_identity) pero sobre un `.p12` **provisto
     /// en memoria** (DER + contraseña) — validar/usar un certificado recién subido. La cripto PKCS#12
     /// (OpenSSL) vive SOLO en el core; el módulo no la implementa. Default = la cripto del core.
@@ -173,6 +192,12 @@ impl NativeHost for DbHost<'_> {
         Ok(crate::certificate::active_kind(self.db, hub_id)
             .await?
             .map(|k| k.as_str().to_string()))
+    }
+
+    async fn certificate_signing_type(&self, hub_id: &str) -> Result<Option<String>> {
+        Ok(crate::certificate::active_type(self.db, hub_id)
+            .await?
+            .map(|t| t.as_str().to_string()))
     }
 
     async fn write_static_file(

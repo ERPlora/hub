@@ -461,6 +461,39 @@ UPDATE hub_user AS u SET email = TRIM(pr.email) \
                       AND LOWER(TRIM(r.email)) = LOWER(TRIM(pr.email)) \
                       AND COALESCE(TRIM(ru.email), '') = '');",
     },
+    // ── v21 — hub#470 / ADR-0202 §2.1: QUÉ ES el certificado, que es lo que la AEAT segrega ──────
+    // `kind` (v14) dice de QUIÉN es el certificado — `own` del negocio, `delegated` del plano de
+    // control—, y hub#320 lo usó para elegir la puerta de la AEAT como si dijera QUÉ es. No lo dice:
+    // que el slot delegado contenga un Sello de Entidad era una premisa de ADR-0202 que nunca viajó
+    // por la frontera, y el `.p12` con el que ERPlora factura hoy es de **representante**. Subido
+    // como delegado, toda la flota delegada habría POSTeado a `www10` y la AEAT habría rechazado
+    // todos sus registros, uno a uno y sin nada que avisara.
+    //
+    // Va en la fila del certificado —y en el MISMO upsert que los bytes, como `cert_version` (v16)—
+    // porque describe ESOS bytes: separados, una escritura a medias deja el `.p12` nuevo bajo el
+    // tipo del anterior, que es exactamente elegir la puerta de un certificado que ya no se tiene.
+    //
+    // **Sin backfill, a propósito.** Las filas ya desplegadas se quedan con `''` = «no consta», y
+    // `certificate::slot_type` deriva la respuesta del contenedor cuando la lee. Rellenar a ciegas
+    // sería adivinar de qué tipo es el certificado de alguien, y esta misma cola ya se libró por
+    // poco de una escalada de privilegio por un backfill «obvio» (v19, hub#436). Leer los bytes que
+    // la fila tiene es una lectura; deducir del slot es una suposición.
+    //
+    // `''` y no NULL: la columna se compara con dos literales (`'seal'`/`'representative'`) y un
+    // tercer estado nulo solo añade una rama por la que colarse. Es la misma forma que `password`
+    // y `uploaded_by` (v6).
+    //
+    // ⚠️ **v21 y no v20.** `apply` compara contra el MÁXIMO aplicado: una migración numerada por
+    // debajo de él se salta EN SILENCIO. La v20 está en vuelo en hub#342 (PR #460, el registro de
+    // hosts de impresión); si esta entra antes, esa hay que RENUMERARLA al rebasar, nunca meterla
+    // por debajo. Y nace **re-ejecutable** (`IF NOT EXISTS`): una migración que no lo era reventó
+    // 15 tests de otra suite con un 42P07 (hub#483).
+    SystemMigration {
+        version: 21,
+        name: "hub_certificate_type",
+        postgres: "ALTER TABLE _hub_certificate \
+                     ADD COLUMN IF NOT EXISTS certificate_type TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -642,6 +675,87 @@ mod tests {
             json!("ana@example.com"),
             "el email llegó a la columna por la que se administra el ACCESO"
         );
+    }
+
+    /// El mismo invariante para la v21 (hub#470): un hub que ya pasó por todo lo anterior **sí**
+    /// recibe la columna del TIPO de certificado. Es el test que revienta si alguien la renumera por
+    /// debajo del máximo —donde se saltaría en silencio— y el hub elegiría la puerta de la AEAT con
+    /// una columna que no existe. Importa ahora mismo: la v20 está en vuelo en hub#342.
+    #[tokio::test]
+    async fn a_hub_already_migrated_still_receives_the_certificate_type_column() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let certificate_type = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_certificate_type")
+            .expect("la columna del tipo sigue en el catálogo");
+        // «Justo antes» = la migración anterior DEL CATÁLOGO, no `version - 1`: hay huecos a
+        // propósito (la v15 y, mientras hub#342 esté en vuelo, la v20) y restar uno haría que el
+        // fixture se parase en un número que no existe.
+        let previous = MIGRATIONS
+            .iter()
+            .filter(|m| m.version < certificate_type.version)
+            .map(|m| m.version)
+            .max()
+            .expect("hay migraciones anteriores");
+        hub_deployed_through(&db, previous).await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            previous,
+            "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
+        );
+
+        apply(&db, "hub-test").await.unwrap();
+
+        // La columna existe, y **vacía**: nada rellena a ciegas el tipo del certificado que ese hub
+        // ya tenía (adivinar de qué tipo es el certificado de alguien es lo que la v19 se negó a
+        // hacer con su email — hub#436). Quien lo resuelve es `certificate::slot_type`, leyendo el
+        // contenedor.
+        db.execute_batch(
+            "INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES ('h1', 'delegated', 'REVS', 'pw', '2026-01-01T00:00:00Z', 'cloud');",
+        )
+        .await
+        .unwrap();
+        let row = db
+            .query(
+                "SELECT certificate_type FROM _hub_certificate WHERE hub_id = 'h1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            row.rows[0]["certificate_type"],
+            json!(""),
+            "la columna nace vacía: el tipo no se deduce del slot, que es justo el defecto de hub#470"
+        );
+    }
+
+    /// 🔒 **La v21 puede RE-EJECUTARSE sobre su propio resultado.** Regla nueva (hub#342/#483): una
+    /// migración que no era idempotente tumbó 15 tests de otra suite con un `42P07`, y en producción
+    /// sería un arranque fallido en vez de un no-op. El `IF NOT EXISTS` es lo que la cumple, y esto
+    /// es lo que revienta si alguien lo quita.
+    ///
+    /// Solo la v21, a propósito: el catálogo histórico **no** es re-ejecutable (la v1 ya falla con
+    /// un `42701` al añadir `hub_module.hub_id` por segunda vez) y arreglarlo entero es otra tarea.
+    /// La regla vale de aquí en adelante, y aquí es donde empieza.
+    #[tokio::test]
+    async fn the_certificate_type_migration_can_run_a_second_time() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        hub_deployed_through(&db, MIGRATIONS.last().expect("catálogo no vacío").version).await;
+        let certificate_type = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_certificate_type")
+            .expect("la columna del tipo sigue en el catálogo");
+
+        let mut hub = Params::new();
+        hub.insert("hub_id".into(), json!("hub-test"));
+        for stmt in split_statements(certificate_type.postgres) {
+            db.execute(&stmt, &hub)
+                .await
+                .expect("la v21 tiene que poder correr sobre un esquema que ya la tiene");
+        }
     }
 
     #[test]
