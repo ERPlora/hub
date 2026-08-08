@@ -15,7 +15,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-use erplora_runtime::api_keys::ScopeEntry;
+use erplora_runtime::api_keys::{ApiKeyAccess, ApiKeyScope, ScopeEntry};
 
 use crate::auth;
 use crate::state::AppState;
@@ -25,8 +25,13 @@ use crate::state::AppState;
 #[derive(Deserialize)]
 pub struct CreateKeyReq {
     name: String,
+    /// The per-module checkboxes. Only read when `access` is `custom` — which is what it defaults
+    /// to, so a client written before hub#504 keeps meaning exactly what it meant.
     #[serde(default)]
     scope: Vec<ScopeEntry>,
+    /// `full` · `read_only` · `write_only` · `custom` (hub#504). Same shape a user's role has.
+    #[serde(default)]
+    access: ApiKeyAccess,
     #[serde(default = "default_rate_limit")]
     rate_limit_per_minute: i64,
 }
@@ -77,15 +82,15 @@ pub async fn create_key(
         Ok(u) => u,
         Err(e) => return admin_unauthorized(e),
     };
-    // Auditoría: quién creó la key (no es `apikey:…`, es el hub_user admin).
+    // Auditoría: quién creó la key (no es `apikey:…`, es el hub_user admin). Y nunca
+    // `SYSTEM_CREATED_BY`: la marca de "la emitió el hub" no se puede pedir desde fuera.
     let created_by = format!("hub_user:{}", admin.id);
+    let scope = ApiKeyScope {
+        access: req.access,
+        modules: req.scope,
+    };
     match rt
-        .create_api_key(
-            &req.name,
-            &req.scope,
-            req.rate_limit_per_minute,
-            &created_by,
-        )
+        .create_api_key(&req.name, &scope, req.rate_limit_per_minute, &created_by)
         .await
     {
         Ok(secret) => Json(json!({ "ok": true, "data": secret })).into_response(),

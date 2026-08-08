@@ -615,6 +615,17 @@ export default {
     rateLimit: 'Peticiones por minuto',
     rateLimitHint: 'Entre 1 y 10.000. Se aplica antes de ejecutar el comando.',
     perMinute: '{count}/min',
+    // hub#504 — qué puede hacer una key (mismo modelo que el rol de un usuario)
+    accessTitle: 'Qué puede hacer esta key',
+    accessHint: 'Los modos generales cubren todas las apps de tu negocio, también las que instales después.',
+    access: {
+      full: 'Acceso total',
+      read_only: 'Solo lectura',
+      write_only: 'Solo escritura',
+      custom: 'Por app',
+    },
+    systemKeyBadge: 'La emite ERPlora',
+    systemKeyHint: 'ERPlora lee con esta key los cambios en vivo de tu negocio. No se puede rotar ni borrar.',
     scopeTitle: 'Permisos por módulo',
     scopeHint: 'Marca lectura y/o escritura por cada módulo instalado.',
     colModule: 'Módulo',

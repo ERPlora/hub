@@ -373,6 +373,16 @@ function unwrapPage(data: unknown): unknown {
 // WS solo para recibir eventos de dominio. ARQUITECTURA.md §7.6.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Reconnect wait when the socket drops (the cadence the channel has always had). */
+const PUSH_RETRY_MIN_MS = 1_000;
+/** Ceiling for the wait while there is no credential to present (a logged-out till). */
+const PUSH_RETRY_MAX_MS = 30_000;
+
+/** Control frame of the event channel: the hub accepted the credential (hub#504). */
+export const STREAM_READY = 'stream.ready';
+/** Control frame of the event channel: the hub refused it, with a stable code. */
+export const STREAM_ERROR = 'stream.error';
+
 export interface HttpWsOptions {
   /** Base URL del server del hub (p.ej. "" para mismo origen, o "http://localhost:8787"). */
   baseUrl?: string;
@@ -394,6 +404,24 @@ export interface HttpWsOptions {
   WebSocketImpl?: typeof WebSocket;
   /** Inyectable para tests (por defecto el EventSource global). */
   EventSourceImpl?: typeof EventSource;
+  /**
+   * **Credential for the event channel** (hub#504). The hub does not push a single event to a
+   * connection that has not presented an API key of that hub with read access.
+   *
+   * Called on **every** (re)connect, never cached: the shell answers with a single-use ticket
+   * (`POST /api/events/ticket`), and a replayed ticket is not a credential. Returning `null` —
+   * nobody is logged in yet, the hub is unreachable — closes the socket rather than leaving it
+   * open and mute; the reconnect loop tries again.
+   *
+   * Without it the transport connects anonymously, which the hub refuses. That is deliberate: a
+   * shell that forgets to configure this goes visibly deaf instead of quietly reading everything.
+   */
+  streamCredential?: () => Promise<string | null>;
+  /**
+   * Told when the hub refuses the channel (`unauthenticated`, `events.read_required`). Without a
+   * hook this is exactly the failure nobody notices: the dashboard simply stops refreshing.
+   */
+  onStreamRefused?: (code: string, message: string) => void;
 }
 
 export class HttpWsTransport implements ErploraTransport {
@@ -405,6 +433,9 @@ export class HttpWsTransport implements ErploraTransport {
   private readonly fetchImpl: typeof fetch;
   private readonly WebSocketImpl?: typeof WebSocket;
   private readonly EventSourceImpl?: typeof EventSource;
+  private readonly streamCredential?: () => Promise<string | null>;
+  private pushRetryMs = PUSH_RETRY_MIN_MS;
+  private readonly onStreamRefused?: (code: string, message: string) => void;
 
   private ws?: WebSocket;
   private es?: EventSource;
@@ -421,6 +452,8 @@ export class HttpWsTransport implements ErploraTransport {
     this.WebSocketImpl = opts.WebSocketImpl ?? (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
     this.EventSourceImpl =
       opts.EventSourceImpl ?? (globalThis as { EventSource?: typeof EventSource }).EventSource;
+    this.streamCredential = opts.streamCredential;
+    this.onStreamRefused = opts.onStreamRefused;
   }
 
   private async post(path: string, body: unknown): Promise<unknown> {
@@ -470,6 +503,15 @@ export class HttpWsTransport implements ErploraTransport {
     // (p.ej. module.installed lleva module_id en la raíz).
     const name = msg.event ?? msg.name ?? msg.type;
     if (!name) return;
+    // hub#504: control frames of the channel itself. They are protocol, not business, so they are
+    // never delivered as domain events — and a refusal is REPORTED, because a channel that goes
+    // quiet without saying why is the failure nobody debugs.
+    if (name === STREAM_READY) return;
+    if (name === STREAM_ERROR) {
+      const frame = msg as { code?: string; message?: string };
+      this.onStreamRefused?.(frame.code ?? 'unknown', frame.message ?? '');
+      return;
+    }
     const set = this.listeners.get(name);
     if (set) for (const cb of set) cb(msg.payload ?? msg);
   }
@@ -484,13 +526,35 @@ export class HttpWsTransport implements ErploraTransport {
   private ensureWs(): void {
     if (!this.WebSocketImpl) return;
     this.pushStarted = true;
-    this.ws = new this.WebSocketImpl(this.wsUrl);
-    this.ws.onmessage = (ev: MessageEvent) => this.handleFrame(ev.data);
-    this.ws.onclose = () => {
+    const socket = new this.WebSocketImpl(this.wsUrl);
+    this.ws = socket;
+    socket.onmessage = (ev: MessageEvent) => this.handleFrame(ev.data);
+    // hub#504: the credential goes in the FIRST FRAME, never in the URL — the query string ends up
+    // in every access log and proxy trace on the way. Asked for on each open, because a ticket is
+    // single use.
+    socket.onopen = () => {
+      if (!this.streamCredential) return;
+      void this.streamCredential()
+        .catch(() => null)
+        .then((token) => {
+          if (token) {
+            socket.send(JSON.stringify({ type: 'auth', token }));
+            this.pushRetryMs = PUSH_RETRY_MIN_MS;
+            return;
+          }
+          // No credential (nobody logged in yet, hub unreachable): close rather than hold a socket
+          // the hub will never speak on, and **back off**. The shell wires its listeners at boot,
+          // so "no session yet" is the ordinary state of the login screen — retrying every second
+          // there would be a request a second for as long as the till sits idle.
+          this.pushRetryMs = Math.min(this.pushRetryMs * 2, PUSH_RETRY_MAX_MS);
+          socket.close();
+        });
+    };
+    socket.onclose = () => {
       this.pushStarted = false;
       this.ws = undefined;
       // Reabre si aún hay suscriptores (degradación elegante: query/command siguen por HTTP).
-      if (this.listeners.size > 0) setTimeout(() => this.ensurePush(), 1000);
+      if (this.listeners.size > 0) setTimeout(() => this.ensurePush(), this.pushRetryMs);
     };
   }
 
@@ -498,7 +562,27 @@ export class HttpWsTransport implements ErploraTransport {
   private ensureSse(): void {
     if (!this.EventSourceImpl) return;
     this.pushStarted = true;
-    this.es = new this.EventSourceImpl(this.sseUrl);
+    // SSE has no first frame and `EventSource` sets no headers, so the ticket travels in the
+    // query — which is only acceptable because it is single use and dies in a minute.
+    if (!this.streamCredential) {
+      this.openSse(this.sseUrl);
+      return;
+    }
+    void this.streamCredential()
+      .catch(() => null)
+      .then((ticket) => {
+        if (!ticket) {
+          this.pushStarted = false;
+          return;
+        }
+        const sep = this.sseUrl.includes('?') ? '&' : '?';
+        this.openSse(`${this.sseUrl}${sep}ticket=${encodeURIComponent(ticket)}`);
+      });
+  }
+
+  private openSse(url: string): void {
+    if (!this.EventSourceImpl) return;
+    this.es = new this.EventSourceImpl(url);
     this.es.onmessage = (ev: MessageEvent) => this.handleFrame(ev.data);
   }
 

@@ -220,6 +220,171 @@ test("createClient('http+sse') selecciona el push por SSE", () => {
   assert.deepEqual(es, ['http://h/api/events']);
 });
 
+// ── hub#504: the event channel asks for a credential ────────────────────────
+
+/** A fake socket with the `onopen` an authenticated channel needs, and a record of what it sent. */
+class FakeAuthWs {
+  onmessage: ((e: { data: string }) => void) | null = null;
+  onclose: (() => void) | null = null;
+  onopen: (() => void) | null = null;
+  sent: string[] = [];
+  closed = false;
+  static last: FakeAuthWs | undefined;
+  close = () => {
+    this.closed = true;
+  };
+  send = (data: string) => {
+    this.sent.push(data);
+  };
+  constructor(public url: string) {
+    FakeAuthWs.last = this;
+  }
+}
+
+/** Lets an awaited credential settle before asserting. */
+const settle = () => new Promise((r) => setTimeout(r, 0));
+
+test('the socket presents the credential the shell hands it, in the FIRST FRAME (hub#504)', async () => {
+  let asked = 0;
+  const t = new HttpWsTransport({
+    baseUrl: 'http://h',
+    WebSocketImpl: FakeAuthWs as unknown as typeof WebSocket,
+    streamCredential: async () => `erpl_tkt_${++asked}`,
+  });
+  const seen: unknown[] = [];
+  t.subscribe('sale.completed', (p) => seen.push(p));
+
+  // Not in the URL: a credential in a URL is a credential in every access log on the way.
+  assert.equal(FakeAuthWs.last?.url, 'ws://h/ws');
+  assert.deepEqual(FakeAuthWs.last!.sent, [], 'nothing is sent before the socket is open');
+
+  FakeAuthWs.last!.onopen!();
+  await settle();
+  assert.deepEqual(JSON.parse(FakeAuthWs.last!.sent[0]!), { type: 'auth', token: 'erpl_tkt_1' });
+
+  // And it is still the same channel: domain events arrive exactly as before.
+  FakeAuthWs.last!.onmessage!({
+    data: JSON.stringify({ name: 'sale.completed', payload: { total: 9 } }),
+  });
+  assert.deepEqual(seen, [{ total: 9 }]);
+});
+
+test('every reconnect asks for a FRESH credential: the ticket is single use', async () => {
+  let n = 0;
+  const t = new HttpWsTransport({
+    baseUrl: 'http://h',
+    WebSocketImpl: FakeAuthWs as unknown as typeof WebSocket,
+    streamCredential: async () => `erpl_tkt_${++n}`,
+  });
+  t.subscribe('sale.completed', () => {});
+  FakeAuthWs.last!.onopen!();
+  await settle();
+  const first = JSON.parse(FakeAuthWs.last!.sent[0]!).token;
+
+  // The socket drops and the transport reopens. Replaying the spent ticket would be refused by the
+  // hub and the shell would go deaf without saying so.
+  FakeAuthWs.last!.onclose!();
+  await new Promise((r) => setTimeout(r, 1_100));
+  FakeAuthWs.last!.onopen!();
+  await settle();
+  const second = JSON.parse(FakeAuthWs.last!.sent[0]!).token;
+
+  assert.notEqual(first, second);
+});
+
+test('with no credential available the socket is closed instead of sitting there mute', async () => {
+  const t = new HttpWsTransport({
+    baseUrl: 'http://h',
+    WebSocketImpl: FakeAuthWs as unknown as typeof WebSocket,
+    // Nobody has logged in yet: there is no ticket to be had.
+    streamCredential: async () => null,
+  });
+  t.subscribe('sale.completed', () => {});
+  FakeAuthWs.last!.onopen!();
+  await settle();
+  assert.deepEqual(FakeAuthWs.last!.sent, []);
+  assert.equal(FakeAuthWs.last!.closed, true);
+});
+
+test('with nobody logged in, the retry BACKS OFF instead of hammering the hub', async () => {
+  // The shell wires its listeners at boot — before anybody has logged in — so "no credential yet"
+  // is the normal state of the login screen, not an error. Retrying every second there would post
+  // to the hub 60 times a minute for as long as the till sits idle.
+  const delays: number[] = [];
+  const realSetTimeout = globalThis.setTimeout;
+  // Records the reconnect delay without ever firing it: the test drives the reconnects by hand.
+  (globalThis as { setTimeout: unknown }).setTimeout = ((fn: () => void, ms: number) => {
+    if (ms >= 500) {
+      delays.push(ms);
+      return 0;
+    }
+    return realSetTimeout(fn, ms);
+  }) as typeof globalThis.setTimeout;
+
+  try {
+    const t = new HttpWsTransport({
+      baseUrl: 'http://h',
+      WebSocketImpl: FakeAuthWs as unknown as typeof WebSocket,
+      streamCredential: async () => null,
+    });
+    t.subscribe('sale.completed', () => {});
+    for (let i = 0; i < 3; i += 1) {
+      FakeAuthWs.last!.onopen!();
+      await settle();
+      FakeAuthWs.last!.onclose!();
+      // The scheduled reconnect never fires on its own here; open the next socket by hand.
+      if (i < 2) t.subscribe(`x${i}`, () => {});
+    }
+
+    assert.ok(delays.length >= 2, `expected several reconnect delays, got ${delays.length}`);
+    assert.ok(
+      delays[delays.length - 1]! > delays[0]!,
+      `the wait must grow: ${JSON.stringify(delays)}`,
+    );
+  } finally {
+    (globalThis as { setTimeout: unknown }).setTimeout = realSetTimeout;
+  }
+});
+
+test('a refusal from the channel is reported, not swallowed', async () => {
+  const refusals: string[] = [];
+  const t = new HttpWsTransport({
+    baseUrl: 'http://h',
+    WebSocketImpl: FakeAuthWs as unknown as typeof WebSocket,
+    streamCredential: async () => 'erpl_tkt_x',
+    onStreamRefused: (code, message) => refusals.push(`${code}:${message}`),
+  });
+  const asDomainEvent: unknown[] = [];
+  t.subscribe('stream.error', (p) => asDomainEvent.push(p));
+  t.subscribe('stream.ready', (p) => asDomainEvent.push(p));
+  FakeAuthWs.last!.onopen!();
+  await settle();
+
+  FakeAuthWs.last!.onmessage!({
+    data: JSON.stringify({
+      type: 'stream.error',
+      code: 'events.read_required',
+      message: 'no reading',
+    }),
+  });
+  FakeAuthWs.last!.onmessage!({ data: JSON.stringify({ type: 'stream.ready' }) });
+
+  assert.deepEqual(refusals, ['events.read_required:no reading']);
+  assert.deepEqual(asDomainEvent, [], 'a control frame is not a domain event');
+});
+
+test('SSE carries the credential in the query, because it has no first frame', async () => {
+  const t = new HttpWsTransport({
+    baseUrl: 'http://h',
+    push: 'sse',
+    EventSourceImpl: FakeEventSource as unknown as typeof EventSource,
+    streamCredential: async () => 'erpl_tkt_sse',
+  });
+  t.subscribe('sale.completed', () => {});
+  await settle();
+  assert.equal(FakeEventSource.last?.url, 'http://h/api/events?ticket=erpl_tkt_sse');
+});
+
 // ── ErploraClient: hasPermission (solo UI) ──────────────────────────────────
 
 test('hasPermission respeta wildcard y permisos namespaced', () => {

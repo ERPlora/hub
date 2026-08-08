@@ -516,6 +516,9 @@ pub struct AppState {
     /// Brute-force guard for the PIN login (hub#329). A PIN is 4 digits on a host that lives on
     /// the public internet; without a failure counter those are 10,000 free tries.
     pub login_throttle: Arc<crate::login_throttle::LoginThrottle>,
+    /// Short-lived, single-use credentials for the event stream (hub#504). In memory: they must
+    /// not survive a restart, and above all they must not travel in a backup or a blueprint.
+    pub stream_tickets: Arc<crate::event_stream::StreamTickets>,
 }
 
 impl AppState {
@@ -572,6 +575,7 @@ impl AppState {
             entitlement: crate::entitlement::new_shared(),
             activity: Arc::new(crate::activity::ActivityState::new()),
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
+            stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
         }
     }
 
