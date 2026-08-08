@@ -22,5 +22,12 @@ members = [
 
 [workspace.package]
 edition = "2021"
-version = "0.0.0"
+# 🔴 FUENTE ÚNICA de la versión del hub (hub#515 / ADR-0275). Todos los crates la heredan
+# (`version.workspace = true`), así que esto es lo que reporta `env!("CARGO_PKG_VERSION")` en
+# `/system` y en `error_sink`; y `scripts/image-tags.sh` lee ESTE fichero para nombrar la imagen,
+# de modo que el tag del registro y el número que dice el binario no pueden separarse.
+# Antes valía `0.0.0` y la imagen se llamaba como el ref de git: dos digests no dicen si el salto
+# es un parche de seguridad o una versión nueva.
+# El criterio de qué es MAJOR/MINOR/PATCH aquí: `architecture/hub/versioning.md`.
+version = "1.0.0"
 license = "MIT"

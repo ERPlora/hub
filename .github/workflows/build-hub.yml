@@ -11,11 +11,28 @@
 #                                      del Cloud/Dokploy registra el servicio con `…/hub:latest`).
 #                                      ESTE es el tag canónico — sin él no se puede hacer pull.
 #   - ghcr.io/erplora/hub:<git-sha>   (tag inmutable por commit, para pin/rollback)
+#   - ghcr.io/erplora/hub:X.Y.Z       (inmutable — SOLO en release; lo que pinea un rollback)
+#   - ghcr.io/erplora/hub:X.Y · :X    (móviles: «la última 1.2.*» y «la última 1.*»)
 #
 # Pipeline:
-#   push a main       ─► build ─► push GHCR (:latest + :<sha>)
-#   tag v*            ─► build ─► push GHCR (:latest + :<sha>)  [versión por tag]
+#   push a main       ─► build ─► push GHCR (:latest + :<sha>)          [build de integración]
+#   tag v*            ─► GUARDA ─► build ─► push GHCR (+ :X.Y.Z :X.Y :X) [release]
 #   workflow_dispatch ─► build ─► push GHCR (manual)
+#
+# ── La versión sale de `Cargo.toml`, NO del ref de git (hub#515 / ADR-0275) ──────────────
+# Antes se derivaba del ref —«1.2.3» en un tag, el sha corto en `main`— mientras el binario
+# decía `0.0.0`: la imagen se llamaba una cosa y el proceso que corre dentro decía otra, y el
+# pie del shell mostraba un SHA donde va una versión. Ahora `scripts/image-tags.sh` lee
+# `[workspace.package] version`, que es lo mismo que reporta `env!("CARGO_PKG_VERSION")` en
+# `/system`, en el latido y en `error_sink` — así no pueden separarse.
+#
+# Ese script además NIEGA la publicación (y el build no llega a correr) si:
+#   · la versión no es semver, o sigue siendo el hueco `0.0.0`;
+#   · un tag `v*` no coincide con `Cargo.toml` — bump olvidado o tag mal escrito, y las dos
+#     cosas aparecen mucho después como un hub reportando una versión que nadie lanzó;
+#   · esa versión YA está en el registro. Un tag inmutable que un segundo build puede mover
+#     convierte «vuelve a 1.2.3» en una promesa vacía.
+# Criterio de MAJOR/MINOR/PATCH para este producto: `architecture/hub/versioning.md`.
 #
 # Auth: `GITHUB_TOKEN` del propio workflow (permiso `packages: write`). No hacen falta claves
 # estáticas ni OIDC de AWS. El paquete queda PRIVADO por defecto; para que Dokploy/provisioning
@@ -68,32 +85,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image tags
+      # El propio guardarraíl tiene tests, y corren aquí: son ~2 s y esto es el único camino a
+      # producción de la imagen. Un guardarraíl sin probar es una creencia.
+      - name: Contrato del guardarraíl de versión
+        run: ./scripts/tests/image-tags.test.sh
+
+      # Va DESPUÉS del login (consulta el registro para no pisar un tag inmutable) y ANTES del
+      # build: un tag que no cuadra se rechaza en segundos, no tras los 16-19 min de compilar.
+      - name: Versión y tags (guarda)
         id: tags
         run: |
-          set -euo pipefail
-          IMAGE_LC=$(echo "${IMAGE}" | tr '[:upper:]' '[:lower:]')
-          # :latest  → tag canónico que consumen los hubs reales (provisioning del Cloud/Dokploy).
-          # :<sha>   → tag inmutable por commit, para pin/rollback.
-          {
-            echo "tags<<EOF"
-            echo "${IMAGE_LC}:latest"
-            echo "${IMAGE_LC}:${GITHUB_SHA}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-          echo "image=${IMAGE_LC}" >> "$GITHUB_OUTPUT"
-
-      - name: Compute app version
-        id: version
-        run: |
-          set -euo pipefail
-          # En un tag v* (p.ej. v0.1.20) → "0.1.20". En push a main → sha corto (dev build).
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            V="${GITHUB_REF_NAME#v}"
-          else
-            V="${GITHUB_SHA::7}"
-          fi
-          echo "version=${V}" >> "$GITHUB_OUTPUT"
+          ./scripts/image-tags.sh \
+            --image "${IMAGE}" --ref "${GITHUB_REF}" --sha "${GITHUB_SHA}"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -110,7 +113,7 @@ jobs:
           # del Dockerfile en CADA build, forzando que la imagen coja SIEMPRE la última OutfitKit
           # publicada (el tag npm `latest` lo mueve la GH action de release de outfitkit).
           build-args: |
-            APP_VERSION=${{ steps.version.outputs.version }}
+            APP_VERSION=${{ steps.tags.outputs.version }}
             OUTFITKIT_CACHEBUST=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -121,9 +124,10 @@ jobs:
 
       - name: Output image URIs
         run: |
-          echo "Imagen publicada (GHCR, privada):"
-          echo "  ${{ steps.tags.outputs.image }}:latest   (hubs reales — Cloud/Dokploy provisioning)"
-          echo "  ${{ steps.tags.outputs.image }}:${GITHUB_SHA}"
+          echo "Versión ${{ steps.tags.outputs.version }} — imagen publicada (GHCR, privada):"
+          printf '  %s\n' ${{ steps.tags.outputs.tags }}
+          echo ""
+          echo "  :latest es el que consumen los hubs reales (Cloud/Dokploy provisioning)."
           echo ""
           echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
 

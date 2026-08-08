@@ -47,6 +47,18 @@ pub struct DailyUsageHeartbeat {
     /// different date means the hub is not really running our certificate (ADR-0202 §2.5).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cert_not_after: Option<String>,
+    /// The hub version this container is running, e.g. `1.0.0` (hub#515).
+    ///
+    /// Sin ella, «¿está este hub al día?» solo se puede contestar adivinando desde un digest — y un
+    /// digest no dice si el salto de delante es un parche de seguridad o una versión nueva. Viaja
+    /// en ESTE request porque el latido ya lleva la credencial de máquina con la cadencia correcta:
+    /// una llamada aparte sería una cosa más que se puede romper.
+    ///
+    /// **No es `Option`, y eso es el contrato.** En este body «ausente» significa *no pude leerlo*
+    /// (`orders_today`, `cert_version`…) y el Cloud lo guarda distinto; la versión va compilada
+    /// dentro del binario, así que no existe el caso de «no la sé». Va **sin** el `v`: el prefijo
+    /// es para leerlo en un panel, no para que el Cloud tenga que quitarlo antes de comparar.
+    pub hub_version: String,
 }
 
 /// What the control plane answered to a heartbeat (ADR-0202 §2.5 — hub#318).
@@ -139,6 +151,9 @@ pub async fn collect_daily_usage(
         // «no he podido leerlo».
         cert_version: None,
         cert_not_after: None,
+        // No sale de la BD ni la rellena el llamador: va compilada en el binario, así que el
+        // único sitio honesto para leerla es aquí.
+        hub_version: crate::version::HUB_VERSION.to_string(),
     }
 }
 
@@ -238,7 +253,7 @@ mod tests {
         assert_eq!(usage.terminals, Some(0));
         assert_eq!(
             serde_json::to_value(usage).unwrap(),
-            json!({"terminals": 0})
+            json!({"terminals": 0, "hub_version": crate::version::HUB_VERSION})
         );
     }
 
@@ -276,7 +291,8 @@ mod tests {
             last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
             cert_version: Some(4),
             cert_not_after: Some("2028-06-10".into()),
-        };
+        hub_version: crate::version::HUB_VERSION.to_string(),
+    };
         send_heartbeat(
             &reqwest::Client::new(),
             &format!("http://{address}"),
@@ -298,6 +314,7 @@ mod tests {
                 "last_user_activity_at": "2026-07-27T11:45:00Z",
                 "cert_version": 4,
                 "cert_not_after": "2028-06-10",
+                "hub_version": crate::version::HUB_VERSION,
             })
         );
         server.abort();
@@ -315,10 +332,11 @@ mod tests {
             last_user_activity_at: None,
             cert_version: None,
             cert_not_after: None,
-        };
+        hub_version: crate::version::HUB_VERSION.to_string(),
+    };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("last_user_activity_at").is_none());
-        assert_eq!(body, json!({"orders_today": 0, "terminals": 0}));
+        assert_eq!(body, json!({"orders_today": 0, "terminals": 0, "hub_version": crate::version::HUB_VERSION}));
     }
 
     // ── The certificate the hub REPORTS (ADR-0202 §2.5 — hub#318) ─────────────────────────────
@@ -335,9 +353,10 @@ mod tests {
             last_user_activity_at: None,
             cert_version: Some(0),
             cert_not_after: None,
-        };
+        hub_version: crate::version::HUB_VERSION.to_string(),
+    };
         let body = serde_json::to_value(&usage).unwrap();
-        assert_eq!(body, json!({"cert_version": 0}));
+        assert_eq!(body, json!({"cert_version": 0, "hub_version": crate::version::HUB_VERSION}));
         // Y la caducidad NO viaja: es justo lo que borra en el Cloud la fecha vieja de un hub
         // reprovisionado (§2.5, «el par se escribe entero»).
         assert!(body.get("cert_not_after").is_none());
@@ -355,10 +374,11 @@ mod tests {
             last_user_activity_at: None,
             cert_version: None,
             cert_not_after: None,
-        };
+        hub_version: crate::version::HUB_VERSION.to_string(),
+    };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("cert_version").is_none());
-        assert_eq!(body, json!({"orders_today": 3, "terminals": 1}));
+        assert_eq!(body, json!({"orders_today": 3, "terminals": 1, "hub_version": crate::version::HUB_VERSION}));
     }
 
     // ── What the control plane announces back (ADR-0202 §2.5) ─────────────────────────────────
@@ -438,7 +458,8 @@ mod tests {
                 last_user_activity_at: None,
                 cert_version: Some(0),
                 cert_not_after: None,
-            },
+            hub_version: crate::version::HUB_VERSION.to_string(),
+        },
         )
         .await
         .expect("un 2xx es un latido entregado, lo que traiga el cuerpo o no");
@@ -487,7 +508,8 @@ mod tests {
                 last_user_activity_at: None,
                 cert_version: Some(4),
                 cert_not_after: None,
-            },
+            hub_version: crate::version::HUB_VERSION.to_string(),
+        },
         )
         .await
         .expect("un 2xx entregado no puede deshacerse porque el cuerpo se corte");
@@ -547,7 +569,7 @@ mod tests {
         .await
         .unwrap();
 
-        let usage = collect_daily_usage(db.as_ref(), "hub-1", "2026-08-08T10:00:00Z").await;
+        let usage = collect_daily_usage(&db, "hub-1", "2026-08-08T10:00:00Z").await;
 
         assert_eq!(usage.hub_version, crate::version::HUB_VERSION);
     }

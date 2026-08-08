@@ -1618,7 +1618,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-cloud-client"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
  "hex",
@@ -1632,7 +1632,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-db"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "libc",
@@ -1644,7 +1644,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-guest-sdk"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
@@ -1654,7 +1654,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-installer"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "erplora-cloud-client",
  "erplora-db",
@@ -1670,7 +1670,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-peripherals"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "mdns-sd",
@@ -1684,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-runtime"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "argon2",
  "async-trait",
@@ -1708,7 +1708,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-server"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -1744,7 +1744,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-source"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "erplora-cloud-client",
  "reqwest 0.12.28",
@@ -1756,7 +1756,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-sync"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1789,7 +1789,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-vector"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "erplora-db",
@@ -1800,7 +1800,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-verifactu"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1818,7 +1818,7 @@ dependencies = [
 
 [[package]]
 name = "erplora-wasm-host"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "erplora-guest-sdk",
  "extism",

@@ -1,4 +1,28 @@
 //! The hub's version — read from one place, by everything that reports it (hub#515).
+//!
+//! The number lives in `[workspace.package] version` of the workspace `Cargo.toml`, and every
+//! crate inherits it (`version.workspace = true`). `scripts/image-tags.sh` reads that same file to
+//! name the image, so the tag on the registry and the number the binary reports cannot drift.
+//!
+//! Before this the two had nothing to do with each other: the image took its version from the git
+//! ref (the tag on a release, the short sha on `main`) while the binary said `0.0.0` — so «which
+//! version is this hub running?» had no answer, and «is this jump a security patch or a new
+//! version?» could not even be asked. Two digests do not tell you that.
+//!
+//! What the criterion for MAJOR/MINOR/PATCH is, for this product:
+//! `architecture/hub/versioning.md`.
+
+/// The running version, e.g. `1.0.0`. **This is the number that goes on the wire** — the
+/// heartbeat, `error_sink`, anything the Cloud will compare.
+pub const HUB_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The same number for a human to read, e.g. `v1.0.0`.
+///
+/// The `v` is a reading aid and stops there: adding it to what travels would mean the Cloud has to
+/// strip it before comparing, and something, somewhere, would forget.
+pub fn display() -> String {
+    format!("v{HUB_VERSION}")
+}
 
 #[cfg(test)]
 mod tests {

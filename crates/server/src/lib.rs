@@ -633,7 +633,7 @@ fn install_error_reporting(state: &AppState) {
         state.hub_id.clone(),
         state.machine_token.clone(),
         state.http.clone(),
-        format!("v{}", env!("CARGO_PKG_VERSION")),
+        version::display(),
     );
     ErrorRegistry::install(std::sync::Arc::new(sink));
 

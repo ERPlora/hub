@@ -86,7 +86,7 @@ pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Resp
         "data": {
             "backend": backend,
             "shell": shell,
-            "hubVersion": format!("v{}", env!("CARGO_PKG_VERSION")),
+            "hubVersion": crate::version::display(),
             "cpu": cpu,
             "memory": memory,
             "database": database,
