@@ -1796,6 +1796,7 @@ dependencies = [
 name = "erplora-tauri"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
  "erplora-peripherals",
  "log",
  "reqwest 0.12.28",

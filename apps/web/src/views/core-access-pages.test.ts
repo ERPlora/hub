@@ -20,7 +20,11 @@ describe('core access and account pages', () => {
   it('localizes billing dates and reports external-action failures', () => {
     const billing = source('BillingPage.vue');
     expect(billing).toContain("locale.value === 'en' ? 'en-GB' : 'es-ES'");
-    expect(billing).toContain("toastError(t('billing.downloadError'))");
+    // hub#480 replaced the single `billing.downloadError` here: that sentence only ever fitted the
+    // fetch half, and inside the installed app the half that fails is the SAVE. The key now comes
+    // from `saveDownloadMessageKey`, which tells "this device has nowhere to put it" — the one the
+    // user can act on — apart from a plain failure.
+    expect(billing).toContain('toastError(t(saveDownloadMessageKey(error)))');
     expect(billing).toContain("t('billing.openBillingPortal')");
   });
 

@@ -15,6 +15,9 @@ fn main() {
             // The way OUT to the user's own browser: the SaaS checkout, the plans page, the
             // billing portal (hub#475). `window.open` opens nothing inside the webview.
             "open_external_url",
+            // The other half of the same trip: bytes the page already holds, written where the
+            // user will find them, with the path returned so the app can SAY so (hub#480).
+            "save_download",
             // Hardware (el shell ES el bridge, §2.7).
             "erplora_bridge_status",
             "erplora_discover_printers",
