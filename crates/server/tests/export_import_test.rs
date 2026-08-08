@@ -13,7 +13,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::{app, AppState, AuthMode, HubConfig};
+use erplora_server::{app, AppState, AuthMode, DEV_HUB_ID, HubConfig};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt; // oneshot
@@ -651,4 +651,90 @@ async fn import_valid_bundle_returns_extended_report() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+// ── hub#377: un hub de DEMO siempre exporta como plantilla ─────────────────
+
+/// Un `HubConfig` de dev sin enrolar (`AuthMode::Dev` + `DEV_HUB_ID`): el único estado en el que
+/// `is_dev_hub()` es `true`, además de la demo efímera (`config.demo`). Su `hub_user` lleva el
+/// `pin_hash` de pruebas y su fiscal es la del hub demo, no de un negocio real.
+fn demo_dev_config(tag: &str) -> HubConfig {
+    let mut c = test_config(AuthMode::Dev, tag);
+    c.hub_id = DEV_HUB_ID.into();
+    c
+}
+
+/// Un hub de demo (`is_dev_hub() == true`) exporta SIEMPRE con `purpose: template`, aunque el
+/// formulario pida `backup`: el override de `export_blueprint` (hub#377) lo fuerza antes de que el
+/// motor del runtime vea la selección. Una plantilla excluye identidades y fiscal (export.rs), así
+/// que el `pin_hash` de pruebas del hub demo nunca llega al zip publicado.
+#[tokio::test]
+async fn demo_hub_export_is_forced_to_template_even_when_backup_is_asked() {
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), DEV_HUB_ID);
+    let app = app(AppState::with_config(rt, demo_dev_config("export_demo_template")));
+    // Pedimos explícitamente backup (el que incluye identidades/fiscal) — el override lo ignora.
+    let resp = app
+        .oneshot(post_json(
+            "/api/hub/export",
+            json!({
+                "name": "plantilla",
+                "locale": "es",
+                "selection": {
+                    "users": true, "settings": true, "settings_items": null,
+                    "fiscal": true, "media": false, "modules": [],
+                    "purpose": "backup"
+                }
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "el export de demo responde 200");
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let mut ar = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
+    let manifest: Value = {
+        use std::io::Read as _;
+        let mut f = ar.by_name("manifest.json").unwrap();
+        let mut s = String::new();
+        f.read_to_string(&mut s).unwrap();
+        serde_json::from_str(&s).unwrap()
+    };
+    // El override fuerza template aunque el body pidiera backup.
+    assert_eq!(manifest["purpose"], json!("template"), "un hub de demo exporta como plantilla");
+    // Consecuencia directa: una plantilla no lleva identidades. No existe `data/hub_users.sql`.
+    assert!(ar.by_name("data/hub_users.sql").is_err(), "una plantilla no lleva hub_user (pin_hash)");
+}
+
+/// Un hub REAL (no demo) respeta el `purpose` que pide el formulario: el override NO se dispara.
+/// Es el contra-test del anterior — sin él, el override podría quedar siempre activo sin que nadie
+/// lo caze.
+#[tokio::test]
+async fn real_hub_export_respects_the_requested_purpose() {
+    let app = make_app(AuthMode::Dev, "export_real_backup").await;
+    let resp = app
+        .oneshot(post_json(
+            "/api/hub/export",
+            json!({
+                "name": "copia",
+                "locale": "es",
+                "selection": {
+                    "users": true, "settings": true, "settings_items": null,
+                    "fiscal": false, "media": false, "modules": [],
+                    "purpose": "backup"
+                }
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let mut ar = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
+    let manifest: Value = {
+        use std::io::Read as _;
+        let mut f = ar.by_name("manifest.json").unwrap();
+        let mut s = String::new();
+        f.read_to_string(&mut s).unwrap();
+        serde_json::from_str(&s).unwrap()
+    };
+    assert_eq!(manifest["purpose"], json!("backup"), "un hub real respeta el purpose pedido");
 }
