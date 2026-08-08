@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   HttpWsTransport,
+  type ElevationAsk,
   ErploraClient,
   ErploraError,
   createClient,
@@ -900,4 +901,314 @@ test('queryOptional también trata module_inactive como ausencia (cascada ADR-01
   // el obligatorio nunca llega a preguntar, porque la cascada lo apagó junto a su dependencia.
   const c = new ErploraClient(transporteQueFalla('module_inactive'));
   assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
+});
+
+// ── hub#363: the approval dialog's TRANSPORT half ────────────────────────────
+//
+// The runtime has said `requires_elevation` since hub#360 and has minted approvals since hub#361,
+// but nothing on the client ever asked for one. These tests pin WHERE that ask lives — here, in
+// the one place every module's `erplora.command()` already passes through — and the two things it
+// must never do: send the elevated attempt twice, or offer a dialog to a caller that cannot type.
+
+/** A `fetch` that answers a scripted queue of envelopes and records what it was asked. */
+function scriptedFetch(replies: unknown[]): {
+  fetchImpl: typeof fetch;
+  calls: Array<{ url: string; body: { name?: string; payload?: unknown }; headers: Record<string, string> }>;
+} {
+  const calls: Array<{ url: string; body: { name?: string; payload?: unknown }; headers: Record<string, string> }> = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    calls.push({
+      url,
+      body: JSON.parse(init.body as string),
+      headers: { ...(init.headers as Record<string, string>) },
+    });
+    const reply = replies[calls.length - 1];
+    if (reply instanceof Error) throw reply;
+    return { json: async () => reply };
+  }) as unknown as typeof fetch;
+  return { fetchImpl, calls };
+}
+
+const REFUSED = {
+  ok: false,
+  error: {
+    code: 'requires_elevation',
+    message: 'requires elevation: `till.void_sale` needs approval from a manager',
+    permission: 'till.void_sale',
+  },
+};
+const WENT_THROUGH = { ok: true, data: { voided: true } };
+
+test('hub#363: a refusal a manager can approve asks the shell for a PIN and retries with the token', async () => {
+  const { fetchImpl, calls } = scriptedFetch([REFUSED, WENT_THROUGH]);
+  const asks: ElevationAsk[] = [];
+  const t = new HttpWsTransport({
+    fetchImpl,
+    headers: () => ({ 'X-Hub-Id': 'h1' }),
+    elevationApprover: async (ask) => {
+      asks.push(ask);
+      return 'tok-abc';
+    },
+  });
+
+  assert.deepEqual(await t.command('till.sale.void', { sale_id: 's1' }), { voided: true });
+
+  // The dialog was told WHAT it is asking approval for — command, the exact payload, and the
+  // permission the runtime named as a field (hub#360). None of it parsed out of a sentence.
+  assert.equal(asks.length, 1);
+  assert.equal(asks[0].command, 'till.sale.void');
+  assert.deepEqual(asks[0].payload, { sale_id: 's1' });
+  assert.equal(asks[0].permission, 'till.void_sale');
+
+  // Two calls: the one that was refused and the one the approval bought. The retry is the SAME
+  // action — a different payload would not match the grant's fingerprint — plus the header, and it
+  // keeps the shell's own headers (without X-Hub-Id the runtime would not even route it).
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1].body, { name: 'till.sale.void', payload: { sale_id: 's1' } });
+  assert.equal(calls[1].headers['X-Elevation-Token'], 'tok-abc');
+  assert.equal(calls[1].headers['X-Hub-Id'], 'h1');
+  // …and the FIRST one carried no token: an approval is asked for after the refusal, never before.
+  assert.equal(calls[0].headers['X-Elevation-Token'], undefined);
+});
+
+test('hub#363: a cashier who closes the dialog gets the refusal they already had, unchanged', async () => {
+  // `null` = nobody approved. The caller must see exactly what it saw before this feature existed,
+  // so a module that already handles `requires_elevation` keeps working.
+  const { fetchImpl, calls } = scriptedFetch([REFUSED]);
+  const t = new HttpWsTransport({ fetchImpl, elevationApprover: async () => null });
+
+  await assert.rejects(
+    () => t.command('till.sale.void', { sale_id: 's1' }),
+    (e: unknown) =>
+      e instanceof ErploraError && e.code === 'requires_elevation' && e.permission === 'till.void_sale',
+  );
+  assert.equal(calls.length, 1, 'nothing was sent without an approval');
+});
+
+test('hub#363: a flat permission_denied never opens a dialog', async () => {
+  // hub#361 made an API key's refusal FLAT — no `permission` field — precisely so it is not offered
+  // a dialog it cannot follow. A capture that treated every 403 alike would undo that: a machine
+  // would sit waiting on a PIN nobody is there to type.
+  for (const code of ['permission_denied', 'module_not_installed', 'invalid_payload']) {
+    const { fetchImpl, calls } = scriptedFetch([{ ok: false, error: { code, message: 'no' } }]);
+    let asked = false;
+    const t = new HttpWsTransport({
+      fetchImpl,
+      elevationApprover: async () => {
+        asked = true;
+        return 'tok';
+      },
+    });
+    await assert.rejects(() => t.command('till.sale.void'), (e: unknown) => (e as ErploraError).code === code);
+    assert.equal(asked, false, `\`${code}\` must not be read as an offer to elevate`);
+    assert.equal(calls.length, 1);
+  }
+});
+
+test('hub#363: a query is never elevated — only actions are', async () => {
+  // The runtime keeps queries refusing flat on purpose (`permissions::check_command` is the command
+  // gate, and only that): an approval exists to ATTRIBUTE an action to the manager who allowed it,
+  // and a PIN that unlocked a report would leave no such trace. Capturing on the query path would
+  // build exactly that door on the client.
+  const { fetchImpl } = scriptedFetch([REFUSED]);
+  let asked = false;
+  const t = new HttpWsTransport({
+    fetchImpl,
+    elevationApprover: async () => {
+      asked = true;
+      return 'tok';
+    },
+  });
+  await assert.rejects(() => t.query('till.sales.list'), (e: unknown) => e instanceof ErploraError);
+  assert.equal(asked, false);
+});
+
+test('hub#363: the elevated attempt is sent ONCE — a second refusal is reported, not re-elevated', async () => {
+  // The grant is spent at the gate BEFORE the command runs, so the token is gone whatever happens
+  // next. Asking again would mint a second approval for an action that may well have already
+  // happened, and looping would keep the manager tapping forever.
+  const { fetchImpl, calls } = scriptedFetch([REFUSED, REFUSED]);
+  let asks = 0;
+  const t = new HttpWsTransport({
+    fetchImpl,
+    elevationApprover: async () => {
+      asks += 1;
+      return `tok-${asks}`;
+    },
+  });
+
+  await assert.rejects(
+    () => t.command('till.sale.void', { sale_id: 's1' }),
+    (e: unknown) => (e as ErploraError).code === 'requires_elevation',
+  );
+  assert.equal(asks, 1, 'one refusal, one dialog');
+  assert.equal(calls.length, 2, 'the elevated attempt is not retried');
+});
+
+test('hub#363: a network failure on the elevated attempt is reported, never resent', async () => {
+  // The worst possible resend: the request may have arrived, spent the approval and voided the
+  // ticket, and only the ANSWER was lost. Sending it again would either void a second one or tell
+  // the cashier to fetch the manager for something that already happened.
+  const { fetchImpl, calls } = scriptedFetch([REFUSED, new Error('network down')]);
+  let asks = 0;
+  const t = new HttpWsTransport({
+    fetchImpl,
+    elevationApprover: async () => {
+      asks += 1;
+      return 'tok-abc';
+    },
+  });
+
+  await assert.rejects(() => t.command('till.sale.void', { sale_id: 's1' }), /network down/);
+  assert.equal(asks, 1);
+  assert.equal(calls.length, 2);
+});
+
+test('hub#363: a double tap on the same action opens ONE dialog and spends ONE approval', async () => {
+  // Two clicks on «void» fire two commands, both refused. Without this, the manager is asked twice
+  // for the same thing: one approval is spent and the other is left minted and spendable — a
+  // credential lying around for whatever the cashier tries next inside the window.
+  const { fetchImpl, calls } = scriptedFetch([REFUSED, REFUSED, WENT_THROUGH]);
+  let asks = 0;
+  let release: (token: string) => void = () => {};
+  const t = new HttpWsTransport({
+    fetchImpl,
+    elevationApprover: async () => {
+      asks += 1;
+      // The manager takes a moment to walk over: the dialog is open while the second tap lands.
+      return new Promise<string>((resolve) => {
+        release = resolve;
+      });
+    },
+  });
+
+  const first = t.command('till.sale.void', { sale_id: 's1' });
+  const second = t.command('till.sale.void', { sale_id: 's1' });
+  // Let both refusals come back before the manager taps.
+  await new Promise((r) => setTimeout(r, 0));
+  release('tok-abc');
+
+  assert.deepEqual(await first, { voided: true });
+  assert.deepEqual(await second, { voided: true }, 'both callers get the one result');
+  assert.equal(asks, 1, 'one dialog for one action');
+  assert.equal(calls.length, 3, 'two refusals and a single elevated send');
+  assert.equal(calls[2].headers['X-Elevation-Token'], 'tok-abc');
+});
+
+test('hub#363: two DIFFERENT actions each get their own approval', async () => {
+  // The coalescing above is keyed on the action, not on "an elevation is happening". Voiding table
+  // 4 must never be authorised by the approval the manager gave for table 11.
+  const { fetchImpl, calls } = scriptedFetch([REFUSED, REFUSED, WENT_THROUGH, WENT_THROUGH]);
+  const seen: string[] = [];
+  const t = new HttpWsTransport({
+    fetchImpl,
+    elevationApprover: async (ask) => {
+      seen.push(JSON.stringify(ask.payload));
+      return `tok-${seen.length}`;
+    },
+  });
+
+  await Promise.all([
+    t.command('till.sale.void', { sale_id: 's1' }),
+    t.command('till.sale.void', { sale_id: 's2' }),
+  ]);
+  assert.equal(seen.length, 2);
+  assert.deepEqual(new Set(seen), new Set(['{"sale_id":"s1"}', '{"sale_id":"s2"}']));
+  const tokens = calls.slice(2).map((c) => c.headers['X-Elevation-Token']);
+  assert.deepEqual(new Set(tokens), new Set(['tok-1', 'tok-2']));
+});
+
+test('hub#363: a second attempt after the dialog closed asks again (the flow is not cached)', async () => {
+  // Single-flight, not memoised: the cashier who cancels and taps again must get a dialog, not the
+  // stale refusal of the one they closed.
+  const { fetchImpl } = scriptedFetch([REFUSED, WENT_THROUGH, REFUSED, WENT_THROUGH]);
+  let asks = 0;
+  const t = new HttpWsTransport({
+    fetchImpl,
+    elevationApprover: async () => {
+      asks += 1;
+      return `tok-${asks}`;
+    },
+  });
+  await t.command('till.sale.void', { sale_id: 's1' });
+  await t.command('till.sale.void', { sale_id: 's1' });
+  assert.equal(asks, 2);
+});
+
+test('hub#363: without an approver configured the refusal passes through untouched', async () => {
+  // A shell that never wires the dialog (a test harness, a headless host) must keep behaving
+  // exactly as it did before hub#363 — never hang waiting for a dialog that does not exist.
+  const { fetchImpl, calls } = scriptedFetch([REFUSED]);
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.command('till.sale.void'),
+    (e: unknown) => (e as ErploraError).code === 'requires_elevation',
+  );
+  assert.equal(calls.length, 1);
+});
+
+test('hub#363: the ask can mint an approval, and the endpoint + header are the SDK\'s to know', async () => {
+  // The shell owns the pixels; the wire is the SDK's. `POST /api/elevation/approve` and
+  // `X-Elevation-Token` are published contract of the runtime (hub#361) — a screen that spelled
+  // them itself would be a second copy of the contract, free to drift.
+  const approved = {
+    ok: true,
+    data: {
+      token: 'tok-xyz',
+      permission: 'till.void_sale',
+      approved_by: 'u-sofia',
+      approver_name: 'Sofía',
+      expires_in_seconds: 120,
+    },
+  };
+  const { fetchImpl, calls } = scriptedFetch([REFUSED, approved, WENT_THROUGH]);
+  const t = new HttpWsTransport({
+    fetchImpl,
+    headers: () => ({ 'X-Hub-Id': 'h1' }),
+    elevationApprover: async (ask) => (await ask.approve('Sofía', '8317')).token,
+  });
+
+  assert.deepEqual(await t.command('till.sale.void', { sale_id: 's1' }), { voided: true });
+  assert.equal(calls[1].url, '/api/elevation/approve');
+  assert.deepEqual(calls[1].body, {
+    approver: 'Sofía',
+    pin: '8317',
+    command: 'till.sale.void',
+    payload: { sale_id: 's1' },
+  });
+  assert.equal(calls[1].headers['X-Hub-Id'], 'h1', 'the cashier is authenticated as on any call');
+  assert.equal(calls[2].headers['X-Elevation-Token'], 'tok-xyz');
+});
+
+test('hub#363: a refused PIN throws the runtime\'s stable code, so the dialog can try again', async () => {
+  // The dialog stays open on a refusal — the manager mistyped, they retype. That only works if the
+  // ask hands the failure back instead of tearing the whole flow down.
+  const refusedPin = {
+    ok: false,
+    error: {
+      code: 'hub.elevation.rejected',
+      message: 'those details do not approve this action. Check the name and the PIN.',
+    },
+  };
+  const approved = {
+    ok: true,
+    data: { token: 'tok-2', permission: 'till.void_sale', approved_by: 'u-sofia', approver_name: 'Sofía', expires_in_seconds: 120 },
+  };
+  const { fetchImpl, calls } = scriptedFetch([REFUSED, refusedPin, approved, WENT_THROUGH]);
+  const codes: string[] = [];
+  const t = new HttpWsTransport({
+    fetchImpl,
+    elevationApprover: async (ask) => {
+      try {
+        await ask.approve('Sofía', '0000');
+      } catch (e) {
+        codes.push((e as ErploraError).code);
+      }
+      return (await ask.approve('Sofía', '8317')).token;
+    },
+  });
+
+  assert.deepEqual(await t.command('till.sale.void', { sale_id: 's1' }), { voided: true });
+  assert.deepEqual(codes, ['hub.elevation.rejected']);
+  assert.equal(calls.length, 4);
 });
