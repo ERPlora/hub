@@ -42,13 +42,23 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot   # hub/
 
-# --- La app instalable. El nombre del exe lo fija `productName` de tauri.conf.json ("ERPlora"),
-# que es también el `Executable=` del manifest; se buscan los dos target-dir posibles porque
-# `tauri build` puede correr desde la raíz del workspace o desde apps/tauri/src-tauri. ---
+# --- The installable app. Two axes of uncertainty, so both are probed:
+#
+#   * Name. `productName` in tauri.conf.json is "ERPlora" (and so is the manifest's
+#     `Executable=`), but the cargo bin is `erplora-tauri`: Tauri renames the binary after
+#     building. That rename has never been observed on a Windows runner here (hub#577 §1), so
+#     both names are candidates. Either way the file is staged as $p.ExeName below, so the
+#     package is correct without having to know which one `tauri build` leaves behind.
+#   * Target dir. `tauri build` may run from the workspace root or from apps/tauri/src-tauri,
+#     and those do not share a target/ directory.
+#
+# Preference order: the renamed exe first — if both exist, that is the one the bundle ships. ---
 $p = @{
   ExeCandidates = @(
     "$repoRoot/target/release/ERPlora.exe",
-    "$repoRoot/apps/tauri/src-tauri/target/release/ERPlora.exe"
+    "$repoRoot/apps/tauri/src-tauri/target/release/ERPlora.exe",
+    "$repoRoot/target/release/erplora-tauri.exe",
+    "$repoRoot/apps/tauri/src-tauri/target/release/erplora-tauri.exe"
   )
   ExeName       = "ERPlora.exe"
   Manifest      = "$repoRoot/apps/tauri/src-tauri/msix/Package.appxmanifest"
@@ -63,7 +73,10 @@ if ($v -match '^\d+\.\d+\.\d+$') { $v = "$v.0" }
 
 # --- Localizar el exe de release. ---
 $exe = $p.ExeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $exe) { throw "No hay $($p.ExeName) en target/release/ — corre antes 'tauri build --release'." }
+if (-not $exe) {
+  throw ("No release binary found — run 'tauri build --release' first. Looked for:`n  " +
+    ($p.ExeCandidates -join "`n  "))
+}
 
 # --- Stage: mismo layout que instala NSIS ($INSTDIR): exe + Assets/. ---
 $stage = "$repoRoot/target/msix-stage-app"
