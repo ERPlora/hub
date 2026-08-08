@@ -335,6 +335,64 @@ pub async fn refresh(
     Ok(determine_fiscal_mode(&profile, registry, hub_id))
 }
 
+/// The stable rejection code of the provider lock (ADR-0259 D5). ABI público: la UI programa
+/// contra el código, no contra el mensaje.
+pub const NO_PROVIDER_LEFT: &str = "fiscal.no_provider_left";
+
+/// **With the profile `ACTIVE`, the hub does not end up with NOBODY complying** (ADR-0259 D5).
+///
+/// `leaving` is the whole set that would go — the target of a deactivation **plus everything the
+/// cascade would drag with it** (ADR-0128). It is computed before touching anything, because
+/// turning off `invoice` drags `verifactu` with it: gating only the target would leave the back
+/// door open.
+///
+/// This is **not** "this module is nailed down": it is "you do not end up with nobody". With two
+/// providers of the regime installed, removing one is not blocked — somebody still complies, and
+/// which one a hub uses is not the runtime's opinion to have.
+///
+/// The difference with R2 (hub#314), which is kept and complements this one:
+///
+/// | | R2 | this |
+/// |---|---|---|
+/// | who decides | the engine is asked (`pending_obligations`) | **the core, and it asks nobody** |
+/// | why | only the engine knows what it owes the tax authority | a module cannot have a vote on whether it may be removed |
+/// | covers | the `READY` stretch, and `ACTIVE` with a queue | `ACTIVE`, always — queue or no queue |
+///
+/// R2 alone was not enough precisely because it looks at the **pending queue**: with the queue
+/// empty the provider leaves without a word, and from then on the hub sells and nobody generates
+/// the record. An empty queue protects the past; the damage is done by the NEXT sales.
+///
+/// A hub that is already without a provider is not held hostage either: if there was nothing to
+/// lose, removing an unrelated module is not what broke it (it already reads `BLOCKED`).
+pub fn ensure_provider_remains(
+    profile: &FiscalProfile,
+    registry: &Registry,
+    leaving: &[String],
+) -> Result<()> {
+    if profile.status != FiscalStatus::Active {
+        return Ok(()); // Before the go-live nothing is anchored: this is a checklist item.
+    }
+    let providers = providers_of(registry, &profile.country_code, &profile.fiscal_system);
+    if providers.is_empty() {
+        return Ok(()); // Already without one — that is `BLOCKED`, not something this can prevent.
+    }
+    let remaining = providers
+        .iter()
+        .filter(|m| !leaving.iter().any(|id| id == &m.id))
+        .count();
+    if remaining > 0 {
+        return Ok(());
+    }
+    Err(RuntimeError::Domain {
+        code: NO_PROVIDER_LEFT.to_string(),
+        message: format!(
+            "this hub files under `{}` and this would leave it with no module fulfilling that \
+             regime: install another provider first, or close the fiscal period",
+            profile.fiscal_system
+        ),
+    })
+}
+
 /// Resolves the regime owed by `country_code`, or `""` if that country has no row.
 ///
 /// The registry is keyed `(country_code, regime_key)` and carries `since` so a country that changes
@@ -361,17 +419,26 @@ pub async fn regime_for_country(db: &dyn DatabaseAdapter, country_code: &str) ->
 }
 
 /// Reads the profile of `hub_id`, or `None` if it has not been bootstrapped yet.
+///
+/// **Tolerant of the table not being there** (same shape as [`crate::settings::country_code_of`]):
+/// a hub that has not run its system migrations has no profile, and that is the answer — not an
+/// error to propagate. It matters because this is read from the module-lifecycle path (the provider
+/// lock below), and a runtime built straight over an empty database must keep reporting *its own*
+/// error — "module not installed" — instead of a missing-relation from the fiscal side.
 pub async fn load(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<FiscalProfile>> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
-    let res = db
+    let Ok(res) = db
         .query(
             "SELECT country_code, taxpayer_id, fiscal_system, status, environment, activated_at, \
                     first_record_at, system_id, fiscal_trigger_events, can_go_live, needs_review \
              FROM _hub_fiscal_profile WHERE hub_id = :hub_id",
             &p,
         )
-        .await?;
+        .await
+    else {
+        return Ok(None);
+    };
     let Some(row) = res.rows.first() else {
         return Ok(None);
     };
@@ -990,6 +1057,131 @@ mod tests {
             FiscalStatus::Active,
             "BLOCKED is a reading; the stored status is untouched"
         );
+    }
+
+    /// 🔴 **Leer el perfil no puede ser la razón de que falle otra cosa.** Un runtime construido
+    /// sobre una BD vacía —sin migraciones de sistema— tiene que seguir contestando SU error
+    /// («módulo no instalado»), no un 42P01 del lado fiscal. Lo pilló el gate al añadir el candado:
+    /// `module_retention_gate_e2e` construye exactamente ese runtime.
+    #[tokio::test]
+    async fn reading_the_profile_of_a_hub_without_system_tables_is_not_an_error() {
+        let db = fresh_db().await;
+        assert!(load(&db, "hub-sin-migrar").await.unwrap().is_none());
+    }
+
+    // ── D5: con el perfil ACTIVE, no te quedas sin proveedor (hub#553) ────────────────────────
+
+    fn code_of(err: &RuntimeError) -> String {
+        match err {
+            RuntimeError::Domain { code, .. } => code.clone(),
+            other => other.to_string(),
+        }
+    }
+
+    /// 🔴 **Lo que R2 no cubre.** El módulo no debe nada (cola vacía), así que la gate de
+    /// retención lo deja marchar sin rechistar — y a partir de ahí el hub sigue vendiendo y nadie
+    /// genera el registro. La cola vacía protege el pasado; el daño lo hacen las ventas
+    /// siguientes.
+    #[test]
+    fn the_last_provider_of_an_active_hub_cannot_leave() {
+        let reg = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            true,
+        )]);
+        let err = ensure_provider_remains(
+            &profile_in(FiscalStatus::Active, "hub-es"),
+            &reg,
+            &["verifactu".to_string()],
+        )
+        .expect_err("quedarse sin nadie que cumpla se rechaza");
+        assert_eq!(code_of(&err), NO_PROVIDER_LEFT);
+    }
+
+    /// **No es «este módulo está clavado»: es «no te quedas sin nadie».** Con dos proveedores del
+    /// mismo régimen, quitar uno pasa — sigue habiendo quien cumpla, y el core no tiene por qué
+    /// opinar sobre cuál. Sustituir un proveedor por otro es cosa del usuario.
+    #[test]
+    fn with_two_providers_removing_one_is_allowed() {
+        let reg = registry_with(&[
+            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            ("otro", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+        ]);
+        assert!(ensure_provider_remains(
+            &profile_in(FiscalStatus::Active, "hub-es"),
+            &reg,
+            &["verifactu".to_string()],
+        )
+        .is_ok());
+    }
+
+    /// 🔴 **La cascada también pasa por aquí** (ADR-0128). Apagar `invoice` arrastraría al
+    /// proveedor, así que el conjunto ENTERO que caería se comprueba **antes** de tocar nada: si
+    /// uno solo está bloqueado, no cae ninguno. Gatear solo el objetivo dejaría la puerta de atrás
+    /// abierta.
+    #[test]
+    fn the_cascade_that_would_drag_the_last_provider_is_refused_too() {
+        let reg = registry_with(&[
+            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            ("invoice", None, &[], true),
+        ]);
+        let err = ensure_provider_remains(
+            &profile_in(FiscalStatus::Active, "hub-es"),
+            &reg,
+            &["invoice".to_string(), "verifactu".to_string()],
+        )
+        .expect_err("la cascada no puede dejar al hub sin proveedor");
+        assert_eq!(code_of(&err), NO_PROVIDER_LEFT);
+    }
+
+    /// Quitar un módulo que **no** es proveedor no se bloquea nunca: el candado protege la
+    /// capacidad de cumplir, no el inventario de módulos.
+    #[test]
+    fn removing_a_module_that_is_not_a_provider_is_never_blocked() {
+        let reg = registry_with(&[
+            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            ("inventory", None, &["sale.completed"], true),
+        ]);
+        assert!(ensure_provider_remains(
+            &profile_in(FiscalStatus::Active, "hub-es"),
+            &reg,
+            &["inventory".to_string()],
+        )
+        .is_ok());
+    }
+
+    /// **Antes del go-live no hay candado.** Nada está anclado todavía: quitar el proveedor es
+    /// volver a tener una tarea en la checklist, no una emergencia. R2 sigue cubriendo ese tramo
+    /// (la cola sí puede tener trabajo).
+    #[test]
+    fn before_go_live_there_is_no_lock() {
+        let reg = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            true,
+        )]);
+        for status in [FiscalStatus::Unconfigured, FiscalStatus::Ready] {
+            assert!(
+                ensure_provider_remains(&profile_in(status, "hub-es"), &reg, &["verifactu".to_string()])
+                    .is_ok(),
+                "{status:?} no ancla nada todavía"
+            );
+        }
+    }
+
+    /// Un hub que YA está sin proveedor no queda de rehén: eso ya se lee como `BLOCKED`, y quitar
+    /// un módulo cualquiera no es lo que lo rompió.
+    #[test]
+    fn a_hub_already_without_a_provider_is_not_held_hostage() {
+        let reg = registry_with(&[("inventory", None, &["sale.completed"], true)]);
+        assert!(ensure_provider_remains(
+            &profile_in(FiscalStatus::Active, "hub-es"),
+            &reg,
+            &["inventory".to_string()],
+        )
+        .is_ok());
     }
 
     /// [`load`] is a read: it does not create the row. A caller that wants the profile to exist
