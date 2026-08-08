@@ -263,6 +263,30 @@ export default {
     adminOnly: 'Solo un administrador puede cambiar cómo entra la gente en este dispositivo.',
     saveError: 'No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
   },
+  devices: {
+    title: 'Dispositivos',
+    intro:
+      'Los dispositivos en los que alguien ha entrado. Si pierdes uno, quítalo aquí: su sesión se cierra al momento y deja de poder entrar con PIN.',
+    thisDevice: 'El que estás usando',
+    unnamed: 'Dispositivo sin nombre',
+    empty: 'Todavía no ha entrado nadie desde ningún dispositivo.',
+    inUse: 'En uso ahora mismo',
+    lastUsed: 'Se usó por última vez {when}',
+    neverUsed: 'Añadido {when}, sin usar desde entonces',
+    openUntil: 'Su sesión sigue abierta hasta {when}',
+    modeShared: 'Pide PIN',
+    modePersonal: 'Se queda abierto',
+    revoke: 'Quitar este dispositivo',
+    cancel: 'Dejarlo',
+    confirm: '¿Quitar este dispositivo?',
+    confirmCurrent:
+      'Es el dispositivo que estás usando: al quitarlo se cerrará tu sesión y tendrás que volver a entrar.',
+    consequence:
+      'Su sesión se cierra al momento. Para volver a usarlo, alguien tiene que entrar en él con su cuenta.',
+    adminOnly: 'Solo un administrador puede quitar un dispositivo.',
+    loadError: 'No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.',
+    revokeError: 'No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
+  },
   pinPolicy: {
     title: 'Preguntar quién vende',
     intro:

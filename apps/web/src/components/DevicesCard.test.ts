@@ -1,0 +1,291 @@
+// @vitest-environment happy-dom
+// hub#455 — the card where an owner disconnects a device they lost (Settings › Hub).
+//
+// The runtime could revoke a device since hub#15 and nothing in the product could ask it to. This
+// is the gesture, and it is the one screen in the hub whose reason for existing is an emergency, so
+// the tests are about what it SAYS as much as about what it does:
+//
+//   - **Recognising the right device is the whole task.** An opaque id decides nothing; the list
+//     has to carry the name it signed in under, when it was last used and whether somebody is on it
+//     right now — and it must mark the device the owner is holding, because that button signs them
+//     out.
+//   - **Nothing destructive happens on one tap.** Revoking is confirmed in place, with the
+//     consequence spelled out, and the confirmation for the current device says something different
+//     because the outcome is different.
+//   - **The words are honest about the limits.** The session dies immediately, and the device can
+//     be signed in on again by somebody with an account. Promising "this device can never come
+//     back" would be a promise the runtime does not keep.
+//   - **Only an administrator writes**, mirroring the runtime gate (ADR-0248), and the runtime
+//     revalidates anyway.
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { createI18n } from 'vue-i18n';
+import { readFileSync } from 'node:fs';
+
+const { DevicesError } = vi.hoisted(() => ({
+  DevicesError: class DevicesError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'DevicesError';
+    }
+  },
+}));
+
+vi.mock('../lib/devices', () => ({
+  DevicesError,
+  listDevices: vi.fn(),
+  revokeDevice: vi.fn(),
+}));
+vi.mock('../lib/session', async () => {
+  const { ref } = await import('vue');
+  return { isAdmin: ref(true), logout: vi.fn() };
+});
+vi.mock('../components/HubIcon.vue', () => ({
+  default: { name: 'HubIcon', template: '<span />' },
+}));
+const replace = vi.fn(async () => undefined);
+vi.mock('vue-router', () => ({ useRouter: () => ({ replace }) }));
+
+import DevicesCard from './DevicesCard.vue';
+import { listDevices, revokeDevice } from '../lib/devices';
+import { isAdmin, logout } from '../lib/session';
+
+// Read from the vitest root (`apps/web`): under happy-dom `import.meta.url` is not a `file:` URL.
+const en = readFileSync(`${process.cwd()}/src/i18n/locales/en.ts`, 'utf8');
+const es = readFileSync(`${process.cwd()}/src/i18n/locales/es.ts`, 'utf8');
+
+/** The real `devices` block of a locale file. The words ARE the feature here. */
+function block(source: string): Record<string, string> {
+  const start = source.indexOf('\n  devices: {');
+  const end = source.indexOf('\n  },', start);
+  const body = source.slice(start, end);
+  const entries: Record<string, string> = {};
+  for (const match of body.matchAll(/^\s{4}(\w+):\s*\n?\s*'((?:[^'\\]|\\.)*)',?$/gm)) {
+    entries[match[1]] = match[2].replace(/\\'/g, "'");
+  }
+  return entries;
+}
+
+const i18n = createI18n({
+  legacy: false,
+  locale: 'en',
+  missingWarn: false,
+  fallbackWarn: false,
+  messages: { en: { devices: block(en) }, es: { devices: block(es) } },
+});
+
+function device(overrides: Record<string, unknown> = {}) {
+  return {
+    deviceId: 'dev_abc',
+    label: 'Office laptop',
+    trustedAt: '2026-08-01T08:00:00+00:00',
+    mode: 'personal' as const,
+    openSessions: 1,
+    lastSignIn: '2026-08-07T10:00:00+00:00',
+    signedInUntil: '2026-09-06T10:00:00+00:00',
+    current: false,
+    ...overrides,
+  };
+}
+
+async function mountCard() {
+  const wrapper = mount(DevicesCard, {
+    global: {
+      plugins: [i18n],
+      stubs: { 'ok-inline-feedback': true },
+      renderStubDefaultSlot: true,
+    },
+  });
+  await flushPromises();
+  return wrapper;
+}
+
+beforeEach(() => {
+  vi.mocked(listDevices).mockReset().mockResolvedValue([device()]);
+  vi.mocked(revokeDevice).mockReset().mockResolvedValue({
+    wasKnown: true,
+    sessionsClosed: 1,
+    wasCurrent: false,
+  });
+  vi.mocked(logout).mockReset();
+  replace.mockClear();
+  (isAdmin as unknown as { value: boolean }).value = true;
+});
+
+describe('the list', () => {
+  it('shows the signals that let a person point at the device they lost', async () => {
+    const wrapper = await mountCard();
+
+    const text = wrapper.html();
+    expect(text).toContain('Office laptop');
+    // Somebody is on it right now: the fact that turns "I think I left it somewhere" into "cut it
+    // off". The id is shown too, because two tills can carry the same name.
+    expect(text).toContain('dev_abc');
+    expect(text.toLowerCase()).toContain('in use');
+  });
+
+  it('marks the device the owner is holding', async () => {
+    vi.mocked(listDevices).mockResolvedValue([device({ current: true })]);
+
+    const wrapper = await mountCard();
+
+    expect(wrapper.html()).toContain(i18n.global.t('devices.thisDevice'));
+  });
+
+  it('names a device that never told the hub what it is called', async () => {
+    vi.mocked(listDevices).mockResolvedValue([device({ label: '  ' })]);
+
+    const wrapper = await mountCard();
+
+    // A blank row would look like a rendering fault, and the owner needs SOMETHING to tap.
+    expect(wrapper.html()).toContain(i18n.global.t('devices.unnamed'));
+  });
+
+  it('says the list is empty rather than showing nothing at all', async () => {
+    vi.mocked(listDevices).mockResolvedValue([]);
+
+    const wrapper = await mountCard();
+
+    expect(wrapper.html()).toContain(i18n.global.t('devices.empty'));
+  });
+
+  it('a failed read says so instead of looking like a business with no devices', async () => {
+    vi.mocked(listDevices).mockRejectedValue(new DevicesError('boom'));
+
+    const wrapper = await mountCard();
+
+    // The distinction matters: "no devices" would tell somebody hunting a stolen tablet that there
+    // is nothing to revoke.
+    expect(wrapper.html()).toContain('boom');
+    expect(wrapper.html()).not.toContain(i18n.global.t('devices.empty'));
+  });
+});
+
+describe('revoking', () => {
+  it('never disconnects on a single tap: it asks, and says what will happen', async () => {
+    const wrapper = await mountCard();
+
+    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+
+    expect(revokeDevice).not.toHaveBeenCalled();
+    expect(wrapper.html()).toContain(i18n.global.t('devices.confirm'));
+    // The honest limits, in the confirmation and not in a tooltip: the session dies now, and the
+    // device is not banned — somebody with an account can sign in on it again.
+    expect(wrapper.html()).toContain(i18n.global.t('devices.consequence'));
+  });
+
+  it('warns differently when the device being cut off is the one in your hands', async () => {
+    vi.mocked(listDevices).mockResolvedValue([device({ current: true })]);
+    const wrapper = await mountCard();
+
+    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+
+    expect(wrapper.html()).toContain(i18n.global.t('devices.confirmCurrent'));
+  });
+
+  it('backing out of the confirmation calls nothing', async () => {
+    const wrapper = await mountCard();
+    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+
+    await wrapper.get('[data-test="cancel-dev_abc"]').trigger('click');
+
+    expect(revokeDevice).not.toHaveBeenCalled();
+    expect(wrapper.html()).not.toContain(i18n.global.t('devices.confirm'));
+  });
+
+  it('confirming disconnects that device and reloads the list', async () => {
+    const wrapper = await mountCard();
+    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+
+    await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
+    await flushPromises();
+
+    expect(revokeDevice).toHaveBeenCalledWith('dev_abc');
+    // Reloaded, never patched locally: what the hub says is the truth, and the counts on the other
+    // rows may have moved too.
+    expect(vi.mocked(listDevices).mock.calls.length).toBe(2);
+  });
+
+  it('cutting off your own device sends you to the login instead of leaving a dead session', async () => {
+    vi.mocked(listDevices).mockResolvedValue([device({ current: true })]);
+    vi.mocked(revokeDevice).mockResolvedValue({
+      wasKnown: true,
+      sessionsClosed: 1,
+      wasCurrent: true,
+    });
+    const wrapper = await mountCard();
+    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+
+    await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
+    await flushPromises();
+
+    // The session it was using is gone server-side; keeping the screen up would mean every next tap
+    // fails with an authentication error nobody can act on.
+    expect(logout).toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith('/login');
+  });
+
+  it('cutting off ANOTHER device leaves you exactly where you were', async () => {
+    const wrapper = await mountCard();
+    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+
+    await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
+    await flushPromises();
+
+    // The other half of the branch above, and the one that would be caught late: signing the owner
+    // out every time they tidy up an old tablet would make the screen unusable.
+    expect(logout).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('a refusal keeps the reason on screen and does not pretend it worked', async () => {
+    vi.mocked(revokeDevice).mockRejectedValue(new DevicesError('sesión inválida o caducada'));
+    const wrapper = await mountCard();
+    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+
+    await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.html()).toContain('sesión inválida o caducada');
+  });
+
+  it('an employee is told who can do this, instead of finding a dead button', async () => {
+    (isAdmin as unknown as { value: boolean }).value = false;
+
+    const wrapper = await mountCard();
+
+    expect(wrapper.html()).toContain(i18n.global.t('devices.adminOnly'));
+    expect(wrapper.find('[data-test="revoke-dev_abc"]').exists()).toBe(false);
+    // The mirror stops here too, exactly like `DeviceModeCard.choose`; the runtime revalidates.
+    expect(revokeDevice).not.toHaveBeenCalled();
+  });
+});
+
+describe('the words', () => {
+  it('says it in Spanish too, and without a word a shopkeeper does not use', async () => {
+    const keys = [
+      'title',
+      'intro',
+      'thisDevice',
+      'unnamed',
+      'empty',
+      'confirm',
+      'confirmCurrent',
+      'consequence',
+      'adminOnly',
+      'inUse',
+      'lastUsed',
+      'revoke',
+      'cancel',
+      'loadError',
+    ];
+    for (const key of keys) {
+      const spanish = i18n.global.t(`devices.${key}`, 1, { locale: 'es' });
+      expect(spanish, key).toBeTruthy();
+      expect(spanish, key).not.toBe(i18n.global.t(`devices.${key}`, 1, { locale: 'en' }));
+      // ADR-0254 fixed the product's vocabulary: "tu negocio", "apps", "Mi plan". "Hub" is our word
+      // for our thing, and this screen is read by somebody running a bar.
+      expect(spanish.toLowerCase(), key).not.toMatch(/\bhubs?\b/);
+    }
+  });
+});

@@ -139,6 +139,13 @@
         <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('pinPolicy.title') }}</h2>
         <PinPolicyCard />
 
+        <!-- Los DEMÁS dispositivos (hub#455). Va justo después de los dos controles de arriba y no
+             antes: aquellos describen el dispositivo que tienes delante, este es el inventario —y el
+             gesto «se me ha perdido la tablet», que es lo único que puede cortar una sesión de 30
+             días de un dispositivo marcado «personal». -->
+        <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('devices.title') }}</h2>
+        <DevicesCard />
+
         <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('settings.hardware') }}</h2>
 
         <!-- ERPlora Bridge -->
@@ -432,6 +439,7 @@ import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import DataPanel from '../components/DataPanel.vue';
 import DeviceModeCard from '../components/DeviceModeCard.vue';
+import DevicesCard from '../components/DevicesCard.vue';
 import PinPolicyCard from '../components/PinPolicyCard.vue';
 import { bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
