@@ -285,6 +285,84 @@ async fn no_caller_can_declare_its_own_hub_a_demo() {
     assert_eq!(body_json(response).await["business_tax_id"], json!("B12345678"));
 }
 
+/// 🔴 **Las dos claves son INDEPENDIENTES, y esta es la mitad que lo demuestra.** Un hub de
+/// desarrollo sin enrolar (`HUB_AUTH=dev` + el `hub_id` placeholder) sale con `demo: true` —el
+/// contrato de siempre, el que gobierna el fallback de login por PIN del SPA— y con
+/// `ephemeral_demo: false`, porque **no** es la demo de ADR-0197.
+///
+/// Sin este test, el renombrado de `is_demo()` a `is_dev_hub()` podría haber colapsado los dos
+/// conceptos en uno y nadie se enteraría: el resto del fichero solo mira el lado `false`.
+#[tokio::test]
+async fn a_dev_hub_is_reported_as_dev_and_never_as_the_ephemeral_demo() {
+    let hub_id = erplora_server::DEV_HUB_ID;
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), hub_id);
+    rt.ensure_system_tables().await.unwrap();
+    let mut cfg = config(hub_id, false, "dev-hub");
+    cfg.auth_mode = AuthMode::Dev;
+    let router = app(AppState::with_config(rt, cfg));
+
+    let response = router
+        .oneshot(
+            Request::builder()
+                .uri("/api/hub/context")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = body_json(response).await;
+    assert_eq!(
+        body["demo"],
+        json!(true),
+        "`HUB_AUTH=dev` + hub_id placeholder = hub de DEV, y el contrato con el SPA lo dice: {body}"
+    );
+    assert_eq!(
+        body["ephemeral_demo"],
+        json!(false),
+        "…y NO es la demo efímera de ADR-0197: son dos banderas con dos dueños: {body}"
+    );
+    assert_eq!(
+        body["registration_required"],
+        json!(false),
+        "un hub de dev es la excepción al registro de máquina — lo que decide `is_dev_hub`: {body}"
+    );
+}
+
+/// 🔴 Ser hub de dev exige **las dos mitades**: `HUB_AUTH=dev` **Y** el `hub_id` placeholder.
+///
+/// Un hub REAL —con su UUID del Cloud— arrancado con `HUB_AUTH=dev` **no** es la excepción al
+/// registro de máquina. Es la mitad que separa «estoy desarrollando en local» de «este hub tiene
+/// identidad propia», y la que impide que una variable de entorno mal puesta en un despliegue de
+/// verdad abra el hub a las cabeceras del navegador.
+#[tokio::test]
+async fn dev_auth_on_a_hub_with_a_real_id_is_not_a_dev_hub() {
+    let hub_id = "hub-real-uuid";
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), hub_id);
+    rt.ensure_system_tables().await.unwrap();
+    let mut cfg = config(hub_id, false, "dev-auth-real-id");
+    cfg.auth_mode = AuthMode::Dev; // una mitad SÍ…
+    let router = app(AppState::with_config(rt, cfg)); // …pero el hub_id NO es el placeholder
+
+    let response = router
+        .oneshot(
+            Request::builder()
+                .uri("/api/hub/context")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = body_json(response).await;
+    assert_eq!(
+        body["demo"],
+        json!(false),
+        "con un hub_id real, `HUB_AUTH=dev` NO basta para ser hub de dev: {body}"
+    );
+    assert_eq!(body["ephemeral_demo"], json!(false), "{body}");
+}
+
 /// El contexto de arranque dice si este hub es la demo efímera — y lo dice en **su propia clave**.
 /// `demo` lleva años significando *modo dev* y el SPA la usa para el fallback de login por PIN:
 /// reutilizarla habría abierto ese fallback en cada demo pública.

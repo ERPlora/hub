@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::errors::RuntimeError;
+use crate::errors::{DemoLock, RuntimeError};
 
 /// Ventana de dedup local: si la misma huella se reportó hace menos de esto, se omite.
 const DEDUP_WINDOW: Duration = Duration::from_secs(30);
@@ -481,5 +481,87 @@ mod tests {
         assert_eq!(got.error_code, "wasm");
         assert_eq!(got.severity, severity::UNEXPECTED);
         assert_eq!(got.context["command"], "inventory.products.create");
+    }
+
+    // ── Los códigos de los cierres de la DEMO (ADR-0197 §4 · hub#376) ──────────────────────
+    //
+    // Son **contrato de máquina**: la UI se traduce contra ellos y el server los devuelve tal cual
+    // con un 409. Se afirman aquí, en el crate que los DEFINE, y no solo desde la puerta HTTP: si
+    // el único sitio que los mira estuviera en `erplora-server`, este crate podría cambiarlos —o
+    // vaciarlos— con su propia suite en verde.
+
+    /// El código de cada cierre, LITERAL. Un valor distinto es una regresión de contrato, no un
+    /// detalle interno: el 409 que llega al navegador deja de significar lo que la UI espera.
+    #[test]
+    fn each_demo_lock_carries_its_own_stable_code() {
+        assert_eq!(
+            DemoLock::FiscalEnvironment.as_str(),
+            "demo_fiscal_environment_locked"
+        );
+        assert_eq!(
+            DemoLock::BusinessCertificate.as_str(),
+            "demo_business_certificate_locked"
+        );
+        assert_eq!(
+            DemoLock::FiscalIdentity.as_str(),
+            "demo_fiscal_identity_locked"
+        );
+    }
+
+    /// Y los tres son DISTINTOS entre sí y no vacíos. Es lo que impide que borrar uno de los tres
+    /// cierres pase inadvertido porque otro contesta lo mismo — y un código vacío sería un 409 que
+    /// no le dice nada a nadie.
+    #[test]
+    fn the_three_demo_locks_never_collapse_into_one_answer() {
+        let codes = [
+            DemoLock::FiscalEnvironment.as_str(),
+            DemoLock::BusinessCertificate.as_str(),
+            DemoLock::FiscalIdentity.as_str(),
+        ];
+        for code in codes {
+            assert!(!code.trim().is_empty(), "un cierre sin código es un 409 mudo");
+        }
+        let mut unique = codes.to_vec();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), 3, "dos cierres con la misma respuesta: {codes:?}");
+    }
+
+    /// `error_code_of` publica el SUJETO del cierre, no un `demo_locked` plano: es lo que viaja al
+    /// registro de errores y a la respuesta HTTP.
+    #[test]
+    fn the_error_code_of_a_demo_lock_is_its_subject() {
+        for lock in [
+            DemoLock::FiscalEnvironment,
+            DemoLock::BusinessCertificate,
+            DemoLock::FiscalIdentity,
+        ] {
+            let err = RuntimeError::DemoLocked { lock };
+            assert_eq!(error_code_of(&err), lock.as_str());
+            // Y es cosa esperable del estado del hub, nunca un bug del Hub que abra una issue.
+            assert_eq!(severity_of(&err), severity::USER);
+        }
+    }
+
+    /// El mensaje humano no es el código: dice qué pasa Y la salida real («crea tu propio hub»),
+    /// que es la única acción que le queda al que se topa con el cierre.
+    #[test]
+    fn a_demo_lock_explains_itself_and_names_the_way_out() {
+        for lock in [
+            DemoLock::FiscalEnvironment,
+            DemoLock::BusinessCertificate,
+            DemoLock::FiscalIdentity,
+        ] {
+            let message = RuntimeError::DemoLocked { lock }.to_string();
+            assert!(
+                message.contains("demo hub"),
+                "el mensaje tiene que decir POR QUÉ: `{message}`"
+            );
+            assert!(
+                message.contains("create your own hub"),
+                "…y la salida real: `{message}`"
+            );
+            assert_ne!(message, lock.as_str(), "el mensaje no es el código");
+        }
     }
 }
