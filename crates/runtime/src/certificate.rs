@@ -848,6 +848,14 @@ pub fn certificate_type_from_der(der: &[u8], password: &str) -> Result<Option<Ce
 }
 
 /// Stub Android: sin OpenSSL no se puede parsear el `.p12` (ver `Cargo.toml`).
+///
+/// ⚠️ **MUTANTE EQUIVALENTE CONOCIDO** (`cargo mutants`, hub#470): sustituir este cuerpo por
+/// `Ok(Some(…))` **sobrevive**, y no se puede matar desde aquí. La función está detrás de
+/// `#[cfg(target_os = "android")]`, así que en la plataforma donde corren los tests (y donde corre
+/// el gate) **no se compila**: mutarla no cambia el binario que se prueba. Matarlo exigiría una
+/// suite cross-compilada a Android, que este workspace no tiene — y el shell Android tampoco hace
+/// transmisión fiscal todavía (mismo motivo por el que existe el stub). Sus gemelos
+/// `identity_from_der`, `expiry_from_der` y `expiry_instant_from_der` están exactamente igual.
 #[cfg(target_os = "android")]
 pub fn certificate_type_from_der(
     _der: &[u8],
@@ -917,6 +925,8 @@ fn certificate_type_of_x509(
 ///
 /// **Both, not either.** An organisation whose name happens to land in one of the two must not be
 /// read as a person; and every certificate that really belongs to somebody carries the pair.
+/// (MUTATION CANARY: turning the `&&` below into `||` must turn
+/// `one_natural_person_attribute_alone_does_not_make_a_person` red.)
 #[cfg(not(target_os = "android"))]
 fn subject_holds_a_natural_person(subject: &openssl::x509::X509NameRef) -> bool {
     use openssl::nid::Nid;
@@ -1814,6 +1824,10 @@ mod tests {
         /// Neither. A self-signed `CN=…` — what every fixture in this file has always built, and
         /// what the hub genuinely cannot classify.
         Anonymous,
+        /// **Only ONE** of the two natural-person attributes, and no `qcStatements`. Certificates
+        /// issued to organisations do land text in `givenName` on their own now and then; one
+        /// attribute is not a human.
+        HalfAPerson,
         /// Declares BOTH `QcType`s. Does not exist honestly; it is what a malformed or crafted
         /// container looks like, and it must not be resolved by falling back to the subject.
         ContradictsItself,
@@ -1844,6 +1858,9 @@ mod tests {
             name.append_entry_by_text("GN", "NOMBRE").unwrap();
             name.append_entry_by_text("SN", "APELLIDO").unwrap();
         }
+        if matches!(shape, Shape::HalfAPerson) {
+            name.append_entry_by_text("GN", "NOMBRE").unwrap();
+        }
         let name = name.build();
 
         let mut cert = X509::builder().unwrap();
@@ -1861,7 +1878,7 @@ mod tests {
             Shape::EntitySeal => &[&QC_TYPE_ESEAL_DER],
             Shape::QualifiedRepresentative => &[&QC_TYPE_ESIGN_DER],
             Shape::ContradictsItself => &[&QC_TYPE_ESEAL_DER, &QC_TYPE_ESIGN_DER],
-            Shape::PersonWithoutQcStatements | Shape::Anonymous => &[],
+            Shape::PersonWithoutQcStatements | Shape::Anonymous | Shape::HalfAPerson => &[],
         };
         if !qc_types.is_empty() {
             let types: Vec<u8> = qc_types.concat();
@@ -1948,6 +1965,19 @@ mod tests {
     #[test]
     fn a_container_with_nothing_to_go_on_is_not_guessed_to_be_a_seal() {
         assert_eq!(type_of(Shape::Anonymous), None);
+    }
+
+    /// 🔒 **One natural-person attribute alone is not a person.** `givenName` **and** `surname`, both
+    /// of them: an organisation with text in only one of the two must not be read as a human, and
+    /// every certificate that really belongs to somebody carries the pair.
+    ///
+    /// It matters in the direction that costs: read as a person, such a container would be a
+    /// *representative* — which is right by luck here, but the same laxity is what turns «I found no
+    /// person» into evidence, and the absence of a person is the ONLY thing standing between an
+    /// unclassifiable certificate and the seal's door. Found by mutation (`&&` → `||` survived).
+    #[test]
+    fn one_natural_person_attribute_alone_does_not_make_a_person() {
+        assert_eq!(type_of(Shape::HalfAPerson), None);
     }
 
     /// A container declaring both `QcType`s contradicts itself, and a contradiction is not resolved

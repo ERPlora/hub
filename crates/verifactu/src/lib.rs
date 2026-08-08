@@ -455,6 +455,12 @@ fn record_environment(record: &Json) -> Option<String> {
 /// REJECTED — loud, and recoverable one record at a time — while the wrong environment is
 /// ACCEPTED by a tax agency that was never meant to receive it, and an accepted record is
 /// neither resent nor deleted (ADR-0189).
+///
+/// ⚠️ The certificate axis is [`signing_type`], **not** [`signing_kind`] (hub#470): the AEAT
+/// segregates by what the certificate IS, and the slot only says whose it is. This function is the
+/// second place in the engine that multiplies the two axes, so it is also the second place that has
+/// to read the same value as [`transmission_endpoint`] — reading one from the type and the other
+/// from the slot is exactly the shape of defect this whole chain keeps producing.
 fn destination_of(record: &Json, config: &Json) -> std::result::Result<Destination, String> {
     let hub_environment = environment_of(config);
     let Some(environment) = record_environment(record) else {
@@ -464,7 +470,7 @@ fn destination_of(record: &Json, config: &Json) -> std::result::Result<Destinati
         ));
     };
     Ok(Destination {
-        endpoint: aeat::endpoint(&environment, &signing_kind(config)),
+        endpoint: aeat::endpoint(&environment, &signing_type(config)),
         // Only when they differ: `Some` IS the drift, so nothing downstream has to compare.
         hub_environment: (environment != hub_environment).then_some(hub_environment),
         environment,
@@ -3440,10 +3446,15 @@ mod environment_chain_tests {
     /// environment from the record (its chain), the door from the certificate signing TODAY
     /// (hub#320 — the AEAT segregates by the certificate presented in the TLS handshake, so a
     /// record that waited days goes through the door of whatever signs now).
+    ///
+    /// The door axis is the certificate's **TYPE**, not the slot it came from (hub#470): `delegated`
+    /// says the control plane handed the container down, and ERPlora's own `.p12` is a
+    /// *representative* certificate — routing on the slot would have sent the whole delegated fleet
+    /// to `www10` and had every record rejected.
     #[test]
     fn the_door_follows_todays_certificate_while_the_environment_follows_the_record() {
         let mut config = config_row("production");
-        config["certificate_kind"] = json!("delegated");
+        config["certificate_type"] = json!("seal");
 
         let destination = destination_of(&queued_testing_record(), &config)
             .expect("a record that carries its environment resolves");
@@ -3451,6 +3462,18 @@ mod environment_chain_tests {
         assert_eq!(
             destination.endpoint, PREPRODUCTION_SEAL,
             "preproduction because of the RECORD, the seal door because of TODAY's certificate"
+        );
+
+        // And the SLOT alone moves nothing: a delegated container that is not a seal keeps the
+        // holder's door, on the very same record.
+        let mut slot_only = config_row("production");
+        slot_only["certificate_kind"] = json!("delegated");
+        assert_eq!(
+            destination_of(&queued_testing_record(), &slot_only)
+                .expect("a record that carries its environment resolves")
+                .endpoint,
+            PREPRODUCTION_HOLDER,
+            "the slot is not the door axis (hub#470)"
         );
     }
 
