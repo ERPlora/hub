@@ -6,9 +6,14 @@ Diseño en [architecture/hub/apps/bridge.md](../../../architecture/hub/apps/brid
 
 ## Consumidores
 
-- **`apps/bridge`** — el **Bridge standalone (red-only)**, la única app instalable (ADR-0154):
-  servidor Axum `GET /status` + `WS /ws` que envuelve este crate. La web shell del Hub Cloud lo
-  alcanza por localhost HTTP/WS.
+- **`apps/tauri`** — **la** app instalable (ADR-0196/0204): sus `invoke` de hardware llaman a este
+  crate **in-process**. No hay servidor local, ni puerto, ni token de emparejamiento.
+
+> 🪦 Hubo un segundo consumidor, el **Bridge standalone** (`apps/bridge`, Axum `GET /status` +
+> `WS /ws` en `localhost:12321`), al que la web shell llegaba por localhost. ADR-0196 lo retiró y
+> **hub#340 lo borró del árbol**: el precio explícito es que una PWA en un navegador, sin la app,
+> no imprime tiques térmicos. Historia en
+> [architecture/hub/apps/bridge.md](../../../architecture/hub/apps/bridge.md).
 
 Habla el **mismo protocolo JSON** que la web shell del Hub consume.
 

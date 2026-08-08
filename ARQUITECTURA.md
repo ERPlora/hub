@@ -176,13 +176,20 @@ El escáner por HID lo maneja el SO/navegador como teclado.
 > rechaza con `hardware_unavailable` — nunca resuelve callando (un tique dado por impreso que no
 > ha salido sería el fallo caro).
 >
-> Siguen en el árbol, **solo** porque hub#340 está abierta: el standalone `apps/bridge` (binario
-> Axum, `GET /status` + `WS /ws` en `localhost:12321`), el pairing y las credenciales de máquina
-> del bridge (incluido el refresco de `GET /api/bridge/token` que el shell aún dispara en el boot,
-> ya sin nadie que presente el token). **No construyas nada nuevo sobre esto**: el modelo vigente
-> es la **app instalable** con `invoke` in-process y la **cola de impresión en el hub**. Ver
-> [architecture/hub/apps/bridge.md](../architecture/hub/apps/bridge.md) y
+> **La retirada está EJECUTADA** (hub#340, 2026-08-08): del árbol se fueron el standalone
+> `apps/bridge` (binario Axum, `GET /status` + `WS /ws` en `localhost:12321`), su pairing
+> device-code, su release (`bridge-release.yml` + el MSIX de la 2ª ficha) y las credenciales de
+> máquina del bridge — incluido el refresco de `GET /api/bridge/token`, que desde hub#339 pedía
+> cada 12 min un secreto con caducidad que **ningún cliente presentaba**. El runtime ya no expone
+> esa ruta y `cloud-client` ya no sabe pedirla.
+>
+> El modelo vigente es la **app instalable** con `invoke` in-process y la **cola de impresión en el
+> hub**. Ver [architecture/hub/apps/bridge.md](../architecture/hub/apps/bridge.md) y
 > [architecture/hub/crates/peripherals.md](../architecture/hub/crates/peripherals.md).
+>
+> Queda **el otro lado del cable**: los endpoints `api/v1/bridge/` del SaaS y sus modelos
+> (`BridgePairing`/`BridgeDevice`) siguen desplegados, ahora sin un solo llamador en todo el
+> código (medido). Su retirada es saas#1274.
 
 | Pieza | Elección | Nota |
 |-------|----------|------|

@@ -43,8 +43,7 @@ ver más abajo):
   (manifest → migraciones → queries/commands/eventos con scope `hub_id`) + adaptador PostgreSQL
   (`PgAdapter`). Módulos de ejemplo viven hoy en `modules-workspace/modules/` (fuente), no en
   `hub/modules/`. **Compila y pasa tests**: `cargo check --workspace` en verde y
-  `cargo test --workspace` corre cientos de tests en las crates + `apps/tauri/src-tauri`
-  (`apps/bridge` sigue en el workspace pero está **en retirada** — ADR-0196), contra un
+  `cargo test --workspace` corre cientos de tests en las crates + `apps/tauri/src-tauri`, contra un
   **Postgres real** (schema efímero por test vía `erplora_db::testutil`; CI con service container
   `postgres:18`). Ver [crates/README.md](crates/README.md) y
   [REPASO-MOTOR-RUST.md](REPASO-MOTOR-RUST.md).
@@ -74,7 +73,7 @@ docker/          Dockerfile (multi-stage: frontend Vite → builder Rust →
 - **Node 20+** (hay Node 24) + **pnpm 10+** (`corepack enable pnpm`).
 - **Playwright** (specs e2e en `apps/web/tests/e2e/`) y **vitest** para el web.
 - **Rust** para `crates/*` y `apps/tauri/src-tauri` (`cargo check --workspace` /
-  `cargo test --workspace`); `apps/bridge` sigue en el workspace pero está en retirada (ADR-0196).
+  `cargo test --workspace`).
 - **PostgreSQL** (los tests corren contra un Postgres real; en CI, service container `postgres:18`).
 
 > El registry npm del repo es el público (`.npmrc`); el `~/.npmrc` global apunta a un

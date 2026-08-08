@@ -91,34 +91,27 @@ parece descarga propia pero firma/updates son de la Store) y ponerla en la pági
 descargas junto a macOS/Linux (que siguen sirviéndose de `downloads/` en Object Storage).
 Enlace a ficha: `https://apps.microsoft.com/detail/<STORE_ID>`.
 
-## Bridge headless: canal S3, SIN ficha de Store (ADR-0160, 2026-07-29)
-
-> **ADR-0196 (2026-08-03) retira el bridge entero**, no solo su ficha de Store: mueren
-> `apps/bridge` y el WS `:12321`, y con ellos este canal de descarga. **La retirada aún no se
-> ha ejecutado** — comprueba si `apps/bridge/` sigue en el árbol antes de dar por buena
-> ninguna de las notas de abajo.
+## 🪦 Bridge headless: retirado (ADR-0160 → ADR-0196, ejecutado en hub#340)
 
 **Decisión (Ioan, ADR-0160):** NO hay segunda ficha en ninguna tienda. Una sola ficha
 **«ERPlora»** (`com.erplora.app`) por tienda: la app es el antiguo bridge con interfaz de
 configuración rápida y, al abrirse, abre la PWA del Hub. La antigua «segunda ficha ERPlora
-Bridge» (hub#120–#124) queda **descartada**.
+Bridge» (hub#120–#124) quedó **descartada**.
 
-El binario headless `apps/bridge` (`erplora-bridge`) **sigue existiendo**, pero SOLO como
-descarga de S3 (`downloads/bridge/`, CI
-[`bridge-release.yml`](../../.github/workflows/bridge-release.yml)); nunca pasa por
-Partner Center.
+**ADR-0196 fue más lejos y hub#340 lo ejecutó (2026-08-08):** ya no hay binario headless. Del
+árbol se fueron `apps/bridge`, su manifest MSIX, el workflow `bridge-release.yml` y con él la
+publicación a `downloads/bridge/`. Lo que queda por hacer en otros repos:
 
-Notas operativas que siguen vigentes (heredadas de la sección retirada):
+- **hub#507** — Sistema → «Descargar la app» todavía apunta a `/bridge/download/`, que sirve el
+  binario retirado. Debe repuntar a `/app/download/`, que el Cloud sirve desde saas#1242.
+- **saas#1274** — retirar en el SaaS las rutas del pairing (`api/v1/bridge/`), el
+  `device/bridge-token/` y los modelos `BridgePairing`/`BridgeDevice` (0 llamadores, 0 filas).
+- El switch del SaaS (saas#707, `MICROSOFT_STORE_BRIDGE_ID`) queda **muerto**: no había ficha que
+  apuntar y ya no hay producto.
 
-- **hub#121** (devices.json → LocalAppData) está implementado en el binario y sigue siendo
-  válido con independencia del canal (persistencia fuera del directorio de instalación).
-- El cableado MSIX del bridge que quedó en el repo (manifest `apps/bridge/msix/`,
-  `pack-msix.ps1 -Flavor bridge`, gates `BRIDGE_MSIX_IDENTITY_NAME` /
-  `BRIDGE_MICROSOFT_STORE_PRODUCT_ID` en `bridge-release.yml`) queda **inerte por gates
-  vacíos** — esas Variables NO se configuran nunca; su retirada física es follow-up aparte.
-- El switch del SaaS (saas#707, `MICROSOFT_STORE_BRIDGE_ID`) queda **obsoleto**: sin
-  configurar, `bridge:download/windows/` sigue sirviendo la descarga de S3 — exactamente
-  el canal del headless.
+⚠️ El packer `scripts/pack-msix.ps1` **era del bridge** y `tauri-release.yml` lo llamaba sin
+`-Flavor`, así que el MSIX de la app nunca pudo construirse. hub#340 lo repuntó a la app; falta
+verificarlo en un runner Windows — **hub#577**.
 
 ## Prueba local del MSIX (opcional, en Windows)
 

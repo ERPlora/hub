@@ -7,7 +7,6 @@ import App from './App.vue';
 import { router } from './router';
 import { i18n } from './i18n';
 import { getClient, clientInjectionKey, bootHubContext } from './lib/runtime';
-import { startBridgeTokenRefresh } from './lib/bridge-client';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
@@ -199,11 +198,5 @@ void bootHubContext().finally(async () => {
   } catch {
     // Login remains available and the one-time credential has already been removed from the URL.
   }
-  // Token de emparejamiento del Bridge standalone. **Ya no lo presenta nadie**: con ADR-0196 §3 el
-  // SDK dejó de tener transporte WS (hub#339), así que este refresco cada 12 min pide una
-  // credencial que ningún cliente usa. Se retira con el resto del pairing y `api/v1/bridge` en
-  // **hub#340**, que es quien borra el endpoint que lo emite — quitar aquí la llamada dejaría
-  // media retirada repartida entre dos PRs.
-  startBridgeTokenRefresh();
   router.isReady().then(() => app.mount('#app'));
 });
