@@ -109,9 +109,10 @@ publicación a `downloads/bridge/`. Lo que queda por hacer en otros repos:
 - El switch del SaaS (saas#707, `MICROSOFT_STORE_BRIDGE_ID`) queda **muerto**: no había ficha que
   apuntar y ya no hay producto.
 
-⚠️ El packer `scripts/pack-msix.ps1` **era del bridge** y `tauri-release.yml` lo llamaba sin
-`-Flavor`, así que el MSIX de la app nunca pudo construirse. hub#340 lo repuntó a la app; falta
-verificarlo en un runner Windows — **hub#577**.
+El packer `scripts/pack-msix.ps1` **ya es de la app**: venía del bridge y `tauri-release.yml` lo
+llamaba sin `-Flavor`, así que el MSIX de la app no podía construirse. **hub#340 / PR #585 lo
+arregló.** Lo único que falta es verificarlo en un runner Windows de verdad, que es DoD de
+**hub#392** (la publicación en Microsoft Store), no de hub#577.
 
 ## Prueba local del MSIX (opcional, en Windows)
 
