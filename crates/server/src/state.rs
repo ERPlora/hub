@@ -99,9 +99,10 @@ pub struct HubConfig {
     /// **Device-trust** del login por PIN (§2.9, hub#15 · hub#330). Activo, el login por PIN exige
     /// que el cliente identifique el dispositivo **y** que ese dispositivo sea de confianza (lo pasa
     /// a serlo un login online cloud previo). Sin `device_id` se rechaza: omitirlo era el bypass.
-    /// Sigue siendo **opt-in** (`HUB_DEVICE_TRUST=enforce`): activarlo por defecto dejaría un hub
-    /// Cloud recién creado sin login por PIN, porque el navegador no tiene `device_id` hasta que la
-    /// máquina está registrada. Activarlo depende de un id de dispositivo estable por navegador.
+    /// Sigue siendo **opt-in** (`HUB_DEVICE_TRUST=enforce`), pero ya no por falta de identidad: el
+    /// navegador se acuña la suya y la conserva (hub#454), así que la tiene desde el primer arranque
+    /// y no depende de que la máquina esté registrada. Encenderlo por defecto es ahora una decisión
+    /// propia — hub#330.
     pub device_trust_enforce: bool,
     /// **Sector / tipo de negocio** del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`), lo
     /// inyecta el despliegue vía env `HUB_SECTOR` (hermano de `HUB_LANGUAGE`/`HUB_CURRENCY`). Lo
@@ -172,10 +173,10 @@ impl HubConfig {
         let cloud_api_token = std::env::var("HUB_CLOUD_API_TOKEN")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        // Still opt-in (hub#330): turning it on by default would lock a fresh Cloud hub out of PIN
-        // login entirely — the browser only has a device id once the machine is registered
-        // (`runtime.ts` sets it from `hub_id` behind `machine_registered`), so on first run there
-        // is none to send. The bypass is closed regardless of this flag's value.
+        // Still opt-in (hub#330), but no longer for lack of an identity: since hub#454 the browser
+        // mints and keeps its own device id, so a fresh Cloud hub has one to send on its very first
+        // run. Turning it on by default is a decision of its own now. The bypass is closed
+        // regardless of this flag's value.
         let device_trust_enforce =
             matches!(std::env::var("HUB_DEVICE_TRUST").as_deref(), Ok("enforce"));
         // Sector / tipo de negocio del hub (preset "Recomendado" del dashboard, ADR-0054). Vacío o

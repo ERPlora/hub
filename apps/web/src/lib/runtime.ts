@@ -24,7 +24,7 @@ import { getLocale, bootHubLanguage } from '../i18n';
 import { hubSettings } from './hub-settings';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
-import { setRuntimeDeviceContext } from './device';
+import { setRuntimeClientKind } from './device';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -934,14 +934,14 @@ export async function bootHubContext(): Promise<HubContext | null> {
     machineRegistrationRequired.value = Boolean(ctx.registration_required);
     cloudPublicKeyLoaded.value = Boolean(ctx.public_key_loaded);
     if (ctx.hub_id) config.hubId = ctx.hub_id;
-    // El runtime es la autoridad del modo demo y del vínculo de máquina. En Cloud el UUID del
-    // deployment funciona como id estable de la máquina lógica; Tauri lo sustituye por su
-    // `device.id` nativo al construir las cabeceras de login.
+    // The runtime is the authority on demo mode and on the machine link. What it can say about the
+    // client is what KIND it is — a provisioned Cloud machine — and nothing more: **which** device
+    // is asking is not something the hub can see, and its own id names the hub (hub#454). The
+    // device identity is resolved in `device.ts`: the shell's installation id, or the one this
+    // browser minted for itself.
     if (ctx.demo) config.demo = true;
-    setRuntimeDeviceContext(
-      ctx.machine_registered && ctx.hub_id
-        ? { id: ctx.hub_id, clientType: 'hub-cloud', platform: 'cloud' }
-        : null,
+    setRuntimeClientKind(
+      ctx.machine_registered ? { clientType: 'hub-cloud', platform: 'cloud' } : null,
     );
     if (Array.isArray(ctx.pin_users)) pinUsers.value = ctx.pin_users;
     // Sector del hub para el preset "Recomendado" del dashboard. Acepta `sector` o el alias
