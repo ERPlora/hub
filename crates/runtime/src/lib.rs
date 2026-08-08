@@ -1308,6 +1308,20 @@ impl Runtime {
         fiscal_profile::refresh(self.db.as_ref(), &self.registry, &self.hub_id).await
     }
 
+    /// **El go-live** (ADR-0259 D3, hub#551): `READY → ACTIVE`, que ES `testing → production`.
+    /// Una sola transición y un solo sitio donde se guarda. Exige que el perfil esté `READY` —la
+    /// misma condición que enseña la checklist— y que el hub pueda hacerlo (una demo no).
+    pub async fn fiscal_go_live(&self) -> Result<fiscal_profile::FiscalProfile> {
+        fiscal_profile::go_live(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// **Apaga el go-live**, y solo mientras no haya salido ni un registro hacia la Hacienda real
+    /// (ADR-0259 D3). Lo irreversible es el primer ENVÍO, no el clic: quien activa por error y se
+    /// da cuenta antes de facturar puede volver.
+    pub async fn fiscal_stand_down(&self) -> Result<fiscal_profile::FiscalProfile> {
+        fiscal_profile::stand_down(self.db.as_ref(), &self.hub_id).await
+    }
+
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
     /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
     pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {
