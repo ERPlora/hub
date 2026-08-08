@@ -452,6 +452,16 @@ pub struct RequestContext {
     /// [`crate::elevation::Grants`] — **never** a claim: an unknown, expired or foreign token is
     /// indistinguishable from no token at all, and the payload is never read for it.
     pub elevation_token: Option<String>,
+    /// **What this hub owes right now** (ADR-0259 D2, hub#550): the fiscal profile's status
+    /// resolved against what is mounted, including the derived `BLOCKED`. The dispatcher fills it
+    /// alongside the business identity and the certificate flag, from the core's own tables — no
+    /// caller can state it.
+    ///
+    /// `None` means **not resolved**, never "nothing owed". It is deliberately not defaulted to a
+    /// permissive value: an enrichment path that forgot to stamp it would otherwise look compliant,
+    /// which is the failure mode `Registry::demo_hub` is placed in the registry to avoid. Whoever
+    /// gates on this (hub#556) resolves `None` rather than passing it.
+    pub fiscal_mode: Option<crate::fiscal_profile::FiscalMode>,
     /// `hub_user.id` of the manager whose approval let this command past the permission gate.
     /// Filled by the dispatcher **after** spending a grant, so it is a fact about what happened,
     /// not something a caller can assert. This is the seam hub#362 writes next to the cashier's
@@ -494,6 +504,7 @@ impl RequestContext {
             business_legal_name: String::new(),
             business_address: String::new(),
             has_certificate: false,
+            fiscal_mode: None,
             principal: Principal::Human,
             elevation_token: None,
             approved_by: None,
@@ -557,6 +568,13 @@ impl RequestContext {
     /// Lo rellena el dispatcher junto a `with_business`. Builder para no romper los `new(...)`/tests.
     pub fn with_certificate(mut self, present: bool) -> Self {
         self.has_certificate = present;
+        self
+    }
+
+    /// Stamps the hub's effective fiscal mode (ADR-0259 D2, hub#550). Only the dispatcher calls it,
+    /// from the core's own tables — it is a fact about the hub, not a claim from the caller.
+    pub fn with_fiscal_mode(mut self, mode: crate::fiscal_profile::FiscalMode) -> Self {
+        self.fiscal_mode = Some(mode);
         self
     }
 }

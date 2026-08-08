@@ -59,6 +59,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 
 use crate::errors::{Result, RuntimeError};
+use crate::registry::Registry;
 use crate::registry::now_rfc3339;
 
 /// The state machine of the fiscal profile (ADR-0259 D2).
@@ -145,6 +146,193 @@ pub struct FiscalProfile {
     pub can_go_live: bool,
     /// Something the core could not decide and refuses to guess (ADR-0249).
     pub needs_review: bool,
+}
+
+/// Why a hub that went live is not operating (ADR-0259 D2, hub#550). Derived, never stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockedReason {
+    /// Nobody is left to comply: no installed **and active** module fulfils the hub's regime.
+    ProviderMissing,
+    /// `system_id` is not this hub: these rows were written by a different installation, so the
+    /// chain they hang from is not ours to continue (ADR-0202 `NumeroInstalacion = hub_id`).
+    InstallationMismatch,
+}
+
+impl BlockedReason {
+    /// The stable rejection code the UI programs against (hub#556 turns these into refusals).
+    pub fn code(self) -> &'static str {
+        match self {
+            BlockedReason::ProviderMissing => "fiscal.provider_missing",
+            BlockedReason::InstallationMismatch => "fiscal.installation_mismatch",
+        }
+    }
+}
+
+/// **What this hub owes right now**: the stored [`FiscalStatus`] plus what has to be derived.
+///
+/// The only difference from the stored status is [`FiscalMode::Blocked`], and it exists precisely
+/// because it is *not* stored: a state that gets written down outlives the bug that wrote it and
+/// then has to be repaired by hand. Derived, it is fixed by fixing the fact — reinstall the
+/// provider and the hub is `ACTIVE` again on the next read, with nobody editing a row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FiscalMode {
+    NotRequired,
+    Unconfigured,
+    Ready,
+    Active,
+    /// `ACTIVE` on paper, not operating in fact.
+    Blocked(BlockedReason),
+    Closed,
+}
+
+/// The installed **and active** modules that fulfil `regime` for `country` (ADR-0259 D5/D6).
+///
+/// The core **counts**; it never picks. Two providers of one regime are a spare, not a conflict,
+/// and which one a hub uses is the user's business — hence a slice and not an `Option`.
+///
+/// Inactive counts as absent, and that is the point: a deactivated module runs no listener, which
+/// is indistinguishable — for the purpose of complying — from not being installed at all.
+pub fn providers_of<'a>(
+    registry: &'a Registry,
+    country: &str,
+    regime: &str,
+) -> Vec<&'a crate::manifest::Manifest> {
+    if regime.trim().is_empty() {
+        return Vec::new();
+    }
+    registry
+        .installed
+        .iter()
+        .filter(|m| registry.is_active(&m.id) && m.fulfils_regime(country, regime))
+        .collect()
+}
+
+/// The events a healthy provider says it listens to — what the core LEARNS while it can ask
+/// (ADR-0259 D4). Sorted and deduplicated so the stored set is stable and comparing it is cheap.
+///
+/// The runtime does not know what `invoice.created` means, and does not need to: it knows *the
+/// provider of this hub's regime said it was listening to it while it was healthy*. That is the
+/// whole trick — it never names business, and it never names a module.
+pub fn learned_trigger_events(registry: &Registry, country: &str, regime: &str) -> Vec<String> {
+    let mut events: Vec<String> = providers_of(registry, country, regime)
+        .iter()
+        .flat_map(|m| m.events.listen.keys().cloned())
+        .collect();
+    events.sort();
+    events.dedup();
+    events
+}
+
+/// Resolves the **effective** mode of `profile` against what is actually mounted (ADR-0259 D2/D4).
+///
+/// Only a hub that went live can be [`FiscalMode::Blocked`]: before the go-live nothing is
+/// anchored, so a missing provider is a task, not an emergency. Turning a hub that never emitted
+/// into a blocked one would stop a till over a checklist item.
+pub fn determine_fiscal_mode(
+    profile: &FiscalProfile,
+    registry: &Registry,
+    hub_id: &str,
+) -> FiscalMode {
+    match profile.status {
+        FiscalStatus::NotRequired => FiscalMode::NotRequired,
+        FiscalStatus::Unconfigured => FiscalMode::Unconfigured,
+        FiscalStatus::Ready => FiscalMode::Ready,
+        FiscalStatus::Closed => FiscalMode::Closed,
+        FiscalStatus::Active => {
+            // The installation check comes first: if these rows belong to somebody else, whether a
+            // provider happens to be mounted is beside the point — continuing another hub's chain
+            // is worse than not emitting.
+            if !profile.system_id.is_empty() && profile.system_id != hub_id {
+                return FiscalMode::Blocked(BlockedReason::InstallationMismatch);
+            }
+            if providers_of(registry, &profile.country_code, &profile.fiscal_system).is_empty() {
+                return FiscalMode::Blocked(BlockedReason::ProviderMissing);
+            }
+            FiscalMode::Active
+        }
+    }
+}
+
+/// Resolves the profile against the world and returns the effective mode (ADR-0259 D2/D4, hub#550).
+///
+/// Runs on every boot, after the registry has been rehydrated — that is the first moment the two
+/// halves of the answer (what the hub owes, and who is mounted to comply) are both available.
+/// Idempotent by construction: everything it writes is recomputed from the same inputs.
+///
+/// Three things happen, in this order:
+///
+/// 1. [`ensure`] resolves the country and the regime (and bootstraps the row on a new hub).
+/// 2. **`READY` is computed, not remembered**: identity ∧ certificate ∧ at least one provider
+///    mounted and active. It is the same condition the go-live will ask for (hub#551), evaluated
+///    once — a checklist and a gate that disagree about "is this configured?" turn one of them into
+///    a lie. It moves `UNCONFIGURED ⇄ READY` and **never touches** `ACTIVE`/`CLOSED`: after the
+///    go-live the answer is not derived from settings any more.
+/// 3. **The trigger events are refreshed while there is somebody to ask.** A provider that is
+///    updated — or replaced by another of the same regime — moves the set. When there is nobody,
+///    the stored set is left exactly as it was: that is the memory hub#556 refuses with.
+pub async fn refresh(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+) -> Result<FiscalMode> {
+    let profile = ensure(db, hub_id).await?;
+    let providers = providers_of(registry, &profile.country_code, &profile.fiscal_system);
+
+    // Learnt while healthy, remembered when gone: only overwrite when somebody taught us something.
+    if !providers.is_empty() {
+        let learned =
+            learned_trigger_events(registry, &profile.country_code, &profile.fiscal_system);
+        if learned != profile.fiscal_trigger_events {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
+            p.insert("events".into(), json!(json!(learned).to_string()));
+            db.execute(
+                "UPDATE _hub_fiscal_profile SET fiscal_trigger_events = :events \
+                 WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await?;
+        }
+    }
+
+    // The go-live froze the answer; settings do not move it any more.
+    if !profile.status.is_frozen() && profile.status != FiscalStatus::NotRequired {
+        let settings = crate::settings::get_all(db, hub_id).await.unwrap_or(json!({}));
+        let filled = |key: &str| {
+            settings
+                .get(key)
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .trim()
+                .is_empty()
+                .eq(&false)
+        };
+        // Degrading to `false` on error keeps this failing CLOSED: a hub whose certificate cannot
+        // be read is not ready to emit.
+        let has_certificate = crate::certificate::can_sign(db, hub_id).await.unwrap_or(false);
+        let ready = filled("business_tax_id")
+            && filled("business_legal_name")
+            && has_certificate
+            && !providers.is_empty();
+        let wanted = if ready {
+            FiscalStatus::Ready
+        } else {
+            FiscalStatus::Unconfigured
+        };
+        if wanted != profile.status {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
+            p.insert("status".into(), json!(wanted.as_str()));
+            db.execute(
+                "UPDATE _hub_fiscal_profile SET status = :status WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await?;
+        }
+    }
+
+    let profile = reload(db, hub_id).await?;
+    Ok(determine_fiscal_mode(&profile, registry, hub_id))
 }
 
 /// Resolves the regime owed by `country_code`, or `""` if that country has no row.
@@ -321,6 +509,23 @@ mod tests {
         }
     }
 
+    /// Writes any `hub_settings` key.
+    async fn set_setting(db: &dyn DatabaseAdapter, hub_id: &str, key: &str, value: &str) {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("key".into(), json!(key));
+        p.insert("value".into(), json!(value));
+        p.insert("now".into(), json!(now_rfc3339()));
+        db.execute(
+            "INSERT INTO hub_settings (hub_id, key, value, updated_at) \
+             VALUES (:hub_id, :key, :value, :now) \
+             ON CONFLICT (hub_id, key) DO UPDATE SET value = EXCLUDED.value",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
     /// Writes `hub_settings.country_code`, the way provisioning's seed does.
     async fn set_country(db: &dyn DatabaseAdapter, hub_id: &str, country: &str) {
         let mut p = Params::new();
@@ -483,6 +688,308 @@ mod tests {
         assert_eq!(regime_for_country(&db, "ES").await.unwrap(), "verifactu");
         assert_eq!(regime_for_country(&db, "es").await.unwrap(), "verifactu");
         assert_eq!(regime_for_country(&db, "FR").await.unwrap(), "");
+    }
+
+    // ── The effective mode: what is derived, and why it is derived (ADR-0259 D2/D4, hub#550) ──
+
+    /// A registry holding `modules`, each `(id, fiscal_regime_json, listens_to, active)`.
+    fn registry_with(modules: &[(&str, Option<serde_json::Value>, &[&str], bool)]) -> Registry {
+        use crate::registry::ModuleStatus;
+        let mut reg = Registry::new();
+        for (id, fiscal, listens, active) in modules {
+            let listen: serde_json::Map<String, serde_json::Value> = listens
+                .iter()
+                .map(|e| ((*e).to_string(), json!({ "command": "x.noop" })))
+                .collect();
+            let mut manifest = json!({
+                "id": id, "name": id, "version": "1.0.0",
+                "events": { "listen": listen }
+            });
+            if let Some(f) = fiscal {
+                manifest["fiscal_regime"] = f.clone();
+            }
+            reg.installed.push(serde_json::from_value(manifest).expect("manifest parses"));
+            reg.status.insert(
+                (*id).to_string(),
+                if *active { ModuleStatus::Active } else { ModuleStatus::Inactive },
+            );
+        }
+        reg
+    }
+
+    /// A profile in `status`, for a Spanish hub owing VeriFactu.
+    fn profile_in(status: FiscalStatus, system_id: &str) -> FiscalProfile {
+        FiscalProfile {
+            country_code: "ES".into(),
+            taxpayer_id: String::new(),
+            fiscal_system: "verifactu".into(),
+            status,
+            environment: "testing".into(),
+            activated_at: String::new(),
+            first_record_at: String::new(),
+            system_id: system_id.into(),
+            fiscal_trigger_events: Vec::new(),
+            can_go_live: true,
+            needs_review: false,
+        }
+    }
+
+    /// 🔴 **The case the whole ADR exists for.** The hub went live and the provider went away —
+    /// uninstalled, failed to mount after a restore, or left inactive by a bug. The stored status
+    /// still says `ACTIVE` and must not be believed.
+    #[test]
+    fn active_with_no_provider_mounted_is_blocked() {
+        let empty = registry_with(&[]);
+        assert_eq!(
+            determine_fiscal_mode(&profile_in(FiscalStatus::Active, "hub-es"), &empty, "hub-es"),
+            FiscalMode::Blocked(BlockedReason::ProviderMissing)
+        );
+    }
+
+    /// With a provider mounted and active, `ACTIVE` means what it says.
+    #[test]
+    fn active_with_a_provider_is_active() {
+        let reg = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            true,
+        )]);
+        assert_eq!(
+            determine_fiscal_mode(&profile_in(FiscalStatus::Active, "hub-es"), &reg, "hub-es"),
+            FiscalMode::Active
+        );
+    }
+
+    /// **An inactive provider is not a provider.** The module is installed and its rows are there,
+    /// and it will not run a single listener — which is, for the purpose of complying, the same as
+    /// not being there.
+    #[test]
+    fn a_deactivated_provider_does_not_count() {
+        let reg = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            false,
+        )]);
+        assert_eq!(
+            determine_fiscal_mode(&profile_in(FiscalStatus::Active, "hub-es"), &reg, "hub-es"),
+            FiscalMode::Blocked(BlockedReason::ProviderMissing)
+        );
+    }
+
+    /// A provider of ANOTHER regime does not comply with this one. The core counts providers of the
+    /// regime the hub owes, not modules that happen to be fiscal.
+    #[test]
+    fn a_provider_of_another_regime_does_not_count() {
+        let reg = registry_with(&[(
+            "facturx",
+            Some(json!({ "country": "FR", "regime": "facturx" })),
+            &["invoice.created"],
+            true,
+        )]);
+        assert_eq!(
+            determine_fiscal_mode(&profile_in(FiscalStatus::Active, "hub-es"), &reg, "hub-es"),
+            FiscalMode::Blocked(BlockedReason::ProviderMissing)
+        );
+    }
+
+    /// **Two providers of one regime are a spare, not a conflict.** The core counts; which one the
+    /// hub uses is not its decision (that is why the profile stores no `module_id`).
+    #[test]
+    fn two_providers_of_the_same_regime_both_count() {
+        let reg = registry_with(&[
+            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            ("otro", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+        ]);
+        assert_eq!(providers_of(&reg, "ES", "verifactu").len(), 2);
+        assert_eq!(
+            determine_fiscal_mode(&profile_in(FiscalStatus::Active, "hub-es"), &reg, "hub-es"),
+            FiscalMode::Active
+        );
+    }
+
+    /// The database says it belongs to a different installation. Continuing a chain somebody else
+    /// opened is worse than not emitting, so this is checked **before** looking for a provider.
+    #[test]
+    fn a_profile_from_another_installation_is_blocked() {
+        let reg = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            true,
+        )]);
+        assert_eq!(
+            determine_fiscal_mode(&profile_in(FiscalStatus::Active, "hub-otro"), &reg, "hub-es"),
+            FiscalMode::Blocked(BlockedReason::InstallationMismatch)
+        );
+    }
+
+    /// **Only a hub that went live can be blocked.** Before the go-live nothing is anchored, so a
+    /// missing provider is a task on a checklist — blocking a till over it would be absurd.
+    #[test]
+    fn a_hub_that_never_went_live_is_never_blocked() {
+        let empty = registry_with(&[]);
+        for status in [FiscalStatus::NotRequired, FiscalStatus::Unconfigured, FiscalStatus::Ready] {
+            let mode = determine_fiscal_mode(&profile_in(status, "hub-es"), &empty, "hub-es");
+            assert!(
+                !matches!(mode, FiscalMode::Blocked(_)),
+                "{status:?} must not derive to blocked, got {mode:?}"
+            );
+        }
+    }
+
+    /// The core LEARNS from a healthy provider what starts a fiscal chain. It never learns from a
+    /// module that is not one, however many events that module listens to — silence never counts as
+    /// complying (hub#555).
+    #[test]
+    fn only_a_declared_provider_teaches_the_trigger_events() {
+        let reg = registry_with(&[
+            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            ("inventory", None, &["sale.completed"], true),
+        ]);
+        assert_eq!(
+            learned_trigger_events(&reg, "ES", "verifactu"),
+            vec!["invoice.created".to_string()]
+        );
+    }
+
+    /// Two providers teach the UNION, deduplicated and stable: the set is compared on every boot.
+    #[test]
+    fn the_learnt_set_is_the_union_and_it_is_stable() {
+        let reg = registry_with(&[
+            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            ("otro", Some(json!({ "country": "ES", "regime": "verifactu" })), &["sale.completed", "invoice.created"], true),
+        ]);
+        assert_eq!(
+            learned_trigger_events(&reg, "ES", "verifactu"),
+            vec!["invoice.created".to_string(), "sale.completed".to_string()]
+        );
+    }
+
+    /// 🔴 **Learnt while healthy, REMEMBERED when gone.** Deriving the set live from the registry
+    /// would give the exact opposite behaviour — no module, no listener, no trigger, and the till
+    /// sells — and the moment the trigger matters most is the moment there is nobody left to ask.
+    #[tokio::test]
+    async fn the_trigger_events_survive_the_provider_that_taught_them() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+        let with_provider = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            true,
+        )]);
+        refresh(&db, &with_provider, "hub-es").await.unwrap();
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().fiscal_trigger_events,
+            vec!["invoice.created".to_string()]
+        );
+
+        // The provider is gone. The core still knows what starts a fiscal chain here.
+        refresh(&db, &registry_with(&[]), "hub-es").await.unwrap();
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().fiscal_trigger_events,
+            vec!["invoice.created".to_string()],
+            "this memory is what lets hub#556 refuse when there is nobody to ask"
+        );
+    }
+
+    /// A replacement provider of the same regime **refreshes** the set while it is healthy: the
+    /// freeze only exists for the case where there is nobody to ask.
+    #[tokio::test]
+    async fn a_healthy_provider_refreshes_the_set() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+        let first = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            true,
+        )]);
+        refresh(&db, &first, "hub-es").await.unwrap();
+
+        let replacement = registry_with(&[(
+            "otro",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created", "sale.completed"],
+            true,
+        )]);
+        refresh(&db, &replacement, "hub-es").await.unwrap();
+
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().fiscal_trigger_events,
+            vec!["invoice.created".to_string(), "sale.completed".to_string()]
+        );
+    }
+
+    /// `READY` is **computed**, not remembered: identity ∧ certificate ∧ a provider mounted. With
+    /// no certificate the hub stays `UNCONFIGURED`, which is the same answer the checklist gives —
+    /// one condition, one place, so a gate and a checklist cannot disagree.
+    #[tokio::test]
+    async fn without_a_certificate_a_hub_is_not_ready() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+        set_setting(&db, "hub-es", "business_tax_id", "B12345678").await;
+        set_setting(&db, "hub-es", "business_legal_name", "Bar Pepe SL").await;
+        let reg = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            true,
+        )]);
+
+        assert_eq!(refresh(&db, &reg, "hub-es").await.unwrap(), FiscalMode::Unconfigured);
+    }
+
+    /// And `READY` goes back to `UNCONFIGURED` when a condition stops holding — before the go-live
+    /// nothing is anchored, so there is simply something to do again.
+    #[tokio::test]
+    async fn losing_the_provider_before_go_live_returns_to_unconfigured() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+        ensure(&db, "hub-es").await.unwrap(); // the row has to exist before it can be moved
+        // A hub sitting at READY (however it got there) with nothing mounted is not ready.
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!("hub-es"));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET status = 'READY' WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            refresh(&db, &registry_with(&[]), "hub-es").await.unwrap(),
+            FiscalMode::Unconfigured
+        );
+    }
+
+    /// **`refresh` never moves a hub that went live.** After the go-live the answer stops being
+    /// derived from settings: the chain is anchored, and a missing certificate is a problem to
+    /// report, not a reason to quietly un-activate a SIF.
+    #[tokio::test]
+    async fn refresh_does_not_walk_an_active_hub_backwards() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+        ensure(&db, "hub-es").await.unwrap(); // the row has to exist before it can be moved
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!("hub-es"));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET status = 'ACTIVE' WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        let mode = refresh(&db, &registry_with(&[]), "hub-es").await.unwrap();
+
+        assert_eq!(mode, FiscalMode::Blocked(BlockedReason::ProviderMissing));
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().status,
+            FiscalStatus::Active,
+            "BLOCKED is a reading; the stored status is untouched"
+        );
     }
 
     /// [`load`] is a read: it does not create the row. A caller that wants the profile to exist
