@@ -52,7 +52,16 @@ impl TableScope {
     /// motores lo hacen (Postgres pasa a minúsculas los identificadores sin comillas; SQLite es
     /// case-insensitive): `INSERT INTO HUB_USER` y `hub_user` son la MISMA tabla y no pueden
     /// significar cosas distintas para el validador. No depende del sistema de ficheros.
+    ///
+    /// **Suelo por debajo de todo scope** (ADR-0259 D8, hub#560): las tablas de SISTEMA del hub
+    /// (`_hub_*` — perfil fiscal, registro de regímenes, certificado, lotes de import) no las
+    /// alcanza ninguna sección. La regla del prefijo se las daría a una sección de módulo `_hub`,
+    /// y el perfil fiscal es la IDENTIDAD de esta instalación: un bundle que pudiera escribirlo
+    /// declararía el hub como ya activado o le cambiaría el `system_id`.
     pub fn allows(&self, table: &str) -> bool {
+        if crate::export::is_system_table(table) {
+            return false;
+        }
         let table = table.to_ascii_lowercase();
         match self {
             Self::Exact(t) => table == t.to_ascii_lowercase(),
@@ -91,8 +100,14 @@ pub fn scope_for_data_file(path: &str) -> Option<TableScope> {
 
 /// Id de módulo aceptable como nombre de fichero de sección (mismo alfabeto que un identificador
 /// SQL seguro: sin puntos, comillas ni separadores).
+///
+/// El `_` inicial queda fuera: es el namespace del RUNTIME (ADR-0259 D8, hub#560). Un
+/// `data/_hub.sql` daría un scope `Module("_hub")`, que por la propia regla del prefijo alcanzaría
+/// todas las `_hub_*` — el perfil fiscal del hub entre ellas. Ningún módulo se llama así, y ahora
+/// tampoco puede llamarse así un fichero del bundle.
 fn is_module_id(s: &str) -> bool {
     !s.is_empty()
+        && !s.starts_with(crate::export::RESERVED_NAMESPACE_PREFIX)
         && s.chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
@@ -342,6 +357,9 @@ fn check_statement(stmt: &str, scope: &TableScope) -> std::result::Result<(), St
         .get(p)
         .and_then(Tok::ident)
         .ok_or_else(|| shape_error(stmt, "la tabla destino no es un identificador simple"))?;
+    if crate::export::is_system_table(table) {
+        return Err(system_table_error(table, "escribir en"));
+    }
     if !scope.allows(table) {
         return Err(format!(
             "la sección solo puede escribir en {}; se encontró un INSERT en `{table}`",
@@ -391,6 +409,17 @@ fn check_statement(stmt: &str, scope: &TableScope) -> std::result::Result<(), St
             "sobra texto tras el INSERT (p. ej. `ON CONFLICT`, `RETURNING` o una subconsulta)",
         )),
     }
+}
+
+/// Rechazo por tocar una tabla de SISTEMA del hub (ADR-0259 D8, hub#560). Mensaje propio, y no el
+/// genérico del scope, porque el motivo es otro: no es «esta sección no llega ahí» sino «ahí no
+/// llega ninguna sección» — el perfil fiscal y su registro de regímenes son la identidad de esta
+/// instalación, no vocabulario del negocio que trae el bundle.
+fn system_table_error(table: &str, verbo: &str) -> String {
+    format!(
+        "`{table}` es una tabla de SISTEMA del hub: ninguna sección de un bundle puede {verbo} el \
+         perfil fiscal, el certificado ni los lotes de importación de esta instalación"
+    )
 }
 
 /// Mensaje de rechazo por forma. Nombra siempre el subconjunto (`INSERT INTO`) para que el informe
@@ -483,6 +512,9 @@ fn not_exists_guard(
         .get(p)
         .and_then(Tok::ident)
         .ok_or_else(|| bad("la tabla de la guarda no es un identificador simple"))?;
+    if crate::export::is_system_table(table) {
+        return Err(system_table_error(table, "leer"));
+    }
     if !scope.allows(table) {
         return Err(format!(
             "la sección solo puede leer {}; se encontró una guarda sobre `{table}`",
@@ -770,6 +802,42 @@ mod tests {
         ] {
             assert!(validate(sql, &scope).is_ok(), "el SQL real del export: {sql}");
         }
+    }
+
+    /// **No section of a bundle writes a system table of the hub** — ADR-0259 D8 (hub#560).
+    ///
+    /// The floor is asked UNDER a scope that would otherwise allow it: `Module("_hub")` reaches
+    /// `_hub_*` by the very prefix rule that decides what a module owns. That is the point — a rule
+    /// that only holds because no module happens to be called `_hub` is not a rule.
+    ///
+    /// What is at stake is not one more table: `_hub_fiscal_profile` is the hub's fiscal identity
+    /// (the tax id the chain is anchored to, its `system_id`, whether it has gone live) and
+    /// `_hub_fiscal_regime_registry` is what says the country owes anything at all.
+    #[test]
+    fn a_bundle_never_writes_a_system_table() {
+        let scope = TableScope::Module("_hub".into());
+        for table in ["_hub_fiscal_profile", "_hub_fiscal_regime_registry", "_hub_certificate"] {
+            assert!(!scope.allows(table), "`{table}` is out of reach of every section");
+        }
+        for sql in [
+            "INSERT INTO _hub_fiscal_profile (\"hub_id\", \"status\") SELECT 'h2', 'ACTIVE';",
+            "INSERT INTO _HUB_FISCAL_PROFILE (\"hub_id\", \"status\") SELECT 'h2', 'ACTIVE';",
+            "INSERT INTO _hub_fiscal_regime_registry (\"country_code\", \"regime_key\") SELECT 'ES', '';",
+            "INSERT INTO _hub_certificate (\"hub_id\", \"slot\") SELECT 'h2', 'own';",
+            "INSERT INTO _hub_import_row (\"batch_id\", \"table_name\", \"row_id\") SELECT 'b', 't', 'r';",
+        ] {
+            assert!(validate(sql, &scope).is_err(), "should be refused: {sql}");
+        }
+        // And it cannot be READ either: the idempotence guard is a query, and a bundle that could
+        // point it at the profile would leak whether this hub is live and under which tax id.
+        let leak = "INSERT INTO _hub (\"a\") SELECT 'x' \
+                    WHERE NOT EXISTS (SELECT 1 FROM _hub_fiscal_profile WHERE hub_id = 'h2');";
+        assert!(validate(leak, &scope).is_err(), "a guard must not read a system table either");
+
+        // …and the door BEFORE that one: a data file cannot even name the namespace, so a bundle
+        // does not get to build the scope in the first place.
+        assert_eq!(scope_for_data_file("data/_hub.sql"), None);
+        assert_eq!(scope_for_data_file("data/_hub_fiscal_profile.sql"), None);
     }
 
     #[test]

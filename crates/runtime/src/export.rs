@@ -119,6 +119,44 @@ impl BundlePurpose {
 /// una cadena mágica la puede escribir un usuario — con lo que vuelve a ser una adivinanza.
 pub const TEMPLATE_EXCLUDED_TABLES: [&str; 2] = ["invoice_series_series", "invoice_series_allocation"];
 
+/// The leading `_` that RESERVES the runtime's own namespace (ADR-0259 D8 — hub#560).
+///
+/// It is broader than [`SYSTEM_TABLE_PREFIX`] on purpose, and the reason is the prefix rule itself:
+/// a module owns `<id>` and `<id>_*`, so a section calling itself module `_hub` would reach every
+/// `_hub_*` table there is. Checking `_hub_` alone would let that one through. Nothing a bundle can
+/// legitimately name starts with `_` — module ids are lowercase words and dashes — so the whole
+/// namespace is simply off limits.
+pub const RESERVED_NAMESPACE_PREFIX: &str = "_";
+
+/// Prefix of the hub's **own** system tables: `_hub_fiscal_profile`, `_hub_fiscal_regime_registry`,
+/// `_hub_certificate`, `_hub_import_batch`/`_hub_import_row`, `_hub_meta`, `_hub_*_migrations`.
+/// Created by [`crate::system_migrations`], owned by the RUNTIME, invisible to every module.
+pub const SYSTEM_TABLE_PREFIX: &str = "_hub_";
+
+/// Is `table` one of the hub's own system tables — i.e. **out of the bundle's world entirely**?
+/// (ADR-0259 D8 — hub#560.)
+///
+/// This is the other side of the frontier `purpose` draws, and it needed a name of its own. ADR-0252
+/// fixed that frontier by deciding the role set DOES travel: *«what `purpose` separates is who you
+/// are (tax id, accounts, certificate), not what you call the posts on your staff»*. The fiscal
+/// profile is squarely on the «who you are» side — the taxpayer id the emitted chain is anchored to,
+/// the `system_id` of the installation, the stamp of the first record sent to the tax authority — and
+/// so is the registry that says a country owes a regime at all. A bundle able to write either could
+/// declare a hub **already live**, or hand it another installation's `system_id`: adopting somebody
+/// else's installation by the back door, which hub#558 makes a deliberate act with a trace.
+///
+/// Note what this is NOT about: `hub_settings`, `hub_user` and `hub_role_activation` carry no
+/// underscore and are not system tables — they travel by their own sections, under their own rules
+/// (ADR-0195 §3/§4, ADR-0252). The `_hub_*` namespace is the runtime's own bookkeeping, and nothing
+/// in it has ever been a section.
+///
+/// Folded case because both engines fold it (Postgres lowercases unquoted identifiers, SQLite is
+/// case-insensitive): `_HUB_FISCAL_PROFILE` and `_hub_fiscal_profile` are the SAME table and must
+/// not mean different things to a guard.
+pub fn is_system_table(table: &str) -> bool {
+    table.to_ascii_lowercase().starts_with(SYSTEM_TABLE_PREFIX)
+}
+
 /// Keys of `hub_settings` that may travel to a hub OTHER than the one that produced the bundle
 /// (ADR-0195 §4 — hub#405). Plain configuration: what kind of business this is, where it operates,
 /// in which language and money it works, how it looks.
@@ -641,7 +679,15 @@ async fn order_rows_parent_first(
 }
 
 /// Módulo instalado dueño de `table` por prefijo más largo (`<id>_*` o nombre exacto).
+///
+/// Las tablas de SISTEMA del hub ([`is_system_table`]) no son de nadie: ni se exportan ni se
+/// borran, porque el reset es el espejo de este mismo inventario (`reset.rs`). Sin esta línea la
+/// regla del prefijo se las daría a un módulo llamado `_hub` — hoy no existe ninguno, y «hoy no
+/// existe» es justo lo que ADR-0259 D8 (hub#560) pide dejar de dar por supuesto.
 pub(crate) fn table_owner(table: &str, installed_ids: &[String]) -> Option<String> {
+    if is_system_table(table) {
+        return None;
+    }
     installed_ids
         .iter()
         .filter(|id| table == id.as_str() || table.starts_with(&format!("{id}_")))
@@ -983,6 +1029,33 @@ mod tests {
         // A key nobody classified — a printer address, a module's API key, tomorrow's setting.
         assert!(!is_portable_setting("printer_ip"), "an unknown key is not portable by default");
         assert!(!is_portable_setting(""), "an empty key is not portable either");
+    }
+
+    /// **The hub's OWN system tables belong to no module** — ADR-0259 D8 (hub#560).
+    ///
+    /// `table_owner` is the single inventory both the export and the reset walk (`reset.rs` is its
+    /// mirror), so a system table that no module can own is a table no bundle can dump and no reset
+    /// can clear. The prefix rule would otherwise hand every `_hub_*` table to a module id of
+    /// `_hub`: today no such module exists, which is exactly the kind of «it holds by accident»
+    /// this names out loud.
+    #[test]
+    fn a_system_table_belongs_to_no_module() {
+        let installed = vec!["_hub".to_string(), "inventory".to_string()];
+        for table in [
+            "_hub_fiscal_profile",
+            "_hub_fiscal_regime_registry",
+            "_hub_certificate",
+            "_hub_import_row",
+        ] {
+            assert!(is_system_table(table), "`{table}` is a system table of the hub");
+            assert_eq!(table_owner(table, &installed), None, "`{table}` is nobody's to export");
+        }
+        // The rule is about the `_hub_*` namespace, not about everything that says «hub»: the
+        // shared tables of the hub travel by their own sections and must keep doing so.
+        for table in ["hub_settings", "hub_user", "hub_role_activation"] {
+            assert!(!is_system_table(table), "`{table}` has its own section, it is not a system table");
+        }
+        assert_eq!(table_owner("inventory_product", &installed).as_deref(), Some("inventory"));
     }
 
     /// Constraint names are only unique PER SCHEMA: two schemas holding the same tables carry
