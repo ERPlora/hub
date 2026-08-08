@@ -41,6 +41,7 @@ pub mod native;
 pub mod outbox;
 pub mod permissions;
 pub mod pin_policy;
+pub mod print_hosts;
 pub mod print_queue;
 pub mod queries;
 pub mod registry;
@@ -723,6 +724,56 @@ impl Runtime {
         limit: i64,
     ) -> Result<Vec<print_queue::PrintJob>> {
         print_queue::list(self.db.as_ref(), &self.hub_id, role, status, limit).await
+    }
+
+    // ── Print hosts: who drains each printer role (ADR-0196 §6, hub#342) ───────────────────────
+
+    /// Registers `device_id` as a print host of `role` (or refreshes a registration it had).
+    /// Several devices may host one role and one device may host several — see [`print_hosts`].
+    pub async fn register_print_host(
+        &self,
+        device_id: &str,
+        role: &str,
+        label: &str,
+        actor: &str,
+    ) -> Result<print_hosts::PrintHost> {
+        print_hosts::register(
+            self.db.as_ref(),
+            &self.hub_id,
+            device_id,
+            role,
+            label,
+            actor,
+        )
+        .await
+    }
+
+    /// News from a print host: it is still there, for every role it drains. Returns how many
+    /// registrations were refreshed (`0` = this device hosts nothing here and must register).
+    pub async fn print_host_heartbeat(&self, device_id: &str) -> Result<usize> {
+        print_hosts::heartbeat(self.db.as_ref(), &self.hub_id, device_id).await
+    }
+
+    /// Retires a device from `role`, or from all its roles when `role` is `None`. Returns how many
+    /// registrations were removed.
+    pub async fn unregister_print_host(
+        &self,
+        device_id: &str,
+        role: Option<&str>,
+    ) -> Result<usize> {
+        print_hosts::unregister(self.db.as_ref(), &self.hub_id, device_id, role).await
+    }
+
+    /// The print host registry, with `live` resolved from each device's last news.
+    pub async fn print_hosts(&self) -> Result<Vec<print_hosts::PrintHost>> {
+        print_hosts::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Per printer role: how much work is waiting and how many hosts are live. This is what lets
+    /// the hub say "nothing is printing the kitchen's tickets" instead of leaving the queue to
+    /// grow in silence.
+    pub async fn print_coverage(&self) -> Result<Vec<print_hosts::RoleCoverage>> {
+        print_hosts::coverage(self.db.as_ref(), &self.hub_id).await
     }
 
     // ── Identidad local (usuarios/PIN/sesiones; §2.9). La autoridad de permisos es local. ──

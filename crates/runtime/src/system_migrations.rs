@@ -494,6 +494,61 @@ UPDATE hub_user AS u SET email = TRIM(pr.email) \
         postgres: "ALTER TABLE _hub_certificate \
                      ADD COLUMN IF NOT EXISTS certificate_type TEXT NOT NULL DEFAULT '';",
     },
+    // ── v22 — hub#342 / ADR-0196 §6: WHO drains each printer role ───────────────────────────
+    // ⚠️ **v22, and it was born as v19, then v20.** `apply` compares against the MAXIMUM applied
+    // version, so anything at or below it is skipped IN SILENCE — the hub boots believing it is up
+    // to date, with the table missing and nothing logged. This branch picked v19 when 18 was the
+    // maximum and hub#436 merged ITS v19 first; it moved to v20 and hub#470 merged a v21 before
+    // this landed, which left v20 sitting *below* the maximum — free, but unreachable. Hence v22.
+    //
+    // Two rules come out of that, and neither is optional:
+    //   * **Take the next number ABOVE the maximum, re-checked at the moment you rebase** — not the
+    //     lowest free one. v20 is empty and would still never run.
+    //   * **Renumbering is free; RENAMING breaks.** The number is an accident of merge order; the
+    //     `name` is the contract that `_hub_system_migrations` and every fixture key on. This has
+    //     been renumbered three times and has always been `print_host`.
+    //
+    // The v15 gap is still open and still reserves nothing.
+    //
+    // The queue (v18) guarantees a job is never lost for want of somebody holding a device. This
+    // is the other half: the device with the installable app, on the printer's network, that says
+    // "I print what goes to `kitchen`".
+    //
+    // `PRIMARY KEY (hub_id, device_id, role)` makes a role a SET of hosts, not a slot. Two tills
+    // within reach of the kitchen printer are a spare, not a conflict — `claim_next` hands out
+    // under `FOR UPDATE SKIP LOCKED`, so they take different jobs — and one device can hold
+    // several roles (the counter till prints `receipt` AND `kitchen`).
+    //
+    // **There is no `live` column, on purpose.** A device that lost power writes nothing, so
+    // liveness cannot be a flag anybody sets: it is DERIVED by comparing `last_seen_at` against
+    // the heartbeat window at read time. A stored flag would need a sweeper — one more thing that
+    // can be down — and while it was down it would claim a dead till is printing.
+    //
+    // `registered_at`/`registered_by` are the audit of who set this device up and when, and a
+    // reconnect deliberately does NOT move them (see `print_hosts::register`). Instants are TEXT
+    // RFC3339 like `_print_queue` and `_event_outbox`.
+    //
+    // ⚠️ **`IF NOT EXISTS` on the table AND the index: this migration must be RE-EXECUTABLE.**
+    // The control table records *versions*, not schema, so anything that deletes rows from
+    // `_hub_system_migrations` makes `apply` replay the SQL over a database where the objects are
+    // already there. That is not hypothetical: `tests/access_email_backfill.rs` rewinds
+    // `version >= 19` to re-run hub#436's backfill, which sweeps every LATER migration with it —
+    // this one. A bare `CREATE TABLE` fails 42P07 there and takes 15 of that suite's tests down.
+    //
+    // Most of the catalogue above is NOT idempotent (hub#483); it gets away with it only because
+    // nothing rewinds past it yet. New migrations should not inherit the defect: re-appliability
+    // is the same property hub#436 demanded of its own backfill.
+    SystemMigration {
+        version: 22,
+        name: "print_host",
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _print_host (\
+  hub_id TEXT NOT NULL, device_id TEXT NOT NULL, role TEXT NOT NULL, \
+  label TEXT NOT NULL DEFAULT '', registered_at TEXT NOT NULL, \
+  registered_by TEXT NOT NULL DEFAULT '', last_seen_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id, device_id, role));\
+CREATE INDEX IF NOT EXISTS ix_print_host_role ON _print_host (hub_id, role, last_seen_at);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -680,7 +735,7 @@ mod tests {
     /// El mismo invariante para la v21 (hub#470): un hub que ya pasó por todo lo anterior **sí**
     /// recibe la columna del TIPO de certificado. Es el test que revienta si alguien la renumera por
     /// debajo del máximo —donde se saltaría en silencio— y el hub elegiría la puerta de la AEAT con
-    /// una columna que no existe. Importa ahora mismo: la v20 está en vuelo en hub#342.
+    /// una columna que no existe.
     #[tokio::test]
     async fn a_hub_already_migrated_still_receives_the_certificate_type_column() {
         use erplora_db::testutil::fresh_db;
@@ -689,19 +744,10 @@ mod tests {
             .iter()
             .find(|m| m.name == "hub_certificate_type")
             .expect("la columna del tipo sigue en el catálogo");
-        // «Justo antes» = la migración anterior DEL CATÁLOGO, no `version - 1`: hay huecos a
-        // propósito (la v15 y, mientras hub#342 esté en vuelo, la v20) y restar uno haría que el
-        // fixture se parase en un número que no existe.
-        let previous = MIGRATIONS
-            .iter()
-            .filter(|m| m.version < certificate_type.version)
-            .map(|m| m.version)
-            .max()
-            .expect("hay migraciones anteriores");
-        hub_deployed_through(&db, previous).await;
+        hub_deployed_through(&db, previous_version_of(certificate_type.version)).await;
         assert_eq!(
             max_applied_version(&db).await.unwrap(),
-            previous,
+            previous_version_of(certificate_type.version),
             "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
         );
 
@@ -756,6 +802,103 @@ mod tests {
                 .await
                 .expect("la v21 tiene que poder correr sobre un esquema que ya la tiene");
         }
+    }
+
+    /// El mismo invariante para el **registro de hosts de impresión** (hub#342, v22). Se repite a
+    /// propósito en vez de generalizarse a todo el catálogo: es la trampa que ya se cobró cuatro
+    /// renumeraciones (hub#316, hub#317 y esta misma dos veces — nació v19 y chocó con hub#436,
+    /// pasó a v20 y hub#470 metió una v21 antes, dejándola por DEBAJO del máximo: libre pero
+    /// inalcanzable). Cada rama nueva en paralelo vuelve a exponerse a ella.
+    ///
+    /// Se para **justo antes** de la suya, con `hub_deployed_through` (que corre el SQL de verdad,
+    /// no solo lo declara): así el test no puede saltarse a sí mismo cuando llegue la v23.
+    #[tokio::test]
+    async fn a_hub_already_migrated_still_receives_the_print_host_registry() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let print_host = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "print_host")
+            .expect("el registro de hosts sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(print_host.version)).await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            previous_version_of(print_host.version),
+            "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
+        );
+
+        apply(&db, "hub-test").await.unwrap();
+
+        db.execute_batch(
+            "INSERT INTO _print_host (hub_id, device_id, role, registered_at, last_seen_at) \
+             VALUES ('h1', 'till-1', 'kitchen', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+    }
+
+    /// **La v22 se puede RE-EJECUTAR sobre una base donde su tabla ya existe.**
+    ///
+    /// El control guarda *versiones*, no esquema, así que cualquier cosa que borre filas de
+    /// `_hub_system_migrations` hace que `apply` vuelva a lanzar el SQL contra objetos que ya
+    /// están. No es hipotético: `tests/access_email_backfill.rs` rebobina `version >= 19` para
+    /// re-ejecutar el backfill de hub#436, y se lleva por delante **toda** migración posterior —
+    /// esta. Con un `CREATE TABLE` a secas el segundo pase muere con 42P07 y tumba 15 tests de esa
+    /// suite; con `IF NOT EXISTS` es una no-op silenciosa.
+    ///
+    /// A diferencia del test hermano de la v21, este rebobina **el registro** y vuelve a llamar a
+    /// `apply` —el camino real— en vez de relanzar el SQL a mano, y comprueba además que la fila
+    /// que el negocio ya tenía configurada **sigue ahí**: re-aplicar no puede recrear la tabla
+    /// vacía y llevarse por delante qué caja imprime lo de cocina.
+    #[tokio::test]
+    async fn the_print_host_registry_can_be_applied_twice() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+
+        // Una fila real: el segundo pase no puede perderla ni pisarla.
+        db.execute_batch(
+            "INSERT INTO _print_host (hub_id, device_id, role, label, registered_at, last_seen_at) \
+             VALUES ('h1', 'till-1', 'kitchen', 'Mostrador', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        // El rebobinado que hace la suite de hub#436: se borra el REGISTRO, no la tabla.
+        let print_host = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "print_host")
+            .expect("el registro de hosts sigue en el catálogo");
+        let mut p = Params::new();
+        p.insert("version".into(), json!(print_host.version));
+        db.execute(
+            "DELETE FROM _hub_system_migrations WHERE version >= :version",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-test")
+            .await
+            .expect("la v22 se re-aplica sobre su propia tabla sin romper");
+
+        let rows = db
+            .query(
+                "SELECT label FROM _print_host WHERE device_id = 'till-1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1, "re-aplicar no recrea la tabla vacía");
+        assert_eq!(
+            rows.rows[0]["label"],
+            json!("Mostrador"),
+            "ni pisa lo que el negocio ya tenía configurado"
+        );
     }
 
     #[test]
@@ -1051,6 +1194,24 @@ mod tests {
     /// `hub_user`, cuya columna `email` solo existe porque corrió la v9: un fixture que miente sobre
     /// el esquema convierte un fallo de la migración en un test que pasa por el motivo equivocado.
     /// Se replican, pues, de verdad.
+    /// La versión del catálogo **inmediatamente anterior** a `version`.
+    ///
+    /// No es `version - 1`, y la diferencia importa: el catálogo tiene **huecos a propósito** (la
+    /// v15, que nadie debe rellenar, y la v20, que quedó libre cuando hub#342 se renumeró a v22 tras
+    /// entrar hub#470). Restar uno haría que el fixture se parase en un número que no existe y el
+    /// `assert` de «justo antes» fallaría comparando contra un máximo que nunca se aplicó.
+    ///
+    /// Lo introdujo hub#470 inline; se factoriza aquí porque los dos tests de guarda lo necesitan y
+    /// el siguiente que añada una migración lo necesitará también.
+    fn previous_version_of(version: i64) -> i64 {
+        MIGRATIONS
+            .iter()
+            .map(|m| m.version)
+            .filter(|v| *v < version)
+            .max()
+            .expect("hay migraciones anteriores")
+    }
+
     async fn hub_deployed_through(db: &dyn DatabaseAdapter, upto: i64) {
         crate::installer::ensure_hub_module_table(db).await.unwrap();
         crate::identity::ensure_tables(db).await.unwrap();
