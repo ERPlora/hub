@@ -38,6 +38,8 @@ pub mod bootstrap;
 pub mod daily_usage;
 /// `shared` (counter till) vs `personal` (somebody's own device) — plan step 2b, hub#357.
 pub mod device_mode;
+/// The devices of a business and the gesture that cuts a lost one off — hub#455.
+pub mod devices;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
@@ -706,6 +708,15 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/device/mode",
             get(device_mode::get_device_mode).put(device_mode::put_device_mode),
+        )
+        // Los dispositivos del negocio y el gesto «se me ha perdido la tablet» (hub#455). Las DOS
+        // puertas exigen sesión **admin**, a diferencia de la de arriba: esta ENUMERA el negocio
+        // entero (cuándo se usó cada dispositivo, cuánto le queda a su sesión), que es una lista de
+        // la compra para quien tenga uno robado. Ver `crate::devices`.
+        .route("/api/devices", get(devices::list_devices))
+        .route(
+            "/api/devices/:device_id",
+            axum::routing::delete(devices::revoke_device),
         )
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
