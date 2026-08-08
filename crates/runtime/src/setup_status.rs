@@ -171,6 +171,19 @@ pub const BLOCKING_KEYS: &[&str] = &[ITEM_BUSINESS_IDENTITY];
 /// of it. The core owns the scale; a module takes the slot the core assigned it.
 pub const DEFAULT_ORDER: i64 = 500;
 
+/// Who put the data behind this item there: the owner of this business (hub#536, ADR-0266).
+pub const ORIGIN_USER: &str = "user";
+/// …or a template that somebody imported.
+///
+/// It is the half of hub#426 that taking things OUT of the bundle cannot fix. With the fiscal
+/// numbering gone (hub#533) most of the false «done» goes with it, but a legitimate remainder
+/// stays: the tables, the catalogue and the services **do** travel —that is what a template is
+/// for— and they **do** tick their item. It is true that they are done; it is just done with less
+/// confidence than if the owner had done it, because a bar has its own room and its own prices.
+///
+/// A false «pending» is visible; a false «done» hides the task for good.
+pub const ORIGIN_BLUEPRINT: &str = "blueprint";
+
 /// Slots the core reserves for its own items. The gaps in between are the module slots (see
 /// `architecture/hub/setup-status.md`): sell first, invoice after.
 const ORDER_APPS: i64 = 10;
@@ -320,8 +333,13 @@ pub async fn status(
             core.order,
             core.actions,
             actionable,
+            // Un ítem del core es SIEMPRE del dueño: una plantilla no lleva identidades ni personas
+            // (ADR-0195 §3/§4/§5), así que `business_identity` y `team` no pueden venir heredados.
+            ORIGIN_USER,
         ));
     }
+
+    let imported = modules_with_imported_rows(db, registry, hub_id).await;
 
     for manifest in &registry.installed {
         let Some(def) = &manifest.setup else { continue };
@@ -378,6 +396,7 @@ pub async fn status(
             // say today which blueprint section fills it.
             &["manual", "assistant"],
             actionable,
+            if imported.contains(&manifest.id) { ORIGIN_BLUEPRINT } else { ORIGIN_USER },
         ));
     }
 
@@ -595,12 +614,18 @@ fn item_json(
     order: i64,
     actions: &[&str],
     actionable: bool,
+    origin: &str,
 ) -> Json {
     json!({
         "key": key,
         "source": source,
         "module_id": module_id,
         "state": state,
+        // Who put the data there (hub#536). Orthogonal to `state`, exactly like `actionable`:
+        // `state` says whether anything is left, `origin` says whose answer it is. NOT a fourth
+        // state — §4/§4bis fix `done + pending + unavailable = total`, and a new state would break
+        // the four surfaces that already read those counters.
+        "origin": origin,
         // What the module declared…
         "required": required,
         // …and the core's verdict, which is what every surface must read: `required` cannot express
@@ -618,6 +643,52 @@ fn item_json(
         // a wall — everything else the session cannot do was dropped from the list.
         "actionable": actionable,
     })
+}
+
+/// Módulos cuyos datos los escribió una IMPORTACIÓN (hub#536, ADR-0266).
+///
+/// Es un **hecho registrado, no una inferencia**: el motor de import apunta cada fila que inserta en
+/// `_hub_import_row` para poder deshacer el lote ([ADR-0170]), así que aquí no se adivina nada — se
+/// lee lo que quedó escrito.
+///
+/// **Por MÓDULO, no por hub.** La pregunta que le importa al dueño es «¿los datos de ESTA app los
+/// trajo una plantilla?», no «¿este hub importó algo alguna vez?»: lo segundo teñiría de heredado el
+/// catálogo que montó él a mano solo porque otra app vino de un bundle.
+///
+/// **Por módulo y no por la fila concreta que hace pasar el `configured_when`**, y es una decisión,
+/// no una limitación que se calle: el chequeo de un módulo es una QUERY (puede agregar, contar o
+/// mirar varias tablas), así que no hay «la fila» que señalar. Lo que sí es cierto y sí sirve es que
+/// los datos de esa app entraron por un bundle — que es exactamente lo que invita a revisarla.
+///
+/// **Sin libro de importaciones ⇒ nada heredado**, y eso no es un fallback silencioso: un hub que
+/// nunca importó no tiene esas tablas, y «no hay importaciones» es la respuesta correcta, no un
+/// «no se sabe». Un error de BD cae en el mismo sitio a propósito: este campo invita a revisar, no
+/// gobierna nada, y no puede tumbar la checklist entera.
+async fn modules_with_imported_rows(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+) -> std::collections::HashSet<String> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let Ok(res) = db
+        .query(
+            "SELECT DISTINCT r.table_name AS table_name FROM _hub_import_row r \
+             JOIN _hub_import_batch b ON b.id = r.batch_id WHERE b.hub_id = :hub_id",
+            &p,
+        )
+        .await
+    else {
+        return std::collections::HashSet::new();
+    };
+    // Misma resolución tabla→módulo que usa el export (prefijo más largo entre los INSTALADOS), para
+    // que no discrepen: si el export dice que `kitchen_order` es de `kitchen`, aquí también.
+    let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
+    res.rows
+        .iter()
+        .filter_map(|r| r.get("table_name").and_then(|v| v.as_str()))
+        .filter_map(|t| crate::export::table_owner(t, &installed))
+        .collect()
 }
 
 /// Evaluates a core item. `None` = the check could not be made ⇒ the item is omitted (best-effort).

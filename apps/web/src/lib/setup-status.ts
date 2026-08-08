@@ -38,6 +38,10 @@ export const STATE_PENDING = 'pending';
 export const STATE_UNAVAILABLE = 'unavailable';
 
 /** ⛔ the runtime rejects the operation without it. */
+/** Who put the data behind an item there (hub#536, ADR-0266). */
+export const ORIGIN_USER = 'user';
+export const ORIGIN_BLUEPRINT = 'blueprint';
+
 export const LEVEL_LEGAL = 'legal';
 /** 🔴 no gate, but the till cannot do its job. */
 export const LEVEL_FUNCTIONAL = 'functional';
@@ -84,6 +88,11 @@ export interface SetupItem {
    * Independent of `state`: `state` says whether anything is left to do, this says whose it is.
    */
   actionable: boolean;
+  /**
+   * Who put the data behind this item there: `user` (this business) or `blueprint` (a template
+   * somebody imported) — hub#536, ADR-0266. Orthogonal to `state`, exactly like `actionable`.
+   */
+  origin: string;
 }
 
 /** The document: one row with the whole answer, counters included. */
@@ -182,7 +191,12 @@ export function checklistView(status: SetupStatus | null, opts: ChecklistOptions
   let rows: SetupItem[] = [];
   if (opts.expanded) rows = items;
   else if (!complete) {
-    const left = items.filter((i) => i.state !== STATE_DONE);
+    // Done, but done by a TEMPLATE (hub#536): it stays in sight instead of folding away with the
+    // rest of what is finished. It is true that it is done — the catalogue, the tables and the
+    // services do travel, that is what a template is for — but a bar has its own room and its own
+    // prices, so it is the one «done» worth a second look. A false «pending» is visible; a false
+    // «done» hides the task for good, and folding it is what hides it.
+    const left = items.filter((i) => i.state !== STATE_DONE || isInherited(i));
     // ⛔ and 🔴 in sight, 🟡 folded — unless the only thing left is 🟡, in which case folding it
     // would leave the card with a headline and an empty body.
     const upfront = left.filter((i) => i.level !== LEVEL_RECOMMENDED);
@@ -248,6 +262,11 @@ export function isActionable(item: SetupItem): boolean {
   return item.state === STATE_PENDING && item.actionable;
 }
 
+/** Done, but by a template rather than by this business (hub#536). */
+export function isInherited(item: SetupItem): boolean {
+  return item.state === STATE_DONE && item.origin === ORIGIN_BLUEPRINT;
+}
+
 /**
  * Is this item already offered by another card on the same screen?
  *
@@ -275,6 +294,9 @@ function toItem(raw: Record<string, unknown>): SetupItem {
     // Absent ⇒ actionable, which is what every item was before hub#435: only a runtime that knows
     // about the field can say no, and a shell reading an older one must not mute its own card.
     actionable: raw.actionable !== false,
+    // Absent ⇒ `user`, the conservative read for a shell talking to an older runtime: claiming a
+    // template brought something it did not would send the owner to re-check a decision they made.
+    origin: str(raw.origin) || ORIGIN_USER,
   };
 }
 

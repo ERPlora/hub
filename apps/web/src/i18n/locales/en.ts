@@ -160,6 +160,7 @@ export default {
     // A wall that is not yours to bring down (hub#435). It says WHO can — not the name of a
     // permission — because a blocker with no owner leaves the user with nowhere to go.
     delegatedHint: 'An administrator has to set this up.',
+    inheritedHint: 'It came from the template you used. Worth a look — your room and your prices are your own.',
     completeTitle: 'Your business is ready',
     completeBody: 'Everything on the checklist is done.',
     // The hero card of a business with no apps yet (hub#368). Its whole job is the FIRST choice, so
@@ -173,6 +174,13 @@ export default {
       working: 'Setting up «{name}»…',
       readyTitle: 'Your apps and your catalogue are in',
       readyBody: 'What is left is what only you can answer: the details of your business. You have them on the list below.',
+      // hub#535 — a template also brings SAMPLE data (customers, appointments). Said BEFORE the
+      // click, because after it the agenda is full of bookings that are not the owner's; and said
+      // AGAIN after, pointing at the door that already removes them (undo an import, ADR-0170).
+      // What we do NOT do is write a relative-date engine so the sample bookings are always in the
+      // future: expensive, small problem, and already solved by that door.
+      sampleData: 'It also brings sample data — customers, appointments — so you can see how everything works.',
+      sampleDataUndo: 'The sample data is there for you to look around. You can remove it whenever you like from Settings › Data.',
       partialTitle: 'Almost: something did not go in',
       // A purchase decision, never a breakage (ADR-0060, hub#409): it names what to add and says
       // where, instead of painting a red error over a plan the owner simply has not bought.

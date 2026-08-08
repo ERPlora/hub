@@ -15,6 +15,8 @@ vi.mock('./module-loader', () => ({
 
 import {
   MAX_VISIBLE_ROWS,
+  ORIGIN_USER,
+  isInherited,
   SETUP_STATUS_QUERY,
   blockingView,
   checklistView,
@@ -377,5 +379,61 @@ describe('decision 1: the panel does not repeat what the apps card already offer
 
     expect(view.total).toBe(2);
     expect(view.pending).toBe(2);
+  });
+});
+
+describe('de dónde viene lo que ya está hecho (hub#536)', () => {
+  it('un hecho HEREDADO de una plantilla no se pliega con el resto de lo hecho', async () => {
+    // Es el residuo legítimo de hub#426: las mesas y el catálogo SÍ viajan —para eso existe una
+    // plantilla— y SÍ marcan su ítem. Es verdad que están hechos, pero un bar tiene su propia sala
+    // y sus propios precios, así que es el único «hecho» que merece un segundo vistazo. Plegarlo
+    // es exactamente lo que lo esconde.
+    const client = clientReturning(
+      doc([
+        item('tables.setup', { state: 'done', origin: 'blueprint' }),
+        item('business_identity', { state: 'pending' }),
+      ]),
+    );
+    await refreshSetupStatus(client);
+
+    const rows = checklistView(setupStatus.value).rows.map((r) => r.key);
+    expect(rows).toContain('tables.setup');
+  });
+
+  it('un hecho del DUEÑO sí se pliega: ya lo decidió él', async () => {
+    const client = clientReturning(
+      doc([
+        item('tables.setup', { state: 'done', origin: 'user' }),
+        item('business_identity', { state: 'pending' }),
+      ]),
+    );
+    await refreshSetupStatus(client);
+
+    const rows = checklistView(setupStatus.value).rows.map((r) => r.key);
+    expect(rows).not.toContain('tables.setup');
+  });
+
+  it('los contadores NO se mueven: heredado no es pendiente', async () => {
+    // Ortogonal al `state`, como `actionable`. Un cuarto estado rompería
+    // `hecho + pending + unavailable = total`, que leen cuatro superficies (ADR-0222 §4/§4bis).
+    const client = clientReturning(
+      doc([item('tables.setup', { state: 'done', origin: 'blueprint' })]),
+    );
+    await refreshSetupStatus(client);
+
+    const view = checklistView(setupStatus.value);
+    expect(view.pending).toBe(0);
+    expect(view.done).toBe(1);
+    expect(view.complete).toBe(true);
+  });
+
+  it('sin el campo se lee como del DUEÑO: un shell contra un runtime viejo no inventa herencias', async () => {
+    const raw = item('tables.setup', { state: 'done' });
+    delete raw.origin;
+    const client = clientReturning(doc([raw]));
+    await refreshSetupStatus(client);
+
+    expect(setupStatus.value?.items[0].origin).toBe(ORIGIN_USER);
+    expect(isInherited(setupStatus.value!.items[0])).toBe(false);
   });
 });
