@@ -13,10 +13,12 @@ import { createI18n } from 'vue-i18n';
 
 const exportHub = vi.fn();
 const listInstalledModules = vi.fn();
+const fetchExportTables = vi.fn();
 
 vi.mock('../lib/runtime', () => ({
   exportHub: (...a: unknown[]) => exportHub(...a),
   listInstalledModules: (...a: unknown[]) => listInstalledModules(...a),
+  fetchExportTables: (...a: unknown[]) => fetchExportTables(...a),
 }));
 vi.mock('../lib/session', () => ({ isAdmin: { value: true } }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -52,6 +54,8 @@ beforeEach(() => {
   exportHub.mockResolvedValue({ blob: new Blob(['x']), filename: 'hub_es.blueprint.zip' });
   listInstalledModules.mockReset();
   listInstalledModules.mockResolvedValue([]);
+  fetchExportTables.mockReset();
+  fetchExportTables.mockResolvedValue([]);
 });
 
 describe('ExportPanel · propósito del bundle (ADR-0195)', () => {
@@ -84,5 +88,63 @@ describe('ExportPanel · propósito del bundle (ADR-0195)', () => {
     const w = mountPanel();
     await flushPromises();
     expect(w.find('[data-testid="export-section-users"]').exists()).toBe(true);
+  });
+});
+
+
+describe('ExportPanel · casillas por TABLA (hub#534)', () => {
+  const conInventory = () => {
+    listInstalledModules.mockResolvedValue([{ id: 'inventory', name: 'Inventory', version: '1.0.0' }]);
+    fetchExportTables.mockResolvedValue([
+      {
+        module_id: 'inventory',
+        tables: [
+          { table: 'inventory_product', rows: 280 },
+          { table: 'inventory_stock_movement', rows: 1240 },
+        ],
+      },
+    ]);
+  };
+
+  it('sin tocar nada manda `tables: null` — «todas», que es lo que significaba antes', async () => {
+    // El campo es una ADICIÓN: un formulario que no lo usa tiene que exportar exactamente igual.
+    conInventory();
+    const w = mountPanel();
+    await flushPromises();
+
+    const selection = await selectionEnviada(w);
+    expect((selection.modules as { tables: unknown }[])[0].tables).toBeNull();
+  });
+
+  it('desmarcar una tabla la deja fuera y manda SOLO las que quedan', async () => {
+    // Es el caso real: las 4 plantillas publicadas llevaban 25-28 citas pasadas y los ajustes de
+    // agenda del salón de origen porque no había forma de dejarlos fuera sin tocar código.
+    conInventory();
+    const w = mountPanel();
+    await flushPromises();
+
+    // «datos» es opt-in por fila: sin marcarlo no hay tablas que elegir.
+    const vm = w.vm as unknown as {
+      toggleTable: (m: string, t: string) => void;
+      rows: { id: string; withData: boolean }[];
+    };
+    vm.rows = vm.rows.map((r) => ({ ...r, withData: true }));
+    vm.toggleTable('inventory', 'inventory_stock_movement');
+    await flushPromises();
+    const selection = await selectionEnviada(w);
+
+    expect((selection.modules as { tables: string[] }[])[0].tables).toEqual(['inventory_product']);
+  });
+
+  it('enseña el RECUENTO de filas: sin el número la lista no es una decisión', async () => {
+    conInventory();
+    const w = mountPanel();
+    await flushPromises();
+
+    const vm = w.vm as unknown as { tablesOf: (m: string) => { table: string; rows: number }[] };
+    expect(vm.tablesOf('inventory')).toEqual([
+      { table: 'inventory_product', rows: 280 },
+      { table: 'inventory_stock_movement', rows: 1240 },
+    ]);
   });
 });

@@ -69,7 +69,7 @@ fn verifactu_backup_selection() -> ExportSelection {
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "verifactu".into(), with_data: true }],
+        modules: vec![ModuleDataSelection { module_id: "verifactu".into(), with_data: true, tables: None }],
         purpose: Default::default(), // Backup
     }
 }

@@ -83,7 +83,41 @@ impl BundlePurpose {
     pub fn allows_identity_sections(self) -> bool {
         matches!(self, Self::Backup)
     }
+
+    /// ¿Es una plantilla, es decir, un artefacto pensado para OTRO negocio?
+    ///
+    /// Se pregunta aparte de [`allows_identity_sections`](Self::allows_identity_sections) porque
+    /// son dos cosas distintas: aquélla habla de **identidad** (de quién es esto), y ésta de **de
+    /// quién es la decisión** — la serie de facturación no identifica a nadie y aun así no puede
+    /// venir hecha (ver [`TEMPLATE_EXCLUDED_TABLES`]). Mezclarlas en un solo booleano habría hecho
+    /// que la próxima regla de este tipo se colgara del nombre equivocado.
+    pub fn is_template(self) -> bool {
+        matches!(self, Self::Template)
+    }
 }
+
+/// Tablas que NO viajan en una **plantilla**, aunque su módulo entre con «datos» (hub#533).
+///
+/// No son identidad ni secretos —eso ya lo cierra ADR-0195 §2/§4—: son **decisiones del negocio
+/// que importa la plantilla**, y venir hechas es peor que faltar. `invoice_series_series` fija el
+/// prefijo, el formato y cuál es la serie por defecto, o sea **cómo se numera cada documento que
+/// ese negocio emite ante Hacienda**; e `invoice_series_allocation` es el libro de números ya
+/// entregados que el RD 1007/2023 exige sin huecos ni duplicados — historial de OTRA instalación.
+///
+/// Y hay un daño de segundo orden: al venir hechas, marcaban como «hecho» el ítem OBLIGATORIO
+/// `invoice_series.setup` de la checklist ([ADR-0222](../../architecture/00-overview/decision-log.md)),
+/// así que su dueño no lo revisaba nunca. Un falso «pendiente» se ve; un falso «hecho» esconde la
+/// tarea para siempre (hub#426).
+///
+/// **Lista corta y del CORE, no un contrato en el manifest de módulo.** Lo que un módulo considere
+/// plantilla lo elige quien exporta, tabla a tabla (hub#534); esto es el suelo que esa elección no
+/// puede levantar, igual que `PORTABLE_SETTING_KEYS` es el suyo. Un **backup** se las lleva todas:
+/// es la numeración de su dueño volviendo a su sitio (ADR-0113 §1).
+///
+/// Se descartó publicar la serie con el código `DEMO` y que el hub lo leyera como «sin configurar»:
+/// una serie llamada `DEMO` existe de verdad y numeraría una factura real (`DEMO-2026-00001`), y
+/// una cadena mágica la puede escribir un usuario — con lo que vuelve a ser una adivinanza.
+pub const TEMPLATE_EXCLUDED_TABLES: [&str; 2] = ["invoice_series_series", "invoice_series_allocation"];
 
 /// Keys of `hub_settings` that may travel to a hub OTHER than the one that produced the bundle
 /// (ADR-0195 §4 — hub#405). Plain configuration: what kind of business this is, where it operates,
@@ -181,6 +215,20 @@ pub struct ExportSelection {
 pub struct ModuleDataSelection {
     pub module_id: String,
     pub with_data: bool,
+    /// Tablas del módulo a volcar. `None` = todas las suyas (lo que manda el shell hoy, y lo que
+    /// significaba `with_data` antes de existir este campo).
+    ///
+    /// Es la **herramienta del operador** (hub#534): quien monta una plantilla deja fuera lo que no
+    /// quiere publicar —las 25-28 citas pasadas, los ajustes de agenda del salón de origen— sin que
+    /// nadie toque código. **No es un control de seguridad**, y por eso vive en el formulario: la
+    /// garantía de una plantilla oficial es que la hacemos nosotros y la revisamos **viendo su
+    /// contenido** (saas#1257).
+    ///
+    /// **ACOTA, nunca amplía** — misma propiedad que `settings_items` desde hub#405. Marcar aquí
+    /// `invoice_series_series` en una plantilla no la mete: la regla del `purpose`
+    /// ([`TEMPLATE_EXCLUDED_TABLES`]) es el suelo, y una casilla no puede levantarlo. Si pudiera,
+    /// esta comodidad sería la puerta por la que vuelve justo lo que se decidió que no viaja.
+    pub tables: Option<Vec<String>>,
 }
 
 /// Resultado del export a nivel runtime: manifest + ficheros de datos (ruta relativa → bytes).
@@ -296,6 +344,14 @@ pub async fn export_hub(
         let mut mine: Vec<String> = all_tables
             .iter()
             .filter(|t| table_owner(t, &installed_ids).as_deref() == Some(m.module_id.as_str()))
+            // Casillas por tabla del formulario (hub#534). Se interseca con las que el módulo POSEE,
+            // así que la selección no puede nombrar la tabla de otro ni una que no exista: acota
+            // dentro de lo que ya se iba a volcar. Lo que la regla del `purpose` deja fuera sigue
+            // fuera —se filtra más abajo, no aquí— porque el llamador nunca amplía.
+            .filter(|t| match &m.tables {
+                Some(marcadas) => marcadas.iter().any(|s| s == *t),
+                None => true,
+            })
             .cloned()
             .collect();
         order_by_dependency(db, &mut mine).await;
@@ -307,6 +363,13 @@ pub async fn export_hub(
             // Iba como una tabla más del módulo, así que el blueprint publicado sembraba el NIF
             // del hub demo y `auto_transmit=1` en el hub de cada cliente que lo importaba.
             if table == "verifactu_config" && !fiscal {
+                continue;
+            }
+            // Y una PLANTILLA tampoco trae las decisiones fiscales del negocio que la importa
+            // (hub#533): la serie de facturación y su libro de números entregados. Ver
+            // `TEMPLATE_EXCLUDED_TABLES` — es el suelo del core, por debajo de lo que el operador
+            // elige tabla a tabla al exportar.
+            if selection.purpose.is_template() && TEMPLATE_EXCLUDED_TABLES.contains(&table.as_str()) {
                 continue;
             }
             // La mayoría de tablas llevan `hub_id` (contrato de fila §2.5) → se acotan por él.
@@ -382,6 +445,67 @@ pub async fn export_hub(
         sha256,
     };
     Ok(ExportBundle { manifest, files })
+}
+
+/// Una tabla del módulo y cuántas filas volcaría el export (hub#534).
+#[derive(Debug, Clone, Serialize)]
+pub struct TableCount {
+    pub table: String,
+    pub rows: i64,
+}
+
+/// Las tablas de un módulo instalado, con su recuento.
+#[derive(Debug, Clone, Serialize)]
+pub struct ModuleTables {
+    pub module_id: String,
+    pub tables: Vec<TableCount>,
+}
+
+/// Qué tablas tiene cada módulo y **cuántas filas** volcaría el export de cada una (hub#534).
+///
+/// Es lo que hace que la lista de casillas sea una decisión y no una fila de nombres: «Citas: 28»
+/// es lo que hace que quien monta la plantilla las desmarque. Mismo argumento que el resumen del
+/// publicador (saas#1257) — sin el número, mirar no sirve de nada.
+///
+/// **Cuenta lo que se volcaría de verdad**, no `SELECT count(*)`: reutiliza `fetch_rows`/
+/// `fetch_join_rows`, así que aplica el mismo acotado por hub, la misma exclusión de soft-deleted y
+/// la misma de filas sembradas por el módulo ([`is_module_seeded`]). Un número que no casara con lo
+/// que sale sería peor que no darlo.
+///
+/// **Una tabla vacía se declara con su 0, nunca se omite**: si desaparece de la lista, quien monta
+/// la plantilla no puede saber que existe — y el 0 es justo la información.
+pub async fn module_table_counts(
+    rt: &Runtime,
+    hub_id: &str,
+    module_ids: &[String],
+) -> crate::Result<Vec<ModuleTables>> {
+    let db = rt.db();
+    let all_tables = list_tables(db).await?;
+    let installed_ids: Vec<String> = rt.registry().installed.iter().map(|m| m.id.clone()).collect();
+
+    let mut out = Vec::with_capacity(module_ids.len());
+    for module_id in module_ids {
+        if !rt.registry().is_installed(module_id) {
+            continue;
+        }
+        let mut tables = Vec::new();
+        for table in all_tables
+            .iter()
+            .filter(|t| table_owner(t, &installed_ids).as_deref() == Some(module_id.as_str()))
+        {
+            let rows = if has_column(db, table, "hub_id").await {
+                fetch_rows(db, table, Some(hub_id)).await.unwrap_or_default().len()
+            } else {
+                fetch_join_rows(db, table, hub_id).await.unwrap_or_default().len()
+            };
+            tables.push(TableCount { table: table.clone(), rows: rows as i64 });
+        }
+        // Por volumen descendente: lo gordo es lo que hay que ver primero. Empate → por nombre, para
+        // que dos cargas de la misma pantalla den la misma lista.
+        tables.sort_by(|a, b| b.rows.cmp(&a.rows).then_with(|| a.table.cmp(&b.table)));
+        out.push(ModuleTables { module_id: module_id.clone(), tables });
+    }
+    Ok(out)
 }
 
 /// SHA256 hex de unos bytes (integridad del bundle, patrón ADR-0015).

@@ -719,6 +719,10 @@ async fn the_document_and_the_item_carry_exactly_the_contracted_keys() {
                 "level",
                 "module_id",
                 "order",
+                // Quién puso los datos que hacen pasar el chequeo (hub#536): el dueño, o una
+                // plantilla que alguien importó. Ortogonal al `state` —como `actionable`—, nunca un
+                // cuarto estado: `done + pending + unavailable = total` lo leen cuatro superficies.
+                "origin",
                 "required",
                 "route",
                 "source",
@@ -1449,4 +1453,112 @@ async fn only_a_principal_with_a_local_session_reads_the_setup_status() {
         .unwrap_err()
         .to_string();
     assert!(err.to_lowercase().contains("permis"), "{err}");
+}
+
+// ── De dónde viene lo que ya está hecho (hub#536, ADR-0267) ───────────────────────────────────
+
+/// Marca una fila de `<table>` como escrita por una importación, igual que hace el motor.
+async fn imported_row(rt: &Runtime, hub_id: &str, table: &str, row_id: &str) {
+    let db = rt.db();
+    db.execute_batch(
+        "CREATE TABLE IF NOT EXISTS _hub_import_batch (\
+           id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL);\
+         CREATE TABLE IF NOT EXISTS _hub_import_row (\
+           batch_id TEXT NOT NULL, table_name TEXT NOT NULL, row_id TEXT NOT NULL);",
+    )
+    .await
+    .unwrap();
+    let mut p = Params::new();
+    p.insert("hub".into(), json!(hub_id));
+    p.insert("t".into(), json!(table));
+    p.insert("r".into(), json!(row_id));
+    db.execute(
+        "INSERT INTO _hub_import_batch (id, hub_id, name, created_at) \
+         VALUES ('b1', :hub, 'restaurante_es', '2026-08-08T10:00:00Z')",
+        &p,
+    )
+    .await
+    .unwrap();
+    db.execute(
+        "INSERT INTO _hub_import_row (batch_id, table_name, row_id) VALUES ('b1', :t, :r)",
+        &p,
+    )
+    .await
+    .unwrap();
+}
+
+/// 🔴 [hub#536] Un ítem hecho dice **de dónde viene**: lo puso el dueño o lo trajo una plantilla.
+///
+/// Es la mitad de hub#426 que no arregla sacar cosas del bundle. Con la numeración fiscal fuera
+/// (hub#533) y las casillas por tabla (hub#534), casi todo el falso «hecho» desaparece — pero queda
+/// un residuo **legítimo**: las mesas, el catálogo y los servicios **sí** viajan, para eso existe
+/// una plantilla, y **sí** marcan su ítem como hecho. Es verdad que están hechos, pero con menos
+/// confianza que si los hubiera puesto el dueño: un bar tiene su propia sala y sus propios precios.
+///
+/// Un falso «pendiente» se ve; un falso «hecho» esconde la tarea para siempre.
+#[tokio::test]
+async fn un_item_hecho_por_una_plantilla_lo_dice() {
+    let mut rt = runtime("hub-origen").await;
+    let dir = setup_module("tables", true, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+    imported_row(&rt, "hub-origen", "tables_table", "t1").await;
+
+    let doc = status(&rt, &ctx("hub-origen", &[SESSION, ADMINISTER, "tables.configure"])).await;
+
+    assert_eq!(must(&doc, "tables.setup")["origin"], "blueprint");
+}
+
+/// …y lo que puso el dueño no se marca como heredado. Un falso «esto lo trajo una plantilla»
+/// mandaría a revisar algo que ya se decidió, que es la molestia simétrica.
+#[tokio::test]
+async fn lo_que_configuro_el_dueno_no_se_marca_como_heredado() {
+    let mut rt = runtime("hub-propio").await;
+    let dir = setup_module("tables", true, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+
+    let doc = status(&rt, &ctx("hub-propio", &[SESSION, ADMINISTER, "tables.configure"])).await;
+
+    assert_eq!(must(&doc, "tables.setup")["origin"], "user");
+}
+
+/// Un import de OTRO módulo no contamina a éste: la pregunta es «¿los datos de ESTA app los trajo
+/// una plantilla?», no «¿este hub importó algo alguna vez?».
+#[tokio::test]
+async fn el_origen_es_por_modulo_no_por_hub() {
+    let mut rt = runtime("hub-mixto").await;
+    rt.install_from_dir(&setup_module("tables", true, json!({}))).await.unwrap();
+    imported_row(&rt, "hub-mixto", "inventory_product", "p1").await;
+
+    let doc = status(&rt, &ctx("hub-mixto", &[SESSION, ADMINISTER, "tables.configure"])).await;
+
+    assert_eq!(must(&doc, "tables.setup")["origin"], "user");
+}
+
+/// Los ítems del CORE son siempre del dueño: una plantilla no lleva identidades ni personas
+/// (ADR-0195 §3/§4/§5), así que `business_identity` y `team` no pueden venir heredados. Decirlo
+/// como dato —y no como ausencia de campo— es lo que evita que un consumidor ramifique por
+/// presencia de clave (ADR-0222 §4).
+#[tokio::test]
+async fn los_items_del_core_son_siempre_del_dueno() {
+    let mut rt = runtime("hub-core").await;
+    imported_row(&rt, "hub-core", "inventory_product", "p1").await;
+
+    let doc = status(&rt, &ctx("hub-core", ADMIN_SESSION)).await;
+
+    for key in ["apps", "business_identity", "team"] {
+        assert_eq!(must(&doc, key)["origin"], "user", "ítem del core: {key}");
+    }
+}
+
+/// Todo ítem lleva el campo, hecho o pendiente (ADR-0222 §4: nadie ramifica por presencia).
+#[tokio::test]
+async fn todo_item_lleva_origen_aunque_este_pendiente() {
+    let mut rt = runtime("hub-pendiente").await;
+    rt.install_from_dir(&setup_module("tables", false, json!({}))).await.unwrap();
+
+    let doc = status(&rt, &ctx("hub-pendiente", &[SESSION, ADMINISTER, "tables.configure"])).await;
+
+    for it in items(&doc) {
+        assert!(it["origin"].is_string(), "sin origen: {it}");
+    }
 }

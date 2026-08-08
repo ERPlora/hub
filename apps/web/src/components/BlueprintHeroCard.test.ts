@@ -77,6 +77,7 @@ function appsItem(state: string): SetupItem {
     order: 10,
     actions: ['template', 'catalog'],
     actionable: true,
+    origin: 'user',
   };
 }
 
@@ -279,6 +280,33 @@ describe('what the owner is told afterwards', () => {
     expect(done.text()).toBe(enCatalogue.setup.hero.readyBody);
     // The checklist below owns «what is left»; this card must not claim there is nothing left.
     expect(done.text()).not.toMatch(/all set|nothing left|ready to sell/i);
+  });
+
+  // 🔴 [hub#535] The card says it brings SAMPLE data — before the click and after it.
+  //
+  // Barbería and peluquería carry 25-28 appointments with their history, invented customers and
+  // their notes. They are sample data on purpose: they show how the agenda works. But they are
+  // born «today into the future» the day the template is generated, so by the time somebody
+  // imports it they are in the past, and the business opens onto an agenda from July that is not
+  // its own (ERPlora/hub#426).
+  //
+  // We do NOT write a relative-date engine for that: expensive, small problem, and already solved
+  // — undoing an import exists and lives in Settings › Data. What was missing is SAYING it.
+  it('warns that the template brings sample data BEFORE the click', async () => {
+    const w = mountCard();
+    await flushPromises();
+
+    expect(w.find('[data-testid="hero-sample"]').text()).toBe(enCatalogue.setup.hero.sampleData);
+  });
+
+  it('says where the sample data is removed once it is in', async () => {
+    const w = await outcomeOf(mountCard());
+
+    const hint = w.find('[data-testid="hero-sample-undo"]');
+    expect(hint.exists()).toBe(true);
+    expect(hint.text()).toBe(enCatalogue.setup.hero.sampleDataUndo);
+    // It points at the door that already exists; it must not promise a button of its own.
+    expect(hint.text()).toMatch(/Settings/);
   });
 
   it('names the apps that only need subscribing, and does not call them broken', async () => {

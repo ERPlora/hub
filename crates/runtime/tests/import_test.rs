@@ -75,8 +75,8 @@ fn full_selection() -> ExportSelection {
         fiscal: false,
         media: false,
         modules: vec![
-            ModuleDataSelection { module_id: "taxes".into(), with_data: true },
-            ModuleDataSelection { module_id: "inventory".into(), with_data: true },
+            ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None },
+            ModuleDataSelection { module_id: "inventory".into(), with_data: true, tables: None },
         ],
         purpose: Default::default(),
     }

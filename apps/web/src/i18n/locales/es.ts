@@ -161,6 +161,7 @@ export default {
     // Un muro que no te toca a ti derribar (hub#435). Dice QUIÉN puede — nunca el nombre de un
     // permiso —, porque un bloqueo sin dueño deja al usuario sin ningún sitio al que ir.
     delegatedHint: 'Esto lo tiene que configurar un administrador.',
+    inheritedHint: 'Vino de la plantilla que usaste. Merece un vistazo: tu sala y tus precios son tuyos.',
     completeTitle: 'Tu negocio está listo',
     completeBody: 'No queda nada pendiente en la checklist.',
     // La tarjeta héroe de un negocio que todavía no tiene apps (hub#368). Su único trabajo es la
@@ -174,6 +175,8 @@ export default {
       working: 'Preparando «{name}»…',
       readyTitle: 'Ya tienes tus apps y tu catálogo',
       readyBody: 'Lo que queda es lo que solo puedes contestar tú: los datos de tu negocio. Los tienes en la lista de abajo.',
+      sampleData: 'Trae además datos de ejemplo —clientes, citas— para que veas cómo funciona todo.',
+      sampleDataUndo: 'Los datos de ejemplo están para que trastees. Puedes quitarlos cuando quieras desde Ajustes › Datos.',
       partialTitle: 'Casi: algo no ha entrado',
       // Una decisión de compra, nunca una avería (ADR-0060, hub#409): nombra lo que hay que añadir
       // en vez de pintar un error rojo sobre un plan que el dueño simplemente no ha contratado.

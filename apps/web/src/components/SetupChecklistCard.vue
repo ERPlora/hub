@@ -103,6 +103,7 @@ import {
   STATE_UNAVAILABLE,
   checklistView,
   isActionable,
+  isInherited,
   type SetupItem,
   type SetupStatus,
 } from '../lib/setup-status';
@@ -183,6 +184,9 @@ function pillTone(item: SetupItem): string {
 function noteOf(item: SetupItem): string {
   if (item.state === STATE_UNAVAILABLE) return t('setup.unavailableHint');
   if (item.state === STATE_PENDING && !isActionable(item)) return t('setup.delegatedHint');
+  // Done, but by a template (hub#536): true, and worth a second look — a bar has its own room and
+  // its own prices. It is an invitation, never a pending task: the counters do not move.
+  if (isInherited(item)) return t('setup.inheritedHint');
   return '';
 }
 

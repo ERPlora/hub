@@ -35,6 +35,7 @@ function item(over: Partial<SetupItem> = {}): SetupItem {
     order: 10,
     actions: ['template', 'catalog'],
     actionable: true,
+    origin: 'user',
     ...over,
   };
 }

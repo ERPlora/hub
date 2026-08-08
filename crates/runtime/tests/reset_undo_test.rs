@@ -217,6 +217,7 @@ async fn el_import_real_registra_un_lote_deshacible() {
             modules: vec![erplora_runtime::export::ModuleDataSelection {
                 module_id: "inventory".into(),
                 with_data: true,
+                tables: None,
             }],
             purpose: Default::default(),
         },

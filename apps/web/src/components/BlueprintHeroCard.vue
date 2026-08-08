@@ -7,6 +7,12 @@
       <!-- The honest half of «one click = configured», and it is said BEFORE the click: a template
            brings the trade, never the details of THIS business. -->
       <p class="hero-body" data-testid="hero-body">{{ t('setup.hero.body') }}</p>
+      <!-- …and the other half nobody was saying (hub#535): it also brings SAMPLE data. Barbería and
+           peluquería carry 25-28 appointments with their history and invented customers — on
+           purpose, they show how the agenda works — but they are born «today into the future» the
+           day the template is generated, so whoever imports it later opens onto an agenda from
+           July that is not theirs. Said before the click, and again after with the way out. -->
+      <p class="hero-body hero-sample" data-testid="hero-sample">{{ t('setup.hero.sampleData') }}</p>
 
       <ul class="hero-offers">
         <li v-for="blueprint in offers" :key="blueprint.slug" class="hero-offer" data-testid="hero-offer">
@@ -54,6 +60,13 @@
 
       <p v-if="outcome?.kind === 'ready'" class="hero-body" data-testid="hero-done">
         {{ t('setup.hero.readyBody') }}
+      </p>
+      <!-- Where the sample data is removed (hub#535). It points at the door that ALREADY exists —
+           undoing an import, Settings › Data (ADR-0170), which the reset panel itself calls «the
+           preferred path, because it is surgical» — instead of promising a button of its own. That
+           is also why no relative-date engine was written for the sample bookings. -->
+      <p v-if="outcome?.kind === 'ready'" class="hero-body hero-sample" data-testid="hero-sample-undo">
+        {{ t('setup.hero.sampleDataUndo') }}
       </p>
 
       <p v-if="blockedApps.length" class="hero-body hero-blocked" data-testid="hero-blocked">

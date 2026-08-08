@@ -116,6 +116,12 @@ pub struct ModuleSelReq {
     module_id: String,
     #[serde(default)]
     with_data: bool,
+    /// Subselección de TABLAS del módulo (hub#534). Ausente ⇒ todas las suyas, que es lo que
+    /// significaba `with_data` antes de existir este campo — así que un shell que no lo mande sigue
+    /// exportando igual. El llamador **acota, nunca amplía**: lo que la regla del `purpose` deja
+    /// fuera (`export::TEMPLATE_EXCLUDED_TABLES`) sigue fuera aunque se marque aquí.
+    #[serde(default)]
+    tables: Option<Vec<String>>,
 }
 
 impl ExportSelectionReq {
@@ -133,6 +139,7 @@ impl ExportSelectionReq {
                 .map(|m| ModuleDataSelection {
                     module_id: m.module_id,
                     with_data: m.with_data,
+                    tables: m.tables,
                 })
                 .collect(),
         }
@@ -157,6 +164,37 @@ fn is_safe_locale(s: &str) -> bool {
 
 /// POST /api/hub/export — exporta el hub a un `.blueprint.zip` según la selección.
 /// Auth = sesión admin (owner/admin), el MISMO gate que `PUT /api/settings`/certificate.
+/// `GET /api/hub/export/tables` — qué tablas tiene cada módulo instalado y **cuántas filas**
+/// volcaría el export de cada una (hub#534).
+///
+/// Es lo que hace que las casillas por tabla sean una decisión y no una fila de nombres: «Citas:
+/// 28» es lo que hace que quien monta la plantilla las desmarque. Mismo argumento que el resumen
+/// del publicador (saas#1257) — sin el número, mirar no sirve de nada.
+///
+/// Misma puerta que el export (`require_admin_session`): la respuesta dice cuántas filas tiene cada
+/// tabla del negocio, así que no puede ser más abierta que el volcado que la usa.
+pub async fn export_tables(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    // Mismo `hub_id` del plano de DATOS que el export, por la misma razón: contar sobre otro hub
+    // daría números que no casan con lo que sale del zip.
+    let data_hub_id = match auth::authenticate(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx.hub_id,
+        Err(e) => return unauthorized(e),
+    };
+    let ids: Vec<String> = rt.registry().installed.iter().map(|m| m.id.clone()).collect();
+    match export::module_table_counts(&rt, &data_hub_id, &ids).await {
+        Ok(modules) => Json(json!({ "ok": true, "modules": modules })).into_response(),
+        Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+    }
+}
+
 pub async fn export_blueprint(
     State(st): State<AppState>,
     headers: HeaderMap,

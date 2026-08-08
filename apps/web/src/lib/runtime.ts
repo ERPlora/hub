@@ -510,6 +510,23 @@ export async function deleteBusinessCertificate(): Promise<void> {
 export interface ExportModuleSelection {
   module_id: string;
   with_data: boolean;
+  /**
+   * Subselección de TABLAS del módulo (hub#534). `null` = todas las suyas, que es lo que
+   * significaba `with_data` antes de existir el campo. **Acota, nunca amplía**: lo que la regla del
+   * `purpose` deja fuera sigue fuera aunque se marque aquí.
+   */
+  tables: string[] | null;
+}
+
+/** Una tabla de un módulo y cuántas filas volcaría el export (`GET /api/hub/export/tables`). */
+export interface ExportTableCount {
+  table: string;
+  rows: number;
+}
+
+export interface ExportModuleTables {
+  module_id: string;
+  tables: ExportTableCount[];
 }
 
 /**
@@ -787,6 +804,27 @@ function filenameFromDisposition(header: string | null): string | null {
  * (del `Content-Disposition` o el default `<nombre>_<idioma>.blueprint.zip`). Solo owner/admin
  * (el runtime revalida). Lanza con el mensaje del server si rechaza.
  */
+/**
+ * Qué tablas tiene cada módulo instalado y **cuántas filas** volcaría el export (hub#534).
+ *
+ * El recuento es lo que convierte la lista de casillas en una decisión: «Citas: 28» es lo que hace
+ * que quien monta una plantilla las desmarque. Sin el número, es una fila de nombres.
+ *
+ * **Degrada en silencio**: si el runtime no lo sirve (versión anterior, o sin sesión de admin) se
+ * devuelve vacío y el formulario sigue funcionando exactamente como antes —todas las tablas—, en
+ * vez de romper la pantalla de export por una comodidad.
+ */
+export async function fetchExportTables(): Promise<ExportModuleTables[]> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/export/tables`, { headers: runtimeHeaders() });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { modules?: ExportModuleTables[] };
+    return Array.isArray(body.modules) ? body.modules : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function exportHub(
   name: string,
   locale: string,
