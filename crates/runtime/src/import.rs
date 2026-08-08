@@ -147,7 +147,8 @@ pub async fn import_sections(
         if section == crate::export::ROLES_SECTION {
             continue;
         }
-        let (status, discarded_rows) = match ignored_by_purpose(manifest, section)
+        let (status, discarded_rows) = match system_table_not_portable(section)
+            .or_else(|| ignored_by_purpose(manifest, section))
             .or_else(|| identity_not_portable(manifest, section, target_hub_id))
             .or_else(|| chain_not_portable(manifest, section, target_hub_id))
         {
@@ -237,6 +238,11 @@ pub mod ignore_reason {
     /// One code for both, because the answer to the user is the same one: those roles are not part
     /// of this hub's catalogue, so nothing was switched on for them.
     pub const ROLES_NOT_ACTIVATABLE: &str = "roles_not_activatable";
+    /// The bundle brought a section over one of the hub's OWN system tables — its fiscal profile,
+    /// its certificate store, its import batches (ADR-0259 D8 — hub#560). Those are the identity of
+    /// THIS installation, not vocabulary of anybody's business, so no bundle writes them: not a
+    /// template, not another hub's backup, not this hub restoring itself.
+    pub const SYSTEM_TABLE_NOT_PORTABLE: &str = "system_table_not_portable";
 }
 
 /// Is this bundle a restore of the destination hub's OWN state?
@@ -247,6 +253,34 @@ pub mod ignore_reason {
 /// the field existed) the one answer that lets their rows through.
 fn is_same_hub(manifest: &BlueprintManifest, target_hub_id: &str) -> bool {
     !manifest.hub.hub_id.is_empty() && manifest.hub.hub_id == target_hub_id
+}
+
+/// **The hub's own system tables are not a section, whatever the manifest calls them** —
+/// ADR-0259 D8 (hub#560).
+///
+/// This is the FIRST question asked of every section, before `purpose`, before whose hub this is:
+/// those two decide what a bundle may carry ABOUT A BUSINESS, and `_hub_*` is not about a business
+/// at all. `_hub_fiscal_profile` is the identity of THIS installation — the taxpayer id the emitted
+/// chain is anchored to, its `system_id`, whether it has gone live — and `_hub_fiscal_regime_registry`
+/// is what says the country owes a regime in the first place. A bundle able to write them could
+/// declare a hub already active, or hand it another installation's `system_id`: adopting somebody
+/// else's installation by the back door, which hub#558 makes a deliberate act with a trace.
+///
+/// Both shapes are caught, because a hand-made zip has both available: a section named after the
+/// table (`_hub_fiscal_profile`), and one disguised as a MODULE whose id opens the same namespace
+/// (`modules/_hub`). The second is the one that matters — a module section reaches its tables by
+/// the very same prefix rule, so `_hub` would reach EVERY `_hub_*` table — and it is why the
+/// question asked here is about the leading `_` and not only about `_hub_`: the underscore is the
+/// runtime's namespace, and no section of a bundle is named inside it.
+///
+/// It IGNORES, it does not fail: the import is best-effort by design (a section that oversteps must
+/// not take the rest of the blueprint with it), and the report says so with a stable reason code
+/// instead of the hollow `Skipped` an unknown section used to get — silence being indistinguishable
+/// from «you did not tick it» is exactly what [`SectionStatus::Ignored`] exists to avoid.
+fn system_table_not_portable(section: &str) -> Option<String> {
+    let name = section.strip_prefix("modules/").unwrap_or(section);
+    name.starts_with(crate::export::RESERVED_NAMESPACE_PREFIX)
+        .then(|| ignore_reason::SYSTEM_TABLE_NOT_PORTABLE.to_string())
 }
 
 /// Identities NEVER land in a hub that is not their own (ADR-0195 §3, consumer plane — hub#331).
