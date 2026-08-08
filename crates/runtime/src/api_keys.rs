@@ -362,7 +362,12 @@ pub async fn verify_and_resolve(
         rate_limit_per_minute: row["rate_limit_per_minute"]
             .as_i64()
             .unwrap_or(DEFAULT_RATE_LIMIT_PER_MINUTE),
-        context: RequestContext::new(hub_id.to_string(), format!("apikey:{id}"), permissions),
+        // hub#361: a machine principal. Built HERE, at the one place an API-key context is ever
+        // constructed, so no surface can forget it: an integration is never offered the PIN
+        // dialog and can never be approved — it has nobody standing at it, and a stored,
+        // long-lived credential must not gain a second way in.
+        context: RequestContext::new(hub_id.to_string(), format!("apikey:{id}"), permissions)
+            .as_machine(),
     }))
 }
 

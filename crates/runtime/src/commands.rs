@@ -5,6 +5,7 @@ use erplora_db::{DatabaseAdapter, Params, TxGatedOutcome};
 use erplora_wasm_host::{Operation, Output, WasmHost};
 use serde_json::{json, Value as Json};
 
+use crate::elevation::Grants;
 use crate::errors::{Result, RuntimeError};
 use crate::events;
 use crate::outbox;
@@ -52,14 +53,32 @@ pub async fn execute(
     name: &str,
     payload: &Params,
     ctx: &RequestContext,
+    grants: &Grants,
 ) -> Result<Json> {
-    execute_at(db, registry, name, payload, ctx, 0, &[], Origin::External).await
+    execute_at(
+        db,
+        registry,
+        name,
+        payload,
+        ctx,
+        0,
+        &[],
+        Origin::External,
+        Some(grants),
+    )
+    .await
 }
 
 /// Como [`execute`] pero a profundidad `depth` (cascada), con `extra_ops` añadidos a la
 /// transacción del command y con el [`Origin`] explícito de la llamada. El relay usa `extra_ops`
 /// para insertar el marcador de entrega (`_event_delivery`) atómicamente con los efectos del
 /// listener (idempotencia, §5.4).
+///
+/// `grants` are the live step-up approvals (hub#361), and only the EXTERNAL door passes them:
+/// [`None`] means «no approval can be spent here, whatever the context carries». The internal
+/// callers — the Outbox relay, the scheduler, the embedder's seeding entrypoint — pass `None`,
+/// because an approval is a person authorising an action at the counter, never the runtime
+/// authorising itself. That is the mechanism, not a second check that could disagree with one.
 #[allow(clippy::too_many_arguments)] // mismo trato que persist_handler_output: firma interna del dispatcher
 pub(crate) async fn execute_at(
     db: &dyn DatabaseAdapter,
@@ -70,6 +89,7 @@ pub(crate) async fn execute_at(
     depth: u32,
     extra_ops: &[(String, Params)],
     origin: Origin,
+    grants: Option<&Grants>,
 ) -> Result<Json> {
     if depth > MAX_EVENT_DEPTH {
         return Err(RuntimeError::EventLoop);
@@ -135,10 +155,31 @@ pub(crate) async fn execute_at(
     //
     // hub#360 (paso 2b, rule 1): the same gate, with a refusal a MANAGER could approve reported as
     // `RequiresElevation` naming the missing permission instead of a flat `403`. It denies exactly
-    // what `permissions::check` denied — nothing below this line runs either way — so no command
-    // becomes reachable; what changes is only that the caller can tell "ask the manager" from
-    // "this is not for you". The PIN that authorises is hub#361.
-    permissions::check_command(registry, ctx, &cmd.def.permission)?;
+    // what `permissions::check` denied, so no command becomes reachable; what changes is only that
+    // the caller can tell "ask the manager" from "this is not for you".
+    //
+    // hub#361 (rules 2 and 4) is the second half: an approval the manager already gave — the PIN
+    // was verified HERE, never by the client — is spent right at the gate that refused. Spent, not
+    // consulted: `Grants::spend` removes it, so the approval buys THIS action and not the next
+    // one. And it does not add the permission to the context, so it opens this gate and nothing
+    // else. Everything downstream (the fiscal precondition, the capability gate, a handler's
+    // operations) sees the same cashier it always saw, plus a note of who approved.
+    let elevated_ctx;
+    let ctx = match permissions::check_command(registry, ctx, &cmd.def.permission) {
+        Ok(()) => ctx,
+        Err(RuntimeError::RequiresElevation { permission }) => {
+            match spend_approval(grants, ctx, name, payload, &permission) {
+                Some(approved_by) => {
+                    elevated_ctx = ctx.clone().spent_approval_of(approved_by);
+                    &elevated_ctx
+                }
+                // No approval, or one granted for another action, another cashier or another hub:
+                // all of them mean the same thing to the caller — go and ask the manager.
+                None => return Err(RuntimeError::RequiresElevation { permission }),
+            }
+        }
+        Err(e) => return Err(e),
+    };
 
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y
     // cacheado en el Registry): rechaza ANTES de tocar la BD o invocar handlers (hub#27).
@@ -738,6 +779,44 @@ pub(crate) fn validate_handler_event(
     Ok(())
 }
 
+/// Spends the step-up approval that authorises `command(payload)` for this context, if there is
+/// one, returning the `hub_user.id` that approved (hub#361).
+///
+/// Everything the answer depends on is server-side: the token is a **lookup key** into the
+/// runtime's own store and the binding is rebuilt here from the context, the command name and the
+/// payload as sent. The client contributes the key and nothing else — it cannot state the
+/// permission, the cashier, the hub or what was approved.
+fn spend_approval(
+    grants: Option<&Grants>,
+    ctx: &RequestContext,
+    command: &str,
+    payload: &Params,
+    permission: &str,
+) -> Option<String> {
+    // The token comes from the CONTEXT and from nowhere else — the HTTP layer put it there from
+    // `X-Elevation-Token`. Reading it from `payload` instead would be the whole vulnerability:
+    // the body of a command is caller-controlled data that already gets validated, defaulted and
+    // bound into SQL, and it must never carry authority (`a_real_token_smuggled_in_the_payload_
+    // grants_nothing` pins that).
+    //
+    // ⚠️ Mutation note: turning this `?` into `.unwrap_or("")` is an EQUIVALENT mutant and no
+    // test can kill it. An empty string is not a token any path can produce — `new_token` always
+    // emits 64 hex chars and `auth::elevation_token` drops an empty header — so the lookup would
+    // simply miss and return `None`, exactly as the short circuit does. It is kept as `?` because
+    // "no token, no question asked" is cheaper and says what it means.
+    let token = ctx.elevation_token.as_deref()?;
+    grants?.spend(
+        token,
+        &crate::elevation::Binding {
+            hub_id: ctx.hub_id.clone(),
+            requester: ctx.user_id.clone(),
+            command: command.to_string(),
+            fingerprint: crate::elevation::fingerprint(payload),
+            permission: permission.to_string(),
+        },
+    )
+}
+
 /// Valida una intención del handler y la resuelve a su(s) SQL.
 ///
 /// Reglas (ARQUITECTURA.md §5.3): el `command` referenciado debe (1) ser de tipo
@@ -1154,9 +1233,16 @@ mod tests {
         let reg = registry_with_native_handler("sales.exfiltrate");
 
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        let err = execute(&db, &reg, "sales.complete_sale", &Params::new(), &ctx)
-            .await
-            .unwrap_err();
+        let err = execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(err, RuntimeError::EventNotDeclared { .. }),
             "got {err:?}"
@@ -1178,9 +1264,16 @@ mod tests {
         let reg = registry_with_native_handler("sale.completed");
 
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        execute(&db, &reg, "sales.complete_sale", &Params::new(), &ctx)
-            .await
-            .unwrap();
+        execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
 
         let rows = db
             .query(
@@ -1243,9 +1336,16 @@ mod tests {
         let reg = registry_with_rejecting_handler("sales.rejected");
 
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        let err = execute(&db, &reg, "sales.complete_sale", &Params::new(), &ctx)
-            .await
-            .unwrap_err();
+        let err = execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(
                 err,
@@ -1276,9 +1376,16 @@ mod tests {
         let reg = registry_with_rejecting_handler("inventory.not_owned");
 
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        let err = execute(&db, &reg, "sales.complete_sale", &Params::new(), &ctx)
-            .await
-            .unwrap_err();
+        let err = execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(err, RuntimeError::Wasm(_)),
             "a foreign-namespace code must surface as a broken guest contract, got {err:?}"
@@ -1462,6 +1569,7 @@ mod tests {
             "cash_register._reverse_sale",
             &Params::new(),
             &ctx,
+            &Grants::new(),
         )
         .await
         .unwrap_err();
@@ -1486,10 +1594,14 @@ mod tests {
             0,
             &[],
             Origin::External,
+            None,
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, RuntimeError::InternalCommand(_)), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::InternalCommand(_)),
+            "got {err:?}"
+        );
     }
 
     /// (b) Una invocación INTERNA legítima (el relay del Outbox entregando un listener, o el
@@ -1508,6 +1620,7 @@ mod tests {
             0,
             &[],
             Origin::Internal,
+            None,
         )
         .await
         .expect("una invocación INTERNA sí debe ejecutar el comando `_`");
@@ -1531,10 +1644,14 @@ mod tests {
             0,
             &[],
             Origin::External,
+            None,
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, RuntimeError::InternalCommand(_)), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::InternalCommand(_)),
+            "got {err:?}"
+        );
     }
 
     /// Control: un command PÚBLICO normal (sin `_`, sin `internal: true`) sigue funcionando desde
@@ -1552,6 +1669,7 @@ mod tests {
             0,
             &[],
             Origin::External,
+            None,
         )
         .await
         .unwrap();
@@ -1641,9 +1759,16 @@ mod tests {
         // No `hub_settings` rows → the enriched context carries an EMPTY business identity.
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
 
-        let err = execute(&db, &reg, "invoice.create", &fiscal_payload(), &ctx)
-            .await
-            .unwrap_err();
+        let err = execute(
+            &db,
+            &reg,
+            "invoice.create",
+            &fiscal_payload(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(&err, RuntimeError::FiscalPrecondition { missing }
                 if missing.contains(&"business_tax_id") && missing.contains(&"business_legal_name")),
@@ -1670,7 +1795,7 @@ mod tests {
         let reg = registry_with_fiscal_command();
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
 
-        let out = execute(&db, &reg, "invoice.create", &fiscal_payload(), &ctx)
+        let out = execute(&db, &reg, "invoice.create", &fiscal_payload(), &ctx, &Grants::new())
             .await
             .expect("with the business identity set, the fiscal document must be emitted");
         assert_eq!(out["ok"], json!(true));
@@ -1704,9 +1829,16 @@ mod tests {
         );
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
 
-        let err = execute(&db, &reg, "invoice.create", &fiscal_payload(), &ctx)
-            .await
-            .unwrap_err();
+        let err = execute(
+            &db,
+            &reg,
+            "invoice.create",
+            &fiscal_payload(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(&err, RuntimeError::FiscalPrecondition { missing }
                 if *missing == vec!["certificate"]),
@@ -1773,9 +1905,16 @@ mod tests {
             .insert("invoice".into(), std::sync::Arc::new(FiscalOpHandler));
 
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        let err = execute(&db, &reg, "invoice.create", &Params::new(), &ctx)
-            .await
-            .unwrap_err();
+        let err = execute(
+            &db,
+            &reg,
+            "invoice.create",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(err, RuntimeError::FiscalPrecondition { .. }),
             "got {err:?}"
@@ -1796,7 +1935,7 @@ mod tests {
         let reg = registry_with_command("notes", "notes.create");
         // Empty business identity (FakeDb returns no settings rows).
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        let out = execute(&FakeDb, &reg, "notes.create", &Params::new(), &ctx)
+        let out = execute(&FakeDb, &reg, "notes.create", &Params::new(), &ctx, &Grants::new())
             .await
             .unwrap();
         assert_eq!(out["ok"], json!(true));
@@ -1822,7 +1961,9 @@ mod tests {
         let mut payload = Params::new();
         payload.insert("business_tax_id_verified".into(), json!(1));
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        let out = execute(&FakeDb, &reg, "crm.flag", &payload, &ctx).await.unwrap();
+        let out = execute(&FakeDb, &reg, "crm.flag", &payload, &ctx, &Grants::new())
+            .await
+            .unwrap();
         assert_eq!(out["ok"], json!(true));
     }
 }

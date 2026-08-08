@@ -238,6 +238,46 @@ async fn read_only_key_cannot_write() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
+/// hub#361: an integration is **never** invited to ask a manager. `catalog.write` is granted to
+/// `manager` in the fixture, so for a person this refusal would be `requires_elevation` (hub#360)
+/// — the offer of a PIN dialog. An API key gets the flat `permission_denied` it always got:
+/// nobody is standing at a nightly job to type four digits, and now that an approval GRANTS, a
+/// stored, copied, long-lived credential must not have a second way in.
+#[tokio::test]
+async fn an_api_key_is_never_offered_the_pin_dialog() {
+    let app = make_app().await;
+    let resp = app
+        .clone()
+        .oneshot(admin_post(
+            "/api/keys",
+            json!({ "name": "RO", "scope": [{ "module": "catalog", "read": true, "write": false }] }),
+        ))
+        .await
+        .unwrap();
+    let secret = body_json(resp).await["data"]["secret"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let resp = app
+        .clone()
+        .oneshot(api_post(
+            "/api/v1/catalog/c/item.create",
+            &secret,
+            json!({ "payload": { "name": "X" } }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body = body_json(resp).await;
+    assert_eq!(body["error"]["code"], json!("permission_denied"));
+    assert_eq!(
+        body["error"]["permission"],
+        json!(null),
+        "and no permission field: this is not an offer to elevate"
+    );
+}
+
 #[tokio::test]
 async fn data_surface_rejects_non_api_key_bearer() {
     let app = make_app().await;

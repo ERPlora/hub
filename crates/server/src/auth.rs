@@ -41,6 +41,16 @@ pub fn session_token(headers: &HeaderMap) -> Option<String> {
     header(headers, "x-hub-session")
 }
 
+/// Step-up approval token of `X-Elevation-Token` (hub#361), if the caller presents one.
+///
+/// A **header**, not a payload field: the body of a command has to stay pure data, so that the
+/// one thing a client contributes to an authorisation decision is a reference to a grant the
+/// runtime already holds. It is not a credential the hub verifies here — an unknown, expired or
+/// foreign token is simply not a grant, and the dispatcher answers exactly as if none had come.
+pub fn elevation_token(headers: &HeaderMap) -> Option<String> {
+    header(headers, "x-elevation-token").filter(|t| !t.is_empty())
+}
+
 /// Bearer `erpl_live_<id>_<secret>` de una **API key** (`Authorization: Bearer …`), si viene y
 /// tiene el prefijo de API key. Distinto del JWT de usuario (que también va en `Authorization:
 /// Bearer` pero NO empieza por `erpl_live_`): así un endpoint sabe qué tipo de bearer le llega.

@@ -41,6 +41,8 @@ pub mod daily_usage;
 pub mod device_mode;
 /// The devices of a business and the gesture that cuts a lost one off — hub#455.
 pub mod devices;
+/// Step-up approvals: the manager's PIN, verified in the runtime, buys ONE action — hub#361.
+pub mod elevation;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
@@ -804,6 +806,10 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        // hub#361: the manager approves ONE action. The PIN is verified in the runtime, and the
+        // token that comes back is presented on the retry in `X-Elevation-Token` — never in the
+        // command payload, so a command body stays pure data.
+        .route("/api/elevation/approve", post(elevation::approve))
         // ── Print queue of the hub (ADR-0196 §6, hub#341) ───────────────────────────────────
         // Enqueue `{jobId, role, html}` (idempotent by `jobId`) and observe the queue. Drenarla
         // por el WS del runtime es hub#343. Auth = sesión de usuario.
@@ -2259,6 +2265,15 @@ async fn command(
     let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
+    };
+    // hub#361: a step-up approval the caller already obtained, presented OUT OF BAND. It is a
+    // lookup key into the runtime's own store — an unknown or foreign one is worth exactly as
+    // much as no header at all — and it is read here and not in `authenticate` on purpose:
+    // `/api/query` never elevates (a PIN that unlocks a report leaves no trace of who approved),
+    // and neither does the public API-key surface (nobody is standing at an integration).
+    let ctx = match auth::elevation_token(&headers) {
+        Some(token) => ctx.with_elevation_token(token),
+        None => ctx,
     };
     // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
     let owner = rt

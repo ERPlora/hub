@@ -230,6 +230,175 @@ async fn requires_elevation_is_403_naming_the_missing_permission() {
     assert_eq!(body["error"]["permission"], json!("till.take_payment"));
 }
 
+// ── hub#361 helpers: a till, a manager who can approve and a cashier who cannot ──────────────
+
+/// The `till` fixture plus two real `hub_user` rows with PINs, in `Dev` auth mode (the cashier's
+/// identity comes from the headers, exactly as in the hub#360 tests above).
+async fn elevation_app() -> AppState {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.ensure_system_tables().await.unwrap();
+    rt.install_from_dir(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixture_elevation"),
+    )
+    .await
+    .unwrap();
+    rt.create_user("Sofía", "8317", "manager", None)
+        .await
+        .unwrap();
+    rt.create_user("Nacho", "4692", "employee", None)
+        .await
+        .unwrap();
+    AppState::with_config(rt, HubConfig::from_env_with_auth(AuthMode::Dev))
+}
+
+/// `POST /api/command` as the cashier, optionally presenting an approval.
+fn take_payment_request(token: Option<&str>) -> Request<Body> {
+    let mut req = Request::builder()
+        .method("POST")
+        .uri("/api/command")
+        .header("content-type", "application/json")
+        .header("x-hub-id", "h1")
+        .header("x-user-id", "u-cashier")
+        .header("x-permissions", "till.view_sale,till.add_sale");
+    if let Some(token) = token {
+        req = req.header("x-elevation-token", token);
+    }
+    req.body(Body::from(
+        json!({ "name": "till.sale.take_payment", "payload": { "label": "table 4" } }).to_string(),
+    ))
+    .unwrap()
+}
+
+/// `POST /api/elevation/approve` — the cashier's request, the approver's digits.
+fn approve_request(approver: &str, pin: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri("/api/elevation/approve")
+        .header("content-type", "application/json")
+        .header("x-hub-id", "h1")
+        .header("x-user-id", "u-cashier")
+        .header("x-permissions", "till.view_sale,till.add_sale")
+        .body(Body::from(
+            json!({
+                "approver": approver,
+                "pin": pin,
+                "command": "till.sale.take_payment",
+                "payload": { "label": "table 4" }
+            })
+            .to_string(),
+        ))
+        .unwrap()
+}
+
+/// hub#361 (paso 2b, rules 2 and 4): the manager's PIN crosses the border **once**, to
+/// `POST /api/elevation/approve`, and what comes back is a token the cashier presents on the
+/// retry in `X-Elevation-Token` — a header, deliberately **not** a payload field, so the body of a
+/// command stays pure data and nothing about authority can be smuggled through it.
+#[tokio::test]
+async fn the_managers_approval_crosses_the_border_and_the_retry_goes_through() {
+    let app = app(elevation_app().await);
+
+    // Without approval: the 403 of hub#360.
+    let resp = app
+        .clone()
+        .oneshot(take_payment_request(None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    let resp = app
+        .clone()
+        .oneshot(approve_request("Sofía", "8317"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(true));
+    assert_eq!(body["data"]["permission"], json!("till.take_payment"));
+    assert_eq!(body["data"]["approver_name"], json!("Sofía"));
+    assert_eq!(body["data"]["expires_in_seconds"], json!(120));
+    let token = body["data"]["token"].as_str().unwrap().to_string();
+    assert!(!token.is_empty());
+
+    let resp = app
+        .clone()
+        .oneshot(take_payment_request(Some(&token)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "the approved action runs");
+
+    // Spent. The same token, the same action, one request later: back to asking the manager.
+    let resp = app
+        .oneshot(take_payment_request(Some(&token)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        body_json(resp).await["error"]["code"],
+        json!("requires_elevation")
+    );
+}
+
+/// A PIN is four digits typed in front of customers: without a limit on the attempts, approval is
+/// decorative. The approval door shares the pinpad's guard (`LoginThrottle`), so a script cannot
+/// walk 10,000 combinations here either — and a lock earned at one door holds at the other,
+/// because it is the same credential.
+#[tokio::test]
+async fn wrong_pins_are_refused_and_then_locked_out() {
+    let app = app(elevation_app().await);
+
+    for attempt in 1..=erplora_server::login_throttle::MAX_FAILURES {
+        let resp = app
+            .clone()
+            .oneshot(approve_request("Sofía", "0000"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CONFLICT, "attempt {attempt}");
+        assert_eq!(
+            body_json(resp).await["error"]["code"],
+            json!("hub.elevation.rejected")
+        );
+    }
+
+    // Locked — and now even the RIGHT PIN waits, or the lock would be a suggestion.
+    let resp = app
+        .clone()
+        .oneshot(approve_request("Sofía", "8317"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        body_json(resp).await["error"]["code"],
+        json!("too_many_attempts")
+    );
+}
+
+/// A refusal that is **not** about the digits must not spend an attempt: picking the wrong person
+/// in the dialog is a mistake anybody makes, and locking their account for it would teach the shop
+/// to stop using the dialog.
+#[tokio::test]
+async fn a_refusal_that_is_not_about_the_pin_does_not_count_towards_the_lock() {
+    let app = app(elevation_app().await);
+
+    for _ in 0..(erplora_server::login_throttle::MAX_FAILURES + 3) {
+        let resp = app
+            .clone()
+            .oneshot(approve_request("Nacho", "4692"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        assert_eq!(
+            body_json(resp).await["error"]["code"],
+            json!("hub.elevation.approver_cannot")
+        );
+    }
+
+    // Nacho's PIN was right every time, so nothing is locked: he simply cannot approve this.
+    let resp = app.oneshot(approve_request("Sofía", "8317")).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
 /// The other half of the same contract: an `admin` permission never advertises a PIN dialog
 /// (rule 5). `fixture_inventory` grants nothing to `manager`, so the shape the 24 published
 /// modules have keeps answering exactly what it answered before — see `permission_denied_is_403`.

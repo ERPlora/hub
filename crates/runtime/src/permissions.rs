@@ -1,7 +1,7 @@
 //! Comprobación de permisos. El gate es el mismo para UI, API y AI tools (ARQUITECTURA.md §9.2).
 //! La autoridad real es siempre el runtime (Rust), nunca la UI.
 use crate::errors::{Result, RuntimeError};
-use crate::registry::{Registry, RequestContext};
+use crate::registry::{Principal, Registry, RequestContext};
 
 /// The one role whose missing permissions can be approved on the spot (PLAN paso 2b, rule 5).
 ///
@@ -40,6 +40,11 @@ pub fn has(ctx: &RequestContext, required: &str) -> bool {
 /// makes this safe to add before the verification exists — the worst a wrong answer here can do
 /// is offer a dialog that then refuses, never let something through.
 ///
+/// **A machine principal is never offered the dialog** (hub#361): an API key
+/// ([`Principal::Machine`]) has nobody standing at it, so «ask a manager to type their PIN» is an
+/// instruction it cannot follow — and now that an approval GRANTS ([`crate::elevation`]), a
+/// stored, copied, long-lived credential must not have a second way in. It gets the flat refusal.
+///
 /// Kept apart from [`check`] deliberately, so **queries keep refusing flat**. Elevation exists to
 /// attribute an ACTION to the manager who approved it (rule 3: `created_by` / `approved_by`); a
 /// PIN that unlocks a report leaves no such trace and would quietly turn the manager's PIN into a
@@ -49,7 +54,7 @@ pub fn check_command(registry: &Registry, ctx: &RequestContext, required: &str) 
     if has(ctx, required) {
         return Ok(());
     }
-    if is_elevable(registry, required) {
+    if ctx.principal == Principal::Human && is_elevable(registry, required) {
         return Err(RuntimeError::RequiresElevation {
             permission: required.to_string(),
         });
@@ -256,5 +261,42 @@ mod elevation_tests {
                 "`{required}` must be allowed by exactly the same rule as before"
             );
         }
+    }
+
+    #[test]
+    fn a_machine_principal_is_never_invited_to_ask_the_manager() {
+        // hub#360 left this open on purpose: an API key has nobody standing at it, so
+        // `requires_elevation` was an instruction it could not follow. It was only an absurd
+        // message while elevation granted nothing — hub#361 makes it a door, and a stored,
+        // copied, long-lived credential must not have one.
+        let reg = registry(&[TILL]);
+        let integration =
+            RequestContext::new("h1", "apikey:k1", ["till.view_sale".to_string()]).as_machine();
+
+        assert!(matches!(
+            check_command(&reg, &integration, "till.take_payment"),
+            Err(RuntimeError::PermissionDenied(p)) if p == "till.take_payment"
+        ));
+        // Everything else about a machine principal is unchanged: it still gets in where it holds
+        // the permission, and it still gets the flat refusal where a human would too.
+        assert!(check_command(&reg, &integration, "till.view_sale").is_ok());
+        assert!(matches!(
+            check_command(&reg, &integration, "till.manage_settings"),
+            Err(RuntimeError::PermissionDenied(p)) if p == "till.manage_settings"
+        ));
+    }
+
+    #[test]
+    fn a_human_is_the_default_so_a_surface_that_says_nothing_behaves_as_before() {
+        // The only thing `Machine` ever does is take capability away, so the default has to be
+        // the ordinary one: a caller that forgets to declare itself must not silently lose the
+        // dialog. (Every surface but the API key builds the context with `new`.)
+        let reg = registry(&[TILL]);
+        let ctx = RequestContext::new("h1", "u1", ["till.view_sale".to_string()]);
+        assert_eq!(ctx.principal, crate::registry::Principal::Human);
+        assert!(matches!(
+            check_command(&reg, &ctx, "till.take_payment"),
+            Err(RuntimeError::RequiresElevation { .. })
+        ));
     }
 }

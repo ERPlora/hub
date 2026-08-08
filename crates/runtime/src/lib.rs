@@ -21,6 +21,7 @@ pub mod commands;
 pub mod device_mode;
 pub mod devices;
 pub mod e2e_support;
+pub mod elevation;
 pub mod error_registry;
 pub mod errors;
 pub mod events;
@@ -61,7 +62,7 @@ pub mod wasm;
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{Result, RuntimeError};
 pub use manifest::Manifest;
-pub use registry::{EventSink, ModuleStatus, NavEntry, Registry, RequestContext};
+pub use registry::{EventSink, ModuleStatus, NavEntry, Principal, Registry, RequestContext};
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
 // `modules_root` travels with the guard on purpose: a test that resolves module paths by hand
@@ -92,6 +93,10 @@ pub struct Runtime {
     /// `hub_id` del despliegue (§2.5). Scoping del estado de módulos (`hub_module`) y de las
     /// migraciones de sistema. Lo inyecta el host; en tests por defecto = [`DEV_HUB_ID`].
     hub_id: String,
+    /// Live **step-up approvals** (hub#361). In memory and nowhere else: an approval describes
+    /// somebody standing at the till right now, so it dies with the process on purpose — see
+    /// [`elevation`] for why persisting it would be worse than losing it.
+    elevation: elevation::Grants,
 }
 
 impl Runtime {
@@ -100,6 +105,7 @@ impl Runtime {
             db,
             registry: Registry::new(),
             hub_id: DEV_HUB_ID.to_string(),
+            elevation: elevation::Grants::new(),
         }
     }
 
@@ -110,6 +116,7 @@ impl Runtime {
             db,
             registry: Registry::new(),
             hub_id: hub_id.into(),
+            elevation: elevation::Grants::new(),
         }
     }
 
@@ -581,7 +588,15 @@ impl Runtime {
         payload: &Params,
         ctx: &RequestContext,
     ) -> Result<Json> {
-        let r = commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx).await;
+        let r = commands::execute(
+            self.db.as_ref(),
+            &self.registry,
+            name,
+            payload,
+            ctx,
+            &self.elevation,
+        )
+        .await;
         if let Err(e) = &r {
             self.report_dispatch_error(e, "command", name, payload);
         }
@@ -614,6 +629,8 @@ impl Runtime {
             0,
             &[],
             commands::Origin::Internal,
+            // The embedder seeding e2e data is the runtime calling itself: no approval to spend.
+            None,
         )
         .await;
         if let Err(e) = &r {
@@ -838,6 +855,122 @@ impl Runtime {
     /// Usuarios activos del hub con PIN (para mostrar el grid de login local). `(id, name, role)`.
     pub async fn list_pin_users(&self) -> Result<Vec<(String, String, String)>> {
         identity::list_pin_users(self.db.as_ref()).await
+    }
+
+    /// **The manager approves one action** (hub#361, PLAN paso 2b rules 2 and 4).
+    ///
+    /// `requester` is the cashier whose command was refused with
+    /// [`RuntimeError::RequiresElevation`]; `req` carries the approver's name + PIN and the exact
+    /// action being approved. On success the caller gets an opaque token to present on **one**
+    /// retry of that same action ([`elevation`] explains the window).
+    ///
+    /// The PIN is verified **here**, against `hub_user` — rule 2: the client is never the
+    /// authority, and the browser never learns whether four digits were right except through this
+    /// answer. Five refusals in a row lock the approver at the HTTP door (the same
+    /// `LoginThrottle` the pinpad uses): without a limit, ten thousand combinations typed by a
+    /// script make the approval decorative.
+    ///
+    /// Order of the checks is deliberate — everything that is a fact about the **command** is
+    /// answered before the digits are looked at, so an action that could never be approved never
+    /// costs a throttle slot and never turns this door into an oracle:
+    ///
+    /// 1. **A machine principal has nobody to approve for** (`machine_principal`). An API key is
+    ///    the hole hub#360 left open; now that an approval grants, it closes here too.
+    /// 2. The command exists (`CommandNotFound`) and is not **internal** (`InternalCommand`):
+    ///    minting an approval for a door the dispatcher refuses before the permission would hand
+    ///    out a token that can never be spent.
+    /// 3. The requester **does not already hold** the permission (`not_required`): an approval
+    ///    nobody needed is a spendable credential left lying around.
+    /// 4. The permission is **elevable** (`not_elevable`, [`permissions::is_elevable`]): rule 5,
+    ///    `admin` territory is not approved at the counter — default-deny.
+    /// 5. The PIN opens an **active** user (`rejected`).
+    /// 6. That user **could have done it themselves** (`approver_cannot`): you cannot approve what
+    ///    you have no right to do, so the approval never manufactures authority that did not
+    ///    already exist in the hub.
+    pub async fn approve_elevation(
+        &self,
+        requester: &RequestContext,
+        req: elevation::ElevationRequest<'_>,
+    ) -> Result<elevation::ElevationApproval> {
+        let reject = |code: &str, message: &str| RuntimeError::Domain {
+            code: format!("{}elevation.{code}", hub_users::CORE_NAMESPACE),
+            message: message.to_string(),
+        };
+
+        if requester.principal == Principal::Machine {
+            return Err(reject(
+                "machine_principal",
+                "an automated integration cannot be approved: a PIN says who is standing at the \
+                 till, and nobody is. Give the key the permission it needs instead.",
+            ));
+        }
+
+        let cmd = self
+            .registry
+            .get_command(req.command)
+            .ok_or_else(|| RuntimeError::CommandNotFound(req.command.to_string()))?;
+        if cmd.def.is_internal(req.command) {
+            return Err(RuntimeError::InternalCommand(req.command.to_string()));
+        }
+        let permission = cmd.def.permission.clone();
+
+        if permissions::has(requester, &permission) {
+            return Err(reject(
+                "not_required",
+                "this action needs no approval: whoever asked for it can already do it.",
+            ));
+        }
+        if !permissions::is_elevable(&self.registry, &permission) {
+            return Err(reject(
+                "not_elevable",
+                "this action is not approved with a PIN: it belongs to whoever administers the \
+                 hub, who signs in with their own account.",
+            ));
+        }
+
+        let approver = identity::verify_pin(self.db.as_ref(), req.approver_name, req.pin)
+            .await?
+            // One answer for an unknown name, a wrong PIN and a deactivated user: a dialog at the
+            // counter must not become a way to find out who works here.
+            .ok_or_else(|| {
+                reject(
+                    "rejected",
+                    "those details do not approve this action. Check the name and the PIN.",
+                )
+            })?;
+
+        if !permissions::has(
+            &RequestContext::new(
+                &requester.hub_id,
+                &approver.id,
+                identity::session_permissions(&self.registry, &approver.role),
+            ),
+            &permission,
+        ) {
+            return Err(reject(
+                "approver_cannot",
+                "that person cannot approve this action: they do not have the right to do it \
+                 themselves.",
+            ));
+        }
+
+        let token = self.elevation.mint(
+            elevation::Binding {
+                hub_id: requester.hub_id.clone(),
+                requester: requester.user_id.clone(),
+                command: req.command.to_string(),
+                fingerprint: elevation::fingerprint(req.payload),
+                permission: permission.clone(),
+            },
+            &approver.id,
+        );
+        Ok(elevation::ElevationApproval {
+            token,
+            permission,
+            approved_by: approver.id,
+            approver_name: approver.name,
+            expires_in_seconds: elevation::GRANT_TTL.as_secs(),
+        })
     }
 
     // ── Personal (core): gestión de TODOS los usuarios del hub. Ver [`hub_users`]. ──────────
@@ -1366,6 +1499,17 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
     p.insert(
         "has_certificate".into(),
         Json::from(if ctx.has_certificate { 1 } else { 0 }),
+    );
+    // Who APPROVED this command, when it only ran because a manager stepped up (hub#361). Empty
+    // for everything else, which is almost everything. It sits next to `:current_user_id` on
+    // purpose: together they are the double attribution rule 3 asks for — `created_by` is the
+    // cashier who was at the till, `approved_by` the manager who authorised. **This exposes it;
+    // hub#362 owns the row contract** (which columns every module table carries, and the
+    // migration that adds them). Never settable by a caller: the dispatcher writes it only after
+    // spending a grant.
+    p.insert(
+        "approved_by".into(),
+        Json::String(ctx.approved_by.clone().unwrap_or_default()),
     );
     p
 }
