@@ -317,6 +317,32 @@ pub async fn list(
     Ok(res.rows.iter().map(row_to_job).collect())
 }
 
+/// Which printer role a job belongs to, or `None` when **this hub** has no such job.
+///
+/// Exists for the drain's authorisation (hub#343): a print host may only close a job of a role it
+/// hosts, and to know that you first have to know the job's role. Scoped by `hub_id` like every
+/// other read here, so another hub's `jobId` is simply not a job as far as this one is concerned.
+pub async fn role_of(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    job_id: &str,
+) -> Result<Option<String>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("job_id".into(), json!(job_id));
+    let res = db
+        .query(
+            "SELECT role FROM _print_queue WHERE hub_id = :hub_id AND job_id = :job_id",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["role"].as_str())
+        .map(str::to_string))
+}
+
 /// Row of [`JOB_COLUMNS`] → [`PrintJob`].
 fn row_to_job(row: &serde_json::Value) -> PrintJob {
     let s = |k: &str| row[k].as_str().unwrap_or_default().to_string();

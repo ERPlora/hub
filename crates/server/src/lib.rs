@@ -16,6 +16,7 @@
 //!   POST /api/query   {name, params}
 //!   POST /api/command {name, payload}
 //!   GET  /ws                                 stream de eventos (solo push)
+//!   GET  /ws/print                           canal del host de impresión (bidireccional, hub#343)
 
 use axum::body::Body;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -58,6 +59,7 @@ pub mod members;
 pub mod module_storage;
 pub mod openapi;
 pub mod print;
+pub mod print_ws;
 pub mod profile;
 pub mod router;
 pub mod settings;
@@ -858,6 +860,11 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
         .route("/ws", get(ws_upgrade))
+        // El canal del HOST DE IMPRESIÓN (ADR-0196 §6, hub#343): el primer WS cliente→servidor del
+        // hub. Ruta propia y no un frame más de `/ws` porque su contrato es otro — `/ws` es un
+        // fan-out anónimo de eventos y este exige sesión + registro de host, y por él viaja el
+        // DOCUMENTO del tique.
+        .route("/ws/print", get(print_ws::upgrade))
         // SSE: alternativa a /ws para el MISMO canal de eventos (hub#19). Se suscribe al mismo
         // `AppState.events` (broadcast, N suscriptores), así que no duplica el fan-out. Da gratis
         // reconexión del navegador (EventSource) + keep-alive (idle timeout del ALB). Nombre de
@@ -1878,11 +1885,18 @@ struct InstallReq {
     dir: String,
 }
 
-pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
+/// HTTP status + stable error code of a runtime error.
+///
+/// Split out of [`err_response`] (hub#343) because the print host's WS channel has to answer with
+/// **the same codes** and cannot go through a `Response` to get them. One table, so the code a
+/// module or the drain declares cannot mean one thing over HTTP and another over the socket.
+pub(crate) fn err_status_and_code(
+    e: &erplora_runtime::RuntimeError,
+) -> (StatusCode, std::borrow::Cow<'_, str>) {
     use erplora_runtime::RuntimeError as E;
     // `Cow` because `Domain` (hub#139) carries a module-declared dynamic code; every other
     // variant keeps its static stable code.
-    let (status, code): (StatusCode, std::borrow::Cow<'_, str>) = match &e {
+    match e {
         E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied".into()),
         E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found".into()),
         // hub#131, hub#145: un command interno (prefijo `_`/`internal:true`) invocado desde un
@@ -1912,7 +1926,12 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
         E::RequiresElevation { .. } => (StatusCode::FORBIDDEN, "requires_elevation".into()),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".into()),
         _ => (StatusCode::BAD_REQUEST, "error".into()),
-    };
+    }
+}
+
+pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
+    use erplora_runtime::RuntimeError as E;
+    let (status, code) = err_status_and_code(&e);
     let mut error = json!({ "code": code, "message": e.to_string() });
     // hub#360: the missing permission travels as a FIELD, never parsed out of the message — it is
     // what the dialog names and what hub#361 re-checks. Only on the elevation branch: a flat

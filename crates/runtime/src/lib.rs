@@ -41,6 +41,7 @@ pub mod native;
 pub mod outbox;
 pub mod permissions;
 pub mod pin_policy;
+pub mod print_drain;
 pub mod print_hosts;
 pub mod print_queue;
 pub mod queries;
@@ -774,6 +775,41 @@ impl Runtime {
     /// grow in silence.
     pub async fn print_coverage(&self) -> Result<Vec<print_hosts::RoleCoverage>> {
         print_hosts::coverage(self.db.as_ref(), &self.hub_id).await
+    }
+
+    // ── Draining the queue: who may pull, and who may close (ADR-0196 §6, hub#343) ─────────────
+
+    /// Hands the next job of `role` to `device_id` — **only** if that device is a registered print
+    /// host of that role here. Reclaims expired leases on the way in, so a ticket stranded by a
+    /// dead host comes back without any background sweeper having to be alive. See [`print_drain`].
+    pub async fn claim_print_job(
+        &self,
+        device_id: &str,
+        role: &str,
+    ) -> Result<Option<print_queue::PrintJob>> {
+        print_drain::claim(self.db.as_ref(), &self.hub_id, device_id, role).await
+    }
+
+    /// The print host confirms the paper came out. `false` = this hub has no such job (or it was
+    /// already terminal). Refused if the device does not host that job's role.
+    pub async fn confirm_print_job(&self, device_id: &str, job_id: &str) -> Result<bool> {
+        print_drain::confirm(self.db.as_ref(), &self.hub_id, device_id, job_id).await
+    }
+
+    /// The print host could not print it. `true` = back in the queue, `false` = dead-lettered.
+    pub async fn fail_print_job(
+        &self,
+        device_id: &str,
+        job_id: &str,
+        error: &str,
+    ) -> Result<bool> {
+        print_drain::report_failure(self.db.as_ref(), &self.hub_id, device_id, job_id, error).await
+    }
+
+    /// Which printer roles `device_id` hosts here — the hub's answer to "what am I for?", so the
+    /// draining client never has to guess.
+    pub async fn print_roles_of_device(&self, device_id: &str) -> Result<Vec<String>> {
+        print_drain::hosted_roles(self.db.as_ref(), &self.hub_id, device_id).await
     }
 
     // ── Identidad local (usuarios/PIN/sesiones; §2.9). La autoridad de permisos es local. ──
