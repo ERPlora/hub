@@ -124,7 +124,9 @@ pub enum RuntimeError {
     /// (the latter only while an installed module declares the `certificate` capability).
     #[error("fiscal precondition failed: configure {} before issuing fiscal documents", missing.join(", "))]
     FiscalPrecondition { missing: Vec<&'static str> },
-    /// `business_tax_id` is FROZEN: this hub already emitted its first fiscal record (hub#554).
+    /// `business_tax_id` is FROZEN: this hub already emitted its first fiscal record (ADR-0273,
+    /// hub#554 — the ADR's own consequence: "`business_tax_id` stops being able to fork a live
+    /// chain").
     ///
     /// The chain is anchored by `(hub_id, issuer_nif, environment)` (guard R4, hub#313), so a
     /// different identifier does not *edit* anything — it starts a SECOND chain from 1 and leaves

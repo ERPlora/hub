@@ -416,7 +416,11 @@ async fn stored_value(db: &dyn DatabaseAdapter, hub_id: &str, key: &str) -> Resu
         .to_string())
 }
 
-/// **`business_tax_id` deja de ser editable una vez el hub ha EMITIDO** (hub#554).
+/// **`business_tax_id` deja de ser editable una vez el hub ha EMITIDO** (ADR-0273, hub#554).
+///
+/// Es la otra mitad de [`crate::fiscal_profile::go_live`], que congela `taxpayer_id` copiándolo de
+/// aquí: sin esta puerta, el ancla quedaba sellada en el perfil y el setting del que salió seguía
+/// siendo libre.
 ///
 /// La cadena VeriFactu está anclada por `(hub_id, issuer_nif, environment)` (guarda R4, hub#313):
 /// el ancla, la secuencia (`next_sequence`) y el `PrimerRegistro` se resuelven por ese NIF. Cambiarlo
