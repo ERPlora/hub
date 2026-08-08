@@ -28,22 +28,15 @@ pub enum DocumentType {
 }
 
 impl DocumentType {
-    /// Maps the protocol string; unknown → `Generic` (same as Python's `else`).
+    /// Maps the protocol string, **refusing what it does not know** (hub#501). The only door.
     ///
-    /// ⚠️ **Lenient, and now for NOBODY.** Its only production caller was the standalone Bridge,
-    /// whose wire this behaviour came from, and hub#340 deleted it — so today this is a permissive
-    /// door with no client. Use [`DocumentType::parse`]; removing this one is **hub#578**.
-    pub fn from_wire(s: &str) -> Self {
-        Self::parse(s).unwrap_or(Self::Generic)
-    }
-
-    /// Maps the protocol string, **refusing what it does not know** (hub#501).
-    ///
-    /// This is the strict half of [`from_wire`], and it exists because the lenient one hides the
-    /// most expensive kind of failure: a `Kitchen` or a `kitchn` used to render as `Generic` — a
-    /// nameless dump of key/value pairs — so the kitchen got a piece of paper that was not an order
-    /// and **nobody found out until the plate was missing**. A ticket that fails loudly is cheaper
-    /// than one that fails quietly, so the caller gets a `None` it has to deal with.
+    /// It used to have a lenient twin (`from_wire`, unknown → `Generic`, mirroring Python's
+    /// `else`), and that leniency is the most expensive kind of failure: a `Kitchen` or a `kitchn`
+    /// rendered as `Generic` — a nameless dump of key/value pairs — so the kitchen got a piece of
+    /// paper that was not an order and **nobody found out until the plate was missing**. A ticket
+    /// that fails loudly is cheaper than one that fails quietly, so the caller gets a `None` it has
+    /// to deal with. The twin's only caller was the standalone Bridge, deleted by hub#340; hub#578
+    /// removed the door with it, so no route can degrade to `Generic` in silence any more.
     ///
     /// It is deliberately the same vocabulary the hub's queue accepts
     /// (`erplora_runtime::print_queue::DOCUMENT_TYPES`) — two guards, two layers, different
@@ -612,8 +605,8 @@ mod tests {
     /// **The wire vocabulary, pinned from this side.** The hub's queue keeps the same seven names
     /// (`erplora_runtime::print_queue::DOCUMENT_TYPES`) and refuses anything else at the door; the
     /// two lists are duplicated on purpose (the hub server has no business linking the hardware
-    /// crate), so each side pins its own or they drift and the printer starts degrading real
-    /// documents to `Generic` in silence.
+    /// crate), so each side pins its own or they drift — and a name the queue accepts becomes a
+    /// job the printer refuses, one layer too late to tell the producer.
     #[test]
     fn the_wire_vocabulary_is_exactly_these_seven() {
         let vocabulary = [
@@ -637,9 +630,10 @@ mod tests {
         }
     }
 
-    /// **A document type nobody knows is refused, not printed as `Generic`.** This is the guard the
-    /// lenient `from_wire` never had: a typo used to reach the paper as a nameless key/value dump,
-    /// and the kitchen only noticed when the plate did not arrive.
+    /// **A document type nobody knows is refused, not printed as `Generic`.** A typo used to reach
+    /// the paper as a nameless key/value dump, and the kitchen only noticed when the plate did not
+    /// arrive. `parse` is now the ONLY way in — the lenient `from_wire` that degraded to `Generic`
+    /// went with its last caller, the standalone Bridge (hub#340 / hub#578).
     #[test]
     fn an_unknown_document_type_is_refused_instead_of_degraded() {
         for unknown in ["Kitchen", "kitchn", "", "html", "KITCHEN_ORDER"] {
@@ -649,10 +643,21 @@ mod tests {
                 "`{unknown}` is not a document this printer renders"
             );
         }
-        // The lenient door is still lenient — but no longer deliberately: the wire it served was
-        // the standalone Bridge's, and hub#340 deleted it. This assertion now pins behaviour that
-        // has zero production callers; it goes away with `from_wire` itself in hub#578.
-        assert_eq!(DocumentType::from_wire("kitchn"), DocumentType::Generic);
+    }
+
+    /// **`generic` is a document you ASK for, never one you fall back into.** The distinction is
+    /// the whole point of removing the lenient door: the type still exists, and a producer may
+    /// legitimately name it, but nothing maps an unknown string onto it any more.
+    #[test]
+    fn generic_is_only_reachable_by_naming_it() {
+        assert_eq!(DocumentType::parse("generic"), Some(DocumentType::Generic));
+        for typo in ["Generic", "generi", "gener1c", "unknown"] {
+            assert_eq!(
+                DocumentType::parse(typo),
+                None,
+                "`{typo}` must not slide into `Generic`"
+            );
+        }
     }
 
     /// **A `data` that is not an object is refused before it becomes blank paper.** Every renderer
@@ -667,6 +672,18 @@ mod tests {
                 "the refusal says the payload is wrong, not that the printer is: {err}"
             );
         }
+    }
+
+    /// Sanity of the builder every renderer is written on: a QR plus a cut must produce Epson's QR
+    /// stamp (`GS ( k`) and the cut (`GS V 1`). Without it, a renderer can look right and still
+    /// hand the printer bytes it does not understand.
+    #[test]
+    fn builder_qr_and_cut_smoke() {
+        let mut b = EscposBuilder::new();
+        b.set(Align::Center, false, false, false).qr("https://erplora.com/v/abc").cut();
+        let out = b.finish();
+        assert!(out.windows(3).any(|w| w == [0x1d, 0x28, 0x6b]), "debe contener GS ( k (QR)");
+        assert!(out.windows(3).any(|w| w == [0x1d, 0x56, 0x01]), "debe contener GS V 1 (corte)");
     }
 
     /// The guard above rejects **shape**, never content: a real ticket still renders, and what comes

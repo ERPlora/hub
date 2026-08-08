@@ -14,7 +14,7 @@
 
 use erplora_peripherals::discovery::{discover_printers, parse_printer_id, LocalNetworkAccess};
 use erplora_peripherals::escpos::render_test_page;
-use erplora_peripherals::printer::NetworkPrinter;
+use erplora_peripherals::queue::{PrintJob, PrintQueue, RetryPolicy};
 use erplora_peripherals::registry::DeviceRegistry;
 
 /// Registro en un temporal: el smoke test no debe pisar el `devices.json` real de la máquina.
@@ -107,8 +107,15 @@ async fn smoke_imprime_pagina_de_prueba() {
     println!("imprimiendo en {} ({})", destino.id, destino.name);
     let target = parse_printer_id(&destino.id).expect("id parseable");
     let bytes = render_test_page(&destino.id);
-    NetworkPrinter::new(target)
-        .print_with_retry(&bytes)
+    // Por la MISMA vía que la app instalable: `erplora_print` encola y el worker de `PrintQueue`
+    // envía. Aquí no hace falta el worker — `send_once` es el envío que ese worker hace.
+    PrintQueue::new(RetryPolicy::default())
+        .send_once(&PrintJob {
+            job_id: None,
+            target,
+            payload: bytes.clone(),
+            attempts: 0,
+        })
         .await
         .expect("la impresión debe llegar a la impresora");
     println!("enviados {} bytes de ESC/POS", bytes.len());
