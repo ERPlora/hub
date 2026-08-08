@@ -98,6 +98,12 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
     let db = fresh_db().await;
 
     let mut rt = Runtime::new(Box::new(db));
+    // `invoice` declara `depends_on: [taxes, sales]` y `sales` a su vez `[inventory, taxes]`: el
+    // instalador exige la cadena completa antes que el dependiente. Lo que este test mide sigue
+    // siendo SOLO lo de `invoice` (sus `_hub_migrations`), que no cambian por instalar sus deps.
+    for dep in ["taxes", "inventory", "sales"] {
+        rt.install_from_dir(&module_dir(dep)).await.unwrap_or_else(|e| panic!("instalar {dep}: {e}"));
+    }
     rt.install_from_dir(&module_dir("invoice")).await.expect("instalar invoice");
 
     let applied = rt

@@ -24,8 +24,14 @@ fn module_dir(id: &str) -> PathBuf {
     erplora_runtime::e2e_support::modules_root().join(id)
 }
 
+/// Resuelto por el MISMO sitio que los módulos (`e2e_support`, hub#541): una ruta relativa
+/// hardcodeada aquí no resuelve desde un worktree fuera del monorepo y el test moría con un
+/// `NotFound` pelado en vez de poder apuntarse con `ERPLORA_BLUEPRINTS_DIR`.
 fn blueprint_seed(sector: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../blueprints/starter_catalogs/es").join(sector).join("seed.sql")
+    erplora_runtime::e2e_support::blueprints_root()
+        .join("starter_catalogs/es")
+        .join(sector)
+        .join("seed.sql")
 }
 
 /// Unión de módulos POS relevantes a los 3 sectores (barbería/peluquería = beauty, restaurante),
@@ -35,7 +41,6 @@ const POS_MODULES_ORDERED: &[&str] = &[
     "pricing",
     "tables",
     "cash_register",
-    "invoice",
     "printing",
     "staff",
     "customers",
@@ -43,6 +48,7 @@ const POS_MODULES_ORDERED: &[&str] = &[
     "inventory",   // dep: taxes
     "services",    // dep: taxes
     "sales",       // dep: inventory, taxes
+    "invoice",     // dep: taxes, sales  ← DESPUÉS de sales (invoice v1.2.x, hub#540)
     "kitchen",     // dep: sales, inventory
     "appointments",// dep: customers, services
     "reservations",// dep: tables, customers

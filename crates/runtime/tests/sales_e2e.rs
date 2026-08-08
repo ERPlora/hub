@@ -28,6 +28,13 @@ fn admin() -> RequestContext {
 fn wasm_present() -> bool {
     mdir("sales").join("dist/handler.wasm").exists()
 }
+/// `idempotency_key` del INTENTO de cobro (sales#20): obligatorio en `sales.complete_sale` desde
+/// `sales` v2.13.x. Es la clave de la PANTALLA de cobro, no de la petición — se reutiliza en los
+/// reintentos para que dos peticiones no cobren dos veces. En los tests, por tanto: una clave
+/// DISTINTA por cada venta esperada, la MISMA para probar el reintento.
+fn key(k: &str) -> serde_json::Value {
+    json!(format!("e2e-{k}"))
+}
 
 #[derive(Default, Debug)]
 struct Sink {
@@ -83,6 +90,7 @@ async fn complete_sale_creates_header_and_lines() {
     let ctx = admin();
     // Dinero en CÉNTIMOS (ADR-0007): price 121=1.21€, 110=1.10€; tendered 2000=20€.
     let res = rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("header-lines"),
         "tax_included": true, "amount_tendered": 2000, "customer_name": "Bar Manolo",
         "items": [
             { "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 },
@@ -114,13 +122,45 @@ async fn second_sale_increments_number() {
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
-    let p = params(json!({ "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }] }));
-    rt.execute_command("sales.complete_sale", &p, &ctx).await.unwrap();
-    rt.execute_command("sales.complete_sale", &p, &ctx).await.unwrap();
+    // DOS cobros distintos → DOS claves distintas (sales#20): la clave identifica el intento de
+    // cobro, así que repetirla sería pedir la MISMA venta, no una segunda.
+    let venta = |k: &str| params(json!({
+        "idempotency_key": key(k),
+        "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }]
+    }));
+    rt.execute_command("sales.complete_sale", &venta("num-1"), &ctx).await.unwrap();
+    rt.execute_command("sales.complete_sale", &venta("num-2"), &ctx).await.unwrap();
     let mut nums: Vec<String> = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap()
         .iter().map(|s| s["sale_number"].as_str().unwrap().to_string()).collect();
     nums.sort();
     assert!(nums[0].ends_with("-0001") && nums[1].ends_with("-0002"), "{nums:?}");
+}
+
+#[tokio::test]
+async fn el_mismo_intento_de_cobro_reintentado_no_cobra_dos_veces() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    // sales#20: `idempotency_key` es la clave del INTENTO de cobro. El caso real: el cajero da a
+    // «Cobrar», la respuesta se pierde (red, tablet que se duerme) y la pantalla reintenta con la
+    // MISMA clave. Debe salir UNA venta, no dos — y el cliente no paga dos veces.
+    //
+    // El hub CONSUME este contrato (es lo que hace que su POS pueda reintentar sin miedo), así que
+    // lo fija aquí: si `sales` lo relajara, este e2e se entera — que es justo lo que no pasó cuando
+    // el campo pasó a obligatorio (hub#540).
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    let intento = params(json!({
+        "idempotency_key": key("reintento-del-mismo-cobro"),
+        "amount_tendered": 1000,
+        "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }]
+    }));
+
+    rt.execute_command("sales.complete_sale", &intento, &ctx).await.expect("primer intento");
+    rt.execute_command("sales.complete_sale", &intento, &ctx).await
+        .expect("el reintento es un no-op limpio, no un error");
+
+    let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(ventas.len(), 1, "el mismo intento de cobro reintentado deja UNA venta: {ventas:?}");
 }
 
 #[tokio::test]
@@ -140,6 +180,7 @@ async fn sale_decrements_stock_via_event() {
 
     // venta de 3 unidades de ese producto → evento descuenta stock a 7.
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("stock-decrement"),
         "items": [{ "product_id": pid, "product_name": "Café", "price": 121, "quantity": 3_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → inventory.stock.decrease.
@@ -159,6 +200,7 @@ async fn sale_persists_staff_id_and_breaks_down_by_staff() {
     let ctx = admin();
     // dos ventas atribuidas a staff-A, una a staff-B.
     let mk = |staff: &str, price: i64| params(json!({
+        "idempotency_key": key(&format!("by-staff-{staff}-{price}")),
         "tax_included": true, "amount_tendered": 0, "staff_id": staff,
         "items": [{ "product_name": "Corte", "price": price, "quantity": 1_000_000, "tax_rate": 21.0, "is_service": true }]
     }));
@@ -192,9 +234,11 @@ async fn by_staff_respects_date_range_and_excludes_unattributed() {
     let ctx = admin();
     // venta SIN staff (TPV normal) + venta CON staff.
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("sin-staff"),
         "items": [{ "product_name": "Café", "price": 121, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("con-staff"),
         "staff_id": "staff-X",
         "items": [{ "product_name": "Corte", "price": 2000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
@@ -224,6 +268,7 @@ async fn create_from_appointment_tags_sale_and_emits_conversion() {
     let ctx = admin();
     // El POS arma los items desde la cita (servicio, precio) y pasa staff_id + appointment_id.
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("desde-la-cita"),
         "tax_included": true, "amount_tendered": 0,
         "staff_id": "stylist-1", "appointment_id": "appt-42",
         "customer_id": "cust-9", "customer_name": "Ana",
@@ -261,6 +306,7 @@ async fn sale_records_customer_purchase_via_event() {
 
     // venta a ese cliente → record_purchase: lead → first_purchase, total_spent sube.
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("compra-del-cliente"),
         "customer_id": cid, "customer_name": "Cliente",
         "items": [{ "product_name": "X", "price": 5000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
@@ -392,6 +438,7 @@ async fn checkout_order_marks_it_completed_and_links_sale() {
         .as_str().unwrap().to_string();
 
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("checkout-del-pedido"),
         "order_id": oid, "amount_tendered": 300,
         "items": [{ "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("checkout");
@@ -426,6 +473,7 @@ async fn split_bill_one_order_produces_two_sales() {
 
     // split 1: cobra el Plato A, deja el pedido ABIERTO.
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("split-plato-a"),
         "order_id": oid, "keep_order_open": true, "amount_tendered": 1000,
         "items": [{ "product_name": "Plato A", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("split 1");
@@ -434,6 +482,7 @@ async fn split_bill_one_order_produces_two_sales() {
 
     // split 2 (final): cobra el Plato B → completa el pedido.
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("split-plato-b"),
         "order_id": oid, "amount_tendered": 500,
         "items": [{ "product_name": "Plato B", "price": 500, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("split 2");
@@ -561,6 +610,7 @@ async fn split_bill_cada_uno_paga_lo_suyo() {
 
     // El primero paga lo suyo: cobro PARCIAL con su línea.
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("cada-uno-lo-suyo-primero"),
         "order_id": oid, "keep_order_open": true, "line_ids": [linea_a],
         "amount_tendered": 1200, "tax_included": true,
         "items": [{ "product_name": "Menú A", "price": 1200, "quantity": 1_000_000, "tax_rate": 21.0 }]
@@ -575,6 +625,7 @@ async fn split_bill_cada_uno_paga_lo_suyo() {
 
     // El segundo paga: cobro final, el pedido se cierra.
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("cada-uno-lo-suyo-segundo"),
         "order_id": oid, "amount_tendered": 1500, "tax_included": true,
         "items": [{ "product_name": "Menú B", "price": 1500, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("cobro del segundo");
@@ -607,6 +658,7 @@ async fn media_racion_de_gambas_descuenta_medio_kilo_y_cobra_la_mitad() {
 
     // Media ración: 0,5 kg con su contexto de unidades CONGELADO (§2.4).
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("media-racion-de-gambas"),
         "tax_included": true, "amount_tendered": 600,
         "items": [{
             "product_id": pid, "product_name": "Gambas", "price": 1200, "quantity": 500_000,
@@ -651,12 +703,20 @@ async fn una_cantidad_fuera_de_la_rejilla_no_crea_venta_ni_toca_stock() {
         .as_str().unwrap().to_string();
 
     let r = rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("azafran-fuera-de-rejilla"),
         "items": [{
             "product_id": pid, "product_name": "Azafrán", "price": 900_000, "quantity": 500,
             "unit_code": "kg", "increment_value": 1_000, "tax_rate": 21.0
         }]
     })), &ctx).await;
-    assert!(r.is_err(), "medio gramo no cae en la rejilla de gramos: {r:?}");
+    // El rechazo debe ser POR LA REJILLA. Un `is_err()` a secas se conformaba con cualquier fallo:
+    // mientras al payload le faltó `idempotency_key` (hub#540) este test pasó en verde sin llegar
+    // nunca a validar el incremento.
+    let err = r.expect_err("medio gramo no cae en la rejilla de gramos");
+    assert!(
+        err.to_string().contains("quantity_off_grid"),
+        "el rechazo debe ser por la rejilla del incremento (ADR-0147 §2.2), no otro error: {err}"
+    );
 
     assert_eq!(rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap().len(), 0,
                "el rechazo no deja media venta escrita");

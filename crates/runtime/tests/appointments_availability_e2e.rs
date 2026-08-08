@@ -146,8 +146,13 @@ async fn book(rt: &Runtime, ctx: &RequestContext, staff_id: &str, start: &str, d
         rt.execute_command(
             "appointments.appointments.create",
             &params(json!({
-                "customer_name": "Cliente", "staff_id": staff_id, "staff_name": staff_id,
-                "service_name": "Peinado/Lavado", "start_datetime": start, "duration_minutes": dur
+                // La cita se reserva contra registros REALES (appointments#21): cliente, servicio
+                // y profesional son ENLACES (`*_id`), y el nombre/precio denormalizado viaja CON
+                // ellos como snapshot histórico. Un nombre suelto ya no se acepta.
+                "customer_id": "cust-1", "customer_name": "Cliente",
+                "service_id": "svc-1", "service_name": "Peinado/Lavado",
+                "staff_id": staff_id, "staff_name": staff_id,
+                "start_datetime": start, "duration_minutes": dur
             })),
             ctx,
         )
@@ -320,8 +325,11 @@ async fn create_rejects_overlap_and_list_works_after_creation() {
     rt.execute_command(
         "appointments.appointments.create",
         &params(json!({
-            "customer_name": "Cliente 1", "staff_id": "P1", "staff_name": "P1",
-            "service_name": "Peinado/Lavado", "start_datetime": start, "duration_minutes": dur
+            // Alta ligada (appointments#21): customer_id/service_id/staff_id son obligatorios.
+            "customer_id": "cust-1", "customer_name": "Cliente 1",
+            "service_id": "svc-1", "service_name": "Peinado/Lavado",
+            "staff_id": "P1", "staff_name": "P1",
+            "start_datetime": start, "duration_minutes": dur
         })),
         &ctx,
     )
@@ -350,9 +358,10 @@ async fn create_rejects_overlap_and_list_works_after_creation() {
         .execute_command(
             "appointments.appointments.create",
             &params(json!({
-                "customer_name": "Cliente 2", "staff_id": "P1", "staff_name": "P1",
-                "service_name": "Peinado/Lavado", "start_datetime": overlap_start,
-                "duration_minutes": dur
+                "customer_id": "cust-2", "customer_name": "Cliente 2",
+                "service_id": "svc-1", "service_name": "Peinado/Lavado",
+                "staff_id": "P1", "staff_name": "P1",
+                "start_datetime": overlap_start, "duration_minutes": dur
             })),
             &ctx,
         )

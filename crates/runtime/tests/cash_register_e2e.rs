@@ -136,9 +136,11 @@ async fn sale_completed_records_cash_movement() {
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap();
-    rt.install_from_dir(&mdir("invoice")).await.unwrap();
     rt.install_from_dir(&mdir("cash_register")).await.unwrap();
+    // `sales` ANTES que `invoice`: invoice declara `depends_on: [taxes, sales]` (la read `sales.get`
+    // de create_from_sale, hub#108) y el instalador exige el orden topológico.
     rt.install_from_dir(&mdir("sales")).await.unwrap();
+    rt.install_from_dir(&mdir("invoice")).await.unwrap();
     let ctx = admin();
 
     // sesión abierta del usuario activo (u1).
@@ -146,6 +148,8 @@ async fn sale_completed_records_cash_movement() {
 
     // venta de 30 → cash_register.record_sale añade un movimiento 'sale' de 30 a la sesión.
     rt.execute_command("sales.complete_sale", &params(json!({
+        // `idempotency_key` del intento de cobro (sales#20, obligatorio desde v2.13.x).
+        "idempotency_key": "cash-e2e-movimiento-de-caja",
         "tax_included": false,
         "items": [{ "product_name": "X", "price": 3000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
@@ -202,13 +206,16 @@ async fn record_sale_emits_movement_added_after_relay() {
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap();
-    rt.install_from_dir(&mdir("invoice")).await.unwrap();
     rt.install_from_dir(&mdir("cash_register")).await.unwrap();
+    // `sales` ANTES que `invoice`: invoice declara `depends_on: [taxes, sales]` (la read `sales.get`
+    // de create_from_sale, hub#108) y el instalador exige el orden topológico.
     rt.install_from_dir(&mdir("sales")).await.unwrap();
+    rt.install_from_dir(&mdir("invoice")).await.unwrap();
     let ctx = admin();
     let sid = open_session(&rt, &ctx, 0).await;
 
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": "cash-e2e-movement-added-por-el-relay",
         "tax_included": false,
         "items": [{ "product_name": "X", "price": 3000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();

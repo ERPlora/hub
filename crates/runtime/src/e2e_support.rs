@@ -51,6 +51,20 @@ pub fn modules_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
 }
 
+/// Canonical root of the blueprint catalogues: `$ERPLORA_BLUEPRINTS_DIR` when set, otherwise
+/// `<CARGO_MANIFEST_DIR>/../../../blueprints` (relative to the monorepo).
+///
+/// Same policy as [`modules_root`], for the same reason (hub#540/#541): `blueprints/` is another
+/// sibling repo, so a worktree created OUTSIDE the monorepo tree cannot resolve it by a relative
+/// path. Without one shared resolver, a test that hardcodes the relative path fails with a bare
+/// `NotFound` in exactly the setup the override exists for.
+pub fn blueprints_root() -> PathBuf {
+    if let Ok(dir) = std::env::var("ERPLORA_BLUEPRINTS_DIR") {
+        return PathBuf::from(dir);
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../blueprints")
+}
+
 /// ¿Estamos corriendo en CI? GitHub Actions (y la mayoría de runners) inyectan `CI=true`.
 fn running_in_ci() -> bool {
     std::env::var_os("CI").is_some()

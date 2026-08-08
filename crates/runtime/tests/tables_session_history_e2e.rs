@@ -406,6 +406,8 @@ async fn cobrar_el_pedido_libera_la_mesa_y_cierra_su_tramo() {
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
+            // `idempotency_key` del intento de cobro (sales#20, obligatorio desde v2.13.x).
+            "idempotency_key": "tables-e2e-cobro-que-libera",
             "order_id": oid, "amount_tendered": 250, "tax_included": true,
             "items": [{ "product_name": "Caña", "price": 250, "quantity": 1, "tax_rate": 21.0 }]
         })),
@@ -450,6 +452,7 @@ async fn un_cobro_PARCIAL_no_libera_la_mesa() {
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
+            "idempotency_key": "tables-e2e-cobro-parcial",
             "order_id": oid, "keep_order_open": true, "amount_tendered": 250, "tax_included": true,
             "items": [{ "product_name": "Caña", "price": 250, "quantity": 1, "tax_rate": 21.0 }]
         })),
