@@ -15,6 +15,26 @@ fn mdir(n: &str) -> PathBuf { erplora_runtime::e2e_support::modules_root().join(
 fn admin() -> RequestContext { RequestContext::new(erplora_runtime::DEV_HUB_ID, "u1", ["*".to_string()]) }
 fn wasm() -> bool { mdir("invoice").join("dist/handler.wasm").exists() }
 
+/// `idempotency_key` del intento de cobro — obligatorio en `sales.complete_sale` (sales#20): una
+/// clave distinta por venta esperada. Aquí `sales` solo es el ORIGEN de la factura, pero la venta
+/// tiene que poder crearse para que la cadena `sale.completed → invoice.create_from_sale` corra.
+fn key(k: &str) -> serde_json::Value { json!(format!("invoice-e2e-{k}")) }
+
+/// Id del método de pago EN EFECTIVO del catálogo del hub.
+///
+/// «El cliente propone, el servidor dispone» (sales#20): cuando el hub tiene catálogo de métodos
+/// de pago, `complete_sale` exige un `payment_method_id` que esté EN él —una venta sin método se
+/// rechaza con `sales.payment_method_required`—. Se resuelve por la query pública en vez de
+/// componer el id del seed a mano: así el test no se ata a cómo `sales` construye sus ids.
+async fn cash_method_id(rt: &Runtime, ctx: &RequestContext) -> String {
+    let rows = rt.execute_query("sales.payment_methods", &Params::new(), ctx).await
+        .expect("sales.payment_methods");
+    rows.iter()
+        .find(|r| r["type"] == json!("cash"))
+        .unwrap_or_else(|| panic!("el catálogo del hub debe traer el método `cash`: {rows:?}"))
+        ["id"].as_str().expect("id del método de pago").to_string()
+}
+
 /// Configures the hub's business identity (ADR-0061 single source) — the fiscal precondition
 /// (hub#328): without it, `invoice.*` commands are rejected with `FiscalPrecondition`.
 async fn set_business_identity(rt: &Runtime) {
@@ -148,6 +168,8 @@ async fn auto_f2_on_sale_completed() {
     let ctx = admin();
 
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("auto-f2"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "customer_name": "Bar Manolo", "tax_included": false,
         "items": [{ "product_name": "Café", "price": 200, "quantity": 3_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
@@ -193,6 +215,8 @@ async fn auto_f2_propagates_business_issuer_via_outbox() {
     rt.set_settings(&up, "u1").await.expect("set business identity");
 
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("issuer-por-el-outbox"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "customer_name": "Cliente", "tax_included": true,
         "items": [{ "product_name": "Corte", "price": 2500, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
@@ -248,6 +272,8 @@ async fn create_from_sale_nonexistent_sale_id_fails_and_creates_no_invoice() {
     // Y la numeración NO se consumió: la primera factura válida posterior sale con -000001.
     // (El rechazo ocurre ANTES de persistir → el contador de serie no se incrementa.)
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("venta-real-tras-el-rechazo"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "customer_name": "Bar Real", "tax_included": false,
         "items": [{ "product_name": "Café", "price": 100, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("crear una venta real");
@@ -275,6 +301,8 @@ async fn create_from_sale_with_real_sale_creates_correct_invoice() {
     // sigue es la PRIMERA factura para esa venta (el camino del issue: la API externa llama a
     // create_from_sale con un sale_id).
     rt.execute_command("sales.complete_sale", &params(json!({
+        "idempotency_key": key("venta-para-facturar-directo"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "customer_name": "Bar Manolo", "tax_included": false,
         "items": [{ "product_name": "Café", "price": 200, "quantity": 2_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("crear la venta");

@@ -89,6 +89,8 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
+            // `idempotency_key` del intento de cobro (sales#20, obligatorio desde v2.13.x).
+            "idempotency_key": "dashboard-e2e-venta-del-kpi",
             "tax_included": true, "amount_tendered": 2000, "customer_name": "Bar Manolo",
             "items": [
                 { "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 },

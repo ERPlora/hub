@@ -106,6 +106,8 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
+            // `idempotency_key` del intento de cobro (sales#20, obligatorio desde v2.13.x).
+            "idempotency_key": "reads-e2e-menu-del-dia",
             "items": [{
                 "product_name": "Menú del día",
                 "price": 1100,
@@ -166,6 +168,7 @@ async fn una_read_que_falla_no_impide_cobrar() {
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
+            "idempotency_key": "reads-e2e-sin-catalogo-fiscal",
             "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }],
             "tax_included": true,
             "amount_tendered": 1000,

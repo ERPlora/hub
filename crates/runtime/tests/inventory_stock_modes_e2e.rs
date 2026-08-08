@@ -100,14 +100,28 @@ async fn stock_of(rt: &Runtime, ctx: &RequestContext, pid: &str) -> f64 {
     product(rt, ctx, pid).await["stock"].as_f64().unwrap()
 }
 
+/// Descuento que se espera ACEPTADO.
 async fn decrease(rt: &Runtime, ctx: &RequestContext, pid: &str, qty: i64) {
+    try_decrease(rt, ctx, pid, qty).await.expect("el descuento debe aceptarse");
+}
+
+/// Descuento cuyo resultado se INSPECCIONA. Desde `inventory` v1.2.18 (inventory#6) el rechazo por
+/// stock insuficiente viaja por el canal de error de dominio (ADR-0205) —código estable
+/// `inventory.insufficient_stock`— en vez del no-op mudo de antes: el POS no podía distinguir
+/// «vendido» de «rechazado», así que la pantalla de ajustes prometía un control que nadie veía
+/// aplicarse. Los tests del rechazo tienen que mirar el error, no tragárselo.
+async fn try_decrease(
+    rt: &Runtime,
+    ctx: &RequestContext,
+    pid: &str,
+    qty: i64,
+) -> Result<serde_json::Value, erplora_runtime::RuntimeError> {
     rt.execute_command(
         "inventory.stock.decrease",
         &params(json!({ "product_id": pid, "qty": qty })),
         ctx,
     )
     .await
-    .unwrap();
 }
 
 /// Venta COMPLETADA sembrada (cabecera + líneas), como en `void_reversal_e2e.rs`:
@@ -166,7 +180,8 @@ async fn void_sale(rt: &Runtime, ctx: &RequestContext, sale_id: &str) {
 
 // ── Modo 3a: tracking activo, sobreventa NO permitida (defaults, sin fila de settings) ──
 
-/// Una disminución INSUFICIENTE se rechaza atómicamente: el stock no se mueve.
+/// Una disminución INSUFICIENTE se rechaza atómicamente: el stock no se mueve — y el caller SE
+/// ENTERA (inventory#6/ADR-0205: código de dominio `inventory.insufficient_stock`, no un no-op mudo).
 /// (Bug original: `CASE WHEN <0 THEN 0` truncaba a cero en silencio.)
 #[tokio::test]
 async fn insufficient_decrease_is_rejected_atomically() {
@@ -175,7 +190,14 @@ async fn insufficient_decrease_is_rejected_atomically() {
     let ctx = admin();
     let pid = create_product(&rt, &ctx, "Café", "CAF", 5, Some(5)).await;
 
-    decrease(&rt, &ctx, &pid, 10).await;
+    let err = try_decrease(&rt, &ctx, &pid, 10).await.expect_err("sobreventa no permitida: rechazo");
+    // Contra el CÓDIGO, no contra la frase: el código es lo estable y lo que la UI programa
+    // (ADR-0205); el `message` es solo el fallback humano y puede reescribirse sin avisar.
+    assert!(
+        matches!(&err, erplora_runtime::RuntimeError::Domain { code, .. }
+                       if code == "inventory.insufficient_stock"),
+        "el rechazo debe llegar con su código de dominio (ADR-0205): {err:?}"
+    );
 
     assert_eq!(stock_of(&rt, &ctx, &pid).await, 5.0, "stock intacto: ni negativo ni truncado a 0");
 }
