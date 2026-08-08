@@ -65,6 +65,7 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
         modules: vec![ModuleDataSelection {
             module_id: "taxes".into(),
             with_data: true,
+            tables: None,
         }],
         purpose: Default::default(),
     };
@@ -164,7 +165,7 @@ async fn importar_una_plantilla_deja_el_hub_con_los_impuestos_puestos() {
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "taxes".into(), with_data: true }],
+        modules: vec![ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None }],
         purpose: erplora_runtime::export::BundlePurpose::Template,
     };
     let bundle = export_hub(&origen, "h1", &selection, "restaurante", "es", "2026-08-08T10:00:00Z")

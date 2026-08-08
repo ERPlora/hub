@@ -178,6 +178,30 @@
       row-key="id"
     ></ok-data-table>
 
+    <!-- ── Casillas por TABLA (hub#534): lo que el operador NO quiere publicar ──
+         Con el recuento al lado, porque es lo que convierte la lista en una decisión: «Citas: 28»
+         es lo que hace que se desmarquen. Solo de los módulos que van CON datos — de los demás no
+         hay nada que elegir. Es herramienta del operador, no un control: la garantía de una
+         plantilla oficial es la revisión con el contenido a la vista (saas#1257). -->
+    <template v-for="row in rows" :key="`tables-${row.id}`">
+      <ion-card v-if="row.include && row.withData && tablesOf(row.id).length" class="tables-card">
+        <ion-card-content>
+          <h3 class="font-semibold mb-1">{{ row.name }}</h3>
+          <ion-list lines="none">
+            <ion-item v-for="tc in tablesOf(row.id)" :key="tc.table">
+              <ion-checkbox
+                :checked="isTableSelected(row.id, tc.table)"
+                :data-testid="`export-table-${tc.table}`"
+                @ion-change="toggleTable(row.id, tc.table)"
+              >
+                {{ tc.table }} · {{ tc.rows }}
+              </ion-checkbox>
+            </ion-item>
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+    </template>
+
     <!-- ── Exportar ── -->
     <!-- Error HONESTO del server (readErrorMessage), nunca un genérico si el runtime dijo algo. -->
     <ion-note v-if="error" data-testid="export-error" color="danger" class="error-note">
@@ -232,6 +256,9 @@ import { toastSuccess } from '../lib/toast';
 import { SaveDownloadError, saveDownload, saveDownloadMessageKey } from '../lib/save-download';
 import {
   listInstalledModules,
+  fetchExportTables,
+  type ExportModuleTables,
+  type ExportTableCount,
   exportHub,
   type BundlePurpose,
   type ExportSelection,
@@ -366,7 +393,49 @@ onMounted(async () => {
   } finally {
     loadingModules.value = false;
   }
+  // Las tablas de cada módulo con su recuento (hub#534). Va aparte y DEGRADA EN SILENCIO: si el
+  // runtime no lo sirve, el formulario sigue exportando todo, que es lo que hacía antes.
+  moduleTables.value = await fetchExportTables();
 });
+
+// ── Casillas por TABLA (hub#534) ─────────────────────────────────────────────────────────────
+//
+// Herramienta del OPERADOR, no un control de seguridad: sirve para no publicar las 25-28 citas
+// pasadas o los ajustes de agenda del salón de origen sin tocar código. La garantía de una
+// plantilla oficial es que la hacemos nosotros y la revisamos VIENDO su contenido (saas#1257).
+const moduleTables = ref<ExportModuleTables[]>([]);
+/** Tablas que el operador ha DESMARCADO, por módulo. Vacío = todas (el default de siempre). */
+const excluded = ref<Record<string, string[]>>({});
+
+/** Las tablas de un módulo, con su recuento, en el orden que manda el runtime (por volumen). */
+function tablesOf(moduleId: string): ExportTableCount[] {
+  return moduleTables.value.find((m) => m.module_id === moduleId)?.tables ?? [];
+}
+
+function isTableSelected(moduleId: string, table: string): boolean {
+  return !(excluded.value[moduleId] ?? []).includes(table);
+}
+
+function toggleTable(moduleId: string, table: string): void {
+  const off = excluded.value[moduleId] ?? [];
+  excluded.value = {
+    ...excluded.value,
+    [moduleId]: off.includes(table) ? off.filter((t) => t !== table) : [...off, table],
+  };
+}
+
+/**
+ * Qué tablas se mandan para un módulo. `null` = todas — y es importante que sea `null` y no la
+ * lista entera: el campo es una ADICIÓN, y mandar la lista completa convertiría cada tabla nueva de
+ * un módulo en una tabla que el formulario deja fuera sin que nadie lo haya decidido.
+ */
+function tablesFor(moduleId: string): string[] | null {
+  const off = excluded.value[moduleId] ?? [];
+  if (!off.length) return null;
+  return tablesOf(moduleId)
+    .map((t) => t.table)
+    .filter((t) => !off.includes(t));
+}
 
 // ── Exportar: POST → blob → descarga con el filename del Content-Disposition (o el default) ──
 const exporting = ref<boolean>(false);
@@ -388,7 +457,11 @@ async function doExport(): Promise<void> {
       media: selMedia.value,
       modules: rows.value
         .filter((r) => r.include)
-        .map((r) => ({ module_id: r.id, with_data: r.withData })),
+        .map((r) => ({
+          module_id: r.id,
+          with_data: r.withData,
+          tables: r.withData ? tablesFor(r.id) : null,
+        })),
       purpose: purpose.value,
     };
     const { blob, filename } = await exportHub(
@@ -417,6 +490,9 @@ async function doExport(): Promise<void> {
     exporting.value = false;
   }
 }
+
+// Expuesto para los tests del panel (misma superficie que `doExport`).
+defineExpose({ doExport, tablesOf, toggleTable, rows });
 </script>
 
 <style scoped>

@@ -215,6 +215,20 @@ pub struct ExportSelection {
 pub struct ModuleDataSelection {
     pub module_id: String,
     pub with_data: bool,
+    /// Tablas del módulo a volcar. `None` = todas las suyas (lo que manda el shell hoy, y lo que
+    /// significaba `with_data` antes de existir este campo).
+    ///
+    /// Es la **herramienta del operador** (hub#534): quien monta una plantilla deja fuera lo que no
+    /// quiere publicar —las 25-28 citas pasadas, los ajustes de agenda del salón de origen— sin que
+    /// nadie toque código. **No es un control de seguridad**, y por eso vive en el formulario: la
+    /// garantía de una plantilla oficial es que la hacemos nosotros y la revisamos **viendo su
+    /// contenido** (saas#1257).
+    ///
+    /// **ACOTA, nunca amplía** — misma propiedad que `settings_items` desde hub#405. Marcar aquí
+    /// `invoice_series_series` en una plantilla no la mete: la regla del `purpose`
+    /// ([`TEMPLATE_EXCLUDED_TABLES`]) es el suelo, y una casilla no puede levantarlo. Si pudiera,
+    /// esta comodidad sería la puerta por la que vuelve justo lo que se decidió que no viaja.
+    pub tables: Option<Vec<String>>,
 }
 
 /// Resultado del export a nivel runtime: manifest + ficheros de datos (ruta relativa → bytes).
@@ -330,6 +344,14 @@ pub async fn export_hub(
         let mut mine: Vec<String> = all_tables
             .iter()
             .filter(|t| table_owner(t, &installed_ids).as_deref() == Some(m.module_id.as_str()))
+            // Casillas por tabla del formulario (hub#534). Se interseca con las que el módulo POSEE,
+            // así que la selección no puede nombrar la tabla de otro ni una que no exista: acota
+            // dentro de lo que ya se iba a volcar. Lo que la regla del `purpose` deja fuera sigue
+            // fuera —se filtra más abajo, no aquí— porque el llamador nunca amplía.
+            .filter(|t| match &m.tables {
+                Some(marcadas) => marcadas.iter().any(|s| s == *t),
+                None => true,
+            })
             .cloned()
             .collect();
         order_by_dependency(db, &mut mine).await;
@@ -423,6 +445,67 @@ pub async fn export_hub(
         sha256,
     };
     Ok(ExportBundle { manifest, files })
+}
+
+/// Una tabla del módulo y cuántas filas volcaría el export (hub#534).
+#[derive(Debug, Clone, Serialize)]
+pub struct TableCount {
+    pub table: String,
+    pub rows: i64,
+}
+
+/// Las tablas de un módulo instalado, con su recuento.
+#[derive(Debug, Clone, Serialize)]
+pub struct ModuleTables {
+    pub module_id: String,
+    pub tables: Vec<TableCount>,
+}
+
+/// Qué tablas tiene cada módulo y **cuántas filas** volcaría el export de cada una (hub#534).
+///
+/// Es lo que hace que la lista de casillas sea una decisión y no una fila de nombres: «Citas: 28»
+/// es lo que hace que quien monta la plantilla las desmarque. Mismo argumento que el resumen del
+/// publicador (saas#1257) — sin el número, mirar no sirve de nada.
+///
+/// **Cuenta lo que se volcaría de verdad**, no `SELECT count(*)`: reutiliza `fetch_rows`/
+/// `fetch_join_rows`, así que aplica el mismo acotado por hub, la misma exclusión de soft-deleted y
+/// la misma de filas sembradas por el módulo ([`is_module_seeded`]). Un número que no casara con lo
+/// que sale sería peor que no darlo.
+///
+/// **Una tabla vacía se declara con su 0, nunca se omite**: si desaparece de la lista, quien monta
+/// la plantilla no puede saber que existe — y el 0 es justo la información.
+pub async fn module_table_counts(
+    rt: &Runtime,
+    hub_id: &str,
+    module_ids: &[String],
+) -> crate::Result<Vec<ModuleTables>> {
+    let db = rt.db();
+    let all_tables = list_tables(db).await?;
+    let installed_ids: Vec<String> = rt.registry().installed.iter().map(|m| m.id.clone()).collect();
+
+    let mut out = Vec::with_capacity(module_ids.len());
+    for module_id in module_ids {
+        if !rt.registry().is_installed(module_id) {
+            continue;
+        }
+        let mut tables = Vec::new();
+        for table in all_tables
+            .iter()
+            .filter(|t| table_owner(t, &installed_ids).as_deref() == Some(module_id.as_str()))
+        {
+            let rows = if has_column(db, table, "hub_id").await {
+                fetch_rows(db, table, Some(hub_id)).await.unwrap_or_default().len()
+            } else {
+                fetch_join_rows(db, table, hub_id).await.unwrap_or_default().len()
+            };
+            tables.push(TableCount { table: table.clone(), rows: rows as i64 });
+        }
+        // Por volumen descendente: lo gordo es lo que hay que ver primero. Empate → por nombre, para
+        // que dos cargas de la misma pantalla den la misma lista.
+        tables.sort_by(|a, b| b.rows.cmp(&a.rows).then_with(|| a.table.cmp(&b.table)));
+        out.push(ModuleTables { module_id: module_id.clone(), tables });
+    }
+    Ok(out)
 }
 
 /// SHA256 hex de unos bytes (integridad del bundle, patrón ADR-0015).

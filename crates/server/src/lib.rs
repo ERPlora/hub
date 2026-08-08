@@ -752,6 +752,9 @@ pub fn app(state: AppState) -> Router {
         // (`export_hub`/`import_sections`). Auth = sesión admin (owner/admin), como /api/settings.
         // El inspect recibe el zip crudo → body limit propio (el default de axum son 2 MiB).
         .route("/api/hub/export", post(export_import::export_blueprint))
+        // Lo que alimenta las casillas por tabla del formulario (hub#534): sin el recuento,
+        // la lista es una fila de nombres que nadie sabe interpretar.
+        .route("/api/hub/export/tables", get(export_import::export_tables))
         .route(
             "/api/hub/import/inspect",
             post(export_import::import_inspect).layer(axum::extract::DefaultBodyLimit::max(
