@@ -55,6 +55,7 @@ async fn fixture_with_db() -> (axum::Router, String, String, erplora_db::PgAdapt
 
     let temp = std::env::temp_dir().join(format!("erplora-print-hosts-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: HUB_ID.into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

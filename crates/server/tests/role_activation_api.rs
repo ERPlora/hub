@@ -59,6 +59,7 @@ async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
         std::process::id()
     ));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-roles".into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

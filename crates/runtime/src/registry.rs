@@ -170,6 +170,26 @@ pub struct Registry {
     /// Backend de `static_files` declarado por módulos. Lo inyecta el host y resuelve a disco
     /// Local o Cloud→S3 sin exponer paths físicos al módulo.
     pub module_storage: Option<std::sync::Arc<dyn crate::module_storage::ModuleStorage>>,
+    /// **This deploy is an ephemeral DEMO hub** (ADR-0197, hub#376). The host seals it at boot
+    /// from `HubConfig.demo` (env `HUB_DEMO`, written only by the SaaS provisioning), exactly
+    /// like it seals `native`, `notify_transport` or `module_storage`. It lives HERE, and not in
+    /// [`RequestContext`], for one reason: `&Registry` is the only authority that reaches
+    /// `commands::execute_at` on **every** path (HTTP, public API, assistant, outbox relay,
+    /// scheduler) and that no caller can forge — a ctx field would be a label the next new door
+    /// could forget to stamp.
+    ///
+    /// It is deliberately **not** a `hub_settings` key and not a header: a demo hub must not be
+    /// able to leave the sandbox, and a REAL hub must not be able to declare itself a demo (that
+    /// would be the way to make real sales stop reaching the AEAT — hub#485).
+    ///
+    /// Default `false` = a normal hub, so every hub that already exists keeps behaving exactly as
+    /// before. Of the two ways to get this wrong, mislabelling a REAL hub as a demo is the worse
+    /// one: it would freeze its fiscal identity and strand it out of production **without saying
+    /// anything**. A demo missing the variable is still stopped by the SaaS-side R5 gate
+    /// (hub#315) — but only by that, so the writer of `HUB_DEMO` is load-bearing: since
+    /// `verifactu-gateway.md` §3.4 (2026-08-04, superseding ADR-0197 §2) a demo DOES carry the
+    /// delegated certificate, so the environment pin below is what keeps it off the real AEAT.
+    pub demo_hub: bool,
 }
 
 impl Registry {

@@ -47,6 +47,7 @@ async fn serve() -> Server {
 
     let temp = std::env::temp_dir().join(format!("erplora-drain-ws-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: HUB_ID.into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

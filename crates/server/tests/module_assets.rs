@@ -18,6 +18,7 @@ use tower::ServiceExt; // oneshot
 
 fn cfg(module_cache: PathBuf) -> HubConfig {
     HubConfig {
+        demo: false,
         hub_id: "hub-assets".into(),
         cloud_base_url: "https://erplora.com".into(),
         module_cache,

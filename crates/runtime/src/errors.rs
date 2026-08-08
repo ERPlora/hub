@@ -124,10 +124,70 @@ pub enum RuntimeError {
     /// (the latter only while an installed module declares the `certificate` capability).
     #[error("fiscal precondition failed: configure {} before issuing fiscal documents", missing.join(", "))]
     FiscalPrecondition { missing: Vec<&'static str> },
+    /// This hub is an ephemeral DEMO (ADR-0197 §4) and the request would change something a demo
+    /// hub does not own: its AEAT environment, its business certificate or its fiscal identity.
+    /// The marker comes from the deployment (`HUB_DEMO`), never from the caller — see
+    /// [`DemoLock`] for what each subject protects.
+    #[error("{lock}")]
+    DemoLocked { lock: DemoLock },
     /// Error genérico que no encaja en una variante específica (p. ej. fallo del hasher argon2id
     /// al fijar un PIN, hub#15). Mensaje libre.
     #[error("{0}")]
     Other(String),
+}
+
+/// What an ephemeral DEMO hub is NOT allowed to change (ADR-0197 §4, hub#376).
+///
+/// Three subjects, three **distinct** stable codes on purpose: they are three independent guards
+/// at three different doors, so a client (and a test) can tell which one refused. Collapsing them
+/// into one code would let any of the three be deleted with the suite still green.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DemoLock {
+    /// The AEAT transmission environment is **pinned** to `testing`. A demo hub is anonymous,
+    /// unregistered and disposable: a record it transmits to the real AEAT would be a fiscal
+    /// record of a business that never asked for one. Pinning is the demo-hub case of the
+    /// one-way fiscal environment switch (hub#485 owns the other case: a REAL hub that already
+    /// went live can never go back to `testing`).
+    FiscalEnvironment,
+    /// The business PKCS#12 is neither uploadable, replaceable nor removable. A demo never gets
+    /// an `own` certificate (ADR-0197 §2: the AEAT issues no fictitious one, so it would have to
+    /// be ERPlora's real fiscal identity inside the most exposed container that exists).
+    BusinessCertificate,
+    /// `business_tax_id` / `business_legal_name` are read-only. The fiscal identity of a demo is
+    /// nobody's: writing it would let an anonymous visitor publish a `BillingProfile` upstream
+    /// and would issue documents under a tax id its typist does not own.
+    FiscalIdentity,
+}
+
+impl DemoLock {
+    /// Stable machine code (the UI translates against it). One per subject.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::FiscalEnvironment => "demo_fiscal_environment_locked",
+            Self::BusinessCertificate => "demo_business_certificate_locked",
+            Self::FiscalIdentity => "demo_fiscal_identity_locked",
+        }
+    }
+}
+
+impl std::fmt::Display for DemoLock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let human = match self {
+            Self::FiscalEnvironment => {
+                "this is a demo hub: its tax authority environment stays on testing — \
+                 to issue real invoices, create your own hub"
+            }
+            Self::BusinessCertificate => {
+                "this is a demo hub: it cannot hold a business certificate — \
+                 to issue real invoices, create your own hub"
+            }
+            Self::FiscalIdentity => {
+                "this is a demo hub: its tax id and legal name are read-only — \
+                 to issue real invoices, create your own hub"
+            }
+        };
+        f.write_str(human)
+    }
 }
 
 pub type Result<T> = std::result::Result<T, RuntimeError>;

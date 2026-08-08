@@ -23,6 +23,7 @@ use tower::ServiceExt; // oneshot
 fn test_config(auth_mode: AuthMode, tag: &str) -> HubConfig {
     let base = std::env::temp_dir().join(format!("erplora_expimp_{}_{tag}", std::process::id()));
     HubConfig {
+        demo: false,
         hub_id: "hub-test".into(),
         cloud_base_url: "http://127.0.0.1:1".into(),
         module_cache: base.join("module_cache"),

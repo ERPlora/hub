@@ -274,7 +274,7 @@ pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
 /// estas llamadas las hace el runtime (server-side).
 pub fn hub_scoped_auth(headers: &HeaderMap, st: &AppState) -> Option<cloud_client::Auth> {
     let hub_id = st.hub_id();
-    machine_auth(st).or_else(|| st.is_demo().then(|| user_auth(headers, &hub_id)).flatten())
+    machine_auth(st).or_else(|| st.is_dev_hub().then(|| user_auth(headers, &hub_id)).flatten())
 }
 
 /// LOCAL role somebody is provisioned with the first time they come in from the Cloud.

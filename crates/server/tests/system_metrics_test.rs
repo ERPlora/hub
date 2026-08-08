@@ -26,6 +26,7 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
     rt.create_user("Cajero", "2222", "cashier", None).await.unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-system-metrics-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-metrics".into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

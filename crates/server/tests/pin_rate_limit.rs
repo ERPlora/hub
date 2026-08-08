@@ -23,6 +23,7 @@ async fn fixture() -> axum::Router {
     rt.create_user("Cashier", "2222", "employee", None).await.unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-pin-rate-{}", std::process::id()));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-rate".into(),
         cloud_base_url: "https://example.invalid".into(),
         module_cache: temp.join("modules-cache"),

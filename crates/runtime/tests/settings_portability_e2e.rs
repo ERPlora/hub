@@ -65,6 +65,7 @@ async fn seed_settings(rt: &Runtime, hub: &str) {
         hub,
         updates.as_object().expect("settings map"),
         "hub_user:owner",
+        false, // a normal hub: the demo lock of hub#376 is not what this suite is about
     )
     .await
     .expect("seed the origin hub settings");
@@ -240,6 +241,7 @@ async fn a_settings_section_that_is_all_identity_is_discarded_whole() {
             .as_object()
             .expect("settings map"),
         "hub_user:owner",
+        false,
     )
     .await
     .expect("seed identity-only settings");
@@ -309,5 +311,75 @@ async fn an_unknown_settings_key_from_a_foreign_bundle_is_not_written() {
         setting_value(&b, "h2", "printer_ip").await,
         None,
         "an unclassified key must not travel between hubs"
+    );
+}
+
+/// 🔴 En un hub de **DEMO** el filtro se aplica SIEMPRE, aunque el bundle se declare de este mismo
+/// hub (ADR-0197 §4, hub#376).
+///
+/// El «es mi propio backup» de arriba se decide con el `manifest.json` que va DENTRO del zip. En
+/// una demo eso no es una credencial: el visitante conoce su propio `hub_id` (está en el subdominio
+/// y en `/api/hub/context`), así que un bundle hecho a mano que se declare suyo escribiría el NIF
+/// que quisiera y dejaría en nada el cierre de `settings::set_many`. Una demo no tiene identidad
+/// fiscal propia **por ninguna puerta**: si la tuviera, emitiría documentos a nombre de un negocio
+/// real y podría publicarla como `BillingProfile` en el SaaS (ADR-0201 decisión 5).
+#[tokio::test]
+async fn a_demo_hub_does_not_get_its_identity_back_even_from_its_own_backup() {
+    let a = fresh("h1").await;
+    seed_settings(&a, "h1").await;
+    let bundle = export_hub(&a, "h1", &selection(BundlePurpose::Backup), "copia", "es", CREATED_AT)
+        .await
+        .expect("export A");
+    assert_eq!(bundle.manifest.hub.hub_id, "h1", "the bundle claims to be this same hub");
+
+    // El MISMO hub_id, pero este despliegue es una demo efímera.
+    let mut demo = fresh("h1").await;
+    demo.set_demo_hub(true);
+    let report = import_sections(&mut demo, &bundle.manifest, &bundle.files, &import_settings(), "h1")
+        .await
+        .expect("the import runs: this is a filter, not a rejection");
+
+    assert_eq!(
+        setting_value(&demo, "h1", "business_tax_id").await,
+        None,
+        "a demo must not end up holding a tax id, not even one that claims to be its own"
+    );
+    assert_eq!(setting_value(&demo, "h1", "business_legal_name").await, None);
+    // Y sigue siendo un hub usable: la configuración del sector SÍ entra.
+    assert_eq!(setting_value(&demo, "h1", "country_code").await.as_deref(), Some("ES"));
+    assert_eq!(setting_value(&demo, "h1", "currency").await.as_deref(), Some("EUR"));
+
+    let section = report
+        .sections
+        .iter()
+        .find(|s| s.section == "hub_settings")
+        .expect("hub_settings in the report");
+    assert!(
+        matches!(section.status, SectionStatus::PartiallyApplied(_)),
+        "the report must say the identity was kept out: {:?}",
+        section.status
+    );
+}
+
+/// La otra dirección, otra vez: un hub REAL que restaura su propio backup NO se ve afectado. Es el
+/// test hermano del de arriba y existe para que la guarda de la demo no se pueda escribir como
+/// «filtra siempre» — eso dejaría a un negocio sin su NIF después de un redespliegue.
+#[tokio::test]
+async fn a_real_hub_restoring_its_own_backup_is_untouched_by_the_demo_lock() {
+    let a = fresh("h1").await;
+    seed_settings(&a, "h1").await;
+    let bundle = export_hub(&a, "h1", &selection(BundlePurpose::Backup), "copia", "es", CREATED_AT)
+        .await
+        .expect("export A");
+
+    let mut real = fresh("h1").await;
+    assert!(!real.is_demo_hub());
+    import_sections(&mut real, &bundle.manifest, &bundle.files, &import_settings(), "h1")
+        .await
+        .expect("restore of its own backup");
+    assert_eq!(
+        setting_value(&real, "h1", "business_tax_id").await.as_deref(),
+        Some(ORIGIN_TAX_ID),
+        "a real hub must get its own tax id back after a redeploy"
     );
 }

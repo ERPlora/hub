@@ -57,6 +57,7 @@ async fn fixture() -> (axum::Router, String, String, Captured) {
     let employee = rt.create_session(&employee_id, 3600, None).await.unwrap();
 
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-media".into(),
         cloud_base_url,
         module_cache: std::env::temp_dir().join("erplora-media-api-cache"),
@@ -220,6 +221,7 @@ async fn fixture_with_module(user_actions: &str) -> (axum::Router, String, Captu
     let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
     let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-media".into(),
         cloud_base_url,
         module_cache: std::env::temp_dir().join("erplora-media-policy-cache"),
@@ -438,6 +440,7 @@ async fn the_listing_serves_files_through_the_runtime_not_a_signed_object_storag
     let user_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
     let session = rt.create_session(&user_id, 3600, None).await.unwrap();
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-media".into(),
         cloud_base_url,
         module_cache: std::env::temp_dir().join("erplora-media-url-cache"),
@@ -532,6 +535,7 @@ async fn raw_downloads_the_file_server_side_and_never_leaks_the_hub_token_to_sto
     let user_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
     let session = rt.create_session(&user_id, 3600, None).await.unwrap();
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-media".into(),
         cloud_base_url: format!("http://{cloud_addr}"),
         module_cache: std::env::temp_dir().join("erplora-media-raw-cache"),

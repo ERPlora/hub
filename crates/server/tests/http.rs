@@ -487,6 +487,7 @@ async fn hub_context_returns_configured_hub_id() {
     let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     let cfg = HubConfig {
+        demo: false,
         hub_id: "hub-xyz".into(),
         cloud_base_url: "https://erplora.com".into(),
         module_cache: std::env::temp_dir().join("erplora-test-cache"),
@@ -533,6 +534,7 @@ async fn hub_context_adopts_machine_identity_without_restart() {
     let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     let cfg = HubConfig {
+        demo: false,
         hub_id: erplora_server::DEV_HUB_ID.into(),
         cloud_base_url: "https://erplora.com".into(),
         module_cache: std::env::temp_dir().join("erplora-live-identity-cache"),
@@ -623,6 +625,7 @@ async fn demo_catalog_uses_public_saas_metadata_without_hub_credentials() {
     let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     let cfg = HubConfig {
+        demo: false,
         hub_id: DEV_HUB_ID.into(),
         cloud_base_url: format!("http://{address}"),
         module_cache: std::env::temp_dir().join("erplora-demo-catalog-cache"),
@@ -697,6 +700,7 @@ async fn real_catalog_uses_private_saas_endpoint_with_machine_credentials() {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "real-hub");
     let cfg = HubConfig {
+        demo: false,
         hub_id: "real-hub".into(),
         cloud_base_url: format!("http://{address}"),
         module_cache: std::env::temp_dir().join("erplora-real-catalog-cache"),
@@ -738,6 +742,7 @@ async fn real_machine_cannot_use_business_api_before_registration() {
     let rt = Runtime::with_hub_id(Box::new(db), "real-but-unregistered");
     rt.ensure_system_tables().await.unwrap();
     let cfg = HubConfig {
+        demo: false,
         hub_id: "real-but-unregistered".into(),
         cloud_base_url: "https://erplora.com".into(),
         module_cache: std::env::temp_dir().join("erplora-unregistered-cache"),

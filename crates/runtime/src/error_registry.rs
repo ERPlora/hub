@@ -250,6 +250,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#328: the fiscal precondition is expected state of a hub that has not finished its
         // setup (missing business identity/certificate) — never a Hub bug worth an issue.
         | E::FiscalPrecondition { .. }
+        // hub#376: a demo hub refusing to leave its sandbox is the deployment marker doing its
+        // job (ADR-0197 §4) — expected, and never a Hub bug worth an issue.
+        | E::DemoLocked { .. }
         // hub#360: a cashier reaching for something a manager approves is the permission model
         // working, not a Hub bug. Same severity as the flat `PermissionDenied` it refines.
         | E::RequiresElevation { .. }
@@ -297,6 +300,9 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::Storage(_) => "module_storage",
         E::Certificate(_) => "certificate",
         E::FiscalPrecondition { .. } => "fiscal_precondition_failed",
+        // hub#376: the SUBJECT is the stable code, one per demo lock — a client that only sees
+        // `demo_locked` could not tell which of the three doors refused.
+        E::DemoLocked { lock } => lock.as_str(),
         E::Other(_) => "other",
     })
 }

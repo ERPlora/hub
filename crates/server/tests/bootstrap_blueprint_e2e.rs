@@ -105,6 +105,7 @@ async fn foreign_blueprint_zip() -> Vec<u8> {
         .as_object()
         .expect("settings map"),
         "hub_user:owner",
+        false, // the ORIGIN hub is a normal one: hub#376's demo lock is not what this fixture tests
     )
     .await
     .expect("seed origin settings");
@@ -238,6 +239,7 @@ async fn rewrite_base(resp: axum::response::Response, base: &str) -> axum::respo
 fn test_config(cloud: &str, blueprint: Option<BootstrapBlueprint>, tag: &str) -> HubConfig {
     let base = std::env::temp_dir().join(format!("erplora_bootstrap_{}_{tag}", std::process::id()));
     HubConfig {
+        demo: false,
         hub_id: DESTINATION_HUB.into(),
         cloud_base_url: cloud.into(),
         module_cache: base.join("module_cache"),

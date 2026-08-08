@@ -245,7 +245,10 @@ pub async fn set_policy(
 ) -> Result<()> {
     let mut updates = serde_json::Map::new();
     updates.insert(PIN_POLICY_SETTING.to_string(), json!(policy.as_str()));
-    crate::settings::set_many(db, hub_id, &updates, actor).await?;
+    // `demo_hub: false` is not a bypass: this door writes ONE key, the pin policy, and a demo hub
+    // is only frozen on its fiscal identity (ADR-0197 §4, hub#376) — how often it asks for a PIN
+    // is its own business.
+    crate::settings::set_many(db, hub_id, &updates, actor, false).await?;
     Ok(())
 }
 

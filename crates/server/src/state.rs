@@ -99,6 +99,25 @@ pub fn parse_device_trust(raw: Option<&str>) -> bool {
     }
 }
 
+/// Variable de entorno que marca este despliegue como **DEMO efímera** (ADR-0197, hub#376). Se
+/// llama como la columna que la escribe (`Hub.is_demo` del SaaS) para que el contrato se lea de un
+/// vistazo en `_build_hub_env_swarm`.
+pub const DEMO_ENV: &str = "HUB_DEMO";
+
+/// ¿El despliegue declara que este hub es una **demo efímera**? (ADR-0197 §4).
+///
+/// Solo `1`/`true`/`yes`/`on` (sin distinguir mayúsculas, recortado) encienden; ausente, vacío o
+/// cualquier otra cosa = **hub normal**. Misma forma que [`crate::install_guard::parse_dev_mode`],
+/// y el default apunta al otro lado a propósito: encender por error los cierres de la demo en un
+/// hub REAL le congelaría la identidad fiscal y lo dejaría fuera de producción **en silencio**,
+/// que es el peor de los dos errores posibles.
+pub fn parse_demo_flag(raw: Option<&str>) -> bool {
+    matches!(
+        raw.map(|s| s.trim().to_ascii_lowercase()).as_deref(),
+        Some("1" | "true" | "yes" | "on")
+    )
+}
+
 /// Configuración de despliegue del hub (ARQUITECTURA.md §2.3; decisiones del humano):
 ///  - `hub_id`: lo inyecta el despliegue vía env `HUB_ID` (sin selector de hub).
 ///  - `cloud_base_url`: el Cloud Portal contra el que se resuelven marketplace + asistente.
@@ -171,6 +190,24 @@ pub struct HubConfig {
     /// mecanismo es del runtime y el SaaS decide quién lo recibe. Ojo, `is_demo()` aquí significa
     /// **modo `dev`**, otra cosa: esto no se ata a ese flag.
     pub bootstrap_blueprint: Option<crate::bootstrap::BootstrapBlueprint>,
+    /// **Este despliegue es una DEMO efímera** (`HUB_DEMO`, ADR-0197 — hub#376). Lo escribe el
+    /// provisioning del SaaS al crear la instancia (espejo de su columna `Hub.is_demo`), por el
+    /// mismo canal que `HUB_AUTH` o `HUB_CLOUD_API_TOKEN`: env del contenedor.
+    ///
+    /// **Qué lo hace no falsificable**: es env del despliegue, se lee UNA vez al arrancar y no
+    /// tiene escritor en el hub — ni cabecera, ni campo de payload, ni clave de `hub_settings`, ni
+    /// endpoint. El navegador no puede tocarlo, y un `command` tampoco. Es el mismo argumento por
+    /// el que vale `X-Hub-Id`: la autoridad la pone quien despliega, no quien llama.
+    ///
+    /// **Fail-closed hacia hub NORMAL**: ausente ⇒ `false`. Es la dirección segura de las dos.
+    /// Tomar por demo a un hub REAL le congelaría la identidad fiscal y lo dejaría fuera de
+    /// producción sin decir nada — que es exactamente la clase de error que auto-borraba el hub
+    /// propio de ERPlora. Al revés, una demo sin la variable solo queda topada por la guarda R5
+    /// del SaaS (hub#315): desde `verifactu-gateway.md` §3.4 (supersede ADR-0197 §2) la demo SÍ
+    /// lleva el certificado delegado, así que quien escriba esta clave es parte de la guarda.
+    ///
+    /// ⚠️ No confundir con [`AppState::is_dev_hub`], que es el modo `dev` de auth.
+    pub demo: bool,
 }
 
 /// UUID fijo de desarrollo si no se inyecta `HUB_ID` (decisión tomada — flag para humano).
@@ -252,6 +289,8 @@ impl HubConfig {
                 std::env::var("HUB_BOOTSTRAP_BLUEPRINT").ok().as_deref(),
                 std::env::var("HUB_BOOTSTRAP_BLUEPRINT_LOCALE").ok().as_deref(),
             );
+        // Marcador de DEMO efímera (ADR-0197). Ausente o con cualquier otro valor ⇒ hub normal.
+        let demo = parse_demo_flag(std::env::var(DEMO_ENV).ok().as_deref());
         Self {
             hub_id,
             cloud_base_url,
@@ -266,6 +305,7 @@ impl HubConfig {
             dev_modules_dir,
             module_trusted_keys,
             bootstrap_blueprint,
+            demo,
         }
     }
 
@@ -344,6 +384,7 @@ mod staging_tests {
 
     fn config_with_keys(dev_mode: bool, module_trusted_keys: Vec<String>) -> HubConfig {
         HubConfig {
+            demo: false,
             hub_id: "h1".into(),
             cloud_base_url: "http://127.0.0.1:1".into(),
             module_cache: PathBuf::from("/var/cache/erplora"),
@@ -513,6 +554,12 @@ impl AppState {
         let (tx, _rx) = broadcast::channel::<WsEvent>(256);
         let sink = Arc::new(BroadcastSink { tx: tx.clone() });
         runtime.set_event_sink(sink);
+        // DEMO efímera (ADR-0197 §4, hub#376): se sella AQUÍ porque este constructor es el embudo
+        // por el que pasan TODOS los hosts —`serve()`, el shell Tauri y cada test—, igual que el
+        // `event_sink` de la línea de arriba. Sellarlo solo en `serve()` habría dejado los cierres
+        // apagados en cualquier otro arranque, y un cierre que depende de que alguien se acuerde de
+        // encenderlo no es un cierre.
+        runtime.set_demo_hub(config.demo);
         Self {
             runtime: Arc::new(Mutex::new(runtime)),
             events: tx,
@@ -593,15 +640,22 @@ impl AppState {
         config
     }
 
-    /// Demo/Dev es la única excepción al registro de máquina obligatorio.
-    pub fn is_demo(&self) -> bool {
+    /// Un hub de **desarrollo sin enrolar** (`HUB_AUTH=dev` + el `hub_id` placeholder) es la única
+    /// excepción al registro de máquina obligatorio.
+    ///
+    /// Se llamaba `is_demo()` y **no tenía nada que ver con la demo** (ADR-0212 ya avisaba de la
+    /// confusión por escrito). Ahora que la demo efímera de ADR-0197 sí existe en el hub
+    /// ([`HubConfig::demo`]), dos cosas distintas no pueden compartir nombre: el siguiente que
+    /// escriba un cierre de demo llamaría a esta y le abriría el hub a cualquiera en `dev`.
+    /// Renombrar es seguro — no es columna, ni clave de manifest, ni ruta, ni evento.
+    pub fn is_dev_hub(&self) -> bool {
         self.config.auth_mode == AuthMode::Dev && self.hub_id() == DEV_HUB_ID
     }
 
     /// Una máquina real está vinculada solo si posee las dos mitades de su identidad: UUID Cloud
     /// y credencial secreta. Tener un JWT de usuario abierto no sustituye este estado.
     pub fn machine_registered(&self) -> bool {
-        !self.is_demo() && self.hub_id() != DEV_HUB_ID && self.machine_token().is_some()
+        !self.is_dev_hub() && self.hub_id() != DEV_HUB_ID && self.machine_token().is_some()
     }
 
     /// Lee el token de máquina vivo (clona). `None` si el hub no está enrolado.
@@ -687,6 +741,38 @@ mod tests {
         }
     }
 
+    // ── El marcador de DEMO efímera (ADR-0197 · hub#376) ───────────────────────────────────
+
+    /// 🔴 **Un hub que ya existe NO se vuelve demo por este cambio.** Sin `HUB_DEMO`, hub normal.
+    /// La dirección del default es una decisión, no una comodidad: dar por demo a un hub REAL le
+    /// congelaría la identidad fiscal y lo dejaría fuera de producción **sin decir nada** — la
+    /// misma clase de error que auto-borraba el hub propio de ERPlora a los 120 días.
+    #[test]
+    fn without_the_env_a_hub_is_never_a_demo() {
+        assert!(!parse_demo_flag(None));
+        assert!(!parse_demo_flag(Some("")));
+        assert!(!parse_demo_flag(Some("   ")));
+    }
+
+    /// Ser demo se pide EXPLÍCITAMENTE, y en las grafías de siempre (`parse_dev_mode`).
+    #[test]
+    fn the_demo_marker_is_requested_explicitly() {
+        for raw in ["1", "true", "TRUE", " yes ", "on", "On"] {
+            assert!(parse_demo_flag(Some(raw)), "`{raw}` debía activar la demo");
+        }
+    }
+
+    /// Un valor que no reconocemos NO enciende los cierres: `HUB_DEMO=maybe` es un hub normal.
+    #[test]
+    fn an_unknown_value_leaves_the_hub_normal() {
+        for raw in ["0", "false", "no", "off", "demo", "sí", "2"] {
+            assert!(
+                !parse_demo_flag(Some(raw)),
+                "`{raw}` no debía marcar el hub como demo"
+            );
+        }
+    }
+
     /// **Anything else arms it.** A typo must not be a silent way to open the PIN door — the same
     /// direction as `parse_auth_mode`, where an unknown mode falls back to `Session`. Note `false`,
     /// `0` and `no`: they read like a switch, and honouring them would mean three spellings of
@@ -699,5 +785,22 @@ mod tests {
                 "`{raw}` must not open the PIN door"
             );
         }
+    }
+
+    /// 🔴 Ser demo y ser hub de **dev** son cosas DISTINTAS, y por eso ya no comparten nombre.
+    /// `is_dev_hub()` (antes `is_demo()`) abre el hub a las cabeceras del navegador; el marcador de
+    /// ADR-0197 lo CIERRA. Confundirlos era abrir una demo pública en modo dev.
+    #[test]
+    fn the_ephemeral_demo_marker_is_not_the_dev_hub_flag() {
+        // Dos variables, dos dueños, dos efectos OPUESTOS: `HUB_AUTH=dev` ABRE el hub (el
+        // navegador dicta identidad y permisos), `HUB_DEMO=1` lo CIERRA (entorno fiscal clavado,
+        // certificado e identidad congelados). Ni el valor de una activa la otra.
+        assert!(!parse_demo_flag(Some("dev")), "`HUB_DEMO=dev` no es una demo");
+        assert_eq!(
+            parse_auth_mode(Some("1")),
+            AuthMode::Session,
+            "`HUB_AUTH=1` no abre el hub"
+        );
+        assert_eq!(parse_auth_mode(Some("true")), AuthMode::Session);
     }
 }

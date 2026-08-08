@@ -6,7 +6,7 @@ use erplora_wasm_host::{Operation, Output, WasmHost};
 use serde_json::{json, Value as Json};
 
 use crate::elevation::Grants;
-use crate::errors::{Result, RuntimeError};
+use crate::errors::{DemoLock, Result, RuntimeError};
 use crate::events;
 use crate::outbox;
 use crate::permissions;
@@ -233,6 +233,9 @@ pub(crate) async fn execute_at(
     // Fiscal precondition gate (hub#328, ADR-0203): SQL that stamps the business identity
     // does not run while that identity (and the certificate, when required) is missing.
     enforce_fiscal_precondition(registry, ctx, cmd.sql.iter().map(|s| s.as_str()))?;
+
+    // Fiscal environment pin (ADR-0197 §4, hub#376): a demo hub never leaves the sandbox.
+    enforce_fiscal_environment_pin(registry, cmd.sql.iter().map(|s| (s.as_str(), payload)))?;
 
     let bound = crate::system_params(payload, ctx);
 
@@ -620,6 +623,11 @@ async fn persist_handler_output(
     // nothing was written. Same gate as the declarative path in `execute_at`.
     enforce_fiscal_precondition(registry, ctx, tx_ops.iter().map(|(sql, _)| sql.as_str()))?;
 
+    // Fiscal environment pin (ADR-0197 §4, hub#376) on what the handler RESOLVED to: the native
+    // VeriFactu engine emits its own operations, so the pin has to see the params it bound — not
+    // the ones the caller sent.
+    enforce_fiscal_environment_pin(registry, tx_ops.iter().map(|(sql, p)| (sql.as_str(), p)))?;
+
     // Las intenciones + los INSERT de outbox (eventos declarados por el command + eventos
     // devueltos por el handler) + `extra_ops` (marcador de entrega del relay) → UNA transacción.
     let declared_payload = crate::system_params(payload, ctx);
@@ -939,6 +947,73 @@ fn enforce_fiscal_precondition<'a>(
     } else {
         Err(RuntimeError::FiscalPrecondition { missing })
     }
+}
+
+// ─── Fiscal environment policy (ADR-0197 §4 · hub#376) ───────────────────────
+
+/// The `system_params`/payload param that names the tax authority environment a fiscal record is
+/// transmitted to. SQL that binds it is, by definition, deciding which AEAT this hub talks to —
+/// the structural marker the pin keys on, exactly like [`FISCAL_IDENTITY_PARAMS`] above.
+const FISCAL_ENVIRONMENT_PARAM: &str = "environment";
+
+/// The only environment an ephemeral demo hub may ever use.
+const SANDBOX_ENVIRONMENT: &str = "testing";
+
+/// Which fiscal environment this hub is PINNED to, if any — the core's answer to «may this hub
+/// change where its fiscal records go?».
+///
+/// This is the seam that hub#485 lands on. Ioan's rule of 2026-08-08: *a tax obligation may never
+/// depend on a module being installed, enabled, licensed or available — the module implements HOW
+/// to comply, the CORE decides THAT you must*. So the authority over the fiscal environment is
+/// here, in the dispatcher, and not in `verifactu/commands/config_save.sql`.
+///
+/// Two cases, one policy, and today only the first is enforced:
+///  - **demo hub → `Some("testing")`.** Pinned, both ways, for its whole life. It is anonymous,
+///    unregistered, disposable and (ADR-0202 phase 2) can receive a *delegated* certificate by
+///    the normal distribution: environment + a certificate is all it takes to file real records
+///    for a business that never asked. This is R5 of ADR-0202 §5 (hub#315) resolved in the core.
+///  - **real hub → `None`.** No pin *today*. hub#485 tightens exactly this arm into a **one-way**
+///    switch: `testing → production` free (the go-live), `production → testing` refused once a
+///    record has been accepted in production. When it lands it replaces this `None`, and the
+///    demo arm above stays untouched — a pin is the degenerate case of a one-way switch.
+fn fiscal_environment_pin(demo_hub: bool) -> Option<&'static str> {
+    demo_hub.then_some(SANDBOX_ENVIRONMENT)
+}
+
+/// Fiscal environment lock (ADR-0197 §4, hub#376): in a demo hub, a transaction may not bind the
+/// fiscal `:environment` to anything but the sandbox.
+///
+/// Structural and business-free, same shape as [`enforce_fiscal_precondition`]: the trigger is the
+/// SQL binding the param, not a module id, so a second fiscal module (or a renamed VeriFactu
+/// command) is covered the day it exists without touching the runtime.
+///
+/// An **absent or empty** value is allowed on purpose: `verifactu/_insert_record.sql` binds
+/// `COALESCE(:environment, (SELECT environment FROM verifactu_config …))`, so «not stated» resolves
+/// to the hub's configuration — which this very gate keeps pinned to the sandbox. Refusing it would
+/// break record insertion in the demo instead of pinning it.
+fn enforce_fiscal_environment_pin<'a>(
+    registry: &Registry,
+    pairs: impl Iterator<Item = (&'a str, &'a Params)>,
+) -> Result<()> {
+    let Some(pinned) = fiscal_environment_pin(registry.demo_hub) else {
+        return Ok(());
+    };
+    for (sql, params) in pairs {
+        if !references_param(sql, FISCAL_ENVIRONMENT_PARAM) {
+            continue;
+        }
+        let requested = params
+            .get(FISCAL_ENVIRONMENT_PARAM)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+        if !requested.is_empty() && !requested.eq_ignore_ascii_case(pinned) {
+            return Err(RuntimeError::DemoLocked {
+                lock: DemoLock::FiscalEnvironment,
+            });
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1744,7 +1819,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("business_tax_id".into(), json!("B12345678"));
         updates.insert("business_legal_name".into(), json!("ACME SL"));
-        crate::settings::set_many(db, hub_id, &updates, "hub_user:1")
+        crate::settings::set_many(db, hub_id, &updates, "hub_user:1", false)
             .await
             .unwrap();
     }
@@ -1965,5 +2040,249 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(out["ok"], json!(true));
+    }
+
+    // ── Fiscal environment pin in a DEMO hub (ADR-0197 §4 · hub#376) ───────────────────────
+    //
+    // A demo hub is a REAL hub handed to an anonymous visitor for an hour. What it must never do
+    // is file records with the real tax authority. The environment is the switch that decides
+    // which AEAT it talks to, so in a demo it is pinned — and the pin is the CORE's, not the
+    // module's (Ioan, 2026-08-08: a tax obligation may never depend on a module being installed).
+
+    /// The shape of `verifactu.config.save`: declarative SQL that binds `:environment`.
+    fn registry_saving_the_fiscal_environment(demo_hub: bool) -> Registry {
+        let mut reg = Registry::new();
+        reg.demo_hub = demo_hub;
+        reg.status.insert("verifactu".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "verifactu.config.save".into(),
+            RegisteredCommand {
+                module_id: "verifactu".into(),
+                def: cmd_def(),
+                sql: vec![
+                    "INSERT INTO verifactu_config (hub_id, environment) \
+                     VALUES (:hub_id, :environment);"
+                        .to_string(),
+                ],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg
+    }
+
+    fn environment_payload(value: &str) -> Params {
+        let mut p = Params::new();
+        p.insert("environment".into(), json!(value));
+        p
+    }
+
+    /// 🔴 The one that matters: a DEMO hub trying to go live. `DenyDb` panics on any DB call, so
+    /// this also proves the refusal lands BEFORE anything is written.
+    #[tokio::test]
+    async fn a_demo_hub_cannot_point_its_fiscal_environment_at_production() {
+        let reg = registry_saving_the_fiscal_environment(true);
+        let err = execute(
+            &DenyDb,
+            &reg,
+            "verifactu.config.save",
+            &environment_payload("production"),
+            &ctx_admin(),
+            &Grants::new(),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                RuntimeError::DemoLocked {
+                    lock: DemoLock::FiscalEnvironment
+                }
+            ),
+            "got {err:?}"
+        );
+    }
+
+    /// Casing is not a bypass: `PRODUCTION` is the same switch.
+    #[tokio::test]
+    async fn the_pin_is_not_case_sensitive() {
+        let reg = registry_saving_the_fiscal_environment(true);
+        for spelling in ["PRODUCTION", "Production", " production "] {
+            let err = execute(
+                &DenyDb,
+                &reg,
+                "verifactu.config.save",
+                &environment_payload(spelling),
+                &ctx_admin(),
+                &Grants::new(),
+            )
+            .await
+            .unwrap_err();
+            assert!(
+                matches!(err, RuntimeError::DemoLocked { .. }),
+                "`{spelling}` must not go live: {err:?}"
+            );
+        }
+    }
+
+    /// The demo still WORKS: saving the sandbox environment is the normal path, not a refusal.
+    #[tokio::test]
+    async fn a_demo_hub_can_still_save_the_sandbox_environment() {
+        let reg = registry_saving_the_fiscal_environment(true);
+        let out = execute(
+            &FakeDb,
+            &reg,
+            "verifactu.config.save",
+            &environment_payload("testing"),
+            &ctx_admin(),
+            &Grants::new(),
+        )
+        .await
+        .expect("a demo hub configures VeriFactu against preproduction like any other");
+        assert_eq!(out["ok"], json!(true));
+    }
+
+    /// Not stating the environment is not a bypass either — and it must NOT be refused:
+    /// `verifactu/_insert_record.sql` binds `COALESCE(:environment, <the config>)`, so «absent»
+    /// resolves to the configuration this very gate keeps pinned. Refusing it would stop the demo
+    /// from writing records at all.
+    #[tokio::test]
+    async fn an_absent_environment_falls_back_to_the_pinned_config_instead_of_failing() {
+        let reg = registry_saving_the_fiscal_environment(true);
+        let out = execute(
+            &FakeDb,
+            &reg,
+            "verifactu.config.save",
+            &Params::new(),
+            &ctx_admin(),
+            &Grants::new(),
+        )
+        .await
+        .expect("no environment stated → the pinned config decides");
+        assert_eq!(out["ok"], json!(true));
+    }
+
+    /// 🔴 The OTHER direction, and the one that would be a silent disaster: a REAL hub is not
+    /// affected. Going live is how a paying business complies — a pin leaking onto a real hub
+    /// would stop its sales reaching the AEAT, which is exactly the hole hub#485 is about.
+    #[tokio::test]
+    async fn a_real_hub_goes_live_untouched() {
+        let reg = registry_saving_the_fiscal_environment(false);
+        let out = execute(
+            &FakeDb,
+            &reg,
+            "verifactu.config.save",
+            &environment_payload("production"),
+            &ctx_admin(),
+            &Grants::new(),
+        )
+        .await
+        .expect("a real hub must be able to go live");
+        assert_eq!(out["ok"], json!(true));
+    }
+
+    /// 🔴 A REAL hub cannot DECLARE ITSELF a demo. The marker is the deployment's
+    /// (`Registry::demo_hub`, sealed at boot from `HUB_DEMO`), so a caller that ships `demo` /
+    /// `is_demo` in the payload changes nothing — otherwise the browser would own the switch that
+    /// makes real sales stop counting.
+    #[tokio::test]
+    async fn the_payload_cannot_turn_a_real_hub_into_a_demo() {
+        let reg = registry_saving_the_fiscal_environment(false);
+        let mut payload = environment_payload("production");
+        payload.insert("demo".into(), json!(true));
+        payload.insert("is_demo".into(), json!(true));
+        payload.insert("demo_hub".into(), json!(true));
+        let out = execute(
+            &FakeDb,
+            &reg,
+            "verifactu.config.save",
+            &payload,
+            &ctx_admin(),
+            &Grants::new(),
+        )
+        .await
+        .expect("only the deployment decides what a demo is");
+        assert_eq!(out["ok"], json!(true));
+    }
+
+    /// Token boundary, same rule as the identity gate: `:environment_label` is another param.
+    #[tokio::test]
+    async fn a_param_that_merely_starts_with_environment_is_not_the_fiscal_switch() {
+        let mut reg = Registry::new();
+        reg.demo_hub = true;
+        reg.status.insert("crm".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "crm.tag".into(),
+            RegisteredCommand {
+                module_id: "crm".into(),
+                def: cmd_def(),
+                sql: vec!["INSERT INTO x VALUES (:environment_label);".to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+        let mut payload = Params::new();
+        payload.insert("environment_label".into(), json!("production"));
+        let out = execute(&FakeDb, &reg, "crm.tag", &payload, &ctx_admin(), &Grants::new())
+            .await
+            .expect("an unrelated param must not be read as the fiscal environment");
+        assert_eq!(out["ok"], json!(true));
+    }
+
+    /// And a demo hub that never mentions the environment runs its normal business untouched:
+    /// the gate is structural (it keys on the SQL binding the param), not a global mode.
+    #[tokio::test]
+    async fn a_demo_hub_runs_commands_that_do_not_bind_the_environment() {
+        let mut reg = registry_with_command("inventory", "inventory.stock.set");
+        reg.demo_hub = true;
+        let out = execute(
+            &FakeDb,
+            &reg,
+            "inventory.stock.set",
+            &environment_payload("production"),
+            &ctx_admin(),
+            &Grants::new(),
+        )
+        .await
+        .expect("no :environment in the SQL → nothing to pin");
+        assert_eq!(out["ok"], json!(true));
+    }
+
+    /// The pin also covers what a NATIVE/WASM handler resolves to. The VeriFactu engine emits its
+    /// own `_insert_record` operation with its own params: a gate that only looked at the caller's
+    /// payload would be blind to exactly the path that transmits.
+    #[tokio::test]
+    async fn the_pin_covers_the_operations_a_handler_resolves_to() {
+        let pairs = vec![(
+            "INSERT INTO verifactu_record (environment) VALUES (:environment);".to_string(),
+            environment_payload("production"),
+        )];
+        let mut reg = Registry::new();
+        reg.demo_hub = true;
+        let err = enforce_fiscal_environment_pin(
+            &reg,
+            pairs.iter().map(|(sql, p)| (sql.as_str(), p)),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                RuntimeError::DemoLocked {
+                    lock: DemoLock::FiscalEnvironment
+                }
+            ),
+            "got {err:?}"
+        );
+    }
+
+    /// The policy itself, spelled out — this is the seam hub#485 lands on.
+    #[test]
+    fn only_a_demo_hub_is_pinned_today() {
+        assert_eq!(fiscal_environment_pin(true), Some("testing"));
+        assert_eq!(
+            fiscal_environment_pin(false),
+            None,
+            "a real hub has no pin YET: hub#485 turns this arm into a one-way switch"
+        );
     }
 }

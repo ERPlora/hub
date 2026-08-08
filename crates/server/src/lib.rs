@@ -233,6 +233,17 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // estado de módulos (`hub_module`) y de las migraciones de sistema (hub#31 / hub#37).
     let mut runtime = Runtime::with_hub_id(db, cfg.hub.hub_id.clone());
 
+    // DEMO efímera (ADR-0197, hub#376): se sella ya, antes incluso de instalar módulos o aplicar
+    // migraciones, para que los cierres estén puestos durante TODO el arranque. `AppState` vuelve a
+    // sellarlo (mismo valor, idempotente) porque su constructor es el embudo de todos los hosts.
+    runtime.set_demo_hub(cfg.hub.demo);
+    if cfg.hub.demo {
+        eprintln!(
+            "demo: hub efímero (ADR-0197) — entorno fiscal clavado a `testing`, certificado \
+             propio e identidad fiscal cerrados"
+        );
+    }
+
     // El mismo backend de ficheros sirve a TODOS los módulos: disco bajo `media/modules/` en
     // Local y proxy Cloud→S3 en Cloud. Se inyecta antes de instalar para que cada manifest con
     // `static_files.folder` materialice su carpeta al activarse.
@@ -941,7 +952,7 @@ async fn require_machine_registration(
     next: Next,
 ) -> Response {
     let path = request.uri().path();
-    if matches!(path, "/healthz" | "/api/hub/context") || st.is_demo() || st.machine_registered() {
+    if matches!(path, "/healthz" | "/api/hub/context") || st.is_dev_hub() || st.machine_registered() {
         return next.run(request).await;
     }
     (
@@ -1063,13 +1074,20 @@ async fn hub_context(State(st): State<AppState>) -> Response {
     let sector = st.config.sector.clone();
     // Demo/Dev es la única excepción al registro obligatorio. En cualquier runtime real se exige
     // tanto UUID Cloud como credencial de máquina; nunca se expone el secreto al navegador.
-    let demo = st.is_demo();
+    let demo = st.is_dev_hub();
     let machine_registered = st.machine_registered();
     Json(json!({
         "hub_id": hub_id,
         "user": Value::Null,
         "pin_users": pin_users,
         "demo": demo,
+        // ⚠️ NO es `demo`. Esa clave lleva años significando **modo `dev`** y el SPA la usa para
+        // el fallback de login por PIN (`runtime.ts` → `config.demo`): cambiarle el sentido sería
+        // abrir ese fallback en cada demo pública. Esta es la DEMO EFÍMERA de ADR-0197: el hub
+        // real de una hora que el visitante prueba sin registrarse. La UI la lee para EXPLICAR
+        // los cierres de hub#376 (entorno fiscal clavado, certificado e identidad congelados)
+        // en vez de dejar un 409 sin contexto.
+        "ephemeral_demo": st.config.demo,
         "machine_registered": machine_registered,
         "registration_required": !demo && !machine_registered,
         "public_key_loaded": st.config.jwt_public_key.is_some(),
@@ -1548,7 +1566,7 @@ async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMa
         }
     }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    if st.is_demo() {
+    if st.is_dev_hub() {
         return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules()).await;
     }
     let placeholder = cloud_client::Auth::HubToken {
@@ -1954,6 +1972,13 @@ pub(crate) fn err_status_and_code(
         // identity/certificate), not the request, blocks emitting fiscal documents. `409`: the
         // request is well-formed and allowed, it conflicts with the hub's current setup state.
         E::FiscalPrecondition { .. } => (StatusCode::CONFLICT, "fiscal_precondition_failed".into()),
+        // hub#376 (ADR-0197 §4): this hub IS an ephemeral demo, so its fiscal environment,
+        // certificate and identity are not its own. `409` for the same reason as above — the
+        // request is well-formed and allowed, it conflicts with what this deploy IS. The code is
+        // the SUBJECT of the lock, never a flat `demo_locked`: the UI has to be able to say WHICH
+        // of the three refused, and three guards sharing one answer means two can be deleted with
+        // the suite still green.
+        E::DemoLocked { lock } => (StatusCode::CONFLICT, lock.as_str().into()),
         // hub#360 (paso 2b): a refusal a MANAGER could approve. `403` like `permission_denied` —
         // it IS a refusal and nothing ran — but with its own stable code, so the UI can tell
         // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling
