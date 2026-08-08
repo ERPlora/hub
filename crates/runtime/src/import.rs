@@ -239,7 +239,7 @@ pub mod ignore_reason {
     /// of this hub's catalogue, so nothing was switched on for them.
     pub const ROLES_NOT_ACTIVATABLE: &str = "roles_not_activatable";
     /// The bundle brought a section over one of the hub's OWN system tables — its fiscal profile,
-    /// its certificate store, its import batches (ADR-0259 D8 — hub#560). Those are the identity of
+    /// its certificate store, its import batches (ADR-0273 D8 — hub#560). Those are the identity of
     /// THIS installation, not vocabulary of anybody's business, so no bundle writes them: not a
     /// template, not another hub's backup, not this hub restoring itself.
     pub const SYSTEM_TABLE_NOT_PORTABLE: &str = "system_table_not_portable";
@@ -256,7 +256,7 @@ fn is_same_hub(manifest: &BlueprintManifest, target_hub_id: &str) -> bool {
 }
 
 /// **The hub's own system tables are not a section, whatever the manifest calls them** —
-/// ADR-0259 D8 (hub#560).
+/// ADR-0273 D8 (hub#560).
 ///
 /// This is the FIRST question asked of every section, before `purpose`, before whose hub this is:
 /// those two decide what a bundle may carry ABOUT A BUSINESS, and `_hub_*` is not about a business

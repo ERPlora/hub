@@ -1,4 +1,4 @@
-//! **The fiscal mode reaches the boot and the dispatcher** — ADR-0259 D2/D4, hub#550.
+//! **The fiscal mode reaches the boot and the dispatcher** — ADR-0273 D2/D4, hub#550.
 //!
 //! The state machine itself is unit-tested in `fiscal_profile.rs`, where a `Registry` can be built
 //! by hand. What this fixes is the part that only shows up assembled: that a real hub, booting the
@@ -121,7 +121,7 @@ async fn refreshing_on_boot_is_idempotent() {
     assert_eq!(first, FiscalMode::Unconfigured);
 }
 
-// ── El go-live sella el primer registro DESDE EL DISPATCHER (ADR-0259 D3, hub#551) ────────────
+// ── El go-live sella el primer registro DESDE EL DISPATCHER (ADR-0273 D3, hub#551) ────────────
 
 /// 🔴 **Lo que hace irreversible el go-live sin preguntarle nada a ningún módulo.**
 ///

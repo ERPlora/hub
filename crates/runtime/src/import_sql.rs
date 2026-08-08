@@ -53,7 +53,7 @@ impl TableScope {
     /// case-insensitive): `INSERT INTO HUB_USER` y `hub_user` son la MISMA tabla y no pueden
     /// significar cosas distintas para el validador. No depende del sistema de ficheros.
     ///
-    /// **Suelo por debajo de todo scope** (ADR-0259 D8, hub#560): las tablas de SISTEMA del hub
+    /// **Suelo por debajo de todo scope** (ADR-0273 D8, hub#560): las tablas de SISTEMA del hub
     /// (`_hub_*` — perfil fiscal, registro de regímenes, certificado, lotes de import) no las
     /// alcanza ninguna sección. La regla del prefijo se las daría a una sección de módulo `_hub`,
     /// y el perfil fiscal es la IDENTIDAD de esta instalación: un bundle que pudiera escribirlo
@@ -101,7 +101,7 @@ pub fn scope_for_data_file(path: &str) -> Option<TableScope> {
 /// Id de módulo aceptable como nombre de fichero de sección (mismo alfabeto que un identificador
 /// SQL seguro: sin puntos, comillas ni separadores).
 ///
-/// El `_` inicial queda fuera: es el namespace del RUNTIME (ADR-0259 D8, hub#560). Un
+/// El `_` inicial queda fuera: es el namespace del RUNTIME (ADR-0273 D8, hub#560). Un
 /// `data/_hub.sql` daría un scope `Module("_hub")`, que por la propia regla del prefijo alcanzaría
 /// todas las `_hub_*` — el perfil fiscal del hub entre ellas. Ningún módulo se llama así, y ahora
 /// tampoco puede llamarse así un fichero del bundle.
@@ -411,7 +411,7 @@ fn check_statement(stmt: &str, scope: &TableScope) -> std::result::Result<(), St
     }
 }
 
-/// Rechazo por tocar una tabla de SISTEMA del hub (ADR-0259 D8, hub#560). Mensaje propio, y no el
+/// Rechazo por tocar una tabla de SISTEMA del hub (ADR-0273 D8, hub#560). Mensaje propio, y no el
 /// genérico del scope, porque el motivo es otro: no es «esta sección no llega ahí» sino «ahí no
 /// llega ninguna sección» — el perfil fiscal y su registro de regímenes son la identidad de esta
 /// instalación, no vocabulario del negocio que trae el bundle.
@@ -804,7 +804,7 @@ mod tests {
         }
     }
 
-    /// **No section of a bundle writes a system table of the hub** — ADR-0259 D8 (hub#560).
+    /// **No section of a bundle writes a system table of the hub** — ADR-0273 D8 (hub#560).
     ///
     /// The floor is asked UNDER a scope that would otherwise allow it: `Module("_hub")` reaches
     /// `_hub_*` by the very prefix rule that decides what a module owns. That is the point — a rule

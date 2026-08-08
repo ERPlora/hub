@@ -672,7 +672,7 @@ CREATE TABLE IF NOT EXISTS _elevation_audit (\
   created_at TEXT NOT NULL, PRIMARY KEY (hub_id, id));\
 CREATE INDEX IF NOT EXISTS idx_elevation_audit_when ON _elevation_audit (hub_id, created_at);",
     },
-    // ── v27 — hub#549 / ADR-0259 D1/D6: the CORE decides THAT there is a fiscal obligation ─────
+    // ── v27 — hub#549 / ADR-0273 D1/D6: the CORE decides THAT there is a fiscal obligation ─────
     // The rule: a fiscal obligation can never depend on a module being installed, enabled,
     // licensed or available. The module implements HOW to comply; the core determines THAT
     // compliance is owed. Today it is the other way round — uninstall the provider with an empty
@@ -1011,7 +1011,7 @@ mod tests {
     /// El mismo invariante para la **v27** (hub#549): un hub que ya pasó por todo lo anterior **sí**
     /// recibe las tablas del perfil fiscal. Si alguien la renumera por debajo del máximo se saltaría
     /// **en silencio** y ese hub arrancaría sin perfil — es decir, sin nadie en el core que sepa que
-    /// debe VeriFactu, que es exactamente el agujero que ADR-0259 cierra.
+    /// debe VeriFactu, que es exactamente el agujero que ADR-0273 cierra.
     #[tokio::test]
     async fn a_hub_already_migrated_still_receives_the_fiscal_profile() {
         use erplora_db::testutil::fresh_db;
