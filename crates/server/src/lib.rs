@@ -1984,6 +1984,12 @@ pub(crate) fn err_status_and_code(
         // of the three refused, and three guards sharing one answer means two can be deleted with
         // the suite still green.
         E::DemoLocked { lock } => (StatusCode::CONFLICT, lock.as_str().into()),
+        // hub#554: this hub already emitted, so its tax id is the anchor of a live chain and of the
+        // `BillingProfile` upstream (ADR-0201 decisión 5). `409` for the same reason: the request
+        // is well-formed and the caller is allowed, it conflicts with what this hub HAS DONE. Its
+        // own code, never the demo one — the demo lock has a way out (create your own hub) and this
+        // one does not.
+        E::BusinessTaxIdFrozen { .. } => (StatusCode::CONFLICT, "business_tax_id_frozen".into()),
         // hub#360 (paso 2b): a refusal a MANAGER could approve. `403` like `permission_denied` —
         // it IS a refusal and nothing ran — but with its own stable code, so the UI can tell
         // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling
