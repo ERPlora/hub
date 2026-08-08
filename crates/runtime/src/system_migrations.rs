@@ -727,6 +727,35 @@ INSERT INTO _hub_fiscal_regime_registry (country_code, regime_key, since, note) 
   VALUES ('ES', 'verifactu', '', 'RD 1007/2023 — VERI*FACTU (ADR-0202)') \
   ON CONFLICT (country_code, regime_key) DO NOTHING;",
     },
+    // ── v28 — hub#557 / ADR-0273 D2: the cessation of activity leaves a RECORD ────────────────
+    // `CLOSED` already existed as a status and the dispatcher already refused writes in it
+    // (hub#556). What did not exist was the way IN — and a one-way door with nothing written down
+    // is a state somebody will later have to guess the origin of: was it the owner? a bug? which
+    // day did the business actually stop?
+    //
+    // So the transition stamps the two facts nobody can reconstruct afterwards: WHEN it ceased and
+    // WHO decided it. `closed_by` follows the same shape as `mode_set_by` (v17) and
+    // `uploaded_by` (`_hub_certificate`): the `hub_user` id the door authenticated, never anything
+    // read from a payload.
+    //
+    // Not a new table: this is one more fact about the singleton profile, and a row that already
+    // carries `activated_at` (when it started filing for real) is exactly where "and when it
+    // stopped" belongs.
+    //
+    // ⚠️ **v28: the next number ABOVE THE MAXIMUM, re-checked at rebase.** `apply` compares against
+    // the MAXIMUM applied version, so anything at or below it is skipped IN SILENCE. The v15, v20
+    // and v24 gaps are free and permanently UNREACHABLE; taking one is that silent failure.
+    //
+    // ⚠️ **Re-executable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`. `tests/access_email_backfill.rs`
+    // rewinds the control table and replays every later migration over a database that already has
+    // the objects; a bare `ADD COLUMN` fails 42701 and takes that suite down with it.
+    SystemMigration {
+        version: 28,
+        name: "hub_fiscal_profile_closed",
+        postgres: "\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_by TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).

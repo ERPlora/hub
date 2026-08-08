@@ -151,6 +151,11 @@ pub struct FiscalProfile {
     pub can_go_live: bool,
     /// Something the core could not decide and refuses to guess (ADR-0249).
     pub needs_review: bool,
+    /// Cessation of activity: when the business stopped. `""` until then. Write-once (hub#557).
+    pub closed_at: String,
+    /// And **who** decided it — the `hub_user` id the door authenticated. An irreversible action
+    /// with nobody attached to it in the record is not a trace.
+    pub closed_by: String,
 }
 
 /// Why a hub that went live is not operating (ADR-0273 D2, hub#550). Derived, never stored.
@@ -376,6 +381,14 @@ pub const NOT_READY: &str = "fiscal.not_ready";
 pub const GO_LIVE_FORBIDDEN: &str = "fiscal.go_live_forbidden";
 pub const ALREADY_EMITTED: &str = "fiscal.already_emitted";
 
+/// **The hub ceased activity** (ADR-0273 D2, hub#557). One code, two doors: the dispatcher rejects
+/// writes with it ([`crate::commands`]), and so does an attempt to start issuing again — because
+/// from the outside they are the same answer, *this business closed*.
+pub const HUB_CLOSED: &str = "fiscal.hub_closed";
+
+/// Ceasing activity with nobody to attribute it to. See [`close`].
+pub const CLOSE_NEEDS_ACTOR: &str = "fiscal.close_needs_actor";
+
 /// **The go-live: `READY → ACTIVE` IS `testing → production`** (ADR-0273 D3).
 ///
 /// They used to be two disconnected things — an `environment` that was a column of a module, and no
@@ -398,6 +411,18 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
     let profile = ensure(db, hub_id).await?;
     if profile.status == FiscalStatus::Active {
         return Ok(profile); // Idempotent: pressing an already-on toggle is not an error.
+    }
+    // A ceased business does not start issuing again from the same profile (hub#557). It gets its
+    // own rejection so the screen can say *why* instead of asking for a certificate the hub has.
+    if profile.status == FiscalStatus::Closed {
+        return Err(RuntimeError::Domain {
+            code: HUB_CLOSED.to_string(),
+            message: format!(
+                "this hub ceased activity on {}: it does not issue again. A business that comes \
+                 back invoices from a new hub, so that its old chain stays closed where it ended",
+                profile.closed_at
+            ),
+        });
     }
     if !profile.can_go_live {
         return Err(RuntimeError::Domain {
@@ -483,6 +508,68 @@ pub async fn stand_down(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Fiscal
     db.execute(
         "UPDATE _hub_fiscal_profile \
          SET status = :status, environment = :testing, activated_at = '' WHERE hub_id = :hub_id",
+        &p,
+    )
+    .await?;
+    reload(db, hub_id).await
+}
+
+/// **Cessation of activity: the way INTO `CLOSED`** (ADR-0273 D2, hub#557).
+///
+/// The refusals were already built — `enforce_fiscal_capacity` turns `CLOSED` into default-deny on
+/// writes, with `hub.*` and the modules of the active regime as its two exceptions, and queries
+/// never gated. What did not exist was the door: no code path could put a hub in that state.
+///
+/// **This is product, not compliance**, and that is verified in primary sources (ADR-0273 D9): a
+/// VERI\*FACTU-only system files no event record — *«solo es obligatorio en el caso de los sistemas
+/// de emisión de facturas no verificables»* — and the cessation that does exist is the taxpayer's
+/// own census deregistration (forms 036/037), which the owner or their accountant files. The
+/// software does not take part. So closing sends nothing anywhere; what it buys is that a business
+/// that has stopped cannot carry on invoicing **by mistake**, while it keeps reading and exporting
+/// its books, which it is legally obliged to keep.
+///
+/// Three properties, and each one is a test:
+///
+/// 1. **One-way.** There is no `CLOSED → ACTIVE`: [`go_live`] refuses with [`HUB_CLOSED`], and the
+///    status is [`FiscalStatus::is_frozen`], so neither [`ensure`] nor [`refresh`] re-resolves it
+///    from settings on the next boot. A business that comes back gets a new hub, whose different
+///    `system_id` gives it a chain of its own by the ADR-0202 invariant — instead of a chain that
+///    stopped and restarted, which nobody could tell apart from one that never stopped.
+/// 2. **Idempotent and write-once.** Closing twice is not an error, and the second pass moves
+///    neither the date nor the author: the date of cessation is the first one.
+/// 3. **Attributed.** An empty `actor` is refused ([`CLOSE_NEEDS_ACTOR`]), the same reasoning as
+///    the elevation receipt ([`crate::elevation`]): if this could be done with no author,
+///    "break the trace" becomes a way to close somebody's hub leaving no record of who did it.
+///
+/// It can be closed **from any status**, and deliberately so: ceasing is a fact about the
+/// *business*, not about how far its fiscal setup got. The hub that most needs to stop being able
+/// to invoice by mistake is precisely the one that never finished configuring.
+///
+/// The **admin session and the confirmation** live at the door that calls this, exactly like the
+/// go-live: the core's own guard is that somebody is named.
+pub async fn close(db: &dyn DatabaseAdapter, hub_id: &str, actor: &str) -> Result<FiscalProfile> {
+    let actor = actor.trim();
+    if actor.is_empty() {
+        return Err(RuntimeError::Domain {
+            code: CLOSE_NEEDS_ACTOR.to_string(),
+            message: "ceasing activity is irreversible and has to be attributed to somebody: no \
+                      hub is closed without a record of who closed it"
+                .to_string(),
+        });
+    }
+    ensure(db, hub_id).await?;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("actor".into(), json!(actor));
+    p.insert("status".into(), json!(FiscalStatus::Closed.as_str()));
+    // `closed_at = ''` in the WHERE is the WHOLE of write-once — no second branch above deciding
+    // the same thing in Rust. Closing twice writes nothing and is not an error; two doors closing
+    // at once still leave one date, and a status somebody wrote by hand still gets its stamp.
+    db.execute(
+        "UPDATE _hub_fiscal_profile \
+         SET status = :status, closed_at = :now, closed_by = :actor \
+         WHERE hub_id = :hub_id AND closed_at = ''",
         &p,
     )
     .await?;
@@ -614,7 +701,8 @@ pub async fn load(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<Fisca
     let Ok(res) = db
         .query(
             "SELECT country_code, taxpayer_id, fiscal_system, status, environment, activated_at, \
-                    first_record_at, system_id, fiscal_trigger_events, can_go_live, needs_review \
+                    first_record_at, system_id, fiscal_trigger_events, can_go_live, needs_review, \
+                    closed_at, closed_by \
              FROM _hub_fiscal_profile WHERE hub_id = :hub_id",
             &p,
         )
@@ -644,6 +732,8 @@ pub async fn load(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<Fisca
             .unwrap_or_default(),
         can_go_live: flag("can_go_live"),
         needs_review: flag("needs_review"),
+        closed_at: text("closed_at"),
+        closed_by: text("closed_by"),
     }))
 }
 
@@ -981,6 +1071,8 @@ mod tests {
             fiscal_trigger_events: Vec::new(),
             can_go_live: true,
             needs_review: false,
+            closed_at: String::new(),
+            closed_by: String::new(),
         }
     }
 
@@ -1450,6 +1542,120 @@ mod tests {
         let first = go_live(&db, "hub-es").await.unwrap();
         let second = go_live(&db, "hub-es").await.unwrap();
         assert_eq!(first, second);
+    }
+
+    // ── D2: `CLOSED` — cessation of activity, and it is a ONE-WAY door (hub#557) ──────────────
+
+    /// **The way IN, which is the whole of this issue.** The refusals were already there
+    /// (`enforce_fiscal_capacity`); what was missing was how a hub gets to `CLOSED` at all.
+    ///
+    /// It records **when** and **who**: an irreversible decision with nobody attached to it in the
+    /// record is not a trace, it is a state somebody will later have to guess the origin of.
+    #[tokio::test]
+    async fn ceasing_activity_closes_the_hub_and_records_when_and_who() {
+        let db = fresh_db().await;
+        let reg = hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+
+        let after = close(&db, "hub-es", "hub_user:1").await.unwrap();
+
+        assert_eq!(after.status, FiscalStatus::Closed);
+        assert!(!after.closed_at.is_empty(), "when it ceased");
+        assert_eq!(after.closed_by, "hub_user:1", "who decided it");
+        assert_eq!(
+            determine_fiscal_mode(&after, &reg, "hub-es"),
+            FiscalMode::Closed,
+            "and the mode the dispatcher reads says so"
+        );
+    }
+
+    /// 🔴 **There is no `CLOSED → ACTIVE`.** A business that ceased and comes back is a new
+    /// registration, and a chain that restarted under the same profile would be indistinguishable
+    /// from one that never stopped. The rejection carries its own code so the screen can say *why*
+    /// instead of asking for a certificate the hub already has.
+    #[tokio::test]
+    async fn a_closed_hub_never_goes_back_to_issuing() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+        close(&db, "hub-es", "hub_user:1").await.unwrap();
+
+        let err = go_live(&db, "hub-es").await.expect_err("a ceased hub does not issue again");
+
+        assert_eq!(code_of(&err), HUB_CLOSED);
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().status,
+            FiscalStatus::Closed,
+            "and the refused attempt moved nothing"
+        );
+    }
+
+    /// Closing twice is not an error — but the stamp is **write-once**: the date of cessation is
+    /// the first one, not the date of the last click.
+    #[tokio::test]
+    async fn closing_twice_keeps_the_first_stamp() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+
+        let first = close(&db, "hub-es", "hub_user:1").await.unwrap();
+        let second = close(&db, "hub-es", "hub_user:2").await.unwrap();
+
+        assert_eq!(first, second, "the second pass moves neither the date nor the author");
+    }
+
+    /// **Nobody to attribute it to, no cessation.** Same reasoning as the elevation receipt: if
+    /// an action this irreversible could be taken with an empty author, "break the trace" becomes
+    /// a way of closing a hub and leaving no record of who did it.
+    #[tokio::test]
+    async fn closing_with_nobody_to_attribute_it_to_is_refused() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+
+        let err = close(&db, "hub-es", "   ").await.expect_err("somebody has to own this");
+
+        assert_eq!(code_of(&err), CLOSE_NEEDS_ACTOR);
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().status,
+            FiscalStatus::Active,
+            "the refusal leaves the hub exactly as it was"
+        );
+    }
+
+    /// **Ceasing is a fact about the BUSINESS, not about how far the fiscal setup got.** A hub
+    /// that never went live can close too — that is precisely the one that must stop being able to
+    /// invoice by mistake, while its books stay readable.
+    #[tokio::test]
+    async fn a_hub_that_never_went_live_can_still_cease_activity() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+        assert_eq!(
+            ensure(&db, "hub-es").await.unwrap().status,
+            FiscalStatus::Unconfigured
+        );
+
+        let after = close(&db, "hub-es", "hub_user:1").await.unwrap();
+
+        assert_eq!(after.status, FiscalStatus::Closed);
+    }
+
+    /// **A restart does not reopen it.** `CLOSED` is frozen exactly like `ACTIVE`: neither the
+    /// country nor the regime is re-resolved from settings, so editing a setting afterwards is not
+    /// a back door into issuing again.
+    #[tokio::test]
+    async fn booting_a_closed_hub_keeps_it_closed() {
+        let db = fresh_db().await;
+        let reg = hub_ready(&db, "hub-es").await;
+        close(&db, "hub-es", "hub_user:1").await.unwrap();
+        set_country(&db, "hub-es", "PT").await;
+
+        let mode = refresh(&db, &reg, "hub-es").await.unwrap();
+
+        assert_eq!(mode, FiscalMode::Closed);
+        let after = load(&db, "hub-es").await.unwrap().unwrap();
+        assert_eq!(after.status, FiscalStatus::Closed);
+        assert_eq!(after.country_code, "ES", "frozen, like an active hub");
+        assert_eq!(after.fiscal_system, "verifactu");
     }
 
     // ── D5: con el perfil ACTIVE, no te quedas sin proveedor (hub#553) ────────────────────────
