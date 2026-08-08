@@ -105,15 +105,32 @@ pub async fn enqueue_job(
     match rt.enqueue_print_job(&job).await {
         // A duplicate is a SUCCESS: `jobId` did its job. The caller shows "queued" either way — it
         // asked for one ticket and there is exactly one ticket.
-        Ok(outcome) => Json(json!({
-            "ok": true,
-            "jobId": job.job_id.trim(),
-            "status": match outcome {
-                EnqueueOutcome::Queued => "queued",
-                EnqueueOutcome::Duplicate => "duplicate",
-            },
-        }))
-        .into_response(),
+        Ok(outcome) => {
+            // Nudge the print hosts of that role (hub#343) so the ticket comes out now instead of
+            // on the next poll. **Only on a real enqueue**: waking every host for a duplicate would
+            // send them all to an empty queue for a job that is already out.
+            //
+            // The frame carries the ROLE and nothing else. It travels on the shared event
+            // broadcast, and `/ws` fans that out to **anyone** — that channel asks for no
+            // credential at all (hub#504, found here, not caused here). So this frame must not say
+            // what the ticket is: the document only ever leaves through `/ws/print`, past both
+            // guards.
+            if outcome == EnqueueOutcome::Queued {
+                st.broadcast(json!({
+                    "type": crate::print_ws::EVENT_JOB_QUEUED,
+                    "role": job.role.trim(),
+                }));
+            }
+            Json(json!({
+                "ok": true,
+                "jobId": job.job_id.trim(),
+                "status": match outcome {
+                    EnqueueOutcome::Queued => "queued",
+                    EnqueueOutcome::Duplicate => "duplicate",
+                },
+            }))
+            .into_response()
+        }
         Err(e) => crate::err_response(e),
     }
 }

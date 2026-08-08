@@ -66,3 +66,8 @@ jsonwebtoken = "9"
 # `tests/install_surface.rs`): el test genera un par efímero y firma el zip del mock cloud.
 ring = "0.17"
 hex = "0.4"
+# Cliente WebSocket REAL para `tests/print_drain_ws.rs` (hub#343): el canal del host de impresión
+# es el primer WS cliente→servidor del hub, así que su transporte se prueba contra un servidor
+# atado de verdad, no solo el manejador de frames. Misma versión que ya trae `axum` con `ws`, así
+# que no añade nada al árbol de dependencias.
+tokio-tungstenite = "0.24"
