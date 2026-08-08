@@ -3219,6 +3219,12 @@ mod environment_chain_tests {
     //
     // The URLs are spelled out on purpose: deriving them from `aeat::endpoint` here would make
     // these tests agree with the code by construction instead of pinning the destination.
+    //
+    // ⚠️ Coverage boundary, unchanged since hub#320: the four call sites that live BEHIND the
+    // socket (`post_soap`/`run_consult` inside `transmit_one` and `auto_rechain_and_retry`) are
+    // not reachable from a unit test — `build_identity` needs a real mTLS identity, and driving
+    // them further would mean opening a connection to Hacienda from `cargo test`. What is pinned
+    // here is the VALUE those call sites are handed; that they keep being handed it is review.
     const PREPRODUCTION_HOLDER: &str =
         "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
     const PRODUCTION_HOLDER: &str =
