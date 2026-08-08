@@ -335,6 +335,57 @@ export class ErploraError extends Error {
   }
 }
 
+// ── Step-up approval: the wire half of the manager's PIN (hub#363, ADR-0238/0246) ────────────
+//
+// **Published contract of the runtime. None of these three names is ours to rename** — the code,
+// the path and the header are what `crates/server` answers, routes and reads (hub#361).
+
+/** The stable code the dispatcher answers when a **manager** could approve the action (hub#360). */
+export const REQUIRES_ELEVATION = 'requires_elevation';
+/** Where a PIN is verified. The runtime is the authority; the client never checks digits. */
+export const ELEVATION_APPROVE_PATH = '/api/elevation/approve';
+/** The header that presents a minted approval on the ONE retry it buys. */
+export const ELEVATION_TOKEN_HEADER = 'X-Elevation-Token';
+
+/** A minted approval, as `POST /api/elevation/approve` returns it. */
+export interface ElevationApproval {
+  /** Opaque, single-use, bound to this exact action. Meaningless outside the hub's runtime. */
+  token: string;
+  /** The permission that was stepped up to — the same one the refusal named. */
+  permission: string;
+  /** `hub_user.id` of the manager. The runtime stamps it as `approved_by`; nothing here does. */
+  approvedBy: string;
+  /** Their name, for the confirmation the cashier sees («approved by Sofía»). */
+  approverName: string;
+  /** How long an UNUSED approval stays spendable. A ceiling, never a window to work inside. */
+  expiresInSeconds: number;
+}
+
+/**
+ * What the shell's dialog is being asked to get approved.
+ *
+ * `approve` is a **function**, not a pair of fields, because a refused PIN must not tear the flow
+ * down: the manager mistyped, they retype, and the dialog stays open. It throws {@link
+ * ErploraError} with the runtime's stable `hub.elevation.*` code so the screen can say something
+ * useful — and so no screen has to know the endpoint.
+ */
+export interface ElevationAsk {
+  /** The command that was refused. */
+  command: string;
+  /** Its payload, **exactly as sent**: the grant is fingerprinted on it. */
+  payload: Record<string, unknown>;
+  /** The permission the refusal named as a field (hub#360) — never parsed out of the message. */
+  permission: string;
+  approve(approver: string, pin: string): Promise<ElevationApproval>;
+}
+
+/**
+ * The shell's approval dialog. Resolves with the **token** to retry with, or `null` when nobody
+ * approved (the cashier closed the dialog) — in which case the caller sees the refusal it already
+ * had, unchanged.
+ */
+export type ElevationApprover = (ask: ElevationAsk) => Promise<string | null>;
+
 /** Sobre de respuesta estándar del server Axum (`crates/server`). */
 interface Envelope {
   ok: boolean;
@@ -422,6 +473,20 @@ export interface HttpWsOptions {
    * hook this is exactly the failure nobody notices: the dashboard simply stops refreshing.
    */
   onStreamRefused?: (code: string, message: string) => void;
+  /**
+   * **The approval dialog** (hub#363). Called when a command comes back
+   * {@link REQUIRES_ELEVATION} — a refusal a manager could approve — and only then.
+   *
+   * It lives HERE, once, and not in every screen. A module that forgot to handle the code would
+   * leave the cashier staring at a raw error instead of a dialog, and there would be no way to
+   * tell which of the 24 modules forgot: the failure is silent by construction. Same shape as the
+   * receipt of hub#362 — the seam every action already crosses is the only place a contract
+   * cannot be lost by omission.
+   *
+   * Without it, `requires_elevation` propagates to the caller exactly as it did before this
+   * feature existed: a headless host never hangs on a dialog it does not have.
+   */
+  elevationApprover?: ElevationApprover;
 }
 
 export class HttpWsTransport implements ErploraTransport {
@@ -436,6 +501,21 @@ export class HttpWsTransport implements ErploraTransport {
   private readonly streamCredential?: () => Promise<string | null>;
   private pushRetryMs = PUSH_RETRY_MIN_MS;
   private readonly onStreamRefused?: (code: string, message: string) => void;
+  private readonly elevationApprover?: ElevationApprover;
+  /**
+   * The approval flows in progress, keyed by the ACTION (hub#363).
+   *
+   * A cashier double-taps «void» and two identical commands are refused. Without this the manager
+   * is asked twice for the same thing, taps twice, and the second approval is either spent on a
+   * duplicate void or left minted — a spendable credential lying around for the rest of the
+   * window. Both callers join one dialog and receive the one result instead.
+   *
+   * Keyed on `command` + a plain `JSON.stringify` of the payload, which is NOT the runtime's
+   * canonical fingerprint and does not need to be: a key that misses (the same payload written in
+   * another key order) merely costs a second dialog, while a key that over-matched would collapse
+   * two different actions into one. It errs the safe way on purpose.
+   */
+  private readonly elevating = new Map<string, Promise<unknown>>();
 
   private ws?: WebSocket;
   private es?: EventSource;
@@ -454,24 +534,114 @@ export class HttpWsTransport implements ErploraTransport {
       opts.EventSourceImpl ?? (globalThis as { EventSource?: typeof EventSource }).EventSource;
     this.streamCredential = opts.streamCredential;
     this.onStreamRefused = opts.onStreamRefused;
+    this.elevationApprover = opts.elevationApprover;
   }
 
-  private async post(path: string, body: unknown): Promise<unknown> {
+  private async post(
+    path: string,
+    body: unknown,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<unknown> {
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this.headers() },
+      headers: { 'Content-Type': 'application/json', ...this.headers(), ...extraHeaders },
       body: JSON.stringify(body),
     });
     const env = (await res.json()) as Envelope;
     return unwrap(env);
   }
 
+  /**
+   * A **query is never elevated** — and that is the runtime's rule, mirrored here rather than
+   * invented: `permissions::check_command` is the command gate and only that, because an approval
+   * exists to attribute an ACTION to the manager who allowed it, and a PIN that unlocked a report
+   * would leave no such trace. So this path has no capture at all.
+   */
   query(name: string, params: Record<string, unknown> = {}): Promise<unknown> {
     return this.post('/api/query', { name, params });
   }
 
   command(name: string, payload: Record<string, unknown> = {}): Promise<unknown> {
-    return this.post('/api/command', { name, payload });
+    if (!this.elevationApprover) return this.sendCommand(name, payload);
+    return this.sendCommand(name, payload).catch((e: unknown) => {
+      // ONE guard, on the code the dispatcher answers only for a refusal a manager could approve.
+      // A flat `permission_denied` — what an API key gets (hub#361), and what any other missing
+      // permission gets — is not an offer to elevate and must never open a dialog: nobody is
+      // standing at an integration to type four digits.
+      if (!(e instanceof ErploraError) || e.code !== REQUIRES_ELEVATION) throw e;
+      return this.elevate(name, payload, e);
+    });
+  }
+
+  /** One POST to `/api/command`, with an approval attached if there is one. Never retried. */
+  private sendCommand(
+    name: string,
+    payload: Record<string, unknown>,
+    token?: string,
+  ): Promise<unknown> {
+    return this.post(
+      '/api/command',
+      { name, payload },
+      token ? { [ELEVATION_TOKEN_HEADER]: token } : {},
+    );
+  }
+
+  /**
+   * Ask the shell for an approval and spend it — **once**.
+   *
+   * The runtime spends the grant at the gate, BEFORE the command runs, so after the elevated
+   * attempt leaves this process the approval is gone whatever happens next. That rules out every
+   * kind of resend: an answer that never arrived may well be an action that already happened, and
+   * sending it again would either duplicate it or tell the cashier to fetch the manager for
+   * something that is already done. So the elevated attempt goes through {@link sendCommand},
+   * which does not re-enter this capture — a second `requires_elevation` (a token that expired
+   * between the tap and the send) is reported, not turned into another dialog.
+   */
+  private elevate(
+    name: string,
+    payload: Record<string, unknown>,
+    refusal: ErploraError,
+  ): Promise<unknown> {
+    const key = `${name} ${JSON.stringify(payload)}`;
+    const joined = this.elevating.get(key);
+    if (joined) return joined;
+    const flow = (async () => {
+      const ask: ElevationAsk = {
+        command: name,
+        payload,
+        permission: refusal.permission ?? '',
+        approve: (approver, pin) => this.approveElevation(name, payload, approver, pin),
+      };
+      const token = await this.elevationApprover!(ask);
+      // Nobody approved: hand back the refusal the caller already had, untouched. A module written
+      // before hub#363 keeps behaving exactly as it did.
+      if (!token) throw refusal;
+      return this.sendCommand(name, payload, token);
+    })();
+    // Single-flight, not a cache: the entry goes the moment the flow settles, so a cashier who
+    // cancels and taps again gets a new dialog rather than the stale refusal of the one they shut.
+    this.elevating.set(key, flow);
+    void flow.catch(() => {}).then(() => this.elevating.delete(key));
+    return flow;
+  }
+
+  /** `POST /api/elevation/approve` — the PIN is verified by the runtime, never here (hub#361). */
+  private approveElevation(
+    command: string,
+    payload: Record<string, unknown>,
+    approver: string,
+    pin: string,
+  ): Promise<ElevationApproval> {
+    return this.post(ELEVATION_APPROVE_PATH, { approver, pin, command, payload }).then((data) => {
+      const d = (data ?? {}) as Record<string, unknown>;
+      return {
+        token: String(d.token ?? ''),
+        permission: String(d.permission ?? ''),
+        approvedBy: String(d.approved_by ?? ''),
+        approverName: String(d.approver_name ?? ''),
+        expiresInSeconds: Number(d.expires_in_seconds ?? 0),
+      };
+    });
   }
 
   subscribe(event: string, cb: (payload: unknown) => void): () => void {

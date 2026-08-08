@@ -122,6 +122,11 @@
       <!-- Modal «vista nativa» (PWA): se ofrece al entrar mientras la app no esté instalada;
            lib/pwa decide (standalone/Tauri/descartado-para-siempre → no se abre). -->
       <PwaInstallModal />
+      <!-- El diálogo de aprobación por PIN (hub#363). Se monta UNA vez, aquí, y lo abre el
+           TRANSPORTE ante un `requires_elevation` — nunca un módulo ni una pantalla: así el
+           encargado aprueba igual venga la acción de la app que venga, y ninguna se lo deja sin
+           poner. Solo con sesión: quien no ha entrado no tiene acción que elevar. -->
+      <ElevationDialog />
     </template>
   </ion-app>
 </template>
@@ -138,6 +143,7 @@ import {
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
 import PwaInstallModal from './components/PwaInstallModal.vue';
+import ElevationDialog from './components/ElevationDialog.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';

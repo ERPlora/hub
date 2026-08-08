@@ -24,6 +24,7 @@ import { getLocale, bootHubLanguage } from '../i18n';
 import { hubSettings } from './hub-settings';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
+import { askForApproval } from './elevation';
 import { setRuntimeClientKind } from './device';
 
 /**
@@ -165,6 +166,10 @@ export function getClient(): ErploraClient {
         // A channel that goes quiet without a word is the failure nobody debugs. This one says so.
         console.error(`[erplora] the event channel was refused (${code}): ${message}`);
       },
+      // hub#363: the manager's PIN, asked for HERE — once, for every app. Wiring it per screen
+      // would mean the first module that forgets leaves a cashier staring at a raw
+      // `requires_elevation` instead of a dialog, and nothing would say which one forgot.
+      elevationApprover: askForApproval,
     });
     // Inyecta la MONEDA DEL HUB (ADR-0059) al cliente que consumen los Web Components de módulo
     // (`globalThis.erplora.currency` / `formatMoney` / `formatAmount`). Misma fuente que el shell
