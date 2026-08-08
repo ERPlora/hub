@@ -352,3 +352,44 @@ fn no_capability_declares_an_origin_outside_our_domain() {
         }
     }
 }
+
+#[test]
+fn the_hub_origin_can_leave_for_the_browser() {
+    // The other half of the guard below, and the one that fails SILENTLY: without this grant the
+    // till is back to hub#475 — `openExternal` asks for `open_external_url`, Tauri's ACL refuses it
+    // because no capability hands it out, and the buttons that CHARGE go dead again with nothing in
+    // the log. Dev hides it (a local origin with no app manifest skips the gate), so it would ship
+    // green and only a real installed app would show it.
+    let granted: Vec<String> = permissions_granted_to("https://panaderia.a.erplora.com/apps")
+        .into_iter()
+        .map(|(_, permission)| permission)
+        .collect();
+
+    assert!(
+        granted.iter().any(|p| p == "allow-open-external-url"),
+        "no capability lets the till PWA reach the system browser; granted: {granted:?}"
+    );
+}
+
+#[test]
+fn no_capability_hands_a_page_the_raw_opener_plugin() {
+    // The app links `tauri-plugin-opener` so the till can send the user to the SaaS checkout in
+    // their own browser (hub#475). The plugin's OWN commands are not what the page gets: they take
+    // any address, and two of them (`open-path`, `reveal-item-in-dir`) address the FILE SYSTEM of
+    // the machine the till runs on. What is granted instead is `allow-open-external-url`, this
+    // crate's command, which refuses everything that is not an https origin of ours
+    // (`external_browser_url`, `tests/external_open.rs`).
+    //
+    // Granting `opener:default` would be a one-word change that reads like housekeeping and hands
+    // every page the app loads a launcher for arbitrary URLs, paths and schemes.
+    for capability in declared_capabilities() {
+        for permission in &capability.permissions {
+            assert!(
+                !permission.starts_with("opener:"),
+                "{} grants `{permission}`: a remote page must reach the system browser only \
+                 through `open_external_url`, which checks the destination first (hub#475)",
+                capability.file
+            );
+        }
+    }
+}

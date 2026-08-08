@@ -217,6 +217,7 @@ export default {
     role: 'Role in this Hub',
     accountType: 'Account type',
     cloudAccount: 'Account linked to ERPlora SaaS',
+    cloudAccountError: 'Your account page could not be opened in your browser. Go to erplora.com to manage it.',
     localAccount: 'Local user of this Hub',
     unavailable: 'Unavailable',
     defaultRole: 'User',
@@ -725,6 +726,7 @@ export default {
     upgradeMemory: 'This hub is close to its memory limit. Upgrading gives it more room to run smoothly.',
     upgradeDatabase: 'Your database is close to its plan limit. Upgrade for more storage.',
     upgradeDevices: "You're using every device your plan allows. Upgrade to connect more.",
+    upgradeError: 'The plans page could not be opened in your browser. Go to erplora.com to upgrade.',
   },
   billing: {
     invoices: 'Invoices',

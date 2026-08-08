@@ -158,6 +158,7 @@ import { openExternal } from '../lib/open-external';
 import {
   fetchSystemMetrics, formatBytes, toPct, upgradeReason, upgradeLink, type SystemMetrics,
 } from '../lib/system-metrics';
+import { toastError } from '../lib/toast';
 
 const { t } = useI18n();
 
@@ -223,8 +224,15 @@ function usageLabel(used: number | null, limit: number | null): string {
     : t('planLimits.usedNoLimit', { used: formatBytes(used) });
 }
 
+// Upgrading happens in the SaaS, in the user's own browser (ADR-0114 §4). If that trip cannot be
+// made, it is said out loud: this button is the one offered to somebody who has just hit a wall,
+// and a wall with a dead button next to it is worse than the wall (hub#475).
 async function openUpgrade(): Promise<void> {
-  await openExternal(upgradeLink());
+  try {
+    await openExternal(upgradeLink());
+  } catch {
+    await toastError(t('planLimits.upgradeError'));
+  }
 }
 
 /** Carga inicial (con spinner). Marca error si el runtime no responde. */

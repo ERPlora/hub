@@ -53,6 +53,12 @@ log = "0.4"
 # from the intent filter in `AndroidManifest.xml`. Doing that by hand is where the plugin earns its
 # place — and it is also the only portable way to receive the URL once the app is running.
 tauri-plugin-deep-link = "2"
+# The user's own browser (hub#475). The webview opens NO window of its own, so `window.open` from
+# the page is a silent no-op — and behind it are the buttons that charge: the module checkout that
+# ADR-0114 §4 moved OUT of the app for Google Play, the plans page, the billing portal. Official
+# plugin: `ACTION_VIEW` on Android, the desktop opener elsewhere. Only its Rust api is used; no
+# `opener:*` permission reaches a page (`tests/remote_acl.rs`).
+tauri-plugin-opener = "2"
 
 [dev-dependencies]
 # `tests/remote_acl.rs` valida los patrones de `capabilities/default.json` con el MISMO motor que

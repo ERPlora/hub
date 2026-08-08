@@ -344,9 +344,16 @@ async function removeAvatar(): Promise<void> {
   }
 }
 
-function manageCloudAccount(): void {
+// The account lives in the SaaS, so this is a trip to the user's own browser. It used to be fired
+// and forgotten (`void`), which inside the installed app meant pressing it did nothing at all and
+// said nothing either (hub#475).
+async function manageCloudAccount(): Promise<void> {
   const base = config.cloudApiUrl.replace(/\/+$/, '');
-  void openExternal(`${base}/dashboard/profile/`);
+  try {
+    await openExternal(`${base}/dashboard/profile/`);
+  } catch {
+    await toast(t('profile.cloudAccountError'), 'danger');
+  }
 }
 
 onMounted(async () => {

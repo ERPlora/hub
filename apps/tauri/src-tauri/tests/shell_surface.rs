@@ -419,3 +419,37 @@ fn the_bundle_ships_the_shell_fallback_page_not_the_hub_web_app() {
         );
     }
 }
+
+// ── The way out to the browser stays wired to its own boundary (hub#475) ─────────────────────────
+
+#[test]
+fn the_external_opener_is_registered_and_checks_before_it_opens() {
+    // `open_external_url` is three lines, and both of them can be deleted by someone tidying up:
+    //
+    // - drop `external_browser_url(...)` and the till becomes a launcher for whatever address the
+    //   page names — a `file://` path handed to the desktop, a custom scheme that starts another
+    //   program, a phishing page wearing the trust of an installed app;
+    // - drop `tauri_plugin_opener::init()` and the command compiles, ships, and panics at the
+    //   `Opener` state the first time somebody presses BUY.
+    //
+    // Neither shows up in a type error and neither is reachable from a unit test: the command needs
+    // a live `AppHandle`. So the guard is on the source, which is where the mistake would be made.
+    let source = read("src/lib.rs");
+
+    let command = source
+        .find("fn open_external_url")
+        .map(|at| &source[at..])
+        .and_then(|rest| rest.find("\n}").map(|end| &rest[..end]))
+        .expect("src/lib.rs no longer defines `open_external_url` (hub#475)");
+
+    assert!(
+        command.contains("external_browser_url"),
+        "`open_external_url` no longer checks its destination: it hands whatever the page sent \
+         straight to the operating system (hub#475, ADR-0255)."
+    );
+    assert!(
+        source.contains("tauri_plugin_opener::init()"),
+        "the opener plugin is not registered: `open_external_url` compiles and panics on the \
+         missing `Opener` state the first time a till tries to buy anything (hub#475)."
+    );
+}
