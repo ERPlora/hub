@@ -14,10 +14,18 @@
 
 name: Hub tests (Rust · Postgres)
 
+# ── Sin `pull_request` a propósito ────────────────────────────────────────────
+# Este gate corría en CADA PR y se llevaba el 96% de los minutos de Actions del repo
+# (127 runs / 1.647 min en 3 días, con la organización en overage). La MISMA suite corre
+# ahora en local, en `.githooks/pre-push`, que aborta el push si está roja y publica un
+# commit status `local-gate/hub-tests` para que `merge-pr.sh` siga viendo un check y
+# siga negándose a mergear con el CI mudo (pm#58/#60).
+#
+# Sigue corriendo en `main` — ahí es donde se integra por lotes y donde el fallo debe ser
+# ruidoso — y a mano con `workflow_dispatch`.
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 concurrency:
