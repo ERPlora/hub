@@ -631,6 +631,11 @@ ALTER TABLE hub_trusted_device ADD CONSTRAINT hub_trusted_device_pkey \
     // cogerlos ES ese fallo mudo. Esta nació v24 y se renumeró a la v25 porque hub#362 reclamó la
     // 24 estando esta sin mergear — el máximo del catálogo se re-comprueba **al rebasar**, no al
     // empezar. Renumerar es gratis; **renombrar rompe** (los fixtures rebobinan por `name`).
+    //
+    // 🚨 **Y por eso la v24 queda en manos de quien mergee SEGUNDO.** Si esta entra antes que
+    // hub#362, su v24 pasa a estar **por debajo del máximo** de cualquier hub que ya haya aplicado
+    // la v25: `apply` se la saltaría **en silencio** y ese hub arrancaría sin su cambio, sin fallar
+    // y sin un solo log. Quien llegue segundo **renumera** (v26), no rellena el hueco.
     SystemMigration {
         version: 25,
         name: "print_queue_structured_document",

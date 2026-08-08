@@ -213,11 +213,17 @@ async fn a_queued_ticket_comes_out_of_a_real_printer_and_ends_done() {
     println!("→ {} bytes of ESC/POS to {printer}", bytes.len());
     // What the paper should read, so the person holding it can check rather than guess. A socket
     // that accepted the bytes is not the same claim as a ticket that came out right.
-    println!("─── expected on the paper ───\n{}\n─────────────────────────────", readable(&bytes));
+    println!(
+        "─── expected on the paper ───\n{}\n─────────────────────────────",
+        readable(&bytes)
+    );
     let mut stream = tokio::net::TcpStream::connect(&printer)
         .await
         .unwrap_or_else(|e| panic!("no printer answering at {printer}: {e}"));
-    stream.write_all(&bytes).await.expect("the printer takes the bytes");
+    stream
+        .write_all(&bytes)
+        .await
+        .expect("the printer takes the bytes");
     stream.flush().await.unwrap();
 
     // ── 4. The host confirms, and the job is terminal. ────────────────────────────────────────

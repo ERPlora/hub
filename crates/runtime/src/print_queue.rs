@@ -212,9 +212,7 @@ pub async fn enqueue(
         ));
     };
     if fields.is_empty() {
-        return Err(invalid(
-            "document is empty (there is nothing to print)",
-        ));
+        return Err(invalid("document is empty (there is nothing to print)"));
     }
     let document = job.document.to_string();
     if document.len() > MAX_DOCUMENT_BYTES {
