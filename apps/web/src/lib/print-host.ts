@@ -27,6 +27,8 @@ import { resolveDeviceId } from './device';
 /** The minimum of the client this needs. Injected so the tests need no hardware. */
 export interface PrintHostClient {
   peripherals: {
+    /** Can this environment reach hardware at all? `{ online: false }` in a plain browser. */
+    detect(timeoutMs?: number): Promise<{ online: boolean }>;
     getDevices(): Promise<PrintDevice[]>;
     print(
       printerId: string,
@@ -119,6 +121,15 @@ export async function bootPrintHost(
     // Opening a socket to be told so would only be noise.
     return () => {};
   }
+  // **A device that cannot reach hardware must not drain, even if it IS registered.** In a plain
+  // browser the SDK answers every peripherals call with `hardware_unavailable` (hub#339), so a
+  // phone somebody once registered as a print host would claim ticket after ticket and fail every
+  // one — burning all five hand-outs and dead-lettering work a real till was about to print. The
+  // hub's guards cannot catch this: as far as the hub is concerned that device is a legitimate
+  // host. `detect()` asks "can this environment reach hardware at all", which is a property of the
+  // environment and does not change while the process lives, so asking once here is enough.
+  const hardware = await client.peripherals.detect().catch(() => ({ online: false }));
+  if (!hardware.online) return () => {};
   const drain = createPrintDrain({
     url: options.url ?? printChannelUrl(globalThis.location),
     printJob: createJobPrinter(client),

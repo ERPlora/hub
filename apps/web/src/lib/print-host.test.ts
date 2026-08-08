@@ -30,6 +30,7 @@ function client(
   return {
     printed,
     peripherals: {
+      detect: () => Promise.resolve({ online: true }),
       getDevices: () => Promise.resolve(devices),
       print: async (...args: unknown[]) => {
         printed.push(args);
@@ -177,6 +178,35 @@ describe('print host — booting it in the shell', () => {
     await bootPrintHost(c, { url: 'ws://h/ws/print', session: () => 's', deviceId: async () => 'till-1', openSocket });
 
     expect(opened).toEqual(['ws://h/ws/print']);
+  });
+
+  // **A device with no hardware access must not drain, even if somebody registered it.** In a plain
+  // browser the SDK's `UnavailableBridgeTransport` refuses everything with `hardware_unavailable`
+  // (hub#339), so a phone that had been registered as a print host would claim ticket after ticket
+  // and fail every one — burning all five hand-outs and DEAD-LETTERING work a real till could have
+  // printed. `detect()` is the question "can this environment reach hardware at all", and it is
+  // stable for the life of the process, so asking once at boot is the right shape.
+  it('does not drain on a device that cannot reach hardware at all', async () => {
+    const opened: string[] = [];
+    const offline = {
+      peripherals: {
+        detect: () => Promise.resolve({ online: false }),
+        getDevices: () => Promise.reject(new Error('hardware unavailable')),
+        print: () => Promise.reject(new Error('hardware unavailable')),
+      },
+    } as unknown as PrintHostClient;
+
+    await bootPrintHost(offline, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'phone-1',
+      openSocket: (url: string) => {
+        opened.push(url);
+        throw new Error('should never be reached');
+      },
+    });
+
+    expect(opened).toEqual([]);
   });
 
   // A browser tab that has no device identity yet is not a print host, and asking the hub about it
