@@ -17,6 +17,18 @@
           <p class="dash-hero-date">{{ todayLabel }}</p>
         </header>
 
+        <!-- Zone 1bis — The hero of an EMPTY business (hub#368, PLAN step 10). It is the one press
+             that turns a hub with nothing into a till that sells: the template of a trade brings its
+             apps, seeds their catalogue and pre-activates the role set of the vertical (hub#354).
+             It goes ABOVE the launcher because on day one the launcher holds exactly one tile (＋
+             Add apps), so it is not the hero of that screen yet — «set-up hero → apps hero →
+             widgets» is the progression the plan asks for. The moment the business HAS apps this
+             card is gone and hub#367 is back in force, unconditionally, for the next thirty days.
+             The card decides on its own whether to be here (the permission of ADR-0248, whether the
+             one query says the business is empty, and whether there is anything published to
+             offer): the panel knows less than it does, so a `v-if` here would be a poorer gate. -->
+        <BlueprintHeroCard :status="setupStatus" />
+
         <!-- Zone 2 — The launcher: «My apps» (hub#367). ERPlora is an ERP, not a till: what the
              owner has in front are THEIR apps. Everything below this line is a report, and a report
              needs a history nobody has on day one — so the launcher goes FIRST and cannot be
@@ -168,6 +180,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import BlueprintHeroCard from '../components/BlueprintHeroCard.vue';
 import MyAppsCard from '../components/MyAppsCard.vue';
 import SetupChecklistCard from '../components/SetupChecklistCard.vue';
 import { dataTableLabels } from '../lib/data-table-labels';

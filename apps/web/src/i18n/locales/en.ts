@@ -142,6 +142,31 @@ export default {
     delegatedHint: 'An administrator has to set this up.',
     completeTitle: 'Your business is ready',
     completeBody: 'Everything on the checklist is done.',
+    // The hero card of a business with no apps yet (hub#368). Its whole job is the FIRST choice, so
+    // it says what one press does AND what it leaves for the owner: a template brings the apps and
+    // the catalogue of a trade, never the details of THIS business (ADR-0195 §4/§5).
+    hero: {
+      title: 'Start from a business like yours',
+      body: 'Pick the closest one and we set up its apps and its catalogue in one go. You will still have to add your own details afterwards.',
+      use: 'Use this one',
+      more: 'See all templates',
+      working: 'Setting up «{name}»…',
+      readyTitle: 'Your apps and your catalogue are in',
+      readyBody: 'What is left is what only you can answer: the details of your business. You have them on the list below.',
+      partialTitle: 'Almost: something did not go in',
+      // A purchase decision, never a breakage (ADR-0060, hub#409): it names what to add and says
+      // where, instead of painting a red error over a plan the owner simply has not bought.
+      blocked: 'These have to be added to your plan first: {apps}',
+      failed: 'Something else did not go in. You can see the detail and try again in Settings › Data.',
+      notStartedTitle: 'That template could not be opened',
+      notStartedBody: 'Nothing changed in your business. Try again, or load it from Settings › Data.',
+      interruptedTitle: 'The set-up did not finish',
+      // We do NOT claim it changed nothing: half of it may already be in, and saying otherwise
+      // would send the owner to press again on top of it.
+      interruptedBody: 'Part of it may already be in. Check it in Settings › Data before trying again.',
+      continue: 'Continue',
+      retry: 'Try again',
+    },
     // The blocking strip (hub#374): the surface for the screens the checklist is not on. It says the
     // CONSEQUENCE, not the severity — ⛔ means the runtime refuses the document, so that is what it
     // announces. It never says "error": nothing is broken, something is missing.

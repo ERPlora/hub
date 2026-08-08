@@ -143,6 +143,31 @@ export default {
     delegatedHint: 'Esto lo tiene que configurar un administrador.',
     completeTitle: 'Tu negocio está listo',
     completeBody: 'No queda nada pendiente en la checklist.',
+    // La tarjeta héroe de un negocio que todavía no tiene apps (hub#368). Su único trabajo es la
+    // PRIMERA elección, así que dice lo que hace un clic Y lo que deja para el dueño: una plantilla
+    // trae las apps y el catálogo de un oficio, nunca los datos de ESTE negocio (ADR-0195 §4/§5).
+    hero: {
+      title: 'Empieza con un negocio como el tuyo',
+      body: 'Elige el que más se parezca al tuyo y te dejamos sus apps y su catálogo listos de una vez. Después tendrás que poner tus propios datos.',
+      use: 'Usar esta',
+      more: 'Ver todas las plantillas',
+      working: 'Preparando «{name}»…',
+      readyTitle: 'Ya tienes tus apps y tu catálogo',
+      readyBody: 'Lo que queda es lo que solo puedes contestar tú: los datos de tu negocio. Los tienes en la lista de abajo.',
+      partialTitle: 'Casi: algo no ha entrado',
+      // Una decisión de compra, nunca una avería (ADR-0060, hub#409): nombra lo que hay que añadir
+      // en vez de pintar un error rojo sobre un plan que el dueño simplemente no ha contratado.
+      blocked: 'Estas hay que añadirlas antes a tu plan: {apps}',
+      failed: 'Hay algo más que no ha entrado. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      notStartedTitle: 'No se ha podido abrir esa plantilla',
+      notStartedBody: 'No ha cambiado nada en tu negocio. Inténtalo otra vez o cárgala desde Ajustes › Datos.',
+      interruptedTitle: 'La configuración no ha terminado',
+      // NO afirmamos que no ha cambiado nada: puede que ya haya entrado la mitad, y decir lo
+      // contrario mandaría al dueño a pulsar otra vez encima.
+      interruptedBody: 'Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.',
+      continue: 'Continuar',
+      retry: 'Intentar otra vez',
+    },
     // La franja bloqueante (hub#374): la superficie de las pantallas donde no está la checklist.
     // Dice la CONSECUENCIA, no la gravedad — ⛔ significa que el runtime rechaza el documento, así
     // que eso es lo que anuncia. Nunca dice «error»: no hay nada roto, hay algo que falta.

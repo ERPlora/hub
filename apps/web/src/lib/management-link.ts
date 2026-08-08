@@ -26,7 +26,7 @@ import { user } from './session';
 export const ADMINISTER_PERMISSION = 'hub.administer';
 
 /** The wildcard the shell hands an owner/admin session (mirror of `lib/runtime.ts`). */
-const ALL_PERMISSIONS = '*';
+export const ALL_PERMISSIONS = '*';
 
 /**
  * Whether THIS session may be offered the way out to management.
