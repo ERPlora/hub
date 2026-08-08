@@ -15,7 +15,9 @@
     "employee": ["till.view_sale", "till.add_sale"]
   },
   "navigation": [],
-  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "migrations": {
+    "postgres": ["migrations/postgres/001_init.sql", "migrations/postgres/002_drawer.sql"]
+  },
   "queries": {
     "till.sales.list": { "permission": "till.view_sale", "sql": "queries/sales_list.sql" },
     "till.reports.revenue": {
@@ -38,6 +40,11 @@
       "permission": "till.void_sale",
       "transaction": true,
       "sql": ["commands/sale_create.sql"]
+    },
+    "till.drawer.open": {
+      "permission": "till.void_sale",
+      "transaction": true,
+      "sql": ["commands/drawer_open.sql"]
     },
     "till.settings.save": {
       "permission": "till.manage_settings",

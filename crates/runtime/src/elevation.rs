@@ -47,7 +47,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use erplora_db::Params;
+use erplora_db::{DatabaseAdapter, Params};
 use serde_json::Value as Json;
 use sha2::{Digest, Sha256};
 
@@ -181,6 +181,77 @@ impl Grants {
         // better than taking the till down.
         self.entries.lock().unwrap_or_else(|e| e.into_inner())
     }
+}
+
+/// Write the **receipt** of an approval that has just been spent (hub#362, rule 3).
+///
+/// ## Why the runtime, and not the module
+///
+/// hub#361 already hands the manager's id to a module's SQL as `:approved_by`, so a module *can*
+/// stamp it next to `created_by`. That is not enough to call it an audit trail: a module that
+/// never declares the column loses the attribution **in silence**, and the party deciding is the
+/// module author — the one with the least reason to record that their own manager-level command
+/// was waved through. Today **none** of the 24 published modules declares one, so «the module
+/// records it» means «nothing is recorded».
+///
+/// The runtime is the only component that knows an approval happened, so the runtime keeps the
+/// record. Same shape as [ADR-0238](crate::permissions::is_elevable): *a manifest coins no
+/// privilege* — and, symmetrically, a manifest cannot drop the trace either. The column in a
+/// module's own table stays welcome (a ticket that prints «approved by Sofía» wants it), but
+/// nothing about the audit depends on it, and no module had to be republished for this.
+///
+/// ## Why a table, when the grant deliberately has none
+///
+/// [`Grants`] lives in memory precisely so an approval cannot outlive the process, travel in a
+/// backup or be spent out of a dump. A receipt is the opposite kind of thing: a fact about
+/// something that already happened, worth nothing to an attacker and useless unless it survives
+/// exactly what the grant must not.
+///
+/// ## Why before the command runs, and outside its transaction
+///
+/// The grant is gone the instant it is spent, whatever the command does next. Writing the receipt
+/// afterwards — or inside the command's own transaction — would mean an approval spent on an
+/// action that then failed disappears from the record: a burnt approval and no trace of who burnt
+/// it. What is recorded is *an approval was used for this*, which is true either way.
+///
+/// **The error is not swallowed.** If the receipt cannot be written the elevated command must not
+/// run: otherwise «break the audit» becomes a way to have a manager-level action executed leaving
+/// no trace, which is the exact outcome this exists to prevent.
+pub(crate) async fn record_spend(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    command: &str,
+    permission: &str,
+    created_by: &str,
+    approved_by: &str,
+    fingerprint: &str,
+) -> crate::errors::Result<()> {
+    let mut p = Params::new();
+    p.insert("id".into(), Json::String(crate::registry::new_id()));
+    p.insert("hub_id".into(), Json::String(hub_id.to_string()));
+    p.insert("command".into(), Json::String(command.to_string()));
+    p.insert("permission".into(), Json::String(permission.to_string()));
+    // The two attributions, side by side in one row — which is the whole of rule 3. Both come
+    // from the runtime: the cashier from the authenticated context, the manager from the grant
+    // just spent. Neither is ever read from the payload.
+    p.insert("created_by".into(), Json::String(created_by.to_string()));
+    p.insert("approved_by".into(), Json::String(approved_by.to_string()));
+    // The fingerprint of the payload the manager was shown: it says WHICH €4 ticket, not just
+    // that some `till.sale.void` was approved.
+    p.insert(
+        "payload_fingerprint".into(),
+        Json::String(fingerprint.to_string()),
+    );
+    p.insert("created_at".into(), Json::String(crate::registry::now_rfc3339()));
+    db.execute(
+        "INSERT INTO _elevation_audit \
+         (id, hub_id, command, permission, created_by, approved_by, payload_fingerprint, created_at) \
+         VALUES (:id, :hub_id, :command, :permission, :created_by, :approved_by, \
+         :payload_fingerprint, :created_at)",
+        &p,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Drop everything already past its ceiling. Called on both doors, so an approval nobody spent
