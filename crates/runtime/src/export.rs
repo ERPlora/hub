@@ -83,7 +83,41 @@ impl BundlePurpose {
     pub fn allows_identity_sections(self) -> bool {
         matches!(self, Self::Backup)
     }
+
+    /// ¿Es una plantilla, es decir, un artefacto pensado para OTRO negocio?
+    ///
+    /// Se pregunta aparte de [`allows_identity_sections`](Self::allows_identity_sections) porque
+    /// son dos cosas distintas: aquélla habla de **identidad** (de quién es esto), y ésta de **de
+    /// quién es la decisión** — la serie de facturación no identifica a nadie y aun así no puede
+    /// venir hecha (ver [`TEMPLATE_EXCLUDED_TABLES`]). Mezclarlas en un solo booleano habría hecho
+    /// que la próxima regla de este tipo se colgara del nombre equivocado.
+    pub fn is_template(self) -> bool {
+        matches!(self, Self::Template)
+    }
 }
+
+/// Tablas que NO viajan en una **plantilla**, aunque su módulo entre con «datos» (hub#533).
+///
+/// No son identidad ni secretos —eso ya lo cierra ADR-0195 §2/§4—: son **decisiones del negocio
+/// que importa la plantilla**, y venir hechas es peor que faltar. `invoice_series_series` fija el
+/// prefijo, el formato y cuál es la serie por defecto, o sea **cómo se numera cada documento que
+/// ese negocio emite ante Hacienda**; e `invoice_series_allocation` es el libro de números ya
+/// entregados que el RD 1007/2023 exige sin huecos ni duplicados — historial de OTRA instalación.
+///
+/// Y hay un daño de segundo orden: al venir hechas, marcaban como «hecho» el ítem OBLIGATORIO
+/// `invoice_series.setup` de la checklist ([ADR-0222](../../architecture/00-overview/decision-log.md)),
+/// así que su dueño no lo revisaba nunca. Un falso «pendiente» se ve; un falso «hecho» esconde la
+/// tarea para siempre (hub#426).
+///
+/// **Lista corta y del CORE, no un contrato en el manifest de módulo.** Lo que un módulo considere
+/// plantilla lo elige quien exporta, tabla a tabla (hub#534); esto es el suelo que esa elección no
+/// puede levantar, igual que `PORTABLE_SETTING_KEYS` es el suyo. Un **backup** se las lleva todas:
+/// es la numeración de su dueño volviendo a su sitio (ADR-0113 §1).
+///
+/// Se descartó publicar la serie con el código `DEMO` y que el hub lo leyera como «sin configurar»:
+/// una serie llamada `DEMO` existe de verdad y numeraría una factura real (`DEMO-2026-00001`), y
+/// una cadena mágica la puede escribir un usuario — con lo que vuelve a ser una adivinanza.
+pub const TEMPLATE_EXCLUDED_TABLES: [&str; 2] = ["invoice_series_series", "invoice_series_allocation"];
 
 /// Keys of `hub_settings` that may travel to a hub OTHER than the one that produced the bundle
 /// (ADR-0195 §4 — hub#405). Plain configuration: what kind of business this is, where it operates,
@@ -307,6 +341,13 @@ pub async fn export_hub(
             // Iba como una tabla más del módulo, así que el blueprint publicado sembraba el NIF
             // del hub demo y `auto_transmit=1` en el hub de cada cliente que lo importaba.
             if table == "verifactu_config" && !fiscal {
+                continue;
+            }
+            // Y una PLANTILLA tampoco trae las decisiones fiscales del negocio que la importa
+            // (hub#533): la serie de facturación y su libro de números entregados. Ver
+            // `TEMPLATE_EXCLUDED_TABLES` — es el suelo del core, por debajo de lo que el operador
+            // elige tabla a tabla al exportar.
+            if selection.purpose.is_template() && TEMPLATE_EXCLUDED_TABLES.contains(&table.as_str()) {
                 continue;
             }
             // La mayoría de tablas llevan `hub_id` (contrato de fila §2.5) → se acotan por él.

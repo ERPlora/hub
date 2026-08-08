@@ -25,8 +25,12 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 
+/// Raíz de módulos por la MISMA resolución que el guard `require_modules_workspace` — que honra
+/// `$ERPLORA_MODULES_DIR`. Esta suite tenía su propia copia sin esa variable, así que en un
+/// worktree fuera del monorepo el guard decía «sigue» y el `install_from_dir` de después reventaba
+/// con `NotFound`: dos resoluciones distintas para la misma pregunta.
 fn modules_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
+    erplora_runtime::e2e_support::modules_root()
 }
 
 fn ctx(hub: &str) -> RequestContext {
@@ -526,9 +530,13 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
     p.insert("hub".into(), json!("h1"));
     rt.db()
         .execute(
+            // Sin `auto_transmit`: la migración 009 del módulo la dejó caer (el diferido dejó de
+            // ser una opción del usuario) y este INSERT se quedó atrás, tumbando la suite entera
+            // con `column "auto_transmit" does not exist`. Lo que el test prueba no cambia: la
+            // identidad fiscal del negocio (NIF y nombre del emisor) solo viaja con `fiscal`.
             "INSERT INTO verifactu_config (id, hub_id, issuer_nif, issuer_name, environment, \
-             enabled, auto_transmit, is_deleted, created_at, updated_at) \
-             VALUES ('cfg1', :hub, 'B12345678', 'Restaurante Ejemplo SL', 'testing', 1, 1, 0, \
+             enabled, is_deleted, created_at, updated_at) \
+             VALUES ('cfg1', :hub, 'B12345678', 'Restaurante Ejemplo SL', 'testing', 1, 0, \
              '2026-07-31T00:00:00Z', '2026-07-31T00:00:00Z')",
             &p,
         )
@@ -633,5 +641,102 @@ async fn export_ordena_las_filas_padre_antes_que_hija_en_tablas_autorreferenciad
     assert!(
         pos_padre < pos_hija,
         "la fila padre debe ir ANTES de la hija que la referencia por parent_id:\n{sql}"
+    );
+}
+
+// ── La numeración fiscal no viaja en una PLANTILLA ───────────────────────────────────────────
+
+/// 🔴 [hub#533] Una **plantilla** no crea la serie de facturación del negocio que la importa.
+///
+/// Lo que había: las cuatro plantillas del catálogo (`restaurante`, `peluqueria`, `barberia`,
+/// `pizzeria`) traían dos filas de `invoice_series_series` — `FAC` (factura) y `TCK` (tique),
+/// `ES`, `fiscal_year 2026`. El prefijo, el formato y cuál es la serie por defecto son una
+/// **decisión fiscal del negocio nuevo**, no del oficio: es lo que decide cómo se numera cada
+/// documento que ese negocio emite ante Hacienda. Y al venir hecha, marcaba como «hecho» el ítem
+/// OBLIGATORIO `invoice_series.setup` de la checklist (ADR-0222), así que su dueño no lo revisaba
+/// nunca — el falso «hecho» de hub#426, que esconde la tarea para siempre.
+///
+/// `invoice_series_allocation` va con ella por la misma razón y una más: es el libro de números
+/// entregados que el RD 1007/2023 exige sin huecos ni duplicados. El historial de numeración de
+/// otro negocio no significa nada aquí.
+///
+/// Se descartó publicar la serie con el código `DEMO` y que el hub lo leyera como «sin
+/// configurar»: una serie llamada `DEMO` **existe de verdad** y numeraría una factura real
+/// (`DEMO-2026-00001`), con su cadena VeriFactu ya abierta; y una cadena mágica la puede escribir
+/// un usuario, con lo que vuelve a ser una adivinanza — el modo de fallo que ADR-0195 cerró.
+///
+/// Un **backup** se la sigue llevando entera: es la numeración de su dueño volviendo a su sitio
+/// (ADR-0113 §1), y sin ella restaurar dejaría al hub sin poder emitir.
+#[tokio::test]
+async fn una_plantilla_no_lleva_la_numeracion_fiscal() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
+    rt.install_from_dir(&modules_root().join("invoice_series"))
+        .await
+        .expect("instalar invoice_series");
+
+    // Serie creada por una PERSONA (`created_by` = su id, no `system`): no la excluye
+    // `is_module_seeded`, así que sin la regla de este test viajaría.
+    let mut p = Params::new();
+    p.insert("hub".into(), json!("h1"));
+    rt.db()
+        .execute(
+            "INSERT INTO invoice_series_series (id, hub_id, code, name, document_type, prefix, \
+             suffix, format, country_code, region_code, fiscal_year, current_sequence, \
+             is_default, is_active, is_deleted, created_by, created_at) \
+             VALUES ('s1', :hub, 'FAC', 'Facturas', 'invoice', 'FAC', '', \
+             '{prefix}-{year}-{seq:05d}', 'ES', '', 2026, 0, 1, 1, 0, 'u1', \
+             '2026-07-13T00:00:00Z')",
+            &p,
+        )
+        .await
+        .expect("sembrar serie");
+    rt.db()
+        .execute(
+            "INSERT INTO invoice_series_allocation (id, hub_id, series_id, document_number, \
+             document_ref, is_deleted, created_by, created_at) \
+             VALUES ('a1', :hub, 's1', 'FAC-2026-00001', 'inv-1', 0, 'u1', \
+             '2026-07-13T00:00:00Z')",
+            &p,
+        )
+        .await
+        .expect("sembrar número entregado");
+
+    let seleccion = |purpose: BundlePurpose| ExportSelection {
+        users: false,
+        settings: false,
+        settings_items: None,
+        fiscal: false,
+        media: false,
+        modules: vec![ModuleDataSelection { module_id: "invoice_series".into(), with_data: true }],
+        purpose,
+    };
+
+    let plantilla = export_hub(&rt, "h1", &seleccion(BundlePurpose::Template), "t", "es", CREATED_AT)
+        .await
+        .expect("export plantilla");
+    let sql_plantilla =
+        String::from_utf8(plantilla.files["data/invoice_series.sql"].clone()).unwrap();
+    assert!(
+        !sql_plantilla.contains("INSERT INTO invoice_series_series"),
+        "una plantilla NO puede crear la serie de facturación del negocio que la importa:\n{sql_plantilla}"
+    );
+    assert!(
+        !sql_plantilla.contains("INSERT INTO invoice_series_allocation"),
+        "el libro de números entregados (RD 1007/2023) es de UNA instalación:\n{sql_plantilla}"
+    );
+
+    let backup = export_hub(&rt, "h1", &seleccion(BundlePurpose::Backup), "t", "es", CREATED_AT)
+        .await
+        .expect("export backup");
+    let sql_backup = String::from_utf8(backup.files["data/invoice_series.sql"].clone()).unwrap();
+    assert!(
+        sql_backup.contains("INSERT INTO invoice_series_series"),
+        "un BACKUP sí se lleva la numeración: es la de su dueño volviendo a su sitio:\n{sql_backup}"
+    );
+    assert!(
+        sql_backup.contains("INSERT INTO invoice_series_allocation"),
+        "un BACKUP sí se lleva el libro de números entregados:\n{sql_backup}"
     );
 }
