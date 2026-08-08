@@ -1265,6 +1265,28 @@ impl Runtime {
         fiscal_profile::load(self.db.as_ref(), &self.hub_id).await
     }
 
+    /// **What this hub owes right now** (ADR-0259 D2, hub#550): the stored status resolved against
+    /// what is actually mounted. This is where `BLOCKED` comes from — derived on every read, never
+    /// stored, so it is fixed by fixing the fact and cannot outlive the bug that caused it.
+    ///
+    /// Read-only: it never writes. The write side is [`Runtime::refresh_fiscal_profile`].
+    pub async fn fiscal_mode(&self) -> Result<fiscal_profile::FiscalMode> {
+        let profile = fiscal_profile::ensure(self.db.as_ref(), &self.hub_id).await?;
+        Ok(fiscal_profile::determine_fiscal_mode(
+            &profile,
+            &self.registry,
+            &self.hub_id,
+        ))
+    }
+
+    /// Resolves the fiscal profile against the world and returns the effective mode (ADR-0259
+    /// D2/D4, hub#550). The host calls it at boot **after re-hydrating the registry** — that is the
+    /// first instant both halves of the answer exist: what the hub owes, and who is mounted to
+    /// comply. Idempotent, so every restart and every redeploy runs it.
+    pub async fn refresh_fiscal_profile(&self) -> Result<fiscal_profile::FiscalMode> {
+        fiscal_profile::refresh(self.db.as_ref(), &self.registry, &self.hub_id).await
+    }
+
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
     /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
     pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {

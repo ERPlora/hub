@@ -131,7 +131,20 @@ pub(crate) async fn execute_at(
             // que el SERVIDOR resuelve el impuesto contra el catálogo — sin ella, ninguna regla
             // casa y el handler se cree el % que le mande el cliente.
             .with_fiscal(get("country_code"), get("region_code"))
-            .with_certificate(has_cert);
+            .with_certificate(has_cert)
+            // What this hub OWES right now (ADR-0259 D2, hub#550): resolved here, from the core's
+            // own tables and the registry, next to the identity and the certificate — never from
+            // anything the caller sent. Degrading to `Unconfigured` on a read error keeps this
+            // side of the enrichment from inventing "nothing owed" out of a failed query; nothing
+            // gates on it yet (hub#556 does).
+            .with_fiscal_mode(
+                crate::fiscal_profile::ensure(db, &ctx.hub_id)
+                    .await
+                    .map(|p| {
+                        crate::fiscal_profile::determine_fiscal_mode(&p, registry, &ctx.hub_id)
+                    })
+                    .unwrap_or(crate::fiscal_profile::FiscalMode::Unconfigured),
+            );
         &enriched_ctx
     } else {
         ctx
