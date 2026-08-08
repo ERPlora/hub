@@ -28,13 +28,20 @@ use crate::registry::{now_rfc3339, Registry, RequestContext};
 /// Tamaño de lote por ciclo del barrido (acota el lock del runtime, como el outbox).
 const BATCH: i64 = 50;
 
+/// Cuánto tiempo una tarea reclamada queda invisible a otras instancias (hub#570). Lo bastante largo
+/// para cubrir la ejecución del command (incluida su tx); lo bastante corto para que un runtime que
+/// muere a media tarea no la deje bloqueada hasta el siguiente reinicio. Cuando el lease expira, la
+/// condición del `WHERE` del claim la vuelve a ver y otra instancia la reclama.
+const LEASE_SECONDS: i64 = 300;
+
 const ENSURE_TABLE: &str = "\
 CREATE TABLE IF NOT EXISTS _scheduled_tasks (\
   module_id TEXT NOT NULL, name TEXT NOT NULL, command TEXT NOT NULL, \
   cron TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', catch_up TEXT NOT NULL DEFAULT 'collapse', \
-  next_run TEXT NOT NULL, last_run TEXT, \
+  next_run TEXT NOT NULL, last_run TEXT, claim_expires_at TEXT, \
   PRIMARY KEY (module_id, name));\
-CREATE INDEX IF NOT EXISTS ix_sched_due ON _scheduled_tasks (next_run);";
+CREATE INDEX IF NOT EXISTS ix_sched_due ON _scheduled_tasks (next_run);\
+ALTER TABLE _scheduled_tasks ADD COLUMN IF NOT EXISTS claim_expires_at TEXT;";
 
 /// Crea la tabla de sistema del scheduler (idempotente), como `outbox::ensure_tables`.
 pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
@@ -140,28 +147,56 @@ pub async fn catch_up_on_boot(db: &dyn DatabaseAdapter, registry: &Registry, hub
 
 /// Barrido común. `on_boot=false`: barrido normal del relay (cada tarea vencida corre y avanza al
 /// siguiente vencimiento). `on_boot=true`: catch-up — `collapse` corre una vez y salta el backlog;
-/// `skip` no corre, solo reprograma. En ambos casos el avance de `next_run` va en la MISMA
-/// transacción que los efectos del command (sin doble-disparo).
+/// `skip` no corre, solo reprograma.
+///
+/// **Reclamo atómico (hub#570).** El modelo de actualización es `start-first`: la tarea nueva
+/// arranca mientras la vieja sigue sirviendo, así que durante el solape hay **dos** runtimes del
+/// mismo hub contra la misma BD corriendo el scheduler. Un `SELECT … WHERE next_run <= :now` seguido
+/// de `UPDATE next_run` en la transacción del command deja una ventana en la que las dos instancias
+/// leen la misma fila vencida y la ejecutan las dos. Lo cerramos **a nivel BD**: cada vuelta del
+/// bucle **reclama una tarea** con un `UPDATE … (SELECT … FOR UPDATE SKIP LOCKED) … RETURNING` que
+/// la marca en vuelo (`claim_expires_at`) — mismo patrón que `print_queue::claim_next`.
+/// `FOR UPDATE SKIP LOCKED` garantiza que dos instancias que compiten se llevan tareas **distintas**:
+/// nunca la misma dos veces. El `next_run` real (calculado en Rust, pues el cron se parsea aquí) se
+/// escribe al **resolver** la tarea, junto a los efectos del command, en la MISMA transacción; si el
+/// proceso muere a media tarea, el lease expira y otra instancia la reclama.
 async fn sweep(db: &dyn DatabaseAdapter, registry: &Registry, hub_id: &str, on_boot: bool) -> Result<usize> {
     let now = now_rfc3339();
-    let mut q = Params::new();
-    q.insert("now".into(), json!(now));
-    q.insert("lim".into(), json!(BATCH));
-    let due = db
-        .query(
-            "SELECT module_id, name, command, cron, payload, catch_up, next_run \
-             FROM _scheduled_tasks WHERE next_run <= :now ORDER BY next_run LIMIT :lim",
-            &q,
-        )
-        .await?;
-
     let mut ran = 0usize;
-    for row in &due.rows {
-        if run_task(db, registry, row, &now, hub_id, on_boot).await? {
-            ran += 1;
+    for _ in 0..BATCH {
+        match claim_next_due(db, &now).await? {
+            Some(row) => {
+                if run_task(db, registry, &row, &now, hub_id, on_boot).await? {
+                    ran += 1;
+                }
+            }
+            // Ninguna tarea vencida y sin dueño: fin del barrido.
+            None => break,
         }
     }
     Ok(ran)
+}
+
+/// Reclama **una** tarea vencida de forma atómica y devuelve la fila reclamada. El `UPDATE` toma la
+/// fila con `FOR UPDATE SKIP LOCKED` y le pone `claim_expires_at` al futuro, **en el mismo
+/// enunciado**: así la fila deja de ser "reclamable" para cualquier otra instancia (la condición del
+/// `WHERE` exige `claim_expires_at IS NULL OR claim_expires_at <= :now`) antes de que esta ejecute el
+/// command. La fila sigue teniendo su `next_run` original (aún no avanzado): `run_task` lo avanza al
+/// resolver la tarea, dentro de la transacción del command.
+async fn claim_next_due(db: &dyn DatabaseAdapter, now: &str) -> Result<Option<Json>> {
+    let lease = (chrono::Utc::now() + chrono::Duration::seconds(LEASE_SECONDS)).to_rfc3339();
+    let mut p = Params::new();
+    p.insert("now".into(), json!(now));
+    p.insert("lease".into(), json!(lease));
+    let sql = "UPDATE _scheduled_tasks SET claim_expires_at = :lease \
+               WHERE (module_id, name) = ( \
+                 SELECT module_id, name FROM _scheduled_tasks \
+                 WHERE next_run <= :now \
+                   AND (claim_expires_at IS NULL OR claim_expires_at <= :now) \
+                 ORDER BY next_run LIMIT 1 FOR UPDATE SKIP LOCKED) \
+               RETURNING module_id, name, command, cron, payload, catch_up, next_run";
+    let res = db.query(sql, &p).await?;
+    Ok(res.rows.into_iter().next())
 }
 
 /// Procesa una fila vencida: decide si ejecutar el command (según `on_boot`/`catch_up`), calcula el
@@ -235,16 +270,20 @@ async fn run_task(
     }
 }
 
-/// `UPDATE` que avanza `next_run` y marca `last_run = now`. Se añade a la transacción del command
-/// (vía `extra_ops` de `commands::execute_at`) para que el disparo y el avance sean atómicos.
+/// `UPDATE` que resuelve una tarea reclamada: avanza `next_run` al siguiente vencimiento, marca
+/// `last_run = now` y **libera el lease** (`claim_expires_at = NULL`). Se añade a la transacción del
+/// command (vía `extra_ops` de `commands::execute_at`) para que el disparo y el avance sean atómicos:
+/// si el command commitea, la tarea queda reprogramada y libre; si revierte, el lease sigue vivo y la
+/// tarea se reintenta (su `next_run` no avanzó). En el path no-runnable (skip en arranque, o command
+/// no resoluble) se ejecuta suelta: la tarea queda reprogramada sin disparar nada.
 fn advance_op(module_id: &str, name: &str, next_run: &str, now: &str) -> (String, Params) {
     let mut p = Params::new();
     p.insert("module_id".into(), json!(module_id));
     p.insert("name".into(), json!(name));
     p.insert("next_run".into(), json!(next_run));
     p.insert("last_run".into(), json!(now));
-    let sql = "UPDATE _scheduled_tasks SET next_run = :next_run, last_run = :last_run \
-               WHERE module_id = :module_id AND name = :name";
+    let sql = "UPDATE _scheduled_tasks SET next_run = :next_run, last_run = :last_run, \
+               claim_expires_at = NULL WHERE module_id = :module_id AND name = :name";
     (sql.to_string(), p)
 }
 
@@ -418,7 +457,7 @@ mod tests {
     use super::*;
     use crate::manifest::CommandDef;
     use crate::registry::{ModuleStatus, RegisteredCommand};
-    use erplora_db::{testutil::fresh_db, PgAdapter};
+    use erplora_db::{testutil::{fresh_db, TestDb}, PgAdapter};
 
     fn cmd(module: &str, sql: &str) -> RegisteredCommand {
         RegisteredCommand {
@@ -604,6 +643,69 @@ mod tests {
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _scheduled_tasks WHERE next_run <= '2025-01-01'").await,
             0
+        );
+    }
+
+    /// hub#570: con `start-first` hay dos runtimes del mismo hub contra la misma BD corriendo el
+    /// scheduler a la vez. El reclamo atómico (`FOR UPDATE SKIP LOCKED` + lease) garantiza que una
+    /// tarea reclamada por una instancia es **invisible** a la otra mientras se ejecuta, y que al
+    /// resolvar queda reprogramada. Este test reproduce la carrera de forma determinista, en el
+    /// eslabón que la decide — el claim:
+    ///
+    /// 1. La instancia A reclama la tarea vencida → devuelve la fila y la marca `claim_expires_at`
+    ///    al futuro (leased). Aún no ha resuelto (`next_run` sigue vencido).
+    /// 2. La instancia B reclama a continuación: su `WHERE` exige
+    ///    `claim_expires_at IS NULL OR <= now`, así que la fila leased **no la ve** → `None`.
+    ///
+    /// Sin el lease (o su condición del `WHERE`), B vería la misma fila vencida y la reclamaría
+    /// también → ambos ejecutarían el command. El test **falla** si se quita el lease del claim.
+    #[tokio::test]
+    async fn two_instances_do_not_double_fire_a_due_task() {
+        let tdb = TestDb::new().await;
+        let db_a = tdb.adapter().await;
+        let db_b = tdb.adapter().await;
+        ensure_tables(&db_a).await.unwrap();
+
+        let mut p = Params::new();
+        p.insert("module_id".into(), json!("m"));
+        p.insert("name".into(), json!("tick"));
+        p.insert("command".into(), json!("m.tick"));
+        p.insert("cron".into(), json!("*/5 * * * *"));
+        p.insert("next_run".into(), json!("2020-01-01T00:00:00+00:00"));
+        db_a.execute(
+            "INSERT INTO _scheduled_tasks (module_id, name, command, cron, payload, catch_up, next_run) \
+             VALUES (:module_id, :name, :command, :cron, '{}', 'collapse', :next_run)",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        let now = "2026-01-01T00:00:00+00:00";
+
+        // A reclama la tarea vencida → la gana (queda leased, aún sin resolver).
+        let claimed_a = claim_next_due(&db_a, now).await.unwrap();
+        assert!(claimed_a.is_some(), "A reclama la tarea vencida");
+        assert_eq!(
+            claimed_a.as_ref().unwrap()["name"].as_str(),
+            Some("tick"),
+            "A se llevó la tarea correcta"
+        );
+
+        // B reclama la misma tarea mientras A la tiene leased → no la ve (None). Sin lease, B la
+        // vería vencida y la reclamaría de nuevo → doble ejecución al correr ambas su command.
+        let claimed_b = claim_next_due(&db_b, now).await.unwrap();
+        assert!(claimed_b.is_none(), "B no puede reclamar una tarea que A tiene leased");
+
+        // Mientras tanto, la fila sigue vencida (next_run no avanzó): A aún no ha resuelto. Esto
+        // confirma que la invisibilidad para B viene del LEASE, no de un next_run ya adelantado.
+        let still_due = db_b
+            .query("SELECT next_run FROM _scheduled_tasks WHERE module_id='m' AND name='tick'", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(
+            still_due.rows[0]["next_run"].as_str(),
+            Some("2020-01-01T00:00:00+00:00"),
+            "next_run no avanza hasta resolver (la guarda es el lease, no el next_run)"
         );
     }
 }
