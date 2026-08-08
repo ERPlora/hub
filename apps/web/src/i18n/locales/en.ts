@@ -47,6 +47,18 @@ export default {
     profile: 'Profile',
     signOut: 'Sign out',
   },
+  // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
+  // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and
+  // one noun for two things is how a cashier ends up uninstalling the till.
+  appUpdate: {
+    available: 'Update ERPlora ({version})',
+    confirmTitle: 'Update ERPlora',
+    confirmBody:
+      'Your browser opens to download version {version}. Nothing installs on its own: finish serving, then close ERPlora and open what you downloaded.',
+    action: 'Download',
+    cancel: 'Not now',
+    failed: 'We could not open your browser. Go to erplora.com to get the new version.',
+  },
   // PWA install modal (PwaInstallModal.vue) — replaces the old sidebar "Install app" button.
   pwa: {
     title: 'Get the full experience',

@@ -87,6 +87,14 @@
              movió a la cabecera del menú; el botón «Instalar app» lo sustituye el modal PWA
              (PwaInstallModal). -->
         <ion-footer class="ion-no-border sidebar-foot">
+          <!-- The app on this counter is older than the one we publish (hub#400). In the FOOTER on
+               purpose: it is the one part of the sidebar that never scrolls away, and the issue
+               asks for visible, not buried in settings. It paints itself only when there is
+               something to do AND this session is the one it belongs to; the rest of the time it is
+               not there at all. -->
+          <ion-menu-toggle :auto-hide="false">
+            <SidebarAppUpdate />
+          </ion-menu-toggle>
           <div class="sidebar-foot-brand">
             <ion-menu-toggle :auto-hide="false">
               <a class="erp-lockup sm brand-link" role="button" tabindex="0" @click="goHome">
@@ -130,6 +138,7 @@ import {
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
 import PwaInstallModal from './components/PwaInstallModal.vue';
+import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
@@ -143,6 +152,7 @@ import { bootHubLanguage } from './i18n';
 import { getUserProfile } from './lib/user-profile';
 import { getClient } from './lib/runtime';
 import { refreshSetupStatus } from './lib/setup-status';
+import { bootAppUpdateWatch } from './lib/app-update';
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }
@@ -216,6 +226,10 @@ async function gateAndRefresh(): Promise<void> {
   // que quien entraba directo al TPV llevaba una franja alimentada por nada. Best-effort: si falla,
   // no hay franja — una lectura rota no es una respuesta.
   void refreshSetupStatus(getClient());
+  // Is the app on this counter the one we publish? (hub#400). After the session, because the entry
+  // it feeds lives in the sidebar and the sidebar needs a session; idempotent, so the `watch` below
+  // re-entering does not start a second clock. In a browser it never starts at all.
+  bootAppUpdateWatch();
 }
 onMounted(() => {
   if (isAuthed.value) void gateAndRefresh();

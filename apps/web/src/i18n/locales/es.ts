@@ -48,6 +48,18 @@ export default {
     profile: 'Perfil',
     signOut: 'Cerrar sesión',
   },
+  // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
+  // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
+  // para dos cosas es como un cajero acaba desinstalando el TPV.
+  appUpdate: {
+    available: 'Actualizar ERPlora ({version})',
+    confirmTitle: 'Actualizar ERPlora',
+    confirmBody:
+      'Se abre tu navegador para descargar la versión {version}. No se instala nada solo: termina de atender, cierra ERPlora y abre lo que hayas descargado.',
+    action: 'Descargar',
+    cancel: 'Ahora no',
+    failed: 'No hemos podido abrir tu navegador. Entra en erplora.com para conseguir la nueva versión.',
+  },
   // Modal de instalación PWA (PwaInstallModal.vue) — sustituye al botón «Instalar app» del sidebar.
   pwa: {
     title: 'Llévate la experiencia completa',
