@@ -672,6 +672,61 @@ CREATE TABLE IF NOT EXISTS _elevation_audit (\
   created_at TEXT NOT NULL, PRIMARY KEY (hub_id, id));\
 CREATE INDEX IF NOT EXISTS idx_elevation_audit_when ON _elevation_audit (hub_id, created_at);",
     },
+    // ── v27 — hub#549 / ADR-0259 D1/D6: the CORE decides THAT there is a fiscal obligation ─────
+    // The rule: a fiscal obligation can never depend on a module being installed, enabled,
+    // licensed or available. The module implements HOW to comply; the core determines THAT
+    // compliance is owed. Today it is the other way round — uninstall the provider with an empty
+    // queue (R2, hub#314, only looks at the queue) and the till keeps selling with nobody
+    // generating the record. Five distinct paths end there; this table is what closes all five.
+    //
+    // `_hub_fiscal_profile` is the AUTHORITY, singleton per hub. What it deliberately does NOT
+    // hold is which MODULE complies: it holds the *regime*, and the core counts how many installed
+    // and active modules fulfil it — the same shape the ADR-0203 gate already uses for the
+    // `certificate` capability without ever naming `verifactu`. Sealing a `module_id` would make
+    // "swap one provider for an equivalent one" a runtime transition, which it is not.
+    //
+    // `_hub_fiscal_regime_registry` is DATA, not code, and carries exactly one row: `ES` →
+    // `verifactu`. A country with no row resolves to `NOT_REQUIRED` and the hub is asked for
+    // nothing, so France is one row plus a module the day it matters and Spain is never shipped to
+    // hubs that do not owe it. The key is `(country_code, regime_key)` with `since` so a country
+    // that CHANGES regime is one more row rather than a schema change; the resolver takes the most
+    // recent `since` that has already arrived.
+    //
+    // Types follow the row contract: instants are RFC3339 TEXT with `''` for "never" (not NULL —
+    // a third state is one more branch to slip through), flags are INTEGER 0/1, never BOOLEAN.
+    // `can_go_live` defaults to 1 because a normal hub may go live; the demo turns it off
+    // (hub#552). `status` defaults to `NOT_REQUIRED` because owing nothing is what a hub with no
+    // country resolved yet owes — the row is then re-resolved on every boot until it goes live.
+    //
+    // ⚠️ **v27: the next number ABOVE THE MAXIMUM, re-checked at rebase.** `apply` compares against
+    // the MAXIMUM applied version, so anything at or below it is skipped IN SILENCE — the hub boots
+    // believing it is up to date, with the table missing and nothing logged. The v15, v20 and v24
+    // gaps are free and permanently UNREACHABLE; taking one is that silent failure. This has
+    // already renumbered hub#341, hub#342 (twice), hub#470 and hub#501. Renumbering is free;
+    // RENAMING breaks (fixtures rewind by `name`).
+    //
+    // ⚠️ **Re-executable** (hub#342/#483): `CREATE TABLE IF NOT EXISTS` and an `ON CONFLICT DO
+    // NOTHING` seed. `tests/access_email_backfill.rs` rewinds `_hub_system_migrations` to
+    // `version >= 19`, which replays every later migration over a database where the objects are
+    // already there; a bare `CREATE TABLE` fails 42P07 and takes 15 of that suite's tests with it.
+    SystemMigration {
+        version: 27,
+        name: "hub_fiscal_profile",
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _hub_fiscal_profile (\
+  hub_id TEXT NOT NULL PRIMARY KEY, country_code TEXT NOT NULL DEFAULT '', \
+  taxpayer_id TEXT NOT NULL DEFAULT '', fiscal_system TEXT NOT NULL DEFAULT '', \
+  status TEXT NOT NULL DEFAULT 'NOT_REQUIRED', environment TEXT NOT NULL DEFAULT 'testing', \
+  activated_at TEXT NOT NULL DEFAULT '', first_record_at TEXT NOT NULL DEFAULT '', \
+  system_id TEXT NOT NULL DEFAULT '', fiscal_trigger_events TEXT NOT NULL DEFAULT '[]', \
+  can_go_live INTEGER NOT NULL DEFAULT 1, needs_review INTEGER NOT NULL DEFAULT 0);\
+CREATE TABLE IF NOT EXISTS _hub_fiscal_regime_registry (\
+  country_code TEXT NOT NULL, regime_key TEXT NOT NULL, since TEXT NOT NULL DEFAULT '', \
+  note TEXT NOT NULL DEFAULT '', PRIMARY KEY (country_code, regime_key));\
+INSERT INTO _hub_fiscal_regime_registry (country_code, regime_key, since, note) \
+  VALUES ('ES', 'verifactu', '', 'RD 1007/2023 — VERI*FACTU (ADR-0202)') \
+  ON CONFLICT (country_code, regime_key) DO NOTHING;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -950,6 +1005,84 @@ mod tests {
             row.rows[0]["status"],
             json!("pending"),
             "un segundo pase no puede matar un tique que está esperando de verdad"
+        );
+    }
+
+    /// El mismo invariante para la **v27** (hub#549): un hub que ya pasó por todo lo anterior **sí**
+    /// recibe las tablas del perfil fiscal. Si alguien la renumera por debajo del máximo se saltaría
+    /// **en silencio** y ese hub arrancaría sin perfil — es decir, sin nadie en el core que sepa que
+    /// debe VeriFactu, que es exactamente el agujero que ADR-0259 cierra.
+    #[tokio::test]
+    async fn a_hub_already_migrated_still_receives_the_fiscal_profile() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let fiscal = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_fiscal_profile")
+            .expect("el perfil fiscal sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(fiscal.version)).await;
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            previous_version_of(fiscal.version),
+            "el hub se para JUSTO antes: si el fixture ya la aplicase, este test no probaría nada"
+        );
+
+        apply(&db, "hub-test").await.unwrap();
+
+        db.execute_batch(
+            "INSERT INTO _hub_fiscal_profile (hub_id, country_code, fiscal_system, status) \
+             VALUES ('h1', 'ES', 'verifactu', 'UNCONFIGURED');",
+        )
+        .await
+        .expect("el perfil fiscal existe tras el arranque");
+        let seeded = db
+            .query(
+                "SELECT regime_key FROM _hub_fiscal_regime_registry WHERE country_code = 'ES'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            seeded.rows.len(),
+            1,
+            "el registro de regímenes nace con su única fila: ES → verifactu"
+        );
+        assert_eq!(seeded.rows[0]["regime_key"], json!("verifactu"));
+    }
+
+    /// 🔒 **La v27 puede RE-EJECUTARSE sobre su propio resultado** (regla hub#342/#483). Lo delicado
+    /// aquí es el `INSERT` del seed: sin `ON CONFLICT DO NOTHING` un segundo pase revienta con un
+    /// 23505 y se lleva por delante la suite de otro — `tests/access_email_backfill.rs` rebobina el
+    /// control a `version >= 19` y arrastra con él **todas** las posteriores, ésta incluida.
+    #[tokio::test]
+    async fn the_fiscal_profile_migration_can_run_a_second_time() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        hub_deployed_through(&db, MIGRATIONS.last().expect("catálogo no vacío").version).await;
+        let fiscal = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_fiscal_profile")
+            .expect("el perfil fiscal sigue en el catálogo");
+
+        let mut hub = Params::new();
+        hub.insert("hub_id".into(), json!("hub-test"));
+        for stmt in split_statements(fiscal.postgres) {
+            db.execute(&stmt, &hub)
+                .await
+                .expect("la v27 tiene que poder correr sobre un esquema que ya la tiene");
+        }
+
+        let seeded = db
+            .query(
+                "SELECT regime_key FROM _hub_fiscal_regime_registry WHERE country_code = 'ES'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            seeded.rows.len(),
+            1,
+            "el segundo pase no duplica el régimen de España"
         );
     }
 
