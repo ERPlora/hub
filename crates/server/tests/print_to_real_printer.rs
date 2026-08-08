@@ -69,6 +69,9 @@ async fn serve() -> (SocketAddr, AppState, String) {
         jwt_public_key: None,
         cloud_api_token: Some("machine-secret".into()),
         device_trust_enforce: false,
+        // hub#376 added this field after this test was written; a smoke test that
+        // drives a REAL printer is never a demo hub, so the locks must stay off here.
+        demo: false,
         media_dir: temp,
         sector: None,
         dev_mode: false,
