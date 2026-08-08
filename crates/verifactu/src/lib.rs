@@ -356,6 +356,78 @@ fn consult_endpoint_of(config: &Json) -> &'static str {
     aeat::consult_endpoint(&environment_of(config), &signing_kind(config))
 }
 
+/// **Where ONE record's transmission is going** — resolved once and then shared by the POST, by
+/// the audit event and by the drift warning, so the wire and the paper trail cannot say
+/// different things about the same send (hub#471).
+#[derive(Debug)]
+struct Destination {
+    /// The AEAT environment that must receive this record: the one its CHAIN lives in.
+    environment: String,
+    /// `environment` × the certificate signing TODAY. Still ONE multiplication (hub#320).
+    endpoint: &'static str,
+    /// The hub's CURRENT environment, and only when it is NOT the record's.
+    hub_environment: Option<String>,
+}
+
+impl Destination {
+    /// What the owner reads in the fiscal event log when a record left for an environment that
+    /// is no longer the hub's — the visible half of hub#471. Nothing is wrong here, but nothing
+    /// about it is routine either: it means the contingency queue outlived a go-live.
+    fn drift_note(&self) -> Option<String> {
+        self.hub_environment.as_ref().map(|hub_environment| {
+            format!(
+                "remitido a «{}» —el entorno de la CADENA de este registro— aunque el hub está \
+                 ahora en «{hub_environment}»: las dos cadenas no se mezclan (ADR-0202 §3)",
+                self.environment
+            )
+        })
+    }
+}
+
+/// The AEAT environment stamped on the record when it was created (guard R4, hub#313) — the one
+/// its hash chain lives in, and never re-derived from the config afterwards.
+///
+/// `None` is NOT «testing». A row that does not carry the column predates migration 008 and its
+/// chain could belong to either system; both guesses are unrecoverable — a practice record
+/// **accepted** by the real AEAT, or a real invoice the real AEAT never receives — so the caller
+/// refuses instead of picking one.
+fn record_environment(record: &Json) -> Option<String> {
+    let environment = str_field(record, "environment");
+    (!environment.is_empty()).then_some(environment)
+}
+
+/// Resolves the [`Destination`] of one record, or says why it cannot.
+///
+/// The two axes answer to different owners **on purpose** (hub#471, hub#320):
+///
+/// - the **environment** belongs to the RECORD. `production` and `testing` are two parallel
+///   chains that never mix (guard R4), and the previous link, the frozen `xml_content` and the
+///   QR host of a queued record already all say the same one. Reading the URL from the config
+///   made those four disagree the moment the operator went live with a non-empty queue;
+/// - the **certificate** belongs to TODAY'S config. The AEAT segregates the door by the
+///   certificate presented in the TLS handshake, so a record that waited days in contingency
+///   goes through the door of whatever signs now.
+///
+/// And they fail in opposite ways, which is why one is worth refusing over: the wrong door is
+/// REJECTED — loud, and recoverable one record at a time — while the wrong environment is
+/// ACCEPTED by a tax agency that was never meant to receive it, and an accepted record is
+/// neither resent nor deleted (ADR-0189).
+fn destination_of(record: &Json, config: &Json) -> std::result::Result<Destination, String> {
+    let hub_environment = environment_of(config);
+    let Some(environment) = record_environment(record) else {
+        return Err(format!(
+            "el registro no dice a qué entorno de la AEAT pertenece (fila anterior a la \
+             migración 008) y el hub está en «{hub_environment}»: no se transmite a ciegas"
+        ));
+    };
+    Ok(Destination {
+        endpoint: aeat::endpoint(&environment, &signing_kind(config)),
+        // Only when they differ: `Some` IS the drift, so nothing downstream has to compare.
+        hub_environment: (environment != hub_environment).then_some(hub_environment),
+        environment,
+    })
+}
+
 /// **Tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4 — hub#318): un fallo del
 /// canal TLS contra la AEAT pide al plano de control el certificado vigente.
 ///
@@ -1011,6 +1083,16 @@ async fn transmit_one(
     recovery_id: &str,
 ) -> Result<(Vec<Operation>, bool)> {
     let record_id = str_field(record, "id");
+    // WHERE this goes is settled BEFORE anything else happens — before the chain read, before
+    // the XML, before the archive (hub#471). If the record cannot say which of the two tax
+    // agencies owns it, nothing is built and nothing is sent.
+    let destination = match destination_of(record, config) {
+        Ok(destination) => destination,
+        Err(reason) => {
+            return refuse_transmission(host, ctx, &record_id, event_id, queue_id, config, &reason)
+                .await
+        }
+    };
     let is_first = int_field(record, "is_first_record", 0) != 0;
     let prev = if is_first {
         None
@@ -1074,11 +1156,10 @@ async fn transmit_one(
     // Archivo duradero ANTES de tocar la red. Si el backend Local/S3 no confirma la escritura, no
     // se envía: nunca aceptamos una transmisión fiscal sin conservar su XML para auditoría/reenvío.
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
-    let environment = environment_of(config);
     // Identity mTLS: cert del core (opaca, bytes en el core) o legacy. Ver `build_identity`.
     let identity = build_identity(host, &ctx.hub_id, config).await?;
 
-    match aeat::post_soap(transmission_endpoint(config), identity, &xml).await {
+    match aeat::post_soap(destination.endpoint, identity, &xml).await {
         Ok(body) => {
             let resp = aeat::parse_response(&body);
 
@@ -1109,6 +1190,7 @@ async fn transmit_one(
                     ctx,
                     record,
                     config,
+                    &destination,
                     &resp,
                     recovery_id,
                     event_id,
@@ -1126,7 +1208,7 @@ async fn transmit_one(
                         return Ok(response_ops(
                             &record_id,
                             &resp,
-                            &environment,
+                            &destination,
                             &xml,
                             &xml_storage_path,
                             event_id,
@@ -1140,7 +1222,7 @@ async fn transmit_one(
             Ok(response_ops(
                 &record_id,
                 &resp,
-                &environment,
+                &destination,
                 &xml,
                 &xml_storage_path,
                 event_id,
@@ -1157,31 +1239,10 @@ async fn transmit_one(
             // así se converge sin polling.
             request_certificate_refetch_on_tls(&err, &signing_kind(config), RefetchSignal::global());
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
-            let queue = host
-                .read(
-                    "SELECT attempts FROM verifactu_contingencyqueue \
-                     WHERE record_id = :record_id AND is_deleted = 0 LIMIT 1",
-                    &params(json!({ "record_id": record_id })),
-                )
-                .await?;
-            let attempts = queue
-                .first()
-                .map(|q| int_field(q, "attempts", 0))
-                .unwrap_or(0)
-                + 1;
-            let interval = config
-                .get("retry_interval_minutes")
-                .and_then(|v| v.as_i64())
-                .filter(|v| *v > 0)
-                .unwrap_or(5);
-            let backoff_minutes = (interval * 2_i64.pow((attempts - 1).min(8) as u32)).min(60);
-            let next_attempt_at = chrono::DateTime::parse_from_rfc3339(&ctx.now)
-                .map(|dt| {
-                    (dt + chrono::Duration::minutes(backoff_minutes))
-                        .to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
-                })
-                .unwrap_or_else(|_| ctx.now.clone());
             let reason = err.to_string();
+            let retry = enqueue_retry(host, ctx, &record_id, queue_id, config, &reason).await?;
+            let environment = &destination.environment;
+            let backoff_minutes = retry.backoff_minutes;
             let ops = vec![
                 apply_transmission(
                     &record_id,
@@ -1201,27 +1262,123 @@ async fn transmit_one(
                         "event_type": "transmission_failure",
                         "severity": "error",
                         "message": format!("Fallo de transmisión AEAT ({environment}); reintento en {backoff_minutes} min"),
-                        "details": json!({ "error": reason.clone(), "attempts": attempts }).to_string(),
+                        "details": json!({ "error": reason.clone(), "attempts": retry.attempts }).to_string(),
                         "timestamp": ctx.now,
                     }),
                 ),
-                op(
-                    "verifactu._enqueue_contingency",
-                    json!({
-                        "queue_id": queue_id,
-                        "record_id": record_id,
-                        "priority": 2,
-                        "attempts": attempts,
-                        "last_attempt_at": ctx.now,
-                        "last_error": reason,
-                        "next_attempt_at": next_attempt_at,
-                        "queue_status": "retrying",
-                    }),
-                ),
+                retry.operation,
             ];
             Ok((ops, false))
         }
     }
+}
+
+/// Contingency entry for a record that could NOT be remitted: attempt count + the 5/10/20/40/60
+/// minute backoff (WASM-TODO §5).
+///
+/// Shared by the transport failure and by the hub#471 refusal, so a record that cannot be sent
+/// is queued the same way whatever stopped it — the FAQ §5 invariant is that no RF may stay
+/// generated and never remitted, and the queue is what makes that true.
+struct Retry {
+    operation: Operation,
+    attempts: i64,
+    backoff_minutes: i64,
+}
+
+async fn enqueue_retry(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    record_id: &str,
+    queue_id: &str,
+    config: &Json,
+    reason: &str,
+) -> Result<Retry> {
+    let queue = host
+        .read(
+            "SELECT attempts FROM verifactu_contingencyqueue \
+             WHERE record_id = :record_id AND is_deleted = 0 LIMIT 1",
+            &params(json!({ "record_id": record_id })),
+        )
+        .await?;
+    let attempts = queue
+        .first()
+        .map(|q| int_field(q, "attempts", 0))
+        .unwrap_or(0)
+        + 1;
+    let interval = config
+        .get("retry_interval_minutes")
+        .and_then(|v| v.as_i64())
+        .filter(|v| *v > 0)
+        .unwrap_or(5);
+    let backoff_minutes = (interval * 2_i64.pow((attempts - 1).min(8) as u32)).min(60);
+    let next_attempt_at = chrono::DateTime::parse_from_rfc3339(&ctx.now)
+        .map(|dt| {
+            (dt + chrono::Duration::minutes(backoff_minutes))
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+        })
+        .unwrap_or_else(|_| ctx.now.clone());
+    Ok(Retry {
+        operation: op(
+            "verifactu._enqueue_contingency",
+            json!({
+                "queue_id": queue_id,
+                "record_id": record_id,
+                "priority": 2,
+                "attempts": attempts,
+                "last_attempt_at": ctx.now,
+                "last_error": reason,
+                "next_attempt_at": next_attempt_at,
+                "queue_status": "retrying",
+            }),
+        ),
+        attempts,
+        backoff_minutes,
+    })
+}
+
+/// **The record does not say which AEAT owns it, so nothing is transmitted** (hub#471).
+///
+/// The row is deliberately left UNTOUCHED: `_apply_transmission` overwrites `xml_content` and
+/// `xml_storage_path` unconditionally, and the archived XML of a record that was never sent is
+/// fiscal evidence. What the refusal leaves is an `error` event with a stable reason key and a
+/// contingency entry, so the record is retried once the cause is fixed and never disappears.
+///
+/// It returns an outcome and not an `Err` on purpose: `process_contingency_queue` propagates
+/// errors with `?`, so one unresolvable row would abort the whole batch and strand every other
+/// record behind it.
+async fn refuse_transmission(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    record_id: &str,
+    event_id: &str,
+    queue_id: &str,
+    config: &Json,
+    reason: &str,
+) -> Result<(Vec<Operation>, bool)> {
+    let retry = enqueue_retry(host, ctx, record_id, queue_id, config, reason).await?;
+    Ok((
+        vec![
+            op(
+                "verifactu._insert_event",
+                json!({
+                    "event_id": event_id,
+                    "record_id": record_id,
+                    "event_type": "transmission_failure",
+                    "severity": "error",
+                    "message": format!("No se ha transmitido a la AEAT: {reason}"),
+                    "details": json!({
+                        "reason": "record_environment_unknown",
+                        "error": reason,
+                        "attempts": retry.attempts,
+                    })
+                    .to_string(),
+                    "timestamp": ctx.now,
+                }),
+            ),
+            retry.operation,
+        ],
+        false,
+    ))
 }
 
 /// Intenciones que aplican una respuesta de la AEAT sobre el registro: UPDATE + evento (+ salida
@@ -1231,7 +1388,7 @@ async fn transmit_one(
 fn response_ops(
     record_id: &str,
     resp: &aeat::AeatResponse,
-    environment: &str,
+    destination: &Destination,
     xml: &str,
     xml_storage_path: &str,
     event_id: &str,
@@ -1240,13 +1397,27 @@ fn response_ops(
 ) -> (Vec<Operation>, bool) {
     let verdict = aeat::classify(resp);
     let success = verdict.status == "accepted";
+    // A record whose chain is not the hub's current environment went to the OTHER tax agency.
+    // That is CORRECT — the chain owns the record — but it is never routine: it is what a
+    // go-live with a non-empty queue looks like, and the owner has to be able to find it
+    // (hub#471). Filed as `info`, nobody would.
+    let drifted = destination.hub_environment.is_some();
     // Un `AceptadoConErrores` está registrado en la AEAT (no se reenvía), pero no puede pasar por
     // un éxito limpio: se persiste el código de la AEAT y el evento sale como aviso, no como info.
-    let (event_type, severity) = match (success, verdict.accepted_with_errors) {
+    let (event_type, severity) = match (success, verdict.accepted_with_errors || drifted) {
         (true, false) => ("transmission_success", "info"),
         (true, true) => ("transmission_warning", "warning"),
         (false, _) => ("transmission_failure", "error"),
     };
+    let environment = &destination.environment;
+    // The note of the caller (an automatic re-anchor, a failed recovery) and the drift note
+    // travel together: both are things the operator has to read next to the AEAT verdict.
+    let notes: Vec<String> = note
+        .map(ToString::to_string)
+        .into_iter()
+        .chain(destination.drift_note())
+        .collect();
+    let note = (!notes.is_empty()).then(|| notes.join(" · "));
     let mut ops = vec![
         apply_transmission(
             record_id,
@@ -1265,7 +1436,7 @@ fn response_ops(
                 "record_id": record_id,
                 "event_type": event_type,
                 "severity": severity,
-                "message": match note {
+                "message": match &note {
                     Some(n) => format!("AEAT ({environment}): {} {} — {n}", resp.estado_envio, resp.estado_registro),
                     None => format!("AEAT ({environment}): {} {}", resp.estado_envio, resp.estado_registro),
                 },
@@ -1311,26 +1482,41 @@ fn anchor_as_prev(anchor: &aeat::ConsultRecord) -> Json {
 ///
 /// Un solo reintento, a propósito: si el segundo envío también se rechaza, el problema no era el
 /// eslabón y reintentar en bucle solo quemaría números de cadena.
+#[allow(clippy::too_many_arguments)]
 async fn auto_rechain_and_retry(
     host: &dyn NativeHost,
     ctx: &Ctx,
     record: &Json,
     config: &Json,
+    // Passed in, never recomputed: resolving the destination twice is how the endpoint got out
+    // of step with the record in the first place (hub#320's rule, hub#471's bug).
+    destination: &Destination,
     rejection: &aeat::AeatResponse,
     recovery_id: &str,
     event_id: &str,
 ) -> Result<Option<(Vec<Operation>, bool)>> {
     let issuer_nif = str_field(record, "issuer_nif");
-    let records = run_consult(host, &ctx.hub_id, config, &issuer_nif, &ctx.now).await?;
+    // Both legs of the recovery go to the record's OWN destination (hub#471): asking the wrong
+    // tax agency for the anchor would re-chain this record onto a link from the other chain,
+    // which is precisely the crossing that guard R4 exists to prevent.
+    let records = run_consult(
+        host,
+        &ctx.hub_id,
+        config,
+        destination.endpoint,
+        &issuer_nif,
+        &ctx.now,
+    )
+    .await?;
     let Some(anchor) = aeat::pick_latest_record(&records) else {
         return Ok(None);
     };
 
-    // The AEAT consult ran against the config environment's endpoint, so the recovered anchor
-    // belongs to THAT environment's chain (guard R4).
-    let environment = environment_of(config);
+    // The consult ran against the RECORD's environment, so the recovered anchor belongs to
+    // THAT environment's chain (guard R4).
+    let environment = &destination.environment;
     // The anchor takes the next number; the rechained record, the one after.
-    let anchor_seq = next_sequence(host, &ctx.hub_id, &issuer_nif, &environment).await?;
+    let anchor_seq = next_sequence(host, &ctx.hub_id, &issuer_nif, environment).await?;
     let anchor_hash = chain::normalize_hash(&anchor.record_hash);
     let anchor_op = op(
         "verifactu._insert_recovery",
@@ -1362,7 +1548,7 @@ async fn auto_rechain_and_retry(
     );
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
     let identity = build_identity(host, &ctx.hub_id, config).await?;
-    let body = aeat::post_soap(transmission_endpoint(config), identity, &xml).await?;
+    let body = aeat::post_soap(destination.endpoint, identity, &xml).await?;
     let resp = aeat::parse_response(&body);
 
     let note = format!(
@@ -1378,7 +1564,7 @@ async fn auto_rechain_and_retry(
     let (mut ops, success) = response_ops(
         &record_id,
         &resp,
-        &environment,
+        destination,
         &xml,
         &xml_storage_path,
         event_id,
@@ -1812,10 +1998,15 @@ fn obligado_name(config: &Json) -> String {
 
 /// Consulta a la AEAT (TLS mutua con el cert de la config) los registros del emisor en el
 /// periodo actual y los parsea. Red real — sin cert/red devuelve error (no silencioso).
+///
+/// The `endpoint` is a parameter and not derived here: a consult on behalf of the hub asks the
+/// environment the hub is in now (`consult_endpoint_of`), while a consult on behalf of ONE
+/// record asks the environment that record's chain lives in (hub#471). Same call, two owners.
 async fn run_consult(
     host: &dyn NativeHost,
     hub_id: &str,
     config: &Json,
+    endpoint: &str,
     issuer_nif: &str,
     now: &str,
 ) -> Result<Vec<aeat::ConsultRecord>> {
@@ -1826,7 +2017,7 @@ async fn run_consult(
     // Se construye ANTES de abrir la conexión: si falta la razón social del obligado, el sobre
     // no es válido y no tiene sentido hablar con Hacienda para llevarse un 4102.
     let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo)?;
-    let body = aeat::post_soap(consult_endpoint_of(config), identity, &xml).await?;
+    let body = aeat::post_soap(endpoint, identity, &xml).await?;
     Ok(aeat::parse_consult_response(&body)?)
 }
 
@@ -2015,7 +2206,14 @@ async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Outpu
         )
         .into());
     }
-    let records = run_consult(host, &ctx.hub_id, &config, &issuer_nif, &ctx.now).await?;
+    let records = run_consult(
+        host,
+        &ctx.hub_id,
+        &config,
+        consult_endpoint_of(&config),
+        &issuer_nif,
+        &ctx.now,
+    ).await?;
     let (ops, limit) = aeat_snapshot_ops(&ctx, &issuer_nif, &records);
     let mut out = Output::new();
     for o in ops {
@@ -2053,7 +2251,14 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
         )
         .into());
     }
-    let records = run_consult(host, &ctx.hub_id, &config, &issuer_nif, &ctx.now).await?;
+    let records = run_consult(
+        host,
+        &ctx.hub_id,
+        &config,
+        consult_endpoint_of(&config),
+        &issuer_nif,
+        &ctx.now,
+    ).await?;
     if records.is_empty() {
         return Err(RuntimeError::Native(
             "la AEAT no devolvió registros para este emisor/periodo; nada que recuperar".into(),
@@ -2655,6 +2860,10 @@ mod environment_chain_tests {
     //! `production` and `testing` are two parallel, independent chains — the anchor, the
     //! sequence and `PrimerRegistro` never cross environments, and the engine passes the
     //! explicit `:environment` param to the module's insert SQL.
+    //!
+    //! And the same scope reaches the WIRE (hub#471): the endpoint a record is POSTed to is
+    //! the one its own chain lives in, so a record that waited in the queue across a go-live
+    //! is still remitted to the tax agency that owns it.
 
     use super::*;
     use std::sync::Mutex;
@@ -2675,6 +2884,8 @@ mod environment_chain_tests {
     struct ChainHost {
         config: Json,
         records: Vec<Json>,
+        /// Contingency entries, so a batch drain can be driven end to end (hub#471).
+        queue: Vec<Json>,
         has_core_certificate: bool,
         reads: Mutex<Vec<(String, Params)>>,
     }
@@ -2684,6 +2895,7 @@ mod environment_chain_tests {
             ChainHost {
                 config,
                 records,
+                queue: Vec::new(),
                 has_core_certificate: false,
                 reads: Mutex::new(Vec::new()),
             }
@@ -2699,6 +2911,9 @@ mod environment_chain_tests {
                 .push((sql.to_string(), p.clone()));
             if sql.contains("FROM verifactu_config") {
                 return Ok(vec![self.config.clone()]);
+            }
+            if sql.contains("FROM verifactu_contingencyqueue") {
+                return Ok(self.queue.clone());
             }
             if sql.contains("FROM verifactu_record") {
                 let param = |k: &str| p.get(k).cloned().unwrap_or(Json::Null);
@@ -2990,6 +3205,374 @@ mod environment_chain_tests {
             params.get("environment"),
             Some(&json!("testing")),
             "the RECORD's environment scopes the lookup, not the current config's"
+        );
+    }
+
+    // ── hub#471: the ENVIRONMENT travels with the RECORD, the DOOR with today's config ──────
+    //
+    // R4 scoped the chain by environment but the wire kept reading the config, so the three
+    // things that describe one transmission disagreed: the previous link and the frozen XML
+    // said `testing` and the URL said `production`. The two axes of the endpoint fail in
+    // opposite ways — a wrong door is REJECTED (loud, fixable one record at a time), a wrong
+    // environment is ACCEPTED by a tax agency that was never meant to receive it, and an
+    // accepted record is neither resent nor deleted (ADR-0189).
+    //
+    // The URLs are spelled out on purpose: deriving them from `aeat::endpoint` here would make
+    // these tests agree with the code by construction instead of pinning the destination.
+    //
+    // ⚠️ Coverage boundary, unchanged since hub#320: the four call sites that live BEHIND the
+    // socket (`post_soap`/`run_consult` inside `transmit_one` and `auto_rechain_and_retry`) are
+    // not reachable from a unit test — `build_identity` needs a real mTLS identity, and driving
+    // them further would mean opening a connection to Hacienda from `cargo test`. What is pinned
+    // here is the VALUE those call sites are handed; that they keep being handed it is review.
+    const PREPRODUCTION_HOLDER: &str =
+        "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
+    const PRODUCTION_HOLDER: &str =
+        "https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
+    const PREPRODUCTION_SEAL: &str =
+        "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
+
+    /// The record that outlived a go-live: chained in `testing`, XML frozen from that attempt,
+    /// still queued when the operator flipped the hub to `production`.
+    fn queued_testing_record() -> Json {
+        let mut record = chain_row("rec-2", 2, "testing", HASH_TESTING_2, HASH_TESTING_1);
+        record["status"] = json!("pending");
+        record
+    }
+
+    /// 🔴 The bug of hub#471: draining that queue after the go-live POSTed a PRACTICE record to
+    /// the real AEAT. Nothing undoes that — a remitted record is never resent nor deleted.
+    #[test]
+    fn a_record_queued_in_testing_is_never_posted_to_the_real_aeat_after_a_go_live() {
+        let destination = destination_of(&queued_testing_record(), &config_row("production"))
+            .expect("a record that carries its environment resolves");
+
+        assert_eq!(
+            destination.endpoint, PREPRODUCTION_HOLDER,
+            "the record belongs to the testing chain, so preproduction is the tax agency that \
+             must receive it — whatever the hub's config says today"
+        );
+        assert_eq!(destination.environment, "testing");
+    }
+
+    /// The mirror image, and the one that breaks the LAW rather than the sandbox: a real sale
+    /// queued before someone flipped the toggle back must still reach the real AEAT. Sent to
+    /// preproduction it would be marked accepted here and be an orphan RF there (FAQ §5).
+    #[test]
+    fn a_record_queued_in_production_still_reaches_the_real_aeat_after_a_rollback() {
+        let mut record = chain_row("prod-2", 2, "production", HASH_TESTING_2, HASH_PRODUCTION_1);
+        record["status"] = json!("pending");
+
+        let destination = destination_of(&record, &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        assert_eq!(
+            destination.endpoint, PRODUCTION_HOLDER,
+            "a real invoice belongs to the real chain; a hub back in testing does not move it"
+        );
+        assert_eq!(destination.environment, "production");
+    }
+
+    /// The two axes come from different places ON PURPOSE, and both survive together: the
+    /// environment from the record (its chain), the door from the certificate signing TODAY
+    /// (hub#320 — the AEAT segregates by the certificate presented in the TLS handshake, so a
+    /// record that waited days goes through the door of whatever signs now).
+    #[test]
+    fn the_door_follows_todays_certificate_while_the_environment_follows_the_record() {
+        let mut config = config_row("production");
+        config["certificate_kind"] = json!("delegated");
+
+        let destination = destination_of(&queued_testing_record(), &config)
+            .expect("a record that carries its environment resolves");
+
+        assert_eq!(
+            destination.endpoint, PREPRODUCTION_SEAL,
+            "preproduction because of the RECORD, the seal door because of TODAY's certificate"
+        );
+    }
+
+    /// A record that does not say which of the two tax agencies owns it is NOT sent. Both
+    /// guesses are unrecoverable — a practice record accepted by the real AEAT, or a real
+    /// invoice the real AEAT never receives — so the engine refuses instead of picking one.
+    #[test]
+    fn a_record_that_does_not_say_which_aeat_owns_it_is_never_transmitted() {
+        let mut record = queued_testing_record();
+        record.as_object_mut().unwrap().remove("environment");
+
+        let refusal = destination_of(&record, &config_row("production"))
+            .expect_err("an unstamped record has no provable destination");
+
+        assert!(
+            refusal.contains("production"),
+            "the refusal must name the environment the hub is in, so the owner can act: {refusal}"
+        );
+    }
+
+    /// The refusal is loud and LOSSLESS: an `error` event with a stable reason, the record put
+    /// back in the contingency queue, and — critically — no `_apply_transmission`, which
+    /// overwrites `xml_content`/`xml_storage_path` unconditionally and would erase the archived
+    /// XML of a record that was never sent.
+    #[tokio::test]
+    async fn the_refusal_queues_the_record_and_never_touches_its_archived_xml() {
+        let mut record = queued_testing_record();
+        record.as_object_mut().unwrap().remove("environment");
+        let mut host = ChainHost::new(config_row("production"), vec![record]);
+        host.has_core_certificate = true; // clear the certificate gate: the refusal is earlier
+        let input = json!({
+            "payload": { "record_id": "rec-2" },
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor"] }
+        });
+
+        let out = transmit_record(&input, &host)
+            .await
+            .expect("the refusal is an outcome, not an error: one bad row must not abort a batch");
+
+        let event = find_op(&out, "verifactu._insert_event");
+        assert_eq!(event.params.get("severity"), Some(&json!("error")));
+        let details: Json =
+            serde_json::from_str(event.params.get("details").and_then(Json::as_str).unwrap())
+                .unwrap();
+        assert_eq!(
+            details["reason"],
+            json!("record_environment_unknown"),
+            "a stable reason key, so the queue-depth alerting can tell this apart from an outage"
+        );
+        let queued = find_op(&out, "verifactu._enqueue_contingency");
+        assert_eq!(
+            queued.params.get("record_id"),
+            Some(&json!("rec-2")),
+            "the refused record has to stay in the queue: an RF may never be left generated and \
+             never remitted (FAQ §5)"
+        );
+        assert_eq!(queued.params.get("queue_status"), Some(&json!("retrying")));
+        assert!(
+            !out.operations
+                .iter()
+                .any(|o| o.command == "verifactu._apply_transmission"),
+            "nothing was transmitted, so nothing may overwrite the record's archived XML"
+        );
+    }
+
+    /// The refusal is per-record, not per-batch: a row nobody can place must not strand every
+    /// other record behind it. That is why it is an outcome and not an `Err` —
+    /// `process_contingency_queue` propagates errors with `?`.
+    #[tokio::test]
+    async fn one_unplaceable_record_does_not_abort_the_contingency_batch() {
+        let mut record = queued_testing_record();
+        record.as_object_mut().unwrap().remove("environment");
+        let mut host = ChainHost::new(config_row("production"), vec![record]);
+        host.has_core_certificate = true;
+        host.queue = vec![json!({ "record_id": "rec-2", "attempts": 2 })];
+        let input = json!({
+            "payload": {},
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor", "id-summary"] }
+        });
+
+        let out = process_contingency_queue(&input, &host)
+            .await
+            .expect("the batch must survive a record it cannot place");
+
+        let summary = out
+            .operations
+            .iter()
+            .find(|o| o.params.get("event_type") == Some(&json!("contingency_processed")))
+            .expect("the batch must still report a summary");
+        let details: Json =
+            serde_json::from_str(summary.params.get("details").and_then(Json::as_str).unwrap())
+                .unwrap();
+        assert_eq!(
+            details["failed"], json!(1),
+            "a record that could not be placed counts as failed, never as sent"
+        );
+        assert_eq!(details["successful"], json!(0));
+    }
+
+    /// When the automatic re-anchor of hub#287 lands on a record that also outlived a go-live,
+    /// the operator needs BOTH facts in the same line: what was re-chained, and which tax agency
+    /// actually got it. Keeping only the first note would hide the one nobody expects.
+    #[test]
+    fn the_rechain_note_and_the_drift_note_travel_together() {
+        let destination = destination_of(&queued_testing_record(), &config_row("production"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, _) = response_ops(
+            "rec-2",
+            &accepted_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            Some("re-anclado automáticamente tras 4102"),
+        );
+
+        let event = ops
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .expect("the transmission must leave an event");
+        let message = event
+            .params
+            .get("message")
+            .and_then(Json::as_str)
+            .unwrap_or_default();
+        assert!(
+            message.contains("re-anclado automáticamente tras 4102"),
+            "the caller's note must survive: {message}"
+        );
+        assert!(
+            message.contains("remitido a «testing»"),
+            "and so must the drift note: {message}"
+        );
+    }
+
+    fn accepted_response() -> aeat::AeatResponse {
+        aeat::AeatResponse {
+            estado_envio: "Correcto".to_string(),
+            estado_registro: "Correcto".to_string(),
+            ..Default::default()
+        }
+    }
+
+    /// The audit trail told the truth about the chain and lied about the wire: the event said
+    /// `AEAT (production)` for a record that was chained — and now sent — in testing.
+    #[test]
+    fn the_audit_event_names_the_environment_the_record_was_actually_sent_to() {
+        let destination = destination_of(&queued_testing_record(), &config_row("production"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, _) = response_ops(
+            "rec-2",
+            &accepted_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            None,
+        );
+
+        let event = ops
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .expect("the transmission must leave an event");
+        let message = event
+            .params
+            .get("message")
+            .and_then(Json::as_str)
+            .unwrap_or_default();
+        assert!(
+            message.contains("AEAT (testing)"),
+            "the event must name where the record WENT, not where the hub is: {message}"
+        );
+    }
+
+    /// Draining a queue into the other tax agency is correct but never routine — it is exactly
+    /// what a go-live with a non-empty queue looks like. A clean `Correcto` would otherwise be
+    /// filed as `info` and the owner would never learn that their practice records left after
+    /// the go-live, nor where they went.
+    #[test]
+    fn a_transmission_that_outlived_a_go_live_is_reported_as_a_warning() {
+        let destination = destination_of(&queued_testing_record(), &config_row("production"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, success) = response_ops(
+            "rec-2",
+            &accepted_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            None,
+        );
+
+        assert!(success, "the AEAT accepted it: the record IS remitted");
+        let event = ops
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .expect("the transmission must leave an event");
+        assert_eq!(event.params.get("severity"), Some(&json!("warning")));
+        assert_eq!(
+            event.params.get("event_type"),
+            Some(&json!("transmission_warning"))
+        );
+        let message = event
+            .params
+            .get("message")
+            .and_then(Json::as_str)
+            .unwrap_or_default();
+        // Both halves, and in this order: the record LEFT for testing, the hub IS in production.
+        // Read the other way round it describes the disaster instead of the safe outcome.
+        assert!(
+            message.contains("remitido a «testing»"),
+            "the warning has to say where the record went: {message}"
+        );
+        assert!(
+            message.contains("ahora en «production»"),
+            "…and which environment the hub is in now: {message}"
+        );
+    }
+
+    /// A config that never set `environment` IS in testing — that is the asymmetric default
+    /// hub#320 fixed in place, and it has to be the same default on both sides of the drift
+    /// comparison. Reading the raw field instead would make every ordinary testing record look
+    /// like a record that outlived a go-live, and a warning that cries wolf is a warning nobody
+    /// reads.
+    #[test]
+    fn an_unconfigured_environment_is_testing_on_both_sides_of_the_comparison() {
+        let config = json!({ "hub_id": HUB, "issuer_nif": NIF });
+
+        let destination = destination_of(&queued_testing_record(), &config)
+            .expect("a record that carries its environment resolves");
+
+        assert_eq!(destination.endpoint, PREPRODUCTION_HOLDER);
+        assert_eq!(
+            destination.drift_note(),
+            None,
+            "an unset environment is testing, so a testing record has not drifted anywhere"
+        );
+
+        let mut unstamped = queued_testing_record();
+        unstamped.as_object_mut().unwrap().remove("environment");
+        let refusal = destination_of(&unstamped, &config)
+            .expect_err("an unstamped record has no provable destination");
+        assert!(
+            refusal.contains("«testing»"),
+            "and the refusal names that same default, not an empty string: {refusal}"
+        );
+    }
+
+    /// …and the ordinary case stays ordinary: a record sent in the hub's own environment is a
+    /// clean `info` success, with no warning to cry wolf with.
+    #[test]
+    fn a_record_sent_in_the_hubs_own_environment_is_a_plain_success() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, _) = response_ops(
+            "rec-2",
+            &accepted_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            None,
+        );
+
+        let event = ops
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .expect("the transmission must leave an event");
+        assert_eq!(event.params.get("severity"), Some(&json!("info")));
+        assert_eq!(
+            event.params.get("message"),
+            Some(&json!("AEAT (testing): Correcto Correcto")),
+            "no drift, no note: the message keeps its plain shape"
         );
     }
 }
