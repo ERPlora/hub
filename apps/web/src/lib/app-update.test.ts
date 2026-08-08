@@ -8,6 +8,12 @@
 // `lib/device.ts` detects it — by the presence of `window.__TAURI__.core.invoke`.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// `toast.ts` reaches for Ionic's `toastController`, which needs a document. The notice itself is
+// asserted through `localStorage` (said once per version) and in the component's own suite; what
+// this stub buys is that the announcement path really RUNS here instead of being skipped.
+const toastInfo = vi.hoisted(() => vi.fn());
+vi.mock('./toast', () => ({ toastInfo, toastError: vi.fn(), toastSuccess: vi.fn(), toast: vi.fn() }));
+
 import {
   APP_VERSION_COMMAND,
   appDownloadUrl,
@@ -275,5 +281,164 @@ describe('checkAppUpdate', () => {
     cloudSays(200, { version: '1.2.3' });
 
     expect((await checkAppUpdate()).state).not.toBe('ok');
+  });
+});
+
+describe('refreshAppUpdate', () => {
+  /** The shell also answers `device_context`, which is how the destination gets resolved. */
+  function installedAppOn(platform: string, version: string): void {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === APP_VERSION_COMMAND) return version;
+      if (command === 'device_context') {
+        return { id: 'dev_1', clientType: 'hub-desktop', platform };
+      }
+      return null;
+    });
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke } } });
+  }
+
+  /** A session that may administer, so the offer is this session's to act on (ADR-0248). */
+  async function signInAdministrator(): Promise<void> {
+    const { setUser } = await import('./session');
+    setUser({
+      id: 'u1',
+      name: 'Owner',
+      email: 'owner@example.com',
+      role: 'owner',
+      permissions: ['hub.administer'],
+    });
+  }
+
+  beforeEach(async () => {
+    const { appUpdate, appUpdateDestination } = await import('./app-update');
+    appUpdate.value = { state: 'unknown', installed: null, latest: null };
+    appUpdateDestination.value = null;
+    const { setUser } = await import('./session');
+    setUser(null);
+  });
+
+  it('publishes both halves of the offer: the verdict AND where to go', async () => {
+    // Without the destination the entry never paints, so "there is an update" would be a fact the
+    // product knows and cannot act on.
+    installedAppOn('windows', '1.2.3');
+    cloudSays(200, { version: '1.4.0' });
+    await signInAdministrator();
+
+    const { refreshAppUpdate, appUpdate, appUpdateDestination } = await import('./app-update');
+    await refreshAppUpdate();
+
+    expect(appUpdate.value.state).toBe('attention');
+    expect(appUpdateDestination.value).toBe('https://erplora.com/app/download/windows/');
+  });
+
+  it('does not look for a destination when there is nothing to offer', async () => {
+    installedAppOn('windows', '1.4.0');
+    cloudSays(200, { version: '1.4.0' });
+    await signInAdministrator();
+
+    const { refreshAppUpdate, appUpdate, appUpdateDestination } = await import('./app-update');
+    await refreshAppUpdate();
+
+    expect(appUpdate.value.state).toBe('ok');
+    expect(appUpdateDestination.value).toBeNull();
+  });
+
+  it('has nowhere to send a macOS build, and says so by leaving the destination empty', async () => {
+    const announced: string[] = [];
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: (key: string, value: string) => {
+        if (key === 'erplora.app_update.announced') announced.push(value);
+      },
+      removeItem: () => undefined,
+    });
+    installedAppOn('macos', '1.2.3');
+    cloudSays(200, { version: '1.4.0' });
+    await signInAdministrator();
+
+    const { refreshAppUpdate, appUpdate, appUpdateDestination } = await import('./app-update');
+    await refreshAppUpdate();
+
+    // The verdict is still honest — there IS a newer one — but there is no button, because there is
+    // no macOS installer to point at.
+    expect(appUpdate.value.state).toBe('attention');
+    expect(appUpdateDestination.value).toBeNull();
+    // And nothing is said either: announcing an update the user cannot get is a notice with no way
+    // out of it, which is the shape of every mute failure this issue exists to end.
+    expect(announced).toEqual([]);
+  });
+
+  it('says it out loud ONCE per version, not on every six-hour round', async () => {
+    // A toast every six hours is how people learn to dismiss the till without reading it.
+    const announced: string[] = [];
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => (key === 'erplora.app_update.announced' ? (announced.at(-1) ?? null) : null),
+      setItem: (key: string, value: string) => {
+        if (key === 'erplora.app_update.announced') announced.push(value);
+      },
+      removeItem: () => undefined,
+    });
+    installedAppOn('windows', '1.2.3');
+    cloudSays(200, { version: '1.4.0' });
+    await signInAdministrator();
+
+    const { refreshAppUpdate } = await import('./app-update');
+    await refreshAppUpdate();
+    await refreshAppUpdate();
+    await refreshAppUpdate();
+
+    expect(announced).toEqual(['1.4.0']);
+  });
+
+  it('says nothing to whoever is on shift — it is not their task', async () => {
+    // ADR-0248 again, and it has to hold for the toast as well: filtering the entry away while
+    // still interrupting the same person with a notice would be the worst of both.
+    const announced: string[] = [];
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: (key: string, value: string) => {
+        // Only the announcement key: `setUser` also writes the session, and a stub that recorded
+        // everything would make "nothing was said" pass for the wrong reason.
+        if (key === 'erplora.app_update.announced') announced.push(value);
+      },
+      removeItem: () => undefined,
+    });
+    installedAppOn('windows', '1.2.3');
+    cloudSays(200, { version: '1.4.0' });
+    const { setUser } = await import('./session');
+    setUser({ id: 'u2', name: 'Ana', email: 'ana@example.com', role: 'employee', permissions: [] });
+
+    const { refreshAppUpdate, appUpdate } = await import('./app-update');
+    await refreshAppUpdate();
+
+    expect(appUpdate.value.state).toBe('attention');
+    expect(announced).toEqual([]);
+  });
+
+  it('says nothing when it could not check', async () => {
+    const announced: string[] = [];
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: (key: string, value: string) => {
+        // Only the announcement key: `setUser` also writes the session, and a stub that recorded
+        // everything would make "nothing was said" pass for the wrong reason.
+        if (key === 'erplora.app_update.announced') announced.push(value);
+      },
+      removeItem: () => undefined,
+    });
+    installedAppOn('windows', '1.2.3');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    await signInAdministrator();
+
+    const { refreshAppUpdate, appUpdate } = await import('./app-update');
+    await refreshAppUpdate();
+
+    expect(appUpdate.value.state).toBe('unknown');
+    expect(announced).toEqual([]);
   });
 });
