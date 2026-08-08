@@ -425,10 +425,27 @@ impl Runtime {
     /// arrastra a `verifactu`, así que gatear solo el objetivo dejaría la puerta de atrás abierta:
     /// si CUALQUIERA de los que caen aún debe registros sin remitir, no cae ninguno.
     pub async fn deactivate(&mut self, module_id: &str) -> Result<()> {
-        for id in self.deactivation_cascade(module_id) {
+        let cascade = self.deactivation_cascade(module_id);
+        // ADR-0259 D5 (hub#553): **el candado del CORE va PRIMERO**, y sobre el conjunto entero.
+        // R2 le pregunta al motor cuánto debe; éste no pregunta a nadie, porque un módulo no puede
+        // tener voto sobre si se le puede quitar. Y con la cola vacía R2 deja marchar al último
+        // proveedor: la cola vacía protege el pasado, el daño lo hacen las ventas siguientes.
+        self.ensure_fiscal_provider_remains(&cascade).await?;
+        for id in cascade {
             self.ensure_module_can_go(&id).await?;
         }
         self.deactivate_unchecked(module_id).await
+    }
+
+    /// Comprueba el candado de proveedor fiscal (ADR-0259 D5) contra el conjunto que se va.
+    ///
+    /// Sin perfil todavía —un hub que nunca arrancó del todo— no hay nada que proteger: leer no
+    /// puede ser la razón de que no se pueda desinstalar un módulo.
+    async fn ensure_fiscal_provider_remains(&self, leaving: &[String]) -> Result<()> {
+        let Some(profile) = fiscal_profile::load(self.db.as_ref(), &self.hub_id).await? else {
+            return Ok(());
+        };
+        fiscal_profile::ensure_provider_remains(&profile, &self.registry, leaving)
     }
 
     /// [`Self::deactivate`] SIN el retention gate: repone un estado inactivo YA persistido
@@ -479,6 +496,10 @@ impl Runtime {
     /// hub#314: se rechaza mientras su motor deba trabajo a una autoridad externa — borrar la fila
     /// de `hub_module` con registros sin remitir los dejaba huérfanos (VeriFactu FAQ §5).
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
+        // ADR-0259 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
+        // marchar al último proveedor, y desde ese momento el hub vende sin que nadie registre.
+        self.ensure_fiscal_provider_remains(&[module_id.to_string()])
+            .await?;
         self.ensure_module_can_go(module_id).await?;
         installer::uninstall(
             self.db.as_ref(),
