@@ -77,6 +77,33 @@ jobs:
           sudo docker image prune -af || true
           df -h /
 
+      # El contenedor de servicio nace con la configuración de fábrica de Postgres
+      # (`max_locks_per_transaction = 64`, `max_connections = 100`), o sea un techo GLOBAL de
+      # 6.400 cerrojos — la tabla se dimensiona `max_locks × (max_connections + prepared)`, no
+      # por transacción. La suite del hub crea un ESQUEMA EFÍMERO POR TEST con todas las tablas
+      # de sistema dentro, así que ese techo se agota y revienta **quien pase por ahí**: fallan
+      # tests distintos en cada corrida y ninguno guarda relación con el diff (hub#526).
+      #
+      # Así tumbó `main` en 8f54663 un único `permission_is_enforced` con
+      # `53200 out of shared memory` — con el resto del workspace en verde.
+      #
+      # Se cambia EN SITIO en vez de recrear el contenedor: los servicios de Actions no admiten
+      # pasarle argumentos al comando del contenedor, y estos tres ajustes necesitan reinicio.
+      - name: Raise Postgres lock limits (hub#526)
+        run: |
+          PG=$(docker ps --filter "ancestor=postgres:18" --format '{{.ID}}' | head -1)
+          docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET max_locks_per_transaction = 4096;"
+          docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
+          docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';"
+          docker restart "$PG"
+          for i in $(seq 1 30); do
+            docker exec "$PG" pg_isready -U postgres >/dev/null 2>&1 && break
+            sleep 2
+          done
+          echo "techo de cerrojos ahora:"
+          docker exec "$PG" psql -U postgres -tAc \
+            "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);"
+
       - name: Toolchain (rust-toolchain.toml)
         run: rustup show
 
