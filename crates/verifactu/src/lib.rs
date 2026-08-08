@@ -384,12 +384,47 @@ impl Destination {
     }
 }
 
-/// Resolves the [`Destination`] of one record.
-fn destination_of(_record: &Json, config: &Json) -> std::result::Result<Destination, String> {
+/// The AEAT environment stamped on the record when it was created (guard R4, hub#313) — the one
+/// its hash chain lives in, and never re-derived from the config afterwards.
+///
+/// `None` is NOT «testing». A row that does not carry the column predates migration 008 and its
+/// chain could belong to either system; both guesses are unrecoverable — a practice record
+/// **accepted** by the real AEAT, or a real invoice the real AEAT never receives — so the caller
+/// refuses instead of picking one.
+fn record_environment(record: &Json) -> Option<String> {
+    let environment = str_field(record, "environment");
+    (!environment.is_empty()).then_some(environment)
+}
+
+/// Resolves the [`Destination`] of one record, or says why it cannot.
+///
+/// The two axes answer to different owners **on purpose** (hub#471, hub#320):
+///
+/// - the **environment** belongs to the RECORD. `production` and `testing` are two parallel
+///   chains that never mix (guard R4), and the previous link, the frozen `xml_content` and the
+///   QR host of a queued record already all say the same one. Reading the URL from the config
+///   made those four disagree the moment the operator went live with a non-empty queue;
+/// - the **certificate** belongs to TODAY'S config. The AEAT segregates the door by the
+///   certificate presented in the TLS handshake, so a record that waited days in contingency
+///   goes through the door of whatever signs now.
+///
+/// And they fail in opposite ways, which is why one is worth refusing over: the wrong door is
+/// REJECTED — loud, and recoverable one record at a time — while the wrong environment is
+/// ACCEPTED by a tax agency that was never meant to receive it, and an accepted record is
+/// neither resent nor deleted (ADR-0189).
+fn destination_of(record: &Json, config: &Json) -> std::result::Result<Destination, String> {
+    let hub_environment = environment_of(config);
+    let Some(environment) = record_environment(record) else {
+        return Err(format!(
+            "el registro no dice a qué entorno de la AEAT pertenece (fila anterior a la \
+             migración 008) y el hub está en «{hub_environment}»: no se transmite a ciegas"
+        ));
+    };
     Ok(Destination {
-        environment: environment_of(config),
-        endpoint: transmission_endpoint(config),
-        hub_environment: None,
+        endpoint: aeat::endpoint(&environment, &signing_kind(config)),
+        // Only when they differ: `Some` IS the drift, so nothing downstream has to compare.
+        hub_environment: (environment != hub_environment).then_some(hub_environment),
+        environment,
     })
 }
 
@@ -1447,11 +1482,14 @@ fn anchor_as_prev(anchor: &aeat::ConsultRecord) -> Json {
 ///
 /// Un solo reintento, a propósito: si el segundo envío también se rechaza, el problema no era el
 /// eslabón y reintentar en bucle solo quemaría números de cadena.
+#[allow(clippy::too_many_arguments)]
 async fn auto_rechain_and_retry(
     host: &dyn NativeHost,
     ctx: &Ctx,
     record: &Json,
     config: &Json,
+    // Passed in, never recomputed: resolving the destination twice is how the endpoint got out
+    // of step with the record in the first place (hub#320's rule, hub#471's bug).
     destination: &Destination,
     rejection: &aeat::AeatResponse,
     recovery_id: &str,
@@ -2846,6 +2884,8 @@ mod environment_chain_tests {
     struct ChainHost {
         config: Json,
         records: Vec<Json>,
+        /// Contingency entries, so a batch drain can be driven end to end (hub#471).
+        queue: Vec<Json>,
         has_core_certificate: bool,
         reads: Mutex<Vec<(String, Params)>>,
     }
@@ -2855,6 +2895,7 @@ mod environment_chain_tests {
             ChainHost {
                 config,
                 records,
+                queue: Vec::new(),
                 has_core_certificate: false,
                 reads: Mutex::new(Vec::new()),
             }
@@ -2870,6 +2911,9 @@ mod environment_chain_tests {
                 .push((sql.to_string(), p.clone()));
             if sql.contains("FROM verifactu_config") {
                 return Ok(vec![self.config.clone()]);
+            }
+            if sql.contains("FROM verifactu_contingencyqueue") {
+                return Ok(self.queue.clone());
             }
             if sql.contains("FROM verifactu_record") {
                 let param = |k: &str| p.get(k).cloned().unwrap_or(Json::Null);
@@ -3253,7 +3297,7 @@ mod environment_chain_tests {
             .expect_err("an unstamped record has no provable destination");
 
         assert!(
-            refusal.contains("producción"),
+            refusal.contains("production"),
             "the refusal must name the environment the hub is in, so the owner can act: {refusal}"
         );
     }
@@ -3289,12 +3333,93 @@ mod environment_chain_tests {
             json!("record_environment_unknown"),
             "a stable reason key, so the queue-depth alerting can tell this apart from an outage"
         );
-        find_op(&out, "verifactu._enqueue_contingency");
+        let queued = find_op(&out, "verifactu._enqueue_contingency");
+        assert_eq!(
+            queued.params.get("record_id"),
+            Some(&json!("rec-2")),
+            "the refused record has to stay in the queue: an RF may never be left generated and \
+             never remitted (FAQ §5)"
+        );
+        assert_eq!(queued.params.get("queue_status"), Some(&json!("retrying")));
         assert!(
             !out.operations
                 .iter()
                 .any(|o| o.command == "verifactu._apply_transmission"),
             "nothing was transmitted, so nothing may overwrite the record's archived XML"
+        );
+    }
+
+    /// The refusal is per-record, not per-batch: a row nobody can place must not strand every
+    /// other record behind it. That is why it is an outcome and not an `Err` —
+    /// `process_contingency_queue` propagates errors with `?`.
+    #[tokio::test]
+    async fn one_unplaceable_record_does_not_abort_the_contingency_batch() {
+        let mut record = queued_testing_record();
+        record.as_object_mut().unwrap().remove("environment");
+        let mut host = ChainHost::new(config_row("production"), vec![record]);
+        host.has_core_certificate = true;
+        host.queue = vec![json!({ "record_id": "rec-2", "attempts": 2 })];
+        let input = json!({
+            "payload": {},
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor", "id-summary"] }
+        });
+
+        let out = process_contingency_queue(&input, &host)
+            .await
+            .expect("the batch must survive a record it cannot place");
+
+        let summary = out
+            .operations
+            .iter()
+            .find(|o| o.params.get("event_type") == Some(&json!("contingency_processed")))
+            .expect("the batch must still report a summary");
+        let details: Json =
+            serde_json::from_str(summary.params.get("details").and_then(Json::as_str).unwrap())
+                .unwrap();
+        assert_eq!(
+            details["failed"], json!(1),
+            "a record that could not be placed counts as failed, never as sent"
+        );
+        assert_eq!(details["successful"], json!(0));
+    }
+
+    /// When the automatic re-anchor of hub#287 lands on a record that also outlived a go-live,
+    /// the operator needs BOTH facts in the same line: what was re-chained, and which tax agency
+    /// actually got it. Keeping only the first note would hide the one nobody expects.
+    #[test]
+    fn the_rechain_note_and_the_drift_note_travel_together() {
+        let destination = destination_of(&queued_testing_record(), &config_row("production"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, _) = response_ops(
+            "rec-2",
+            &accepted_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            Some("re-anclado automáticamente tras 4102"),
+        );
+
+        let event = ops
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .expect("the transmission must leave an event");
+        let message = event
+            .params
+            .get("message")
+            .and_then(Json::as_str)
+            .unwrap_or_default();
+        assert!(
+            message.contains("re-anclado automáticamente tras 4102"),
+            "the caller's note must survive: {message}"
+        );
+        assert!(
+            message.contains("remitido a «testing»"),
+            "and so must the drift note: {message}"
         );
     }
 
@@ -3374,9 +3499,44 @@ mod environment_chain_tests {
             .get("message")
             .and_then(Json::as_str)
             .unwrap_or_default();
+        // Both halves, and in this order: the record LEFT for testing, the hub IS in production.
+        // Read the other way round it describes the disaster instead of the safe outcome.
         assert!(
-            message.contains("production"),
-            "the warning has to say which environment the hub is in now: {message}"
+            message.contains("remitido a «testing»"),
+            "the warning has to say where the record went: {message}"
+        );
+        assert!(
+            message.contains("ahora en «production»"),
+            "…and which environment the hub is in now: {message}"
+        );
+    }
+
+    /// A config that never set `environment` IS in testing — that is the asymmetric default
+    /// hub#320 fixed in place, and it has to be the same default on both sides of the drift
+    /// comparison. Reading the raw field instead would make every ordinary testing record look
+    /// like a record that outlived a go-live, and a warning that cries wolf is a warning nobody
+    /// reads.
+    #[test]
+    fn an_unconfigured_environment_is_testing_on_both_sides_of_the_comparison() {
+        let config = json!({ "hub_id": HUB, "issuer_nif": NIF });
+
+        let destination = destination_of(&queued_testing_record(), &config)
+            .expect("a record that carries its environment resolves");
+
+        assert_eq!(destination.endpoint, PREPRODUCTION_HOLDER);
+        assert_eq!(
+            destination.drift_note(),
+            None,
+            "an unset environment is testing, so a testing record has not drifted anywhere"
+        );
+
+        let mut unstamped = queued_testing_record();
+        unstamped.as_object_mut().unwrap().remove("environment");
+        let refusal = destination_of(&unstamped, &config)
+            .expect_err("an unstamped record has no provable destination");
+        assert!(
+            refusal.contains("«testing»"),
+            "and the refusal names that same default, not an empty string: {refusal}"
         );
     }
 
