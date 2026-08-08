@@ -278,6 +278,32 @@ pub async fn refresh(
     let profile = ensure(db, hub_id).await?;
     let providers = providers_of(registry, &profile.country_code, &profile.fiscal_system);
 
+    // **R5 (hub#315/#552): una demo NUNCA pasa a producción.** `Registry::demo_hub` sale de
+    // `HUB_DEMO`, env del despliegue que escribe el provisioning del SaaS como espejo de
+    // `Hub.is_demo`: se lee UNA vez al arrancar y **no tiene escritor dentro del hub** — ni
+    // cabecera, ni campo de payload, ni clave de `hub_settings`, ni endpoint. Ni el navegador ni un
+    // command pueden tocarlo.
+    //
+    // Se refleja en el perfil en cada arranque en vez de consultarse en el momento del go-live
+    // porque así el hecho queda **escrito y consultable**: la pantalla puede decir por qué el
+    // toggle está apagado sin preguntarle al entorno del proceso.
+    //
+    // Fail-closed hacia hub NORMAL (ausente ⇒ puede), que es la dirección segura: tomar por demo a
+    // un hub real lo dejaría fuera de producción **sin decir nada**. Y desde
+    // `verifactu-gateway.md` §3.4 la demo SÍ lleva certificado delegado y transmite de verdad a
+    // preproducción — el entorno es lo único que la separa de la AEAT real.
+    let can_go_live = !registry.demo_hub;
+    if can_go_live != profile.can_go_live {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("can_go_live".into(), json!(if can_go_live { 1 } else { 0 }));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET can_go_live = :can_go_live WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await?;
+    }
+
     // Learnt while healthy, remembered when gone: only overwrite when somebody taught us something.
     if !providers.is_empty() {
         let learned =
@@ -1219,6 +1245,50 @@ mod tests {
     async fn reading_the_profile_of_a_hub_without_system_tables_is_not_an_error() {
         let db = fresh_db().await;
         assert!(load(&db, "hub-sin-migrar").await.unwrap().is_none());
+    }
+
+    // ── R5: un hub de demo NUNCA puede pasar a producción (hub#315/#552) ──────────────────────
+
+    /// 🔴 **La demo lleva el certificado delegado y transmite de verdad a preproducción**
+    /// (`verifactu-gateway.md` §3.4, que supersede ADR-0197 §2): el entorno es LO ÚNICO que la
+    /// separa de la AEAT real. Así que el arranque de un hub demo apaga el go-live en el perfil,
+    /// y el mismo gate que cierra R1 cierra R5 — que es como ADR-0202 §5 lo planteó.
+    #[tokio::test]
+    async fn a_demo_hub_boots_with_the_go_live_switched_off() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-demo", Some("ES")).await;
+        let mut demo = registry_with(&[]);
+        demo.demo_hub = true;
+
+        refresh(&db, &demo, "hub-demo").await.unwrap();
+
+        assert!(!load(&db, "hub-demo").await.unwrap().unwrap().can_go_live);
+    }
+
+    /// **Fail-closed hacia hub NORMAL**: sin la bandera, el hub puede facturar. Es la dirección
+    /// segura — tomar por demo a un hub real le congelaría el go-live y lo dejaría fuera de
+    /// producción sin decir nada.
+    #[tokio::test]
+    async fn a_normal_hub_keeps_the_go_live_available() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+
+        refresh(&db, &registry_with(&[]), "hub-es").await.unwrap();
+
+        assert!(load(&db, "hub-es").await.unwrap().unwrap().can_go_live);
+    }
+
+    /// Y de punta a punta: con la bandera puesta, un hub que por lo demás está listo **no** pasa a
+    /// producción. Es un caso del mismo gate que R1, no una guarda aparte.
+    #[tokio::test]
+    async fn a_demo_hub_that_is_otherwise_ready_still_cannot_go_live() {
+        let db = fresh_db().await;
+        let mut reg = hub_ready(&db, "hub-demo").await;
+        reg.demo_hub = true;
+        refresh(&db, &reg, "hub-demo").await.unwrap();
+
+        let err = go_live(&db, "hub-demo").await.expect_err("una demo no factura de verdad");
+        assert_eq!(code_of(&err), GO_LIVE_FORBIDDEN);
     }
 
     // ── D3: el go-live ES `testing → production`, y muere con el primer ENVÍO (hub#551) ───────
