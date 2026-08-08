@@ -30,8 +30,9 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 
+/// Same resolution as the `require_modules_workspace` guard — it honours `$ERPLORA_MODULES_DIR`.
 fn modules_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
+    erplora_runtime::e2e_support::modules_root()
 }
 
 fn ctx(hub: &str) -> RequestContext {

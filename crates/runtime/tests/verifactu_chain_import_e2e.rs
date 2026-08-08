@@ -17,8 +17,9 @@ use serde_json::json;
 const HUB_ORIGIN: &str = "6c9e7a52-0f1b-4b2e-9c1d-2f8a5e3d7b10";
 const HUB_OTHER: &str = "a3d94f1c-8e57-4d0a-b6c2-91e0f4728c55";
 
+/// Same resolution as the `require_modules_workspace` guard — it honours `$ERPLORA_MODULES_DIR`.
 fn modules_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
+    erplora_runtime::e2e_support::modules_root()
 }
 
 /// Runtime with the real fiscal chain installed: verifactu ← invoice ← sales ← inventory+taxes.

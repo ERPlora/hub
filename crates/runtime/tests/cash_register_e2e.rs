@@ -28,7 +28,7 @@ fn cents(v: &serde_json::Value) -> i64 {
         .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
         .unwrap_or_else(|| panic!("no es un importe numérico: {v:?}"))
 }
-fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(n) }
+fn mdir(n: &str) -> PathBuf { erplora_runtime::e2e_support::modules_root().join(n) }
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 fn wasm() -> bool { mdir("cash_register").join("dist/handler.wasm").exists() }
 

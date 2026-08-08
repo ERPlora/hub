@@ -11,9 +11,7 @@ fn params(v: serde_json::Value) -> Params {
 }
 
 fn mdir(n: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../modules-workspace/modules")
-        .join(n)
+    erplora_runtime::e2e_support::modules_root().join(n)
 }
 
 fn ctx() -> RequestContext {

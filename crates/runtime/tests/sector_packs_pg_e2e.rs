@@ -21,7 +21,7 @@ use erplora_db::Params;
 use erplora_runtime::{RequestContext, Runtime};
 
 fn module_dir(id: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(id)
+    erplora_runtime::e2e_support::modules_root().join(id)
 }
 
 fn blueprint_seed(sector: &str) -> PathBuf {
