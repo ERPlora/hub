@@ -81,6 +81,10 @@ describe('parseVersion', () => {
     expect(parseVersion(raw)).toBeNull();
   });
 
+  it('ignores the blanks a hand-edited manifest can carry', () => {
+    expect(parseVersion(' 1.2.3\n')).toEqual([1, 2, 3]);
+  });
+
   it('refuses null and undefined without throwing', () => {
     expect(parseVersion(null)).toBeNull();
     expect(parseVersion(undefined)).toBeNull();

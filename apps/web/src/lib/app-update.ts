@@ -94,6 +94,10 @@ export function isNewerVersion(
   for (let i = 0; i < a.length; i += 1) {
     // Number by number. Compared as text, `1.10.0` sorts BELOW `1.9.0` and the fleet stops being
     // offered updates at x.9 — silently, which is how this kind of bug survives a release.
+    //
+    // ⚠️ Equivalent mutant, on purpose: `>=` here behaves exactly like `>`, because the guard on the
+    // same line has already established that the two differ. It is written `>` because that is the
+    // sentence ("strictly ahead"); no test can tell them apart and none should try.
     if (a[i] !== b[i]) return a[i] > b[i];
   }
   return false;
@@ -171,6 +175,12 @@ async function latestVersion(): Promise<string | null> {
 export async function checkAppUpdate(): Promise<AppUpdate> {
   // A browser has no installed app to update — it is served fresh by the hub on every deploy. It
   // does not even ask: a request per browser tab, for an answer that can never mean anything.
+  //
+  // ⚠️ Equivalent mutant, on purpose: removing this line changes nothing observable today, because
+  // `installedVersion()` also answers `null` outside the shell and the early return below stops
+  // before the fetch. It stays because it makes "a browser never asks the runtime" true BY
+  // CONSTRUCTION rather than as a consequence of the order of two questions — and the day somebody
+  // reorders them to fetch first, this line is what stops every open tab in the shop from polling.
   if (!isTauri()) return UNKNOWN_UPDATE;
 
   const installed = await installedVersion();
