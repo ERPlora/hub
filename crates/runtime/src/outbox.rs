@@ -46,9 +46,12 @@ CREATE TABLE IF NOT EXISTS _event_outbox (\
   depth INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', \
   attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, \
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT, \
-  module_id TEXT NOT NULL DEFAULT '', claim_expires_at TEXT);\
+  module_id TEXT NOT NULL DEFAULT '', claim_expires_at TEXT, \
+  discarded_at TEXT, discarded_by TEXT);\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS module_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS claim_expires_at TEXT;\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_at TEXT;\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
 CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_at);\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
@@ -422,6 +425,138 @@ async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &
     )
     .await?;
     Ok(())
+}
+
+// ─────────────────────── Operable dead-letter (hub#660 — ADR-0127 phase 2) ───────────────────────
+//
+// `dead` used to be the end of the line: after `MAX_ATTEMPTS` the row stopped moving and the only
+// window onto it was `GET /api/system`, which shows 50 rows without their payload. An event that
+// died for a fixable reason — a listener demanding a permission the emitter did not carry, a module
+// that was deactivated mid-flight — was lost work nobody could see, replay or close.
+//
+// The three gestures below are the whole of it, and they are deliberately small: LIST what died,
+// RETRY one back onto the relay, DISCARD one for good. `discard` never DELETEs — the row is the
+// only evidence the event ever existed, so it is kept and stamped with who closed it.
+
+/// Terminal status of a row that burnt [`MAX_ATTEMPTS`] (dead-letter).
+pub const STATUS_DEAD: &str = "dead";
+
+/// Status of a dead-letter an admin closed by hand: it will never be delivered, and the relay —
+/// which only ever claims `pending` — cannot pick it up again. The row **is kept**, auditable.
+pub const STATUS_DISCARDED: &str = "discarded";
+
+/// Hard cap on how many dead-letters one listing returns (the payloads make the rows heavy).
+pub const MAX_DEAD_PAGE: i64 = 200;
+
+/// One dead-letter, with everything an operator needs to decide between retry and discard.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DeadEvent {
+    pub id: String,
+    pub event_name: String,
+    /// The **emitting** module (attribution): who produced the event, not who refused it.
+    pub module_id: String,
+    /// The user whose context the emitter ran with — the cashier behind a structural dead-letter.
+    pub user_id: String,
+    /// The payload, parsed so it can be inspected. Unparseable stored text comes back as a string
+    /// rather than being hidden: what is in the row is what the operator gets to see.
+    pub payload: Json,
+    pub last_error: String,
+    pub attempts: i64,
+    pub depth: i64,
+    pub created_at: String,
+}
+
+/// Dead-letters of this hub, newest first. `limit` is clamped to [`MAX_DEAD_PAGE`].
+pub async fn list_dead(db: &dyn DatabaseAdapter, hub_id: &str, limit: i64) -> Result<Vec<DeadEvent>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("status".into(), json!(STATUS_DEAD));
+    p.insert("lim".into(), json!(limit.clamp(1, MAX_DEAD_PAGE)));
+    let res = db
+        .query(
+            "SELECT id, event_name, module_id, user_id, payload, last_error, attempts, depth, created_at \
+             FROM _event_outbox WHERE hub_id = :hub_id AND status = :status \
+             ORDER BY created_at DESC LIMIT :lim",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.iter().map(dead_event).collect())
+}
+
+fn dead_event(row: &Json) -> DeadEvent {
+    let s = |k: &str| row[k].as_str().unwrap_or_default().to_string();
+    let n = |k: &str| row[k].as_i64().or_else(|| row[k].as_f64().map(|f| f as i64)).unwrap_or(0);
+    let raw = s("payload");
+    DeadEvent {
+        id: s("id"),
+        event_name: s("event_name"),
+        module_id: s("module_id"),
+        user_id: s("user_id"),
+        payload: serde_json::from_str(&raw).unwrap_or(Json::String(raw)),
+        last_error: s("last_error"),
+        attempts: n("attempts"),
+        depth: n("depth"),
+        created_at: s("created_at"),
+    }
+}
+
+/// Puts a dead-letter back in front of the relay: `pending`, attempts reset, due now, lease
+/// cleared. `false` if there is no dead-letter with that id in this hub.
+///
+/// Only a `dead` row is replayable. A `delivered` one is not an operator gesture (the delivery
+/// markers in `_event_delivery` already make it a no-op), and a `pending` one is the relay's.
+///
+/// Resetting `attempts` to 0 is what makes the retry meaningful: the row gets the full budget of
+/// [`MAX_ATTEMPTS`] again, so a transient cause gets its backoff ladder back instead of dying on
+/// the first stumble. If the cause is still there, it simply dies again — and is listed again.
+pub async fn retry(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<bool> {
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("status".into(), json!(STATUS_DEAD));
+    p.insert("now".into(), json!(now_rfc3339()));
+    let res = db
+        .execute(
+            "UPDATE _event_outbox SET status = 'pending', attempts = 0, next_attempt_at = :now, \
+             last_error = '', claim_expires_at = NULL \
+             WHERE id = :id AND hub_id = :hub_id AND status = :status",
+            &p,
+        )
+        .await?;
+    Ok(res.affected > 0)
+}
+
+/// Closes a dead-letter for good: status [`STATUS_DISCARDED`] + who and when. `false` if there is
+/// no dead-letter with that id in this hub.
+///
+/// **The row is CONSERVED — never `DELETE`.** It is the only record that the event existed, and a
+/// discard is a decision somebody made; both have to survive it. The relay cannot take it again
+/// because [`claim_next_due`] only ever claims `pending`.
+///
+/// `discarded_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`), never
+/// something the caller sent in the body.
+pub async fn discard(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    id: &str,
+    discarded_by: &str,
+) -> Result<bool> {
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("status".into(), json!(STATUS_DEAD));
+    p.insert("discarded".into(), json!(STATUS_DISCARDED));
+    p.insert("by".into(), json!(discarded_by));
+    p.insert("now".into(), json!(now_rfc3339()));
+    let res = db
+        .execute(
+            "UPDATE _event_outbox SET status = :discarded, discarded_at = :now, discarded_by = :by, \
+             claim_expires_at = NULL \
+             WHERE id = :id AND hub_id = :hub_id AND status = :status",
+            &p,
+        )
+        .await?;
+    Ok(res.affected > 0)
 }
 
 #[cfg(test)]
@@ -991,5 +1126,213 @@ mod tests {
         let claimed = claim_next_due(&db, now).await.unwrap();
         assert!(claimed.is_some(), "an expired lease is reclaimed (orphan recovery)");
         assert_eq!(claimed.as_ref().unwrap()["id"].as_str(), Some("evt-1"));
+    }
+
+    // ── Operable dead-letter (hub#660 — ADR-0127 phase 2 · ADR-0283 K6a) ───────────────────────
+
+    /// A hub holding exactly one dead-letter. `m.fire` emits `e`, whose only listener `m.apply`
+    /// explodes on every attempt, so the row burns [`MAX_ATTEMPTS`] and lands in `dead`.
+    ///
+    /// This is the shape of the STRUCTURAL dead-letters production already has: an employee closes
+    /// a sale, the `verifactu.records.ingest_invoice` listener demands a manager permission the
+    /// emitter's reconstructed context does not carry, and eight attempts later the event is dead
+    /// with nobody able to see it, let alone replay it.
+    async fn hub_with_a_dead_letter() -> (PgAdapter, Registry) {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("m".into(), ModuleStatus::Active);
+        // Listener that always fails (unknown column) — from the relay's point of view a refused
+        // listener and a broken one are the same thing: `execute_at` returns `Err`.
+        reg.commands.insert(
+            "m.apply".into(),
+            cmd("m", "INSERT INTO t (no_such_column) VALUES (1);", vec![]),
+        );
+        reg.commands
+            .insert("m.fire".into(), cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]));
+        reg.listeners.insert("e".into(), vec!["m.apply".into()]);
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let mut payload = Params::new();
+        payload.insert("invoice".into(), json!("F2-1"));
+        crate::commands::execute(&db, &reg, "m.fire", &payload, &ctx, &Grants::new())
+            .await
+            .unwrap();
+
+        // Skip the real backoff: leave the row one attempt short of the cap and already due, so a
+        // single relay cycle sends it to dead-letter.
+        let mut p = Params::new();
+        p.insert("a".into(), json!(MAX_ATTEMPTS - 1));
+        db.execute(
+            "UPDATE _event_outbox SET attempts = :a, next_attempt_at = '2020-01-01T00:00:00+00:00'",
+            &p,
+        )
+        .await
+        .unwrap();
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            1,
+            "fixture precondition: the event is dead-lettered"
+        );
+        (db, reg)
+    }
+
+    /// A dead-letter is VISIBLE with everything an operator needs to decide: which event, from
+    /// which module, the payload it carried, why it died and how many attempts it burnt. Before
+    /// hub#660 the only window was `GET /api/system`, which shows 50 rows with no payload at all.
+    #[tokio::test]
+    async fn dead_letters_are_listed_with_payload_error_and_attempts() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+
+        let dead = list_dead(&db, "h1", 50).await.unwrap();
+        assert_eq!(dead.len(), 1, "the dead-letter is listed");
+        let row = &dead[0];
+        assert_eq!(row.event_name, "e");
+        assert_eq!(row.module_id, "m", "the EMITTING module, for attribution");
+        // `defer_or_dead` stops counting when it gives up: the attempt that kills the row goes to
+        // `mark_dead`, which changes the status without bumping the counter. So a row that burnt
+        // its whole budget reads `MAX_ATTEMPTS - 1` — the last attempt it survived to record.
+        assert_eq!(row.attempts, MAX_ATTEMPTS - 1, "it burnt its whole budget");
+        assert!(
+            row.last_error.contains("m.apply"),
+            "the error names the listener that refused: {}",
+            row.last_error
+        );
+        assert_eq!(
+            row.payload["invoice"], "F2-1",
+            "the payload is INSPECTABLE, not just the event name"
+        );
+        assert!(!row.id.is_empty() && !row.created_at.is_empty());
+
+        // Another hub's operator never sees it (tenancy).
+        assert!(list_dead(&db, "other-hub", 50).await.unwrap().is_empty());
+    }
+
+    /// `retry` puts a dead-letter back in front of the relay: `pending`, attempts reset and due
+    /// now. Once whatever refused it is fixed, the delivery completes for real — the effect the
+    /// event was carrying finally lands.
+    #[tokio::test]
+    async fn retry_returns_a_dead_letter_to_the_relay_and_it_is_delivered() {
+        let (db, mut reg) = hub_with_a_dead_letter().await;
+
+        // The relay ignores a dead row, no matter how many cycles run.
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 0);
+
+        // The operator fixes the cause (here: the listener now works) and replays the event.
+        reg.commands
+            .insert("m.apply".into(), cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]));
+        assert!(retry(&db, "h1", &dead_id(&db).await).await.unwrap(), "the row was requeued");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=0").await,
+            1,
+            "back to pending with a fresh attempt budget"
+        );
+
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            1,
+            "the listener finally runs: the retry is a real delivery, not a status change"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            1
+        );
+
+        // Only a dead-letter is replayable: replaying a delivered row is not an operator gesture.
+        assert!(!retry(&db, "h1", &id_of(&db, "delivered").await).await.unwrap());
+    }
+
+    /// `discard` closes a dead-letter without deleting it: the row STAYS, stamped with who
+    /// discarded it and when, and the relay never touches it again. Deleting would destroy the only
+    /// record that the event existed at all — the audit trail is the point.
+    #[tokio::test]
+    async fn discard_keeps_the_row_auditable_and_the_relay_never_takes_it_again() {
+        let (db, mut reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1").await.unwrap());
+
+        // The row is conserved, with its audit stamp.
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        let rows = db
+            .query(
+                "SELECT status, discarded_by, discarded_at, payload, last_error \
+                 FROM _event_outbox WHERE id = :id",
+                &p,
+            )
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 1, "the row is CONSERVED, never deleted");
+        assert_eq!(rows[0]["status"].as_str(), Some(STATUS_DISCARDED));
+        assert_eq!(rows[0]["discarded_by"].as_str(), Some("hub_user:admin-1"));
+        assert!(rows[0]["discarded_at"].as_str().is_some_and(|s| !s.is_empty()));
+        assert!(
+            rows[0]["payload"].as_str().is_some_and(|s| s.contains("F2-1")),
+            "the payload survives for inspection"
+        );
+
+        // The relay filters by `status='pending'`, so a discarded row is not even claimable —
+        // not even after making it look due, and not even if its listener starts working again.
+        db.execute(
+            "UPDATE _event_outbox SET next_attempt_at = '2020-01-01T00:00:00+00:00', claim_expires_at = NULL",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+        assert!(
+            claim_next_due(&db, "2026-01-01T00:00:00+00:00").await.unwrap().is_none(),
+            "the relay never claims a discarded row"
+        );
+        reg.commands
+            .insert("m.apply".into(), cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]));
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            0,
+            "a discarded event is never delivered"
+        );
+
+        // And it drops off the operator's list: discarding is what makes the queue drainable.
+        assert!(list_dead(&db, "h1", 50).await.unwrap().is_empty());
+    }
+
+    /// Neither gesture crosses hubs, and neither invents a row: an unknown id is simply `false`.
+    #[tokio::test]
+    async fn retry_and_discard_are_scoped_to_the_hub() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+
+        assert!(!retry(&db, "other-hub", &id).await.unwrap(), "another hub cannot replay it");
+        assert!(!discard(&db, "other-hub", &id, "hub_user:x").await.unwrap());
+        assert!(!retry(&db, "h1", "no-such-event").await.unwrap());
+        assert!(!discard(&db, "h1", "no-such-event", "hub_user:x").await.unwrap());
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            1,
+            "the dead-letter is untouched"
+        );
+    }
+
+    async fn dead_id(db: &PgAdapter) -> String {
+        id_of(db, STATUS_DEAD).await
+    }
+
+    async fn id_of(db: &PgAdapter, status: &str) -> String {
+        let mut p = Params::new();
+        p.insert("s".into(), json!(status));
+        db.query("SELECT id FROM _event_outbox WHERE status = :s", &p)
+            .await
+            .unwrap()
+            .rows[0]["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
     }
 }

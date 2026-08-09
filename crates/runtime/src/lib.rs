@@ -1645,6 +1645,24 @@ impl Runtime {
         outbox::drain(self.db.as_ref(), &self.registry).await
     }
 
+    /// Dead-letters of this hub, newest first (hub#660). What the relay gave up on, with the
+    /// payload it was carrying — the queue an admin operates from `/api/hub/events/dead`.
+    pub async fn list_dead_events(&self, limit: i64) -> Result<Vec<outbox::DeadEvent>> {
+        outbox::list_dead(self.db.as_ref(), &self.hub_id, limit).await
+    }
+
+    /// Puts a dead-letter back in front of the relay (`pending`, attempts reset). `false` if there
+    /// is no dead-letter with that id **in this hub**.
+    pub async fn retry_dead_event(&self, id: &str) -> Result<bool> {
+        outbox::retry(self.db.as_ref(), &self.hub_id, id).await
+    }
+
+    /// Closes a dead-letter for good, keeping the row (auditable). `discarded_by` is the identity
+    /// the HTTP layer resolved from the session. `false` if there is no such dead-letter here.
+    pub async fn discard_dead_event(&self, id: &str, discarded_by: &str) -> Result<bool> {
+        outbox::discard(self.db.as_ref(), &self.hub_id, id, discarded_by).await
+    }
+
     /// Un ciclo del barrido del **scheduler** (ADR-0011): ejecuta las scheduled tasks vencidas de
     /// los módulos activos. Lo llama el bucle de background del server (junto al relay del outbox).
     /// Devuelve cuántas tareas corrió. `hub_id` es el del despliegue (contexto de sistema).

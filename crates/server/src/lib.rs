@@ -60,6 +60,8 @@ pub mod media;
 pub mod members;
 pub mod module_storage;
 pub mod openapi;
+/// Operable dead-letter of the event outbox: list · retry · discard — hub#660 (ADR-0127 phase 2).
+pub mod outbox_admin;
 pub mod print;
 pub mod print_ws;
 pub mod profile;
@@ -959,6 +961,16 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/keys/:id/rotate", post(api_keys::rotate_key))
         .route("/api/keys/:id", axum::routing::delete(api_keys::revoke_key))
+        // ── Dead-letter del outbox, operable (hub#660 — ADR-0127 fase 2) ────────────────────
+        // Misma puerta que la gestión de keys: sesión local de un humano owner/admin. Reintentar
+        // re-ejecuta el command de otro con los permisos del emisor y descartar cierra un registro
+        // para siempre, así que NO se abren a una API key ni al token de máquina.
+        .route("/api/hub/events/dead", get(outbox_admin::list_dead))
+        .route("/api/hub/events/:id/retry", post(outbox_admin::retry_dead))
+        .route(
+            "/api/hub/events/:id/discard",
+            post(outbox_admin::discard_dead),
+        )
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
         .route("/api/v1/:module/c/:command", post(api_keys::data_command))
