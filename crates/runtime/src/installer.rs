@@ -48,6 +48,16 @@ pub async fn install(
     dir: &Path,
 ) -> Result<String> {
     let manifest = Manifest::load(dir)?;
+    // hub#521: `load` already REFUSED anything unknown that would change what runs, and collected
+    // the rest. Those go to the log here, once per install, next to the module they belong to —
+    // `/api/modules` carries the same list for whoever asks later, but a boot scrolling past is
+    // where a half-understood manifest is most likely to be noticed.
+    for warning in &manifest.warnings {
+        eprintln!(
+            "⚠️  módulo {}: `{}` — {}",
+            manifest.id, warning.path, warning.detail
+        );
+    }
     // hub#139: id-dependent contract checks (domain error namespaces, exclusive row gates)
     // run BEFORE any side effect — a broken contract never reaches migrations or the registry.
     validate_command_contracts(&manifest)?;

@@ -59,7 +59,10 @@ pub mod logging;
 pub mod media;
 pub mod members;
 pub mod module_storage;
+pub mod notify_transport;
 pub mod openapi;
+/// Operable dead-letter of the event outbox: list · retry · discard — hub#660 (ADR-0127 phase 2).
+pub mod outbox_admin;
 pub mod print;
 pub mod print_ws;
 pub mod profile;
@@ -510,16 +513,24 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         }
     }
 
-    // Transporte de `host.notify` (ADR-0012): cliente real de email/sms/whatsapp. Hoy un MOCK
-    // (decisión de dependencia del humano para el SMTP/SMS reales; ver crates/runtime/host_notify.rs).
-    // El mock pasa por el Outbox como cualquier transporte, así que la mecánica de reintentos/
-    // dead-letter del listener-host queda real. TODO: sustituir por el transporte real (lettre/HTTP).
+    // Transporte de `host.notify` (ADR-0012 + ADR-0283 §5 K4, hub#663): el cliente REAL. Email y
+    // WhatsApp salen por el **proxy del SaaS** (`/api/v1/hub/device/notify/{email,whatsapp}/`) con
+    // la credencial de máquina; el hub nunca guarda credenciales de Meta/SES (patrón del LLM).
+    //
+    // El mock sigue disponible, pero **hay que pedirlo por su nombre** (`HUB_NOTIFY_TRANSPORT=mock`)
+    // y no se cae en él por accidente: un mock devuelve `Sent` sin enviar nada, y el outbox marca
+    // entonces el evento como entregado — un recordatorio que nunca salió y del que nadie se entera.
+    // Un hub sin enrolar falla RUIDOSAMENTE (reintento → dead-letter), que sí se ve.
     state
         .runtime
         .lock()
         .await
-        .set_notify_transport(std::sync::Arc::new(
-            erplora_runtime::host_notify::MockTransport::new(),
+        .set_notify_transport(notify_transport::build(
+            state.http.clone(),
+            &state.config.cloud_base_url,
+            state.hub_id.clone(),
+            state.machine_token.clone(),
+            std::env::var(notify_transport::TRANSPORT_ENV).ok(),
         ));
 
     // Registro GLOBAL de errores ("todo controlado", un único embudo): instala el sink que reenvía
@@ -959,6 +970,16 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/keys/:id/rotate", post(api_keys::rotate_key))
         .route("/api/keys/:id", axum::routing::delete(api_keys::revoke_key))
+        // ── Dead-letter del outbox, operable (hub#660 — ADR-0127 fase 2) ────────────────────
+        // Misma puerta que la gestión de keys: sesión local de un humano owner/admin. Reintentar
+        // re-ejecuta el command de otro con los permisos del emisor y descartar cierra un registro
+        // para siempre, así que NO se abren a una API key ni al token de máquina.
+        .route("/api/hub/events/dead", get(outbox_admin::list_dead))
+        .route("/api/hub/events/:id/retry", post(outbox_admin::retry_dead))
+        .route(
+            "/api/hub/events/:id/discard",
+            post(outbox_admin::discard_dead),
+        )
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
         .route("/api/v1/:module/c/:command", post(api_keys::data_command))
@@ -2287,6 +2308,11 @@ async fn list_modules(
                 "depends_on": m.depends_on,
                 // ADITIVO (ADR-0057): true si el módulo expone alguna query/command `expose_api`.
                 "has_public_api": public_api.contains(&m.id),
+                // ADITIVO (hub#521): lo que el core NO entendió de su `module.json` y aun así
+                // instaló. Vacío en un módulo que encaja con el contrato — que es lo normal. Es la
+                // superficie CONSULTABLE del aviso: sin ella, «el hub lo ignora en silencio» se
+                // arreglaría escribiendo el silencio en un log que nadie mira.
+                "manifest_warnings": m.manifest_warnings,
             })
         })
         .collect();

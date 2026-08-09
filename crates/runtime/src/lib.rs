@@ -64,7 +64,7 @@ pub mod wasm;
 
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{DemoLock, Result, RuntimeError};
-pub use manifest::Manifest;
+pub use manifest::{Manifest, ManifestWarning, CORE_VERSION};
 pub use registry::{EventSink, ModuleStatus, NavEntry, Principal, Registry, RequestContext};
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
@@ -83,6 +83,13 @@ pub struct ModuleInfo {
     /// Dependencias declaradas (`depends_on`): la UI del shell las usa para avisar de la CASCADA
     /// (ADR-0128) antes de desactivar («también desactivará: …»).
     pub depends_on: Vec<String>,
+    /// What this core did not understand of the module's manifest and installed anyway (hub#521).
+    ///
+    /// Empty for every module that fits the contract, which is all 24 published ones bar the two
+    /// carrying a retired `validates`. It travels here — and not only to a log — because "the hub
+    /// ignores it in silence" is not fixed by writing the silence down somewhere nobody looks:
+    /// whoever is staring at a module that half works has to be able to ASK.
+    pub manifest_warnings: Vec<crate::manifest::ManifestWarning>,
 }
 
 /// `hub_id` de desarrollo por defecto (mismo UUID fijo que `crates/server::DEV_HUB_ID`). El host
@@ -540,6 +547,7 @@ impl Runtime {
                     .get(&m.id)
                     .unwrap_or(&ModuleStatus::Inactive),
                 depends_on: m.depends_on.clone(),
+                manifest_warnings: m.warnings.clone(),
             })
             .collect()
     }
@@ -1643,6 +1651,24 @@ impl Runtime {
     /// Drena el outbox hasta vaciarlo (cascada incluida). Útil al arrancar y en tests.
     pub async fn drain_outbox(&self) -> Result<usize> {
         outbox::drain(self.db.as_ref(), &self.registry).await
+    }
+
+    /// Dead-letters of this hub, newest first (hub#660). What the relay gave up on, with the
+    /// payload it was carrying — the queue an admin operates from `/api/hub/events/dead`.
+    pub async fn list_dead_events(&self, limit: i64) -> Result<Vec<outbox::DeadEvent>> {
+        outbox::list_dead(self.db.as_ref(), &self.hub_id, limit).await
+    }
+
+    /// Puts a dead-letter back in front of the relay (`pending`, attempts reset). `false` if there
+    /// is no dead-letter with that id **in this hub**.
+    pub async fn retry_dead_event(&self, id: &str) -> Result<bool> {
+        outbox::retry(self.db.as_ref(), &self.hub_id, id).await
+    }
+
+    /// Closes a dead-letter for good, keeping the row (auditable). `discarded_by` is the identity
+    /// the HTTP layer resolved from the session. `false` if there is no such dead-letter here.
+    pub async fn discard_dead_event(&self, id: &str, discarded_by: &str) -> Result<bool> {
+        outbox::discard(self.db.as_ref(), &self.hub_id, id, discarded_by).await
     }
 
     /// Un ciclo del barrido del **scheduler** (ADR-0011): ejecuta las scheduled tasks vencidas de

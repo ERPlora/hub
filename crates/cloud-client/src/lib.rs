@@ -443,15 +443,40 @@ impl CloudClient {
     /// por Cloud, que aplica `check_quota`, inyecta el token de Meta de ERPlora y bloquea al
     /// agotar la cuota (el Hub solo refleja el estado). `POST /api/v1/hub/device/notify/whatsapp/`
     /// con la credencial de **máquina** (`X-Hub-Token`, contexto hub-scoped sin usuario; el envío
-    /// lo dispara una scheduled task / un listener del outbox, no un usuario). El body
-    /// (`{to, template, vars}`) lo construye el llamador (server) desde la `NotifyIntent`.
+    /// lo dispara una scheduled task / un listener del outbox, no un usuario).
     ///
-    /// Los canales **del tenant** (email/sms/WhatsApp self-hosted) NO pasan por aquí: usan el
-    /// secreto local cifrado del hub y el host llama directo (sin cuota ERPlora).
+    /// **Body** (lo construye el llamador desde la `NotifyIntent`; contrato verificado contra
+    /// `saas/apps/whatsapp_inbox/api/notify.py`, saas#1353):
+    /// `{"to": "+34…", "body": "texto libre"}` **o**
+    /// `{"to": "+34…", "template": {"name": …, "language": …, "components": […]}}`, más un
+    /// `phone_number_id` opcional (uno de los números de ESTE hub). Uno de `body`/`template` es
+    /// obligatorio; el `template` es un **objeto** que el SaaS reenvía a Meta tal cual, no el
+    /// nombre suelto. Respuesta: `{"message_id": "wamid…"}`.
+    ///
+    /// El resto de canales (email) tiene su propio proxy — ver [`CloudClient::notify_email`].
     pub fn notify_whatsapp(&self, auth: &Auth) -> PreparedRequest {
         PreparedRequest {
             method: "POST",
             url: format!("{}/api/v1/hub/device/notify/whatsapp/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Email del negocio del hub vía el proxy del Cloud** (ADR-0283 §5 K4, saas#1347).
+    ///
+    /// Mismo patrón que el LLM y que WhatsApp: el hub **nunca** guarda credenciales de SES/SMTP.
+    /// Pide al Cloud que envíe, y el Cloud pone el remitente verificado de ERPlora (`From`) y
+    /// resuelve **en el servidor** el `Reply-To` del negocio (owner del hub →
+    /// `BillingProfile.billing_email` → `SUPPORT_EMAIL`). Por eso el body **no** lleva `Reply-To`:
+    /// un `Reply-To` libre convertiría un correo firmado por ERPlora en phishing.
+    ///
+    /// `POST /api/v1/hub/device/notify/email/` con la credencial de **máquina** (`X-Hub-Token` +
+    /// `X-Hub-Id`, `IsHubMachine`). **Body**: `{"to": "a@b.c" | ["a@b.c", …], "subject": "…",
+    /// "text": "…", "html": "…"?}`; respuesta `{"message_id": "<…>"}`.
+    pub fn notify_email(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/notify/email/", self.base_url),
             headers: auth.headers(),
         }
     }
@@ -1087,6 +1112,26 @@ mod tests {
             .headers
             .contains(&("X-Hub-Token", "machine-tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn notify_email_uses_machine_token() {
+        // El email del negocio sale por el MISMO proxy y con la MISMA credencial: lo dispara el
+        // relay del outbox, sin usuario logueado (ADR-0003). El hub no guarda credenciales de SES.
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
+        let r = c.notify_email(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/notify/email/");
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        // Nunca el JWT de un usuario: el endpoint es `IsHubMachine`.
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
     }
 
     #[test]
