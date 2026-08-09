@@ -14,8 +14,11 @@ thiserror = "2"
 # Cliente WebSocket real (rustls, raíces webpki) detrás de la feature `ws`.
 # Opcional: el build por defecto del workspace NO lo arrastra.
 tungstenite = { version = "0.24", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"], optional = true }
+# Tipos de cabecera del handshake WS (Authorization: Bearer). Mismo `http` que tungstenite usa
+# internamente para `IntoClientRequest`; lo necesitamos aquí para estampar la credencial (hub#530).
+http = { version = "1", optional = true }
 
 [features]
 # Activa `WsStream` + `connect_ws`: implementación real de `EventStream` sobre tungstenite.
 # `cargo build -p erplora-sync --features ws`.
-ws = ["dep:tungstenite"]
+ws = ["dep:tungstenite", "dep:http"]

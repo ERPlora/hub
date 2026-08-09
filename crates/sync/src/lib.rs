@@ -254,15 +254,14 @@ mod ws {
         }
     }
 
-    /// Abre una conexión WebSocket a `url` (`ws://…` o `wss://…`) y la envuelve en un
-    /// [`WsStream`] listo para [`run_with_reconnect`].
+    /// Abre una conexión WebSocket a `url` (`ws://…` o `wss://…`) presentando `api_key` como
+    /// `Authorization: Bearer …` en el handshake, y la envuelve en un [`WsStream`] listo para
+    /// [`run_with_reconnect`].
     ///
-    /// ⚠️ **Sin credencial** (hub#504, ADR-0263): desde que `/ws` exige una API key del hub con
-    /// lectura, este `connect` abre el socket y **no recibe nada** — el hub lo cuelga al vencer la
-    /// ventana del handshake. Este cliente **no tiene llamadores** hoy (la feature `ws` está
-    /// apagada por defecto); cuando alguien lo use, tiene que presentar la key: como es un cliente
-    /// que SÍ controla cabeceras, le corresponde `Authorization: Bearer erpl_live_…` en el
-    /// handshake, no el frame del navegador. Ver `architecture/hub/auth.md`.
+    /// Desde ADR-0263, `/ws` no manda nada a un socket que no se autentique dentro de su ventana de
+    /// handshake. Como este cliente **sí** controla cabeceras (no es un navegador), le corresponde
+    /// la puerta normal de ADR-0057 — no el primer-frame del navegador. Presentar la credencial de
+    /// dos formas es dos formas de equivocarse, así que solo hay una.
     ///
     /// Pensado para usarse como el `connect` de `run_with_reconnect`:
     /// ```no_run
@@ -272,16 +271,23 @@ mod ws {
     /// let mut sleeper = ThreadSleeper;
     /// let mut handler = |ev: &erplora_sync::Event| println!("{}", ev.name);
     /// run_with_reconnect(
-    ///     || connect_ws(url).map(|s| Box::new(s) as Box<dyn EventStream>),
+    ///     || connect_ws(url, "erpl_live_xxx").map(|s| Box::new(s) as Box<dyn EventStream>),
     ///     &mut handler,
     ///     &mut backoff,
     ///     &mut sleeper,
     ///     None,
     /// );
     /// ```
-    pub fn connect_ws(url: &str) -> Result<WsStream, SyncError> {
+    pub fn connect_ws(url: &str, api_key: &str) -> Result<WsStream, SyncError> {
+        use tungstenite::client::IntoClientRequest;
+        let mut request = url
+            .into_client_request()
+            .map_err(|e| SyncError::Transport(e.to_string()))?;
+        request
+            .headers_mut()
+            .insert(http::header::AUTHORIZATION, http::header::HeaderValue::from_str(&format!("Bearer {api_key}")).map_err(|e| SyncError::Transport(e.to_string()))?);
         let (socket, _resp) =
-            tungstenite::connect(url).map_err(|e| SyncError::Transport(e.to_string()))?;
+            tungstenite::connect(request).map_err(|e| SyncError::Transport(e.to_string()))?;
         Ok(WsStream::new(socket))
     }
 }
