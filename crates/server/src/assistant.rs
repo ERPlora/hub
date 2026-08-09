@@ -63,6 +63,32 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
         }
     }
 
+    // Tools del CORE — capacidades del hub que no pertenecen a ningún módulo. Sin ellas el
+    // asistente está ciego justo en el hub VACÍO, donde no hay tools de módulo que ofrecer.
+    //
+    // La primera es `hub.setup.status` (ADR-0224/0230): «¿qué falta por configurar?» tiene
+    // respuesta computable, y sin esta tool el modelo la sustituía por una página de consejo
+    // fiscal genérico (caso real: modelo 036, IAE, OSS… en vez de la checklist del hub). El gate
+    // es el MISMO de la query core (`hub.users.view` — toda sesión lo tiene, ninguna API key), y
+    // el runtime lo revalida server-side igual que con cualquier tool: esto solo la OFRECE.
+    let core_tools: &[(&str, &str, &str)] = &[(
+        "hub.setup.status",
+        "What is left to configure in THIS hub, live: the union of core setup items (business \
+         identity, fiscal identity, apps, staff) and each installed module's own checklist — \
+         status, blocking level, route and available actions per item. Call it whenever the \
+         user asks what is missing, what to configure, or why an operation is blocked. The \
+         answer is already ordered and filtered by country and permission: relay it, do not \
+         re-derive or second-guess it.",
+        erplora_runtime::hub_users::VIEW_USERS_PERMISSION,
+    )];
+    for (name, description, permission) in core_tools {
+        if permits(permission) {
+            // module_id "hub" marca tool del CORE: `filter_tools_by_modules` la preserva
+            // explícitamente (el core no es un módulo y su ref_id nunca está en el índice).
+            tools.push(tool_def(name, description, "query", "hub", None));
+        }
+    }
+
     // Orden determinista (estabilidad del prompt + tests reproducibles).
     tools.sort_by(|a, b| {
         a["name"]
@@ -463,6 +489,30 @@ mod tests {
         assert!(!ins.contains("Kitchen order display"), "inactive module leaked: {ins}");
     }
 
+    /// The production failure this pins: asked "¿qué necesito configurar para poder empezar a
+    /// vender?", the assistant produced a page of GENERIC Spanish fiscal advice (modelo 036, IAE,
+    /// OSS…) — because the live answer, `hub.setup.status`, was not callable from a normal chat.
+    /// The setup briefing (ADR-0230) only arrives when the drawer opens from a setup screen; a
+    /// question typed anywhere else had no path to the document. The query IS the answer
+    /// (setup-status.md §1: "el estado de configuración es UNA query"), so it is offered as a
+    /// tool in EVERY turn, to any session — the runtime's own gate (`hub.users.view`, granted to
+    /// every session and no API key) still revalidates server-side.
+    #[test]
+    fn assemble_tools_offers_the_core_setup_status_query() {
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        // An EMPTY hub: no modules, no module tools — exactly where the checklist matters most.
+        let tools = assemble_tools(&Registry::new(), &ctx);
+        let setup = tools
+            .iter()
+            .find(|t| t["name"] == "hub.setup.status")
+            .expect("hub.setup.status must be offered even with zero modules installed");
+        assert_eq!(setup["kind"], "query", "a read: auto-run, no confirm-card");
+        assert!(
+            setup["description"].as_str().unwrap_or("").to_lowercase().contains("configur"),
+            "the description must say it answers configuration questions: {setup}"
+        );
+    }
+
     /// The money contract (ADR-0123) is a HUB-WIDE invariant, so it belongs in the system prompt
     /// and not in each module's schema: every amount the runtime accepts is an **integer of
     /// cents**. The JSON Schemas only say `{"type":"integer","minimum":0}` — nothing there tells
@@ -810,9 +860,16 @@ mod tests {
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
         let tools = assemble_tools(&reg, &ctx);
+        // Antes esto afirmaba `is_empty()` — un proxy que valía cuando SOLO los módulos aportaban
+        // tools. Hoy el catálogo lleva además las tools del CORE (`module_id: "hub"`), así que el
+        // contrato se afirma directo: ninguna tool de MÓDULO interna, vengan las core que vengan.
+        let module_tools: Vec<_> = tools
+            .iter()
+            .filter(|t| t["module_id"] != "hub")
+            .collect();
         assert!(
-            tools.is_empty(),
-            "ningún command interno debe exponerse como tool: {tools:?}"
+            module_tools.is_empty(),
+            "ningún command interno debe exponerse como tool: {module_tools:?}"
         );
     }
 
