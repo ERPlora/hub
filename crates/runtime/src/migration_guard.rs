@@ -294,7 +294,15 @@ fn tables_touched(statement: &str) -> Vec<String> {
 
     for (i, token) in tokens.iter().enumerate() {
         let upper = token.to_uppercase();
+        // `ON` solo cuenta en un `CREATE INDEX … ON <tabla>`: en un JOIN va seguido de una
+        // condición (`a.id = b.id`), y tomarla por un nombre de tabla es un falso positivo — que
+        // aquí significa dejar un módulo sin instalar.
+        let creating_index = {
+            let head = strip_comments(statement).trim_start().to_uppercase();
+            head.starts_with("CREATE INDEX") || head.starts_with("CREATE UNIQUE INDEX")
+        };
         let is_anchor = matches!(upper.as_str(), "TABLE" | "INTO" | "UPDATE")
+            || (upper == "ON" && creating_index)
             || (upper == "FROM" && !statement.trim_start().to_uppercase().starts_with("SELECT"));
         if !is_anchor {
             continue;
@@ -394,6 +402,21 @@ mod tests {
                 "debería rechazar `{sql}`: {refused:?}"
             );
         }
+    }
+
+    /// **Un índice también toca una tabla.** Sin esto, un módulo podía indexar la tabla de otro y
+    /// el guard no lo veía — el hueco lo destapó un fixture al que `CREATE INDEX … ON products` se
+    /// le escapó del renombrado.
+    #[test]
+    fn an_index_on_another_modules_table_is_caught() {
+        let refused = expand("CREATE INDEX idx_x ON inventory_item (hub_id)");
+
+        assert!(matches!(refused, Err(GuardError::ForeignTable { .. })), "{refused:?}");
+    }
+
+    #[test]
+    fn an_index_on_its_own_table_is_fine() {
+        expand("CREATE INDEX idx_x ON sales_sale (hub_id)").expect("su tabla, su índice");
     }
 
     // ── El SQL coincide con el `kind` declarado ──────────────────────────────────────
