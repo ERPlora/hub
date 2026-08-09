@@ -1,5 +1,5 @@
-// The bridge pairing credential has no client left, and the shell must stop asking for one
-// (ADR-0196 §3, hub#340).
+// Nothing in the shell may still talk to the standalone Bridge — not its port, not its download,
+// not its credential (ADR-0196 §3; hub#340, then hub#524/#507).
 //
 // hub#339 removed `WsBridgeTransport` from the SDK — the only thing that ever PRESENTED the bridge
 // token. What it deliberately left behind was the other half: the shell kept calling
@@ -41,6 +41,27 @@ function code(source: string): string {
 const sources = shellSources(SRC).map(
   (path) => [path, code(readFileSync(path, 'utf8'))] as const,
 );
+
+describe('the retired bridge daemon', () => {
+  it('is not knocked on: nothing in the shell probes the local port', () => {
+    // `localhost:12321` was the standalone Bridge's HTTP/WS port. hub#340 deleted the binary, so
+    // the probe left behind could only ever answer `{online:false}` — including inside
+    // `com.erplora.app`, where the hardware is right there and answers on the module door
+    // (`erplora.peripherals` → `invoke`). A probe that always says no is worse than none: the
+    // screens built on it kept telling owners to install the app they were already running
+    // (hub#524).
+    const callers = sources.filter(([, code]) => code.includes('12321'));
+    expect(callers.map(([path]) => path)).toEqual([]);
+  });
+
+  it('is not downloaded either: no shell source builds the Bridge address', () => {
+    // `/bridge/download/<platform>/` still resolves — and still serves `erplora-bridge.exe`. The
+    // installers of the one app live behind `/app/download/<platform>/` (saas#1242). Pointing at
+    // the old route does not fail and does not warn: it hands the user the wrong binary (hub#507).
+    const callers = sources.filter(([, code]) => code.includes('/bridge/download/'));
+    expect(callers.map(([path]) => path)).toEqual([]);
+  });
+});
 
 describe('the retired bridge pairing credential', () => {
   it('is asked for by nobody: no shell source calls the runtime proxy', () => {

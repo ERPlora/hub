@@ -20,14 +20,21 @@ describe('the installer offer', () => {
   it('leaves through the ONE door out of the till, not window.open', () => {
     // `window.open` opens nothing inside the webview of the installed app; `openExternal` knows the
     // difference between the two surfaces and rejects when the trip cannot be made (ADR-0255).
-    expect(source).toContain('openExternal(bridgeDownloadUrl(os.platform))');
+    expect(source).toContain('openExternal(appDownloadUrl(os.platform))');
     expect(source).not.toContain('window.open(');
+  });
+
+  it('reuses the ONE address of the installer instead of minting a second one', () => {
+    // `appDownloadUrl` (hub#400, `lib/app-update.ts`) is what the sidebar's «Update» already opens.
+    // A second helper here is how the two halves of the same button drift apart — one pointing at
+    // the store the day a listing goes live, the other still at a signed bucket URL (hub#507).
+    expect(source).toContain("from '../lib/app-update'");
   });
 
   it('is not shown to the app that would be installing itself', () => {
     // Inside `com.erplora.app` this card is the app offering its own installer. Updating it is its
     // own job (hub#400), and the printer steps above already drop «download» and «install».
-    expect(source).toContain('v-if="!bridge.online && !inInstalledApp"');
+    expect(source).toContain('v-if="!hardware.online && !inInstalledApp"');
     expect(source).toContain('printerSetupStepKeys(inInstalledApp)');
   });
 

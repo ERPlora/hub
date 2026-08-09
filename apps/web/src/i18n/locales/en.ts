@@ -734,8 +734,11 @@ export default {
     // (hub#375). What is left below is the INSTALL flow, which is still about a piece of software
     // and says so on purpose.
     recheck: 'Recheck',
-    downloadBridge: 'Download ERPlora Bridge',
-    downloadBridgeHint: 'Bridge is a small native app that connects this hub with your printers, cash drawer and scanners. Choose your system to continue.',
+    // One product, one name (hub#500). «Download ERPlora Bridge» followed by «install ERPlora» were
+    // two names for the same thing, and one of them belonged to an app ADR-0196 deleted — «Bridge»
+    // is platform jargon, the side ADR-0254 keeps out of the hub's screens.
+    downloadApp: 'Download the ERPlora app',
+    downloadAppHint: 'The ERPlora app is what talks to your printers, cash drawer and scanners. Choose your system to continue.',
     stepDownload: 'Download',
     stepInstall: 'Install',
     stepPair: 'Pair',
@@ -770,7 +773,7 @@ export default {
     colTime: 'Time',
     colLevel: 'Level',
     colEvent: 'Event',
-    toastDownloadingBridge: 'Downloading Bridge for {os}…',
+    toastDownloadingApp: 'Downloading ERPlora for {os}…',
     // What the hub says about itself, to the person who owns the bar (hub#375). Every sentence
     // names a thing they recognise —the printer— and, when there is something to do, what to do.
     // The third state is the honest one: we could not check. It is never dressed up as "fine".
