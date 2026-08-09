@@ -139,12 +139,16 @@ describe('every caller of openExternal', () => {
       import('../i18n/locales/es'),
     ]);
 
+    // `planLimits.upgradeError` used to be checked here. Its caller is gone (hub#479): the button
+    // that opened the SaaS plans page was a route from the app to a payment, which both stores
+    // reject. `appUpdate.failed` takes its place and is the better witness anyway — it belongs to
+    // the update channel (hub#400), the one trip out that MUST keep working after the sweep.
     for (const messages of [en.default, es.default]) {
-      expect(messages.planLimits.upgradeError).toBeTruthy();
+      expect(messages.appUpdate.failed).toBeTruthy();
       expect(messages.profile.cloudAccountError).toBeTruthy();
     }
     // Not the same sentence twice: an untranslated string is a key that was copied, not translated.
-    expect(es.default.planLimits.upgradeError).not.toBe(en.default.planLimits.upgradeError);
+    expect(es.default.appUpdate.failed).not.toBe(en.default.appUpdate.failed);
     expect(es.default.profile.cloudAccountError).not.toBe(en.default.profile.cloudAccountError);
   });
 });

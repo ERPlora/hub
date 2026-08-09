@@ -4,10 +4,14 @@
   (`billing.tiers`) y el estado de suscripción actual (cloudModuleSubscription, JWT del usuario +
   X-Hub-Id).
 
-  El Hub NO vende (decisión Fase 4): los CTAs comprar/mejorar/cancelar abren un DEEP-LINK a la
-  página del módulo en el SaaS (navegador externo vía openExternal), donde vive el checkout y la
-  gestión de la suscripción. Al recuperar foco/visibilidad —o con el botón "comprobar"— el panel
-  re-consulta la suscripción para reflejar la compra hecha en el navegador.
+  El Hub NO vende, y desde hub#479 tampoco LLEVA a vender: los CTAs comprar/mejorar/cancelar abrían
+  un deep-link a la página del módulo en el SaaS —donde vive el checkout— y eso es exactamente el
+  steering que rechazan Google Play y Microsoft Store. Ya no existen. El panel MUESTRA: el estado de
+  la suscripción y qué tiers declara el manifest. Contratar o cambiar de tier se hace en erplora.com,
+  que es el único sitio donde ERPlora vende.
+
+  El botón "comprobar" se queda, y ahora es el que importa: quien contrate desde el navegador vuelve
+  aquí y refresca el estado (además del recheck-on-focus, que sigue).
 
   El Cloud NO expone el slug del tier actual (ni module-subscription ni check_ownership lo traen),
   así que en v1 NO se resalta un tier concreto: se muestra solo el `status` global y los CTAs se
@@ -38,24 +42,15 @@
           </p>
           <p v-else class="status-line opacity-70">{{ statusHint }}</p>
 
-          <!-- La compra/gestión ocurre en el navegador (SaaS); aquí solo se refleja el estado. -->
-          <p class="status-line opacity-70">{{ t('modulePlan.opensInBrowser') }}</p>
+          <!-- Dónde se gestiona. Frase, no enlace: la página del módulo en el SaaS tiene checkout
+               y llevar ahí desde dentro de la app es steering (hub#479). El botón «Cancelar» que
+               había aquí abría ese mismo destino, así que se fue con los demás. -->
+          <p class="status-line opacity-70">{{ t('modulePlan.managedInAccount') }}</p>
           <div class="status-actions">
-            <!-- Re-consulta manual: "he completado la compra" (además del recheck-on-focus). -->
+            <!-- Re-consulta manual: "ya lo he contratado" (además del recheck-on-focus). -->
             <ion-button size="small" fill="outline" :disabled="loadingStatus" @click="onCheckPurchase">
               <HubIcon name="refresh-outline" slot="start" />
               {{ t('modulePlan.checkPurchase') }}
-            </ion-button>
-            <!-- Cancelar: la gestión vive en el SaaS → mismo deep-link que la compra. -->
-            <ion-button
-              v-if="canCancel"
-              fill="outline"
-              color="danger"
-              size="small"
-              @click="onCancel"
-            >
-              <HubIcon name="close-outline" slot="start" />
-              {{ t('modulePlan.cancel') }}
             </ion-button>
           </div>
         </template>
@@ -84,14 +79,9 @@
               {{ t('modulePlan.overage', { price: fmtMoney(tier.overage_price) }) }}
             </li>
           </ul>
-          <ion-button
-            expand="block"
-            :fill="isOwned ? 'outline' : 'solid'"
-            @click="onPurchase"
-          >
-            <HubIcon :name="isOwned ? 'trending-up-outline' : 'cart-outline'" slot="start" />
-            {{ isOwned ? t('modulePlan.upgrade') : t('modulePlan.buy') }}
-          </ion-button>
+          <!-- Aquí vivía el botón «Comprar»/«Mejorar» (icono de carrito) que abría el checkout del
+               SaaS en el navegador. Los tiers se siguen VIENDO —saber qué incluye cada uno y qué
+               cuesta es información, no un camino al pago—, pero desde el hub no se contrata. -->
         </ion-card-content>
       </ion-card>
     </div>
@@ -121,8 +111,6 @@ import {
 } from '../lib/cloud';
 import type { ModuleBilling, BillingTierDef } from '@erplora/module-types';
 import { formatAmount } from '../lib/money';
-import { openExternal } from '../lib/open-external';
-import { config } from '../lib/config';
 
 const props = defineProps<{
   /** Slug del módulo (el Hub usa el module_id como slug; el Cloud resuelve por pk|slug|module_id). */
@@ -146,11 +134,8 @@ const isOwned = computed(() => {
   const s = sub.value?.status;
   return s === 'active' || s === 'trialing' || s === 'canceled' || s === 'past_due';
 });
-// Cancelar solo tiene sentido sobre una suscripción viva no cancelada aún.
-const canCancel = computed(() => {
-  const s = sub.value?.status;
-  return s === 'active' || s === 'trialing' || s === 'past_due';
-});
+// `canCancel` gateaba el botón «Cancelar», retirado con el resto de controles que aterrizaban en el
+// checkout (hub#479). Cancelar sigue siendo posible: en erplora.com.
 
 // Estado → color del badge / etiqueta i18n.
 const STATUS_COLOR: Record<ModuleSubscriptionStatus, 'success' | 'warning' | 'danger' | 'medium'> = {
@@ -216,31 +201,12 @@ async function loadStatus(): Promise<void> {
   }
 }
 
-// Deep-link a la página del módulo en el SaaS. El Hub NO vende: la compra, el upgrade y la
-// cancelación viven ahí (checkout de Stripe incluido). `hub` identifica este hub en el SaaS
-// (config.hubId lo resuelve el boot desde `GET /api/hub/context`, ver lib/runtime.ts).
-const deepLink = computed(() =>
-  `${config.cloudApiUrl}/dashboard/marketplace/modules/${encodeURIComponent(props.moduleId)}/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`);
+// Aquí vivía `deepLink` —la página del módulo en el SaaS, con el checkout de Stripe— y los dos
+// controles que la abrían, `onPurchase()` y `onCancel()`. Los tres se fueron con hub#479: una
+// dirección construida aquí para llevar al pago es steering la construya quien la construya, y esa
+// es la causa de rechazo que había que quitar de en medio antes de subir la app a las tiendas.
 
-async function onPurchase(): Promise<void> {
-  // Abre el navegador externo; al volver el foco a esta vista, el recheck refleja la compra.
-  try {
-    await openExternal(deepLink.value);
-  } catch {
-    notify(t('modulePlan.purchaseError'), 'danger');
-  }
-}
-
-async function onCancel(): Promise<void> {
-  // La gestión de la suscripción vive en el SaaS: mismo deep-link que la compra.
-  try {
-    await openExternal(deepLink.value);
-  } catch {
-    notify(t('modulePlan.cancelError'), 'danger');
-  }
-}
-
-/** Botón "He completado la compra — comprobar": re-consulta y avisa si el plan ya está activo. */
+/** Botón "ya lo he contratado — comprobar": re-consulta y avisa si el plan ya está activo. */
 async function onCheckPurchase(): Promise<void> {
   await loadStatus();
   if (isOwned.value) notify(t('modulePlan.purchaseDetected'), 'success');

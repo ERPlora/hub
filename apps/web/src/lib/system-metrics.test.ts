@@ -4,7 +4,6 @@ import {
   toPct,
   upgradeReason,
   shouldPromptUpgrade,
-  upgradeLink,
   type SystemMetrics,
 } from './system-metrics';
 
@@ -83,10 +82,10 @@ describe('upgradeReason (solo plan free)', () => {
   });
 });
 
-describe('upgradeLink', () => {
-  it('apunta al marketplace de planes del SaaS con utm del hub', () => {
-    const url = upgradeLink();
-    expect(url).toContain('/dashboard/marketplace/plans/');
-    expect(url).toContain('utm_source=hub');
-  });
-});
+// `upgradeLink()` ya no existe y su test se va con ella (hub#479): apuntaba al marketplace de
+// planes del SaaS, o sea a una página donde se paga, y enlazar ahí desde dentro de la app es lo que
+// rechazan Google Play y Microsoft Store. Que NADIE la reintroduzca lo vigila
+// `no-purchase-steering.test.ts`, que es un guard sobre toda la fuente y no sobre esta función.
+//
+// Lo que sí sigue probado arriba es `upgradeReason()`: saber que el hub roza su techo es útil por sí
+// solo, y es lo que el panel ahora dice con palabras en vez de con un botón.
