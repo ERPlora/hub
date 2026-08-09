@@ -26,6 +26,12 @@ use crate::Runtime;
 /// backs, so the mirror of the export cannot drift into clearing something else.
 const ROLES_TABLE: &str = "hub_role_activation";
 
+/// Section name + table for the print queue (hub#502). `_print_queue` is DATA — pending receipts
+/// of sales the reset deletes — so it IS swept. `_print_host` is NOT (local/printer config) and
+/// must survive: see the `print_host_survives_a_full_reset` e2e.
+const PRINT_QUEUE_SECTION: &str = "print_queue";
+const PRINT_QUEUE_TABLE: &str = "_print_queue";
+
 /// Qué secciones se borran. Todo `false`/vacío por defecto: el reset nunca hace de más.
 #[derive(Debug, Clone, Default)]
 pub struct ResetSelection {
@@ -41,6 +47,11 @@ pub struct ResetSelection {
     /// modules DECLARE are live here. Off by default like everything else — switching a role off
     /// makes it unassignable, so it is never a side effect of clearing something else.
     pub roles: bool,
+    /// The print queue (`_print_queue`, hub#502): pending tickets from sales the reset just
+    /// deleted. Since hub#343 there IS a host draining it, so a reset followed by an app
+    /// reconnecting would print **ghost tickets of a business that no longer exists**. The queue
+    /// is DATA, unlike `_print_host` (which LOCAL config and stays — see [`print_host_survives`]).
+    pub print_queue: bool,
     /// Ids de módulos instalados cuyos datos de usuario se borran.
     pub modules: Vec<String>,
 }
@@ -99,6 +110,14 @@ pub async fn plan_reset(rt: &Runtime, hub_id: &str) -> crate::Result<ResetPlan> 
     sections.push(SectionPlan {
         section: ROLES_SECTION.into(),
         rows: count_where(rt, ROLES_TABLE, "TRUE", hub_id).await,
+        blocked_by: None,
+    });
+    // The print queue (hub#502): pending receipts of sales the reset is about to delete. Counted
+    // with the SAME `WHERE hub_id` as the DELETE — the dry-run must announce exactly what goes.
+    // `_print_host` is NOT here on purpose: it is local/printer config, not business data.
+    sections.push(SectionPlan {
+        section: PRINT_QUEUE_SECTION.into(),
+        rows: count_where(rt, PRINT_QUEUE_TABLE, "TRUE", hub_id).await,
         blocked_by: None,
     });
 
@@ -292,6 +311,18 @@ pub async fn execute_reset(
             ROLES_SECTION.into(),
             ROLES_TABLE.into(),
             format!("DELETE FROM {ROLES_TABLE} WHERE hub_id = :hub_id"),
+        ));
+    }
+    // The print queue (hub#502): since hub#343 a host DRAINS it, so a reset followed by an app
+    // reconnecting would print ghost tickets of a business that just got deleted. Sweeping the
+    // queue is the owner's door the other way. `_print_host` (which printer prints kitchen) is
+    // LOCAL config and stays — re-pairing printers after every reset is exactly what hub#342
+    // avoided on purpose.
+    if selection.print_queue && existing.iter().any(|t| t == PRINT_QUEUE_TABLE) {
+        ops.push((
+            PRINT_QUEUE_SECTION.into(),
+            PRINT_QUEUE_TABLE.into(),
+            format!("DELETE FROM {PRINT_QUEUE_TABLE} WHERE hub_id = :hub_id"),
         ));
     }
 
@@ -561,6 +592,7 @@ mod tests {
     fn default_selection_is_empty() {
         let sel = ResetSelection::default();
         assert!(!sel.settings && !sel.users && !sel.media && !sel.fiscal);
+        assert!(!sel.print_queue, "la cola de impresión tampoco se borra por defecto");
         assert!(sel.modules.is_empty());
     }
 
