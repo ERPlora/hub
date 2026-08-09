@@ -197,7 +197,7 @@ async fn turn(rt: &Runtime, limits: &Limits) -> Vec<IoResult> {
 }
 
 async fn run_status(rt: &Runtime, flow_id: &str) -> (String, String) {
-    let run = rt.list_flow_runs(flow_id, 1).await.unwrap().remove(0);
+    let run = rt.list_flow_runs(flow_id, 1, None).await.unwrap().remove(0);
     (run.status, run.last_error)
 }
 
@@ -416,7 +416,7 @@ async fn the_background_loop_completes_what_it_dispatched() {
     for _ in 0..50 {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let rt = state.runtime.lock().await;
-        let run = rt.list_flow_runs(&flow_id, 1).await.unwrap().remove(0);
+        let run = rt.list_flow_runs(&flow_id, 1, None).await.unwrap().remove(0);
         status = run.status.clone();
         if status == "failed" || status == "pending" {
             assert!(run.last_error.contains("flow.http_blocked"), "{}", run.last_error);
@@ -468,12 +468,28 @@ async fn the_credential_arrives_at_the_server_and_never_at_the_run_history() {
     // …and it is nowhere in what the hub wrote down — not in the step's input, and not in the
     // OUTPUT either, because this server echoed the key back inside its answer.
     let (run, steps) = {
-        let run = rt.list_flow_runs(&flow_id, 1).await.unwrap().remove(0);
+        let run = rt.list_flow_runs(&flow_id, 1, None).await.unwrap().remove(0);
         rt.get_flow_run(&run.id).await.unwrap()
     };
     let written = format!("{:?}{:?}", run, steps);
     assert!(!written.contains("sk-live-42"), "the run history holds the credential: {written}");
-    assert!(written.contains("***"), "and its place is marked: {written}");
+
+    // Two layers, and this is what each of them caught — they are not redundant:
+    //
+    //  · the WRITE door (hub#662, `HttpRequest::scrub`): the OUTPUT. This server echoed the key
+    //    back inside its answer, and no rule about key NAMES could have found it there — it is
+    //    free-form data. It is `***` because the request scrubbed its own credential out of
+    //    everything that came back.
+    //  · the READ door (hub#666, `store::redact_step`): the INPUT. The `Authorization` header is
+    //    blanked when the run is read, by learning the key name from the flow's own definition.
+    assert!(
+        written.contains("Bearer ***"),
+        "the echoed credential is scrubbed out of the answer: {written}"
+    );
+    assert!(
+        written.contains("«secret»"),
+        "and the header that carried it is blanked on the way out: {written}"
+    );
 }
 
 #[tokio::test]
