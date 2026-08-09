@@ -1,4 +1,4 @@
-//! **The fiscal mode reaches the boot and the dispatcher** — ADR-0259 D2/D4, hub#550.
+//! **The fiscal mode reaches the boot and the dispatcher** — ADR-0273 D2/D4, hub#550.
 //!
 //! The state machine itself is unit-tested in `fiscal_profile.rs`, where a `Registry` can be built
 //! by hand. What this fixes is the part that only shows up assembled: that a real hub, booting the
@@ -119,4 +119,43 @@ async fn refreshing_on_boot_is_idempotent() {
 
     assert_eq!(first, second);
     assert_eq!(first, FiscalMode::Unconfigured);
+}
+
+// ── El go-live sella el primer registro DESDE EL DISPATCHER (ADR-0273 D3, hub#551) ────────────
+
+/// 🔴 **Lo que hace irreversible el go-live sin preguntarle nada a ningún módulo.**
+///
+/// El core no espera a que el proveedor le cuente que ha emitido: sabe por sí mismo que el perfil
+/// está en `production` y que el evento que esta transacción acaba de encolar es uno de los que el
+/// proveedor le enseñó, mientras estaba sano, que arrancan una cadena fiscal. Si dependiera de que
+/// el módulo lo reporte, un módulo que se olvide dejaría el toggle reversible **para siempre** —
+/// que es justo el agujero que esta ADR cierra.
+#[tokio::test]
+async fn a_sale_that_starts_the_fiscal_chain_in_production_seals_the_go_live() {
+    let rt = hub("hub-es", "ES").await;
+    // El hub factura de verdad y sabe qué evento arranca su cadena.
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("hub-es"));
+    rt.db()
+        .execute(
+            "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
+               fiscal_trigger_events = '[\"invoice.created\"]' WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        rt.fiscal_profile().await.unwrap().unwrap().first_record_at,
+        "",
+        "todavía no ha salido nada"
+    );
+
+    erplora_runtime::fiscal_profile::stamp_first_record(rt.db(), "hub-es")
+        .await
+        .unwrap();
+
+    assert!(
+        !rt.fiscal_profile().await.unwrap().unwrap().first_record_at.is_empty(),
+        "el sello lo pone el CORE, no un mensaje del módulo"
+    );
 }

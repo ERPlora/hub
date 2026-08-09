@@ -32,7 +32,10 @@
           </ok-status-pill>
         </div>
 
-        <!-- CTA de upgrade: SOLO plan free rozando un límite (RAM/BD >=80% o tope de dispositivos). -->
+        <!-- Aviso de techo: SOLO plan free rozando un límite (RAM/BD >=80% o tope de dispositivos).
+             Informa, no enlaza: el botón «Ver planes» que había aquí llevaba al marketplace del
+             SaaS, o sea a una página donde se paga, y eso es steering (hub#479). El aviso sigue —
+             quien roza el techo tiene que saberlo—; el camino a ampliarlo está en erplora.com. -->
         <ok-inline-feedback
           v-if="reason"
           class="pl-cta"
@@ -41,10 +44,7 @@
           :heading="t('planLimits.upgradeTitle')"
         >
           {{ upgradeMessage }}
-          <ion-button slot="actions" size="small" @click="openUpgrade">
-            <HubIcon slot="start" name="open-outline" />
-            {{ t('planLimits.upgradeCta') }}
-          </ion-button>
+          <p class="pl-cta-where">{{ t('planLimits.upgradeWhere') }}</p>
         </ok-inline-feedback>
 
         <ion-grid class="ion-no-padding pl-grid">
@@ -154,11 +154,9 @@ import {
   IonSpinner, IonButton, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonProgressBar,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
-import { openExternal } from '../lib/open-external';
 import {
-  fetchSystemMetrics, formatBytes, toPct, upgradeReason, upgradeLink, type SystemMetrics,
+  fetchSystemMetrics, formatBytes, toPct, upgradeReason, type SystemMetrics,
 } from '../lib/system-metrics';
-import { toastError } from '../lib/toast';
 
 const { t } = useI18n();
 
@@ -224,16 +222,11 @@ function usageLabel(used: number | null, limit: number | null): string {
     : t('planLimits.usedNoLimit', { used: formatBytes(used) });
 }
 
-// Upgrading happens in the SaaS, in the user's own browser (ADR-0114 §4). If that trip cannot be
-// made, it is said out loud: this button is the one offered to somebody who has just hit a wall,
-// and a wall with a dead button next to it is worse than the wall (hub#475).
-async function openUpgrade(): Promise<void> {
-  try {
-    await openExternal(upgradeLink());
-  } catch {
-    await toastError(t('planLimits.upgradeError'));
-  }
-}
+// There was an `openUpgrade()` here that opened the SaaS plans page in the user's own browser
+// (ADR-0114 §4, wired for real in hub#475). It is gone: that page changes the plan on the saved
+// card, so the button was a route from inside the app to a payment — steering, and a rejection
+// cause on both stores (hub#479). The wall is still announced; the way past it is on erplora.com,
+// which the notice now says in words instead of offering as a door.
 
 /** Carga inicial (con spinner). Marca error si el runtime no responde. */
 async function load(): Promise<void> {

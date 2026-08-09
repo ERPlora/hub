@@ -1,5 +1,10 @@
-//! **The hub's fiscal profile** — the CORE decides THAT there is an obligation (ADR-0259 D1/D6,
+//! **The hub's fiscal profile** — the CORE decides THAT there is an obligation (ADR-0273 D1/D6,
 //! hub#549).
+//!
+//! ⚠️ **The decision circulated as "ADR-0259" while it was a draft, and that number was already
+//! taken** (the installed app saving a download, merged the same day). Everything landed as
+//! **ADR-0273**; the first commits of this line still say 0259 in their messages, which cannot be
+//! rewritten. If you are following a reference from a commit, this is the one it means.
 //!
 //! The rule this module exists to enforce:
 //!
@@ -62,7 +67,7 @@ use crate::errors::{Result, RuntimeError};
 use crate::registry::Registry;
 use crate::registry::now_rfc3339;
 
-/// The state machine of the fiscal profile (ADR-0259 D2).
+/// The state machine of the fiscal profile (ADR-0273 D2).
 ///
 /// `BLOCKED` is **not** in this enum on purpose: it is derived on every boot and on every gate from
 /// `Active` ∧ (no mounted provider ∨ mismatched `system_id`), never persisted. A derived state that
@@ -146,9 +151,21 @@ pub struct FiscalProfile {
     pub can_go_live: bool,
     /// Something the core could not decide and refuses to guess (ADR-0249).
     pub needs_review: bool,
+    /// Cessation of activity: when the business stopped. `""` until then. Write-once (hub#557).
+    pub closed_at: String,
+    /// And **who** decided it — the `hub_user` id the door authenticated. An irreversible action
+    /// with nobody attached to it in the record is not a trace.
+    pub closed_by: String,
+    /// When somebody took a **foreign** installation over. `""` while none was (hub#558).
+    pub adopted_at: String,
+    /// The `system_id` these rows carried before the takeover — the one fact the takeover itself
+    /// destroys, and the only evidence left that two chains could have been mixed here.
+    pub adopted_from: String,
+    /// And who decided it.
+    pub adopted_by: String,
 }
 
-/// Why a hub that went live is not operating (ADR-0259 D2, hub#550). Derived, never stored.
+/// Why a hub that went live is not operating (ADR-0273 D2, hub#550). Derived, never stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockedReason {
     /// Nobody is left to comply: no installed **and active** module fulfils the hub's regime.
@@ -185,7 +202,7 @@ pub enum FiscalMode {
     Closed,
 }
 
-/// The installed **and active** modules that fulfil `regime` for `country` (ADR-0259 D5/D6).
+/// The installed **and active** modules that fulfil `regime` for `country` (ADR-0273 D5/D6).
 ///
 /// The core **counts**; it never picks. Two providers of one regime are a spare, not a conflict,
 /// and which one a hub uses is the user's business — hence a slice and not an `Option`.
@@ -208,7 +225,7 @@ pub fn providers_of<'a>(
 }
 
 /// The events a healthy provider says it listens to — what the core LEARNS while it can ask
-/// (ADR-0259 D4). Sorted and deduplicated so the stored set is stable and comparing it is cheap.
+/// (ADR-0273 D4). Sorted and deduplicated so the stored set is stable and comparing it is cheap.
 ///
 /// The runtime does not know what `invoice.created` means, and does not need to: it knows *the
 /// provider of this hub's regime said it was listening to it while it was healthy*. That is the
@@ -223,7 +240,20 @@ pub fn learned_trigger_events(registry: &Registry, country: &str, regime: &str) 
     events
 }
 
-/// Resolves the **effective** mode of `profile` against what is actually mounted (ADR-0259 D2/D4).
+/// **Were these rows written by a DIFFERENT installation of the software?** (ADR-0273 D8, hub#558).
+///
+/// `NumeroInstalacion = hub_id` is the ADR-0202 invariant, so the answer is a string comparison and
+/// nothing more: another `system_id` is another installation, another SIF and another chain.
+///
+/// An **empty** `system_id` is not foreign. Only a profile written before the column existed can be
+/// empty, and reading "nobody stamped this yet" as "somebody else's" would block a hub over a
+/// missing value rather than over a conflicting one — the wrong direction for a fact that stops a
+/// till. It gets stamped by the first [`ensure`] that creates the row.
+pub fn is_foreign_installation(profile: &FiscalProfile, hub_id: &str) -> bool {
+    !profile.system_id.is_empty() && profile.system_id != hub_id
+}
+
+/// Resolves the **effective** mode of `profile` against what is actually mounted (ADR-0273 D2/D4).
 ///
 /// Only a hub that went live can be [`FiscalMode::Blocked`]: before the go-live nothing is
 /// anchored, so a missing provider is a task, not an emergency. Turning a hub that never emitted
@@ -242,7 +272,7 @@ pub fn determine_fiscal_mode(
             // The installation check comes first: if these rows belong to somebody else, whether a
             // provider happens to be mounted is beside the point — continuing another hub's chain
             // is worse than not emitting.
-            if !profile.system_id.is_empty() && profile.system_id != hub_id {
+            if is_foreign_installation(profile, hub_id) {
                 return FiscalMode::Blocked(BlockedReason::InstallationMismatch);
             }
             if providers_of(registry, &profile.country_code, &profile.fiscal_system).is_empty() {
@@ -253,7 +283,7 @@ pub fn determine_fiscal_mode(
     }
 }
 
-/// Resolves the profile against the world and returns the effective mode (ADR-0259 D2/D4, hub#550).
+/// Resolves the profile against the world and returns the effective mode (ADR-0273 D2/D4, hub#550).
 ///
 /// Runs on every boot, after the registry has been rehydrated — that is the first moment the two
 /// halves of the answer (what the hub owes, and who is mounted to comply) are both available.
@@ -277,6 +307,51 @@ pub async fn refresh(
 ) -> Result<FiscalMode> {
     let profile = ensure(db, hub_id).await?;
     let providers = providers_of(registry, &profile.country_code, &profile.fiscal_system);
+
+    // **R5 (hub#315/#552): una demo NUNCA pasa a producción.** `Registry::demo_hub` sale de
+    // `HUB_DEMO`, env del despliegue que escribe el provisioning del SaaS como espejo de
+    // `Hub.is_demo`: se lee UNA vez al arrancar y **no tiene escritor dentro del hub** — ni
+    // cabecera, ni campo de payload, ni clave de `hub_settings`, ni endpoint. Ni el navegador ni un
+    // command pueden tocarlo.
+    //
+    // Se refleja en el perfil en cada arranque en vez de consultarse en el momento del go-live
+    // porque así el hecho queda **escrito y consultable**: la pantalla puede decir por qué el
+    // toggle está apagado sin preguntarle al entorno del proceso.
+    //
+    // Fail-closed hacia hub NORMAL (ausente ⇒ puede), que es la dirección segura: tomar por demo a
+    // un hub real lo dejaría fuera de producción **sin decir nada**. Y desde
+    // `verifactu-gateway.md` §3.4 la demo SÍ lleva certificado delegado y transmite de verdad a
+    // preproducción — el entorno es lo único que la separa de la AEAT real.
+    let can_go_live = !registry.demo_hub;
+    if can_go_live != profile.can_go_live {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("can_go_live".into(), json!(if can_go_live { 1 } else { 0 }));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET can_go_live = :can_go_live WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await?;
+    }
+
+    // **These rows are another installation's** (ADR-0273 D8, hub#558). `NumeroInstalacion =
+    // hub_id` (ADR-0202), so a different `system_id` means the chain they hang from is not this
+    // hub's to continue. `determine_fiscal_mode` already derives `BLOCKED` from the same fact; what
+    // is written here is the *flag*, because a hub that will not file needs somebody told, and the
+    // core will not choose between "carry on" and "start again" on its own (ADR-0249).
+    //
+    // Only ever SET, never cleared here — the way out is somebody adopting the installation on
+    // purpose ([`adopt_installation`]). A boot that could clear it would be the boot adopting in
+    // silence, which is exactly how two chains end up mixed.
+    if is_foreign_installation(&profile, hub_id) && !profile.needs_review {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET needs_review = 1 WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await?;
+    }
 
     // Learnt while healthy, remembered when gone: only overwrite when somebody taught us something.
     if !providers.is_empty() {
@@ -335,11 +410,328 @@ pub async fn refresh(
     Ok(determine_fiscal_mode(&profile, registry, hub_id))
 }
 
-/// The stable rejection code of the provider lock (ADR-0259 D5). ABI público: la UI programa
+/// The two environments a fiscal record can be transmitted to. `testing` is the sandbox of the tax
+/// authority; `production` is the real one.
+pub const ENV_TESTING: &str = "testing";
+pub const ENV_PRODUCTION: &str = "production";
+
+/// Stable rejection codes of the go-live (ADR-0273 D3). ABI público: la UI programa contra ellos.
+pub const NOT_READY: &str = "fiscal.not_ready";
+pub const GO_LIVE_FORBIDDEN: &str = "fiscal.go_live_forbidden";
+pub const ALREADY_EMITTED: &str = "fiscal.already_emitted";
+
+/// **The hub ceased activity** (ADR-0273 D2, hub#557). One code, two doors: the dispatcher rejects
+/// writes with it ([`crate::commands`]), and so does an attempt to start issuing again — because
+/// from the outside they are the same answer, *this business closed*.
+pub const HUB_CLOSED: &str = "fiscal.hub_closed";
+
+/// Ceasing activity with nobody to attribute it to. See [`close`].
+pub const CLOSE_NEEDS_ACTOR: &str = "fiscal.close_needs_actor";
+
+/// Taking over an installation with nobody to attribute it to. See [`adopt_installation`].
+pub const ADOPT_NEEDS_ACTOR: &str = "fiscal.adopt_needs_actor";
+
+/// Nothing foreign to take over: the profile already belongs to this hub. See
+/// [`adopt_installation`].
+pub const NOTHING_TO_ADOPT: &str = "fiscal.nothing_to_adopt";
+
+/// **The go-live: `READY → ACTIVE` IS `testing → production`** (ADR-0273 D3).
+///
+/// They used to be two disconnected things — an `environment` that was a column of a module, and no
+/// concept of a go-live at all. Fusing them leaves one path and one place to store it, and takes
+/// the switch that decides *which tax authority sees the real sales* out of an `UPDATE` that lives
+/// in a publishable module. A fork, a third-party module or a badly written statement could get
+/// round that; nothing gets round a column of the core.
+///
+/// Three conditions, and they are the ones the core already evaluates:
+///
+/// 1. **`READY`** — identity ∧ certificate ∧ a provider mounted and active. The same condition the
+///    checklist shows, computed in one place (see [`refresh`]), not a second list to keep in sync.
+/// 2. **`can_go_live`** — `false` on a demo hub (hub#552). A throwaway hub carries the delegated
+///    certificate, so the environment is the only thing standing between it and the real AEAT.
+/// 3. It is **not already live**.
+///
+/// What it freezes: `taxpayer_id` (the identifier the chain will be anchored to — from now on
+/// `business_tax_id` may not move, hub#554), `activated_at`, and `environment = production`.
+pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalProfile> {
+    let profile = ensure(db, hub_id).await?;
+    if profile.status == FiscalStatus::Active {
+        return Ok(profile); // Idempotent: pressing an already-on toggle is not an error.
+    }
+    // A ceased business does not start issuing again from the same profile (hub#557). It gets its
+    // own rejection so the screen can say *why* instead of asking for a certificate the hub has.
+    if profile.status == FiscalStatus::Closed {
+        return Err(RuntimeError::Domain {
+            code: HUB_CLOSED.to_string(),
+            message: format!(
+                "this hub ceased activity on {}: it does not issue again. A business that comes \
+                 back invoices from a new hub, so that its old chain stays closed where it ended",
+                profile.closed_at
+            ),
+        });
+    }
+    if !profile.can_go_live {
+        return Err(RuntimeError::Domain {
+            code: GO_LIVE_FORBIDDEN.to_string(),
+            message: "this hub may never file for real: it is a demo. Create a hub of your own to \
+                      go live"
+                .to_string(),
+        });
+    }
+    if profile.status != FiscalStatus::Ready {
+        return Err(RuntimeError::Domain {
+            code: NOT_READY.to_string(),
+            message: "the hub is not ready to file for real yet: it needs its tax identity, its \
+                      certificate and a module that fulfils its fiscal regime"
+                .to_string(),
+        });
+    }
+    let taxpayer_id = crate::settings::get_all(db, hub_id)
+        .await
+        .unwrap_or(json!({}))
+        .get("business_tax_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("taxpayer_id".into(), json!(taxpayer_id));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("production".into(), json!(ENV_PRODUCTION));
+    p.insert("status".into(), json!(FiscalStatus::Active.as_str()));
+    db.execute(
+        "UPDATE _hub_fiscal_profile \
+         SET status = :status, environment = :production, activated_at = :now, \
+             taxpayer_id = :taxpayer_id \
+         WHERE hub_id = :hub_id",
+        &p,
+    )
+    .await?;
+    reload(db, hub_id).await
+}
+
+/// **Stands the hub back down to the sandbox** — allowed *while nothing has left for the real tax
+/// authority* (ADR-0273 D3, decisión de Ioan del 2026-08-08).
+///
+/// > **Lo irreversible es el primer ENVÍO, no el clic.**
+///
+/// Somebody who activates by mistake and notices before invoicing can go back; the damage is not
+/// done by the toggle but by the record. Once one has gone out, `first_record_at` is sealed and
+/// this is refused for ever — because a record accepted by the AEAT is never re-sent (ADR-0189),
+/// and the next sales would file to preproduction: real invoices whose records the real AEAT never
+/// sees. That is the generated-but-never-remitted orphan the FAQ forbids.
+///
+/// **The block is a query, not a state somebody remembers**, and it asks the CORE — not a module
+/// table. `first_record_at` is stamped by the dispatcher the moment it lets a transaction that
+/// starts a fiscal chain commit in production (see [`stamp_first_record`]), so it does not depend
+/// on any provider remembering to report anything.
+///
+/// The legitimate way to try things out after the go-live is **another hub**: a different
+/// `system_id` gives it a different chain by the ADR-0202 invariant, with no risk to the one that
+/// invoices.
+pub async fn stand_down(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalProfile> {
+    let profile = ensure(db, hub_id).await?;
+    if profile.status != FiscalStatus::Active {
+        return Ok(profile); // Already down; nothing to undo.
+    }
+    if !profile.first_record_at.is_empty() {
+        return Err(RuntimeError::Domain {
+            code: ALREADY_EMITTED.to_string(),
+            message: format!(
+                "this hub has been filing for real since {}: it cannot go back to the sandbox, \
+                 because the sales that followed would file where the tax authority never sees \
+                 them. To try things out, create another hub",
+                profile.first_record_at
+            ),
+        });
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("testing".into(), json!(ENV_TESTING));
+    p.insert("status".into(), json!(FiscalStatus::Ready.as_str()));
+    db.execute(
+        "UPDATE _hub_fiscal_profile \
+         SET status = :status, environment = :testing, activated_at = '' WHERE hub_id = :hub_id",
+        &p,
+    )
+    .await?;
+    reload(db, hub_id).await
+}
+
+/// **Cessation of activity: the way INTO `CLOSED`** (ADR-0273 D2, hub#557).
+///
+/// The refusals were already built — `enforce_fiscal_capacity` turns `CLOSED` into default-deny on
+/// writes, with `hub.*` and the modules of the active regime as its two exceptions, and queries
+/// never gated. What did not exist was the door: no code path could put a hub in that state.
+///
+/// **This is product, not compliance**, and that is verified in primary sources (ADR-0273 D9): a
+/// VERI\*FACTU-only system files no event record — *«solo es obligatorio en el caso de los sistemas
+/// de emisión de facturas no verificables»* — and the cessation that does exist is the taxpayer's
+/// own census deregistration (forms 036/037), which the owner or their accountant files. The
+/// software does not take part. So closing sends nothing anywhere; what it buys is that a business
+/// that has stopped cannot carry on invoicing **by mistake**, while it keeps reading and exporting
+/// its books, which it is legally obliged to keep.
+///
+/// Three properties, and each one is a test:
+///
+/// 1. **One-way.** There is no `CLOSED → ACTIVE`: [`go_live`] refuses with [`HUB_CLOSED`], and the
+///    status is [`FiscalStatus::is_frozen`], so neither [`ensure`] nor [`refresh`] re-resolves it
+///    from settings on the next boot. A business that comes back gets a new hub, whose different
+///    `system_id` gives it a chain of its own by the ADR-0202 invariant — instead of a chain that
+///    stopped and restarted, which nobody could tell apart from one that never stopped.
+/// 2. **Idempotent and write-once.** Closing twice is not an error, and the second pass moves
+///    neither the date nor the author: the date of cessation is the first one.
+/// 3. **Attributed.** An empty `actor` is refused ([`CLOSE_NEEDS_ACTOR`]), the same reasoning as
+///    the elevation receipt ([`crate::elevation`]): if this could be done with no author,
+///    "break the trace" becomes a way to close somebody's hub leaving no record of who did it.
+///
+/// It can be closed **from any status**, and deliberately so: ceasing is a fact about the
+/// *business*, not about how far its fiscal setup got. The hub that most needs to stop being able
+/// to invoice by mistake is precisely the one that never finished configuring.
+///
+/// The **admin session and the confirmation** live at the door that calls this, exactly like the
+/// go-live: the core's own guard is that somebody is named.
+pub async fn close(db: &dyn DatabaseAdapter, hub_id: &str, actor: &str) -> Result<FiscalProfile> {
+    let actor = actor.trim();
+    if actor.is_empty() {
+        return Err(RuntimeError::Domain {
+            code: CLOSE_NEEDS_ACTOR.to_string(),
+            message: "ceasing activity is irreversible and has to be attributed to somebody: no \
+                      hub is closed without a record of who closed it"
+                .to_string(),
+        });
+    }
+    ensure(db, hub_id).await?;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("actor".into(), json!(actor));
+    p.insert("status".into(), json!(FiscalStatus::Closed.as_str()));
+    // `closed_at = ''` in the WHERE is the WHOLE of write-once — no second branch above deciding
+    // the same thing in Rust. Closing twice writes nothing and is not an error; two doors closing
+    // at once still leave one date, and a status somebody wrote by hand still gets its stamp.
+    db.execute(
+        "UPDATE _hub_fiscal_profile \
+         SET status = :status, closed_at = :now, closed_by = :actor \
+         WHERE hub_id = :hub_id AND closed_at = ''",
+        &p,
+    )
+    .await?;
+    reload(db, hub_id).await
+}
+
+/// **Takes over a FOREIGN installation, on purpose and on the record** (ADR-0273 D8, hub#558).
+///
+/// The case: a **new** hub pointing at **old** data — a migration between deployments, a restore
+/// somewhere else. The `hub_id` changed, so the write-once `system_id` no longer matches the live
+/// one, and that has a direct legal consequence: `NumeroInstalacion = hub_id` (ADR-0202), so
+/// **another `hub_id` is another installation, another SIF and a new chain** with
+/// `PrimerRegistro=S`.
+///
+/// **Never automatic, and that is the entire point.** Adopting somebody else's installation in
+/// silence is exactly how two chains end up mixed — and a record the tax authority already accepted
+/// is neither re-sent nor deleted (ADR-0189), so the damage cannot be undone afterwards. The boot
+/// therefore only ever *flags* it ([`refresh`]) and the gate only ever *refuses*
+/// ([`crate::commands`]); moving the profile takes somebody deciding.
+///
+/// What it writes, and what it deliberately does not:
+///
+/// - **`system_id` becomes this hub**, which is what unblocks the mode. What it opens is a chain of
+///   its own, and by construction: the provider's chain anchor is scoped by `hub_id`, so under the
+///   live one there is no previous record to hang from. The core does not have to *make* the new
+///   chain — it only has to stop the hub filing under an identity that is not its own.
+/// - **`adopted_from` keeps the id these rows carried**, because the takeover overwrites it and
+///   nobody could reconstruct it afterwards. It is the only evidence left that two chains could
+///   have been mixed here.
+/// - **`first_record_at` is left alone.** Something in this database was filed for real; letting
+///   the hub drop back to the sandbox afterwards would file the sales that follow where the tax
+///   authority never sees them (see [`stand_down`]).
+///
+/// It refuses when there is **nothing foreign** ([`NOTHING_TO_ADOPT`]) rather than doing nothing:
+/// a no-op that still wrote the receipt would leave the next reader believing this hub came from
+/// somewhere else. And it refuses with no author ([`ADOPT_NEEDS_ACTOR`]), same reasoning as
+/// [`close`].
+///
+/// ⚠️ **What this does NOT cover**: a hand-made "rehome" that also re-stamps the `hub_id` of the
+/// provider's own records. Then the anchor would find them and the chain would continue instead of
+/// restarting — but no path in the product does that: a bundle refuses to carry another hub's
+/// fiscal section (`import::chain_not_portable`), and a pgBackRest restore keeps the same `hub_id`,
+/// which is the same installation legitimately resuming its own chain (AEAT developer FAQ §4).
+pub async fn adopt_installation(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    actor: &str,
+) -> Result<FiscalProfile> {
+    let actor = actor.trim();
+    if actor.is_empty() {
+        return Err(RuntimeError::Domain {
+            code: ADOPT_NEEDS_ACTOR.to_string(),
+            message: "taking over another installation has to be attributed to somebody: it is \
+                      what separates a deliberate takeover from two chains quietly merging"
+                .to_string(),
+        });
+    }
+    let profile = ensure(db, hub_id).await?;
+    if !is_foreign_installation(&profile, hub_id) {
+        return Err(RuntimeError::Domain {
+            code: NOTHING_TO_ADOPT.to_string(),
+            message: "this profile already belongs to this hub: there is no other installation to \
+                      take over"
+                .to_string(),
+        });
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("actor".into(), json!(actor));
+    p.insert("origin".into(), json!(profile.system_id));
+    db.execute(
+        "UPDATE _hub_fiscal_profile \
+         SET system_id = :hub_id, adopted_at = :now, adopted_from = :origin, adopted_by = :actor, \
+             needs_review = 0 \
+         WHERE hub_id = :hub_id",
+        &p,
+    )
+    .await?;
+    reload(db, hub_id).await
+}
+
+/// **Seals `first_record_at` the first time a fiscal chain starts for real** (ADR-0273 D3).
+///
+/// Write-once and idempotent: only the first one counts, and it is never moved afterwards.
+///
+/// Why the CORE stamps it, and not the provider reporting back: what has to be irreversible cannot
+/// depend on a module remembering to say something — a module that forgets would leave the go-live
+/// reversible for ever, which is the exact hole this ADR exists to close. The dispatcher already
+/// knows two things without asking anybody: that the profile is in `production`, and that the
+/// transaction it is about to commit enqueues one of the events the provider taught it start a
+/// fiscal chain ([`FiscalProfile::fiscal_trigger_events`]).
+///
+/// It errs on the safe side on purpose: it seals at the sale that starts the chain, not at the tax
+/// authority's acknowledgement. So the go-live closes EARLIER than the record's round trip, never
+/// later — and the window ADR-0273 §2.5 pointed at (a record already down the wire whose answer has
+/// not come back, which `status = 'accepted'` alone would miss) is closed by construction.
+pub async fn stamp_first_record(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("production".into(), json!(ENV_PRODUCTION));
+    db.execute(
+        "UPDATE _hub_fiscal_profile SET first_record_at = :now \
+         WHERE hub_id = :hub_id AND first_record_at = '' AND environment = :production",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
+/// The stable rejection code of the provider lock (ADR-0273 D5). ABI público: la UI programa
 /// contra el código, no contra el mensaje.
 pub const NO_PROVIDER_LEFT: &str = "fiscal.no_provider_left";
 
-/// **With the profile `ACTIVE`, the hub does not end up with NOBODY complying** (ADR-0259 D5).
+/// **With the profile `ACTIVE`, the hub does not end up with NOBODY complying** (ADR-0273 D5).
 ///
 /// `leaving` is the whole set that would go — the target of a deactivation **plus everything the
 /// cascade would drag with it** (ADR-0128). It is computed before touching anything, because
@@ -431,7 +823,8 @@ pub async fn load(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<Fisca
     let Ok(res) = db
         .query(
             "SELECT country_code, taxpayer_id, fiscal_system, status, environment, activated_at, \
-                    first_record_at, system_id, fiscal_trigger_events, can_go_live, needs_review \
+                    first_record_at, system_id, fiscal_trigger_events, can_go_live, needs_review, \
+                    closed_at, closed_by, adopted_at, adopted_from, adopted_by \
              FROM _hub_fiscal_profile WHERE hub_id = :hub_id",
             &p,
         )
@@ -461,6 +854,11 @@ pub async fn load(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<Fisca
             .unwrap_or_default(),
         can_go_live: flag("can_go_live"),
         needs_review: flag("needs_review"),
+        closed_at: text("closed_at"),
+        closed_by: text("closed_by"),
+        adopted_at: text("adopted_at"),
+        adopted_from: text("adopted_from"),
+        adopted_by: text("adopted_by"),
     }))
 }
 
@@ -757,7 +1155,7 @@ mod tests {
         assert_eq!(regime_for_country(&db, "FR").await.unwrap(), "");
     }
 
-    // ── The effective mode: what is derived, and why it is derived (ADR-0259 D2/D4, hub#550) ──
+    // ── The effective mode: what is derived, and why it is derived (ADR-0273 D2/D4, hub#550) ──
 
     /// A registry holding `modules`, each `(id, fiscal_regime_json, listens_to, active)`.
     fn registry_with(modules: &[(&str, Option<serde_json::Value>, &[&str], bool)]) -> Registry {
@@ -798,6 +1196,11 @@ mod tests {
             fiscal_trigger_events: Vec::new(),
             can_go_live: true,
             needs_review: false,
+            closed_at: String::new(),
+            closed_by: String::new(),
+            adopted_at: String::new(),
+            adopted_from: String::new(),
+            adopted_by: String::new(),
         }
     }
 
@@ -1067,6 +1470,449 @@ mod tests {
     async fn reading_the_profile_of_a_hub_without_system_tables_is_not_an_error() {
         let db = fresh_db().await;
         assert!(load(&db, "hub-sin-migrar").await.unwrap().is_none());
+    }
+
+    // ── R5: un hub de demo NUNCA puede pasar a producción (hub#315/#552) ──────────────────────
+
+    /// 🔴 **La demo lleva el certificado delegado y transmite de verdad a preproducción**
+    /// (`verifactu-gateway.md` §3.4, que supersede ADR-0197 §2): el entorno es LO ÚNICO que la
+    /// separa de la AEAT real. Así que el arranque de un hub demo apaga el go-live en el perfil,
+    /// y el mismo gate que cierra R1 cierra R5 — que es como ADR-0202 §5 lo planteó.
+    #[tokio::test]
+    async fn a_demo_hub_boots_with_the_go_live_switched_off() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-demo", Some("ES")).await;
+        let mut demo = registry_with(&[]);
+        demo.demo_hub = true;
+
+        refresh(&db, &demo, "hub-demo").await.unwrap();
+
+        assert!(!load(&db, "hub-demo").await.unwrap().unwrap().can_go_live);
+    }
+
+    /// **Fail-closed hacia hub NORMAL**: sin la bandera, el hub puede facturar. Es la dirección
+    /// segura — tomar por demo a un hub real le congelaría el go-live y lo dejaría fuera de
+    /// producción sin decir nada.
+    #[tokio::test]
+    async fn a_normal_hub_keeps_the_go_live_available() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+
+        refresh(&db, &registry_with(&[]), "hub-es").await.unwrap();
+
+        assert!(load(&db, "hub-es").await.unwrap().unwrap().can_go_live);
+    }
+
+    /// Y de punta a punta: con la bandera puesta, un hub que por lo demás está listo **no** pasa a
+    /// producción. Es un caso del mismo gate que R1, no una guarda aparte.
+    #[tokio::test]
+    async fn a_demo_hub_that_is_otherwise_ready_still_cannot_go_live() {
+        let db = fresh_db().await;
+        let mut reg = hub_ready(&db, "hub-demo").await;
+        reg.demo_hub = true;
+        refresh(&db, &reg, "hub-demo").await.unwrap();
+
+        let err = go_live(&db, "hub-demo").await.expect_err("una demo no factura de verdad");
+        assert_eq!(code_of(&err), GO_LIVE_FORBIDDEN);
+    }
+
+    // ── D3: el go-live ES `testing → production`, y muere con el primer ENVÍO (hub#551) ───────
+
+    /// Deja el hub en `READY` de verdad: identidad + certificado + proveedor montado.
+    async fn hub_ready(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
+        booted_hub(db, hub_id, Some("ES")).await;
+        set_setting(db, hub_id, "business_tax_id", "B12345678").await;
+        set_setting(db, hub_id, "business_legal_name", "Bar Pepe SL").await;
+        // Straight into the system table the gate reads (`_hub_certificate`, ADR-0081): going
+        // through `set_business_certificate` would need the process-global `HUB_SECRETS_KEY`, and
+        // what is looked at here is the PRESENCE of the row, never its contents.
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        db.execute(
+            "INSERT INTO _hub_certificate (hub_id, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES (:hub_id, 'v1:ciphertext', 'v1:ciphertext', '2026-08-08T09:00:00Z', 'hub_user:1')",
+            &p,
+        )
+        .await
+        .expect("the business certificate is stored in the hub");
+        let reg = registry_with(&[(
+            "verifactu",
+            Some(json!({ "country": "ES", "regime": "verifactu" })),
+            &["invoice.created"],
+            true,
+        )]);
+        refresh(db, &reg, hub_id).await.unwrap();
+        assert_eq!(
+            load(db, hub_id).await.unwrap().unwrap().status,
+            FiscalStatus::Ready,
+            "el fixture tiene que dejarlo READY o el test no prueba nada"
+        );
+        reg
+    }
+
+    /// El go-live y el `environment` son **la misma transición**: `READY → ACTIVE` ES
+    /// `testing → production`. Un solo camino y un solo sitio donde guardarlo.
+    #[tokio::test]
+    async fn going_live_moves_the_environment_and_freezes_the_taxpayer_id() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+
+        let after = go_live(&db, "hub-es").await.unwrap();
+
+        assert_eq!(after.status, FiscalStatus::Active);
+        assert_eq!(after.environment, ENV_PRODUCTION);
+        assert_eq!(
+            after.taxpayer_id, "B12345678",
+            "la copia CONGELADA con la que la cadena queda anclada"
+        );
+        assert!(!after.activated_at.is_empty());
+    }
+
+    /// **Solo se puede encender si todo está configurado**, que es la misma condición que ya
+    /// evalúa el core — no una segunda lista que mantener.
+    #[tokio::test]
+    async fn a_hub_that_is_not_ready_cannot_go_live() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+
+        let err = go_live(&db, "hub-es").await.expect_err("sin configurar no se enciende");
+        assert_eq!(code_of(&err), NOT_READY);
+    }
+
+    /// R5 (hub#315/#552): un hub de demo **nunca** pasa a producción. Lleva el certificado
+    /// delegado, así que el entorno es lo único que lo separa de la AEAT real.
+    #[tokio::test]
+    async fn a_demo_hub_can_never_go_live() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-demo").await;
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!("hub-demo"));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET can_go_live = 0 WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        let err = go_live(&db, "hub-demo").await.expect_err("una demo no factura de verdad");
+        assert_eq!(code_of(&err), GO_LIVE_FORBIDDEN);
+    }
+
+    /// 🟢 **Lo irreversible es el primer ENVÍO, no el clic.** Quien activa por error y se da
+    /// cuenta ANTES de facturar puede volver: el daño no lo hace el toggle, lo hace el registro.
+    #[tokio::test]
+    async fn the_toggle_still_goes_back_while_nothing_has_been_filed() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+
+        let after = stand_down(&db, "hub-es").await.unwrap();
+
+        assert_eq!(after.status, FiscalStatus::Ready);
+        assert_eq!(after.environment, ENV_TESTING);
+    }
+
+    /// 🔴 **Y muere con el primero.** Un registro aceptado no se reenvía (ADR-0189), así que las
+    /// ventas SIGUIENTES irían a preproducción: facturas reales cuyos registros la AEAT real nunca
+    /// ve — el huérfano generado-y-jamás-remitido que prohíbe la FAQ §5.
+    #[tokio::test]
+    async fn once_something_has_been_filed_the_toggle_is_dead_for_ever() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+        stamp_first_record(&db, "hub-es").await.unwrap();
+
+        let err = stand_down(&db, "hub-es").await.expect_err("ya salió un registro real");
+        assert_eq!(code_of(&err), ALREADY_EMITTED);
+        assert!(
+            err.to_string().contains("another hub"),
+            "el mensaje dice la salida REAL —otro hub—, no «vuelve atrás»: {err}"
+        );
+    }
+
+    /// `first_record_at` es **write-once**: solo cuenta el primero, y no se mueve después.
+    #[tokio::test]
+    async fn the_first_record_stamp_is_write_once() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+
+        stamp_first_record(&db, "hub-es").await.unwrap();
+        let first = load(&db, "hub-es").await.unwrap().unwrap().first_record_at;
+        stamp_first_record(&db, "hub-es").await.unwrap();
+        let second = load(&db, "hub-es").await.unwrap().unwrap().first_record_at;
+
+        assert_eq!(first, second, "el segundo pase no mueve el sello");
+        assert!(!first.is_empty());
+    }
+
+    /// Y **solo sella en producción**: lo que se hace en el sandbox no ancla nada ni cierra ningún
+    /// camino de vuelta.
+    #[tokio::test]
+    async fn nothing_filed_in_the_sandbox_seals_anything() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+
+        stamp_first_record(&db, "hub-es").await.unwrap();
+
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().first_record_at,
+            "",
+            "emitir en pruebas no cierra el go-live"
+        );
+    }
+
+    /// Encender un interruptor que ya está encendido no es un error.
+    #[tokio::test]
+    async fn going_live_is_idempotent() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+        let first = go_live(&db, "hub-es").await.unwrap();
+        let second = go_live(&db, "hub-es").await.unwrap();
+        assert_eq!(first, second);
+    }
+
+    // ── D2: `CLOSED` — cessation of activity, and it is a ONE-WAY door (hub#557) ──────────────
+
+    /// **The way IN, which is the whole of this issue.** The refusals were already there
+    /// (`enforce_fiscal_capacity`); what was missing was how a hub gets to `CLOSED` at all.
+    ///
+    /// It records **when** and **who**: an irreversible decision with nobody attached to it in the
+    /// record is not a trace, it is a state somebody will later have to guess the origin of.
+    #[tokio::test]
+    async fn ceasing_activity_closes_the_hub_and_records_when_and_who() {
+        let db = fresh_db().await;
+        let reg = hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+
+        let after = close(&db, "hub-es", "hub_user:1").await.unwrap();
+
+        assert_eq!(after.status, FiscalStatus::Closed);
+        assert!(!after.closed_at.is_empty(), "when it ceased");
+        assert_eq!(after.closed_by, "hub_user:1", "who decided it");
+        assert_eq!(
+            determine_fiscal_mode(&after, &reg, "hub-es"),
+            FiscalMode::Closed,
+            "and the mode the dispatcher reads says so"
+        );
+    }
+
+    /// 🔴 **There is no `CLOSED → ACTIVE`.** A business that ceased and comes back is a new
+    /// registration, and a chain that restarted under the same profile would be indistinguishable
+    /// from one that never stopped. The rejection carries its own code so the screen can say *why*
+    /// instead of asking for a certificate the hub already has.
+    #[tokio::test]
+    async fn a_closed_hub_never_goes_back_to_issuing() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+        close(&db, "hub-es", "hub_user:1").await.unwrap();
+
+        let err = go_live(&db, "hub-es").await.expect_err("a ceased hub does not issue again");
+
+        assert_eq!(code_of(&err), HUB_CLOSED);
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().status,
+            FiscalStatus::Closed,
+            "and the refused attempt moved nothing"
+        );
+    }
+
+    /// Closing twice is not an error — but the stamp is **write-once**: the date of cessation is
+    /// the first one, not the date of the last click.
+    #[tokio::test]
+    async fn closing_twice_keeps_the_first_stamp() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+
+        let first = close(&db, "hub-es", "hub_user:1").await.unwrap();
+        let second = close(&db, "hub-es", "hub_user:2").await.unwrap();
+
+        assert_eq!(first, second, "the second pass moves neither the date nor the author");
+    }
+
+    /// **Nobody to attribute it to, no cessation.** Same reasoning as the elevation receipt: if
+    /// an action this irreversible could be taken with an empty author, "break the trace" becomes
+    /// a way of closing a hub and leaving no record of who did it.
+    #[tokio::test]
+    async fn closing_with_nobody_to_attribute_it_to_is_refused() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+        go_live(&db, "hub-es").await.unwrap();
+
+        let err = close(&db, "hub-es", "   ").await.expect_err("somebody has to own this");
+
+        assert_eq!(code_of(&err), CLOSE_NEEDS_ACTOR);
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().status,
+            FiscalStatus::Active,
+            "the refusal leaves the hub exactly as it was"
+        );
+    }
+
+    /// **Ceasing is a fact about the BUSINESS, not about how far the fiscal setup got.** A hub
+    /// that never went live can close too — that is precisely the one that must stop being able to
+    /// invoice by mistake, while its books stay readable.
+    #[tokio::test]
+    async fn a_hub_that_never_went_live_can_still_cease_activity() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+        assert_eq!(
+            ensure(&db, "hub-es").await.unwrap().status,
+            FiscalStatus::Unconfigured
+        );
+
+        let after = close(&db, "hub-es", "hub_user:1").await.unwrap();
+
+        assert_eq!(after.status, FiscalStatus::Closed);
+    }
+
+    /// **A restart does not reopen it.** `CLOSED` is frozen exactly like `ACTIVE`: neither the
+    /// country nor the regime is re-resolved from settings, so editing a setting afterwards is not
+    /// a back door into issuing again.
+    #[tokio::test]
+    async fn booting_a_closed_hub_keeps_it_closed() {
+        let db = fresh_db().await;
+        let reg = hub_ready(&db, "hub-es").await;
+        close(&db, "hub-es", "hub_user:1").await.unwrap();
+        set_country(&db, "hub-es", "PT").await;
+
+        let mode = refresh(&db, &reg, "hub-es").await.unwrap();
+
+        assert_eq!(mode, FiscalMode::Closed);
+        let after = load(&db, "hub-es").await.unwrap().unwrap();
+        assert_eq!(after.status, FiscalStatus::Closed);
+        assert_eq!(after.country_code, "ES", "frozen, like an active hub");
+        assert_eq!(after.fiscal_system, "verifactu");
+    }
+
+    // ── D8: the hub moved deployment — these rows are ANOTHER installation's (hub#558) ────────
+
+    /// Leaves `hub_id`'s profile looking like rows written by a **different** installation: live,
+    /// filing for real, and stamped with somebody else's `system_id`.
+    async fn hub_restored_from(db: &dyn DatabaseAdapter, hub_id: &str, origin: &str) -> Registry {
+        let reg = hub_ready(db, hub_id).await;
+        go_live(db, hub_id).await.unwrap();
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("origin".into(), json!(origin));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET system_id = :origin WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+        reg
+    }
+
+    /// 🔴 **The boot NOTICES**, and says so out loud. `NumeroInstalacion = hub_id` (ADR-0202), so a
+    /// different `system_id` means these records hang from a chain that is not ours to continue.
+    /// The mode is derived `BLOCKED`; the row is flagged for a human, because this is not something
+    /// the core may decide by itself (ADR-0249).
+    #[tokio::test]
+    async fn a_profile_from_another_installation_is_flagged_at_boot() {
+        let db = fresh_db().await;
+        let reg = hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
+
+        let mode = refresh(&db, &reg, "hub-es").await.unwrap();
+
+        assert_eq!(mode, FiscalMode::Blocked(BlockedReason::InstallationMismatch));
+        assert!(
+            load(&db, "hub-es").await.unwrap().unwrap().needs_review,
+            "somebody has to look at this: the core will not guess"
+        );
+    }
+
+    /// 🔴 **And it is NEVER adopted on its own**, however many times the hub restarts. Adopting
+    /// somebody else's installation in silence is exactly how two chains end up mixed — and a
+    /// record already filed is neither re-sent nor deleted (ADR-0189).
+    #[tokio::test]
+    async fn booting_never_adopts_a_foreign_installation_by_itself() {
+        let db = fresh_db().await;
+        let reg = hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
+
+        for _ in 0..3 {
+            refresh(&db, &reg, "hub-es").await.unwrap();
+        }
+
+        let after = load(&db, "hub-es").await.unwrap().unwrap();
+        assert_eq!(after.system_id, "hub-somewhere-else", "nobody took it over");
+        assert_eq!(
+            determine_fiscal_mode(&after, &reg, "hub-es"),
+            FiscalMode::Blocked(BlockedReason::InstallationMismatch)
+        );
+    }
+
+    /// **The way out is explicit**, and it writes down where the rows came from — the one fact
+    /// that the takeover itself destroys, and the only evidence that two chains could have been
+    /// mixed here.
+    #[tokio::test]
+    async fn adopting_takes_over_the_installation_and_records_where_it_came_from() {
+        let db = fresh_db().await;
+        let reg = hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
+
+        let after = adopt_installation(&db, "hub-es", "hub_user:1").await.unwrap();
+
+        assert_eq!(after.system_id, "hub-es", "this installation is ours now");
+        assert_eq!(after.adopted_from, "hub-somewhere-else");
+        assert_eq!(after.adopted_by, "hub_user:1");
+        assert!(!after.adopted_at.is_empty());
+        assert!(!after.needs_review, "the thing that needed reviewing is settled");
+        assert_eq!(
+            determine_fiscal_mode(&after, &reg, "hub-es"),
+            FiscalMode::Active,
+            "and the hub files again"
+        );
+    }
+
+    /// Adopting when nothing is foreign is **refused**, not a no-op: it would write a trace of a
+    /// takeover that never happened, and the next reader would believe this hub came from
+    /// somewhere else.
+    #[tokio::test]
+    async fn adopting_when_nothing_is_foreign_is_refused() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+
+        let err = adopt_installation(&db, "hub-es", "hub_user:1")
+            .await
+            .expect_err("there is nothing to take over");
+
+        assert_eq!(code_of(&err), NOTHING_TO_ADOPT);
+    }
+
+    /// Same rule as the cessation: an irreversible decision with nobody attached to it in the
+    /// record is not a trace.
+    #[tokio::test]
+    async fn adopting_with_nobody_to_attribute_it_to_is_refused() {
+        let db = fresh_db().await;
+        hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
+
+        let err = adopt_installation(&db, "hub-es", "  ")
+            .await
+            .expect_err("somebody has to own this");
+
+        assert_eq!(code_of(&err), ADOPT_NEEDS_ACTOR);
+        assert_eq!(
+            load(&db, "hub-es").await.unwrap().unwrap().system_id,
+            "hub-somewhere-else",
+            "the refusal leaves the profile exactly as it was"
+        );
+    }
+
+    /// **Adopting does not unseal the go-live.** The rows in this database were filed for real by
+    /// somebody, and the invoices they belong to exist: letting the hub drop back to the sandbox
+    /// afterwards would file the following sales where the tax authority never sees them.
+    #[tokio::test]
+    async fn adopting_does_not_unseal_the_go_live() {
+        let db = fresh_db().await;
+        hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
+        stamp_first_record(&db, "hub-es").await.unwrap();
+
+        let after = adopt_installation(&db, "hub-es", "hub_user:1").await.unwrap();
+
+        assert!(!after.first_record_at.is_empty(), "what was filed stays filed");
+        let err = stand_down(&db, "hub-es").await.expect_err("no way back to the sandbox");
+        assert_eq!(code_of(&err), ALREADY_EMITTED);
     }
 
     // ── D5: con el perfil ACTIVE, no te quedas sin proveedor (hub#553) ────────────────────────

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 // Contrato estructural del panel «Plan y límites» (ADR-0154). Igual que `system-tabs.test.ts`,
 // se verifica sobre la fuente del componente: garantiza el cableado clave (fetch real, refresco
-// en vivo solo-visible, barras de %, dispositivos vs plan y CTA de upgrade) sin montar Ionic.
+// en vivo solo-visible, barras de %, dispositivos vs plan y aviso de techo) sin montar Ionic.
 const source = readFileSync(new URL('./PlanLimitsPanel.vue', import.meta.url), 'utf8');
 
 describe('PlanLimitsPanel', () => {
@@ -32,10 +32,15 @@ describe('PlanLimitsPanel', () => {
     expect(source).toContain("t('planLimits.dbNoQuota')");
   });
 
-  it('ofrece el CTA de upgrade (gated) con deep-link externo al SaaS', () => {
+  // El CTA de upgrade («Ver planes» → marketplace del SaaS) se retiró en hub#479: aterrizaba en una
+  // página que cambia el plan con proración sobre la tarjeta guardada, y llevar al pago desde dentro
+  // de la app es causa de rechazo en Google Play y Microsoft Store. El AVISO se queda —quien roza el
+  // techo tiene que saberlo—; lo que desaparece es la puerta.
+  it('avisa del techo del plan sin ofrecer una puerta al pago', () => {
     expect(source).toMatch(/shouldPromptUpgrade|upgradeReason/);
-    expect(source).toContain('upgradeLink');
-    expect(source).toContain('openExternal');
+    expect(source).toContain("t('planLimits.upgradeTitle')");
+    expect(source).toContain("t('planLimits.upgradeWhere')");
+    expect(source).not.toContain('openExternal');
   });
 
   it('usa el sistema de i18n (namespace planLimits)', () => {

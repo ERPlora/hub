@@ -27,6 +27,12 @@ edition = "2021"
 # `env!("CARGO_PKG_VERSION")` (/api/system hubVersion, error-sink). El CI de release la reescribe
 # desde el tag `v*` antes del build (build-hub.yml), así que en una release publicada este valor es
 # el del último tag; en `main` entre releases es el "en desarrollo". Criterio MAJOR/MINOR/PATCH en
-# architecture/00-overview/update-model.md.
-version = "0.1.0"
+# architecture/hub/versioning.md (ADR-0275).
+#
+# 🔴 El tag NO se cree a ciegas: `scripts/image-tags.sh` corre ANTES del build y rechaza un tag
+# que no sea semver, uno YA PUBLICADO o uno MENOR que la última release. Las versiones de
+# Microsoft Store y Google Play son monótonas e irreversibles —el MISMO tag `v*` dispara
+# `tauri-release.yml`—, así que un `v1.2.4` mal escrito quema ese número en las stores para
+# siempre. La guarda es lo único que se interpone.
+version = "1.0.0"
 license = "MIT"

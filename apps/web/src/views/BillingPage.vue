@@ -13,10 +13,6 @@
         :heading="t('billing.cloudAuthTitle')"
       >
         {{ t('billing.cloudAuthBody') }}
-        <ion-button slot="actions" size="small" @click="onOpenBillingPortal">
-          <HubIcon name="open-outline" slot="start" />
-          {{ t('billing.openBillingPortal') }}
-        </ion-button>
       </ok-inline-feedback>
       <ok-inline-feedback
         v-else-if="invoiceState === 'error'"
@@ -49,15 +45,13 @@
 
     <!-- Suscripciones -->
     <div v-show="tab === 'subscriptions'" class="fill subs-fill">
-      <!-- El Hub NO vende (ADR-0114): el upgrade/cambio de plan vive en el marketplace del
-           SaaS; aquí solo un CTA que abre el navegador externo + recheck al recuperar el foco. -->
+      <!-- El Hub NO vende (ADR-0114) y desde hub#479 tampoco lleva a vender: el CTA «Gestionar
+           plan» abría el marketplace del SaaS, que cambia el plan con proración sobre la tarjeta
+           guardada. Queda la frase que dice DÓNDE se gestiona; la tabla de abajo sigue mostrando
+           lo contratado, que es lo que esta página tiene que hacer. -->
       <ion-card v-if="subscriptionState === 'ready'" class="plan-cta m-0">
         <ion-card-content class="plan-cta-content">
           <p class="plan-cta-hint">{{ t('billing.managePlanHint') }}</p>
-          <ion-button size="small" fill="outline" @click="onManagePlan">
-            <HubIcon name="open-outline" slot="start" />
-            {{ t('billing.managePlan') }}
-          </ion-button>
         </ion-card-content>
       </ion-card>
       <div v-if="subscriptionState === 'loading'" class="flex justify-center py-10">
@@ -71,10 +65,6 @@
         :heading="t('billing.cloudAuthTitle')"
       >
         {{ t('billing.cloudAuthBody') }}
-        <ion-button slot="actions" size="small" @click="onOpenBillingPortal">
-          <HubIcon name="open-outline" slot="start" />
-          {{ t('billing.openBillingPortal') }}
-        </ion-button>
       </ok-inline-feedback>
       <ok-inline-feedback
         v-else-if="subscriptionState === 'error'"
@@ -102,16 +92,17 @@
       ></ok-data-table>
     </div>
 
-    <!-- Pagos: aviso (no es un vacío de datos, sino unportal externo) → ok-empty-state. -->
+    <!-- Pagos: aviso (no es un vacío de datos, sino un portal externo) → ok-empty-state. El botón
+         que abría ese portal se retiró (hub#479): el portal de facturación del SaaS es una
+         superficie de pago —lleva el alta de Stripe Connect—, así que el aviso dice dónde está y
+         ya. Ojo al escribir aquí: el guard `no-purchase-steering.test.ts` es literal a propósito y
+         salta también con una ruta escrita en un comentario. Es lo que se quiere: prefiere un falso
+         positivo que reformulas en diez segundos a un enlace real que se cuela. -->
     <div v-show="tab === 'payments'" class="payments-notice">
       <ok-empty-state
         icon="card-outline"
         :message="t('billing.paymentsPortalNotice')"
       />
-      <ion-button size="small" @click="onOpenBillingPortal">
-        <HubIcon name="open-outline" slot="start" />
-        {{ t('billing.openBillingPortal') }}
-      </ion-button>
     </div>
 
     <!-- Tabs en footer -->
@@ -146,7 +137,6 @@ import {
   IonToolbar, IonCard, IonCardContent, IonButton,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonSpinner
 } from '@ionic/vue';
-import { openExternal } from '../lib/open-external';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
@@ -196,29 +186,15 @@ const subscriptions = ref<CloudSubscription[]>([]);
 const invoiceState = ref<BillingLoadState>('loading');
 const subscriptionState = ref<BillingLoadState>('loading');
 
-// --- Plan del hub: deep-link al marketplace del SaaS + recheck-on-focus ---
-// (patrón ModulePlanPanel: el Hub nunca compra; abre el navegador y, al volver
-// el foco, re-consulta las suscripciones para reflejar el cambio).
-const plansDeepLink = (): string =>
-  `${config.cloudApiUrl}/dashboard/marketplace/plans/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
-const billingPortalLink = (): string =>
-  `${config.cloudApiUrl}/dashboard/billing/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
-
-async function onManagePlan(): Promise<void> {
-  try {
-    await openExternal(plansDeepLink());
-  } catch {
-    await toastError(t('billing.managePlanError'));
-  }
-}
-
-async function onOpenBillingPortal(): Promise<void> {
-  try {
-    await openExternal(billingPortalLink());
-  } catch {
-    await toastError(t('billing.portalError'));
-  }
-}
+// --- Plan del hub: solo LECTURA (hub#479) ---
+// Aquí había dos direcciones del SaaS y los controles que las abrían: `plansDeepLink()` (el
+// marketplace de planes, que cambia el plan con proración sobre la tarjeta guardada) y
+// `billingPortalLink()` (el portal de facturación, con el alta de Stripe Connect). Las dos son
+// superficies de pago, así que llevar a ellas desde dentro de la app es steering — la causa de
+// rechazo que hay que no tener en Google Play ni en Microsoft Store.
+//
+// Esta página conserva lo suyo: enseña facturas y suscripciones, que es información del plan
+// contratado. Contratar, cambiar o cancelar se hace en erplora.com.
 
 function unavailableCloudState(): BillingLoadState {
   return getAccessToken() ? 'error' : 'auth-required';

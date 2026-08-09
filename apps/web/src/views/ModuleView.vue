@@ -30,16 +30,15 @@
       :settings="settings"
     />
     <!-- Módulo de pago BLOQUEADO por la revalidación híbrida (ADR-0114 §6): el dispatcher del
-         runtime rechaza sus queries/commands (402) — la UI lo cuenta y manda a gestionar la
-         suscripción al SaaS. Los datos locales NUNCA se tocan. La pestaña "Plan" sigue accesible. -->
+         runtime rechaza sus queries/commands (402) — la UI lo cuenta y dice dónde se arregla. Los
+         datos locales NUNCA se tocan. La pestaña "Plan" sigue accesible.
+         El botón que llevaba al marketplace del SaaS se retiró (hub#479): aterrizaba en el
+         checkout, y eso es steering. El aviso nombra erplora.com en vez de abrirlo — nadie se
+         queda sin saber qué hacer, que era el riesgo de quitarlo a secas. -->
     <ion-card v-if="status === 'ready' && isBlocked && !isPlanTab" color="warning" class="blocked-card">
       <ion-card-content>
         <strong>{{ t('moduleView.blockedTitle') }}</strong>
         <p class="blocked-hint">{{ t('moduleView.blockedHint') }}</p>
-        <ion-button size="small" @click="onManageSubscription">
-          <HubIcon name="open-outline" slot="start" />
-          {{ t('moduleView.manageSubscription') }}
-        </ion-button>
       </ion-card-content>
     </ion-card>
 
@@ -96,9 +95,6 @@ import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/mo
 import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
 import { clientInjectionKey, getClient } from '../lib/runtime';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
-import { openExternal } from '../lib/open-external';
-import { config } from '../lib/config';
-import { toastError } from '../lib/toast';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -137,24 +133,18 @@ const isPlanTab = computed(() => activeNavId.value === PLAN_TAB_ID);
 /** ¿Módulo de pago bloqueado por la revalidación híbrida? (bloque `revalidation`, ADR-0114 §6). */
 const isBlocked = computed(() => isModuleBlocked(params().moduleId));
 
-/** CTA del banner de bloqueo: gestionar la suscripción en el marketplace del SaaS
- *  (deep-link con hub) + recheck del entitlement al recuperar el foco. */
-async function onManageSubscription(): Promise<void> {
-  const url =
-    `${config.cloudApiUrl}/dashboard/marketplace/modules/${encodeURIComponent(params().moduleId)}` +
-    `/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
-  const recheck = (): void => {
-    window.removeEventListener('focus', recheck);
-    void resolveEntitlement();
-  };
-  window.addEventListener('focus', recheck);
-  try {
-    await openExternal(url);
-  } catch {
-    window.removeEventListener('focus', recheck);
-    await toastError(t('moduleView.manageSubscriptionError'));
-  }
-}
+/**
+ * Re-comprueba el entitlement al recuperar el foco: quien acaba de contratar en erplora.com vuelve
+ * a esta pantalla y el bloqueo se levanta solo, sin recargar.
+ *
+ * Antes esto colgaba de `onManageSubscription()` —el botón que abría el marketplace del SaaS— y se
+ * desenganchaba tras el primer foco, porque solo cubría «el usuario acaba de salir a comprar». Al
+ * retirar ese botón (hub#479) el recheck no se va con él: se queda PERMANENTE mientras la vista
+ * vive, que además cubre el caso que antes no cubría —contratar desde el móvil o desde otro equipo
+ * mientras el TPV sigue abierto aquí—. Sin él, quitar el botón habría dejado el módulo bloqueado
+ * hasta un F5 a mano.
+ */
+const recheckEntitlement = (): void => void resolveEntitlement();
 /**
  * ¿La pestaña activa es la de ajustes Y el módulo declara `settings` sin `component`? Entonces el
  * shell pinta el form genérico. Con `settings.component`, en cambio, se monta ese WC (vía outlet).
@@ -296,7 +286,10 @@ async function revealActiveTab(): Promise<void> {
   });
 }
 
-onMounted(() => void mount().then(revealActiveTab));
+onMounted(() => {
+  window.addEventListener('focus', recheckEntitlement);
+  void mount().then(revealActiveTab);
+});
 watch(
   () => [route.params.moduleId, route.params.navId],
   () => {
@@ -305,6 +298,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  window.removeEventListener('focus', recheckEntitlement);
   mountGeneration += 1;
   outlet.value?.replaceChildren();
 });

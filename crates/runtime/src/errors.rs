@@ -124,6 +124,27 @@ pub enum RuntimeError {
     /// (the latter only while an installed module declares the `certificate` capability).
     #[error("fiscal precondition failed: configure {} before issuing fiscal documents", missing.join(", "))]
     FiscalPrecondition { missing: Vec<&'static str> },
+    /// `business_tax_id` is FROZEN: this hub already emitted its first fiscal record (ADR-0273,
+    /// hub#554 — the ADR's own consequence: "`business_tax_id` stops being able to fork a live
+    /// chain").
+    ///
+    /// The chain is anchored by `(hub_id, issuer_nif, environment)` (guard R4, hub#313), so a
+    /// different identifier does not *edit* anything — it starts a SECOND chain from 1 and leaves
+    /// the first abandoned half-way, without a word. And to the tax authority a different tax id
+    /// is a different **taxpayer**: the business would carry on issuing under an identity that may
+    /// not be its own.
+    ///
+    /// `hub_settings` remains the single, editable source of the business identity (ADR-0061):
+    /// this closes ONE key, and only from the moment `_hub_fiscal_profile.first_record_at` says
+    /// the damage would be real. Re-sending the SAME value is not a change and is accepted —
+    /// Ajustes → Negocio posts the tax id, the legal name and the address together, so refusing
+    /// the no-op would freeze the whole form. `business_legal_name` is NOT frozen: it anchors
+    /// nothing.
+    ///
+    /// `frozen_to` is the identifier the emitted chain hangs from and `since` the instant it went
+    /// out — both travel so the screen can say what happened instead of "409".
+    #[error("the business tax id is frozen to `{frozen_to}`: this hub emitted its first fiscal record on {since} and the chain is anchored to that identifier")]
+    BusinessTaxIdFrozen { frozen_to: String, since: String },
     /// This hub is an ephemeral DEMO (ADR-0197 §4) and the request would change something a demo
     /// hub does not own: its AEAT environment, its business certificate or its fiscal identity.
     /// The marker comes from the deployment (`HUB_DEMO`), never from the caller — see

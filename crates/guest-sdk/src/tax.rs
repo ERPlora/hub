@@ -232,9 +232,17 @@ pub fn resolve_root<'a>(
             return Some(hit);
         }
     }
+    // Country-wide rule (empty/NULL region), and NOTHING else. There is no third step: a rule that
+    // belongs to another region is not a worse answer, it is the wrong tax. Spain alone holds VAT
+    // on the peninsula, IGIC in the Canaries and IPSI in Ceuta and Melilla, so falling through to
+    // "any eligible rule of this country" charged the customer one territory's tax and declared
+    // that territory's qualification (ERPlora/taxes#10).
+    //
+    // Exhausting both levels is `None` on purpose: what the caller does with a category it has no
+    // rule for is the caller's contract, and it must be able to see that it happened.
     let national =
         eligible.iter().copied().filter(|rule| rule_field(rule, "region_code").is_empty()).collect();
-    pick_best(national).or_else(|| pick_best(eligible))
+    pick_best(national)
 }
 
 /// Best of a set: newest `valid_from` first, then `id` ascending. Deterministic — the answer

@@ -54,10 +54,13 @@ pub async fn install(
     // hub#351 (paso 2b): same door for the roles the module declares. A manifest may add roles to
     // the hub's catalogue, but it can neither redefine a base role nor hand out administration.
     validate_role_declarations(&manifest)?;
-    // ADR-0259 D6 (hub#555): same door for the regime a module claims to implement. What it
+    // ADR-0273 D6 (hub#555): same door for the regime a module claims to implement. What it
     // declares here is what the core will COUNT as a provider, so a malformed block must not be
     // stored — it would read as "no provider installed", which blocks a till.
     validate_fiscal_regime(&manifest)?;
+    // ADR-0273 D7 (hub#559): and if what it declares is THIS hub's regime, it may not be sold.
+    // Defensive: no published module is in that position today (see the function).
+    validate_fiscal_provider_is_free(db, hub_id, &manifest).await?;
 
     // `hub` es el namespace RESERVADO del core (ADR-0192): el dispatcher resuelve `hub.*` antes de
     // mirar el registry, así que un módulo con ese id tendría capacidades inalcanzables y aparentaría
@@ -291,7 +294,7 @@ const MAX_ROLE_KEY_LEN: usize = 32;
 /// may grant `waiter` (declared by `tables`) `add_sale` without `take_payment`. Requiring the
 /// declaration would force every module to know roles it did not invent — the opposite of the
 /// design — and would break manifests that already grant to keys of their own.
-/// Validates the optional `fiscal_regime` block of a manifest (ADR-0259 D6, hub#555).
+/// Validates the optional `fiscal_regime` block of a manifest (ADR-0273 D6, hub#555).
 ///
 /// The block is what makes a module count as a **provider** of the regime a hub owes, so it is
 /// checked at the hostile border (a third-party zip) and not only by the JSON Schema: a malformed
@@ -336,6 +339,106 @@ fn validate_fiscal_regime(manifest: &Manifest) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// The stable rejection code of the rule below. ABI público: the UI and the marketplace program
+/// against the code, never against the message.
+pub const PROVIDER_NOT_FREE: &str = "fiscal.provider_not_free";
+
+/// **A module that fulfils the hub's own fiscal regime may not be SOLD** (ADR-0273 D7, hub#559).
+///
+/// ⚠️ **This fixes nothing that is broken.** VeriFactu is free (decisión de Ioan, 2026-08-08), so
+/// the path *«the entitlement expired → VeriFactu off → the till keeps selling»* — one of the five
+/// that motivated the ADR — does not exist: there is nothing to expire. Not paying costs the
+/// customer **access to the hub**, which is a platform matter and not a fiscal one. Selling this as
+/// a security fix would be a lie.
+///
+/// What it buys is that nothing brings it back **without anybody noticing**. A future price change,
+/// or a third party implementing the same regime and charging for it, would reopen it — and the
+/// mechanism that breaks the hub already exists: `module-system.md` §2bis, *«blocking = the
+/// dispatcher refuses that module's queries and commands»*. Pointed at the fiscal provider, an
+/// unpaid invoice leaves a hub that can neither transmit nor read its own queue. That turns a
+/// billing incident into a fiscal fire, which is exactly the shape of failure ADR-0273 exists to
+/// forbid: **a fiscal obligation may never depend on a module being licensed or available.**
+///
+/// Three things it deliberately does NOT do:
+///
+/// 1. **It does not judge commerce.** Only a module fulfilling the regime THIS hub owes is looked
+///    at. A paid module that is not a fiscal provider (`whatsapp_inbox`), or one that provides
+///    another country's regime, installs untouched — refusing those would be the runtime having an
+///    opinion about somebody else's business model.
+/// 2. **It does not break a dependency the hub already has.** Every restart re-registers the
+///    installed modules through this very function ([`crate::Runtime::rehydrate_installed`], and
+///    `install_all_from_dir` in dev), so a rule that only asked "is this sold?" would answer a price
+///    change by refusing to mount the provider at the next boot — `BLOCKED`, till stopped, caused by
+///    the guard itself. Same for a hub re-downloading its modules after a redeploy (Hub Cloud is
+///    stateless: `installed_but_unregistered` → `install_from_cloud`). The door is at the moment the
+///    hub TAKES the dependency; from then on the provider lock
+///    ([`crate::fiscal_profile::ensure_provider_remains`]) is what governs it, and stopping a free
+///    module from turning paid belongs in the SaaS, at publish time, where no till is open.
+/// 3. **It does not read the marketplace's price.** It reads what the manifest DECLARES
+///    ([`Manifest::sold_under`]), which is also what the SaaS's git sync writes into
+///    `Module.tier`/`price` for a module of ours. A third party stripping the block from its zip
+///    walks past this — which is why this is the second lock and not the only one: the first is the
+///    SaaS refusing to publish it at all (ADR-0105 phase 1 already bars a third-party paid module).
+///    What this door adds is the half the SaaS cannot have: it is the only place that knows which
+///    regime **this** hub owes.
+async fn validate_fiscal_provider_is_free(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    manifest: &Manifest,
+) -> Result<()> {
+    // Not a fiscal provider at all — the shape of 23 of the 24 published manifests. Cheapest check
+    // first, and it keeps the install path from touching the database for almost every module.
+    if manifest.fiscal_regime.is_none() {
+        return Ok(());
+    }
+    let Some(term) = manifest.sold_under() else {
+        return Ok(()); // Free, which is what a fiscal provider has to be.
+    };
+    // What this hub owes. `load` is tolerant of the table not being there (a runtime built straight
+    // over an empty database), and a hub whose country has no regime owes nothing.
+    let Some(profile) = crate::fiscal_profile::load(db, hub_id).await? else {
+        return Ok(());
+    };
+    if profile.fiscal_system.trim().is_empty()
+        || !manifest.fulfils_regime(&profile.country_code, &profile.fiscal_system)
+    {
+        return Ok(());
+    }
+    if already_installed(db, hub_id, &manifest.id).await {
+        return Ok(()); // Point 2 above: never break a dependency the hub already has.
+    }
+    Err(RuntimeError::Domain {
+        code: PROVIDER_NOT_FREE.to_string(),
+        message: format!(
+            "`{}` fulfils the fiscal regime this hub owes (`{}`) and declares {term}: complying \
+             with the law cannot depend on a subscription staying paid, because the day it lapses \
+             the hub can neither file nor read its own queue. A module that implements the active \
+             regime has to be free",
+            manifest.id, profile.fiscal_system
+        ),
+    })
+}
+
+/// Is `module_id` already recorded as installed for `hub_id`?
+///
+/// Read straight from `hub_module` instead of through [`installed_status`] because that one applies
+/// the system migrations as a side effect, and this is called from inside `install`.
+///
+/// **An unreadable answer counts as "already installed"**, i.e. it makes the caller's guard step
+/// aside. The guard above is defensive and has no live case; a false negative costs nothing, while
+/// a false positive stops a till. The direction is chosen accordingly.
+async fn already_installed(db: &dyn DatabaseAdapter, hub_id: &str, module_id: &str) -> bool {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("module_id".into(), json!(module_id));
+    db.query(
+        "SELECT module_id FROM hub_module WHERE hub_id = :hub_id AND module_id = :module_id",
+        &p,
+    )
+    .await
+    .map_or(true, |res| !res.rows.is_empty())
 }
 
 fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
@@ -945,7 +1048,7 @@ mod tests {
         assert!(super::validate_command_contracts(&valid).is_ok());
     }
 
-    // ── `fiscal_regime`: who says "I implement this regime" (ADR-0259 D6, hub#555) ─────────────
+    // ── `fiscal_regime`: who says "I implement this regime" (ADR-0273 D6, hub#555) ─────────────
 
     /// Builds a manifest carrying the given `fiscal_regime` block.
     fn with_regime(regime: serde_json::Value) -> crate::manifest::Manifest {

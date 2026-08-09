@@ -60,7 +60,7 @@ const MIGRATIONS: &[SystemMigration] = &[
         // de DDL, que Postgres rechazaría en sentencia preparada), luego la pone NOT NULL y
         // recompone la PK a `(hub_id, module_id)`.
         postgres: "\
-ALTER TABLE hub_module ADD COLUMN hub_id TEXT;\
+ALTER TABLE hub_module ADD COLUMN IF NOT EXISTS hub_id TEXT;\
 UPDATE hub_module SET hub_id = :hub_id WHERE hub_id IS NULL;\
 ALTER TABLE hub_module ALTER COLUMN hub_id SET NOT NULL;\
 ALTER TABLE hub_module DROP CONSTRAINT hub_module_pkey;\
@@ -75,7 +75,7 @@ ALTER TABLE hub_module ADD PRIMARY KEY (hub_id, module_id);",
         version: 2,
         name: "hub_trusted_device",
         postgres: "\
-CREATE TABLE hub_trusted_device (\
+CREATE TABLE IF NOT EXISTS hub_trusted_device (\
   device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
     },
     // ── v3 — ADR-0057 / public-api.md: API keys de la API pública por módulo ─────────────────
@@ -93,7 +93,7 @@ CREATE TABLE hub_trusted_device (\
         version: 3,
         name: "hub_api_key",
         postgres: "\
-CREATE TABLE hub_api_key (\
+CREATE TABLE IF NOT EXISTS hub_api_key (\
   id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
   secret_hash TEXT NOT NULL, scope_json TEXT NOT NULL DEFAULT '[]', \
   status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, \
@@ -113,7 +113,7 @@ CREATE INDEX IF NOT EXISTS ix_hub_api_key_hub ON hub_api_key (hub_id);",
         version: 4,
         name: "hub_settings",
         postgres: "\
-CREATE TABLE hub_settings (\
+CREATE TABLE IF NOT EXISTS hub_settings (\
   hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
   updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, key));",
@@ -130,7 +130,7 @@ CREATE TABLE hub_settings (\
         version: 5,
         name: "module_capability_grants",
         postgres: "\
-CREATE TABLE _module_capability_grants (\
+CREATE TABLE IF NOT EXISTS _module_capability_grants (\
   hub_id TEXT NOT NULL, module_id TEXT NOT NULL, capability TEXT NOT NULL, \
   granted INTEGER NOT NULL DEFAULT 0, granted_at TEXT, granted_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, module_id, capability));",
@@ -147,7 +147,7 @@ CREATE TABLE _module_capability_grants (\
         version: 6,
         name: "hub_certificate",
         postgres: "\
-CREATE TABLE _hub_certificate (\
+CREATE TABLE IF NOT EXISTS _hub_certificate (\
   hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
   uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id));",
@@ -160,12 +160,12 @@ CREATE TABLE _hub_certificate (\
         version: 7,
         name: "hub_user_profile_preferences",
         postgres: "\
-CREATE TABLE hub_user_profile (\
+CREATE TABLE IF NOT EXISTS hub_user_profile (\
   hub_id TEXT NOT NULL, user_id TEXT NOT NULL, first_name TEXT NOT NULL DEFAULT '', \
   last_name TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', \
   avatar_path TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, \
   PRIMARY KEY (hub_id, user_id));\
-CREATE TABLE hub_user_pref (\
+CREATE TABLE IF NOT EXISTS hub_user_pref (\
   hub_id TEXT NOT NULL, user_id TEXT NOT NULL, language TEXT NOT NULL DEFAULT '', \
   theme_mode TEXT NOT NULL DEFAULT '', theme_palette TEXT NOT NULL DEFAULT '', \
   updated_at TEXT NOT NULL, PRIMARY KEY (hub_id, user_id));",
@@ -182,7 +182,7 @@ CREATE TABLE hub_user_pref (\
     SystemMigration {
         version: 8,
         name: "hub_session_device_id",
-        postgres: "ALTER TABLE hub_session ADD COLUMN device_id TEXT;",
+        postgres: "ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS device_id TEXT;",
     },
     // ── v9 — identidad por EMAIL: `hub_user.email` (ADR-0157, corrección owner sembrado) ─────────
     // El owner del hub es el CREADOR, sembrado por el provisioning del SaaS (`HUB_OWNER_EMAIL`)
@@ -198,7 +198,7 @@ CREATE TABLE hub_user_pref (\
         version: 9,
         name: "hub_user_email",
         postgres: "\
-ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
     },
     // ── v10 — #42: cuota durable de API keys ────────────────────────────────────────────────
@@ -207,8 +207,8 @@ CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
         name: "api_key_rate_limit",
         postgres:
             "\
-ALTER TABLE hub_api_key ADD COLUMN rate_limit_per_minute INTEGER NOT NULL DEFAULT 60;\
-CREATE TABLE hub_api_key_rate_window (\
+ALTER TABLE hub_api_key ADD COLUMN IF NOT EXISTS rate_limit_per_minute INTEGER NOT NULL DEFAULT 60;\
+CREATE TABLE IF NOT EXISTS hub_api_key_rate_window (\
   api_key_id TEXT PRIMARY KEY, window_epoch_minute BIGINT NOT NULL, request_count BIGINT NOT NULL);",
     },
     // ── v11 — hub#348 (paso 2b regla D): POR QUÉ está cerrada la puerta de un `hub_user` ─────────
@@ -227,7 +227,7 @@ CREATE TABLE hub_api_key_rate_window (\
     SystemMigration {
         version: 11,
         name: "hub_user_cloud_revoked_at",
-        postgres: "ALTER TABLE hub_user ADD COLUMN cloud_revoked_at TEXT NOT NULL DEFAULT '';",
+        postgres: "ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS cloud_revoked_at TEXT NOT NULL DEFAULT '';",
     },
     // ── v12 — hub#349 (paso 2b): `owner` sale del catálogo de roles del hub ──────────────────────
     // `owner` era la MISMA palabra en los dos planos —el rol de la CUENTA en el SaaS y el rol del
@@ -273,7 +273,7 @@ CREATE TABLE hub_api_key_rate_window (\
         version: 13,
         name: "hub_role_activation",
         postgres: "\
-CREATE TABLE hub_role_activation (\
+CREATE TABLE IF NOT EXISTS hub_role_activation (\
   hub_id TEXT NOT NULL, role_key TEXT NOT NULL, \
   activated_at TEXT NOT NULL, activated_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, role_key));",
@@ -299,7 +299,7 @@ CREATE TABLE hub_role_activation (\
         version: 14,
         name: "hub_certificate_slots",
         postgres: "\
-ALTER TABLE _hub_certificate ADD COLUMN kind TEXT NOT NULL DEFAULT 'own';\
+ALTER TABLE _hub_certificate ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'own';\
 ALTER TABLE _hub_certificate DROP CONSTRAINT _hub_certificate_pkey;\
 ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     },
@@ -330,7 +330,7 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     SystemMigration {
         version: 16,
         name: "hub_certificate_delegated_version",
-        postgres: "ALTER TABLE _hub_certificate ADD COLUMN cert_version BIGINT;",
+        postgres: "ALTER TABLE _hub_certificate ADD COLUMN IF NOT EXISTS cert_version BIGINT;",
     },
     // ── v17 — hub#357 (paso 2b): QUÉ CLASE de dispositivo es este — `shared` vs `personal` ───────
     // El mismo negocio tiene el TPV del mostrador (varias personas se turnan) y el portátil del
@@ -358,9 +358,9 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
         version: 17,
         name: "hub_trusted_device_mode",
         postgres: "\
-ALTER TABLE hub_trusted_device ADD COLUMN mode TEXT NOT NULL DEFAULT 'shared';\
-ALTER TABLE hub_trusted_device ADD COLUMN mode_set_at TEXT NOT NULL DEFAULT '';\
-ALTER TABLE hub_trusted_device ADD COLUMN mode_set_by TEXT NOT NULL DEFAULT '';",
+ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'shared';\
+ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode_set_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode_set_by TEXT NOT NULL DEFAULT '';",
     },
     // ── v18 — hub#341 / ADR-0196 §6: the print queue lives in the HUB ───────────────────────
     // ⚠️ **v18 and not the v15 hub#317 left free for this.** A gap does NOT reserve a number:
@@ -392,15 +392,15 @@ ALTER TABLE hub_trusted_device ADD COLUMN mode_set_by TEXT NOT NULL DEFAULT '';"
         version: 18,
         name: "print_queue",
         postgres: "\
-CREATE TABLE _print_queue (\
+CREATE TABLE IF NOT EXISTS _print_queue (\
   hub_id TEXT NOT NULL, job_id TEXT NOT NULL, seq BIGSERIAL NOT NULL, \
   role TEXT NOT NULL, html TEXT NOT NULL, format TEXT NOT NULL DEFAULT 'receipt', \
   status TEXT NOT NULL DEFAULT 'pending', attempts BIGINT NOT NULL DEFAULT 0, \
   claimed_by TEXT NOT NULL DEFAULT '', lease_expires_at TEXT NOT NULL DEFAULT '', \
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, completed_at TEXT, \
   PRIMARY KEY (hub_id, job_id));\
-CREATE INDEX ix_print_queue_next ON _print_queue (hub_id, role, status, seq);\
-CREATE INDEX ix_print_queue_lease ON _print_queue (hub_id, status, lease_expires_at);",
+CREATE INDEX IF NOT EXISTS ix_print_queue_next ON _print_queue (hub_id, role, status, seq);\
+CREATE INDEX IF NOT EXISTS ix_print_queue_lease ON _print_queue (hub_id, status, lease_expires_at);",
     },
     // ── v19 — hub#436: the email of the rows written before hub#356, moved to where ACCESS is ───
     // hub#356 (PR #432) fixed the code — the alta now writes the email in the two places that need
@@ -672,7 +672,7 @@ CREATE TABLE IF NOT EXISTS _elevation_audit (\
   created_at TEXT NOT NULL, PRIMARY KEY (hub_id, id));\
 CREATE INDEX IF NOT EXISTS idx_elevation_audit_when ON _elevation_audit (hub_id, created_at);",
     },
-    // ── v27 — hub#549 / ADR-0259 D1/D6: the CORE decides THAT there is a fiscal obligation ─────
+    // ── v27 — hub#549 / ADR-0273 D1/D6: the CORE decides THAT there is a fiscal obligation ─────
     // The rule: a fiscal obligation can never depend on a module being installed, enabled,
     // licensed or available. The module implements HOW to comply; the core determines THAT
     // compliance is owed. Today it is the other way round — uninstall the provider with an empty
@@ -727,6 +727,61 @@ INSERT INTO _hub_fiscal_regime_registry (country_code, regime_key, since, note) 
   VALUES ('ES', 'verifactu', '', 'RD 1007/2023 — VERI*FACTU (ADR-0202)') \
   ON CONFLICT (country_code, regime_key) DO NOTHING;",
     },
+    // ── v28 — hub#557 / ADR-0273 D2: the cessation of activity leaves a RECORD ────────────────
+    // `CLOSED` already existed as a status and the dispatcher already refused writes in it
+    // (hub#556). What did not exist was the way IN — and a one-way door with nothing written down
+    // is a state somebody will later have to guess the origin of: was it the owner? a bug? which
+    // day did the business actually stop?
+    //
+    // So the transition stamps the two facts nobody can reconstruct afterwards: WHEN it ceased and
+    // WHO decided it. `closed_by` follows the same shape as `mode_set_by` (v17) and
+    // `uploaded_by` (`_hub_certificate`): the `hub_user` id the door authenticated, never anything
+    // read from a payload.
+    //
+    // Not a new table: this is one more fact about the singleton profile, and a row that already
+    // carries `activated_at` (when it started filing for real) is exactly where "and when it
+    // stopped" belongs.
+    //
+    // ⚠️ **v28: the next number ABOVE THE MAXIMUM, re-checked at rebase.** `apply` compares against
+    // the MAXIMUM applied version, so anything at or below it is skipped IN SILENCE. The v15, v20
+    // and v24 gaps are free and permanently UNREACHABLE; taking one is that silent failure.
+    //
+    // ⚠️ **Re-executable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`. `tests/access_email_backfill.rs`
+    // rewinds the control table and replays every later migration over a database that already has
+    // the objects; a bare `ADD COLUMN` fails 42701 and takes that suite down with it.
+    SystemMigration {
+        version: 28,
+        name: "hub_fiscal_profile_closed",
+        postgres: "\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_by TEXT NOT NULL DEFAULT '';",
+    },
+    // ── v29 — hub#558 / ADR-0273 D8: taking over ANOTHER installation leaves a receipt ────────
+    // `NumeroInstalacion = hub_id` (ADR-0202): a profile whose `system_id` is not this hub was
+    // written by a different installation, so its chain is not this hub's to continue. The way out
+    // is explicit and manual (`fiscal_profile::adopt_installation`) — never the boot deciding by
+    // itself, because adopting somebody else's installation in silence is exactly how two chains
+    // get mixed, and a record the tax authority already accepted is neither re-sent nor deleted
+    // (ADR-0189).
+    //
+    // The takeover OVERWRITES `system_id`, which destroys the one fact nobody could reconstruct
+    // afterwards: *which* installation these rows came from. `adopted_from` keeps it, and it is
+    // the only evidence left that two chains could have been mixed here — worth more than the
+    // other two columns put together. `adopted_at`/`adopted_by` follow the shape of `closed_at`/
+    // `closed_by` (v28) and `mode_set_at`/`mode_set_by` (v17).
+    //
+    // ⚠️ **v29: the next number ABOVE THE MAXIMUM, re-checked at rebase.** `apply` compares against
+    // the maximum applied version, so anything at or below it is skipped IN SILENCE.
+    //
+    // ⚠️ **Re-executable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`.
+    SystemMigration {
+        version: 29,
+        name: "hub_fiscal_profile_adopted",
+        postgres: "\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_from TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_by TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -740,11 +795,20 @@ pub async fn ensure_control_table(db: &dyn DatabaseAdapter) -> Result<()> {
 /// transacción** junto con el `INSERT` en `_hub_system_migrations` (atomicidad: o se aplica y
 /// queda registrada, o no se aplica). Idempotente: una versión ya registrada se salta.
 ///
+/// **Coherencia del catálogo (hub#573).** Antes este bucle trataba `version <= max_aplicado`
+/// como «ya hecha» y saltaba en silencio. Pero dos ramas paralelas que eligen el mismo número
+/// (o una migración que cae por debajo del máximo tras un renumerado) dejan exactamente este
+/// estado: la versión está en el catálogo, el máximo del hub está por encima, pero su fila de
+/// control **nunca se escribió** — la tabla no existe en el hub desplegado y nadie se entera.
+/// Ahora, antes de iterar, se comprueba que toda versión del catálogo ≤ máximo esté **registrada**;
+/// si falta alguna, el arranque **aborta** nombrando la versión (fallo ruidoso, no silencio).
+///
 /// El SQL de las migraciones puede llevar el parámetro `:hub_id` (lo usa v1 para sellar el
 /// hub_id del despliegue en las filas existentes).
 pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
     ensure_control_table(db).await?;
     let applied = max_applied_version(db).await?;
+    let registered = registered_versions(db).await?;
 
     let mut prev = 0i64;
     for m in MIGRATIONS {
@@ -757,8 +821,25 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
         );
         prev = m.version;
 
+        if registered.contains(&m.version) {
+            continue; // registrada de verdad (idempotencia por identidad, no por umbral).
+        }
+
+        // Versión del catálogo NO registrada, pero ≤ máximo aplicado: incoherencia. Sin esta
+        // guarda se saltaría en silencio y el hub arrancaría sin la tabla (hub#573).
         if m.version <= applied {
-            continue; // ya aplicada en un arranque previo (idempotente).
+            return Err(crate::errors::RuntimeError::Other(format!(
+                "migración de sistema v{} (`{}`) no registrada pero su versión es ≤ el máximo \
+                 aplicado (v{}): el catálogo embebido y el esquema del hub están incoherentes \
+                 (probable colisión de versión entre ramas paralelas, o un renumerado que dejó \
+                 esta migración por debajo del máximo). Renumerar a v{} NO arregla un hub ya \
+                 desplegado: hay que aplicar su SQL a mano y registrarla, o restaurar el hub \
+                 desde un backup coherente.",
+                m.version,
+                m.name,
+                applied,
+                next_catalogue_version()
+            )));
         }
 
         let sql = m.postgres;
@@ -786,6 +867,27 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
         db.execute_tx(&ops).await?;
     }
     Ok(())
+}
+
+/// La siguiente versión libre del catálogo (máximo + 1), para sugerirla en el mensaje de aborto
+/// de hub#573. Ojo: esto NO es una recomendación de renumerar — renumerar no arregla un hub ya
+/// desplegado, solo evita que la colisión vuelva a pasar. El mensaje lo deja claro.
+fn next_catalogue_version() -> i64 {
+    MIGRATIONS.iter().map(|m| m.version).max().unwrap_or(0) + 1
+}
+
+/// Versiones registradas en `_hub_system_migrations` (las que de verdad se aplicaron). A
+/// diferencia de [`max_applied_version`], esta es la **identidad** de lo aplicado, no solo el
+/// techo — y es lo que hace que la guarda de hub#573 distinga «ya hecha» de «saltada en silencio».
+async fn registered_versions(db: &dyn DatabaseAdapter) -> Result<Vec<i64>> {
+    let res = db
+        .query("SELECT version FROM _hub_system_migrations", &Params::new())
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .filter_map(|r| r["version"].as_i64())
+        .collect())
 }
 
 /// Versión máxima de migración de sistema ya aplicada (0 si ninguna).
@@ -1011,7 +1113,7 @@ mod tests {
     /// El mismo invariante para la **v27** (hub#549): un hub que ya pasó por todo lo anterior **sí**
     /// recibe las tablas del perfil fiscal. Si alguien la renumera por debajo del máximo se saltaría
     /// **en silencio** y ese hub arrancaría sin perfil — es decir, sin nadie en el core que sepa que
-    /// debe VeriFactu, que es exactamente el agujero que ADR-0259 cierra.
+    /// debe VeriFactu, que es exactamente el agujero que ADR-0273 cierra.
     #[tokio::test]
     async fn a_hub_already_migrated_still_receives_the_fiscal_profile() {
         use erplora_db::testutil::fresh_db;
@@ -1547,8 +1649,8 @@ mod tests {
 
     #[test]
     fn split_statements_keeps_each_terminated() {
-        let stmts = split_statements("CREATE TABLE a (x);  DROP TABLE b; ");
-        assert_eq!(stmts, vec!["CREATE TABLE a (x);", "DROP TABLE b;"]);
+        let stmts = split_statements("CREATE TABLE IF NOT EXISTS a (x);  DROP TABLE b; ");
+        assert_eq!(stmts, vec!["CREATE TABLE IF NOT EXISTS a (x);", "DROP TABLE b;"]);
     }
 
     #[tokio::test]
@@ -2043,5 +2145,127 @@ mod tests {
 
         // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').
         apply(&db, "hub-test").await.unwrap();
+    }
+
+    /// hub#573: a system migration whose version is ≤ the max applied, but which is **not
+    /// registered** as applied, is an **incoherent catalogue** — not "already done". Two parallel
+    /// branches that picked the same number (or a migration that landed below the max after a
+    /// renumber) leave exactly this state: the row is in the embedded catalogue, the hub's max is
+    /// above it, but its `_hub_system_migrations` row never got written because the old `apply`
+    /// skipped it in silence.
+    ///
+    /// Before this fix `apply` treated `version <= max` as "done" and `continue`d — the hub booted
+    /// believing it was up to date while missing the table. After: it **aborts** and names the
+    /// version, turning a silent skip into a loud failure that a test or a boot log catches.
+    #[tokio::test]
+    async fn apply_aborts_if_a_catalogue_version_below_the_max_is_not_registered() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        // A hub deployed through v13 (baseline + v1..v13), all genuinely applied and registered.
+        hub_deployed_before_the_slots(&db).await;
+        assert_eq!(max_applied_version(&db).await.unwrap(), 13);
+
+        // Now bump the recorded max to 15 WITHOUT registering v14 — the exact state a skipped
+        // migration leaves: a row above v14 is recorded, v14 is in the catalogue, but v14's own
+        // registration never happened (simulating a parallel-branch collision or a renumber).
+        let mut p = Params::new();
+        p.insert("version".into(), json!(15));
+        p.insert("name".into(), json!("bogus_skip_above_14"));
+        p.insert("applied_at".into(), json!(now_rfc3339()));
+        db.execute(
+            "INSERT INTO _hub_system_migrations (version, name, applied_at) \
+             VALUES (:version, :name, :applied_at)",
+            &p,
+        )
+        .await
+        .unwrap();
+        assert_eq!(max_applied_version(&db).await.unwrap(), 15);
+
+        // v14 is in the catalogue and its version (14) is ≤ the recorded max (15), but it is NOT
+        // registered. `apply` must REFUSE to boot — not silently skip v14 and continue.
+        let err = apply(&db, "hub-test").await.unwrap_err();
+        let msg = err.to_string().to_lowercase();
+        assert!(
+            msg.contains("14"),
+            "el error nombra la versión perdida (v14); fue: {msg}"
+        );
+        assert!(
+            !msg.contains("ok") && err.to_string() != "",
+            "es un error real, no un silencio"
+        );
+    }
+
+    /// The catalogue has **gaps by design** (v15, v20, v24 were left free by renumbers and must
+    /// never be reused). hub#573's fix must not treat a gap as a missing migration: a version that
+    /// is simply absent from the catalogue is not "unregistered", it is "does not exist". Only a
+    /// version that IS in the catalogue but missing from `_hub_system_migrations` (while below the
+    /// max) is the incoherence that aborts the boot.
+    #[test]
+    fn known_gaps_in_the_catalogue_are_documented_not_filled() {
+        let versions: Vec<i64> = MIGRATIONS.iter().map(|m| m.version).collect();
+        // Strictly increasing (no duplicates) — the existing guard, restated.
+        let mut prev = 0i64;
+        for &v in &versions {
+            assert!(v > prev, "v{v} duplicada o desordenada");
+            prev = v;
+        }
+        // The historical gaps. Documented here so a new gap is noticed: adding to this list is a
+        // conscious act (you renumbered and left a hole), NOT an accident. If a gap appears that is
+        // not in this list, someone added a migration out of order — investigate before listing it.
+        let known_gaps: Vec<i64> = vec![15, 20, 24];
+        let actual_gaps: Vec<i64> = (1..=*versions.last().unwrap())
+            .filter(|v| !versions.contains(v))
+            .collect();
+        assert_eq!(
+            actual_gaps, known_gaps,
+            "gap nuevo en el catálogo: si lo dejaste a propósito al renumerar, añádelo a `known_gaps`; \
+             si no, es un fallo de orden"
+        );
+    }
+
+    /// **hub#483 — the whole catalogue is re-runnable.** `_hub_system_migrations` records versions
+    /// applied, not schema. Anything that wipes rows from it (a fixture rewinding, a restored backup
+    /// with control behind schema, a partial import) makes `apply` re-run the SQL against a base
+    /// where the objects already exist. Without `IF NOT EXISTS`, the boot dies on `42P07` instead of
+    /// converging — and dies with a Postgres error, not a message that explains anything.
+    ///
+    /// This test fixes the property for the ENTIRE catalogue, not one migration at a time: apply it
+    /// all, wipe every control row, re-apply, and require green. A new migration that forgets
+    /// `IF NOT EXISTS` fails here in CI, not in a fixture that belongs to somebody else.
+    #[tokio::test]
+    async fn the_whole_catalogue_can_be_re_applied_over_existing_schema() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        // Full baseline + the whole catalogue, genuinely applied once.
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        ensure_control_table(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+        assert!(
+            max_applied_version(&db).await.unwrap() > 0,
+            "el catálogo tiene migraciones y se aplicaron"
+        );
+
+        // Wipe ALL control rows → `apply` sees a max of 0 and re-runs every migration. With the
+        // objects already in the schema, a `CREATE TABLE` without `IF NOT EXISTS` dies on 42P07.
+        db.execute_batch("DELETE FROM _hub_system_migrations;").await.unwrap();
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            0,
+            "borrado el control, el máximo vuelve a 0 → apply re-corre el catálogo entero"
+        );
+
+        // Re-applying over the existing schema must converge, not abort. Today this fails on the
+        // first `CREATE TABLE` without `IF NOT EXISTS`.
+        apply(&db, "hub-test").await.expect(
+            "re-aplicar el catálogo sobre un esquema ya creado no debe fallar: cada CREATE/ALTER \
+             necesita IF NOT EXISTS (hub#483)"
+        );
+        // And it leaves the control table populated again — a re-run is a real apply, not a no-op
+        // that silently skipped everything.
+        assert!(
+            max_applied_version(&db).await.unwrap() > 0,
+            "tras re-aplicar, el control vuelve a registrar las versiones"
+        );
     }
 }

@@ -19,6 +19,9 @@ use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::{Column, Encode, Row, Type, TypeInfo, ValueRef};
 
+mod migration_lock;
+pub use migration_lock::{MigrationLock, MigrationLockError};
+
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 
 /// Helpers de test compartidos (esquema Postgres efímero por test). Compilados para los tests del
@@ -125,6 +128,32 @@ pub trait DatabaseAdapter: Send + Sync {
 
     /// Runs a query and returns the rows as JSON objects.
     async fn query(&self, sql: &str, params: &Params) -> Result<QueryResult, DbError>;
+
+    /// Toma el lock que serializa **el arranque que migra** de este hub (hub#539).
+    ///
+    /// Con `order: start-first` (ADR-0269) hay **dos procesos del mismo hub contra la misma base**
+    /// en cada actualización, y los dos corren el arranque entero. Sin esto pueden leer el mismo
+    /// `max_applied_version` y aplicar la misma migración a la vez: `CREATE TABLE` sin
+    /// `IF NOT EXISTS` da **42P07**, un `ALTER` deja el esquema a medias, y el `INSERT` de control
+    /// choca contra la PK.
+    ///
+    /// La clave sale del `hub_id`, así que **dos hubs distintos no se estorban** — importa cuando
+    /// la flota entera se actualiza a la vez.
+    ///
+    /// Si no lo consigue en `timeout_ms`, **falla**. No se cuelga: colgarse dejaría el contenedor
+    /// arrancando para siempre, `/readyz` sin dar `UP`, y Swarm esperando a que expire
+    /// `start_period` para revertir — cuando el diagnóstico estaba disponible desde el segundo uno.
+    ///
+    /// El default no bloquea nada: los adaptadores en memoria de los tests no tienen concurrencia
+    /// que serializar.
+    async fn migration_lock(
+        &self,
+        hub_id: &str,
+        timeout_ms: u64,
+    ) -> Result<MigrationLock, MigrationLockError> {
+        let _ = (hub_id, timeout_ms);
+        Ok(MigrationLock::noop())
+    }
 
     /// Runs a multi-statement script (migrations).
     async fn execute_batch(&self, sql: &str) -> Result<(), DbError>;
@@ -282,6 +311,12 @@ impl PgAdapter {
     }
 }
 
+/// `55P03 lock_not_available`: Postgres se rindió esperando el lock (lo puso `SET LOCAL
+/// lock_timeout`). Es la única forma de distinguir «otro arranque lo tiene» de un error de verdad.
+fn is_lock_timeout(error: &sqlx::Error) -> bool {
+    matches!(error.as_database_error().and_then(|e| e.code()), Some(code) if code == "55P03")
+}
+
 #[async_trait]
 impl DatabaseAdapter for PgAdapter {
     async fn execute(&self, sql: &str, params: &Params) -> Result<CommandResult, DbError> {
@@ -341,6 +376,43 @@ impl DatabaseAdapter for PgAdapter {
         let rows = q.fetch_all(&self.pool).await?;
         let out = rows.iter().map(pg_row_to_json).collect();
         Ok(QueryResult::new(out))
+    }
+
+    async fn migration_lock(
+        &self,
+        hub_id: &str,
+        timeout_ms: u64,
+    ) -> Result<MigrationLock, MigrationLockError> {
+        let mut tx = self.pool.begin().await.map_err(DbError::from)?;
+
+        // `lock_timeout` no admite parámetro, y `timeout_ms` es un u64 nuestro: no hay entrada de
+        // usuario que interpolar. `SET LOCAL` muere con la transacción, así que no contamina la
+        // conexión cuando vuelva al pool.
+        // `AssertSqlSafe`: sqlx 0.9 exige SQL `'static` o una aserción explícita (anti-inyección).
+        // Aquí lo interpolado es un `u64` nuestro, no entrada de nadie.
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "SET LOCAL lock_timeout = '{timeout_ms}ms'"
+        )))
+            .execute(&mut *tx)
+            .await
+            .map_err(DbError::from)?;
+
+        // `hashtext()` y no un hash de Rust: la clave la calculan DOS PROCESOS DISTINTOS y tiene
+        // que salir idéntica. `DefaultHasher` no garantiza estabilidad entre versiones ni entre
+        // procesos; lo de Postgres sí, y de paso no hay que serializar nada.
+        let taken = sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+            .bind(hub_id)
+            .execute(&mut *tx)
+            .await;
+
+        match taken {
+            Ok(_) => Ok(MigrationLock::held(tx)),
+            Err(error) if is_lock_timeout(&error) => Err(MigrationLockError::Timeout {
+                hub_id: hub_id.to_string(),
+                waited_ms: timeout_ms,
+            }),
+            Err(error) => Err(MigrationLockError::Db(DbError::from(error))),
+        }
     }
 
     async fn execute_batch(&self, sql: &str) -> Result<(), DbError> {

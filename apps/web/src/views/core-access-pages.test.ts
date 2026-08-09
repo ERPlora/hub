@@ -25,7 +25,11 @@ describe('core access and account pages', () => {
     // from `saveDownloadMessageKey`, which tells "this device has nowhere to put it" — the one the
     // user can act on — apart from a plain failure.
     expect(billing).toContain('toastError(t(saveDownloadMessageKey(error)))');
-    expect(billing).toContain("t('billing.openBillingPortal')");
+    // `billing.openBillingPortal` se comprobaba aquí. El botón ya no existe (hub#479): el portal de
+    // facturación del SaaS es una superficie de pago, y la app no lleva a ninguna. Lo que esta
+    // página sigue haciendo —y es lo que se prueba— es DECIR dónde se gestiona el plan.
+    expect(billing).toContain("t('billing.managePlanHint')");
+    expect(billing).not.toContain('openExternal');
   });
 
   it('does not revive stale PIN users or create a fake trusted PIN in demo mode', () => {

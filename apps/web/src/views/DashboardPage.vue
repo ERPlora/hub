@@ -190,7 +190,7 @@ import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { moduleNav } from '../lib/nav';
 import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
 import { openAssistantForSetup } from '../lib/shell';
-import { detectBridge, type BridgeStatus } from '../lib/bridge-client';
+import { detectPeripherals, type BridgeStatus } from '../lib/bridge-transport';
 import { printerLine, probeFromBridge, type HealthLine } from '../lib/system-health';
 import { GREETING_KEY, panelHeading } from '../lib/dashboard-heading';
 import { hubSettings } from '../lib/hub-settings';
@@ -341,9 +341,11 @@ const printerHealth = computed<HealthLine | null>(() =>
 async function loadSystemHealth(): Promise<void> {
   // Both fail on their own: printing installed but unreachable is a different sentence from «we do
   // not even know whether this hub prints», and neither may borrow the other's answer.
-  // `detectBridge` does GET http://localhost:12321/status with a short timeout (800 ms).
+  // `detectPeripherals` asks the door the modules use — `invoke` in the installed app, and an
+  // honest «no hardware here» in a browser. It used to probe `localhost:12321`, where nothing has
+  // listened since ADR-0196, so the badge read «no printer» even with one plugged in (hub#524).
   try {
-    printerProbe.value = await detectBridge();
+    printerProbe.value = await detectPeripherals();
   } catch {
     printerProbe.value = null; // we could not ask — NOT «it is off»
   }

@@ -120,14 +120,14 @@
                 <ok-status-pill :tone="printerHealth.tone" dot>
                   {{ t(printerHealth.titleKey) }}
                 </ok-status-pill>
-                <ion-button fill="clear" size="small" :aria-label="t('system.recheck')" @click="refreshBridge">
+                <ion-button fill="clear" size="small" :aria-label="t('system.recheck')" @click="refreshHardware">
                   <HubIcon slot="icon-only" name="refresh-outline" />
                 </ion-button>
               </div>
             </div>
             <p class="muted-note">
               {{ t(printerHealth.detailKey) }}
-              <span v-if="bridge.online && bridge.version"> · v{{ bridge.version }}</span>
+              <span v-if="hardware.online && hardware.version"> · v{{ hardware.version }}</span>
             </p>
             <div v-if="printerHealth.action" class="printer-action">
               <ion-button
@@ -141,8 +141,8 @@
               </ion-button>
             </div>
 
-            <ol v-if="!bridge.online" class="bridge-steps">
-              <li v-for="(s, i) in bridgeSteps" :key="s" class="bridge-step">
+            <ol v-if="!hardware.online" class="bridge-steps">
+              <li v-for="(s, i) in printerSteps" :key="s" class="bridge-step">
                 <ion-badge :color="i === 0 ? 'primary' : 'medium'" class="step-badge">
                   {{ i + 1 }}
                 </ion-badge>
@@ -154,17 +154,17 @@
                  this is the app offering to install itself: the steps above already skip
                  «download» and «install», and the buttons themselves were `window.open` calls that
                  open nothing in a webview. Updating the installed app is its own job (hub#400). -->
-            <div v-if="!bridge.online && !inInstalledApp">
-              <div class="download-label">{{ t('system.downloadBridge') }}</div>
+            <div v-if="!hardware.online && !inInstalledApp">
+              <div class="download-label">{{ t('system.downloadApp') }}</div>
               <p class="muted-note">
-                {{ t('system.downloadBridgeHint') }}
+                {{ t('system.downloadAppHint') }}
               </p>
               <div class="bridge-os-row">
                 <ion-button
-                  v-for="os in BRIDGE_OS"
+                  v-for="os in DOWNLOAD_OS"
                   :key="os.label"
                   :fill="os.fill"
-                  @click="handleBridgeDownload(os)"
+                  @click="handleAppDownload(os)"
                 >
                   <HubIcon slot="start" :name="os.icon" />
                   {{ os.label }}
@@ -303,7 +303,8 @@ import {
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import PlanLimitsPanel from '../components/PlanLimitsPanel.vue';
-import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';
+import { detectPeripherals, type BridgeStatus } from '../lib/bridge-transport';
+import { appDownloadUrl, type DownloadPlatform } from '../lib/app-update';
 import { fetchSystemInfo, type SystemInfo } from '../lib/system';
 import { isTauri } from '../lib/device';
 import { openExternal } from '../lib/open-external';
@@ -328,11 +329,11 @@ const { t, locale } = useI18n();
 
 // ── Types ────────────────────────────────────────────────────────
 
-interface BridgeOs {
+interface DownloadOs {
   label: string;
   icon: string;
-  platform: BridgePlatform;
-  /** Igual que en erplora.com/download/: el primero (Windows) resalta en `solid`, el resto `outline`. */
+  platform: DownloadPlatform;
+  /** Same as erplora.com/download/: the first one (Windows) stands out in `solid`, the rest `outline`. */
   fill: 'solid' | 'outline';
 }
 
@@ -377,8 +378,10 @@ const loadFailed = ref(false);
 
 // Estado REAL del sistema (GET /api/system). null = endpoint aún no disponible → UI degrada.
 const info = ref<SystemInfo | null>(null);
-// Estado real del Bridge local (GET localhost:12321/status), independiente del runtime.
-const bridge = ref<BridgeStatus>({ online: false });
+// What the hardware of THIS device answers, asked at the door the modules use (hub#524). In a
+// browser that is honestly `{online:false}`; inside `com.erplora.app` it is whatever the peripherals
+// crate reports. Independent of the runtime, which knows nothing about the counter's printer.
+const hardware = ref<BridgeStatus>({ online: false });
 // The two readings behind the printer sentence (hub#375). `null` in either of them means «we have
 // not been able to ask», which is a different answer from «no» and is never dressed up as one.
 const printerProbe = ref<BridgeStatus | null>(null);
@@ -388,13 +391,13 @@ const installedModules = ref<InstalledModule[] | null>(null);
 // this screen is allowed to offer (hub#480). Read once: it cannot change while the page is open.
 const inInstalledApp = isTauri();
 
-const bridgeSteps = computed<string[]>(() =>
+const printerSteps = computed<string[]>(() =>
   printerSetupStepKeys(inInstalledApp).map((key) => t(key)),
 );
 
-// macOS fuera (solo desarrollo local). El Cloud sirve Windows/Linux/Android.
-// Logos de marca por SO + primero en `solid`, igual que los botones de erplora.com/download/.
-const BRIDGE_OS: BridgeOs[] = [
+// macOS is out (local development only). The Cloud serves Windows/Linux/Android.
+// Brand logo per OS + the first one `solid`, same as the buttons of erplora.com/download/.
+const DOWNLOAD_OS: DownloadOs[] = [
   { label: 'Windows', icon: 'logo-windows', platform: 'windows', fill: 'solid'   },
   { label: 'Linux',   icon: 'logo-tux',     platform: 'linux',   fill: 'outline' },
   { label: 'Android', icon: 'logo-android', platform: 'android', fill: 'outline' },
@@ -537,16 +540,19 @@ function showToast(message: string): void {
 /**
  * Fetches the installer of the app from the Cloud, in the user's own browser (hub#480).
  *
- * The address is the SaaS (`{cloud}/bridge/download/{platform}/`, which redirects to the release in
- * Object Storage), so the boundary of ADR-0255 already covers it — nothing needed widening for
- * this. `openExternal` and not `window.open` because this screen also runs inside the installed
- * app: this block is hidden there (`inInstalledApp`), and the helper is what keeps the button
- * honest anywhere it is ever shown again.
+ * `appDownloadUrl` and not an address built here (hub#507): `/bridge/download/` still answers, and
+ * still serves `erplora-bridge.exe` — a product ADR-0196 deleted. It does not fail and it does not
+ * warn, it just downloads the wrong thing. The one helper (hub#400) is also what turns this into a
+ * STORE listing the day one goes live, so this button and the sidebar's «Update» cannot drift.
+ *
+ * `openExternal` and not `window.open` because this screen also runs inside the installed app: this
+ * block is hidden there (`inInstalledApp`), and the helper is what keeps the button honest anywhere
+ * it is ever shown again (ADR-0255).
  */
-async function handleBridgeDownload(os: BridgeOs): Promise<void> {
+async function handleAppDownload(os: DownloadOs): Promise<void> {
   try {
-    await openExternal(bridgeDownloadUrl(os.platform));
-    showToast(t('system.toastDownloadingBridge', { os: os.label }));
+    await openExternal(appDownloadUrl(os.platform));
+    showToast(t('system.toastDownloadingApp', { os: os.label }));
   } catch {
     showToast(t('download.failed'));
   }
@@ -556,16 +562,16 @@ async function handleBridgeDownload(os: BridgeOs): Promise<void> {
  * Re-reads the two things behind the printer sentence (hub#375).
  *
  * Each one fails on its own and each failure is kept as `null` — «we could not ask», which is not
- * «no». `bridge` keeps the raw probe because the install steps below still key off it.
+ * «no». `hardware` keeps the raw probe because the install steps below still key off it.
  */
-async function refreshBridge(): Promise<void> {
+async function refreshHardware(): Promise<void> {
   try {
-    const status = await detectBridge();
+    const status = await detectPeripherals();
     printerProbe.value = status;
-    bridge.value = status;
+    hardware.value = status;
   } catch {
     printerProbe.value = null;
-    bridge.value = { online: false };
+    hardware.value = { online: false };
   }
   try {
     installedModules.value = await listInstalledModules();
@@ -608,7 +614,7 @@ async function loadSystemInfo(): Promise<void> {
 }
 
 onMounted(() => {
-  void refreshBridge();
+  void refreshHardware();
   void loadSystemInfo();
 });
 </script>
