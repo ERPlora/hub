@@ -501,6 +501,9 @@ export default {
     stateAvailable: 'Disponible',
     stateUnavailable: 'No disponible',
     stateInstalling: 'Instalando…',
+    // hub#516: instalado, pero hay una versión más nueva publicada. Se nombra la versión — decir
+    // «hay actualización» sin decir cuál es una insistencia, no una información.
+    stateUpdatable: 'Actualizar a {version}',
     phaseResolving: 'Resolviendo versión…',
     phaseDownloading: 'Descargando…',
     phaseVerifying: 'Verificando integridad…',
@@ -509,6 +512,7 @@ export default {
     actionToggle: 'Activar/Desactivar',
     actionUninstall: 'Desinstalar',
     actionInstall: 'Instalar',
+    actionUpdate: 'Actualizar',
     priceFree: 'Gratis',
     priceMonthly: '{price} €/mes',
     priceYearly: '{price} €/año',
@@ -520,6 +524,13 @@ export default {
     installError: 'No se pudo iniciar la instalación de {name}.',
     // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
     installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
+    // hub#516 — el botón de actualizar. `updateError` dice lo único que importa: el módulo NO se
+    // ha quedado a medias, sigue corriendo la versión que tenía.
+    updating: 'Actualizando {name}…',
+    updateSuccess: '{name} actualizado: {from} → {to}.',
+    updateUpToDate: '{name} ya está en la última versión.',
+    updateError: 'No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.',
+    updateBlocked: 'La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.',
     needsSubscription: '{name} necesita una suscripción. Contrátala desde tu cuenta de ERPlora, en erplora.com, y se instalará aquí.',
     deactivated: '{name} desactivado.',
     activated: '{name} activado.',

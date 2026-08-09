@@ -24,6 +24,18 @@
 //!
 //! Este módulo es solo la decisión: **qué versión**. El cómo lo aplica es el instalador.
 
+/// Una actualización que **ocurrió**: de dónde venía y a dónde fue.
+///
+/// Es lo único que el dueño ve de todo esto (ADR-0269 §3.5, hub#564): *«qué me habéis cambiado y
+/// desde qué versión»*. Por eso viaja el `from` y no solo la versión nueva — «inventory 1.1.2» no
+/// dice nada; «1.1.1 → 1.1.2» sí.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleUpdate {
+    pub module_id: String,
+    pub from: String,
+    pub to: String,
+}
+
 /// Una versión que el marketplace ofrece.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Available {

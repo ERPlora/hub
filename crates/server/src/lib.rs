@@ -10,9 +10,14 @@
 //!   POST /api/modules/install   {dir}        instala desde carpeta (extraída por erplora-source).
 //!                                            **Solo dev** (`HUB_DEV_MODE`) y confinado al staging
 //!                                            del hub — ver `install_guard` (hub#239).
+//!   GET  /api/modules/updates                qué versión ofrece hoy el marketplace por módulo
+//!                                            instalado (hub#516). Bajo demanda, no en bucle.
 //!   POST /api/modules/:id/activate
 //!   POST /api/modules/:id/deactivate
 //!   POST /api/modules/:id/uninstall
+//!   POST /api/modules/:id/update {version?}  actualiza un módulo instalado (hub#516). Mismo
+//!                                            pipeline verificado que instalar; sin `version`,
+//!                                            resuelve la que toca (cuarentena y pin mandan).
 //!   POST /api/query   {name, params}
 //!   POST /api/command {name, payload}
 //!   GET  /ws                                 stream de eventos (solo push)
@@ -448,10 +453,16 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                                 // un hub con la versión de ayer funciona, uno sin el módulo no. Se
                                 // cae a la que tenía registrada.
                                 eprintln!("✗ actualización de {id} a {}: {e} — vuelvo a {version}", target.version());
-                                match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await {
+                                let fallback = install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await;
+                                match &fallback {
                                     Ok(_) => eprintln!("✓ {id} sigue en {version}"),
                                     Err(e) => eprintln!("✗ {id}@{version} tampoco: {e}"),
                                 }
+                                // Y no puede ser un silencio (update-model §3.1.1): si actualizamos
+                                // solos, una actualización que se cae —y más aún un hub que arranca
+                                // SIN el módulo— tiene que llegar a alguien, no morir en un log del
+                                // contenedor. Best-effort: sin sink (hub sin enrolar) se descarta.
+                                report_failed_module_update(&id, &version, target.version(), &e.to_string(), fallback.is_ok());
                             }
                             Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
                         }
@@ -914,6 +925,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))
         .route("/api/modules/request-install", post(request_install))
+        // Qué versión ofrece hoy el marketplace para cada módulo instalado (hub#516). Bajo demanda:
+        // lo pide la pantalla de Apps al abrirse, no un sondeo en bucle.
+        .route("/api/modules/updates", get(list_module_updates))
         // Assets web de un módulo instalado (module.json + `dist/*.esm.js` + wasm/icons) servidos
         // desde la CACHÉ de descargas, resueltos por la VERSIÓN instalada. En Hub Cloud los módulos
         // se descargan en runtime al `module_cache` (NO se hornean en el `web_dir`), así que sin esta
@@ -932,9 +946,11 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
         .route("/api/modules/:id/uninstall", post(uninstall_module))
-        // Actualizar un módulo SIN reiniciar el contenedor (hub#675). Es la pieza que faltaba:
-        // hasta ahora un fix de módulo esperaba a que saliera una imagen nueva del hub, porque los
-        // módulos solo se recogen al arrancar y el rollout excluye a quien ya está en la imagen.
+        // Actualizar un módulo SIN reiniciar el contenedor (hub#675/hub#516). Es la pieza que
+        // faltaba: hasta ahora un fix de módulo esperaba a que saliera una imagen nueva del hub,
+        // porque los módulos solo se recogen al arrancar y el rollout excluye a quien ya está en la
+        // imagen. Es también el botón «Actualizar» del dueño, y con `{"version": "…"}` la palanca de
+        // soporte.
         .route("/api/modules/:id/update", post(update_module))
         .route(
             "/api/modules/:id/capabilities",
@@ -1064,11 +1080,44 @@ pub fn app(state: AppState) -> Router {
 /// [`readiness::readyz`], y es la que mira el `HEALTHCHECK`. Mezclarlas fue el bug: durante meses
 /// esto FUE el healthcheck del contenedor, así que un hub sin BD, con las migraciones a medias o
 /// sin un solo módulo cargado pasaba por sano.
+/// Manda al Cloud que una actualización automática de módulo se cayó (hub#516).
+///
+/// Si actualizamos solos y sin preguntar (ADR-0269), una actualización que falla no puede quedarse
+/// en un `eprintln!` del contenedor: `outcome` distingue el caso tolerable —el hub siguió con la
+/// versión de ayer— del que no lo es: **el hub arrancó sin el módulo**, que es el único desenlace
+/// que este modelo prohíbe. Best-effort por contrato del registro: sin sink (hub sin enrolar) se
+/// descarta en silencio.
+fn report_failed_module_update(
+    module_id: &str,
+    from: &str,
+    to: &str,
+    error: &str,
+    fell_back: bool,
+) {
+    use erplora_runtime::error_registry::{ErrorEvent, ErrorRegistry};
+
+    ErrorRegistry::global().report(
+        ErrorEvent::new(
+            erplora_runtime::error_registry::source::HUB,
+            "module_update_failed",
+            format!("no se pudo actualizar `{module_id}` de {from} a {to}: {error}"),
+            erplora_runtime::error_registry::severity::UNEXPECTED,
+        )
+        .with_module(module_id.to_string())
+        .with_context(json!({
+            "from": from,
+            "to": to,
+            // `stayed_on_previous` = el hub sirve; `no_module` = arrancó incompleto.
+            "outcome": if fell_back { "stayed_on_previous" } else { "no_module" },
+        })),
+    );
+}
+
 /// La versión que debe correr un módulo en este arranque (hub#516).
 ///
-/// Pregunta al marketplace qué versiones hay y deja decidir a
-/// [`erplora_runtime::module_update::resolve`]. Si el Cloud no contesta, **se queda con la que
-/// tiene**: un hub con la versión de ayer funciona; uno sin el módulo, no.
+/// Delega en [`install::resolve_target`] — **el mismo resolutor que usa el botón «Actualizar»** y
+/// que `/api/modules/updates`. Una segunda copia de esta decisión sería una segunda política: la
+/// automática y la manual acabarían ofreciendo cosas distintas.
 async fn resolve_module_target(
     state: &AppState,
     machine: &cloud_client::Auth,
@@ -1076,164 +1125,15 @@ async fn resolve_module_target(
     installed: &str,
     pinned: Option<&str>,
 ) -> erplora_runtime::module_update::Target {
-    use erplora_runtime::module_update::{resolve, Available, Target};
-
-    if let Some(pin) = pinned {
-        return Target::StayPut(pin.to_string());
-    }
-
-    let request = cloud_client::CloudClient::new(&state.config.cloud_base_url).versions(machine, module_id);
-    let mut call = state.http.get(&request.url);
-    for (name, value) in request.headers {
-        call = call.header(name, value);
-    }
-    let available: Vec<Available> = match call.send().await {
-        Ok(response) => response
-            .json::<Vec<cloud_client::ModuleVersion>>()
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|v| Available { version: v.version, is_active: v.is_active })
-            .collect(),
-        // Sin catálogo no se adivina: quedarse donde está es el único movimiento seguro.
-        Err(error) => {
-            eprintln!("⚠ versiones de {module_id}: {error} — se mantiene {installed}");
-            Vec::new()
-        }
-    };
-
-    resolve(installed, None, &available)
-}
-
-/// Cuerpo de `POST /api/modules/:id/update`. Sin `version` = **la última**, que es lo que se ofrece
-/// por defecto; con `version` = la que el usuario eligió del desplegable.
-#[derive(serde::Deserialize)]
-struct UpdateModuleReq {
-    #[serde(default)]
-    version: Option<String>,
-}
-
-/// **Actualiza un módulo sin reiniciar el contenedor** (hub#675).
-///
-/// Es lo que hace que un fix de módulo **no espere a una imagen nueva del hub**: los módulos solo se
-/// recogían al arrancar, y `rollout_hub_fleet` excluye a los hubs que ya están en la imagen
-/// objetivo — así que no había campaña que provocase el reinicio.
-///
-/// Si la versión nueva falla, **la anterior vuelve a quedar puesta**: un hub con la versión de ayer
-/// funciona, uno sin el módulo no.
-///
-/// Elegir una versión concreta **no la clava**: el arranque siguiente vuelve a resolver la última
-/// (ADR-0269 — nadie se queda atrás). Clavar una versión es el pin de soporte, que es herramienta
-/// nuestra y no se toca desde aquí.
-async fn update_module(
-    State(st): State<AppState>,
-    Path(module_id): Path<String>,
-    headers: HeaderMap,
-    Json(req): Json<UpdateModuleReq>,
-) -> Response {
-    use erplora_runtime::module_update::{resolve, update_with_fallback, Available, Outcome};
-
-    {
-        let rt = st.runtime.lock().await;
-        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-            return unauthorized(e);
-        }
-    }
-    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
-        )
-            .into_response();
-    };
-
-    // La versión que tiene ahora: es a la que hay que volver si la nueva falla.
-    let installed = {
-        let rt = st.runtime.lock().await;
-        rt.registry().module_version(&module_id)
-    };
-    if installed.is_empty() {
-        return (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "ok": false, "error": format!("`{module_id}` no está instalado") })),
-        )
-            .into_response();
-    }
-
-    // Sin `version` en el cuerpo → la última que ofrezca el marketplace.
-    let target = match req.version {
-        Some(chosen) => chosen,
-        None => {
-            let request = cloud_client::CloudClient::new(&st.config.cloud_base_url).versions(&auth, &module_id);
-            let mut call = st.http.get(&request.url);
-            for (name, value) in request.headers {
-                call = call.header(name, value);
-            }
-            let available: Vec<Available> = match call.send().await {
-                Ok(response) => response
-                    .json::<Vec<cloud_client::ModuleVersion>>()
-                    .await
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|v| Available { version: v.version, is_active: v.is_active })
-                    .collect(),
-                Err(error) => {
-                    return (
-                        StatusCode::BAD_GATEWAY,
-                        Json(json!({ "ok": false, "error": format!("no pude preguntar por las versiones de `{module_id}`: {error}") })),
-                    )
-                        .into_response()
-                }
-            };
-            resolve(&installed, None, &available).version().to_string()
-        }
-    };
-
-    let outcome = update_with_fallback(&installed, &target, |version| {
-        let st = st.clone();
-        let auth = auth.clone();
-        let module_id = module_id.clone();
-        async move {
-            let mut rt = st.runtime.lock().await;
-            install::install_from_cloud(
-                &st.http,
-                &st.config.cloud_base_url,
-                &st.config.module_cache,
-                &auth,
-                &mut rt,
-                &module_id,
-                &version,
-                &|_, _| {},
-                &st.config.signature_policy(),
-            )
-            .await
-            .map(|_| ())
-            .map_err(|e| e.to_string())
-        }
-    })
-    .await;
-
-    match outcome {
-        Outcome::AlreadyThere(version) => {
-            Json(json!({ "ok": true, "data": { "module_id": module_id, "version": version, "updated": false } })).into_response()
-        }
-        Outcome::Updated { from, to } => {
-            Json(json!({ "ok": true, "data": { "module_id": module_id, "from": from, "version": to, "updated": true } })).into_response()
-        }
-        // 200, no 5xx: la actualización no salió, pero **el módulo sigue funcionando**. Devolver un
-        // error haría pensar que el hub se quedó tocado, y no es el caso.
-        Outcome::RolledBack { stayed_on, error } => Json(json!({
-            "ok": true,
-            "data": { "module_id": module_id, "version": stayed_on, "updated": false },
-            "warning": { "code": "module.update_failed_kept_previous", "message": error },
-        }))
-        .into_response(),
-        Outcome::Lost { module, error } => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "ok": false, "error": { "code": "module.update_lost", "message": format!("`{module}`: {error}") } })),
-        )
-            .into_response(),
-    }
+    install::resolve_target(
+        &state.http,
+        &state.config.cloud_base_url,
+        machine,
+        module_id,
+        installed,
+        pinned,
+    )
+    .await
 }
 
 async fn healthz() -> &'static str {
@@ -1484,40 +1384,10 @@ async fn request_install(
 
     match result {
         Ok(installed) => {
-            // Ingestión de embeddings (§9.6): recoge el texto agéntico del módulo (agent.description
-            // + ai.description de queries/commands), lo embebe **vía el proxy del Cloud** (§9.3 — el
-            // Hub nunca llama a un proveedor de embeddings directamente) y lo registra en el índice
-            // vectorial para el routing de tools (§9.2b). Best-effort: un fallo aquí NO aborta la
-            // instalación (el módulo ya está instalado y operativo; el router degrada a "todos").
             let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
             drop(rt);
-            if !chunks.is_empty() {
-                if let Some(store) = &st.vector {
-                    let embedder = embed::CloudEmbedder::new(
-                        st.http.clone(),
-                        &st.config.cloud_base_url,
-                        auth.clone(),
-                    );
-                    match embed::index_chunks(
-                        &embedder,
-                        store.as_ref(),
-                        &st.hub_id(),
-                        &installed.version,
-                        &chunks,
-                    )
-                    .await
-                    {
-                        Ok(n) => {
-                            tracing::info!(module_id = %installed.module_id, chunks = n, "embeddings indexados (§9.6)")
-                        }
-                        Err(e) => {
-                            tracing::warn!(module_id = %installed.module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)")
-                        }
-                    }
-                } else {
-                    tracing::info!(module_id = %installed.module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
-                }
-            }
+            index_module_embeddings(&st, &auth, &installed.module_id, &installed.version, chunks)
+                .await;
 
             // Evento WS con la forma exacta del contrato del frontend.
             st.broadcast(json!({ "type": "module.installed", "module_id": installed.module_id }));
@@ -1541,49 +1411,339 @@ async fn request_install(
                 error = %e,
                 "request-install falló"
             );
-            let code = match &e {
-                install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
-                install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
-                // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
-                // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
-                install::InstallError::Source(source::SourceError::BadSignature(_)) => {
-                    StatusCode::FORBIDDEN
-                }
-                // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
-                // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
-                install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
-                install::InstallError::Cloud(_)
-                | install::InstallError::Source(_)
-                | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
-            };
-            // Canal de errores de dominio (hub#139): además del mensaje humano viaja un `code`
-            // estable contra el que la UI programa y traduce. Un install fallido no es mudo.
-            let mut body = json!({
-                "ok": false,
-                "error": e.to_string(),
-                "code": e.code(),
-            });
-            if let install::InstallError::Blocked {
-                blocked_on,
-                purchase,
-                ..
-            } = &e
-            {
-                body["blocked_on"] = json!(blocked_on);
-                body["purchase"] = json!(purchase
-                    .iter()
-                    .map(|p| json!({
-                        "module_id": p.module_id,
-                        "module_type": p.module_type,
-                        "price": p.price,
-                        "currency": p.currency,
-                        "purchase_url": p.purchase_url,
-                    }))
-                    .collect::<Vec<_>>());
-            }
-            (code, Json(body)).into_response()
+            install_error_response(&e)
         }
     }
+}
+
+/// Ingestión de embeddings (§9.6): recoge el texto agéntico del módulo (`agent.description` +
+/// `ai.description` de queries/commands), lo embebe **vía el proxy del Cloud** (§9.3 — el Hub nunca
+/// llama a un proveedor de embeddings directamente) y lo registra en el índice vectorial para el
+/// routing de tools (§9.2b).
+///
+/// Best-effort: un fallo aquí NO aborta nada (el módulo ya está instalado y operativo; el router
+/// degrada a "todos"). Corre también tras un **update** (hub#516): la versión nueva puede describir
+/// tools distintas, y un índice que se queda con el texto de la versión anterior enruta a ciegas.
+async fn index_module_embeddings(
+    st: &AppState,
+    auth: &cloud_client::Auth,
+    module_id: &str,
+    version: &str,
+    chunks: Vec<ingest::PendingChunk>,
+) {
+    if chunks.is_empty() {
+        return;
+    }
+    let Some(store) = &st.vector else {
+        tracing::info!(module_id = %module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
+        return;
+    };
+    let embedder =
+        embed::CloudEmbedder::new(st.http.clone(), &st.config.cloud_base_url, auth.clone());
+    match embed::index_chunks(&embedder, store.as_ref(), &st.hub_id(), version, &chunks).await {
+        Ok(n) => tracing::info!(module_id = %module_id, chunks = n, "embeddings indexados (§9.6)"),
+        Err(e) => {
+            tracing::warn!(module_id = %module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)")
+        }
+    }
+}
+
+/// Cuerpo (opcional) de `POST /api/modules/:id/update`. Sin `version` = **la última**, que es lo
+/// que se ofrece por defecto; con `version` = la que se eligió (palanca de soporte).
+///
+/// Elegir una versión concreta **no la clava**: el arranque siguiente vuelve a resolver la última
+/// (ADR-0269 — nadie se queda atrás). Clavar es el **pin de soporte**, herramienta nuestra, y no se
+/// toca desde aquí.
+#[derive(Deserialize, Default)]
+struct UpdateModuleReq {
+    #[serde(default)]
+    version: Option<String>,
+}
+
+/// **Actualiza un módulo sin reiniciar el contenedor** (hub#675 + hub#516).
+///
+/// Es lo que hace que un fix de módulo **no espere a una imagen nueva del hub**: los módulos solo se
+/// recogían al arrancar, y `rollout_hub_fleet` excluye a los hubs que ya están en la imagen
+/// objetivo, así que no había campaña que provocase el reinicio.
+///
+/// Va por [`install::update_from_cloud`] y **no** por `install_from_cloud`, y la diferencia no es
+/// cosmética: con el plan del Cloud (ADR-0060) el módulo que ya está instalado viaja en el set
+/// instalado, vuelve como `already_satisfied` y `execute_plan` lo **salta** — el update habría dicho
+/// que sí sin descargar nada. La puerta de update lo excluye del set y no lo salta.
+///
+/// **Si la versión nueva falla, la anterior sigue puesta**, y por dos caminos que se componen: el
+/// runtime repone en memoria lo que el módulo aportaba (hub#516, `Registry::snapshot_module`), y
+/// encima `update_with_fallback` confirma reinstalando la que había. `Outcome::Lost` queda para lo
+/// que de verdad lo es: que ni siquiera eso valga y el hub se quede sin el módulo.
+///
+/// Auth = **sesión local de admin** *más* credencial hub-scoped, igual que `request-install`. La
+/// sesión no es un detalle: sin ella, cualquier módulo web same-origin podría disparar
+/// actualizaciones usando indirectamente el token de máquina del hub.
+async fn update_module(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+    body: Option<Json<UpdateModuleReq>>,
+) -> Response {
+    use erplora_runtime::module_update::{update_with_fallback, Outcome};
+
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response();
+    };
+
+    // La versión que tiene ahora: es a la que hay que volver si la nueva falla.
+    let installed = {
+        let rt = st.runtime.lock().await;
+        rt.registry().module_version(&module_id)
+    };
+    if !st.runtime.lock().await.registry().is_installed(&module_id) {
+        return install_error_response(&install::InstallError::NotInstalled(module_id));
+    }
+
+    // Vacío / `latest` = lo que el resolutor decida (el MISMO del arranque: cuarentena y pin
+    // mandan, nunca hacia atrás). Se resuelve AQUÍ, antes de tocar nada, porque el destino tiene que
+    // ser una versión concreta: es la que se compara con la instalada para saber si hay algo que
+    // hacer, y la que se reporta como `from → to`.
+    let requested = body
+        .map(|Json(b)| b)
+        .unwrap_or_default()
+        .version
+        .unwrap_or_default();
+    let target = {
+        let rt = st.runtime.lock().await;
+        install::resolve_update_target(
+            &st.http,
+            &st.config.cloud_base_url,
+            &auth,
+            &rt,
+            &module_id,
+            &requested,
+        )
+        .await
+    };
+
+    // Mismas fases que instalar (`resolving → downloading → verifying → installing`): la card del
+    // catálogo ya sabe pintarlas, así que actualizar se ve igual de vivo que instalar.
+    let progress_state = st.clone();
+    let root_id = module_id.clone();
+    let on_progress = move |current: &str, phase: &str| {
+        progress_state.broadcast(json!({
+            "type": "module.install.progress",
+            "module_id": current,
+            "root_id": root_id,
+            "phase": phase,
+        }));
+    };
+
+    // El fallo del PRIMER intento se guarda entero, no como texto: un plan `blocked` (dependencia
+    // premium sin comprar) o un `NotInstalled` son decisiones que le tocan al usuario, con su código
+    // y su puntero de compra — convertirlos en «no se pudo, sigues en la anterior» perdería la única
+    // información accionable que llevan.
+    let first_error: std::sync::Arc<std::sync::Mutex<Option<install::InstallError>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+
+    // `update_with_fallback` compara `from`/`to` y decide la secuencia; la instalación real la pone
+    // este closure. Pedir la versión de partida es barato: `update_from_cloud` ve `to == from` y no
+    // descarga nada, así que la vuelta atrás confirma sin repetir trabajo.
+    let outcome = update_with_fallback(&installed, &target, |version| {
+        let st = st.clone();
+        let auth = auth.clone();
+        let module_id = module_id.clone();
+        let on_progress = &on_progress;
+        let first_error = first_error.clone();
+        async move {
+            let mut rt = st.runtime.lock().await;
+            let result = install::update_from_cloud(
+                &st.http,
+                &st.config.cloud_base_url,
+                &st.config.module_cache,
+                &auth,
+                &mut rt,
+                &module_id,
+                &version,
+                on_progress,
+                &st.config.signature_policy(),
+            )
+            .await;
+            match result {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    let message = e.to_string();
+                    first_error.lock().unwrap().get_or_insert(e);
+                    Err(message)
+                }
+            }
+        }
+    })
+    .await;
+
+    // Un fallo con decisión del usuario detrás (409 `install_blocked`, 404 `update_not_installed`)
+    // se cuenta como lo que es, no como «no se pudo».
+    if !matches!(outcome, Outcome::Updated { .. } | Outcome::AlreadyThere(_)) {
+        if let Some(e) = first_error.lock().unwrap().as_ref() {
+            if matches!(
+                e,
+                install::InstallError::Blocked { .. } | install::InstallError::NotInstalled(_)
+            ) {
+                return install_error_response(e);
+            }
+        }
+    }
+
+    match outcome {
+        Outcome::AlreadyThere(version) => {
+            Json(json!({ "ok": true, "data": { "module_id": module_id, "version": version, "updated": false } })).into_response()
+        }
+        Outcome::Updated { from, to } => {
+            // La versión nueva puede describir tools distintas: un índice que se queda con el texto
+            // de la anterior enruta a ciegas.
+            let chunks = {
+                let rt = st.runtime.lock().await;
+                ingest::collect_chunks(rt.registry(), &module_id)
+            };
+            index_module_embeddings(&st, &auth, &module_id, &to, chunks).await;
+            // Lo único que el dueño ve de toda la maquinaria (ADR-0269 §3.5): qué cambió y de qué
+            // versión a cuál. `module.installed` va detrás porque es el evento que el shell YA
+            // escucha (App.vue) para refrescar entitlement + nav.
+            st.broadcast(json!({
+                "type": "module.updated",
+                "module_id": module_id,
+                "from": from,
+                "to": to,
+            }));
+            st.broadcast(json!({ "type": "module.installed", "module_id": module_id }));
+            Json(json!({ "ok": true, "data": { "module_id": module_id, "from": from, "version": to, "updated": true } })).into_response()
+        }
+        // 200, no 5xx: la actualización no salió, pero **el módulo sigue funcionando**. Devolver un
+        // error haría pensar que el hub se quedó tocado, y no es el caso.
+        Outcome::RolledBack { stayed_on, error } => Json(json!({
+            "ok": true,
+            "data": { "module_id": module_id, "version": stayed_on, "updated": false },
+            "warning": { "code": "module.update_failed_kept_previous", "message": error },
+        }))
+        .into_response(),
+        Outcome::Lost { module, error } => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "ok": false, "error": { "code": "module.update_lost", "message": format!("`{module}`: {error}") } })),
+        )
+            .into_response(),
+    }
+}
+
+/// `GET /api/modules/updates` — qué versión ofrece hoy el marketplace para cada módulo instalado
+/// (hub#516). **Bajo demanda**, no en bucle: lo pregunta la pantalla de Apps cuando alguien la
+/// abre. Un sondeo periódico costaría una llamada por módulo (24) contra el Cloud sin que nadie
+/// esté mirando, y la vía desatendida ya la cubre el arranque, que resuelve la última versión.
+///
+/// Usa **el mismo resolutor** que el arranque, así que lo que el botón ofrece es exactamente lo que
+/// la actualización automática haría sola: nunca una versión en cuarentena, nunca hacia atrás, y el
+/// pin de soporte gana. Si el Cloud no contesta, `latest == installed` y no se ofrece nada —
+/// inventar una versión sería peor que no decir nada.
+async fn list_module_updates(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let installed: Vec<(String, String, Option<String>)> = {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+        match erplora_runtime::installer::installed_with_pin(rt.db(), &st.hub_id()).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "ok": false, "error": e.to_string() })),
+                )
+                    .into_response()
+            }
+        }
+    };
+
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        // Sin credencial no se puede preguntar al marketplace. No es un error: es «no lo sé», y
+        // «no lo sé» nunca se pinta como «hay actualización».
+        return Json(json!({ "ok": true, "data": [] })).into_response();
+    };
+
+    let mut out = Vec::with_capacity(installed.len());
+    for (module_id, version, pinned) in installed {
+        let target = install::resolve_target(
+            &st.http,
+            &st.config.cloud_base_url,
+            &auth,
+            &module_id,
+            &version,
+            pinned.as_deref(),
+        )
+        .await;
+        out.push(json!({
+            "module_id": module_id,
+            "installed": version,
+            "latest": target.version(),
+            "update_available": target.is_update(),
+            "pinned": pinned,
+        }));
+    }
+    Json(json!({ "ok": true, "data": out })).into_response()
+}
+
+/// Status HTTP de un fallo del pipeline de instalación/actualización. Compartido por
+/// `request-install` y `update` (hub#516): el mismo fallo tiene que contarse igual por las dos
+/// puertas, o la UI acaba programando contra dos contratos.
+fn install_error_status(e: &install::InstallError) -> StatusCode {
+    match e {
+        install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
+        // Actualizar algo que no está instalado: no hay recurso al que aplicar la operación.
+        install::InstallError::NotInstalled(_) => StatusCode::NOT_FOUND,
+        install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
+        // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
+        install::InstallError::Source(source::SourceError::BadSignature(_)) => StatusCode::FORBIDDEN,
+        // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
+        // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
+        install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
+        install::InstallError::Cloud(_)
+        | install::InstallError::Source(_)
+        | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
+    }
+}
+
+/// Respuesta de un fallo del pipeline, con el canal de errores de dominio (hub#139): además del
+/// mensaje humano viaja un `code` estable contra el que la UI programa y traduce. Un install —o un
+/// update— fallido no es mudo.
+fn install_error_response(e: &install::InstallError) -> Response {
+    let mut body = json!({
+        "ok": false,
+        "error": e.to_string(),
+        "code": e.code(),
+    });
+    if let install::InstallError::Blocked {
+        blocked_on,
+        purchase,
+        ..
+    } = e
+    {
+        body["blocked_on"] = json!(blocked_on);
+        body["purchase"] = json!(purchase
+            .iter()
+            .map(|p| json!({
+                "module_id": p.module_id,
+                "module_type": p.module_type,
+                "price": p.price,
+                "currency": p.currency,
+                "purchase_url": p.purchase_url,
+            }))
+            .collect::<Vec<_>>());
+    }
+    (install_error_status(e), Json(body)).into_response()
 }
 
 /// GET /modules/:id/*path — sirve los assets web (`module.json`, `dist/*.esm.js`, wasm, icons) de un

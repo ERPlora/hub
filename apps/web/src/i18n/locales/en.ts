@@ -521,6 +521,9 @@ export default {
     stateAvailable: 'Available',
     stateUnavailable: 'Unavailable',
     stateInstalling: 'Installing…',
+    // hub#516: installed, but a newer version is published. Names the version — «there is an
+    // update» without saying which one is a nag, not information.
+    stateUpdatable: 'Update to {version}',
     phaseResolving: 'Resolving version…',
     phaseDownloading: 'Downloading…',
     phaseVerifying: 'Verifying integrity…',
@@ -529,6 +532,7 @@ export default {
     actionToggle: 'Activate/Deactivate',
     actionUninstall: 'Uninstall',
     actionInstall: 'Install',
+    actionUpdate: 'Update',
     priceFree: 'Free',
     priceMonthly: '€{price}/month',
     priceYearly: '€{price}/year',
@@ -540,6 +544,13 @@ export default {
     installError: 'Could not start installation of {name}.',
     // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
     installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',
+    // hub#516 — the update button. `updateError` says the one thing that matters: the module did
+    // NOT end up half-updated; it keeps running the version it had.
+    updating: 'Updating {name}…',
+    updateSuccess: '{name} updated: {from} → {to}.',
+    updateUpToDate: '{name} is already on the latest version.',
+    updateError: 'Could not update {name}. It keeps running the version it had.',
+    updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
     // Names the place, does not open it (hub#479). `purchaseInBrowser`/`purchaseOpenError` went
     // with the button that opened the SaaS checkout.
     needsSubscription: '{name} needs a subscription. Subscribe from your ERPlora account at erplora.com and it will install here.',
