@@ -154,7 +154,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { IonButton, IonTextarea, IonSpinner } from '@ionic/vue';
+import { IonButton, IonTextarea, IonSpinner, alertController } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { assistantOpen, closeAssistant, assistantIntent } from '../lib/shell';
 import {
@@ -338,6 +338,27 @@ async function send(): Promise<void> {
   }
 
   abort = streamAssistant(history, {
+    // Confirm-card de ESCRITURAS (§9.2): sin este handler, streamAssistant cancela toda
+    // mutación por default-deny — correcto como seguro, pero dejaba al asistente sin manos
+    // (ni instalar un módulo ni ningún command de módulo). Un ion-alert nativo: el usuario ve
+    // QUÉ tool y con QUÉ argumentos, y decide. Lo DESTRUCTIVO ni llega aquí: no se ofrece
+    // como tool (regla de Ioan, test en assemble_tools).
+    onConfirm: async ({ name, arguments: args }) => {
+      let pretty = args;
+      try { pretty = JSON.stringify(JSON.parse(args || '{}'), null, 1); } catch { /* raw */ }
+      const alert = await alertController.create({
+        header: t('assistant.confirmTitle'),
+        subHeader: name,
+        message: pretty,
+        buttons: [
+          { text: t('assistant.confirmCancel'), role: 'cancel' },
+          { text: t('assistant.confirmRun'), role: 'confirm' },
+        ],
+      });
+      await alert.present();
+      const { role } = await alert.onDidDismiss();
+      return role === 'confirm';
+    },
     onToken: (tok) => {
       // La respuesta del asistente siempre es texto (string); acumula tokens.
       const cur = assistantMsg.value.content;
