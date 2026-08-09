@@ -192,17 +192,6 @@ pub struct HubConfig {
     /// los tests pueden inyectarlas directamente aquí (sin tocar el env global del proceso).
     /// Vacío ⇒ anillo vacío ⇒ **deny-all** bajo [`Self::signature_policy`] en producción.
     pub module_trusted_keys: Vec<String>,
-    /// Blueprint que el SaaS DECLARA para este hub (ADR-0212): `HUB_BOOTSTRAP_BLUEPRINT` (slug) +
-    /// `HUB_BOOTSTRAP_BLUEPRINT_LOCALE`. `None` ⇒ el hub no importa nada al arrancar.
-    ///
-    /// Viaja la **identidad** del bundle, nunca su URL prefirmada: esa lleva credencial, acaba en
-    /// un log de deploy y caduca en 1 h — menos de lo que vive una task que se reprograma. El hub
-    /// resuelve versión y `sha256` con su token de máquina y verifica el hash antes de aplicar.
-    ///
-    /// El nombre es genérico a propósito (`BOOTSTRAP`, no `DEMO`), como `HUB_SEED_SQL`: el
-    /// mecanismo es del runtime y el SaaS decide quién lo recibe. Ojo, `is_demo()` aquí significa
-    /// **modo `dev`**, otra cosa: esto no se ata a ese flag.
-    pub bootstrap_blueprint: Option<crate::bootstrap::BootstrapBlueprint>,
     /// **Este despliegue es una DEMO efímera** (`HUB_DEMO`, ADR-0197 — hub#376). Lo escribe el
     /// provisioning del SaaS al crear la instancia (espejo de su columna `Hub.is_demo`), por el
     /// mismo canal que `HUB_AUTH` o `HUB_CLOUD_API_TOKEN`: env del contenedor.
@@ -292,17 +281,10 @@ impl HubConfig {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        // Blueprint declarado por el SaaS para este hub (ADR-0212). Hermano de `HUB_SECTOR`:
-        // ausente o en blanco ⇒ `None` y el arranque no importa nada.
+        // ⚠️ `HUB_BOOTSTRAP_BLUEPRINT` / `HUB_BOOTSTRAP_BLUEPRINT_LOCALE` ya NO se leen: un hub nace
+        // VACÍO (ADR-0293). El despliegue puede seguir inyectándolas —el SaaS lo hace para las
+        // demos— y el hub las ignora a propósito. Ver `crates/server/src/lib.rs` (final de `serve`).
         //
-        // Sin locale NO se desactiva: un slug declarado sin idioma sigue siendo una declaración, y
-        // callar sería repetir el contrato muerto de `HUB_COUNTRY`. El SaaS contesta 400 si el slug
-        // es ambiguo, y eso es un fallo REPORTADO en vez de un hub que se queda vacío en silencio.
-        let bootstrap_blueprint =
-            crate::bootstrap::BootstrapBlueprint::from_env_values(
-                std::env::var("HUB_BOOTSTRAP_BLUEPRINT").ok().as_deref(),
-                std::env::var("HUB_BOOTSTRAP_BLUEPRINT_LOCALE").ok().as_deref(),
-            );
         // Marcador de DEMO efímera (ADR-0197). Ausente o con cualquier otro valor ⇒ hub normal.
         let demo = parse_demo_flag(std::env::var(DEMO_ENV).ok().as_deref());
         Self {
@@ -318,7 +300,6 @@ impl HubConfig {
             dev_mode,
             dev_modules_dir,
             module_trusted_keys,
-            bootstrap_blueprint,
             demo,
         }
     }
@@ -411,7 +392,6 @@ mod staging_tests {
             dev_mode,
             dev_modules_dir: Some(PathBuf::from("/tmp/modules")),
             module_trusted_keys,
-            bootstrap_blueprint: None,
         }
     }
 

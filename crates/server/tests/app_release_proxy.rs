@@ -40,7 +40,6 @@ fn config(hub_id: &str, cloud_base_url: String, tag: &str) -> HubConfig {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     }
 }
 

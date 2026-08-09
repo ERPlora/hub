@@ -261,7 +261,6 @@ async fn fixture(
         dev_modules_dir: None,
         // Empty ring ⇒ `Sha256Only` (ADR-0194): integrity still mandatory, signature not required.
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     let state = AppState::with_config(rt, cfg);
     (app(state.clone()), session, state, temp)
