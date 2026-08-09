@@ -8,11 +8,13 @@
 //     token de emparejamiento); ADR-0196 §3 lo retira y con él PNA, mixed-content y la clave
 //     pública del emparejamiento. El precio explícito: la PWA deja de imprimir tiques térmicos.
 //
-// Los módulos consumen `erplora.peripherals` sin distinguir el transporte (mismo contrato).
+// Modules consume `erplora.peripherals` without knowing which transport they got (one contract),
+// and since hub#524 the shell's own SCREENS ask at that same door ({@link detectPeripherals}).
 import {
   IpcBridgeTransport,
   LocalNetworkPermissionDeniedError,
   UnavailableBridgeTransport,
+  type BridgeStatus,
   type BridgeTransport,
   type TauriBridge,
 } from '@erplora/module-sdk';
@@ -54,6 +56,28 @@ function withLocalisedDiscovery<T extends BridgeTransport>(transport: T): T {
     }
   };
   return transport;
+}
+
+export type { BridgeStatus };
+
+/**
+ * **Is there hardware on THIS device?** — one question, one door: the modules' own (hub#524).
+ *
+ * There used to be two ways of asking it, and the screens used the one ADR-0196 walled up:
+ * `GET localhost:12321/status`, the daemon hub#340 deleted. With nobody listening there the answer
+ * was `{online:false}` **everywhere, always** — including inside `com.erplora.app`, where the
+ * printer is plugged in and answering. And it failed **mute**: no error, no log, just a calm
+ * sentence sending the owner off to install the app they already had open.
+ *
+ * Delegating to the transport makes the answer honest by construction: in a browser
+ * `{online:false}` IS the truth (there is no hardware there — ADR-0196 §3), and in the installed
+ * app it comes from `erplora_bridge_status`, the very call the `printing` module reads.
+ *
+ * It never rejects. Both `detect()` implementations resolve on purpose, because whoever asks is
+ * painting a state — a rejection would take down the screen instead of filling in a status.
+ */
+export function detectPeripherals(timeoutMs?: number): Promise<BridgeStatus> {
+  return makeBridgeTransport().detect(timeoutMs);
 }
 
 /** Transporte de hardware correcto para el entorno actual. */

@@ -104,20 +104,21 @@ jobs:
             libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev
 
-      # Sin `version`: la lee de `packageManager: pnpm@10` en package.json (evita el conflicto
-      # ERR_PNPM_BAD_PM_VERSION que da fijar dos versiones).
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install JS deps
-        run: pnpm install --frozen-lockfile
-
+      # No pnpm/Node setup here on purpose (hub#465): nothing in this job builds a frontend, so
+      # there is nothing for a JS toolchain to do. `tauri.conf.json` has no `beforeBuildCommand`
+      # — the only thing that would make tauri-action build one — because `frontendDist` points
+      # at the committed static `shell-dist/` (ADR-0154).
+      #
+      # Nor does anything else here need the workspace's node_modules, checked against the
+      # action's own source: `getRunner()` only uses a package manager when
+      # `hasDependency('@tauri-apps/cli', projectPath)` holds — there is no apps/tauri/package.json,
+      # so it takes the other branch, `npm install -g @tauri-apps/cli`, on the runner's
+      # preinstalled Node. The root pnpm-lock.yaml never enters the picture. tauri-action itself
+      # is a `using: node24` action, which GitHub runs on its own bundled runtime.
+      # The `node -e` below is likewise the runner's preinstalled node — same as job `upload-s3`.
+      #
+      # Guarded by scripts/pack-msix.test.sh: bring a `beforeBuildCommand` back and that test
+      # fails until the setup steps come back with it.
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -259,18 +260,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install JS deps
-        run: pnpm install --frozen-lockfile
-
+      # No pnpm/Node setup here either (hub#465): the Android build is Rust + Kotlin, its CLI
+      # comes from `cargo install tauri-cli` below, and nothing bundles a frontend. See the
+      # matrix job above for the full reasoning.
       # El módulo Kotlin del plugin compila con jvmTarget 17.
       - name: Setup JDK 17
         uses: actions/setup-java@v4

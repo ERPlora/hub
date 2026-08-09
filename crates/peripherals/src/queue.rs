@@ -117,3 +117,192 @@ impl PrintQueue {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::escpos::{self, DocumentType};
+    use crate::test_support::{unreachable_target, MockPrinter};
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
+    use tokio::io::AsyncReadExt;
+    use tokio::net::TcpListener;
+
+    /// Reintentos rápidos: los tests no deben pagar los 2 s de backoff de producción.
+    fn fast_policy(max_attempts: u32) -> RetryPolicy {
+        RetryPolicy {
+            max_attempts,
+            backoff_ms: 10,
+        }
+    }
+
+    /// Arranca el worker de la cola y devuelve el receptor de outcomes.
+    fn spawn_worker(queue: Arc<PrintQueue>) -> UnboundedReceiver<JobOutcome> {
+        let (tx, rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move { queue.run(tx).await });
+        rx
+    }
+
+    fn job(target: NetworkTarget, payload: &[u8]) -> PrintJob {
+        PrintJob {
+            job_id: Some("j1".into()),
+            target,
+            payload: payload.to_vec(),
+            attempts: 0,
+        }
+    }
+
+    /// **Lo encolado llega a la impresora byte por byte.** Es toda la razón de ser de la cola: el
+    /// comando de Tauri (`erplora_print`) devuelve `Ok` en cuanto encola, así que si el worker
+    /// mutila o pierde el payload nadie se entera hasta mirar el papel.
+    #[tokio::test]
+    async fn an_enqueued_job_reaches_the_printer_byte_for_byte() {
+        let mock = MockPrinter::start().await;
+        let queue = Arc::new(PrintQueue::new(fast_policy(3)));
+        let mut outcomes = spawn_worker(queue.clone());
+
+        let payload = b"hello escpos";
+        queue.enqueue(job(mock.target.clone(), payload)).unwrap();
+
+        assert!(
+            matches!(outcomes.recv().await, Some(JobOutcome::Completed { .. })),
+            "un envío que llega se reporta como completado"
+        );
+        assert_eq!(mock.captured_bytes().await, payload);
+        assert!(mock.accepted(), "se abrió la conexión a la impresora");
+    }
+
+    /// Un recibo real renderizado por `escpos` sobrevive el viaje entero: el corte `GS V 1` y el
+    /// nombre del negocio (cp437) tienen que salir por el cable, no solo del renderizador.
+    #[tokio::test]
+    async fn a_rendered_receipt_travels_whole_including_the_paper_cut() {
+        let mock = MockPrinter::start().await;
+        let queue = Arc::new(PrintQueue::new(fast_policy(3)));
+        let mut outcomes = spawn_worker(queue.clone());
+
+        let bytes = escpos::render_document(
+            DocumentType::Receipt,
+            &serde_json::json!({
+                "business_name": "Bar Pepe",
+                "receipt_id": "T-001",
+                "items": [{ "name": "Cafe", "quantity": 2, "total": 3.0 }],
+                "total": 3.0,
+            }),
+        )
+        .expect("un recibo bien formado renderiza");
+        queue.enqueue(job(mock.target.clone(), &bytes)).unwrap();
+        outcomes.recv().await.expect("hay outcome");
+
+        let got = mock.captured_bytes().await;
+        assert!(
+            got.windows(3).any(|w| w == [0x1d, 0x56, 0x01]),
+            "sin el corte, el siguiente tique sale pegado a este"
+        );
+        assert!(
+            got.windows(8).any(|w| w == b"Bar Pepe"),
+            "el nombre del negocio debe llegar al papel"
+        );
+    }
+
+    /// **La impresora apagada un momento no pierde el trabajo.** Es el requisito §2.7 entero: el
+    /// primer intento falla con el puerto cerrado y un reintento posterior, ya con la impresora de
+    /// vuelta, entrega. Sin esto un tique se pierde cada vez que alguien tropieza con el cable.
+    #[tokio::test]
+    async fn a_printer_that_comes_back_still_gets_its_job() {
+        // Reserva un puerto y ciérralo: "impresora apagada" en una dirección que luego revive.
+        let probe = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = probe.local_addr().unwrap();
+        drop(probe);
+
+        let captured = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+        let accepted = Arc::new(AtomicU32::new(0));
+
+        let cap = captured.clone();
+        let seen = accepted.clone();
+        let revive = tokio::spawn(async move {
+            // Vuelve a levantarse mientras la cola hace backoff.
+            tokio::time::sleep(Duration::from_millis(40)).await;
+            let listener = TcpListener::bind(addr).await.expect("rebind del puerto");
+            if let Ok((mut sock, _)) = listener.accept().await {
+                seen.fetch_add(1, Ordering::SeqCst);
+                let mut buf = Vec::new();
+                let _ = sock.read_to_end(&mut buf).await;
+                *cap.lock().await = buf;
+            }
+        });
+
+        let queue = Arc::new(PrintQueue::new(RetryPolicy {
+            max_attempts: 8,
+            backoff_ms: 20,
+        }));
+        let mut outcomes = spawn_worker(queue.clone());
+        let target = NetworkTarget {
+            host: addr.ip().to_string(),
+            port: addr.port(),
+        };
+        queue.enqueue(job(target, b"resilient job")).unwrap();
+
+        assert!(
+            matches!(outcomes.recv().await, Some(JobOutcome::Completed { .. })),
+            "el trabajo se completa tras la recuperación, no se descarta"
+        );
+        revive.await.unwrap();
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            *captured.lock().await,
+            b"resilient job".to_vec(),
+            "y el payload entregado es el original, no uno truncado por los intentos fallidos"
+        );
+    }
+
+    /// **Cuando se agotan los intentos el trabajo se reporta como fallido, no desaparece.** El
+    /// consumidor mapea este outcome a `print_error`; un `Completed` optimista aquí sería un tique
+    /// que nadie imprimió y nadie echó en falta.
+    #[tokio::test]
+    async fn a_job_that_never_lands_ends_as_failed_with_the_reason() {
+        let queue = Arc::new(PrintQueue::new(fast_policy(3)));
+        let mut outcomes = spawn_worker(queue.clone());
+
+        queue
+            .enqueue(job(unreachable_target(), b"never lands"))
+            .unwrap();
+
+        match outcomes.recv().await {
+            Some(JobOutcome::Failed { job_id, error }) => {
+                assert_eq!(job_id.as_deref(), Some("j1"), "el id vuelve para poder correlacionarlo");
+                assert!(!error.is_empty(), "el fallo tiene que decir por qué");
+            }
+            other => panic!("una impresora inalcanzable no puede completar: {other:?}"),
+        }
+    }
+
+    /// La política se **respeta**: con `max_attempts: 1` no hay reintento. Fijarlo evita que un
+    /// bucle mal contado convierta un solo intento en tres (o al revés, que el default de 3 se
+    /// quede en uno y la recuperación de arriba deje de existir).
+    #[tokio::test]
+    async fn a_single_attempt_policy_does_not_retry() {
+        let queue = Arc::new(PrintQueue::new(fast_policy(1)));
+        let started = std::time::Instant::now();
+        let outcome = queue
+            .process(job(unreachable_target(), b"one shot"))
+            .await;
+
+        assert!(matches!(outcome, JobOutcome::Failed { .. }));
+        assert!(
+            started.elapsed() < Duration::from_millis(10),
+            "con un solo intento no se espera ningún backoff (tardó {:?})",
+            started.elapsed()
+        );
+    }
+
+    /// Encolar en una cola cuyo worker murió es un error explícito, no un trabajo que se evapora.
+    #[tokio::test]
+    async fn enqueueing_into_a_closed_queue_is_refused() {
+        let queue = PrintQueue::new(fast_policy(1));
+        queue.rx.lock().await.close();
+        let err = queue
+            .enqueue(job(unreachable_target(), b"nowhere"))
+            .expect_err("la cola cerrada no acepta trabajos");
+        assert!(matches!(err, PeripheralError::InvalidPayload(_)));
+    }
+}

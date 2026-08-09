@@ -71,6 +71,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # El propio guardarraíl tiene tests, y corren aquí: ~2 s, y esto es el único camino a
+      # producción de la imagen. Un guardarraíl sin probar es una creencia.
+      - name: Contrato del guardarraíl de versión
+        run: ./scripts/tests/image-tags.test.sh
       # hub#515: en un tag v*, la versión que el runtime reporta (env!("CARGO_PKG_VERSION") →
       # /api/system hubVersion, error-sink) debe ser la del tag, no el "0.1.0 en desarrollo" del
       # Cargo.toml del commit. Reescribimos [workspace.package].version desde el tag antes del build,
@@ -136,17 +140,47 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "image=${IMAGE_LC}" >> "$GITHUB_OUTPUT"
 
-      - name: Compute app version
-        id: version
+      # 🔴 LO PRIMERO tras el login, y ANTES de estampar o compilar.
+      #
+      # El MISMO tag `v*` dispara también `tauri-release.yml`, que publica la app en **Microsoft
+      # Store y Google Play**, donde las versiones son monótonas e IRREVERSIBLES: no se republica
+      # ni se retira. Un `git tag v1.2.4` mal escrito no «etiqueta mal una imagen» — quema ese
+      # número para siempre. Esta guarda es lo único que se interpone.
+      #
+      # Rechaza: tag que no es semver · versión YA publicada · versión MENOR o igual que la última ·
+      # registro ilegible (refuse-by-default; override `IMAGE_TAGS_ALLOW_UNVERIFIED=1`).
+      #
+      # Devuelve `version` y `tags` — sustituye a los pasos «Compute image tags» y «Compute app
+      # version», que calculaban lo mismo en bash inline y sin probar.
+      - name: Guarda de versión (semver · no publicada · monótona)
+        id: tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./scripts/image-tags.sh \
+            --image "${IMAGE}" --ref "${GITHUB_REF}" --sha "${GITHUB_SHA}"
+
+      # En un tag `v*`, lo que el runtime reporta (`env!("CARGO_PKG_VERSION")` → `/system`,
+      # el latido, `error_sink`) debe ser la versión del TAG, no el «en desarrollo» del commit.
+      # Va DESPUÉS de la guarda: no se reescribe nada por un tag que se va a rechazar.
+      - name: Estampar la versión en Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          V: ${{ steps.tags.outputs.version }}
         run: |
           set -euo pipefail
-          # En un tag v* (p.ej. v0.1.20) → "0.1.20". En push a main → sha corto (dev build).
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            V="${GITHUB_REF_NAME#v}"
-          else
-            V="${GITHUB_SHA::7}"
-          fi
-          echo "version=${V}" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import os, pathlib, re
+          v = os.environ["V"]
+          p = pathlib.Path("Cargo.toml")
+          s = p.read_text()
+          s2 = re.sub(r'(\[workspace\.package\][^\[]*?version\s*=\s*)"[^"]*"',
+                      rf'\1"{v}"', s, count=1, flags=re.DOTALL)
+          if s == s2:
+              raise SystemExit("no se encontró [workspace.package].version para estampar")
+          p.write_text(s2)
+          print(f'Cargo.toml [workspace.package].version = "{v}"')
+          PY
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -163,7 +197,7 @@ jobs:
           # del Dockerfile en CADA build, forzando que la imagen coja SIEMPRE la última OutfitKit
           # publicada (el tag npm `latest` lo mueve la GH action de release de outfitkit).
           build-args: |
-            APP_VERSION=${{ steps.version.outputs.version }}
+            APP_VERSION=${{ steps.tags.outputs.version }}
             OUTFITKIT_CACHEBUST=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

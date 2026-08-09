@@ -7,12 +7,12 @@
 //!     cuando la IP cambia por DHCP).
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
+use crate::discovery::local_subnet_prefix;
 use crate::protocol::Device;
 use crate::{Result, ESCPOS_NETWORK_PORT};
 
@@ -597,21 +597,6 @@ pub async fn tcp_check(host: &str, port: u16, timeout_ms: u64) -> bool {
     )
 }
 
-/// Detecta el prefijo /24 de la subred local (p.ej. `192.168.1`). Réplica local de
-/// `discovery::local_subnet_prefix` (que es privado): UDP "connect" a 8.8.8.8:80 sin enviar nada.
-fn local_subnet_prefix() -> Option<String> {
-    let sock = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
-    sock.connect("8.8.8.8:80").ok()?;
-    let local: SocketAddr = sock.local_addr().ok()?;
-    let ip = local.ip().to_string();
-    let mut parts = ip.split('.');
-    let a = parts.next()?;
-    let b = parts.next()?;
-    let c = parts.next()?;
-    parts.next()?; // Solo IPv4 tiene 4 octetos.
-    Some(format!("{a}.{b}.{c}"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -622,6 +607,41 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let path = dir.join("devices.json");
         (DeviceRegistry::load(path.clone()), path)
+    }
+
+    // ── tcp_check: la sonda de alcanzabilidad del watchdog ──────────────────────────────────────
+
+    /// **La sonda distingue viva de apagada, y es lo único que lo hace.** El watchdog marca
+    /// `offline` y dispara el barrido de recuperación a partir de esta respuesta: si dijera
+    /// siempre `true`, una impresora que cambió de IP por DHCP se quedaría marcada online para
+    /// siempre y los tiques se irían a una dirección que ya no es suya.
+    #[tokio::test]
+    async fn the_probe_says_reachable_only_while_something_is_listening() {
+        let mock = crate::test_support::MockPrinter::start().await;
+        assert!(
+            tcp_check(&mock.target.host, mock.target.port, 500).await,
+            "con un listener arriba la sonda tiene que ver la impresora"
+        );
+
+        let dead = crate::test_support::unreachable_target();
+        assert!(
+            !tcp_check(&dead.host, dead.port, 500).await,
+            "un puerto cerrado es una impresora apagada, no una viva"
+        );
+    }
+
+    /// Un destino que ni siquiera resuelve/enruta no puede colgar la sonda: el watchdog barre 254
+    /// direcciones en serie, así que una sola espera sin techo congela la recuperación entera.
+    #[tokio::test]
+    async fn the_probe_gives_up_within_its_timeout() {
+        // `192.0.2.0/24` es TEST-NET-1 (RFC 5737): no se enruta, así que el connect no responde.
+        let started = Instant::now();
+        assert!(!tcp_check("192.0.2.1", ESCPOS_NETWORK_PORT, 120).await);
+        assert!(
+            started.elapsed() < Duration::from_millis(2_000),
+            "la sonda debe rendirse con su timeout, no con el del SO (tardó {:?})",
+            started.elapsed()
+        );
     }
 
     // ── device_key: la identidad estable ────────────────────────────────────────────────────────

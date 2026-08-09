@@ -354,11 +354,19 @@ fn service_to_printer(info: &mdns_sd::ServiceInfo, service_type: &str) -> Option
 
 /// Detecta el prefijo /24 de la subred local (p.ej. `192.168.1`). Porta `_get_local_subnet`:
 /// abre un socket UDP "conectado" a 8.8.8.8:80 y lee la IP local de salida (sin enviar nada).
-fn local_subnet_prefix() -> Option<String> {
+///
+/// `pub(crate)` porque el watchdog de `registry` barre exactamente la misma subred: tenía su
+/// propia copia de esta función, y dos copias de una regla es una que se queda atrás.
+pub(crate) fn local_subnet_prefix() -> Option<String> {
     let sock = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     sock.connect("8.8.8.8:80").ok()?;
     let local: SocketAddr = sock.local_addr().ok()?;
-    let ip = local.ip().to_string();
+    subnet_prefix_of(&local.ip().to_string())
+}
+
+/// Los tres primeros octetos de una IPv4 (`192.168.1.42` → `192.168.1`). Cualquier otra cosa
+/// —IPv6, una cadena corta— no tiene subred /24 que barrer y devuelve `None`.
+fn subnet_prefix_of(ip: &str) -> Option<String> {
     let mut parts = ip.split('.');
     let a = parts.next()?;
     let b = parts.next()?;
@@ -412,6 +420,29 @@ mod tests {
         assert!(parse_printer_id("bluetooth:AA:BB:CC:DD:EE:FF").is_err());
         assert!(parse_printer_id("usb:001:002").is_err());
         assert!(parse_printer_id("network:10.0.0.5:9100").is_ok());
+    }
+
+    /// **The /24 prefix is derived from the local IP, and that derivation is what gets tested.**
+    /// The socket half (`local_subnet_prefix`) asks the OS which interface would reach the
+    /// internet — untestable in CI, and the reason this rule used to live twice in the crate
+    /// (here and in `registry`, copy-pasted). Splitting the pure half out gives the single
+    /// implementation the sweep and the watchdog now share something to pin.
+    #[test]
+    fn the_subnet_prefix_is_the_first_three_octets_of_an_ipv4() {
+        assert_eq!(subnet_prefix_of("192.168.1.42"), Some("192.168.1".to_string()));
+        assert_eq!(subnet_prefix_of("10.0.2.15"), Some("10.0.2".to_string()));
+    }
+
+    /// A prefix that is not a /24 IPv4 must come back as `None`, never as a truncated string: the
+    /// sweep builds `{prefix}.{1..=254}` out of it, so a wrong prefix means 254 connects to
+    /// addresses nobody owns — a scan that finds zero printers and blames the printer.
+    #[test]
+    fn anything_that_is_not_an_ipv4_has_no_scannable_subnet() {
+        // IPv6: no /24 to sweep.
+        assert_eq!(subnet_prefix_of("fe80::1"), None);
+        // Too few octets — `"10.0.2"` would otherwise be taken for a prefix as-is.
+        assert_eq!(subnet_prefix_of("10.0.2"), None);
+        assert_eq!(subnet_prefix_of(""), None);
     }
 
     // ── "No permission" is not "no printers" (hub#338) ────────────────────────────────────────

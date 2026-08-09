@@ -119,7 +119,16 @@ USER erplora
 EXPOSE 8787
 
 # Healthcheck contra el endpoint /healthz del router Axum.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8787/healthz || exit 1
+# Apunta a /readyz, NO a /healthz (hub#538). `/healthz` es un literal «ok»: un hub sin BD, con las
+# migraciones a medias o sin un solo módulo cargado lo pasaba igual. Y esto no es cosmético — con el
+# blue/green de ADR-0269 este HEALTHCHECK es el ÚNICO criterio de `failure_action: rollback`: si da
+# verde a una tarea rota, Swarm mata la vieja que sí funcionaba y no hay vuelta atrás.
+#
+# `start-period` sube de 10s a 90s: /readyz no responde UP hasta tener BD, migraciones aplicadas y
+# los módulos de `hub_module` registrados, y eso incluye re-descargarlos del marketplace en el
+# contrato stateless de Swarm. Con 10s el arranque normal contaba como fallo. El número definitivo
+# sale de MEDIR el arranque real (hub#520), no de estimarlo.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8787/readyz || exit 1
 
 ENTRYPOINT ["/usr/local/bin/erplora-server"]

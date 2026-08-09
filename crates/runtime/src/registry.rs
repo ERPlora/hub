@@ -452,7 +452,7 @@ pub struct RequestContext {
     /// [`crate::elevation::Grants`] — **never** a claim: an unknown, expired or foreign token is
     /// indistinguishable from no token at all, and the payload is never read for it.
     pub elevation_token: Option<String>,
-    /// **What this hub owes right now** (ADR-0259 D2, hub#550): the fiscal profile's status
+    /// **What this hub owes right now** (ADR-0273 D2, hub#550): the fiscal profile's status
     /// resolved against what is mounted, including the derived `BLOCKED`. The dispatcher fills it
     /// alongside the business identity and the certificate flag, from the core's own tables — no
     /// caller can state it.
@@ -462,6 +462,16 @@ pub struct RequestContext {
     /// which is the failure mode `Registry::demo_hub` is placed in the registry to avoid. Whoever
     /// gates on this (hub#556) resolves `None` rather than passing it.
     pub fiscal_mode: Option<crate::fiscal_profile::FiscalMode>,
+    /// The events that START a fiscal chain in this hub — learnt by the core from a healthy
+    /// provider and **remembered** after it disappears (ADR-0273 D4, hub#550). The dispatcher fills
+    /// it from the profile alongside [`RequestContext::fiscal_mode`]; the gate of hub#556 uses it
+    /// as its trigger, so a transaction that would open a fiscal chain is refused **precisely when
+    /// there is nobody left to close it**.
+    pub fiscal_triggers: Vec<String>,
+    /// Ids of the installed **and active** modules that fulfil the regime this hub owes (ADR-0273
+    /// D4/D6). Resolved by the dispatcher from the profile + the registry, so `CLOSED` can let a
+    /// provider drain what it still owes **without the core naming a single module**.
+    pub fiscal_providers: Vec<String>,
     /// `hub_user.id` of the manager whose approval let this command past the permission gate.
     /// Filled by the dispatcher **after** spending a grant, so it is a fact about what happened,
     /// not something a caller can assert. This is the seam hub#362 writes next to the cashier's
@@ -505,6 +515,8 @@ impl RequestContext {
             business_address: String::new(),
             has_certificate: false,
             fiscal_mode: None,
+            fiscal_triggers: Vec::new(),
+            fiscal_providers: Vec::new(),
             principal: Principal::Human,
             elevation_token: None,
             approved_by: None,
@@ -571,10 +583,17 @@ impl RequestContext {
         self
     }
 
-    /// Stamps the hub's effective fiscal mode (ADR-0259 D2, hub#550). Only the dispatcher calls it,
+    /// Stamps the hub's effective fiscal mode (ADR-0273 D2, hub#550). Only the dispatcher calls it,
     /// from the core's own tables — it is a fact about the hub, not a claim from the caller.
-    pub fn with_fiscal_mode(mut self, mode: crate::fiscal_profile::FiscalMode) -> Self {
+    pub fn with_fiscal_mode(
+        mut self,
+        mode: crate::fiscal_profile::FiscalMode,
+        triggers: Vec<String>,
+        providers: Vec<String>,
+    ) -> Self {
         self.fiscal_mode = Some(mode);
+        self.fiscal_triggers = triggers;
+        self.fiscal_providers = providers;
         self
     }
 }

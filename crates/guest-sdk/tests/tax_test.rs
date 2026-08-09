@@ -67,6 +67,59 @@ fn a_rule_of_another_country_never_matches() {
     assert!(tax::resolve_root(&refs(&rows), "ES", "", "standard", "2026-08-07").is_none());
 }
 
+// The twin of the test above, on the axis the precedence actually splits (ERPlora/taxes#10).
+//
+// Spain is not one tax territory: the peninsula charges VAT, the Canaries charge IGIC, Ceuta and
+// Melilla charge IPSI. They are different taxes of different jurisdictions, and a catalog that is
+// complete in one of them and empty in another is the normal case, not the exotic one.
+//
+// So when neither the exact region nor a country-wide rule applies, the answer is «no rule» — and
+// the caller has to deal with that. Resolving to a rule that belongs to ANOTHER region means the
+// customer is charged one territory's tax and that territory's qualification is what gets declared.
+#[test]
+fn a_rule_of_another_region_never_matches() {
+    let rows = vec![root("es-ce-ipsi", "ES", "CE", "standard", 10.0)];
+    assert!(
+        tax::resolve_root(&refs(&rows), "ES", "CN", "standard", "2026-08-07").is_none(),
+        "a sale in the Canaries resolved with the rule of Ceuta",
+    );
+}
+
+#[test]
+fn each_spanish_territory_resolves_to_its_own_rule_or_to_none() {
+    // A catalog with one rule per special territory and NO country-wide rule for the category.
+    let rows = vec![
+        root("es-cn-igic", "ES", "CN", "standard", 7.0),
+        root("es-ce-ipsi", "ES", "CE", "standard", 10.0),
+        root("es-ml-ipsi", "ES", "ML", "standard", 4.0),
+    ];
+    let resolved = |region: &str| {
+        tax::resolve_root(&refs(&rows), "ES", region, "standard", "2026-08-07")
+            .map(|hit| tax::rule_field(hit, "id"))
+    };
+
+    assert_eq!(resolved("CN").as_deref(), Some("es-cn-igic"));
+    assert_eq!(resolved("CE").as_deref(), Some("es-ce-ipsi"));
+    assert_eq!(resolved("ML").as_deref(), Some("es-ml-ipsi"));
+    // The peninsula has no rule here and there is no country-wide one either. It must NOT borrow
+    // one from an island or from a Spanish city in Africa.
+    assert_eq!(resolved("MD"), None, "the peninsula borrowed another territory's rule");
+    // Neither must a hub that never declared its region.
+    assert_eq!(resolved(""), None, "a hub without region borrowed a regional rule");
+}
+
+#[test]
+fn a_country_wide_rule_still_covers_a_region_that_has_none() {
+    // The guard above must not break the normal case: the national rule is the fallback, the only
+    // one there has ever been.
+    let rows = vec![
+        root("es-vat", "ES", "", "standard", 21.0),
+        root("es-ce-ipsi", "ES", "CE", "standard", 10.0),
+    ];
+    let hit = tax::resolve_root(&refs(&rows), "ES", "CN", "standard", "2026-08-07").unwrap();
+    assert_eq!(tax::rule_field(hit, "id"), "es-vat");
+}
+
 // ── Precedence inside a level: newest `valid_from`, then `id` ────────────────
 
 #[test]

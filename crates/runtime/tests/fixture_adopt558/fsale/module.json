@@ -1,0 +1,16 @@
+{
+  "id": "fsale",
+  "name": "Adopt558 Till",
+  "version": "1.0.0",
+  "permissions": ["fsale.sale.write"],
+  "role_permissions": { "admin": ["*"] },
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "fsale.sales.complete": {
+      "permission": "fsale.sale.write",
+      "transaction": true,
+      "sql": ["commands/sales_complete.sql"],
+      "emit": ["fsale.sale.completed"]
+    }
+  }
+}

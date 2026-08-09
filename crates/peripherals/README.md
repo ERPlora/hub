@@ -39,7 +39,12 @@ Lo que **no** se porta: `hardware/scanner.py`, `toggle_keyboard`/teclado virtual
 
 ## Estado
 
-**Implementado**: los 8 módulos (`protocol`, `discovery`, `escpos`, `drawer`, `queue`,
-`registry`, `printer`, `lib`) tienen lógica real (~2148 líneas), no firmas con `todo!()`.
-`cargo test -p erplora-peripherals` corre 9 tests en verde (render ESC/POS contra bytes
-esperados, cola/reintentos, apertura de cajón, discovery).
+**Implementado**: los módulos (`protocol`, `discovery`, `escpos`, `drawer`, `queue`,
+`registry`, `lib`) tienen lógica real, no firmas con `todo!()`. `cargo test -p erplora-peripherals`
+corre en verde (render ESC/POS contra bytes esperados, cola/reintentos contra un socket, apertura
+de cajón, sonda del watchdog, discovery).
+
+> 🪦 Hubo un módulo `printer` con una capa de traits (`Printer`/`CashDrawer`) y **su propia**
+> política de reintentos, propuesta en pm#4 y nunca consumida: la app instalable encola por `queue`
+> y abre el cajón por `drawer`. **hub#379** lo borró —dos políticas de reintento coexistiendo son
+> una que nadie mantiene— y movió sus tests a las vías vivas, que hasta entonces no tenían ninguno.

@@ -100,6 +100,19 @@ pub struct Runtime {
     elevation: elevation::Grants,
 }
 
+/// Cuánto espera un arranque por el lock de migración antes de rendirse.
+///
+/// 120 s por defecto: el que espera es el arranque NUEVO del solape blue/green, y lo que espera es
+/// a que el viejo —o el otro nuevo— termine de migrar. Las migraciones son aditivas por contrato
+/// (ADR-0269), así que duran segundos; el margen es para un backfill lento, no para una espera
+/// normal. Ajustable con `HUB_MIGRATION_LOCK_TIMEOUT_MS` por si algún hub tiene un histórico gordo.
+fn migration_lock_timeout_ms() -> u64 {
+    std::env::var("HUB_MIGRATION_LOCK_TIMEOUT_MS")
+        .ok()
+        .and_then(|raw| raw.trim().parse().ok())
+        .unwrap_or(120_000)
+}
+
 impl Runtime {
     pub fn new(db: Box<dyn DatabaseAdapter>) -> Self {
         Self {
@@ -426,7 +439,7 @@ impl Runtime {
     /// si CUALQUIERA de los que caen aún debe registros sin remitir, no cae ninguno.
     pub async fn deactivate(&mut self, module_id: &str) -> Result<()> {
         let cascade = self.deactivation_cascade(module_id);
-        // ADR-0259 D5 (hub#553): **el candado del CORE va PRIMERO**, y sobre el conjunto entero.
+        // ADR-0273 D5 (hub#553): **el candado del CORE va PRIMERO**, y sobre el conjunto entero.
         // R2 le pregunta al motor cuánto debe; éste no pregunta a nadie, porque un módulo no puede
         // tener voto sobre si se le puede quitar. Y con la cola vacía R2 deja marchar al último
         // proveedor: la cola vacía protege el pasado, el daño lo hacen las ventas siguientes.
@@ -437,7 +450,7 @@ impl Runtime {
         self.deactivate_unchecked(module_id).await
     }
 
-    /// Comprueba el candado de proveedor fiscal (ADR-0259 D5) contra el conjunto que se va.
+    /// Comprueba el candado de proveedor fiscal (ADR-0273 D5) contra el conjunto que se va.
     ///
     /// Sin perfil todavía —un hub que nunca arrancó del todo— no hay nada que proteger: leer no
     /// puede ser la razón de que no se pueda desinstalar un módulo.
@@ -496,7 +509,7 @@ impl Runtime {
     /// hub#314: se rechaza mientras su motor deba trabajo a una autoridad externa — borrar la fila
     /// de `hub_module` con registros sin remitir los dejaba huérfanos (VeriFactu FAQ §5).
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
-        // ADR-0259 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
+        // ADR-0273 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
         // marchar al último proveedor, y desde ese momento el hub vende sin que nadie registre.
         self.ensure_fiscal_provider_remains(&[module_id.to_string()])
             .await?;
@@ -725,6 +738,30 @@ impl Runtime {
     ///
     /// Idempotente: re-arrancar no reaplica. El server la llama al arrancar.
     pub async fn ensure_system_tables(&self) -> Result<()> {
+        // 🔒 UN solo arranque toca el esquema a la vez (hub#539).
+        //
+        // Con `order: start-first` (ADR-0269) hay **dos procesos del mismo hub contra la misma
+        // base** en cada actualización, y los dos corren esto entero. Sin lock pueden leer el mismo
+        // `max_applied_version` y aplicar la misma migración a la vez: `CREATE TABLE` sin
+        // `IF NOT EXISTS` da 42P07, un `ALTER` deja el esquema a medias y el `INSERT` de control
+        // choca contra la PK. El segundo espera, entra, y se encuentra el trabajo hecho —
+        // todo lo de abajo es idempotente.
+        //
+        // Envuelve la función ENTERA y no solo `system_migrations::apply`: el baseline v0, el
+        // marcador monetario y los backfills de más abajo escriben esquema y datos igual.
+        //
+        // Si no lo consigue, **falla el arranque**. Es deliberado: seguir sin él es migrar en
+        // paralelo, y con `/readyz` de verdad (hub#538) un arranque fallido dispara el rollback en
+        // vez de matar a la tarea que sí funcionaba.
+        let _migration_lock = self
+            .db
+            .migration_lock(&self.hub_id, migration_lock_timeout_ms())
+            .await
+            .map_err(|error| RuntimeError::Domain {
+                code: "hub.migration_lock_timeout".into(),
+                message: error.to_string(),
+            })?;
+
         // 1) Baseline v0 (idempotente).
         installer::ensure_hub_module_table(self.db.as_ref()).await?;
         outbox::ensure_tables(self.db.as_ref()).await?;
@@ -736,7 +773,7 @@ impl Runtime {
         // migration on purpose: it is an invariant, not a schema change — it must also clean a
         // database restored from a backup taken before the fix, and re-running it is a no-op.
         identity::forget_hub_id_as_device(self.db.as_ref(), &self.hub_id).await?;
-        // 2c) The hub's FISCAL PROFILE (ADR-0259, hub#549): what this hub owes, resolved from its
+        // 2c) The hub's FISCAL PROFILE (ADR-0273, hub#549): what this hub owes, resolved from its
         // country and persisted by the core. It runs here — on the boot path every hub takes —
         // precisely so that owing VeriFactu is never a consequence of having installed something.
         // It only resolves and records; nothing rejects anything yet (hub#550/#556).
@@ -1278,7 +1315,7 @@ impl Runtime {
         devices::revoke(self.db.as_ref(), &self.hub_id, device_id).await
     }
 
-    /// The hub's **fiscal profile** (ADR-0259, hub#549): what this hub owes, who it owes it as, and
+    /// The hub's **fiscal profile** (ADR-0273, hub#549): what this hub owes, who it owes it as, and
     /// how far along it is. `None` only before [`Runtime::ensure_system_tables`] has ever run —
     /// booting resolves it. The authority on the obligation lives here, in the core, so that no
     /// module can take it away by being uninstalled.
@@ -1286,7 +1323,7 @@ impl Runtime {
         fiscal_profile::load(self.db.as_ref(), &self.hub_id).await
     }
 
-    /// **What this hub owes right now** (ADR-0259 D2, hub#550): the stored status resolved against
+    /// **What this hub owes right now** (ADR-0273 D2, hub#550): the stored status resolved against
     /// what is actually mounted. This is where `BLOCKED` comes from — derived on every read, never
     /// stored, so it is fixed by fixing the fact and cannot outlive the bug that caused it.
     ///
@@ -1300,12 +1337,56 @@ impl Runtime {
         ))
     }
 
-    /// Resolves the fiscal profile against the world and returns the effective mode (ADR-0259
+    /// Resolves the fiscal profile against the world and returns the effective mode (ADR-0273
     /// D2/D4, hub#550). The host calls it at boot **after re-hydrating the registry** — that is the
     /// first instant both halves of the answer exist: what the hub owes, and who is mounted to
     /// comply. Idempotent, so every restart and every redeploy runs it.
     pub async fn refresh_fiscal_profile(&self) -> Result<fiscal_profile::FiscalMode> {
         fiscal_profile::refresh(self.db.as_ref(), &self.registry, &self.hub_id).await
+    }
+
+    /// **El go-live** (ADR-0273 D3, hub#551): `READY → ACTIVE`, que ES `testing → production`.
+    /// Una sola transición y un solo sitio donde se guarda. Exige que el perfil esté `READY` —la
+    /// misma condición que enseña la checklist— y que el hub pueda hacerlo (una demo no).
+    pub async fn fiscal_go_live(&self) -> Result<fiscal_profile::FiscalProfile> {
+        fiscal_profile::go_live(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// **Apaga el go-live**, y solo mientras no haya salido ni un registro hacia la Hacienda real
+    /// (ADR-0273 D3). Lo irreversible es el primer ENVÍO, no el clic: quien activa por error y se
+    /// da cuenta antes de facturar puede volver.
+    pub async fn fiscal_stand_down(&self) -> Result<fiscal_profile::FiscalProfile> {
+        fiscal_profile::stand_down(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// **Cese de actividad** (ADR-0273 D2, hub#557): el negocio cierra y deja de facturar, pero
+    /// sigue consultando y exportando sus libros. `actor` = quién lo decidió, y sin él no se
+    /// cierra: una acción irreversible sin nadie detrás en el registro no es una traza.
+    ///
+    /// **Es función de producto, no compliance** — siendo VERI\*FACTU-only no hay registro de
+    /// eventos que remitir, y el cese que existe es la baja censal (036/037) del obligado, que
+    /// presenta él o su gestoría. Lo que compra es que quien cesó no siga facturando por error.
+    ///
+    /// No tiene vuelta: no hay `CLOSED → ACTIVE`. La **sesión admin y la confirmación** las pone
+    /// la puerta que llama, igual que en el go-live.
+    pub async fn fiscal_close(&self, actor: &str) -> Result<fiscal_profile::FiscalProfile> {
+        fiscal_profile::close(self.db.as_ref(), &self.hub_id, actor).await
+    }
+
+    /// **Adopta una instalación AJENA** (ADR-0273 D8, hub#558): el hub se movió de despliegue —o se
+    /// restauró en otro sitio—, el `hub_id` cambió y estas filas las escribió otra instalación.
+    /// Como `NumeroInstalacion = hub_id` (ADR-0202), otro `hub_id` es **otro SIF y otra cadena**,
+    /// que arranca con `PrimerRegistro=S`.
+    ///
+    /// **Jamás automático**: el arranque solo lo **marca** (`needs_review` + `BLOCKED` derivado) y
+    /// el gate solo **rechaza**. Adoptar en silencio la instalación de otro es exactamente cómo se
+    /// mezclan dos cadenas, y un registro ya remitido ni se reenvía ni se borra (ADR-0189). Sesión
+    /// admin y confirmación las pone la puerta que llama; `actor` es la traza.
+    pub async fn fiscal_adopt_installation(
+        &self,
+        actor: &str,
+    ) -> Result<fiscal_profile::FiscalProfile> {
+        fiscal_profile::adopt_installation(self.db.as_ref(), &self.hub_id, actor).await
     }
 
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),

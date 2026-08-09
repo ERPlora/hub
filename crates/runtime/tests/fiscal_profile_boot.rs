@@ -1,4 +1,4 @@
-//! **A hub is born knowing what it owes** — ADR-0259 D1/D6, hub#549.
+//! **A hub is born knowing what it owes** — ADR-0273 D1/D6, hub#549.
 //!
 //! The unit tests in `fiscal_profile.rs` fix what the resolution *is*. This one fixes the part
 //! that makes it matter: that it happens **at boot**, on the same path every hub takes, without

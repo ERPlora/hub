@@ -56,6 +56,10 @@ pub struct ResetSelectionReq {
     /// older shell that does not send the field switches nothing off.
     #[serde(default)]
     roles: bool,
+    /// The print queue (`_print_queue`, hub#502). `#[serde(default)]`: an older shell that does
+    /// not send the field clears no queue — same forward-compat rule as every other section.
+    #[serde(default)]
+    print_queue: bool,
     #[serde(default)]
     modules: Vec<String>,
 }
@@ -68,6 +72,7 @@ impl ResetSelectionReq {
             media: self.media,
             fiscal: self.fiscal,
             roles: self.roles,
+            print_queue: self.print_queue,
             modules: self.modules,
         }
     }

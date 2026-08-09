@@ -154,7 +154,6 @@ import {
 import { refreshModuleNav } from '../lib/nav';
 import { isModuleInstalled } from '../lib/apps-catalog';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
-import { openExternal } from '../lib/open-external';
 import { isAdmin } from '../lib/session';
 
 // --- Tipos ---
@@ -418,25 +417,17 @@ function closeConsent(): void {
   consentCaps.value = [];
 }
 
-/** Deep-link a la ficha de compra del módulo en el marketplace del SaaS (el Hub NO vende,
- *  ADR-0114): abre el navegador externo y, al volver el foco, re-resuelve el entitlement
- *  y refresca el catálogo para reflejar la compra. */
-async function openPurchase(mod: Mod): Promise<void> {
-  const url =
-    `${config.cloudApiUrl}/dashboard/marketplace/modules/${encodeURIComponent(mod.id)}` +
-    `/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
-  const recheck = (): void => {
-    window.removeEventListener('focus', recheck);
-    void resolveEntitlement().then(() => loadCatalog());
-  };
-  window.addEventListener('focus', recheck);
-  try {
-    await openExternal(url);
-    notify(t('apps.purchaseInBrowser', { name: mod.name }), 'primary');
-  } catch {
-    window.removeEventListener('focus', recheck);
-    notify(t('apps.purchaseOpenError'), 'danger');
-  }
+/**
+ * El módulo necesita suscripción y este hub no la tiene: se DICE, no se lleva a comprar.
+ *
+ * Aquí había un `openPurchase()` que abría la ficha del módulo en el marketplace del SaaS —donde
+ * está el checkout— con su recheck-on-focus. Retirado en hub#479: es el caso de manual de steering,
+ * un control de la app que empuja al pago de fuera, y es causa de rechazo en Play y en Microsoft
+ * Store. El recheck no se pierde: `resolveEntitlement()` sigue corriendo al recuperar el foco desde
+ * `onMounted`, así que quien contrate en erplora.com vuelve y el módulo ya se instala.
+ */
+function sayItNeedsASubscription(mod: Mod): void {
+  notify(t('apps.needsSubscription', { name: mod.name }), 'primary');
 }
 
 /** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
@@ -445,13 +436,14 @@ async function installModule(mod: Mod): Promise<void> {
   if (mod.installed) { notify(t('apps.alreadyInstalled', { name: mod.name }), 'primary'); return; }
   // Ya en curso (doble clic o instalación arrancada por otro cliente): no relanzar el request.
   if (installing.value.has(mod.id)) return;
-  // Gate de compra (ADR-0114): un módulo de pago SIN entitlement de ESTE hub no se intenta
-  // instalar (el download/ del SaaS lo denegaría con un error genérico) — se manda a comprar
-  // al marketplace del SaaS. El freemium (premium con capa gratis) SÍ viene en el token de
-  // entitlement, así que sigue instalándose sin compra (ADR-0032). Solo gateamos con el
-  // entitlement RESUELTO (permisivo mientras 'unknown', igual que el resto del shell).
+  // Gate de suscripción (ADR-0114): un módulo de pago SIN entitlement de ESTE hub no se intenta
+  // instalar (el download/ del SaaS lo denegaría con un error genérico) — se avisa y ya; contratar
+  // es cosa de erplora.com (hub#479). El freemium (premium con capa gratis) SÍ viene en el token de
+  // entitlement, así que sigue instalándose sin contratar nada (ADR-0032) — que es el caso de los
+  // 24 módulos de hoy. Solo gateamos con el entitlement RESUELTO (permisivo mientras 'unknown',
+  // igual que el resto del shell).
   if (mod.paid && entitlementStatus.value === 'unlocked' && !isModuleEntitled(mod.id)) {
-    await openPurchase(mod);
+    sayItNeedsASubscription(mod);
     return;
   }
   // Best-effort: intentamos conocer los permisos que declara el módulo ANTES de instalar. El catálogo
@@ -743,7 +735,17 @@ watch(locale, () => {
 });
 
 // --- Fetch + suscripción al evento de instalación al montar ---
+/**
+ * Re-resuelve el entitlement (y recarga el catálogo) al recuperar el foco.
+ *
+ * Colgaba de `openPurchase()` y se desenganchaba tras el primer foco. Al retirar ese botón
+ * (hub#479) pasa a ser permanente mientras la vista vive: quien contrate en erplora.com —en el
+ * navegador, en el móvil o en otro equipo— vuelve aquí y el módulo ya se puede instalar, sin F5.
+ */
+const recheckEntitlement = (): void => void resolveEntitlement().then(() => loadCatalog());
+
 onMounted(() => {
+  window.addEventListener('focus', recheckEntitlement);
   void loadCatalog();
   void loadInstalled();
   // Cuando el runtime termina de instalar un módulo, refrescamos catálogo, instalados y nav.
@@ -769,6 +771,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('focus', recheckEntitlement);
   unsubInstalled?.();
   unsubProgress?.();
   mineTable.value?.removeEventListener('rowAction', handleMineAction);

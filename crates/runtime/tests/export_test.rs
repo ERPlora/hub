@@ -134,6 +134,98 @@ async fn un_backup_si_exporta_identidades() {
     assert!(bundle.files.contains_key("data/hub_users.sql"), "un backup SÍ lleva identidades");
 }
 
+/// **hub#464 — a backup carries the staff's profile and preferences, not just their `hub_user`
+/// row.** Before this, restoring a backup reset every profile to blank: the person could log in
+/// (name/role/PIN live in `hub_user`) but lost their display name, avatar, profile email
+/// (`hub_user_profile`) and their language/theme/palette choices (`hub_user_pref`). Both tables
+/// are hub-scoped and were left out of the export. Now they travel under the `hub_users` section.
+#[tokio::test]
+async fn a_backup_carries_the_staff_profile_and_preferences() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let rt = fresh().await;
+    // A user with a real profile + preferences set.
+    let uid = erplora_runtime::identity::create_user(rt.db(), "Ana", "1234", "cashier", None)
+        .await
+        .expect("crear usuario");
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("h1"));
+    p.insert("user_id".into(), json!(uid));
+    p.insert("first_name".into(), json!("Ana"));
+    p.insert("last_name".into(), json!("López"));
+    p.insert("email".into(), json!("ana@demo.es"));
+    p.insert("now".into(), json!("2026-01-01T00:00:00Z"));
+    rt.db()
+        .execute(
+            "INSERT INTO hub_user_profile (hub_id, user_id, first_name, last_name, email, avatar_path, updated_at) \
+             VALUES (:hub_id, :user_id, :first_name, :last_name, :email, '', :now)",
+            &p,
+        )
+        .await
+        .unwrap();
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("h1"));
+    p.insert("user_id".into(), json!(uid));
+    p.insert("now".into(), json!("2026-01-01T00:00:00Z"));
+    rt.db()
+        .execute(
+            "INSERT INTO hub_user_pref (hub_id, user_id, language, theme_mode, theme_palette, updated_at) \
+             VALUES (:hub_id, :user_id, 'es', 'light', 'blue', :now)",
+            &p,
+        )
+        .await
+        .unwrap();
+
+    let bundle = export_hub(&rt, "h1", &full_selection(), "backup", "es", CREATED_AT)
+        .await
+        .expect("export de backup");
+
+    // Both data files are in the bundle, with the placeholder (never the literal hub_id — ADR-0072).
+    let profile = bundle
+        .files
+        .get("data/hub_user_profile.sql")
+        .expect("un backup lleva data/hub_user_profile.sql (hub#464)");
+    let pref = bundle
+        .files
+        .get("data/hub_user_pref.sql")
+        .expect("un backup lleva data/hub_user_pref.sql (hub#464)");
+    let profile_sql = std::str::from_utf8(profile).unwrap();
+    let pref_sql = std::str::from_utf8(pref).unwrap();
+    assert!(profile_sql.contains("Ana"), "el perfil viaja con el nombre: {profile_sql}");
+    assert!(profile_sql.contains(HUB_ID_PLACEHOLDER), "usa el placeholder, no el literal");
+    assert!(pref_sql.contains("'es'"), "el idioma elegido viaja: {pref_sql}");
+}
+
+/// **hub#464 — a template carries NEITHER the profile nor the preferences.** Same identity gate as
+/// `hub_users`: a published artefact transports no personal data. Both files must be absent from a
+/// `purpose: Template` bundle, whatever the selection says.
+#[tokio::test]
+async fn a_template_carries_neither_profile_nor_preferences() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let rt = fresh().await;
+    let _uid = erplora_runtime::identity::create_user(rt.db(), "Ana", "1234", "cashier", None)
+        .await
+        .unwrap();
+
+    let selection = ExportSelection {
+        users: true,
+        purpose: BundlePurpose::Template,
+        ..full_selection()
+    };
+    let bundle = export_hub(&rt, "h1", &selection, "plantilla", "es", CREATED_AT)
+        .await
+        .expect("export de plantilla");
+
+    assert!(!bundle.files.contains_key("data/hub_users.sql"), "una plantilla no lleva identidades");
+    assert!(
+        !bundle.files.contains_key("data/hub_user_profile.sql"),
+        "una plantilla tampoco lleva perfiles (hub#464)"
+    );
+    assert!(
+        !bundle.files.contains_key("data/hub_user_pref.sql"),
+        "una plantilla tampoco lleva preferencias (hub#464)"
+    );
+}
+
 #[tokio::test]
 async fn full_export_produces_manifest_and_data_files() {
     if !erplora_runtime::require_modules_workspace() { return; }

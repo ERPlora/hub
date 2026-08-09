@@ -50,6 +50,7 @@ pub mod export_import;
 pub mod fiscal_certificate;
 pub mod hub_users;
 pub mod login_throttle;
+pub mod readiness;
 pub mod reset;
 pub mod ingest;
 pub mod install;
@@ -68,6 +69,7 @@ pub mod state;
 pub mod system;
 pub mod system_metrics;
 pub mod tenant;
+pub mod version;
 
 pub use state::{AppState, AuthMode, HubConfig, HubId, MachineToken, WsEvent, DEV_HUB_ID};
 pub use tenant::{
@@ -405,7 +407,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
     }
 
-    // **Perfil fiscal** (ADR-0259 D2/D4, hub#550): qué debe este hub, resuelto contra lo que hay
+    // **Perfil fiscal** (ADR-0273 D2/D4, hub#550): qué debe este hub, resuelto contra lo que hay
     // montado de verdad. Va AQUÍ y no junto a `ensure_system_tables` por dos razones que son la
     // misma: el registry ya está re-hidratado (así se sabe si queda algún proveedor del régimen) y
     // el seed ya escribió el `country_code` (así se sabe qué régimen es). Antes de este punto las
@@ -418,7 +420,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         let rt = state.runtime.lock().await;
         match rt.refresh_fiscal_profile().await {
             Ok(mode) => eprintln!("fiscal: perfil del hub resuelto → {mode:?}"),
-            Err(e) => eprintln!("✗ fiscal: no se pudo resolver el perfil del hub (ADR-0259): {e}"),
+            Err(e) => eprintln!("✗ fiscal: no se pudo resolver el perfil del hub (ADR-0273): {e}"),
         }
     }
 
@@ -632,7 +634,7 @@ fn install_error_reporting(state: &AppState) {
         state.hub_id.clone(),
         state.machine_token.clone(),
         state.http.clone(),
-        format!("v{}", env!("CARGO_PKG_VERSION")),
+        version::display(),
     );
     ErrorRegistry::install(std::sync::Arc::new(sink));
 
@@ -704,6 +706,10 @@ pub fn app(state: AppState) -> Router {
     let activity_state = state.activity.clone();
     Router::new()
         .route("/healthz", get(healthz))
+        // Liveness ≠ readiness (hub#538): `/healthz` dice si el proceso responde;
+        // `/readyz` dice si puede ATENDER. El `HEALTHCHECK` del contenedor apunta al
+        // segundo, que es el que Swarm mira para decidir si revierte.
+        .route("/readyz", get(readiness::readyz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
@@ -941,6 +947,12 @@ pub fn app(state: AppState) -> Router {
         .with_state(state)
 }
 
+/// **Liveness**: ¿el proceso responde? Nada más — y por eso es un literal.
+///
+/// La pregunta que de verdad importa al desplegar («¿puedo atender?») la contesta
+/// [`readiness::readyz`], y es la que mira el `HEALTHCHECK`. Mezclarlas fue el bug: durante meses
+/// esto FUE el healthcheck del contenedor, así que un hub sin BD, con las migraciones a medias o
+/// sin un solo módulo cargado pasaba por sano.
 async fn healthz() -> &'static str {
     "ok"
 }
@@ -975,7 +987,7 @@ async fn require_machine_registration(
     next: Next,
 ) -> Response {
     let path = request.uri().path();
-    if matches!(path, "/healthz" | "/api/hub/context") || st.is_dev_hub() || st.machine_registered() {
+    if matches!(path, "/healthz" | "/readyz" | "/api/hub/context") || st.is_dev_hub() || st.machine_registered() {
         return next.run(request).await;
     }
     (
@@ -1984,6 +1996,12 @@ pub(crate) fn err_status_and_code(
         // of the three refused, and three guards sharing one answer means two can be deleted with
         // the suite still green.
         E::DemoLocked { lock } => (StatusCode::CONFLICT, lock.as_str().into()),
+        // hub#554: this hub already emitted, so its tax id is the anchor of a live chain and of the
+        // `BillingProfile` upstream (ADR-0201 decisión 5). `409` for the same reason: the request
+        // is well-formed and the caller is allowed, it conflicts with what this hub HAS DONE. Its
+        // own code, never the demo one — the demo lock has a way out (create your own hub) and this
+        // one does not.
+        E::BusinessTaxIdFrozen { .. } => (StatusCode::CONFLICT, "business_tax_id_frozen".into()),
         // hub#360 (paso 2b): a refusal a MANAGER could approve. `403` like `permission_denied` —
         // it IS a refusal and nothing ran — but with its own stable code, so the UI can tell
         // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling

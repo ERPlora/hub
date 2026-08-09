@@ -11,16 +11,23 @@
 //! SO/navegador como teclado. Por eso aquí **no** hay `usb`/`bluetooth`/`scanner`.
 //!
 //! Estado: **implementado** — render ESC/POS (`escpos`), descubrimiento (`discovery`), registro +
-//! watchdog (`registry`), cajón (`drawer`), cola con reintentos (`queue`) e impresora por red con
-//! traits (`printer`). El mapeo Python→Rust por módulo está en `README.md`.
+//! watchdog (`registry`), cajón (`drawer`) y cola con reintentos (`queue`). El mapeo Python→Rust
+//! por módulo está en `README.md`.
+//!
+//! Hubo además un `printer` con una capa de traits (`Printer`/`CashDrawer`) y **su propia**
+//! política de reintentos: nunca tuvo consumidor —la app encola por `queue` y abre el cajón por
+//! `drawer`— y dos políticas de reintento coexistiendo son una que nadie mantiene. hub#379 la
+//! borró y pasó su cobertura a las vías vivas.
 
 pub mod discovery;
 pub mod drawer;
 pub mod escpos;
-pub mod printer;
 pub mod protocol;
 pub mod queue;
 pub mod registry;
+
+#[cfg(test)]
+mod test_support;
 
 /// Puerto estándar ESC/POS por red (raw printing).
 pub const ESCPOS_NETWORK_PORT: u16 = 9100;

@@ -638,7 +638,7 @@
         "country",
         "regime"
       ],
-      "description": "El régimen fiscal que este módulo IMPLEMENTA (ADR-0259 D6). Solo lo declara quien implementa uno: un módulo de inventario no declara nada. Es la respuesta a la única pregunta del core — «¿hay algún módulo instalado y activo que cumpla el régimen que debe ESTE hub?» —, y el core CUENTA, no elige: puede haber N módulos del mismo régimen en el marketplace. NO es el flag opt-in que ADR-0203 descartó: declararlo no apaga ninguna guarda, es lo que el core exige que exista, así que un módulo que no lo declare simplemente no cuenta como proveedor y el hub se queda bloqueado (fail-closed, misma forma que `capabilities.certificate`).",
+      "description": "El régimen fiscal que este módulo IMPLEMENTA (ADR-0273 D6). Solo lo declara quien implementa uno: un módulo de inventario no declara nada. Es la respuesta a la única pregunta del core — «¿hay algún módulo instalado y activo que cumpla el régimen que debe ESTE hub?» —, y el core CUENTA, no elige: puede haber N módulos del mismo régimen en el marketplace. NO es el flag opt-in que ADR-0203 descartó: declararlo no apaga ninguna guarda, es lo que el core exige que exista, así que un módulo que no lo declare simplemente no cuenta como proveedor y el hub se queda bloqueado (fail-closed, misma forma que `capabilities.certificate`).",
       "properties": {
         "country": {
           "type": "string",

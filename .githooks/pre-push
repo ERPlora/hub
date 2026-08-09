@@ -154,7 +154,43 @@ ensure_postgres() {
             sleep 1
         done
     fi
+    raise_lock_limits
     export DATABASE_URL="$PG_DSN"
+}
+
+# The local half of hub#526 (CI was hub#565). `postgres:18` ships with
+# `max_locks_per_transaction=64` and `max_connections=100` — a GLOBAL ceiling of ~6 400 locks. The
+# suite creates an ephemeral schema PER TEST with every system table inside, so it exhausts that
+# ceiling and crashes whichever test passes by with `53200 out of shared memory`. Red tests that
+# have nothing to do with the diff, different each run — the most expensive flaky to diagnose.
+#
+# Raise the three settings (same as CI: 4096 / 300 / 512MB → ceiling ~1.2M) and restart, but ONLY
+# when the ceiling is still the low default. That keeps it idempotent: a container already raised
+# (a second push, or one that survived from a previous run) is not restarted, so this never adds
+# latency to the common path. `ALTER SYSTEM` needs a restart to take effect.
+raise_lock_limits() {
+    local current
+    current=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
+    # 6 400 is the stock ceiling (64 × 100). Anything already above it was raised before — skip.
+    if [ -n "$current" ] && [ "$current" -gt 6400 ] 2>/dev/null; then
+        return 0
+    fi
+    echo "pre-push: raising Postgres lock limits (hub#526) — was ${current:-?}, restarting $PG_CONTAINER…"
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_locks_per_transaction = 4096;" >/dev/null
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;" >/dev/null
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';" >/dev/null
+    docker restart "$PG_CONTAINER" >/dev/null
+    local tries=0
+    until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
+        tries=$((tries + 1))
+        [ "$tries" -gt 30 ] && { echo "❌ pre-push: $PG_CONTAINER never came back after raising limits." >&2; return 1; }
+        sleep 1
+    done
+    local after
+    after=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
+    echo "pre-push: lock ceiling now ${after:-?} (was ${current:-?})."
 }
 
 # The module e2e — the ones that install real modules from `modules-workspace` — are the one

@@ -119,7 +119,7 @@ impl BundlePurpose {
 /// una cadena mágica la puede escribir un usuario — con lo que vuelve a ser una adivinanza.
 pub const TEMPLATE_EXCLUDED_TABLES: [&str; 2] = ["invoice_series_series", "invoice_series_allocation"];
 
-/// The leading `_` that RESERVES the runtime's own namespace (ADR-0259 D8 — hub#560).
+/// The leading `_` that RESERVES the runtime's own namespace (ADR-0273 D8 — hub#560).
 ///
 /// It is broader than [`SYSTEM_TABLE_PREFIX`] on purpose, and the reason is the prefix rule itself:
 /// a module owns `<id>` and `<id>_*`, so a section calling itself module `_hub` would reach every
@@ -134,7 +134,7 @@ pub const RESERVED_NAMESPACE_PREFIX: &str = "_";
 pub const SYSTEM_TABLE_PREFIX: &str = "_hub_";
 
 /// Is `table` one of the hub's own system tables — i.e. **out of the bundle's world entirely**?
-/// (ADR-0259 D8 — hub#560.)
+/// (ADR-0273 D8 — hub#560.)
 ///
 /// This is the other side of the frontier `purpose` draws, and it needed a name of its own. ADR-0252
 /// fixed that frontier by deciding the role set DOES travel: *«what `purpose` separates is who you
@@ -322,6 +322,23 @@ pub async fn export_hub(
             }
         }
         files.insert("data/hub_users.sql".into(), rows_to_sql("hub_user", &rows, hub_id).into_bytes());
+        // hub#464: the profile and preferences are half of «the person comes back whole». `hub_user`
+        // carries name/role/PIN/access-email, but the display name, avatar, profile email
+        // (`hub_user_profile`) and the language/theme/palette choices (`hub_user_pref`) live in their
+        // own hub-scoped tables. Both key on `(hub_id, user_id)` and were left out of the export, so
+        // restoring a backup reset every profile to blank — the person could log in, then had to redo
+        // their preferences and retype their name. Same identity gate as `hub_user`: identity sections
+        // never travel in a template (`carries_identity`), so a published blueprint still carries no
+        // personal data.
+        for table in ["hub_user_profile", "hub_user_pref"] {
+            let rows = fetch_rows(db, table, Some(hub_id)).await.unwrap_or_default();
+            if !rows.is_empty() {
+                files.insert(
+                    format!("data/{table}.sql"),
+                    rows_to_sql(table, &rows, hub_id).into_bytes(),
+                );
+            }
+        }
         sections.push("hub_users".into());
     }
     if selection.settings {
@@ -683,7 +700,7 @@ async fn order_rows_parent_first(
 /// Las tablas de SISTEMA del hub ([`is_system_table`]) no son de nadie: ni se exportan ni se
 /// borran, porque el reset es el espejo de este mismo inventario (`reset.rs`). Sin esta línea la
 /// regla del prefijo se las daría a un módulo llamado `_hub` — hoy no existe ninguno, y «hoy no
-/// existe» es justo lo que ADR-0259 D8 (hub#560) pide dejar de dar por supuesto.
+/// existe» es justo lo que ADR-0273 D8 (hub#560) pide dejar de dar por supuesto.
 pub(crate) fn table_owner(table: &str, installed_ids: &[String]) -> Option<String> {
     if is_system_table(table) {
         return None;
@@ -1031,7 +1048,7 @@ mod tests {
         assert!(!is_portable_setting(""), "an empty key is not portable either");
     }
 
-    /// **The hub's OWN system tables belong to no module** — ADR-0259 D8 (hub#560).
+    /// **The hub's OWN system tables belong to no module** — ADR-0273 D8 (hub#560).
     ///
     /// `table_owner` is the single inventory both the export and the reset walk (`reset.rs` is its
     /// mirror), so a system table that no module can own is a table no bundle can dump and no reset

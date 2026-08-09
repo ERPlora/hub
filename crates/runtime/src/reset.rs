@@ -26,6 +26,12 @@ use crate::Runtime;
 /// backs, so the mirror of the export cannot drift into clearing something else.
 const ROLES_TABLE: &str = "hub_role_activation";
 
+/// Section name + table for the print queue (hub#502). `_print_queue` is DATA — pending receipts
+/// of sales the reset deletes — so it IS swept. `_print_host` is NOT (local/printer config) and
+/// must survive: see the `print_host_survives_a_full_reset` e2e.
+const PRINT_QUEUE_SECTION: &str = "print_queue";
+const PRINT_QUEUE_TABLE: &str = "_print_queue";
+
 /// Qué secciones se borran. Todo `false`/vacío por defecto: el reset nunca hace de más.
 #[derive(Debug, Clone, Default)]
 pub struct ResetSelection {
@@ -41,6 +47,11 @@ pub struct ResetSelection {
     /// modules DECLARE are live here. Off by default like everything else — switching a role off
     /// makes it unassignable, so it is never a side effect of clearing something else.
     pub roles: bool,
+    /// The print queue (`_print_queue`, hub#502): pending tickets from sales the reset just
+    /// deleted. Since hub#343 there IS a host draining it, so a reset followed by an app
+    /// reconnecting would print **ghost tickets of a business that no longer exists**. The queue
+    /// is DATA, unlike `_print_host` (which LOCAL config and stays — see [`print_host_survives`]).
+    pub print_queue: bool,
     /// Ids de módulos instalados cuyos datos de usuario se borran.
     pub modules: Vec<String>,
 }
@@ -101,9 +112,17 @@ pub async fn plan_reset(rt: &Runtime, hub_id: &str) -> crate::Result<ResetPlan> 
         rows: count_where(rt, ROLES_TABLE, "TRUE", hub_id).await,
         blocked_by: None,
     });
+    // The print queue (hub#502): pending receipts of sales the reset is about to delete. Counted
+    // with the SAME `WHERE hub_id` as the DELETE — the dry-run must announce exactly what goes.
+    // `_print_host` is NOT here on purpose: it is local/printer config, not business data.
+    sections.push(SectionPlan {
+        section: PRINT_QUEUE_SECTION.into(),
+        rows: count_where(rt, PRINT_QUEUE_TABLE, "TRUE", hub_id).await,
+        blocked_by: None,
+    });
 
     // Límite fiscal: se calcula UNA vez y se aplica a todas las secciones que lo sostienen.
-    let remitted = remitted_invoices(rt, hub_id).await;
+    let hold = fiscal_hold(rt, hub_id).await;
 
     for module_id in module_ids(rt) {
         let mut rows = 0;
@@ -113,7 +132,7 @@ pub async fn plan_reset(rt: &Runtime, hub_id: &str) -> crate::Result<ResetPlan> 
         sections.push(SectionPlan {
             section: format!("modules/{module_id}"),
             rows,
-            blocked_by: fiscal_block(&module_id, remitted),
+            blocked_by: fiscal_block(&module_id, hold),
         });
     }
     Ok(ResetPlan { sections })
@@ -125,12 +144,74 @@ pub async fn plan_reset(rt: &Runtime, hub_id: &str) -> crate::Result<ResetPlan> 
 /// la cadena VeriFactu apuntando a facturas que ya no existen.
 const FISCAL_SECTIONS: [&str; 3] = ["verifactu", "invoice", "sales"];
 
+/// Lo que la ley congela en este hub, y cuánto de ello el core puede poner en una cifra.
+///
+/// **Dos fuentes a propósito, y bloquea la UNIÓN** (hub#561, ADR-0273):
+///
+/// - [`FiscalHold::emitted`] — `_hub_fiscal_profile.first_record_at`, el sello del PROPIO core:
+///   este hub ya mandó un registro a una administración tributaria de verdad. Es
+///   **país-agnóstico** y tiene dueño dentro del runtime, así que sostiene el límite en los dos
+///   casos donde el conteo de abajo devuelve 0 sin decir nada: un hub francés bajo Factur-X (que
+///   no tiene `verifactu_record`) y uno español al que le desinstalaron el módulo.
+/// - [`FiscalHold::remitted`] — el conteo sobre la tabla del módulo, que se queda como **red**.
+///
+/// **Por qué la red sigue puesta aunque hub#551 ya selle el campo.** El sello va sólo **hacia
+/// delante**: lo estampa el dispatcher al commitear una transacción que arranca cadena con el perfil
+/// en `production` ([`crate::fiscal_profile::stamp_first_record`]). **Nada lo rellena hacia atrás.**
+/// Un hub que ya facturó ANTES de esta versión llega con `first_record_at = ''` —la migración v27
+/// crea la columna con `DEFAULT ''`— y con `environment = 'testing'`, porque el único que escribe
+/// `production` es `go_live`, un botón que entonces no existía. Su única huella son las filas
+/// `accepted` de `verifactu_record`. Quitar el conteo dejaría resetear justo a ese hub: el que más
+/// tiene que perder.
+///
+/// Se retira cuando el perfil se rellene hacia atrás, o cuando se dé por bueno que no queda ningún
+/// hub anterior al sello.
+#[derive(Debug, Clone, Copy, Default)]
+struct FiscalHold {
+    /// El hub ya emitió, según el perfil fiscal del core.
+    emitted: bool,
+    /// Facturas remitidas que el módulo `verifactu` todavía puede contar; 0 si no está.
+    remitted: i64,
+}
+
+impl FiscalHold {
+    /// ¿Hay algo que la ley congele? La unión: cualquiera de las dos fuentes basta.
+    fn holds(self) -> bool {
+        self.emitted || self.remitted > 0
+    }
+}
+
+/// Resuelve el límite fiscal del hub `hub_id`. Se llama UNA vez por operación y se aplica a todas
+/// las secciones que lo sostienen.
+async fn fiscal_hold(rt: &Runtime, hub_id: &str) -> FiscalHold {
+    FiscalHold {
+        emitted: has_emitted(rt, hub_id).await,
+        remitted: remitted_invoices(rt, hub_id).await,
+    }
+}
+
+/// `first_record_at IS NOT NULL` escrito contra el contrato de fila del hub, donde el «nunca» de un
+/// instante es `""` y no `NULL`.
+///
+/// Un perfil que no se puede leer (hub aún sin arrancar, base de datos vieja sin la tabla) degrada
+/// a `false` en vez de a error: es la mitad de seguridad de un panel, y un `plan_reset` que revienta
+/// deja al dueño sin poder hacer NADA. Lo que no se puede leer lo cubre el conteo de abajo.
+async fn has_emitted(rt: &Runtime, hub_id: &str) -> bool {
+    matches!(
+        crate::fiscal_profile::load(rt.db(), hub_id).await,
+        Ok(Some(profile)) if !profile.first_record_at.is_empty()
+    )
+}
+
 /// Facturas del hub **ya remitidas a la AEAT**: `status` transmitido/aceptado o con CSV de la
 /// AEAT. Son **inalterables** (RD 1007/2023). 0 si el módulo `verifactu` no está instalado (la
-/// consulta falla y `count_raw` devuelve 0), que es justo el caso «hub sin fiscal».
+/// consulta falla y `count_raw` devuelve 0) — y ese silencio es justo lo que hub#561 tapa con
+/// [`has_emitted`].
 ///
 /// El criterio es EXACTO, no heurístico: los datos de demo se quedan en `pending` y sin CSV, así
-/// que el caso que motiva el ADR-0170 —probar la demo y borrarla— nunca se bloquea.
+/// que el caso que motiva el ADR-0170 —probar la demo y borrarla— nunca se bloquea. Y es el mismo
+/// hecho que sella `first_record_at` (una cadena fiscal que arrancó de verdad), así que la unión de
+/// los dos se comporta igual que antes: esto es desacoplar, no cambiar la política.
 async fn remitted_invoices(rt: &Runtime, hub_id: &str) -> i64 {
     count_raw(
         rt,
@@ -141,14 +222,24 @@ async fn remitted_invoices(rt: &Runtime, hub_id: &str) -> i64 {
     .await
 }
 
-/// Motivo del bloqueo de una sección, o `None` si no aplica. El texto lleva la CIFRA y nombra a
-/// la AEAT: un bloqueo sin explicación se lee como un fallo del producto, no como la ley.
-fn fiscal_block(module_id: &str, remitted: i64) -> Option<String> {
-    (remitted > 0 && FISCAL_SECTIONS.contains(&module_id)).then(|| {
+/// Motivo del bloqueo de una sección, o `None` si no aplica. Un bloqueo sin explicación se lee como
+/// un fallo del producto y no como la ley, así que siempre hay texto: con la CIFRA y nombrando a la
+/// AEAT cuando el módulo español todavía puede contarlas, y **sin nombrar país** cuando lo único
+/// que se sabe es que el hub ya emitió (el caso de un régimen que no es VeriFactu).
+fn fiscal_block(module_id: &str, hold: FiscalHold) -> Option<String> {
+    if !hold.holds() || !FISCAL_SECTIONS.contains(&module_id) {
+        return None;
+    }
+    Some(if hold.remitted > 0 {
         format!(
-            "{remitted} facturas remitidas a la AEAT: inalterables por RD 1007/2023, \
-             no se pueden borrar"
+            "{} facturas remitidas a la AEAT: inalterables por RD 1007/2023, \
+             no se pueden borrar",
+            hold.remitted
         )
+    } else {
+        "este hub ya ha emitido registros de facturación ante su administración tributaria: \
+         son inalterables y no se pueden borrar"
+            .to_string()
     })
 }
 
@@ -165,8 +256,8 @@ pub async fn execute_reset(
     // ── Límite fiscal ANTES de tocar nada (el cliente puede venir manipulado) ────────────
     // La UI ya pinta estas secciones deshabilitadas, pero la autoridad es el servidor: un
     // `fetch` a mano no puede saltarse el RD 1007/2023.
-    let remitted = remitted_invoices(rt, hub_id).await;
-    if remitted > 0 {
+    let hold = fiscal_hold(rt, hub_id).await;
+    if hold.holds() {
         let bloqueada = selection
             .modules
             .iter()
@@ -176,7 +267,7 @@ pub async fn execute_reset(
         if let Some(section) = bloqueada {
             return Err(crate::RuntimeError::Other(format!(
                 "reset: la sección {section} está bloqueada — {}. No se ha borrado nada.",
-                fiscal_block("verifactu", remitted).unwrap_or_default()
+                fiscal_block("verifactu", hold).unwrap_or_default()
             )));
         }
     }
@@ -220,6 +311,18 @@ pub async fn execute_reset(
             ROLES_SECTION.into(),
             ROLES_TABLE.into(),
             format!("DELETE FROM {ROLES_TABLE} WHERE hub_id = :hub_id"),
+        ));
+    }
+    // The print queue (hub#502): since hub#343 a host DRAINS it, so a reset followed by an app
+    // reconnecting would print ghost tickets of a business that just got deleted. Sweeping the
+    // queue is the owner's door the other way. `_print_host` (which printer prints kitchen) is
+    // LOCAL config and stays — re-pairing printers after every reset is exactly what hub#342
+    // avoided on purpose.
+    if selection.print_queue && existing.iter().any(|t| t == PRINT_QUEUE_TABLE) {
+        ops.push((
+            PRINT_QUEUE_SECTION.into(),
+            PRINT_QUEUE_TABLE.into(),
+            format!("DELETE FROM {PRINT_QUEUE_TABLE} WHERE hub_id = :hub_id"),
         ));
     }
 
@@ -489,7 +592,61 @@ mod tests {
     fn default_selection_is_empty() {
         let sel = ResetSelection::default();
         assert!(!sel.settings && !sel.users && !sel.media && !sel.fiscal);
+        assert!(!sel.print_queue, "la cola de impresión tampoco se borra por defecto");
         assert!(sel.modules.is_empty());
+    }
+
+    // ── El límite duro, sin base de datos de por medio (hub#561, ADR-0273) ───────────────
+    //
+    // Los e2e de `tests/reset_fiscal_test.rs` prueban esto contra los módulos REALES, pero el
+    // gate de pre-push los salta por paridad con CI (`ERPLORA_E2E_ALLOW_SKIP=1`). La decisión
+    // —qué bloquea y con qué texto— se fija aquí también, en el nivel que SIEMPRE corre.
+
+    /// **El sello del core basta.** Es todo el punto de hub#561: un hub que ya emitió queda
+    /// bloqueado aunque el módulo que sabía contarlo no esté (otro régimen, o desinstalado).
+    #[test]
+    fn el_sello_del_core_bloquea_sin_que_ningun_modulo_cuente_nada() {
+        let hold = FiscalHold { emitted: true, remitted: 0 };
+        let motivo = fiscal_block("sales", hold).expect("un hub que emitió bloquea sus ventas");
+        assert!(!motivo.is_empty(), "el bloqueo llega siempre con motivo escrito");
+        // País-agnóstico: sin cifra que dar, el texto NO puede nombrar a la AEAT — sería meter
+        // España en un core que ya no la nombra.
+        assert!(
+            !motivo.to_lowercase().contains("aeat"),
+            "sin conteo del módulo español, el motivo no nombra país: {motivo}"
+        );
+    }
+
+    /// **La red sigue puesta.** El sello de hub#551 sólo va hacia delante y nada lo rellena hacia
+    /// atrás, así que en un hub que facturó ANTES de esta versión el conteo sobre la tabla del
+    /// módulo es lo ÚNICO que bloquea. Si este test cae, el límite duro se apagó para ese hub.
+    #[test]
+    fn el_conteo_del_modulo_sigue_bloqueando_con_el_sello_aun_vacio() {
+        let hold = FiscalHold { emitted: false, remitted: 2 };
+        let motivo = fiscal_block("verifactu", hold).expect("2 facturas remitidas bloquean");
+        assert!(motivo.contains('2'), "el motivo dice CUÁNTAS: {motivo}");
+        assert!(motivo.to_lowercase().contains("aeat"), "y nombra a la AEAT: {motivo}");
+    }
+
+    /// Nada sellado y nada contado ⇒ nada bloqueado. El caso ADR-0170: probar la demo y borrarla.
+    #[test]
+    fn sin_sello_ni_conteo_no_se_bloquea_nada() {
+        assert!(!FiscalHold::default().holds());
+        assert_eq!(fiscal_block("sales", FiscalHold::default()), None);
+    }
+
+    /// El alcance no se toca: el límite congela las secciones fiscal/ventas, no el reset entero.
+    #[test]
+    fn el_bloqueo_solo_alcanza_a_las_secciones_fiscales() {
+        let hold = FiscalHold { emitted: true, remitted: 3 };
+        for fiscal in FISCAL_SECTIONS {
+            assert!(fiscal_block(fiscal, hold).is_some(), "{fiscal} sostiene lo emitido");
+        }
+        assert_eq!(
+            fiscal_block("inventory", hold),
+            None,
+            "limpiar el catálogo de demo nunca se bloquea por una factura"
+        );
     }
 }
 
