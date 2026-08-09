@@ -154,6 +154,29 @@ pub fn modules_check(expected: &[String], registered: &[String]) -> Check {
 
 /// `GET /readyz`.
 pub async fn readyz(State(st): State<AppState>) -> Response {
+    let checks = snapshot(&st).await;
+    let status = aggregate(&checks);
+    let body = json!({
+        "status": status.as_str(),
+        "version": crate::version::HUB_VERSION,
+        "checks": checks
+            .iter()
+            .map(|(name, check)| (name.clone(), check.to_json()))
+            .collect::<serde_json::Map<_, _>>(),
+    });
+
+    (status_code(status), Json(body)).into_response()
+}
+
+/// Los chequeos, sin HTTP: lo que `/readyz` publica y lo que consulta el aviso de arranque
+/// (`crate::boot_announce`).
+///
+/// Existe como función aparte para que **no haya dos respuestas** a la misma pregunta. El aviso
+/// que le dice al Cloud «ya atiendo» es lo que hace que un hub pase a `active` sin esperar al
+/// sondeo, así que tiene que salir exactamente cuando esta ruta diría `UP` — ni antes (marcaría
+/// listo un hub que no atiende, que es peor que tardar) ni con un criterio propio que se
+/// desincronice del que mira Swarm.
+pub async fn snapshot(st: &AppState) -> Checks {
     let mut checks = Checks::new();
     let runtime = st.runtime.lock().await;
     let db = runtime.db();
@@ -207,17 +230,12 @@ pub async fn readyz(State(st): State<AppState>) -> Response {
     };
     checks.insert("modules".into(), modules);
 
-    let status = aggregate(&checks);
-    let body = json!({
-        "status": status.as_str(),
-        "version": crate::version::HUB_VERSION,
-        "checks": checks
-            .iter()
-            .map(|(name, check)| (name.clone(), check.to_json()))
-            .collect::<serde_json::Map<_, _>>(),
-    });
+    checks
+}
 
-    (status_code(status), Json(body)).into_response()
+/// ¿Puede atender este hub **ahora mismo**? La misma respuesta que da `/readyz`.
+pub async fn is_ready(st: &AppState) -> bool {
+    aggregate(&snapshot(st).await) == Health::Up
 }
 
 /// Los módulos que `hub_module` dice que este hub debería tener cargados.

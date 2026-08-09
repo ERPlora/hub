@@ -38,6 +38,7 @@ pub mod activity;
 pub mod api_keys;
 pub mod assistant;
 pub mod auth;
+pub mod boot_announce;
 pub mod bootstrap;
 pub mod daily_usage;
 /// `shared` (counter till) vs `personal` (somebody's own device) — plan step 2b, hub#357.
@@ -782,6 +783,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     if let Some(dir) = cfg.web_dir.as_deref() {
         eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
     }
+    // El router consume el `state`; el aviso de arranque de más abajo necesita el suyo.
+    let announce_state = state.clone();
     let mut router = build_router(state, cfg.web_dir.as_deref());
     // CSP (ADR-0050): con el doc servido por Axum, la CSP de `tauri.conf` no aplica → la emitimos aquí.
     if let Some(csp) = cfg.csp.as_deref() {
@@ -791,6 +794,15 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
     eprintln!("erplora-server escuchando en http://{}", cfg.bind);
     tracing::info!(bind = %cfg.bind, "erplora-server arrancado");
+
+    // «Ya atiendo» (hub#712): en cuanto el agregado de `/readyz` diga `UP`, un latido al Cloud
+    // para que un hub recién desplegado pase a `active` sin esperar al sondeo del SaaS.
+    //
+    // 🔑 Va AQUÍ, después de bindear: el socket ya escucha, así que el aviso no puede adelantar
+    // al hub que anuncia. Antes de este punto marcaríamos listo un hub que todavía no atiende, y
+    // eso es peor que tardar. En su propia task y best-effort, como el import de blueprint y el
+    // refetch del certificado: un plano de control inalcanzable deja un hub que FUNCIONA.
+    boot_announce::spawn(&announce_state);
     // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
     // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).
     axum::serve(listener, router)
