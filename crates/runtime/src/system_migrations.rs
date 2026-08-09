@@ -2576,9 +2576,10 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        // 32 = 27 + las cinco del kernel de automatización (v31–v35, hub#661). El número está a
-        // mano a propósito: añadir una migración de sistema tiene que ser un gesto CONSCIENTE, y
-        // este assert es lo que obliga a mirar el catálogo entero antes de tocarlo.
-        assert_eq!(MIGRATIONS.len(), 32, "el catálogo cambió de tamaño");
+        // 33 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
+        // (v36, hub#662). El número está a mano a propósito: añadir una migración de sistema tiene
+        // que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero
+        // antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan el mismo número.
+        assert_eq!(MIGRATIONS.len(), 33, "el catálogo cambió de tamaño");
     }
 }
