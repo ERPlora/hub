@@ -237,7 +237,22 @@ pub async fn export_blueprint(
             "locale inválido (esperado p.ej. \"es\")",
         );
     }
-    let selection = req.selection.into_selection();
+    let mut selection = req.selection.into_selection();
+
+    // Un hub que no es un negocio real nunca puede exportar más que una plantilla (hub#377,
+    // ADR-0195). Son dos los estados que cumplen eso, y los dos se tratan igual aquí:
+    //   · `is_dev_hub()` — el hub de desarrollo sin enrolar (`AuthMode::Dev` + `DEV_HUB_ID`), cuyo
+    //     `hub_user` lleva el `pin_hash` de pruebas;
+    //   · `config.demo` — la demo efímera (ADR-0197).
+    // Forzar `purpose: template` antes de que el motor vea la selección hace que el runtime excluya
+    // identidades (`hub_user`), fiscal (`verifactu_config`, certificado) y la identidad de negocio
+    // de `hub_settings`, marque lo que marque el formulario. El runtime ya honra `purpose` por
+    // encima de las casillas (export.rs), así que esto basta: no hace falta tocar `users`/`fiscal`
+    // uno a uno. (La issue hablaba de `is_demo`; ese nombre se retiró en ADR-0212 porque era ambiguo
+    // — `is_dev_hub` es lo que significaba.)
+    if st.is_dev_hub() || st.config.demo {
+        selection.purpose = BundlePurpose::Template;
+    }
 
     // Motor del runtime (Fase 1): manifest + data/*.sql. `created_at` lo aporta esta capa
     // (el runtime no lee el reloj) en ISO-8601 UTC.

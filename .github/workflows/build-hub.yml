@@ -11,28 +11,14 @@
 #                                      del Cloud/Dokploy registra el servicio con `…/hub:latest`).
 #                                      ESTE es el tag canónico — sin él no se puede hacer pull.
 #   - ghcr.io/erplora/hub:<git-sha>   (tag inmutable por commit, para pin/rollback)
-#   - ghcr.io/erplora/hub:X.Y.Z       (inmutable — SOLO en release; lo que pinea un rollback)
-#   - ghcr.io/erplora/hub:X.Y · :X    (móviles: «la última 1.2.*» y «la última 1.*»)
+#   - ghcr.io/erplora/hub:<semver>    (solo en tag v*: :1.2.3 inmutable + :1.2 y :1 móviles,
+#                                      para poder decir "la última 1.x" y distinguir un parche de
+#                                      seguridad de una versión nueva — hub#515, ADR-0269)
 #
 # Pipeline:
-#   push a main       ─► build ─► push GHCR (:latest + :<sha>)          [build de integración]
-#   tag v*            ─► GUARDA ─► build ─► push GHCR (+ :X.Y.Z :X.Y :X) [release]
+#   push a main       ─► build ─► push GHCR (:latest + :<sha>)
+#   tag v*            ─► build ─► push GHCR (:latest + :<sha> + :<semver>)  + reescribe Cargo
 #   workflow_dispatch ─► build ─► push GHCR (manual)
-#
-# ── La versión sale de `Cargo.toml`, NO del ref de git (hub#515 / ADR-0275) ──────────────
-# Antes se derivaba del ref —«1.2.3» en un tag, el sha corto en `main`— mientras el binario
-# decía `0.0.0`: la imagen se llamaba una cosa y el proceso que corre dentro decía otra, y el
-# pie del shell mostraba un SHA donde va una versión. Ahora `scripts/image-tags.sh` lee
-# `[workspace.package] version`, que es lo mismo que reporta `env!("CARGO_PKG_VERSION")` en
-# `/system`, en el latido y en `error_sink` — así no pueden separarse.
-#
-# Ese script además NIEGA la publicación (y el build no llega a correr) si:
-#   · la versión no es semver, o sigue siendo el hueco `0.0.0`;
-#   · un tag `v*` no coincide con `Cargo.toml` — bump olvidado o tag mal escrito, y las dos
-#     cosas aparecen mucho después como un hub reportando una versión que nadie lanzó;
-#   · esa versión YA está en el registro. Un tag inmutable que un segundo build puede mover
-#     convierte «vuelve a 1.2.3» en una promesa vacía.
-# Criterio de MAJOR/MINOR/PATCH para este producto: `architecture/hub/versioning.md`.
 #
 # Auth: `GITHUB_TOKEN` del propio workflow (permiso `packages: write`). No hacen falta claves
 # estáticas ni OIDC de AWS. El paquete queda PRIVADO por defecto; para que Dokploy/provisioning
@@ -85,18 +71,52 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # El propio guardarraíl tiene tests, y corren aquí: son ~2 s y esto es el único camino a
+      # El propio guardarraíl tiene tests, y corren aquí: ~2 s, y esto es el único camino a
       # producción de la imagen. Un guardarraíl sin probar es una creencia.
       - name: Contrato del guardarraíl de versión
         run: ./scripts/tests/image-tags.test.sh
 
-      # Va DESPUÉS del login (consulta el registro para no pisar un tag inmutable) y ANTES del
-      # build: un tag que no cuadra se rechaza en segundos, no tras los 16-19 min de compilar.
-      - name: Versión y tags (guarda)
+      # 🔴 LO PRIMERO tras el login, y ANTES de estampar o compilar.
+      #
+      # El MISMO tag `v*` dispara también `tauri-release.yml`, que publica la app en **Microsoft
+      # Store y Google Play**, donde las versiones son monótonas e IRREVERSIBLES: no se republica
+      # ni se retira. Un `git tag v1.2.4` mal escrito no «etiqueta mal una imagen» — quema ese
+      # número para siempre. Esta guarda es lo único que se interpone.
+      #
+      # Rechaza: tag que no es semver · versión YA publicada · versión MENOR o igual que la última ·
+      # registro ilegible (refuse-by-default; override `IMAGE_TAGS_ALLOW_UNVERIFIED=1`).
+      #
+      # Devuelve `version` y `tags` — sustituye a los pasos «Compute image tags» y «Compute app
+      # version», que calculaban lo mismo en bash inline y sin probar.
+      - name: Guarda de versión (semver · no publicada · monótona)
         id: tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./scripts/image-tags.sh \
             --image "${IMAGE}" --ref "${GITHUB_REF}" --sha "${GITHUB_SHA}"
+
+      # En un tag `v*`, lo que el runtime reporta (`env!("CARGO_PKG_VERSION")` → `/system`,
+      # el latido, `error_sink`) debe ser la versión del TAG, no el «en desarrollo» del commit.
+      # Va DESPUÉS de la guarda: no se reescribe nada por un tag que se va a rechazar.
+      - name: Estampar la versión en Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          V: ${{ steps.tags.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, pathlib, re
+          v = os.environ["V"]
+          p = pathlib.Path("Cargo.toml")
+          s = p.read_text()
+          s2 = re.sub(r'(\[workspace\.package\][^\[]*?version\s*=\s*)"[^"]*"',
+                      rf'\1"{v}"', s, count=1, flags=re.DOTALL)
+          if s == s2:
+              raise SystemExit("no se encontró [workspace.package].version para estampar")
+          p.write_text(s2)
+          print(f'Cargo.toml [workspace.package].version = "{v}"')
+          PY
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -124,10 +144,9 @@ jobs:
 
       - name: Output image URIs
         run: |
-          echo "Versión ${{ steps.tags.outputs.version }} — imagen publicada (GHCR, privada):"
-          printf '  %s\n' ${{ steps.tags.outputs.tags }}
-          echo ""
-          echo "  :latest es el que consumen los hubs reales (Cloud/Dokploy provisioning)."
+          echo "Imagen publicada (GHCR, privada):"
+          echo "  ${{ steps.tags.outputs.image }}:latest   (hubs reales — Cloud/Dokploy provisioning)"
+          echo "  ${{ steps.tags.outputs.image }}:${GITHUB_SHA}"
           echo ""
           echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
 
