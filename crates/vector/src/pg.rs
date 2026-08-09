@@ -240,6 +240,26 @@ impl VectorStore for PgVectorStore {
             .collect()
     }
 
+    /// The distinct modules present in this hub's index — the backfill's question. Served by the
+    /// plain `(hub_id, ref_id)` btree index, not the HNSW one.
+    async fn indexed_refs(&self, hub_id: &str) -> Result<Vec<String>> {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        let res = self
+            .db
+            .query(
+                "SELECT DISTINCT ref_id FROM hub_knowledge_chunk WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await?;
+        Ok(res
+            .rows
+            .iter()
+            .filter_map(|r| r.get("ref_id").and_then(serde_json::Value::as_str))
+            .map(str::to_string)
+            .collect())
+    }
+
     /// Drop every chunk a module contributed to THIS hub. Called when a module is uninstalled:
     /// its knowledge must not outlive it, or the assistant keeps describing a capability the
     /// dispatcher no longer has.

@@ -173,3 +173,25 @@ async fn search_on_empty_index_returns_no_rows() {
     let s = store().await;
     assert!(s.search("h1", &unit(0), 10, None).await.unwrap().is_empty());
 }
+
+/// What the boot-time backfill asks: which modules does this hub already have indexed?
+///
+/// Without it the hub cannot tell "never indexed" from "indexed and empty", and re-embedding
+/// every module on every boot would spend real money at the Cloud's embedding endpoint on every
+/// restart. It is also the reason a hub that installed its modules before the index existed ever
+/// gets one — the install hook only fires on install.
+#[tokio::test]
+async fn indexed_refs_lists_the_modules_already_in_the_index() {
+    let s = store().await;
+    s.upsert(&chunk("a", "h1", "inventory", unit(0))).await.unwrap();
+    s.upsert(&chunk("b", "h1", "inventory", unit(1))).await.unwrap();
+    s.upsert(&chunk("c", "h1", "sales", unit(2))).await.unwrap();
+    s.upsert(&chunk("d", "h2", "kitchen", unit(3))).await.unwrap();
+
+    let mut refs = s.indexed_refs("h1").await.unwrap();
+    refs.sort();
+    assert_eq!(refs, vec!["inventory".to_string(), "sales".to_string()],
+        "deduplicated, and scoped to this hub only");
+
+    assert!(s.indexed_refs("h3").await.unwrap().is_empty(), "a hub with nothing indexed");
+}

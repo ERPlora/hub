@@ -430,6 +430,27 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         }
     }
 
+    // Backfill del índice vectorial (§9.6): la ingesta normal corre en el hook de INSTALL, que ya
+    // pasó para todo hub existente — sin esto, su índice quedaría vacío para siempre y el router
+    // (§9.2b) nunca se activaría. Solo embebe la DIFERENCIA (módulos activos aún no indexados):
+    // los embeddings son llamadas metered al Cloud (§9.3), así que reiniciar no cuesta nada.
+    // En tarea de fondo: el arranque no espera a la red, y un fallo aquí no toca el arranque.
+    if let (Some(store), Some(machine)) = (state.vector.clone(), auth::machine_auth(&state)) {
+        let runtime = state.runtime.clone();
+        let http = state.http.clone();
+        let cloud = state.config.cloud_base_url.clone();
+        let hub_id = state.hub_id();
+        tokio::spawn(async move {
+            let embedder = embed::CloudEmbedder::new(http, &cloud, machine);
+            let rt = runtime.lock().await;
+            let (modules, chunks) =
+                embed::backfill_index(&embedder, store.as_ref(), rt.registry(), &hub_id).await;
+            if modules > 0 {
+                tracing::info!(modules, chunks, "índice vectorial backfilleado (§9.6)");
+            }
+        });
+    }
+
     // Seed de configuración inicial (hub#36): SQL idempotente que se aplica UNA vez al arrancar,
     // tras las tablas de sistema. Mecanismo genérico (NO "modo demo"): el host lo pasa por env —
     // `HUB_SEED_SQL` (SQL inline, p. ej. el del despliegue demo) o `HUB_SEED_SQL_PATH` (fichero).
