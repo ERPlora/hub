@@ -18,6 +18,8 @@ export default {
     system: 'Sistema',
     settings: 'Ajustes',
     apiDocs: 'API',
+    upgradePlan: 'Actualizar plan',
+    upgradePlanError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu plan.',
   },
   apiDocs: {
     title: 'Documentación de la API',
@@ -37,6 +39,7 @@ export default {
     // The way out to management (hub#364). It is the only affordance an icon-only action has, and
     // it crosses a product boundary, so it names the destination out loud.
     manage: 'Gestiona tu negocio en erplora.com',
+    manageError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.',
     notifications: 'Notificaciones',
     noNotifications: 'Todo al día. Sin notificaciones.',
     configure: 'Configurar',
@@ -384,7 +387,10 @@ export default {
     showApiDocs: 'Mostrar documentación de la API',
     showApiDocsDesc: 'Añade una página interna con la API pública del Hub (Swagger) para integraciones',
     hardware: 'Hardware',
-    bridgeDesc: 'Impresoras, cajón, escáner y conexión de hardware periférico',
+    hardwareTitle: 'Acceso a recursos locales y de red',
+    hardwareDesc: 'Impresoras, escáneres y otros dispositivos de este equipo o de su red',
+    hardwareReady: 'Disponible aquí',
+    hardwareAppOnly: 'Solo desde la app instalada',
     disabled: 'Desactivado',
     fiscalIdentity: 'Datos del negocio',
     fiscalIdentityDesc: 'Identidad del obligado tributario (la usan las facturas y los módulos fiscales).',

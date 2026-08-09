@@ -30,6 +30,9 @@ vi.mock('./session', async () => {
   return { user: ref<{ permissions?: string[] } | null>(null) };
 });
 
+const { openExternal } = vi.hoisted(() => ({ openExternal: vi.fn(async () => {}) }));
+vi.mock('./open-external', () => ({ openExternal }));
+
 import { canOpenManagement, managementUrl, openManagement } from './management-link';
 import { user } from './session';
 
@@ -76,17 +79,28 @@ describe('managementUrl', () => {
 });
 
 describe('openManagement', () => {
-  it('navigates THIS tab — a till may have no way back from a new one', () => {
+  // Esto navegaba la VENTANA ACTUAL, y el comentario que lo justificaba decía que «navegar en el
+  // sitio siempre deja Atrás, en toda superficie». **En la app instalada es falso**: la webview no
+  // tiene chrome, ni botón de atrás, ni pestañas — el usuario aterrizaba en el SaaS y se quedaba
+  // encerrado ahí, sin vuelta. Reportado por Ioan probando la app de escritorio (2026-08-09).
+  //
+  // Su otra premisa también había caducado: decía que dentro de la app `window.open` no abre nada.
+  // Era cierto ANTES de hub#475, que es exactamente lo que arregló — `openExternal` sale por el
+  // shell (`open_external_url`) en la app y abre pestaña en el navegador. Una sola puerta, las dos
+  // superficies.
+  //
+  // Regla de Ioan: **la app nunca navega al SaaS en su ventana.** Pestaña nueva en navegador,
+  // navegador del sistema en la app instalada.
+  it('sale por la puerta de fuera — la app NUNCA se navega a sí misma al SaaS', async () => {
     const assign = vi.fn();
-    const open = vi.fn();
-    vi.stubGlobal('window', { location: { assign }, open });
+    vi.stubGlobal('window', { location: { assign } });
 
-    openManagement();
+    await openManagement();
 
-    expect(assign).toHaveBeenCalledWith(
+    expect(openExternal).toHaveBeenCalledWith(
       'https://erplora.com/dashboard/?view=advanced&hub=hub-1&utm_source=hub',
     );
-    expect(open).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 });
 

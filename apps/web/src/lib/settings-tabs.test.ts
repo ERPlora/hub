@@ -6,6 +6,35 @@ const settingsSource = readFileSync(new URL('../views/SettingsPage.vue', import.
 const profileSource = readFileSync(new URL('../views/ProfilePage.vue', import.meta.url), 'utf8');
 
 describe('navegación de Ajustes', () => {
+  // La fila de hardware de Ajustes decía «ERPlora Bridge» y, al lado, «Desactivado» — las dos cosas
+  // FALSAS a la vez: «Bridge» es una app que ADR-0196 eliminó, y el estado era una cadena LITERAL,
+  // así que rezaba «Desactivado» siempre: dentro de la app instalada, en el navegador, y con la
+  // impresora imprimiendo. Un usuario con el hardware funcionando leía que no lo tenía.
+  //
+  // El lenguaje correcto ya lo fijó hub#500 en `SystemPage`: se habla de la impresora del mostrador,
+  // no de un proceso. Nadie que lleva un bar sabe qué es un «bridge».
+  it('la fila de hardware no nombra al Bridge, que ya no existe', () => {
+    expect(settingsSource).not.toContain('ERPlora Bridge');
+    expect(settingsSource).not.toContain('bridgeDesc');
+  });
+
+  it('el estado del hardware se LEE, no se escribe a mano', () => {
+    // La prueba de que no vuelve a cablearse: el literal `settings.disabled` suelto era todo el
+    // «estado». Ahora la fila depende de si estamos dentro de la app instalada.
+    expect(settingsSource).toContain('isTauri');
+    expect(settingsSource).not.toMatch(/slot="end">\{\{ t\('settings\.disabled'\) \}\}/);
+  });
+
+  it('la fila de hardware lleva a algún sitio en vez de fingir que se pulsa', () => {
+    // Tenía `button detail` —la flecha que promete que algo pasa— y ni un `@click`. Un control que
+    // no hace nada al pulsarlo es el defecto que hub#475 tuvo que arreglar en otras diez pantallas.
+    const fila = settingsSource.slice(settingsSource.indexOf("t('settings.hardware')"));
+    const item = fila.slice(0, fila.indexOf('</ion-card>'));
+    if (item.includes('button')) {
+      expect(item).toMatch(/@click|href|router-link/);
+    }
+  });
+
   it('no ofrece una pestaña Tienda duplicada', () => {
     expect(SETTINGS_TABS).toEqual(['hub', 'tax', 'tickets', 'permissions', 'data']);
     expect(SETTINGS_TABS).not.toContain('store');

@@ -17,6 +17,10 @@ export default {
     system: 'System',
     settings: 'Settings',
     apiDocs: 'API',
+    // Account management, not a storefront (hub#479): the label names the task, never a price
+    // or an offer, and it lands on THIS hub's plan page — the customer's own account.
+    upgradePlan: 'Upgrade plan',
+    upgradePlanError: 'We could not open your browser. Go to erplora.com to manage your plan.',
   },
   apiDocs: {
     title: 'API documentation',
@@ -36,6 +40,7 @@ export default {
     // The way out to management (hub#364). It is the only affordance an icon-only action has, and
     // it crosses a product boundary, so it names the destination out loud.
     manage: 'Manage your business at erplora.com',
+    manageError: 'We could not open your browser. Go to erplora.com to manage your business.',
     notifications: 'Notifications',
     noNotifications: 'All caught up. No notifications.',
     configure: 'Configure',
@@ -398,7 +403,14 @@ export default {
     showApiDocs: 'Show API documentation',
     showApiDocsDesc: 'Adds an internal page with the Hub public API (Swagger) for integrations',
     hardware: 'Hardware',
-    bridgeDesc: 'Printers, cash drawer, scanner and peripheral hardware connection',
+    // The counter's hardware, said as what it is. `bridgeDesc` named «ERPlora Bridge», an app
+    // ADR-0196 deleted, and sat next to a hardcoded «Disabled» that was wrong inside the app.
+    // Named after the CAPABILITY, not after one vertical's kit: an ERP without a till has no cash
+    // drawer, and «Printer and cash drawer» reads as «not for me» to everyone who is not a shop.
+    hardwareTitle: 'Local and network access',
+    hardwareDesc: 'Printers, scanners and other devices on this computer or its network',
+    hardwareReady: 'Available here',
+    hardwareAppOnly: 'Only from the installed app',
     disabled: 'Disabled',
     fiscalIdentity: 'Business details',
     fiscalIdentityDesc: 'Taxpayer identity (used by invoices and the fiscal modules).',
