@@ -336,19 +336,22 @@ export default {
     revokeError: 'No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
   },
   pinPolicy: {
-    title: 'Preguntar quién vende',
+    title: 'Pinpad',
     intro:
-      'Cada cuánto pregunta este hub qué persona está en la caja. Vale para todo el negocio: además, cada dispositivo decide por su cuenta, arriba.',
-    always: 'Cada hora',
-    alwaysConsequence:
-      'La caja olvida quién la estaba usando al cabo de una hora, así que la siguiente persona vuelve a identificarse. Es el que más nombres deja en los tickets, y el que más obliga a teclear.',
-    perShift: 'Una vez por turno',
-    perShiftConsequence:
-      'Quien empieza se identifica y la caja lo recuerda durante las 12 horas siguientes. Cada venta sigue llevando un nombre. Es lo que hace un hub mientras no lo cambies.',
-    never: 'Nunca',
-    neverConsequence:
+      'Si este hub muestra el pinpad y pregunta quién está en la caja. Vale para todo el negocio: además, cada dispositivo decide por su cuenta, arriba.',
+    showPinpad: 'Mostrar pinpad',
+    onConsequence:
+      'El personal elige su nombre y teclea su PIN, así que cada venta lleva el nombre de quien la hizo.',
+    offConsequence:
       'Nadie teclea un PIN. Quien abriera la caja por la mañana es el nombre de todas las ventas hasta que acabe el turno, las hiciera quien las hiciera: no podrás saber quién vendió qué ni quién hizo un descuento. El personal que solo tiene PIN y no tiene cuenta no podrá entrar.',
-    adminOnly: 'Solo un administrador puede cambiar cada cuánto pregunta el hub.',
+    idleTitle: 'Volver a preguntar tras inactividad',
+    idleMinutes: '{n} min',
+    idleUntilSignOut: 'Hasta cerrar sesión',
+    idleMinutesConsequence:
+      'Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.',
+    idleUntilSignOutConsequence:
+      'La caja no se bloquea sola por inactividad: la sesión sigue abierta hasta que quien entró cierre sesión, o hasta que caduque por el dispositivo.',
+    adminOnly: 'Solo un administrador puede cambiar si este hub pregunta.',
     saveError: 'No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.',
   },
   settings: {

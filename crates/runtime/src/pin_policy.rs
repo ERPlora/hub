@@ -82,6 +82,25 @@ const POLICY_PAYLOAD: &str = "hub.pin_policy";
 /// one and the owner would be choosing between a difference that does not exist.
 pub const ALWAYS_SESSION_TTL_SECS: i64 = 60 * 60;
 
+/// The key of the idle window in `hub_settings` (hub#628): how many minutes of inactivity before
+/// the shell signs the user out and shows the pinpad again. Same contract shape as
+/// [`PIN_POLICY_SETTING`] — the column stores it, `GET /api/settings` returns it.
+///
+/// It only has an effect while the policy is [`Always`](PinPolicy::Always), and the one who
+/// enforces it is the **client** (the shell's idle detector): the hub cannot see a hand leaving
+/// the till. The server keeps [`ALWAYS_SESSION_TTL_SECS`] as the backstop for a client that never
+/// comes back to enforce anything.
+pub const PIN_INACTIVITY_MINUTES_SETTING: &str = "pin_inactivity_minutes";
+
+/// Idle minutes assumed when the row is absent or unreadable: the middle-low stop of the range
+/// the owner is shown (1 · 5 · 10 · 15 · 30). Short enough to be a real lock on a counter till,
+/// long enough not to punish reading a long menu out loud.
+pub const DEFAULT_PIN_INACTIVITY_MINUTES: i64 = 5;
+
+/// Ceiling of the idle window. Above this the "lock" would outlive the longest coffee break and
+/// the position stops being distinguishable from "until you sign out".
+pub const MAX_PIN_INACTIVITY_MINUTES: i64 = 30;
+
 /// How often this business wants to be asked who is standing at the till.
 ///
 /// The default is [`PerShift`](PinPolicy::PerShift) **on purpose**, and the reasoning is not "it is

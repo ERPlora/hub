@@ -986,6 +986,9 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     // sería quitar el pinpad por una lectura que no habla de él. La autoridad son el GET completo
     // y `GET /api/device/mode` (que es el que lee la pantalla de login, sin sesión).
     pin_policy: hubSettings.value?.pin_policy ?? STRICT_PIN_POLICY,
+    // Los minutos de inactividad (hub#628) tampoco viajan en el context: se preserva la cache o
+    // el default del runtime (5) hasta el GET completo.
+    pin_inactivity_minutes: hubSettings.value?.pin_inactivity_minutes ?? 5,
   };
   // Publica la moneda a `globalThis.__erploraCurrency` para los Web Components de módulo (ADR-0059):
   // el SDK la lee de ahí como fallback cuando el shell no inyecta el getter (mirror de cómo `locale`

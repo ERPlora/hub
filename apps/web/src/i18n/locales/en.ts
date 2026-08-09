@@ -350,19 +350,22 @@ export default {
   // because the hub really does enforce them, and a promise it cannot keep would be worse than no
   // setting at all.
   pinPolicy: {
-    title: 'Asking who is selling',
+    title: 'PIN pad',
     intro:
-      'How often this hub asks which person is at the till. It applies to the whole business — each device also decides for itself, above.',
-    always: 'Every hour',
-    alwaysConsequence:
-      'The till forgets who was using it after an hour, so the next person signs in again. The most names on your receipts, and the most typing.',
-    perShift: 'Once per shift',
-    perShiftConsequence:
-      'Somebody signs in when they start and the till remembers them for the next 12 hours. Every sale still carries a name. This is what a hub does unless you change it.',
-    never: 'Never',
-    neverConsequence:
+      'Whether this hub shows the PIN pad and asks who is at the till. It applies to the whole business — each device also decides for itself, above.',
+    showPinpad: 'Show PIN pad',
+    onConsequence:
+      'Staff pick their name and type their PIN, so every sale carries the name of whoever made it.',
+    offConsequence:
       'Nobody types a PIN. Whoever opened the till in the morning is the name on every sale until the shift ends, whoever actually made them — so you cannot tell who sold what, or who gave a discount. Staff who only have a PIN and no account will not be able to sign in.',
-    adminOnly: 'Only an administrator can change how often this hub asks.',
+    idleTitle: 'Ask again after inactivity',
+    idleMinutes: '{n} min',
+    idleUntilSignOut: 'Until you sign out',
+    idleMinutesConsequence:
+      'A till nobody has touched for {n} minutes signs the user out and shows the PIN pad, so the next sale carries the next person’s name.',
+    idleUntilSignOutConsequence:
+      'The till never locks itself for inactivity: the session stays open until whoever signed in signs out, or until the device says it expires.',
+    adminOnly: 'Only an administrator can change whether this hub asks.',
     saveError: 'This could not be changed. Check the connection and try again.',
   },
   settings: {
