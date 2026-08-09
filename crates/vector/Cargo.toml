@@ -13,3 +13,6 @@ async-trait = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+# `PgVectorStore`'s tests run against a REAL Postgres with pgvector (tests/pg_store.rs): the
+# production store computes cosine with the `<=>` operator, which no in-memory double can check.
+erplora-db = { path = "../db", features = ["test-util"] }

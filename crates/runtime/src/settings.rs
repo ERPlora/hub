@@ -146,6 +146,16 @@ const KNOWN: &[Setting] = &[
         validate: validate_pin_policy,
         parse_stored: |s| json!(s),
     },
+    // Minutos de INACTIVIDAD antes de que el shell cierre la sesión y vuelva al pinpad (hub#628).
+    // Solo tiene efecto con `pin_policy = always`; quien lo aplica es el CLIENTE (el hub no ve una
+    // mano soltar la caja) y el TTL de servidor de `always` queda como red. La UI ofrece paradas
+    // (1·5·10·15·30) pero aquí se valida un RANGO: las paradas son presentación.
+    Setting {
+        key: crate::pin_policy::PIN_INACTIVITY_MINUTES_SETTING,
+        default: || json!(crate::pin_policy::DEFAULT_PIN_INACTIVITY_MINUTES),
+        validate: validate_pin_inactivity_minutes,
+        parse_stored: |s| s.parse::<i64>().map(|n| json!(n)).unwrap_or(Value::Null),
+    },
 ];
 
 /// Locales soportados por el hub (espejo del contrato del frontend, ADR-0055).
@@ -309,6 +319,23 @@ fn validate_pin_policy(v: &Value) -> std::result::Result<String, String> {
     crate::pin_policy::PinPolicy::parse(s)
         .map(|p| p.as_str().to_string())
         .map_err(|e| e.to_string())
+}
+
+/// `pin_inactivity_minutes`: entero 1..=30. Un no-entero (`2.5`, `"five"`, `true`, `null`) no se
+/// interpreta: la clave decide cuánto tarda una caja en volver a pedir el PIN, y adivinar aquí es
+/// adivinar hacia el lado que deja la sesión abierta.
+fn validate_pin_inactivity_minutes(v: &Value) -> std::result::Result<String, String> {
+    let n = v
+        .as_i64()
+        .ok_or("debe ser un entero (minutos de inactividad, 1..=30)")?;
+    if (1..=crate::pin_policy::MAX_PIN_INACTIVITY_MINUTES).contains(&n) {
+        Ok(n.to_string())
+    } else {
+        Err(format!(
+            "minutos de inactividad inválidos `{n}`: se espera 1..={}",
+            crate::pin_policy::MAX_PIN_INACTIVITY_MINUTES
+        ))
+    }
 }
 
 fn validate_theme_palette(v: &Value) -> std::result::Result<String, String> {
@@ -1190,5 +1217,83 @@ mod tests {
             !KNOWN.iter().any(|s| s.key.contains("demo")),
             "the demo marker is the deployment's (HUB_DEMO), never a row anyone can write"
         );
+    }
+
+    // ── «Show PIN pad» + idle lock (hub#628) ────────────────────────────────────────────
+    //
+    // The Settings card became a toggle + an idle range (1 · 5 · 10 · 15 · 30 · until sign-out).
+    // The wire keeps the closed `pin_policy` set; the ONE new key is `pin_inactivity_minutes`:
+    // how many minutes of inactivity before the shell signs the user out and shows the pinpad.
+    // It only matters while `pin_policy = always`; the server-side TTL backstop is unchanged.
+
+    #[tokio::test]
+    async fn pin_inactivity_minutes_defaults_to_five() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["pin_inactivity_minutes"], json!(5));
+    }
+
+    #[tokio::test]
+    async fn pin_inactivity_minutes_accepts_a_minute_count_and_persists_it() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        // The UI offers 1/5/10/15/30, but the door validates a RANGE (1..=30), not the UI's
+        // stops: the stops are presentation, and a future numeric input must not need a
+        // runtime release.
+        for n in [1, 5, 10, 15, 30, 7] {
+            let mut updates = serde_json::Map::new();
+            updates.insert("pin_inactivity_minutes".into(), json!(n));
+            let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+                .await
+                .unwrap();
+            assert_eq!(result["pin_inactivity_minutes"], json!(n));
+        }
+    }
+
+    #[tokio::test]
+    async fn pin_inactivity_minutes_rejects_what_is_not_a_minute_count() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        for bad in [
+            json!(0),
+            json!(31),
+            json!(-3),
+            json!(2.5),
+            json!("five"),
+            json!(true),
+            Value::Null,
+        ] {
+            let mut updates = serde_json::Map::new();
+            updates.insert("pin_inactivity_minutes".into(), bad.clone());
+            let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(err, RuntimeError::InvalidPayload { .. }),
+                "`{bad}` must be refused: {err:?}"
+            );
+        }
+        // And the refusals above are about the VALUE, not an unknown key: a sane write lands.
+        let mut updates = serde_json::Map::new();
+        updates.insert("pin_inactivity_minutes".into(), json!(10));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .unwrap();
+        assert_eq!(result["pin_inactivity_minutes"], json!(10));
+    }
+
+    #[tokio::test]
+    async fn a_corrupt_pin_inactivity_row_degrades_to_the_default() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        db.execute_batch(
+            "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+             VALUES ('hub-1', 'pin_inactivity_minutes', 'soon', '2026-01-01T00:00:00Z', 'x');",
+        )
+        .await
+        .unwrap();
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["pin_inactivity_minutes"], json!(5), "corrupt row → default");
     }
 }

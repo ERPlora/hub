@@ -42,9 +42,25 @@ use std::path::PathBuf;
 /// Pública para que los tests puedan construir rutas de módulo con la MISMA resolución que usa el
 /// guard, evitando divergencias.
 pub fn modules_root() -> PathBuf {
-    if let Ok(dir) = std::env::var("ERPLORA_MODULES_DIR") {
-        return PathBuf::from(dir);
+    resolve_root(std::env::var("ERPLORA_MODULES_DIR").ok(), default_modules_root)
+}
+
+/// La política «override si lo hay, si no el default», factorizada para poder probarla sin mutar el
+/// entorno —que es del PROCESO y provocaría carreras entre tests—, igual que [`decide`].
+fn resolve_root(override_dir: Option<String>, default: fn() -> PathBuf) -> PathBuf {
+    match override_dir {
+        Some(dir) => PathBuf::from(dir),
+        None => default(),
     }
+}
+
+/// The monorepo-relative default, WITHOUT the `$ERPLORA_MODULES_DIR` override.
+///
+/// Split out so a test can assert what the default resolves to without going through the function
+/// the environment is allowed to override — asserting on [`modules_root`] made the test contradict
+/// the very override this module documents, and it went red for anyone pointing the variable at a
+/// directory of their own.
+fn default_modules_root() -> PathBuf {
     // `env!` se evalúa al compilar el crate `erplora-runtime`, cuyo MANIFEST_DIR es
     // `crates/runtime`. `../../../modules-workspace/modules` sube tres niveles hasta la raíz del
     // monorepo (donde vive `modules-workspace` como repo hermano del hub).
@@ -59,9 +75,12 @@ pub fn modules_root() -> PathBuf {
 /// path. Without one shared resolver, a test that hardcodes the relative path fails with a bare
 /// `NotFound` in exactly the setup the override exists for.
 pub fn blueprints_root() -> PathBuf {
-    if let Ok(dir) = std::env::var("ERPLORA_BLUEPRINTS_DIR") {
-        return PathBuf::from(dir);
-    }
+    resolve_root(std::env::var("ERPLORA_BLUEPRINTS_DIR").ok(), default_blueprints_root)
+}
+
+/// The monorepo-relative default, WITHOUT the `$ERPLORA_BLUEPRINTS_DIR` override
+/// (same split, same reason, as [`default_modules_root`]).
+fn default_blueprints_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../blueprints")
 }
 
@@ -208,8 +227,34 @@ mod tests {
     fn modules_root_por_defecto_apunta_a_monorepo() {
         // `env!` se evalúa al compilar `erplora-runtime` (MANIFEST_DIR = crates/runtime); la ruta
         // por defecto siempre termina en el segmento canónico del repo hermano.
-        let root = modules_root();
-        assert!(root.ends_with("modules-workspace/modules"));
+        //
+        // Contra `default_modules_root()`, NO contra `modules_root()`: esta afirmación es sobre el
+        // DEFAULT, y `modules_root()` deja de serlo en cuanto hay override. Preguntándole a la
+        // función que el entorno pisa, el test se ponía rojo con `ERPLORA_MODULES_DIR` apuntando a
+        // cualquier ruta propia — o sea, justo al correr los e2e como el módulo dice que se corren.
+        assert!(default_modules_root().ends_with("modules-workspace/modules"));
+        assert!(default_blueprints_root().ends_with("blueprints"));
+    }
+
+    #[test]
+    fn la_variable_de_entorno_gana_al_default() {
+        // La otra mitad del contrato, que no probaba nadie: el override existe PARA pisar. Es lo
+        // que permite correr los e2e desde un worktree fuera del monorepo, donde la ruta relativa
+        // no resuelve (hub#253/#541). Sin esto, romper el override no rompe ningún test.
+        //
+        // Se ejerce `resolve_root`, que es LA función que usan `modules_root`/`blueprints_root` —
+        // no una copia de su lógica en el test. Mismo motivo que `decide()`: la política se factoriza
+        // para poder probarla sin mutar el entorno, que es del PROCESO y provocaría carreras.
+        assert_eq!(
+            resolve_root(Some("/tmp/mis-modulos".to_string()), default_modules_root),
+            PathBuf::from("/tmp/mis-modulos"),
+            "con la variable puesta, el default NO se usa"
+        );
+        assert_eq!(
+            resolve_root(None, default_modules_root),
+            default_modules_root(),
+            "sin la variable, manda el default del monorepo"
+        );
     }
 
     #[test]

@@ -18,12 +18,12 @@
 //!      permisos, el scoping `hub_id` y `requires_primary`/`requires_cloud` siguen aplicándose
 //!      **server-side** (los aporta el propio `Runtime`, no cambian aquí).
 //!
-//! Lo que **NO** decide este módulo (columna del humano — ver `TODO(humano)` abajo): el **formato
-//! del secreto/DSN por org** y **cómo el server descubre las orgs y sus `database_name`**. ADR-0005
-//! deja a Django en el plano de control (provisiona la BD de la org + emite token) pero no cierra el
-//! mecanismo de entrega del DSN al gateway. Se parametriza tras el trait [`OrgResolver`] y se aporta
-//! un resolvedor mínimo por entorno ([`EnvOrgResolver`]); el mecanismo real (¿endpoint de control de
-//! Django?, ¿Secrets Manager?, ¿env por org?) lo cierra el humano.
+//! What this module does **NOT** decide (still open — see [`EnvOrgResolver`]): the **secret/DSN
+//! format per org** and **how the server discovers the orgs and their `database_name`**. ADR-0005
+//! puts Django in the control plane (it provisions the org's DB and issues the token) but does not
+//! close how the DSN reaches the gateway. That is parameterized behind the [`OrgResolver`] trait,
+//! with a minimal environment-backed resolver ([`EnvOrgResolver`]) standing in until the real
+//! mechanism is chosen.
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -81,12 +81,12 @@ pub trait OrgResolver: Send + Sync {
 /// `hub_id → (org_id, dsn)` cargado al arrancar. Pensado para tests y un primer despliegue; **no**
 /// es el sistema de descubrimiento definitivo.
 ///
-/// TODO(humano): cerrar cómo el gateway descubre las orgs y sus `database_name`/DSN. Opciones que
-/// abre ADR-0005 (Django en el plano de control): (a) un endpoint de control de Django que el
-/// gateway consulta y cachea (`GET /api/v1/orgs/{hub_id}/db/` → DSN firmado de corta vida); (b)
-/// Secrets Manager por org (`erplora/org/{org_id}/dsn`); (c) env por org en el arranque. El formato
-/// EXACTO del secreto/DSN y el refresco (rotación de credenciales de Aurora) son **columna del
-/// humano** — aquí solo se parametriza tras [`OrgResolver`].
+/// OPEN: how the gateway discovers the orgs and their `database_name`/DSN. The options ADR-0005
+/// leaves open (Django in the control plane): (a) a Django control endpoint the gateway queries
+/// and caches (`GET /api/v1/orgs/{hub_id}/db/` → short-lived signed DSN); (b) Secrets Manager per
+/// org (`erplora/org/{org_id}/dsn`); (c) per-org env at boot. The exact secret/DSN format and the
+/// refresh path (credential rotation) are part of that same decision; until it is taken, this is
+/// parameterized behind [`OrgResolver`].
 pub struct EnvOrgResolver {
     /// `hub_id → descriptor`. Inmutable tras construcción (un refresco vivo sería otro trabajo).
     map: HashMap<String, OrgDescriptor>,

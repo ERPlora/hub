@@ -31,7 +31,10 @@ pub async fn apply(db: &dyn DatabaseAdapter, dir: &Path, manifest: &Manifest) ->
 
     // Hub Cloud es Postgres-only (ADR-0154): siempre el dialecto `postgres`.
     let (declared, subdir) = (&manifest.migrations.postgres, "postgres");
-    let mut files = declared.clone();
+    let mut files: Vec<(String, crate::migration_guard::Kind)> = declared
+        .iter()
+        .map(|entry| (entry.file().to_string(), entry.kind()))
+        .collect();
     if let Ok(entries) = std::fs::read_dir(dir.join("migrations").join(subdir)) {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
@@ -40,20 +43,38 @@ pub async fn apply(db: &dyn DatabaseAdapter, dir: &Path, manifest: &Manifest) ->
             }
             // Misma ruta relativa que usa el manifest: dedupe aquí y en `_hub_migrations`.
             let rel = format!("migrations/{subdir}/{name}");
-            if !files.contains(&rel) {
+            if !files.iter().any(|(f, _)| f == &rel) {
                 eprintln!("⚠ módulo {}: migración {rel} no listada en el manifest — se aplica desde el paquete", manifest.id);
-                files.push(rel);
+                // Sin declaración, `expand`: lo más restrictivo que sigue siendo el caso normal.
+                files.push((rel, crate::migration_guard::Kind::Expand));
             }
         }
     }
-    files.sort();
+    files.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-    for file in &files {
+    for (file, kind) in &files {
         if is_applied(db, &manifest.id, file).await? {
             continue;
         }
         let sql = loader::read_text(dir, file)?;
-        db.execute_batch(&sql).await?;
+
+        // 🚪 La puerta que protege (hub#542): no se fía del paquete. Devuelve las sentencias ya
+        // traducidas — en un `contract`, con los `DROP` convertidos en rename.
+        let plan = crate::migration_guard::check(&manifest.id, file, &sql, *kind)
+            .map_err(|error| crate::errors::RuntimeError::Domain {
+                code: "hub.module_migration_rejected".into(),
+                message: format!("módulo `{}`, {file}: {error}", manifest.id),
+            })?;
+
+        // El SQL se ejecuta TAL CUAL salvo en un `contract`. Recomponer un batch que se ha partido
+        // por `;` corrompe SQL válido —el splitter no entiende dollar-quoting— y el peor caso de
+        // eso es romper un módulo que estaba bien. Ver `migration_guard::Plan`.
+        match plan {
+            crate::migration_guard::Plan::AsWritten => db.execute_batch(&sql).await?,
+            crate::migration_guard::Plan::Rewritten(statements) => {
+                db.execute_batch(&format!("{};", statements.join(";\n"))).await?
+            }
+        }
         record_applied(db, &manifest.id, file).await?;
     }
     Ok(())

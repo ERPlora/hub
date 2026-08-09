@@ -305,11 +305,44 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     }
     eprintln!("auth: modo {:?}", cfg.hub.auth_mode);
 
-    // Índice vectorial del asistente (§9.2b routing + §9.6 ingestión). Hoy **None**: el store
-    // pgvector para Postgres es un follow-up (ADR-0154; hub#204 / pm#29). Mientras tanto el
-    // asistente degrada a "todos los tools" (§9.5). La generación de embeddings sigue yendo por el
-    // Cloud (§9.3). TODO(humano): `PgVectorStore` (pgvector) para el índice de routing/RAG.
-    let vector_store: Option<state::SharedVectorStore> = None;
+    // Índice vectorial del asistente (§9.2b routing + §9.6 ingestión) — Postgres + pgvector
+    // (hub#204 / pm#29). Con los 24 módulos instalados el catálogo de tools que viaja en CADA
+    // turno son ~58k tokens; el router lo recorta a los módulos relevantes, y para eso necesita
+    // este índice.
+    //
+    // **Nunca aborta el arranque.** Si pgvector no está disponible en esta BD (la imagen no lo
+    // trae, o el rol del hub no puede crear la extensión — ADR-0201 da a cada hub su BD y su rol),
+    // se queda en `None` y el asistente degrada a ofrecer todos los tools (§9.5), que es
+    // exactamente lo que hacía antes. Más caro de prompt, nunca roto. Lo que el asistente SABE del
+    // hub no depende de esto: el mapa de módulos va en el system prompt
+    // (`assistant::build_instructions`). Los embeddings siguen saliendo por el Cloud (§9.3).
+    let vector_store: Option<state::SharedVectorStore> = match erplora_db::PgAdapter::connect(&dsn)
+        .await
+    {
+        Ok(vdb) => {
+            let store = erplora_vector::PgVectorStore::new(
+                std::sync::Arc::new(vdb),
+                erplora_vector::DEFAULT_DIMS,
+            );
+            match erplora_vector::VectorStore::ensure_schema(&store).await {
+                Ok(()) => {
+                    eprintln!("asistente: índice vectorial pgvector listo (router §9.2b activo)");
+                    Some(std::sync::Arc::new(store) as state::SharedVectorStore)
+                }
+                Err(e) => {
+                    eprintln!(
+                        "asistente: sin índice vectorial ({e}); se ofrecen TODOS los tools (§9.5). \
+                         Instala pgvector en esta BD para abaratar el prompt."
+                    );
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("asistente: sin índice vectorial (pool: {e}); se ofrecen todos los tools (§9.5)");
+            None
+        }
+    };
 
     // Celda del token de máquina: externa (compartida con el shell Tauri para hot-reload) o propia.
     let mut state = AppState::with_config_cells(runtime, cfg.hub, machine_token_cell, hub_id_cell);
@@ -395,6 +428,27 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 ),
             }
         }
+    }
+
+    // Backfill del índice vectorial (§9.6): la ingesta normal corre en el hook de INSTALL, que ya
+    // pasó para todo hub existente — sin esto, su índice quedaría vacío para siempre y el router
+    // (§9.2b) nunca se activaría. Solo embebe la DIFERENCIA (módulos activos aún no indexados):
+    // los embeddings son llamadas metered al Cloud (§9.3), así que reiniciar no cuesta nada.
+    // En tarea de fondo: el arranque no espera a la red, y un fallo aquí no toca el arranque.
+    if let (Some(store), Some(machine)) = (state.vector.clone(), auth::machine_auth(&state)) {
+        let runtime = state.runtime.clone();
+        let http = state.http.clone();
+        let cloud = state.config.cloud_base_url.clone();
+        let hub_id = state.hub_id();
+        tokio::spawn(async move {
+            let embedder = embed::CloudEmbedder::new(http, &cloud, machine);
+            let rt = runtime.lock().await;
+            let (modules, chunks) =
+                embed::backfill_index(&embedder, store.as_ref(), rt.registry(), &hub_id).await;
+            if modules > 0 {
+                tracing::info!(modules, chunks, "índice vectorial backfilleado (§9.6)");
+            }
+        });
     }
 
     // Seed de configuración inicial (hub#36): SQL idempotente que se aplica UNA vez al arrancar,
@@ -1811,7 +1865,7 @@ async fn assistant_chat_stream(
     };
     // La sesión LOCAL del hub da el contexto/permisos para ensamblar las tools (gate = el de la UI)
     // y el id del usuario activo, que se manda como metadata de coste/auditoría (no permisos).
-    let (all_tools, active_user, active_modules) = {
+    let (all_tools, active_user, active_modules, instructions) = {
         let rt = st.runtime.lock().await;
         let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
             Ok(c) => c,
@@ -1819,7 +1873,19 @@ async fn assistant_chat_stream(
         };
         let tools = assistant::assemble_tools(rt.registry(), &ctx);
         let active = rt.registry().active_module_count();
-        (tools, ctx.user_id.clone(), active)
+        // El system prompt del turno (§9.2). Se arma con el MISMO lock que las tools: el mapa de
+        // módulos que describe y el catálogo que ofrece tienen que ser la misma foto del registry.
+        // Absorbe además los `system` del cliente (el briefing de `hub.setup.status`, ADR-0230),
+        // que el Cloud descarta en su frontera — `instructions` es el único canal que sobrevive.
+        // La fecha/hora ACTUAL viaja en cada turno: el reloj del modelo se congeló al entrenar,
+        // y en un ERP «hoy» es estructural (ventas de hoy, trimestre, vencimientos).
+        let now = chrono::Utc::now();
+        let instructions = assistant::build_instructions(
+            rt.registry(),
+            &assistant::client_system_messages(&frontend),
+            &format!("{} ({})", now.format("%Y-%m-%dT%H:%M:%SZ"), now.format("%A")),
+        );
+        (tools, ctx.user_id.clone(), active, instructions)
     };
 
     // Router de tools por vectores (§9.2b): embebe la última petición del usuario, busca en el
@@ -1857,7 +1923,7 @@ async fn assistant_chat_stream(
         })
         .collect();
 
-    let body = assistant::build_cloud_body(&frontend, tools, Some(&active_user));
+    let body = assistant::build_cloud_body(&frontend, tools, Some(&active_user), &instructions);
 
     // Construye la petición al Cloud (POST, Bearer + X-Hub-Id) y abre el stream.
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
@@ -2451,15 +2517,39 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
         match rt.is_device_trusted(device_id).await {
             Ok(true) => {}
             Ok(false) => {
-                return (
-                    StatusCode::FORBIDDEN,
-                    Json(json!({
-                        "ok": false,
-                        "error": "this device has not signed in with an account yet",
-                        "code": "device_untrusted"
-                    })),
-                )
-                    .into_response()
+                // Demo hubs adopt the FIRST device that shows up (hub#630). A demo visitor has no
+                // account, and an online cloud login is the only thing that otherwise earns a
+                // device its trust — so without this the PIN door on a demo could never be opened
+                // by anybody: the hub came up, the seeded `Demo` user was there, and every login
+                // answered `device_untrusted` until the reaper destroyed it.
+                //
+                // First use, not "off". The gate stays enforced and only the empty case is
+                // special: once a device is adopted, the next one is refused exactly as always, so
+                // whoever opened the demo keeps it and somebody who later guesses the URL does not
+                // walk into their session. `Registry::demo_hub` is sealed at boot from `HUB_DEMO`
+                // and has no writer (ADR-0197 §4), so this cannot be turned on from outside.
+                let adopt = if st.config.demo {
+                    match rt.list_devices().await {
+                        Ok(devices) => devices.is_empty(),
+                        Err(e) => return err_response(e),
+                    }
+                } else {
+                    false
+                };
+                if !adopt {
+                    return (
+                        StatusCode::FORBIDDEN,
+                        Json(json!({
+                            "ok": false,
+                            "error": "this device has not signed in with an account yet",
+                            "code": "device_untrusted"
+                        })),
+                    )
+                        .into_response();
+                }
+                if let Err(e) = rt.trust_device(device_id, "Demo (first device)").await {
+                    return err_response(e);
+                }
             }
             Err(e) => return err_response(e),
         }

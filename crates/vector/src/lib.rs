@@ -19,6 +19,9 @@ use erplora_db::DbError;
 use std::sync::Mutex;
 use thiserror::Error;
 
+mod pg;
+pub use pg::{PgVectorStore, DEFAULT_DIMS};
+
 #[derive(Debug, Error)]
 pub enum VectorError {
     /// Reserved for the Postgres/pgvector store (hub#204 / pm#29): the error contract for
@@ -78,6 +81,14 @@ pub trait VectorStore {
     ) -> Result<Vec<ScoredChunk>>;
     /// Delete every chunk of `hub_id` with the given `ref_id`; returns rows removed.
     async fn delete_by_ref(&self, hub_id: &str, ref_id: &str) -> Result<usize>;
+
+    /// The distinct `ref_id`s (module ids) present in `hub_id`'s index.
+    ///
+    /// This is what the boot-time backfill asks to tell "already indexed" from "installed before
+    /// the index existed": the install hook only fires on install, so without this question a
+    /// pre-existing hub would either never get an index or re-embed everything on every boot —
+    /// and embeddings are metered Cloud calls (§9.3), so the difference is money.
+    async fn indexed_refs(&self, hub_id: &str) -> Result<Vec<String>>;
 }
 
 /// In-memory [`VectorStore`] — the reference/test implementation.
@@ -152,6 +163,18 @@ impl VectorStore for MemoryVectorStore {
         let before = chunks.len();
         chunks.retain(|c| !(c.hub_id == hub_id && c.ref_id == ref_id));
         Ok(before - chunks.len())
+    }
+
+    async fn indexed_refs(&self, hub_id: &str) -> Result<Vec<String>> {
+        let chunks = self.chunks.lock().unwrap();
+        let mut refs: Vec<String> = chunks
+            .iter()
+            .filter(|c| c.hub_id == hub_id)
+            .map(|c| c.ref_id.clone())
+            .collect();
+        refs.sort();
+        refs.dedup();
+        Ok(refs)
     }
 }
 

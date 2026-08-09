@@ -141,6 +141,57 @@ pub async fn drop_module<S: VectorStore + ?Sized>(
     Ok(store.delete_by_ref(hub_id, module_id).await?)
 }
 
+/// **Backfill de arranque** (§9.6): indexa los módulos ACTIVOS que aún no están en el índice.
+///
+/// La ingesta normal corre en el hook de instalación — que solo dispara al instalar. Un hub que
+/// instaló sus módulos antes de que existiera el índice (todos, el día que esto se estrena), o
+/// cuya ingesta falló aquel día (best-effort a propósito), arrancaría con el índice vacío para
+/// siempre y el router (§9.2b) no se activaría jamás.
+///
+/// Solo indexa la DIFERENCIA (`indexed_refs`): los embeddings son llamadas al Cloud con coste
+/// metered (§9.3), y re-embeber 24 módulos en cada reinicio sería pagar por lo que ya se tiene.
+/// Un módulo presente en el índice no se re-embebe aunque su versión cambiara — ese caso lo cubre
+/// la ingesta del hook de update, que borra e indexa de nuevo.
+///
+/// Best-effort por módulo: un fallo en uno no impide indexar los demás (y el router degrada a
+/// "todos los tools" mientras tanto). Devuelve `(módulos indexados, chunks totales)`.
+pub async fn backfill_index<S: VectorStore + ?Sized>(
+    embedder: &dyn Embedder,
+    store: &S,
+    registry: &erplora_runtime::Registry,
+    hub_id: &str,
+) -> (usize, usize) {
+    let already: std::collections::HashSet<String> = match store.indexed_refs(hub_id).await {
+        Ok(refs) => refs.into_iter().collect(),
+        Err(e) => {
+            tracing::warn!(error = %e, "backfill: no se pudo leer el índice; se omite");
+            return (0, 0);
+        }
+    };
+
+    let (mut modules, mut total) = (0usize, 0usize);
+    for manifest in &registry.installed {
+        if !registry.is_active(&manifest.id) || already.contains(&manifest.id) {
+            continue;
+        }
+        let chunks = crate::ingest::collect_chunks(registry, &manifest.id);
+        if chunks.is_empty() {
+            continue; // módulo sin bloque agent/ai: no hay nada que embeber.
+        }
+        match index_chunks(embedder, store, hub_id, &manifest.version, &chunks).await {
+            Ok(n) => {
+                modules += 1;
+                total += n;
+            }
+            Err(e) => {
+                tracing::warn!(module_id = %manifest.id, error = %e,
+                    "backfill: módulo no indexado (no crítico; router degrada)");
+            }
+        }
+    }
+    (modules, total)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,5 +331,56 @@ mod tests {
         assert_eq!(removed, 2);
         let all = s.search("h1", &[1.0, 1.0, 0.0], 100, None).await.unwrap();
         assert!(all.is_empty());
+    }
+
+    /// The backfill fixture: a registry with two ACTIVE modules carrying `agent` text and one
+    /// inactive. Built by deserializing manifests — the same parse the installer runs.
+    fn backfill_registry() -> erplora_runtime::Registry {
+        use erplora_runtime::registry::ModuleStatus;
+        let mut reg = erplora_runtime::Registry::new();
+        for (id, active) in [("inventory", true), ("sales", true), ("kitchen", false)] {
+            let m = serde_json::json!({
+                "id": id, "name": id, "version": "1.0.0",
+                "agent": { "description": format!("What {id} does") }
+            });
+            reg.installed.push(serde_json::from_value(m).unwrap());
+            reg.status.insert(
+                id.to_string(),
+                if active { ModuleStatus::Active } else { ModuleStatus::Inactive },
+            );
+        }
+        reg
+    }
+
+    /// A hub that installed its modules BEFORE the index existed boots with an empty index and
+    /// the install hook will never fire again — the backfill is the only path that fills it.
+    /// Inactive modules are not capabilities of the hub and must not be embedded (money, §9.3).
+    #[tokio::test]
+    async fn backfill_indexes_active_modules_not_yet_in_the_index() {
+        let s = store().await;
+        let emb = MockEmbedder::new();
+        let (modules, chunks) = backfill_index(&emb, &s, &backfill_registry(), "h1").await;
+        assert_eq!(modules, 2, "the two active modules");
+        assert_eq!(chunks, 2, "one agent chunk each");
+        let mut refs = s.indexed_refs("h1").await.unwrap();
+        refs.sort();
+        assert_eq!(refs, vec!["inventory".to_string(), "sales".to_string()],
+            "the inactive module must NOT be embedded");
+    }
+
+    /// Only the DIFFERENCE is embedded: embeddings are metered Cloud calls, and re-embedding the
+    /// whole catalogue on every restart would pay every boot for what the hub already has.
+    #[tokio::test]
+    async fn backfill_skips_modules_already_indexed() {
+        let s = store().await;
+        let emb = MockEmbedder::new();
+        let reg = backfill_registry();
+        backfill_index(&emb, &s, &reg, "h1").await;
+        let calls_after_first = emb.seen.lock().unwrap().len();
+
+        let (modules, chunks) = backfill_index(&emb, &s, &reg, "h1").await;
+        assert_eq!((modules, chunks), (0, 0), "second boot: nothing new to index");
+        assert_eq!(emb.seen.lock().unwrap().len(), calls_after_first,
+            "and crucially, ZERO further calls to the embeddings endpoint");
     }
 }

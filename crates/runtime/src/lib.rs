@@ -36,6 +36,7 @@ pub mod import_sql;
 pub mod installer;
 pub mod loader;
 pub mod manifest;
+pub mod migration_guard;
 pub mod migrations;
 pub mod module_storage;
 pub mod money_backfill;

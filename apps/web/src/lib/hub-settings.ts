@@ -49,6 +49,10 @@ export interface HubSettings {
    *  ventas dejan de llevar el nombre de quien las hizo. Se compone con el modo del DISPOSITIVO
    *  (hub#358) por el lado restrictivo, y esa composición la hace el runtime, no el navegador. */
   pin_policy: PinPolicy;
+  /** Minutos de INACTIVIDAD antes de que el shell cierre la sesión y vuelva al pinpad (hub#628).
+   *  Solo tiene efecto con `pin_policy = always` y en dispositivos `shared`; quien lo aplica es
+   *  el detector del shell (lib/idle-logout), el TTL de servidor queda como red. */
+  pin_inactivity_minutes: number;
 }
 
 /**
@@ -81,6 +85,14 @@ function setHubSettings(raw: unknown): HubSettings {
     // minúsculas— porque lo que NO se puede leer no puede degradar a `never`: esa es la posición
     // que deja de atribuir las ventas a una persona.
     pin_policy: publishPinPolicy(r.pin_policy),
+    // Minutos de inactividad del pinpad (hub#628). Espejo del runtime: un valor ilegible o fuera
+    // de rango degrada al DEFAULT (5), nunca a un borde.
+    pin_inactivity_minutes:
+      Number.isInteger(r.pin_inactivity_minutes) &&
+      (r.pin_inactivity_minutes as number) >= 1 &&
+      (r.pin_inactivity_minutes as number) <= 30
+        ? (r.pin_inactivity_minutes as number)
+        : 5,
   };
   hubSettings.value = next;
   // La paleta global se refleja en el shell al momento (theme.ts decide si hay override local).

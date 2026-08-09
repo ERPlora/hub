@@ -670,9 +670,45 @@ pub struct ExpectRows {
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct Migrations {
     #[serde(default)]
-    pub sqlite: Vec<String>,
+    pub sqlite: Vec<MigrationEntry>,
     #[serde(default)]
-    pub postgres: Vec<String>,
+    pub postgres: Vec<MigrationEntry>,
+}
+
+/// Una migración declarada: la ruta, y qué dice el módulo que hace (hub#542).
+///
+/// **Un string sigue siendo válido y se lee como `expand`**, así que los 24 manifests publicados
+/// valen sin tocarlos — que es lo que permite meter el contrato sin republicar la flota.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(untagged)]
+pub enum MigrationEntry {
+    /// `"migrations/postgres/001_init.sql"` — aditiva, el 95% de los casos.
+    Path(String),
+    Declared {
+        file: String,
+        #[serde(default)]
+        kind: crate::migration_guard::Kind,
+        /// Versión del módulo que dejó de usar lo que este `contract` retira. Todavía no se
+        /// consume: la ventana del contract es la segunda iteración de hub#542.
+        #[serde(default)]
+        since: Option<String>,
+    },
+}
+
+impl MigrationEntry {
+    pub fn file(&self) -> &str {
+        match self {
+            MigrationEntry::Path(file) => file,
+            MigrationEntry::Declared { file, .. } => file,
+        }
+    }
+
+    pub fn kind(&self) -> crate::migration_guard::Kind {
+        match self {
+            MigrationEntry::Path(_) => crate::migration_guard::Kind::Expand,
+            MigrationEntry::Declared { kind, .. } => *kind,
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
