@@ -383,6 +383,7 @@
       "properties": {
         "listen": {
           "type": "object",
+          "description": "Eventos a los que reacciona el módulo: evento → command que lo atiende. El evento puede ser de CUALQUIER módulo (`inventory` escucha `sale.completed`), pero el `command` tiene que ser SUYO — dentro de su namespace `<id>.` (hub#659, ADR-0283 §7). Un listener que apunta al command de otro módulo se rechaza AL INSTALAR: reaccionar corriendo algo ajeno es territorio de los flows con grant explícito, no de una línea del manifest. El JSON Schema no puede expresar la regla (depende de `id`), así que la puerta la aplica el runtime en `installer::validate_event_listeners`.",
           "additionalProperties": {
             "type": "object",
             "required": [
