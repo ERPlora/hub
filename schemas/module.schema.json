@@ -183,6 +183,42 @@
               ]
             },
             "description": "Controles de chrome del shell que esta entrada de navegación pide en la topbar, por nombre (ADR-0048, Nivel 1). El botón y su lógica los pone y maneja el SHELL (no viajan en el módulo) → respeta ADR-0022; el módulo solo opta-in a una capacidad que ya es del shell, no inyecta chrome. Enum CERRADA que crece en el shell: añadir un control nuevo es tocar el shell, no solo el manifest. Hoy soportado: `fullscreen` (Fullscreen API sobre el documento; el botón se muestra solo en la vista que lo pide y solo si el navegador la soporta). El shell lo lee del `module.json` crudo (la API aún no lo re-sirve)."
+          },
+          "actions": {
+            "type": "array",
+            "default": [],
+            "description": "Acciones de topbar de ESTA pestaña (ADR-0048, Nivel 2): el shell las pinta en `slot=\"end\"` y al pulsar reenvía `module-action` al Web Component montado. El manifest declara el botón; el comportamiento vive en el componente. El runtime las parsea desde siempre (`manifest::NavAction`) — el schema las prohibía, así que un módulo que declarase una acción fallaba `erplora validate` sin motivo. Deriva corregida en hub#521, donde el desacuerdo pasó a ser un test.",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "label"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Identificador de la acción; viaja en el evento `module-action` que recibe el Web Component."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Texto del botón, INGLÉS canónico (ADR-0055): la traducción viaja en `locales/<lang>.json`."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "Nombre del icono (set Iconify `ion:`)."
+                },
+                "primary": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Botón destacado (color primario)."
+                },
+                "permission": {
+                  "type": "string",
+                  "description": "Permiso para MOSTRAR el botón (show/hide de UI). Rust revalida siempre el command real: esto no autoriza nada."
+                }
+              }
+            }
           }
         }
       }
@@ -817,6 +853,23 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "compatibility": {
+      "description": "Qué cores pueden ejecutar este módulo (hub#521). Ausente = cualquiera, que es la forma de los 24 manifests publicados y sigue siendo válida. El nombre del bloque NO es nuevo: el SaaS ya leía `compatibility.min_erplora_version` del manifest y lo republicaba en el catálogo como `min_core_version`; lo nuevo es que el HUB por fin lo lee, en vez de instalar a medias algo que no puede ejecutar entero.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_erplora_version": {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+){0,2}([-+].*)?$",
+          "description": "Core MÁS ANTIGUO que puede ejecutar este módulo. Por debajo, el hub RECHAZA la instalación con un mensaje accionable («esta app necesita una versión más nueva de tu terminal») en vez de instalar un módulo al que le faltarán trozos en silencio."
+        },
+        "max_erplora_version": {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+){0,2}([-+].*)?$",
+          "description": "Core más NUEVO contra el que el autor probó. Documental: el hub lo parsea y NO lo aplica. Aplicarlo rechazaría un módulo VIEJO en un hub NUEVO, y que esa dirección funcione es justo lo que permite actualizar el hub sin mover los 24 módulos el mismo día."
         }
       }
     }

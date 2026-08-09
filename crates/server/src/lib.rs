@@ -2308,6 +2308,11 @@ async fn list_modules(
                 "depends_on": m.depends_on,
                 // ADITIVO (ADR-0057): true si el módulo expone alguna query/command `expose_api`.
                 "has_public_api": public_api.contains(&m.id),
+                // ADITIVO (hub#521): lo que el core NO entendió de su `module.json` y aun así
+                // instaló. Vacío en un módulo que encaja con el contrato — que es lo normal. Es la
+                // superficie CONSULTABLE del aviso: sin ella, «el hub lo ignora en silencio» se
+                // arreglaría escribiendo el silencio en un log que nadie mira.
+                "manifest_warnings": m.manifest_warnings,
             })
         })
         .collect();

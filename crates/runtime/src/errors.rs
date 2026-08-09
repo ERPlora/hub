@@ -10,6 +10,43 @@ pub enum RuntimeError {
         path: String,
         source: serde_json::Error,
     },
+    /// The manifest declares a field this core does not understand, in a place where not
+    /// understanding it changes what RUNS (hub#521): inside a command, a query, the migrations,
+    /// the events or the capabilities.
+    ///
+    /// Until now serde dropped it without a word, which is the worst of the three possible
+    /// outcomes: the module installs, looks complete, and is missing the guard, the reaction or
+    /// the permission its author declared. `inventory` and `services` have shipped a `validates`
+    /// block for months believing a tax category was checked (hub#610) — it never was.
+    ///
+    /// Refusing is not the same as being strict everywhere: a field whose loss costs a screen or a
+    /// button is reported instead (`Manifest::warnings`), because bricking a till over a tab that
+    /// does not render would be a worse trade. See `manifest::refuses_unknown_fields`.
+    #[error("the module `{module}` declares `{path}`, which this hub's core (v{core}) does not understand — ignoring it would change what runs, so the module was NOT installed")]
+    ManifestUnknownField {
+        module: String,
+        path: String,
+        core: String,
+    },
+    /// The module declares (`compatibility.min_erplora_version`) that it needs a newer core than
+    /// this hub runs (hub#521).
+    ///
+    /// The field existed on both sides of the wire and was read by neither: the SaaS stores it and
+    /// republishes it as `min_core_version`, and the hub never looked. So a module built for a
+    /// newer core installed anyway and quietly lacked whatever the new core would have given it.
+    /// Saying no is the point — the user can act on "update your terminal"; they cannot act on a
+    /// module that is subtly missing pieces.
+    #[error("the module `{module}` needs a newer version of your terminal: it requires ERPlora {required} and this hub runs {core} — update the hub and install it again")]
+    CoreVersionTooOld {
+        module: String,
+        required: String,
+        core: String,
+    },
+    /// The declared core floor is not a version this hub can compare against (hub#521). Refused
+    /// rather than ignored, the same direction as [`crate::manifest::Manifest::sold_under`]: a
+    /// compatibility claim the runtime cannot check must not be read as "compatible".
+    #[error("the module `{module}` declares `compatibility.min_erplora_version: {declared}`, which is not a version this hub can compare against")]
+    ManifestCoreFloorUnreadable { module: String, declared: String },
     #[error("db: {0}")]
     Db(#[from] DbError),
     #[error("query no encontrada: {0}")]
