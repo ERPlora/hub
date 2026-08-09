@@ -33,7 +33,7 @@
   "$defs": {
     "path": {
       "type": "string",
-      "description": "Ruta del lenguaje de mapeo: `input.<campo>`, `steps.<step_id>.<campo>`, `event.<campo>` (solo dentro de un trigger) o `secret.<NOMBRE>` (RESERVADO — `_flow_secrets` llega con hub#662; hoy se rechaza al guardar)."
+      "description": "Ruta del lenguaje de mapeo: `input.<campo>`, `steps.<step_id>.<campo>`, `event.<campo>` (solo dentro de un trigger) o `secret.<NOMBRE>` (SOLO dentro de un step `http`, hub#662: es el único sitio donde una credencial tiene que salir; en cualquier otro step se rechaza al guardar). Los secretos viven en `_flow_secrets`, cifrados y write-only: se referencian por nombre, se sustituyen al construir la petición y NUNCA se persisten en `_flow_run_steps`."
     },
     "mapping": {
       "type": "object",
@@ -100,7 +100,7 @@
         },
         "kind": {
           "enum": ["command", "condition", "delay", "http", "ai", "notify"],
-          "description": "Vocabulario CONGELADO. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http`/`ai`/`notify` siguen el contrato claim → I/O → complete (el server los ejecuta FUERA del lock) y aún no están implementados: un documento que los use se RECHAZA al guardar nombrando su issue (http: hub#662, ai: hub#665, notify: hub#663), en vez de guardarse y quedarse colgado a las 3 de la mañana."
+          "description": "Vocabulario CONGELADO. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http` (hub#662) sigue el contrato claim → I/O → complete: el tick lo prepara y el server lo ejecuta FUERA del lock. `ai`/`notify` todavía NO están implementados: un documento que los use se RECHAZA al guardar nombrando su issue (ai: hub#665, notify: hub#663), en vez de guardarse y quedarse colgado a las 3 de la mañana."
         },
         "command": {
           "type": "string",
@@ -122,6 +122,27 @@
         "until": {
           "$ref": "#/$defs/path",
           "description": "Solo `kind: delay` — ruta a un instante RFC-3339. Alternativa a `seconds`; hace falta uno de los dos."
+        },
+        "method": {
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "description": "Solo `kind: http` — método. Por defecto `GET`. El conjunto está CONGELADO y es pequeño a propósito: `CONNECT`/`TRACE` son la forma de convertir una URL permitida en un túnel."
+        },
+        "url": {
+          "type": "string",
+          "description": "Solo `kind: http` — URL absoluta `http(s)`, con plantillas `{{ruta}}`. OBLIGATORIA. Se templa contra el run y SOLO ENTONCES se compara con los grants `http` del flujo (`https://host/ruta*`): juzgar la forma sin templar autorizaría `https://api.example.com/{{input.path}}` y luego llamaría a lo que trajera el evento. Además, antes de salir se comprueba la DIRECCIÓN a la que resuelve (anti-SSRF): nada dentro de la red del hub."
+        },
+        "headers": {
+          "$ref": "#/$defs/mapping",
+          "description": "Solo `kind: http` — cabeceras, mapeadas contra el run. Es donde va la credencial: `{\"Authorization\": \"Bearer {{secret.API_KEY}}\"}`."
+        },
+        "body": {
+          "description": "Solo `kind: http` — cuerpo. Un objeto/array se envía como JSON (y se le pone `content-type: application/json` si el autor no declaró uno); cualquier otra cosa se envía como texto tal cual, y el autor pone su propia cabecera."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Solo `kind: http` — segundos de espera. Por defecto 10, máximo 30: el run mantiene su lease todo ese rato, así que es también lo que cuesta un error. La respuesta se trunca a 1 MB y no se siguen redirecciones (un 3xx es una segunda petición a un sitio que nadie concedió)."
         }
       }
     }

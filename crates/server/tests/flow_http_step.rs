@@ -104,6 +104,17 @@ async fn start_server() -> Server {
             }),
         )
         .route(
+            "/redirect",
+            get(|s: State<Fake>, h: HeaderMap| async move {
+                count(s, h).await;
+                (
+                    StatusCode::FOUND,
+                    [(axum::http::header::LOCATION, "/ok")],
+                    "moved",
+                )
+            }),
+        )
+        .route(
             "/echo-key",
             get(|s: State<Fake>, h: HeaderMap| async move {
                 let key = h
@@ -353,6 +364,67 @@ async fn a_literal_address_inside_this_network_is_refused_even_with_a_grant_for_
     let (status, error) = run_status(&rt, &flow_id).await;
     assert_eq!(status, "failed");
     assert!(error.contains("flow.http_blocked"), "{error}");
+}
+
+#[tokio::test]
+async fn a_redirect_is_not_followed_because_the_second_hop_was_never_granted() {
+    // A 302 is a SECOND request, to a location the server chose — not the admin. Following it
+    // would walk straight past both the allow-list and the address guard.
+    let server = start_server().await;
+    let rt = runtime().await;
+    let flow_id = flow_calling(&rt, &server.url("/redirect"), 5).await;
+    allow(&rt, &flow_id, &server.url("/*")).await;
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+
+    turn(&rt, &Limits::allowing_private_addresses()).await;
+
+    assert_eq!(server.hits(), 1, "the redirect itself, and nothing after it");
+    let (status, error) = run_status(&rt, &flow_id).await;
+    assert_eq!(status, "failed");
+    assert!(error.contains("302"), "the step reports the 3xx it got: {error}");
+}
+
+/// The wiring the 1 s loop uses: `process_flows` → [`flow_io::dispatch`] → `complete_flow_io`,
+/// with the limits that really ship. The call is refused (a fake server lives on loopback), and
+/// that is the point of THIS test: what it proves is that the result comes back and the run ends
+/// instead of sitting `running` until its lease expires.
+#[tokio::test]
+async fn the_background_loop_completes_what_it_dispatched() {
+    use erplora_server::{AppState, HubConfig};
+
+    let server = start_server().await;
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), HUB);
+    rt.ensure_system_tables().await.unwrap();
+    let flow_id = flow_calling(&rt, &server.url("/ok"), 5).await;
+    allow(&rt, &flow_id, &server.url("/*")).await;
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+
+    let mut config = HubConfig::from_env();
+    config.hub_id = HUB.to_string();
+    let state = AppState::with_config(rt, config);
+
+    let pending = {
+        let rt = state.runtime.lock().await;
+        rt.process_flows().await.unwrap().pending_io
+    };
+    assert_eq!(pending.len(), 1);
+    flow_io::dispatch(&state, pending);
+
+    // The dispatched task completes it out of band; wait for the run to stop being in flight.
+    let mut status = String::new();
+    for _ in 0..50 {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let rt = state.runtime.lock().await;
+        let run = rt.list_flow_runs(&flow_id, 1).await.unwrap().remove(0);
+        status = run.status.clone();
+        if status == "failed" || status == "pending" {
+            assert!(run.last_error.contains("flow.http_blocked"), "{}", run.last_error);
+            break;
+        }
+    }
+    assert_eq!(status, "failed", "the run came back from its I/O instead of hanging");
+    assert_eq!(server.hits(), 0, "and the guard that ships refused loopback");
 }
 
 // ── secrets, on the wire ──────────────────────────────────────────────────────────────────────
