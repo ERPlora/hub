@@ -95,6 +95,27 @@
           <ion-menu-toggle :auto-hide="false">
             <SidebarAppUpdate />
           </ion-menu-toggle>
+
+          <!-- «Actualizar plan» — la gestión del plan de este hub, que vive en el SaaS.
+               SIN gate de permiso, a propósito (decisión de Ioan 2026-08-09): la salida a gestión
+               del topbar sí filtra por `hub.administer`, pero el dueño entra muchas veces con la
+               sesión de caja y esconderle su propio plan es peor que enseñárselo a un cajero — al
+               llegar al SaaS manda `IsHubAdmin`, que es la autoridad de verdad.
+               Sale por `openExternal`: dentro de la app instalada `window.open` no abre NADA
+               (hub#475), y un botón muerto justo donde el dueño va a pagar es el peor sitio. -->
+          <ion-menu-toggle :auto-hide="false">
+            <ion-button
+              class="sidebar-upgrade"
+              fill="clear"
+              size="small"
+              expand="block"
+              @click="onUpgradePlan"
+            >
+              <HubIcon slot="start" name="rocket-outline" />
+              {{ t('nav.upgradePlan') }}
+            </ion-button>
+          </ion-menu-toggle>
+
           <div class="sidebar-foot-brand">
             <ion-menu-toggle :auto-hide="false">
               <a class="erp-lockup sm brand-link" role="button" tabindex="0" @click="goHome">
@@ -147,6 +168,9 @@ import ElevationDialog from './components/ElevationDialog.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';
+import { toastError } from './lib/toast';
+import { openExternal } from './lib/open-external';
+import { upgradePlanUrl } from './lib/upgrade-plan-link';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
 import { railCollapsed } from './lib/shell';
 import { SHELL_MENU_ID, runAfterShellMenuCloses } from './lib/shell-menu';
@@ -198,6 +222,16 @@ const router = useRouter();
 
 // Versión de la app (horneada por Vite, ver vite.config.ts `define`).
 const appVersion = __APP_VERSION__;
+
+/** Sale a gestionar el plan de este hub en el SaaS. Si el viaje no se puede hacer, se DICE:
+ *  un botón que no hace nada al pulsarlo es el defecto que hub#475 tuvo que arreglar diez veces. */
+async function onUpgradePlan(): Promise<void> {
+  try {
+    await openExternal(upgradePlanUrl());
+  } catch {
+    await toastError(t('nav.upgradePlanError'));
+  }
+}
 
 const isActive = (path: string): boolean =>
   route.path === path || route.path.startsWith(`${path}/`);

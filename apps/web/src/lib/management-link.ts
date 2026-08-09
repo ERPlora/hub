@@ -13,6 +13,9 @@
 import { computed, type ComputedRef } from 'vue';
 
 import { config } from './config';
+import { openExternal } from './open-external';
+import { toastError } from './toast';
+import { i18n } from '../i18n';
 import { user } from './session';
 
 /**
@@ -51,15 +54,26 @@ export function managementUrl(): string {
 }
 
 /**
- * Walk out to management, in THIS tab.
+ * Walk out to management — through the door OUT, never by navigating this window.
  *
- * Not `openExternal` (which is `_blank`, and right for a checkout you come BACK from): this is a
- * switch between two halves of one product, and its return path is a feature of the destination —
- * the SaaS panel enters the hub again. A new tab would be a dead end on a till with no tab bar, and
- * inside the installed app it is worse than a dead end: there is no `shell`/`opener` plugin and the
- * webview spawns no window, so `window.open` would be a button that silently does nothing.
- * Navigating in place always leaves Back, on every surface.
+ * **The Hub never takes its own window to the SaaS.** In a browser that is merely rude; inside the
+ * installed app it is a trap: the webview has no chrome, no Back, no tabs, so the user lands on the
+ * SaaS and is stuck there with no way home. Reported by Ioan on the desktop app (2026-08-09).
+ *
+ * This used to be `window.location.assign`, argued as "navigating in place always leaves Back, on
+ * every surface". That is false on the one surface that matters most, and the other half of the
+ * argument — that inside the app `window.open` opens NOTHING — stopped being true with hub#475,
+ * which is precisely what it fixed: `openExternal` hands the address to the system browser through
+ * the shell, and opens a tab in a browser. One door, both surfaces.
+ *
+ * When the trip cannot be made it is SAID, here rather than at the caller: this door is opened from
+ * an icon-only action in the topbar, and a silent failure there is indistinguishable from a dead
+ * button — the exact defect hub#475 existed to end.
  */
-export function openManagement(): void {
-  window.location.assign(managementUrl());
+export async function openManagement(): Promise<void> {
+  try {
+    await openExternal(managementUrl());
+  } catch {
+    await toastError(i18n.global.t('topbar.manageError'));
+  }
 }

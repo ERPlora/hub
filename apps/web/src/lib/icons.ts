@@ -44,6 +44,7 @@ import phonePortraitOutline from "~icons/ion/phone-portrait-outline?raw";
 import pulseOutline from "~icons/ion/pulse-outline?raw";
 import readerOutline from "~icons/ion/reader-outline?raw";
 import receiptOutline from "~icons/ion/receipt-outline?raw";
+import rocketOutline from "~icons/ion/rocket-outline?raw";
 import refreshOutline from "~icons/ion/refresh-outline?raw";
 import saveOutline from "~icons/ion/save-outline?raw";
 import serverOutline from "~icons/ion/server-outline?raw";
@@ -202,6 +203,7 @@ const SVGS: Record<string, string> = {
   "pulse-outline": pulseOutline,
   "reader-outline": readerOutline,
   "receipt-outline": receiptOutline,
+  "rocket-outline": rocketOutline,
   "refresh-outline": refreshOutline,
   "save-outline": saveOutline,
   "server-outline": serverOutline,
