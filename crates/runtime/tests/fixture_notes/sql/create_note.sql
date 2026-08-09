@@ -1,1 +1,1 @@
-INSERT INTO note (id, hub_id, body) VALUES (:new_id, :hub_id, :body);
+INSERT INTO notes_note (id, hub_id, body) VALUES (:new_id, :hub_id, :body);

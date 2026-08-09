@@ -123,7 +123,7 @@ pub async fn install(
     if !seed_files.is_empty() {
         let now = crate::registry::now_rfc3339();
         for file in seed_files {
-            let sql = loader::read_text(dir, file)?;
+            let sql = loader::read_text(dir, file.file())?;
             crate::seed::apply_module_seed(db, &sql, hub_id, &now).await?;
         }
     }
