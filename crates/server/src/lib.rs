@@ -75,6 +75,7 @@ pub mod profile;
 pub mod router;
 pub mod settings;
 pub mod state;
+pub mod shutdown;
 pub mod system;
 pub mod system_metrics;
 pub mod tenant;
@@ -815,7 +816,19 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
-    eprintln!("apagado: señal recibida, drenando conexiones en vuelo…");
+    // 🔑 Seguir ACEPTANDO antes de cerrar (hub#646). `with_graceful_shutdown` empieza a apagar en
+    // cuanto este future resuelve, así que retrasarlo es lo que mantiene el listener abierto —
+    // justo el tiempo que Traefik tarda en dejar de mandarnos tráfico. Sin esto, cada actualización
+    // devuelve 502 a quien llegue en esa ventana.
+    let drain = shutdown::drain_delay();
+    if !drain.is_zero() {
+        eprintln!(
+            "apagado: señal recibida — sigo aceptando {}s para que Traefik deje de enrutar aquí…",
+            drain.as_secs()
+        );
+        tokio::time::sleep(drain).await;
+    }
+    eprintln!("apagado: cierro el listener y dreno las conexiones en vuelo…");
 }
 
 /// Construye el router con todas las rutas montadas sobre `state`.
