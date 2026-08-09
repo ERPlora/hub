@@ -78,11 +78,19 @@ pub struct FlowRunStep {
     pub finished_at: Option<String>,
 }
 
-/// Run statuses. `sleeping` is a `delay` waiting on `wake_at`; `waiting_io` is the state an I/O
-/// step will park in once hub#662 lands (claim → I/O → complete) and nothing produces it today.
+/// Run statuses. `sleeping` is a `delay` waiting on `wake_at`; `waiting_approval` is a write a
+/// model proposed and a person has not decided yet (hub#665).
+///
+/// An I/O step in flight has NO status of its own: the run stays `running` and **keeps its lease**
+/// (hub#662's seam), which is what makes the next tick skip it and start the turn exactly once.
+/// `waiting_approval` is different because it lasts until a person acts, which can be hours — a
+/// held lease would expire and the run would be reclaimed with its proposal still in the tray. It
+/// is deliberately not a status [`crate::flows::executor::tick`] claims, so no amount of ticking
+/// smuggles an unapproved write through.
 pub const STATUS_PENDING: &str = "pending";
 pub const STATUS_RUNNING: &str = "running";
 pub const STATUS_SLEEPING: &str = "sleeping";
+pub const STATUS_WAITING_APPROVAL: &str = "waiting_approval";
 pub const STATUS_DONE: &str = "done";
 pub const STATUS_FAILED: &str = "failed";
 pub const STATUS_CANCELLED: &str = "cancelled";

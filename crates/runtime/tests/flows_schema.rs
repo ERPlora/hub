@@ -1,4 +1,5 @@
-//! hub#661 (ADR-0283 K1) + hub#662 (§4) — the six tables the automation kernel stands on.
+//! hub#661 (ADR-0283 K1) + hub#662 (§4) + hub#665 (D3) — the tables the automation kernel
+//! stands on.
 //!
 //! They are **system migrations**, not `CREATE TABLE IF NOT EXISTS` at boot, for the reason
 //! hub#37 wrote down: an ensure-create never reaches a hub whose database already exists. Every
@@ -11,8 +12,8 @@
 //! 1. **The tables exist after `apply`** with the columns the kernel reads by name. A missing
 //!    column here is a runtime error in a background tick, which is exactly the failure nobody
 //!    sees until a flow silently stops.
-//! 2. **`hub_id` is on all six.** One database per hub today (ADR-0201), but the row contract is
-//!    not allowed to depend on that.
+//! 2. **`hub_id` is on all of them.** One database per hub today (ADR-0201), but the row contract
+//!    is not allowed to depend on that.
 //! 3. **A live grant is UNIQUE per (hub, flow, kind, value); a revoked one is not.** The partial
 //!    index is the mechanism that lets a grant be revoked (soft-delete) and granted again later
 //!    without either colliding with its own tombstone or leaving two live rows that disagree.
@@ -131,6 +132,27 @@ async fn the_flow_tables_land_with_the_row_contract() {
         // hub#662 — write-only: `value_enc` holds the `secret_box` envelope and nothing reads it
         // back but the executor, while it builds a request that is about to leave.
         ("_flow_secrets", &["id", "name", "value_enc", "updated_by"]),
+        // hub#665 — the write a model proposed, waiting for a person. `command` + `payload` are
+        // load-bearing and not descriptive: approving runs EXACTLY them, so they are stored rather
+        // than re-derived. `decided_by`/`decided_at` are the record of who authorised the hub to
+        // write while nobody was watching.
+        (
+            "_flow_approvals",
+            &[
+                "id",
+                "run_id",
+                "flow_id",
+                "step_id",
+                "command",
+                "payload",
+                "reason",
+                "status",
+                "decided_by",
+                "decided_at",
+                "expires_at",
+                "error",
+            ],
+        ),
     ];
 
     for (table, cols) in expected {
@@ -283,4 +305,50 @@ async fn a_hub_holds_one_live_secret_per_name_and_forgetting_one_is_not_a_reserv
     )
     .await
     .expect("the uniqueness is per (hub, name)");
+}
+
+/// hub#665 — the tray has to answer «what is waiting?» per tenant, because it is read by a screen
+/// that opens every morning. A pending proposal of ANOTHER hub must not appear in it, and the
+/// neighbour is ALIVE in this test rather than merely absent: a scoping test whose other tenant
+/// has no rows proves nothing.
+#[tokio::test]
+async fn the_approval_tray_is_scoped_to_its_hub_with_a_live_neighbour() {
+    let tdb = TestDb::new().await;
+    let db = tdb.adapter().await;
+    apply_system_schema(&db).await;
+
+    for (id, hub) in [("a1", HUB), ("a2", "hub-next-door")] {
+        db.execute(
+            "INSERT INTO _flow_approvals \
+               (id, hub_id, run_id, flow_id, step_id, command, payload, reason, status, \
+                created_at, updated_at) \
+             VALUES (:id, :hub_id, 'r1', 'f1', 'agent', 'agenda.booking.create', \
+                     :payload, '', 'pending', :now, :now)",
+            &p(&[
+                ("id", json!(id)),
+                ("hub_id", json!(hub)),
+                ("payload", json!(r#"{"customer":"Marta"}"#)),
+                ("now", json!("2026-08-09T03:00:00+00:00")),
+            ]),
+        )
+        .await
+        .unwrap();
+    }
+
+    let mine = db
+        .query(
+            "SELECT id, payload FROM _flow_approvals \
+             WHERE hub_id = :hub_id AND status = 'pending' AND deleted_at IS NULL",
+            &p(&[("hub_id", json!(HUB))]),
+        )
+        .await
+        .unwrap()
+        .rows;
+    assert_eq!(mine.len(), 1, "the neighbour's proposal is not in my tray");
+    assert_eq!(mine[0]["id"], json!("a1"));
+    assert_eq!(
+        mine[0]["payload"],
+        json!(r#"{"customer":"Marta"}"#),
+        "the payload is kept verbatim: it is what «approve» means"
+    );
 }

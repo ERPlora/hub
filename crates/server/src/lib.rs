@@ -49,6 +49,10 @@ pub mod elevation;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
+/// **Server-side agent runner** (ADR-0283 K5, hub#665): the tool loop of an `ai` step, in Rust and
+/// outside the runtime's global lock. It lives here and not in the runtime because it needs
+/// `cloud-client` — the runtime has no network by design.
+pub mod agent_runner;
 pub mod event_stream;
 pub mod export_import;
 /// ERPlora's DELEGATED fiscal certificate, fetched from the control plane (ADR-0202 §2 — hub#317).
@@ -1135,6 +1139,22 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/hub/flows/:id/run", post(flows_api::start_run))
         .route("/api/hub/flows/:id/runs", get(flows_api::list_runs))
+        // ── Bandeja de aprobación (ADR-0283 D3, hub#665) ───────────────────────────────────
+        // `approvals` es un segmento ESTÁTICO y matchit lo resuelve con prioridad sobre `:id`, así
+        // que no se lo come `/flows/:id` aunque vaya después (igual que `/flows/runs/:run_id`);
+        // `tests/agent_runner_test.rs` lo comprueba contra el router de verdad.
+        // Misma puerta que el resto: sesión local de un humano owner/admin. Aquí es lo esencial —
+        // esta fila ES el registro de una persona autorizando al hub a escribir sin nadie
+        // delante, así que `decided_by` sale de la sesión resuelta y JAMÁS del body.
+        .route("/api/hub/flows/approvals", get(flows_api::list_approvals))
+        .route(
+            "/api/hub/flows/approvals/:id/approve",
+            post(flows_api::approve),
+        )
+        .route(
+            "/api/hub/flows/approvals/:id/reject",
+            post(flows_api::reject),
+        )
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
         .route("/api/v1/:module/c/:command", post(api_keys::data_command))

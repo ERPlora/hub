@@ -119,9 +119,15 @@ pub fn dispatch(state: &AppState, pending: Vec<PendingIo>) {
             let step_id = io.step_id().to_string();
             let result = match &io {
                 PendingIo::Http { request, .. } => execute(request, &Limits::default()).await,
-                // hub#665 (`ai`) and hub#663 (`notify`) fill these in. Until then a document using
-                // them is refused at save time, so this arm is unreachable — and if it ever is
-                // reached, the run FAILS by name instead of hanging until its lease expires.
+                // The agent turn (hub#665). It answers with the same `IoResult` vocabulary as an
+                // HTTP call, plus the two states only an agent has: the write it proposed is
+                // waiting for a person, or a person said no.
+                PendingIo::Ai { .. } => {
+                    crate::agent_runner::run_turn(&state, &run_id, &step_id).await
+                }
+                // hub#663 (`notify`) fills this in. Until then a document using it is refused at
+                // save time, so this arm is unreachable — and if it ever is reached, the run FAILS
+                // by name instead of hanging until its lease expires.
                 other => IoResult::Failed(format!(
                     "{ERR_IO_NOT_IMPLEMENTED}: step `{}` needs an I/O this hub does not perform yet",
                     other.step_id()

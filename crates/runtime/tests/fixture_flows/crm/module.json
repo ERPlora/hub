@@ -4,11 +4,24 @@
   "version": "1.0.0",
   "permissions": ["crm.change_customer"],
   "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "crm.note.list": {
+      "permission": "crm.change_customer",
+      "sql": "sql/list_notes.sql",
+      "ai": { "description": "List the notes left on customers" }
+    },
+    "crm.note.recent": {
+      "permission": "crm.change_customer",
+      "sql": "sql/list_notes.sql",
+      "ai": { "description": "The most recent notes" }
+    }
+  },
   "commands": {
     "crm.note.add": {
       "permission": "crm.change_customer",
       "sql": ["sql/add_note.sql"],
-      "emit": ["crm.note.added"]
+      "emit": ["crm.note.added"],
+      "ai": { "description": "Leave a note on a customer" }
     },
     "crm.note.count": {
       "permission": "crm.change_customer",

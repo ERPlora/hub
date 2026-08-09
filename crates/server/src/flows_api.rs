@@ -7,6 +7,8 @@
 //! POST            /api/hub/flows/{id}/run       disparo manual
 //! GET             /api/hub/flows/{id}/runs      · GET /api/hub/flows/runs/{run_id} (con steps)
 //! GET             /api/hub/flows/secrets        NOMBRES · PUT/DELETE …/secrets/{name} (write-only)
+//! GET             /api/hub/flows/approvals      la bandeja (hub#665)
+//! POST            /api/hub/flows/approvals/{id}/approve|reject
 //! ```
 //!
 //! **Core REST, not `hub.*` commands.** The dispatcher is deliberately not where this goes
@@ -26,7 +28,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_runtime::flows::{grants, store, NewFlow};
+use erplora_runtime::flows::{approvals, grants, store, NewFlow};
 use erplora_runtime::RuntimeError;
 use serde_json::{json, Value};
 
@@ -71,7 +73,9 @@ fn bad_request(code: &str, message: &str) -> Response {
 fn flow_err(e: RuntimeError) -> Response {
     if let RuntimeError::Domain { code, message } = &e {
         let status = match code.as_str() {
-            store::ERR_FLOW_NOT_FOUND => Some(StatusCode::NOT_FOUND),
+            store::ERR_FLOW_NOT_FOUND | approvals::ERR_APPROVAL_NOT_FOUND => {
+                Some(StatusCode::NOT_FOUND)
+            }
             grants::ERR_GRANT_DENIED => Some(StatusCode::FORBIDDEN),
             _ => None,
         };
@@ -395,6 +399,61 @@ pub async fn get_run(
     };
     Json(json!({ "ok": true, "data": { "run": run, "steps": steps, "events": events } }))
         .into_response()
+}
+
+// ── approvals: the tray (hub#665, ADR-0283 D3) ────────────────────────────────────────────────
+
+/// How many approvals `GET …/approvals` returns.
+const APPROVALS_PAGE: i64 = 100;
+
+/// `GET /api/hub/flows/approvals[?status=pending]` — what the hub proposed to do while nobody was
+/// watching. Without `status` it lists everything, which is the audit of what it actually did.
+pub async fn list_approvals(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let (arc, _) = admin_session!(st, headers);
+    let rt = arc.lock().await;
+    let status = params.get("status").map(String::as_str).filter(|s| !s.is_empty());
+    match rt.list_flow_approvals(status, APPROVALS_PAGE).await {
+        Ok(items) => Json(json!({ "ok": true, "data": items })).into_response(),
+        Err(e) => flow_err(e),
+    }
+}
+
+/// `POST /api/hub/flows/approvals/{id}/approve` — runs **exactly** the proposed command, with the
+/// grant re-checked at this moment and **without re-entering the model**
+/// (`Runtime::decide_flow_approval`).
+///
+/// `decided_by` comes from the RESOLVED SESSION and is never read from the body — the same rule as
+/// `discarded_by` in `outbox_admin.rs`, and here it is the whole audit: this row is the record of a
+/// person authorising the hub to write.
+pub async fn approve(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    decide(st, headers, id, true).await
+}
+
+/// `POST /api/hub/flows/approvals/{id}/reject` — nothing runs, and the run stops: the steps written
+/// after an agent step assumed it acted.
+pub async fn reject(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    decide(st, headers, id, false).await
+}
+
+async fn decide(st: AppState, headers: HeaderMap, id: String, approve: bool) -> Response {
+    let (arc, who) = admin_session!(st, headers);
+    let rt = arc.lock().await;
+    match rt.decide_flow_approval(&id, approve, &who).await {
+        Ok(approval) => Json(json!({ "ok": true, "data": approval })).into_response(),
+        Err(e) => flow_err(e),
+    }
 }
 
 #[cfg(test)]

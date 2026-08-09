@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use erplora_db::{DatabaseAdapter, Params};
-use serde_json::Value as Json;
+use serde_json::{json, Value as Json};
 
 pub mod access_email;
 pub mod api_keys;
@@ -1890,6 +1890,286 @@ impl Runtime {
             caused: outbox::events_caused_by(db, &self.hub_id, event_id).await?,
             event,
         }))
+    }
+
+    // ── The agent step: what the server-side runner is allowed to ask for (hub#665) ──────────
+    //
+    // The runner lives in `crates/server` because it needs `cloud-client`, and the runtime has no
+    // network by design. Everything it is NOT allowed to decide for itself goes through the
+    // methods below (plus `complete_flow_io`, the seam hub#662 built) — and none of them lets it
+    // build an automation context of its own:
+    // `RequestContext.automation` is private with a `pub(crate)` setter precisely so that a caller
+    // outside this crate cannot stamp a flow's identity on a request and inherit its grants
+    // (flows.md §13.9).
+
+    /// The `ai` step a run is stopped on, read once, with its prompt already resolved.
+    pub async fn load_flow_ai_request(
+        &self,
+        run_id: &str,
+        step_id: &str,
+    ) -> Result<flows::AiRequest> {
+        flows::agent::prepare(self.db.as_ref(), &self.hub_id, run_id, step_id).await
+    }
+
+    /// The live grants of a flow — what the runner intersects the offered tools with.
+    pub async fn flow_authority(&self, flow_id: &str) -> Result<flows::grants::Authority> {
+        flows::grants::authority(self.db.as_ref(), &self.hub_id, flow_id).await
+    }
+
+    /// Runs a READ on behalf of a flow. The grant is checked HERE, freshly, so a query the flow
+    /// was not granted is refused by the runtime and not by the runner's good manners — a gate the
+    /// caller can skip is not a gate.
+    pub async fn execute_flow_query(
+        &self,
+        flow_id: &str,
+        run_id: &str,
+        name: &str,
+        params: &Params,
+    ) -> Result<Vec<Json>> {
+        flows::grants::check_query_grant(self.db.as_ref(), &self.hub_id, flow_id, name).await?;
+        let ctx = self.automation_ctx(flow_id, run_id).await?;
+        let r = queries::execute(self.db.as_ref(), &self.registry, name, params, &ctx).await;
+        if let Err(e) = &r {
+            self.report_dispatch_error(e, "query", name, params);
+        }
+        r
+    }
+
+    /// Runs a WRITE on behalf of a flow, through the SAME door the kernel's own `command` steps
+    /// use ([`commands::Origin::Automation`]). That is the whole reason ADR-0283 D2 puts the
+    /// automation gate inside `execute_at`: a flow's command inherits the fiscal gates, the schema
+    /// validation and the transactional outbox whole, instead of getting a dispatcher of its own.
+    pub async fn execute_flow_command(
+        &self,
+        flow_id: &str,
+        run_id: &str,
+        depth: i64,
+        name: &str,
+        payload: &Params,
+    ) -> Result<Json> {
+        let ctx = self.automation_ctx(flow_id, run_id).await?;
+        let r = commands::execute_at(
+            self.db.as_ref(),
+            &self.registry,
+            name,
+            payload,
+            &ctx,
+            depth.max(0) as u32,
+            &[],
+            commands::Origin::Automation,
+            // No approval to spend: an elevation is a person authorising an action at the counter,
+            // and there is nobody at the counter (hub#361).
+            None,
+        )
+        .await;
+        if let Err(e) = &r {
+            self.report_dispatch_error(e, "command", name, payload);
+        }
+        r
+    }
+
+    /// The context a flow acts under: attributed to the flow, machine-principal (never offered a
+    /// manager's PIN), and carrying only the permissions of what it was granted.
+    async fn automation_ctx(&self, flow_id: &str, run_id: &str) -> Result<RequestContext> {
+        let authority = self.flow_authority(flow_id).await?;
+        Ok(RequestContext::new(
+            self.hub_id.clone(),
+            format!("flow:{flow_id}"),
+            authority.permissions(&self.registry),
+        )
+        .as_machine()
+        .with_automation(AutomationCtx {
+            flow_id: flow_id.to_string(),
+            run_id: run_id.to_string(),
+        }))
+    }
+
+    // ── The approval tray (ADR-0283 D3) ─────────────────────────────────────────────────────
+
+    /// Parks a write the model proposed: the row a person reads in the morning, and the run
+    /// stopped in the same gesture. A proposal with a run still marching forward would be a
+    /// question nobody is waiting for.
+    pub async fn request_flow_approval(
+        &self,
+        new: &flows::NewApproval,
+    ) -> Result<flows::Approval> {
+        let approval = flows::approvals::create(self.db.as_ref(), &self.hub_id, new).await?;
+        // The park goes through the SAME seam an `http` step completes by (hub#662): one place
+        // decides what «this run stopped on its I/O step» means, and a second one would drift.
+        self.complete_flow_io(
+            &new.run_id,
+            &new.step_id,
+            flows::IoResult::AwaitingApproval(new.partial_output.clone()),
+        )
+        .await?;
+        // Ephemeral, WS-only (`events::notify_sink`): the tray lights up without polling. The
+        // SCREEN is the module `flows`'s job — the core emits the fact and nothing else.
+        let mut payload = Params::new();
+        payload.insert("approval_id".into(), Json::from(approval.id.clone()));
+        payload.insert("flow_id".into(), Json::from(approval.flow_id.clone()));
+        payload.insert("run_id".into(), Json::from(approval.run_id.clone()));
+        payload.insert("command".into(), Json::from(approval.command.clone()));
+        events::notify_sink(
+            &self.registry,
+            flows::approvals::EVENT_APPROVAL_CREATED,
+            &payload,
+        );
+        Ok(approval)
+    }
+
+    /// What the agent turn had produced when it stopped for approval — parked on the step row, so
+    /// a decision taken hours later completes the whole turn and not just its ending. Degrades to
+    /// an empty object: a missing partial must not stop a booking somebody just approved.
+    async fn parked_step_output(&self, run_id: &str) -> Json {
+        self.get_flow_run(run_id)
+            .await
+            .ok()
+            .and_then(|(run, steps)| {
+                steps
+                    .into_iter()
+                    .find(|s| s.step_index == run.current_step)
+                    .map(|s| s.output)
+            })
+            .filter(Json::is_object)
+            .unwrap_or_else(|| json!({}))
+    }
+
+    pub async fn get_flow_approval(&self, id: &str) -> Result<flows::Approval> {
+        flows::approvals::get(self.db.as_ref(), &self.hub_id, id).await
+    }
+
+    pub async fn list_flow_approvals(
+        &self,
+        status: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<flows::Approval>> {
+        flows::approvals::list(self.db.as_ref(), &self.hub_id, status, limit).await
+    }
+
+    /// **The approval contract**, in one method because its four steps are one decision:
+    ///
+    /// 1. the proposal must still be decidable (once, and not expired);
+    /// 2. on `approve`, the grant is **re-checked right now** — a proposal is not a stored
+    ///    permission, and between 3 AM and 9 AM the owner may have withdrawn the capability. If it
+    ///    is gone, nothing runs and the row stays **pending**: granting again and approving again
+    ///    is a working remedy, whereas a burnt approval would force a re-run of the whole flow;
+    /// 3. what runs is **exactly** the stored command with the stored payload, through
+    ///    `Origin::Automation`. The model is **not** asked again — re-planning after a rejection is
+    ///    product (the module `flows`), and a kernel that quietly re-planned would make "I approved
+    ///    *this*" mean nothing;
+    /// 4. the run continues from the step after the agent's, or — on `reject` — stops as
+    ///    `cancelled`, because the steps written after an agent step assumed it acted.
+    ///
+    /// `decided_by` is the caller's job to resolve from the SESSION; this method never reads it
+    /// from a body (same rule as `discarded_by` in `outbox_admin.rs`).
+    pub async fn decide_flow_approval(
+        &self,
+        id: &str,
+        approve: bool,
+        decided_by: &str,
+    ) -> Result<flows::Approval> {
+        let approval = flows::approvals::claim_pending(self.db.as_ref(), &self.hub_id, id).await?;
+
+        if !approve {
+            let decided = flows::approvals::mark_decided(
+                self.db.as_ref(),
+                &self.hub_id,
+                id,
+                flows::approvals::STATUS_REJECTED,
+                decided_by,
+                "",
+            )
+            .await?;
+            self.complete_flow_io(
+                &approval.run_id,
+                &approval.step_id,
+                flows::IoResult::Cancelled(format!(
+                    "`{}` was rejected by `{decided_by}`",
+                    approval.command
+                )),
+            )
+            .await?;
+            return Ok(decided);
+        }
+
+        // Step 2 — the gate, NOW. Deliberately before anything is written: nothing about this
+        // approval changes if the answer is no.
+        flows::grants::check_command_grant(
+            self.db.as_ref(),
+            &self.hub_id,
+            &approval.flow_id,
+            &approval.command,
+        )
+        .await?;
+
+        // Step 3 — exactly what was proposed.
+        let payload: Params = approval
+            .payload
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        let (run, _) = flows::store::get_run(self.db.as_ref(), &self.hub_id, &approval.run_id)
+            .await?;
+        let outcome = self
+            .execute_flow_command(
+                &approval.flow_id,
+                &approval.run_id,
+                run.depth,
+                &approval.command,
+                &payload,
+            )
+            .await;
+
+        match outcome {
+            Ok(result) => {
+                let decided = flows::approvals::mark_decided(
+                    self.db.as_ref(),
+                    &self.hub_id,
+                    id,
+                    flows::approvals::STATUS_APPROVED,
+                    decided_by,
+                    "",
+                )
+                .await?;
+                // The step's output is the WHOLE turn: what the model produced before it
+                // proposed (parked on the step row hours ago) plus how the proposal ended.
+                let mut output = self.parked_step_output(&approval.run_id).await;
+                if let Some(map) = output.as_object_mut() {
+                    map.insert("status".into(), json!(flows::approvals::STATUS_APPROVED));
+                    map.insert("approval_id".into(), json!(id));
+                    map.insert("command".into(), json!(approval.command));
+                    map.insert("result".into(), result);
+                }
+                self.complete_flow_io(
+                    &approval.run_id,
+                    &approval.step_id,
+                    flows::IoResult::Done(output),
+                )
+                .await?;
+                Ok(decided)
+            }
+            Err(e) => {
+                // The person DID approve; what broke is the command. Both facts are recorded, and
+                // the error is returned so the tray shows a failure instead of a green tick.
+                let message = format!("{e}");
+                flows::approvals::mark_decided(
+                    self.db.as_ref(),
+                    &self.hub_id,
+                    id,
+                    flows::approvals::STATUS_APPROVED,
+                    decided_by,
+                    &message,
+                )
+                .await?;
+                self.complete_flow_io(
+                    &approval.run_id,
+                    &approval.step_id,
+                    flows::IoResult::Failed(format!("{}: {message}", approval.command)),
+                )
+                .await?;
+                Err(e)
+            }
+        }
     }
 
     /// Catch-up del scheduler al **arrancar** (Tauri/local): ejecuta una sola vez las tareas con

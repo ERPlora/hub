@@ -32,12 +32,15 @@ pub const ERR_UNKNOWN_GRANT_KIND: &str = "flow.unknown_grant_kind";
 pub const ERR_GRANT_KIND_NOT_AVAILABLE: &str = "flow.grant_kind_not_available";
 pub const ERR_INVALID_HTTP_PATTERN: &str = "flow.invalid_http_pattern";
 
-/// The five kinds of ADR-0283 §2. The vocabulary is frozen here; only `command` can be created in
-/// this delivery, because a grant for something the kernel cannot do yet would tell an owner that
+/// The five kinds of ADR-0283 §2. The vocabulary is frozen here; what grows is which of them can
+/// be CREATED, because a grant for something the kernel cannot do yet would tell an owner that
 /// their flow may call an URL or message a customer when it cannot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GrantKind {
     Command,
+    /// A read the flow may perform. Creatable since hub#665: it is the third filter over the tools
+    /// an agent step offers the model ("assembled ∩ declared by the step ∩ granted"), and without
+    /// it that intersection would have nothing behind it for reads.
     Query,
     /// Reserved — hub#663 part 2 (`notify` per channel).
     Notify,
@@ -71,7 +74,10 @@ impl GrantKind {
     /// Can this kind be created today? The others are refused by name, with the issue that brings
     /// them, instead of being stored as a promise nothing keeps.
     pub fn is_available(self) -> bool {
-        matches!(self, GrantKind::Command | GrantKind::Http)
+        matches!(
+            self,
+            GrantKind::Command | GrantKind::Http | GrantKind::Query
+        )
     }
     pub const ALL: &'static [GrantKind] = &[
         GrantKind::Command,
@@ -107,6 +113,14 @@ impl Authority {
             .contains(&(GrantKind::Command, command.to_string()))
     }
 
+    /// May this flow run this query RIGHT NOW? Same default-deny, same freshness. A read is not
+    /// harmless just because it writes nothing: an agent step's whole job is to put what it reads
+    /// in front of a model, and a hub's tables hold its customers.
+    pub fn allows_query(&self, query: &str) -> bool {
+        self.granted
+            .contains(&(GrantKind::Query, query.to_string()))
+    }
+
     /// The permissions a run carries in its [`crate::registry::RequestContext`]: **only** the
     /// `permission` of the commands this flow was granted.
     ///
@@ -125,9 +139,14 @@ impl Authority {
     pub fn permissions(&self, registry: &Registry) -> HashSet<String> {
         self.granted
             .iter()
-            .filter(|(kind, _)| *kind == GrantKind::Command)
-            .filter_map(|(_, name)| registry.get_command(name))
-            .map(|cmd| cmd.def.permission.clone())
+            .filter_map(|(kind, name)| match kind {
+                GrantKind::Command => registry.get_command(name).map(|c| c.def.permission.clone()),
+                // The granted READS have to be here too, or a query with a live grant would pass
+                // the flow's gate and then be refused by the permission check inside
+                // `queries::execute`: the grant would open one door and the next one would be shut.
+                GrantKind::Query => registry.get_query(name).map(|q| q.def.permission.clone()),
+                _ => None,
+            })
             .filter(|p| !p.is_empty() && p != "*")
             .collect()
     }
@@ -321,6 +340,27 @@ pub async fn check_command_grant(
     })
 }
 
+/// The same gate for a READ (hub#665). It is the door `Runtime::execute_flow_query` goes through,
+/// so a query the flow was not granted is refused by the runtime and not by the agent runner's
+/// good manners — the runner is the caller, and a gate a caller can skip is not a gate.
+pub async fn check_query_grant(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    flow_id: &str,
+    query: &str,
+) -> Result<()> {
+    if authority(db, hub_id, flow_id).await?.allows_query(query) {
+        return Ok(());
+    }
+    Err(RuntimeError::Domain {
+        code: ERR_GRANT_DENIED.to_string(),
+        message: format!(
+            "flow `{flow_id}` has no live grant for query `{query}`. A flow reads only what it was \
+             explicitly granted (ADR-0283 D2)."
+        ),
+    })
+}
+
 /// Replaces the whole grant list of a flow (the `PUT …/grants` contract): what disappears is
 /// **revoked** (soft-delete + `revoked_by`), what stays is left alone with its original
 /// `granted_by`, and what is new is inserted.
@@ -342,16 +382,19 @@ pub async fn replace(
                 code: ERR_GRANT_KIND_NOT_AVAILABLE.to_string(),
                 message: format!(
                     "grants of kind `{}` cannot be created yet (http: hub#662, notify and \
-                     recipient_query: hub#663 part 2, query tools: hub#665). Refused rather than \
-                     stored as a permission nothing enforces.",
+                     recipient_query: hub#663 part 2). Refused rather than stored as a permission \
+                     nothing enforces.",
                     kind.as_str()
                 ),
             });
         }
-        // A grant naming a command that does not exist is a promise about nothing — and, worse, it
-        // reads as authorisation on the screen. `PUT …/grants` refuses the whole list (§9).
+        // A grant naming an operation that does not exist is a promise about nothing — and, worse,
+        // it reads as authorisation on the screen. `PUT …/grants` refuses the whole list (§9).
         if *kind == GrantKind::Command && registry.get_command(value).is_none() {
             return Err(RuntimeError::CommandNotFound(value.clone()));
+        }
+        if *kind == GrantKind::Query && registry.get_query(value).is_none() {
+            return Err(RuntimeError::QueryNotFound(value.clone()));
         }
         if *kind == GrantKind::Http {
             check_http_pattern(value)?;
@@ -516,6 +559,14 @@ mod tests {
             "sales.sale.void".into(),
             crate::flows::test_support::command("sales", "sales.void_sale", "SELECT 1;", vec![]),
         );
+        reg.queries.insert(
+            "sales.sale.list".into(),
+            crate::flows::test_support::query("sales", "sales.view_sale", "SELECT 1;"),
+        );
+        reg.queries.insert(
+            "sales.sale.totals".into(),
+            crate::flows::test_support::query("sales", "sales.view_sale", "SELECT 1;"),
+        );
         reg
     }
 
@@ -646,7 +697,7 @@ mod tests {
     #[tokio::test]
     async fn the_kinds_the_kernel_cannot_enforce_yet_are_refused_by_name() {
         let db = db_with_schema().await;
-        for kind in [GrantKind::Notify, GrantKind::RecipientQuery, GrantKind::Query] {
+        for kind in [GrantKind::Notify, GrantKind::RecipientQuery] {
             let err = replace(&db, HUB, FLOW, &registry(), &[(kind, "x".into())], "hub_user:1")
                 .await
                 .expect_err("a permission nothing enforces must not be stored");
@@ -840,6 +891,79 @@ mod tests {
             .expect_err("a grant that does not name one host and one path prefix is no containment");
             assert!(format!("{err}").contains(pattern), "{err}");
         }
+    }
+
+    // ── query grants (hub#665) ────────────────────────────────────────────────────────────────
+
+    /// hub#665 opens the third kind. Until the agent runner existed, `query` was refused with the
+    /// rest — a grant nothing enforced. Now it is the third filter over the tools the model is
+    /// offered ("assembled ∩ declared by the step ∩ granted"), and it is a real gate: without it,
+    /// intersecting reads with the grants would be a sentence with nothing behind it.
+    #[tokio::test]
+    async fn a_query_grant_opens_exactly_the_query_it_names() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[(GrantKind::Query, "sales.sale.list".into())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        check_query_grant(&db, HUB, FLOW, "sales.sale.list")
+            .await
+            .expect("the granted query runs");
+        assert!(
+            check_query_grant(&db, HUB, FLOW, "sales.sale.totals")
+                .await
+                .is_err(),
+            "a sibling query is a different question with the same default answer: no"
+        );
+        // And granting a READ never opens a WRITE, whatever they share.
+        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn a_query_grant_naming_a_query_that_does_not_exist_is_refused() {
+        let db = db_with_schema().await;
+        let err = replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[(GrantKind::Query, "ghost.query".into())],
+            "hub_user:1",
+        )
+        .await
+        .expect_err("a grant naming nothing reads as authorisation on the screen");
+        assert!(format!("{err}").contains("ghost.query"), "{err}");
+    }
+
+    /// The permission union has to carry the granted QUERIES too, or a query with a live grant
+    /// would still be refused downstream by the permission check inside `queries::execute` — the
+    /// grant would open one door and the next one would be shut.
+    #[tokio::test]
+    async fn the_context_permissions_include_the_granted_queries() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[(GrantKind::Query, "sales.sale.list".into())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let permissions = authority(&db, HUB, FLOW).await.unwrap().permissions(&reg);
+        assert_eq!(permissions, HashSet::from(["sales.view_sale".to_string()]));
     }
 
     #[tokio::test]
