@@ -644,6 +644,37 @@ pub async fn uninstall(
 /// distintos y este SELECT solo devuelve los del hub que pregunta. Lo usa la reconstrucción del
 /// `Registry` para respetar el estado activo/inactivo por hub tras un reinicio. Idempotente: si la
 /// tabla aún no tiene la forma hub-scoped, asegura+migra primero.
+/// Los módulos instalados de este hub con su pin de soporte, si lo tienen (hub#516).
+///
+/// `pinned_version` (migración de sistema v30) es la salida de emergencia: deja a un cliente en
+/// `sales@3.1` mientras se arregla la `3.2`, **sin tocar a los demás**. No es una opción de
+/// producto —el dueño no elige— sino una herramienta nuestra, y por eso no hay UI.
+pub async fn installed_with_pin(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Vec<(String, String, Option<String>)>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT module_id, version, pinned_version FROM hub_module \
+             WHERE hub_id = :hub_id AND status = 'active'",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .map(|row| {
+            (
+                row["module_id"].as_str().unwrap_or_default().to_string(),
+                row["version"].as_str().unwrap_or_default().to_string(),
+                row["pinned_version"].as_str().map(str::to_owned),
+            )
+        })
+        .collect())
+}
+
 pub async fn installed_status(
     db: &dyn DatabaseAdapter,
     hub_id: &str,

@@ -413,11 +413,43 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     let cache_root = state.config.module_cache.clone();
                     let cloud = state.config.cloud_base_url.clone();
                     eprintln!("cache vacío: re-descargando {} módulo(s) instalados del marketplace…", missing.len());
+                    // Pins de soporte de este hub (hub#516): `module_id → pinned_version`.
+                    let pins: std::collections::HashMap<String, String> = {
+                        let rt = state.runtime.lock().await;
+                        erplora_runtime::installer::installed_with_pin(rt.db(), &state.hub_id())
+                            .await
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter_map(|(id, _, pin)| pin.map(|p| (id, p)))
+                            .collect()
+                    };
+
                     for (id, version) in missing {
+                        // 🔄 Los módulos se actualizan SOLOS (hub#516): se resuelve la ÚLTIMA versión
+                        // instalable, no la registrada. Es lo único que faltaba — la re-descarga del
+                        // arranque ya existía porque el `module_cache` es `/tmp`.
+                        //
+                        // Seguro porque hub#542 valida el SQL de la migración y traduce sus `DROP` a
+                        // rename, hub#517 garantiza que no hay nada que deshacer al revertir, y
+                        // hub#538 deja `/readyz` en DOWN si el módulo no carga — así Swarm revierte
+                        // el despliegue en vez de dejar el hub «sano» con el TPV roto.
+                        let target = resolve_module_target(&state, &machine, &id, &version, pins.get(&id).map(String::as_str)).await;
+
                         let mut rt = state.runtime.lock().await;
                         // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
-                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await {
-                            Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{version}"),
+                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
+                            Ok(_) if target.is_update() => eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version()),
+                            Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{}", target.version()),
+                            Err(e) if target.is_update() => {
+                                // ⚠️ Una actualización que falla NO puede dejar al hub SIN el módulo:
+                                // un hub con la versión de ayer funciona, uno sin el módulo no. Se
+                                // cae a la que tenía registrada.
+                                eprintln!("✗ actualización de {id} a {}: {e} — vuelvo a {version}", target.version());
+                                match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await {
+                                    Ok(_) => eprintln!("✓ {id} sigue en {version}"),
+                                    Err(e) => eprintln!("✗ {id}@{version} tampoco: {e}"),
+                                }
+                            }
                             Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
                         }
                     }
@@ -1007,6 +1039,47 @@ pub fn app(state: AppState) -> Router {
 /// [`readiness::readyz`], y es la que mira el `HEALTHCHECK`. Mezclarlas fue el bug: durante meses
 /// esto FUE el healthcheck del contenedor, así que un hub sin BD, con las migraciones a medias o
 /// sin un solo módulo cargado pasaba por sano.
+/// La versión que debe correr un módulo en este arranque (hub#516).
+///
+/// Pregunta al marketplace qué versiones hay y deja decidir a
+/// [`erplora_runtime::module_update::resolve`]. Si el Cloud no contesta, **se queda con la que
+/// tiene**: un hub con la versión de ayer funciona; uno sin el módulo, no.
+async fn resolve_module_target(
+    state: &AppState,
+    machine: &cloud_client::Auth,
+    module_id: &str,
+    installed: &str,
+    pinned: Option<&str>,
+) -> erplora_runtime::module_update::Target {
+    use erplora_runtime::module_update::{resolve, Available, Target};
+
+    if let Some(pin) = pinned {
+        return Target::StayPut(pin.to_string());
+    }
+
+    let request = cloud_client::CloudClient::new(&state.config.cloud_base_url).versions(machine, module_id);
+    let mut call = state.http.get(&request.url);
+    for (name, value) in request.headers {
+        call = call.header(name, value);
+    }
+    let available: Vec<Available> = match call.send().await {
+        Ok(response) => response
+            .json::<Vec<cloud_client::ModuleVersion>>()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|v| Available { version: v.version, is_active: v.is_active })
+            .collect(),
+        // Sin catálogo no se adivina: quedarse donde está es el único movimiento seguro.
+        Err(error) => {
+            eprintln!("⚠ versiones de {module_id}: {error} — se mantiene {installed}");
+            Vec::new()
+        }
+    };
+
+    resolve(installed, None, &available)
+}
+
 async fn healthz() -> &'static str {
     "ok"
 }

@@ -822,6 +822,23 @@ ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_at TEXT NOT NUL
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_from TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_by TEXT NOT NULL DEFAULT '';",
     },
+    // ── v30 — hub#516: el PIN DE SOPORTE de un módulo ──────────────────────────────────────
+    // Con la actualización automática, el arranque resuelve la ÚLTIMA versión instalable de cada
+    // módulo en vez de la registrada. `pinned_version` es la salida de emergencia: cuando un
+    // cliente tiene un problema con `sales@3.2`, se le deja en `3.1` mientras se arregla, **sin
+    // tocar a los demás**.
+    //
+    // No es una opción de producto —el dueño no elige, ADR-0269— sino una herramienta nuestra, y
+    // por eso no hay UI: se pone a mano y se quita a mano.
+    //
+    // ADITIVA: columna nullable, así que un binario anterior la ignora y sus INSERT siguen
+    // funcionando (la regla de hub#517 para que el rollback no tenga nada que deshacer).
+    SystemMigration {
+        version: 30,
+        name: "hub_module_pinned_version",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE hub_module ADD COLUMN IF NOT EXISTS pinned_version TEXT;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2377,6 +2394,6 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        assert_eq!(MIGRATIONS.len(), 26, "el catálogo cambió de tamaño");
+        assert_eq!(MIGRATIONS.len(), 27, "el catálogo cambió de tamaño");
     }
 }
