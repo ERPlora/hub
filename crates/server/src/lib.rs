@@ -58,6 +58,7 @@ pub mod hub_users;
 pub mod login_throttle;
 pub mod readiness;
 pub mod reset;
+pub mod inbound_poll;
 pub mod ingest;
 pub mod install;
 pub mod install_guard;
@@ -592,6 +593,52 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     }
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            }
+        });
+    }
+
+    // **WhatsApp entrante** (ADR-0283 K1c, `architecture/hub/flows.md` §6): el hub POLLEA su
+    // bandeja en el SaaS y convierte cada mensaje en el evento core
+    // `hub.whatsapp.message_received`. El SaaS no puede llamar a un hub (ADR-0213) y los hubs
+    // viven tras NAT, así que la única dirección posible es esta.
+    //
+    // Tick PROPIO y no el bucle de 1s de arriba, por dos razones: su periodo es otro (5s) y, sobre
+    // todo, hace **I/O de red** — meterlo en el bucle del relay tendría el lock del runtime
+    // cogido durante un round-trip HTTP y pararía la entrega de eventos de todo el hub.
+    // `poll_once` coge el lock solo para el gate y para las escrituras (ver su doc).
+    //
+    // El propio tick se auto-gatea: sin el módulo `whatsapp_inbox` activo y con entitlement, no
+    // sale ni una petición (720 GET/hora por hub que sí lo usa).
+    {
+        let poll_state = state.clone();
+        let poller = inbound_poll::InboundPoller::new(
+            state.http.clone(),
+            &state.config.cloud_base_url,
+            state.hub_id.clone(),
+            state.machine_token.clone(),
+        );
+        let secs = inbound_poll::interval_secs(
+            std::env::var(inbound_poll::INTERVAL_ENV).ok().as_deref(),
+        );
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                tick.tick().await;
+                match poller
+                    .poll_once(&poll_state.runtime, &poll_state.entitlement)
+                    .await
+                {
+                    Ok(report) if report.ingested > 0 => tracing::info!(
+                        ingested = report.ingested,
+                        acked = report.acked,
+                        "whatsapp entrante: mensajes ingeridos como evento core"
+                    ),
+                    Ok(_) => {}
+                    // Un fallo de red aquí NO es fatal: los mensajes siguen pendientes en el SaaS
+                    // y el siguiente tick los recoge (nada se pierde por no haber podido leer).
+                    Err(e) => tracing::warn!("whatsapp entrante: {e}"),
+                }
             }
         });
     }

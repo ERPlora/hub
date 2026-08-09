@@ -104,6 +104,48 @@ pub(crate) fn insert_op(
     (sql.to_string(), p)
 }
 
+/// Writes a **core event** — one the host itself ingests from outside the hub — into the outbox
+/// under an id the CALLER chooses, at most once (ADR-0283 K1c).
+///
+/// Every other row here gets a fresh [`new_id`] because a command emitting an event is already
+/// inside its own transaction: emit twice and you meant twice. An event ingested from an external
+/// source is the opposite case. The source redelivers whatever it has not seen acknowledged, so
+/// the same message arrives repeatedly by design, and the only thing that can tell one delivery of
+/// a message from a second message is **the source's own id**. Deriving the primary key from it
+/// (`"wa-<wa_message_id>"`) turns `ON CONFLICT DO NOTHING` into the exactly-once guarantee: the
+/// database refuses the second write, so no listener runs twice and no caller has to remember
+/// anything across a restart.
+///
+/// `DO NOTHING` — never `DO UPDATE`: a duplicate must not overwrite the stored payload, and above
+/// all must not reset an already-`delivered` row back to `pending`, which would re-run listeners.
+///
+/// Returns whether a row was actually written (`false` = the id was already there).
+///
+/// The row's context is the **system** one, like [`crate::scheduler`]'s: `user_id` empty because
+/// nobody in this hub caused it (the message came from a customer's phone), `module_id` empty
+/// because no module emitted it. Per ADR-0288 the `permissions` column is forensic only — the
+/// listener runs with its own module's authority — and the wildcard recorded here is simply the
+/// honest description of the host: the same one `scheduler::system_ctx` uses.
+pub async fn insert_core_event_once(
+    db: &dyn DatabaseAdapter,
+    id: &str,
+    hub_id: &str,
+    event_name: &str,
+    payload: &Params,
+) -> Result<bool> {
+    let ctx = RequestContext::new(
+        hub_id.to_string(),
+        String::new(),
+        [permissions::WILDCARD.to_string()],
+    );
+    let (sql, mut params) = insert_op(&ctx, "", event_name, payload, 0);
+    params.insert("id".into(), json!(id));
+    let result = db
+        .execute(&format!("{sql} ON CONFLICT (id) DO NOTHING"), &params)
+        .await?;
+    Ok(result.affected > 0)
+}
+
 /// `INSERT` del marcador de entrega (event_id, listener). El relay lo añade a la transacción
 /// del listener → si el listener commitea, la entrega queda registrada atómicamente.
 fn delivery_op(event_id: &str, listener: &str) -> (String, Params) {
@@ -1695,6 +1737,119 @@ mod tests {
             Principal::Machine,
             "nobody is standing at the relay: it must never be offered a manager's PIN (hub#361)"
         );
+    }
+
+    /// A core event ingested from OUTSIDE the hub (ADR-0283 K1c: an inbound WhatsApp message)
+    /// carries an id the caller chose, so the source's own message id becomes the primary key.
+    /// Written once, it is a normal outbox row: `pending`, with the hub's tenant on it.
+    #[tokio::test]
+    async fn a_core_event_lands_in_the_outbox_under_the_caller_s_id() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+
+        let mut payload = Params::new();
+        payload.insert("from".into(), json!("34600999888"));
+        let fresh = insert_core_event_once(&db, "wa-wamid.1", "hub-7", "hub.whatsapp.message_received", &payload)
+            .await
+            .unwrap();
+        assert!(fresh, "the first write of an id is a new event");
+
+        let rows = db
+            .query("SELECT * FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["id"], json!("wa-wamid.1"));
+        assert_eq!(rows[0]["hub_id"], json!("hub-7"));
+        assert_eq!(rows[0]["event_name"], json!("hub.whatsapp.message_received"));
+        assert_eq!(rows[0]["status"], json!("pending"));
+        assert_eq!(
+            rows[0]["payload"].as_str().unwrap(),
+            r#"{"from":"34600999888"}"#
+        );
+    }
+
+    /// **The primary key IS the exactly-once guarantee.** The source redelivers whatever it has
+    /// not seen acked, so the same message arrives more than once by design; the second write must
+    /// be a no-op that says so, not an error and not a second event.
+    #[tokio::test]
+    async fn the_same_id_twice_is_one_event_and_the_second_write_says_it_was_already_there() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+
+        let mut first = Params::new();
+        first.insert("text".into(), json!("is the table free?"));
+        assert!(insert_core_event_once(&db, "wa-wamid.1", "h", "e", &first).await.unwrap());
+
+        // A redelivery of the SAME message: different payload on purpose — the id decides, and the
+        // row that is already there must not be overwritten either.
+        let mut second = Params::new();
+        second.insert("text".into(), json!("tampered"));
+        let fresh = insert_core_event_once(&db, "wa-wamid.1", "h", "e", &second)
+            .await
+            .unwrap();
+        assert!(!fresh, "a duplicate id is not a new event");
+
+        let rows = db
+            .query("SELECT payload FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 1, "exactly one event, however many times it arrives");
+        assert_eq!(rows[0]["payload"].as_str().unwrap(), r#"{"text":"is the table free?"}"#);
+    }
+
+    /// A duplicate must not resurrect an event the relay already delivered: `ON CONFLICT DO
+    /// NOTHING` leaves the row exactly as it was, so a listener does not run twice.
+    #[tokio::test]
+    async fn a_duplicate_does_not_reopen_an_already_delivered_event() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+
+        insert_core_event_once(&db, "wa-1", "h", "e", &Params::new()).await.unwrap();
+        mark_delivered(&db, "wa-1").await.unwrap();
+
+        insert_core_event_once(&db, "wa-1", "h", "e", &Params::new()).await.unwrap();
+        let rows = db
+            .query("SELECT status FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["status"], json!("delivered"), "still delivered, not pending again");
+    }
+
+    /// Delivery contract of a host-emitted event (ADR-0288): it reaches the listening module's
+    /// command and that command runs with ITS OWN module's authority. There is no emitting user —
+    /// the message came from a customer's phone — so `user_id` is empty, exactly as the
+    /// scheduler's system context does.
+    #[tokio::test]
+    async fn a_core_event_is_delivered_to_its_listeners_with_no_emitting_user() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("wa".into(), ModuleStatus::Active);
+        reg.commands
+            .insert("wa.on_message".into(), cmd("wa", "INSERT INTO t (n) VALUES (1);", vec![]));
+        reg.listeners
+            .insert("hub.whatsapp.message_received".into(), vec!["wa.on_message".into()]);
+
+        insert_core_event_once(&db, "wa-1", "h", "hub.whatsapp.message_received", &Params::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1);
+        let rows = db
+            .query("SELECT user_id, status FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows[0]["user_id"], json!(""), "nobody in this hub caused it");
+        assert_eq!(rows[0]["status"], json!("delivered"));
     }
 
     async fn dead_id(db: &PgAdapter) -> String {
