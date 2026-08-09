@@ -187,3 +187,10 @@ async fn run(conn: &mut sqlx::PgConnection, sql: &str) -> Result<(), sqlx::Error
 #[cfg(test)]
 #[path = "testutil_test.rs"]
 mod tests;
+
+/// Dos adaptadores **sobre el mismo esquema**: los dos runtimes del solape blue/green, cada uno con
+/// su propio pool, exactamente como en producción.
+pub async fn two_adapters_sharing_a_schema() -> (PgAdapter, PgAdapter) {
+    let db = TestDb::new().await;
+    (db.adapter().await, db.adapter().await)
+}
