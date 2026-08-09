@@ -60,7 +60,7 @@ const MIGRATIONS: &[SystemMigration] = &[
         // de DDL, que Postgres rechazaría en sentencia preparada), luego la pone NOT NULL y
         // recompone la PK a `(hub_id, module_id)`.
         postgres: "\
-ALTER TABLE hub_module ADD COLUMN hub_id TEXT;\
+ALTER TABLE hub_module ADD COLUMN IF NOT EXISTS hub_id TEXT;\
 UPDATE hub_module SET hub_id = :hub_id WHERE hub_id IS NULL;\
 ALTER TABLE hub_module ALTER COLUMN hub_id SET NOT NULL;\
 ALTER TABLE hub_module DROP CONSTRAINT hub_module_pkey;\
@@ -75,7 +75,7 @@ ALTER TABLE hub_module ADD PRIMARY KEY (hub_id, module_id);",
         version: 2,
         name: "hub_trusted_device",
         postgres: "\
-CREATE TABLE hub_trusted_device (\
+CREATE TABLE IF NOT EXISTS hub_trusted_device (\
   device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
     },
     // ── v3 — ADR-0057 / public-api.md: API keys de la API pública por módulo ─────────────────
@@ -93,7 +93,7 @@ CREATE TABLE hub_trusted_device (\
         version: 3,
         name: "hub_api_key",
         postgres: "\
-CREATE TABLE hub_api_key (\
+CREATE TABLE IF NOT EXISTS hub_api_key (\
   id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
   secret_hash TEXT NOT NULL, scope_json TEXT NOT NULL DEFAULT '[]', \
   status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, \
@@ -113,7 +113,7 @@ CREATE INDEX IF NOT EXISTS ix_hub_api_key_hub ON hub_api_key (hub_id);",
         version: 4,
         name: "hub_settings",
         postgres: "\
-CREATE TABLE hub_settings (\
+CREATE TABLE IF NOT EXISTS hub_settings (\
   hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
   updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, key));",
@@ -130,7 +130,7 @@ CREATE TABLE hub_settings (\
         version: 5,
         name: "module_capability_grants",
         postgres: "\
-CREATE TABLE _module_capability_grants (\
+CREATE TABLE IF NOT EXISTS _module_capability_grants (\
   hub_id TEXT NOT NULL, module_id TEXT NOT NULL, capability TEXT NOT NULL, \
   granted INTEGER NOT NULL DEFAULT 0, granted_at TEXT, granted_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, module_id, capability));",
@@ -147,7 +147,7 @@ CREATE TABLE _module_capability_grants (\
         version: 6,
         name: "hub_certificate",
         postgres: "\
-CREATE TABLE _hub_certificate (\
+CREATE TABLE IF NOT EXISTS _hub_certificate (\
   hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
   uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id));",
@@ -160,12 +160,12 @@ CREATE TABLE _hub_certificate (\
         version: 7,
         name: "hub_user_profile_preferences",
         postgres: "\
-CREATE TABLE hub_user_profile (\
+CREATE TABLE IF NOT EXISTS hub_user_profile (\
   hub_id TEXT NOT NULL, user_id TEXT NOT NULL, first_name TEXT NOT NULL DEFAULT '', \
   last_name TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', \
   avatar_path TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, \
   PRIMARY KEY (hub_id, user_id));\
-CREATE TABLE hub_user_pref (\
+CREATE TABLE IF NOT EXISTS hub_user_pref (\
   hub_id TEXT NOT NULL, user_id TEXT NOT NULL, language TEXT NOT NULL DEFAULT '', \
   theme_mode TEXT NOT NULL DEFAULT '', theme_palette TEXT NOT NULL DEFAULT '', \
   updated_at TEXT NOT NULL, PRIMARY KEY (hub_id, user_id));",
@@ -182,7 +182,7 @@ CREATE TABLE hub_user_pref (\
     SystemMigration {
         version: 8,
         name: "hub_session_device_id",
-        postgres: "ALTER TABLE hub_session ADD COLUMN device_id TEXT;",
+        postgres: "ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS device_id TEXT;",
     },
     // ── v9 — identidad por EMAIL: `hub_user.email` (ADR-0157, corrección owner sembrado) ─────────
     // El owner del hub es el CREADOR, sembrado por el provisioning del SaaS (`HUB_OWNER_EMAIL`)
@@ -198,7 +198,7 @@ CREATE TABLE hub_user_pref (\
         version: 9,
         name: "hub_user_email",
         postgres: "\
-ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
     },
     // ── v10 — #42: cuota durable de API keys ────────────────────────────────────────────────
@@ -207,8 +207,8 @@ CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
         name: "api_key_rate_limit",
         postgres:
             "\
-ALTER TABLE hub_api_key ADD COLUMN rate_limit_per_minute INTEGER NOT NULL DEFAULT 60;\
-CREATE TABLE hub_api_key_rate_window (\
+ALTER TABLE hub_api_key ADD COLUMN IF NOT EXISTS rate_limit_per_minute INTEGER NOT NULL DEFAULT 60;\
+CREATE TABLE IF NOT EXISTS hub_api_key_rate_window (\
   api_key_id TEXT PRIMARY KEY, window_epoch_minute BIGINT NOT NULL, request_count BIGINT NOT NULL);",
     },
     // ── v11 — hub#348 (paso 2b regla D): POR QUÉ está cerrada la puerta de un `hub_user` ─────────
@@ -227,7 +227,7 @@ CREATE TABLE hub_api_key_rate_window (\
     SystemMigration {
         version: 11,
         name: "hub_user_cloud_revoked_at",
-        postgres: "ALTER TABLE hub_user ADD COLUMN cloud_revoked_at TEXT NOT NULL DEFAULT '';",
+        postgres: "ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS cloud_revoked_at TEXT NOT NULL DEFAULT '';",
     },
     // ── v12 — hub#349 (paso 2b): `owner` sale del catálogo de roles del hub ──────────────────────
     // `owner` era la MISMA palabra en los dos planos —el rol de la CUENTA en el SaaS y el rol del
@@ -273,7 +273,7 @@ CREATE TABLE hub_api_key_rate_window (\
         version: 13,
         name: "hub_role_activation",
         postgres: "\
-CREATE TABLE hub_role_activation (\
+CREATE TABLE IF NOT EXISTS hub_role_activation (\
   hub_id TEXT NOT NULL, role_key TEXT NOT NULL, \
   activated_at TEXT NOT NULL, activated_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, role_key));",
@@ -299,7 +299,7 @@ CREATE TABLE hub_role_activation (\
         version: 14,
         name: "hub_certificate_slots",
         postgres: "\
-ALTER TABLE _hub_certificate ADD COLUMN kind TEXT NOT NULL DEFAULT 'own';\
+ALTER TABLE _hub_certificate ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'own';\
 ALTER TABLE _hub_certificate DROP CONSTRAINT _hub_certificate_pkey;\
 ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     },
@@ -330,7 +330,7 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     SystemMigration {
         version: 16,
         name: "hub_certificate_delegated_version",
-        postgres: "ALTER TABLE _hub_certificate ADD COLUMN cert_version BIGINT;",
+        postgres: "ALTER TABLE _hub_certificate ADD COLUMN IF NOT EXISTS cert_version BIGINT;",
     },
     // ── v17 — hub#357 (paso 2b): QUÉ CLASE de dispositivo es este — `shared` vs `personal` ───────
     // El mismo negocio tiene el TPV del mostrador (varias personas se turnan) y el portátil del
@@ -358,9 +358,9 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
         version: 17,
         name: "hub_trusted_device_mode",
         postgres: "\
-ALTER TABLE hub_trusted_device ADD COLUMN mode TEXT NOT NULL DEFAULT 'shared';\
-ALTER TABLE hub_trusted_device ADD COLUMN mode_set_at TEXT NOT NULL DEFAULT '';\
-ALTER TABLE hub_trusted_device ADD COLUMN mode_set_by TEXT NOT NULL DEFAULT '';",
+ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'shared';\
+ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode_set_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode_set_by TEXT NOT NULL DEFAULT '';",
     },
     // ── v18 — hub#341 / ADR-0196 §6: the print queue lives in the HUB ───────────────────────
     // ⚠️ **v18 and not the v15 hub#317 left free for this.** A gap does NOT reserve a number:
@@ -392,15 +392,15 @@ ALTER TABLE hub_trusted_device ADD COLUMN mode_set_by TEXT NOT NULL DEFAULT '';"
         version: 18,
         name: "print_queue",
         postgres: "\
-CREATE TABLE _print_queue (\
+CREATE TABLE IF NOT EXISTS _print_queue (\
   hub_id TEXT NOT NULL, job_id TEXT NOT NULL, seq BIGSERIAL NOT NULL, \
   role TEXT NOT NULL, html TEXT NOT NULL, format TEXT NOT NULL DEFAULT 'receipt', \
   status TEXT NOT NULL DEFAULT 'pending', attempts BIGINT NOT NULL DEFAULT 0, \
   claimed_by TEXT NOT NULL DEFAULT '', lease_expires_at TEXT NOT NULL DEFAULT '', \
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, completed_at TEXT, \
   PRIMARY KEY (hub_id, job_id));\
-CREATE INDEX ix_print_queue_next ON _print_queue (hub_id, role, status, seq);\
-CREATE INDEX ix_print_queue_lease ON _print_queue (hub_id, status, lease_expires_at);",
+CREATE INDEX IF NOT EXISTS ix_print_queue_next ON _print_queue (hub_id, role, status, seq);\
+CREATE INDEX IF NOT EXISTS ix_print_queue_lease ON _print_queue (hub_id, status, lease_expires_at);",
     },
     // ── v19 — hub#436: the email of the rows written before hub#356, moved to where ACCESS is ───
     // hub#356 (PR #432) fixed the code — the alta now writes the email in the two places that need
@@ -1649,8 +1649,8 @@ mod tests {
 
     #[test]
     fn split_statements_keeps_each_terminated() {
-        let stmts = split_statements("CREATE TABLE a (x);  DROP TABLE b; ");
-        assert_eq!(stmts, vec!["CREATE TABLE a (x);", "DROP TABLE b;"]);
+        let stmts = split_statements("CREATE TABLE IF NOT EXISTS a (x);  DROP TABLE b; ");
+        assert_eq!(stmts, vec!["CREATE TABLE IF NOT EXISTS a (x);", "DROP TABLE b;"]);
     }
 
     #[tokio::test]
@@ -2220,6 +2220,52 @@ mod tests {
             actual_gaps, known_gaps,
             "gap nuevo en el catálogo: si lo dejaste a propósito al renumerar, añádelo a `known_gaps`; \
              si no, es un fallo de orden"
+        );
+    }
+
+    /// **hub#483 — the whole catalogue is re-runnable.** `_hub_system_migrations` records versions
+    /// applied, not schema. Anything that wipes rows from it (a fixture rewinding, a restored backup
+    /// with control behind schema, a partial import) makes `apply` re-run the SQL against a base
+    /// where the objects already exist. Without `IF NOT EXISTS`, the boot dies on `42P07` instead of
+    /// converging — and dies with a Postgres error, not a message that explains anything.
+    ///
+    /// This test fixes the property for the ENTIRE catalogue, not one migration at a time: apply it
+    /// all, wipe every control row, re-apply, and require green. A new migration that forgets
+    /// `IF NOT EXISTS` fails here in CI, not in a fixture that belongs to somebody else.
+    #[tokio::test]
+    async fn the_whole_catalogue_can_be_re_applied_over_existing_schema() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        // Full baseline + the whole catalogue, genuinely applied once.
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        ensure_control_table(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+        assert!(
+            max_applied_version(&db).await.unwrap() > 0,
+            "el catálogo tiene migraciones y se aplicaron"
+        );
+
+        // Wipe ALL control rows → `apply` sees a max of 0 and re-runs every migration. With the
+        // objects already in the schema, a `CREATE TABLE` without `IF NOT EXISTS` dies on 42P07.
+        db.execute_batch("DELETE FROM _hub_system_migrations;").await.unwrap();
+        assert_eq!(
+            max_applied_version(&db).await.unwrap(),
+            0,
+            "borrado el control, el máximo vuelve a 0 → apply re-corre el catálogo entero"
+        );
+
+        // Re-applying over the existing schema must converge, not abort. Today this fails on the
+        // first `CREATE TABLE` without `IF NOT EXISTS`.
+        apply(&db, "hub-test").await.expect(
+            "re-aplicar el catálogo sobre un esquema ya creado no debe fallar: cada CREATE/ALTER \
+             necesita IF NOT EXISTS (hub#483)"
+        );
+        // And it leaves the control table populated again — a re-run is a real apply, not a no-op
+        // that silently skipped everything.
+        assert!(
+            max_applied_version(&db).await.unwrap() > 0,
+            "tras re-aplicar, el control vuelve a registrar las versiones"
         );
     }
 }
