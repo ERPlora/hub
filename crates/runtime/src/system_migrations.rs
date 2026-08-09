@@ -795,11 +795,20 @@ pub async fn ensure_control_table(db: &dyn DatabaseAdapter) -> Result<()> {
 /// transacción** junto con el `INSERT` en `_hub_system_migrations` (atomicidad: o se aplica y
 /// queda registrada, o no se aplica). Idempotente: una versión ya registrada se salta.
 ///
+/// **Coherencia del catálogo (hub#573).** Antes este bucle trataba `version <= max_aplicado`
+/// como «ya hecha» y saltaba en silencio. Pero dos ramas paralelas que eligen el mismo número
+/// (o una migración que cae por debajo del máximo tras un renumerado) dejan exactamente este
+/// estado: la versión está en el catálogo, el máximo del hub está por encima, pero su fila de
+/// control **nunca se escribió** — la tabla no existe en el hub desplegado y nadie se entera.
+/// Ahora, antes de iterar, se comprueba que toda versión del catálogo ≤ máximo esté **registrada**;
+/// si falta alguna, el arranque **aborta** nombrando la versión (fallo ruidoso, no silencio).
+///
 /// El SQL de las migraciones puede llevar el parámetro `:hub_id` (lo usa v1 para sellar el
 /// hub_id del despliegue en las filas existentes).
 pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
     ensure_control_table(db).await?;
     let applied = max_applied_version(db).await?;
+    let registered = registered_versions(db).await?;
 
     let mut prev = 0i64;
     for m in MIGRATIONS {
@@ -812,8 +821,25 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
         );
         prev = m.version;
 
+        if registered.contains(&m.version) {
+            continue; // registrada de verdad (idempotencia por identidad, no por umbral).
+        }
+
+        // Versión del catálogo NO registrada, pero ≤ máximo aplicado: incoherencia. Sin esta
+        // guarda se saltaría en silencio y el hub arrancaría sin la tabla (hub#573).
         if m.version <= applied {
-            continue; // ya aplicada en un arranque previo (idempotente).
+            return Err(crate::errors::RuntimeError::Other(format!(
+                "migración de sistema v{} (`{}`) no registrada pero su versión es ≤ el máximo \
+                 aplicado (v{}): el catálogo embebido y el esquema del hub están incoherentes \
+                 (probable colisión de versión entre ramas paralelas, o un renumerado que dejó \
+                 esta migración por debajo del máximo). Renumerar a v{} NO arregla un hub ya \
+                 desplegado: hay que aplicar su SQL a mano y registrarla, o restaurar el hub \
+                 desde un backup coherente.",
+                m.version,
+                m.name,
+                applied,
+                next_catalogue_version()
+            )));
         }
 
         let sql = m.postgres;
@@ -841,6 +867,27 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
         db.execute_tx(&ops).await?;
     }
     Ok(())
+}
+
+/// La siguiente versión libre del catálogo (máximo + 1), para sugerirla en el mensaje de aborto
+/// de hub#573. Ojo: esto NO es una recomendación de renumerar — renumerar no arregla un hub ya
+/// desplegado, solo evita que la colisión vuelva a pasar. El mensaje lo deja claro.
+fn next_catalogue_version() -> i64 {
+    MIGRATIONS.iter().map(|m| m.version).max().unwrap_or(0) + 1
+}
+
+/// Versiones registradas en `_hub_system_migrations` (las que de verdad se aplicaron). A
+/// diferencia de [`max_applied_version`], esta es la **identidad** de lo aplicado, no solo el
+/// techo — y es lo que hace que la guarda de hub#573 distinga «ya hecha» de «saltada en silencio».
+async fn registered_versions(db: &dyn DatabaseAdapter) -> Result<Vec<i64>> {
+    let res = db
+        .query("SELECT version FROM _hub_system_migrations", &Params::new())
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .filter_map(|r| r["version"].as_i64())
+        .collect())
 }
 
 /// Versión máxima de migración de sistema ya aplicada (0 si ninguna).
@@ -2098,5 +2145,81 @@ mod tests {
 
         // Idempotente: re-aplicar no re-ALTERa (no falla por 'duplicate column').
         apply(&db, "hub-test").await.unwrap();
+    }
+
+    /// hub#573: a system migration whose version is ≤ the max applied, but which is **not
+    /// registered** as applied, is an **incoherent catalogue** — not "already done". Two parallel
+    /// branches that picked the same number (or a migration that landed below the max after a
+    /// renumber) leave exactly this state: the row is in the embedded catalogue, the hub's max is
+    /// above it, but its `_hub_system_migrations` row never got written because the old `apply`
+    /// skipped it in silence.
+    ///
+    /// Before this fix `apply` treated `version <= max` as "done" and `continue`d — the hub booted
+    /// believing it was up to date while missing the table. After: it **aborts** and names the
+    /// version, turning a silent skip into a loud failure that a test or a boot log catches.
+    #[tokio::test]
+    async fn apply_aborts_if_a_catalogue_version_below_the_max_is_not_registered() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        // A hub deployed through v13 (baseline + v1..v13), all genuinely applied and registered.
+        hub_deployed_before_the_slots(&db).await;
+        assert_eq!(max_applied_version(&db).await.unwrap(), 13);
+
+        // Now bump the recorded max to 15 WITHOUT registering v14 — the exact state a skipped
+        // migration leaves: a row above v14 is recorded, v14 is in the catalogue, but v14's own
+        // registration never happened (simulating a parallel-branch collision or a renumber).
+        let mut p = Params::new();
+        p.insert("version".into(), json!(15));
+        p.insert("name".into(), json!("bogus_skip_above_14"));
+        p.insert("applied_at".into(), json!(now_rfc3339()));
+        db.execute(
+            "INSERT INTO _hub_system_migrations (version, name, applied_at) \
+             VALUES (:version, :name, :applied_at)",
+            &p,
+        )
+        .await
+        .unwrap();
+        assert_eq!(max_applied_version(&db).await.unwrap(), 15);
+
+        // v14 is in the catalogue and its version (14) is ≤ the recorded max (15), but it is NOT
+        // registered. `apply` must REFUSE to boot — not silently skip v14 and continue.
+        let err = apply(&db, "hub-test").await.unwrap_err();
+        let msg = err.to_string().to_lowercase();
+        assert!(
+            msg.contains("14"),
+            "el error nombra la versión perdida (v14); fue: {msg}"
+        );
+        assert!(
+            !msg.contains("ok") && err.to_string() != "",
+            "es un error real, no un silencio"
+        );
+    }
+
+    /// The catalogue has **gaps by design** (v15, v20, v24 were left free by renumbers and must
+    /// never be reused). hub#573's fix must not treat a gap as a missing migration: a version that
+    /// is simply absent from the catalogue is not "unregistered", it is "does not exist". Only a
+    /// version that IS in the catalogue but missing from `_hub_system_migrations` (while below the
+    /// max) is the incoherence that aborts the boot.
+    #[test]
+    fn known_gaps_in_the_catalogue_are_documented_not_filled() {
+        let versions: Vec<i64> = MIGRATIONS.iter().map(|m| m.version).collect();
+        // Strictly increasing (no duplicates) — the existing guard, restated.
+        let mut prev = 0i64;
+        for &v in &versions {
+            assert!(v > prev, "v{v} duplicada o desordenada");
+            prev = v;
+        }
+        // The historical gaps. Documented here so a new gap is noticed: adding to this list is a
+        // conscious act (you renumbered and left a hole), NOT an accident. If a gap appears that is
+        // not in this list, someone added a migration out of order — investigate before listing it.
+        let known_gaps: Vec<i64> = vec![15, 20, 24];
+        let actual_gaps: Vec<i64> = (1..=*versions.last().unwrap())
+            .filter(|v| !versions.contains(v))
+            .collect();
+        assert_eq!(
+            actual_gaps, known_gaps,
+            "gap nuevo en el catálogo: si lo dejaste a propósito al renumerar, añádelo a `known_gaps`; \
+             si no, es un fallo de orden"
+        );
     }
 }
