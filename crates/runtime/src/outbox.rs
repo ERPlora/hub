@@ -34,6 +34,11 @@ pub const HOST_NOTIFY_LISTENER: &str = "host.notify";
 /// Tamaño de lote por ciclo del relay (mantiene el lock del runtime acotado).
 const BATCH: i64 = 50;
 
+/// Vigencia del reclamo de una fila del outbox, en segundos. Si el proceso muere a media entrega,
+/// el lease expira y otra instancia reclama la fila en el siguiente barrido (orphan recovery).
+/// Mismo valor que el scheduler (hub#570): las dos colas viven el mismo modelo `start-first`.
+const LEASE_SECONDS: i64 = 300;
+
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS _event_outbox (\
   id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, user_id TEXT NOT NULL, \
@@ -41,8 +46,9 @@ CREATE TABLE IF NOT EXISTS _event_outbox (\
   depth INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', \
   attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, \
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT, \
-  module_id TEXT NOT NULL DEFAULT '');\
+  module_id TEXT NOT NULL DEFAULT '', claim_expires_at TEXT);\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS module_id TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS claim_expires_at TEXT;\
 CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_at);\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
@@ -113,7 +119,7 @@ fn backoff_seconds(attempts: i64) -> i64 {
 /// quedan `pending` y se toman en el siguiente ciclo.
 ///
 /// **Cada fila es independiente (hub#142):** un error al procesar UNA fila (p.ej. un listener que
-/// revienta, o un `UPDATE` del propio relay que falla) NUNCA aborta la entrega del resto del lote.
+/// reventa, o un `UPDATE` del propio relay que falla) NUNCA aborta la entrega del resto del lote.
 /// Antes este bucle propagaba el error con `?`, así que una sola fila "venenosa" —ordenada antes
 /// por `created_at`— bloqueaba la entrega de todos los eventos posteriores del mismo ciclo. Como
 /// esa fila se reintentaba ciclo tras ciclo con el mismo fallo, los eventos que llegaban después
@@ -121,32 +127,64 @@ fn backoff_seconds(attempts: i64) -> i64 {
 /// sin reverso de caja/stock. El síntoma era no determinista y dependía del orden/carrera del
 /// relay por hub: en algunos hubs la fila venenosa no existía o llegaba al final del lote. Ahora
 /// se captura el error por fila, se difiere/dead-lettera esa fila concretay el bucle sigue.
+///
+/// **Reclamo atómico (hub#593).** El modelo de actualización es `start-first` (ADR-0269): la
+/// instancia nueva arranca mientras la vieja sigue sirviendo, así que durante el solape hay **dos**
+/// runtimes del mismo hub contra la misma BD corriendo el relay del outbox. Antes este bucle hacía
+/// un `SELECT … WHERE status='pending' AND next_attempt_at <= :now` **sin** `FOR UPDATE SKIP
+/// LOCKED`: las dos instancias leían la misma fila vencida y la entregaban las dos. Ahora cada
+/// vuelta **reclama** una fila con `UPDATE … (SELECT … FOR UPDATE SKIP LOCKED) … RETURNING` que la
+/// marca en vuelo (`claim_expires_at`) — mismo patrón que el scheduler (`claim_next_due`) y la
+/// cola de impresión (`print_queue::claim_next`). Si el proceso muere a media entrega, el lease
+/// expira y otra instancia reclama la fila (orphan recovery).
 pub async fn process_once(db: &dyn DatabaseAdapter, registry: &Registry) -> Result<usize> {
     let now = now_rfc3339();
-    let mut q = Params::new();
-    q.insert("now".into(), json!(now));
-    q.insert("lim".into(), json!(BATCH));
-    let due = db
-        .query(
-            "SELECT id, hub_id, user_id, permissions, event_name, module_id, payload, depth, attempts \
-             FROM _event_outbox WHERE status = 'pending' AND next_attempt_at <= :now \
-             ORDER BY created_at LIMIT :lim",
-            &q,
-        )
-        .await?;
-
-    let count = due.rows.len();
-    for row in &due.rows {
-        // Aislar cada fila: un fallo aquí difiere/dead-lettera SOLO esta fila (en `process_row`)
-        // y el resto del lote sigue entregándose. No propagamos el error al bucle del server,
-        // que solo haría `eprintln!` y dejaría todo el lote sin procesar este ciclo (hub#142).
-        if let Err(e) = process_row(db, registry, row).await {
-            // `process_row` ya intentó defer/dead; si hasta eso falla (p.ej. la BD se cayó),
-            // lo dejamos para el próximo ciclo del relay y seguimos con las filas sanas.
-            eprintln!("relay outbox: fila {}: {e}", row["id"].as_str().unwrap_or("?"));
+    let mut ran = 0usize;
+    for _ in 0..BATCH {
+        match claim_next_due(db, &now).await? {
+            Some(row) => {
+                // Aislar cada fila: un fallo aquí difiere/dead-lettera SOLO esta fila (en
+                // `process_row`) y el resto del lote sigue entregándose. No propagamos el error al
+                // bucle del server, que solo haría `eprintln!` y dejaría todo el lote sin procesar
+                // este ciclo (hub#142).
+                if let Err(e) = process_row(db, registry, &row).await {
+                    // `process_row` ya intentó defer/dead; si hasta eso falla (p.ej. la BD se cayó),
+                    // lo dejamos para el próximo ciclo del relay y seguimos con las filas sanas.
+                    eprintln!("relay outbox: fila {}: {e}", row["id"].as_str().unwrap_or("?"));
+                }
+                ran += 1;
+            }
+            // Ninguna fila vencida y sin dueño: fin del barrido.
+            None => break,
         }
     }
-    Ok(count)
+    Ok(ran)
+}
+
+/// Reclama **una** fila vencida de forma atómica y la devuelve. El `UPDATE` toma la fila con
+/// `FOR UPDATE SKIP LOCKED` y le pone `claim_expires_at` al futuro, **en el mismo enunciado**: así
+/// la fila deja de ser "reclamable" para cualquier otra instancia (la condición del `WHERE` exige
+/// `status='pending' AND next_attempt_at <= :now AND (claim_expires_at IS NULL OR
+/// claim_expires_at <= :now)`) antes de que esta la entregue. Es el espejo de
+/// `scheduler::claim_next_due` (hub#570): dos instancias que compiten se llevan filas **distintas**.
+///
+/// El lease se limpia al resolver la fila: `mark_delivered`, `mark_dead` y `defer_or_dead`
+/// pisarían `claim_expires_at` a NULL junto al cambio de estado (de modo que una fila diferida,
+/// que sigue `pending`, vuelve a ser reclamable en cuanto venza su `next_attempt_at`).
+async fn claim_next_due(db: &dyn DatabaseAdapter, now: &str) -> Result<Option<Json>> {
+    let lease = (chrono::Utc::now() + chrono::Duration::seconds(LEASE_SECONDS)).to_rfc3339();
+    let mut p = Params::new();
+    p.insert("now".into(), json!(now));
+    p.insert("lease".into(), json!(lease));
+    let sql = "UPDATE _event_outbox SET claim_expires_at = :lease \
+               WHERE id = ( \
+                 SELECT id FROM _event_outbox \
+                 WHERE status = 'pending' AND next_attempt_at <= :now \
+                   AND (claim_expires_at IS NULL OR claim_expires_at <= :now) \
+                 ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED) \
+               RETURNING id, hub_id, user_id, permissions, event_name, module_id, payload, depth, attempts";
+    let res = db.query(sql, &p).await?;
+    Ok(res.rows.into_iter().next())
 }
 
 /// Procesa el relay hasta drenar todo lo vencido (incluida la cascada). Para tests y arranque.
@@ -345,7 +383,7 @@ async fn mark_delivered(db: &dyn DatabaseAdapter, id: &str) -> Result<()> {
     p.insert("id".into(), json!(id));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
-        "UPDATE _event_outbox SET status = 'delivered', delivered_at = :now WHERE id = :id",
+        "UPDATE _event_outbox SET status = 'delivered', delivered_at = :now, claim_expires_at = NULL WHERE id = :id",
         &p,
     )
     .await?;
@@ -357,7 +395,7 @@ async fn mark_dead(db: &dyn DatabaseAdapter, id: &str, err: &str) -> Result<()> 
     p.insert("id".into(), json!(id));
     p.insert("err".into(), json!(err));
     db.execute(
-        "UPDATE _event_outbox SET status = 'dead', last_error = :err WHERE id = :id",
+        "UPDATE _event_outbox SET status = 'dead', last_error = :err, claim_expires_at = NULL WHERE id = :id",
         &p,
     )
     .await?;
@@ -365,6 +403,8 @@ async fn mark_dead(db: &dyn DatabaseAdapter, id: &str, err: &str) -> Result<()> 
 }
 
 /// Reintento: incrementa `attempts`, reprograma con backoff; si supera `MAX_ATTEMPTS` → dead.
+/// Limpia el lease (`claim_expires_at = NULL`) para que la fila diferida —que sigue `pending`—
+/// vuelva a ser reclamable en cuanto venza su `next_attempt_at`.
 async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &str) -> Result<()> {
     let next = attempts + 1;
     if next >= MAX_ATTEMPTS {
@@ -377,7 +417,7 @@ async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &
     p.insert("next_at".into(), json!(next_at));
     p.insert("err".into(), json!(err));
     db.execute(
-        "UPDATE _event_outbox SET attempts = :attempts, next_attempt_at = :next_at, last_error = :err WHERE id = :id",
+        "UPDATE _event_outbox SET attempts = :attempts, next_attempt_at = :next_at, last_error = :err, claim_expires_at = NULL WHERE id = :id",
         &p,
     )
     .await?;
@@ -840,5 +880,116 @@ mod tests {
             1,
             "la fila sana quedó entregada"
         );
+    }
+
+    /// hub#593: with `start-first` (ADR-0269) two runtimes of the same hub race the relay against
+    /// the same DB. The atomic claim (`FOR UPDATE SKIP LOCKED` + lease) guarantees that a row
+    /// claimed by one instance is **invisible** to the other while it is being delivered. This
+    /// test reproduces the race deterministically, at the link that decides it — the claim:
+    ///
+    /// 1. Instance A claims the due event → returns the row and stamps `claim_expires_at` into the
+    ///    future (leased). It has not resolved yet (`status` is still `pending`).
+    /// 2. Instance B claims right after: its `WHERE` requires
+    ///    `claim_expires_at IS NULL OR <= now`, so the leased row is **invisible** → `None`.
+    ///
+    /// Without the lease (or its `WHERE` condition), B would see the same due row and claim it too
+    /// → both would deliver the event. The test **fails** if the lease is removed from the claim.
+    #[tokio::test]
+    async fn two_instances_do_not_double_deliver_an_event() {
+        use erplora_db::testutil::TestDb;
+
+        let tdb = TestDb::new().await;
+        let db_a = tdb.adapter().await;
+        let db_b = tdb.adapter().await;
+        ensure_tables(&db_a).await.unwrap();
+
+        // One due event in the outbox.
+        let mut p = Params::new();
+        p.insert("id".into(), json!("evt-1"));
+        p.insert("hub_id".into(), json!("h1"));
+        p.insert("user_id".into(), json!("u1"));
+        p.insert("permissions".into(), json!("[]"));
+        p.insert("event_name".into(), json!("e"));
+        p.insert("payload".into(), json!("{}"));
+        p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        db_a.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, module_id, payload, status, attempts, \
+              next_attempt_at, last_error, created_at) \
+             VALUES (:id, :hub_id, :user_id, :permissions, :event_name, '', :payload, 'pending', 0, \
+                     :at, '', :at)",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        let now = "2026-01-01T00:00:00+00:00";
+
+        // A claims the due event → it wins (leased, not yet resolved).
+        let claimed_a = claim_next_due(&db_a, now).await.unwrap();
+        assert!(claimed_a.is_some(), "A claims the due event");
+        assert_eq!(
+            claimed_a.as_ref().unwrap()["id"].as_str(),
+            Some("evt-1"),
+            "A took the right row"
+        );
+
+        // B claims the same row while A has it leased → it does not see it (None). Without the
+        // lease, B would see it due and claim it again → double delivery once both run their relay.
+        let claimed_b = claim_next_due(&db_b, now).await.unwrap();
+        assert!(claimed_b.is_none(), "B cannot claim a row A has leased");
+
+        // Meanwhile the row is still `pending` (A has not resolved): the invisibility for B comes
+        // from the LEASE, not from a status already moved to `delivered`.
+        let still_pending = db_b
+            .query(
+                "SELECT status FROM _event_outbox WHERE id='evt-1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            still_pending.rows[0]["status"].as_str(),
+            Some("pending"),
+            "status does not advance until delivery (the guard is the lease, not the status)"
+        );
+    }
+
+    /// hub#593: an expired lease can be reclaimed. If a runtime died mid-delivery (or the process
+    /// was killed), its `claim_expires_at` is in the past by the time another sweep runs, so the
+    /// orphaned row is visible again and gets retried instead of being stuck forever.
+    #[tokio::test]
+    async fn an_expired_lease_can_be_reclaimed() {
+        use erplora_db::testutil::TestDb;
+
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter().await;
+        ensure_tables(&db).await.unwrap();
+
+        let mut p = Params::new();
+        p.insert("id".into(), json!("evt-1"));
+        p.insert("hub_id".into(), json!("h1"));
+        p.insert("user_id".into(), json!("u1"));
+        p.insert("permissions".into(), json!("[]"));
+        p.insert("event_name".into(), json!("e"));
+        p.insert("payload".into(), json!("{}"));
+        p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        p.insert("lease".into(), json!("2020-01-01T00:05:00+00:00"));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, module_id, payload, status, attempts, \
+              next_attempt_at, last_error, created_at, claim_expires_at) \
+             VALUES (:id, :hub_id, :user_id, :permissions, :event_name, '', :payload, 'pending', 0, \
+                     :at, '', :at, :lease)",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        // `now` is past the lease: the row is reclaimable.
+        let now = "2026-01-01T00:00:00+00:00";
+        let claimed = claim_next_due(&db, now).await.unwrap();
+        assert!(claimed.is_some(), "an expired lease is reclaimed (orphan recovery)");
+        assert_eq!(claimed.as_ref().unwrap()["id"].as_str(), Some("evt-1"));
     }
 }
