@@ -1,4 +1,4 @@
-// El asistente ANCLADO al hub (ADR-0281) — e2e de navegador contra el runtime REAL.
+// El asistente ANCLADO al hub (ADR-0282) — e2e de navegador contra el runtime REAL.
 //
 // El fallo de producción que esto clava: preguntar «¿qué necesito configurar para poder empezar
 // a vender?» devolvía una página de consejo fiscal GENÉRICO (modelo 036, IAE, OSS…), porque el
@@ -139,7 +139,7 @@ test('la pregunta de configuración viaja ANCLADA: identidad, fecha y hub.setup.
     timeout: 15_000,
   });
 
-  // 2) El CONTRATO del turno que cruzó la frontera del Cloud — lo que ADR-0281 garantiza.
+  // 2) El CONTRATO del turno que cruzó la frontera del Cloud — lo que ADR-0282 garantiza.
   expect(capturedBody, 'el runtime nunca llamó al Cloud').toBeTruthy();
   const body = capturedBody!;
   const instructions = String(body.instructions ?? '');
