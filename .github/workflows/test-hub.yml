@@ -43,7 +43,18 @@ jobs:
 
     services:
       postgres:
-        image: postgres:18
+        # pgvector, NO `postgres:18` a secas: `crates/vector/tests/pg_store.rs` hace
+        # `CREATE EXTENSION vector` (ADR-0282) y sobre la imagen de stock sus 9 tests mueren con
+        #   type "public.vector" does not exist
+        # Eso tuvo `main` en ROJO 7 runs seguidos el 2026-08-09, desde que esos tests llegaron ahí.
+        #
+        # ⚠️ El gate local (`.githooks/pre-push`) tenía el MISMO defecto y se arregló en hub#647 —
+        # pero solo esa mitad. Son dos Postgres distintos para la misma suite: si uno cambia de
+        # imagen, el otro también. Cambiar solo uno es lo que produjo esta ventana.
+        #
+        # Mismo major (18) → el data dir es compatible; la extensión queda solo DISPONIBLE y los
+        # tests la siguen creando ellos.
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: hub_test
