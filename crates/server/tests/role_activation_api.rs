@@ -42,7 +42,16 @@ async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
             .as_nanos()
     ));
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("module.json"), KITCHEN).unwrap();
+    // Atomic write (hub#490): under load, a plain `write` followed by `install_from_dir` could
+    // observe a zero-byte file — the OS hadn't flushed the page cache yet when the reader opened
+    // it, producing `EOF while parsing a value, line 1 column 0`. Writing to a `.tmp` sidecar and
+    // `rename`-ing makes the manifest appear atomically: a reader either sees the old name (gone)
+    // or the complete new file, never a half-written one. `rename` on the same filesystem is atomic
+    // by POSIX, so the tmpdir + sidecar (same parent dir) satisfies it.
+    let target = dir.join("module.json");
+    let sidecar = dir.join("module.json.tmp");
+    std::fs::write(&sidecar, KITCHEN).unwrap();
+    std::fs::rename(&sidecar, &target).unwrap();
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
 
