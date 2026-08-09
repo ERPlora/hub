@@ -59,6 +59,7 @@ pub mod logging;
 pub mod media;
 pub mod members;
 pub mod module_storage;
+pub mod notify_transport;
 pub mod openapi;
 /// Operable dead-letter of the event outbox: list · retry · discard — hub#660 (ADR-0127 phase 2).
 pub mod outbox_admin;
@@ -512,16 +513,24 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         }
     }
 
-    // Transporte de `host.notify` (ADR-0012): cliente real de email/sms/whatsapp. Hoy un MOCK
-    // (decisión de dependencia del humano para el SMTP/SMS reales; ver crates/runtime/host_notify.rs).
-    // El mock pasa por el Outbox como cualquier transporte, así que la mecánica de reintentos/
-    // dead-letter del listener-host queda real. TODO: sustituir por el transporte real (lettre/HTTP).
+    // Transporte de `host.notify` (ADR-0012 + ADR-0283 §5 K4, hub#663): el cliente REAL. Email y
+    // WhatsApp salen por el **proxy del SaaS** (`/api/v1/hub/device/notify/{email,whatsapp}/`) con
+    // la credencial de máquina; el hub nunca guarda credenciales de Meta/SES (patrón del LLM).
+    //
+    // El mock sigue disponible, pero **hay que pedirlo por su nombre** (`HUB_NOTIFY_TRANSPORT=mock`)
+    // y no se cae en él por accidente: un mock devuelve `Sent` sin enviar nada, y el outbox marca
+    // entonces el evento como entregado — un recordatorio que nunca salió y del que nadie se entera.
+    // Un hub sin enrolar falla RUIDOSAMENTE (reintento → dead-letter), que sí se ve.
     state
         .runtime
         .lock()
         .await
-        .set_notify_transport(std::sync::Arc::new(
-            erplora_runtime::host_notify::MockTransport::new(),
+        .set_notify_transport(notify_transport::build(
+            state.http.clone(),
+            &state.config.cloud_base_url,
+            state.hub_id.clone(),
+            state.machine_token.clone(),
+            std::env::var(notify_transport::TRANSPORT_ENV).ok(),
         ));
 
     // Registro GLOBAL de errores ("todo controlado", un único embudo): instala el sink que reenvía
