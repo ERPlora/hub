@@ -98,6 +98,8 @@ impl fmt::Debug for HttpRequest {
 }
 
 /// The two halves of a prepared step: the one that goes out and the one that gets written down.
+/// Its `Debug` is [`HttpRequest`]'s, which is redacted.
+#[derive(Debug)]
 pub(crate) struct Prepared {
     pub request: HttpRequest,
     /// What `_flow_run_steps.input` records — the same request with [`REDACTED`] where each secret
