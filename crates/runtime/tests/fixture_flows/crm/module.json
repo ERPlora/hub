@@ -1,0 +1,32 @@
+{
+  "id": "crm",
+  "name": "CRM",
+  "version": "1.0.0",
+  "permissions": ["crm.change_customer"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "crm.note.add": {
+      "permission": "crm.change_customer",
+      "sql": ["sql/add_note.sql"],
+      "emit": ["crm.note.added"]
+    },
+    "crm.note.count": {
+      "permission": "crm.change_customer",
+      "sql": ["sql/count_note.sql"]
+    },
+    "crm._purge_notes": {
+      "permission": "crm.change_customer",
+      "sql": ["sql/purge_notes.sql"]
+    },
+    "crm.receipt.stamp": {
+      "permission": "crm.change_customer",
+      "sql": ["sql/stamp_receipt.sql"]
+    },
+    "crm.note.echo": {
+      "permission": "crm.change_customer",
+      "sql": ["sql/add_note.sql"],
+      "emit": ["sale.completed"]
+    }
+  },
+  "events": { "listen": { "crm.note.added": { "command": "crm.note.count" } } }
+}

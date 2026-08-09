@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS sales_sale (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, total TEXT NOT NULL, customer_id TEXT NOT NULL);

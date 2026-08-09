@@ -839,6 +839,159 @@ ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_by TEXT NOT NUL
         kind: Kind::Expand,
         postgres: "ALTER TABLE hub_module ADD COLUMN IF NOT EXISTS pinned_version TEXT;",
     },
+    // ── v31 — hub#661 / ADR-0283 K1: `_flow`, the flow itself ────────────────────────────────
+    // A flow is a core row with a VERSIONED JSON definition (`schema_version`, 1 from day one:
+    // an unknown version is refused, never guessed). The definition is stored as it was written,
+    // not exploded into columns, because the shape that gets frozen is the DOCUMENT (§9) — and a
+    // document the kernel can round-trip is what lets a future `schema_version: 2` read what v1
+    // wrote instead of migrating rows.
+    //
+    // Row contract of `tenancy.md`, in full: `hub_id`, soft-delete (`deleted_at`/`deleted_by`) and
+    // audit on both ends. It is not ceremony here — a flow row is a standing authorisation for the
+    // hub to act with nobody watching, so "who created this, who last changed it, and when did it
+    // stop existing" is the minimum an audit can ask.
+    //
+    // ⚠️ **v31: the next number ABOVE THE MAXIMUM, re-checked at rebase** (hub#573). `apply`
+    // aborts loudly on a catalogue entry at or below the maximum applied version, but only after a
+    // hub already has the higher number — pick the number against `origin/develop`, not memory.
+    SystemMigration {
+        version: 31,
+        name: "flow",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, \
+  enabled INTEGER NOT NULL DEFAULT 1, schema_version INTEGER NOT NULL DEFAULT 1, \
+  definition TEXT NOT NULL DEFAULT '{}', \
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  deleted_at TEXT, deleted_by TEXT, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_flow_hub ON _flow (hub_id);",
+    },
+    // ── v32 — hub#661 / ADR-0283 D2: `_flow_grants`, what a flow is allowed to do ─────────────
+    // **Default-deny by absence**: no row, no permission. There is deliberately no `granted`
+    // boolean — a grant either exists and is alive, or it does not exist. A column would allow a
+    // row that says "no", and then two places would have to agree on what that means.
+    //
+    // Revocation is a SOFT-DELETE, so the partial unique index has to be partial: without the
+    // `WHERE deleted_at IS NULL`, revoking a grant and granting it again later would collide with
+    // its own tombstone, and the owner would be told the permission is already given while the
+    // gate refuses it. `granted_by`/`revoked_by` name the admin on both ends — a grant is the one
+    // thing in the kernel that a person, not a machine, has to decide.
+    //
+    // ⚠️ v32: number re-checked against the maximum at rebase (hub#573).
+    SystemMigration {
+        version: 32,
+        name: "flow_grants",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_grants (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, flow_id TEXT NOT NULL, \
+  kind TEXT NOT NULL, value TEXT NOT NULL, \
+  created_at TEXT NOT NULL, granted_by TEXT NOT NULL DEFAULT '', \
+  deleted_at TEXT, revoked_by TEXT, \
+  PRIMARY KEY (id));\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_flow_grant_live \
+  ON _flow_grants (hub_id, flow_id, kind, value) WHERE deleted_at IS NULL;\
+CREATE INDEX IF NOT EXISTS ix_flow_grant_flow ON _flow_grants (hub_id, flow_id);",
+    },
+    // ── v33 — hub#661 / ADR-0283 §3: `_flow_triggers`, materialised from the definition ───────
+    // The triggers live INSIDE the flow document; this table is the index the hot paths read —
+    // the outbox relay asking "does this event start anything?" and the tick asking "is anything
+    // due?". Re-saving a flow re-seeds it idempotently and **preserves `next_run`** (the
+    // `seed_module_tasks` pattern): editing the name of a flow must not silently reschedule a
+    // nightly job to now.
+    //
+    // `trigger_key` is the identity of a trigger WITHIN its flow, so re-seeding updates instead of
+    // duplicating. `claim_expires_at` mirrors `_scheduled_tasks`/`_event_outbox`: with start-first
+    // deploys (ADR-0269) two runtimes of the same hub share this table, and a due trigger must
+    // fire once, not twice.
+    //
+    // `_scheduled_tasks` is deliberately NOT reused (ADR-0283 §3): it is keyed by
+    // `(module_id, name)` and fires a command of that module. A flow is not a module.
+    //
+    // ⚠️ v33: number re-checked against the maximum at rebase (hub#573).
+    SystemMigration {
+        version: 33,
+        name: "flow_triggers",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_triggers (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, flow_id TEXT NOT NULL, \
+  trigger_key TEXT NOT NULL, kind TEXT NOT NULL, \
+  event_name TEXT NOT NULL DEFAULT '', filter TEXT NOT NULL DEFAULT '{}', \
+  input_map TEXT NOT NULL DEFAULT '{}', cron TEXT NOT NULL DEFAULT '', \
+  run_at TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 1, \
+  next_run TEXT, last_run TEXT, claim_expires_at TEXT, \
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT, \
+  PRIMARY KEY (id));\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_flow_trigger_key \
+  ON _flow_triggers (hub_id, flow_id, trigger_key) WHERE deleted_at IS NULL;\
+CREATE INDEX IF NOT EXISTS ix_flow_trigger_event \
+  ON _flow_triggers (hub_id, kind, event_name) WHERE deleted_at IS NULL;\
+CREATE INDEX IF NOT EXISTS ix_flow_trigger_due ON _flow_triggers (next_run);",
+    },
+    // ── v34 — hub#661 / ADR-0283 §8: `_flow_runs`, one execution of one flow ──────────────────
+    // The run is the unit of recovery: `claim_expires_at` + `FOR UPDATE SKIP LOCKED` (the outbox
+    // and print-queue model) so a runtime that dies mid-run does not strand it, and `wake_at` so a
+    // `delay` step costs a row update instead of a held task.
+    //
+    // **`depth` is the anti-loop guard and it is why this column exists** (an addition to the
+    // design in flows.md §3, which relied on the event depth alone). A run inherits the depth of
+    // the event that started it and passes it to `execute_at`, so the events its commands emit
+    // come out one level deeper. Without it every flow-emitted event would be born at depth 1 and
+    // a flow that triggers itself would spin forever at a depth the guard never notices — the
+    // guard would be describing a ceiling nothing ever climbs.
+    //
+    // ⚠️ v34: number re-checked against the maximum at rebase (hub#573).
+    SystemMigration {
+        version: 34,
+        name: "flow_runs",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_runs (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, flow_id TEXT NOT NULL, \
+  trigger_id TEXT NOT NULL DEFAULT '', trigger_kind TEXT NOT NULL DEFAULT '', \
+  parent_event_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', \
+  current_step INTEGER NOT NULL DEFAULT 0, input TEXT NOT NULL DEFAULT '{}', \
+  vars TEXT NOT NULL DEFAULT '{}', depth INTEGER NOT NULL DEFAULT 0, \
+  wake_at TEXT, attempts INTEGER NOT NULL DEFAULT 0, \
+  last_error TEXT NOT NULL DEFAULT '', claim_expires_at TEXT, \
+  started_at TEXT, finished_at TEXT, \
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, deleted_at TEXT, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_flow_run_due ON _flow_runs (hub_id, status, wake_at);\
+CREATE INDEX IF NOT EXISTS ix_flow_run_flow ON _flow_runs (hub_id, flow_id, created_at);",
+    },
+    // ── v35 — hub#661 / ADR-0283 §8: `_flow_run_steps`, what each step did ────────────────────
+    // One row per step attempted, with its resolved input and its output. The output is not a log
+    // line: the mapping language reads it back as `steps.<step_id>.<field>`, so this table is the
+    // *memory* of a run, and losing it would break the next step, not just the audit.
+    //
+    // `(run_id, step_index)` is unique among live rows: v1 is LINEAR (ADR-0283 §5), so a step
+    // index happening twice in one run is a bug, and the index is where that bug surfaces instead
+    // of quietly doubling an invoice.
+    //
+    // ⚠️ v35: number re-checked against the maximum at rebase (hub#573).
+    SystemMigration {
+        version: 35,
+        name: "flow_run_steps",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_run_steps (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, run_id TEXT NOT NULL, \
+  step_index INTEGER NOT NULL, step_id TEXT NOT NULL, kind TEXT NOT NULL, \
+  status TEXT NOT NULL DEFAULT 'pending', input TEXT NOT NULL DEFAULT '{}', \
+  output TEXT NOT NULL DEFAULT '{}', error TEXT NOT NULL DEFAULT '', \
+  started_at TEXT, finished_at TEXT, \
+  created_at TEXT NOT NULL, deleted_at TEXT, \
+  PRIMARY KEY (id));\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_flow_run_step \
+  ON _flow_run_steps (run_id, step_index) WHERE deleted_at IS NULL;\
+CREATE INDEX IF NOT EXISTS ix_flow_run_step_run ON _flow_run_steps (hub_id, run_id, step_index);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2394,6 +2547,9 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        assert_eq!(MIGRATIONS.len(), 27, "el catálogo cambió de tamaño");
+        // 32 = 27 + las cinco del kernel de automatización (v31–v35, hub#661). El número está a
+        // mano a propósito: añadir una migración de sistema tiene que ser un gesto CONSCIENTE, y
+        // este assert es lo que obliga a mirar el catálogo entero antes de tocarlo.
+        assert_eq!(MIGRATIONS.len(), 32, "el catálogo cambió de tamaño");
     }
 }

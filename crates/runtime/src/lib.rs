@@ -27,6 +27,7 @@ pub mod errors;
 pub mod events;
 pub mod export;
 pub mod fiscal_profile;
+pub mod flows;
 pub mod host_notify;
 pub mod hub_meta;
 pub mod hub_users;
@@ -67,7 +68,8 @@ pub use errors::{DemoLock, Result, RuntimeError};
 pub use manifest::{Manifest, ManifestWarning, CORE_VERSION};
 pub use module_update::ModuleUpdate;
 pub use registry::{
-    EventSink, ModuleSnapshot, ModuleStatus, NavEntry, Principal, Registry, RequestContext,
+    AutomationCtx, EventSink, ModuleSnapshot, ModuleStatus, NavEntry, Principal, Registry,
+    RequestContext,
 };
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
@@ -1714,6 +1716,96 @@ impl Runtime {
     /// Devuelve cuántas tareas corrió. `hub_id` es el del despliegue (contexto de sistema).
     pub async fn process_scheduler(&self, hub_id: &str) -> Result<usize> {
         scheduler::process_once(self.db.as_ref(), &self.registry, hub_id).await
+    }
+
+    // ── Automation kernel (ADR-0283, hub#661) ───────────────────────────────────────────────
+    // The REST surface (`crates/server/src/flows_api.rs`) is the only caller of these; there are
+    // deliberately no `hub.*` commands for flows (ADR-0283 §9 — the core is being frozen, and the
+    // dispatcher is not where new core surface goes).
+
+    /// One cycle of the flows kernel: fire due clock triggers, wake finished delays, advance
+    /// claimed runs. Called from the same 1 s loop as the outbox relay and the scheduler.
+    pub async fn process_flows(&self) -> Result<flows::executor::TickReport> {
+        flows::tick(self.db.as_ref(), &self.registry, &self.hub_id).await
+    }
+
+    pub async fn list_flows(&self) -> Result<Vec<flows::Flow>> {
+        flows::store::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    pub async fn get_flow(&self, id: &str) -> Result<flows::Flow> {
+        flows::store::get(self.db.as_ref(), &self.hub_id, id).await
+    }
+
+    pub async fn create_flow(&self, new: &flows::NewFlow, by: &str) -> Result<flows::Flow> {
+        flows::store::create(self.db.as_ref(), &self.hub_id, new, by).await
+    }
+
+    pub async fn update_flow(
+        &self,
+        id: &str,
+        new: &flows::NewFlow,
+        by: &str,
+    ) -> Result<flows::Flow> {
+        flows::store::update(self.db.as_ref(), &self.hub_id, id, new, by).await
+    }
+
+    pub async fn delete_flow(&self, id: &str, by: &str) -> Result<()> {
+        flows::store::delete(self.db.as_ref(), &self.hub_id, id, by).await
+    }
+
+    pub async fn list_flow_grants(&self, flow_id: &str) -> Result<Vec<flows::grants::Grant>> {
+        flows::grants::list(self.db.as_ref(), &self.hub_id, flow_id).await
+    }
+
+    /// Replaces the grant list of a flow. The commands are checked against the **registry** here,
+    /// so a grant naming something that does not exist is refused with the whole list.
+    pub async fn replace_flow_grants(
+        &self,
+        flow_id: &str,
+        wanted: &[(flows::grants::GrantKind, String)],
+        granted_by: &str,
+    ) -> Result<()> {
+        // 404 first: granting to a flow that is not here must not create rows for a ghost.
+        flows::store::get(self.db.as_ref(), &self.hub_id, flow_id).await?;
+        flows::grants::replace(
+            self.db.as_ref(),
+            &self.hub_id,
+            flow_id,
+            &self.registry,
+            wanted,
+            granted_by,
+        )
+        .await
+    }
+
+    /// `manual` trigger: starts a run and returns its id. The run itself is advanced by the tick,
+    /// never by the request — a flow with a delay would otherwise hold the HTTP call open.
+    pub async fn start_flow_run(
+        &self,
+        flow_id: &str,
+        input: &Json,
+        started_by: &str,
+    ) -> Result<String> {
+        flows::executor::start_manual_run(
+            self.db.as_ref(),
+            &self.hub_id,
+            flow_id,
+            input,
+            started_by,
+        )
+        .await
+    }
+
+    pub async fn list_flow_runs(&self, flow_id: &str, limit: i64) -> Result<Vec<flows::FlowRun>> {
+        flows::store::list_runs(self.db.as_ref(), &self.hub_id, flow_id, limit).await
+    }
+
+    pub async fn get_flow_run(
+        &self,
+        run_id: &str,
+    ) -> Result<(flows::FlowRun, Vec<flows::FlowRunStep>)> {
+        flows::store::get_run(self.db.as_ref(), &self.hub_id, run_id).await
     }
 
     /// Catch-up del scheduler al **arrancar** (Tauri/local): ejecuta una sola vez las tareas con

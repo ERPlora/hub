@@ -284,6 +284,31 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         }
     }
 
+    // ── Triggers de FLUJO (ADR-0283 §3, hub#661) ────────────────────────────────────────────
+    // Un evento entregado puede además arrancar flujos. Aquí SOLO se inserta la fila `_flow_runs`
+    // (transaccional, idempotente por `_event_delivery` con un listener sintético `_flow:<id>`):
+    // ejecutar el flujo inline mantendría el lock global del runtime tomado durante todo el flujo
+    // —incluidos sus delays— y congelaría los commands de todo el hub. Lo ejecuta el tick.
+    //
+    // Va DESPUÉS de los listeners de manifest a propósito: que un flujo reaccione a un evento no
+    // cambia cuándo corren los listeners de ese mismo evento. Y un fallo aquí NO impide marcar la
+    // fila entregada por lo demás: se registra como los otros (backoff/dead-letter) y los flujos
+    // que sí arrancaron ya tienen su marcador.
+    if let Err(e) = crate::flows::triggers::on_event(
+        db,
+        &ctx.hub_id,
+        &id,
+        &event_name,
+        &payload,
+        depth,
+    )
+    .await
+    {
+        if first_err.is_none() {
+            first_err = Some(format!("flows: {e}"));
+        }
+    }
+
     // Si algún listener falló, la fila se difiere/dead-lettera (NO se marca entregada): el/los
     // listeners fallidos se reintentarán; los que sí se entregaron ya tienen su marcador.
     if let Some(err) = first_err {
@@ -644,6 +669,21 @@ mod tests {
         }
     }
 
+    /// El esquema de sistema que deja un arranque REAL (`Runtime::ensure_system_tables`).
+    ///
+    /// Hasta hub#661 bastaba con `ensure_tables` (las dos tablas del outbox), porque el relay solo
+    /// leía las suyas. Ahora, tras entregar a los listeners, además le pregunta a `_flow_triggers`
+    /// si ese evento arranca algún flujo (ADR-0283 §3) — así que un fixture con MEDIO esquema deja
+    /// de parecerse a ningún hub, y sus tests pasarían a hablar del fixture en vez del relay.
+    /// Montarlo entero es más lento y es lo correcto: en un hub las tablas nacen juntas, bajo un
+    /// único lock de migración.
+    async fn system_schema(db: &PgAdapter) {
+        crate::installer::ensure_hub_module_table(db).await.unwrap();
+        crate::identity::ensure_tables(db).await.unwrap();
+        ensure_tables(db).await.unwrap();
+        crate::system_migrations::apply(db, "h1").await.unwrap();
+    }
+
     async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
         r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
@@ -655,7 +695,7 @@ mod tests {
     async fn outbox_async_delivery_is_exactly_once() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         // Módulo "m" activo: "m.fire" emite "e"; "m.append" (listener de "e") inserta n=1.
         let mut reg = Registry::new();
@@ -697,7 +737,7 @@ mod tests {
     async fn relay_delivers_to_an_underscore_prefixed_internal_listener() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         // "sales.void" emite "sale.voided"; "cash_register._reverse_sale" (interno, sin
         // `expose_api`) es su listener, como en el caso real (void_reversal_e2e.rs).
@@ -929,7 +969,7 @@ mod tests {
     async fn one_failing_listener_does_not_block_sibling_listeners() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         // "sales.void" emite "sale.voided"; dos listeners: "bad" (revienta: columna inexistente)
         // y "good" (inserta n=1). El orden del registro pone "bad" PRIMERO: si el bug siguiera
@@ -1013,7 +1053,7 @@ mod tests {
     async fn one_failing_row_does_not_starve_later_rows_in_the_batch() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         // "poison.fire" emite "poison.e" cuyo ÚNICO listener revienta (columna inexistente).
         // "ok.fire" emite "ok.e" cuyo listener inserta n=1. Disparamos "poison" ANTES para que su
@@ -1090,7 +1130,7 @@ mod tests {
         let tdb = TestDb::new().await;
         let db_a = tdb.adapter().await;
         let db_b = tdb.adapter().await;
-        ensure_tables(&db_a).await.unwrap();
+        system_schema(&db_a).await;
 
         // One due event in the outbox.
         let mut p = Params::new();
@@ -1153,7 +1193,7 @@ mod tests {
 
         let tdb = TestDb::new().await;
         let db = tdb.adapter().await;
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         let mut p = Params::new();
         p.insert("id".into(), json!("evt-1"));
@@ -1194,7 +1234,7 @@ mod tests {
     async fn hub_with_a_dead_letter() -> (PgAdapter, Registry) {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         let mut reg = Registry::new();
         reg.status.insert("m".into(), ModuleStatus::Active);
@@ -1410,7 +1450,7 @@ mod tests {
         )
         .await
         .unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         let mut reg = Registry::new();
         reg.status.insert("sales".into(), ModuleStatus::Active);

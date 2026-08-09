@@ -584,6 +584,28 @@ pub struct RequestContext {
     /// `created_by` — the double attribution is the whole point of approving instead of sharing a
     /// password.
     pub approved_by: Option<String>,
+    /// **Which flow is acting, when no person is** (ADR-0283 D2, hub#661). `Some` means this
+    /// request is a step of a flow run, and the permission gate in `commands::execute_at` asks
+    /// `_flow_grants` about THAT flow instead of asking a role about a human.
+    ///
+    /// The field is **private and its setter is `pub(crate)`** on purpose, and that is the whole
+    /// mechanism: `RequestContext` crosses the crate boundary into `erplora-server`, where every
+    /// context is built from something a caller sent (a session, an API key, a header). Were this
+    /// `pub`, a route could stamp `automation: Some(flow_id)` on a request and inherit that flow's
+    /// grants — turning «the hub acting on its own» into a privilege anybody with an HTTP client
+    /// could claim. Only the runtime's own executor can fill it in.
+    automation: Option<AutomationCtx>,
+}
+
+/// Identity of the flow behind an automation request: which flow, and which of its runs.
+///
+/// Both halves are needed and neither is decoration: `flow_id` is what the grant gate reads, and
+/// `run_id` is what ties the effects back to the execution that caused them when somebody later
+/// asks why a row exists.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutomationCtx {
+    pub flow_id: String,
+    pub run_id: String,
 }
 
 /// Who is behind a request. The distinction only exists because of what it forbids.
@@ -626,7 +648,21 @@ impl RequestContext {
             principal: Principal::Human,
             elevation_token: None,
             approved_by: None,
+            automation: None,
         }
+    }
+
+    /// Marks this context as **a step of a flow run** (ADR-0283 D2). `pub(crate)` is the point:
+    /// see [`RequestContext::automation`].
+    pub(crate) fn with_automation(mut self, automation: AutomationCtx) -> Self {
+        self.automation = Some(automation);
+        self
+    }
+
+    /// The flow this request belongs to, if any. Readable everywhere (the audit and the error
+    /// reporter want it); settable only inside the runtime.
+    pub fn automation(&self) -> Option<&AutomationCtx> {
+        self.automation.as_ref()
     }
 
     /// Marks this context as a **machine** principal (an API key — [`Principal::Machine`]). Only

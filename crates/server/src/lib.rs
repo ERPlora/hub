@@ -53,6 +53,7 @@ pub mod event_stream;
 pub mod export_import;
 /// ERPlora's DELEGATED fiscal certificate, fetched from the control plane (ADR-0202 §2 — hub#317).
 pub mod fiscal_certificate;
+pub mod flows_api;
 pub mod hub_users;
 pub mod login_throttle;
 pub mod readiness;
@@ -580,6 +581,15 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     if let Err(e) = rt.process_scheduler(&hub_id).await {
                         eprintln!("scheduler: {e}");
                     }
+                    // Kernel de automatización (ADR-0283, hub#661): dispara los triggers de reloj,
+                    // despierta los `delay` vencidos y avanza los runs reclamados. Comparte este
+                    // lock con los dos de arriba, y por eso su trabajo está ACOTADO por tick
+                    // (`MAX_RUNS_PER_TICK` × `MAX_STEPS_PER_TICK`, todos sin I/O): un step `http` o
+                    // un turno de IA aquí dentro congelaría los commands de todo el hub, así que
+                    // esos van por claim → I/O → complete FUERA del lock (hub#662/#665).
+                    if let Err(e) = rt.process_flows().await {
+                        eprintln!("flows: {e}");
+                    }
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
             }
@@ -1000,6 +1010,33 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/events/:id/discard",
             post(outbox_admin::discard_dead),
         )
+        // ── Kernel de automatización (ADR-0283 K7, hub#661) ────────────────────────────────
+        // REST del core, NO commands `hub.*`: el core se congela y el dispatcher no es donde se
+        // añade superficie nueva (§9). Misma puerta que las keys y la dead-letter: sesión local de
+        // un humano owner/admin — `PUT …/grants` es la pantalla donde una persona decide qué puede
+        // hacer el hub cuando no hay nadie mirando, y una credencial de integración copiable no
+        // decide eso (podría concederse a sí misma todo el hub a través de un flujo).
+        //
+        // ⚠️ `/flows/runs/:run_id` va ANTES de `/flows/:id/...` en este `Router` solo por
+        // legibilidad: matchit resuelve el segmento estático `runs` con prioridad sobre el
+        // parámetro `:id`, y `tests/flows_api_test.rs` lo comprueba contra el router de verdad.
+        .route(
+            "/api/hub/flows",
+            get(flows_api::list_flows).post(flows_api::create_flow),
+        )
+        .route("/api/hub/flows/runs/:run_id", get(flows_api::get_run))
+        .route(
+            "/api/hub/flows/:id",
+            get(flows_api::get_flow)
+                .put(flows_api::update_flow)
+                .delete(flows_api::delete_flow),
+        )
+        .route(
+            "/api/hub/flows/:id/grants",
+            get(flows_api::list_grants).put(flows_api::replace_grants),
+        )
+        .route("/api/hub/flows/:id/run", post(flows_api::start_run))
+        .route("/api/hub/flows/:id/runs", get(flows_api::list_runs))
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
         .route("/api/v1/:module/c/:command", post(api_keys::data_command))

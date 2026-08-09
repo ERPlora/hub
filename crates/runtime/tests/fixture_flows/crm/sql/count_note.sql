@@ -1,0 +1,1 @@
+INSERT INTO crm_counter (name, n) VALUES ('notes', 1) ON CONFLICT (name) DO UPDATE SET n = crm_counter.n + 1;
