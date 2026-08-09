@@ -25,6 +25,11 @@ const DEFAULT_USER: &str = "local";
 pub enum AuthError {
     MissingSession,
     Invalid(String),
+    /// The session is perfectly valid — the ROLE is not enough (hub#660). It is a different answer
+    /// from the two above: `401` invites the caller to authenticate, and re-authenticating as the
+    /// same cashier will never help. Handlers that care about the distinction map this to `403`;
+    /// every handler that predates it maps the whole enum to `401` and is unaffected.
+    Forbidden(String),
 }
 
 impl AuthError {
@@ -32,7 +37,13 @@ impl AuthError {
         match self {
             AuthError::MissingSession => "falta sesión (cabecera X-Hub-Session)".to_string(),
             AuthError::Invalid(e) => format!("no autenticado: {e}"),
+            AuthError::Forbidden(e) => e.clone(),
         }
+    }
+
+    /// ¿Es un fallo de **rol** (sesión válida, permiso insuficiente) y no de autenticación?
+    pub fn is_forbidden(&self) -> bool {
+        matches!(self, AuthError::Forbidden(_))
     }
 }
 
@@ -192,7 +203,9 @@ pub async fn require_admin_session(
     if is_admin_role(&user.role) {
         Ok(user)
     } else {
-        Err(AuthError::Invalid(format!(
+        // Authenticated, just not allowed → `Forbidden`, so a handler that tells the two apart can
+        // answer `403`. Callers that map every `AuthError` to `401` keep behaving exactly as before.
+        Err(AuthError::Forbidden(format!(
             "se requiere rol owner/admin para gestionar el Hub (rol actual: {})",
             user.role
         )))
