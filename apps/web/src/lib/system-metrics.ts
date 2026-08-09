@@ -8,7 +8,9 @@
 // solo pinta. Fuera de un contenedor (Tauri/desktop, dev) memoria/CPU llegan como `null` y la UI
 // lo muestra como «n/a». Contrato implementado en `crates/server/src/system_metrics.rs`.
 
-import { config } from './config';
+// `config` was imported for `upgradeLink()`, the one thing here that built a Cloud address. With
+// that gone (hub#479) this module only reads the runtime's own metrics — it no longer knows the
+// SaaS exists.
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
 /** Métrica de recurso con uso y límite absolutos + fracción para la barra. `null` = no medible. */
@@ -114,13 +116,13 @@ export function shouldPromptUpgrade(m: SystemMetrics, threshold = UPGRADE_THRESH
   return upgradeReason(m, threshold) !== null;
 }
 
-/**
- * Deep-link al marketplace de planes del SaaS (el Hub NO vende, ADR-0114): abre el navegador
- * externo. Mismo patrón que `BillingPage` (`plansDeepLink`), con `utm_content` propio para atribuir
- * las conversiones que nacen del techo de recursos.
- */
-export function upgradeLink(): string {
-  return `${config.cloudApiUrl}/dashboard/marketplace/plans/?hub=${encodeURIComponent(
-    config.hubId,
-  )}&utm_source=hub&utm_content=system-limits`;
-}
+// `upgradeLink()` lived here: a deep-link to the SaaS plans marketplace, with its own `utm_content`
+// to attribute the conversions born at the resource ceiling. It is gone (hub#479).
+//
+// Not because the trip was broken — it worked — but because a link from inside the app to a page
+// that can take money is STEERING, and steering is what gets a listing rejected on Google Play and
+// on Microsoft Store. The Hub still says the shop is running out of room; it no longer offers the
+// door. Buying and upgrading live on erplora.com, which is the only place ERPlora sells.
+//
+// `upgradeReason()` above stays exactly as it was: knowing you are near the ceiling is useful on
+// its own, and it is what the panel now words as guidance instead of a button.

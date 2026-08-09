@@ -519,8 +519,9 @@ export default {
     installError: 'Could not start installation of {name}.',
     // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
     installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',
-    purchaseInBrowser: '{name} is a paid app — complete the purchase in your browser and come back.',
-    purchaseOpenError: 'Could not open the purchase page. Please try again.',
+    // Names the place, does not open it (hub#479). `purchaseInBrowser`/`purchaseOpenError` went
+    // with the button that opened the SaaS checkout.
+    needsSubscription: '{name} needs a subscription. Subscribe from your ERPlora account at erplora.com and it will install here.',
     deactivated: '{name} deactivated.',
     activated: '{name} activated.',
     cascadeOffTitle: 'Deactivate {name}',
@@ -815,11 +816,12 @@ export default {
     loadErrorBody: "The Hub couldn't report its resource usage right now. You can try again.",
     retry: 'Try again',
     upgradeTitle: 'Running out of room on your plan',
-    upgradeCta: 'See plans',
-    upgradeMemory: 'This hub is close to its memory limit. Upgrading gives it more room to run smoothly.',
-    upgradeDatabase: 'Your database is close to its plan limit. Upgrade for more storage.',
-    upgradeDevices: "You're using every device your plan allows. Upgrade to connect more.",
-    upgradeError: 'The plans page could not be opened in your browser. Go to erplora.com to upgrade.',
+    upgradeMemory: 'This hub is close to its memory limit. More room would let it run smoothly.',
+    upgradeDatabase: 'Your database is close to its plan limit.',
+    upgradeDevices: "You're using every device your plan allows.",
+    // Says WHERE, and stays a sentence: a link from here to the plans page is a link to somewhere
+    // money changes hands, and that is what both stores reject (hub#479).
+    upgradeWhere: 'Plans are managed from your ERPlora account at erplora.com.',
   },
   billing: {
     invoices: 'Invoices',
@@ -842,14 +844,13 @@ export default {
     month: 'month',
     ends: 'Ends',
     renews: 'Renews',
-    paymentsPortalNotice: 'Payment method management is handled from the billing portal.',
-    managePlan: 'Update plan',
-    managePlanHint: 'Plan upgrades and changes are managed from your ERPlora account (opens in your browser).',
-    managePlanError: 'Could not open the plans page. Please try again.',
-    portalError: 'Could not open the billing portal. Please try again.',
+    // These three name erplora.com instead of opening it: `managePlan`, `openBillingPortal` and
+    // their error strings went with the buttons (hub#479). No "opens in your browser" either —
+    // nothing opens from here any more.
+    paymentsPortalNotice: 'Payment methods are managed from your ERPlora account at erplora.com.',
+    managePlanHint: 'Plan changes are managed from your ERPlora account at erplora.com.',
     cloudAuthTitle: 'View billing in your ERPlora account',
-    cloudAuthBody: 'Your local session is still active. Invoices and subscriptions require your online account session.',
-    openBillingPortal: 'Open my billing',
+    cloudAuthBody: 'Your local session is still active. Invoices and subscriptions require your online account session at erplora.com.',
     loadErrorTitle: 'We could not load billing',
     loadErrorBody: 'Check your connection and try again. You can continue using the Hub.',
     retry: 'Try again',
@@ -1075,9 +1076,7 @@ export default {
     loadErrorHint: 'Check that the module is still installed and active, then try again.',
     retry: 'Try again',
     blockedTitle: 'Subscription required',
-    blockedHint: 'This paid module is disabled because its subscription is no longer active for this hub. Your local data is safe and will be available again as soon as the subscription is restored.',
-    manageSubscription: 'Manage subscription',
-    manageSubscriptionError: 'Subscription management could not be opened. Please try again.',
+    blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',
   },
   moduleSettings: {
     tab: 'Settings',
@@ -1098,18 +1097,15 @@ export default {
     trialDays: '{n}-day trial',
     quota: 'Includes {quota}',
     overage: '{price} per extra unit',
-    buy: 'Buy',
-    upgrade: 'Upgrade',
-    cancel: 'Cancel subscription',
     noTiers: 'This module has no paid plans.',
     trialEnds: 'Trial until {date}',
     renewsOn: 'Renews on {date}',
     cancelsOn: 'Cancels on {date}',
-    opensInBrowser: 'Purchases and plan changes are completed in your browser, on your ERPlora account.',
-    checkPurchase: 'I completed the purchase — check',
-    purchaseDetected: 'Purchase confirmed. Your plan has been updated.',
-    purchaseError: 'Could not open the purchase page. Please try again.',
-    cancelError: 'Could not open the subscription page. Please try again.',
+    // Where, not a way there — `buy` / `upgrade` / `cancel` and their error strings went with the
+    // buttons that carried them (hub#479).
+    managedInAccount: 'Plans for this module are managed from your ERPlora account at erplora.com.',
+    checkPurchase: 'I already subscribed — check',
+    purchaseDetected: 'Confirmed. Your plan has been updated.',
     status: {
       active: 'Active',
       trialing: 'Trialing',
