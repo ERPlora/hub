@@ -27,10 +27,14 @@ SELECT 'demo-user-0000000000000000000000', 'Demo',
        'admin', NULL, 1, '2026-01-01T00:00:00+00:00'
 WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE name = 'Demo');
 
--- Dispositivo de confianza del demo: permite el login por PIN sin login online previo cuando el
--- device-trust está activo. `device_id` = 'demo-trusted-device'. La confianza es del hub que se
--- siembra (v23/hub#489): sin el `:hub_id` la fila no nombraría hub y no la vería nadie.
-INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at)
-SELECT :hub_id, 'demo-trusted-device', 'Demo device', '2026-01-01T00:00:00+00:00'
-WHERE NOT EXISTS (SELECT 1 FROM hub_trusted_device
-                   WHERE hub_id = :hub_id AND device_id = 'demo-trusted-device');
+-- 🔴 AQUÍ HABÍA un dispositivo de confianza sembrado, `demo-trusted-device`, para que el login por
+-- PIN funcionase sin login online previo. NO funcionaba, y no podía (hub#630): el `device_id` se lo
+-- acuña el NAVEGADOR con un CSPRNG y lo guarda en el localStorage **del origen del hub**
+-- (`apps/web/src/lib/device.ts`), así que ningún visitante iba a presentar jamás ese nombre. Era un
+-- escritor sin lector posible — la demo arrancaba y se quedaba en «en este dispositivo todavía no
+-- funciona el PIN», que es exactamente lo que el visitante no puede resolver: no tiene cuenta.
+--
+-- Lo sustituye el **trust-on-first-use** del core (`crates/server/src/lib.rs`, login por PIN): en un
+-- hub de demo, el PRIMER dispositivo que se presenta queda adoptado y registrado, y los siguientes
+-- se rechazan como siempre. Sembrar una fila aquí volvería a romperlo — la adopción solo actúa
+-- cuando el hub no conoce ningún dispositivo todavía, y esta fila la haría inalcanzable.

@@ -154,9 +154,14 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
     }
 
     /// GARANTÍA del seed del demo (hub#36): aplicar `demo.sql` sobre un Runtime SQLite real deja
-    /// un usuario "Demo" cuyo PIN "0000" verifica, y un dispositivo de confianza `demo-trusted-device`.
-    /// Si el hash del PIN o los nombres de columna fueran erróneos, este test FALLA — es la red de
-    /// seguridad que pide hub#36.
+    /// un usuario "Demo" cuyo PIN "0000" verifica. Si el hash del PIN o los nombres de columna
+    /// fueran erróneos, este test FALLA — es la red de seguridad que pide hub#36.
+    ///
+    /// Ya NO siembra dispositivo de confianza (hub#630): el `device_id` lo acuña el navegador, así
+    /// que la fila que había aquí no la podía presentar nadie. Quien abre la puerta ahora es el
+    /// trust-on-first-use del login, y **necesita que el hub no conozca ningún dispositivo** —
+    /// sembrar uno lo desactivaría. Por eso este test comprueba lo contrario que antes: que el seed
+    /// deja la lista VACÍA.
     #[tokio::test]
     async fn demo_seed_enables_demo_pin_login_and_trusted_device() {
         let db = fresh_db().await;
@@ -167,7 +172,7 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
         // quien pone el `hub_id` del despliegue: llamar a `apply` a pelo dejaría sin probar
         // justamente el punto donde se decide de qué hub es lo que se siembra (hub#489).
         let n = runtime.apply_seed(DEMO_SEED).await.unwrap();
-        assert!(n >= 2, "el seed del demo aplica al menos usuario + dispositivo, fue {n}");
+        assert!(n >= 1, "el seed del demo aplica al menos el usuario, fue {n}");
 
         // El PIN "0000" del usuario "Demo" verifica (valida el formato del hash).
         let user = runtime.verify_pin("Demo", "0000").await.unwrap();
@@ -179,10 +184,13 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
         // PIN incorrecto NO verifica.
         assert!(runtime.verify_pin("Demo", "1111").await.unwrap().is_none());
 
-        // El dispositivo de confianza del demo está activo.
+        // 🔴 El seed NO deja ningún dispositivo de confianza, y eso es el contrato ahora (hub#630):
+        // el trust-on-first-use del login solo adopta al primer visitante si el hub no conoce
+        // ninguno todavía. Una fila sembrada aquí —como la que había, `demo-trusted-device`— dejaba
+        // la demo sin puerta: nadie podía presentar ese id y la adopción no llegaba a actuar.
         assert!(
-            runtime.is_device_trusted("demo-trusted-device").await.unwrap(),
-            "demo-trusted-device es de confianza"
+            runtime.list_devices().await.unwrap().is_empty(),
+            "el seed debe dejar la lista de dispositivos vacía o el first-use no adopta a nadie"
         );
 
         // Re-aplicar el seed es idempotente (no crea un segundo "Demo" ni falla).

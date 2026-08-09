@@ -191,6 +191,151 @@ async fn post_pin(app_: &axum::Router, body: Value) -> (StatusCode, Value) {
     (status, json)
 }
 
+/// Like [`fixture`], but the deployment declares this hub an **ephemeral demo** (`HUB_DEMO`).
+/// Device-trust stays ENFORCED: the point of the demo path is not that the gate is off.
+async fn demo_fixture() -> axum::Router {
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
+    rt.ensure_system_tables().await.unwrap();
+    // The seeded demo user, as `hub_demo_seed.sql` leaves it (name + PIN, no cloud id).
+    rt.create_user("Demo", "0000", "admin", None).await.unwrap();
+    let temp = std::env::temp_dir().join(format!("erplora-demo-tofu-{}", std::process::id()));
+    let cfg = HubConfig {
+        demo: true,
+        hub_id: HUB_ID.into(),
+        cloud_base_url: "https://example.invalid".into(),
+        module_cache: temp.join("modules-cache"),
+        auth_mode: AuthMode::Session,
+        jwt_public_key: Some(PUB.into()),
+        cloud_api_token: Some("machine-secret".into()),
+        device_trust_enforce: true,
+        media_dir: temp.clone(),
+        sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
+        bootstrap_blueprint: None,
+    };
+    app(AppState::with_config(rt, cfg))
+}
+
+// ── Demo: trust-on-first-use (hub#630) ─────────────────────────────────────────────────────
+//
+// A demo visitor has NO account, and "sign in online once" is the only way a device earns its
+// trust — so on a demo hub the PIN gate could never be passed by anybody. The hub arrived, the
+// seeded `Demo` user was there, and the login answered `device_untrusted` forever.
+//
+// The fix is not to disarm the gate. It is that on a demo hub the FIRST device to present itself
+// is adopted, and every later one is refused as always: the visitor who opened the hub gets in,
+// and somebody who later guesses the URL does not walk into their session.
+//
+// 🔴 Note what these tests do NOT do: seed the trust with `rt.trust_device(..)`. The claim is that
+// the LOGIN grants it, so the assertion has to come out of the login itself.
+
+#[tokio::test]
+async fn a_demo_adopts_the_first_device_that_shows_up() {
+    let app_ = demo_fixture().await;
+
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Demo", "pin": "0000", "device_id": "dev_visitor" }),
+    )
+    .await;
+
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a demo visitor has no account, so nothing else could ever earn the trust: {body}"
+    );
+}
+
+#[tokio::test]
+async fn the_adoption_is_written_down_not_just_waved_through() {
+    // Distinguishes "the gate lets demos pass" from "the demo REGISTERED this device". Only the
+    // second one can refuse the next device, which is the whole point of first-use.
+    let app_ = demo_fixture().await;
+
+    post_pin(
+        &app_,
+        json!({ "name": "Demo", "pin": "0000", "device_id": "dev_first" }),
+    )
+    .await;
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Demo", "pin": "0000", "device_id": "dev_second" }),
+    )
+    .await;
+
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the first device was adopted, so a SECOND one must be refused: {body}"
+    );
+    assert_eq!(body["code"], json!("device_untrusted"), "{body}");
+}
+
+#[tokio::test]
+async fn the_adopted_device_keeps_getting_in() {
+    let app_ = demo_fixture().await;
+
+    post_pin(
+        &app_,
+        json!({ "name": "Demo", "pin": "0000", "device_id": "dev_visitor" }),
+    )
+    .await;
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Demo", "pin": "0000", "device_id": "dev_visitor" }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK, "the visitor must not be locked out of their own demo: {body}");
+}
+
+#[tokio::test]
+async fn a_demo_still_refuses_a_client_that_does_not_identify_its_device() {
+    // First-use adopts a device; it does not invent one. An unidentified client is refused on a
+    // demo exactly as anywhere else (hub#330) — otherwise "demo" would be a bypass of the gate
+    // rather than a way through it.
+    let app_ = demo_fixture().await;
+
+    let (status, body) = post_pin(&app_, json!({ "name": "Demo", "pin": "0000" })).await;
+
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    assert_eq!(body["code"], json!("device_unidentified"), "{body}");
+}
+
+#[tokio::test]
+async fn a_NORMAL_hub_never_adopts_anybody() {
+    // 🔴 The expensive direction. If first-use leaked to a normal hub, every hub on the public
+    // internet would hand its PIN door to whoever knocked first — the exact bypass hub#330 closed.
+    let app_ = fixture(true, None).await;
+
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Admin", "pin": "1111", "device_id": "dev_stranger" }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    assert_eq!(body["code"], json!("device_untrusted"), "{body}");
+}
+
+#[tokio::test]
+async fn a_demo_does_not_hand_the_door_to_a_WRONG_pin() {
+    // The device gate runs FIRST, so adopting on first use must not shortcut what comes behind it
+    // (the brute-force lock and the PIN check itself). A wrong PIN is still a wrong PIN.
+    let app_ = demo_fixture().await;
+
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Demo", "pin": "9999", "device_id": "dev_visitor" }),
+    )
+    .await;
+
+    assert_ne!(status, StatusCode::OK, "a wrong PIN must not open a demo: {body}");
+}
+
 #[tokio::test]
 async fn enforce_on_without_device_id_is_refused() {
     let app_ = fixture(true, None).await;

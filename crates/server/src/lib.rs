@@ -2451,15 +2451,39 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
         match rt.is_device_trusted(device_id).await {
             Ok(true) => {}
             Ok(false) => {
-                return (
-                    StatusCode::FORBIDDEN,
-                    Json(json!({
-                        "ok": false,
-                        "error": "this device has not signed in with an account yet",
-                        "code": "device_untrusted"
-                    })),
-                )
-                    .into_response()
+                // Demo hubs adopt the FIRST device that shows up (hub#630). A demo visitor has no
+                // account, and an online cloud login is the only thing that otherwise earns a
+                // device its trust — so without this the PIN door on a demo could never be opened
+                // by anybody: the hub came up, the seeded `Demo` user was there, and every login
+                // answered `device_untrusted` until the reaper destroyed it.
+                //
+                // First use, not "off". The gate stays enforced and only the empty case is
+                // special: once a device is adopted, the next one is refused exactly as always, so
+                // whoever opened the demo keeps it and somebody who later guesses the URL does not
+                // walk into their session. `Registry::demo_hub` is sealed at boot from `HUB_DEMO`
+                // and has no writer (ADR-0197 §4), so this cannot be turned on from outside.
+                let adopt = if st.config.demo {
+                    match rt.list_devices().await {
+                        Ok(devices) => devices.is_empty(),
+                        Err(e) => return err_response(e),
+                    }
+                } else {
+                    false
+                };
+                if !adopt {
+                    return (
+                        StatusCode::FORBIDDEN,
+                        Json(json!({
+                            "ok": false,
+                            "error": "this device has not signed in with an account yet",
+                            "code": "device_untrusted"
+                        })),
+                    )
+                        .into_response();
+                }
+                if let Err(e) = rt.trust_device(device_id, "Demo (first device)").await {
+                    return err_response(e);
+                }
             }
             Err(e) => return err_response(e),
         }
