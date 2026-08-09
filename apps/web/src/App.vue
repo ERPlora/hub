@@ -154,6 +154,7 @@ import { PROFILE_ROUTE } from './lib/routes';
 import { maybeShowInstallModal } from './lib/pwa';
 import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
+import { installIdleLogout } from './lib/idle-logout';
 import { bootHubLanguage } from './i18n';
 import { getUserProfile } from './lib/user-profile';
 import { getClient } from './lib/runtime';
@@ -242,6 +243,14 @@ onMounted(() => {
 });
 watch(isAuthed, (authed) => {
   if (authed) void gateAndRefresh();
+});
+// Cierre por INACTIVIDAD (hub#628): con «Mostrar pinpad» ON y el range en N minutos
+// (`pin_policy = always`), una caja `shared` que nadie toca N minutos cierra la sesión y vuelve
+// al pinpad. El detector se arma/desarma solo (lib/idle-logout) según política + modo + sesión;
+// el ticket abierto no se pierde: las líneas ya persisten en BD en cada toque (ADR-0144).
+installIdleLogout(() => {
+  logout();
+  void router.replace('/login');
 });
 // Modal PWA «vista nativa»: se ofrece al ENTRAR (autenticado y ya FUERA de /login — el login
 // cloud crea sesión antes de terminar, p. ej. en el paso «crea tu PIN», y el modal no debe
