@@ -38,10 +38,16 @@ vi.mock('../lib/device-mode', async () => {
   const { ref } = await import('vue');
   const actual = await vi.importActual<typeof import('../lib/device-mode')>('../lib/device-mode');
   const deviceMode = ref<'shared' | 'personal'>('shared');
+  // hub#514: trust comes from the server now. The mock starts `false` (fail-closed) and the test
+  // flips it via `seedTrustedDevice`, mirroring what `GET /api/device/mode` would say.
+  const deviceTrusted = ref(false);
   return {
     deviceMode,
+    deviceTrusted,
     deviceModeReady: ref(true),
-    loadDeviceMode: vi.fn(async () => deviceMode.value),
+    loadDeviceMode: vi.fn(async () => {
+      return deviceMode.value;
+    }),
     setDeviceMode: vi.fn(),
     offersPinLogin: actual.offersPinLogin,
   };
@@ -78,7 +84,7 @@ vi.mock('../components/HubIcon.vue', () => ({ default: { name: 'HubIcon', templa
 
 import LoginPage from './LoginPage.vue';
 import { hubContextReady, machineRegistrationRequired, pinUsers } from '../lib/runtime';
-import { deviceMode, loadDeviceMode } from '../lib/device-mode';
+import { deviceMode, deviceTrusted, loadDeviceMode } from '../lib/device-mode';
 import { STRICT_PIN_POLICY, pinPolicy } from '../lib/pin-policy';
 
 // Read from the vitest root (`apps/web`): under happy-dom `import.meta.url` is not a `file:` URL.
@@ -102,6 +108,9 @@ function seedTrustedDevice(): void {
   pinUsers.value = [{ id: 'u1', name: 'Marta Ruiz', role: 'employee' }];
   hubContextReady.value = true;
   machineRegistrationRequired.value = false;
+  // hub#514: trust comes from the server. The test simulates `GET /api/device/mode` answering
+  // `trusted: true` for this device — what the old `erplora.trusted` flag pretended to be.
+  deviceTrusted.value = true;
 }
 
 async function mountLogin() {
