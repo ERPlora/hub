@@ -237,7 +237,28 @@ async function gateAndRefresh(): Promise<void> {
   // it feeds lives in the sidebar and the sidebar needs a session; idempotent, so the `watch` below
   // re-entering does not start a second clock. In a browser it never starts at all.
   bootAppUpdateWatch();
+
+  // La nav de módulos se refresca GLOBALMENTE al instalarse un módulo. El único oyente de
+  // `module.installed` vivía en AppsPage (montada solo en /apps): instalar desde el DRAWER del
+  // asistente (hub#631) —o desde otro dispositivo/pestaña— con cualquier otra pantalla abierta
+  // dejaba el shell ciego hasta recargar (visto en vivo el 2026-08-09: taxes+inventory activos
+  // en el runtime y la lista de apps sin enterarse). Idempotente: guarda de una sola suscripción.
+  if (!moduleInstalledUnsub) {
+    moduleInstalledUnsub = getClient().on('module.installed', () => {
+      // La MISMA secuencia del login: entitlement ANTES que nav — `loadMenu` filtra por
+      // `isModuleEntitled` sobre el snapshot resuelto, y un módulo recién instalado no está
+      // en el snapshot viejo: refrescar solo la nav lo dejaba filtrado (visto en vivo).
+      void (async () => {
+        await resolveEntitlement();
+        await refreshModuleNav();
+        await refreshSetupStatus(getClient());
+      })();
+    });
+  }
 }
+
+/** Desuscripción de `module.installed` (una sola suscripción viva; App.vue no se desmonta). */
+let moduleInstalledUnsub: (() => void) | null = null;
 onMounted(() => {
   if (isAuthed.value) void gateAndRefresh();
 });

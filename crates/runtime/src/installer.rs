@@ -54,6 +54,9 @@ pub async fn install(
     // hub#351 (paso 2b): same door for the roles the module declares. A manifest may add roles to
     // the hub's catalogue, but it can neither redefine a base role nor hand out administration.
     validate_role_declarations(&manifest)?;
+    // hub#659 (ADR-0283 §7): same door for the commands its `events.listen` subscribes. A module
+    // reacts to anyone's EVENT, but always with a command of its OWN.
+    validate_event_listeners(&manifest)?;
     // ADR-0273 D6 (hub#555): same door for the regime a module claims to implement. What it
     // declares here is what the core will COUNT as a provider, so a malformed block must not be
     // stored — it would read as "no provider installed", which blocks a till.
@@ -255,6 +258,52 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
                     manifest.id
                 )));
             }
+        }
+    }
+    Ok(())
+}
+
+/// Validates the `events.listen` block of a manifest (hub#659, ADR-0283 §7): every subscribed
+/// command must belong to the module that declares the listener.
+///
+/// A listener is the one place where a manifest names a command that somebody ELSE will run: the
+/// relay resolves the name from `registry.listeners` long after the install, with no caller in
+/// sight. Until this door existed, `"sale.completed": {"command": "inventory.stock.decrease"}` in a
+/// third-party manifest was registered as written, and the only thing between it and the other
+/// module's data was the permission check at delivery time — an omission, not a decision.
+///
+/// The two sibling doors already refuse the same thing, and this one only puts `events.listen` on
+/// their level:
+///
+/// - [`crate::scheduler`] runs a scheduled task only if `get_command(&command).module_id` is the
+///   module that declared the task.
+/// - `commands::validate_operation` requires a handler's extra operations to be its module's own.
+///
+/// Ownership is the **namespace** (`<module_id>.`), not a string prefix: `inventory_admin.wipe` is
+/// no more `inventory`'s than `hub.users.create` is — the core namespace (ADR-0192) is foreign to
+/// every module too, and the dispatcher resolves it before ever reaching the registry.
+///
+/// What this deliberately does NOT do is stop a module from reacting to a foreign EVENT: that is
+/// the whole design (`inventory` listens to `sale.completed`, `verifactu` to `invoice.created`).
+/// What changes hands is the transformation — a cross-module reaction that has to RUN something of
+/// another module's is the territory of flows with explicit grants (`Origin::Automation`,
+/// ADR-0283), where the grant is visible and revocable, not a line in a zip.
+///
+/// Also deliberately NOT checked: that the command exists. A listener naming a command of its own
+/// module that it never declares is already inert — [`Registry::listeners_for`] only returns
+/// commands that are registered and active — so it is a manifest bug for `erplora validate` to
+/// catch, not a reason to refuse an install and leave the hub without the module.
+fn validate_event_listeners(manifest: &Manifest) -> Result<()> {
+    let namespace = format!("{}.", manifest.id);
+    for (event, listener) in &manifest.events.listen {
+        if !listener.command.starts_with(&namespace) {
+            return Err(RuntimeError::Other(format!(
+                "manifest `{}`: the listener for `{event}` points at `{}`, a command outside the \
+                 module's namespace `{namespace}`. A module reacts to any event, but always with a \
+                 command of its OWN — running another module's command belongs to a flow with an \
+                 explicit grant (ADR-0283), not to a line in a manifest",
+                manifest.id, listener.command
+            )));
         }
     }
     Ok(())
