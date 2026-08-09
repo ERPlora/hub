@@ -429,7 +429,7 @@ pub(crate) async fn execute_at(
 /// payload y se lo creía. Con `reads`, el handler resuelve el % contra `taxes.rules.list` (el
 /// catálogo del hub) y la pista del cliente queda como mero fallback.
 ///
-/// # Las tres reglas (ADR-0069 §1)
+/// # Las tres reglas (ADR-0069 §1) + la cuarta (hub#701)
 ///
 /// 1. **Alcance por DEPENDENCIA, no por permiso.** Solo queries del propio módulo o de los que
 ///    declara en `depends_on`. Un módulo no puede leerle las tablas a otro con el que no tiene
@@ -438,18 +438,22 @@ pub(crate) async fn execute_at(
 ///    ya se comprobó, y las reads son contrato vouched por el autor del módulo. Un empleado de POS
 ///    sin `taxes.view_tax` igual necesita los tipos para poder cobrar. Se conserva el `hub_id` del
 ///    caller (el tenant NO es negociable) y se usa el wildcard de permisos.
-/// 3. **Fallo GRACEFUL.** Una read que no resuelve se **omite** (no aborta el command). Cobrar es
-///    lo último que puede romperse en un TPV: si `taxes` está raro, el handler degrada a su
-///    fallback, pero la venta se cierra.
+/// 3. **Fallo GRACEFUL (defecto).** Una read que no resuelve se **omite** (no aborta el command).
+///    Cobrar es lo último que puede romperse en un TPV: si `taxes` está raro, el handler degrada
+///    a su fallback, pero la venta se cierra.
+/// 4. **`required` (hub#701, opt-in).** Una read marcada `required` que no resuelve **aborta**
+///    el command con `ReadUnavailable`. Es lo que no admite adivinar: el impuesto. Sin esto, un
+///    catálogo vacío (la read falló) es indistinguible de «este hub no tiene reglas», y el handler
+///    cobra el porcentaje que propone el navegador — exactamente lo que sales#21 prohíbe.
 async fn preload_reads(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     cmd: &RegisteredCommand,
     ctx: &RequestContext,
     payload: &erplora_db::Params,
-) -> Json {
+) -> Result<Json> {
     if cmd.def.reads.is_empty() {
-        return Json::Object(Default::default());
+        return Ok(Json::Object(Default::default()));
     }
 
     // Regla 1 — alcance: el propio módulo + sus `depends_on` declarados en el manifest.
@@ -484,17 +488,26 @@ async fn preload_reads(
         // contra la fila concreta se quedaba sin sitio donde vivir.
         let params = read.resolve_params_from_map(payload);
 
-        // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente), se omite.
         match crate::queries::execute(db, registry, name, &params, &sys).await {
             Ok(rows) => {
                 out.insert(name.to_string(), Json::Array(rows));
             }
             Err(e) => {
+                // Regla 4 (hub#701): una read OBLIGATORIA aborta. Sin esto, el handler recibe un
+                // catálogo vacío indistinguible de «no hay reglas» y degrada al porcentaje del
+                // payload — que es justo lo que no puede admitir adivinar (el impuesto).
+                if read.is_required() {
+                    return Err(RuntimeError::ReadUnavailable {
+                        query: name.to_string(),
+                    });
+                }
+                // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente),
+                // se omite. Cobrar es lo último que puede romperse en un TPV.
                 eprintln!("⚠ reads: `{name}` falló ({e}) → se omite; el handler degradará");
             }
         }
     }
-    Json::Object(out)
+    Ok(Json::Object(out))
 }
 
 async fn execute_wasm(
@@ -525,7 +538,7 @@ async fn execute_wasm(
     // LECTURAS PRE-CARGADAS (ADR-0069). El handler corre en un sandbox y NO puede leer la BD, así
     // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
     // confianza del hub**.
-    let reads = preload_reads(db, registry, cmd, ctx, payload).await;
+    let reads = preload_reads(db, registry, cmd, ctx, payload).await?;
     let input = json!({
         "payload": Json::Object(bound_payload),
         "context": {

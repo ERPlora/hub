@@ -236,3 +236,51 @@ fn un_campo_ausente_del_payload_resuelve_a_null_no_revienta() {
     let resueltos = def.resolve_params_from_map(&params(serde_json::json!({ "otro": 1 })));
     assert_eq!(resueltos.get("product_id"), Some(&serde_json::Value::Null));
 }
+
+// ── `required` (hub#701): la read OBLIGATORIA aborta en vez de degradar ─────────────────────────
+//
+// El defecto sigue siendo graceful (regla 3): una read que falla se omite. Pero la read de la que
+// depende el IMPUESTO no puede admitir adivinar: si `taxes.rules.list` llega vacía, el handler no
+// distingue «no hay reglas» de «el catálogo nunca llegó» y cae al `tax_rate` del payload — que es
+// justo lo que sales#21 prohíbe. `required` hace que el runtime aborte con `ReadUnavailable`.
+
+#[test]
+fn una_read_string_nunca_es_required() {
+    // La forma simple no puede ser obligatoria: el caso fácil sigue siendo el caso graceful.
+    let def: erplora_runtime::manifest::ReadDef =
+        serde_json::from_str(r#""taxes.rules.list""#).unwrap();
+    assert!(!def.is_required());
+}
+
+#[test]
+fn una_read_parametrizada_por_defecto_no_es_required() {
+    // El flag es opt-in: si no se declara, la read sigue siendo graceful.
+    let def: erplora_runtime::manifest::ReadDef =
+        serde_json::from_str(r#"{ "query": "taxes.rules.list" }"#).unwrap();
+    assert!(!def.is_required());
+}
+
+#[test]
+fn una_read_parametrizada_puede_declararse_required() {
+    let def: erplora_runtime::manifest::ReadDef =
+        serde_json::from_str(r#"{ "query": "taxes.rules.list", "required": true }"#).unwrap();
+    assert_eq!(def.query(), "taxes.rules.list");
+    assert!(def.is_required());
+}
+
+/// Una read **normal** (sin `required`) que falla sigue siendo graceful: el command se ejecuta.
+///
+/// Este es el guardrail de no-regresión: el defecto no cambia. Solo la read marcada aborta.
+#[test]
+fn una_read_normal_que_falla_sigue_siendo_graceful() {
+    // El defecto no cambia: la forma string y la forma objeto sin `required` ambas responden
+    // `false` a `is_required()`, y eso es lo que `preload_reads` consulta para decidir si aborta
+    // o si omite y deja al handler degradar.
+    let def_str: erplora_runtime::manifest::ReadDef =
+        serde_json::from_str(r#""x.y.z""#).unwrap();
+    assert!(!def_str.is_required(), "la forma string nunca es required");
+
+    let def_obj: erplora_runtime::manifest::ReadDef =
+        serde_json::from_str(r#"{ "query": "x.y.z" }"#).unwrap();
+    assert!(!def_obj.is_required(), "sin el flag, una read objeto no es required");
+}
