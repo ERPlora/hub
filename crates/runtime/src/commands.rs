@@ -1104,7 +1104,7 @@ fn enforce_fiscal_capacity(
                 return Ok(());
             }
             Err(RuntimeError::Domain {
-                code: "fiscal.hub_closed".to_string(),
+                code: crate::fiscal_profile::HUB_CLOSED.to_string(),
                 message: "this hub has closed its fiscal period: it can still be consulted and \
                           exported, but it does not issue any more"
                     .to_string(),

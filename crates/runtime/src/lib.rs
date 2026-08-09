@@ -1322,6 +1322,20 @@ impl Runtime {
         fiscal_profile::stand_down(self.db.as_ref(), &self.hub_id).await
     }
 
+    /// **Cese de actividad** (ADR-0273 D2, hub#557): el negocio cierra y deja de facturar, pero
+    /// sigue consultando y exportando sus libros. `actor` = quién lo decidió, y sin él no se
+    /// cierra: una acción irreversible sin nadie detrás en el registro no es una traza.
+    ///
+    /// **Es función de producto, no compliance** — siendo VERI\*FACTU-only no hay registro de
+    /// eventos que remitir, y el cese que existe es la baja censal (036/037) del obligado, que
+    /// presenta él o su gestoría. Lo que compra es que quien cesó no siga facturando por error.
+    ///
+    /// No tiene vuelta: no hay `CLOSED → ACTIVE`. La **sesión admin y la confirmación** las pone
+    /// la puerta que llama, igual que en el go-live.
+    pub async fn fiscal_close(&self, actor: &str) -> Result<fiscal_profile::FiscalProfile> {
+        fiscal_profile::close(self.db.as_ref(), &self.hub_id, actor).await
+    }
+
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
     /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
     pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {
