@@ -50,6 +50,7 @@ pub mod export_import;
 pub mod fiscal_certificate;
 pub mod hub_users;
 pub mod login_throttle;
+pub mod readiness;
 pub mod reset;
 pub mod ingest;
 pub mod install;
@@ -705,6 +706,10 @@ pub fn app(state: AppState) -> Router {
     let activity_state = state.activity.clone();
     Router::new()
         .route("/healthz", get(healthz))
+        // Liveness ≠ readiness (hub#538): `/healthz` dice si el proceso responde;
+        // `/readyz` dice si puede ATENDER. El `HEALTHCHECK` del contenedor apunta al
+        // segundo, que es el que Swarm mira para decidir si revierte.
+        .route("/readyz", get(readiness::readyz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
@@ -942,6 +947,12 @@ pub fn app(state: AppState) -> Router {
         .with_state(state)
 }
 
+/// **Liveness**: ¿el proceso responde? Nada más — y por eso es un literal.
+///
+/// La pregunta que de verdad importa al desplegar («¿puedo atender?») la contesta
+/// [`readiness::readyz`], y es la que mira el `HEALTHCHECK`. Mezclarlas fue el bug: durante meses
+/// esto FUE el healthcheck del contenedor, así que un hub sin BD, con las migraciones a medias o
+/// sin un solo módulo cargado pasaba por sano.
 async fn healthz() -> &'static str {
     "ok"
 }
@@ -976,7 +987,7 @@ async fn require_machine_registration(
     next: Next,
 ) -> Response {
     let path = request.uri().path();
-    if matches!(path, "/healthz" | "/api/hub/context") || st.is_dev_hub() || st.machine_registered() {
+    if matches!(path, "/healthz" | "/readyz" | "/api/hub/context") || st.is_dev_hub() || st.machine_registered() {
         return next.run(request).await;
     }
     (
