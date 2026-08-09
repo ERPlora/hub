@@ -133,10 +133,23 @@ pub struct HubConfig {
     pub jwt_public_key: Option<String>,
     /// Credencial de **máquina** del hub (`cloud_api_token`), enviada como `X-Hub-Token` para
     /// hablar con el Cloud en endpoints hub-scoped (marketplace, entitlement, asistente, install)
-    /// **sin** usuario logueado. La inyecta el despliegue (env `HUB_CLOUD_API_TOKEN`, ECS) o la
-    /// persiste el shell Tauri tras enrolar (`GET /api/v1/hub/device/enroll/`). Es un **secreto**:
-    /// vive solo aquí (runtime), nunca en el navegador. `None` en dev/local sin enrolar → se cae al
-    /// JWT del usuario activo. Ver ARQUITECTURA.md §2.3.
+    /// **sin** usuario logueado.
+    ///
+    /// **La inyecta el aprovisionamiento** como env `HUB_CLOUD_API_TOKEN`: el SaaS acuña el token al
+    /// crear el hub (`Hub.cloud_api_token`) y el hub nace con él puesto. No lo pide nadie.
+    ///
+    /// Es un **secreto del runtime**: vive solo aquí, nunca en el navegador. Y como desde ADR-0154 el
+    /// runtime corre en el contenedor del hub —no dentro de la app instalable—, **la app NUNCA lo
+    /// tiene**: N dispositivos con la app hablan con UN hub, que es quien lo guarda.
+    ///
+    /// ⚠️ Aquí ponía que «la persiste el shell Tauri tras enrolar». Era de cuando la app llevaba el
+    /// runtime dentro, y ADR-0154 se lo llevó: no hay una sola línea en `apps/tauri` que toque este
+    /// token. `cloud-client` sigue exponiendo `GET/POST /api/v1/hub/device/enroll/`, pero **nadie en
+    /// el hub lo llama**.
+    ///
+    /// `None` = hub creado **fuera** del aprovisionamiento (un `pnpm dev` local): el SaaS no sabe que
+    /// existe, así que marketplace, entitlement, asistente y el almacenamiento de VeriFactu quedan
+    /// muertos. Se cae al JWT del usuario activo donde eso basta. Ver ARQUITECTURA.md §2.3.
     pub cloud_api_token: Option<String>,
     /// Raíz de la carpeta `media/` del hub: path por defecto de TODOS los ficheros (adjuntos de
     /// módulos, registros `_logs/`, actividad `_system/`). La navega la pantalla /files
@@ -237,7 +250,8 @@ impl HubConfig {
         let jwt_public_key = std::env::var("HUB_JWT_PUBLIC_KEY")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        // Token de máquina (ECS lo inyecta como `HUB_CLOUD_API_TOKEN`; Tauri lo setea tras enrolar).
+        // Token de máquina: lo inyecta el APROVISIONAMIENTO como `HUB_CLOUD_API_TOKEN`. Vacío = hub
+        // creado fuera de él (p. ej. `pnpm dev`) → sin marketplace/entitlement/asistente/VeriFactu.
         let cloud_api_token = std::env::var("HUB_CLOUD_API_TOKEN")
             .ok()
             .filter(|s| !s.trim().is_empty());
