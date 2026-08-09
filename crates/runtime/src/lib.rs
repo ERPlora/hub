@@ -100,6 +100,19 @@ pub struct Runtime {
     elevation: elevation::Grants,
 }
 
+/// Cuánto espera un arranque por el lock de migración antes de rendirse.
+///
+/// 120 s por defecto: el que espera es el arranque NUEVO del solape blue/green, y lo que espera es
+/// a que el viejo —o el otro nuevo— termine de migrar. Las migraciones son aditivas por contrato
+/// (ADR-0269), así que duran segundos; el margen es para un backfill lento, no para una espera
+/// normal. Ajustable con `HUB_MIGRATION_LOCK_TIMEOUT_MS` por si algún hub tiene un histórico gordo.
+fn migration_lock_timeout_ms() -> u64 {
+    std::env::var("HUB_MIGRATION_LOCK_TIMEOUT_MS")
+        .ok()
+        .and_then(|raw| raw.trim().parse().ok())
+        .unwrap_or(120_000)
+}
+
 impl Runtime {
     pub fn new(db: Box<dyn DatabaseAdapter>) -> Self {
         Self {
@@ -725,6 +738,30 @@ impl Runtime {
     ///
     /// Idempotente: re-arrancar no reaplica. El server la llama al arrancar.
     pub async fn ensure_system_tables(&self) -> Result<()> {
+        // 🔒 UN solo arranque toca el esquema a la vez (hub#539).
+        //
+        // Con `order: start-first` (ADR-0269) hay **dos procesos del mismo hub contra la misma
+        // base** en cada actualización, y los dos corren esto entero. Sin lock pueden leer el mismo
+        // `max_applied_version` y aplicar la misma migración a la vez: `CREATE TABLE` sin
+        // `IF NOT EXISTS` da 42P07, un `ALTER` deja el esquema a medias y el `INSERT` de control
+        // choca contra la PK. El segundo espera, entra, y se encuentra el trabajo hecho —
+        // todo lo de abajo es idempotente.
+        //
+        // Envuelve la función ENTERA y no solo `system_migrations::apply`: el baseline v0, el
+        // marcador monetario y los backfills de más abajo escriben esquema y datos igual.
+        //
+        // Si no lo consigue, **falla el arranque**. Es deliberado: seguir sin él es migrar en
+        // paralelo, y con `/readyz` de verdad (hub#538) un arranque fallido dispara el rollback en
+        // vez de matar a la tarea que sí funcionaba.
+        let _migration_lock = self
+            .db
+            .migration_lock(&self.hub_id, migration_lock_timeout_ms())
+            .await
+            .map_err(|error| RuntimeError::Domain {
+                code: "hub.migration_lock_timeout".into(),
+                message: error.to_string(),
+            })?;
+
         // 1) Baseline v0 (idempotente).
         installer::ensure_hub_module_table(self.db.as_ref()).await?;
         outbox::ensure_tables(self.db.as_ref()).await?;
