@@ -71,21 +71,49 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
     // fiscal genérico (caso real: modelo 036, IAE, OSS… en vez de la checklist del hub). El gate
     // es el MISMO de la query core (`hub.users.view` — toda sesión lo tiene, ninguna API key), y
     // el runtime lo revalida server-side igual que con cualquier tool: esto solo la OFRECE.
-    let core_tools: &[(&str, &str, &str)] = &[(
-        "hub.setup.status",
-        "What is left to configure in THIS hub, live: the union of core setup items (business \
-         identity, fiscal identity, apps, staff) and each installed module's own checklist — \
-         status, blocking level, route and available actions per item. Call it whenever the \
-         user asks what is missing, what to configure, or why an operation is blocked. The \
-         answer is already ordered and filtered by country and permission: relay it, do not \
-         re-derive or second-guess it.",
-        erplora_runtime::hub_users::VIEW_USERS_PERMISSION,
-    )];
-    for (name, description, permission) in core_tools {
+    // (name, description, kind, permission, schema). El límite que fijó Ioan (2026-08-09):
+    // el asistente actúa CON los permisos del usuario y las mutaciones pasan por confirm-card —
+    // pero lo DESTRUCTIVO (uninstall, reset, purge, borrar) no se ofrece JAMÁS: eso lo hace el
+    // usuario con sus manos. Hay un test que barre el catálogo y lo garantiza.
+    let core_tools: &[(&str, &str, &str, &str, Option<&str>)] = &[
+        (
+            "hub.setup.status",
+            "What is left to configure in THIS hub, live: the union of core setup items (business \
+             identity, fiscal identity, apps, staff) and each installed module's own checklist — \
+             status, blocking level, route and available actions per item. Call it whenever the \
+             user asks what is missing, what to configure, or why an operation is blocked. The \
+             answer is already ordered and filtered by country and permission: relay it, do not \
+             re-derive or second-guess it.",
+            "query",
+            erplora_runtime::hub_users::VIEW_USERS_PERMISSION,
+            None,
+        ),
+        (
+            "hub.marketplace.search",
+            "Search the ERPlora marketplace catalogue — modules this hub could install (id, name, \
+             description, version, pricing). Call it when the user needs a capability no installed \
+             module covers (e.g. \"add a product\" with no inventory module), BEFORE saying \
+             something cannot be done: the answer to a missing capability is usually a module.",
+            "query",
+            erplora_runtime::hub_users::VIEW_USERS_PERMISSION,
+            Some(r#"{"type":"object","properties":{"search":{"type":"string","description":"Free-text filter over name/description/tags. Omit to list everything."}}}"#),
+        ),
+        (
+            "hub.modules.install",
+            "Install a marketplace module into THIS hub (downloads, verifies, migrates and \
+             activates it; its tools and screens appear immediately). Mutating: the user confirms \
+             a card before it runs — never claim it is installed until the result comes back. Use \
+             the module_id exactly as hub.marketplace.search returned it.",
+            "command",
+            erplora_runtime::hub_users::ADMINISTER_PERMISSION,
+            Some(r#"{"type":"object","properties":{"module_id":{"type":"string","description":"Marketplace module id, e.g. \"inventory\""},"version":{"type":"string","description":"Optional. Omit to install the latest published version."}},"required":["module_id"]}"#),
+        ),
+    ];
+    for (name, description, kind, permission, schema) in core_tools {
         if permits(permission) {
             // module_id "hub" marca tool del CORE: `filter_tools_by_modules` la preserva
             // explícitamente (el core no es un módulo y su ref_id nunca está en el índice).
-            tools.push(tool_def(name, description, "query", "hub", None));
+            tools.push(tool_def(name, description, kind, "hub", *schema));
         }
     }
 
@@ -268,6 +296,11 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
          it by hand.\n\
          - Tools whose name marks a write are confirmed by the user before they run; describe \
          what will change rather than claiming it is already done.\n\
+         - You CAN act on this hub with the user's permissions — including installing modules \
+         (each install is confirmed by the user on a card). DESTRUCTIVE actions are different by \
+         design: uninstalling modules, deleting the hub or wiping data are never yours — you \
+         have no tool for them on purpose. Say so plainly and point to the screen where the \
+         user does it themselves.\n\
          - Tax rates and fiscal numbering that the app APPLIES come from the hub's fiscal tables, \
          never from this conversation. You may explain the rules; you may not be the source of \
          them.\n\
@@ -543,6 +576,67 @@ mod tests {
             lower.contains("utc"),
             "the timezone must be explicit or 'today' shifts by the user's offset: {ins}"
         );
+    }
+
+
+    /// The production complaint this pins (2026-08-09): asked to install a module, the assistant
+    /// INVENTED a security policy («solo tú puedes hacerlo desde tu Hub») — because it had no
+    /// tool, and a model with no tool rationalizes. The design truth is the opposite: the
+    /// assistant is another caller WITH THE USER'S PERMISSIONS (§9.2); installing is a mutation
+    /// like any other — offered as a `command`, so the drawer's confirm-card gates it.
+    #[test]
+    fn assemble_tools_offers_marketplace_search_and_install_to_an_admin() {
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+
+        let search = tools.iter().find(|t| t["name"] == "hub.marketplace.search")
+            .expect("search must be offered even on an empty hub — it is HOW an empty hub stops being empty");
+        assert_eq!(search["kind"], "query", "a read: auto-run");
+
+        let install = tools.iter().find(|t| t["name"] == "hub.modules.install")
+            .expect("install must be offered to an admin");
+        assert_eq!(install["kind"], "command", "a mutation: the confirm-card gates it");
+        assert_eq!(install["parameters"]["required"][0], "module_id");
+    }
+
+    /// Permission still rules: a cashier (no `hub.administer`) is never OFFERED install — same
+    /// gate as the Apps screen. Search and setup remain: reading the catalogue mutates nothing.
+    #[test]
+    fn install_is_not_offered_without_the_admin_permission() {
+        let ctx = RequestContext::new("h1", "u1", ["hub.users.view".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+        let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+        assert!(names.contains(&"hub.setup.status"));
+        assert!(names.contains(&"hub.marketplace.search"));
+        assert!(!names.contains(&"hub.modules.install"), "a non-admin must not see install: {names:?}");
+    }
+
+    /// The line the user drew (2026-08-09): DESTRUCTIVE actions are the user's alone. The core
+    /// catalogue must never offer uninstall/reset/purge — not gated, not confirmed: ABSENT.
+    #[test]
+    fn destructive_host_actions_are_never_offered() {
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+        for t in &tools {
+            let name = t["name"].as_str().unwrap_or("");
+            assert!(
+                !name.contains("uninstall") && !name.contains("reset") && !name.contains("purge")
+                    && !name.contains("delete"),
+                "destructive host tool offered: {name}"
+            );
+        }
+    }
+
+
+    /// The policy line itself travels in the prompt: the model must know destructive actions are
+    /// off the table BY DESIGN — so it explains honestly («eso lo haces tú desde la pantalla»)
+    /// instead of inventing a security policy, which is exactly the failure this session caught.
+    #[test]
+    fn instructions_state_that_destructive_actions_belong_to_the_user() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
+        let lower = ins.to_lowercase();
+        assert!(lower.contains("destructive"), "the destructive-actions rule must be stated: {ins}");
+        assert!(lower.contains("uninstall"), "with its concrete examples: {ins}");
     }
 
     /// The money contract (ADR-0123) is a HUB-WIDE invariant, so it belongs in the system prompt
