@@ -75,7 +75,7 @@ async fn create_product(rt: &Runtime, ctx: &RequestContext, name: &str, sku: &st
     rt.execute_command("inventory.products.create", &params(json!({
         "name": name, "sku": sku, "price": 1000, "cost": 500, "stock": stock,
         "low_stock_threshold": 5, "product_type": "physical",
-        "ean13": null, "description": "", "tax_category_key": null, "image": ""
+        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
     })), ctx).await.unwrap();
     rt.execute_query("inventory.products.list", &params(json!({"search": sku})), ctx).await.unwrap()[0]
         ["id"].as_str().unwrap().to_string()

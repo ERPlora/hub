@@ -124,7 +124,7 @@ async fn inventory_stats_kpis_show_real_numbers() {
         &params(json!({
             "name": "Café", "sku": "CAF", "price": 450, "cost": 200,
             "stock": 3_000_000, "low_stock_threshold": 5_000_000, "product_type": "physical",
-            "ean13": null, "description": "", "tax_category_key": null, "image": ""
+            "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
         })),
         &ctx,
     )

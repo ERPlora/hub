@@ -44,8 +44,14 @@ async fn stack() -> Runtime {
     rt
 }
 
+/// `tax_category_key` es obligatorio desde inventory v1.3.0: un producto sin categoría fiscal no se
+/// puede vender, así que el alta ya no lo acepta vacío. Estas altas son ruido de fondo para las
+/// estadísticas —lo que se mide es stock y coste, no impuestos—, así que se rellena aquí una vez y
+/// cada caso sigue declarando solo lo suyo.
 async fn create(rt: &Runtime, ctx: &RequestContext, v: serde_json::Value) {
-    rt.execute_command("inventory.products.create", &params(v), ctx).await.unwrap();
+    let mut v = params(v);
+    v.entry("tax_category_key".to_string()).or_insert_with(|| json!("product.generic"));
+    rt.execute_command("inventory.products.create", &v, ctx).await.unwrap();
 }
 
 /// Catálogo de prueba:
