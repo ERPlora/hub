@@ -92,6 +92,10 @@ pub fn scope_for_data_file(path: &str) -> Option<TableScope> {
     }
     match name {
         "hub_users" => Some(TableScope::Exact("hub_user".into())),
+        // hub#464: the profile and preferences travel as their own data files under the `hub_users`
+        // section. Each is scoped to its own table — an exact scope, same as `hub_user`/`hub_settings`.
+        "hub_user_profile" => Some(TableScope::Exact("hub_user_profile".into())),
+        "hub_user_pref" => Some(TableScope::Exact("hub_user_pref".into())),
         "hub_settings" => Some(TableScope::Exact("hub_settings".into())),
         id if is_module_id(id) => Some(TableScope::Module(id.to_string())),
         _ => None,
