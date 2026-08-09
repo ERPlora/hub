@@ -149,10 +149,12 @@ import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
   getModuleCapabilities, putModuleCapabilities, ModuleActionError, InstallBlockedError,
+  updateModule, listModuleUpdates,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
 import { isModuleInstalled } from '../lib/apps-catalog';
+import { pendingUpdate, updateLabel, type ModuleUpdateInfo } from '../lib/module-updates';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
 import { isAdmin } from '../lib/session';
 
@@ -211,6 +213,10 @@ interface DataTableAction {
 // --- Estado ---
 const modules = ref<Mod[]>([]);
 const installedModules = ref<InstalledModule[]>([]);
+// Qué versión ofrece hoy el marketplace por módulo instalado (hub#516). Se pide BAJO DEMANDA al
+// abrir la pantalla, no en bucle: el resolutor vive en el runtime (el mismo del arranque), así que
+// esto es solo lo que hay que enseñar. Vacío = no se ofrece nada (incluido «no se pudo preguntar»).
+const moduleUpdates = ref<ModuleUpdateInfo[]>([]);
 const loading = ref(true);
 const catalogError = ref(false);
 let catalogLoadId = 0;
@@ -244,6 +250,17 @@ function clearProgress(rootId: string): void {
   const next = new Map(installing.value);
   next.delete(rootId);
   installing.value = next;
+}
+
+// Módulos con una actualización en curso (hub#516). Se reemplaza el Set en cada cambio (no se muta)
+// para que los computed que lo leen reaccionen, igual que el mapa de progreso de instalación.
+const updatingIds = ref<Set<string>>(new Set());
+
+function setUpdating(id: string, busy: boolean): void {
+  const next = new Set(updatingIds.value);
+  if (busy) next.add(id);
+  else next.delete(id);
+  updatingIds.value = next;
 }
 
 // --- Celdas ricas: pill de tinte suave con tokens Ionic (cruzan el shadow de la tabla) ---
@@ -284,6 +301,7 @@ function stateCell(row: Row): Node {
     wrap.append(spinner, label);
     return wrap;
   }
+  if (row.state === 'updatable') return badgeCell(String(row.stateLabel ?? ''), 'primary');
   if (row.state === 'installed') return badgeCell(t('apps.stateInstalled'), 'success');
   if (row.state === 'unavailable') return badgeCell(t('apps.stateUnavailable'), 'warning');
   return badgeCell(t('apps.stateAvailable'), 'medium');
@@ -302,37 +320,57 @@ const filteredModules = computed<Row[]>(() => {
   return base.map((m) => {
     const prog = installing.value.get(m.id) ?? null;
     const isInstalled = isModuleInstalled(m.installed, m.id, installedIds.value);
-    const state = prog
+    // Instalado PERO con versión nueva: estado propio (hub#516). Antes todo lo instalado caía en
+    // «Instalado» con el botón muerto, así que el arreglo publicado no tenía por dónde entrar.
+    const update = isInstalled ? pendingUpdate(m.id, moduleUpdates.value) : null;
+    const state = prog || updatingIds.value.has(m.id)
       ? 'installing'
-      : isInstalled
-        ? 'installed'
-        : m.available
-          ? 'available'
-          : 'unavailable';
+      : update
+        ? 'updatable'
+        : isInstalled
+          ? 'installed'
+          : m.available
+            ? 'available'
+            : 'unavailable';
     return {
       ...m,
       state,
       stateLabel:
         state === 'installing'
           ? t('apps.stateInstalling')
-          : state === 'installed'
-            ? t('apps.stateInstalled')
-            : state === 'unavailable'
-              ? t('apps.stateUnavailable')
-              : t('apps.stateAvailable'),
+          : state === 'updatable'
+            ? t('apps.stateUpdatable', { version: update?.latest ?? '' })
+            : state === 'installed'
+              ? t('apps.stateInstalled')
+              : state === 'unavailable'
+                ? t('apps.stateUnavailable')
+                : t('apps.stateAvailable'),
       progress: prog,
     };
   });
 });
 
-// Instalados desde el runtime, como filas de la tabla.
-const installedRows = computed<Row[]>(() => installedModules.value as unknown as Row[]);
+// Instalados desde el runtime, como filas de la tabla. Se les cuelga la actualización pendiente
+// (hub#516) para que la celda de versión y el predicado de la acción la vean sin recalcularla.
+const installedRows = computed<Row[]>(() =>
+  installedModules.value.map((m) => ({
+    ...m,
+    update: pendingUpdate(m.id, moduleUpdates.value),
+    updating: updatingIds.value.has(m.id),
+  })) as unknown as Row[],
+);
 
 // --- Columnas + acciones ---
 // `computed` para que cabeceras/labels/celdas se recalculen al cambiar de idioma en caliente.
 const mineColumns = computed<DataTableColumn[]>(() => [
   { key: 'name', header: t('apps.colModule') },
-  { key: 'version', header: t('apps.colVersion'), format: (r) => `v${String(r.version ?? '')}` },
+  {
+    key: 'version',
+    header: t('apps.colVersion'),
+    // DE → A cuando hay actualización (`1.1.1 → 1.1.2`), y solo lo que corre cuando no la hay
+    // (ADR-0269 §3.5). «Inventario 1.1.2» no dice nada; «1.1.1 → 1.1.2» sí.
+    format: (r) => updateLabel(String(r.version ?? ''), (r.update as ModuleUpdateInfo | null) ?? null),
+  },
   {
     key: 'status', header: t('apps.colStatus'), filterable: true, filterType: 'select',
     // Tres estados (ADR-0128): apagado A MANO ≠ ARRASTRADO por la cascada de una dependencia.
@@ -347,6 +385,16 @@ const mineColumns = computed<DataTableColumn[]>(() => [
 ]);
 const mineActions = computed<DataTableAction[]>(() => isAdmin.value
   ? [
+      {
+        // El botón «Actualizar» de ADR-0269 §3.5: **por módulo**, para ADELANTAR. Que el sistema
+        // acabe haciéndolo solo al arrancar no quita que se pueda pedir ahora.
+        id: 'update',
+        label: t('apps.actionUpdate'),
+        icon: 'arrow-up-circle-outline',
+        // Sin versión nueva no hay nada que pulsar; con una en curso, spinner en vez del icono.
+        disabled: (row) => !row.update || row.updating === true,
+        loading: (row) => row.updating === true,
+      },
       { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
       { id: 'uninstall', label: t('apps.actionUninstall'), icon: 'trash', color: 'danger' },
     ]
@@ -368,8 +416,9 @@ const catalogActions = computed<DataTableAction[]>(() => isAdmin.value && !confi
         id: 'install',
         label: t('apps.actionInstall'),
         icon: 'download-outline',
-        // Instalado o en curso → botón muerto; en curso → spinner en su lugar (pista de actividad).
-        disabled: (row) => row.state !== 'available',
+        // Instalado sin novedades o en curso → botón muerto; en curso → spinner en su lugar.
+        // `updatable` (hub#516) SÍ es accionable: el mismo botón lleva la versión nueva.
+        disabled: (row) => row.state !== 'available' && row.state !== 'updatable',
         loading: (row) => row.state === 'installing',
       },
     ]
@@ -430,10 +479,60 @@ function sayItNeedsASubscription(mod: Mod): void {
   notify(t('apps.needsSubscription', { name: mod.name }), 'primary');
 }
 
+/**
+ * Actualiza un módulo instalado a la versión que el runtime resuelva (hub#516).
+ *
+ * El runtime decide **cuál**: nunca una versión en cuarentena, nunca hacia atrás, y el pin de
+ * soporte gana. Si el intento falla, el módulo se queda con la versión que ya tenía **funcionando**
+ * —eso lo garantiza el runtime, no esta pantalla—, así que aquí solo hay que decirlo.
+ */
+async function updateInstalledModule(id: string, name: string): Promise<void> {
+  if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
+  if (updatingIds.value.has(id)) return;
+  setUpdating(id, true);
+  notify(t('apps.updating', { name }), 'primary', 0);
+  try {
+    const result = await updateModule(id);
+    if (!result.updated) {
+      notify(t('apps.updateUpToDate', { name }), 'primary');
+      return;
+    }
+    notify(t('apps.updateSuccess', { name, from: result.from, to: result.to }), 'success');
+    await loadInstalled();
+    await refreshModuleNav();
+  } catch (e) {
+    if (e instanceof InstallBlockedError) {
+      // ADR-0060: a la versión nueva le faltan módulos de pago sin contratar. No se ha tocado nada
+      // y NO se ha cobrado nada; el módulo sigue en la versión anterior. Sticky para poder leerlo.
+      notify(
+        t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') }),
+        'danger',
+        0,
+      );
+    } else {
+      // Lo importante de este mensaje: el módulo NO se ha quedado a medias.
+      notify(t('apps.updateError', { name }), 'danger');
+    }
+  } finally {
+    setUpdating(id, false);
+    await loadModuleUpdates();
+  }
+}
+
 /** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
 async function installModule(mod: Mod): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
-  if (mod.installed) { notify(t('apps.alreadyInstalled', { name: mod.name }), 'primary'); return; }
+  if (mod.installed) {
+    // Antes esto cortaba con «ya instalado» y ahí se acababa el camino: publicar la v2 de un módulo
+    // con un bug corregido no llegaba a ningún hub que ya tuviera la v1 (hub#516). Ahora, si hay
+    // versión nueva, el botón ACTUALIZA; y si no la hay, sigue diciendo que ya está.
+    if (pendingUpdate(mod.id, moduleUpdates.value)) {
+      await updateInstalledModule(mod.id, mod.name);
+    } else {
+      notify(t('apps.alreadyInstalled', { name: mod.name }), 'primary');
+    }
+    return;
+  }
   // Ya en curso (doble clic o instalación arrancada por otro cliente): no relanzar el request.
   if (installing.value.has(mod.id)) return;
   // Gate de suscripción (ADR-0114): un módulo de pago SIN entitlement de ESTE hub no se intenta
@@ -523,6 +622,20 @@ async function loadInstalled(): Promise<void> {
     installedModules.value = await listInstalledModules();
   } catch {
     installedModules.value = [];
+  }
+}
+
+/**
+ * Pregunta al runtime qué versión ofrece hoy el marketplace por módulo instalado (hub#516).
+ *
+ * Bajo demanda, al abrir la pantalla y tras instalar/actualizar. Un fallo deja la lista vacía: sin
+ * respuesta **no se ofrece nada** — «no lo sé» no se pinta como «hay novedad».
+ */
+async function loadModuleUpdates(): Promise<void> {
+  try {
+    moduleUpdates.value = await listModuleUpdates();
+  } catch {
+    moduleUpdates.value = [];
   }
 }
 
@@ -693,6 +806,7 @@ function handleMineAction(e: Event): void {
   const m = row as unknown as InstalledModule;
   if (actionId === 'toggle') void toggleModule(m);
   else if (actionId === 'uninstall') void removeModule(m);
+  else if (actionId === 'update') void updateInstalledModule(m.id, m.name);
 }
 function handleCatalogAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
@@ -748,6 +862,9 @@ onMounted(() => {
   window.addEventListener('focus', recheckEntitlement);
   void loadCatalog();
   void loadInstalled();
+  // Bajo demanda, al abrir la pantalla (hub#516): una llamada por módulo instalado, y solo cuando
+  // alguien está mirando. La vía desatendida la cubre el arranque, que resuelve la última versión.
+  void loadModuleUpdates();
   // Cuando el runtime termina de instalar un módulo, refrescamos catálogo, instalados y nav.
   unsubInstalled = client.on('module.installed', (payload) => {
     const id = (payload as { module_id?: string } | null)?.module_id;
@@ -757,6 +874,7 @@ onMounted(() => {
     notify(found ? t('apps.moduleInstalledNamed', { name: found.name }) : t('apps.moduleInstalled'), 'success');
     void loadCatalog();
     void loadInstalled();
+    void loadModuleUpdates();
     void refreshModuleNav();
   });
   // Progreso por fases del pipeline (resolving → downloading → verifying → installing). El frame

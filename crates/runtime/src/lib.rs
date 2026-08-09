@@ -65,7 +65,10 @@ pub mod wasm;
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{DemoLock, Result, RuntimeError};
 pub use manifest::{Manifest, ManifestWarning, CORE_VERSION};
-pub use registry::{EventSink, ModuleStatus, NavEntry, Principal, Registry, RequestContext};
+pub use module_update::ModuleUpdate;
+pub use registry::{
+    EventSink, ModuleSnapshot, ModuleStatus, NavEntry, Principal, Registry, RequestContext,
+};
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
 // `modules_root` travels with the guard on purpose: a test that resolves module paths by hand
@@ -182,6 +185,41 @@ impl Runtime {
     /// Instala un módulo ya extraído en `dir` (lee `module.json`, migra, registra, activa).
     pub async fn install_from_dir(&mut self, dir: &Path) -> Result<String> {
         installer::install(self.db.as_ref(), &mut self.registry, &self.hub_id, dir).await
+    }
+
+    /// Actualiza a la versión ya extraída en `dir` un módulo que **ya está instalado** (hub#516).
+    ///
+    /// Es la misma puerta que [`install_from_dir`](Self::install_from_dir) —el paquete llega
+    /// verificado (SHA256 + firma ed25519) y su manifest se valida igual—, con dos diferencias que
+    /// solo existen aquí:
+    ///
+    /// - **Se exige que el módulo esté instalado.** Actualizar lo que no hay no es actualizar; sin
+    ///   esto, un id mal escrito instalaría un módulo nuevo en silencio.
+    /// - **Devuelve la transición `from → to`**, que es lo que el dueño ve (ADR-0269 §3.5) y lo que
+    ///   la incidencia pregunta primero: qué cambió y desde dónde.
+    ///
+    /// Solo se aplican las migraciones que la versión nueva **añade** (`_hub_migrations` dedupe por
+    /// fichero), y si el intento falla **sigue corriendo la versión anterior** — lo garantiza
+    /// `installer::install`, no este método.
+    pub async fn update_from_dir(&mut self, dir: &Path) -> Result<ModuleUpdate> {
+        let manifest = crate::manifest::Manifest::load(dir)?;
+        let from = self
+            .registry
+            .installed
+            .iter()
+            .find(|m| m.id == manifest.id)
+            .map(|m| m.version.clone())
+            .ok_or_else(|| {
+                RuntimeError::CommandNotFound(format!("módulo no instalado: {}", manifest.id))
+            })?;
+
+        let module_id =
+            installer::install(self.db.as_ref(), &mut self.registry, &self.hub_id, dir).await?;
+        Ok(ModuleUpdate {
+            module_id,
+            from,
+            to: manifest.version,
+        })
     }
 
     /// Dependencias declaradas en el `module.json` de `dir` que aún NO están instaladas en este
