@@ -103,4 +103,7 @@ export function logout(): void {
   void import('./entitlement').then((m) => m.resetEntitlement());
   // El historial del AED muere con la sesión (ADR-0149): el Cloud ya no guarda copia.
   void import('./assistant-history').then((m) => m.clearAssistantHistory());
+  // La campana de dead-letters deja de sondear y se limpia (hub#660): sin sesión no hay cola que
+  // mirar, y el badge no debe sobrevivir al logout.
+  void import('./dead-letter').then((m) => m.stopDeadLetterWatch());
 }

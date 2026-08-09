@@ -206,6 +206,8 @@ async fn only_an_owner_or_admin_session_operates_the_queue() {
     let f = fixture().await;
     let routes = [
         ("GET", "/api/hub/events/dead".to_string()),
+        ("GET", "/api/hub/events/dead/count".to_string()),
+        ("POST", "/api/hub/events/retry-all".to_string()),
         ("POST", format!("/api/hub/events/{DEAD_ID}/retry")),
         ("POST", format!("/api/hub/events/{DEAD_ID}/discard")),
     ];
@@ -243,6 +245,40 @@ async fn only_an_owner_or_admin_session_operates_the_queue() {
     // And nothing the refused callers did touched the row.
     let listed = body_json(send(&f.router, request("GET", "/api/hub/events/dead", Some(&f.admin))).await).await;
     assert_eq!(listed["data"].as_array().unwrap().len(), 1, "the dead-letter is untouched");
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// The count is the cheap number the topbar bell polls (no payloads). It counts ONLY `dead` rows,
+/// and it drops to zero once the queue is cleared — the badge the operator trusts to mean "nothing
+/// needs you". Then `retry-all` clears the whole queue in one gesture (the case a transient outage
+/// killed several events), and the count reflects it immediately.
+#[tokio::test]
+async fn the_count_feeds_the_bell_and_retry_all_clears_the_queue() {
+    let f = fixture().await;
+
+    // The fixture seeds one dead row; the delivered one does not count.
+    let response = send(&f.router, request("GET", "/api/hub/events/dead/count", Some(&f.admin))).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], true);
+    assert_eq!(body["data"]["count"], 1, "one dead-letter, the delivered one does not count");
+
+    // retry-all clears the whole queue: the dead row goes back to the relay, the count drops to 0.
+    let response = send(&f.router, request("POST", "/api/hub/events/retry-all", Some(&f.admin))).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], true);
+    assert_eq!(body["data"]["retried"], 1, "the one dead row moved back to the relay");
+
+    let response = send(&f.router, request("GET", "/api/hub/events/dead/count", Some(&f.admin))).await;
+    let body = body_json(response).await;
+    assert_eq!(body["data"]["count"], 0, "the queue is clear — the bell reads zero");
+
+    // Idempotent: a second retry-all moves nothing, still 200 (0 is a valid "nothing to do").
+    let response = send(&f.router, request("POST", "/api/hub/events/retry-all", Some(&f.admin))).await;
+    let body = body_json(response).await;
+    assert_eq!(body["data"]["retried"], 0, "the queue was already clear");
 
     std::fs::remove_dir_all(f.temp).ok();
 }

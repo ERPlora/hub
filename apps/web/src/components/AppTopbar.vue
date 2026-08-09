@@ -90,10 +90,10 @@
           <HubIcon slot="icon-only" name="sparkles-outline" />
         </ion-button>
 
-        <!-- Notificaciones: campana + badge. Central de notificaciones de EVENTOS (placeholder):
-             el contador es un STUB a 0 (lib/shell, sin backend de notificaciones todavía) y el
-             popover muestra un estado vacío. NO está acoplada a la configuración pendiente de los
-             módulos — eso vive SOLO en el dashboard (ADR-0063, banner). -->
+        <!-- Campana de notificaciones (hub#660): hoy su única señal real son las dead-letters del
+             outbox. El contador lo alimenta el watcher de lib/dead-letter desde el endpoint de
+             count. Con events caídos, el popover avisa y lleva directo a Sistema → Eventos, donde
+             se reenvían (uno/todos) o se descartan; sin nada, el estado vacío de siempre. -->
         <ion-button
           id="topbar-notif-btn"
           fill="clear"
@@ -109,7 +109,14 @@
         <ion-popover trigger="topbar-notif-btn" trigger-action="click">
           <ion-content>
             <ion-list lines="full">
-              <ion-item lines="none">
+              <ion-item v-if="notificationCount > 0" lines="none" button detail @click="goToDeadLetters">
+                <HubIcon slot="start" name="alert-circle-outline" color="danger" />
+                <ion-label class="ion-text-wrap">
+                  <h3>{{ t('topbar.deadLettersTitle') }}</h3>
+                  <p>{{ t('topbar.deadLettersBody', { count: notificationCount }) }}</p>
+                </ion-label>
+              </ion-item>
+              <ion-item v-else lines="none">
                 <ion-label class="ion-text-wrap" style="opacity:.6">{{ t('topbar.noNotifications') }}</ion-label>
               </ion-item>
             </ion-list>
@@ -197,6 +204,11 @@ function goBack(): void {
   // Si hay historial dentro de la app, volvemos; si no (deep-link), al href de fallback.
   if (window.history.state?.back) router.back();
   else if (props.backHref) void router.push(props.backHref);
+}
+
+// La campana avisa de dead-letters: llevar directo a la pestaña donde se gestionan (hub#660).
+function goToDeadLetters(): void {
+  void router.push({ path: '/system', hash: '#events' });
 }
 </script>
 

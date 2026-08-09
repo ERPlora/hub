@@ -249,6 +249,59 @@
         </ion-card>
       </template>
 
+      <!-- ── Tab: Eventos caídos (dead-letters, hub#660) ───────────────────────
+           Solo un admin gestiona dead-letters: el endpoint revalida el rol, así que a un no-admin
+           la pestaña le muestra vacío (no es un agujero de permiso, es que no hay nada para él). El
+           flujo es «arreglar la causa y reenviar tal cual» — el payload nunca se edita (inmutabilidad
+           de la cadena fiscal, ADR-0189); si la causa sigue, la fila vuelve a morir y reaparece. -->
+      <template v-else-if="tab === 'events'">
+        <ion-card class="ion-no-margin">
+          <ion-card-content>
+            <div class="events-head">
+              <h3 class="logs-title">{{ t('system.deadEvents') }}</h3>
+              <div class="events-actions" v-if="deadLetters.length">
+                <ion-button size="small" fill="outline" color="success" :disabled="eventsBusy" @click="retryAll">
+                  <HubIcon slot="start" name="refresh-outline" />
+                  {{ t('system.retryAll') }}
+                </ion-button>
+              </div>
+            </div>
+            <p class="events-hint" v-if="deadLetters.length">{{ t('system.deadEventsHint') }}</p>
+
+            <ion-spinner v-if="eventsLoading" name="crescent" class="events-spinner" />
+
+            <ok-empty-state
+              v-else-if="!deadLetters.length"
+              icon="checkmark-circle-outline"
+              :heading="t('system.noDeadEvents')"
+              :message="t('system.noDeadEventsHint')"
+            />
+
+            <div v-else class="events-list">
+              <div v-for="ev in deadLetters" :key="ev.id" class="event-row">
+                <div class="event-row__main">
+                  <div class="event-row__top">
+                    <code class="event-row__name">{{ ev.event_name }}</code>
+                    <ion-badge color="warning" class="event-row__attempts">{{ ev.attempts }}× {{ t('system.attempts') }}</ion-badge>
+                    <span class="event-row__module" v-if="ev.module_id">{{ ev.module_id }}</span>
+                    <span class="event-row__when">{{ formatWhen(ev.created_at) }}</span>
+                  </div>
+                  <div class="event-row__error" :title="ev.last_error">{{ ev.last_error }}</div>
+                </div>
+                <div class="event-row__actions">
+                  <ion-button size="small" fill="clear" color="success" :disabled="eventsBusyId === ev.id" @click="retryOne(ev.id)">
+                    <HubIcon slot="icon-only" name="refresh-outline" />
+                  </ion-button>
+                  <ion-button size="small" fill="clear" color="medium" :disabled="eventsBusyId === ev.id" @click="discardOne(ev.id)">
+                    <HubIcon slot="icon-only" name="trash-outline" />
+                  </ion-button>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </template>
+
     </template>
 
     <!-- ── Footer con ion-segment (tabs) ─────────────────────────── -->
@@ -271,6 +324,10 @@
             <ion-segment-button value="documents">
               <HubIcon name="folder-outline" />
               <ion-label>{{ t('system.tabDocuments') }}</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="events">
+              <HubIcon name="alert-circle-outline" />
+              <ion-label>{{ t('system.tabEvents') }}</ion-label>
             </ion-segment-button>
             <ion-segment-button value="logs">
               <HubIcon name="document-text-outline" />
@@ -324,6 +381,16 @@ import {
   resolveSystemTab,
   type SystemTab as Tab,
 } from '../lib/system-tabs';
+import {
+  fetchDeadLetters,
+  retryDeadLetter,
+  retryAllDeadLetters,
+  discardDeadLetter,
+  refreshDeadLetterCount,
+  type DeadEvent,
+} from '../lib/dead-letter';
+import { isAdmin } from '../lib/session';
+import { toastSuccess, toastError } from '../lib/toast';
 
 const { t, locale } = useI18n();
 
@@ -613,6 +680,89 @@ async function loadSystemInfo(): Promise<void> {
   applyTableLabels();
 }
 
+// ── Dead-letters (hub#660) ────────────────────────────────────────────────────
+// El flujo del operador: ver la cola → arreglar la causa → reenviar (uno o todos) o descartar.
+// El payload NUNCA se edita (inmutabilidad fiscal, ADR-0189): si la causa sigue, la fila vuelve a
+// morir y reaparece aquí. Solo un admin gestiona dead-letters; un no-admin recibe 403 del runtime.
+const deadLetters = ref<DeadEvent[]>([]);
+const eventsLoading = ref(false);
+const eventsBusy = ref(false);
+const eventsBusyId = ref<string | null>(null);
+
+async function loadDeadLetters(): Promise<void> {
+  if (!isAdmin.value) return; // el endpoint revalida; evitamos el 403 ruidoso del no-admin
+  eventsLoading.value = true;
+  try {
+    deadLetters.value = await fetchDeadLetters();
+  } catch {
+    deadLetters.value = [];
+  } finally {
+    eventsLoading.value = false;
+  }
+}
+
+function formatWhen(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+async function retryOne(id: string): Promise<void> {
+  eventsBusyId.value = id;
+  try {
+    await retryDeadLetter(id);
+    void toastSuccess(t('system.retryDone'));
+    await loadDeadLetters();
+    void refreshDeadLetterCount(); // actualiza el badge de la campana
+  } catch (e) {
+    void toastError(t('system.retryFailed', { reason: (e as Error).message }));
+  } finally {
+    eventsBusyId.value = null;
+  }
+}
+
+async function retryAll(): Promise<void> {
+  eventsBusy.value = true;
+  try {
+    const moved = await retryAllDeadLetters();
+    void toastSuccess(t('system.retryAllDone', { count: moved }));
+    await loadDeadLetters();
+    void refreshDeadLetterCount();
+  } catch (e) {
+    void toastError(t('system.retryFailed', { reason: (e as Error).message }));
+  } finally {
+    eventsBusy.value = false;
+  }
+}
+
+async function discardOne(id: string): Promise<void> {
+  // Descartar es definitivo (la fila se conserva, pero el relay no la vuelve a tocar). Un
+  // doble-check evita el clic accidental sobre un evento fiscal que luego nadie registra.
+  const confirmed = window.confirm(t('system.discardConfirm'));
+  if (!confirmed) return;
+  eventsBusyId.value = id;
+  try {
+    await discardDeadLetter(id);
+    void toastSuccess(t('system.discardDone'));
+    await loadDeadLetters();
+    void refreshDeadLetterCount();
+  } catch (e) {
+    void toastError(t('system.discardFailed', { reason: (e as Error).message }));
+  } finally {
+    eventsBusyId.value = null;
+  }
+}
+
+// Carga la cola al entrar en la pestaña de eventos.
+watch(
+  () => tab.value === 'events',
+  (active) => {
+    if (active) void loadDeadLetters();
+  },
+);
+
 onMounted(() => {
   void refreshHardware();
   void loadSystemInfo();
@@ -776,5 +926,72 @@ onMounted(() => {
 .logs-title {
   margin: 0 0 12px;
   font-weight: 600;
+}
+
+/* ── Pestaña Eventos caídos (hub#660) ── */
+.events-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.events-head .logs-title {
+  margin: 0;
+}
+.events-hint {
+  margin: 0 0 12px;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+.events-spinner {
+  display: block;
+  margin: 16px auto;
+}
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.event-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ion-color-light-shade, #e0e0e0);
+  border-radius: 8px;
+}
+.event-row__main {
+  min-width: 0;
+  flex: 1;
+}
+.event-row__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.event-row__name {
+  font-weight: 600;
+  font-size: 0.9em;
+}
+.event-row__module,
+.event-row__when {
+  font-size: 0.8em;
+  opacity: 0.6;
+}
+.event-row__error {
+  font-size: 0.82em;
+  color: var(--ion-color-danger, #eb445a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.event-row__actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
 }
 </style>

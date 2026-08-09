@@ -160,6 +160,7 @@ import { getUserProfile } from './lib/user-profile';
 import { getClient } from './lib/runtime';
 import { refreshSetupStatus } from './lib/setup-status';
 import { bootAppUpdateWatch } from './lib/app-update';
+import { bootDeadLetterWatch } from './lib/dead-letter';
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }
@@ -237,6 +238,10 @@ async function gateAndRefresh(): Promise<void> {
   // it feeds lives in the sidebar and the sidebar needs a session; idempotent, so the `watch` below
   // re-entering does not start a second clock. In a browser it never starts at all.
   bootAppUpdateWatch();
+  // Campana de dead-letters (hub#660): sondea el count y alimenta el badge del topbar para que un
+  // admin vea, sin ir a buscarlo, que hay eventos caídos. Solo arranca para admin (el propio
+  // watcher se filtra por rol), igual que el de actualizaciones solo arranca en Tauri.
+  bootDeadLetterWatch();
 }
 onMounted(() => {
   if (isAuthed.value) void gateAndRefresh();

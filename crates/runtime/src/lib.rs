@@ -1663,6 +1663,19 @@ impl Runtime {
         outbox::discard(self.db.as_ref(), &self.hub_id, id, discarded_by).await
     }
 
+    /// Puts EVERY dead-letter of this hub back in front of the relay at once (bulk retry, hub#660).
+    /// Returns how many rows it moved. The hub never stays stuck behind a queue that only moves one
+    /// click at a time: a transient outage that killed several events is cleared in one gesture.
+    pub async fn retry_all_dead_events(&self) -> Result<u64> {
+        outbox::retry_all(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// How many dead-letters this hub has right now (hub#660). Cheap count — powers the topbar bell
+    /// without dragging the payloads the listing carries.
+    pub async fn count_dead_events(&self) -> Result<i64> {
+        outbox::count_dead(self.db.as_ref(), &self.hub_id).await
+    }
+
     /// Un ciclo del barrido del **scheduler** (ADR-0011): ejecuta las scheduled tasks vencidas de
     /// los módulos activos. Lo llama el bucle de background del server (junto al relay del outbox).
     /// Devuelve cuántas tareas corrió. `hub_id` es el del despliegue (contexto de sistema).
