@@ -932,6 +932,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
         .route("/api/modules/:id/uninstall", post(uninstall_module))
+        // Actualizar un módulo SIN reiniciar el contenedor (hub#675). Es la pieza que faltaba:
+        // hasta ahora un fix de módulo esperaba a que saliera una imagen nueva del hub, porque los
+        // módulos solo se recogen al arrancar y el rollout excluye a quien ya está en la imagen.
+        .route("/api/modules/:id/update", post(update_module))
         .route(
             "/api/modules/:id/capabilities",
             get(settings::get_module_capabilities).put(settings::put_module_capabilities),
@@ -1099,6 +1103,137 @@ async fn resolve_module_target(
     };
 
     resolve(installed, None, &available)
+}
+
+/// Cuerpo de `POST /api/modules/:id/update`. Sin `version` = **la última**, que es lo que se ofrece
+/// por defecto; con `version` = la que el usuario eligió del desplegable.
+#[derive(serde::Deserialize)]
+struct UpdateModuleReq {
+    #[serde(default)]
+    version: Option<String>,
+}
+
+/// **Actualiza un módulo sin reiniciar el contenedor** (hub#675).
+///
+/// Es lo que hace que un fix de módulo **no espere a una imagen nueva del hub**: los módulos solo se
+/// recogían al arrancar, y `rollout_hub_fleet` excluye a los hubs que ya están en la imagen
+/// objetivo — así que no había campaña que provocase el reinicio.
+///
+/// Si la versión nueva falla, **la anterior vuelve a quedar puesta**: un hub con la versión de ayer
+/// funciona, uno sin el módulo no.
+///
+/// Elegir una versión concreta **no la clava**: el arranque siguiente vuelve a resolver la última
+/// (ADR-0269 — nadie se queda atrás). Clavar una versión es el pin de soporte, que es herramienta
+/// nuestra y no se toca desde aquí.
+async fn update_module(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+    Json(req): Json<UpdateModuleReq>,
+) -> Response {
+    use erplora_runtime::module_update::{resolve, update_with_fallback, Available, Outcome};
+
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response();
+    };
+
+    // La versión que tiene ahora: es a la que hay que volver si la nueva falla.
+    let installed = {
+        let rt = st.runtime.lock().await;
+        rt.registry().module_version(&module_id)
+    };
+    if installed.is_empty() {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "ok": false, "error": format!("`{module_id}` no está instalado") })),
+        )
+            .into_response();
+    }
+
+    // Sin `version` en el cuerpo → la última que ofrezca el marketplace.
+    let target = match req.version {
+        Some(chosen) => chosen,
+        None => {
+            let request = cloud_client::CloudClient::new(&st.config.cloud_base_url).versions(&auth, &module_id);
+            let mut call = st.http.get(&request.url);
+            for (name, value) in request.headers {
+                call = call.header(name, value);
+            }
+            let available: Vec<Available> = match call.send().await {
+                Ok(response) => response
+                    .json::<Vec<cloud_client::ModuleVersion>>()
+                    .await
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|v| Available { version: v.version, is_active: v.is_active })
+                    .collect(),
+                Err(error) => {
+                    return (
+                        StatusCode::BAD_GATEWAY,
+                        Json(json!({ "ok": false, "error": format!("no pude preguntar por las versiones de `{module_id}`: {error}") })),
+                    )
+                        .into_response()
+                }
+            };
+            resolve(&installed, None, &available).version().to_string()
+        }
+    };
+
+    let outcome = update_with_fallback(&installed, &target, |version| {
+        let st = st.clone();
+        let auth = auth.clone();
+        let module_id = module_id.clone();
+        async move {
+            let mut rt = st.runtime.lock().await;
+            install::install_from_cloud(
+                &st.http,
+                &st.config.cloud_base_url,
+                &st.config.module_cache,
+                &auth,
+                &mut rt,
+                &module_id,
+                &version,
+                &|_, _| {},
+                &st.config.signature_policy(),
+            )
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+        }
+    })
+    .await;
+
+    match outcome {
+        Outcome::AlreadyThere(version) => {
+            Json(json!({ "ok": true, "data": { "module_id": module_id, "version": version, "updated": false } })).into_response()
+        }
+        Outcome::Updated { from, to } => {
+            Json(json!({ "ok": true, "data": { "module_id": module_id, "from": from, "version": to, "updated": true } })).into_response()
+        }
+        // 200, no 5xx: la actualización no salió, pero **el módulo sigue funcionando**. Devolver un
+        // error haría pensar que el hub se quedó tocado, y no es el caso.
+        Outcome::RolledBack { stayed_on, error } => Json(json!({
+            "ok": true,
+            "data": { "module_id": module_id, "version": stayed_on, "updated": false },
+            "warning": { "code": "module.update_failed_kept_previous", "message": error },
+        }))
+        .into_response(),
+        Outcome::Lost { module, error } => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "ok": false, "error": { "code": "module.update_lost", "message": format!("`{module}`: {error}") } })),
+        )
+            .into_response(),
+    }
 }
 
 async fn healthz() -> &'static str {
