@@ -22,6 +22,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 
 use crate::errors::Result;
+use crate::migration_guard::Kind;
 use crate::registry::now_rfc3339;
 
 /// Tabla de control de las migraciones de sistema aplicadas (espejo de `_hub_migrations`, pero
@@ -35,6 +36,19 @@ const ENSURE_CONTROL: &str = "CREATE TABLE IF NOT EXISTS _hub_system_migrations 
 struct SystemMigration {
     version: i64,
     name: &'static str,
+    /// Qué hace, con el mismo vocabulario que las migraciones de módulo (hub#542):
+    /// `expand` aditiva · `backfill` datos · `contract` **no admite vuelta atrás**.
+    ///
+    /// **Esta marca ES lo que hace seguro el auto-rollback** (saas#1246). Al revertir **no se
+    /// ejecuta nada sobre el esquema** (ADR-0269): se revierte el código y la columna se queda,
+    /// y el binario anterior la ignora porque su SQL no la menciona. Eso solo funciona si lo
+    /// aplicado era aditivo — así que marcar lo que **no** lo es es la única forma de saber qué
+    /// versiones no se pueden desandar.
+    ///
+    /// Nada de `down`: deshacer borraría los datos que la versión nueva escribió, y además es
+    /// imposible de ejecutar (un binario ya publicado no puede traer la inversa de algo que no
+    /// existía cuando se publicó).
+    kind: Kind,
     postgres: &'static str,
 }
 
@@ -55,6 +69,7 @@ const MIGRATIONS: &[SystemMigration] = &[
     SystemMigration {
         version: 1,
         name: "hub_module_hub_scoped",
+        kind: Kind::Contract,
         // Postgres: añade la columna nullable, sella el hub_id del despliegue en las filas
         // existentes (UPDATE con `:hub_id`, bind seguro — no se mete un parámetro en un DEFAULT
         // de DDL, que Postgres rechazaría en sentencia preparada), luego la pone NOT NULL y
@@ -74,6 +89,7 @@ ALTER TABLE hub_module ADD PRIMARY KEY (hub_id, module_id);",
     SystemMigration {
         version: 2,
         name: "hub_trusted_device",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS hub_trusted_device (\
   device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
@@ -92,6 +108,7 @@ CREATE TABLE IF NOT EXISTS hub_trusted_device (\
     SystemMigration {
         version: 3,
         name: "hub_api_key",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS hub_api_key (\
   id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
@@ -112,6 +129,7 @@ CREATE INDEX IF NOT EXISTS ix_hub_api_key_hub ON hub_api_key (hub_id);",
     SystemMigration {
         version: 4,
         name: "hub_settings",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS hub_settings (\
   hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
@@ -129,6 +147,7 @@ CREATE TABLE IF NOT EXISTS hub_settings (\
     SystemMigration {
         version: 5,
         name: "module_capability_grants",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS _module_capability_grants (\
   hub_id TEXT NOT NULL, module_id TEXT NOT NULL, capability TEXT NOT NULL, \
@@ -146,6 +165,7 @@ CREATE TABLE IF NOT EXISTS _module_capability_grants (\
     SystemMigration {
         version: 6,
         name: "hub_certificate",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS _hub_certificate (\
   hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
@@ -159,6 +179,7 @@ CREATE TABLE IF NOT EXISTS _hub_certificate (\
     SystemMigration {
         version: 7,
         name: "hub_user_profile_preferences",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS hub_user_profile (\
   hub_id TEXT NOT NULL, user_id TEXT NOT NULL, first_name TEXT NOT NULL DEFAULT '', \
@@ -182,6 +203,7 @@ CREATE TABLE IF NOT EXISTS hub_user_pref (\
     SystemMigration {
         version: 8,
         name: "hub_session_device_id",
+        kind: Kind::Expand,
         postgres: "ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS device_id TEXT;",
     },
     // ── v9 — identidad por EMAIL: `hub_user.email` (ADR-0157, corrección owner sembrado) ─────────
@@ -197,6 +219,7 @@ CREATE TABLE IF NOT EXISTS hub_user_pref (\
     SystemMigration {
         version: 9,
         name: "hub_user_email",
+        kind: Kind::Expand,
         postgres: "\
 ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
@@ -205,6 +228,7 @@ CREATE INDEX IF NOT EXISTS ix_hub_user_email ON hub_user (email);",
     SystemMigration {
         version: 10,
         name: "api_key_rate_limit",
+        kind: Kind::Expand,
         postgres:
             "\
 ALTER TABLE hub_api_key ADD COLUMN IF NOT EXISTS rate_limit_per_minute INTEGER NOT NULL DEFAULT 60;\
@@ -227,6 +251,7 @@ CREATE TABLE IF NOT EXISTS hub_api_key_rate_window (\
     SystemMigration {
         version: 11,
         name: "hub_user_cloud_revoked_at",
+        kind: Kind::Expand,
         postgres: "ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS cloud_revoked_at TEXT NOT NULL DEFAULT '';",
     },
     // ── v12 — hub#349 (paso 2b): `owner` sale del catálogo de roles del hub ──────────────────────
@@ -248,6 +273,7 @@ CREATE TABLE IF NOT EXISTS hub_api_key_rate_window (\
     SystemMigration {
         version: 12,
         name: "hub_user_owner_role_to_admin",
+        kind: Kind::Backfill,
         postgres: "UPDATE hub_user SET role = 'admin' WHERE lower(role) = 'owner';",
     },
     // ── v13 — hub#352 (paso 2b): qué roles del catálogo están ACTIVOS en este hub ────────────────
@@ -272,6 +298,7 @@ CREATE TABLE IF NOT EXISTS hub_api_key_rate_window (\
     SystemMigration {
         version: 13,
         name: "hub_role_activation",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS hub_role_activation (\
   hub_id TEXT NOT NULL, role_key TEXT NOT NULL, \
@@ -298,6 +325,7 @@ CREATE TABLE IF NOT EXISTS hub_role_activation (\
     SystemMigration {
         version: 14,
         name: "hub_certificate_slots",
+        kind: Kind::Contract,
         postgres: "\
 ALTER TABLE _hub_certificate ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'own';\
 ALTER TABLE _hub_certificate DROP CONSTRAINT _hub_certificate_pkey;\
@@ -330,6 +358,7 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     SystemMigration {
         version: 16,
         name: "hub_certificate_delegated_version",
+        kind: Kind::Expand,
         postgres: "ALTER TABLE _hub_certificate ADD COLUMN IF NOT EXISTS cert_version BIGINT;",
     },
     // ── v17 — hub#357 (paso 2b): QUÉ CLASE de dispositivo es este — `shared` vs `personal` ───────
@@ -357,6 +386,7 @@ ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     SystemMigration {
         version: 17,
         name: "hub_trusted_device_mode",
+        kind: Kind::Expand,
         postgres: "\
 ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'shared';\
 ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode_set_at TEXT NOT NULL DEFAULT '';\
@@ -391,6 +421,7 @@ ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS mode_set_by TEXT NOT NUL
     SystemMigration {
         version: 18,
         name: "print_queue",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS _print_queue (\
   hub_id TEXT NOT NULL, job_id TEXT NOT NULL, seq BIGSERIAL NOT NULL, \
@@ -445,6 +476,7 @@ CREATE INDEX IF NOT EXISTS ix_print_queue_lease ON _print_queue (hub_id, status,
     SystemMigration {
         version: 19,
         name: "hub_user_access_email_backfill",
+        kind: Kind::Backfill,
         postgres: "\
 UPDATE hub_user AS u SET email = TRIM(pr.email) \
   FROM hub_user_profile AS pr \
@@ -491,6 +523,7 @@ UPDATE hub_user AS u SET email = TRIM(pr.email) \
     SystemMigration {
         version: 21,
         name: "hub_certificate_type",
+        kind: Kind::Expand,
         postgres: "ALTER TABLE _hub_certificate \
                      ADD COLUMN IF NOT EXISTS certificate_type TEXT NOT NULL DEFAULT '';",
     },
@@ -541,6 +574,7 @@ UPDATE hub_user AS u SET email = TRIM(pr.email) \
     SystemMigration {
         version: 22,
         name: "print_host",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS _print_host (\
   hub_id TEXT NOT NULL, device_id TEXT NOT NULL, role TEXT NOT NULL, \
@@ -592,6 +626,7 @@ CREATE INDEX IF NOT EXISTS ix_print_host_role ON _print_host (hub_id, role, last
     SystemMigration {
         version: 23,
         name: "hub_trusted_device_hub_scoped",
+        kind: Kind::Contract,
         postgres: "\
 ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS hub_id TEXT NOT NULL DEFAULT '';\
 DELETE FROM hub_trusted_device WHERE hub_id = '';\
@@ -639,6 +674,7 @@ ALTER TABLE hub_trusted_device ADD CONSTRAINT hub_trusted_device_pkey \
     SystemMigration {
         version: 25,
         name: "print_queue_structured_document",
+        kind: Kind::Contract,
         postgres: "\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS document_type TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS document TEXT NOT NULL DEFAULT '';\
@@ -665,6 +701,7 @@ ALTER TABLE _print_queue DROP COLUMN IF EXISTS html;",
     SystemMigration {
         version: 26,
         name: "elevation_audit",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS _elevation_audit (\
   id TEXT NOT NULL, hub_id TEXT NOT NULL, command TEXT NOT NULL, permission TEXT NOT NULL, \
@@ -712,6 +749,7 @@ CREATE INDEX IF NOT EXISTS idx_elevation_audit_when ON _elevation_audit (hub_id,
     SystemMigration {
         version: 27,
         name: "hub_fiscal_profile",
+        kind: Kind::Expand,
         postgres: "\
 CREATE TABLE IF NOT EXISTS _hub_fiscal_profile (\
   hub_id TEXT NOT NULL PRIMARY KEY, country_code TEXT NOT NULL DEFAULT '', \
@@ -752,6 +790,7 @@ INSERT INTO _hub_fiscal_regime_registry (country_code, regime_key, since, note) 
     SystemMigration {
         version: 28,
         name: "hub_fiscal_profile_closed",
+        kind: Kind::Expand,
         postgres: "\
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_at TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_by TEXT NOT NULL DEFAULT '';",
@@ -777,6 +816,7 @@ ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_by TEXT NOT NULL
     SystemMigration {
         version: 29,
         name: "hub_fiscal_profile_adopted",
+        kind: Kind::Expand,
         postgres: "\
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_at TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_from TEXT NOT NULL DEFAULT '';\
@@ -2267,5 +2307,76 @@ mod tests {
             max_applied_version(&db).await.unwrap() > 0,
             "tras re-aplicar, el control vuelve a registrar las versiones"
         );
+    }
+}
+
+#[cfg(test)]
+mod kind_contract_tests {
+    use super::*;
+
+    /// **Cada migración de sistema hace lo que su `kind` dice.**
+    ///
+    /// Esto es lo que impide que la próxima entre destruyendo algo sin decirlo: quien añada un
+    /// `DROP COLUMN` marcándolo `expand` no llega a mergear. Y es el eslabón que hace seguro el
+    /// auto-rollback (saas#1246) — sin él, revertir el binario sobre un esquema adelantado falla
+    /// **en silencio**.
+    #[test]
+    fn every_system_migration_does_what_its_kind_says() {
+        for migration in MIGRATIONS {
+            if let Err(error) = crate::migration_guard::kind_matches(migration.postgres, migration.kind) {
+                panic!(
+                    "v{} `{}`: {error}\n\
+                     Si de verdad no admite vuelta atrás, márcala `Kind::Contract` y añádela al \
+                     inventario de abajo — no la disfraces de aditiva.",
+                    migration.version, migration.name
+                );
+            }
+        }
+    }
+
+    /// **El inventario: qué versiones NO admiten vuelta atrás.**
+    ///
+    /// Cuatro de veintiséis. La issue decía «al menos dos» (las PK de `hub_module` y de
+    /// `_hub_certificate`) y se dejaba las dos peores:
+    ///
+    /// - **v23** hace `DELETE FROM` — **borra datos**, no solo esquema;
+    /// - **v25** hace `DROP COLUMN` — el binario anterior usaba esa columna.
+    ///
+    /// Sirve para dos cosas: un rollback **por debajo** de estas versiones no es seguro, y este
+    /// test se rompe si alguien añade una quinta sin mirarlo.
+    #[test]
+    fn the_inventory_of_versions_that_cannot_be_rolled_back() {
+        let no_vuelta: Vec<i64> = MIGRATIONS
+            .iter()
+            .filter(|m| m.kind == Kind::Contract)
+            .map(|m| m.version)
+            .collect();
+
+        assert_eq!(
+            no_vuelta,
+            vec![1, 14, 23, 25],
+            "cambió el inventario de migraciones sin vuelta atrás. Si es una nueva: revisa que \
+             de verdad haga falta, porque cada una es una versión por debajo de la cual el \
+             rollback deja de ser seguro."
+        );
+    }
+
+    /// Y el catálogo sigue siendo estrictamente creciente, con sus huecos.
+    ///
+    /// Los huecos (v15, v20, v24) son reales y correctos: una versión reservada y descartada no se
+    /// reutiliza **nunca** — hacerlo aplicaría un SQL distinto en hubs que ya registraron ese
+    /// número y no volverían a mirarlo.
+    #[test]
+    fn the_catalogue_only_grows() {
+        let mut previous = 0;
+        for migration in MIGRATIONS {
+            assert!(
+                migration.version > previous,
+                "v{} rompe el orden del catálogo",
+                migration.version
+            );
+            previous = migration.version;
+        }
+        assert_eq!(MIGRATIONS.len(), 26, "el catálogo cambió de tamaño");
     }
 }
