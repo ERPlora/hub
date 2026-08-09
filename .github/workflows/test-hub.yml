@@ -102,7 +102,7 @@ jobs:
       # pasarle argumentos al comando del contenedor, y estos tres ajustes necesitan reinicio.
       - name: Raise Postgres lock limits (hub#526)
         run: |
-          PG=$(docker ps --filter "ancestor=postgres:18" --format '{{.ID}}' | head -1)
+          PG=$(docker ps --filter "ancestor=pgvector/pgvector:pg18" --format '{{.ID}}' | head -1)
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET max_locks_per_transaction = 4096;"
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';"
