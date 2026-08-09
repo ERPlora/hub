@@ -332,6 +332,61 @@ fn no_published_manifest_is_refused_by_the_contract() {
     );
 }
 
+/// hub#709 — the other half of that guard: the published catalogue does not only LOAD, it also
+/// **declares what it emits**.
+///
+/// Before this, 23 of the 24 manifests had `events.emits` empty or absent, and `sale.completed` —
+/// emitted on every sale, listened to by `inventory`, `customers`, `cash_register`, `invoice` and
+/// `tables` — appeared in no manifest at all. The hub's event catalogue is the aggregation of what
+/// each installed module declares, so the list a flow can react to came out with the eleven events
+/// of `whatsapp_inbox` and nothing else.
+///
+/// The rule is a WARNING and not a refusal (see `Manifest::undeclared_emit_warnings`), so nothing
+/// here can stop a till. What this test buys is that the catalogue stays true: put back a command
+/// that emits without declaring, and this goes red naming the module and the event.
+#[test]
+fn no_published_manifest_hides_an_event_it_emits() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let root = erplora_runtime::modules_root();
+    let mut holes: Vec<String> = Vec::new();
+    let mut loaded = 0;
+    for entry in std::fs::read_dir(&root)
+        .expect("modules root is readable")
+        .flatten()
+    {
+        let dir = entry.path();
+        if !dir.join("module.json").is_file() {
+            continue;
+        }
+        let module = dir
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        let manifest = erplora_runtime::Manifest::load(&dir)
+            .unwrap_or_else(|e| panic!("`{module}` is PUBLISHED and must keep loading: {e}"));
+        for warning in &manifest.warnings {
+            if warning.path == "events.emits" {
+                holes.push(format!("  {module}: {}", warning.detail));
+            }
+        }
+        loaded += 1;
+    }
+    assert!(
+        loaded >= 20,
+        "expected the published catalogue (~24 modules), only {loaded} loaded from {}",
+        root.display()
+    );
+    assert!(
+        holes.is_empty(),
+        "these published modules emit events they do not declare, so the hub's event catalogue \
+         cannot offer them:\n{}",
+        holes.join("\n")
+    );
+}
+
 #[tokio::test]
 async fn the_retired_validates_block_installs_but_says_out_loud_that_it_does_nothing() {
     let db = fresh_db().await;

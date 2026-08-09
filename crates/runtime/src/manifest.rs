@@ -1,6 +1,6 @@
 //! Parseo de `module.json` (el contrato declarativo del módulo). Espejo del JSON Schema
 //! en `schemas/module.schema.json`. ARQUITECTURA.md §5.2.
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
 use crate::errors::{Result, RuntimeError};
@@ -1096,18 +1096,25 @@ pub struct HandlerRef {
 pub struct Events {
     #[serde(default)]
     pub listen: HashMap<String, Listener>,
-    /// Eventos que el módulo **emite desde sus handlers** (WASM/nativo). Es el allowlist que el
-    /// runtime comprueba antes de encolar en el outbox un evento devuelto por un handler (hub#240).
+    /// **El catálogo completo de eventos que el módulo emite** — los de sus commands declarativos
+    /// y los que devuelven sus handlers (WASM/nativo).
     ///
-    /// Por qué existe: `emit` declara los eventos de un command **declarativo**; los que devuelve
-    /// un handler no tenían dónde declararse, así que no se validaban contra nada — el handler
-    /// elegía el nombre y el relay se lo entregaba a los listeners de otros módulos y al
-    /// **listener-host de `host.notify`** (`*.reminder.due` → email/SMS/WhatsApp).
+    /// Nació (hub#240) como el allowlist de lo que un HANDLER puede encolar en el outbox: `emit`
+    /// declaraba los de un command declarativo y los del handler no tenían dónde declararse, así
+    /// que no se validaban contra nada — el handler elegía el nombre y el relay se lo entregaba a
+    /// los listeners de otros módulos y al **listener-host de `host.notify`** (`*.reminder.due` →
+    /// email/SMS/WhatsApp).
     ///
-    /// Declarar esta lista pone al módulo en **modo estricto**: solo estos nombres (más los `emit`
-    /// de sus commands) pueden salir de sus handlers. Un manifest que no la declara mantiene la
-    /// compatibilidad con lo ya publicado, pero sigue sujeto a las dos reglas duras: no emitir en
-    /// el namespace de otro módulo instalado y no emitir `*.reminder.due` sin la capability
+    /// hub#709 la ensancha a **catálogo**: el hub no tiene un registro central de eventos (se
+    /// desincronizaría del código el primer día) — la lista de «cosas que pueden pasar en mi
+    /// negocio» que ofrece el editor de flujos ES la agregación de este campo en los módulos
+    /// instalados. Por eso un `emit` de command que no aparezca aquí queda REPORTADO en
+    /// [`Manifest::warnings`] (aviso, no rechazo: ver `Manifest::undeclared_emit_warnings`).
+    ///
+    /// Declarar esta lista pone además al módulo en **modo estricto**: solo estos nombres (más los
+    /// `emit` de sus commands) pueden salir de sus handlers. Un manifest que no la declara mantiene
+    /// la compatibilidad con lo ya publicado, pero sigue sujeto a las dos reglas duras: no emitir
+    /// en el namespace de otro módulo instalado y no emitir `*.reminder.due` sin la capability
     /// `notify`. Ver `commands::validate_handler_event`.
     #[serde(default)]
     pub emits: Vec<String>,
@@ -1341,7 +1348,12 @@ impl Manifest {
         let mut manifest: Manifest = serde_json::from_str(&text).map_err(to_err)?;
         let raw: serde_json::Value = serde_json::from_str(&text).map_err(to_err)?;
         manifest.require_core_version()?;
-        manifest.warnings = manifest.audit(&raw)?;
+        let mut warnings = manifest.audit(&raw)?;
+        // hub#709: and the same channel for a manifest this core understands PERFECTLY but that
+        // does not declare what it emits. It is not an unknown field — it is a hole in the event
+        // catalogue the whole hub is built out of. See `undeclared_emit_warnings`.
+        warnings.extend(manifest.undeclared_emit_warnings());
+        manifest.warnings = warnings;
         Ok(manifest)
     }
 
@@ -1484,6 +1496,73 @@ impl Manifest {
             });
         }
         Ok(())
+    }
+
+    /// The PRODUCER side of the event contract (hub#709): every event a command declares in
+    /// `emit` has to be listed in `events.emits`.
+    ///
+    /// # Why it exists
+    ///
+    /// `installer::validate_event_listeners` (hub#659) already forces the CONSUMER to declare
+    /// well. Nothing forced the producer, and the result was not a rough edge: `sale.completed` —
+    /// the hub's central event, emitted on every sale and listened to by `inventory`, `customers`,
+    /// `cash_register`, `invoice` and `tables` — was declared in NO place the runtime could read.
+    /// The catalogue of "things that can happen in my business" that the flow editor offers the
+    /// owner is the aggregation of what every installed module declares in its own manifest (it is
+    /// not a central registry — that would drift from the code on day one), so a module that keeps
+    /// quiet does not appear in it at all.
+    ///
+    /// # Why a WARNING and not a refusal
+    ///
+    /// ADR-0286 (hub#521) settled the tier by the RADIUS OF THE DAMAGE: what changes what RUNS or
+    /// who may run it is refused; what costs a screen, a button or a checklist item installs and
+    /// is REPORTED. An undeclared emit is squarely the second: the event still leaves (a
+    /// declarative `emit` goes into the outbox without passing through
+    /// [`crate::commands::validate_handler_event`], which only judges what a HANDLER returns), the
+    /// listeners still receive it, and nothing about permissions changes. What is lost is a line
+    /// in a catalogue.
+    ///
+    /// And the enforcement would cost far more than the mistake: `Manifest::load` is also the door
+    /// the boot scan re-registers every INSTALLED module through, so refusing here would make a
+    /// module that has been running for months VANISH from a till over a missing line — with no
+    /// way to update it out of trouble (ADR-0269). Better a warning that travels in
+    /// `/api/modules` than a POS that stops.
+    ///
+    /// The warning is per EVENT, not per emit: two commands emitting the same undeclared name is
+    /// one hole in the catalogue. Sorted by event name because `commands` is a `HashMap` and a
+    /// warning that reshuffles on every boot is one nobody can diff.
+    fn undeclared_emit_warnings(&self) -> Vec<ManifestWarning> {
+        let declared: HashSet<&str> = self.events.emits.iter().map(String::as_str).collect();
+        let mut by_event: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+        for (name, command) in &self.commands {
+            for event in &command.emit {
+                if declared.contains(event.as_str()) {
+                    continue;
+                }
+                by_event
+                    .entry(event.as_str())
+                    .or_default()
+                    .insert(name.as_str());
+            }
+        }
+        by_event
+            .into_iter()
+            .map(|(event, commands)| {
+                let commands = commands
+                    .into_iter()
+                    .map(|c| format!("`{c}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                ManifestWarning {
+                    path: "events.emits".to_string(),
+                    detail: format!(
+                        "`{event}` is emitted by {commands} and is not declared in \
+                         `events.emits`: the hub's event catalogue is the aggregation of what \
+                         each installed module declares, so nothing can be built to react to it"
+                    ),
+                }
+            })
+            .collect()
     }
 
     /// Carga las traducciones del módulo desde `<dir>/locales/*.json` → `lang → ModuleLocale`
@@ -1995,5 +2074,110 @@ mod tests {
             "an old module on a new hub keeps installing: that is the tolerance that makes \
              upgrading a hub possible"
         );
+    }
+
+    // ── The producer side of the event contract (hub#709) ────────────────────────────────────
+
+    /// 🔴 The hole this closes. `installer::validate_event_listeners` (hub#659) already forces the
+    /// CONSUMER to declare well; nothing forced the PRODUCER, so `sale.completed` — the hub's
+    /// central event — was declared in no place the runtime could read, and the catalogue the
+    /// flow editor builds out of the installed manifests came out empty.
+    #[test]
+    fn an_emit_missing_from_events_emits_is_reported() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                "commands":{"sales.void":{"permission":"sales.void","sql":[],
+                            "emit":["sale.voided"]}}}"#,
+        )
+        .unwrap();
+
+        let warnings = manifest.undeclared_emit_warnings();
+
+        assert_eq!(warnings.len(), 1, "one warning per undeclared event");
+        assert_eq!(warnings[0].path, "events.emits");
+        assert!(
+            warnings[0].detail.contains("sale.voided") && warnings[0].detail.contains("sales.void"),
+            "the warning has to name the event AND the command that emits it: {}",
+            warnings[0].detail
+        );
+    }
+
+    /// The rule is satisfiable and it does not nag a manifest that already declares what it emits
+    /// — otherwise the 24 published modules would warn forever and the channel would be noise.
+    #[test]
+    fn an_emit_listed_in_events_emits_says_nothing() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                "commands":{"sales.void":{"permission":"sales.void","sql":[],
+                            "emit":["sale.voided"]}},
+                "events":{"emits":["sale.voided","sale.completed"]}}"#,
+        )
+        .unwrap();
+
+        assert!(
+            manifest.undeclared_emit_warnings().is_empty(),
+            "a declared emit is exactly what this rule asks for"
+        );
+        // And declaring MORE than the commands emit is not an error: `events.emits` is also where
+        // the handler's own events live (`sale.completed` comes out of the WASM, not a command).
+    }
+
+    /// Two commands emitting the same undeclared name is ONE hole in the catalogue, not two — and
+    /// the order has to be stable, because `commands` is a `HashMap` and a warning that reshuffles
+    /// on every boot is unreadable.
+    #[test]
+    fn the_same_undeclared_event_is_reported_once_with_every_command_that_emits_it() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"cash_register","name":"Cash","version":"1.0.0",
+                "commands":{
+                  "cash_register.movement.add":{"permission":"p","sql":[],
+                        "emit":["cash_register.movement_added"]},
+                  "cash_register.record_sale":{"permission":"p","sql":[],
+                        "emit":["cash_register.movement_added"]},
+                  "cash_register.session.open":{"permission":"p","sql":[],
+                        "emit":["cash_register.session_opened"]}}}"#,
+        )
+        .unwrap();
+
+        let warnings = manifest.undeclared_emit_warnings();
+
+        assert_eq!(warnings.len(), 2, "two distinct events, not three emits");
+        assert!(
+            warnings[0].detail.contains("cash_register.movement_added"),
+            "sorted by event name so two boots read the same: {warnings:?}"
+        );
+        assert!(
+            warnings[0].detail.contains("cash_register.movement.add")
+                && warnings[0].detail.contains("cash_register.record_sale"),
+            "both commands that emit it get named: {}",
+            warnings[0].detail
+        );
+    }
+
+    /// Wired into the door every module goes through — install AND the boot re-registration — so
+    /// the warning rides on `Manifest::warnings` into `/api/modules` like the hub#521 ones.
+    #[test]
+    fn load_carries_the_undeclared_emit_warning() {
+        let dir = std::env::temp_dir().join(format!("erplora-emits-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("module.json"),
+            r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                "commands":{"sales.void":{"permission":"sales.void","sql":[],
+                            "emit":["sale.voided"]}}}"#,
+        )
+        .unwrap();
+
+        let manifest = Manifest::load(&dir).expect("an under-declared producer still INSTALLS");
+
+        assert!(
+            manifest
+                .warnings
+                .iter()
+                .any(|w| w.path == "events.emits" && w.detail.contains("sale.voided")),
+            "the warning travels with the manifest: {:?}",
+            manifest.warnings
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }
