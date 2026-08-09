@@ -355,3 +355,146 @@ async fn reset_de_usuarios_conserva_a_quien_lo_ejecuta() {
     assert!(ids.contains(&owner), "🔴 el reset expulsó al usuario que lo ejecutaba");
     assert!(!ids.contains(&empleado), "el resto de empleados sí se borran cuando se marca la sección");
 }
+
+// ── 8. La cola de impresión: dato que se borra, host que sobrevive (hub#502) ────────────
+
+/// `_print_queue` and `_print_host` are created by the system migrations that run when modules
+/// are installed, so `fresh()` already has both — with the real schema (v22: `_print_host` keys
+/// on `(hub_id, device_id, role)`). This helper is a no-op once the tables exist; it exists so a
+/// future minimal fixture that does not install modules can still set up a host row.
+async fn ensure_print_host(rt: &Runtime) {
+    rt.db()
+        .execute_batch(
+            "CREATE TABLE IF NOT EXISTS _print_host (\
+               hub_id TEXT NOT NULL, device_id TEXT NOT NULL, role TEXT NOT NULL, \
+               label TEXT NOT NULL DEFAULT '', registered_at TEXT NOT NULL, \
+               registered_by TEXT NOT NULL DEFAULT '', last_seen_at TEXT NOT NULL, \
+               PRIMARY KEY (hub_id, device_id, role));",
+        )
+        .await
+        .unwrap();
+}
+
+/// **hub#502 — a reset empties the print queue but leaves the host registry intact.** Since
+/// hub#343 a host DRAINS `_print_queue`, so a reset followed by an app reconnecting would print
+/// **ghost tickets of a business that just got deleted**. The queue is DATA (it goes); the host
+/// registry is LOCAL config (which printer prints kitchen) and must survive, or the owner would
+/// have to re-pair printers after every reset — exactly what hub#342 avoided on purpose.
+#[tokio::test]
+async fn reset_empties_the_print_queue_but_keeps_the_host_registry() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let rt = fresh().await;
+    ensure_print_host(&rt).await;
+
+    // Two pending tickets for h1 (ghosts of sales the reset is deleting) and one for h2 (must be
+    // untouched — the queue is hub-scoped, same as every other table).
+    let db = rt.db();
+    for job in ["T-1", "T-2"] {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!("h1"));
+        p.insert("job_id".into(), json!(job));
+        p.insert("role".into(), json!("receipt"));
+        p.insert("now".into(), json!("2026-01-01T00:00:00Z"));
+        db.execute(
+            "INSERT INTO _print_queue (hub_id, job_id, role, status, attempts, \
+             claimed_by, lease_expires_at, last_error, created_at) \
+             VALUES (:hub_id, :job_id, :role, 'pending', 0, '', '', '', :now)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("h2"));
+    p.insert("job_id".into(), json!("VECINO"));
+    p.insert("now".into(), json!("2026-01-01T00:00:00Z"));
+    db.execute(
+        "INSERT INTO _print_queue (hub_id, job_id, role, status, attempts, \
+         claimed_by, lease_expires_at, last_error, created_at) \
+         VALUES (:hub_id, :job_id, 'receipt', 'pending', 0, '', '', '', :now)",
+        &p,
+    )
+    .await
+    .unwrap();
+    // A registered host for kitchen — this is LOCAL config and must NOT be cleared.
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("h1"));
+    p.insert("role".into(), json!("kitchen"));
+    p.insert("device_id".into(), json!("host-caja-2"));
+    p.insert("now".into(), json!("2026-01-01T00:00:00Z"));
+    db.execute(
+        "INSERT INTO _print_host (hub_id, device_id, role, registered_at, last_seen_at) \
+         VALUES (:hub_id, :device_id, :role, :now, :now)",
+        &p,
+    )
+    .await
+    .unwrap();
+
+    // The plan announces the queue section with the real count — same WHERE as the DELETE.
+    let plan = plan_reset(&rt, "h1").await.expect("plan");
+    let pq = plan
+        .sections
+        .iter()
+        .find(|s| s.section == "print_queue")
+        .expect("el plan lista la sección print_queue");
+    assert_eq!(pq.rows, 2, "el plan cuenta los 2 tiques pendientes de h1 (no el del vecino)");
+
+    // Reset WITH the print_queue section marked.
+    let sel = ResetSelection { print_queue: true, ..Default::default() };
+    execute_reset(&rt, "h1", &sel, "u1").await.expect("reset");
+
+    // The queue is empty for h1…
+    assert_eq!(count(&rt, "_print_queue", "h1").await, 0, "la cola de h1 queda vacía");
+    // …but h2's ticket is untouched (tenant isolation, same rule as every other table).
+    assert_eq!(count(&rt, "_print_queue", "h2").await, 1, "el tique del vecino no se toca");
+    // …and the host registry survives: re-pairing printers after every reset is the papercut
+    // hub#342 killed, and this reset must not bring it back.
+    let hosts = rt
+        .db()
+        .query(
+            "SELECT device_id FROM _print_host WHERE hub_id='h1' AND role='kitchen'",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        hosts.rows.len(),
+        1,
+        "🔴 el registro de impresoras (_print_host) se borró: es CONFIG del local, no dato del \
+         negocio, y sobrevive al reset (hub#342)"
+    );
+}
+
+/// **hub#502 — the print queue is NOT cleared when the section is off.** Default-off is the rule
+/// for every section: a reset never does more than asked. An older shell that does not send the
+/// field clears no queue.
+#[tokio::test]
+async fn reset_without_the_print_queue_section_leaves_the_queue_intact() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let rt = fresh().await;
+    ensure_print_host(&rt).await;
+
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("h1"));
+    p.insert("job_id".into(), json!("T-1"));
+    p.insert("now".into(), json!("2026-01-01T00:00:00Z"));
+    rt.db()
+        .execute(
+            "INSERT INTO _print_queue (hub_id, job_id, role, status, attempts, \
+             claimed_by, lease_expires_at, last_error, created_at) \
+             VALUES (:hub_id, :job_id, 'receipt', 'pending', 0, '', '', '', :now)",
+            &p,
+        )
+        .await
+        .unwrap();
+
+    // Reset WITHOUT print_queue — empty selection clears nothing.
+    let sel = ResetSelection::default();
+    execute_reset(&rt, "h1", &sel, "u1").await.expect("reset");
+
+    assert_eq!(
+        count(&rt, "_print_queue", "h1").await,
+        1,
+        "sin la sección marcada la cola no se toca (el reset nunca hace de más)"
+    );
+}
