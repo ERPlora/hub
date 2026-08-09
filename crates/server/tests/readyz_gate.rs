@@ -152,3 +152,26 @@ async fn an_intentionally_inactive_module_does_not_block() {
 
     assert_eq!(status, StatusCode::OK, "cuerpo: {body}");
 }
+
+/// **El caso que rompió el provisioning en producción (2026-08-09): un hub RECIÉN NACIDO, cero
+/// módulos, arrancado por el camino REAL (`Runtime::ensure_system_tables`) — debe estar READY.**
+///
+/// El fixture `booted_hub()` de arriba llamaba a `migrations::ensure_table` a mano… y el boot
+/// real NO lo hacía: `_hub_migrations` solo nacía con la primera migración de módulo. En un hub
+/// virgen el chequeo de migraciones petaba con «relation does not exist» → DOWN → 503 → el
+/// healthcheck de Swarm mataba la tarea → `deployment_status=error`. Ningún hub nuevo podía
+/// aprovisionarse, y los tests seguían verdes porque el fixture no era el boot real.
+#[tokio::test]
+async fn a_fresh_hub_with_zero_modules_booted_the_real_way_is_ready() {
+    let db = fresh_db().await;
+    let mut runtime = Runtime::new(Box::new(db));
+    // El camino REAL del arranque (`serve()`), no una recreación a mano pieza a pieza.
+    runtime.ensure_system_tables().await.unwrap();
+    let state = AppState::with_config(runtime, HubConfig::from_env_with_auth(AuthMode::Dev));
+
+    let (status, body) = get(state, "/readyz").await;
+
+    assert_eq!(status, StatusCode::OK, "un hub virgen debe estar READY; cuerpo: {body}");
+    assert_eq!(body["checks"]["migrations"]["status"], "UP", "cuerpo: {body}");
+    assert_eq!(body["checks"]["modules"]["status"], "UP", "cero módulos esperados = cero cargados: {body}");
+}
