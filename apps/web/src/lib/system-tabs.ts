@@ -1,4 +1,4 @@
-export const SYSTEM_TABS = ['resources', 'plan', 'updates', 'documents', 'logs'] as const;
+export const SYSTEM_TABS = ['resources', 'plan', 'updates', 'logs'] as const;
 
 export type SystemTab = (typeof SYSTEM_TABS)[number];
 

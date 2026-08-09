@@ -24,6 +24,7 @@
 //!   DELETE /api/media?path=<rel>        → borra un fichero o una carpeta (con su contenido)
 //!   POST   /api/media/folder            → json { parent, name } crea sub-carpeta
 //!   POST   /api/media/rename            → json { path, name } renombra fichero o carpeta
+//!   POST   /api/media/move              → json { from, to } mueve fichero o carpeta
 //!
 //! Qué puede hacer el USUARIO con cada ruta lo decide el módulo dueño de la carpeta
 //! (`static_files.user_actions`, ADR-0172): por defecto solo ver y descargar. Ver `policy_for`.
@@ -35,6 +36,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::future::Future;
 use std::path::{Component, Path, PathBuf};
 
 use erplora_runtime::manifest::{StaticFilesDef, UserFileAction};
@@ -166,8 +168,17 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
     // Política de la carpeta pedida: la UI pinta solo las acciones posibles (ADR-0172). No es la
     // autoridad — cada endpoint la revalida —, pero evita ofrecer un botón que va a dar 403.
     let policy = resolve_policy(st, folder).await;
+    // Árbol de carpetas decorado con `readOnly` por nodo: una carpeta es readOnly cuando su módulo
+    // dueño no concede ninguna acción de modificación (carpetas reservadas del hub `_logs/_system`,
+    // `modules/` raíz o un módulo que no opte en `static_files.user_actions`). La UI lo usa para
+    // marcarlas como no arrastrables y no receptoras de drops (ADR-0172, arrastrar-y-soltar).
+    let folders = decorate_folders(
+        raw.get("folders").cloned().unwrap_or_else(|| json!([])),
+        st,
+    )
+    .await;
     let data = json!({
-        "folders": raw.get("folders").cloned().unwrap_or_else(|| json!([])),
+        "folders": folders,
         "files": files,
         "path": raw.get("path").cloned().unwrap_or_else(|| json!([])),
         // Bucket por hub sin cuota dura (ADR-0047): solo lo usado, sin barra.
@@ -345,6 +356,54 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
         .unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "respuesta inválida"))
 }
 
+/// `POST …/media/move/` en el Cloud (que hace el copy+delete sobre Object Storage). Mueve un
+/// fichero o carpeta de `from` al destino `to` (ambos relativos a `media/`).
+async fn cloud_move(st: &AppState, from: &str, to: &str) -> Response {
+    let Some(headers) = cloud_headers(st) else {
+        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+    };
+    let url = format!("{}/api/v1/hub/device/media/move/", cloud_base(st));
+    let mut r = st.http.post(&url).json(&json!({ "from": from, "to": to }));
+    for (k, v) in headers {
+        r = r.header(k, v);
+    }
+    match r.send().await {
+        Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
+        Ok(resp) => err(
+            StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
+            "el Cloud no pudo mover",
+        ),
+        Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
+    }
+}
+
+/// Recorre el árbol de carpetas y añade `readOnly: true` a cada nodo cuya política no conceda
+/// ninguna acción de modificación. El `id` de cada carpeta es su ruta relativa; la política se
+/// resuelve contra el registro de módulos instalados.
+fn decorate_folders(folders: Value, st: &AppState) -> std::pin::Pin<Box<dyn Future<Output = Value> + Send + '_>> {
+    Box::pin(async move {
+        let Some(arr) = folders.as_array().cloned() else {
+            return folders;
+        };
+        let mut out = Vec::with_capacity(arr.len());
+        for mut node in arr {
+            if let Some(obj) = node.as_object_mut() {
+                if let Some(id) = obj.get("id").and_then(Value::as_str) {
+                    let policy = resolve_policy(st, id).await;
+                    let read_only = !policy.upload && !policy.rename && !policy.delete;
+                    obj.insert("readOnly".into(), json!(read_only));
+                }
+                if let Some(children) = obj.get("children").cloned() {
+                    let decorated = decorate_folders(children, st).await;
+                    obj.insert("children".into(), decorated);
+                }
+            }
+            out.push(node);
+        }
+        Value::Array(out)
+    })
+}
+
 // ─────────────────────────── GET /api/media ───────────────────────────
 
 #[derive(Deserialize)]
@@ -488,6 +547,52 @@ pub async fn media_rename(
         return response;
     }
     cloud_rename(&st, &req.path, &req.name).await
+}
+
+// ─────────────────────────── POST /api/media/move ───────────────────────────
+
+#[derive(Deserialize)]
+pub struct MoveReq {
+    /// Ruta relativa (a `media/`) del fichero o carpeta a mover.
+    from: String,
+    /// Carpeta destino (relativa a `media/`; `""` = raíz) donde reubicarlo.
+    to: String,
+}
+
+/// Mueve un fichero o carpeta dentro de `media/`, proxyando al Cloud.
+///
+/// Para que el movimiento sea válido, el usuario debe poder MODIFICAR tanto el origen (sacarlo de
+/// ahí es un delete) como el destino (meterlo es un upload). Así una carpeta de módulo (readOnly)
+/// no recibe drops ni se deja sacar de su sitio.
+pub async fn media_move(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<MoveReq>,
+) -> Response {
+    if let Err(response) = require_admin(&st, &headers).await {
+        return response;
+    }
+    if req.from.trim_matches('/').is_empty() {
+        return err(StatusCode::BAD_REQUEST, "falta la ruta de origen");
+    }
+    if req.from == req.to {
+        return err(StatusCode::BAD_REQUEST, "origen y destino coinciden");
+    }
+    // No se puede mover algo al interior de sí mismo (carpeta dentro de su subcarpeta).
+    if is_within(&req.from, &req.to) {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "no se puede mover una carpeta dentro de sí misma",
+        );
+    }
+    // Sacar el elemento del origen cuenta como borrado; meterlo, como subida.
+    if let Err(response) = require_action(&st, &req.from, UserFileAction::Delete).await {
+        return response;
+    }
+    if let Err(response) = require_action(&st, &req.to, UserFileAction::Upload).await {
+        return response;
+    }
+    cloud_move(&st, &req.from, &req.to).await
 }
 
 // ─────────────────────────── Helpers ───────────────────────────
@@ -649,6 +754,17 @@ impl From<&StaticFilesDef> for MediaPolicy {
 /// Primer segmento de la ruta relativa (`""` si está vacía).
 fn first_segment(rel: &str) -> &str {
     rel.trim_matches('/').split('/').next().unwrap_or("")
+}
+
+/// `true` si `to` es el mismo o un descendiente de `from` (ambas rutas relativas a `media/`).
+/// Usado por `media_move` para rechazar meter una carpeta dentro de sí misma o de su subárbol.
+fn is_within(from: &str, to: &str) -> bool {
+    let f = from.trim_matches('/');
+    let t = to.trim_matches('/');
+    if f.is_empty() {
+        return false;
+    }
+    t == f || t.starts_with(&format!("{f}/"))
 }
 
 /// Nombre de la carpeta de módulo dueña de la ruta, si vive bajo `modules/<folder>/…`.

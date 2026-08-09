@@ -6,21 +6,15 @@ export default {
   nav: {
     general: 'General',
     account: 'Account',
+    modules: 'Modules',
     home: 'Home',
     employees: 'Employees',
     files: 'Files',
-    // hub#365 — the money door, in the first person of the business. «Billing» names the ledger the
-    // SaaS keeps; from inside the till what the owner asks is which plan they are on. One label for
-    // two surfaces: this sidebar entry and the title of the page it opens.
-    billing: 'My plan',
+    billing: 'Billing',
     apps: 'Apps',
     system: 'System',
     settings: 'Settings',
     apiDocs: 'API',
-    // Account management, not a storefront (hub#479): the label names the task, never a price
-    // or an offer, and it lands on THIS hub's plan page — the customer's own account.
-    upgradePlan: 'Upgrade plan',
-    upgradePlanError: 'We could not open your browser. Go to erplora.com to manage your plan.',
   },
   apiDocs: {
     title: 'API documentation',
@@ -34,13 +28,9 @@ export default {
   topbar: {
     back: 'Back',
     apps: 'My apps',
-    appsEmpty: 'Your apps will show up here. Tap Apps to add the ones your business needs.',
+    appsEmpty: 'No modules installed yet. Open Apps to add some.',
     appsClose: 'Close',
     assistant: 'Assistant',
-    // The way out to management (hub#364). It is the only affordance an icon-only action has, and
-    // it crosses a product boundary, so it names the destination out loud.
-    manage: 'Manage your business at erplora.com',
-    manageError: 'We could not open your browser. Go to erplora.com to manage your business.',
     notifications: 'Notifications',
     noNotifications: 'All caught up. No notifications.',
     configure: 'Configure',
@@ -51,18 +41,6 @@ export default {
   sidebar: {
     profile: 'Profile',
     signOut: 'Sign out',
-  },
-  // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
-  // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and
-  // one noun for two things is how a cashier ends up uninstalling the till.
-  appUpdate: {
-    available: 'Update ERPlora ({version})',
-    confirmTitle: 'Update ERPlora',
-    confirmBody:
-      'Your browser opens to download version {version}. Nothing installs on its own: finish serving, then close ERPlora and open what you downloaded.',
-    action: 'Download',
-    cancel: 'Not now',
-    failed: 'We could not open your browser. Go to erplora.com to get the new version.',
   },
   // PWA install modal (PwaInstallModal.vue) — replaces the old sidebar "Install app" button.
   pwa: {
@@ -75,9 +53,6 @@ export default {
     browserHint: 'In your browser menu, choose “Install app” (or “Add to Home Screen”).',
   },
   assistant: {
-    confirmTitle: 'The assistant wants to run an action',
-    confirmCancel: 'Cancel',
-    confirmRun: 'Run it',
     title: 'Assistant',
     empty: 'Ask me about your sales, your inventory or anything about your business.',
     emptySetup: 'Review the hub configuration. Pick an option or type your question.',
@@ -94,14 +69,6 @@ export default {
     attachRemove: 'Remove attachment',
     attachImage: 'image',
     attachTooLarge: 'The file is too large.',
-  },
-  // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
-  // installed app there is no download shelf and no notification, so if we say nothing, nothing is
-  // said at all.
-  download: {
-    savedTo: 'Saved to {path}',
-    noPlaceToSave: 'This app cannot save files on a phone or tablet. Open your business in a browser to download it.',
-    failed: 'The file could not be downloaded.',
   },
   files: {
     title: 'Files',
@@ -136,6 +103,8 @@ export default {
     newName: 'New name',
     renameSuccess: 'Renamed.',
     renameError: 'It could not be renamed. This folder may be read-only.',
+    moveSuccess: 'Moved.',
+    moveError: 'It could not be moved. The source or destination may be read-only.',
     deleteFolderTitle: 'Delete folder',
     deleteFolderBody: 'You are about to delete “{name}” and everything inside it. This cannot be undone.',
     close: 'Close',
@@ -147,91 +116,15 @@ export default {
     previewUnsupportedBody: 'This file type cannot be shown here. Download it to open it with an app on your device.',
     previewPdfTruncated: 'Showing the first {shown} of {total} pages. Download the file to read it in full.',
   },
-  // The configuration checklist — the dashboard surface of `hub.setup.status` (hub#372).
-  // `items.<key>` covers the CORE items only: a core item's key IS its i18n key, while a module's
-  // title travels in English inside its manifest and is used as-is (setup-status.md §7).
-  setup: {
-    title: 'Finish setting up your business',
-    progress: '{done} of {total} done',
-    viewAll: 'View all',
-    viewLess: 'Show less',
-    configure: 'Set up',
-    review: 'Ask the assistant',
-    doneLabel: 'Done',
-    // The three levels, said as what they mean for the business — not as a severity word.
-    levelLegal: 'Needed to invoice',
-    levelFunctional: 'Needed to sell',
-    levelRecommended: 'Recommended',
-    // The third state: OUR breakdown, not the user's task. It must not read as a chore.
-    unavailableLabel: 'Not available yet',
-    unavailableHint: 'This one is on us: there is nothing on your side to do yet. We are on it.',
-    // A wall that is not yours to bring down (hub#435). It says WHO can — not the name of a
-    // permission — because a blocker with no owner leaves the user with nowhere to go.
-    delegatedHint: 'An administrator has to set this up.',
-    inheritedHint: 'It came from the template you used. Worth a look — your room and your prices are your own.',
-    completeTitle: 'Your business is ready',
-    completeBody: 'Everything on the checklist is done.',
-    // The hero card of a business with no apps yet (hub#368). Its whole job is the FIRST choice, so
-    // it says what one press does AND what it leaves for the owner: a template brings the apps and
-    // the catalogue of a trade, never the details of THIS business (ADR-0195 §4/§5).
-    hero: {
-      title: 'Start from a business like yours',
-      body: 'Pick the closest one and we set up its apps and its catalogue in one go. You will still have to add your own details afterwards.',
-      use: 'Use this one',
-      more: 'See all templates',
-      working: 'Setting up «{name}»…',
-      readyTitle: 'Your apps and your catalogue are in',
-      readyBody: 'What is left is what only you can answer: the details of your business. You have them on the list below.',
-      // hub#535 — a template also brings SAMPLE data (customers, appointments). Said BEFORE the
-      // click, because after it the agenda is full of bookings that are not the owner's; and said
-      // AGAIN after, pointing at the door that already removes them (undo an import, ADR-0170).
-      // What we do NOT do is write a relative-date engine so the sample bookings are always in the
-      // future: expensive, small problem, and already solved by that door.
-      sampleData: 'It also brings sample data — customers, appointments — so you can see how everything works.',
-      sampleDataUndo: 'The sample data is there for you to look around. You can remove it whenever you like from Settings › Data.',
-      partialTitle: 'Almost: something did not go in',
-      // A purchase decision, never a breakage (ADR-0060, hub#409): it names what to add and says
-      // where, instead of painting a red error over a plan the owner simply has not bought.
-      blocked: 'These have to be added to your plan first: {apps}',
-      failed: 'Something else did not go in. You can see the detail and try again in Settings › Data.',
-      notStartedTitle: 'That template could not be opened',
-      notStartedBody: 'Nothing changed in your business. Try again, or load it from Settings › Data.',
-      interruptedTitle: 'The set-up did not finish',
-      // We do NOT claim it changed nothing: half of it may already be in, and saying otherwise
-      // would send the owner to press again on top of it.
-      interruptedBody: 'Part of it may already be in. Check it in Settings › Data before trying again.',
-      continue: 'Continue',
-      retry: 'Try again',
-    },
-    // The blocking strip (hub#374): the surface for the screens the checklist is not on. It says the
-    // CONSEQUENCE, not the severity — ⛔ means the runtime refuses the document, so that is what it
-    // announces. It never says "error": nothing is broken, something is missing.
-    blocking: {
-      title: 'You cannot issue invoices yet',
-      body: 'No ticket or invoice can be issued until this is set up:',
-    },
-    items: {
-      apps: {
-        title: 'Your apps',
-        description: 'Install at least one business app so your till has something to sell.',
-      },
-      business_identity: {
-        title: 'Your business details',
-        description: 'Legal name and tax id: without them you cannot issue an invoice.',
-      },
-      team: {
-        title: 'Your team',
-        description: 'Add the people who will use the till, each with their own way in.',
-      },
-    },
-  },
   dashboard: {
-    // Contextual greeting by time of day (zone 1 — header). It stands in for the BUSINESS NAME
-    // while the hub has none yet, so nobody is interpolated: greeting a person here is what put an
-    // account address in the `<h1>` (hub#366).
-    greetingMorning: 'Good morning',
-    greetingAfternoon: 'Good afternoon',
-    greetingEvening: 'Good evening',
+    setupTitle: '{n} module(s) need configuration',
+    configure: 'Configure',
+    setupHint: 'Review what is missing and the assistant will guide you step by step to get it ready.',
+    reviewConfig: 'Review configuration',
+    // Contextual greeting by time of day (zone 1 — header). Name is interpolated.
+    greetingMorning: 'Good morning, {name}',
+    greetingAfternoon: 'Good afternoon, {name}',
+    greetingEvening: 'Good evening, {name}',
     // Today label; the full date is formatted by the browser locale.
     todayLabel: 'Today',
     loading: 'Loading…',
@@ -251,19 +144,19 @@ export default {
     activeWidgets: 'Active · drag to reorder',
     availableWidgets: 'Available',
     emptyPanel: 'Empty panel. Tap ⋮ to add widgets.',
-    noWidgets: 'No installed app offers widgets yet.',
+    noWidgets: 'No installed module offers widgets yet.',
     widgetEmpty: 'No data',
     widgetError: 'Unavailable',
-    // «My apps» card (hub#367): the launcher of the panel. Its title reuses `topbar.apps` — same
-    // name for the same thing on both surfaces.
-    appsAdd: 'Add apps',
-    appsEmpty: 'Your apps will show up here. Add the ones your business needs.',
-    blueprintTitle: 'Set up your business',
+    // Onboarding for an empty hub (no modules installed): invites to install the first one.
+    onboardingTitle: 'Your panel is ready',
+    onboardingBody: 'Install your first module and we will start showing your sales, stock and activity here.',
+    onboardingCta: 'Browse modules',
+    blueprintTitle: 'Set up your hub',
     blueprintBody: 'Load a template for your business or restore a backup to get started.',
     blueprintCta: 'Set up',
-    // Zone 4 — what the hub says about itself. The badge's own copy lives in `system.health.*`
-    // (hub#375); «System connected/disconnected» is gone on purpose — it was a verdict about
-    // everything drawn from a probe that only ever knew about the printer host.
+    // Zone 4 — system health: discreet pill with the Bridge (local hardware) status.
+    systemOk: 'System connected',
+    systemOff: 'System disconnected',
     openSystem: 'View system',
   },
   profile: {
@@ -278,7 +171,6 @@ export default {
     role: 'Role in this Hub',
     accountType: 'Account type',
     cloudAccount: 'Account linked to ERPlora SaaS',
-    cloudAccountError: 'Your account page could not be opened in your browser. Go to erplora.com to manage it.',
     localAccount: 'Local user of this Hub',
     unavailable: 'Unavailable',
     defaultRole: 'User',
@@ -308,74 +200,6 @@ export default {
       'This identity only belongs to the current Hub. The Hub does not know about or show other businesses or Hubs.',
     manageInSaas: 'Manage account in SaaS',
   },
-  // hub#358 — «this device»: whether this terminal asks who is using it. The copy says the
-  // CONSEQUENCE of each mode, never its technical name: the owner of a bar has to be able to tell,
-  // from the sentence alone, that one of the two means "whoever picks this up is already signed in
-  // as me". Source language; `es.ts` carries the translation.
-  deviceMode: {
-    title: 'This device',
-    intro: 'How this device asks who is using it. Each device in your business decides separately.',
-    shared: 'Shared — a till or tablet several people use',
-    sharedConsequence:
-      'It asks for a PIN when somebody signs in and forgets it at the end of the shift, so every sale is attributed to whoever made it.',
-    personal: 'Personal — a device only you use',
-    personalConsequence:
-      'It stays signed in and never asks for a PIN: anyone who picks it up is already you. Only choose this for a device nobody else touches, and change it back if you lose it.',
-    adminOnly: 'Only an administrator can change how this device signs people in.',
-    saveError: 'This device could not be changed. Check the connection and try again.',
-  },
-  // hub#455 — the "somebody walked off with the tablet" screen. Two rules the copy follows: it says
-  // WHEN the cut-off takes effect (right away — the owner has just reported a theft and needs to
-  // know), and it does not promise more than the hub delivers (removing a device is not a ban:
-  // anybody with an account can sign in on it again). No "hub" anywhere — ADR-0254.
-  devices: {
-    title: 'Devices',
-    intro:
-      'The devices somebody has signed in on. If you lose one, remove it here: its session closes right away and it can no longer sign in with a PIN.',
-    thisDevice: 'The one you are using',
-    unnamed: 'Unnamed device',
-    empty: 'Nobody has signed in on a device yet.',
-    inUse: 'In use right now',
-    lastUsed: 'Last used {when}',
-    neverUsed: 'Added {when}, never used since',
-    openUntil: 'Its session stays open until {when}',
-    modeShared: 'Asks for a PIN',
-    modePersonal: 'Stays signed in',
-    revoke: 'Remove this device',
-    cancel: 'Keep it',
-    confirm: 'Remove this device?',
-    confirmCurrent:
-      'This is the device you are using: removing it closes your session and you will have to sign in again.',
-    consequence:
-      'Its session closes right away. To use it again, somebody has to sign in on it with their account.',
-    adminOnly: 'Only an administrator can remove a device.',
-    loadError: 'The devices could not be loaded. Check the connection and try again.',
-    revokeError: 'This device could not be removed. Check the connection and try again.',
-  },
-  // hub#359 — the dial the OWNER turns, on top of the device mode above. Every option says what it
-  // does to the business, never what it is called: "never" means nothing to a shopkeeper, "whoever
-  // opened the till is the name on every sale" does. The hour and the twelve hours are spelled out
-  // because the hub really does enforce them, and a promise it cannot keep would be worse than no
-  // setting at all.
-  pinPolicy: {
-    title: 'PIN pad',
-    intro:
-      'Whether this hub shows the PIN pad and asks who is at the till. It applies to the whole business — each device also decides for itself, above.',
-    showPinpad: 'Show PIN pad',
-    onConsequence:
-      'Staff pick their name and type their PIN, so every sale carries the name of whoever made it.',
-    offConsequence:
-      'Nobody types a PIN. Whoever opened the till in the morning is the name on every sale until the shift ends, whoever actually made them — so you cannot tell who sold what, or who gave a discount. Staff who only have a PIN and no account will not be able to sign in.',
-    idleTitle: 'Ask again after inactivity',
-    idleMinutes: '{n} min',
-    idleUntilSignOut: 'Until you sign out',
-    idleMinutesConsequence:
-      'A till nobody has touched for {n} minutes signs the user out and shows the PIN pad, so the next sale carries the next person’s name.',
-    idleUntilSignOutConsequence:
-      'The till never locks itself for inactivity: the session stays open until whoever signed in signs out, or until the device says it expires.',
-    adminOnly: 'Only an administrator can change whether this hub asks.',
-    saveError: 'This could not be changed. Check the connection and try again.',
-  },
   settings: {
     hubWide: 'Hub settings',
     currency: 'Currency',
@@ -403,14 +227,7 @@ export default {
     showApiDocs: 'Show API documentation',
     showApiDocsDesc: 'Adds an internal page with the Hub public API (Swagger) for integrations',
     hardware: 'Hardware',
-    // The counter's hardware, said as what it is. `bridgeDesc` named «ERPlora Bridge», an app
-    // ADR-0196 deleted, and sat next to a hardcoded «Disabled» that was wrong inside the app.
-    // Named after the CAPABILITY, not after one vertical's kit: an ERP without a till has no cash
-    // drawer, and «Printer and cash drawer» reads as «not for me» to everyone who is not a shop.
-    hardwareTitle: 'Local and network access',
-    hardwareDesc: 'Printers, scanners and other devices on this computer or its network',
-    hardwareReady: 'Available here',
-    hardwareAppOnly: 'Only from the installed app',
+    bridgeDesc: 'Printers, cash drawer, scanner and peripheral hardware connection',
     disabled: 'Disabled',
     fiscalIdentity: 'Business details',
     fiscalIdentityDesc: 'Taxpayer identity (used by invoices and the fiscal modules).',
@@ -477,7 +294,6 @@ export default {
     reset_hub_users: 'Employees',
     reset_media: 'Files and images',
     reset_fiscal: 'Tax configuration',
-    reset_roles: 'Active roles',
     permissionsTitle: 'Module permissions',
     permissionsDesc: 'Grant or revoke the permissions each module requests (internet access, certificate, printer, notifications). For safety, everything is denied until you grant it.',
     permissionsAdminOnly: 'Only an administrator can change permissions.',
@@ -488,24 +304,20 @@ export default {
     permissionRevoked: '{cap} revoked from {module}.',
     permissionSaveError: 'Could not change the permission.',
   },
-  // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
-  // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
-  // the manifest's word and renaming them would break nothing here and everything elsewhere.
   apps: {
-    searchInstalled: 'Search your apps…',
-    searchCatalog: 'Search apps to add…',
-    tabMine: 'My apps',
-    // The same words as the ＋ tile on the panel (`dashboard.appsAdd`): one door, one name.
-    tabCatalog: 'Add apps',
+    searchInstalled: 'Search installed module…',
+    searchCatalog: 'Search the catalog…',
+    tabMine: 'My modules',
+    tabCatalog: 'Catalog',
     tabPaid: 'Paid',
-    emptyInstalled: 'You have no apps yet. Open “Add apps” to install your first one.',
-    emptyCatalog: 'No apps match your search.',
+    emptyInstalled: 'You have no modules installed yet. Browse the catalog to add your first one.',
+    emptyCatalog: 'No modules match your search.',
     catalogLoadError:
-      'The catalog could not be loaded. Check the connection or this device registration.',
+      'The cloud catalog could not be loaded. Check the connection or this device registration.',
     retryCatalog: 'Retry',
-    demoCatalogReadOnly: 'You are browsing the real catalog in demo mode. Connect a real business to install apps.',
-    adminOnly: 'You can browse the apps, but only an administrator can install, activate or uninstall them.',
-    colModule: 'App',
+    demoCatalogReadOnly: 'You are viewing the real SaaS catalog in Demo mode. Link a real Hub to install modules.',
+    adminOnly: 'You can browse modules, but only an administrator can install, activate, or uninstall them.',
+    colModule: 'Module',
     colVersion: 'Version',
     colStatus: 'Status',
     colCategory: 'Category',
@@ -535,11 +347,8 @@ export default {
     installing: 'Installing {name}…',
     installSuccess: '{name} installed successfully.',
     installError: 'Could not start installation of {name}.',
-    // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
-    installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',
-    // Names the place, does not open it (hub#479). `purchaseInBrowser`/`purchaseOpenError` went
-    // with the button that opened the SaaS checkout.
-    needsSubscription: '{name} needs a subscription. Subscribe from your ERPlora account at erplora.com and it will install here.',
+    purchaseInBrowser: '{name} is a paid module — complete the purchase in your browser and come back.',
+    purchaseOpenError: 'Could not open the purchase page. Please try again.',
     deactivated: '{name} deactivated.',
     activated: '{name} activated.',
     cascadeOffTitle: 'Deactivate {name}',
@@ -549,15 +358,15 @@ export default {
     cascadeConfirm: 'Continue',
     cascadeCancel: 'Cancel',
     uninstallTitle: 'Uninstall {name}',
-    uninstallBody: 'The app will no longer be available. Its data and files will be kept for a later reinstall.',
+    uninstallBody: 'The module will no longer be available. Its data and files will be kept for a later reinstall.',
     uninstallConfirm: 'Uninstall',
     toggleError: 'Could not change the status of {name}.',
     uninstalled: '{name} uninstalled.',
     uninstallError: 'Could not uninstall {name}.',
     moduleInstalledNamed: '{name} installed.',
-    moduleInstalled: 'App installed.',
+    moduleInstalled: 'Module installed.',
     consentTitle: 'Requested permissions',
-    consentIntro: 'This app requests these permissions. You can review them later in Settings → Permissions.',
+    consentIntro: 'This module requests these permissions. You can review them later in Settings → Permissions.',
     consentInstallGrant: 'Install and grant',
     consentCancel: 'Cancel',
   },
@@ -606,25 +415,6 @@ export default {
     active: 'Active',
     inactive: 'Deactivated',
   },
-  // Role catalogue (hub#352/hub#353): base roles ∪ what the installed modules declare ∪ what
-  // somebody still carries. The administrator switches on the ones this business actually needs.
-  roleCatalog: {
-    intro:
-      'These are the roles this Hub can hand out. The built-in ones are always available; the ones a module brings in are yours to switch on when your business needs them.',
-    colSource: 'Comes from',
-    colActive: 'Available',
-    sourceCore: 'Built in',
-    sourceModule: '{module}',
-    sourceInUse: 'Module removed',
-    alwaysOn: 'Always on',
-    // Va DENTRO de la celda, al lado del interruptor: tiene que caber en una línea.
-    notDeclared: 'No app brings it in',
-    adminOnly: 'Only an administrator can switch roles on or off.',
-    activated: '“{role}” can now be assigned.',
-    deactivated: '“{role}” can no longer be assigned.',
-    toggleError: '“{role}” could not be switched.',
-    loadError: 'The role catalogue could not be loaded.',
-  },
   apiKeys: {
     // List
     searchKey: 'Search API key…',
@@ -651,17 +441,6 @@ export default {
     rateLimit: 'Requests per minute',
     rateLimitHint: 'Between 1 and 10,000. Enforced before command execution.',
     perMinute: '{count}/min',
-    // hub#504 — qué puede hacer una key (mismo modelo que el rol de un usuario)
-    accessTitle: 'What this key may do',
-    accessHint: 'The blanket modes cover every app of your business, including ones installed later.',
-    access: {
-      full: 'Full access',
-      read_only: 'Read only',
-      write_only: 'Write only',
-      custom: 'Per app',
-    },
-    systemKeyBadge: 'Issued by ERPlora',
-    systemKeyHint: 'ERPlora reads your live changes with this key. It cannot be rotated or deleted.',
     scopeTitle: 'Permissions per module',
     scopeHint: 'Toggle read and/or write for each installed module.',
     colModule: 'Module',
@@ -704,29 +483,6 @@ export default {
     pinHelp: 'Between 4 and 8 digits. Leave blank to sign in with an online account.',
     pinSetHelp: 'Type a new PIN to change it; leave blank to keep the current one.',
     clearPin: 'Remove PIN',
-    localUser: 'Local user',
-    localUserHelp:
-      'Works this hub with a PIN only: no email and no ERPlora account. Turn it off to give them an account later, keeping their history.',
-    localPinHelp: 'Between 4 and 8 digits. Required: it is how this person signs in.',
-    accountEmailHelp:
-      'We email them an invitation to this hub. They choose their own password — you never see it.',
-    accountPinHelp:
-      'Optional: between 4 and 8 digits. Only needed if they also work a shared till in this hub.',
-    // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
-    errors: {
-      local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
-      account_needs_email: 'An account user signs in with their ERPlora account, so an email is required. Tick «Local user» to create somebody who works this hub with a PIN.',
-      account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
-      email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
-      role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
-      invalid_email: 'Enter a valid email.',
-      pin_length: 'The PIN must be between 4 and 8 digits.',
-      pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
-      pin_in_use: 'Another active user already has this PIN. A PIN says who is at the till, so no two people can share one.',
-      local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
-      local_has_email: 'A local user has no email. Turn off «Local user» to invite them as an account user.',
-      name_taken: 'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',
-    },
     activeUser: 'Active user',
     required: 'Required field',
     invalidEmail: 'Enter a valid email',
@@ -748,26 +504,21 @@ export default {
     connections: 'Connections',
     connectionsOf: 'of {limit}',
     connectionsActive: 'active',
-    // The printer card's headline, status word and status sentence used to live here, naming a
-    // process («Bridge») instead of the thing on the counter. They now come from `system.health.*`
-    // (hub#375). What is left below is the INSTALL flow, which is still about a piece of software
-    // and says so on purpose.
+    bridgeConnection: 'Bridge connection',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
     recheck: 'Recheck',
-    // One product, one name (hub#500). «Download ERPlora Bridge» followed by «install ERPlora» were
-    // two names for the same thing, and one of them belonged to an app ADR-0196 deleted — «Bridge»
-    // is platform jargon, the side ADR-0254 keeps out of the hub's screens.
-    downloadApp: 'Download the ERPlora app',
-    downloadAppHint: 'The ERPlora app is what talks to your printers, cash drawer and scanners. Choose your system to continue.',
+    bridgeRunning: 'Bridge is running on this device',
+    bridgeRunningHint: 'Your printers, cash drawer and scanners are managed from here.',
+    bridgeOffline: 'The Bridge client is not running on this device. Pair a Bridge below to manage hardware — your printers, cash drawer and scanners will appear here.',
+    downloadBridge: 'Download ERPlora Bridge',
+    downloadBridgeHint: 'Bridge is a small native app that connects this hub with your printers, cash drawer and scanners. Choose your system to continue.',
     stepDownload: 'Download',
     stepInstall: 'Install',
     stepPair: 'Pair',
     stepConfigure: 'Configure',
     updatesManaged: 'Managed updates',
     updatesCloudHint: 'This web Hub is updated automatically as part of service deployments.',
-    documents: 'Documents',
-    noDocuments: 'No documents',
-    noDocumentsBucket: "This hub's storage bucket is empty.",
-    searchDocument: 'Search document…',
     loadErrorTitle: 'System information is unavailable',
     loadErrorBody: 'Metrics and logs are unavailable right now. You can try again.',
     retry: 'Try again',
@@ -778,37 +529,15 @@ export default {
     tabResources: 'Resources',
     tabPlan: 'Plan & limits',
     tabUpdates: 'Updates',
-    tabDocuments: 'Documents',
     tabLogs: 'Logs',
     resourcesCloud: 'Cloud resources',
     resourcesSystem: 'System resources',
     sourceCloud: 'Cloud',
     databaseShared: 'Shared database',
-    storageS3: 'S3 storage',
-    colName: 'Name',
-    colType: 'Type',
-    colSize: 'Size',
-    colModified: 'Modified',
     colTime: 'Time',
     colLevel: 'Level',
     colEvent: 'Event',
-    toastDownloadingApp: 'Downloading ERPlora for {os}…',
-    // What the hub says about itself, to the person who owns the bar (hub#375). Every sentence
-    // names a thing they recognise —the printer— and, when there is something to do, what to do.
-    // The third state is the honest one: we could not check. It is never dressed up as "fine".
-    health: {
-      printerTitle: 'Your printer',
-      printerReady: 'Printer ready',
-      printerReadyDetail: 'Receipts come out on their own when you charge.',
-      printerOffline: 'Printer not connected',
-      printerOfflineDetail:
-        'You can keep charging: the receipt opens on this screen and you print it from here.',
-      printerAction: 'Set up printing',
-      printerUnknown: "We couldn't check the printer",
-      printerUnknownDetail:
-        "We don't know whether it is connected — nothing else is affected. We will check again on our own.",
-      notMeasured: "We couldn't read this",
-    },
+    toastDownloadingBridge: 'Downloading Bridge for {os}…',
   },
   planLimits: {
     currentPlan: 'Current plan',
@@ -834,12 +563,10 @@ export default {
     loadErrorBody: "The Hub couldn't report its resource usage right now. You can try again.",
     retry: 'Try again',
     upgradeTitle: 'Running out of room on your plan',
-    upgradeMemory: 'This hub is close to its memory limit. More room would let it run smoothly.',
-    upgradeDatabase: 'Your database is close to its plan limit.',
-    upgradeDevices: "You're using every device your plan allows.",
-    // Says WHERE, and stays a sentence: a link from here to the plans page is a link to somewhere
-    // money changes hands, and that is what both stores reject (hub#479).
-    upgradeWhere: 'Plans are managed from your ERPlora account at erplora.com.',
+    upgradeCta: 'See plans',
+    upgradeMemory: 'This hub is close to its memory limit. Upgrading gives it more room to run smoothly.',
+    upgradeDatabase: 'Your database is close to its plan limit. Upgrade for more storage.',
+    upgradeDevices: "You're using every device your plan allows. Upgrade to connect more.",
   },
   billing: {
     invoices: 'Invoices',
@@ -862,16 +589,18 @@ export default {
     month: 'month',
     ends: 'Ends',
     renews: 'Renews',
-    // These three name erplora.com instead of opening it: `managePlan`, `openBillingPortal` and
-    // their error strings went with the buttons (hub#479). No "opens in your browser" either —
-    // nothing opens from here any more.
-    paymentsPortalNotice: 'Payment methods are managed from your ERPlora account at erplora.com.',
-    managePlanHint: 'Plan changes are managed from your ERPlora account at erplora.com.',
+    paymentsPortalNotice: 'Payment method management is handled from the billing portal.',
+    managePlan: 'Update plan',
+    managePlanHint: 'Plan upgrades and changes are managed from your ERPlora account (opens in your browser).',
+    managePlanError: 'Could not open the plans page. Please try again.',
+    portalError: 'Could not open the billing portal. Please try again.',
     cloudAuthTitle: 'View billing in your ERPlora account',
-    cloudAuthBody: 'Your local session is still active. Invoices and subscriptions require your online account session at erplora.com.',
+    cloudAuthBody: 'Your local session is still active. Invoices and subscriptions require your online account session.',
+    openBillingPortal: 'Open my billing',
     loadErrorTitle: 'We could not load billing',
     loadErrorBody: 'Check your connection and try again. You can continue using the Hub.',
     retry: 'Try again',
+    downloadError: 'Could not download the invoice. Please try again.',
     statusDraft: 'Draft',
     statusOpen: 'Open',
     statusPaid: 'Paid',
@@ -879,11 +608,11 @@ export default {
     statusUncollectible: 'Uncollectible',
   },
   login: {
-    logoAlt: 'Business logo',
+    logoAlt: 'Hub logo',
     toggleTheme: 'Toggle theme',
     subtitleSetup: 'Create your access PIN',
     subtitlePin: 'Enter your PIN',
-    subtitleEmail: 'Sign in to your business',
+    subtitleEmail: 'Sign in to your hub',
     tabPin: 'PIN',
     tabEmail: 'Email',
     emailLabel: 'Email',
@@ -891,11 +620,6 @@ export default {
     passwordLabel: 'Password',
     trustDevice: 'Trust this device',
     trustInfoAria: 'More information about trusted devices',
-    // hub#358: shown instead of the "trust this device" box when an administrator marked this
-    // device as personal. It states the CONSEQUENCE (it stays signed in), which is what matters if
-    // the device is ever lost, and says where the decision lives.
-    personalDeviceNote:
-      'This device is set up as personal: it stays signed in and never asks for a PIN. An administrator can change that in Settings › Hub.',
     popoverTitle: 'PIN access',
     popoverBody: 'Check this box to sign in with a <strong>PIN</strong> on this device next time, without typing your email and password. If you leave it unchecked, you will always have to sign in with your email.',
     signIn: 'Sign in',
@@ -904,16 +628,6 @@ export default {
     signInWithEmail: 'Sign in with email',
     changeUser: 'Change user',
     pinIncorrect: 'Incorrect PIN',
-    // hub#330. Shown INSTEAD of «Incorrect PIN» when the refusal was about the device, not the
-    // digits. Saying "incorrect PIN" to somebody whose PIN is correct is the worst answer available:
-    // they retype it, and nothing on the screen names the one gesture that fixes it.
-    deviceNotEnrolled:
-      'A PIN does not work on this device yet. Sign in once with your account here and it will from then on.',
-    // The other refusal, and it needs its own words: this browser keeps nothing between page loads
-    // (a private window, or site data turned off), so signing in with an account would not help —
-    // the next visit would be a stranger again.
-    deviceUnidentified:
-      'This browser cannot remember which device it is, so a PIN cannot be used here. Sign in with your account, or allow this site to store data and try again.',
     // ADR-0154: shown when this device's session was taken over by a sign-in on another device
     // (single active device plan). Surfacing it needs the runtime-session-401 interceptor (see PR).
     sessionTakenOver: 'Session opened on another device',
@@ -922,7 +636,7 @@ export default {
     setupMismatch: 'The PINs do not match, please try again',
     setupSaveError: 'The PIN could not be saved. Please try again.',
     footerTrustedDevice: 'trusted device',
-    footerSecureCloud: 'secure connection',
+    footerSecureCloud: 'secure connection to Cloud',
     errorSignIn: 'Could not sign in. Check your credentials or your connection.',
     errorMachineRegistration:
       'Your account is valid, but this device could not be registered. Check the connection and try again.',
@@ -942,36 +656,11 @@ export default {
     twoFactorIncorrect: 'Incorrect or expired code. We sent a new code — try again.',
     twoFactorError: 'Could not verify the code. Please try again.',
   },
-  // hub#363 — the manager's approval, asked for without closing the cashier's session. Every line
-  // here is read out loud across a counter with a queue behind it, so it says what to DO. Guarded
-  // by `i18n/elevation-copy.test.ts`, including the one thing it must never say: WHICH of unknown
-  // name / wrong PIN / deactivated user it was. The runtime answers those three identically on
-  // purpose, so that a dialog anybody can open is not the way to learn who works here.
-  elevation: {
-    title: 'Approval needed',
-    lead: 'Ask a manager to enter their PIN to approve this.',
-    chooseApprover: 'Who is approving?',
-    approverName: 'Their name',
-    approverNamePlaceholder: 'Type their name',
-    continue: 'Continue',
-    cancel: 'Cancel',
-    changeApprover: 'Someone else',
-    // The confirmation the cashier gets: the action went through, and under whose name it is now
-    // recorded. Saying it out loud is half of what keeps the trail honest.
-    approvedBy: 'Approved by {name}',
-    rejected: 'Those details do not approve this. Check the name and the PIN, and try again.',
-    approverCannot: 'That person cannot approve this. Ask someone who could do it themselves.',
-    notElevable:
-      'This one is not approved with a PIN. Whoever runs your business has to sign in with their own account to do it.',
-    notRequired: 'This no longer needs approval. Close this and try again.',
-    tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
-    failed: 'The approval could not be sent. Check the connection and try again.',
-  },
   activation: {
     title: 'Activation required',
-    lead: 'This device has to check your apps with erplora.com before it can open your business. Connect to the internet and try again.',
+    lead: 'This device needs to validate its module license with the Cloud to unlock the business. Connect to the internet and try again.',
     retry: 'Retry',
-    retryError: 'Your apps could not be checked yet. Check your connection or sign in with your ERPlora account.',
+    retryError: 'The license could not be validated yet. Check your connection or sign in with your online account.',
     logout: 'Log out',
   },
   exportPage: {
@@ -990,9 +679,6 @@ export default {
     sectionUsersDesc: 'Employees, roles and permissions',
     sectionSettings: 'Settings',
     sectionSettingsDesc: 'Hub settings: currency, language, business identity',
-    // hub#405 — a template carries the configuration of the sector, never the identity of the
-    // business that made it: its tax id would make another hub invoice under this company's name.
-    sectionSettingsDescTemplate: 'Hub settings: country, currency, language and theme. Never the tax id or the legal name.',
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'VeriFactu configuration and the company certificate',
     fiscalWarning: 'Includes the certificate: the .p12 travels as-is and keeps its own password. Share the file only with people you trust.',
@@ -1049,9 +735,6 @@ export default {
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'VeriFactu configuration and the company certificate (.p12)',
     sectionMedia: 'Images and media',
-    // hub#354 — the job titles the template switches on (Waiter, Kitchen…). A vertical brings its
-    // own role set; the people who fill it are never in the file.
-    sectionRoles: 'Roles',
     sectionModule: 'Module {id}',
     modulesTitle: 'Modules',
     withData: 'includes data',
@@ -1064,28 +747,8 @@ export default {
     statusApplied: 'Applied',
     statusSkipped: 'Skipped',
     statusIgnored: 'Discarded',
-    statusPartial: 'Applied in part',
     statusFailed: 'Failed',
-    // hub#409 / ADR-0060 — the module was not installed because the plan needs a dependency that
-    // is not subscribed to. It is a purchase decision, not a breakage: it says what to subscribe
-    // to (with the price the engine sent), never a mute red cross.
-    statusBlocked: 'Subscription required',
-    reasonBlocked:
-      'Not installed: it needs modules you have not subscribed to yet: {missing}. Subscribe to them and import again — nothing else was touched.',
     mediaFailed: '{n} not copied',
-    // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
-    // identity of ONE hub: only that hub restoring its own backup gets them back.
-    reasonIdentityNotPortable:
-      'Users, roles and PINs belong to the hub that created them. Accounts discarded: {n}. Nobody was given access to your hub.',
-    // hub#405 — the settings that came in and the ones that did not. The tax id is the one that
-    // matters: with someone else's, this hub would invoice under their name.
-    reasonSettingsNotPortable:
-      'Country, currency and language were applied. Settings discarded: {n} — tax id, legal name and other details belong to the business that created the file; yours stay as they are.',
-    // hub#354 — the template asked for roles this hub does not have in its catalogue: they belong
-    // to a module that is not installed, or they are the administrative roles, which no file may
-    // switch on. Nothing was created and nobody gained access.
-    reasonRolesNotActivatable:
-      'Roles not switched on: {n}. A template can only switch on roles the modules installed here provide, and never the administrative ones.',
     done: 'Go to home',
   },
   moduleView: {
@@ -1094,7 +757,9 @@ export default {
     loadErrorHint: 'Check that the module is still installed and active, then try again.',
     retry: 'Try again',
     blockedTitle: 'Subscription required',
-    blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',
+    blockedHint: 'This paid module is disabled because its subscription is no longer active for this hub. Your local data is safe and will be available again as soon as the subscription is restored.',
+    manageSubscription: 'Manage subscription',
+    manageSubscriptionError: 'Subscription management could not be opened. Please try again.',
   },
   moduleSettings: {
     tab: 'Settings',
@@ -1115,15 +780,18 @@ export default {
     trialDays: '{n}-day trial',
     quota: 'Includes {quota}',
     overage: '{price} per extra unit',
+    buy: 'Buy',
+    upgrade: 'Upgrade',
+    cancel: 'Cancel subscription',
     noTiers: 'This module has no paid plans.',
     trialEnds: 'Trial until {date}',
     renewsOn: 'Renews on {date}',
     cancelsOn: 'Cancels on {date}',
-    // Where, not a way there — `buy` / `upgrade` / `cancel` and their error strings went with the
-    // buttons that carried them (hub#479).
-    managedInAccount: 'Plans for this module are managed from your ERPlora account at erplora.com.',
-    checkPurchase: 'I already subscribed — check',
-    purchaseDetected: 'Confirmed. Your plan has been updated.',
+    opensInBrowser: 'Purchases and plan changes are completed in your browser, on your ERPlora account.',
+    checkPurchase: 'I completed the purchase — check',
+    purchaseDetected: 'Purchase confirmed. Your plan has been updated.',
+    purchaseError: 'Could not open the purchase page. Please try again.',
+    cancelError: 'Could not open the subscription page. Please try again.',
     status: {
       active: 'Active',
       trialing: 'Trialing',
@@ -1140,19 +808,5 @@ export default {
       canceled: 'Your subscription is canceled.',
       past_due: 'There is a pending payment on your subscription.',
     },
-  },
-
-  // Hardware (printers, cash drawer). The two sentences below are the whole point of hub#338:
-  // a scan can end with no printers for two OPPOSITE reasons, and each one asks the user for a
-  // different thing. Showing the wrong one sends them to fix something that was never broken.
-  hardware: {
-    printersBlocked:
-      'ERPlora could not search this network: the system has not given the app permission to reach local devices. Grant local network access to ERPlora in your device settings and search again.',
-    printersNone:
-      'No printer found on this network. Check that the printer is switched on and connected to the same network as this device, then search again.',
-    // ADR-0196 §3: a browser on its own has no way to reach a printer. Naming the app is the
-    // whole point — this is the one sentence that turns "it does not work" into a next step.
-    unavailable:
-      'This device cannot reach printers from the browser. Install the ERPlora app on the device that is connected to the printer and open your business from there.',
   },
 } as const;
