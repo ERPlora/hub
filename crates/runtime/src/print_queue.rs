@@ -193,10 +193,10 @@ pub async fn enqueue(
         return Err(invalid("role is required (which printer prints this)"));
     }
     let document_type = job.document_type.trim();
-    // The vocabulary is CLOSED, and that is the point of this guard. `DocumentType::from_wire` maps
-    // anything it does not know to `Generic`, so a typo (`kitchn`) used to print a nameless list of
-    // key/value pairs where the kitchen expected an order — a failure nobody sees until the plate is
-    // missing. Here it is a refusal, with the accepted names in the message.
+    // The vocabulary is CLOSED, and that is the point of this guard. An unknown document type
+    // used to map to `Generic`, so a typo (`kitchn`) printed a nameless list of key/value pairs
+    // where the kitchen expected an order — a failure nobody saw until the plate was missing.
+    // Here it is a refusal, with the accepted names in the message.
     if !DOCUMENT_TYPES.contains(&document_type) {
         return Err(invalid(format!(
             "unknown document type `{document_type}` (expected one of {})",
@@ -952,10 +952,10 @@ mod tests {
         assert_eq!(claimed.document_type, "receipt");
     }
 
-    /// **A document type the renderer does not know is refused at the door.** `from_wire` maps
-    /// anything unknown to `Generic`, so a typo used to print a nameless key/value dump where the
-    /// kitchen expected an order — and nobody found out until the plate was missing. The refusal
-    /// names the accepted vocabulary so the producer can fix it.
+    /// **A document type the renderer does not know is refused at the door.** An unknown type
+    /// used to map to `Generic`, so a typo printed a nameless key/value dump where the kitchen
+    /// expected an order — and nobody found out until the plate was missing. The refusal names
+    /// the accepted vocabulary so the producer can fix it.
     #[tokio::test]
     async fn a_document_type_the_printer_does_not_know_is_rejected() {
         let db = queue_db().await;
