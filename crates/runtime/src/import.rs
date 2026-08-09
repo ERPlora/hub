@@ -501,11 +501,60 @@ async fn apply_section(
             SectionStatus::PartiallyApplied(ignore_reason::SETTINGS_NOT_PORTABLE.into()),
             discarded,
         ),
-        Ok(_) => (SectionStatus::Applied, 0),
+        Ok(_) => {
+            // hub#464: the `hub_users` section also carries the profile and the preferences, each in
+            // its own data file. They are hub-scoped (`(hub_id, user_id)`) and key off the users the
+            // section just wrote, so they MUST follow the same identity gate and only run when the
+            // main file succeeded. A failure here fails the whole section — half-restored identity
+            // (users without their profiles) is worse than a clear `Failed`.
+            if section == "hub_users" {
+                for extra in ["data/hub_user_profile.sql", "data/hub_user_pref.sql"] {
+                    if let Some(bytes) = files.get(extra) {
+                        if let Err(e) = apply_identity_extra(rt, extra, bytes, target_hub_id, batch_id).await {
+                            return (SectionStatus::Failed(e.to_string()), 0);
+                        }
+                    }
+                }
+            }
+            (SectionStatus::Applied, 0)
+        }
         // A section that failed applied nothing, so nothing was «discarded»: the filter's count
         // would be a number about rows that were never going to land anyway.
         Err(e) => (SectionStatus::Failed(e.to_string()), 0),
     }
+}
+
+/// Applies a hub-scoped identity data file (`hub_user_profile` / `hub_user_pref`) that follows the
+/// `hub_users` section. Same pipeline as the main section — validate against its scope, swap the
+/// `hub_id` placeholder for the target, remap ids — but these tables key on `(hub_id, user_id)`, so
+/// there is no global-PK collision and the remap is a passthrough. Empty files are a no-op: a hub
+/// with no profiles set exports nothing for them.
+async fn apply_identity_extra(
+    rt: &Runtime,
+    path: &str,
+    bytes: &[u8],
+    target_hub_id: &str,
+    batch_id: Option<&str>,
+) -> Result<(), crate::RuntimeError> {
+    let raw = std::str::from_utf8(bytes).map_err(|_| {
+        crate::RuntimeError::Other(format!("{path} no es UTF-8 válido"))
+    })?;
+    let sql = raw.replace(crate::export::HUB_ID_PLACEHOLDER, target_hub_id);
+    if sql.trim().is_empty() {
+        return Ok(()); // sin filas: nada que hacer
+    }
+    let scope = crate::import_sql::scope_for_data_file(path)
+        .ok_or_else(|| crate::RuntimeError::Other(format!("{path} no corresponde a ninguna sección conocida")))?;
+    let sql = remap_section_ids(&sql, target_hub_id);
+    match batch_id {
+        Some(batch) => {
+            crate::reset::apply_tracked_into(rt, batch, target_hub_id, &sql, &scope).await?;
+        }
+        None => {
+            crate::import_sql::apply(rt.db(), &sql, &scope).await?;
+        }
+    }
+    Ok(())
 }
 
 /// Keeps only the statements of a `hub_settings` section that write a PORTABLE configuration key,

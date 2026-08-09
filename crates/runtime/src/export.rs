@@ -322,6 +322,23 @@ pub async fn export_hub(
             }
         }
         files.insert("data/hub_users.sql".into(), rows_to_sql("hub_user", &rows, hub_id).into_bytes());
+        // hub#464: the profile and preferences are half of «the person comes back whole». `hub_user`
+        // carries name/role/PIN/access-email, but the display name, avatar, profile email
+        // (`hub_user_profile`) and the language/theme/palette choices (`hub_user_pref`) live in their
+        // own hub-scoped tables. Both key on `(hub_id, user_id)` and were left out of the export, so
+        // restoring a backup reset every profile to blank — the person could log in, then had to redo
+        // their preferences and retype their name. Same identity gate as `hub_user`: identity sections
+        // never travel in a template (`carries_identity`), so a published blueprint still carries no
+        // personal data.
+        for table in ["hub_user_profile", "hub_user_pref"] {
+            let rows = fetch_rows(db, table, Some(hub_id)).await.unwrap_or_default();
+            if !rows.is_empty() {
+                files.insert(
+                    format!("data/{table}.sql"),
+                    rows_to_sql(table, &rows, hub_id).into_bytes(),
+                );
+            }
+        }
         sections.push("hub_users".into());
     }
     if selection.settings {
