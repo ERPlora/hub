@@ -305,11 +305,44 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     }
     eprintln!("auth: modo {:?}", cfg.hub.auth_mode);
 
-    // Índice vectorial del asistente (§9.2b routing + §9.6 ingestión). Hoy **None**: el store
-    // pgvector para Postgres es un follow-up (ADR-0154; hub#204 / pm#29). Mientras tanto el
-    // asistente degrada a "todos los tools" (§9.5). La generación de embeddings sigue yendo por el
-    // Cloud (§9.3). TODO(humano): `PgVectorStore` (pgvector) para el índice de routing/RAG.
-    let vector_store: Option<state::SharedVectorStore> = None;
+    // Índice vectorial del asistente (§9.2b routing + §9.6 ingestión) — Postgres + pgvector
+    // (hub#204 / pm#29). Con los 24 módulos instalados el catálogo de tools que viaja en CADA
+    // turno son ~58k tokens; el router lo recorta a los módulos relevantes, y para eso necesita
+    // este índice.
+    //
+    // **Nunca aborta el arranque.** Si pgvector no está disponible en esta BD (la imagen no lo
+    // trae, o el rol del hub no puede crear la extensión — ADR-0201 da a cada hub su BD y su rol),
+    // se queda en `None` y el asistente degrada a ofrecer todos los tools (§9.5), que es
+    // exactamente lo que hacía antes. Más caro de prompt, nunca roto. Lo que el asistente SABE del
+    // hub no depende de esto: el mapa de módulos va en el system prompt
+    // (`assistant::build_instructions`). Los embeddings siguen saliendo por el Cloud (§9.3).
+    let vector_store: Option<state::SharedVectorStore> = match erplora_db::PgAdapter::connect(&dsn)
+        .await
+    {
+        Ok(vdb) => {
+            let store = erplora_vector::PgVectorStore::new(
+                std::sync::Arc::new(vdb),
+                erplora_vector::DEFAULT_DIMS,
+            );
+            match erplora_vector::VectorStore::ensure_schema(&store).await {
+                Ok(()) => {
+                    eprintln!("asistente: índice vectorial pgvector listo (router §9.2b activo)");
+                    Some(std::sync::Arc::new(store) as state::SharedVectorStore)
+                }
+                Err(e) => {
+                    eprintln!(
+                        "asistente: sin índice vectorial ({e}); se ofrecen TODOS los tools (§9.5). \
+                         Instala pgvector en esta BD para abaratar el prompt."
+                    );
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("asistente: sin índice vectorial (pool: {e}); se ofrecen todos los tools (§9.5)");
+            None
+        }
+    };
 
     // Celda del token de máquina: externa (compartida con el shell Tauri para hot-reload) o propia.
     let mut state = AppState::with_config_cells(runtime, cfg.hub, machine_token_cell, hub_id_cell);
@@ -1811,7 +1844,7 @@ async fn assistant_chat_stream(
     };
     // La sesión LOCAL del hub da el contexto/permisos para ensamblar las tools (gate = el de la UI)
     // y el id del usuario activo, que se manda como metadata de coste/auditoría (no permisos).
-    let (all_tools, active_user, active_modules) = {
+    let (all_tools, active_user, active_modules, instructions) = {
         let rt = st.runtime.lock().await;
         let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
             Ok(c) => c,
@@ -1819,7 +1852,15 @@ async fn assistant_chat_stream(
         };
         let tools = assistant::assemble_tools(rt.registry(), &ctx);
         let active = rt.registry().active_module_count();
-        (tools, ctx.user_id.clone(), active)
+        // El system prompt del turno (§9.2). Se arma con el MISMO lock que las tools: el mapa de
+        // módulos que describe y el catálogo que ofrece tienen que ser la misma foto del registry.
+        // Absorbe además los `system` del cliente (el briefing de `hub.setup.status`, ADR-0230),
+        // que el Cloud descarta en su frontera — `instructions` es el único canal que sobrevive.
+        let instructions = assistant::build_instructions(
+            rt.registry(),
+            &assistant::client_system_messages(&frontend),
+        );
+        (tools, ctx.user_id.clone(), active, instructions)
     };
 
     // Router de tools por vectores (§9.2b): embebe la última petición del usuario, busca en el
@@ -1857,7 +1898,7 @@ async fn assistant_chat_stream(
         })
         .collect();
 
-    let body = assistant::build_cloud_body(&frontend, tools, Some(&active_user));
+    let body = assistant::build_cloud_body(&frontend, tools, Some(&active_user), &instructions);
 
     // Construye la petición al Cloud (POST, Bearer + X-Hub-Id) y abre el stream.
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);

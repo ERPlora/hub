@@ -67,7 +67,7 @@ fn inventory_factory() -> RuntimeFactory {
 /// AppState en modo **cloud compartido** con dos orgs (org-a ← hub-a1, org-b ← hub-b1).
 async fn shared_app() -> axum::Router {
     // Resolvedor mínimo por entorno: mapea cada hub_id a su org (el DSN es irrelevante con el
-    // factory SQLite). En prod este seam lo cubre el plano de control de Django (TODO humano).
+    // factory SQLite). En prod este seam lo cubre el plano de control de Django.
     let mut map = HashMap::new();
     map.insert(
         "hub-a1".to_string(),

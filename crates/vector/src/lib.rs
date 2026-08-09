@@ -19,6 +19,9 @@ use erplora_db::DbError;
 use std::sync::Mutex;
 use thiserror::Error;
 
+mod pg;
+pub use pg::{PgVectorStore, DEFAULT_DIMS};
+
 #[derive(Debug, Error)]
 pub enum VectorError {
     /// Reserved for the Postgres/pgvector store (hub#204 / pm#29): the error contract for
