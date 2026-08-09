@@ -52,7 +52,7 @@ async fn fresh() -> Runtime {
 async fn create_product(rt: &Runtime, hub: &str, name: &str, sku: &str) {
     rt.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": 10 })),
+        &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": 10, "tax_category_key": "product.generic" })),
         &ctx(hub),
     )
     .await

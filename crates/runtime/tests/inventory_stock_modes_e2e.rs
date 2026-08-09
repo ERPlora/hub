@@ -75,7 +75,7 @@ async fn create_product(
     let mut payload = json!({
         "name": name, "sku": sku, "price": 1000, "cost": 500, "stock": stock,
         "product_type": "physical",
-        "ean13": null, "description": "", "tax_category_key": null, "image": ""
+        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
     });
     if let Some(t) = threshold {
         payload["low_stock_threshold"] = json!(t);

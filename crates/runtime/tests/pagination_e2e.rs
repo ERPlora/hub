@@ -29,7 +29,7 @@ async fn fresh_with_products(names_prices: &[(&str, f64)]) -> Runtime {
             &params(json!({
                 "name": name, "sku": format!("SKU-{i}"), "price": price, "cost": 0,
                 "stock": (i as i64) + 1, "low_stock_threshold": 5, "product_type": "physical",
-                "ean13": null, "description": "", "tax_category_key": null, "image": ""
+                "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
             })),
             &ctx(),
         )
@@ -151,7 +151,7 @@ async fn eq_filter_on_is_active() {
             "low_stock_threshold": 5, "is_active": 0,
             // products.update es un REEMPLAZO completo (#178): lo no enviado se borraría en
             // silencio, así que el contrato exige ean13/description/tax_category_key explícitos.
-            "ean13": null, "description": "", "tax_category_key": null
+            "ean13": null, "description": "", "tax_category_key": "product.generic"
         })),
         &ctx(),
     )

@@ -223,7 +223,7 @@ async fn execute_rechaza_lo_fiscal_por_el_perfil_del_core_y_no_borra_lo_de_al_la
     seal_first_record(&rt, "h1").await;
     rt.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10 })),
+        &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10, "tax_category_key": "product.generic" })),
         &ctx("h1"),
     )
     .await
@@ -323,7 +323,7 @@ async fn execute_deja_resetear_lo_no_fiscal_aunque_haya_facturas_remitidas() {
     insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     rt.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10 })),
+        &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10, "tax_category_key": "product.generic" })),
         &ctx("h1"),
     )
     .await
