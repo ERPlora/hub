@@ -221,3 +221,112 @@ function fakeIframeDoc() {
       /width:\s*([^;]+)/.exec((iframe.style as { cssText: string }).cssText)?.[1]?.trim(),
   };
 }
+
+// ── hub#344: sin Bridge, el tique se ENCOLA en el hub (no se pierde ni cae al navegador) ──────
+// La PWA en un móvil sin app instalada no tiene impresora. Antes caía al diálogo del navegador
+// (que en un móvil no sirve para un tique térmico). Ahora encola en el hub: un print host del rol
+// conectado al hub lo drene por el WS del runtime. Una venta desde el móvil sale tarde, no se pierde.
+describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
+  const noBridge = { getDevices: vi.fn(async () => { throw new Error('hardware_unavailable'); }) };
+
+  it('sin Bridge encola el tique en el hub (vía queue)', async () => {
+    const enqueue = vi.fn(async () => true);
+    const browserPrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
+
+    expect(r.via).toBe('queue');
+    expect(enqueue).toHaveBeenCalledWith({
+      jobId: 'sale-42', role: 'receipt', documentType: 'receipt',
+      document: { total: 1 }, format: undefined,
+    });
+    expect(browserPrint).not.toHaveBeenCalled();
+  });
+
+  it('un duplicado (mismo jobId) es éxito: la cola es idempotente', async () => {
+    const enqueue = vi.fn(async () => true); // el runtime responde ok:true a un duplicado
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: {} });
+
+    expect(r.via).toBe('queue');
+  });
+
+  it('si el runtime rechaza el encolado, cae al navegador (una venta no se cae)', async () => {
+    const enqueue = vi.fn(async () => false); // ok:false → rechazado
+    const browserPrint = vi.fn();
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', html: '<i>x</i>' });
+
+    expect(r.via).toBe('browser');
+    expect(enqueue).toHaveBeenCalled();
+  });
+
+  it('si enqueue lanza (red caída), cae al navegador', async () => {
+    const enqueue = vi.fn(async () => { throw new Error('network'); });
+    const browserPrint = vi.fn();
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', html: '<i>x</i>' });
+
+    expect(r.via).toBe('browser');
+  });
+
+  it('sin jobId no se encola (sin idempotencia, cada reintento duplicaría): cae al navegador', async () => {
+    const enqueue = vi.fn();
+    const browserPrint = vi.fn();
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', html: '<i>x</i>' });
+
+    expect(r.via).toBe('browser');
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it('A4 (facturas/albaranes) no encola: no hay cola térmica, va al navegador', async () => {
+    const enqueue = vi.fn();
+    const browserPrint = vi.fn();
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
+
+    const r = await print({ role: 'receipt', documentType: 'invoice', format: 'a4', jobId: 'inv-1', html: '<i>x</i>' });
+
+    expect(r.via).toBe('browser');
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it('un fallo del Bridge al imprimir también va a la cola antes que al navegador', async () => {
+    // Hay Bridge y hay impresora del rol, pero print() falla (sin papel, apagada…). El tique no se
+    // pierde: a la cola, por si un print host del rol lo saca.
+    const devicesWithReceipt = [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }];
+    const failingPrint = {
+      getDevices: vi.fn(async () => devicesWithReceipt),
+      print: vi.fn(async () => { throw new Error('sin papel'); }),
+    };
+    const enqueue = vi.fn(async () => true);
+    const browserPrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: failingPrint }), { enqueue, browserPrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: {} });
+
+    expect(r.via).toBe('queue');
+    expect(failingPrint.print).toHaveBeenCalled();
+    expect(browserPrint).not.toHaveBeenCalled();
+  });
+
+  it('sin enqueue cableado, mantiene el comportamiento anterior (al navegador)', async () => {
+    // Un caller que aún no cablea el enqueue no se rompe: cae al navegador como antes de hub#344.
+    const browserPrint = vi.fn();
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { browserPrint, iframePrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', html: '<i>x</i>' });
+
+    expect(r.via).toBe('browser');
+  });
+});

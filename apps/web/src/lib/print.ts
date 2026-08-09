@@ -1,19 +1,23 @@
 // print — LA puerta de impresión del Hub. Global: la usan todos los módulos (sales, kitchen,
 // cash_register, printing…), no cada uno la suya.
 //
-// Dos vías, en este orden:
+// Tres vías, en este orden:
 //   1. BRIDGE — si está, se imprime en la impresora que tenga el ROL pedido (ESC/POS). Puede haber
 //      muchas: `receipt`, `kitchen`, `bar`, y las que se den de alta en el Bridge. El rol físico
 //      vive en el Bridge (devices.json); el módulo solo dice "esto es una comanda de cocina".
-//   2. NAVEGADOR — sin Bridge (o sin impresora para ese rol, o si el Bridge falla) se abre el
-//      diálogo del navegador con el documento en pantalla. Es un RESPALDO manual: nunca se abre
-//      solo, solo cuando alguien pide imprimir.
+//   2. COLA del hub — sin Bridge (PWA en un navegador, sin app instalada) el tique térmico se
+//      ENCOLA en el hub (`POST /api/print/jobs`, hub#341/#344): queda esperando a que un print host
+//      del rol lo drene por el WS del runtime (hub#342/#343). Así una venta desde el móvil no se
+//      cae por no tener impresora; sale tarde, no se pierde. El documento viaja ESTRUCTURADO
+//      (hub#501), no como HTML.
+//   3. NAVEGADOR — si encolar también falla (o es A4, que no tiene cola térmica), se abre el
+//      diálogo del navegador con el documento en pantalla. Es un RESPALDO manual.
 //
 // Por qué vive en el SHELL y no en un módulo: imprimir es client-side y toca hardware; el runtime
 // no lo hace (ARQUITECTURA.md §2.7). Y debe estar disponible siempre, no solo con una pantalla
 // montada (mismo criterio que `print-on-sale`, ADR-0017).
 //
-// Tercer escalón previsto (aún no): si el DOM se resiste, renderizar a PDF y mandarlo a la
+// Cuarto escalón previsto (aún no): si el DOM se resiste, renderizar a PDF y mandarlo a la
 // impresora desde Rust. La forma de esta API no cambia — solo se añade una vía más aquí dentro.
 
 /** Dispositivo tal y como lo registra el Bridge. */
@@ -67,13 +71,29 @@ export interface PrintRequest {
 }
 
 export interface PrintResult {
-  /** Por dónde salió: el Bridge, el navegador, o por ningún sitio. */
-  via: 'bridge' | 'browser' | 'none';
+  /** Por dónde salió: el Bridge, la cola del hub, el navegador, o por ningún sitio. */
+  via: 'bridge' | 'queue' | 'browser' | 'none';
   role: string;
   printerId?: string;
   /** Motivo por el que no se pudo usar el Bridge (si aplica). */
   error?: string;
 }
+
+/**
+ * Encola un tique en la cola de impresión del hub (`POST /api/print/jobs`, hub#341). Lo usa la vía
+ * COLA cuando no hay Bridge. Inyectable para tests; el shell pasa la implementación real, que reusa
+ * `RUNTIME_URL` + `runtimeHeaders()`.
+ *
+ * Un duplicado (mismo `jobId`) es ÉXITO, no error: la cola es idempotente por `(hub_id, job_id)`.
+ * Devuelve `true` si el trabajo quedó encolado (nuevo o duplicado), `false` si el runtime lo rechazó.
+ */
+export type EnqueuePrintJob = (job: {
+  jobId: string;
+  role: string;
+  documentType: string;
+  document: Record<string, unknown>;
+  format?: PrintFormat;
+}) => Promise<boolean>;
 
 /** Impresora del Bridge con ese ROL, en el formato que espera `peripherals.print`. */
 export function printerIdForRole(devices: PrintDevice[], role: string): string | undefined {
@@ -135,15 +155,37 @@ export function createPrintService(
   opts: {
     browserPrint?: () => void;
     iframePrint?: (html: string, format?: PrintFormat) => void;
+    /** Encola en la cola del hub cuando no hay Bridge (hub#344). Si no se pasa, se salta la vía
+     *  COLA y se cae al navegador (comportamiento anterior, para quien aún no cablea el enqueue). */
+    enqueue?: EnqueuePrintJob;
   } = {},
 ): (req: PrintRequest) => Promise<PrintResult> {
   const browserPrint = opts.browserPrint ?? (() => globalThis.print?.());
   const iframePrint =
     opts.iframePrint ?? ((html: string, format?: PrintFormat) => printHtmlInIframe(html, document, format));
+  const enqueue = opts.enqueue;
 
   return async function print(req: PrintRequest): Promise<PrintResult> {
     const role = req.role || 'receipt';
     const allowBrowser = req.fallbackToBrowser !== false;
+    const documentType = req.documentType || 'receipt';
+    const data = req.data ?? {};
+
+    // Encola en el hub y devuelve vía 'queue'. Solo para tiques térmicos (receipt/kitchen…): el
+    // A4 (facturas/albaranes) no tiene cola, va al navegador. Si el runtime rechaza el encolado,
+    // cae al navegador como antes — una venta no se cae por un problema de impresión.
+    const toQueue = async (): Promise<PrintResult> => {
+      // Sin jobId no hay idempotencia: cada reintento duplicaría el tique. Se exige (el caller de
+      // ventas ya lo trae: `sale-${saleId}`). Si falta, no se encola — se cae al navegador.
+      if (!enqueue || !req.jobId) return toBrowser('sin cola: falta jobId o enqueue');
+      try {
+        const ok = await enqueue({ jobId: req.jobId, role, documentType, document: data, format: req.format });
+        return ok ? { via: 'queue', role } : toBrowser('el runtime rechazó el encolado');
+      } catch (e) {
+        return toBrowser(e instanceof Error ? e.message : String(e));
+      }
+    };
+
     const toBrowser = (error?: string): PrintResult => {
       if (!allowBrowser) return { via: 'none', role, error };
       // Con HTML del documento se imprime AISLADO (lo correcto). Sin él queda el print del
@@ -156,20 +198,38 @@ export function createPrintService(
     try {
       devices = await client.peripherals.getDevices();
     } catch (e) {
-      // Sin Bridge (no instalado, apagado, sin emparejar…). No es un error: es el caso PWA.
-      return toBrowser(e instanceof Error ? e.message : String(e));
+      // Sin Bridge (no instalado, apagado, sin emparejar, o PWA en navegador). No es un error: es
+      // el caso PWA. Antes caía al navegador; ahora ENCOLA en el hub si hay un print host que lo
+      // drene (hub#344), y solo si no, al navegador.
+      const reason = e instanceof Error ? e.message : String(e);
+      if (documentType !== 'receipt' && !documentType.endsWith('_order')) {
+        // A4 (facturas/albaranes): no hay cola térmica, va al navegador directo.
+        return toBrowser(reason);
+      }
+      // El reason va como info al caller pero NO se abre el navegador si la cola lo absorbe.
+      void reason;
+      return toQueue();
     }
 
     const printerId = printerIdForRole(devices, role);
-    if (!printerId) return toBrowser(`sin impresora con rol "${role}"`);
+    if (!printerId) {
+      // Hay Bridge pero ninguna impresora con ese rol. Igual que sin Bridge: a la cola si puede.
+      return toQueue();
+    }
 
     try {
-      await client.peripherals.print(printerId, req.documentType || 'receipt', req.data ?? {}, req.jobId);
+      await client.peripherals.print(printerId, documentType, data, req.jobId);
       return { via: 'bridge', role, printerId };
     } catch (e) {
-      // La impresora existe pero falló (sin papel, apagada…). No se pierde el documento: al
-      // navegador. Una venta NUNCA se cae por un problema de impresión.
-      return toBrowser(e instanceof Error ? e.message : String(e));
+      // La impresora existe pero falló (sin papel, apagada…). A la cola antes que al navegador: si
+      // un print host del rol está conectado al hub, lo saca tarde en vez de perderse. Una venta
+      // NUNCA se cae por un problema de impresión.
+      const reason = e instanceof Error ? e.message : String(e);
+      const q = await toQueue();
+      // Si la cola no absorbió el trabajo (vía 'browser'/'none'), el motivo del bridge se conserva
+      // para que el caller sepa por qué no fue directo.
+      if (q.via !== 'queue') q.error = reason;
+      return q;
     }
   };
 }
