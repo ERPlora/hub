@@ -64,7 +64,7 @@ pub mod wasm;
 
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{DemoLock, Result, RuntimeError};
-pub use manifest::Manifest;
+pub use manifest::{Manifest, ManifestWarning, CORE_VERSION};
 pub use registry::{EventSink, ModuleStatus, NavEntry, Principal, Registry, RequestContext};
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
@@ -83,6 +83,13 @@ pub struct ModuleInfo {
     /// Dependencias declaradas (`depends_on`): la UI del shell las usa para avisar de la CASCADA
     /// (ADR-0128) antes de desactivar («también desactivará: …»).
     pub depends_on: Vec<String>,
+    /// What this core did not understand of the module's manifest and installed anyway (hub#521).
+    ///
+    /// Empty for every module that fits the contract, which is all 24 published ones bar the two
+    /// carrying a retired `validates`. It travels here — and not only to a log — because "the hub
+    /// ignores it in silence" is not fixed by writing the silence down somewhere nobody looks:
+    /// whoever is staring at a module that half works has to be able to ASK.
+    pub manifest_warnings: Vec<crate::manifest::ManifestWarning>,
 }
 
 /// `hub_id` de desarrollo por defecto (mismo UUID fijo que `crates/server::DEV_HUB_ID`). El host
@@ -540,6 +547,7 @@ impl Runtime {
                     .get(&m.id)
                     .unwrap_or(&ModuleStatus::Inactive),
                 depends_on: m.depends_on.clone(),
+                manifest_warnings: m.warnings.clone(),
             })
             .collect()
     }
