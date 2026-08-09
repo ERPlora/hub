@@ -400,23 +400,124 @@ pub async fn start_run(
     Ok(id)
 }
 
+/// The largest page of runs one request may take. The rows carry each run's input, so a listing
+/// nobody bounded is a screen that stops loading on the first hub that uses flows in earnest.
+pub const MAX_RUNS_PAGE: i64 = 200;
+
+/// The history of one flow, **newest first**, paged by cursor.
+///
+/// `before` is the id of the last run of the previous page — «older than this one». It is a cursor
+/// and not an `OFFSET` because runs keep arriving at the head while somebody is reading: with an
+/// offset, every new run shifts the page under them and a row is served twice or skipped. An
+/// unknown `before` yields nothing rather than silently restarting from the top, which would be the
+/// same duplicate with a friendlier face.
+///
+/// Reads `ix_flow_run_flow (hub_id, flow_id, created_at)`, which is why the order is by
+/// `created_at` and the tie-break is the id.
 pub async fn list_runs(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     flow_id: &str,
     limit: i64,
+    before: Option<&str>,
 ) -> Result<Vec<FlowRun>> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("flow_id".into(), json!(flow_id));
-    p.insert("limit".into(), json!(limit.clamp(1, 200)));
+    p.insert("limit".into(), json!(limit.clamp(1, MAX_RUNS_PAGE)));
+
+    let anchor = match before {
+        Some(id) if !id.is_empty() => match cursor_of(db, hub_id, id).await? {
+            Some(created_at) => Some(created_at),
+            // A cursor this hub does not have: an empty page. Falling back to the first page would
+            // hand the caller rows they have already seen and call it pagination.
+            None => return Ok(Vec::new()),
+        },
+        _ => None,
+    };
+    let keyset = match &anchor {
+        Some(created_at) => {
+            p.insert("before_at".into(), json!(created_at));
+            p.insert("before_id".into(), json!(before.unwrap_or_default()));
+            " AND (created_at, id) < (:before_at, :before_id)"
+        }
+        None => "",
+    };
+
+    let sql = format!(
+        "SELECT id, flow_id, trigger_kind, parent_event_id, status, current_step, input, \
+                depth, attempts, last_error, wake_at, started_at, finished_at, created_at \
+         FROM _flow_runs \
+         WHERE hub_id = :hub_id AND flow_id = :flow_id AND deleted_at IS NULL{keyset} \
+         ORDER BY created_at DESC, id DESC LIMIT :limit"
+    );
+    let res = db.query(&sql, &p).await?;
+    Ok(res.rows.iter().map(run_row).collect())
+}
+
+/// The `created_at` of a run of THIS hub, so a cursor from another tenant resolves to nothing.
+async fn cursor_of(db: &dyn DatabaseAdapter, hub_id: &str, run_id: &str) -> Result<Option<String>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("id".into(), json!(run_id));
+    let res = db
+        .query(
+            "SELECT created_at FROM _flow_runs WHERE id = :id AND hub_id = :hub_id \
+             AND deleted_at IS NULL",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["created_at"].as_str().map(|s| s.to_string())))
+}
+
+/// Arms the indexes the flow tables need but their creating migration did not know about.
+///
+/// **Idempotent, run at every boot, and deliberately NOT a numbered system migration** — the same
+/// reasoning that puts `run_id`/`parent_event_id` in the outbox's `ENSURE_TABLES` and
+/// `identity::forget_hub_id_as_device` on the boot path: an index is not a change to the shape of
+/// the data, and a `CREATE INDEX IF NOT EXISTS` that costs nothing on the second boot does not need
+/// a version. It also keeps additive work clear of the number races between parallel branches.
+///
+/// `ix_flow_run_parent` backs `runs_of_event` (the trace, hub#666), which v34 could not anticipate:
+/// v34 indexed what the tick reads (`ix_flow_run_due`) and what the history reads
+/// (`ix_flow_run_flow`). It is **partial** because most runs — every manual one, every cron one —
+/// have no originating event, and an index over their empty string is paid for on every insert to
+/// serve lookups nobody makes.
+///
+/// Called AFTER `system_migrations::apply`: the tables have to exist first.
+pub async fn ensure_indexes(db: &dyn DatabaseAdapter) -> Result<()> {
+    db.execute_batch(
+        "CREATE INDEX IF NOT EXISTS ix_flow_run_parent \
+           ON _flow_runs (hub_id, parent_event_id) \
+           WHERE parent_event_id <> '' AND deleted_at IS NULL;",
+    )
+    .await?;
+    Ok(())
+}
+
+/// The runs one event started — the forward half of «this sale set off these steps».
+pub async fn runs_of_event(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+) -> Result<Vec<FlowRun>> {
+    if event_id.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("event_id".into(), json!(event_id));
+    p.insert("limit".into(), json!(MAX_RUNS_PAGE));
     let res = db
         .query(
             "SELECT id, flow_id, trigger_kind, parent_event_id, status, current_step, input, \
                     depth, attempts, last_error, wake_at, started_at, finished_at, created_at \
              FROM _flow_runs \
-             WHERE hub_id = :hub_id AND flow_id = :flow_id AND deleted_at IS NULL \
-             ORDER BY created_at DESC, id DESC LIMIT :limit",
+             WHERE hub_id = :hub_id AND parent_event_id = :event_id AND deleted_at IS NULL \
+             ORDER BY created_at, id LIMIT :limit",
             &p,
         )
         .await?;
@@ -424,6 +525,9 @@ pub async fn list_runs(
 }
 
 /// One run with its steps — the shape `GET /api/hub/flows/runs/{run_id}` returns.
+///
+/// The steps come back **redacted against the flow's own definition** ([`redact_step`]): this is a
+/// second door onto rows a step wrote, and a door that trusts the other one is the one that leaks.
 pub async fn get_run(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -449,7 +553,140 @@ pub async fn get_run(
             &p,
         )
         .await?;
-    Ok((run, steps.rows.iter().map(step_row).collect()))
+    // The definition is read here, not carried on the run, because it is what says which fields of
+    // a step hold a secret. **Deliberately through `definition_of` and not `get`**: `delete` is a
+    // SOFT delete and the runs outlive it, so reading it through the ordinary door — which filters
+    // `deleted_at IS NULL` — would make «press delete, then open the history» the way to read
+    // every secret the flow ever sent.
+    let definition = definition_of(db, hub_id, &run.flow_id).await?;
+    Ok((
+        run,
+        steps
+            .rows
+            .iter()
+            .map(|row| redact_step(&definition, step_row(row)))
+            .collect(),
+    ))
+}
+
+/// The stored document of a flow **including a soft-deleted one**, for redacting its history.
+///
+/// It is the one read in this file that ignores `deleted_at`, and only because of what it is for:
+/// a deleted flow's runs survive it, and their steps must stay redacted afterwards. Nothing else
+/// may use it to resurrect a flow — it returns the raw document, never a [`Flow`], so a caller
+/// cannot mistake it for «the flow is still here». A missing flow yields `Null`, which redacts
+/// nothing, which is right: no definition means no field was ever declared as a secret.
+async fn definition_of(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) -> Result<Json> {
+    let mut p = Params::new();
+    p.insert("id".into(), json!(flow_id));
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT definition FROM _flow WHERE id = :id AND hub_id = :hub_id",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["definition"].as_str())
+        .and_then(|raw| serde_json::from_str(raw).ok())
+        .unwrap_or(Json::Null))
+}
+
+// ── keeping secrets out of the history (ADR-0283 §4) ──────────────────────────────────────────
+
+/// What a redacted field shows instead of its value. Not removal: an operator looking at a `401`
+/// has to see that the header **was** sent, and a missing key looks like a bug in the flow.
+pub const REDACTED: &str = "«secret»";
+
+/// Blanks every field of a step whose **definition** templates a `{{secret.…}}`.
+///
+/// The first line of defence is that a resolved secret is never persisted at all (flows.md §4: they
+/// are resolved when the `PendingIo` is built and never written to `_flow_run_steps`). This is the
+/// second: the read door does not depend on the write door having been careful, because the step
+/// kinds that carry credentials — `http`, `notify` — are still being written (hub#662, hub#663) and
+/// "we will remember" is not a control.
+///
+/// The rule is by **key name**, learnt from the step's own definition and applied at any depth: a
+/// key that holds a secret in the document holds one in the row. Two keys sharing a name inside one
+/// step redact both, which is the direction to be wrong in.
+///
+/// ⚠️ **What this canNOT cover, and whoever writes the I/O steps has to**: `error` is free-form
+/// prose, so a message that interpolated a credential (`request to https://x?key=sk-live failed`)
+/// is not something a key-name rule can find — catching it would need the secret's VALUE, which
+/// this layer deliberately does not have. The rule for hub#662/#663 stands: a step never writes a
+/// resolved secret ANYWHERE, its own error message included.
+fn redact_step(definition: &Json, mut step: FlowRunStep) -> FlowRunStep {
+    let secret_keys = secret_keys_of(definition, &step.step_id);
+    if secret_keys.is_empty() {
+        return step;
+    }
+    blank(&mut step.input, &secret_keys);
+    blank(&mut step.output, &secret_keys);
+    step
+}
+
+/// The key names that hold a secret in the definition of step `step_id`.
+///
+/// It walks the RAW document rather than the parsed [`FlowDefinition`], on purpose: a parsed step
+/// of a kind this binary cannot execute yet keeps none of its fields (`StepSpec::Reserved`), and
+/// those are exactly the steps that will carry the credentials.
+fn secret_keys_of(definition: &Json, step_id: &str) -> Vec<String> {
+    let Some(step) = definition
+        .get("steps")
+        .and_then(|s| s.as_array())
+        .and_then(|steps| {
+            steps
+                .iter()
+                .find(|s| s.get("id").and_then(|v| v.as_str()) == Some(step_id))
+        })
+    else {
+        return Vec::new();
+    };
+    let mut keys = Vec::new();
+    collect_secret_keys(step, &mut keys);
+    keys
+}
+
+fn collect_secret_keys(value: &Json, out: &mut Vec<String>) {
+    match value {
+        Json::Object(map) => {
+            for (key, child) in map {
+                if mentions_secret(child) && !out.contains(key) {
+                    out.push(key.clone());
+                }
+                collect_secret_keys(child, out);
+            }
+        }
+        Json::Array(items) => items.iter().for_each(|v| collect_secret_keys(v, out)),
+        _ => {}
+    }
+}
+
+/// Does this expression read a secret, directly (`secret.API_KEY`) or through a template
+/// (`"Bearer {{secret.API_KEY}}"`)? Both forms are the mapping language of flows.md §1.
+fn mentions_secret(value: &Json) -> bool {
+    match value {
+        Json::String(s) => s.starts_with("secret.") || s.contains("{{secret."),
+        _ => false,
+    }
+}
+
+fn blank(value: &mut Json, keys: &[String]) {
+    match value {
+        Json::Object(map) => {
+            for (key, child) in map.iter_mut() {
+                if keys.contains(key) {
+                    *child = json!(REDACTED);
+                } else {
+                    blank(child, keys);
+                }
+            }
+        }
+        Json::Array(items) => items.iter_mut().for_each(|v| blank(v, keys)),
+        _ => {}
+    }
 }
 
 fn run_row(row: &Json) -> FlowRun {
@@ -727,6 +964,262 @@ mod tests {
 
         assert!(get(&db, HUB, &flow.id).await.is_err());
         assert!(list(&db, HUB).await.unwrap().is_empty());
+    }
+
+    // ── run history (hub#666) ─────────────────────────────────────────────────────────────────
+
+    /// The trace query has an index, and that index is the reason it is allowed to exist.
+    ///
+    /// `runs_of_event` reads `parent_event_id`, which v34 does not index — it indexes what the tick
+    /// and the history read. A hub with live flows makes runs at the rate of its till, so an
+    /// unindexed lookup on that column is a sequential scan of a table that only ever grows.
+    #[tokio::test]
+    async fn the_lookup_by_originating_event_is_indexed_and_arming_it_twice_is_a_no_op() {
+        let db = db().await;
+        // The boot path arms it once; a second runtime of the same hub (start-first deploys, two
+        // processes against one database) arms it again, and it must not care.
+        ensure_indexes(&db).await.unwrap();
+
+        let rows = db
+            .query(
+                // Scoped to THIS test's ephemeral schema: every parallel test has its own
+                // `_flow_runs`, and an unscoped `pg_indexes` counts the whole container.
+                "SELECT indexdef FROM pg_indexes WHERE tablename = '_flow_runs' \
+                 AND indexname = 'ix_flow_run_parent' AND schemaname = current_schema()",
+                &Params::new(),
+            )
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 1, "nothing indexes the trace query");
+        let def = rows[0]["indexdef"].as_str().unwrap();
+        assert!(def.contains("parent_event_id"), "{def}");
+        assert!(
+            def.contains("WHERE"),
+            "partial on purpose: most runs (manual, cron) have no originating event, and indexing \
+             their empty string is paying for rows nobody ever looks up — {def}"
+        );
+    }
+
+    /// Starts `n` runs of `flow_id` and returns their ids, oldest first.
+    async fn many_runs(db: &dyn DatabaseAdapter, flow_id: &str, n: usize) -> Vec<String> {
+        let mut ids = Vec::new();
+        for _ in 0..n {
+            ids.push(
+                start_run(db, HUB, flow_id, "", "manual", "", &json!({}), 0, "hub_user:1")
+                    .await
+                    .unwrap(),
+            );
+        }
+        ids
+    }
+
+    /// A hub with live flows makes runs forever, so the history is paged — and a page that can
+    /// repeat or skip a row is worse than no history: the operator counting «this sale fired five
+    /// steps» would count four, or six.
+    ///
+    /// The cursor is `(created_at, id)` and not an offset, because rows keep arriving at the head
+    /// while somebody is reading: with `OFFSET` every new run shifts the page under them.
+    #[tokio::test]
+    async fn the_history_pages_backwards_without_repeating_or_skipping_a_run() {
+        let db = db().await;
+        let flow = create(
+            &db,
+            HUB,
+            &NewFlow {
+                name: "Busy".into(),
+                enabled: true,
+                definition: definition("0 9 * * *"),
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let started = many_runs(&db, &flow.id, 5).await;
+
+        let mut seen: Vec<String> = Vec::new();
+        let mut before: Option<String> = None;
+        for _ in 0..4 {
+            let page = list_runs(&db, HUB, &flow.id, 2, before.as_deref()).await.unwrap();
+            if page.is_empty() {
+                break;
+            }
+            before = Some(page.last().unwrap().id.clone());
+            seen.extend(page.into_iter().map(|r| r.id));
+        }
+
+        assert_eq!(seen.len(), 5, "every run appeared exactly once across the pages");
+        let mut unique = seen.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), 5, "no run was served twice: {seen:?}");
+        assert_eq!(
+            seen[0],
+            *started.last().unwrap(),
+            "newest first: the run somebody is looking for is the one that just failed"
+        );
+    }
+
+    /// The history is scoped to its hub in BOTH doors — the list and the detail. The detail is the
+    /// one that matters most: it carries the resolved inputs of every step, which is the whole
+    /// business of another tenant if the `hub_id` is ever dropped from the `WHERE`.
+    #[tokio::test]
+    async fn a_run_of_another_hub_is_not_visible_here() {
+        let db = db().await;
+        test_support::ensure_schema(&db, "hub-other").await;
+        let theirs = create(
+            &db,
+            "hub-other",
+            &NewFlow {
+                name: "Theirs".into(),
+                enabled: true,
+                definition: definition("0 9 * * *"),
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let their_run = start_run(
+            &db,
+            "hub-other",
+            &theirs.id,
+            "",
+            "manual",
+            "",
+            &json!({ "customer_email": "someone@example.com" }),
+            0,
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            get_run(&db, HUB, &their_run).await.is_err(),
+            "the detail of another tenant's run is not a 404 by luck: it must not be readable"
+        );
+        assert!(list_runs(&db, HUB, &theirs.id, 50, None).await.unwrap().is_empty());
+    }
+
+    /// **The history never shows a secret** (ADR-0283 §4).
+    ///
+    /// The first defence is that a templated `{{secret.X}}` is never persisted into
+    /// `_flow_run_steps` — but that defence lives in the step that resolves it, and this endpoint
+    /// is a **second door** onto the same rows. A door that trusts the other one is a door that
+    /// leaks the day somebody adds a step kind and forgets.
+    ///
+    /// The flow row is seeded directly here on purpose: `FlowDefinition::parse` refuses `secret.…`
+    /// while `_flow_secrets` does not exist (hub#662), so the shape being defended against cannot
+    /// be created through the front door yet. It is coming, and the door is shut before it arrives.
+    ///
+    /// Returns `(flow_id, run_id)` — an `http` step whose `Authorization` header is templated from
+    /// a secret, plus the step row a resolved call would have left behind, credential and all.
+    async fn flow_with_a_secret_step(db: &dyn DatabaseAdapter) -> (String, String) {
+        let flow_id = "flow-http";
+        let definition = json!({
+            "schema_version": 1,
+            "triggers": [],
+            "steps": [{
+                "id": "call",
+                "kind": "http",
+                "url": "https://api.example.com/send",
+                "headers": { "Authorization": "Bearer {{secret.API_KEY}}", "X-Trace": "abc" },
+                "params": { "note": "{{input.note}}" }
+            }]
+        });
+        let mut p = Params::new();
+        p.insert("id".into(), json!(flow_id));
+        p.insert("hub".into(), json!(HUB));
+        p.insert("def".into(), json!(definition.to_string()));
+        p.insert("now".into(), json!(now_rfc3339()));
+        db.execute(
+            "INSERT INTO _flow (id, hub_id, name, enabled, schema_version, definition, \
+                                created_at, created_by, updated_at, updated_by) \
+             VALUES (:id, :hub, 'Webhook', 1, 1, :def, :now, 'seed', :now, 'seed')",
+            &p,
+        )
+        .await
+        .unwrap();
+        let run_id = start_run(db, HUB, flow_id, "", "manual", "", &json!({}), 0, "hub_user:1")
+            .await
+            .unwrap();
+
+        // What a resolved http step would have written: the header, templated, in the clear.
+        let mut s = Params::new();
+        s.insert("id".into(), json!("step-1"));
+        s.insert("hub".into(), json!(HUB));
+        s.insert("run".into(), json!(run_id));
+        s.insert(
+            "input".into(),
+            json!(json!({
+                "url": "https://api.example.com/send",
+                "headers": { "Authorization": "Bearer sk-live-31337", "X-Trace": "abc" }
+            })
+            .to_string()),
+        );
+        s.insert("now".into(), json!(now_rfc3339()));
+        db.execute(
+            "INSERT INTO _flow_run_steps (id, hub_id, run_id, step_index, step_id, kind, status, \
+                                          input, output, error, created_at) \
+             VALUES (:id, :hub, :run, 0, 'call', 'http', 'done', :input, '{}', '', :now)",
+            &s,
+        )
+        .await
+        .unwrap();
+        (flow_id.to_string(), run_id)
+    }
+
+    #[tokio::test]
+    async fn a_step_whose_definition_names_a_secret_never_shows_its_value() {
+        let db = db().await;
+        let (_, run_id) = flow_with_a_secret_step(&db).await;
+
+        let (_, steps) = get_run(&db, HUB, &run_id).await.unwrap();
+        let shown = serde_json::to_string(&steps[0].input).unwrap();
+        assert!(
+            !shown.contains("sk-live-31337"),
+            "the history handed out a live credential: {shown}"
+        );
+        assert_eq!(
+            steps[0].input["headers"]["Authorization"],
+            json!(REDACTED),
+            "the field is shown as redacted rather than removed: an operator debugging a 401 has \
+             to see that the header WAS sent"
+        );
+        assert_eq!(
+            steps[0].input["headers"]["X-Trace"],
+            json!("abc"),
+            "only what the definition marks as a secret is hidden; the rest is why this screen exists"
+        );
+        assert_eq!(steps[0].input["url"], json!("https://api.example.com/send"));
+    }
+
+    /// **Deleting the flow must not un-redact its history.** `delete` is a SOFT delete, and the
+    /// runs survive it — so if the redaction read the definition through the ordinary `get` (which
+    /// filters `deleted_at IS NULL`), the way to see every secret a flow ever sent would be to
+    /// press «delete» and then open its history. That is the opposite of what deleting means.
+    #[tokio::test]
+    async fn deleting_the_flow_does_not_turn_its_history_into_a_way_to_read_its_secrets() {
+        let db = db().await;
+        let (flow_id, run_id) = flow_with_a_secret_step(&db).await;
+
+        // Soft-delete the flow, exactly as `delete()` does.
+        let mut p = Params::new();
+        p.insert("id".into(), json!(flow_id));
+        p.insert("now".into(), json!(now_rfc3339()));
+        db.execute(
+            "UPDATE _flow SET deleted_at = :now, deleted_by = 'hub_user:1' WHERE id = :id",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        let (_, steps) = get_run(&db, HUB, &run_id).await.unwrap();
+        let shown = serde_json::to_string(&steps[0].input).unwrap();
+        assert!(
+            !shown.contains("sk-live-31337"),
+            "pressing delete handed out the credential: {shown}"
+        );
+        assert_eq!(steps[0].input["headers"]["Authorization"], json!(REDACTED));
     }
 
     #[tokio::test]

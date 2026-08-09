@@ -595,6 +595,19 @@ pub struct RequestContext {
     /// grants — turning «the hub acting on its own» into a privilege anybody with an HTTP client
     /// could claim. Only the runtime's own executor can fill it in.
     automation: Option<AutomationCtx>,
+    /// **The event whose delivery caused this request** (hub#666), if any. Stamped by the outbox
+    /// relay when it reconstructs a listener's context, and carried by a flow run from the event
+    /// that started it, so every event emitted downstream can name what set it off.
+    ///
+    /// `_event_outbox.depth` already said how FAR a cascade had travelled; it never said **from
+    /// what**. On a till closing two sales a second, "the row before it in time" is a guess, and a
+    /// guess is not an answer to "why does this invoice exist".
+    ///
+    /// Private with a `pub(crate)` setter for the same reason as [`Self::automation`]: this
+    /// struct crosses into `erplora-server`, where contexts are built from what a caller sent. A
+    /// route able to stamp it could file its events under somebody else's execution, which makes
+    /// the whole audit trail worth exactly nothing.
+    parent_event_id: String,
 }
 
 /// Identity of the flow behind an automation request: which flow, and which of its runs.
@@ -649,6 +662,7 @@ impl RequestContext {
             elevation_token: None,
             approved_by: None,
             automation: None,
+            parent_event_id: String::new(),
         }
     }
 
@@ -663,6 +677,18 @@ impl RequestContext {
     /// reporter want it); settable only inside the runtime.
     pub fn automation(&self) -> Option<&AutomationCtx> {
         self.automation.as_ref()
+    }
+
+    /// Marks this context as **caused by the delivery of an event** (hub#666). Only the relay and
+    /// the flow executor call it — see [`RequestContext::parent_event_id`].
+    pub(crate) fn caused_by_event(mut self, event_id: impl Into<String>) -> Self {
+        self.parent_event_id = event_id.into();
+        self
+    }
+
+    /// The event that caused this request, or `""` when a person started it directly.
+    pub fn parent_event_id(&self) -> &str {
+        &self.parent_event_id
     }
 
     /// Marks this context as a **machine** principal (an API key — [`Principal::Machine`]). Only

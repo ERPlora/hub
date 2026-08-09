@@ -134,6 +134,48 @@ pub async fn discard_dead(
     }
 }
 
+/// GET /api/hub/events/{id}/trace — **what this event set off** (hub#666).
+///
+/// The event itself, the flow runs it started, and the events its delivery caused. It is the
+/// forward reading of the correlation columns, and the door that answers «this sale fired these
+/// five steps» from the sale end: a person has the sale, not the run id.
+///
+/// One level only. A recursive walk would be a single request that can traverse the whole outbox of
+/// a busy hub; the caller follows the link it cares about, one hop at a time, and each hop is
+/// bounded and indexed.
+///
+/// Same door as the rest of this file: **a human owner/admin session**. The trace names what every
+/// automation of the hub did, which is the shape of the business — not something a copyable
+/// integration credential gets to read.
+pub async fn trace_event(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return rejected(e);
+    }
+    match rt.trace_event(&id).await {
+        Ok(Some(trace)) => Json(json!({ "ok": true, "data": trace })).into_response(),
+        // Not in this hub: the same `404` as a dead-letter that is not ours. An event of another
+        // tenant is indistinguishable from one that never existed, which is the point.
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "not_found", "message": "no hay ningún evento con ese id" }
+            })),
+        )
+            .into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

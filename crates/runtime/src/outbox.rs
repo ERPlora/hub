@@ -40,6 +40,14 @@ const BATCH: i64 = 50;
 /// Mismo valor que el scheduler (hub#570): las dos colas viven el mismo modelo `start-first`.
 const LEASE_SECONDS: i64 = 300;
 
+/// The schema of the outbox, laid down idempotently at every boot.
+///
+/// New columns arrive here as `ALTER TABLE … ADD COLUMN IF NOT EXISTS` and **not** as a numbered
+/// system migration. That is this table's own pattern (`module_id` in ADR-0168, `discarded_at/by`
+/// in hub#660, `run_id`/`parent_event_id` in hub#666) and it is deliberate: these tables are
+/// created by the runtime before the migration engine runs at all — a hub with zero modules still
+/// has an outbox — so their shape cannot depend on a numbered version. It also keeps additive
+/// columns out of the way of the number races between parallel branches.
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS _event_outbox (\
   id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, user_id TEXT NOT NULL, \
@@ -48,12 +56,18 @@ CREATE TABLE IF NOT EXISTS _event_outbox (\
   attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, \
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT, \
   module_id TEXT NOT NULL DEFAULT '', claim_expires_at TEXT, \
-  discarded_at TEXT, discarded_by TEXT);\
+  discarded_at TEXT, discarded_by TEXT, \
+  run_id TEXT NOT NULL DEFAULT '', parent_event_id TEXT NOT NULL DEFAULT '');\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS module_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS claim_expires_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS run_id TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS parent_event_id TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_at);\
+CREATE INDEX IF NOT EXISTS ix_outbox_run ON _event_outbox (hub_id, run_id) WHERE run_id <> '';\
+CREATE INDEX IF NOT EXISTS ix_outbox_parent ON _event_outbox (hub_id, parent_event_id) \
+  WHERE parent_event_id <> '';\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
   PRIMARY KEY (event_id, listener_command));";
@@ -76,6 +90,11 @@ pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
 /// `module_id` = **módulo emisor**. Se persiste porque el relay necesita saber a quién exigirle la
 /// capability al ejercer un primitivo de host (`*.reminder.due` → `host.notify`): sin atribución,
 /// el envío externo se hacía "en nombre del hub" y cualquier módulo llegaba a él (hub#240).
+///
+/// `run_id` y `parent_event_id` son la **correlación** (hub#666), y salen del contexto — jamás del
+/// payload. Un evento emitido dentro de un run queda sellado con ese run, y todo evento en cascada
+/// nombra al evento cuya entrega lo provocó. Sin eso la cadena venta → run → command → evento hijo
+/// solo se podía adivinar por marca de tiempo, que con dos ventas por segundo no es una respuesta.
 pub(crate) fn insert_op(
     ctx: &RequestContext,
     module_id: &str,
@@ -97,10 +116,15 @@ pub(crate) fn insert_op(
         json!(serde_json::to_string(&Json::Object(payload.clone())).unwrap_or_else(|_| "{}".into())),
     );
     p.insert("depth".into(), json!(depth));
+    p.insert(
+        "run_id".into(),
+        json!(ctx.automation().map(|a| a.run_id.as_str()).unwrap_or_default()),
+    );
+    p.insert("parent_event_id".into(), json!(ctx.parent_event_id()));
     p.insert("now".into(), json!(now));
     let sql = "INSERT INTO _event_outbox \
-        (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, status, attempts, next_attempt_at, last_error, created_at) \
-        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, 'pending', 0, :now, '', :now)";
+        (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, run_id, parent_event_id, status, attempts, next_attempt_at, last_error, created_at) \
+        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, :run_id, :parent_event_id, 'pending', 0, :now, '', :now)";
     (sql.to_string(), p)
 }
 
@@ -471,6 +495,8 @@ fn listener_ctx(row: &Json) -> RequestContext {
     let hub_id = row["hub_id"].as_str().unwrap_or_default().to_string();
     let user_id = row["user_id"].as_str().unwrap_or_default().to_string();
     RequestContext::new(hub_id, user_id, [permissions::WILDCARD.to_string()])
+        // Whatever this listener emits is a consequence of THIS event, and says so (hub#666).
+        .caused_by_event(row["id"].as_str().unwrap_or_default())
         // There is no human at the relay, so there is nobody to type a manager's PIN: the
         // step-up dialog (hub#361) must never be offered here. It cannot be today — the
         // wildcard opens the gate before elevation is ever considered — and saying so in the
@@ -680,6 +706,127 @@ pub async fn discard(
     Ok(res.affected > 0)
 }
 
+// ─────────────────────────── Correlation (hub#666 — ADR-0283 §8) ───────────────────────────────
+//
+// Two columns and two queries, and between them they answer the two questions the kernel could not
+// answer before: **«what did this sale set off?»** and **«why does this row exist?»**.
+//
+// `depth` already bounded a cascade, but it only ever said how far one had travelled — never from
+// what. The link had to be guessed from timestamps, and a till closing two sales a second makes
+// that guess wrong exactly when it matters. `parent_event_id` names the event whose delivery caused
+// this one; `run_id` names the flow execution that emitted it. Both are written by the runtime from
+// the [`RequestContext`], never by a caller.
+
+/// How many rows one correlation query returns. A chain longer than this is a runaway, and the
+/// guards in `flows::triggers` are what deal with those.
+pub const MAX_CORRELATED: i64 = 200;
+
+/// One event, seen as a link in a chain rather than as a payload to inspect. The payload is
+/// deliberately absent: this shape is for walking the chain, and the door that shows payloads is
+/// the dead-letter queue, where an operator is deciding whether to replay one specific row.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CorrelatedEvent {
+    pub id: String,
+    pub event_name: String,
+    pub module_id: String,
+    pub status: String,
+    /// The flow run that emitted it (`""` when a person's command did).
+    pub run_id: String,
+    /// The event whose delivery caused it (`""` when it is the root of its chain).
+    pub parent_event_id: String,
+    pub depth: i64,
+    pub created_at: String,
+}
+
+/// The events **a flow run emitted** — the forward link from a run into everything downstream.
+pub async fn events_of_run(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+) -> Result<Vec<CorrelatedEvent>> {
+    // An empty `run_id` is the value of every event nobody automated: matching on it would return
+    // the whole outbox for a run id that got lost on the way here.
+    if run_id.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("run_id".into(), json!(run_id));
+    p.insert("lim".into(), json!(MAX_CORRELATED));
+    let res = db
+        .query(
+            "SELECT id, event_name, module_id, status, run_id, parent_event_id, depth, created_at \
+             FROM _event_outbox WHERE hub_id = :hub_id AND run_id = :run_id \
+             ORDER BY created_at, id LIMIT :lim",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.iter().map(correlated).collect())
+}
+
+/// The events **caused by the delivery of** `event_id` — one level of the cascade, not the whole
+/// transitive closure. A recursive walk in SQL would be a single query that can traverse the entire
+/// outbox; one level at a time is what the caller can page and bound.
+pub async fn events_caused_by(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+) -> Result<Vec<CorrelatedEvent>> {
+    if event_id.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("parent".into(), json!(event_id));
+    p.insert("lim".into(), json!(MAX_CORRELATED));
+    let res = db
+        .query(
+            "SELECT id, event_name, module_id, status, run_id, parent_event_id, depth, created_at \
+             FROM _event_outbox WHERE hub_id = :hub_id AND parent_event_id = :parent \
+             ORDER BY created_at, id LIMIT :lim",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.iter().map(correlated).collect())
+}
+
+/// One event of this hub, as a link in a chain. `None` when it is not in this hub — the tenant is
+/// part of the lookup, not a filter applied afterwards.
+pub async fn correlated_event(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+) -> Result<Option<CorrelatedEvent>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("id".into(), json!(event_id));
+    let res = db
+        .query(
+            "SELECT id, event_name, module_id, status, run_id, parent_event_id, depth, created_at \
+             FROM _event_outbox WHERE hub_id = :hub_id AND id = :id",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.first().map(correlated))
+}
+
+fn correlated(row: &Json) -> CorrelatedEvent {
+    let s = |k: &str| row[k].as_str().unwrap_or_default().to_string();
+    CorrelatedEvent {
+        id: s("id"),
+        event_name: s("event_name"),
+        module_id: s("module_id"),
+        status: s("status"),
+        run_id: s("run_id"),
+        parent_event_id: s("parent_event_id"),
+        depth: row["depth"]
+            .as_i64()
+            .or_else(|| row["depth"].as_f64().map(|f| f as i64))
+            .unwrap_or(0),
+        created_at: s("created_at"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -724,6 +871,7 @@ mod tests {
         crate::identity::ensure_tables(db).await.unwrap();
         ensure_tables(db).await.unwrap();
         crate::system_migrations::apply(db, "h1").await.unwrap();
+        crate::flows::store::ensure_indexes(db).await.unwrap();
     }
 
     async fn count(db: &PgAdapter, sql: &str) -> i64 {
@@ -1828,7 +1976,11 @@ mod tests {
     async fn a_core_event_is_delivered_to_its_listeners_with_no_emitting_user() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        // The WHOLE system schema, not just the outbox's two tables: this test DRAINS, and since
+        // hub#661 the relay asks `_flow_triggers` whether the event it just delivered starts a
+        // flow. With half a schema that question errors, the row is deferred instead of delivered,
+        // and the test says "pending" for a reason that has nothing to do with what it is about.
+        system_schema(&db).await;
 
         let mut reg = Registry::new();
         reg.status.insert("wa".into(), ModuleStatus::Active);
@@ -1850,6 +2002,97 @@ mod tests {
             .rows;
         assert_eq!(rows[0]["user_id"], json!(""), "nobody in this hub caused it");
         assert_eq!(rows[0]["status"], json!("delivered"));
+    }
+
+    // ── Correlation (hub#666) ─────────────────────────────────────────────────────────────────
+
+    /// A cascade event names the event whose delivery caused it.
+    ///
+    /// `depth` said how FAR a cascade had gone; it never said **from what**. On a till closing two
+    /// sales a second, "the row before it in time" is not an answer, so without this column the
+    /// chain that produced a row is not reconstructible at all — only guessable.
+    #[tokio::test]
+    async fn a_cascade_event_names_the_event_whose_delivery_caused_it() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        system_schema(&db).await;
+
+        // "m.fire" emits "e"; its listener "m.append" emits "f" — a two-link chain.
+        let mut reg = Registry::new();
+        reg.status.insert("m".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "m.append".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (1);", vec!["f".into()]),
+        );
+        reg.commands
+            .insert("m.fire".into(), cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]));
+        reg.listeners.insert("e".into(), vec!["m.append".into()]);
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "m.fire", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        let rows = db
+            .query(
+                "SELECT id, event_name, parent_event_id, run_id FROM _event_outbox",
+                &Params::new(),
+            )
+            .await
+            .unwrap()
+            .rows;
+        let named = |name: &str| {
+            rows.iter()
+                .find(|r| r["event_name"] == json!(name))
+                .unwrap_or_else(|| panic!("no `{name}` row"))
+                .clone()
+        };
+        let root = named("e");
+        let cascade = named("f");
+        assert_eq!(
+            root["parent_event_id"],
+            json!(""),
+            "an event a person caused has no parent event"
+        );
+        assert_eq!(
+            cascade["parent_event_id"], root["id"],
+            "the cascade names its cause, which is the only thing that makes it a chain"
+        );
+        assert_eq!(
+            cascade["run_id"],
+            json!(""),
+            "no flow was involved: the seal is empty rather than borrowed"
+        );
+    }
+
+    /// The correlation columns are stamped by the RUNTIME, from the context — never by a caller.
+    /// A payload that could name a run would let anybody file their event under somebody else's
+    /// execution, which is exactly as useful as no correlation at all.
+    #[test]
+    fn the_seal_of_an_event_comes_from_the_context_and_not_from_its_payload() {
+        let plain = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let (_, p) = insert_op(&plain, "m", "e", &Params::new(), 0);
+        assert_eq!(p["run_id"], json!(""));
+        assert_eq!(p["parent_event_id"], json!(""));
+
+        let inside_a_run = RequestContext::new("h1", "flow:f-1", ["*".to_string()])
+            .with_automation(crate::registry::AutomationCtx {
+                flow_id: "f-1".into(),
+                run_id: "run-7".into(),
+            })
+            .caused_by_event("evt-origin");
+        let (_, p) = insert_op(&inside_a_run, "m", "e", &Params::new(), 0);
+        assert_eq!(
+            p["run_id"],
+            json!("run-7"),
+            "everything a run emits carries the run that emitted it"
+        );
+        assert_eq!(
+            p["parent_event_id"],
+            json!("evt-origin"),
+            "and the event that set the whole thing off"
+        );
     }
 
     async fn dead_id(db: &PgAdapter) -> String {

@@ -150,7 +150,7 @@ async fn claim_next_run(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option
                    AND status IN ('pending','running') \
                    AND (claim_expires_at IS NULL OR claim_expires_at <= :now) \
                  ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED) \
-               RETURNING id, flow_id, current_step, input, vars, depth, attempts";
+               RETURNING id, flow_id, current_step, input, vars, depth, attempts, parent_event_id";
     let res = db.query(sql, &p).await?;
     Ok(res.rows.into_iter().next())
 }
@@ -165,6 +165,10 @@ async fn advance_run(
     let run_id = run["id"].as_str().unwrap_or_default().to_string();
     let flow_id = run["flow_id"].as_str().unwrap_or_default().to_string();
     let depth = run["depth"].as_i64().unwrap_or(0);
+    // The event this run was born from. It travels into every command the run executes so the
+    // events THOSE emit can name it too (hub#666): without it the chain breaks in the middle, at
+    // precisely the point where the flow did something to somebody else's module.
+    let parent_event_id = run["parent_event_id"].as_str().unwrap_or_default().to_string();
     let mut index = run["current_step"].as_i64().unwrap_or(0);
     let input: Json = parse_json(run["input"].as_str().unwrap_or("{}"));
     let mut vars: Json = parse_json(run["vars"].as_str().unwrap_or("{}"));
@@ -223,7 +227,20 @@ async fn advance_run(
         };
         let scope = json!({ "input": input, "steps": vars.get("steps").cloned().unwrap_or(json!({})) });
 
-        match run_step(db, registry, hub_id, &flow_id, &run_id, depth, index, step, &scope).await? {
+        match run_step(
+            db,
+            registry,
+            hub_id,
+            &flow_id,
+            &run_id,
+            &parent_event_id,
+            depth,
+            index,
+            step,
+            &scope,
+        )
+        .await?
+        {
             Outcome::Continue { output } => {
                 set_step_output(&mut vars, &step.id, output);
                 index += 1;
@@ -268,6 +285,7 @@ async fn run_step(
     hub_id: &str,
     flow_id: &str,
     run_id: &str,
+    parent_event_id: &str,
     depth: i64,
     index: i64,
     step: &StepDef,
@@ -342,7 +360,11 @@ async fn run_step(
             .with_automation(AutomationCtx {
                 flow_id: flow_id.to_string(),
                 run_id: run_id.to_string(),
-            });
+            })
+            // Correlation (hub#666): every event this command emits is sealed with the run that
+            // caused it AND with the event the run was born from, so «why does this row exist?»
+            // ends at the sale instead of at «a flow did it».
+            .caused_by_event(parent_event_id);
 
             // The step row and the run's advance ride in the command's transaction: effects and
             // bookkeeping commit together, so a crash never re-runs a command that already ran.
@@ -703,7 +725,7 @@ mod tests {
     }
 
     async fn run_of(db: &dyn DatabaseAdapter, flow_id: &str) -> store::FlowRun {
-        store::list_runs(db, HUB, flow_id, 10).await.unwrap().remove(0)
+        store::list_runs(db, HUB, flow_id, 10, None).await.unwrap().remove(0)
     }
 
     fn one_command_flow() -> Json {

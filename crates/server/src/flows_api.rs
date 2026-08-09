@@ -21,7 +21,7 @@
 //!
 //! `granted_by`, `created_by` and `started_by` always come from the RESOLVED session, never from
 //! the body (same rule as `discarded_by` in `outbox_admin.rs`).
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -32,8 +32,12 @@ use serde_json::{json, Value};
 use crate::auth;
 use crate::state::AppState;
 
-/// How many runs `GET …/runs` returns. The runtime caps it again; this is the page size.
+/// Default page of `GET …/runs` when the caller does not ask for one.
 const RUNS_PAGE: i64 = 50;
+
+/// The biggest page anybody may ask for. The runtime clamps it again — this is the door, not the
+/// guarantee.
+const MAX_RUNS_PAGE: i64 = store::MAX_RUNS_PAGE;
 
 fn rejected(e: auth::AuthError) -> Response {
     let (status, code) = if e.is_forbidden() {
@@ -273,25 +277,56 @@ pub async fn start_run(
     }
 }
 
+/// `GET /api/hub/flows/{id}/runs?limit=&before=` — the history of one flow, newest first.
+///
+/// **It is paged, and the page is a cursor.** A hub with live flows makes runs without stopping
+/// (that is what a flow is), so an unpaged listing is a screen that stops loading within a month of
+/// somebody using this seriously. `before` is the id of the last run of the previous page — a
+/// cursor and not an `OFFSET`, because runs keep arriving at the head while a person reads, and an
+/// offset shifts the page under them: rows get served twice or skipped, and a count of "this sale
+/// fired five steps" comes out as four.
 pub async fn list_runs(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    Query(page): Query<RunsPage>,
 ) -> Response {
     let (arc, _) = admin_session!(st, headers);
     let rt = arc.lock().await;
     if let Err(e) = rt.get_flow(&id).await {
         return flow_err(e);
     }
-    match rt.list_flow_runs(&id, RUNS_PAGE).await {
-        Ok(runs) => Json(json!({ "ok": true, "data": runs })).into_response(),
+    let limit = page.limit.unwrap_or(RUNS_PAGE).clamp(1, MAX_RUNS_PAGE);
+    match rt.list_flow_runs(&id, limit, page.before.as_deref()).await {
+        Ok(runs) => {
+            // A cursor only when the page was full: a short page is the end of the history, and
+            // handing out a cursor for it means one more request that answers nothing.
+            let next = (runs.len() as i64 == limit)
+                .then(|| runs.last().map(|r| r.id.clone()))
+                .flatten();
+            Json(json!({ "ok": true, "data": runs, "next_cursor": next })).into_response()
+        }
         Err(e) => flow_err(e),
     }
 }
 
-/// `GET /api/hub/flows/runs/{run_id}` — one run WITH its steps. The steps are the point: they carry
-/// each step's resolved input, its output and its error, which is the only way to answer "why did
-/// this flow do that?" after the fact.
+/// The page a caller asked for. Both fields are optional: the plain URL still works.
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct RunsPage {
+    limit: Option<i64>,
+    /// The id of the last run of the previous page — "older than this one".
+    before: Option<String>,
+}
+
+/// `GET /api/hub/flows/runs/{run_id}` — one run WITH its steps and the events it emitted.
+///
+/// The steps carry each step's resolved input, its output and its error: that is the only way to
+/// answer «why did this flow do that?» after the fact. The events are the other half — they are
+/// where the chain leaves the flow and continues into other modules, so «this sale set off these
+/// five steps» can be followed all the way down instead of stopping at the run.
+///
+/// **Secrets never come out of here**: the steps are redacted against the flow's own definition in
+/// the runtime (`flows::store::get_run`), so this is not a promise the HTTP layer has to keep.
 pub async fn get_run(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -299,12 +334,16 @@ pub async fn get_run(
 ) -> Response {
     let (arc, _) = admin_session!(st, headers);
     let rt = arc.lock().await;
-    match rt.get_flow_run(&run_id).await {
-        Ok((run, steps)) => {
-            Json(json!({ "ok": true, "data": { "run": run, "steps": steps } })).into_response()
-        }
-        Err(e) => flow_err(e),
-    }
+    let (run, steps) = match rt.get_flow_run(&run_id).await {
+        Ok(found) => found,
+        Err(e) => return flow_err(e),
+    };
+    let events = match rt.events_of_run(&run_id).await {
+        Ok(events) => events,
+        Err(e) => return flow_err(e),
+    };
+    Json(json!({ "ok": true, "data": { "run": run, "steps": steps, "events": events } }))
+        .into_response()
 }
 
 #[cfg(test)]

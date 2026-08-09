@@ -1070,6 +1070,9 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/events/:id/discard",
             post(outbox_admin::discard_dead),
         )
+        // Correlación (hub#666): qué disparó ESTE evento — los runs que arrancó y los eventos que
+        // provocó su entrega. Misma puerta admin: el trace dibuja lo que hace el negocio entero.
+        .route("/api/hub/events/:id/trace", get(outbox_admin::trace_event))
         // ── Kernel de automatización (ADR-0283 K7, hub#661) ────────────────────────────────
         // REST del core, NO commands `hub.*`: el core se congela y el dispatcher no es donde se
         // añade superficie nueva (§9). Misma puerta que las keys y la dead-letter: sesión local de

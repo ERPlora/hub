@@ -77,6 +77,21 @@ async fn rows(rt: &Runtime, sql: &str) -> Vec<Value> {
         .rows
 }
 
+/// One `_event_outbox` row by event name, with its correlation columns.
+async fn event_named(rt: &Runtime, event_name: &str) -> Value {
+    rows(
+        rt,
+        &format!(
+            "SELECT id, event_name, run_id, parent_event_id, status FROM _event_outbox \
+             WHERE event_name = '{event_name}'"
+        ),
+    )
+    .await
+    .into_iter()
+    .next()
+    .unwrap_or_else(|| panic!("no `{event_name}` in the outbox"))
+}
+
 /// The flow of the story: «when a sale over 100 € closes, leave a note on that customer».
 fn welcome_definition() -> Value {
     json!({
@@ -145,7 +160,7 @@ async fn a_sale_triggers_a_flow_that_writes_in_another_module_and_its_cascade_su
     // The relay delivers. It creates the RUN and nothing else: executing a flow inline would hold
     // the runtime's global lock for the length of the flow, delays included.
     rt.drain_outbox().await.unwrap();
-    let runs = rt.list_flow_runs(&flow_id, 10).await.unwrap();
+    let runs = rt.list_flow_runs(&flow_id, 10, None).await.unwrap();
     assert_eq!(runs.len(), 1, "the event started exactly one run");
     assert_eq!(runs[0].status, store::STATUS_PENDING);
     assert_eq!(runs[0].trigger_kind, "event");
@@ -183,7 +198,7 @@ async fn a_sale_triggers_a_flow_that_writes_in_another_module_and_its_cascade_su
         "the audit says a flow wrote this, and which one"
     );
 
-    let run = rt.list_flow_runs(&flow_id, 10).await.unwrap().remove(0);
+    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
     assert_eq!(run.status, store::STATUS_DONE);
     let (_, steps) = rt.get_flow_run(&run.id).await.unwrap();
     assert_eq!(steps.len(), 1);
@@ -221,6 +236,100 @@ async fn a_sale_triggers_a_flow_that_writes_in_another_module_and_its_cascade_su
     );
 }
 
+/// **«This sale set off these five steps», answered from the data** (hub#666).
+///
+/// Every link of the chain is a row that names the previous one, so the question can be asked from
+/// either end: from the sale forwards ("what did it cause?") and from a note backwards ("why does
+/// this row exist?"). Before the correlation columns the middle of that chain was missing — a run
+/// knew its event, but the events the run went on to emit knew nothing about the run, so anything
+/// downstream of the flow was orphaned from its cause.
+#[tokio::test]
+async fn the_chain_from_the_sale_to_the_last_event_is_reconstructible_from_the_rows() {
+    let rt = runtime().await;
+    let flow_id = create_flow(&rt, welcome_definition()).await;
+    grant(&rt, &flow_id, "crm.note.add").await;
+
+    complete_sale(&rt, "120.50").await;
+    rt.drain_outbox().await.unwrap(); // the sale is delivered → the run is created
+    rt.process_flows().await.unwrap(); // the tick runs the step → `crm.note.added` is emitted
+    rt.drain_outbox().await.unwrap(); // that event is delivered to its listener
+
+    // 1. The sale. A cashier caused it, so it is the root: nothing above it.
+    let sale = event_named(&rt, "sale.completed").await;
+    assert_eq!(sale["parent_event_id"], json!(""));
+    assert_eq!(sale["run_id"], json!(""), "no automation was running yet");
+
+    // 2. The run names the event that caused it.
+    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    assert_eq!(
+        json!(run.parent_event_id), sale["id"],
+        "the run remembers which sale set it off"
+    );
+
+    // 3. The event the flow's command emitted is sealed with the run AND with the sale, so the
+    //    chain can be walked without joining through three tables in the right order.
+    let note = event_named(&rt, "crm.note.added").await;
+    assert_eq!(
+        note["run_id"],
+        json!(run.id),
+        "everything a run emits carries the run that emitted it"
+    );
+    assert_eq!(
+        note["parent_event_id"], sale["id"],
+        "and the event the run was born from, so `why does this note exist` ends at the sale"
+    );
+
+    // 4. The steps say WHAT the run did, in order, with what each one was given.
+    let (_, steps) = rt.get_flow_run(&run.id).await.unwrap();
+    assert_eq!(steps.len(), 1);
+    assert_eq!(steps[0].step_index, 0);
+    assert_eq!(steps[0].step_id, "note");
+    assert_eq!(steps[0].status, "done");
+
+    // 5. And the same chain read the other way: from the sale, everything it set off.
+    let trace = rt
+        .events_of_run(&run.id)
+        .await
+        .unwrap();
+    assert_eq!(trace.len(), 1, "one event came out of this run");
+    assert_eq!(trace[0].event_name, "crm.note.added");
+    assert_eq!(trace[0].status, "delivered");
+}
+
+/// A failed run keeps its story: the step that died, and why. This is the other half of hub#666 —
+/// «why did this flow die?» is answered by the step row, not by a log line that rotated away.
+#[tokio::test]
+async fn a_run_that_died_keeps_the_step_that_killed_it_and_its_error() {
+    let rt = runtime().await;
+    let mut definition = welcome_definition();
+    definition["steps"] = json!([
+        { "id": "first", "kind": "command", "command": "crm.note.add", "params": { "text": "ok" } },
+        { "id": "boom", "kind": "command", "command": "crm.note.count", "params": {} }
+    ]);
+    let flow_id = create_flow(&rt, definition).await;
+    // Only the first command is granted: the second dies at the gate, which is the ordinary way a
+    // flow breaks in production (somebody added a step and forgot the grant).
+    grant(&rt, &flow_id, "crm.note.add").await;
+
+    complete_sale(&rt, "120.50").await;
+    rt.drain_outbox().await.unwrap();
+    rt.process_flows().await.unwrap();
+
+    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    assert_eq!(run.status, store::STATUS_FAILED);
+    let (_, steps) = rt.get_flow_run(&run.id).await.unwrap();
+    assert_eq!(steps.len(), 2, "the step that worked is kept next to the one that did not");
+    assert_eq!(steps[0].step_id, "first");
+    assert_eq!(steps[0].status, "done");
+    assert_eq!(steps[1].step_id, "boom");
+    assert_eq!(steps[1].status, "failed");
+    assert!(
+        steps[1].error.contains("flow.grant_denied"),
+        "the step carries the stable code, not prose: {}",
+        steps[1].error
+    );
+}
+
 #[tokio::test]
 async fn the_filter_is_what_decides_and_a_sale_below_it_starts_nothing() {
     let rt = runtime().await;
@@ -231,7 +340,7 @@ async fn the_filter_is_what_decides_and_a_sale_below_it_starts_nothing() {
     rt.drain_outbox().await.unwrap();
     rt.process_flows().await.unwrap();
 
-    assert!(rt.list_flow_runs(&flow_id, 10).await.unwrap().is_empty());
+    assert!(rt.list_flow_runs(&flow_id, 10, None).await.unwrap().is_empty());
     assert_eq!(count(&rt, "SELECT COUNT(*) AS c FROM crm_note").await, 0);
 }
 
@@ -248,7 +357,7 @@ async fn without_a_grant_the_flow_runs_and_writes_nothing() {
     rt.process_flows().await.unwrap();
 
     assert_eq!(count(&rt, "SELECT COUNT(*) AS c FROM crm_note").await, 0);
-    let run = rt.list_flow_runs(&flow_id, 10).await.unwrap().remove(0);
+    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
     assert!(
         run.last_error.contains("flow.grant_denied"),
@@ -272,7 +381,7 @@ async fn a_grant_for_one_command_does_not_open_its_neighbour() {
     rt.process_flows().await.unwrap();
 
     assert_eq!(count(&rt, "SELECT COUNT(*) AS c FROM crm_counter").await, 0);
-    let run = rt.list_flow_runs(&flow_id, 10).await.unwrap().remove(0);
+    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
 }
 
@@ -290,7 +399,7 @@ async fn an_internal_command_is_as_closed_to_a_flow_as_it_is_to_the_outside_worl
     rt.drain_outbox().await.unwrap();
     rt.process_flows().await.unwrap();
 
-    let run = rt.list_flow_runs(&flow_id, 10).await.unwrap().remove(0);
+    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
     assert!(
         run.last_error.contains("crm._purge_notes"),
@@ -323,7 +432,7 @@ async fn revoking_a_grant_stops_the_run_at_its_next_step() {
     rt.replace_flow_grants(&flow_id, &[], "hub_user:owner")
         .await
         .unwrap();
-    let run_id = rt.list_flow_runs(&flow_id, 10).await.unwrap().remove(0).id;
+    let run_id = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0).id;
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
     rt.db_for_test()
@@ -340,7 +449,7 @@ async fn revoking_a_grant_stops_the_run_at_its_next_step() {
         1,
         "the second write never happened"
     );
-    let run = rt.list_flow_runs(&flow_id, 10).await.unwrap().remove(0);
+    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
     assert!(run.last_error.contains("flow.grant_denied"), "{}", run.last_error);
 }
@@ -367,7 +476,7 @@ async fn the_fiscal_precondition_refuses_a_flow_exactly_as_it_refuses_a_person()
         0,
         "a grant authorises WHAT a flow may run, never WHETHER the hub may issue"
     );
-    let run = rt.list_flow_runs(&flow_id, 10).await.unwrap().remove(0);
+    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
     assert!(
         run.last_error.contains("business_tax_id"),
@@ -402,7 +511,7 @@ async fn a_flow_that_emits_the_event_that_triggers_it_is_cut_off_and_the_hub_kee
     // 17 = depths 0..=16: `MAX_EVENT_DEPTH` is what stops it, NOT the rate guard (which only
     // trips at 30 runs/min). Asserting the tighter number is what tells the two guards apart —
     // with a loose bound this test would still pass if the depth guard were deleted.
-    let runs = rt.list_flow_runs(&flow_id, 200).await.unwrap();
+    let runs = rt.list_flow_runs(&flow_id, 200, None).await.unwrap();
     assert!(
         runs.len() <= 17,
         "the DEPTH guard bounds the cascade; {} runs means it is not the one stopping this",
@@ -444,7 +553,7 @@ async fn a_flow_of_another_hub_never_sees_this_hubs_events() {
     rt.process_flows().await.unwrap();
 
     assert!(
-        rt.list_flow_runs(&flow_id, 10).await.unwrap().is_empty(),
+        rt.list_flow_runs(&flow_id, 10, None).await.unwrap().is_empty(),
         "a flow reacts to its own hub and to nothing else"
     );
     assert_eq!(count(&rt, "SELECT COUNT(*) AS c FROM crm_note").await, 0);

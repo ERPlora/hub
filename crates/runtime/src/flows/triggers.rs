@@ -426,10 +426,10 @@ mod tests {
         let p = payload(&[("customer_id", json!("c-1")), ("id", json!("s-9"))]);
         on_event(&db, HUB, "evt-1", "sale.completed", &p, 0).await.unwrap();
 
-        let runs = store::list_runs(&db, HUB, &mapped, 10).await.unwrap();
+        let runs = store::list_runs(&db, HUB, &mapped, 10, None).await.unwrap();
         assert_eq!(runs[0].input, json!({ "who": "c-1", "note": "sale s-9" }));
 
-        let runs = store::list_runs(&db, HUB, &plain, 10).await.unwrap();
+        let runs = store::list_runs(&db, HUB, &plain, 10, None).await.unwrap();
         assert_eq!(
             runs[0].input,
             json!({ "customer_id": "c-1", "id": "s-9" }),

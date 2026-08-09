@@ -85,6 +85,9 @@ pub(crate) mod test_support {
         crate::identity::ensure_tables(db).await.unwrap();
         crate::outbox::ensure_tables(db).await.unwrap();
         crate::system_migrations::apply(db, hub_id).await.unwrap();
+        // The boot path arms these right after the migrations (hub#666); a fixture that skipped
+        // them would be testing a schema no hub ever has.
+        crate::flows::store::ensure_indexes(db).await.unwrap();
     }
 }
 
