@@ -50,6 +50,44 @@ async fn fresh_fiscal() -> Runtime {
     rt
 }
 
+/// Runtime que vende pero **no tiene el módulo `verifactu`**: el hub de un régimen que no es el
+/// español (Factur-X en Francia), o uno al que se lo desinstalaron. Aquí la tabla
+/// `verifactu_record` NO EXISTE, así que el conteo del límite duro devuelve 0 sin decir nada.
+///
+/// Arranca por `ensure_system_tables` a propósito: el perfil fiscal del core es una tabla de
+/// SISTEMA (`_hub_fiscal_profile`, ADR-0273), existe por el arranque y no porque alguien haya
+/// instalado algo — que es justo lo que la sostiene cuando el módulo no está.
+async fn fresh_without_verifactu() -> Runtime {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
+    rt.ensure_system_tables().await.expect("tablas de sistema");
+    for m in ["taxes", "inventory", "sales"] {
+        rt.install_from_dir(&modules_root().join(m))
+            .await
+            .unwrap_or_else(|e| panic!("instalar {m}: {e}"));
+    }
+    rt
+}
+
+/// Sella `first_record_at` en el perfil del core: «este hub YA emitió ante su administración
+/// tributaria». Se escribe a mano en vez de pasar por `stamp_first_record` (hub#551) porque el
+/// contrato que se prueba aquí es el del **lector** —lo que hub#561 cambia—, y montar un go-live
+/// entero para llegar al mismo estado ataría este test al camino de escritura de otra issue.
+async fn seal_first_record(rt: &Runtime, hub: &str) {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub));
+    let res = rt
+        .db()
+        .execute(
+            "UPDATE _hub_fiscal_profile SET first_record_at = '2026-07-31T10:00:00Z' \
+             WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .expect("sellar first_record_at");
+    assert_eq!(res.affected, 1, "el perfil fiscal del hub debe existir para poder sellarlo");
+}
+
 /// Inserta un registro VeriFactu real en la tabla del módulo. `status`/`csv` deciden si cuenta
 /// como REMITIDO a la AEAT.
 /// `seq` va explícito: la cadena VeriFactu tiene un único `(hub_id, issuer_nif,
@@ -147,6 +185,106 @@ async fn plan_no_se_bloquea_por_las_facturas_de_otro_hub() {
     assert!(
         blocked(&plan, "modules/verifactu").is_none(),
         "las facturas del hub h2 no pueden bloquear el reset de h1"
+    );
+}
+
+// ── El límite lo sostiene el PERFIL DEL CORE, no la tabla de un módulo (hub#561) ────────
+
+/// **El caso que motiva hub#561.** El hub ya emitió —el core lo tiene sellado en
+/// `_hub_fiscal_profile.first_record_at`— pero `verifactu_record` NO EXISTE: régimen distinto
+/// (Factur-X) o módulo desinstalado. El conteo sobre la tabla del módulo devuelve 0 en silencio,
+/// así que hasta ahora el reset se llevaba las VENTAS de un hub que ya había emitido.
+#[tokio::test]
+async fn plan_bloquea_lo_fiscal_por_el_perfil_del_core_aunque_no_exista_la_tabla_del_modulo() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let rt = fresh_without_verifactu().await;
+    seal_first_record(&rt, "h1").await;
+
+    let plan = plan_reset(&rt, "h1").await.expect("plan");
+
+    let motivo = blocked(&plan, "modules/sales")
+        .expect("modules/sales debe llegar BLOQUEADA: el hub ya emitió, lo diga o no un módulo");
+    assert!(
+        !motivo.is_empty(),
+        "el bloqueo tiene que llegar con motivo escrito, no vacío: {motivo}"
+    );
+}
+
+/// El bloqueo del perfil se aplica **en el servidor** y sin efectos parciales, igual que el del
+/// conteo: pedirlo a la vez que una sección libre no borra la libre «de paso».
+#[tokio::test]
+async fn execute_rechaza_lo_fiscal_por_el_perfil_del_core_y_no_borra_lo_de_al_lado() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let rt = fresh_without_verifactu().await;
+    seal_first_record(&rt, "h1").await;
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10 })),
+        &ctx("h1"),
+    )
+    .await
+    .expect("crear producto");
+
+    let sel =
+        ResetSelection { modules: vec!["inventory".into(), "sales".into()], ..Default::default() };
+    let res = execute_reset(&rt, "h1", &sel, "u1").await;
+
+    assert!(res.is_err(), "el servidor debe RECHAZAR el reset de las ventas de un hub que emitió");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        1,
+        "🔴 el reset bloqueado borró la sección de al lado: no es all-or-nothing"
+    );
+}
+
+/// **La otra mitad: el perfil no puede bloquear por existir.** Un hub arrancado y sin emitir
+/// (`first_record_at = ''`, que es como nace) resetea lo que quiera — el caso que motiva el
+/// ADR-0170 es exactamente ese: probar la demo y borrarla.
+#[tokio::test]
+async fn plan_no_bloquea_nada_si_el_perfil_existe_pero_el_hub_no_ha_emitido() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let rt = fresh_without_verifactu().await;
+
+    let plan = plan_reset(&rt, "h1").await.expect("plan");
+
+    assert!(
+        blocked(&plan, "modules/sales").is_none(),
+        "un hub que nunca emitió no puede quedar congelado por tener perfil fiscal"
+    );
+}
+
+/// **El conteo sobre la tabla del módulo sigue siendo la red.** Es el hub que ya facturaba ANTES
+/// de que existiera el sello: hub#551 sólo estampa `first_record_at` hacia delante y nada lo
+/// rellena hacia atrás, así que ese hub llega con el perfil VACÍO y con facturas remitidas de
+/// verdad. Perfil vacío + facturas remitidas ⇒ bloqueado igual, o el reset se llevaría lo que la
+/// AEAT ya tiene.
+#[tokio::test]
+async fn plan_sigue_bloqueando_por_facturas_remitidas_con_el_perfil_aun_vacio() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
+    rt.ensure_system_tables().await.expect("tablas de sistema");
+    for m in ["taxes", "inventory", "sales", "invoice", "verifactu"] {
+        rt.install_from_dir(&modules_root().join(m))
+            .await
+            .unwrap_or_else(|e| panic!("instalar {m}: {e}"));
+    }
+    insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
+
+    let plan = plan_reset(&rt, "h1").await.expect("plan");
+
+    assert!(
+        blocked(&plan, "modules/verifactu").is_some(),
+        "🔴 el límite duro se aflojó para el hub que facturaba antes del sello: perfil vacío y \
+         el conteo dejó de contar"
     );
 }
 
