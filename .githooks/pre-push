@@ -42,6 +42,16 @@ ZERO=0000000000000000000000000000000000000000
 CONTEXT=local-gate/hub-tests
 PG_CONTAINER=erplora-test-pg-5433
 PG_DSN=postgres://postgres:test@localhost:5433/hub_test
+# pgvector, not plain `postgres:18` — `crates/vector/tests/pg_store.rs` does `CREATE EXTENSION
+# vector`, and on a stock image every one of its 9 tests dies with
+#   type "public.vector" does not exist
+# which is a red the pusher cannot fix and did not cause. Same PG major, so the data dir is
+# compatible; the extension is merely AVAILABLE, the tests still create it themselves.
+# The tuning mirrors the container the vector work already uses on 5434 —
+# `max_locks_per_transaction` is the one that matters: the suite opens a schema per test and the
+# default (64) runs out mid-run.
+PG_IMAGE=pgvector/pgvector:pg18
+PG_ARGS="-c max_locks_per_transaction=1024 -c max_connections=300 -c shared_buffers=512MB"
 
 armed="$(git config --bool hooks.hubPrepushGate 2>/dev/null || echo false)"
 if [ "$armed" != "true" ]; then
@@ -140,12 +150,28 @@ ensure_postgres() {
         echo "   Export DATABASE_URL yourself, or install/start Docker." >&2
         return 1
     fi
+    # A container built from the OLD image has to be REPLACED, not started. Everyone who ran this
+    # gate before pgvector was needed already has an `erplora-test-pg-5433` made from `postgres:18`,
+    # and `docker start` would happily bring the broken one back up — the fix would then only work
+    # on machines that never ran the gate, which is nobody's.
+    #
+    # Dropping it is safe: this container holds throwaway test schemas and nothing else.
+    if [ -n "$(docker ps -aq -f "name=^${PG_CONTAINER}$")" ]; then
+        current=$(docker inspect "$PG_CONTAINER" --format '{{.Config.Image}}' 2>/dev/null || echo '')
+        if [ "$current" != "$PG_IMAGE" ]; then
+            echo "ℹ️  pre-push: $PG_CONTAINER runs '$current', but the suite needs '$PG_IMAGE'" >&2
+            echo "   (crates/vector needs the pgvector extension). Recreating it — test data only." >&2
+            docker rm -f "$PG_CONTAINER" >/dev/null 2>&1 || true
+        fi
+    fi
+
     if ! docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
         if docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
             docker start "$PG_CONTAINER" >/dev/null
         else
+            # shellcheck disable=SC2086  # PG_ARGS is a deliberate list of -c flags.
             docker run -d --name "$PG_CONTAINER" -p 5433:5432 \
-                -e POSTGRES_PASSWORD=test -e POSTGRES_DB=hub_test postgres:18 >/dev/null
+                -e POSTGRES_PASSWORD=test -e POSTGRES_DB=hub_test "$PG_IMAGE" $PG_ARGS >/dev/null
         fi
         local tries=0
         until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
@@ -224,6 +250,33 @@ resolve_modules_dir() {
     export ERPLORA_E2E_ALLOW_SKIP=1
 }
 resolve_modules_dir
+
+# `blueprints/` lives in a SIBLING repo, and `sector_packs_pg_e2e` reads the sector seeds out of it
+# (`starter_catalogs/es/<sector>/seed.sql`). Unlike the module e2e there is no opt-in: those two
+# tests always run, so from a worktree outside the monorepo the relative path misses and the gate
+# dies with "no se pudo leer …/seed.sql" — a red that has nothing to do with what is being pushed.
+#
+# The fleet works out of /private/tmp worktrees, so that was EVERY gated push from a worktree: the
+# gate looked broken, and the way out looked like `SKIP_HUB_TESTS=1`. `ERPLORA_BLUEPRINTS_DIR` is
+# the escape the test itself documents; this just sets it, exactly as `resolve_modules_dir` does.
+#
+# Not finding it is not fatal: a checkout without the sibling repo is a legitimate state, and
+# refusing the push would be worse than the red it prevents.
+resolve_blueprints_dir() {
+    [ -n "${ERPLORA_BLUEPRINTS_DIR:-}" ] && return 0
+    local candidate
+    for candidate in \
+        "$(git rev-parse --show-toplevel)/../blueprints" \
+        "${HOME:-}/workspace/code/ERPlora/blueprints"
+    do
+        if [ -d "$candidate" ]; then
+            ERPLORA_BLUEPRINTS_DIR="$(cd "$candidate" && pwd)"
+            export ERPLORA_BLUEPRINTS_DIR
+            return 0
+        fi
+    done
+}
+resolve_blueprints_dir
 
 if [ -n "${HUB_GATE_TEST_CMD:-}" ]; then
     test_cmd="$HUB_GATE_TEST_CMD"

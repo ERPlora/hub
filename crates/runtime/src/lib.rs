@@ -765,6 +765,13 @@ impl Runtime {
 
         // 1) Baseline v0 (idempotente).
         installer::ensure_hub_module_table(self.db.as_ref()).await?;
+        // El ledger de migraciones de MÓDULO nace AQUÍ, no con la primera migración: el readiness
+        // (`/readyz`, hub#538) lo consulta en cada latido, y en un hub RECIÉN NACIDO —cero
+        // módulos— «relation _hub_migrations does not exist» era DOWN → 503 → el healthcheck de
+        // Swarm mataba la tarea → `deployment_status=error`. Ningún hub nuevo podía aprovisionarse
+        // (2026-08-09); los tests no lo veían porque su fixture creaba la tabla A MANO, cosa que
+        // el boot real no hacía.
+        migrations::ensure_table(self.db.as_ref()).await?;
         outbox::ensure_tables(self.db.as_ref()).await?;
         scheduler::ensure_tables(self.db.as_ref()).await?;
         identity::ensure_tables(self.db.as_ref()).await?;

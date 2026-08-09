@@ -5,9 +5,17 @@
 //! cargo test -p erplora-peripherals --test hardware_smoke -- --ignored --nocapture
 //! ```
 //!
-//! Existe porque **el emulador de Android no puede dar esto**: su red es NAT (`10.0.2.x`) y no
-//! alcanza la LAN, así que todo lo verificado ahí fue contra una impresora falsa. La única forma
-//! de saber que el descubrimiento y el ESC/POS funcionan de verdad es una impresora de verdad.
+//! Existe porque el emulador de Android no puede dar **el descubrimiento**, y conviene ser exacto
+//! sobre por qué — medido el 2026-08-09 contra una térmica real en `192.168.100.196:9100`:
+//!
+//!  - **Salir SÍ sale.** La NAT del emulador enruta la conexión TCP saliente por el host, así que
+//!    desde `10.0.2.15` se llega a una IP de la LAN: `nc -w 3 -z 192.168.100.196 9100` → OK. O sea
+//!    que **imprimir por IP a una impresora ya conocida funciona en el emulador**.
+//!  - **Encontrarla NO.** El barrido /24 saca el prefijo de la IP local, que ahí es `10.0.2` — barre
+//!    la red del emulador, no la de casa. Y el mDNS es multicast, que la NAT no cruza.
+//!
+//! Por eso el emulador vale para el camino de impresión pero no para el de descubrimiento, y la
+//! única forma de verificar ESE es una impresora de verdad delante.
 //!
 //! Gasta papel: `smoke_imprime_pagina_de_prueba` solo imprime si se pide con
 //! `ERPLORA_SMOKE_PRINT=1`, para poder buscar la impresora sin dejar tiques por el suelo.
