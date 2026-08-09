@@ -17,8 +17,22 @@ use crate::protocol::PrinterInfo;
 use crate::registry::DeviceRegistry;
 use crate::{Result, ESCPOS_NETWORK_PORT};
 
-/// Timeout del `connect` TCP durante el escaneo de subred (espejo de `timeout=0.3` en Python).
-const SCAN_CONNECT_TIMEOUT: Duration = Duration::from_millis(300);
+/// Timeout del `connect` TCP durante el escaneo de subred.
+///
+/// Eran 300 ms, heredados del `timeout=0.3` del Python. Un `connect` a una impresora encendida en
+/// la misma LAN tarda milisegundos, así que 300 parecía de sobra — y no lo es: el margen no lo come
+/// la impresora, lo come la CONTENCIÓN. Con el barrido compitiendo consigo mismo (el watchdog de
+/// `registry` barre esta misma subred) o con la máquina cargada, el `connect` a la impresora REAL
+/// se pasa de 300 ms y se descarta **sin un solo error**: «no hay impresoras».
+///
+/// Medido el 2026-08-09 contra una térmica encendida, dos barridos en paralelo: con 300 ms la
+/// perdía 3 de 3; acotando la concurrencia a [`SCAN_MAX_IN_FLIGHT`] bajó a 1 de 3; con 1 s, 0 de 3.
+/// Las dos mitades hacen falta.
+///
+/// El coste es el peor caso de un barrido sin nadie al otro lado: 254 direcciones en tandas de 64 →
+/// 4 tandas × 1 s ≈ 4 s. Un descubrimiento se pide a mano y de tarde en tarde; perder la impresora
+/// sale mucho más caro que esperar cuatro segundos.
+const SCAN_CONNECT_TIMEOUT: Duration = Duration::from_millis(1000);
 /// Ventana de escucha mDNS (espejo de `time.sleep(1.5)` en Python).
 const MDNS_BROWSE_WINDOW: Duration = Duration::from_millis(1500);
 /// Tipos de servicio mDNS sondeados (espejo de la lista de `_discover_mdns`).
@@ -206,22 +220,19 @@ pub async fn discover_subnet_scan(port: u16) -> Result<Vec<PrinterInfo>> {
 
     tracing::info!("escaneando subred {subnet_prefix}.0/24 buscando impresoras en :{port}");
 
-    // 254 sondas concurrentes: `tokio::time::timeout` sobre `TcpStream::connect`.
-    let mut set: JoinSet<Option<String>> = JoinSet::new();
-    for i in 1u8..=254 {
-        let ip = format!("{subnet_prefix}.{i}");
-        set.spawn(async move {
-            let addr = format!("{ip}:{port}");
-            match tokio::time::timeout(SCAN_CONNECT_TIMEOUT, TcpStream::connect(&addr)).await {
-                Ok(Ok(_stream)) => Some(ip),
-                _ => None,
-            }
-        });
-    }
+    let ips: Vec<String> = (1u8..=254).map(|i| format!("{subnet_prefix}.{i}")).collect();
+    let found = sweep_addresses(ips, move |ip| async move {
+        let addr = format!("{ip}:{port}");
+        matches!(
+            tokio::time::timeout(SCAN_CONNECT_TIMEOUT, TcpStream::connect(&addr)).await,
+            Ok(Ok(_))
+        )
+    })
+    .await;
 
     let mut printers = Vec::new();
-    while let Some(joined) = set.join_next().await {
-        if let Ok(Some(ip)) = joined {
+    {
+        for ip in found {
             tracing::debug!("impresora de red encontrada en {ip}:{port}");
             printers.push(PrinterInfo {
                 id: format!("network:{ip}:{port}"),
@@ -238,6 +249,55 @@ pub async fn discover_subnet_scan(port: u16) -> Result<Vec<PrinterInfo>> {
     }
 
     Ok(printers)
+}
+
+/// Cuántas sondas pueden estar EN VUELO a la vez durante el barrido.
+///
+/// El barrido nació lanzando las 254 de golpe, y eso pierde impresoras de verdad: cada sonda tiene
+/// [`SCAN_CONNECT_TIMEOUT`] (300 ms) para completar el `connect`, así que basta con que la máquina
+/// vaya cargada —o que haya otro barrido a la vez, cosa que pasa: el watchdog de `registry` barre
+/// esta misma subred— para que el `connect` a la impresora REAL se pase de 300 ms y se descarte.
+///
+/// Y el fallo es MUDO: el resultado es «no hay impresoras», que es exactamente lo que se ve en un
+/// local sin impresora. Medido el 2026-08-09 contra una térmica encendida: con dos barridos
+/// simultáneos la perdía 3 de cada 3 veces; en serie, 0 de 2.
+///
+/// 64 mantiene el barrido rápido (4 tandas) dando a cada `connect` una ventana que no se come la
+/// contención.
+pub const SCAN_MAX_IN_FLIGHT: usize = 64;
+
+/// El barrido, separado de CÓMO se conecta.
+///
+/// La separación existe para poder fijarle el límite en un test sin red ni impresora: lo que hay
+/// que garantizar es cuántas sondas coexisten, y eso con sockets de verdad solo se observa
+/// provocando la congestión que se quiere evitar.
+async fn sweep_addresses<C, F>(addresses: Vec<String>, probe: C) -> Vec<String>
+where
+    C: Fn(String) -> F + Clone + Send + 'static,
+    F: std::future::Future<Output = bool> + Send + 'static,
+{
+    // El semáforo NO reduce lo que se sondea: se sondean las 254 igual, por tandas de
+    // SCAN_MAX_IN_FLIGHT. Lo que acota es cuántas compiten a la vez por la red y por los 300 ms.
+    let permisos = std::sync::Arc::new(tokio::sync::Semaphore::new(SCAN_MAX_IN_FLIGHT));
+
+    let mut set: JoinSet<Option<String>> = JoinSet::new();
+    for addr in addresses {
+        let probe = probe.clone();
+        let permisos = permisos.clone();
+        set.spawn(async move {
+            // `acquire_owned` solo falla si el semáforo se cierra, y aquí no se cierra nunca.
+            let _permiso = permisos.acquire_owned().await.ok()?;
+            probe(addr.clone()).await.then_some(addr)
+        });
+    }
+
+    let mut hits = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        if let Ok(Some(addr)) = joined {
+            hits.push(addr);
+        }
+    }
+    hits
 }
 
 /// Descubrimiento mDNS/Bonjour. Porta `_discover_mdns`.
@@ -393,6 +453,71 @@ pub fn category_for_service(service_type: &str) -> &'static str {
 mod tests {
     use super::*;
     use crate::protocol::{PRINTER_CATEGORY_A4, PRINTER_CATEGORY_UNKNOWN};
+
+    /// El barrido no puede lanzar las 254 sondas a la vez.
+    ///
+    /// Con `SCAN_CONNECT_TIMEOUT` = 300 ms, cada sonda que espera detrás de otras 253 se queda sin
+    /// ventana y **la impresora real se descarta en silencio** — el usuario ve «no hay impresoras»
+    /// y no hay nada en los logs que lo distinga de un local sin impresora. Medido contra hardware
+    /// de verdad: dos barridos simultáneos la perdían 3 de 3.
+    #[tokio::test]
+    async fn el_barrido_no_abre_mas_sondas_de_las_que_puede_atender() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let en_vuelo = Arc::new(AtomicUsize::new(0));
+        let pico = Arc::new(AtomicUsize::new(0));
+
+        let direcciones: Vec<String> = (1..=254).map(|i| format!("10.0.0.{i}")).collect();
+        let (v, p) = (en_vuelo.clone(), pico.clone());
+        sweep_addresses(direcciones, move |_addr| {
+            let (v, p) = (v.clone(), p.clone());
+            async move {
+                let ahora = v.fetch_add(1, Ordering::SeqCst) + 1;
+                p.fetch_max(ahora, Ordering::SeqCst);
+                // Sin esperar, una sonda termina antes de que arranque la siguiente y el pico nunca
+                // sube: la congestión que se quiere medir necesita que se solapen.
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                v.fetch_sub(1, Ordering::SeqCst);
+                false
+            }
+        })
+        .await;
+
+        let pico = pico.load(Ordering::SeqCst);
+        assert!(
+            pico <= SCAN_MAX_IN_FLIGHT,
+            "el barrido tuvo {pico} sondas en vuelo a la vez, por encima del límite de \
+             {SCAN_MAX_IN_FLIGHT}: con 300 ms por sonda, las que esperan detrás se descartan y la \
+             impresora se pierde SIN error"
+        );
+    }
+
+    /// El límite acota, no amputa: las 254 direcciones se sondean igual, solo que por tandas. Sin
+    /// esto, «arreglar» la concurrencia bajando el número de sondas dejaría medio /24 sin barrer y
+    /// el test de arriba seguiría en verde.
+    #[tokio::test]
+    async fn el_barrido_sigue_sondeando_todas_las_direcciones() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let sondeadas = Arc::new(AtomicUsize::new(0));
+        let s = sondeadas.clone();
+        let encontradas = sweep_addresses(
+            (1..=254).map(|i| format!("10.0.0.{i}")).collect(),
+            move |addr| {
+                let s = s.clone();
+                async move {
+                    s.fetch_add(1, Ordering::SeqCst);
+                    addr.ends_with(".42")
+                }
+            },
+        )
+        .await;
+
+        assert_eq!(sondeadas.load(Ordering::SeqCst), 254, "se dejó direcciones sin sondear");
+        assert_eq!(encontradas, vec!["10.0.0.42".to_string()], "debe devolver solo los aciertos");
+    }
 
     #[test]
     fn ipp_delata_una_impresora_de_oficina() {
