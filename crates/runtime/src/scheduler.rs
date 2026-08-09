@@ -14,9 +14,9 @@
 //!    apagado, se ejecuta **una sola vez** y se reprograma al siguiente vencimiento futuro (no se
 //!    corre el backlog acumulado). `catch_up=skip` no ejecuta el backlog, solo reprograma.
 //!
-//! El cron es un parser mínimo de 5 campos (sin dependencia nueva; ver [`cron`]). TODO humano:
-//! decidir si se adopta el crate `cron`/`croner` para soportar la gramática completa (rangos
-//! `1-5`, listas `1,15`, `L`/`#`); hoy se cubren los casos del ADR (`*/5`, `@daily`, `@hourly`).
+//! El cron es un parser mínimo de 5 campos (sin dependencia nueva; ver [`cron`]). Adoptar el crate
+//! `cron`/`croner` para la gramática completa (rangos `1-5`, listas `1,15`, `L`/`#`) queda para
+//! cuando un módulo la necesite; hoy se cubren los casos del ADR (`*/5`, `@daily`, `@hourly`).
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
@@ -309,7 +309,7 @@ fn parse_payload(row: &Json) -> Params {
 /// Parser de cron mínimo (5 campos `min hora dom mes dow` + atajos), **sin dependencia nueva**.
 /// Soporta lo que pide el ADR-0011: `*` (cualquiera), `*/N` (cada N), un entero fijo, y los atajos
 /// `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`. NO soporta rangos (`1-5`) ni listas (`1,15`)
-/// — TODO humano: adoptar un crate de cron si se necesita la gramática completa.
+/// — adoptar un crate de cron cuando algún módulo necesite la gramática completa.
 pub mod cron {
     use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
 

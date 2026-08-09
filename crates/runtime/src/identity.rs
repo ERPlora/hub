@@ -962,9 +962,9 @@ pub async fn delete_session(db: &dyn DatabaseAdapter, token: &str) -> Result<()>
 // es la credencial de máquina del hub (`cloud_api_token`/`X-Hub-Token`, enroll del dispositivo en el
 // Cloud, `cloud-client`): aquel autentica el HUB ante el Cloud; este autoriza el LOGIN LOCAL por PIN.
 //
-// TODO(humano): §2.9/architecture no cierran el esquema exacto del device-trust local (¿expiración
-// del trust?, ¿revocación por admin desde el dashboard?, ¿binding del device_id a un hub_user?).
-// Esto implementa lo mínimo coherente con el flujo actual; cerrar el diseño antes de endurecerlo.
+// ABIERTO: §2.9/architecture no cierran el esquema exacto del device-trust local (¿expiración del
+// trust?, ¿revocación por admin desde el dashboard?, ¿binding del device_id a un hub_user?). Esto
+// implementa lo mínimo coherente con el flujo actual; cerrar el diseño antes de endurecerlo.
 
 /// Marca un dispositivo como **de confianza** (idempotente). Lo llama el server tras un login online
 /// (cloud) correcto. `label` es un nombre legible opcional (p. ej. "Caja 1").

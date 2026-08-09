@@ -112,7 +112,10 @@ pub fn filter_tools_by_modules(tools: Vec<Value>, allowed: Option<&[String]>) ->
         .filter(|t| {
             t.get("module_id")
                 .and_then(Value::as_str)
-                .is_some_and(|m| set.contains(m))
+                // `"hub"` = tool del CORE (`assistant::assemble_tools`): el core no es un módulo,
+                // su ref_id nunca está en el índice, y filtrarlo dejaría al asistente sin
+                // `hub.setup.status` justo en los hubs con bastantes módulos como para enrutar.
+                .is_some_and(|m| m == "hub" || set.contains(m))
         })
         .collect()
 }
@@ -147,6 +150,26 @@ mod tests {
     use async_trait::async_trait;
     use erplora_vector::MemoryVectorStore;
     use serde_json::json;
+
+    /// CORE tools (`module_id: "hub"`, e.g. `hub.setup.status`) survive the module prefilter.
+    /// The router narrows by module relevance, but the core is not a module: its `ref_id` never
+    /// appears in the index, so without this rule an active router would silently drop the very
+    /// tool that answers "what is left to configure" — reintroducing the generic-advice failure
+    /// exactly on the hubs busy enough to route.
+    #[test]
+    fn filter_keeps_core_hub_tools() {
+        let tools = vec![
+            json!({"name": "hub.setup.status", "module_id": "hub"}),
+            json!({"name": "inventory.products.list", "module_id": "inventory"}),
+            json!({"name": "sales.today", "module_id": "sales"}),
+        ];
+        let allowed = vec!["sales".to_string()];
+        let kept = filter_tools_by_modules(tools, Some(&allowed));
+        let names: Vec<&str> = kept.iter().filter_map(|t| t["name"].as_str()).collect();
+        assert!(names.contains(&"hub.setup.status"), "core tool must survive: {names:?}");
+        assert!(names.contains(&"sales.today"));
+        assert!(!names.contains(&"inventory.products.list"), "module filtering still works");
+    }
 
     /// Embedder de juguete: mapea texto → vector por palabras-clave, determinista y sin red. Cada
     /// dimensión = nº de apariciones de una palabra clave (inventory/sales/customers).
