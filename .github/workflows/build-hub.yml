@@ -75,6 +75,70 @@ jobs:
       # producción de la imagen. Un guardarraíl sin probar es una creencia.
       - name: Contrato del guardarraíl de versión
         run: ./scripts/tests/image-tags.test.sh
+      # hub#515: en un tag v*, la versión que el runtime reporta (env!("CARGO_PKG_VERSION") →
+      # /api/system hubVersion, error-sink) debe ser la del tag, no el "0.1.0 en desarrollo" del
+      # Cargo.toml del commit. Reescribimos [workspace.package].version desde el tag antes del build,
+      # igual que tauri-release.yml hace con tauri.conf.json. En `main` se deja intacto.
+      - name: Stamp Cargo version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          V="${GITHUB_REF_NAME#v}"
+          # Valida semver antes de tocar nada: un tag mal formado no debe producir una imagen rara.
+          if ! [[ "${V}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::El tag ${GITHUB_REF_NAME} no es semver (vX.Y.Z); no se puede estampar la versión."
+            exit 1
+          fi
+          # Reemplaza solo la línea `version = "…"` bajo [workspace.package] (sed addresses la
+          # primera ocurrencia tras el header, que es la del workspace).
+          python3 - <<PY
+          import re, pathlib
+          v = "${V}"
+          p = pathlib.Path("Cargo.toml")
+          s = p.read_text()
+          s2 = re.sub(
+              r'(\[workspace\.package\][^\[]*?version\s*=\s*)"[^"]*"',
+              rf'\1"{v}"',
+              s,
+              count=1,
+              flags=re.DOTALL,
+          )
+          if s == s2:
+              raise SystemExit("no se encontró [workspace.package].version para estampar")
+          p.write_text(s2)
+          print(f"Cargo.toml [workspace.package].version = \"{v}\"")
+          PY
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          set -euo pipefail
+          IMAGE_LC=$(echo "${IMAGE}" | tr '[:upper:]' '[:lower:]')
+          # :latest  → tag canónico que consumen los hubs reales (provisioning del Cloud/Dokploy).
+          # :<sha>   → tag inmutable por commit, para pin/rollback.
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE_LC}:latest"
+            echo "${IMAGE_LC}:${GITHUB_SHA}"
+            # En un tag v* publicamos además los tags semver (hub#515, ADR-0269): :1.2.3 inmutable
+            # para pin/rollback exacto, y :1.2 / :1 móviles para poder decir "la última 1.x" y
+            # aplicar un parche de seguridad sin saltar de major. Parseo robusto: solo vX.Y.Z.
+            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+              V="${GITHUB_REF_NAME#v}"
+              if [[ "${V}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+                MAJOR="${BASH_REMATCH[1]}"
+                MINOR="${BASH_REMATCH[2]}"
+                PATCH="${BASH_REMATCH[3]}"
+                echo "${IMAGE_LC}:${MAJOR}.${MINOR}.${PATCH}"
+                echo "${IMAGE_LC}:${MAJOR}.${MINOR}"
+                echo "${IMAGE_LC}:${MAJOR}"
+              else
+                echo "::warning::El tag ${GITHUB_REF_NAME} no es semver (vX.Y.Z); no se publican tags :semver"
+              fi
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE_LC}" >> "$GITHUB_OUTPUT"
 
       # 🔴 LO PRIMERO tras el login, y ANTES de estampar o compilar.
       #
