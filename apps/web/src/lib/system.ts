@@ -16,10 +16,9 @@
 // `crates/server`.) Los documentos SIEMPRE salen del Cloud: el Hub no tiene credenciales S3.
 //
 // Mientras el endpoint no exista, `fetchSystemInfo` devuelve `null`: las tarjetas KPI se muestran
-// igualmente con valores a 0 (CPU/Memoria/Conexiones 0, BD sin tamaño) y la pestaña de datos
-// (Registros) muestra su estado vacío propio — nunca números inventados. Los documentos del hub
-// se gestionan desde /files (gestor de `media/`). Las copias, importaciones y restauraciones se
-// gestionan únicamente en Ajustes → Datos y copias.
+// igualmente con valores a 0 (CPU/Memoria/Conexiones 0, BD sin tamaño) y las pestañas de datos
+// (Documentos/Registros) muestran su estado vacío propio — nunca números inventados. Las copias,
+// importaciones y restauraciones se gestionan únicamente en Ajustes → Datos y copias.
 
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
@@ -53,6 +52,17 @@ export interface DatabaseInfo {
   connectionsLimit?: number | null;
 }
 
+/** Un documento de almacenamiento (objeto S3 del hub, servido vía el Cloud). */
+export interface StorageDoc {
+  name: string;
+  sizeLabel: string;
+  /** ISO 8601. */
+  modified: string;
+  kind?: string | null;
+  /** URL firmada S3 (vía el Cloud); `null` si no descargable. */
+  url?: string | null;
+}
+
 /** Una línea del registro de eventos del runtime. */
 export interface SystemLogEntry {
   /** ISO 8601 o "HH:MM:SS". */
@@ -76,6 +86,7 @@ export interface SystemInfo {
   storageSource?: 's3' | null;
   /** Capacidad de almacenamiento formateada para la barra (p.ej. "2,1 GB / 8 GB"). */
   storageUsed?: UsageMetric | null;
+  documents?: StorageDoc[];
   logs?: SystemLogEntry[];
 }
 

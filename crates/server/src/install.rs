@@ -56,6 +56,10 @@ pub enum InstallError {
     },
     #[error("runtime: {0}")]
     Runtime(String),
+    /// Se pidió **actualizar** un módulo que este hub no tiene instalado (hub#516). Actualizar no
+    /// es una puerta trasera para instalar: un id mal escrito debe decirlo, no instalar algo nuevo.
+    #[error("el módulo `{0}` no está instalado en este hub: no hay nada que actualizar")]
+    NotInstalled(String),
 }
 
 impl InstallError {
@@ -70,6 +74,7 @@ impl InstallError {
             InstallError::MissingSha256 { .. } => "install_missing_sha256",
             InstallError::Blocked { .. } => "install_blocked",
             InstallError::Runtime(_) => "install_runtime_failed",
+            InstallError::NotInstalled(_) => "update_not_installed",
         }
     }
 }
@@ -243,6 +248,36 @@ pub async fn install_from_cloud(
     on_progress: OnProgress<'_>,
     signature_policy: &cloud_client::SignaturePolicy,
 ) -> Result<Installed, InstallError> {
+    acquire_and_install(
+        http,
+        cloud_base_url,
+        cache_root,
+        auth,
+        runtime,
+        module_id,
+        requested_version,
+        on_progress,
+        signature_policy,
+        None,
+    )
+    .await
+}
+
+/// El pipeline compartido por `install` y `update`. `updating` = el módulo que se está
+/// **actualizando** (hub#516): el único al que hay que volver a instalar aunque ya esté instalado.
+#[allow(clippy::too_many_arguments)]
+async fn acquire_and_install(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    cache_root: &std::path::Path,
+    auth: &Auth,
+    runtime: &mut erplora_runtime::Runtime,
+    module_id: &str,
+    requested_version: &str,
+    on_progress: OnProgress<'_>,
+    signature_policy: &cloud_client::SignaturePolicy,
+    updating: Option<&str>,
+) -> Result<Installed, InstallError> {
     // (0) ADR-0060: el Cloud resuelve el cierre transitivo (tiene el grafo fresco y la verdad del
     //     entitlement); el Hub lo EJECUTA. Si el plan llega, manda: trae `version`+`sha256` por
     //     nodo, así que nos ahorramos el round-trip a `versions/` de cada uno.
@@ -251,8 +286,20 @@ pub async fn install_from_cloud(
     //     verifying → installing`) y las emite quien acaba instalando —`execute_plan` por nodo o
     //     `install_recursive` en el fallback—. Emitir un `resolving` extra antes de saber cuál de
     //     los dos caminos se toma duplicaría la fase del módulo pedido.
-    match fetch_install_plan(http, cloud_base_url, auth, runtime, module_id, requested_version)
-        .await
+    //
+    //     En un **update** el set instalado que viaja al Cloud excluye al propio módulo: de lo
+    //     contrario el plan lo daría por `already_satisfied` y no traería ni su versión nueva ni
+    //     las dependencias que esa versión añade — que es justo lo que hay que resolver.
+    match fetch_install_plan(
+        http,
+        cloud_base_url,
+        auth,
+        runtime,
+        module_id,
+        requested_version,
+        updating,
+    )
+    .await
     {
         Ok(plan) => {
             return execute_plan(
@@ -265,6 +312,7 @@ pub async fn install_from_cloud(
                 plan,
                 on_progress,
                 signature_policy,
+                updating,
             )
             .await;
         }
@@ -292,8 +340,202 @@ pub async fn install_from_cloud(
         &mut installing,
         on_progress,
         signature_policy,
+        updating.map(str::to_string),
     )
     .await
+}
+
+/// Resultado de pedir una actualización de módulo (hub#516).
+///
+/// `updated == false` **no es un fallo**: es «ya está en la versión que le toca». Es el caso normal
+/// de un botón que se puede pulsar siempre, y también el de una versión nueva **en cuarentena**,
+/// que sencillamente no se ofrece.
+#[derive(Debug, Clone)]
+pub struct Updated {
+    pub module_id: String,
+    pub from: String,
+    pub to: String,
+    pub updated: bool,
+}
+
+/// La versión que el marketplace ofrece hoy para un módulo instalado (hub#516).
+///
+/// **El mismo resolutor que usa el arranque** (`erplora_runtime::module_update::resolve`): el botón
+/// no puede ofrecer algo distinto de lo que la actualización automática haría sola — respeta la
+/// cuarentena, respeta el pin de soporte y nunca va hacia atrás. Si el Cloud no contesta, el
+/// resultado es «quédate donde estás»: adivinar es peor.
+pub async fn resolve_target(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+    installed: &str,
+    pinned: Option<&str>,
+) -> erplora_runtime::module_update::Target {
+    use erplora_runtime::module_update::{resolve, Available, Target};
+
+    if let Some(pin) = pinned {
+        return Target::StayPut(pin.to_string());
+    }
+
+    let request = CloudClient::new(cloud_base_url).versions(auth, module_id);
+    let mut call = http.get(&request.url);
+    for (name, value) in &request.headers {
+        call = call.header(*name, value);
+    }
+    let available: Vec<Available> = match call.send().await {
+        Ok(response) => response
+            .json::<Vec<ModuleVersion>>()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|v| Available {
+                version: v.version,
+                is_active: v.is_active,
+            })
+            .collect(),
+        Err(error) => {
+            tracing::warn!(
+                module_id = %module_id,
+                error = %error,
+                "no se pudo leer versions/: se mantiene la versión instalada"
+            );
+            Vec::new()
+        }
+    };
+
+    resolve(installed, None, &available)
+}
+
+/// A qué versión debe ir un módulo instalado si se le pide actualizar (hub#516).
+///
+/// Una versión **explícita** es nuestra (soporte): manda tal cual, sin resolver — es la única forma
+/// de bajar a alguien a `sales@3.1` mientras se arregla la `3.2`. Vacío o `latest` es el botón del
+/// dueño y el arranque, y ahí decide el **resolutor del arranque**: nunca una versión en cuarentena,
+/// nunca hacia atrás, y el pin de soporte gana.
+///
+/// Devuelve **siempre una versión concreta** (la instalada si no hay nada mejor), porque quien la
+/// pide necesita saber a dónde volver si el intento se cae.
+pub async fn resolve_update_target(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    runtime: &erplora_runtime::Runtime,
+    module_id: &str,
+    requested_version: &str,
+) -> String {
+    let installed = runtime.registry().module_version(module_id);
+    match requested_version.trim() {
+        "" | "latest" => {
+            let pin = support_pin(runtime, module_id).await;
+            resolve_target(
+                http,
+                cloud_base_url,
+                auth,
+                module_id,
+                &installed,
+                pin.as_deref(),
+            )
+            .await
+            .version()
+            .to_string()
+        }
+        explicit => explicit.to_string(),
+    }
+}
+
+/// El pin de soporte de un módulo en este hub, si lo tiene (`hub_module.pinned_version`).
+///
+/// No es una opción de producto —el dueño no elige— sino la salida de emergencia: dejar a un
+/// cliente en `sales@3.1` mientras se arregla la `3.2`, **sin tocar a los demás**.
+async fn support_pin(runtime: &erplora_runtime::Runtime, module_id: &str) -> Option<String> {
+    erplora_runtime::installer::installed_with_pin(runtime.db(), runtime.hub_id())
+        .await
+        .ok()?
+        .into_iter()
+        .find(|(id, _, _)| id == module_id)
+        .and_then(|(_, _, pin)| pin)
+}
+
+/// **Actualiza un módulo ya instalado** (hub#516). La ruta que faltaba: sin ella, publicar la v2 de
+/// un módulo con un bug corregido no llegaba a ningún hub que ya tuviera la v1.
+///
+/// Es el **mismo pipeline verificado** que instalar —`InstallGrant` → SHA256 obligatorio
+/// (ADR-0015) → firma ed25519 (ADR-0193/0194) → manifest validado → plan/topo-orden de
+/// `depends_on` → migraciones → capacidades → `mark_installed`—, con tres diferencias:
+///
+/// - **Se exige que el módulo esté instalado.** Actualizar no es una puerta trasera para instalar.
+/// - **El módulo no se salta por «ya instalado»**, que es justo lo que impedía que el arreglo
+///   llegara.
+/// - **Se resuelve a qué versión ir** con el resolutor del arranque, así que el botón hace lo mismo
+///   que la actualización automática: nunca una versión en cuarentena, nunca hacia atrás, y el pin
+///   de soporte gana.
+///
+/// Si algo falla, lo que estaba corriendo **sigue corriendo**: la verificación y la validación del
+/// manifest ocurren antes de tocar nada, y a partir de ahí el runtime repone la versión anterior
+/// (`installer::install`). Lo único que no se deshace es el esquema — las migraciones son aditivas
+/// y hacia delante (ADR-0269 §3.4/§7).
+#[allow(clippy::too_many_arguments)]
+pub async fn update_from_cloud(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    cache_root: &std::path::Path,
+    auth: &Auth,
+    runtime: &mut erplora_runtime::Runtime,
+    module_id: &str,
+    requested_version: &str,
+    on_progress: OnProgress<'_>,
+    signature_policy: &cloud_client::SignaturePolicy,
+) -> Result<Updated, InstallError> {
+    if !runtime.registry().is_installed(module_id) {
+        return Err(InstallError::NotInstalled(module_id.to_string()));
+    }
+    let from = runtime.registry().module_version(module_id);
+    let to = resolve_update_target(
+        http,
+        cloud_base_url,
+        auth,
+        runtime,
+        module_id,
+        requested_version,
+    )
+    .await;
+
+    if to == from {
+        // No hay nada más nuevo (o lo que hay está en cuarentena, o el pin dice que aquí se queda).
+        // No se descarga nada y no es un error: el botón se puede pulsar siempre.
+        return Ok(Updated {
+            module_id: module_id.to_string(),
+            from: from.clone(),
+            to: from,
+            updated: false,
+        });
+    }
+
+    let installed = acquire_and_install(
+        http,
+        cloud_base_url,
+        cache_root,
+        auth,
+        runtime,
+        module_id,
+        &to,
+        on_progress,
+        signature_policy,
+        Some(module_id),
+    )
+    .await?;
+
+    // `to` sale de lo que se instaló DE VERDAD, no de lo que se pidió, y `updated` se deriva de la
+    // comparación: si el plan acabó dejando la misma versión (drift raro entre lo que el Cloud
+    // planifica y lo que el registry tiene), decir «actualizado 1.0.0 → 1.0.0» sería mentir.
+    let to = installed.version;
+    Ok(Updated {
+        module_id: installed.module_id,
+        updated: to != from,
+        from,
+        to,
+    })
 }
 
 /// Por qué no hay plan ejecutable.
@@ -313,12 +555,17 @@ async fn fetch_install_plan(
     runtime: &erplora_runtime::Runtime,
     module_id: &str,
     requested_version: &str,
+    updating: Option<&str>,
 ) -> Result<cloud_client::InstallPlan, PlanUnavailable> {
     let installed: Vec<String> = runtime
         .registry()
         .installed
         .iter()
         .map(|m| m.id.clone())
+        // hub#516: el módulo que se actualiza NO va en el set instalado. Si fuera, el Cloud lo
+        // daría por `already_satisfied` y el plan volvería vacío — sin su versión nueva y, peor,
+        // sin las dependencias que esa versión añade (que son las que pueden estar bloqueadas).
+        .filter(|id| Some(id.as_str()) != updating)
         .collect();
     let cloud = CloudClient::new(cloud_base_url);
     let prepared = cloud.install_plan(auth, module_id, requested_version, &installed);
@@ -396,6 +643,7 @@ async fn execute_plan(
     plan: cloud_client::InstallPlan,
     on_progress: OnProgress<'_>,
     signature_policy: &cloud_client::SignaturePolicy,
+    updating: Option<&str>,
 ) -> Result<Installed, InstallError> {
     let cloud = CloudClient::new(cloud_base_url);
     let mut headline: Option<Installed> = None;
@@ -403,7 +651,11 @@ async fn execute_plan(
     for node in &plan.plan {
         // Idempotencia / drift: el plan excluye lo ya instalado, pero si el registry lo tiene
         // igualmente (instalación concurrente, set desfasado) no se reinstala.
-        if runtime.registry().is_installed(&node.module_id) {
+        //
+        // La excepción es el módulo que se está ACTUALIZANDO (hub#516): saltarlo por «ya
+        // instalado» era exactamente lo que dejaba un bug de módulo sin arreglo posible.
+        if runtime.registry().is_installed(&node.module_id) && Some(node.module_id.as_str()) != updating
+        {
             continue;
         }
 
@@ -456,10 +708,7 @@ async fn execute_plan(
         )?;
 
         on_progress(&node.module_id, "installing");
-        let installed_id = runtime
-            .install_from_dir(&dir)
-            .await
-            .map_err(|e| InstallError::Runtime(e.to_string()))?;
+        let installed_id = register(runtime, &dir, &node.module_id, updating).await?;
 
         mark_installed(http, &cloud, auth, &node.module_id, &node.version).await;
 
@@ -522,6 +771,7 @@ fn install_recursive<'a>(
     installing: &'a mut std::collections::HashSet<String>,
     on_progress: OnProgress<'a>,
     signature_policy: &'a cloud_client::SignaturePolicy,
+    updating: Option<String>,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Installed, InstallError>> + Send + 'a>>
 {
     Box::pin(async move {
@@ -584,16 +834,15 @@ fn install_recursive<'a>(
                 &mut *installing,
                 on_progress,
                 signature_policy,
+                // Una dependencia nunca es «el módulo que se actualiza»: se instala si falta.
+                None,
             )
             .await?;
         }
 
         // (5) Instalar el módulo (migra, registra, activa) — ya con sus deps presentes.
         on_progress(&module_id, "installing");
-        let installed_id = runtime
-            .install_from_dir(&dir)
-            .await
-            .map_err(|e| InstallError::Runtime(e.to_string()))?;
+        let installed_id = register(runtime, &dir, &module_id, updating.as_deref()).await?;
 
         // (6) Registrar la instalación en el Cloud (best-effort: no aborta si falla).
         mark_installed(http, &cloud, auth, &module_id, &version.version).await;
@@ -604,4 +853,27 @@ fn install_recursive<'a>(
             dir,
         })
     })
+}
+
+/// Registra en el runtime el paquete ya descargado y verificado de `dir`.
+///
+/// Entra por la puerta de **update** cuando este es el módulo que se está actualizando (hub#516) y
+/// por la de **install** en cualquier otro caso. Las dos acaban en `installer::install` —así que la
+/// versión anterior vuelve si el intento falla—; la diferencia es el contrato: `update_from_dir`
+/// **se niega** si el módulo no está instalado, de modo que una actualización nunca puede acabar
+/// instalando algo que este hub no tenía.
+async fn register(
+    runtime: &mut erplora_runtime::Runtime,
+    dir: &std::path::Path,
+    module_id: &str,
+    updating: Option<&str>,
+) -> Result<String, InstallError> {
+    let is_update =
+        updating == Some(module_id) && runtime.registry().is_installed(module_id);
+    let result = if is_update {
+        runtime.update_from_dir(dir).await.map(|u| u.module_id)
+    } else {
+        runtime.install_from_dir(dir).await
+    };
+    result.map_err(|e| InstallError::Runtime(e.to_string()))
 }

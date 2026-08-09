@@ -7,15 +7,19 @@ export default {
   nav: {
     general: 'General',
     account: 'Cuenta',
-    modules: 'Módulos',
     home: 'Inicio',
     employees: 'Empleados',
     files: 'Archivos',
-    billing: 'Facturación',
+    // hub#365 — the money door, in the first person of the business. «Billing» names the ledger the
+    // SaaS keeps; from inside the till what the owner asks is which plan they are on. One label for
+    // two surfaces: this sidebar entry and the title of the page it opens.
+    billing: 'Mi plan',
     apps: 'Apps',
     system: 'Sistema',
     settings: 'Ajustes',
     apiDocs: 'API',
+    upgradePlan: 'Actualizar plan',
+    upgradePlanError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu plan.',
   },
   apiDocs: {
     title: 'Documentación de la API',
@@ -29,11 +33,18 @@ export default {
   topbar: {
     back: 'Atrás',
     apps: 'Mis apps',
-    appsEmpty: 'No tienes módulos instalados. Abre Apps para añadir.',
+    appsEmpty: 'Aquí aparecerán tus apps. Pulsa Apps para añadir las que necesite tu negocio.',
     appsClose: 'Cerrar',
     assistant: 'Asistente',
+    // The way out to management (hub#364). It is the only affordance an icon-only action has, and
+    // it crosses a product boundary, so it names the destination out loud.
+    manage: 'Gestiona tu negocio en erplora.com',
+    manageError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.',
     notifications: 'Notificaciones',
     noNotifications: 'Todo al día. Sin notificaciones.',
+    // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
+    // lo que un lector de pantalla puede anunciarlo.
+    more: 'Más opciones',
     configure: 'Configurar',
     menu: 'Abrir menú',
     collapseMenu: 'Colapsar menú',
@@ -42,6 +53,18 @@ export default {
   sidebar: {
     profile: 'Perfil',
     signOut: 'Cerrar sesión',
+  },
+  // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
+  // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
+  // para dos cosas es como un cajero acaba desinstalando el TPV.
+  appUpdate: {
+    available: 'Actualizar ERPlora ({version})',
+    confirmTitle: 'Actualizar ERPlora',
+    confirmBody:
+      'Se abre tu navegador para descargar la versión {version}. No se instala nada solo: termina de atender, cierra ERPlora y abre lo que hayas descargado.',
+    action: 'Descargar',
+    cancel: 'Ahora no',
+    failed: 'No hemos podido abrir tu navegador. Entra en erplora.com para conseguir la nueva versión.',
   },
   // Modal de instalación PWA (PwaInstallModal.vue) — sustituye al botón «Instalar app» del sidebar.
   pwa: {
@@ -54,6 +77,9 @@ export default {
     browserHint: 'En el menú de tu navegador, elige «Instalar aplicación» (o «Añadir a pantalla de inicio»).',
   },
   assistant: {
+    confirmTitle: 'El asistente quiere ejecutar una acción',
+    confirmCancel: 'Cancelar',
+    confirmRun: 'Ejecutar',
     title: 'Asistente',
     empty: 'Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.',
     emptySetup: 'Revisa la configuración del hub. Elige una opción o escribe tu duda.',
@@ -70,6 +96,14 @@ export default {
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
     attachTooLarge: 'El archivo es demasiado grande.',
+  },
+  // Lo que se le dice al usuario tras pulsar «descargar», lo pulse donde lo pulse (hub#480). Dentro
+  // de la app instalada no hay barra de descargas ni aviso del sistema: si no lo decimos nosotros,
+  // no lo dice nadie.
+  download: {
+    savedTo: 'Guardado en {path}',
+    noPlaceToSave: 'Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un navegador para descargarlo.',
+    failed: 'No se ha podido descargar el archivo.',
   },
   files: {
     title: 'Archivos',
@@ -104,8 +138,6 @@ export default {
     newName: 'Nombre nuevo',
     renameSuccess: 'Renombrado.',
     renameError: 'No se pudo renombrar. Puede que esta carpeta sea de solo lectura.',
-    moveSuccess: 'Movido.',
-    moveError: 'No se pudo mover. Puede que el origen o el destino sean de solo lectura.',
     deleteFolderTitle: 'Eliminar carpeta',
     deleteFolderBody: 'Vas a eliminar «{name}» y todo su contenido. Esto no se puede deshacer.',
     close: 'Cerrar',
@@ -117,15 +149,86 @@ export default {
     previewUnsupportedBody: 'Este tipo de archivo no se puede mostrar aquí. Descárgalo para abrirlo con una aplicación de tu dispositivo.',
     previewPdfTruncated: 'Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.',
   },
-  dashboard: {
-    setupTitle: '{n} módulo(s) requieren configuración',
+  // La checklist de configuración — la superficie del panel de `hub.setup.status` (hub#372).
+  // `items.<key>` cubre SOLO los ítems del core: la clave de un ítem del core es también su clave
+  // i18n; el título de un módulo viaja en inglés en su manifest y se pinta tal cual.
+  setup: {
+    title: 'Termina de configurar tu negocio',
+    progress: '{done} de {total} hechos',
+    viewAll: 'Ver todo',
+    viewLess: 'Ver menos',
     configure: 'Configurar',
-    setupHint: 'Revisa qué falta y el asistente te guiará paso a paso para dejarlo listo.',
-    reviewConfig: 'Revisar configuración',
-    // Saludo contextual por franja horaria (zona 1 — cabecera). El nombre se interpola.
-    greetingMorning: 'Buenos días, {name}',
-    greetingAfternoon: 'Buenas tardes, {name}',
-    greetingEvening: 'Buenas noches, {name}',
+    review: 'Pedírselo al asistente',
+    doneLabel: 'Hecho',
+    // Los tres niveles, dichos por lo que significan para el negocio, no por su gravedad.
+    levelLegal: 'Necesario para facturar',
+    levelFunctional: 'Necesario para vender',
+    levelRecommended: 'Recomendado',
+    // El tercer estado: una avería NUESTRA, no una tarea suya. No puede sonar a deber.
+    unavailableLabel: 'Todavía no disponible',
+    unavailableHint: 'Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.',
+    // Un muro que no te toca a ti derribar (hub#435). Dice QUIÉN puede — nunca el nombre de un
+    // permiso —, porque un bloqueo sin dueño deja al usuario sin ningún sitio al que ir.
+    delegatedHint: 'Esto lo tiene que configurar un administrador.',
+    inheritedHint: 'Vino de la plantilla que usaste. Merece un vistazo: tu sala y tus precios son tuyos.',
+    completeTitle: 'Tu negocio está listo',
+    completeBody: 'No queda nada pendiente en la checklist.',
+    // La tarjeta héroe de un negocio que todavía no tiene apps (hub#368). Su único trabajo es la
+    // PRIMERA elección, así que dice lo que hace un clic Y lo que deja para el dueño: una plantilla
+    // trae las apps y el catálogo de un oficio, nunca los datos de ESTE negocio (ADR-0195 §4/§5).
+    hero: {
+      title: 'Empieza con un negocio como el tuyo',
+      body: 'Elige el que más se parezca al tuyo y te dejamos sus apps y su catálogo listos de una vez. Después tendrás que poner tus propios datos.',
+      use: 'Usar esta',
+      more: 'Ver todas las plantillas',
+      working: 'Preparando «{name}»…',
+      readyTitle: 'Ya tienes tus apps y tu catálogo',
+      readyBody: 'Lo que queda es lo que solo puedes contestar tú: los datos de tu negocio. Los tienes en la lista de abajo.',
+      sampleData: 'Trae además datos de ejemplo —clientes, citas— para que veas cómo funciona todo.',
+      sampleDataUndo: 'Los datos de ejemplo están para que trastees. Puedes quitarlos cuando quieras desde Ajustes › Datos.',
+      partialTitle: 'Casi: algo no ha entrado',
+      // Una decisión de compra, nunca una avería (ADR-0060, hub#409): nombra lo que hay que añadir
+      // en vez de pintar un error rojo sobre un plan que el dueño simplemente no ha contratado.
+      blocked: 'Estas hay que añadirlas antes a tu plan: {apps}',
+      failed: 'Hay algo más que no ha entrado. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      notStartedTitle: 'No se ha podido abrir esa plantilla',
+      notStartedBody: 'No ha cambiado nada en tu negocio. Inténtalo otra vez o cárgala desde Ajustes › Datos.',
+      interruptedTitle: 'La configuración no ha terminado',
+      // NO afirmamos que no ha cambiado nada: puede que ya haya entrado la mitad, y decir lo
+      // contrario mandaría al dueño a pulsar otra vez encima.
+      interruptedBody: 'Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.',
+      continue: 'Continuar',
+      retry: 'Intentar otra vez',
+    },
+    // La franja bloqueante (hub#374): la superficie de las pantallas donde no está la checklist.
+    // Dice la CONSECUENCIA, no la gravedad — ⛔ significa que el runtime rechaza el documento, así
+    // que eso es lo que anuncia. Nunca dice «error»: no hay nada roto, hay algo que falta.
+    blocking: {
+      title: 'Todavía no puedes facturar',
+      body: 'No se podrá emitir ningún ticket ni factura hasta que configures esto:',
+    },
+    items: {
+      apps: {
+        title: 'Tus apps',
+        description: 'Instala al menos una app de negocio para que el TPV tenga algo que vender.',
+      },
+      business_identity: {
+        title: 'Los datos de tu negocio',
+        description: 'Razón social y NIF: sin ellos no puedes emitir una factura.',
+      },
+      team: {
+        title: 'Tu equipo',
+        description: 'Añade a las personas que usarán el TPV, cada una con su forma de entrar.',
+      },
+    },
+  },
+  dashboard: {
+    // Contextual greeting by time of day (zone 1 — header). It stands in for the BUSINESS NAME
+    // while the hub has none yet, so nobody is interpolated: greeting a person here is what put an
+    // account address in the `<h1>` (hub#366).
+    greetingMorning: 'Buenos días',
+    greetingAfternoon: 'Buenas tardes',
+    greetingEvening: 'Buenas noches',
     // Fecha larga del día, formateada por el locale del navegador (p. ej. «martes, 22 de julio»).
     todayLabel: 'Hoy',
     loading: 'Cargando…',
@@ -145,19 +248,19 @@ export default {
     activeWidgets: 'Activos · arrastra para reordenar',
     availableWidgets: 'Disponibles',
     emptyPanel: 'Panel vacío. Pulsa ⋮ para añadir widgets.',
-    noWidgets: 'Ningún módulo instalado ofrece widgets todavía.',
+    noWidgets: 'Ninguna app instalada ofrece widgets todavía.',
     widgetEmpty: 'Sin datos',
     widgetError: 'No disponible',
-    // Onboarding del hub vacío (sin módulos instalados): invita a instalar el primero.
-    onboardingTitle: 'Tu panel está listo',
-    onboardingBody: 'Instala tu primer módulo y empezaremos a mostrar aquí tus ventas, stock y actividad.',
-    onboardingCta: 'Explorar módulos',
-    blueprintTitle: 'Configura tu hub',
+    // Tarjeta «Mis apps» (hub#367): el lanzador del panel. El título reutiliza `topbar.apps` — el
+    // mismo nombre para lo mismo en las dos superficies.
+    appsAdd: 'Añadir apps',
+    appsEmpty: 'Aquí aparecerán tus apps. Añade las que necesite tu negocio.',
+    blueprintTitle: 'Configura tu negocio',
     blueprintBody: 'Carga una plantilla para tu negocio o restaura una copia para empezar.',
     blueprintCta: 'Configurar',
-    // Zona 4 — salud del sistema: pill discreta con el estado del Bridge (hardware local).
-    systemOk: 'Sistema conectado',
-    systemOff: 'Sistema desconectado',
+    // Zona 4 — lo que el hub cuenta de sí mismo. La copy de la pill vive en `system.health.*`
+    // (hub#375); «Sistema conectado/desconectado» se ha ido a propósito: era un veredicto sobre
+    // todo sacado de una sonda que solo sabía del equipo de la impresora.
     openSystem: 'Ver sistema',
   },
   profile: {
@@ -172,6 +275,7 @@ export default {
     role: 'Rol en este Hub',
     accountType: 'Tipo de cuenta',
     cloudAccount: 'Cuenta vinculada a ERPlora SaaS',
+    cloudAccountError: 'No se pudo abrir la página de tu cuenta en el navegador. Entra en erplora.com para gestionarla.',
     localAccount: 'Usuario local de este Hub',
     unavailable: 'No disponible',
     defaultRole: 'Usuario',
@@ -201,6 +305,64 @@ export default {
       'Esta identidad pertenece únicamente al Hub actual. El Hub no conoce ni muestra otros negocios o Hubs.',
     manageInSaas: 'Gestionar cuenta en SaaS',
   },
+  // hub#358 — «este dispositivo»: si esta terminal pregunta quién la está usando. El texto dice la
+  // CONSECUENCIA de cada modo, nunca su nombre técnico: el dueño de un bar tiene que poder deducir,
+  // solo de la frase, que uno de los dos significa «quien coja esto ya ha entrado como yo».
+  deviceMode: {
+    title: 'Este dispositivo',
+    intro: 'Cómo pregunta este dispositivo quién lo está usando. Cada dispositivo del negocio se decide por separado.',
+    shared: 'Compartido — una caja o tablet que usan varias personas',
+    sharedConsequence:
+      'Pide PIN al entrar y la olvida al acabar el turno, así que cada venta queda atribuida a quien la hizo.',
+    personal: 'Personal — un dispositivo que solo usas tú',
+    personalConsequence:
+      'La sesión se queda abierta y nunca pide PIN: quien lo coja ya eres tú. Elígelo solo para un dispositivo que no toca nadie más, y vuelve a cambiarlo si lo pierdes.',
+    adminOnly: 'Solo un administrador puede cambiar cómo entra la gente en este dispositivo.',
+    saveError: 'No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
+  },
+  devices: {
+    title: 'Dispositivos',
+    intro:
+      'Los dispositivos en los que alguien ha entrado. Si pierdes uno, quítalo aquí: su sesión se cierra al momento y deja de poder entrar con PIN.',
+    thisDevice: 'El que estás usando',
+    unnamed: 'Dispositivo sin nombre',
+    empty: 'Todavía no ha entrado nadie desde ningún dispositivo.',
+    inUse: 'En uso ahora mismo',
+    lastUsed: 'Se usó por última vez {when}',
+    neverUsed: 'Añadido {when}, sin usar desde entonces',
+    openUntil: 'Su sesión sigue abierta hasta {when}',
+    modeShared: 'Pide PIN',
+    modePersonal: 'Se queda abierto',
+    revoke: 'Quitar este dispositivo',
+    cancel: 'Dejarlo',
+    confirm: '¿Quitar este dispositivo?',
+    confirmCurrent:
+      'Es el dispositivo que estás usando: al quitarlo se cerrará tu sesión y tendrás que volver a entrar.',
+    consequence:
+      'Su sesión se cierra al momento. Para volver a usarlo, alguien tiene que entrar en él con su cuenta.',
+    adminOnly: 'Solo un administrador puede quitar un dispositivo.',
+    loadError: 'No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.',
+    revokeError: 'No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
+  },
+  pinPolicy: {
+    title: 'Pinpad',
+    intro:
+      'Si este hub muestra el pinpad y pregunta quién está en la caja. Vale para todo el negocio: además, cada dispositivo decide por su cuenta, arriba.',
+    showPinpad: 'Mostrar pinpad',
+    onConsequence:
+      'El personal elige su nombre y teclea su PIN, así que cada venta lleva el nombre de quien la hizo.',
+    offConsequence:
+      'Nadie teclea un PIN. Quien abriera la caja por la mañana es el nombre de todas las ventas hasta que acabe el turno, las hiciera quien las hiciera: no podrás saber quién vendió qué ni quién hizo un descuento. El personal que solo tiene PIN y no tiene cuenta no podrá entrar.',
+    idleTitle: 'Volver a preguntar tras inactividad',
+    idleMinutes: '{n} min',
+    idleUntilSignOut: 'Hasta cerrar sesión',
+    idleMinutesConsequence:
+      'Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.',
+    idleUntilSignOutConsequence:
+      'La caja no se bloquea sola por inactividad: la sesión sigue abierta hasta que quien entró cierre sesión, o hasta que caduque por el dispositivo.',
+    adminOnly: 'Solo un administrador puede cambiar si este hub pregunta.',
+    saveError: 'No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.',
+  },
   settings: {
     hubWide: 'Ajustes del Hub',
     currency: 'Moneda',
@@ -228,7 +390,10 @@ export default {
     showApiDocs: 'Mostrar documentación de la API',
     showApiDocsDesc: 'Añade una página interna con la API pública del Hub (Swagger) para integraciones',
     hardware: 'Hardware',
-    bridgeDesc: 'Impresoras, cajón, escáner y conexión de hardware periférico',
+    hardwareTitle: 'Acceso a recursos locales y de red',
+    hardwareDesc: 'Impresoras, escáneres y otros dispositivos de este equipo o de su red',
+    hardwareReady: 'Disponible aquí',
+    hardwareAppOnly: 'Solo desde la app instalada',
     disabled: 'Desactivado',
     fiscalIdentity: 'Datos del negocio',
     fiscalIdentityDesc: 'Identidad del obligado tributario (la usan las facturas y los módulos fiscales).',
@@ -295,6 +460,7 @@ export default {
     reset_hub_users: 'Empleados',
     reset_media: 'Ficheros e imágenes',
     reset_fiscal: 'Configuración fiscal',
+    reset_roles: 'Roles activos',
     permissionsTitle: 'Permisos de los módulos',
     permissionsDesc: 'Concede o revoca los permisos que cada módulo solicita (acceso a internet, certificado, impresora, notificaciones). Por seguridad, todo está denegado hasta que lo concedas.',
     permissionsAdminOnly: 'Solo un administrador puede cambiar los permisos.',
@@ -305,20 +471,24 @@ export default {
     permissionRevoked: '{cap} revocado a {module}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
   },
+  // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
+  // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
+  // the manifest's word and renaming them would break nothing here and everything elsewhere.
   apps: {
-    searchInstalled: 'Buscar módulo instalado…',
-    searchCatalog: 'Buscar en el catálogo…',
-    tabMine: 'Mis módulos',
-    tabCatalog: 'Catálogo',
+    searchInstalled: 'Buscar en tus apps…',
+    searchCatalog: 'Buscar apps para añadir…',
+    tabMine: 'Mis apps',
+    // The same words as the ＋ tile on the panel (`dashboard.appsAdd`): one door, one name.
+    tabCatalog: 'Añadir apps',
     tabPaid: 'De pago',
-    emptyInstalled: 'Aún no tienes módulos instalados. Explora el catálogo para añadir el primero.',
-    emptyCatalog: 'No hay módulos que coincidan con tu búsqueda.',
+    emptyInstalled: 'Aún no tienes apps. Abre «Añadir apps» para instalar la primera.',
+    emptyCatalog: 'No hay apps que coincidan con tu búsqueda.',
     catalogLoadError:
-      'No se pudo cargar el catálogo desde la nube. Revisa la conexión o el registro de este dispositivo.',
+      'No se pudo cargar el catálogo. Revisa la conexión o el registro de este dispositivo.',
     retryCatalog: 'Reintentar',
-    demoCatalogReadOnly: 'Estás viendo el catálogo real de SaaS en modo demostración. Para instalar módulos, vincula un Hub real.',
-    adminOnly: 'Puedes consultar los módulos, pero solo un administrador puede instalarlos, activarlos o desinstalarlos.',
-    colModule: 'Módulo',
+    demoCatalogReadOnly: 'Estás viendo el catálogo real en modo demostración. Conecta un negocio real para instalar apps.',
+    adminOnly: 'Puedes ver las apps, pero solo un administrador puede instalarlas, activarlas o desinstalarlas.',
+    colModule: 'App',
     colVersion: 'Versión',
     colStatus: 'Estado',
     colCategory: 'Categoría',
@@ -331,6 +501,9 @@ export default {
     stateAvailable: 'Disponible',
     stateUnavailable: 'No disponible',
     stateInstalling: 'Instalando…',
+    // hub#516: instalado, pero hay una versión más nueva publicada. Se nombra la versión — decir
+    // «hay actualización» sin decir cuál es una insistencia, no una información.
+    stateUpdatable: 'Actualizar a {version}',
     phaseResolving: 'Resolviendo versión…',
     phaseDownloading: 'Descargando…',
     phaseVerifying: 'Verificando integridad…',
@@ -339,6 +512,7 @@ export default {
     actionToggle: 'Activar/Desactivar',
     actionUninstall: 'Desinstalar',
     actionInstall: 'Instalar',
+    actionUpdate: 'Actualizar',
     priceFree: 'Gratis',
     priceMonthly: '{price} €/mes',
     priceYearly: '{price} €/año',
@@ -348,8 +522,16 @@ export default {
     installing: 'Instalando {name}…',
     installSuccess: '{name} instalado correctamente.',
     installError: 'No se pudo iniciar la instalación de {name}.',
-    purchaseInBrowser: '{name} es un módulo de pago — completa la compra en el navegador y vuelve.',
-    purchaseOpenError: 'No se pudo abrir la página de compra. Inténtalo de nuevo.',
+    // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
+    installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
+    // hub#516 — el botón de actualizar. `updateError` dice lo único que importa: el módulo NO se
+    // ha quedado a medias, sigue corriendo la versión que tenía.
+    updating: 'Actualizando {name}…',
+    updateSuccess: '{name} actualizado: {from} → {to}.',
+    updateUpToDate: '{name} ya está en la última versión.',
+    updateError: 'No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.',
+    updateBlocked: 'La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.',
+    needsSubscription: '{name} necesita una suscripción. Contrátala desde tu cuenta de ERPlora, en erplora.com, y se instalará aquí.',
     deactivated: '{name} desactivado.',
     activated: '{name} activado.',
     toggleError: 'No se pudo cambiar el estado de {name}.',
@@ -360,14 +542,14 @@ export default {
     cascadeConfirm: 'Continuar',
     cascadeCancel: 'Cancelar',
     uninstallTitle: 'Desinstalar {name}',
-    uninstallBody: 'El módulo dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.',
+    uninstallBody: 'La app dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.',
     uninstallConfirm: 'Desinstalar',
     uninstalled: '{name} desinstalado.',
     uninstallError: 'No se pudo desinstalar {name}.',
     moduleInstalledNamed: '{name} instalado.',
-    moduleInstalled: 'Módulo instalado.',
+    moduleInstalled: 'App instalada.',
     consentTitle: 'Permisos solicitados',
-    consentIntro: 'Este módulo solicita estos permisos. Podrás revisarlos después en Ajustes → Permisos.',
+    consentIntro: 'Esta app solicita estos permisos. Podrás revisarlos después en Ajustes → Permisos.',
     consentInstallGrant: 'Instalar y conceder',
     consentCancel: 'Cancelar',
   },
@@ -416,6 +598,25 @@ export default {
     active: 'Activo',
     inactive: 'De baja',
   },
+  // Catálogo de roles (hub#352/hub#353): roles base ∪ los que declaran los módulos instalados ∪
+  // los que alguien todavía lleva. El administrador enciende los que su negocio necesita.
+  roleCatalog: {
+    intro:
+      'Estos son los roles que este Hub puede repartir. Los básicos están siempre; los que trae una app los enciendes tú cuando tu negocio los necesita.',
+    colSource: 'Viene de',
+    colActive: 'Disponible',
+    sourceCore: 'Básico',
+    sourceModule: '{module}',
+    sourceInUse: 'App desinstalada',
+    alwaysOn: 'Siempre disponible',
+    // Va DENTRO de la celda, al lado del interruptor: tiene que caber en una línea.
+    notDeclared: 'Ninguna app lo trae',
+    adminOnly: 'Solo un administrador puede encender o apagar roles.',
+    activated: 'Ya puedes asignar «{role}».',
+    deactivated: 'Ya no se puede asignar «{role}».',
+    toggleError: 'No se pudo cambiar «{role}».',
+    loadError: 'No se pudo cargar el catálogo de roles.',
+  },
   apiKeys: {
     // Lista
     searchKey: 'Buscar API key…',
@@ -442,6 +643,17 @@ export default {
     rateLimit: 'Peticiones por minuto',
     rateLimitHint: 'Entre 1 y 10.000. Se aplica antes de ejecutar el comando.',
     perMinute: '{count}/min',
+    // hub#504 — qué puede hacer una key (mismo modelo que el rol de un usuario)
+    accessTitle: 'Qué puede hacer esta key',
+    accessHint: 'Los modos generales cubren todas las apps de tu negocio, también las que instales después.',
+    access: {
+      full: 'Acceso total',
+      read_only: 'Solo lectura',
+      write_only: 'Solo escritura',
+      custom: 'Por app',
+    },
+    systemKeyBadge: 'La emite ERPlora',
+    systemKeyHint: 'ERPlora lee con esta key los cambios en vivo de tu negocio. No se puede rotar ni borrar.',
     scopeTitle: 'Permisos por módulo',
     scopeHint: 'Marca lectura y/o escritura por cada módulo instalado.',
     colModule: 'Módulo',
@@ -484,6 +696,28 @@ export default {
     pinHelp: 'Entre 4 y 8 dígitos. En blanco, entra con su cuenta online.',
     pinSetHelp: 'Escribe un PIN nuevo para cambiarlo; déjalo en blanco y se queda como está.',
     clearPin: 'Retirar el PIN',
+    localUser: 'Usuario local',
+    localUserHelp:
+      'Trabaja en este hub solo con un PIN: sin email y sin cuenta de ERPlora. Desmárcalo para darle una cuenta más adelante, sin perder su historial.',
+    localPinHelp: 'Entre 4 y 8 dígitos. Obligatorio: es cómo entra esta persona.',
+    accountEmailHelp:
+      'Le mandamos por email una invitación a este hub. La contraseña la elige él: tú no la ves nunca.',
+    accountPinHelp:
+      'Opcional: entre 4 y 8 dígitos. Solo si además atiende una caja compartida de este hub.',
+    errors: {
+      local_needs_pin: 'Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.',
+      account_needs_email: 'Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.',
+      account_role_not_grantable: 'A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.',
+      email_taken: 'Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.',
+      role_above_inviter: 'No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.',
+      invalid_email: 'Introduce un email válido.',
+      pin_length: 'El PIN debe tener entre 4 y 8 dígitos.',
+      pin_too_simple: 'Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).',
+      pin_in_use: 'Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.',
+      local_cannot_administer: 'Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.',
+      local_has_email: 'Un usuario local no lleva email. Desmarca «Usuario local» para invitarlo como usuario de cuenta.',
+      name_taken: 'Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.',
+    },
     activeUser: 'Usuario activo',
     required: 'Campo obligatorio',
     invalidEmail: 'Introduce un email válido',
@@ -505,21 +739,26 @@ export default {
     connections: 'Conexiones',
     connectionsOf: 'de {limit}',
     connectionsActive: 'activas',
-    bridgeConnection: 'Conexión Bridge',
-    connected: 'Conectado',
-    disconnected: 'Desconectado',
+    // El titular de la tarjeta de la impresora, su palabra de estado y su frase vivían aquí, y
+    // nombraban un proceso («Bridge») en vez de lo que hay sobre el mostrador. Ahora salen de
+    // `system.health.*` (hub#375). Lo que queda abajo es el flujo de INSTALACIÓN, que sí va de un
+    // programa y lo dice a propósito.
     recheck: 'Recomprobar',
-    bridgeRunning: 'Bridge está corriendo en este equipo',
-    bridgeRunningHint: 'Tus impresoras, cajón y escáneres se gestionan desde aquí.',
-    bridgeOffline: 'El cliente Bridge no está corriendo en este equipo. Vincula un Bridge abajo para gestionar el hardware — tus impresoras, cajón y escáneres aparecerán aquí.',
-    downloadBridge: 'Descargar ERPlora Bridge',
-    downloadBridgeHint: 'Bridge es una pequeña app nativa que conecta este hub con tus impresoras, cajón y escáneres. Elige tu sistema para continuar.',
+    // Un producto, un nombre (hub#500). «Descargar ERPlora Bridge» y luego «instala ERPlora» eran
+    // dos nombres para lo mismo, y uno de ellos era el de una app que ADR-0196 eliminó — «Bridge»
+    // es jerga de plataforma, justo el lado que ADR-0254 dejó fuera de las pantallas del hub.
+    downloadApp: 'Descargar la app de ERPlora',
+    downloadAppHint: 'La app de ERPlora es la que habla con tus impresoras, el cajón y los escáneres. Elige tu sistema para continuar.',
     stepDownload: 'Descargar',
     stepInstall: 'Instalar',
     stepPair: 'Vincular',
     stepConfigure: 'Configurar',
     updatesManaged: 'Actualizaciones gestionadas',
     updatesCloudHint: 'Este Hub web se actualiza automáticamente durante los despliegues del servicio.',
+    documents: 'Documentos',
+    noDocuments: 'Sin documentos',
+    noDocumentsBucket: 'El bucket de almacenamiento de este hub está vacío.',
+    searchDocument: 'Buscar documento…',
     loadErrorTitle: 'No se pudo consultar el sistema',
     loadErrorBody: 'Las métricas y los registros no están disponibles ahora. Puedes volver a intentarlo.',
     retry: 'Reintentar',
@@ -530,15 +769,37 @@ export default {
     tabResources: 'Recursos',
     tabPlan: 'Plan y límites',
     tabUpdates: 'Actualizaciones',
+    tabDocuments: 'Documentos',
     tabLogs: 'Registros',
     resourcesCloud: 'Recursos en la nube',
     resourcesSystem: 'Recursos del sistema',
     sourceCloud: 'Nube',
     databaseShared: 'Base de datos compartida',
+    storageS3: 'Almacenamiento S3',
+    colName: 'Nombre',
+    colType: 'Tipo',
+    colSize: 'Tamaño',
+    colModified: 'Modificado',
     colTime: 'Hora',
     colLevel: 'Nivel',
     colEvent: 'Evento',
-    toastDownloadingBridge: 'Descargando Bridge para {os}…',
+    toastDownloadingApp: 'Descargando ERPlora para {os}…',
+    // Lo que el hub cuenta de sí mismo, al que lleva el bar (hub#375). Cada frase nombra algo que
+    // esa persona reconoce —la impresora— y, cuando hay algo que hacer, qué hacer. El tercer estado
+    // es el honesto: no hemos podido comprobarlo. Nunca se disfraza de «va bien».
+    health: {
+      printerTitle: 'Tu impresora',
+      printerReady: 'Impresora lista',
+      printerReadyDetail: 'Los tiques salen solos al cobrar.',
+      printerOffline: 'Impresora sin conectar',
+      printerOfflineDetail:
+        'Puedes seguir cobrando: el tique sale en esta pantalla y lo imprimes desde aquí.',
+      printerAction: 'Configurar la impresión',
+      printerUnknown: 'No hemos podido comprobar la impresora',
+      printerUnknownDetail:
+        'No sabemos si está conectada; no afecta a nada más. Volveremos a comprobarlo solos.',
+      notMeasured: 'No hemos podido leerlo',
+    },
   },
   planLimits: {
     currentPlan: 'Plan actual',
@@ -564,10 +825,10 @@ export default {
     loadErrorBody: 'El Hub no ha podido informar de su uso de recursos ahora mismo. Puedes reintentarlo.',
     retry: 'Reintentar',
     upgradeTitle: 'Te estás quedando sin margen en tu plan',
-    upgradeCta: 'Ver planes',
-    upgradeMemory: 'Este hub está cerca de su límite de memoria. Subir de plan le da más margen para funcionar con soltura.',
-    upgradeDatabase: 'Tu base de datos está cerca del límite de tu plan. Sube de plan para tener más almacenamiento.',
-    upgradeDevices: 'Estás usando todos los dispositivos que permite tu plan. Sube de plan para conectar más.',
+    upgradeMemory: 'Este hub está cerca de su límite de memoria. Con más margen funcionaría con soltura.',
+    upgradeDatabase: 'Tu base de datos está cerca del límite de tu plan.',
+    upgradeDevices: 'Estás usando todos los dispositivos que permite tu plan.',
+    upgradeWhere: 'Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.',
   },
   billing: {
     invoices: 'Facturas',
@@ -590,18 +851,13 @@ export default {
     month: 'mes',
     ends: 'Finaliza',
     renews: 'Renueva',
-    paymentsPortalNotice: 'La gestión del método de pago se realiza desde el portal de facturación.',
-    managePlan: 'Actualizar plan',
-    managePlanHint: 'Los cambios y mejoras de plan se gestionan desde tu cuenta de ERPlora (se abre en el navegador).',
-    managePlanError: 'No se pudo abrir la página de planes. Inténtalo de nuevo.',
-    portalError: 'No se pudo abrir el portal de facturación. Inténtalo de nuevo.',
+    paymentsPortalNotice: 'Los métodos de pago se gestionan desde tu cuenta de ERPlora, en erplora.com.',
+    managePlanHint: 'Los cambios de plan se gestionan desde tu cuenta de ERPlora, en erplora.com.',
     cloudAuthTitle: 'Consulta la facturación en tu cuenta de ERPlora',
-    cloudAuthBody: 'Tu sesión local sigue activa. Las facturas y suscripciones requieren la sesión de tu cuenta online.',
-    openBillingPortal: 'Abrir mi facturación',
+    cloudAuthBody: 'Tu sesión local sigue activa. Las facturas y suscripciones requieren la sesión de tu cuenta online en erplora.com.',
     loadErrorTitle: 'No pudimos cargar la facturación',
     loadErrorBody: 'Comprueba la conexión e inténtalo de nuevo. Puedes seguir utilizando el Hub.',
     retry: 'Reintentar',
-    downloadError: 'No se pudo descargar la factura. Inténtalo de nuevo.',
     statusDraft: 'Borrador',
     statusOpen: 'Abierta',
     statusPaid: 'Pagada',
@@ -609,11 +865,11 @@ export default {
     statusUncollectible: 'Incobrable',
   },
   login: {
-    logoAlt: 'Logotipo del Hub',
+    logoAlt: 'Logotipo del negocio',
     toggleTheme: 'Cambiar tema',
     subtitleSetup: 'Crea tu PIN de acceso',
     subtitlePin: 'Introduce tu PIN',
-    subtitleEmail: 'Inicia sesión en tu hub',
+    subtitleEmail: 'Entra en tu negocio',
     tabPin: 'PIN',
     tabEmail: 'Email',
     emailLabel: 'Email',
@@ -621,6 +877,11 @@ export default {
     passwordLabel: 'Contraseña',
     trustDevice: 'Confiar en este dispositivo',
     trustInfoAria: 'Más información sobre dispositivos de confianza',
+    // hub#358: sustituye a la casilla «confiar en este dispositivo» cuando un administrador marcó
+    // el dispositivo como personal. Dice la CONSECUENCIA (la sesión se queda abierta) —lo que
+    // importa si el dispositivo se pierde— y dónde vive la decisión.
+    personalDeviceNote:
+      'Este dispositivo está configurado como personal: la sesión se queda abierta y nunca pide PIN. Un administrador puede cambiarlo en Ajustes › Hub.',
     popoverTitle: 'Acceso por PIN',
     popoverBody: 'Marca esta casilla para poder entrar con un <strong>PIN</strong> en este dispositivo la próxima vez, sin escribir email y contraseña. Si no la marcas, siempre tendrás que iniciar sesión con email.',
     signIn: 'Entrar',
@@ -629,6 +890,16 @@ export default {
     signInWithEmail: 'Iniciar sesión con email',
     changeUser: 'Cambiar usuario',
     pinIncorrect: 'PIN incorrecto',
+    // hub#330. Sustituye a «PIN incorrecto» cuando lo que se rechazó fue el dispositivo, no los
+    // dígitos. Decirle «PIN incorrecto» a quien lo ha escrito bien es la peor respuesta posible: lo
+    // vuelve a teclear, y nada en pantalla nombra el gesto que lo arregla.
+    deviceNotEnrolled:
+      'En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.',
+    // El otro rechazo, y necesita sus propias palabras: este navegador no guarda nada entre cargas
+    // (ventana privada, o datos del sitio desactivados), así que entrar con la cuenta no serviría —
+    // la próxima visita volvería a ser un desconocido.
+    deviceUnidentified:
+      'Este navegador no puede recordar qué dispositivo es, así que aquí no se puede usar un PIN. Entra con tu cuenta, o permite que este sitio guarde datos y vuelve a intentarlo.',
     // ADR-0154: se muestra cuando la sesión de este dispositivo fue desalojada por un login en
     // otro dispositivo (plan de un solo dispositivo activo). Requiere el interceptor 401 (ver PR).
     sessionTakenOver: 'Sesión abierta en otro dispositivo',
@@ -637,7 +908,7 @@ export default {
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
     setupSaveError: 'No se pudo guardar el PIN. Vuelve a intentarlo.',
     footerTrustedDevice: 'dispositivo de confianza',
-    footerSecureCloud: 'conexión segura con Cloud',
+    footerSecureCloud: 'conexión segura',
     errorSignIn: 'No se pudo iniciar sesión. Revisa tus credenciales o la conexión.',
     errorMachineRegistration:
       'La cuenta es válida, pero no se pudo registrar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
@@ -657,11 +928,37 @@ export default {
     twoFactorIncorrect: 'Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.',
     twoFactorError: 'No se pudo verificar el código. Inténtalo de nuevo.',
   },
+  // hub#363 — la aprobación del encargado, pedida sin cerrar la sesión del cajero. Cada línea se
+  // lee en voz alta sobre el mostrador con una cola detrás, así que dice QUÉ HACER. La guarda
+  // `i18n/elevation-copy.test.ts`, incluido lo único que no puede decir nunca: CUÁL de los tres
+  // rechazos fue (nombre desconocido / PIN incorrecto / usuario desactivado). El runtime responde
+  // a los tres igual a propósito, para que un diálogo que abre cualquiera no sirva para averiguar
+  // quién trabaja aquí.
+  elevation: {
+    title: 'Hace falta una aprobación',
+    lead: 'Pide a un encargado que introduzca su PIN para aprobarlo.',
+    chooseApprover: '¿Quién lo aprueba?',
+    approverName: 'Su nombre',
+    approverNamePlaceholder: 'Escribe su nombre',
+    continue: 'Continuar',
+    cancel: 'Cancelar',
+    changeApprover: 'Otra persona',
+    // La confirmación que ve el cajero: la acción salió, y a nombre de quién queda registrada.
+    // Decirlo en voz alta es la mitad de lo que mantiene honesta la trazabilidad.
+    approvedBy: 'Aprobado por {name}',
+    rejected: 'Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a intentarlo.',
+    approverCannot: 'Esa persona no puede aprobarlo. Pídeselo a alguien que pueda hacerlo por sí mismo.',
+    notElevable:
+      'Esto no se aprueba con un PIN. Tiene que hacerlo quien dirige tu negocio, entrando con su propia cuenta.',
+    notRequired: 'Esto ya no necesita aprobación. Cierra esta ventana y vuelve a intentarlo.',
+    tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
+    failed: 'No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.',
+  },
   activation: {
     title: 'Activación requerida',
-    lead: 'Este dispositivo necesita validar su licencia de módulos con el Cloud para desbloquear el negocio. Conéctate a internet y reintenta.',
+    lead: 'Este dispositivo tiene que comprobar tus apps en erplora.com antes de poder abrir tu negocio. Conéctate a internet y vuelve a intentarlo.',
     retry: 'Reintentar',
-    retryError: 'La licencia todavía no se ha podido validar. Comprueba la conexión o inicia sesión con tu cuenta online.',
+    retryError: 'Todavía no se han podido comprobar tus apps. Comprueba la conexión o inicia sesión con tu cuenta de ERPlora.',
     logout: 'Cerrar sesión',
   },
   exportPage: {
@@ -680,6 +977,7 @@ export default {
     sectionUsersDesc: 'Empleados, roles y permisos',
     sectionSettings: 'Ajustes',
     sectionSettingsDesc: 'Ajustes del hub: moneda, idioma, identidad de negocio',
+    sectionSettingsDescTemplate: 'Ajustes del hub: país, moneda, idioma y tema. Nunca el NIF ni la razón social.',
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'Configuración VeriFactu y el certificado de empresa',
     fiscalWarning: 'Incluye el certificado: el .p12 viaja tal cual y conserva su contraseña. Comparte el fichero solo con gente de confianza.',
@@ -736,6 +1034,7 @@ export default {
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'Configuración VeriFactu y el certificado de empresa (.p12)',
     sectionMedia: 'Imágenes y media',
+    sectionRoles: 'Roles',
     sectionModule: 'Módulo {id}',
     modulesTitle: 'Módulos',
     withData: 'incluye datos',
@@ -748,8 +1047,21 @@ export default {
     statusApplied: 'Aplicado',
     statusSkipped: 'Saltado',
     statusIgnored: 'Descartado',
+    statusPartial: 'Aplicado en parte',
     statusFailed: 'Falló',
+    // hub#409 / ADR-0060 — no se instaló porque el plan necesita una dependencia sin contratar.
+    // Es una decisión de compra, no una avería: se dice QUÉ contratar (con el precio que mandó el
+    // motor), nunca una ✗ roja y muda.
+    statusBlocked: 'Requiere contratación',
+    reasonBlocked:
+      'No se ha instalado: necesita módulos que aún no tienes contratados: {missing}. Contrátalos y vuelve a importar — no se ha tocado nada más.',
     mediaFailed: '{n} sin copiar',
+    reasonIdentityNotPortable:
+      'Los usuarios, roles y PIN son del hub que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso a tu hub.',
+    reasonSettingsNotPortable:
+      'Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.',
+    reasonRolesNotActivatable:
+      'Roles sin activar: {n}. Una plantilla solo puede activar roles que traigan los módulos instalados aquí, y nunca los administrativos.',
     done: 'Ir al inicio',
   },
   moduleView: {
@@ -758,9 +1070,7 @@ export default {
     loadErrorHint: 'Comprueba que el módulo siga instalado y activo, y vuelve a intentarlo.',
     retry: 'Reintentar',
     blockedTitle: 'Suscripción necesaria',
-    blockedHint: 'Este módulo de pago está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y volverán a estar disponibles en cuanto se restaure la suscripción.',
-    manageSubscription: 'Gestionar suscripción',
-    manageSubscriptionError: 'No se pudo abrir la gestión de la suscripción. Inténtalo de nuevo.',
+    blockedHint: 'Este módulo está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y vuelven en cuanto vuelva la suscripción — se gestiona desde tu cuenta de ERPlora, en erplora.com.',
   },
   moduleSettings: {
     tab: 'Ajustes',
@@ -781,18 +1091,13 @@ export default {
     trialDays: '{n} días de prueba',
     quota: 'Incluye {quota}',
     overage: '{price} por unidad extra',
-    buy: 'Comprar',
-    upgrade: 'Mejorar',
-    cancel: 'Cancelar suscripción',
-    noTiers: 'Este módulo no ofrece planos de pago.',
+    noTiers: 'Este módulo no ofrece planes de pago.',
     trialEnds: 'Prueba hasta el {date}',
     renewsOn: 'Se renueva el {date}',
     cancelsOn: 'Se cancela el {date}',
-    opensInBrowser: 'La compra y los cambios de plan se completan en tu navegador, en tu cuenta de ERPlora.',
-    checkPurchase: 'He completado la compra — comprobar',
-    purchaseDetected: 'Compra confirmada. Tu plan se ha actualizado.',
-    purchaseError: 'No se pudo abrir la página de compra. Inténtalo de nuevo.',
-    cancelError: 'No se pudo abrir la página de la suscripción. Inténtalo de nuevo.',
+    managedInAccount: 'Los planes de este módulo se gestionan desde tu cuenta de ERPlora, en erplora.com.',
+    checkPurchase: 'Ya lo he contratado — comprobar',
+    purchaseDetected: 'Confirmado. Tu plan se ha actualizado.',
     status: {
       active: 'Activo',
       trialing: 'En prueba',
@@ -809,5 +1114,19 @@ export default {
       canceled: 'Tu suscripción está cancelada.',
       past_due: 'Hay un pago pendiente en tu suscripción.',
     },
+  },
+
+  // Hardware (impresoras, cajón). Las dos frases de abajo son el motivo de hub#338: un escaneo
+  // puede acabar sin impresoras por dos razones OPUESTAS, y cada una le pide al usuario una cosa
+  // distinta. Enseñar la que no toca le manda a arreglar algo que nunca estuvo roto.
+  hardware: {
+    printersBlocked:
+      'ERPlora no ha podido buscar en esta red: el sistema no le ha dado permiso a la app para acceder a los dispositivos de la red local. Concédele el acceso a la red local a ERPlora en los ajustes del dispositivo y vuelve a buscar.',
+    printersNone:
+      'No se ha encontrado ninguna impresora en esta red. Comprueba que la impresora está encendida y conectada a la misma red que este dispositivo, y vuelve a buscar.',
+    // ADR-0196 §3: desde el navegador, a secas, no hay forma de llegar a una impresora. Nombrar
+    // la app es lo importante: es la frase que convierte «no funciona» en un paso siguiente.
+    unavailable:
+      'Desde el navegador, este dispositivo no puede llegar a las impresoras. Instala la app de ERPlora en el dispositivo conectado a la impresora y abre tu negocio desde ahí.',
   },
 } as const;

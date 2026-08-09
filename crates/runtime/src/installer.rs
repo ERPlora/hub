@@ -106,11 +106,59 @@ pub async fn install(
     // Tablas de sistema del runtime (outbox de eventos): necesarias en cuanto un command emita.
     crate::outbox::ensure_tables(db).await?;
 
-    if registry.is_installed(&manifest.id) {
-        // Reinstalar = volver a registrar capacidades (p. ej. tras update). Limpiamos antes.
+    // 🔁 Instalar sobre un módulo YA instalado **es una actualización** (hub#516), y a partir de
+    // aquí empiezan los efectos: registrar capacidades exige desregistrar las anteriores, migrar
+    // toca el esquema. Si lo que viene falla a medias, el hub se quedaría **sin el módulo** —sin
+    // queries, sin commands, sin navegación— mientras `hub_module` sigue diciendo que está
+    // instalado. Peor que no actualizar. Así que lo que hay se guarda ANTES de tocarlo y vuelve si
+    // el intento se cae: **una actualización que falla deja corriendo la versión que funcionaba**.
+    //
+    // `None` = primera instalación: no hay nada que restaurar, y un fallo debe seguir dejando el
+    // hub exactamente como estaba (sin módulo a medias).
+    let previous = registry.snapshot_module(&manifest.id);
+    if previous.is_some() {
         registry.remove_module(&manifest.id);
     }
 
+    match register_module(db, registry, hub_id, dir, manifest).await {
+        Ok(id) => Ok(id),
+        Err(error) => {
+            if let Some(snapshot) = previous {
+                // Las scheduled tasks se vuelcan por manifest (`seed_module_tasks` borra las que el
+                // manifest ya no declara), así que la vuelta atrás también las repone. Idempotente
+                // y best-effort: si esto fallara, el error que se devuelve sigue siendo el de la
+                // actualización, que es el que explica qué pasó.
+                let restored = snapshot.manifest().clone();
+                registry.restore_module(snapshot);
+                if let Err(e) =
+                    crate::scheduler::seed_module_tasks(db, &restored.id, &restored.scheduled_tasks)
+                        .await
+                {
+                    eprintln!(
+                        "⚠ {}: restoring the previous version's scheduled tasks failed: {e}",
+                        restored.id
+                    );
+                }
+            }
+            Err(error)
+        }
+    }
+}
+
+/// Registers `manifest` (already validated) into the registry: dependencies, migrations, seed,
+/// capabilities, scheduled tasks and the `hub_module` row.
+///
+/// Split out of [`install`] for one reason: everything here has effects, so the caller needs a
+/// single place to put the previous version back if it fails (hub#516). What is **not** undone is
+/// the schema — migrations are forward-only and expand-only (ADR-0269 §3.4/§7), each file is
+/// recorded only once it succeeded, so what landed stays and the one that failed is retried.
+async fn register_module(
+    db: &dyn DatabaseAdapter,
+    registry: &mut Registry,
+    hub_id: &str,
+    dir: &Path,
+    manifest: Manifest,
+) -> Result<String> {
     // Dependencias declaradas deben estar ya instaladas (orden topológico = del llamador).
     for dep in &manifest.depends_on {
         if !registry.is_installed(dep) {

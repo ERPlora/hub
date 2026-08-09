@@ -410,6 +410,112 @@ impl Registry {
         self.listeners.retain(|_, v| !v.is_empty());
         true
     }
+
+    /// Everything [`remove_module`](Self::remove_module) would strip, kept aside so it can be put
+    /// back (hub#516).
+    ///
+    /// This is what makes an update safe to attempt: installing a new version has to unregister the
+    /// old one before registering the new, and if the new one fails halfway the hub would be left
+    /// **without the module** — no queries, no commands, no navigation — while `hub_module` still
+    /// says it is installed. Taking the snapshot costs a clone of what one module contributes; not
+    /// taking it costs a till.
+    ///
+    /// `None` when the module is not installed: a first install that fails has nothing to restore,
+    /// and must not end up half-registered because of this.
+    pub fn snapshot_module(&self, module_id: &str) -> Option<ModuleSnapshot> {
+        let manifest = self.installed.iter().find(|m| m.id == module_id)?.clone();
+        Some(ModuleSnapshot {
+            status: self.status.get(module_id).copied(),
+            queries: self
+                .queries
+                .iter()
+                .filter(|(_, q)| q.module_id == module_id)
+                .map(|(name, q)| (name.clone(), q.clone()))
+                .collect(),
+            commands: self
+                .commands
+                .iter()
+                .filter(|(_, c)| c.module_id == module_id)
+                .map(|(name, c)| (name.clone(), c.clone()))
+                .collect(),
+            navigation: self
+                .navigation
+                .iter()
+                .filter(|n| n.module_id == module_id)
+                .cloned()
+                .collect(),
+            locales: self.locales.get(module_id).cloned().unwrap_or_default(),
+            // A listener belongs to the module that owns the command it fires (hub#659 makes that
+            // the only shape a manifest can declare), so this is exactly the module's own share of
+            // the map — the same rule `remove_module` uses to prune it.
+            listeners: self
+                .listeners
+                .iter()
+                .flat_map(|(event, commands)| {
+                    commands
+                        .iter()
+                        .filter(|name| {
+                            self.commands
+                                .get(*name)
+                                .is_some_and(|c| c.module_id == module_id)
+                        })
+                        .map(move |name| (event.clone(), name.clone()))
+                })
+                .collect(),
+            manifest,
+        })
+    }
+
+    /// Puts a [`ModuleSnapshot`] back, replacing whatever is registered for that module now.
+    ///
+    /// Used after a failed update: the version that was running goes back to serving. It is NOT a
+    /// schema rollback — migrations are forward-only and expand-only (ADR-0269 §3.4/§7), so what
+    /// already applied stays and the previous version simply ignores it.
+    pub fn restore_module(&mut self, snapshot: ModuleSnapshot) {
+        let module_id = snapshot.manifest.id.clone();
+        self.remove_module(&module_id);
+
+        self.installed.push(snapshot.manifest);
+        if let Some(status) = snapshot.status {
+            self.status.insert(module_id.clone(), status);
+        }
+        self.queries.extend(snapshot.queries);
+        self.commands.extend(snapshot.commands);
+        self.navigation.extend(snapshot.navigation);
+        self.set_locales(&module_id, snapshot.locales);
+        for (event, command) in snapshot.listeners {
+            let listeners = self.listeners.entry(event).or_default();
+            if !listeners.contains(&command) {
+                listeners.push(command);
+            }
+        }
+    }
+}
+
+/// What one module contributes to the [`Registry`], kept aside so a failed update can put the
+/// working version back (hub#516). Opaque on purpose: it is a restore token, not a view.
+#[derive(Debug, Clone)]
+pub struct ModuleSnapshot {
+    manifest: Manifest,
+    status: Option<ModuleStatus>,
+    queries: Vec<(String, RegisteredQuery)>,
+    commands: Vec<(String, RegisteredCommand)>,
+    navigation: Vec<NavEntry>,
+    locales: HashMap<String, ModuleLocale>,
+    /// `(event, command)` pairs whose command belongs to the module.
+    listeners: Vec<(String, String)>,
+}
+
+impl ModuleSnapshot {
+    /// The manifest of the version that was running — what the restore puts back.
+    pub fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+
+    /// The version that was running (`1.0.0`), i.e. the `from` of an update.
+    pub fn version(&self) -> &str {
+        &self.manifest.version
+    }
 }
 
 /// Contexto de una petición: identidad y alcance. El runtime inyecta `hub_id`,
@@ -478,6 +584,41 @@ pub struct RequestContext {
     /// `created_by` — the double attribution is the whole point of approving instead of sharing a
     /// password.
     pub approved_by: Option<String>,
+    /// **Which flow is acting, when no person is** (ADR-0283 D2, hub#661). `Some` means this
+    /// request is a step of a flow run, and the permission gate in `commands::execute_at` asks
+    /// `_flow_grants` about THAT flow instead of asking a role about a human.
+    ///
+    /// The field is **private and its setter is `pub(crate)`** on purpose, and that is the whole
+    /// mechanism: `RequestContext` crosses the crate boundary into `erplora-server`, where every
+    /// context is built from something a caller sent (a session, an API key, a header). Were this
+    /// `pub`, a route could stamp `automation: Some(flow_id)` on a request and inherit that flow's
+    /// grants — turning «the hub acting on its own» into a privilege anybody with an HTTP client
+    /// could claim. Only the runtime's own executor can fill it in.
+    automation: Option<AutomationCtx>,
+    /// **The event whose delivery caused this request** (hub#666), if any. Stamped by the outbox
+    /// relay when it reconstructs a listener's context, and carried by a flow run from the event
+    /// that started it, so every event emitted downstream can name what set it off.
+    ///
+    /// `_event_outbox.depth` already said how FAR a cascade had travelled; it never said **from
+    /// what**. On a till closing two sales a second, "the row before it in time" is a guess, and a
+    /// guess is not an answer to "why does this invoice exist".
+    ///
+    /// Private with a `pub(crate)` setter for the same reason as [`Self::automation`]: this
+    /// struct crosses into `erplora-server`, where contexts are built from what a caller sent. A
+    /// route able to stamp it could file its events under somebody else's execution, which makes
+    /// the whole audit trail worth exactly nothing.
+    parent_event_id: String,
+}
+
+/// Identity of the flow behind an automation request: which flow, and which of its runs.
+///
+/// Both halves are needed and neither is decoration: `flow_id` is what the grant gate reads, and
+/// `run_id` is what ties the effects back to the execution that caused them when somebody later
+/// asks why a row exists.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutomationCtx {
+    pub flow_id: String,
+    pub run_id: String,
 }
 
 /// Who is behind a request. The distinction only exists because of what it forbids.
@@ -520,7 +661,34 @@ impl RequestContext {
             principal: Principal::Human,
             elevation_token: None,
             approved_by: None,
+            automation: None,
+            parent_event_id: String::new(),
         }
+    }
+
+    /// Marks this context as **a step of a flow run** (ADR-0283 D2). `pub(crate)` is the point:
+    /// see [`RequestContext::automation`].
+    pub(crate) fn with_automation(mut self, automation: AutomationCtx) -> Self {
+        self.automation = Some(automation);
+        self
+    }
+
+    /// The flow this request belongs to, if any. Readable everywhere (the audit and the error
+    /// reporter want it); settable only inside the runtime.
+    pub fn automation(&self) -> Option<&AutomationCtx> {
+        self.automation.as_ref()
+    }
+
+    /// Marks this context as **caused by the delivery of an event** (hub#666). Only the relay and
+    /// the flow executor call it — see [`RequestContext::parent_event_id`].
+    pub(crate) fn caused_by_event(mut self, event_id: impl Into<String>) -> Self {
+        self.parent_event_id = event_id.into();
+        self
+    }
+
+    /// The event that caused this request, or `""` when a person started it directly.
+    pub fn parent_event_id(&self) -> &str {
+        &self.parent_event_id
     }
 
     /// Marks this context as a **machine** principal (an API key — [`Principal::Machine`]). Only

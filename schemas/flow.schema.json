@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://erplora.com/schemas/flow.schema.json",
+  "title": "ERPlora hub flow document",
+  "description": "Contrato CONGELADO del documento de un flujo (ADR-0283 K7, hub#661). El core gana esta última familia de primitivas y se congela; el producto (editor visual, plantillas, conectores) vive en el módulo `flows`. `schema_version` es OBLIGATORIO desde el día 1: una versión desconocida se RECHAZA, nunca se ejecuta a medias. v1 es deliberadamente LINEAL (sin branching ni DAG: eso sería una v2 futura) y su lenguaje de mapeo NO es Turing-completo — lo difuso lo resuelve el step `ai`, no un DSL. La autoridad es el runtime (`crates/runtime/src/flows/def.rs`), no este fichero: aquí se declara para que el toolkit y el editor validen en el momento de escribir, y `crates/runtime/tests/flow_schema_matches_the_runtime.rs` impide que las dos mitades se separen.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Versión del documento. Obligatoria; una desconocida se rechaza (no se adivina)."
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre legible dentro del documento. El nombre que se muestra vive en la fila `_flow.name`; este es opcional y solo documental."
+    },
+    "triggers": {
+      "type": "array",
+      "description": "Qué arranca el flujo. Se materializan a `_flow_triggers` al guardar (idempotente, conservando `next_run`). Un flujo sin triggers solo se dispara a mano.",
+      "items": { "$ref": "#/$defs/trigger" }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Los pasos, EN ORDEN. v1 es lineal y `on_error` es siempre `stop`: un fallo detiene el run (reintentar un command de negocio por su cuenta es como se cobra dos veces una venta).",
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "path": {
+      "type": "string",
+      "description": "Ruta del lenguaje de mapeo: `input.<campo>`, `steps.<step_id>.<campo>`, `event.<campo>` (solo dentro de un trigger) o `secret.<NOMBRE>` (SOLO dentro de un step `http`, hub#662: es el único sitio donde una credencial tiene que salir; en cualquier otro step se rechaza al guardar). Los secretos viven en `_flow_secrets`, cifrados y write-only: se referencian por nombre, se sustituyen al construir la petición y NUNCA se persisten en `_flow_run_steps`."
+    },
+    "mapping": {
+      "type": "object",
+      "description": "Mapa `{nombre: valor}`. Un valor es un literal, una RUTA (`input.x` — conserva el tipo), o un string con plantillas `{{ruta}}` (siempre devuelve string). Los objetos y arrays se recorren recursivamente. Mismo estilo que `ReadDef::resolve_params_from_map` de los `reads`.",
+      "additionalProperties": true
+    },
+    "condition": {
+      "type": "object",
+      "description": "Filtro declarativo `{ruta: {operador: valor}}` evaluado en AND. El conjunto de operadores está CONGELADO: uno desconocido se rechaza al guardar (un filtro que casa con todo en silencio es como se acaba enviando un email a la lista entera de clientes). Comparación: `eq`/`neq` estrictos con caída a texto y a número (el dinero es un string, ADR-0123); `gt|gte|lt|lte` numéricos si ambos lados lo son, si no lexicográficos (así ordenan bien las fechas RFC-3339); un campo ausente NUNCA casa salvo `exists: false`.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eq": {},
+          "neq": {},
+          "in": { "type": "array" },
+          "exists": { "type": "boolean" },
+          "contains": {},
+          "gt": {},
+          "gte": {},
+          "lt": {},
+          "lte": {}
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": ["event", "cron", "at", "manual"],
+          "description": "`event`: casa en el relay del outbox y SOLO inserta el run (el tick lo ejecuta). `cron`/`at`: reloj propio en `_flow_triggers` reutilizando `scheduler::cron::next_after` (NO se tocan las `_scheduled_tasks`); `at` es one-shot y es lo que da los «dentro de 3 días…». `manual`: `POST /api/hub/flows/{id}/run`."
+        },
+        "event": {
+          "type": "string",
+          "description": "Solo `kind: event` — nombre del evento. Obligatorio ahí."
+        },
+        "filter": {
+          "$ref": "#/$defs/condition",
+          "description": "Solo `kind: event` — filtro sobre el payload del evento, con rutas `event.<campo>`. Ausente = casa siempre."
+        },
+        "input": {
+          "$ref": "#/$defs/mapping",
+          "description": "Solo `kind: event` — cómo el payload del evento se convierte en el `input` del run. Ausente/vacío = pasa el evento entero."
+        },
+        "cron": {
+          "type": "string",
+          "description": "Solo `kind: cron` — expresión de 5 campos o atajo (`@daily`, `@hourly`). Obligatoria ahí."
+        },
+        "at": {
+          "type": "string",
+          "description": "Solo `kind: at` — instante RFC-3339. Obligatorio ahí."
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identidad del paso DENTRO del flujo: es como lo leen los pasos posteriores (`steps.<id>.<campo>`). Único en el documento."
+        },
+        "kind": {
+          "enum": ["command", "condition", "delay", "http", "ai", "notify"],
+          "description": "Vocabulario CONGELADO. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http` (hub#662) sigue el contrato claim → I/O → complete: el tick lo prepara y el server lo ejecuta FUERA del lock. `ai`/`notify` todavía NO están implementados: un documento que los use se RECHAZA al guardar nombrando su issue (ai: hub#665, notify: hub#663), en vez de guardarse y quedarse colgado a las 3 de la mañana."
+        },
+        "command": {
+          "type": "string",
+          "description": "Solo `kind: command` — nombre del command. Debe tener un grant vivo (`_flow_grants`) en el momento de ejecutarse; los commands internos (`_`/`internal:true`) están prohibidos, igual que para un caller externo."
+        },
+        "params": {
+          "$ref": "#/$defs/mapping",
+          "description": "Solo `kind: command` — payload del command, mapeado contra el run."
+        },
+        "when": {
+          "$ref": "#/$defs/condition",
+          "description": "Solo `kind: condition` — guarda. Si no pasa, el run TERMINA (`done`, no `failed`): una guarda que no pasa es el flujo funcionando."
+        },
+        "seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Solo `kind: delay` — espera relativa. El run duerme como una FILA (`wake_at`), nunca como una tarea retenida."
+        },
+        "until": {
+          "$ref": "#/$defs/path",
+          "description": "Solo `kind: delay` — ruta a un instante RFC-3339. Alternativa a `seconds`; hace falta uno de los dos."
+        },
+        "method": {
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "description": "Solo `kind: http` — método. Por defecto `GET`. El conjunto está CONGELADO y es pequeño a propósito: `CONNECT`/`TRACE` son la forma de convertir una URL permitida en un túnel."
+        },
+        "url": {
+          "type": "string",
+          "description": "Solo `kind: http` — URL absoluta `http(s)`, con plantillas `{{ruta}}`. OBLIGATORIA. Se templa contra el run y SOLO ENTONCES se compara con los grants `http` del flujo (`https://host/ruta*`): juzgar la forma sin templar autorizaría `https://api.example.com/{{input.path}}` y luego llamaría a lo que trajera el evento. Además, antes de salir se comprueba la DIRECCIÓN a la que resuelve (anti-SSRF): nada dentro de la red del hub."
+        },
+        "headers": {
+          "$ref": "#/$defs/mapping",
+          "description": "Solo `kind: http` — cabeceras, mapeadas contra el run. Es donde va la credencial: `{\"Authorization\": \"Bearer {{secret.API_KEY}}\"}`."
+        },
+        "body": {
+          "description": "Solo `kind: http` — cuerpo. Un objeto/array se envía como JSON (y se le pone `content-type: application/json` si el autor no declaró uno); cualquier otra cosa se envía como texto tal cual, y el autor pone su propia cabecera."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Solo `kind: http` — segundos de espera. Por defecto 10, máximo 30: el run mantiene su lease todo ese rato, así que es también lo que cuesta un error. La respuesta se trunca a 1 MB y no se siguen redirecciones (un 3xx es una segunda petición a un sitio que nadie concedió)."
+        }
+      }
+    }
+  }
+}

@@ -6,14 +6,11 @@ const source = readFileSync(new URL('../views/SystemPage.vue', import.meta.url),
 const contract = readFileSync(new URL('./system.ts', import.meta.url), 'utf8');
 
 describe('navegación de Sistema', () => {
-  it('reserva Sistema para diagnóstico, suma «Plan y límites» y retira copias y documentos', () => {
+  it('reserva Sistema para diagnóstico, suma «Plan y límites» y retira la pestaña de copias', () => {
     // `plan` = telemetría de recursos vs límites del plan (ADR-0154). Va tras `resources`.
-    // `documents` se retiró: los documentos del hub viven en /files (gestor de `media/`).
-    expect(SYSTEM_TABS).toEqual(['resources', 'plan', 'updates', 'logs']);
+    expect(SYSTEM_TABS).toEqual(['resources', 'plan', 'updates', 'documents', 'logs']);
     expect(source).not.toContain('value="backups"');
     expect(source).not.toContain("tab === 'backups'");
-    expect(source).not.toContain('value="documents"');
-    expect(source).not.toContain("tab === 'documents'");
     expect(contract).not.toContain('backups?:');
   });
 

@@ -12,12 +12,13 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
+    "verify": "pnpm run typecheck && pnpm run test",
     "preview": "vite preview"
   },
   "dependencies": {
     "@erplora/module-sdk": "workspace:*",
     "@erplora/module-types": "workspace:*",
-    "@erplora/outfitkit": "^0.1.34",
+    "@erplora/outfitkit": "^0.1.29",
     "@iconify/vue": "^5.0.1",
     "@ionic/core": "^8.8.8",
     "@ionic/vue": "^8.8.8",

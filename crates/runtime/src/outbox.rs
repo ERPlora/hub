@@ -18,6 +18,7 @@ use serde_json::{json, Value as Json};
 use crate::commands::{self, MAX_EVENT_DEPTH};
 use crate::errors::{Result, RuntimeError};
 use crate::host_notify::{self, NotifyIntent};
+use crate::permissions;
 use crate::registry::{new_id, now_rfc3339, Registry, RequestContext};
 
 /// Reintentos antes de mandar la fila a dead-letter (`status='dead'`).
@@ -39,6 +40,14 @@ const BATCH: i64 = 50;
 /// Mismo valor que el scheduler (hub#570): las dos colas viven el mismo modelo `start-first`.
 const LEASE_SECONDS: i64 = 300;
 
+/// The schema of the outbox, laid down idempotently at every boot.
+///
+/// New columns arrive here as `ALTER TABLE … ADD COLUMN IF NOT EXISTS` and **not** as a numbered
+/// system migration. That is this table's own pattern (`module_id` in ADR-0168, `discarded_at/by`
+/// in hub#660, `run_id`/`parent_event_id` in hub#666) and it is deliberate: these tables are
+/// created by the runtime before the migration engine runs at all — a hub with zero modules still
+/// has an outbox — so their shape cannot depend on a numbered version. It also keeps additive
+/// columns out of the way of the number races between parallel branches.
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS _event_outbox (\
   id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, user_id TEXT NOT NULL, \
@@ -47,12 +56,18 @@ CREATE TABLE IF NOT EXISTS _event_outbox (\
   attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, \
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT, \
   module_id TEXT NOT NULL DEFAULT '', claim_expires_at TEXT, \
-  discarded_at TEXT, discarded_by TEXT);\
+  discarded_at TEXT, discarded_by TEXT, \
+  run_id TEXT NOT NULL DEFAULT '', parent_event_id TEXT NOT NULL DEFAULT '');\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS module_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS claim_expires_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS run_id TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS parent_event_id TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_at);\
+CREATE INDEX IF NOT EXISTS ix_outbox_run ON _event_outbox (hub_id, run_id) WHERE run_id <> '';\
+CREATE INDEX IF NOT EXISTS ix_outbox_parent ON _event_outbox (hub_id, parent_event_id) \
+  WHERE parent_event_id <> '';\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
   PRIMARY KEY (event_id, listener_command));";
@@ -64,13 +79,22 @@ pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
 }
 
 /// Construye el `INSERT` de una fila de outbox para un evento emitido por un command.
-/// Se añade a la MISMA transacción que el SQL del command (escritura atómica). Guarda el
-/// contexto (hub_id/user_id/permissions) para que el relay reconstruya el `RequestContext`
-/// exacto del emisor — preserva la semántica de permisos del modelo síncrono.
+/// Se añade a la MISMA transacción que el SQL del command (escritura atómica).
+///
+/// Guarda el contexto del emisor. `hub_id` y `user_id` los usa el relay para construir el contexto
+/// del listener ([`listener_ctx`]): el tenant y **quién lo causó**, que es la atribución que acaba
+/// en `created_by`. `permissions` es desde hub#686 **forense**, no autorización: queda como
+/// registro de lo que el emisor podía hacer (útil en el dead-letter, hub#660), pero el listener ya
+/// no corre con ello — corre con la autoridad de su propio módulo.
 ///
 /// `module_id` = **módulo emisor**. Se persiste porque el relay necesita saber a quién exigirle la
 /// capability al ejercer un primitivo de host (`*.reminder.due` → `host.notify`): sin atribución,
 /// el envío externo se hacía "en nombre del hub" y cualquier módulo llegaba a él (hub#240).
+///
+/// `run_id` y `parent_event_id` son la **correlación** (hub#666), y salen del contexto — jamás del
+/// payload. Un evento emitido dentro de un run queda sellado con ese run, y todo evento en cascada
+/// nombra al evento cuya entrega lo provocó. Sin eso la cadena venta → run → command → evento hijo
+/// solo se podía adivinar por marca de tiempo, que con dos ventas por segundo no es una respuesta.
 pub(crate) fn insert_op(
     ctx: &RequestContext,
     module_id: &str,
@@ -92,11 +116,58 @@ pub(crate) fn insert_op(
         json!(serde_json::to_string(&Json::Object(payload.clone())).unwrap_or_else(|_| "{}".into())),
     );
     p.insert("depth".into(), json!(depth));
+    p.insert(
+        "run_id".into(),
+        json!(ctx.automation().map(|a| a.run_id.as_str()).unwrap_or_default()),
+    );
+    p.insert("parent_event_id".into(), json!(ctx.parent_event_id()));
     p.insert("now".into(), json!(now));
     let sql = "INSERT INTO _event_outbox \
-        (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, status, attempts, next_attempt_at, last_error, created_at) \
-        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, 'pending', 0, :now, '', :now)";
+        (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, run_id, parent_event_id, status, attempts, next_attempt_at, last_error, created_at) \
+        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, :run_id, :parent_event_id, 'pending', 0, :now, '', :now)";
     (sql.to_string(), p)
+}
+
+/// Writes a **core event** — one the host itself ingests from outside the hub — into the outbox
+/// under an id the CALLER chooses, at most once (ADR-0283 K1c).
+///
+/// Every other row here gets a fresh [`new_id`] because a command emitting an event is already
+/// inside its own transaction: emit twice and you meant twice. An event ingested from an external
+/// source is the opposite case. The source redelivers whatever it has not seen acknowledged, so
+/// the same message arrives repeatedly by design, and the only thing that can tell one delivery of
+/// a message from a second message is **the source's own id**. Deriving the primary key from it
+/// (`"wa-<wa_message_id>"`) turns `ON CONFLICT DO NOTHING` into the exactly-once guarantee: the
+/// database refuses the second write, so no listener runs twice and no caller has to remember
+/// anything across a restart.
+///
+/// `DO NOTHING` — never `DO UPDATE`: a duplicate must not overwrite the stored payload, and above
+/// all must not reset an already-`delivered` row back to `pending`, which would re-run listeners.
+///
+/// Returns whether a row was actually written (`false` = the id was already there).
+///
+/// The row's context is the **system** one, like [`crate::scheduler`]'s: `user_id` empty because
+/// nobody in this hub caused it (the message came from a customer's phone), `module_id` empty
+/// because no module emitted it. Per ADR-0288 the `permissions` column is forensic only — the
+/// listener runs with its own module's authority — and the wildcard recorded here is simply the
+/// honest description of the host: the same one `scheduler::system_ctx` uses.
+pub async fn insert_core_event_once(
+    db: &dyn DatabaseAdapter,
+    id: &str,
+    hub_id: &str,
+    event_name: &str,
+    payload: &Params,
+) -> Result<bool> {
+    let ctx = RequestContext::new(
+        hub_id.to_string(),
+        String::new(),
+        [permissions::WILDCARD.to_string()],
+    );
+    let (sql, mut params) = insert_op(&ctx, "", event_name, payload, 0);
+    params.insert("id".into(), json!(id));
+    let result = db
+        .execute(&format!("{sql} ON CONFLICT (id) DO NOTHING"), &params)
+        .await?;
+    Ok(result.affected > 0)
 }
 
 /// `INSERT` del marcador de entrega (event_id, listener). El relay lo añade a la transacción
@@ -218,7 +289,7 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         return mark_dead(db, &id, "profundidad máxima de cascada superada").await;
     }
 
-    let ctx = reconstruct_ctx(row);
+    let ctx = listener_ctx(row);
     let payload = parse_payload(row);
 
     // Listeners actuales (solo módulos activos). Si no hay, la entrega es trivialmente completa.
@@ -276,6 +347,31 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {e}"));
             }
+        }
+    }
+
+    // ── Triggers de FLUJO (ADR-0283 §3, hub#661) ────────────────────────────────────────────
+    // Un evento entregado puede además arrancar flujos. Aquí SOLO se inserta la fila `_flow_runs`
+    // (transaccional, idempotente por `_event_delivery` con un listener sintético `_flow:<id>`):
+    // ejecutar el flujo inline mantendría el lock global del runtime tomado durante todo el flujo
+    // —incluidos sus delays— y congelaría los commands de todo el hub. Lo ejecuta el tick.
+    //
+    // Va DESPUÉS de los listeners de manifest a propósito: que un flujo reaccione a un evento no
+    // cambia cuándo corren los listeners de ese mismo evento. Y un fallo aquí NO impide marcar la
+    // fila entregada por lo demás: se registra como los otros (backoff/dead-letter) y los flujos
+    // que sí arrancaron ya tienen su marcador.
+    if let Err(e) = crate::flows::triggers::on_event(
+        db,
+        &ctx.hub_id,
+        &id,
+        &event_name,
+        &payload,
+        depth,
+    )
+    .await
+    {
+        if first_err.is_none() {
+            first_err = Some(format!("flows: {e}"));
         }
     }
 
@@ -347,14 +443,65 @@ async fn deliver_host_notify(
     Ok(())
 }
 
-fn reconstruct_ctx(row: &Json) -> RequestContext {
+/// The context a listener runs with (hub#686, ADR-0288): **the module's own authority, the
+/// emitter's attribution, the event's tenant.**
+///
+/// # What it replaced, and why that was broken
+///
+/// This used to rebuild the EMITTER's context verbatim — permissions included — so a listener only
+/// ran if the human who triggered the event happened to hold a permission over a command of
+/// ANOTHER module. In the published catalogue the cashier (`employee`) holds none of the four that
+/// the sale cascade needs: closing a sale left the stock untouched, the customer's purchase
+/// unrecorded and the invoice **unsent to VeriFactu** — a legal breach, arriving as eight silent
+/// retries and a dead-letter. The owner selling produced one result and their employee selling
+/// another, from the same button.
+///
+/// The confusion was of planes. The cashier asked for «close the sale»; that this implies bringing
+/// stock down and filing with the tax agency is decided by the MODULE in its manifest. Demanding
+/// that the human hold a permission over an internal command of a module they never named is
+/// asking the wrong principal.
+///
+/// # The three parts, each for its own reason
+///
+/// 1. **`hub_id` — from the row, always.** Not negotiable in any context the runtime builds
+///    (`tenancy.md`): the listener writes in the hub of the event it reacts to and in no other.
+/// 2. **`user_id` — from the row.** Module SQL binds `:current_user_id` into `created_by` /
+///    `updated_by`, so a stock movement caused by Ana's sale must say Ana. This is the one place
+///    this context differs from [`crate::scheduler`]'s (which has no user because nobody asked
+///    for anything) and it is what keeps the fix from costing traceability.
+/// 3. **`*` — the module's authority, not the human's role.** The two sibling doors of the runtime
+///    already work this way: a scheduled task runs on `system_ctx`, and a handler's preloaded
+///    `reads` run on a system context precisely so «un empleado de POS sin `taxes.view_tax` igual
+///    necesita los tipos para poder cobrar».
+///
+/// # Why the wildcard is bounded, and by what
+///
+/// It is not a skeleton key handed to whoever emits an event: it authorises exactly ONE command,
+/// and that command is the listening module's own. Since hub#659 a manifest's `events.listen` may
+/// only name a command inside the declaring module's namespace, and that check sits in
+/// [`crate::installer::install`] — the single registration path, which
+/// [`crate::Runtime::rehydrate_installed`] re-runs on every boot, so a listener pointing at
+/// somebody else's command cannot be in a live registry at all. Downstream, `validate_operation`
+/// keeps a Tier-2 handler's operations inside the same module. So the authority never crosses a
+/// module boundary: what the wildcard opens is a door the module already owned.
+///
+/// Everything that does NOT key on permissions keeps refusing exactly as before — the fiscal
+/// preconditions (ADR-0203), the capability grants (ADR-0079), the payload schema, `min_affected_rows`.
+/// Those cover the listeners on purpose and none of them changes here.
+///
+/// The row's `permissions` column is kept: it is the record of what the emitter could do, which is
+/// worth having in a dead-letter (hub#660). It is simply no longer what authorises anything.
+fn listener_ctx(row: &Json) -> RequestContext {
     let hub_id = row["hub_id"].as_str().unwrap_or_default().to_string();
     let user_id = row["user_id"].as_str().unwrap_or_default().to_string();
-    let perms: Vec<String> = row["permissions"]
-        .as_str()
-        .and_then(|s| serde_json::from_str(s).ok())
-        .unwrap_or_default();
-    RequestContext::new(hub_id, user_id, perms)
+    RequestContext::new(hub_id, user_id, [permissions::WILDCARD.to_string()])
+        // Whatever this listener emits is a consequence of THIS event, and says so (hub#666).
+        .caused_by_event(row["id"].as_str().unwrap_or_default())
+        // There is no human at the relay, so there is nobody to type a manager's PIN: the
+        // step-up dialog (hub#361) must never be offered here. It cannot be today — the
+        // wildcard opens the gate before elevation is ever considered — and saying so in the
+        // context means it stays true if the authority is ever narrowed.
+        .as_machine()
 }
 
 fn parse_payload(row: &Json) -> Params {
@@ -559,12 +706,133 @@ pub async fn discard(
     Ok(res.affected > 0)
 }
 
+// ─────────────────────────── Correlation (hub#666 — ADR-0283 §8) ───────────────────────────────
+//
+// Two columns and two queries, and between them they answer the two questions the kernel could not
+// answer before: **«what did this sale set off?»** and **«why does this row exist?»**.
+//
+// `depth` already bounded a cascade, but it only ever said how far one had travelled — never from
+// what. The link had to be guessed from timestamps, and a till closing two sales a second makes
+// that guess wrong exactly when it matters. `parent_event_id` names the event whose delivery caused
+// this one; `run_id` names the flow execution that emitted it. Both are written by the runtime from
+// the [`RequestContext`], never by a caller.
+
+/// How many rows one correlation query returns. A chain longer than this is a runaway, and the
+/// guards in `flows::triggers` are what deal with those.
+pub const MAX_CORRELATED: i64 = 200;
+
+/// One event, seen as a link in a chain rather than as a payload to inspect. The payload is
+/// deliberately absent: this shape is for walking the chain, and the door that shows payloads is
+/// the dead-letter queue, where an operator is deciding whether to replay one specific row.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CorrelatedEvent {
+    pub id: String,
+    pub event_name: String,
+    pub module_id: String,
+    pub status: String,
+    /// The flow run that emitted it (`""` when a person's command did).
+    pub run_id: String,
+    /// The event whose delivery caused it (`""` when it is the root of its chain).
+    pub parent_event_id: String,
+    pub depth: i64,
+    pub created_at: String,
+}
+
+/// The events **a flow run emitted** — the forward link from a run into everything downstream.
+pub async fn events_of_run(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+) -> Result<Vec<CorrelatedEvent>> {
+    // An empty `run_id` is the value of every event nobody automated: matching on it would return
+    // the whole outbox for a run id that got lost on the way here.
+    if run_id.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("run_id".into(), json!(run_id));
+    p.insert("lim".into(), json!(MAX_CORRELATED));
+    let res = db
+        .query(
+            "SELECT id, event_name, module_id, status, run_id, parent_event_id, depth, created_at \
+             FROM _event_outbox WHERE hub_id = :hub_id AND run_id = :run_id \
+             ORDER BY created_at, id LIMIT :lim",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.iter().map(correlated).collect())
+}
+
+/// The events **caused by the delivery of** `event_id` — one level of the cascade, not the whole
+/// transitive closure. A recursive walk in SQL would be a single query that can traverse the entire
+/// outbox; one level at a time is what the caller can page and bound.
+pub async fn events_caused_by(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+) -> Result<Vec<CorrelatedEvent>> {
+    if event_id.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("parent".into(), json!(event_id));
+    p.insert("lim".into(), json!(MAX_CORRELATED));
+    let res = db
+        .query(
+            "SELECT id, event_name, module_id, status, run_id, parent_event_id, depth, created_at \
+             FROM _event_outbox WHERE hub_id = :hub_id AND parent_event_id = :parent \
+             ORDER BY created_at, id LIMIT :lim",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.iter().map(correlated).collect())
+}
+
+/// One event of this hub, as a link in a chain. `None` when it is not in this hub — the tenant is
+/// part of the lookup, not a filter applied afterwards.
+pub async fn correlated_event(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+) -> Result<Option<CorrelatedEvent>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("id".into(), json!(event_id));
+    let res = db
+        .query(
+            "SELECT id, event_name, module_id, status, run_id, parent_event_id, depth, created_at \
+             FROM _event_outbox WHERE hub_id = :hub_id AND id = :id",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.first().map(correlated))
+}
+
+fn correlated(row: &Json) -> CorrelatedEvent {
+    let s = |k: &str| row[k].as_str().unwrap_or_default().to_string();
+    CorrelatedEvent {
+        id: s("id"),
+        event_name: s("event_name"),
+        module_id: s("module_id"),
+        status: s("status"),
+        run_id: s("run_id"),
+        parent_event_id: s("parent_event_id"),
+        depth: row["depth"]
+            .as_i64()
+            .or_else(|| row["depth"].as_f64().map(|f| f as i64))
+            .unwrap_or(0),
+        created_at: s("created_at"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::elevation::Grants;
     use crate::manifest::CommandDef;
-    use crate::registry::{ModuleStatus, RegisteredCommand};
+    use crate::registry::{ModuleStatus, Principal, RegisteredCommand};
     use erplora_db::{testutil::fresh_db, PgAdapter};
 
     fn cmd(module: &str, sql: &str, emit: Vec<String>) -> RegisteredCommand {
@@ -590,6 +858,22 @@ mod tests {
         }
     }
 
+    /// El esquema de sistema que deja un arranque REAL (`Runtime::ensure_system_tables`).
+    ///
+    /// Hasta hub#661 bastaba con `ensure_tables` (las dos tablas del outbox), porque el relay solo
+    /// leía las suyas. Ahora, tras entregar a los listeners, además le pregunta a `_flow_triggers`
+    /// si ese evento arranca algún flujo (ADR-0283 §3) — así que un fixture con MEDIO esquema deja
+    /// de parecerse a ningún hub, y sus tests pasarían a hablar del fixture en vez del relay.
+    /// Montarlo entero es más lento y es lo correcto: en un hub las tablas nacen juntas, bajo un
+    /// único lock de migración.
+    async fn system_schema(db: &PgAdapter) {
+        crate::installer::ensure_hub_module_table(db).await.unwrap();
+        crate::identity::ensure_tables(db).await.unwrap();
+        ensure_tables(db).await.unwrap();
+        crate::system_migrations::apply(db, "h1").await.unwrap();
+        crate::flows::store::ensure_indexes(db).await.unwrap();
+    }
+
     async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
         r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
@@ -601,7 +885,7 @@ mod tests {
     async fn outbox_async_delivery_is_exactly_once() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         // Módulo "m" activo: "m.fire" emite "e"; "m.append" (listener de "e") inserta n=1.
         let mut reg = Registry::new();
@@ -643,7 +927,7 @@ mod tests {
     async fn relay_delivers_to_an_underscore_prefixed_internal_listener() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         // "sales.void" emite "sale.voided"; "cash_register._reverse_sale" (interno, sin
         // `expose_api`) es su listener, como en el caso real (void_reversal_e2e.rs).
@@ -875,7 +1159,7 @@ mod tests {
     async fn one_failing_listener_does_not_block_sibling_listeners() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         // "sales.void" emite "sale.voided"; dos listeners: "bad" (revienta: columna inexistente)
         // y "good" (inserta n=1). El orden del registro pone "bad" PRIMERO: si el bug siguiera
@@ -959,7 +1243,7 @@ mod tests {
     async fn one_failing_row_does_not_starve_later_rows_in_the_batch() {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         // "poison.fire" emite "poison.e" cuyo ÚNICO listener revienta (columna inexistente).
         // "ok.fire" emite "ok.e" cuyo listener inserta n=1. Disparamos "poison" ANTES para que su
@@ -1036,7 +1320,7 @@ mod tests {
         let tdb = TestDb::new().await;
         let db_a = tdb.adapter().await;
         let db_b = tdb.adapter().await;
-        ensure_tables(&db_a).await.unwrap();
+        system_schema(&db_a).await;
 
         // One due event in the outbox.
         let mut p = Params::new();
@@ -1099,7 +1383,7 @@ mod tests {
 
         let tdb = TestDb::new().await;
         let db = tdb.adapter().await;
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         let mut p = Params::new();
         p.insert("id".into(), json!("evt-1"));
@@ -1133,14 +1417,14 @@ mod tests {
     /// A hub holding exactly one dead-letter. `m.fire` emits `e`, whose only listener `m.apply`
     /// explodes on every attempt, so the row burns [`MAX_ATTEMPTS`] and lands in `dead`.
     ///
-    /// This is the shape of the STRUCTURAL dead-letters production already has: an employee closes
-    /// a sale, the `verifactu.records.ingest_invoice` listener demands a manager permission the
-    /// emitter's reconstructed context does not carry, and eight attempts later the event is dead
-    /// with nobody able to see it, let alone replay it.
+    /// The shape this was written for — an employee closes a sale, `verifactu.records.ingest_invoice`
+    /// demands a permission the emitter does not carry, eight attempts later the invoice is dead —
+    /// is gone at the source (hub#686: a listener runs with its module's authority, not the
+    /// cashier's role). What is left is what will always be left: a listener that is simply broken.
     async fn hub_with_a_dead_letter() -> (PgAdapter, Registry) {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        ensure_tables(&db).await.unwrap();
+        system_schema(&db).await;
 
         let mut reg = Registry::new();
         reg.status.insert("m".into(), ModuleStatus::Active);
@@ -1317,6 +1601,497 @@ mod tests {
             count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
             1,
             "the dead-letter is untouched"
+        );
+    }
+
+    // ───────────── hub#686 — with WHOSE authority does a listener run? ─────────────
+    //
+    // The relay used to rebuild the EMITTER's `RequestContext` — permissions included — and run
+    // the listener under it. So the reaction to an event only happened if the human who triggered
+    // it happened to hold a permission over a command of ANOTHER module. In the catalogue as
+    // published, the cashier (`employee`) holds none of them: they close a sale and the stock does
+    // not come down, the customer's purchase is not recorded, and the invoice is not sent to the
+    // AEAT. Eight retries later the event is a dead-letter, and until hub#660 that was invisible.
+    //
+    // The reaction to an event is a decision of the MODULE, in its manifest — not an action of the
+    // user. So the listener runs with the module's own authority, keeping the emitter's `user_id`
+    // for the audit trail and the `hub_id`, which is never negotiable.
+
+    /// A command that actually demands a permission (the base [`cmd`] helper declares none).
+    fn gated_cmd(
+        module: &str,
+        permission: &str,
+        sql: &str,
+        emit: Vec<String>,
+    ) -> RegisteredCommand {
+        let mut c = cmd(module, sql, emit);
+        c.def.permission = permission.to_string();
+        c
+    }
+
+    /// The cast of the real bug: `sales` emits `sale.completed`, `inventory` reacts with a command
+    /// of its OWN gated on `inventory.change_product` — a permission the cashier deliberately does
+    /// not have, because editing the catalogue is not their job.
+    async fn till_with_a_cashier() -> (PgAdapter, Registry, RequestContext) {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE sales_log (id TEXT);\
+             CREATE TABLE stock_moves (hub_id TEXT NOT NULL, created_by TEXT NOT NULL);",
+        )
+        .await
+        .unwrap();
+        system_schema(&db).await;
+
+        let mut reg = Registry::new();
+        reg.status.insert("sales".into(), ModuleStatus::Active);
+        reg.status.insert("inventory".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "sales.complete_sale".into(),
+            gated_cmd(
+                "sales",
+                "sales.add_sale",
+                "INSERT INTO sales_log (id) VALUES (:new_id);",
+                vec!["sale.completed".into()],
+            ),
+        );
+        reg.commands.insert(
+            "inventory.stock.decrease_on_sale".into(),
+            gated_cmd(
+                "inventory",
+                "inventory.change_product",
+                "INSERT INTO stock_moves (hub_id, created_by) VALUES (:hub_id, :current_user_id);",
+                vec![],
+            ),
+        );
+        reg.listeners
+            .insert("sale.completed".into(), vec!["inventory.stock.decrease_on_sale".into()]);
+
+        // The cashier: may sell, may look at the catalogue, may not edit it.
+        let cashier = RequestContext::new(
+            "h1",
+            "hub_user:ana",
+            [
+                "sales.add_sale".to_string(),
+                "inventory.view_product".to_string(),
+            ],
+        );
+        (db, reg, cashier)
+    }
+
+    /// **The bug.** A cashier closes a sale and the stock comes down — the same as when the owner
+    /// is at the till. Before hub#686 this listener died with `PermissionDenied` on every single
+    /// sale an `employee` made, and the hub's inventory diverged from reality from sale one.
+    #[tokio::test]
+    async fn a_listener_runs_even_when_the_cashier_lacks_its_permission() {
+        let (db, reg, cashier) = till_with_a_cashier().await;
+
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &cashier,
+            &Grants::new(),
+        )
+        .await
+        .expect("selling is what a cashier is FOR");
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM stock_moves").await,
+            1,
+            "the stock came down: reacting to the sale is the MODULE's decision, not the cashier's"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            1,
+            "the event is delivered, not deferred"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            0,
+            "no dead-letter: this was the structural one that hid a fiscal breach"
+        );
+    }
+
+    /// The `hub_id` is NOT part of what gets relaxed (tenancy.md): the listener writes in the hub
+    /// of the event it is reacting to, and in no other. It is the one thing the relay may never
+    /// take from anywhere but the row.
+    #[tokio::test]
+    async fn a_listener_stays_in_the_hub_that_emitted_the_event() {
+        let (db, reg, cashier) = till_with_a_cashier().await;
+
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &cashier,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM stock_moves WHERE hub_id = 'h1'").await,
+            1,
+            "the tenant of the emitter, never a system-wide or empty hub_id"
+        );
+    }
+
+    /// Running with the module's authority must not cost the audit trail. `:current_user_id` — what
+    /// every module binds into `created_by`/`updated_by` — stays the human who caused the event: a
+    /// stock movement stamped "system" when Ana's sale produced it is a traceability regression,
+    /// and the whole reason this is not simply `scheduler::system_ctx` (which has no user at all).
+    #[tokio::test]
+    async fn a_listener_credits_the_user_whose_action_caused_it() {
+        let (db, reg, cashier) = till_with_a_cashier().await;
+
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &cashier,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM stock_moves WHERE created_by = 'hub_user:ana'"
+            )
+            .await,
+            1,
+            "the cashier who sold is who the row is attributed to, not the runtime"
+        );
+        // And the row of the event keeps the same attribution, so the dead-letter queue (hub#660)
+        // and any forensics can still answer «who caused this».
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE user_id = 'hub_user:ana'"
+            )
+            .await,
+            1
+        );
+    }
+
+    /// **What does NOT come down with the permission gate.** The fiscal preconditions (ADR-0203)
+    /// cover listeners on purpose — `invoice.create_from_sale` and `verifactu.records.ingest_invoice`
+    /// run here — and they key on the hub's identity, never on a permission. A listener that stamps
+    /// the issuer into a document still refuses while that identity is missing: the alternative is
+    /// an invoice with a BLANK issuer that VeriFactu then chains from (ADR-0189).
+    #[tokio::test]
+    async fn the_fiscal_precondition_still_stops_a_listener_that_stamps_the_issuer() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE sales_log (id TEXT);\
+             CREATE TABLE fiscal_records (issuer TEXT);",
+        )
+        .await
+        .unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("sales".into(), ModuleStatus::Active);
+        reg.status.insert("verifactu".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "sales.complete_sale".into(),
+            gated_cmd(
+                "sales",
+                "sales.add_sale",
+                "INSERT INTO sales_log (id) VALUES (:new_id);",
+                vec!["invoice.created".into()],
+            ),
+        );
+        reg.commands.insert(
+            "verifactu.records.ingest_invoice".into(),
+            gated_cmd(
+                "verifactu",
+                "verifactu.manage_verifactu",
+                "INSERT INTO fiscal_records (issuer) VALUES (:business_tax_id);",
+                vec![],
+            ),
+        );
+        reg.listeners
+            .insert("invoice.created".into(), vec!["verifactu.records.ingest_invoice".into()]);
+
+        // No business identity configured in this hub — the precondition the gate exists for.
+        let cashier = RequestContext::new("h1", "hub_user:ana", ["sales.add_sale".to_string()]);
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &cashier,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM fiscal_records").await,
+            0,
+            "no fiscal record is written without the hub's identity, whatever the authority"
+        );
+        let last_error = db
+            .query("SELECT last_error FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows[0]["last_error"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            last_error.contains("fiscal precondition"),
+            "the refusal is the fiscal gate, not a permission: {last_error}"
+        );
+    }
+
+    /// The context itself, stated once. Everything above is this in motion.
+    #[test]
+    fn the_listener_context_carries_the_hub_and_the_user_but_the_modules_authority() {
+        let row = json!({
+            "hub_id": "h1",
+            "user_id": "hub_user:ana",
+            // What the emitter could do. Kept in the row for forensics; no longer what authorises
+            // the listener, which is the whole of hub#686.
+            "permissions": r#"["sales.add_sale"]"#,
+        });
+
+        let ctx = listener_ctx(&row);
+
+        assert_eq!(ctx.hub_id, "h1", "the tenant is never negotiable");
+        assert_eq!(
+            ctx.user_id, "hub_user:ana",
+            "who caused it survives, for `created_by` and for the dead-letter queue"
+        );
+        assert!(
+            ctx.permissions.contains("*"),
+            "the module's own authority, not the cashier's role"
+        );
+        assert!(
+            !ctx.permissions.contains("sales.add_sale"),
+            "the emitter's permissions are not what the listener runs on any more"
+        );
+        assert_eq!(
+            ctx.principal,
+            Principal::Machine,
+            "nobody is standing at the relay: it must never be offered a manager's PIN (hub#361)"
+        );
+    }
+
+    /// A core event ingested from OUTSIDE the hub (ADR-0283 K1c: an inbound WhatsApp message)
+    /// carries an id the caller chose, so the source's own message id becomes the primary key.
+    /// Written once, it is a normal outbox row: `pending`, with the hub's tenant on it.
+    #[tokio::test]
+    async fn a_core_event_lands_in_the_outbox_under_the_caller_s_id() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+
+        let mut payload = Params::new();
+        payload.insert("from".into(), json!("34600999888"));
+        let fresh = insert_core_event_once(&db, "wa-wamid.1", "hub-7", "hub.whatsapp.message_received", &payload)
+            .await
+            .unwrap();
+        assert!(fresh, "the first write of an id is a new event");
+
+        let rows = db
+            .query("SELECT * FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["id"], json!("wa-wamid.1"));
+        assert_eq!(rows[0]["hub_id"], json!("hub-7"));
+        assert_eq!(rows[0]["event_name"], json!("hub.whatsapp.message_received"));
+        assert_eq!(rows[0]["status"], json!("pending"));
+        assert_eq!(
+            rows[0]["payload"].as_str().unwrap(),
+            r#"{"from":"34600999888"}"#
+        );
+    }
+
+    /// **The primary key IS the exactly-once guarantee.** The source redelivers whatever it has
+    /// not seen acked, so the same message arrives more than once by design; the second write must
+    /// be a no-op that says so, not an error and not a second event.
+    #[tokio::test]
+    async fn the_same_id_twice_is_one_event_and_the_second_write_says_it_was_already_there() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+
+        let mut first = Params::new();
+        first.insert("text".into(), json!("is the table free?"));
+        assert!(insert_core_event_once(&db, "wa-wamid.1", "h", "e", &first).await.unwrap());
+
+        // A redelivery of the SAME message: different payload on purpose — the id decides, and the
+        // row that is already there must not be overwritten either.
+        let mut second = Params::new();
+        second.insert("text".into(), json!("tampered"));
+        let fresh = insert_core_event_once(&db, "wa-wamid.1", "h", "e", &second)
+            .await
+            .unwrap();
+        assert!(!fresh, "a duplicate id is not a new event");
+
+        let rows = db
+            .query("SELECT payload FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 1, "exactly one event, however many times it arrives");
+        assert_eq!(rows[0]["payload"].as_str().unwrap(), r#"{"text":"is the table free?"}"#);
+    }
+
+    /// A duplicate must not resurrect an event the relay already delivered: `ON CONFLICT DO
+    /// NOTHING` leaves the row exactly as it was, so a listener does not run twice.
+    #[tokio::test]
+    async fn a_duplicate_does_not_reopen_an_already_delivered_event() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+
+        insert_core_event_once(&db, "wa-1", "h", "e", &Params::new()).await.unwrap();
+        mark_delivered(&db, "wa-1").await.unwrap();
+
+        insert_core_event_once(&db, "wa-1", "h", "e", &Params::new()).await.unwrap();
+        let rows = db
+            .query("SELECT status FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["status"], json!("delivered"), "still delivered, not pending again");
+    }
+
+    /// Delivery contract of a host-emitted event (ADR-0288): it reaches the listening module's
+    /// command and that command runs with ITS OWN module's authority. There is no emitting user —
+    /// the message came from a customer's phone — so `user_id` is empty, exactly as the
+    /// scheduler's system context does.
+    #[tokio::test]
+    async fn a_core_event_is_delivered_to_its_listeners_with_no_emitting_user() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        // The WHOLE system schema, not just the outbox's two tables: this test DRAINS, and since
+        // hub#661 the relay asks `_flow_triggers` whether the event it just delivered starts a
+        // flow. With half a schema that question errors, the row is deferred instead of delivered,
+        // and the test says "pending" for a reason that has nothing to do with what it is about.
+        system_schema(&db).await;
+
+        let mut reg = Registry::new();
+        reg.status.insert("wa".into(), ModuleStatus::Active);
+        reg.commands
+            .insert("wa.on_message".into(), cmd("wa", "INSERT INTO t (n) VALUES (1);", vec![]));
+        reg.listeners
+            .insert("hub.whatsapp.message_received".into(), vec!["wa.on_message".into()]);
+
+        insert_core_event_once(&db, "wa-1", "h", "hub.whatsapp.message_received", &Params::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1);
+        let rows = db
+            .query("SELECT user_id, status FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows[0]["user_id"], json!(""), "nobody in this hub caused it");
+        assert_eq!(rows[0]["status"], json!("delivered"));
+    }
+
+    // ── Correlation (hub#666) ─────────────────────────────────────────────────────────────────
+
+    /// A cascade event names the event whose delivery caused it.
+    ///
+    /// `depth` said how FAR a cascade had gone; it never said **from what**. On a till closing two
+    /// sales a second, "the row before it in time" is not an answer, so without this column the
+    /// chain that produced a row is not reconstructible at all — only guessable.
+    #[tokio::test]
+    async fn a_cascade_event_names_the_event_whose_delivery_caused_it() {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        system_schema(&db).await;
+
+        // "m.fire" emits "e"; its listener "m.append" emits "f" — a two-link chain.
+        let mut reg = Registry::new();
+        reg.status.insert("m".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "m.append".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (1);", vec!["f".into()]),
+        );
+        reg.commands
+            .insert("m.fire".into(), cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]));
+        reg.listeners.insert("e".into(), vec!["m.append".into()]);
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "m.fire", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        let rows = db
+            .query(
+                "SELECT id, event_name, parent_event_id, run_id FROM _event_outbox",
+                &Params::new(),
+            )
+            .await
+            .unwrap()
+            .rows;
+        let named = |name: &str| {
+            rows.iter()
+                .find(|r| r["event_name"] == json!(name))
+                .unwrap_or_else(|| panic!("no `{name}` row"))
+                .clone()
+        };
+        let root = named("e");
+        let cascade = named("f");
+        assert_eq!(
+            root["parent_event_id"],
+            json!(""),
+            "an event a person caused has no parent event"
+        );
+        assert_eq!(
+            cascade["parent_event_id"], root["id"],
+            "the cascade names its cause, which is the only thing that makes it a chain"
+        );
+        assert_eq!(
+            cascade["run_id"],
+            json!(""),
+            "no flow was involved: the seal is empty rather than borrowed"
+        );
+    }
+
+    /// The correlation columns are stamped by the RUNTIME, from the context — never by a caller.
+    /// A payload that could name a run would let anybody file their event under somebody else's
+    /// execution, which is exactly as useful as no correlation at all.
+    #[test]
+    fn the_seal_of_an_event_comes_from_the_context_and_not_from_its_payload() {
+        let plain = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let (_, p) = insert_op(&plain, "m", "e", &Params::new(), 0);
+        assert_eq!(p["run_id"], json!(""));
+        assert_eq!(p["parent_event_id"], json!(""));
+
+        let inside_a_run = RequestContext::new("h1", "flow:f-1", ["*".to_string()])
+            .with_automation(crate::registry::AutomationCtx {
+                flow_id: "f-1".into(),
+                run_id: "run-7".into(),
+            })
+            .caused_by_event("evt-origin");
+        let (_, p) = insert_op(&inside_a_run, "m", "e", &Params::new(), 0);
+        assert_eq!(
+            p["run_id"],
+            json!("run-7"),
+            "everything a run emits carries the run that emitted it"
+        );
+        assert_eq!(
+            p["parent_event_id"],
+            json!("evt-origin"),
+            "and the event that set the whole thing off"
         );
     }
 

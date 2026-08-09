@@ -69,7 +69,7 @@ async fn product_crud_and_low_stock() {
         &params(json!({
             "name": "Café", "sku": "CAF", "price": 450, "cost": 200,
             "stock": 3_000_000, "low_stock_threshold": 5_000_000, "product_type": "physical",
-            "ean13": null, "description": "", "tax_category_key": null, "image": ""
+            "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
         })),
         &ctx,
     ).await
@@ -108,7 +108,7 @@ async fn stock_adjust_is_absolute_count() {
         "inventory.products.create",
         &params(json!({ "name": "X", "sku": "X1", "price": 1, "cost": 0, "stock": 2,
                         "low_stock_threshold": 10, "product_type": "physical",
-                        "ean13": null, "description": "", "tax_category_key": null, "image": "" })),
+                        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": "" })),
         &ctx,
     ).await.unwrap();
     let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
@@ -136,9 +136,9 @@ async fn bulk_create_wasm_inserts_with_generated_skus() {
             &params(json!({
                 "existing_count": 0,
                 "products": [
-                    { "name": "Café", "price": 450 },
-                    { "name": "Té", "sku": "TE-1", "price": 300, "stock": 20 },
-                    { "name": "Agua", "price": 100 }
+                    { "name": "Café", "price": 450, "tax_category_key": "product.generic" },
+                    { "name": "Té", "sku": "TE-1", "price": 300, "stock": 20, "tax_category_key": "product.generic" },
+                    { "name": "Agua", "price": 100, "tax_category_key": "product.generic" }
                 ]
             })),
             &ctx,
@@ -168,7 +168,7 @@ async fn receive_stock_wasm_increments_existing() {
         "inventory.products.create",
         &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10,
                         "low_stock_threshold": 5, "product_type": "physical",
-                        "ean13": null, "description": "", "tax_category_key": null, "image": "" })),
+                        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": "" })),
         &ctx,
     ).await.unwrap();
     let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
@@ -228,7 +228,7 @@ async fn product_category_link_add_and_remove() {
         "inventory.products.create",
         &params(json!({ "name": "Café solo", "sku": "CAFE-SOLO", "price": 180, "cost": 0,
                         "stock": 0, "low_stock_threshold": 10, "product_type": "physical",
-                        "ean13": null, "description": "", "tax_category_key": null, "image": "" })),
+                        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": "" })),
         &ctx,
     ).await.unwrap();
     let prods = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();

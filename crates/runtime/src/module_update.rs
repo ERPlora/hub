@@ -24,6 +24,18 @@
 //!
 //! Este módulo es solo la decisión: **qué versión**. El cómo lo aplica es el instalador.
 
+/// Una actualización que **ocurrió**: de dónde venía y a dónde fue.
+///
+/// Es lo único que el dueño ve de todo esto (ADR-0269 §3.5, hub#564): *«qué me habéis cambiado y
+/// desde qué versión»*. Por eso viaja el `from` y no solo la versión nueva — «inventory 1.1.2» no
+/// dice nada; «1.1.1 → 1.1.2» sí.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleUpdate {
+    pub module_id: String,
+    pub from: String,
+    pub to: String,
+}
+
 /// Una versión que el marketplace ofrece.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Available {
@@ -87,6 +99,56 @@ pub fn resolve(installed: &str, pinned: Option<&str>, available: &[Available]) -
             to: version.clone(),
         },
         None => Target::StayPut(installed.to_string()),
+    }
+}
+
+/// Cómo acabó un intento de actualización.
+#[derive(Debug)]
+pub enum Outcome {
+    /// Ya estaba en esa versión: no se descargó nada ni se migró nada.
+    AlreadyThere(String),
+    Updated { from: String, to: String },
+    /// La nueva falló y **la vieja volvió a quedar instalada y funcionando**.
+    RolledBack { stayed_on: String, error: String },
+    /// La nueva falló **y la vuelta atrás también**. El hub se queda sin el módulo, y por eso este
+    /// caso no puede pasar en silencio: con el readiness duro de hub#538 el arranque siguiente no
+    /// dará `UP`, y Swarm revertirá el despliegue entero.
+    Lost { module: String, error: String },
+}
+
+/// Actualiza, y si falla **deja la versión anterior puesta**.
+///
+/// Un hub con la versión de ayer funciona; uno sin el módulo, no. Antes el arranque omitía con un
+/// log el módulo que no podía bajar, y el módulo **dejaba de existir** para el hub — era el cuarto
+/// punto de hub#516 y el que más duele.
+///
+/// `install` recibe la versión y la instala (descarga, verifica firma y aplica migraciones por el
+/// guard de hub#542). Se pasa como closure para que esta secuencia —que es la parte con reglas— se
+/// pueda probar sin red.
+pub async fn update_with_fallback<F, Fut>(from: &str, to: &str, install: F) -> Outcome
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
+    if from == to {
+        return Outcome::AlreadyThere(to.to_string());
+    }
+
+    match install(to.to_string()).await {
+        Ok(()) => Outcome::Updated {
+            from: from.to_string(),
+            to: to.to_string(),
+        },
+        Err(error) => match install(from.to_string()).await {
+            Ok(()) => Outcome::RolledBack {
+                stayed_on: from.to_string(),
+                error,
+            },
+            Err(second) => Outcome::Lost {
+                module: from.to_string(),
+                error: format!("{error}; y la vuelta a {from} tampoco: {second}"),
+            },
+        },
     }
 }
 
@@ -206,5 +268,69 @@ mod tests {
         let target = resolve("no-semver", None, &[v("1.0.0", true)]);
 
         assert_eq!(target, Target::StayPut("no-semver".into()));
+    }
+
+    // ── Actualizar sin quedarse sin módulo ───────────────────────────────────────────
+
+    async fn attempt(fails: &[&str], from: &str, to: &str) -> (Outcome, Vec<String>) {
+        let intentos = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let registro = intentos.clone();
+        let rotas: Vec<String> = fails.iter().map(|s| s.to_string()).collect();
+        let outcome = update_with_fallback(from, to, move |version: String| {
+            let registro = registro.clone();
+            let rotas = rotas.clone();
+            async move {
+                registro.lock().unwrap().push(version.clone());
+                if rotas.contains(&version) {
+                    Err(format!("la {version} no instala"))
+                } else {
+                    Ok(())
+                }
+            }
+        })
+        .await;
+        let hechos = intentos.lock().unwrap().clone();
+        (outcome, hechos)
+    }
+
+    #[tokio::test]
+    async fn a_clean_update_lands_on_the_new_version() {
+        let (outcome, intentos) = attempt(&[], "1.0.0", "1.1.0").await;
+
+        assert!(matches!(outcome, Outcome::Updated { .. }));
+        assert_eq!(intentos, vec!["1.1.0"], "no se reinstala lo que ya estaba");
+    }
+
+    /// **Una actualización que falla NO puede dejar al hub sin el módulo.**
+    ///
+    /// Un hub con la versión de ayer funciona; uno sin el módulo, no. Antes el arranque omitía con
+    /// un log el que no podía bajar y el módulo **dejaba de existir** para el hub.
+    #[tokio::test]
+    async fn a_failed_update_puts_the_old_version_back() {
+        let (outcome, intentos) = attempt(&["1.1.0"], "1.0.0", "1.1.0").await;
+
+        assert!(matches!(outcome, Outcome::RolledBack { .. }), "{outcome:?}");
+        assert_eq!(intentos, vec!["1.1.0", "1.0.0"], "se intenta la nueva y se vuelve a la vieja");
+    }
+
+    /// Y si la vuelta atrás TAMBIÉN falla, se dice — no se finge que salió bien.
+    ///
+    /// Es el caso en que el hub sí se queda sin el módulo, y precisamente por eso no puede pasar
+    /// en silencio: con readiness duro (hub#538) el arranque siguiente no dará `UP`.
+    #[tokio::test]
+    async fn when_even_the_rollback_fails_it_says_so() {
+        let (outcome, intentos) = attempt(&["1.1.0", "1.0.0"], "1.0.0", "1.1.0").await;
+
+        assert!(matches!(outcome, Outcome::Lost { .. }), "{outcome:?}");
+        assert_eq!(intentos, vec!["1.1.0", "1.0.0"]);
+    }
+
+    /// Actualizar a lo que ya tienes no toca nada: ni descarga, ni migraciones, ni riesgo.
+    #[tokio::test]
+    async fn updating_to_the_version_already_installed_does_nothing() {
+        let (outcome, intentos) = attempt(&[], "1.1.0", "1.1.0").await;
+
+        assert!(matches!(outcome, Outcome::AlreadyThere(_)), "{outcome:?}");
+        assert!(intentos.is_empty(), "no se reinstala por gusto");
     }
 }

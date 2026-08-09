@@ -10,7 +10,8 @@
 //   - **The name says where it goes.** The only affordance an icon-only topbar action has is its
 //     accessible name, and this one crosses a product boundary: it has to say `erplora.com` out
 //     loud, in every language, or the till just teleports somewhere without warning.
-//   - **It leaves through `openManagement`**, the one helper that knows the door opens in THIS tab.
+//   - **It leaves through `openManagement`**, the one helper that knows how the door opens on each
+//     surface: a new tab in a browser, the system browser in the installed app.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
@@ -84,7 +85,7 @@ describe('the entry to management', () => {
     expect(manageButton(mountTopbar())).toBeFalsy();
   });
 
-  it('leaves through the helper that navigates THIS tab', async () => {
+  it('leaves through the helper that opens the door OUT of this window', async () => {
     const button = manageButton(mountTopbar());
 
     await button!.trigger('click');
@@ -102,10 +103,14 @@ describe('the entry to management', () => {
     }
   });
 
-  it('carries the outbound mark the shell already uses for the SaaS', () => {
+  // The mark used to be `open-outline`, the shell's generic "this leads to the SaaS" (Billing,
+  // Profile, ModuleView). In the topbar that is not enough: those three sit next to a sentence that
+  // says where they go, and this one is icon-only among three other icon-only actions. A cloud names
+  // the DESTINATION — the online account — instead of merely announcing that something opens.
+  it('carries the cloud: the destination, not just the fact that it leaves', () => {
     const icon = manageButton(mountTopbar())!.find('[data-icon]');
 
-    expect(icon.attributes('data-icon')).toBe('open-outline');
+    expect(icon.attributes('data-icon')).toBe('cloud-outline');
   });
 });
 

@@ -1,0 +1,1 @@
+DELETE FROM crm_note WHERE hub_id = :hub_id;

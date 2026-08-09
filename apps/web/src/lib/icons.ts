@@ -20,6 +20,7 @@ import businessOutline from "~icons/ion/business-outline?raw";
 import cardOutline from "~icons/ion/card-outline?raw";
 import cameraOutline from "~icons/ion/camera-outline?raw";
 import checkmarkCircleOutline from "~icons/ion/checkmark-circle-outline?raw";
+import cloudOutline from "~icons/ion/cloud-outline?raw";
 import cloudUploadOutline from "~icons/ion/cloud-upload-outline?raw";
 import colorPaletteOutline from "~icons/ion/color-palette-outline?raw";
 import cubeOutline from "~icons/ion/cube-outline?raw";
@@ -179,6 +180,7 @@ const SVGS: Record<string, string> = {
   "card-outline": cardOutline,
   "camera-outline": cameraOutline,
   "checkmark-circle-outline": checkmarkCircleOutline,
+  "cloud-outline": cloudOutline,
   "cloud-upload-outline": cloudUploadOutline,
   "color-palette-outline": colorPaletteOutline,
   "cube-outline": cubeOutline,
