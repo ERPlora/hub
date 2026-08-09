@@ -6,6 +6,7 @@
 //! GET/PUT         /api/hub/flows/{id}/grants    replace COMPLETO, admin
 //! POST            /api/hub/flows/{id}/run       disparo manual
 //! GET             /api/hub/flows/{id}/runs      · GET /api/hub/flows/runs/{run_id} (con steps)
+//! GET             /api/hub/flows/secrets        NOMBRES · PUT/DELETE …/secrets/{name} (write-only)
 //! ```
 //!
 //! **Core REST, not `hub.*` commands.** The dispatcher is deliberately not where this goes
@@ -316,6 +317,56 @@ pub struct RunsPage {
     limit: Option<i64>,
     /// The id of the last run of the previous page — "older than this one".
     before: Option<String>,
+}
+
+// ── secrets (hub#662) ─────────────────────────────────────────────────────────────────────────
+
+/// `GET /api/hub/flows/secrets` — **the names, never the values**.
+///
+/// There is no endpoint that returns a secret, and that is the design rather than an omission
+/// (ADR-0283 §4): the only reader is the executor, while it builds the request that is about to
+/// leave. A "reveal" button would turn one admin session into a copy of every API key the hub
+/// holds, and a hub's credentials are its customer's, not ours.
+pub async fn list_secrets(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let (arc, _) = admin_session!(st, headers);
+    let rt = arc.lock().await;
+    match rt.list_flow_secrets().await {
+        Ok(secrets) => Json(json!({ "ok": true, "data": secrets })).into_response(),
+        Err(e) => flow_err(e),
+    }
+}
+
+/// `PUT /api/hub/flows/secrets/{name}` — creates or rotates one. Body `{"value": "…"}`.
+pub async fn put_secret(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    Json(body): Json<Value>,
+) -> Response {
+    let (arc, who) = admin_session!(st, headers);
+    let Some(value) = body.get("value").and_then(|v| v.as_str()) else {
+        return bad_request("invalid_payload", "a secret needs a `value`");
+    };
+    let rt = arc.lock().await;
+    match rt.put_flow_secret(&name, value, &who).await {
+        Ok(info) => Json(json!({ "ok": true, "data": info })).into_response(),
+        Err(e) => flow_err(e),
+    }
+}
+
+/// `DELETE /api/hub/flows/secrets/{name}` — a flow that references it stops working, loudly, which
+/// is the point: it fails at the step instead of calling with an empty credential.
+pub async fn delete_secret(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(name): Path<String>,
+) -> Response {
+    let (arc, who) = admin_session!(st, headers);
+    let rt = arc.lock().await;
+    match rt.delete_flow_secret(&name, &who).await {
+        Ok(()) => Json(json!({ "ok": true, "data": { "name": name, "deleted": true } })).into_response(),
+        Err(e) => flow_err(e),
+    }
 }
 
 /// `GET /api/hub/flows/runs/{run_id}` — one run WITH its steps and the events it emitted.

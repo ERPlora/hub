@@ -992,6 +992,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_flow_run_step \
   ON _flow_run_steps (run_id, step_index) WHERE deleted_at IS NULL;\
 CREATE INDEX IF NOT EXISTS ix_flow_run_step_run ON _flow_run_steps (hub_id, run_id, step_index);",
     },
+    // ── v36 — hub#662 / ADR-0283 §4: `_flow_secrets`, the credentials an `http` step carries ────
+    // WRITE-ONLY by construction. The column holds the `secret_box` envelope (AES-256-GCM, master
+    // key in the environment — hub#114), so a backup, a support dump or a stolen volume carries the
+    // ciphertext and never the key: the key was never next to the data it protects.
+    //
+    // There is deliberately NO read path for a human — `flows::secrets::list` answers names, and the
+    // only reader is the executor while it builds the request that is about to leave. A "reveal"
+    // button would turn every admin session into a copy of every API key the hub holds.
+    //
+    // Unique per (hub, name) among LIVE rows, partial for the same reason as `_flow_grants`:
+    // forgetting a credential and adding it again later must not collide with its own tombstone.
+    //
+    // ⚠️ v36: number re-checked against the maximum on `origin/develop` right before the push
+    // (hub#573) — three flow issues were in flight at once and each wanted a number.
+    SystemMigration {
+        version: 36,
+        name: "flow_secrets",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_secrets (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, \
+  value_enc TEXT NOT NULL DEFAULT '', \
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  deleted_at TEXT, deleted_by TEXT, \
+  PRIMARY KEY (id));\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_flow_secret_name \
+  ON _flow_secrets (hub_id, name) WHERE deleted_at IS NULL;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2547,9 +2576,10 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        // 32 = 27 + las cinco del kernel de automatización (v31–v35, hub#661). El número está a
-        // mano a propósito: añadir una migración de sistema tiene que ser un gesto CONSCIENTE, y
-        // este assert es lo que obliga a mirar el catálogo entero antes de tocarlo.
-        assert_eq!(MIGRATIONS.len(), 32, "el catálogo cambió de tamaño");
+        // 33 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
+        // (v36, hub#662). El número está a mano a propósito: añadir una migración de sistema tiene
+        // que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero
+        // antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan el mismo número.
+        assert_eq!(MIGRATIONS.len(), 33, "el catálogo cambió de tamaño");
     }
 }

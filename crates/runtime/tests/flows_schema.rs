@@ -1,4 +1,4 @@
-//! hub#661 (ADR-0283 K1) — the five tables the automation kernel stands on.
+//! hub#661 (ADR-0283 K1) + hub#662 (§4) — the six tables the automation kernel stands on.
 //!
 //! They are **system migrations**, not `CREATE TABLE IF NOT EXISTS` at boot, for the reason
 //! hub#37 wrote down: an ensure-create never reaches a hub whose database already exists. Every
@@ -11,7 +11,7 @@
 //! 1. **The tables exist after `apply`** with the columns the kernel reads by name. A missing
 //!    column here is a runtime error in a background tick, which is exactly the failure nobody
 //!    sees until a flow silently stops.
-//! 2. **`hub_id` is on all five.** One database per hub today (ADR-0201), but the row contract is
+//! 2. **`hub_id` is on all six.** One database per hub today (ADR-0201), but the row contract is
 //!    not allowed to depend on that.
 //! 3. **A live grant is UNIQUE per (hub, flow, kind, value); a revoked one is not.** The partial
 //!    index is the mechanism that lets a grant be revoked (soft-delete) and granted again later
@@ -61,7 +61,7 @@ async fn apply_system_schema(db: &dyn DatabaseAdapter) {
 }
 
 #[tokio::test]
-async fn the_five_flow_tables_land_with_the_row_contract() {
+async fn the_flow_tables_land_with_the_row_contract() {
     let tdb = TestDb::new().await;
     let db = tdb.adapter().await;
     apply_system_schema(&db).await;
@@ -128,6 +128,9 @@ async fn the_five_flow_tables_land_with_the_row_contract() {
                 "finished_at",
             ],
         ),
+        // hub#662 — write-only: `value_enc` holds the `secret_box` envelope and nothing reads it
+        // back but the executor, while it builds a request that is about to leave.
+        ("_flow_secrets", &["id", "name", "value_enc", "updated_by"]),
     ];
 
     for (table, cols) in expected {
@@ -231,4 +234,53 @@ async fn re_applying_the_system_migrations_does_not_re_run_the_flow_tables() {
         .unwrap()
         .rows;
     assert_eq!(rows.len(), 1, "the flow survives a re-apply");
+}
+
+
+#[tokio::test]
+async fn a_hub_holds_one_live_secret_per_name_and_forgetting_one_is_not_a_reservation() {
+    // Same partial-unique shape as `_flow_grants`, for the same reason: a credential is removed by
+    // SOFT-delete (the row records that it existed and who took it away), so a hub that adds
+    // `API_KEY` again next month must not collide with its own tombstone.
+    let tdb = TestDb::new().await;
+    let db = tdb.adapter().await;
+    apply_system_schema(&db).await;
+
+    let insert = "INSERT INTO _flow_secrets (id, hub_id, name, value_enc, created_at, updated_at) \
+                  VALUES (:id, :hub_id, 'API_KEY', 'v1:blob', :now, :now)";
+    let row = |id: &str| {
+        p(&[
+            ("id", json!(id)),
+            ("hub_id", json!(HUB)),
+            ("now", json!("2026-08-09T10:00:00+00:00")),
+        ])
+    };
+
+    db.execute(insert, &row("s1")).await.unwrap();
+    assert!(
+        db.execute(insert, &row("s2")).await.is_err(),
+        "two live secrets called `API_KEY` would be two answers to `{{secret.API_KEY}}`"
+    );
+
+    db.execute(
+        "UPDATE _flow_secrets SET deleted_at = :now, deleted_by = 'hub_user:1' WHERE id = 's1'",
+        &p(&[("now", json!("2026-08-09T11:00:00+00:00"))]),
+    )
+    .await
+    .unwrap();
+    db.execute(insert, &row("s3"))
+        .await
+        .expect("adding the credential again after forgetting it is not a conflict");
+
+    // And a secret belongs to ITS hub: the same name in another tenant is another secret.
+    db.execute(
+        insert,
+        &p(&[
+            ("id", json!("s4")),
+            ("hub_id", json!("hub-other")),
+            ("now", json!("2026-08-09T10:00:00+00:00")),
+        ]),
+    )
+    .await
+    .expect("the uniqueness is per (hub, name)");
 }

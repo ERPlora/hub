@@ -219,6 +219,15 @@ async fn only_a_human_admin_session_gets_through_this_door() {
         ("POST", format!("/api/hub/flows/{id}/run"), None),
         ("GET", format!("/api/hub/flows/{id}/runs"), None),
         ("GET", "/api/hub/flows/runs/whatever".to_string(), None),
+        // The secrets, hub#662: the same door, and the one whose stakes are highest — an API key
+        // able to write one would be a credential that installs credentials.
+        ("GET", "/api/hub/flows/secrets".to_string(), None),
+        (
+            "PUT",
+            "/api/hub/flows/secrets/API_KEY".to_string(),
+            Some(json!({ "value": "sk-live-42" })),
+        ),
+        ("DELETE", "/api/hub/flows/secrets/API_KEY".to_string(), None),
     ] {
         // No session at all.
         let anon = send(&f.router, request(method, &uri, None, body.clone())).await;
@@ -274,11 +283,12 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
             "flow.unknown_schema_version",
         ),
         (
+            // `http` runs since hub#662; `ai` is still only a vocabulary.
             json!({
-                "name": "Calls out",
+                "name": "Thinks",
                 "definition": {
                     "schema_version": 1,
-                    "steps": [{ "id": "call", "kind": "http" }]
+                    "steps": [{ "id": "ask", "kind": "ai" }]
                 }
             }),
             "flow.step_kind_not_available",
@@ -351,13 +361,14 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
     assert_eq!(refused.status(), StatusCode::NOT_FOUND);
 
     // A kind the kernel cannot enforce yet is refused BY NAME rather than stored as a promise.
+    // (`http` left this list with hub#662 — see `an_http_flow_saves_now_and_…` below.)
     let not_yet = send(
         &f.router,
         request(
             "PUT",
             &format!("/api/hub/flows/{id}/grants"),
             Some(&f.admin),
-            Some(json!({ "grants": [{ "kind": "http", "value": "https://example.com/*" }] })),
+            Some(json!({ "grants": [{ "kind": "notify", "value": "whatsapp" }] })),
         ),
     )
     .await;
@@ -567,6 +578,162 @@ async fn a_disabled_flow_refuses_to_be_run_by_hand() {
     .await;
     assert_eq!(response.status(), StatusCode::CONFLICT);
     assert_eq!(body_json(response).await["error"]["code"], "flow.disabled");
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+
+/// hub#662 — the write-only credential store, through the real router.
+///
+/// Two things only a router test can catch: that `secrets` is not swallowed by `/flows/{id}` (it is
+/// one static segment away from being read as a flow whose id is literally "secrets"), and that no
+/// response anywhere on this surface can carry a value back out.
+#[tokio::test]
+async fn a_secret_goes_in_and_only_its_name_comes_back() {
+    // A secret is refused without a master key (hub#114, fail-closed), so the test provides one.
+    // SAFETY: no other test in this binary reads or writes this variable.
+    unsafe { std::env::set_var("HUB_SECRETS_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=") };
+    let f = fixture().await;
+
+    let created = send(
+        &f.router,
+        request(
+            "PUT",
+            "/api/hub/flows/secrets/API_KEY",
+            Some(&f.admin),
+            Some(json!({ "value": "sk-live-42" })),
+        ),
+    )
+    .await;
+    assert_eq!(created.status(), StatusCode::OK);
+    let payload = body_json(created).await;
+    assert_eq!(payload["data"]["name"], "API_KEY");
+    assert!(
+        !payload.to_string().contains("sk-live-42"),
+        "not even the response to the write echoes it: {payload}"
+    );
+
+    // The listing is names. There is no endpoint that returns a value, and that absence IS the
+    // design (ADR-0283 §4): one admin session must not be a copy of every key the hub holds.
+    let listed = send(
+        &f.router,
+        request("GET", "/api/hub/flows/secrets", Some(&f.admin), None),
+    )
+    .await;
+    assert_eq!(listed.status(), StatusCode::OK, "`secrets` is not read as a flow id");
+    let listing = body_json(listed).await;
+    assert_eq!(listing["data"][0]["name"], "API_KEY");
+    assert!(!listing.to_string().contains("sk-live-42"), "{listing}");
+
+    // A name a step could never reference is refused where it was typed.
+    let bad = send(
+        &f.router,
+        request(
+            "PUT",
+            "/api/hub/flows/secrets/api.key",
+            Some(&f.admin),
+            Some(json!({ "value": "x" })),
+        ),
+    )
+    .await;
+    assert_eq!(bad.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(bad).await["error"]["code"],
+        "flow.invalid_secret_name"
+    );
+
+    let removed = send(
+        &f.router,
+        request("DELETE", "/api/hub/flows/secrets/API_KEY", Some(&f.admin), None),
+    )
+    .await;
+    assert_eq!(removed.status(), StatusCode::OK);
+    let empty = send(
+        &f.router,
+        request("GET", "/api/hub/flows/secrets", Some(&f.admin), None),
+    )
+    .await;
+    assert_eq!(body_json(empty).await["data"].as_array().unwrap().len(), 0);
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// The `http` step and its grant stopped being refused (hub#662) — and `ai`/`notify` did not.
+#[tokio::test]
+async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
+    let f = fixture().await;
+
+    let id = create(
+        &f,
+        json!({
+            "name": "Webhook",
+            "definition": {
+                "schema_version": 1,
+                "steps": [{
+                    "id": "call", "kind": "http", "method": "POST",
+                    "url": "https://api.example.com/v1/hook",
+                    "headers": { "Authorization": "Bearer {{secret.API_KEY}}" }
+                }]
+            }
+        }),
+    )
+    .await;
+
+    // And its grant is creatable, which is what makes the step able to do anything.
+    let granted = send(
+        &f.router,
+        request(
+            "PUT",
+            &format!("/api/hub/flows/{id}/grants"),
+            Some(&f.admin),
+            Some(json!({ "grants": [{ "kind": "http", "value": "https://api.example.com/v1/*" }] })),
+        ),
+    )
+    .await;
+    assert_eq!(granted.status(), StatusCode::OK);
+    assert_eq!(body_json(granted).await["data"][0]["kind"], "http");
+
+    // A pattern that does not contain anything is refused on the screen where it was typed.
+    let loose = send(
+        &f.router,
+        request(
+            "PUT",
+            &format!("/api/hub/flows/{id}/grants"),
+            Some(&f.admin),
+            Some(json!({ "grants": [{ "kind": "http", "value": "*" }] })),
+        ),
+    )
+    .await;
+    assert_eq!(loose.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(loose).await["error"]["code"],
+        "flow.invalid_http_pattern"
+    );
+
+    // The two that are still only a vocabulary.
+    for kind in ["ai", "notify"] {
+        let response = send(
+            &f.router,
+            request(
+                "POST",
+                "/api/hub/flows",
+                Some(&f.admin),
+                Some(json!({
+                    "name": "Too soon",
+                    "definition": {
+                        "schema_version": 1,
+                        "steps": [{ "id": "s", "kind": kind }]
+                    }
+                })),
+            ),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CONFLICT, "`{kind}` still cannot run");
+        assert_eq!(
+            body_json(response).await["error"]["code"],
+            "flow.step_kind_not_available"
+        );
+    }
 
     std::fs::remove_dir_all(f.temp).ok();
 }

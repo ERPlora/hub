@@ -1744,6 +1744,36 @@ impl Runtime {
         flows::tick(self.db.as_ref(), &self.registry, &self.hub_id).await
     }
 
+    /// The **complete** half of claim → I/O → complete (hub#662): the server performed the call
+    /// outside the lock and hands back what it produced, so the run can carry on — or stop.
+    pub async fn complete_flow_io(
+        &self,
+        run_id: &str,
+        step_id: &str,
+        result: flows::IoResult,
+    ) -> Result<()> {
+        flows::executor::complete_io(self.db.as_ref(), &self.hub_id, run_id, step_id, result).await
+    }
+
+    /// Names of the `_flow_secrets` this hub holds. **Never the values** — there is no method that
+    /// returns one, and the only reader is the executor while it builds a request (ADR-0283 §4).
+    pub async fn list_flow_secrets(&self) -> Result<Vec<flows::secrets::SecretInfo>> {
+        flows::secrets::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    pub async fn put_flow_secret(
+        &self,
+        name: &str,
+        value: &str,
+        by: &str,
+    ) -> Result<flows::secrets::SecretInfo> {
+        flows::secrets::put(self.db.as_ref(), &self.hub_id, name, value, by).await
+    }
+
+    pub async fn delete_flow_secret(&self, name: &str, by: &str) -> Result<()> {
+        flows::secrets::delete(self.db.as_ref(), &self.hub_id, name, by).await
+    }
+
     pub async fn list_flows(&self) -> Result<Vec<flows::Flow>> {
         flows::store::list(self.db.as_ref(), &self.hub_id).await
     }

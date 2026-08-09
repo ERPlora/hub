@@ -18,23 +18,29 @@
 //!                      flows_tick ──▶ step: command | condition | delay
 //!                                      │        │
 //!                                      │        └─ Origin::Automation → _flow_grants (per step)
-//!                                      └─ http | ai | notify → claim → I/O → complete (hub#662/665)
+//!                                      └─ http → claim → I/O (server, no lock) → complete
+//!                                         ai | notify → still only a vocabulary (hub#665/#663)
 //! ```
 //!
 //! Submodules, in the order the data flows through them:
 //! - [`def`] — the frozen document, the mapping language and the conditions;
 //! - [`grants`] — what a flow is allowed to do, read fresh at every step;
+//! - [`secrets`] — the write-only credentials an `http` step carries;
+//! - [`http`] — building an outbound request, and the allow-list it has to pass first;
 //! - [`store`] — the CRUD the REST layer sits on, plus materialising triggers;
 //! - [`triggers`] — event matching in the relay, and the cron/`at` clock;
 //! - [`executor`] — the tick that advances runs.
 pub mod def;
 pub mod executor;
 pub mod grants;
+pub mod http;
+pub mod secrets;
 pub mod store;
 pub mod triggers;
 
 pub use def::{Condition, FlowDefinition, StepKind, TriggerKind, SCHEMA_VERSION};
-pub use executor::tick;
+pub use executor::{tick, IoResult, PendingIo, TickReport};
+pub use http::HttpRequest;
 pub use store::{Flow, FlowRun, FlowRunStep, NewFlow};
 
 /// Identity of the flow behind an [`crate::commands::Origin::Automation`] call, carried in the
@@ -108,6 +114,12 @@ mod tests {
             def::ERR_SECRET_NOT_AVAILABLE,
             grants::ERR_GRANT_DENIED,
             grants::ERR_UNKNOWN_GRANT_KIND,
+            grants::ERR_INVALID_HTTP_PATTERN,
+            http::ERR_HTTP_URL_INVALID,
+            secrets::ERR_SECRET_NOT_FOUND,
+            secrets::ERR_SECRETS_KEY_MISSING,
+            secrets::ERR_INVALID_SECRET_NAME,
+            secrets::ERR_SECRET_UNREADABLE,
             store::ERR_FLOW_NOT_FOUND,
         ] {
             assert!(

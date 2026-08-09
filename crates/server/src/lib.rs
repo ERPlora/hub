@@ -53,6 +53,8 @@ pub mod event_stream;
 pub mod export_import;
 /// ERPlora's DELEGATED fiscal certificate, fetched from the control plane (ADR-0202 §2 — hub#317).
 pub mod fiscal_certificate;
+/// The I/O half of a flow step (hub#662): the call itself, outside the runtime's global lock.
+pub mod flow_io;
 pub mod flows_api;
 pub mod hub_users;
 pub mod login_throttle;
@@ -571,6 +573,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         let scheduler_state = state.clone();
         tokio::spawn(async move {
             loop {
+                // I/O que el tick de flujos deja preparada (hub#662). Se recoge DENTRO del bloque
+                // con lock y se despacha FUERA: el `dispatch` no debe tocar el lock que acabamos de
+                // soltar, y el bucle de 1 s no puede esperar a una llamada de 30 s.
+                let mut pending_io = Vec::new();
                 {
                     let hub_id = scheduler_state.hub_id();
                     let rt = scheduler_state.runtime.lock().await;
@@ -589,9 +595,15 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     // (`MAX_RUNS_PER_TICK` × `MAX_STEPS_PER_TICK`, todos sin I/O): un step `http` o
                     // un turno de IA aquí dentro congelaría los commands de todo el hub, así que
                     // esos van por claim → I/O → complete FUERA del lock (hub#662/#665).
-                    if let Err(e) = rt.process_flows().await {
-                        eprintln!("flows: {e}");
+                    match rt.process_flows().await {
+                        Ok(report) => pending_io = report.pending_io,
+                        Err(e) => eprintln!("flows: {e}"),
                     }
+                }
+                // Ya sin el lock: cada llamada se va a su propia tarea y vuelve por
+                // `complete_flow_io` cuando termine (crates/server/src/flow_io.rs).
+                if !pending_io.is_empty() {
+                    flow_io::dispatch(&scheduler_state, pending_io);
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
             }
@@ -1088,6 +1100,13 @@ pub fn app(state: AppState) -> Router {
             get(flows_api::list_flows).post(flows_api::create_flow),
         )
         .route("/api/hub/flows/runs/:run_id", get(flows_api::get_run))
+        // `secrets` es igual: segmento estático, gana al `:id` (hub#662). El GET devuelve NOMBRES —
+        // no hay endpoint que devuelva un secreto, y esa ausencia es el diseño (ADR-0283 §4).
+        .route("/api/hub/flows/secrets", get(flows_api::list_secrets))
+        .route(
+            "/api/hub/flows/secrets/:name",
+            axum::routing::put(flows_api::put_secret).delete(flows_api::delete_secret),
+        )
         .route(
             "/api/hub/flows/:id",
             get(flows_api::get_flow)

@@ -60,6 +60,32 @@ fn the_step_kinds_are_the_same_six_on_both_sides() {
     );
 }
 
+/// The `http` step's keys (hub#662). The runtime refuses a key it does not know — that is hub#521's
+/// lesson written into this contract — so a key the editor offers and the runtime rejects is a
+/// document that saves in one place and is refused in the other.
+#[test]
+fn the_keys_of_an_http_step_are_declared_on_both_sides() {
+    let declared = keys_at(&schema(), "/$defs/step/properties");
+    for key in ["method", "url", "headers", "body", "timeout"] {
+        assert!(
+            declared.contains(key),
+            "`{key}` is accepted by `flows::def` for an http step and missing from the schema"
+        );
+    }
+    // And the runtime really does accept exactly these.
+    let accepted = erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+        "schema_version": 1,
+        "steps": [{
+            "id": "call", "kind": "http", "method": "POST",
+            "url": "https://api.example.com/v1/x",
+            "headers": { "Authorization": "Bearer {{secret.K}}" },
+            "body": { "a": 1 },
+            "timeout": 20
+        }]
+    }));
+    assert!(accepted.is_ok(), "{accepted:?}");
+}
+
 #[test]
 fn the_trigger_kinds_are_the_same_four_on_both_sides() {
     let declared = enum_at(&schema(), "/$defs/trigger/properties/kind");
