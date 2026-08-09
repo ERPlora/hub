@@ -772,6 +772,7 @@ export default {
     deadEventsHint: 'Fix the cause (permission, a module that was down…) and resend. The content is never edited: if the cause persists, the event dies again and reappears here.',
     noDeadEvents: 'All clear',
     noDeadEventsHint: 'No failed events. The event queue lives in the database: a restart never loses it.',
+    deadEventsLoadError: 'Could not load the failed-event queue. Check the connection and retry.',
     attempts: 'attempts',
     retryAll: 'Resend all',
     retryDone: 'Event resent to the relay.',

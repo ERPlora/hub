@@ -755,6 +755,7 @@ export default {
     deadEventsHint: 'Arregla la causa (permiso, módulo caído…) y reenvía. El contenido no se edita: si la causa sigue, el evento vuelve a morir aquí.',
     noDeadEvents: 'Todo en orden',
     noDeadEventsHint: 'No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio nunca la pierde.',
+    deadEventsLoadError: 'No se pudo cargar la cola de eventos caídos. Comprueba la conexión y reintenta.',
     attempts: 'intentos',
     retryAll: 'Reenviar todos',
     retryDone: 'Evento reenviado al relay.',

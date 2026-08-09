@@ -270,6 +270,20 @@
 
             <ion-spinner v-if="eventsLoading" name="crescent" class="events-spinner" />
 
+            <!-- Un fallo de carga NO es "no hay eventos": distinguirlos evita que un error de red o
+                 un 403 se lea como «Todo en orden» y el operador crea que no hay nada (pudiendo ser
+                 fiscal). Con reintentar se recupera sin salir de la pestaña. -->
+            <ok-empty-state
+              v-else-if="eventsError"
+              icon="cloud-offline-outline"
+              :heading="t('system.loadErrorTitle')"
+              :message="t('system.deadEventsLoadError')"
+            >
+              <ion-button slot="actions" size="small" fill="outline" @click="loadDeadLetters">
+                {{ t('system.retry') }}
+              </ion-button>
+            </ok-empty-state>
+
             <ok-empty-state
               v-else-if="!deadLetters.length"
               icon="checkmark-circle-outline"
@@ -688,14 +702,21 @@ const deadLetters = ref<DeadEvent[]>([]);
 const eventsLoading = ref(false);
 const eventsBusy = ref(false);
 const eventsBusyId = ref<string | null>(null);
+// Un fallo de carga NO es "no hay eventos": hay que distinguirlos. Sin esto, un error de red o un
+// 403 mostraban «Todo en orden» — el operador cree que no hay nada cuando sí lo hay (y es fiscal).
+const eventsError = ref(false);
 
 async function loadDeadLetters(): Promise<void> {
   if (!isAdmin.value) return; // el endpoint revalida; evitamos el 403 ruidoso del no-admin
   eventsLoading.value = true;
+  eventsError.value = false;
   try {
     deadLetters.value = await fetchDeadLetters();
   } catch {
-    deadLetters.value = [];
+    // NO dejamos el array vacío como si nada: un fallo aquí es un estado distinto de "cola vacía".
+    // Conservamos lo que ya había (no borrarmos la lista visible por un blip de red) y señalamos el
+    // error para que el empty-state no mienta.
+    eventsError.value = true;
   } finally {
     eventsLoading.value = false;
   }
@@ -755,12 +776,17 @@ async function discardOne(id: string): Promise<void> {
   }
 }
 
-// Carga la cola al entrar en la pestaña de eventos.
+// Carga la cola al entrar en la pestaña de eventos, y también cuando la sesión pasa a admin: si el
+// usuario entró directo a /system#events antes de que la sesión estuviera resuelta, isAdmin era
+// false y loadDeadLetters se saltó — sin este segundo disparo la cola quedaría vacía hasta recargar.
+// `immediate`: si ya se aterriza en /system#events, tab es 'events' desde el setup y un watch sin
+// immediate NO dispara (no hay cambio) → la cola quedaría vacía hasta cambiar de pestaña y volver.
 watch(
-  () => tab.value === 'events',
-  (active) => {
-    if (active) void loadDeadLetters();
+  () => tab.value === 'events' && isAdmin.value,
+  (ready) => {
+    if (ready) void loadDeadLetters();
   },
+  { immediate: true },
 );
 
 onMounted(() => {
