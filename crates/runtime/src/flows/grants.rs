@@ -29,6 +29,7 @@ use crate::registry::{new_id, now_rfc3339, Registry};
 pub const ERR_GRANT_DENIED: &str = "flow.grant_denied";
 pub const ERR_UNKNOWN_GRANT_KIND: &str = "flow.unknown_grant_kind";
 pub const ERR_GRANT_KIND_NOT_AVAILABLE: &str = "flow.grant_kind_not_available";
+pub const ERR_INVALID_HTTP_PATTERN: &str = "flow.invalid_http_pattern";
 
 /// The five kinds of ADR-0283 §2. The vocabulary is frozen here; only `command` can be created in
 /// this delivery, because a grant for something the kernel cannot do yet would tell an owner that
@@ -39,7 +40,8 @@ pub enum GrantKind {
     Query,
     /// Reserved — hub#663 part 2 (`notify` per channel).
     Notify,
-    /// Reserved — hub#662 (`http`, URL pattern).
+    /// hub#662 — one URL pattern, `https://host/path*`, matched against the URL the step really
+    /// built (see [`Authority::allows_http`]).
     Http,
     /// Reserved — hub#663 part 2 (`<query>#<field>`, contacting customers of a module's tables).
     RecipientQuery,
@@ -68,7 +70,7 @@ impl GrantKind {
     /// Can this kind be created today? The others are refused by name, with the issue that brings
     /// them, instead of being stored as a promise nothing keeps.
     pub fn is_available(self) -> bool {
-        matches!(self, GrantKind::Command)
+        matches!(self, GrantKind::Command | GrantKind::Http)
     }
     pub const ALL: &'static [GrantKind] = &[
         GrantKind::Command,
@@ -129,9 +131,102 @@ impl Authority {
             .collect()
     }
 
+    /// May this flow call this URL RIGHT NOW? (hub#662)
+    ///
+    /// The caller passes the URL **as it will really be requested** — templates rendered, secrets
+    /// substituted. Matching the un-templated form would authorise
+    /// `https://api.example.com/{{input.path}}` and then call whatever the event carried.
+    pub fn allows_http(&self, url: &str) -> bool {
+        self.granted
+            .iter()
+            .filter(|(kind, _)| *kind == GrantKind::Http)
+            .any(|(_, pattern)| url_matches(pattern, url))
+    }
+
     pub fn is_empty(&self) -> bool {
         self.granted.is_empty()
     }
+}
+
+/// Splits `scheme://host[:port]` from the rest of an URL. `None` if it is not an absolute http(s)
+/// URL — which is also how a pattern that names no host is refused.
+fn split_origin(url: &str) -> Option<(String, &str)> {
+    let after_scheme = ["http://", "https://"].iter().find_map(|scheme| {
+        url.get(..scheme.len())
+            .filter(|head| head.eq_ignore_ascii_case(scheme))
+            .map(|_| (scheme.len(), *scheme))
+    })?;
+    let (offset, scheme) = after_scheme;
+    let rest = &url[offset..];
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..end];
+    if authority.is_empty() {
+        return None;
+    }
+    // `user:pass@host` is not accepted anywhere in this kernel: an allow-list that has to reason
+    // about credentials in the authority is one that can be fooled (`https://api.example.com@evil`).
+    if authority.contains('@') {
+        return None;
+    }
+    Some((
+        format!("{}{}", scheme.to_ascii_lowercase(), authority.to_ascii_lowercase()),
+        &rest[end..],
+    ))
+}
+
+/// Does `url` fall under `pattern`?
+///
+/// **The origin is compared whole and the path only by prefix.** That asymmetry is the whole
+/// security of the allow-list: a plain `starts_with` over the entire URL would let
+/// `https://api.example.com.evil.test/…` through a grant for `https://api.example.com/…`, which is
+/// the oldest allow-list escape there is.
+///
+/// A trailing `*` extends the match to anything below the prefix; without it the path must be
+/// exactly the one granted. `*` anywhere else is not a wildcard — it is a literal, because
+/// `https://*.example.com` reads like containment and is not (nothing stops `a.b.evil.example.com`
+/// from being somebody else's server).
+fn url_matches(pattern: &str, url: &str) -> bool {
+    let (Some((p_origin, p_path)), Some((u_origin, u_path))) =
+        (split_origin(pattern), split_origin(url))
+    else {
+        return false;
+    };
+    if p_origin != u_origin {
+        return false;
+    }
+    match p_path.strip_suffix('*') {
+        Some(prefix) => u_path.starts_with(prefix),
+        None => u_path == p_path,
+    }
+}
+
+/// Refuses a pattern that is not «one scheme, one host, one path prefix» — the only shape the
+/// matcher can enforce. Everything else (`*`, `https://*`, a bare host) reads as containment on the
+/// grants screen while covering more than the owner believes, and a grant nobody can read
+/// correctly is worse than no grant at all.
+fn check_http_pattern(pattern: &str) -> Result<()> {
+    let refuse = |why: &str| {
+        Err(RuntimeError::Domain {
+            code: ERR_INVALID_HTTP_PATTERN.to_string(),
+            message: format!(
+                "`{pattern}` is not a usable http grant: {why}. The shape is \
+                 `https://host/path` or `https://host/path*`."
+            ),
+        })
+    };
+    let Some((origin, path)) = split_origin(pattern) else {
+        return refuse("it must start with an absolute `http://` or `https://` origin");
+    };
+    if origin.contains('*') {
+        return refuse("the host cannot contain a wildcard");
+    }
+    if path.is_empty() {
+        return refuse("it must name a path (use `/*` to mean the whole host, deliberately)");
+    }
+    if path.trim_end_matches('*').contains('*') {
+        return refuse("`*` is only a wildcard at the very end");
+    }
+    Ok(())
 }
 
 /// Reads the live grants of a flow. One query, and the caller decides what to ask of the result.
@@ -209,6 +304,9 @@ pub async fn replace(
         // reads as authorisation on the screen. `PUT …/grants` refuses the whole list (§9).
         if *kind == GrantKind::Command && registry.get_command(value).is_none() {
             return Err(RuntimeError::CommandNotFound(value.clone()));
+        }
+        if *kind == GrantKind::Http {
+            check_http_pattern(value)?;
         }
     }
 
@@ -494,11 +592,76 @@ mod tests {
     #[tokio::test]
     async fn the_kinds_the_kernel_cannot_enforce_yet_are_refused_by_name() {
         let db = db_with_schema().await;
-        for kind in [GrantKind::Http, GrantKind::Notify, GrantKind::RecipientQuery, GrantKind::Query] {
+        for kind in [GrantKind::Notify, GrantKind::RecipientQuery, GrantKind::Query] {
             let err = replace(&db, HUB, FLOW, &registry(), &[(kind, "x".into())], "hub_user:1")
                 .await
                 .expect_err("a permission nothing enforces must not be stored");
             assert!(format!("{err}").contains(kind.as_str()), "{err}");
+        }
+    }
+
+    // ── the http allow-list (hub#662) ─────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn an_http_grant_opens_exactly_the_urls_its_pattern_covers() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[(
+                GrantKind::Http,
+                "https://api.example.com/v1/messages*".into(),
+            )],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let authority = authority(&db, HUB, FLOW).await.unwrap();
+
+        assert!(authority.allows_http("https://api.example.com/v1/messages"));
+        assert!(authority.allows_http("https://api.example.com/v1/messages/42?dry=1"));
+        // Another path of the same host is a different permission.
+        assert!(!authority.allows_http("https://api.example.com/v1/customers"));
+        // A host that merely STARTS with the granted one is the classic allow-list escape
+        // (`api.example.com.evil.test`); the origin is compared whole, never by prefix.
+        assert!(!authority.allows_http("https://api.example.com.evil.test/v1/messages"));
+        // The scheme is part of the origin: a grant for https never authorises cleartext.
+        assert!(!authority.allows_http("http://api.example.com/v1/messages"));
+        // And an URL that merely CONTAINS the pattern is not covered by it.
+        assert!(!authority.allows_http("https://evil.test/?u=https://api.example.com/v1/messages"));
+    }
+
+    #[tokio::test]
+    async fn a_flow_with_no_http_grant_may_call_nothing() {
+        let db = db_with_schema().await;
+        let authority = authority(&db, HUB, FLOW).await.unwrap();
+        assert!(!authority.allows_http("https://api.example.com/v1/messages"));
+    }
+
+    #[tokio::test]
+    async fn a_pattern_that_does_not_name_a_concrete_host_is_refused() {
+        let db = db_with_schema().await;
+        for pattern in [
+            "*",
+            "https://*",
+            "https://*.example.com/x",
+            "api.example.com/v1*",
+            "ftp://example.com/*",
+            "https://example.com",
+        ] {
+            let err = replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[(GrantKind::Http, pattern.into())],
+                "hub_user:1",
+            )
+            .await
+            .expect_err("a grant that does not name one host and one path prefix is no containment");
+            assert!(format!("{err}").contains(pattern), "{err}");
         }
     }
 

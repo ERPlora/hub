@@ -60,19 +60,60 @@ const STEP_SLEEPING: &str = "sleeping";
 const STEP_STOPPED: &str = "stopped";
 
 /// **The claim → I/O → complete seam.** The tick produces one of these instead of performing the
-/// call; the server performs it outside the lock and hands the result back.
+/// call; the server performs it outside the lock and hands the result back with
+/// [`complete_io`].
 ///
-/// It is deliberately an enum of the three reserved kinds and not a generic "do this HTTP thing":
-/// each one has different limits, a different allow-list and a different grant, and flattening
-/// them would be inventing the contract of hub#662 here.
+/// It is deliberately an enum of the three I/O kinds and not a generic "do this HTTP thing": each
+/// one has different limits, a different allow-list and a different grant, and flattening them
+/// would make the agent runner (hub#665) look like an HTTP call with a longer timeout, which is
+/// exactly what it is not.
+///
+/// **The run stays claimed while its I/O is in flight** — status `running`, lease held — so the
+/// next tick skips it and advances everybody else. If the process dies mid-call the lease expires,
+/// the run is reclaimed and the step is re-issued: an `http` step is **at-least-once**, like every
+/// other outbound thing in this hub (the outbox, the print queue). A step that must not happen
+/// twice is a step whose endpoint takes an idempotency key, and the flow author puts it in the
+/// document.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PendingIo {
-    /// hub#662 — `http` with a URL allow-list and `_flow_secrets`.
-    Http { run_id: String, step_id: String },
+    /// hub#662 — `http`, already allow-listed and with its secrets substituted.
+    Http {
+        run_id: String,
+        step_id: String,
+        request: HttpRequest,
+    },
     /// hub#665 — the server-side agent runner.
     Ai { run_id: String, step_id: String },
     /// hub#663 part 2 — `notify` with `recipient_query`.
     Notify { run_id: String, step_id: String },
+}
+
+impl PendingIo {
+    /// The run this I/O belongs to, for a caller that only needs to route it.
+    pub fn run_id(&self) -> &str {
+        match self {
+            PendingIo::Http { run_id, .. }
+            | PendingIo::Ai { run_id, .. }
+            | PendingIo::Notify { run_id, .. } => run_id,
+        }
+    }
+
+    pub fn step_id(&self) -> &str {
+        match self {
+            PendingIo::Http { step_id, .. }
+            | PendingIo::Ai { step_id, .. }
+            | PendingIo::Notify { step_id, .. } => step_id,
+        }
+    }
+}
+
+/// What the server hands back once the I/O is over. The runtime does not know (or care) whether it
+/// was an HTTP call or an agent turn: it gets an output to feed the next step, or a reason the run
+/// stopped.
+#[derive(Debug, Clone, PartialEq)]
+pub enum IoResult {
+    Done(Json),
+    Failed(String),
 }
 
 /// What one tick did, so the caller can log it without a second query.
@@ -82,7 +123,7 @@ pub struct TickReport {
     pub started: usize,
     /// Runs advanced (claimed and moved at least one step).
     pub advanced: usize,
-    /// I/O the server should perform outside the lock. Always empty until hub#662.
+    /// I/O the server should perform outside the lock, then complete with [`complete_io`].
     pub pending_io: Vec<PendingIo>,
 }
 
@@ -105,11 +146,10 @@ pub async fn tick(
         };
         // A failure advancing ONE run never stops the others (the lesson of hub#142 in the
         // outbox): the run is left claimed, its lease expires, and it is retried.
-        if let Err(e) = advance_run(db, registry, hub_id, &run).await {
-            eprintln!(
-                "flows: run {}: {e}",
-                run["id"].as_str().unwrap_or("?")
-            );
+        match advance_run(db, registry, hub_id, &run).await {
+            Ok(Some(pending)) => report.pending_io.push(pending),
+            Ok(None) => {}
+            Err(e) => eprintln!("flows: run {}: {e}", run["id"].as_str().unwrap_or("?")),
         }
         report.advanced += 1;
     }
@@ -155,13 +195,14 @@ async fn claim_next_run(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option
     Ok(res.rows.into_iter().next())
 }
 
-/// Advances one claimed run by up to [`MAX_STEPS_PER_TICK`] steps.
+/// Advances one claimed run by up to [`MAX_STEPS_PER_TICK`] steps, and stops early when it reaches
+/// a step whose work belongs outside the lock — returning it as a [`PendingIo`].
 async fn advance_run(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     hub_id: &str,
     run: &Json,
-) -> Result<()> {
+) -> Result<Option<PendingIo>> {
     let run_id = run["id"].as_str().unwrap_or_default().to_string();
     let flow_id = run["flow_id"].as_str().unwrap_or_default().to_string();
     let depth = run["depth"].as_i64().unwrap_or(0);
@@ -186,7 +227,8 @@ async fn advance_run(
                  read as a value"
             ),
         )
-        .await;
+        .await
+        .map(|()| None);
     }
 
     // The definition is read fresh, and a flow that was disabled or deleted mid-run stops here.
@@ -201,6 +243,7 @@ async fn advance_run(
                 "the flow was disabled while this run was in flight",
             )
             .await
+            .map(|()| None)
         }
         Err(_) => {
             return finish(
@@ -210,6 +253,7 @@ async fn advance_run(
                 &format!("{ERR_FLOW_GONE}: the flow was deleted while this run was in flight"),
             )
             .await
+            .map(|()| None)
         }
     };
     // The document is validated before it is ever stored, so this only fires when the stored one
@@ -218,12 +262,16 @@ async fn advance_run(
     // every time its lease expires, forever.
     let def = match FlowDefinition::parse(&flow.definition) {
         Ok(def) => def,
-        Err(e) => return finish(db, &run_id, store::STATUS_FAILED, &format!("{e}")).await,
+        Err(e) => {
+            return finish(db, &run_id, store::STATUS_FAILED, &format!("{e}"))
+                .await
+                .map(|()| None)
+        }
     };
 
     for _ in 0..MAX_STEPS_PER_TICK {
         let Some(step) = def.steps.get(index as usize) else {
-            return finish(db, &run_id, store::STATUS_DONE, "").await;
+            return finish(db, &run_id, store::STATUS_DONE, "").await.map(|()| None);
         };
         let scope = json!({ "input": input, "steps": vars.get("steps").cloned().unwrap_or(json!({})) });
 
@@ -246,12 +294,21 @@ async fn advance_run(
                 index += 1;
                 persist_vars(db, &run_id, index, &vars).await?;
             }
-            Outcome::Stopped => return finish(db, &run_id, store::STATUS_DONE, "").await,
-            Outcome::Sleep { wake_at } => return sleep_until(db, &run_id, &wake_at).await,
+            Outcome::Io { pending } => {
+                // The run keeps its lease: it is invisible to the next tick until the server
+                // completes it, and every OTHER run carries on being advanced meanwhile.
+                return Ok(Some(pending));
+            }
+            Outcome::Stopped => {
+                return finish(db, &run_id, store::STATUS_DONE, "").await.map(|()| None)
+            }
+            Outcome::Sleep { wake_at } => {
+                return sleep_until(db, &run_id, &wake_at).await.map(|()| None)
+            }
             Outcome::Failed { error } => {
                 // v1 is `on_error: "stop"` (ADR-0283 §1): a linear flow has nowhere else to go,
                 // and retrying a business command by itself is how a sale gets charged twice.
-                return finish(db, &run_id, store::STATUS_FAILED, &error).await;
+                return finish(db, &run_id, store::STATUS_FAILED, &error).await.map(|()| None);
             }
         }
     }
@@ -266,11 +323,14 @@ async fn advance_run(
         &p,
     )
     .await?;
-    Ok(())
+    Ok(None)
 }
 
 enum Outcome {
     Continue { output: Json },
+    /// The step's work happens outside the lock (`http` today, `ai`/`notify` later). The tick
+    /// hands it to the server and this run pauses exactly here, claimed, until it comes back.
+    Io { pending: PendingIo },
     /// A `condition` said no. The run is complete, not failed: a guard that does not pass is the
     /// flow working exactly as written.
     Stopped,
@@ -409,14 +469,58 @@ async fn run_step(
             }
         }
 
-        // Reserved for the I/O kinds. `FlowDefinition::parse` refuses to store a document that
-        // reaches here, so this arm is the seam and not a live path: when hub#662 fills it in, it
-        // returns the run to the tick as a `PendingIo` and the server performs the call outside
-        // the lock.
+        // **The claim half of claim → I/O → complete** (hub#662). Everything that decides WHETHER
+        // this call may happen — the allow-list, the secrets, the URL — happens here, under the
+        // lock, against the state of this instant. What crosses the seam is a request with nothing
+        // left to decide.
+        StepSpec::Http { .. } => {
+            let authority = grants::authority(db, hub_id, flow_id).await?;
+            match http::prepare(db, hub_id, flow_id, step, scope, &authority).await {
+                Ok(prepared) => {
+                    // The step is written BEFORE the call leaves, with the redacted request: if
+                    // this hub dies mid-call, the run history still says what it was doing.
+                    write_step(
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_RUNNING,
+                        &prepared.recorded_input,
+                        &json!({}),
+                        "",
+                        &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Io {
+                        pending: PendingIo::Http {
+                            run_id: run_id.to_string(),
+                            step_id: step.id.clone(),
+                            request: prepared.request,
+                        },
+                    })
+                }
+                Err(e) => {
+                    // Denied, un-callable or missing a secret: nothing left the hub, and the run
+                    // says why. The message is already redacted by `http::prepare`.
+                    let error = format!("step `{}`: {}", step.id, error_text(&e));
+                    write_step(
+                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
+                        &error, &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Failed { error })
+                }
+            }
+        }
+
+        // `ai` and `notify`. `FlowDefinition::parse` refuses to store a document that reaches here,
+        // so this arm is the seam and not a live path: hub#665/#663 fill it in the way `http`
+        // already is.
         StepSpec::Reserved => {
             let error = format!(
                 "step `{}` is of kind `{}`: the claim → I/O → complete path is not implemented \
-                 yet (http: hub#662, ai: hub#665, notify: hub#663)",
+                 yet (ai: hub#665, notify: hub#663)",
                 step.id,
                 step.kind.as_str()
             );
@@ -601,9 +705,14 @@ async fn finish(
 /// it», where the prose does not. `last_error` is read hours later by somebody who was not there,
 /// so both halves are stamped here.
 fn step_error(command: &str, error: &RuntimeError) -> String {
+    format!("{command}: {}", error_text(error))
+}
+
+/// A runtime error as a run records it: the stable code AND the prose, for the same reason.
+fn error_text(error: &RuntimeError) -> String {
     match error {
-        RuntimeError::Domain { code, message } => format!("{command}: {code}: {message}"),
-        other => format!("{command}: {other}"),
+        RuntimeError::Domain { code, message } => format!("{code}: {message}"),
+        other => format!("{other}"),
     }
 }
 

@@ -35,10 +35,22 @@ pub const SCHEMA_VERSION: i64 = 1;
 const ROOT_INPUT: &str = "input";
 const ROOT_STEPS: &str = "steps";
 const ROOT_EVENT: &str = "event";
-/// Reserved for `_flow_secrets` (ADR-0283 §4, hub#662). It is refused at save time rather than
+/// `_flow_secrets` (ADR-0283 §4, hub#662). Legal ONLY inside an `http` step: that is the one place
+/// a credential has a reason to exist, and anywhere else it is refused at save time rather than
 /// silently treated as a literal string — a step that thinks it is sending a secret and sends the
 /// text `secret.API_KEY` is worse than one that will not save.
 const ROOT_SECRET: &str = "secret";
+
+/// The methods an `http` step may use. Frozen and small: the point of the step is to call a
+/// business API, and `CONNECT`/`TRACE` are how an allow-listed URL becomes a tunnel.
+const METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+/// Timeout of an `http` step when it does not say (ADR-0283 §4).
+pub const DEFAULT_TIMEOUT_SECONDS: u64 = 10;
+
+/// The most a single `http` step may wait. The run sits `running` with its lease held for that
+/// long, so this is also how long a mistake costs.
+pub const MAX_TIMEOUT_SECONDS: u64 = 30;
 
 /// Error code namespace of the kernel. Callers (and the module `flows`) program against these.
 pub const ERR_UNKNOWN_SCHEMA_VERSION: &str = "flow.unknown_schema_version";
@@ -64,7 +76,7 @@ pub enum StepKind {
     Command,
     Condition,
     Delay,
-    /// Reserved — hub#662 (`http` + `_flow_secrets`).
+    /// The first way out to the internet (hub#662): allow-listed URL + `_flow_secrets`.
     Http,
     /// Reserved — hub#665 (server-side agent runner).
     Ai,
@@ -97,10 +109,26 @@ impl StepKind {
     }
 
     /// Does this kind reach outside the runtime? Those follow the **claim → I/O → complete**
-    /// contract (the tick prepares them, the server performs the I/O outside the global lock, a
-    /// second locked pass persists the result) and none of them is implemented in this delivery.
+    /// contract: the tick prepares them, the server performs the I/O outside the global lock, and a
+    /// second locked pass persists the result.
     pub fn needs_io(self) -> bool {
         matches!(self, StepKind::Http | StepKind::Ai | StepKind::Notify)
+    }
+
+    /// Can this hub execute this kind? `ai` and `notify` are still only a vocabulary, and a
+    /// document using them is refused **at save time** naming its issue — a flow stored with a step
+    /// nothing performs would park a run forever at 3 AM.
+    pub fn is_available(self) -> bool {
+        !matches!(self, StepKind::Ai | StepKind::Notify)
+    }
+
+    /// The issue that brings the kinds that are not here yet, so the refusal is actionable.
+    fn pending_issue(self) -> &'static str {
+        match self {
+            StepKind::Ai => "hub#665",
+            StepKind::Notify => "hub#663",
+            _ => "",
+        }
     }
 
     /// Every kind, in document order. Mirrored by `schemas/flow.schema.json`.
@@ -128,7 +156,21 @@ pub enum StepSpec {
     /// `{"kind":"delay","seconds":N}` or `{"kind":"delay","until":"input.when"}` — the run sleeps
     /// as a row (`wake_at`), never as a held task.
     Delay { seconds: Option<i64>, until: Option<String> },
-    /// `http` / `ai` / `notify`: accepted by the grammar, refused by [`FlowDefinition::validate`].
+    /// `{"kind":"http","method":"POST","url":"https://…","headers":{…},"body":{…},"timeout":10}`
+    /// — the first way out to the internet (hub#662). Every field except `url` has a default, and
+    /// each one is a mapping expression: the URL is templated against the run and matched against
+    /// the flow's `http` grants **after** templating, because the allow-list has to judge the URL
+    /// that would actually be called.
+    Http {
+        /// Upper-case, one of [`METHODS`].
+        method: String,
+        url: String,
+        headers: Map<String, Json>,
+        /// An object becomes a JSON body; a string is sent verbatim.
+        body: Option<Json>,
+        timeout_seconds: u64,
+    },
+    /// `ai` / `notify`: accepted by the grammar, refused by [`FlowDefinition::validate`].
     Reserved,
 }
 
@@ -138,6 +180,52 @@ pub struct StepDef {
     pub id: String,
     pub kind: StepKind,
     pub spec: StepSpec,
+}
+
+impl StepDef {
+    /// Every mapping expression this step evaluates, in document order.
+    fn expressions(&self) -> Vec<Json> {
+        match &self.spec {
+            StepSpec::Command { params, .. } => vec![Json::Object(params.clone())],
+            StepSpec::Condition { when } => {
+                vec![Json::Array(when.paths().map(|p| json_str(p)).collect())]
+            }
+            StepSpec::Delay { until, .. } => {
+                until.iter().map(|u| json_str(u)).collect::<Vec<_>>()
+            }
+            StepSpec::Http {
+                url, headers, body, ..
+            } => {
+                let mut out = vec![json_str(url), Json::Object(headers.clone())];
+                out.extend(body.clone());
+                out
+            }
+            StepSpec::Reserved => Vec::new(),
+        }
+    }
+
+    /// The `_flow_secrets` this step names, deduplicated and sorted.
+    ///
+    /// The executor loads **exactly** these: a hub with fifty credentials decrypts the one the step
+    /// about to run asked for, so a step can never carry a secret it does not mention.
+    pub fn secret_names(&self) -> Vec<String> {
+        let mut paths = Vec::new();
+        for expr in self.expressions() {
+            template_paths(&expr, &mut paths);
+        }
+        let mut names: Vec<String> = paths
+            .iter()
+            .filter_map(|p| p.strip_prefix("secret."))
+            .map(|n| n.to_string())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+}
+
+fn json_str(s: &str) -> Json {
+    Json::String(s.to_string())
 }
 
 // ── Triggers ──────────────────────────────────────────────────────────────────────────────────
@@ -425,6 +513,19 @@ pub fn is_path(s: &str) -> bool {
             && s.len() > root.len() + 1)
 }
 
+/// Is this an absolute `http(s)` URL? **Syntax only.** Whether the hub may talk to that host is the
+/// allow-list's question (`grants::Authority::allows_http`), and whether its address is one that
+/// would reach back inside the network is `flow_io`'s (anti-SSRF). Three separate questions, asked
+/// by three separate gates, because each of them fails differently.
+pub fn is_http_url(url: &str) -> bool {
+    let lower = url.trim().to_ascii_lowercase();
+    ["http://", "https://"].iter().any(|scheme| {
+        lower
+            .strip_prefix(scheme)
+            .is_some_and(|rest| !rest.is_empty() && !rest.starts_with('/'))
+    })
+}
+
 /// Walks `a.b.c` through an object scope. Array indexing is deliberately absent: v1 maps fields,
 /// and "the third line of the ticket" is a shape that belongs in a query, not in a flow document.
 pub fn resolve_path(path: &str, scope: &Json) -> Option<Json> {
@@ -622,35 +723,43 @@ impl FlowDefinition {
             }
             seen.push(&step.id);
 
-            if step.kind.needs_io() {
+            if !step.kind.is_available() {
                 return Err(invalid(
                     ERR_STEP_KIND_NOT_AVAILABLE,
                     format!(
-                        "step `{}` is of kind `{}`, which this hub cannot execute yet: the I/O \
-                         steps follow the claim → I/O → complete contract and land with their own \
-                         issues (http: hub#662, ai: hub#665, notify: hub#663). Refused at save \
-                         time so a flow never stalls forever at 3 AM.",
+                        "step `{}` is of kind `{}`, which this hub cannot execute yet ({}). \
+                         Refused at save time so a flow never stalls forever at 3 AM.",
                         step.id,
-                        step.kind.as_str()
+                        step.kind.as_str(),
+                        step.kind.pending_issue()
                     ),
                 ));
             }
-        }
-        // No `secret.…` anywhere: `_flow_secrets` does not exist yet (ADR-0283 §4), and a step
-        // that believes it is sending a secret must not send the literal text of its name.
-        let mut paths: Vec<String> = Vec::new();
-        for step in &self.steps {
-            match &step.spec {
-                StepSpec::Command { params, .. } => {
-                    template_paths(&Json::Object(params.clone()), &mut paths)
+
+            // A `secret.…` outside an `http` step is refused. Inside one it is the credential of
+            // the API being called; outside it there is no legitimate reader — a `command` step
+            // would hand it to a module's table, and a `condition` could compare it byte by byte
+            // until it had guessed it.
+            if step.kind != StepKind::Http {
+                let mut paths = Vec::new();
+                for expr in step.expressions() {
+                    template_paths(&expr, &mut paths);
                 }
-                StepSpec::Condition { when } => {
-                    paths.extend(when.paths().cloned());
+                if let Some(path) = paths.iter().find(|p| p.starts_with("secret.")) {
+                    return Err(invalid(
+                        ERR_SECRET_NOT_AVAILABLE,
+                        format!(
+                            "step `{}`: `{path}` — a flow secret is only readable from an `http` \
+                             step (ADR-0283 §4), which is the one place a credential has to go out.",
+                            step.id
+                        ),
+                    ));
                 }
-                StepSpec::Delay { until, .. } => paths.extend(until.clone()),
-                StepSpec::Reserved => {}
             }
         }
+        // A trigger runs before any step and its scope is the EVENT, so there is nothing a secret
+        // could mean there.
+        let mut paths: Vec<String> = Vec::new();
         for trigger in &self.triggers {
             template_paths(&Json::Object(trigger.input.clone()), &mut paths);
             paths.extend(trigger.filter.paths().cloned());
@@ -658,7 +767,7 @@ impl FlowDefinition {
         if let Some(path) = paths.iter().find(|p| p.starts_with("secret.")) {
             return Err(invalid(
                 ERR_SECRET_NOT_AVAILABLE,
-                format!("`{path}`: flow secrets are not available yet (ADR-0283 §4, hub#662)"),
+                format!("`{path}`: a trigger cannot read a flow secret (ADR-0283 §4)"),
             ));
         }
         Ok(())
@@ -763,9 +872,9 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         )
     })?;
 
-    // The reserved kinds are parsed no further ON PURPOSE: their keys are the contract of hub#662
-    // and hub#665, and inventing it here would freeze a shape nobody has run.
-    if kind.needs_io() {
+    // The kinds that do not run yet are parsed no further ON PURPOSE: their keys are the contract
+    // of hub#665/#663, and inventing it here would freeze a shape nobody has run.
+    if !kind.is_available() {
         return Ok(StepDef {
             id,
             kind,
@@ -777,6 +886,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         StepKind::Command => &["id", "kind", "command", "params"],
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &["id", "kind", "seconds", "until"],
+        StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
         _ => &["id", "kind"],
     };
     for key in map.keys() {
@@ -840,6 +950,89 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             }
             StepSpec::Delay { seconds, until }
         }
+        StepKind::Http => {
+            let url = map
+                .get("url")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            if url.is_empty() {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!("step `{id}`: an `http` step needs a `url`"),
+                ));
+            }
+            // Only a LITERAL url can be judged here; a templated one is only known at run time and
+            // is checked again in `flow_io` before the call leaves. Checking the literal half at
+            // save time puts the refusal on the screen where the author typed it.
+            if !url.contains("{{") && !is_http_url(&url) {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!(
+                        "step `{id}`: `{url}` — an `http` step only ever calls an absolute \
+                         `http://` or `https://` URL"
+                    ),
+                ));
+            }
+
+            let method = map
+                .get("method")
+                .and_then(|v| v.as_str())
+                .unwrap_or("GET")
+                .trim()
+                .to_uppercase();
+            if !METHODS.contains(&method.as_str()) {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!(
+                        "step `{id}`: `{method}` is not one of {}",
+                        METHODS.join(", ")
+                    ),
+                ));
+            }
+
+            let headers = match map.get("headers") {
+                Some(Json::Object(m)) => m.clone(),
+                None | Some(Json::Null) => Map::new(),
+                Some(_) => {
+                    return Err(invalid(
+                        ERR_INVALID_DEFINITION,
+                        format!("step `{id}`: `headers` is an object of mappings"),
+                    ))
+                }
+            };
+
+            let timeout_seconds = match map.get("timeout") {
+                None | Some(Json::Null) => DEFAULT_TIMEOUT_SECONDS,
+                Some(Json::Number(n)) => match n.as_i64() {
+                    Some(s) if (1..=MAX_TIMEOUT_SECONDS as i64).contains(&s) => s as u64,
+                    _ => {
+                        return Err(invalid(
+                            ERR_INVALID_DEFINITION,
+                            format!(
+                                "step `{id}`: `timeout` is a whole number of seconds between 1 and \
+                                 {MAX_TIMEOUT_SECONDS} — the run holds its lease for that long"
+                            ),
+                        ))
+                    }
+                },
+                Some(_) => {
+                    return Err(invalid(
+                        ERR_INVALID_DEFINITION,
+                        format!("step `{id}`: `timeout` is a number of seconds"),
+                    ))
+                }
+            };
+
+            StepSpec::Http {
+                method,
+                url,
+                headers,
+                body: map.get("body").filter(|b| !b.is_null()).cloned(),
+                timeout_seconds,
+            }
+        }
         _ => StepSpec::Reserved,
     };
 
@@ -885,14 +1078,149 @@ mod tests {
     }
 
     #[test]
-    fn an_io_step_is_refused_by_name_with_the_issue_that_brings_it() {
-        let err = FlowDefinition::parse(&json!({
+    fn the_io_steps_this_hub_still_cannot_run_are_refused_by_name() {
+        for (kind, issue) in [("ai", "hub#665"), ("notify", "hub#663")] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "call", "kind": kind }]
+            }))
+            .expect_err("this kernel cannot perform these I/O steps yet");
+            let text = format!("{err}");
+            assert!(text.contains(kind) && text.contains(issue), "{text}");
+        }
+    }
+
+    // ── the `http` step (hub#662) ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn an_http_step_carries_its_method_url_headers_body_and_timeout() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "call", "kind": "http", "method": "post",
+                "url": "https://api.example.com/v1/send?to={{input.phone}}",
+                "headers": { "Authorization": "Bearer {{secret.API_KEY}}" },
+                "body": { "text": "input.text" },
+                "timeout": 5
+            }]
+        }))
+        .expect("the shape a connector template writes");
+        let StepSpec::Http {
+            method,
+            url,
+            headers,
+            body,
+            timeout_seconds,
+        } = &def.steps[0].spec
+        else {
+            panic!("an http step parses as one");
+        };
+        assert_eq!(method, "POST", "the method is normalised, not echoed");
+        assert_eq!(url, "https://api.example.com/v1/send?to={{input.phone}}");
+        assert_eq!(headers.len(), 1);
+        assert_eq!(*timeout_seconds, 5);
+        assert!(body.is_some());
+    }
+
+    #[test]
+    fn an_http_step_defaults_to_a_get_with_the_ten_second_timeout() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "call", "kind": "http", "url": "https://api.example.com/ping" }]
+        }))
+        .unwrap();
+        let StepSpec::Http { method, timeout_seconds, body, .. } = &def.steps[0].spec else {
+            panic!()
+        };
+        assert_eq!(method, "GET");
+        assert_eq!(*timeout_seconds, DEFAULT_TIMEOUT_SECONDS);
+        assert!(body.is_none(), "a GET with no body declared sends none");
+    }
+
+    #[test]
+    fn an_http_step_without_a_url_is_refused() {
+        assert!(FlowDefinition::parse(&json!({
             "schema_version": 1,
             "steps": [{ "id": "call", "kind": "http" }]
         }))
-        .expect_err("this kernel cannot perform I/O steps yet");
-        let text = format!("{err}");
-        assert!(text.contains("http") && text.contains("hub#662"), "{text}");
+        .is_err());
+    }
+
+    #[test]
+    fn a_literal_url_that_is_not_http_is_refused_at_save_time() {
+        // The authoritative check runs again before the call leaves (`flow_io`), because a
+        // templated URL is only known then. This one is the early half: a scheme typed by hand is
+        // refused on the screen where it was typed, not at 3 AM.
+        for url in ["file:///etc/passwd", "ftp://example.com/x", "/relative"] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "call", "kind": "http", "url": url }]
+            }))
+            .expect_err("only http(s) ever leaves the hub");
+            assert!(format!("{err}").contains("http"), "{err}");
+        }
+    }
+
+    #[test]
+    fn a_timeout_beyond_the_cap_and_an_unknown_method_are_refused() {
+        let over = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "c", "kind": "http", "url": "https://a.example.com/x", "timeout": 120 }]
+        }))
+        .expect_err("a 2-minute step is a run nobody can explain");
+        assert!(format!("{over}").contains(&MAX_TIMEOUT_SECONDS.to_string()), "{over}");
+
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "c", "kind": "http", "url": "https://a.example.com/x", "method": "TRACE" }]
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn a_secret_is_reachable_from_an_http_step_and_from_nowhere_else() {
+        // Where it belongs: the one step that talks to somebody who needs a credential.
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "call", "kind": "http", "url": "https://api.example.com/x",
+                "headers": { "Authorization": "Bearer {{secret.API_KEY}}" }
+            }]
+        }))
+        .is_ok());
+
+        // Everywhere else it is refused, and that is the containment: a command step could hand a
+        // credential to a module's table, and a condition could compare it byte by byte until it
+        // had guessed it.
+        for step in [
+            json!({ "id": "a", "kind": "command", "command": "m.c", "params": { "k": "{{secret.API_KEY}}" } }),
+            json!({ "id": "a", "kind": "condition", "when": { "secret.API_KEY": { "eq": "x" } } }),
+            json!({ "id": "a", "kind": "delay", "until": "secret.API_KEY" }),
+        ] {
+            let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .expect_err("a secret only leaves the hub through an http step");
+            assert!(format!("{err}").contains("secret"), "{err}");
+        }
+    }
+
+    #[test]
+    fn the_secret_names_a_step_needs_are_known_before_it_runs() {
+        // The executor loads exactly these and nothing else: a hub with fifty secrets decrypts the
+        // one this step names.
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "call", "kind": "http",
+                "url": "https://api.example.com/x?k={{secret.KEY}}",
+                "headers": { "Authorization": "Bearer {{secret.TOKEN}}" },
+                "body": { "sig": "{{secret.KEY}}" }
+            }]
+        }))
+        .unwrap();
+        assert_eq!(
+            def.steps[0].secret_names(),
+            vec!["KEY".to_string(), "TOKEN".to_string()]
+        );
     }
 
     #[test]
@@ -906,19 +1234,6 @@ mod tests {
         }))
         .expect_err("`steps.a.x` would be ambiguous");
         assert!(format!("{err}").contains("duplicate step id"), "{err}");
-    }
-
-    #[test]
-    fn a_secret_reference_is_refused_while_flow_secrets_do_not_exist() {
-        let err = FlowDefinition::parse(&json!({
-            "schema_version": 1,
-            "steps": [{
-                "id": "a", "kind": "command", "command": "m.c",
-                "params": { "key": "{{secret.API_KEY}}" }
-            }]
-        }))
-        .expect_err("sending the literal text `secret.API_KEY` is worse than not saving");
-        assert!(format!("{err}").contains("secret"), "{err}");
     }
 
     #[test]
