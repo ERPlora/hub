@@ -126,6 +126,35 @@ pub enum Plan {
     Rewritten(Vec<String>),
 }
 
+/// ¿El SQL hace lo que su `kind` dice? **Sin** la regla de propiedad.
+///
+/// Existe para las migraciones de **sistema** (hub#517), que no tienen manifest donde declarar nada
+/// y que —al revés que las de módulo— **sí son dueñas** de `hub_*` y `_*`. Lo que sigue valiendo
+/// igual es lo otro: una migración que destruye tiene que decirlo.
+///
+/// Es la mitad que importa para el rollback. Al revertir **no se ejecuta nada sobre el esquema**
+/// (ADR-0269): se revierte el código y la columna se queda, y la versión anterior la ignora porque
+/// su SQL no la menciona. Eso solo funciona si lo que se aplicó era **aditivo** — de ahí que
+/// marcar lo que no lo es sea la única forma de saber qué versiones no admiten vuelta atrás.
+pub fn kind_matches(sql: &str, kind: Kind) -> Result<(), GuardError> {
+    for statement in split_statements(sql) {
+        match kind {
+            Kind::Expand => {
+                if let Some(found) = destructive_verb(&statement) {
+                    return Err(GuardError::KindMismatch { kind, found });
+                }
+            }
+            Kind::Backfill => {
+                if let Some(found) = ddl_verb(&statement) {
+                    return Err(GuardError::KindMismatch { kind, found });
+                }
+            }
+            Kind::Contract => {}
+        }
+    }
+    Ok(())
+}
+
 /// Revisa la migración y dice cómo aplicarla.
 pub fn check(
     module_id: &str,
@@ -221,6 +250,12 @@ fn destructive_verb(statement: &str) -> Option<String> {
         if upper.contains(verb) {
             return Some(verb.to_string());
         }
+    }
+    // `SET NOT NULL` sobre una columna que YA existe tampoco admite vuelta atrás: el binario
+    // anterior insertaba sin ese campo y empezaría a fallar. Dentro de un `CREATE TABLE` sí es
+    // aditivo (la tabla es nueva), y por eso solo cuenta en un `ALTER`.
+    if upper.trim_start().starts_with("ALTER TABLE") && upper.contains("SET NOT NULL") {
+        return Some("SET NOT NULL".to_string());
     }
     None
 }
