@@ -50,7 +50,7 @@ pub async fn execute_page(
     // WC → SDK → dispatcher), así que la identidad del hub se ofrece como una query más, con el
     // mismo gate de permisos. Va ANTES del registry: ningún módulo puede suplantarla.
     if let Some(rest) = name.strip_prefix(crate::hub_users::CORE_NAMESPACE) {
-        let rows = crate::hub_users::core_query(db, registry, &ctx.hub_id, name, rest, ctx).await?;
+        let rows = crate::hub_users::core_query(db, registry, &ctx.hub_id, name, rest, ctx, params).await?;
         let total = rows.len() as u64;
         return Ok(QueryPage { rows, total, limit: total, offset: 0 });
     }
