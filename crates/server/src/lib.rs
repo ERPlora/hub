@@ -1877,9 +1877,13 @@ async fn assistant_chat_stream(
         // módulos que describe y el catálogo que ofrece tienen que ser la misma foto del registry.
         // Absorbe además los `system` del cliente (el briefing de `hub.setup.status`, ADR-0230),
         // que el Cloud descarta en su frontera — `instructions` es el único canal que sobrevive.
+        // La fecha/hora ACTUAL viaja en cada turno: el reloj del modelo se congeló al entrenar,
+        // y en un ERP «hoy» es estructural (ventas de hoy, trimestre, vencimientos).
+        let now = chrono::Utc::now();
         let instructions = assistant::build_instructions(
             rt.registry(),
             &assistant::client_system_messages(&frontend),
+            &format!("{} ({})", now.format("%Y-%m-%dT%H:%M:%SZ"), now.format("%A")),
         );
         (tools, ctx.user_id.clone(), active, instructions)
     };

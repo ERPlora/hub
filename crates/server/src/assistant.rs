@@ -136,7 +136,7 @@ fn tool_def(name: &str, description: &str, kind: &str, module_id: &str, schema: 
 /// `client_system` carries the `system` turns the web app sent (today, the `hub.setup.status`
 /// briefing of ADR-0230). They are folded in HERE because the Cloud drops client `system`
 /// messages: `instructions` is the only channel that survives the boundary.
-pub fn build_instructions(registry: &Registry, client_system: &[String]) -> String {
+pub fn build_instructions(registry: &Registry, client_system: &[String], now: &str) -> String {
     let mut s = String::from(
         "You are the ERPlora assistant. ERPlora is a modular, multi-tenant ERP/POS: the user is \
          working inside their own Hub — their business's instance — which loads business modules \
@@ -144,6 +144,15 @@ pub fn build_instructions(registry: &Registry, client_system: &[String]) -> Stri
          You are not a general-purpose chatbot. Every question is about THIS business and THIS \
          hub unless the user plainly says otherwise.\n\n",
     );
+
+    // "Today" is the one fact a model can never supply itself — its clock froze at training
+    // time — and in an ERP the date is load-bearing: today's sales, this quarter, due dates.
+    // Injected per request; UTC so it is unambiguous, and the model converts for the user.
+    s.push_str(&format!(
+        "## Current date and time\n\nNow (UTC): **{now}**. Trust this over any date you \
+         believe from training; resolve \"today\", \"yesterday\" and \"this month\" from it, in \
+         the user's timezone if they state one.\n\n"
+    ));
 
     // Active modules with the description their manifest declares for the assistant.
     let mut modules: Vec<&erplora_runtime::manifest::Manifest> = registry
@@ -474,7 +483,7 @@ mod tests {
             ("inventory", "Inventory", Some("Product catalog and basic stock control"), true),
             ("kitchen", "Kitchen", Some("Kitchen order display"), false),
         ]);
-        let ins = build_instructions(&reg, &[]);
+        let ins = build_instructions(&reg, &[], "2026-08-09T14:30:00Z (Sunday)");
 
         assert!(ins.contains("ERPlora"), "must name the product: {ins}");
         // The active module is named, with the `agent.description` the manifest declares for
@@ -513,6 +522,29 @@ mod tests {
         );
     }
 
+    /// An LLM does not know what day it is — its sense of "today" froze at training time. In an
+    /// ERP that is not a cosmetic gap: "today's sales", "this quarter", an invoice date or a tax
+    /// deadline all hang on the clock. So every turn's instructions carry the CURRENT date and
+    /// time (UTC, RFC3339, with the weekday), injected per request — never cached, never left to
+    /// the model's guess. `build_instructions` takes it as a parameter so the tests can pin it.
+    #[test]
+    fn instructions_carry_the_current_datetime_of_every_turn() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
+        assert!(
+            ins.contains("2026-08-09T14:30:00Z (Sunday)"),
+            "the exact per-turn timestamp must be in the prompt: {ins}"
+        );
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("current date"),
+            "it must be LABELLED as the current date, not float as a loose string: {ins}"
+        );
+        assert!(
+            lower.contains("utc"),
+            "the timezone must be explicit or 'today' shifts by the user's offset: {ins}"
+        );
+    }
+
     /// The money contract (ADR-0123) is a HUB-WIDE invariant, so it belongs in the system prompt
     /// and not in each module's schema: every amount the runtime accepts is an **integer of
     /// cents**. The JSON Schemas only say `{"type":"integer","minimum":0}` — nothing there tells
@@ -521,7 +553,7 @@ mod tests {
     /// that to cents is the assistant's job, and it has to be told so.
     #[test]
     fn instructions_state_the_money_contract_in_cents() {
-        let ins = build_instructions(&Registry::new(), &[]);
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         let lower = ins.to_lowercase();
         assert!(lower.contains("cent"), "the money contract must be stated: {ins}");
         // The worked example is what makes it stick — a rule without one is re-derived wrong.
@@ -544,7 +576,7 @@ mod tests {
     /// safe is read-then-write, and it has to be stated: the model must not infer it.
     #[test]
     fn instructions_require_reading_the_record_before_updating_it() {
-        let ins = build_instructions(&Registry::new(), &[]);
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         let lower = ins.to_lowercase();
         assert!(
             lower.contains("read") && lower.contains("update"),
@@ -577,7 +609,7 @@ mod tests {
         reg.installed.push(serde_json::from_value(m).expect("manifest parses"));
         reg.status.insert("inventory".into(), ModuleStatus::Active);
 
-        let ins = build_instructions(&reg, &[]);
+        let ins = build_instructions(&reg, &[], "2026-08-09T14:30:00Z (Sunday)");
         assert!(ins.contains("Products"), "nav label missing: {ins}");
         assert!(
             ins.contains("/m/inventory/products"),
@@ -593,7 +625,7 @@ mod tests {
     /// outside (a tax rate changing, a legal deadline).
     #[test]
     fn instructions_put_our_own_capabilities_before_memory_and_the_web() {
-        let ins = build_instructions(&Registry::new(), &[]);
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         let lower = ins.to_lowercase();
         assert!(
             lower.contains("web search") || lower.contains("web_search"),
@@ -613,7 +645,7 @@ mod tests {
     /// the user's language, and treat the labels as source, not as what is painted.
     #[test]
     fn instructions_are_multilingual_and_warn_that_labels_are_english_source() {
-        let ins = build_instructions(&Registry::new(), &[]);
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         let lower = ins.to_lowercase();
         assert!(
             lower.contains("language"),
@@ -629,7 +661,7 @@ mod tests {
     /// "no modules installed" is a fact worth stating — not a reason to say nothing.
     #[test]
     fn instructions_without_modules_still_identify_erplora() {
-        let ins = build_instructions(&Registry::new(), &[]);
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         assert!(ins.contains("ERPlora"), "must name the product even with no modules: {ins}");
         assert!(!ins.trim().is_empty());
     }
@@ -642,7 +674,7 @@ mod tests {
     #[test]
     fn instructions_fold_in_the_client_system_briefing() {
         let briefing = "SETUP BRIEFING: the fiscal identity is pending.";
-        let ins = build_instructions(&Registry::new(), &[briefing.to_string()]);
+        let ins = build_instructions(&Registry::new(), &[briefing.to_string()], "2026-08-09T14:30:00Z (Sunday)");
         assert!(
             ins.contains(briefing),
             "the client briefing must survive into instructions: {ins}"
@@ -671,7 +703,7 @@ mod tests {
             {"role":"system","content":"SETUP BRIEFING"},
             {"role":"user","content":"¿qué falta por configurar?"}
         ]});
-        let ins = build_instructions(&Registry::new(), &client_system_messages(&fe));
+        let ins = build_instructions(&Registry::new(), &client_system_messages(&fe), "2026-08-09T14:30:00Z (Sunday)");
         let body = build_cloud_body(&fe, vec![], None, &ins);
 
         assert!(
