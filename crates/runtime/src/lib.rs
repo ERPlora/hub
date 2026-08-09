@@ -1336,6 +1336,22 @@ impl Runtime {
         fiscal_profile::close(self.db.as_ref(), &self.hub_id, actor).await
     }
 
+    /// **Adopta una instalación AJENA** (ADR-0273 D8, hub#558): el hub se movió de despliegue —o se
+    /// restauró en otro sitio—, el `hub_id` cambió y estas filas las escribió otra instalación.
+    /// Como `NumeroInstalacion = hub_id` (ADR-0202), otro `hub_id` es **otro SIF y otra cadena**,
+    /// que arranca con `PrimerRegistro=S`.
+    ///
+    /// **Jamás automático**: el arranque solo lo **marca** (`needs_review` + `BLOCKED` derivado) y
+    /// el gate solo **rechaza**. Adoptar en silencio la instalación de otro es exactamente cómo se
+    /// mezclan dos cadenas, y un registro ya remitido ni se reenvía ni se borra (ADR-0189). Sesión
+    /// admin y confirmación las pone la puerta que llama; `actor` es la traza.
+    pub async fn fiscal_adopt_installation(
+        &self,
+        actor: &str,
+    ) -> Result<fiscal_profile::FiscalProfile> {
+        fiscal_profile::adopt_installation(self.db.as_ref(), &self.hub_id, actor).await
+    }
+
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
     /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
     pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {

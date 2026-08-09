@@ -1,0 +1,21 @@
+{
+  "id": "fprov",
+  "name": "Adopt558 Fiscal Provider",
+  "version": "1.0.0",
+  "permissions": ["fprov.record.write"],
+  "role_permissions": { "admin": ["*"] },
+  "fiscal_regime": { "country": "ES", "regime": "verifactu" },
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "fprov.records.create": {
+      "permission": "fprov.record.write",
+      "transaction": true,
+      "sql": ["commands/records_create.sql"]
+    }
+  },
+  "events": {
+    "listen": {
+      "fsale.sale.completed": { "command": "fprov.records.create" }
+    }
+  }
+}

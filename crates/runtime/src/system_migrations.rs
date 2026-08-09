@@ -756,6 +756,32 @@ INSERT INTO _hub_fiscal_regime_registry (country_code, regime_key, since, note) 
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_at TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS closed_by TEXT NOT NULL DEFAULT '';",
     },
+    // ── v29 — hub#558 / ADR-0273 D8: taking over ANOTHER installation leaves a receipt ────────
+    // `NumeroInstalacion = hub_id` (ADR-0202): a profile whose `system_id` is not this hub was
+    // written by a different installation, so its chain is not this hub's to continue. The way out
+    // is explicit and manual (`fiscal_profile::adopt_installation`) — never the boot deciding by
+    // itself, because adopting somebody else's installation in silence is exactly how two chains
+    // get mixed, and a record the tax authority already accepted is neither re-sent nor deleted
+    // (ADR-0189).
+    //
+    // The takeover OVERWRITES `system_id`, which destroys the one fact nobody could reconstruct
+    // afterwards: *which* installation these rows came from. `adopted_from` keeps it, and it is
+    // the only evidence left that two chains could have been mixed here — worth more than the
+    // other two columns put together. `adopted_at`/`adopted_by` follow the shape of `closed_at`/
+    // `closed_by` (v28) and `mode_set_at`/`mode_set_by` (v17).
+    //
+    // ⚠️ **v29: the next number ABOVE THE MAXIMUM, re-checked at rebase.** `apply` compares against
+    // the maximum applied version, so anything at or below it is skipped IN SILENCE.
+    //
+    // ⚠️ **Re-executable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`.
+    SystemMigration {
+        version: 29,
+        name: "hub_fiscal_profile_adopted",
+        postgres: "\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_from TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS adopted_by TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
