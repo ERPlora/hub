@@ -972,8 +972,8 @@ pub fn app(state: AppState) -> Router {
         .route("/api/keys/:id", axum::routing::delete(api_keys::revoke_key))
         // ── Dead-letter del outbox, operable (hub#660 — ADR-0127 fase 2) ────────────────────
         // Misma puerta que la gestión de keys: sesión local de un humano owner/admin. Reintentar
-        // re-ejecuta el command de otro con los permisos del emisor y descartar cierra un registro
-        // para siempre, así que NO se abren a una API key ni al token de máquina.
+        // re-ejecuta el command de otro módulo con la autoridad de ESE módulo (hub#686) y descartar
+        // cierra un registro para siempre, así que NO se abren a una API key ni al token de máquina.
         .route("/api/hub/events/dead", get(outbox_admin::list_dead))
         .route("/api/hub/events/:id/retry", post(outbox_admin::retry_dead))
         .route(

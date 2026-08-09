@@ -18,6 +18,7 @@ use serde_json::{json, Value as Json};
 use crate::commands::{self, MAX_EVENT_DEPTH};
 use crate::errors::{Result, RuntimeError};
 use crate::host_notify::{self, NotifyIntent};
+use crate::permissions;
 use crate::registry::{new_id, now_rfc3339, Registry, RequestContext};
 
 /// Reintentos antes de mandar la fila a dead-letter (`status='dead'`).
@@ -64,9 +65,13 @@ pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
 }
 
 /// Construye el `INSERT` de una fila de outbox para un evento emitido por un command.
-/// Se añade a la MISMA transacción que el SQL del command (escritura atómica). Guarda el
-/// contexto (hub_id/user_id/permissions) para que el relay reconstruya el `RequestContext`
-/// exacto del emisor — preserva la semántica de permisos del modelo síncrono.
+/// Se añade a la MISMA transacción que el SQL del command (escritura atómica).
+///
+/// Guarda el contexto del emisor. `hub_id` y `user_id` los usa el relay para construir el contexto
+/// del listener ([`listener_ctx`]): el tenant y **quién lo causó**, que es la atribución que acaba
+/// en `created_by`. `permissions` es desde hub#686 **forense**, no autorización: queda como
+/// registro de lo que el emisor podía hacer (útil en el dead-letter, hub#660), pero el listener ya
+/// no corre con ello — corre con la autoridad de su propio módulo.
 ///
 /// `module_id` = **módulo emisor**. Se persiste porque el relay necesita saber a quién exigirle la
 /// capability al ejercer un primitivo de host (`*.reminder.due` → `host.notify`): sin atribución,
@@ -218,7 +223,7 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         return mark_dead(db, &id, "profundidad máxima de cascada superada").await;
     }
 
-    let ctx = reconstruct_ctx(row);
+    let ctx = listener_ctx(row);
     let payload = parse_payload(row);
 
     // Listeners actuales (solo módulos activos). Si no hay, la entrega es trivialmente completa.
@@ -347,14 +352,63 @@ async fn deliver_host_notify(
     Ok(())
 }
 
-fn reconstruct_ctx(row: &Json) -> RequestContext {
+/// The context a listener runs with (hub#686, ADR-0288): **the module's own authority, the
+/// emitter's attribution, the event's tenant.**
+///
+/// # What it replaced, and why that was broken
+///
+/// This used to rebuild the EMITTER's context verbatim — permissions included — so a listener only
+/// ran if the human who triggered the event happened to hold a permission over a command of
+/// ANOTHER module. In the published catalogue the cashier (`employee`) holds none of the four that
+/// the sale cascade needs: closing a sale left the stock untouched, the customer's purchase
+/// unrecorded and the invoice **unsent to VeriFactu** — a legal breach, arriving as eight silent
+/// retries and a dead-letter. The owner selling produced one result and their employee selling
+/// another, from the same button.
+///
+/// The confusion was of planes. The cashier asked for «close the sale»; that this implies bringing
+/// stock down and filing with the tax agency is decided by the MODULE in its manifest. Demanding
+/// that the human hold a permission over an internal command of a module they never named is
+/// asking the wrong principal.
+///
+/// # The three parts, each for its own reason
+///
+/// 1. **`hub_id` — from the row, always.** Not negotiable in any context the runtime builds
+///    (`tenancy.md`): the listener writes in the hub of the event it reacts to and in no other.
+/// 2. **`user_id` — from the row.** Module SQL binds `:current_user_id` into `created_by` /
+///    `updated_by`, so a stock movement caused by Ana's sale must say Ana. This is the one place
+///    this context differs from [`crate::scheduler`]'s (which has no user because nobody asked
+///    for anything) and it is what keeps the fix from costing traceability.
+/// 3. **`*` — the module's authority, not the human's role.** The two sibling doors of the runtime
+///    already work this way: a scheduled task runs on `system_ctx`, and a handler's preloaded
+///    `reads` run on a system context precisely so «un empleado de POS sin `taxes.view_tax` igual
+///    necesita los tipos para poder cobrar».
+///
+/// # Why the wildcard is bounded, and by what
+///
+/// It is not a skeleton key handed to whoever emits an event: it authorises exactly ONE command,
+/// and that command is the listening module's own. Since hub#659 a manifest's `events.listen` may
+/// only name a command inside the declaring module's namespace, and that check sits in
+/// [`crate::installer::install`] — the single registration path, which
+/// [`crate::Runtime::rehydrate_installed`] re-runs on every boot, so a listener pointing at
+/// somebody else's command cannot be in a live registry at all. Downstream, `validate_operation`
+/// keeps a Tier-2 handler's operations inside the same module. So the authority never crosses a
+/// module boundary: what the wildcard opens is a door the module already owned.
+///
+/// Everything that does NOT key on permissions keeps refusing exactly as before — the fiscal
+/// preconditions (ADR-0203), the capability grants (ADR-0079), the payload schema, `min_affected_rows`.
+/// Those cover the listeners on purpose and none of them changes here.
+///
+/// The row's `permissions` column is kept: it is the record of what the emitter could do, which is
+/// worth having in a dead-letter (hub#660). It is simply no longer what authorises anything.
+fn listener_ctx(row: &Json) -> RequestContext {
     let hub_id = row["hub_id"].as_str().unwrap_or_default().to_string();
     let user_id = row["user_id"].as_str().unwrap_or_default().to_string();
-    let perms: Vec<String> = row["permissions"]
-        .as_str()
-        .and_then(|s| serde_json::from_str(s).ok())
-        .unwrap_or_default();
-    RequestContext::new(hub_id, user_id, perms)
+    RequestContext::new(hub_id, user_id, [permissions::WILDCARD.to_string()])
+        // There is no human at the relay, so there is nobody to type a manager's PIN: the
+        // step-up dialog (hub#361) must never be offered here. It cannot be today — the
+        // wildcard opens the gate before elevation is ever considered — and saying so in the
+        // context means it stays true if the authority is ever narrowed.
+        .as_machine()
 }
 
 fn parse_payload(row: &Json) -> Params {
@@ -564,7 +618,7 @@ mod tests {
     use super::*;
     use crate::elevation::Grants;
     use crate::manifest::CommandDef;
-    use crate::registry::{ModuleStatus, RegisteredCommand};
+    use crate::registry::{ModuleStatus, Principal, RegisteredCommand};
     use erplora_db::{testutil::fresh_db, PgAdapter};
 
     fn cmd(module: &str, sql: &str, emit: Vec<String>) -> RegisteredCommand {
@@ -1133,10 +1187,10 @@ mod tests {
     /// A hub holding exactly one dead-letter. `m.fire` emits `e`, whose only listener `m.apply`
     /// explodes on every attempt, so the row burns [`MAX_ATTEMPTS`] and lands in `dead`.
     ///
-    /// This is the shape of the STRUCTURAL dead-letters production already has: an employee closes
-    /// a sale, the `verifactu.records.ingest_invoice` listener demands a manager permission the
-    /// emitter's reconstructed context does not carry, and eight attempts later the event is dead
-    /// with nobody able to see it, let alone replay it.
+    /// The shape this was written for — an employee closes a sale, `verifactu.records.ingest_invoice`
+    /// demands a permission the emitter does not carry, eight attempts later the invoice is dead —
+    /// is gone at the source (hub#686: a listener runs with its module's authority, not the
+    /// cashier's role). What is left is what will always be left: a listener that is simply broken.
     async fn hub_with_a_dead_letter() -> (PgAdapter, Registry) {
         let db = fresh_db().await;
         db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
@@ -1317,6 +1371,289 @@ mod tests {
             count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
             1,
             "the dead-letter is untouched"
+        );
+    }
+
+    // ───────────── hub#686 — with WHOSE authority does a listener run? ─────────────
+    //
+    // The relay used to rebuild the EMITTER's `RequestContext` — permissions included — and run
+    // the listener under it. So the reaction to an event only happened if the human who triggered
+    // it happened to hold a permission over a command of ANOTHER module. In the catalogue as
+    // published, the cashier (`employee`) holds none of them: they close a sale and the stock does
+    // not come down, the customer's purchase is not recorded, and the invoice is not sent to the
+    // AEAT. Eight retries later the event is a dead-letter, and until hub#660 that was invisible.
+    //
+    // The reaction to an event is a decision of the MODULE, in its manifest — not an action of the
+    // user. So the listener runs with the module's own authority, keeping the emitter's `user_id`
+    // for the audit trail and the `hub_id`, which is never negotiable.
+
+    /// A command that actually demands a permission (the base [`cmd`] helper declares none).
+    fn gated_cmd(
+        module: &str,
+        permission: &str,
+        sql: &str,
+        emit: Vec<String>,
+    ) -> RegisteredCommand {
+        let mut c = cmd(module, sql, emit);
+        c.def.permission = permission.to_string();
+        c
+    }
+
+    /// The cast of the real bug: `sales` emits `sale.completed`, `inventory` reacts with a command
+    /// of its OWN gated on `inventory.change_product` — a permission the cashier deliberately does
+    /// not have, because editing the catalogue is not their job.
+    async fn till_with_a_cashier() -> (PgAdapter, Registry, RequestContext) {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE sales_log (id TEXT);\
+             CREATE TABLE stock_moves (hub_id TEXT NOT NULL, created_by TEXT NOT NULL);",
+        )
+        .await
+        .unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("sales".into(), ModuleStatus::Active);
+        reg.status.insert("inventory".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "sales.complete_sale".into(),
+            gated_cmd(
+                "sales",
+                "sales.add_sale",
+                "INSERT INTO sales_log (id) VALUES (:new_id);",
+                vec!["sale.completed".into()],
+            ),
+        );
+        reg.commands.insert(
+            "inventory.stock.decrease_on_sale".into(),
+            gated_cmd(
+                "inventory",
+                "inventory.change_product",
+                "INSERT INTO stock_moves (hub_id, created_by) VALUES (:hub_id, :current_user_id);",
+                vec![],
+            ),
+        );
+        reg.listeners
+            .insert("sale.completed".into(), vec!["inventory.stock.decrease_on_sale".into()]);
+
+        // The cashier: may sell, may look at the catalogue, may not edit it.
+        let cashier = RequestContext::new(
+            "h1",
+            "hub_user:ana",
+            [
+                "sales.add_sale".to_string(),
+                "inventory.view_product".to_string(),
+            ],
+        );
+        (db, reg, cashier)
+    }
+
+    /// **The bug.** A cashier closes a sale and the stock comes down — the same as when the owner
+    /// is at the till. Before hub#686 this listener died with `PermissionDenied` on every single
+    /// sale an `employee` made, and the hub's inventory diverged from reality from sale one.
+    #[tokio::test]
+    async fn a_listener_runs_even_when_the_cashier_lacks_its_permission() {
+        let (db, reg, cashier) = till_with_a_cashier().await;
+
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &cashier,
+            &Grants::new(),
+        )
+        .await
+        .expect("selling is what a cashier is FOR");
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM stock_moves").await,
+            1,
+            "the stock came down: reacting to the sale is the MODULE's decision, not the cashier's"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            1,
+            "the event is delivered, not deferred"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            0,
+            "no dead-letter: this was the structural one that hid a fiscal breach"
+        );
+    }
+
+    /// The `hub_id` is NOT part of what gets relaxed (tenancy.md): the listener writes in the hub
+    /// of the event it is reacting to, and in no other. It is the one thing the relay may never
+    /// take from anywhere but the row.
+    #[tokio::test]
+    async fn a_listener_stays_in_the_hub_that_emitted_the_event() {
+        let (db, reg, cashier) = till_with_a_cashier().await;
+
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &cashier,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM stock_moves WHERE hub_id = 'h1'").await,
+            1,
+            "the tenant of the emitter, never a system-wide or empty hub_id"
+        );
+    }
+
+    /// Running with the module's authority must not cost the audit trail. `:current_user_id` — what
+    /// every module binds into `created_by`/`updated_by` — stays the human who caused the event: a
+    /// stock movement stamped "system" when Ana's sale produced it is a traceability regression,
+    /// and the whole reason this is not simply `scheduler::system_ctx` (which has no user at all).
+    #[tokio::test]
+    async fn a_listener_credits_the_user_whose_action_caused_it() {
+        let (db, reg, cashier) = till_with_a_cashier().await;
+
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &cashier,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM stock_moves WHERE created_by = 'hub_user:ana'"
+            )
+            .await,
+            1,
+            "the cashier who sold is who the row is attributed to, not the runtime"
+        );
+        // And the row of the event keeps the same attribution, so the dead-letter queue (hub#660)
+        // and any forensics can still answer «who caused this».
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE user_id = 'hub_user:ana'"
+            )
+            .await,
+            1
+        );
+    }
+
+    /// **What does NOT come down with the permission gate.** The fiscal preconditions (ADR-0203)
+    /// cover listeners on purpose — `invoice.create_from_sale` and `verifactu.records.ingest_invoice`
+    /// run here — and they key on the hub's identity, never on a permission. A listener that stamps
+    /// the issuer into a document still refuses while that identity is missing: the alternative is
+    /// an invoice with a BLANK issuer that VeriFactu then chains from (ADR-0189).
+    #[tokio::test]
+    async fn the_fiscal_precondition_still_stops_a_listener_that_stamps_the_issuer() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE sales_log (id TEXT);\
+             CREATE TABLE fiscal_records (issuer TEXT);",
+        )
+        .await
+        .unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("sales".into(), ModuleStatus::Active);
+        reg.status.insert("verifactu".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "sales.complete_sale".into(),
+            gated_cmd(
+                "sales",
+                "sales.add_sale",
+                "INSERT INTO sales_log (id) VALUES (:new_id);",
+                vec!["invoice.created".into()],
+            ),
+        );
+        reg.commands.insert(
+            "verifactu.records.ingest_invoice".into(),
+            gated_cmd(
+                "verifactu",
+                "verifactu.manage_verifactu",
+                "INSERT INTO fiscal_records (issuer) VALUES (:business_tax_id);",
+                vec![],
+            ),
+        );
+        reg.listeners
+            .insert("invoice.created".into(), vec!["verifactu.records.ingest_invoice".into()]);
+
+        // No business identity configured in this hub — the precondition the gate exists for.
+        let cashier = RequestContext::new("h1", "hub_user:ana", ["sales.add_sale".to_string()]);
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &cashier,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM fiscal_records").await,
+            0,
+            "no fiscal record is written without the hub's identity, whatever the authority"
+        );
+        let last_error = db
+            .query("SELECT last_error FROM _event_outbox", &Params::new())
+            .await
+            .unwrap()
+            .rows[0]["last_error"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            last_error.contains("fiscal precondition"),
+            "the refusal is the fiscal gate, not a permission: {last_error}"
+        );
+    }
+
+    /// The context itself, stated once. Everything above is this in motion.
+    #[test]
+    fn the_listener_context_carries_the_hub_and_the_user_but_the_modules_authority() {
+        let row = json!({
+            "hub_id": "h1",
+            "user_id": "hub_user:ana",
+            // What the emitter could do. Kept in the row for forensics; no longer what authorises
+            // the listener, which is the whole of hub#686.
+            "permissions": r#"["sales.add_sale"]"#,
+        });
+
+        let ctx = listener_ctx(&row);
+
+        assert_eq!(ctx.hub_id, "h1", "the tenant is never negotiable");
+        assert_eq!(
+            ctx.user_id, "hub_user:ana",
+            "who caused it survives, for `created_by` and for the dead-letter queue"
+        );
+        assert!(
+            ctx.permissions.contains("*"),
+            "the module's own authority, not the cashier's role"
+        );
+        assert!(
+            !ctx.permissions.contains("sales.add_sale"),
+            "the emitter's permissions are not what the listener runs on any more"
+        );
+        assert_eq!(
+            ctx.principal,
+            Principal::Machine,
+            "nobody is standing at the relay: it must never be offered a manager's PIN (hub#361)"
         );
     }
 

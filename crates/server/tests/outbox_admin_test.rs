@@ -2,14 +2,15 @@
 //!
 //! `_event_outbox.status='dead'` used to be the end of the line: after `MAX_ATTEMPTS` the row
 //! stopped moving, and the only window onto it was `GET /api/system` — 50 rows, no payload, nothing
-//! to press. Production already has STRUCTURAL dead-letters (an employee closes a sale, the
-//! `verifactu.records.ingest_invoice` listener demands a manager permission the emitter's
-//! reconstructed context does not carry, eight attempts later the invoice event is dead), so what
-//! this surface decides is whether that work is recoverable at all.
+//! to press. The structural case it was written for (an employee closes a sale, the
+//! `verifactu.records.ingest_invoice` listener demands a permission the emitter does not carry,
+//! eight attempts later the invoice event is dead) is fixed at the source in hub#686 — a listener
+//! runs with its module's authority now. What this surface decides is whether everything else that
+//! dies is recoverable at all.
 //!
 //! Auth is the same door as `/api/keys` (ADR-0057): the **local session of a human owner/admin**,
 //! never an API key and never the machine token. Replaying an event re-runs somebody else's
-//! command with the emitter's permissions, and discarding one closes a fiscal record for good;
+//! command with that module's own authority, and discarding one closes a fiscal record for good;
 //! neither is something an integration token gets to do.
 use axum::body::Body;
 use axum::http::{Request, StatusCode};

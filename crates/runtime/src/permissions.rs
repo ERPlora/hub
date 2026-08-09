@@ -12,6 +12,12 @@ use crate::registry::{Principal, Registry, RequestContext};
 /// the way there is a manager.
 const ELEVABLE_ROLE: &str = "manager";
 
+/// El comodín: un contexto que lo lleva pasa cualquier gate de permiso. Lo usan los contextos que
+/// el RUNTIME se construye a sí mismo, donde no hay rol humano que consultar — la tarea programada
+/// ([`crate::scheduler`]), las `reads` precargadas de un handler y la entrega de un listener del
+/// outbox ([`crate::outbox`], hub#686).
+pub const WILDCARD: &str = "*";
+
 /// Verifica que el contexto tenga el permiso requerido (o el comodín `*`).
 pub fn check(ctx: &RequestContext, required: &str) -> Result<()> {
     if has(ctx, required) {
