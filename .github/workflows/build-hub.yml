@@ -109,37 +109,6 @@ jobs:
           print(f"Cargo.toml [workspace.package].version = \"{v}\"")
           PY
 
-      - name: Compute image tags
-        id: tags
-        run: |
-          set -euo pipefail
-          IMAGE_LC=$(echo "${IMAGE}" | tr '[:upper:]' '[:lower:]')
-          # :latest  → tag canónico que consumen los hubs reales (provisioning del Cloud/Dokploy).
-          # :<sha>   → tag inmutable por commit, para pin/rollback.
-          {
-            echo "tags<<EOF"
-            echo "${IMAGE_LC}:latest"
-            echo "${IMAGE_LC}:${GITHUB_SHA}"
-            # En un tag v* publicamos además los tags semver (hub#515, ADR-0269): :1.2.3 inmutable
-            # para pin/rollback exacto, y :1.2 / :1 móviles para poder decir "la última 1.x" y
-            # aplicar un parche de seguridad sin saltar de major. Parseo robusto: solo vX.Y.Z.
-            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-              V="${GITHUB_REF_NAME#v}"
-              if [[ "${V}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-                MAJOR="${BASH_REMATCH[1]}"
-                MINOR="${BASH_REMATCH[2]}"
-                PATCH="${BASH_REMATCH[3]}"
-                echo "${IMAGE_LC}:${MAJOR}.${MINOR}.${PATCH}"
-                echo "${IMAGE_LC}:${MAJOR}.${MINOR}"
-                echo "${IMAGE_LC}:${MAJOR}"
-              else
-                echo "::warning::El tag ${GITHUB_REF_NAME} no es semver (vX.Y.Z); no se publican tags :semver"
-              fi
-            fi
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-          echo "image=${IMAGE_LC}" >> "$GITHUB_OUTPUT"
-
       # 🔴 LO PRIMERO tras el login, y ANTES de estampar o compilar.
       #
       # El MISMO tag `v*` dispara también `tauri-release.yml`, que publica la app en **Microsoft
