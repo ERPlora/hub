@@ -1,0 +1,1 @@
+INSERT INTO crm_receipt (id, hub_id, issuer) VALUES (:new_id, :hub_id, :business_tax_id);

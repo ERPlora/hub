@@ -1,0 +1,1 @@
+INSERT INTO sales_sale (id, hub_id, total, customer_id) VALUES (:new_id, :hub_id, :total, :customer_id);

@@ -1,0 +1,1 @@
+INSERT INTO crm_note (id, hub_id, created_by, customer_id, text) VALUES (:new_id, :hub_id, :current_user_id, COALESCE(:customer_id, ''), COALESCE(:text, ''));

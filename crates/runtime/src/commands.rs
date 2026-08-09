@@ -32,10 +32,18 @@ pub(crate) const NEW_IDS_BATCH: usize = 256;
 /// segmento del nombre prefijado `_`): un caller externo nunca debe poder invocar directamente lo
 /// que un módulo emite como implementación (`module._helper`), saltándose la validación,
 /// orquestación y atomicidad del command público que normalmente lo dispara.
+///
+/// [`Origin::Automation`] is the third door (ADR-0283 D2, hub#661): a **flow** executing one of
+/// its steps. It is neither of the other two on purpose. It is not `External`, because there is
+/// no caller and no role to check; and it is not `Internal`, because `Internal` means "the runtime
+/// invoking itself on behalf of a module it already trusts" and would hand a flow every internal
+/// command in the hub. What it has instead is its OWN authorisation — `_flow_grants`,
+/// default-deny — and the same ban on internal commands that `External` has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Origin {
     External,
     Internal,
+    Automation,
 }
 
 /// Ejecuta `name(payload)` con el contexto dado. Aplica permiso, ejecuta el SQL **y persiste
@@ -174,7 +182,13 @@ pub(crate) async fn execute_at(
     // (relay del Outbox, scheduler) lo invoca, siempre con `Origin::Internal`. Sin esto, un
     // `module._helper` "privado" solo por convención era invocable tal cual desde
     // `POST /api/command`, saltándose la orquestación/atomicidad del command público que lo emite.
-    if origin == Origin::External && cmd.def.is_internal(name) {
+    //
+    // hub#661: `Origin::Automation` is gated here too, and for the same reason. A flow is written
+    // in an editor by whoever owns the hub; letting it name `module._helper` would hand it the
+    // half of a module that exists precisely so that the public command controls when it runs.
+    // Cross-module reactions with transformation are what flows are FOR — but through the public
+    // surface, with a grant, not through the back door (ADR-0283 §7).
+    if origin != Origin::Internal && cmd.def.is_internal(name) {
         return Err(RuntimeError::InternalCommand(name.to_string()));
     }
 
@@ -197,33 +211,65 @@ pub(crate) async fn execute_at(
     // it — are written to the runtime's own record right here, BEFORE the command runs. Not by
     // the module: a module that never declares an `approved_by` column would lose the trace in
     // silence, and today that is every module in the catalogue.
+    //
+    // hub#661 (ADR-0283 D2): under `Origin::Automation` this gate is a DIFFERENT question, asked
+    // of a different table. There is no user whose role could answer «may you do this», so the RBAC
+    // check is replaced — not supplemented — by `_flow_grants`: does THIS flow have a live grant
+    // for THIS command? Default-deny, and read **fresh on every step**, which is what makes
+    // revoking a grant stop a run that is already in flight at its next step.
+    //
+    // Three properties come from putting it exactly here and nowhere else:
+    //  · a flow inherits ÍNTEGROS the fiscal gates, the schema validation and the transactional
+    //    outbox below — the reason the ADR insists automation goes through `execute_at` instead of
+    //    getting its own dispatcher;
+    //  · no elevation: a flow is `Principal::Machine`, and the executor passes `grants: None`, so
+    //    there is no manager's PIN to spend and no `RequiresElevation` to offer nobody;
+    //  · no privilege growth: the grant opens THIS command and nothing else. `ctx.permissions` —
+    //    what the executor derived from the granted commands — is not consulted here at all; it
+    //    only answers the questions asked downstream of this point.
     let elevated_ctx;
-    let ctx = match permissions::check_command(registry, ctx, &cmd.def.permission) {
-        Ok(()) => ctx,
-        Err(RuntimeError::RequiresElevation { permission }) => {
-            match spend_approval(grants, ctx, name, payload, &permission) {
-                Some((approved_by, fingerprint)) => {
-                    // No receipt, no elevated action: swallowing this would make «break the
-                    // audit» a way to run a manager-level command leaving no trace at all.
-                    crate::elevation::record_spend(
-                        db,
-                        &ctx.hub_id,
-                        name,
-                        &permission,
-                        &ctx.user_id,
-                        &approved_by,
-                        &fingerprint,
-                    )
-                    .await?;
-                    elevated_ctx = ctx.clone().spent_approval_of(approved_by);
-                    &elevated_ctx
+    let ctx = if origin == Origin::Automation {
+        let Some(automation) = ctx.automation() else {
+            // Automation with no flow identity is a bug in a caller, and the safe reading of a bug
+            // in an authorisation path is "denied".
+            return Err(RuntimeError::Domain {
+                code: crate::flows::grants::ERR_GRANT_DENIED.to_string(),
+                message: format!(
+                    "`{name}` was invoked as automation without a flow identity; refused"
+                ),
+            });
+        };
+        crate::flows::grants::check_command_grant(db, &ctx.hub_id, &automation.flow_id, name)
+            .await?;
+        ctx
+    } else {
+        match permissions::check_command(registry, ctx, &cmd.def.permission) {
+            Ok(()) => ctx,
+            Err(RuntimeError::RequiresElevation { permission }) => {
+                match spend_approval(grants, ctx, name, payload, &permission) {
+                    Some((approved_by, fingerprint)) => {
+                        // No receipt, no elevated action: swallowing this would make «break the
+                        // audit» a way to run a manager-level command leaving no trace at all.
+                        crate::elevation::record_spend(
+                            db,
+                            &ctx.hub_id,
+                            name,
+                            &permission,
+                            &ctx.user_id,
+                            &approved_by,
+                            &fingerprint,
+                        )
+                        .await?;
+                        elevated_ctx = ctx.clone().spent_approval_of(approved_by);
+                        &elevated_ctx
+                    }
+                    // No approval, or one granted for another action, another cashier or another
+                    // hub: all of them mean the same thing to the caller — ask the manager.
+                    None => return Err(RuntimeError::RequiresElevation { permission }),
                 }
-                // No approval, or one granted for another action, another cashier or another hub:
-                // all of them mean the same thing to the caller — go and ask the manager.
-                None => return Err(RuntimeError::RequiresElevation { permission }),
             }
+            Err(e) => return Err(e),
         }
-        Err(e) => return Err(e),
     };
 
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y

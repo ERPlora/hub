@@ -1,0 +1,14 @@
+{
+  "id": "sales",
+  "name": "Sales",
+  "version": "1.0.0",
+  "permissions": ["sales.add_sale"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "sales.sale.complete": {
+      "permission": "sales.add_sale",
+      "sql": ["sql/complete.sql"],
+      "emit": ["sale.completed"]
+    }
+  }
+}
