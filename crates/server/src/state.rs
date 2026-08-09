@@ -519,6 +519,9 @@ pub struct AppState {
     /// Short-lived, single-use credentials for the event stream (hub#504). In memory: they must
     /// not survive a restart, and above all they must not travel in a backup or a blueprint.
     pub stream_tickets: Arc<crate::event_stream::StreamTickets>,
+    /// Per-key cap on simultaneous stream connections (hub#531). One API key should not be able to
+    /// exhaust the hub by opening N sockets — a reconnection bug reaches the ceiling, not just malice.
+    pub stream_limiter: Arc<crate::event_stream::StreamLimiter>,
 }
 
 impl AppState {
@@ -576,6 +579,7 @@ impl AppState {
             activity: Arc::new(crate::activity::ActivityState::new()),
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
             stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
+            stream_limiter: Arc::new(crate::event_stream::StreamLimiter::default()),
         }
     }
 
