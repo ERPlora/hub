@@ -42,6 +42,9 @@ export default {
     manageError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.',
     notifications: 'Notificaciones',
     noNotifications: 'Todo al día. Sin notificaciones.',
+    // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
+    // lo que un lector de pantalla puede anunciarlo.
+    more: 'Más opciones',
     configure: 'Configurar',
     menu: 'Abrir menú',
     collapseMenu: 'Colapsar menú',

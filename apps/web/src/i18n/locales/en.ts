@@ -43,6 +43,9 @@ export default {
     manageError: 'We could not open your browser. Go to erplora.com to manage your business.',
     notifications: 'Notifications',
     noNotifications: 'All caught up. No notifications.',
+    // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
+    // only thing a screen reader has to announce it with.
+    more: 'More options',
     configure: 'Configure',
     menu: 'Open menu',
     collapseMenu: 'Collapse menu',
