@@ -16,7 +16,8 @@ import {
   mayAdminister,
   type HeroInput,
 } from './blueprint-hero';
-import { ADMINISTER_PERMISSION, ALL_PERMISSIONS } from './management-link';
+import { ADMINISTER_PERMISSION } from './management-link';
+import { ALL_PERMISSIONS } from './session';
 import type { BlueprintManifest, CatalogBlueprint, ImportReport } from './runtime';
 import type { SetupItem, SetupStatus } from './setup-status';
 

@@ -24,10 +24,18 @@ const { config } = vi.hoisted(() => ({
 vi.mock('./config', () => ({ config }));
 
 // A real `ref`: `canOpenManagement` is a computed over the session, and a plain object would make
-// it look wired while never reacting to a login.
+// it look wired while never reacting to a login. `hasPermission` lee de ese mismo ref — la regla
+// del comodín vive ahí ahora (hub#506), así que el mock la expone sobre el mismo estado mutable.
 vi.mock('./session', async () => {
   const { ref } = await import('vue');
-  return { user: ref<{ permissions?: string[] } | null>(null) };
+  const user = ref<{ permissions?: string[] } | null>(null);
+  return {
+    user,
+    hasPermission: (permission: string) => {
+      const granted = user.value?.permissions ?? [];
+      return granted.includes('*') || granted.includes(permission);
+    },
+  };
 });
 
 const { openExternal } = vi.hoisted(() => ({ openExternal: vi.fn(async () => {}) }));
