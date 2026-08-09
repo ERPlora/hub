@@ -225,6 +225,33 @@ resolve_modules_dir() {
 }
 resolve_modules_dir
 
+# `blueprints/` lives in a SIBLING repo, and `sector_packs_pg_e2e` reads the sector seeds out of it
+# (`starter_catalogs/es/<sector>/seed.sql`). Unlike the module e2e there is no opt-in: those two
+# tests always run, so from a worktree outside the monorepo the relative path misses and the gate
+# dies with "no se pudo leer …/seed.sql" — a red that has nothing to do with what is being pushed.
+#
+# The fleet works out of /private/tmp worktrees, so that was EVERY gated push from a worktree: the
+# gate looked broken, and the way out looked like `SKIP_HUB_TESTS=1`. `ERPLORA_BLUEPRINTS_DIR` is
+# the escape the test itself documents; this just sets it, exactly as `resolve_modules_dir` does.
+#
+# Not finding it is not fatal: a checkout without the sibling repo is a legitimate state, and
+# refusing the push would be worse than the red it prevents.
+resolve_blueprints_dir() {
+    [ -n "${ERPLORA_BLUEPRINTS_DIR:-}" ] && return 0
+    local candidate
+    for candidate in \
+        "$(git rev-parse --show-toplevel)/../blueprints" \
+        "${HOME:-}/workspace/code/ERPlora/blueprints"
+    do
+        if [ -d "$candidate" ]; then
+            ERPLORA_BLUEPRINTS_DIR="$(cd "$candidate" && pwd)"
+            export ERPLORA_BLUEPRINTS_DIR
+            return 0
+        fi
+    done
+}
+resolve_blueprints_dir
+
 if [ -n "${HUB_GATE_TEST_CMD:-}" ]; then
     test_cmd="$HUB_GATE_TEST_CMD"
 else

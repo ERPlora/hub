@@ -160,7 +160,7 @@ wait $first $second
 make_monorepo() {
     local base
     base=$(cd "$(mktemp -d)" && pwd -P)
-    mkdir -p "$base/modules-workspace/modules" "$base/hub"
+    mkdir -p "$base/modules-workspace/modules" "$base/blueprints" "$base/hub"
     git -C "$base/hub" init -q
     git -C "$base/hub" config user.email gate@test
     git -C "$base/hub" config user.name gate
@@ -212,6 +212,39 @@ got=$(cat "$repo/ENV" 2>/dev/null)
 [ "$code" = 0 ] && [ "$got" = "skip=1" ] \
     && ok "opt-in with no modules on disk: skips instead of panicking" \
     || bad "opt-in with no modules on disk: skips instead of panicking" "exit=$code got='$got'"
+
+# ── 12. `blueprints/` is resolved too, or the gate red-lines from every worktree ─
+#    `sector_packs_pg_e2e` reads the sector seeds out of the SIBLING repo
+#    (`blueprints/starter_catalogs/es/<sector>/seed.sql`). Unlike the module e2e
+#    there is no opt-in: those two tests run always, so from a worktree outside
+#    the monorepo the relative path misses and the gate fails with
+#    "no se pudo leer …/seed.sql" — a red that has nothing to do with the push.
+#
+#    Measured 2026-08-09: the whole fleet works out of /private/tmp worktrees, so
+#    that was every gated push. `ERPLORA_BLUEPRINTS_DIR` is the escape the test
+#    already documents; the hook just never set it, the way it does for modules.
+base=$(make_monorepo)
+sha=$(git -C "$base/hub" rev-parse HEAD)
+code=$(run_hook "$base/hub" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$base/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="echo \"dir=\${ERPLORA_BLUEPRINTS_DIR:-}\" > $base/ENV; true")
+got=$(cat "$base/ENV" 2>/dev/null)
+[ "$code" = 0 ] && [ "$got" = "dir=$base/blueprints" ] \
+    && ok "the suite is pointed at blueprints/, wherever the worktree is" \
+    || bad "the suite is pointed at blueprints/, wherever the worktree is" "exit=$code got='$got'"
+
+# ── 13. No blueprints on disk: the gate still runs, it just cannot point at them ─
+#    Refusing the push would be worse than the red it prevents: a checkout without
+#    the sibling repo is a legitimate state, and the two tests say so themselves.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" HOME="$repo/nowhere" \
+    HUB_GATE_TEST_CMD="true")
+[ "$code" = 0 ] \
+    && ok "no blueprints on disk: the gate still runs" \
+    || bad "no blueprints on disk: the gate still runs" "exit=$code"
 
 echo
 echo "  $pass passed, $fail failed"
