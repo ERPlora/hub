@@ -143,3 +143,42 @@ async fn install_rejects_a_listener_whose_command_only_shares_the_id_as_a_prefix
     );
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// hub#686 turned this check into the PREMISE of something else, so it is worth stating what it
+/// now holds up.
+///
+/// The relay runs a listener with the authority of its own module (`outbox::listener_ctx`) instead
+/// of the emitting user's permissions — because the reaction to an event is the module's decision,
+/// not the cashier's. That is only safe while a listener can name nothing but its own command:
+/// otherwise a `module.json` could point a listener at somebody else's command and have the relay
+/// run it with that module's full authority, on every event, with nobody looking.
+///
+/// The check that guarantees it lives in `installer::install`, which is the single registration
+/// path: `Runtime::rehydrate_installed` re-runs it for every module on every boot. So a foreign
+/// listener cannot merely be *refused at install* — it cannot be in a live registry at all, not
+/// even one built before the check existed. This test pins the second half of that sentence: after
+/// a refusal, there is nothing registered for the relay to elevate.
+#[tokio::test]
+async fn a_refused_listener_leaves_the_relay_nothing_to_run() {
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-listeners");
+    runtime.ensure_system_tables().await.unwrap();
+    let dir = fixture(
+        r#"{
+          "id":"analytics",
+          "name":"Analytics",
+          "version":"1.0.0",
+          "events":{
+            "listen":{ "sale.completed": {"command":"inventory.stock.decrease"} }
+          }
+        }"#,
+    );
+
+    runtime.install_from_dir(&dir).await.unwrap_err();
+
+    assert!(
+        runtime.registry().listeners_for("sale.completed").is_empty(),
+        "a refused install registers no listener: the relay never sees a foreign command to run"
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}

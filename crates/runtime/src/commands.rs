@@ -102,7 +102,7 @@ pub(crate) async fn execute_at(
     // enriquecido. Degrada a vacío si los settings fallan.
     // FIX QA (2026-06-25): la condición original `depth == 0` dejaba SIN enriquecer las commands
     // entregadas por el relay del Outbox (listeners de eventos), que corren a depth>0 con un ctx
-    // RECONSTRUIDO (reconstruct_ctx) cuyo business_tax_id está vacío. El caso real: `sale.completed`
+    // CONSTRUIDO por el relay (`outbox::listener_ctx`) cuyo business_tax_id está vacío. El caso real: `sale.completed`
     // (depth 1) → `invoice.create_from_sale` (listener, depth 1) generaba facturas con issuer_nif
     // vacío → VeriFactu (`ingest_invoice`) no-op (no encadena, 0 registros, 0 QR). Enriquecemos
     // SIEMPRE que falte la identidad fiscal (la cascada con ctx ya enriquecido salta el get_all).

@@ -3,11 +3,12 @@
 //!
 //! `_event_outbox.status='dead'` era TERMINAL. Tras `MAX_ATTEMPTS` la fila dejaba de moverse y la
 //! única ventana era `GET /api/system` (`collect_logs`): 50 filas, sin payload y sin nada que
-//! pulsar. Un evento que moría por una causa **arreglable** —un listener que exige un permiso que
-//! el contexto reconstruido del emisor no lleva, un módulo desactivado a media entrega— era trabajo
-//! perdido que nadie podía ver, reintentar ni cerrar. Y hay dead-letters ESTRUCTURALES en
-//! producción: un empleado cierra una venta → `verifactu.records.ingest_invoice` exige permiso de
-//! manager → 8 intentos → muerta, con la factura sin registrar.
+//! pulsar. Un evento que moría por una causa **arreglable** —un módulo desactivado a media entrega,
+//! un listener roto— era trabajo perdido que nadie podía ver, reintentar ni cerrar. El caso que
+//! motivó esto (un empleado cierra una venta → `verifactu.records.ingest_invoice` exige un permiso
+//! que el emisor no lleva → 8 intentos → muerta, con la factura sin registrar) ya no ocurre: desde
+//! hub#686 un listener corre con la autoridad de SU módulo, no con el rol del cajero. Esta
+//! superficie sigue siendo el rescate de todo lo demás.
 //!
 //! Tres gestos, deliberadamente pequeños: **ver** qué murió (con el payload, que es lo que permite
 //! distinguir una factura perdida de ruido), **reintentar** una fila devolviéndola al relay, y
