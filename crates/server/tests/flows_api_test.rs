@@ -454,6 +454,105 @@ async fn the_run_routes_do_not_shadow_each_other() {
     std::fs::remove_dir_all(f.temp).ok();
 }
 
+/// **The history is paged, and the page is a cursor** (hub#666). A hub with live flows produces
+/// runs forever; a listing that answers with all of them is a screen that stops loading in a month.
+/// The cursor is the last row of the page, not an offset — runs keep arriving at the head while
+/// somebody reads, and `OFFSET` would shift the page under them and duplicate a row.
+#[tokio::test]
+async fn the_run_history_is_paged_by_cursor_and_never_serves_the_same_run_twice() {
+    let f = fixture().await;
+    let id = create(&f, welcome_flow()).await;
+
+    let mut started = Vec::new();
+    for _ in 0..5 {
+        let response = send(
+            &f.router,
+            request(
+                "POST",
+                &format!("/api/hub/flows/{id}/run"),
+                Some(&f.admin),
+                Some(json!({ "input": { "total": "120.50" } })),
+            ),
+        )
+        .await;
+        started.push(
+            body_json(response).await["data"]["run_id"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+        );
+    }
+
+    let mut seen: Vec<String> = Vec::new();
+    let mut uri = format!("/api/hub/flows/{id}/runs?limit=2");
+    for _ in 0..4 {
+        let page = body_json(send(&f.router, request("GET", &uri, Some(&f.admin), None)).await).await;
+        let rows = page["data"].as_array().unwrap().clone();
+        if rows.is_empty() {
+            break;
+        }
+        assert!(rows.len() <= 2, "`limit` is honoured, not advisory");
+        seen.extend(rows.iter().map(|r| r["id"].as_str().unwrap().to_string()));
+        let Some(cursor) = page["next_cursor"].as_str() else {
+            break;
+        };
+        // The cursor is the id of the last run of the page — URL-safe by construction, and
+        // meaningful to whoever reads the request in a log.
+        uri = format!("/api/hub/flows/{id}/runs?limit=2&before={cursor}");
+    }
+
+    assert_eq!(seen.len(), 5, "the pages covered every run: {seen:?}");
+    let mut unique = seen.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), 5, "no run came back twice: {seen:?}");
+    assert_eq!(
+        seen[0],
+        *started.last().unwrap(),
+        "newest first — the run somebody is looking for is the one that just failed"
+    );
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// The run detail answers «what did this set off?»: the steps it took **and** the events it emitted,
+/// which is where the chain continues into other modules.
+#[tokio::test]
+async fn the_run_detail_carries_the_events_the_run_emitted() {
+    let f = fixture().await;
+    let id = create(&f, welcome_flow()).await;
+    let started = send(
+        &f.router,
+        request(
+            "POST",
+            &format!("/api/hub/flows/{id}/run"),
+            Some(&f.admin),
+            Some(json!({ "input": { "total": "120.50" } })),
+        ),
+    )
+    .await;
+    let run_id = body_json(started).await["data"]["run_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let body = body_json(send(
+        &f.router,
+        request("GET", &format!("/api/hub/flows/runs/{run_id}"), Some(&f.admin), None),
+    )
+    .await)
+    .await;
+
+    assert_eq!(body["data"]["run"]["id"], run_id);
+    assert!(body["data"]["steps"].is_array());
+    assert!(
+        body["data"]["events"].is_array(),
+        "the events a run emitted are the link to everything downstream of it"
+    );
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
 #[tokio::test]
 async fn a_disabled_flow_refuses_to_be_run_by_hand() {
     let f = fixture().await;

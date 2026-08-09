@@ -97,6 +97,16 @@ pub struct ModuleInfo {
     pub manifest_warnings: Vec<crate::manifest::ManifestWarning>,
 }
 
+/// **What one event set off** (hub#666): the event itself, the flow runs it started and the events
+/// its delivery caused. One level of the chain, because a transitive walk is a single query that
+/// can traverse the whole outbox — the caller follows the links it cares about.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EventTrace {
+    pub event: outbox::CorrelatedEvent,
+    pub runs: Vec<flows::FlowRun>,
+    pub caused: Vec<outbox::CorrelatedEvent>,
+}
+
 /// `hub_id` de desarrollo por defecto (mismo UUID fijo que `crates/server::DEV_HUB_ID`). El host
 /// real (server/Tauri) sobreescribe con el del despliegue vía [`Runtime::with_hub_id`].
 pub const DEV_HUB_ID: &str = "00000000-0000-0000-0000-000000000001";
@@ -826,6 +836,11 @@ impl Runtime {
         identity::ensure_tables(self.db.as_ref()).await?;
         // 2) Migraciones de sistema versionadas (≥ v1), scoped por hub_id del despliegue.
         system_migrations::apply(self.db.as_ref(), &self.hub_id).await?;
+        // 2a) Índices de las tablas de flujo que su migración creadora no podía prever (hub#666).
+        // Va DESPUÉS de `apply` porque las tablas tienen que existir. No es migración numerada a
+        // propósito: un índice no cambia la forma del dato y `IF NOT EXISTS` no cuesta nada en el
+        // segundo arranque — mismo criterio que las columnas del outbox por su `ENSURE_TABLES`.
+        flows::store::ensure_indexes(self.db.as_ref()).await?;
         // 2b) The device row an id that names the HUB left behind (hub#454). Not a versioned
         // migration on purpose: it is an invariant, not a schema change — it must also clean a
         // database restored from a backup taken before the fix, and re-running it is a no-op.
@@ -1797,8 +1812,15 @@ impl Runtime {
         .await
     }
 
-    pub async fn list_flow_runs(&self, flow_id: &str, limit: i64) -> Result<Vec<flows::FlowRun>> {
-        flows::store::list_runs(self.db.as_ref(), &self.hub_id, flow_id, limit).await
+    /// The history of one flow, newest first. `before` is the id of the last run of the previous
+    /// page (a cursor, not an offset — see [`flows::store::list_runs`]).
+    pub async fn list_flow_runs(
+        &self,
+        flow_id: &str,
+        limit: i64,
+        before: Option<&str>,
+    ) -> Result<Vec<flows::FlowRun>> {
+        flows::store::list_runs(self.db.as_ref(), &self.hub_id, flow_id, limit, before).await
     }
 
     pub async fn get_flow_run(
@@ -1806,6 +1828,27 @@ impl Runtime {
         run_id: &str,
     ) -> Result<(flows::FlowRun, Vec<flows::FlowRunStep>)> {
         flows::store::get_run(self.db.as_ref(), &self.hub_id, run_id).await
+    }
+
+    /// The events one run emitted — the forward link from a run into everything downstream of it
+    /// (hub#666).
+    pub async fn events_of_run(&self, run_id: &str) -> Result<Vec<outbox::CorrelatedEvent>> {
+        outbox::events_of_run(self.db.as_ref(), &self.hub_id, run_id).await
+    }
+
+    /// **What one event set off**: the runs it started and the events its delivery caused. This is
+    /// the answer to «this sale fired these five steps», read from the event end of the chain.
+    /// `None` when the event is not in this hub.
+    pub async fn trace_event(&self, event_id: &str) -> Result<Option<EventTrace>> {
+        let db = self.db.as_ref();
+        let Some(event) = outbox::correlated_event(db, &self.hub_id, event_id).await? else {
+            return Ok(None);
+        };
+        Ok(Some(EventTrace {
+            runs: flows::store::runs_of_event(db, &self.hub_id, event_id).await?,
+            caused: outbox::events_caused_by(db, &self.hub_id, event_id).await?,
+            event,
+        }))
     }
 
     /// Catch-up del scheduler al **arrancar** (Tauri/local): ejecuta una sola vez las tareas con

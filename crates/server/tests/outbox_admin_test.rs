@@ -79,6 +79,9 @@ async fn fixture() -> Fixture {
     // One dead-letter to operate on, and one delivered event that must never show up in the queue.
     seed_event(rt.db_for_test(), DEAD_ID, "dead", 7).await;
     seed_event(rt.db_for_test(), DELIVERED_ID, "delivered", 1).await;
+    // The chain the delivered event set off, and one event of a different tenant (hub#666).
+    seed_chain(rt.db_for_test(), DELIVERED_ID).await;
+    seed_foreign_event(rt.db_for_test()).await;
 
     let temp = std::env::temp_dir().join(format!(
         "erplora-outbox-admin-{}-{admin_id}",
@@ -209,6 +212,9 @@ async fn only_an_owner_or_admin_session_operates_the_queue() {
         ("GET", "/api/hub/events/dead".to_string()),
         ("POST", format!("/api/hub/events/{DEAD_ID}/retry")),
         ("POST", format!("/api/hub/events/{DEAD_ID}/discard")),
+        // The trace draws what every automation of this hub did — the shape of the business. Same
+        // door (hub#666).
+        ("GET", format!("/api/hub/events/{DEAD_ID}/trace")),
     ];
 
     for (method, uri) in &routes {
@@ -244,6 +250,111 @@ async fn only_an_owner_or_admin_session_operates_the_queue() {
     // And nothing the refused callers did touched the row.
     let listed = body_json(send(&f.router, request("GET", "/api/hub/events/dead", Some(&f.admin))).await).await;
     assert_eq!(listed["data"].as_array().unwrap().len(), 1, "the dead-letter is untouched");
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+// ── Correlation: what one event set off (hub#666) ─────────────────────────────────────────────
+
+/// An event of a DIFFERENT tenant, sitting in the same table (the row contract survives even though
+/// ADR-0201 gives each hub its own database).
+async fn seed_foreign_event(db: &dyn DatabaseAdapter) {
+    let mut p = Params::new();
+    p.insert("at".into(), json!("2026-08-09T10:00:00+00:00"));
+    db.execute(
+        "INSERT INTO _event_outbox \
+         (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, status, \
+          attempts, next_attempt_at, last_error, created_at) \
+         VALUES ('evt-theirs', 'hub-someone-else', 'u', '[]', 'sale.closed', 'sales', '{}', 0, \
+                 'delivered', 0, :at, '', :at)",
+        &p,
+    )
+    .await
+    .unwrap();
+}
+
+/// Seeds the shape a real chain leaves behind: a flow, a run born from `parent`, and an event the
+/// delivery of `parent` caused. Seeded and not driven through the dispatcher on purpose — what is
+/// under test here is the READ door, and the chain it reads is already pinned end to end against
+/// the real path in `crates/runtime/tests/flows_e2e.rs`.
+async fn seed_chain(db: &dyn DatabaseAdapter, parent: &str) {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(HUB));
+    p.insert("parent".into(), json!(parent));
+    p.insert("at".into(), json!("2026-08-09T10:00:01+00:00"));
+    db.execute(
+        "INSERT INTO _flow (id, hub_id, name, enabled, schema_version, definition, \
+                            created_at, created_by, updated_at, updated_by) \
+         VALUES ('flow-1', :hub_id, 'Welcome', 1, 1, '{}', :at, 'seed', :at, 'seed')",
+        &p,
+    )
+    .await
+    .unwrap();
+    db.execute(
+        "INSERT INTO _flow_runs (id, hub_id, flow_id, trigger_id, trigger_kind, parent_event_id, \
+                                 status, current_step, input, vars, depth, attempts, last_error, \
+                                 created_at, created_by, updated_at) \
+         VALUES ('run-1', :hub_id, 'flow-1', 't-1', 'event', :parent, 'done', 1, '{}', '{}', 0, 0, \
+                 '', :at, 'flow:flow-1', :at)",
+        &p,
+    )
+    .await
+    .unwrap();
+    db.execute(
+        "INSERT INTO _event_outbox \
+         (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, status, \
+          attempts, next_attempt_at, last_error, created_at, run_id, parent_event_id) \
+         VALUES ('evt-child', :hub_id, 'flow:flow-1', '[]', 'crm.note.added', 'crm', '{}', 1, \
+                 'delivered', 0, :at, '', :at, 'run-1', :parent)",
+        &p,
+    )
+    .await
+    .unwrap();
+}
+
+/// **«This sale set off these five steps», asked from the sale.** A person has the event, not the
+/// run id, so the chain has to be walkable from the event end: the runs it started and the events
+/// its delivery caused.
+#[tokio::test]
+async fn the_trace_of_an_event_names_the_runs_it_started_and_the_events_it_caused() {
+    let f = fixture().await;
+
+    let body = body_json(send(
+        &f.router,
+        request("GET", &format!("/api/hub/events/{DELIVERED_ID}/trace"), Some(&f.admin)),
+    )
+    .await)
+    .await;
+
+    assert_eq!(body["data"]["event"]["id"], DELIVERED_ID);
+    assert_eq!(body["data"]["runs"].as_array().unwrap().len(), 1);
+    assert_eq!(body["data"]["runs"][0]["id"], "run-1");
+    assert_eq!(
+        body["data"]["caused"].as_array().unwrap().len(),
+        1,
+        "the event the run went on to emit is where the chain leaves the flow"
+    );
+    assert_eq!(body["data"]["caused"][0]["event_name"], "crm.note.added");
+    assert_eq!(
+        body["data"]["caused"][0]["run_id"], "run-1",
+        "and it says which execution emitted it"
+    );
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// The trace is scoped to its hub. An event of another tenant is indistinguishable from one that
+/// never existed — not a `403` that confirms it is there.
+#[tokio::test]
+async fn the_trace_of_another_hubs_event_is_a_404() {
+    let f = fixture().await;
+
+    let response = send(
+        &f.router,
+        request("GET", "/api/hub/events/evt-theirs/trace", Some(&f.admin)),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     std::fs::remove_dir_all(f.temp).ok();
 }
