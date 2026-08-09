@@ -305,6 +305,12 @@ async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireM
       return toolMessage(fc.call_id, { status: 'cancelled', message: 'Action was not confirmed.' });
     }
     try {
+      // Host tool mutante (hub#631): instalar va por el MISMO endpoint que el botón de Apps
+      // (`request-install`), que revalida admin server-side. Pasa por el confirm de arriba
+      // como cualquier command — el modelo nunca instala sin el clic del usuario.
+      if (fc.name === 'hub.modules.install') {
+        return toolMessage(fc.call_id, await hostInstall(params));
+      }
       const data = await getClient().command(fc.name, params);
       return toolMessage(fc.call_id, data ?? null);
     } catch (err) {
@@ -313,11 +319,54 @@ async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireM
   }
 
   try {
+    // Host tool de lectura (hub#631): el catálogo del marketplace no es una query de módulo —
+    // se sirve por su endpoint real y se recorta a lo que el modelo necesita (id, nombre,
+    // descripción, versión, precio, instalado) para no quemar contexto.
+    if (fc.name === 'hub.marketplace.search') {
+      return toolMessage(fc.call_id, await hostMarketplaceSearch(params));
+    }
     const data = await getClient().query(fc.name, params);
     return toolMessage(fc.call_id, data ?? null);
   } catch (err) {
     return toolMessage(fc.call_id, { error: errMessage(err) });
   }
+}
+
+/** `hub.marketplace.search`: catálogo real, filtrado por texto libre y recortado (cap 20). */
+async function hostMarketplaceSearch(params: Record<string, unknown>): Promise<unknown> {
+  const { cloudMarketplaceModules } = await import('./cloud');
+  const all = await cloudMarketplaceModules();
+  const q = String(params.search ?? '').trim().toLowerCase();
+  const hit = (s: string | undefined) => (s ?? '').toLowerCase().includes(q);
+  const filtered = q ? all.filter((m) => hit(m.id) || hit(m.name) || hit(m.description) || hit(m.category)) : all;
+  return {
+    modules: filtered.slice(0, 20).map((m) => ({
+      module_id: m.id,
+      name: m.name,
+      description: m.description,
+      version: m.version ?? null,
+      price: m.priceLabel,
+      installed: m.installed,
+      available: m.available,
+    })),
+    total: filtered.length,
+  };
+}
+
+/** `hub.modules.install`: resuelve la versión (la última publicada si no viene) e instala por
+ *  `request-install` — el runtime valida admin, descarga, verifica SHA256, migra y activa. */
+async function hostInstall(params: Record<string, unknown>): Promise<unknown> {
+  const moduleId = String(params.module_id ?? '').trim();
+  if (!moduleId) return { error: 'module_id is required' };
+  let version = String(params.version ?? '').trim();
+  if (!version) {
+    const { cloudMarketplaceModules } = await import('./cloud');
+    const found = (await cloudMarketplaceModules()).find((m) => m.id === moduleId);
+    if (!found?.version) return { error: `module "${moduleId}" not found in the marketplace catalogue` };
+    version = found.version;
+  }
+  const { requestInstall } = await import('./runtime');
+  return await requestInstall(moduleId, version);
 }
 
 function safeParseArgs(s: string): Record<string, unknown> {
