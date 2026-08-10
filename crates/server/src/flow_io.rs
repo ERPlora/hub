@@ -33,14 +33,27 @@
 //! - **Redirects** are disabled. A 302 to `http://169.254.169.254/` would be a second request to a
 //!   host nobody granted and nobody checked.
 //!
+//! ## And the URL judged is the URL dialled (hub#728)
+//!
+//! The literal check above used to be done on the *text* of the URL, with a parser written here,
+//! while the request was built from that same text by `reqwest` — which parses it with WHATWG.
+//! `http://2130706433/` is «a host name» to a hand-rolled splitter and `http://127.0.0.1/` to
+//! WHATWG, so the literal check found nothing to check and hyper short-circuited straight to the
+//! loopback. A flow read `/api/hub/context` off the hub running it.
+//!
+//! There is now **one parse**, in `erplora_runtime::flows::net`, and what crosses the seam is the
+//! resulting [`Url`] object. [`check_url`] judges that object and [`wire_request`] hands that same
+//! object to `reqwest` — never a string for it to parse again.
+//!
 //! What this does NOT close, stated plainly: an allow-listed host that is legitimately public today
 //! and points somewhere hostile tomorrow is still called (that is what granting a host means), and
 //! a *public* address that is nonetheless sensitive — a hub reachable from the internet — is not
 //! distinguishable from any other public address here.
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::SocketAddr;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
+use erplora_runtime::flows::net::{self, Url};
 use erplora_runtime::flows::{HttpRequest, IoResult, PendingIo};
 use futures_util::StreamExt;
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
@@ -129,36 +142,17 @@ pub fn dispatch(state: &AppState, pending: Vec<PendingIo>) {
 /// there is nowhere to branch on a 500, and carrying on would be a flow that treats "the API
 /// refused" as "the API accepted".
 pub async fn execute(request: &HttpRequest, limits: &Limits) -> IoResult {
-    if let Err(why) = check_url(&request.url, limits) {
-        return IoResult::Failed(format!("{ERR_HTTP_BLOCKED}: {why}"));
-    }
-
-    let client = client(limits.allow_private_addresses);
-    let method = match reqwest::Method::from_bytes(request.method.as_bytes()) {
-        Ok(method) => method,
-        Err(_) => {
-            return IoResult::Failed(format!(
-                "{ERR_HTTP_BLOCKED}: `{}` is not an HTTP method",
-                request.method
-            ))
-        }
+    let outgoing = match wire_request(request, limits) {
+        Ok(outgoing) => outgoing,
+        Err(why) => return IoResult::Failed(why),
     };
-
-    let mut builder = client
-        .request(method, &request.url)
-        .timeout(Duration::from_secs(request.timeout_seconds));
-    for (name, value) in &request.headers {
-        builder = builder.header(name, value);
-    }
-    if let Some(body) = &request.body {
-        builder = builder.body(body.clone());
-    }
+    let client = client(limits.allow_private_addresses);
 
     // Belt and braces on the deadline: reqwest's own timeout covers the request, and this covers
     // everything including reading a body that arrives one slow byte at a time. A step that
     // overruns its lease would be re-issued while still in flight.
     let deadline = Duration::from_secs(request.timeout_seconds + 1);
-    let sent = match tokio::time::timeout(deadline, builder.send()).await {
+    let sent = match tokio::time::timeout(deadline, client.execute(outgoing)).await {
         Ok(Ok(response)) => response,
         Ok(Err(e)) => return failed(request, &e),
         Err(_) => {
@@ -209,6 +203,36 @@ pub async fn execute(request: &HttpRequest, limits: &Limits) -> IoResult {
         map.insert("truncated".into(), json!(true));
     }
     IoResult::Done(output)
+}
+
+/// **The request as it really goes on the wire.** The one place it is built, and the whole of
+/// hub#728/#729 in five lines: [`check_url`] judges `request.url`, and it is *that very object* —
+/// not its text — that `reqwest` is handed. A `&str` here would be parsed a second time, and a
+/// second parse is a second URL nobody approved.
+///
+/// Public so that a test can ask what would be dialled without dialling it, of the same code path
+/// that dials it; a test that rebuilt the request itself would pin nothing.
+pub fn wire_request(request: &HttpRequest, limits: &Limits) -> Result<reqwest::Request, String> {
+    check_url(&request.url, limits).map_err(|why| format!("{ERR_HTTP_BLOCKED}: {why}"))?;
+    let method = reqwest::Method::from_bytes(request.method.as_bytes()).map_err(|_| {
+        format!(
+            "{ERR_HTTP_BLOCKED}: `{}` is not an HTTP method",
+            request.method
+        )
+    })?;
+
+    let mut builder = client(limits.allow_private_addresses)
+        .request(method, request.url.clone())
+        .timeout(Duration::from_secs(request.timeout_seconds));
+    for (name, value) in &request.headers {
+        builder = builder.header(name, value);
+    }
+    if let Some(body) = &request.body {
+        builder = builder.body(body.clone());
+    }
+    builder
+        .build()
+        .map_err(|e| format!("{ERR_HTTP_FAILED}: {}", request.scrub(&error_chain(&e))))
 }
 
 /// Reads at most [`Limits::max_body_bytes`], streaming — a `Content-Length` of 4 GB must cost this
@@ -319,7 +343,7 @@ impl Resolve for GuardedResolver {
                 // ones filtered out: a name that answers with one public and one private address is
                 // not a name with a bad entry, it is a name doing exactly what a rebinding attack
                 // does, and which address gets dialled first is not ours to decide.
-                if let Some(bad) = addrs.iter().find(|a| is_internal(&a.ip())) {
+                if let Some(bad) = addrs.iter().find(|a| net::is_internal(&a.ip())) {
                     return Err(format!(
                         "{BLOCKED_MARKER} `{host}` resolves to {}, which is inside this network — \
                          a flow reaches the internet, never the hub's own neighbourhood",
@@ -335,144 +359,47 @@ impl Resolve for GuardedResolver {
 
 /// The scheme and, for a literal address, the address — the half of the guard a resolver never
 /// sees, because hyper does not resolve `http://127.0.0.1/`.
-fn check_url(url: &str, limits: &Limits) -> Result<(), String> {
-    let lower = url.to_ascii_lowercase();
-    let rest = ["http://", "https://"]
-        .iter()
-        .find_map(|scheme| lower.strip_prefix(scheme).map(|_| &url[scheme.len()..]))
-        .ok_or_else(|| format!("`{url}` is not an http(s) URL"))?;
-
-    let authority = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
-    let host = match authority.strip_prefix('[') {
-        // `[::1]:8080` — an IPv6 literal wears brackets.
-        Some(after) => after.split(']').next().unwrap_or_default(),
-        None => authority.split(':').next().unwrap_or_default(),
-    };
-    if host.is_empty() {
-        return Err(format!("`{url}` names no host"));
+///
+/// It takes the [`Url`] the runtime already parsed, so «which host is this?» is answered by
+/// `Url::host()` — the WHATWG host parser, the same one that will produce the address hyper
+/// dials. That identity is hub#728: every spelling of the loopback (`2130706433`, `0x7f000001`,
+/// `127.1`, `127.0.0.1.`, `[::ffff:7f00:1]`) arrives here already collapsed into `127.0.0.1`,
+/// instead of looking like a host name to a splitter that only understood dotted quads.
+fn check_url(url: &Url, limits: &Limits) -> Result<(), String> {
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(format!("`{url}` is not an http(s) URL"));
     }
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        if !limits.allow_private_addresses && is_internal(&ip) {
-            return Err(format!(
-                "`{host}` is inside this network — a flow reaches the internet, never the hub's \
-                 own neighbourhood"
-            ));
-        }
+    // A NAME is not judged here — that is the resolver's job, and it is judged there so that the
+    // addresses approved are the addresses dialled (no window for a DNS rebinding).
+    let Some(ip) = net::literal_address(url) else {
+        return Ok(());
+    };
+    if !limits.allow_private_addresses && net::is_internal(&ip) {
+        return Err(format!(
+            "`{ip}` is inside this network — a flow reaches the internet, never the hub's own \
+             neighbourhood"
+        ));
     }
     Ok(())
-}
-
-/// Is this address one the hub must never be talked into calling on somebody else's behalf?
-///
-/// Everything that is not routable on the public internet: loopback, the private ranges, the
-/// link-local block that holds every cloud metadata service (`169.254.169.254`), carrier NAT, the
-/// reserved space — and the IPv6 spellings of all of them, including an IPv4 address wearing an
-/// IPv6 hat (`::ffff:127.0.0.1` is `127.0.0.1`).
-fn is_internal(ip: &IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => is_internal_v4(v4),
-        IpAddr::V6(v6) => is_internal_v6(v6),
-    }
-}
-
-fn is_internal_v4(ip: &Ipv4Addr) -> bool {
-    let [a, b, ..] = ip.octets();
-    ip.is_private()
-        || ip.is_loopback()
-        || ip.is_link_local()
-        || ip.is_unspecified()
-        || ip.is_broadcast()
-        || ip.is_documentation()
-        || ip.is_multicast()
-        || (a == 100 && (64..128).contains(&b))   // 100.64/10  carrier-grade NAT
-        || (a == 192 && b == 0)                   // 192.0.0/24 IETF protocol assignments
-        || (a == 198 && (18..20).contains(&b))    // 198.18/15  benchmarking
-        || a >= 240 // 240/4      reserved, and 255.255.255.255 with it
-}
-
-fn is_internal_v6(ip: &Ipv6Addr) -> bool {
-    if ip.is_loopback() || ip.is_unspecified() || ip.is_multicast() {
-        return true;
-    }
-    let s = ip.segments();
-    if (s[0] & 0xfe00) == 0xfc00 || (s[0] & 0xffc0) == 0xfe80 {
-        return true; // fc00::/7 unique-local · fe80::/10 link-local
-    }
-    // The same address in another notation is the same address. `to_ipv4` also covers the
-    // deprecated `::a.b.c.d` compat form, which some stacks still route.
-    if let Some(v4) = ip.to_ipv4_mapped().or_else(|| ip.to_ipv4()) {
-        return is_internal_v4(&v4);
-    }
-    if s[0] == 0x0064 && s[1] == 0xff9b {
-        // 64:ff9b::/96 — NAT64 wraps a v4 address in the last two groups.
-        let v4 = Ipv4Addr::new(
-            (s[6] >> 8) as u8,
-            (s[6] & 0xff) as u8,
-            (s[7] >> 8) as u8,
-            (s[7] & 0xff) as u8,
-        );
-        return is_internal_v4(&v4);
-    }
-    false
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// The end-to-end behaviour (a real fake server, the count of requests that leave, the timeout,
-    /// a name that resolves to loopback) lives in `tests/flow_http_step.rs`, which can bind a
-    /// socket. What belongs here is the address arithmetic, where an off-by-one prefix is invisible
-    /// until it is a metadata endpoint.
-    #[test]
-    fn every_address_that_is_not_the_public_internet_is_internal() {
-        for blocked in [
-            "127.0.0.1",
-            "127.1.2.3",
-            "0.0.0.0",
-            "10.0.0.5",
-            "172.16.0.1",
-            "172.31.255.254",
-            "192.168.1.1",
-            // The one that matters most: every cloud's metadata service.
-            "169.254.169.254",
-            "100.64.0.1",     // carrier-grade NAT
-            "192.0.0.1",      // IETF protocol assignments
-            "198.18.0.1",     // benchmarking
-            "240.0.0.1",      // reserved
-            "255.255.255.255",
-            "224.0.0.1",      // multicast
-            "::1",
-            "::",
-            "fe80::1",        // link-local
-            "fc00::1",        // unique-local
-            "fd12:3456::1",
-            "::ffff:127.0.0.1",   // v4 wearing a v6 hat
-            "::ffff:169.254.169.254",
-            "::169.254.169.254",  // the deprecated compat form
-            "64:ff9b::7f00:1",    // NAT64 of 127.0.0.1
-            "ff02::1",            // multicast
-        ] {
-            assert!(
-                is_internal(&blocked.parse().unwrap()),
-                "`{blocked}` must never be reachable from a flow"
-            );
-        }
-
-        for public in [
-            "1.1.1.1",
-            "8.8.8.8",
-            "93.184.216.34",
-            "172.32.0.1",  // just outside 172.16/12
-            "100.128.0.1", // just outside 100.64/10
-            "198.20.0.1",  // just outside 198.18/15
-            "9.9.9.9",
-            "2606:4700:4700::1111",
-        ] {
-            assert!(
-                !is_internal(&public.parse().unwrap()),
-                "`{public}` is the public internet and a granted flow may call it"
-            );
+    /// The whole pipeline in one line: **parse once**, then judge THAT. Nothing in the server can
+    /// hand the guard a string, so nothing in these tests may either — an URL that does not parse
+    /// is a call that never happens, which is the same answer as a refusal.
+    ///
+    /// The address arithmetic itself (`is_internal`, and which spelling of a literal collapses
+    /// into which address) lives with the parser, in `erplora_runtime::flows::net`; what belongs
+    /// here is what THIS gate does with the answer. The end-to-end behaviour — a real fake server,
+    /// the count of requests that leave, a name that resolves to loopback — is in
+    /// `tests/flow_http_step.rs`, which can bind a socket.
+    fn refused(url: &str, limits: &Limits) -> bool {
+        match net::parse(url) {
+            Err(_) => true,
+            Ok(parsed) => check_url(&parsed, limits).is_err(),
         }
     }
 
@@ -485,19 +412,57 @@ mod tests {
             "https://169.254.169.254/latest/meta-data/",
             "http://[::ffff:127.0.0.1]/x",
         ] {
-            assert!(check_url(url, &limits).is_err(), "{url}");
+            assert!(refused(url, &limits), "{url}");
         }
-        assert!(check_url("https://api.example.com/v1/x", &limits).is_ok());
+        assert!(!refused("https://api.example.com/v1/x", &limits));
         // A NAME is not judged here — that is the resolver's job, and it is judged there so that
         // the address checked is the address dialled.
-        assert!(check_url("http://localhost/x", &limits).is_ok());
+        assert!(!refused("http://localhost/x", &limits));
+    }
+
+    /// hub#728 — the corpus a QA walked a live hub through. Every string here is `127.0.0.1` or
+    /// `169.254.169.254` **to the parser the HTTP client uses**, so it has to be that to the guard
+    /// too. The one that was verified in the wild is the first: a flow read `/api/hub/context` off
+    /// the hub that was running it.
+    #[test]
+    fn an_address_inside_this_network_is_refused_in_every_notation_a_url_can_spell_it() {
+        let limits = Limits::default();
+        for url in [
+            "http://2130706433:8791/api/hub/context", // 127.0.0.1 in decimal
+            "http://0x7f000001/x",                    // …in hex
+            "http://017700000001/x",                  // …in octal
+            "http://127.1/x",                         // …short form
+            "http://127.0.0.1./x",                    // …with the root label
+            "http://0/x",                             // …0.0.0.0, the other way to say "me"
+            "http://2852039166/latest/meta-data/",    // the cloud metadata service in decimal
+            "http://0xa9fea9fe/latest/meta-data/",    // …in hex
+            "http://[::ffff:169.254.169.254]/x",      // …wearing an IPv6 hat
+            "http://[::ffff:a9fe:a9fe]/x",            // …the same hat, written in groups
+            "http://[64:ff9b::a9fe:a9fe]/x",          // …through NAT64
+            "http://[0:0:0:0:0:0:0:1]/x",             // ::1, uncompressed
+            "http://3232235777/x",                    // 192.168.1.1 in decimal
+            "http://167772161/x",                     // 10.0.0.1 in decimal
+        ] {
+            assert!(refused(url, &limits), "{url}");
+        }
+
+        // The twin, so that «refused» keeps meaning something: the public internet still goes out,
+        // including hosts whose name is all digits and addresses next door to a blocked range.
+        for url in [
+            "https://api.example.com/v1/x",
+            "http://1.1.1.1/x",
+            "http://172.32.0.1/x",
+            "http://[2606:4700:4700::1111]/x",
+        ] {
+            assert!(!refused(url, &limits), "{url}");
+        }
     }
 
     #[test]
     fn only_http_and_https_ever_leave() {
         let limits = Limits::default();
         for url in ["file:///etc/passwd", "ftp://example.com/x", "gopher://x/", "/x"] {
-            assert!(check_url(url, &limits).is_err(), "{url}");
+            assert!(refused(url, &limits), "{url}");
         }
     }
 
@@ -506,7 +471,7 @@ mod tests {
         // It exists for a fake server on loopback and nothing else — nothing in the server sets it,
         // and there is deliberately no environment variable that would.
         assert!(!Limits::default().allow_private_addresses);
-        assert!(check_url("http://127.0.0.1:9/x", &Limits::default()).is_err());
-        assert!(check_url("http://127.0.0.1:9/x", &Limits::allowing_private_addresses()).is_ok());
+        assert!(refused("http://127.0.0.1:9/x", &Limits::default()));
+        assert!(!refused("http://127.0.0.1:9/x", &Limits::allowing_private_addresses()));
     }
 }
