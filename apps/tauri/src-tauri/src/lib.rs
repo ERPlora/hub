@@ -321,9 +321,16 @@ const MAX_DOWNLOAD_COPIES: u32 = 999;
 /// Where a saved file landed, as the page will spell it out to the user.
 #[derive(Debug, Serialize)]
 pub struct SavedDownload {
-    /// Absolute path of the file on this machine. It is not a detail: inside the installed app
-    /// there is no download shelf, no notification and no Downloads button, so this string is the
-    /// ONLY trace the user gets that the file exists at all.
+    /// Where the file is, in the words to put in front of the user — **not always a path**.
+    ///
+    /// On the desktop it is the absolute path, because that is what the user's file manager opens.
+    /// On Android there is no path to show: the file lives in the public Downloads **collection**
+    /// and `MediaStore` names it `content://media/external/downloads/1234`, so what travels is the
+    /// folder and the name — `Download/factura-2026-0042.pdf` (hub#499).
+    ///
+    /// Either way it is not a detail: inside the installed app there is no download shelf, no
+    /// notification and no Downloads button, so this string is the ONLY trace the user gets that
+    /// the file exists at all.
     pub path: String,
 }
 
@@ -364,6 +371,41 @@ pub fn reachable_downloads_dir(
         return Err(ShellError::DownloadsUnreachable);
     }
     resolved.ok_or_else(|| ShellError::Io(format!("no downloads directory on {target_os}")))
+}
+
+/// Where a saved file goes on this platform.
+///
+/// Two ways to save exist, and they are not variations of one thing. A desktop has a **folder** the
+/// user opens in their own file manager. Android has no such folder for us — what `download_dir()`
+/// resolves is app-scoped storage Android 11 closed to every file manager — but it does have a
+/// public **Downloads collection**, which is not a path at all: a row in `MediaStore` that the Files
+/// app browses and that the shell can only reach through Kotlin (hub#499).
+#[derive(Debug, PartialEq, Eq)]
+pub enum SaveTarget {
+    /// A folder on this device's file system, which the user can open.
+    Folder(PathBuf),
+    /// Android's public Downloads collection, published through `MediaStore` by our own plugin.
+    AndroidDownloads,
+}
+
+/// The one place that decides where a download goes — or that it cannot go anywhere.
+///
+/// Android is answered **before** the resolved path is even looked at, and that order is the point:
+/// Android does hand back a Downloads folder, it is simply one no file manager will open, so a
+/// decision made from that value would keep writing the file where the user cannot reach it
+/// (hub#480). Everything else falls through to [`reachable_downloads_dir`], which keeps the two
+/// remaining answers apart: a phone with nowhere to save gets [`ShellError::DownloadsUnreachable`],
+/// which the page turns into a sentence the user can act on, and a desktop that resolved no
+/// Downloads folder at all gets a plain failure — putting the phone sentence in front of that user
+/// would just be wrong.
+///
+/// iOS is still refused, on purpose: closing the same hole there needs its own native work
+/// (`UIDocumentPickerViewController` or the share sheet) and nothing here has been built or tried.
+pub fn save_target(target_os: &str, resolved: Option<PathBuf>) -> Result<SaveTarget, ShellError> {
+    if target_os == "android" {
+        return Ok(SaveTarget::AndroidDownloads);
+    }
+    reachable_downloads_dir(target_os, resolved).map(SaveTarget::Folder)
 }
 
 /// The single, safe leaf name a saved file may land under — or `None`.
@@ -663,7 +705,13 @@ fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(), ShellErro
 /// Refusals are returned, never swallowed — and one of them is a sentence in its own right:
 /// `downloads_unreachable` means this device has no Downloads folder the user could open, which the
 /// page must say out loud instead of reporting a path into storage nobody can browse.
-#[tauri::command]
+///
+/// ⚠️ `(async)` is not decoration (hub#499). The Android half hands the file to Kotlin through
+/// `run_mobile_plugin`, which dispatches onto Android's main looper and BLOCKS waiting for the
+/// answer; a plain `#[tauri::command]` runs on that very thread, so the till would hang forever on
+/// the press that saves its backup. The body stays synchronous — the attribute only moves it off
+/// the main thread.
+#[tauri::command(async)]
 fn save_download(
     app: tauri::AppHandle,
     name: String,
@@ -674,7 +722,7 @@ fn save_download(
 
     // `std::env::consts::OS` is the TARGET the binary was compiled for, so on the Android build it
     // reads `"android"` — the same string the tests reason about.
-    let dir = reachable_downloads_dir(std::env::consts::OS, app.path().download_dir().ok())
+    let target = save_target(std::env::consts::OS, app.path().download_dir().ok())
         .inspect_err(|e| log::warn!("shell: nowhere to save {name:?}: {e}"))?;
     let Some(file_name) = download_file_name(&name) else {
         log::warn!("shell: refused to save {name:?} — that is not a file name");
@@ -684,14 +732,78 @@ fn save_download(
         .decode(data_base64.as_bytes())
         .map_err(|_| ShellError::DownloadRefused)?;
 
-    std::fs::create_dir_all(&dir).map_err(|e| ShellError::Io(e.to_string()))?;
-    let path = free_download_path(&dir, &file_name, &|candidate| candidate.exists())
-        .ok_or(ShellError::DownloadRefused)?;
-    std::fs::write(&path, &bytes).map_err(|e| ShellError::Io(e.to_string()))?;
+    match target {
+        SaveTarget::Folder(dir) => {
+            std::fs::create_dir_all(&dir).map_err(|e| ShellError::Io(e.to_string()))?;
+            let path = free_download_path(&dir, &file_name, &|candidate| candidate.exists())
+                .ok_or(ShellError::DownloadRefused)?;
+            std::fs::write(&path, &bytes).map_err(|e| ShellError::Io(e.to_string()))?;
+            Ok(SavedDownload {
+                path: path.display().to_string(),
+            })
+        }
+        SaveTarget::AndroidDownloads => {
+            #[cfg(target_os = "android")]
+            {
+                publish_to_android_downloads(&app, &file_name, &bytes)
+            }
+            #[cfg(not(target_os = "android"))]
+            {
+                // Unreachable: `save_target` only answers this on Android. Refusing rather than
+                // claiming a save is the rule of ADR-0259 applied to a case that cannot happen.
+                let _ = (&app, &file_name, &bytes);
+                Err(ShellError::DownloadsUnreachable)
+            }
+        }
+    }
+}
 
-    Ok(SavedDownload {
-        path: path.display().to_string(),
-    })
+/// Hands the bytes to Kotlin so they land in Android's **public** Downloads collection (hub#499).
+///
+/// The file is staged in the app's own cache first and handed over as a **path**: a 5 MB export has
+/// already crossed the `invoke` boundary once as base64, and copying it onto a tablet's heap again
+/// to cross JNI would be the second copy that matters. The staged file is removed either way —
+/// including when publishing fails, so a refused save leaves nothing behind to fill the device.
+///
+/// What comes back is not a path but a **place to say**: `MediaStore` answers with
+/// `content://media/external/downloads/1234`, and what the user needs is *Download/factura.pdf* —
+/// the folder they will open and the name they will look for. Inside the installed app that
+/// sentence is the only sign the file exists at all.
+#[cfg(target_os = "android")]
+fn publish_to_android_downloads(
+    app: &tauri::AppHandle,
+    file_name: &str,
+    bytes: &[u8],
+) -> Result<SavedDownload, ShellError> {
+    use tauri::Manager;
+    use tauri_plugin_erplora_android::ErploraAndroidExt as _;
+
+    let staging = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| ShellError::Io(e.to_string()))?
+        .join("downloads");
+    std::fs::create_dir_all(&staging).map_err(|e| ShellError::Io(e.to_string()))?;
+    let staged = staging.join(file_name);
+    std::fs::write(&staged, bytes).map_err(|e| ShellError::Io(e.to_string()))?;
+
+    let published = app.erplora_android().save_to_downloads(&staged, file_name);
+    let _ = std::fs::remove_file(&staged);
+
+    match published {
+        Ok(saved) => Ok(SavedDownload {
+            path: saved.location,
+        }),
+        // The one refusal the user can act on has to keep its own sentence all the way to the page.
+        Err(tauri_plugin_erplora_android::Error::DownloadsUnreachable) => {
+            log::warn!("shell: this Android has no public Downloads collection");
+            Err(ShellError::DownloadsUnreachable)
+        }
+        Err(e) => {
+            log::warn!("shell: could not publish {file_name:?} to Downloads: {e}");
+            Err(ShellError::Io(e.to_string()))
+        }
+    }
 }
 
 /// Pregunta en segundo plano si el hub recordado sigue existiendo y, si no, lo olvida y devuelve
