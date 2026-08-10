@@ -33,8 +33,9 @@
 # Android SÍ se construye aquí (job `build-android`): ADR-0180 revierte el §3 de ADR-0160 y
 # devuelve el Tauri-Android a este workflow — Android es la MISMA app Tauri, bajo la identidad
 # única `com.erplora.app` (ADR-0160). ADR-0196 remata la dirección: muere la app Kotlin de
-# `ERPlora-Bridge-android`. Este workflow produce el AAB y lo sube a Object Storage; **no** lo
-# publica en Play (no hay job `publish-play` aquí). Runbook: apps/tauri/GOOGLE-PLAY.md.
+# `ERPlora-Bridge-android`. Este workflow produce el AAB, lo sube a Object Storage y lo **publica
+# en Play** (job `publish-play`, hub#308) — gateado por `vars.PLAY_PACKAGE_NAME`, con la PRIMERA
+# subida manual como requisito de Google. Runbook: apps/tauri/GOOGLE-PLAY.md.
 #
 # Firma Windows (ADR-0136, 2026-07-16): el canal PRINCIPAL de Windows es Microsoft Store —
 # MSIX sin firmar que la Store re-firma con su cert tras certificación (0€, sin SmartScreen,
@@ -385,6 +386,59 @@ jobs:
           name: app-android
           path: dist/*
           if-no-files-found: error
+
+  # Publica el AAB en Google Play (hub#308). Gemelo de `publish-store`: consume el artefacto que
+  # `build-android` acaba de subir — **no reconstruye nada** — y solo corre en tag `v*`.
+  #
+  # ⚠️ La PRIMERA subida de cada app es MANUAL, por requisito de Google: es la que registra la
+  # upload key y activa Play App Signing. Este job no la sustituye; empieza a servir DESPUÉS, para
+  # que cada release etiquetada llegue sola a la pista.
+  #
+  # Gate por Variable `PLAY_PACKAGE_NAME` (vacía = job saltado, igual que el de Microsoft). Ponerla
+  # ANTES de esa primera subida manual haría fallar el job en el primer tag: la API rechaza un
+  # paquete que aún no existe en la consola.
+  #
+  # `PLAY_TRACK` decide la pista y su default es `internal` a propósito — la promoción a producción
+  # se hace a mano en la consola mientras no haya confianza. `changesNotSentForReview: true` porque
+  # una release en pista interna se revisa sola; mandarla a revisión desde aquí sería decidir por el
+  # humano algo que el runbook deja en su mano.
+  #
+  # La service account NO necesita roles IAM en GCP: los permisos se conceden invitándola en Play
+  # Console sobre esta app, con «Release to testing tracks» y nada más.
+  publish-play:
+    name: Publish to Google Play
+    needs: build-android
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PLAY_PACKAGE_NAME != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: app-android
+          path: artifacts
+
+      # El AAB que se sube tiene que ser EL del build, firmado con la keystore de ADR-0053. Si el
+      # `Keystore` de arriba se saltó (secret ausente), aquí llegaría uno sin firmar y Play lo
+      # rechazaría con un error que no dice eso — mejor pararlo aquí, nombrando la causa.
+      - name: Verificar que el AAB va firmado
+        run: |
+          set -euo pipefail
+          AAB=artifacts/erplora-app.aab
+          [ -f "$AAB" ] || { echo "::error::no hay $AAB en el artefacto app-android"; exit 1; }
+          jarsigner -verify "$AAB" | grep -q "jar verified" \
+            || { echo "::error::el AAB NO está firmado — ¿faltó ANDROID_KEYSTORE_BASE64 en el build?"; exit 1; }
+          echo "AAB firmado ✓"
+
+      - name: Publish to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ vars.PLAY_PACKAGE_NAME }}
+          releaseFiles: artifacts/erplora-app.aab
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: completed
+          changesNotSentForReview: true
 
   upload-s3:
     name: Upload to Object Storage
