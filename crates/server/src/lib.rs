@@ -1383,7 +1383,7 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         Err(error) => return tenant_rejected(error),
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (pin_users, currency, currency_decimals, language) = {
+    let (pin_users, currency, currency_decimals, language, timezone) = {
         let rt = runtime.lock().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
@@ -1420,7 +1420,12 @@ async fn hub_context(State(st): State<AppState>) -> Response {
             .get("language")
             .cloned()
             .unwrap_or_else(|| json!("es"));
-        (pin_users, currency, currency_decimals, language)
+        // La zona horaria del negocio ya RESUELTA (hub#731). En `settings` la clave viaja cruda
+        // (`null` = «dedúcela del país») porque tiene que poder volver por un `PUT`; aquí se
+        // expone el nombre IANA real, que es lo que la UI necesita para enseñar a qué hora local
+        // se va a disparar un flujo. Si la lectura falla, UTC — que es lo que el reloj hará.
+        let timezone = rt.timezone_name().await.unwrap_or_else(|_| "UTC".to_string());
+        (pin_users, currency, currency_decimals, language, timezone)
     };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
@@ -1452,6 +1457,8 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         // Cuántos decimales tiene esa moneda. El front NO puede asumir 2 (ADR-0123 §7).
         "currency_decimals": currency_decimals,
         "language": language,
+        // Nombre IANA del reloj del NEGOCIO (hub#731) — resuelto, nunca `null`.
+        "timezone": timezone,
     }))
     .into_response()
 }

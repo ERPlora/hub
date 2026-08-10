@@ -1597,6 +1597,17 @@ impl Runtime {
         settings::get_all(self.db.as_ref(), &self.hub_id).await
     }
 
+    /// El nombre IANA de la zona horaria del negocio, ya **resuelta** (hub#731): la declarada en
+    /// `timezone` o, lo normal, la deducida de `country_code`/`region_code`. `get_settings`
+    /// devuelve la clave cruda (`null` mientras se deduzca) porque tiene que poder volver por un
+    /// `PUT`; esto es lo que la UI necesita para decir a qué hora local va a correr un flujo.
+    pub async fn timezone_name(&self) -> Result<String> {
+        Ok(settings::timezone_of(self.db.as_ref(), &self.hub_id)
+            .await?
+            .name()
+            .to_string())
+    }
+
     /// Aplica un mapa parcial de settings (valida cada clave conocida; rechaza desconocidas o
     /// valores inválidos antes de tocar la BD) y devuelve el objeto completo actualizado. El gate
     /// de rol (owner/admin) lo aplica el server. `updated_by` audita quién hizo el cambio.

@@ -1144,7 +1144,7 @@
         },
         "cron": {
           "type": "string",
-          "description": "Expresión cron de 5 campos `min hora dom mes dow` (p. ej. `*/5 * * * *`) o atajo `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`. El parser actual soporta `*`, `*/N` y valor fijo por campo (no rangos/listas todavía)."
+          "description": "Expresión cron de 5 campos `min hora dom mes dow` (p. ej. `*/5 * * * *`) o atajo `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`. Por campo: `*`, un valor, un rango `a-b`, una lista `a,b`, un paso `*/N` o `a-b/N`; mes y día de semana admiten nombres (`JAN`…`DEC`, `SUN`…`SAT`). **Se interpreta SIEMPRE en UTC**, no en la zona del negocio (hub#731): el cron de una tarea de módulo lo escribe el programador en el manifest, meses antes de saber dónde vive el hub. El reloj del negocio es cosa de los triggers `cron` de un flujo. Una expresión que el hub no sabe ejecutar hace que la tarea **no se programe** (se avisa por log), en vez de quedar vencida en cada tick."
         },
         "payload": {
           "type": "object",

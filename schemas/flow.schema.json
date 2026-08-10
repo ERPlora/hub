@@ -82,11 +82,11 @@
         },
         "cron": {
           "type": "string",
-          "description": "Solo `kind: cron` — expresión de 5 campos o atajo (`@daily`, `@hourly`). Obligatoria ahí."
+          "description": "Solo `kind: cron` — expresión de 5 campos `min hora dom mes dow` o atajo (`@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`). Obligatoria ahí. Por campo: `*`, un valor, un rango `a-b`, una lista `a,b`, un paso `*/N` o `a-b/N`; mes y día de semana admiten nombres (`JAN`…`DEC`, `SUN`…`SAT`, p. ej. `0 9 * * MON-FRI`). **Se lee en la ZONA HORARIA DEL NEGOCIO** (`timezone` de los settings, o la deducida de `country_code`/`region_code`) — «a las 9:00» son las 9:00 de la tienda (hub#731). Lo que el hub no sepa ejecutar se **rechaza al guardar** con `flow.invalid_cron` (hub#730): nunca se guarda un trigger activo que no va a disparar."
         },
         "at": {
           "type": "string",
-          "description": "Solo `kind: at` — instante RFC-3339. Obligatorio ahí."
+          "description": "Solo `kind: at` — instante RFC-3339 CON offset (p. ej. `2026-08-11T09:00:00+02:00`). Obligatorio ahí. Lo que no parsee se rechaza al guardar con `flow.invalid_at` (hub#730). No lleva zona aparte: el offset ya está en el propio instante."
         }
       }
     },
