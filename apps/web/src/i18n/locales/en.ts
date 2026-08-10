@@ -1157,6 +1157,14 @@ export default {
     // switch on. Nothing was created and nobody gained access.
     reasonRolesNotActivatable:
       'Roles not switched on: {n}. A template can only switch on roles the modules installed here provide, and never the administrative ones.',
+    // ADR-0273 D8 / hub#560 — the file brought a section over this hub's own system tables (its
+    // fiscal profile, its certificate store). No bundle writes those: they are this installation.
+    reasonSystemTableNotPortable:
+      "Rows discarded: {n}. The file tried to write this hub's own records — its tax profile and certificate. Those belong to this installation and no file can change them.",
+    // hub#753 — invoice series and the ledger of numbers already issued belong to ONE installation
+    // (RD 1007/2023: no gaps, no duplicates). Yours are untouched; set them up here if you have not.
+    reasonNumberingNotPortable:
+      'Invoice numbering discarded: {n}. Series and the numbers already issued belong to the business that created the file. Your own numbering is untouched — set up your series in Settings if you have not yet.',
     done: 'Go to home',
   },
   moduleView: {

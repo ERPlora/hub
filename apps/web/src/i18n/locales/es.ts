@@ -1108,6 +1108,10 @@ export default {
       'Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.',
     reasonRolesNotActivatable:
       'Roles sin activar: {n}. Una plantilla solo puede activar roles que traigan los módulos instalados aquí, y nunca los administrativos.',
+    reasonSystemTableNotPortable:
+      'Filas descartadas: {n}. El fichero intentaba escribir los registros propios de este hub — su perfil fiscal y su certificado. Son de esta instalación y ningún fichero puede cambiarlos.',
+    reasonNumberingNotPortable:
+      'Numeración descartada: {n}. Las series de facturación y los números ya emitidos son del negocio que creó el fichero. Tu numeración se queda como está — si aún no tienes series, configúralas en Ajustes.',
     done: 'Ir al inicio',
   },
   moduleView: {

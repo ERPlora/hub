@@ -734,3 +734,256 @@ async fn cross_hub_en_bd_compartida_applied_implica_filas_reales_bajo_el_destino
     // `Applied` solo es cierto si B realmente tiene la fila bajo su hub_id (antes era 0 filas).
     assert_eq!(product_names(&b, "h2").await, vec!["Café".to_string()]);
 }
+
+// ── CLAVE NATURAL: el destino ya tiene la fila EQUIVALENTE (hub#753) ─────────────────────────
+
+/// El destino ya tiene un producto con el MISMO `sku` que trae el bundle, pero con otro `id`.
+///
+/// El guard de idempotencia del import compara por IDENTIDAD TÉCNICA (`hub_id` + `id` derivado del
+/// hub destino), y el `id` derivado nunca coincide con el que el destino generó por su cuenta. Así
+/// que el guard pasa, el INSERT sale, y revienta contra la CLAVE NATURAL que la tabla sí declara
+/// (`ix_inventory_product_sku` sobre `(hub_id, sku)`) — perdiendo la SECCIÓN ENTERA, porque el
+/// módulo se aplica en bloque.
+///
+/// No es un caso raro: hay ~80 índices únicos `(hub_id, <clave natural>)` en los módulos
+/// (`inventory_unit(code)`, `services_service(slug)`, `taxes_category(key)`,
+/// `invoice_series_series(code)`…). Cualquier catálogo que el destino ya tenga a medias tumba su
+/// sección. El guard tiene que ir TAMBIÉN por la clave natural DECLARADA por el esquema del
+/// destino: si ya hay una fila equivalente, la fila del bundle se salta; nunca colisiona.
+#[tokio::test]
+async fn una_fila_con_la_misma_clave_natural_que_el_destino_no_rompe_la_seccion() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+
+    // Hub A (origen) con su catálogo.
+    let a = fresh().await;
+    create_product(&a, "h1", "Café", "CAF").await;
+    create_product(&a, "h1", "Té verde", "TEV").await;
+    let bundle = export_hub(&a, "h1", &full_selection(), "barberia", "es", CREATED_AT)
+        .await
+        .expect("export A");
+
+    // Hub B (destino) que YA dio de alta su propio café con el MISMO sku (otro id, otro nombre).
+    let mut b = fresh().await;
+    create_product(&b, "h2", "Café de la casa", "CAF").await;
+
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("import en B");
+    let inv = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .expect("inventory en informe");
+    assert!(
+        !matches!(inv.status, SectionStatus::Failed(_)),
+        "una fila equivalente en destino no puede tumbar la sección: {:?}",
+        inv.status
+    );
+
+    // Lo que el destino ya tenía se respeta (no se duplica ni se pisa) y lo que faltaba entra.
+    let names = product_names(&b, "h2").await;
+    assert!(
+        names.contains(&"Café de la casa".to_string()),
+        "el import pisó/duplicó el producto que el destino ya tenía: {names:?}"
+    );
+    assert!(
+        names.contains(&"Té verde".to_string()),
+        "la fila que NO chocaba tenía que entrar igual: {names:?}"
+    );
+    assert_eq!(names.len(), 2, "clave natural duplicada en el destino: {names:?}");
+}
+
+// ── SERIES DE FACTURACIÓN: el caso reportado (hub#753) ───────────────────────────────────────
+
+/// Runtime con `invoice_series` instalado sobre un esquema nuevo, bajo `hub`.
+async fn fresh_series(hub: &str) -> Runtime {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), hub);
+    rt.install_from_dir(&modules_root().join("invoice_series"))
+        .await
+        .expect("instalar invoice_series");
+    rt
+}
+
+async fn create_series(rt: &Runtime, hub: &str, code: &str, name: &str, doc_type: &str) {
+    rt.execute_command(
+        "invoice_series.series.create",
+        &params(json!({
+            "code": code, "name": name, "document_type": doc_type, "prefix": code,
+            "suffix": "", "format": "{prefix}-{year}-{seq:05d}",
+            "country_code": "ES", "region_code": "", "fiscal_year": 2026, "is_default": 0,
+        })),
+        &ctx(hub),
+    )
+    .await
+    .unwrap_or_else(|e| panic!("crear serie {code}: {e}"));
+}
+
+/// `(id, code, current_sequence)` de cada serie viva del hub, ordenado por código.
+async fn series_fingerprint(rt: &Runtime, hub: &str) -> Vec<(String, String, i64)> {
+    let rows = rt
+        .execute_query("invoice_series.series.list", &Params::new(), &ctx(hub))
+        .await
+        .expect("listar series");
+    let mut out: Vec<(String, String, i64)> = rows
+        .iter()
+        .map(|r| {
+            (
+                r["id"].as_str().unwrap_or_default().to_string(),
+                r["code"].as_str().unwrap_or_default().to_string(),
+                r["current_sequence"].as_i64().unwrap_or_default(),
+            )
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+fn series_export_selection() -> ExportSelection {
+    ExportSelection {
+        users: false,
+        settings: false,
+        settings_items: None,
+        fiscal: false,
+        media: false,
+        modules: vec![ModuleDataSelection {
+            module_id: "invoice_series".into(),
+            with_data: true,
+            tables: None,
+        }],
+        purpose: Default::default(), // Backup: las series SÍ salen en el volcado
+    }
+}
+
+fn import_series_only() -> ImportSelection {
+    ImportSelection {
+        users: false,
+        settings: false,
+        fiscal: false,
+        media: false,
+        modules: vec!["invoice_series".into()],
+    }
+}
+
+/// **El caso reportado (hub#753).** Un hub que ya tiene sus series naturales `FAC` y `TCK`
+/// (con SUS ids) importa un bundle que trae `FAC` y `TCK` de OTRA instalación.
+///
+/// El guard por `id` pasaba y el INSERT chocaba contra `uq_invoice_series_hub_code (hub_id, code)`:
+/// «reset: aplicar sentencia: duplicate key value violates unique constraint
+/// "uq_invoice_series_hub_code"». La sección `modules/invoice_series` quedaba en `Failed` y el
+/// onboarding terminaba a medias.
+///
+/// Lo que NO puede pasar, además de no reventar: que la numeración del destino se toque. Las series
+/// son FISCALES (RD 1007/2023): fusionar, renumerar o reasignar una serie rompe la correlatividad
+/// que exige VeriFactu. La serie del destino conserva su `id`, su `code` y su `current_sequence`
+/// exactamente como estaban.
+#[tokio::test]
+async fn las_series_de_facturacion_del_destino_sobreviven_al_import() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+
+    // Hub A (origen): las dos series que trae cualquier plantilla.
+    let a = fresh_series("h1").await;
+    create_series(&a, "h1", "FAC", "Facturas", "invoice").await;
+    create_series(&a, "h1", "TCK", "Tiques", "receipt").await;
+    let bundle = export_hub(&a, "h1", &series_export_selection(), "peluqueria", "es", CREATED_AT)
+        .await
+        .expect("export A");
+
+    // Hub B (destino): YA tiene FAC y TCK, con ids propios y distintos.
+    let mut b = fresh_series("h2").await;
+    create_series(&b, "h2", "FAC", "Facturas", "invoice").await;
+    create_series(&b, "h2", "TCK", "Tiques", "receipt").await;
+    let antes = series_fingerprint(&b, "h2").await;
+    assert_eq!(antes.len(), 2, "el destino tenía que arrancar con sus dos series");
+
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_series_only(), "h2")
+        .await
+        .expect("import en B");
+    let sec = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/invoice_series")
+        .expect("invoice_series en informe");
+    assert!(
+        !matches!(sec.status, SectionStatus::Failed(_)),
+        "las series del destino no pueden tumbar la sección: {:?}",
+        sec.status
+    );
+
+    // Correlatividad fiscal: ni un id, ni un código, ni un contador se han movido.
+    let despues = series_fingerprint(&b, "h2").await;
+    assert_eq!(
+        antes, despues,
+        "el import tocó las series FISCALES del destino (id/código/numeración)"
+    );
+}
+
+/// Lo que trae el bundle NO se aplica en silencio: el informe dice que la numeración de otra
+/// instalación se ha quedado fuera, y cuántas filas eran.
+///
+/// Que el hub destino ya tuviera `FAC` no puede ser la única razón por la que nada aterriza: una
+/// serie define **cómo numera un negocio lo que declara a Hacienda** y `invoice_series_allocation`
+/// es el libro de números ya entregados que el RD 1007/2023 exige sin huecos ni duplicados. De
+/// otra instalación, aquí, son numeración ajena — la misma regla que ya se aplica a la cadena
+/// VeriFactu (`chain_not_portable`, ADR-0202 §4.2).
+#[tokio::test]
+async fn la_numeracion_de_otra_instalacion_se_descarta_diciendolo() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+
+    let a = fresh_series("h1").await;
+    create_series(&a, "h1", "FAC", "Facturas", "invoice").await;
+    let bundle = export_hub(&a, "h1", &series_export_selection(), "peluqueria", "es", CREATED_AT)
+        .await
+        .expect("export A");
+
+    // Destino LIMPIO: aquí no hay ninguna colisión que resolver, y aun así no se aplica.
+    let mut b = fresh_series("h2").await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_series_only(), "h2")
+        .await
+        .expect("import en B");
+    let sec = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/invoice_series")
+        .expect("invoice_series en informe");
+    assert!(
+        matches!(&sec.status, SectionStatus::Ignored(r) | SectionStatus::PartiallyApplied(r)
+                 if r == "numbering_not_portable"),
+        "el descarte tiene que ir con su motivo estable: {:?}",
+        sec.status
+    );
+    assert!(sec.discarded_rows > 0, "un descarte que no dice CUÁNTAS filas eran es casi mudo");
+    assert!(
+        series_fingerprint(&b, "h2").await.is_empty(),
+        "la serie de otra instalación no puede aterrizar aquí"
+    );
+}
+
+/// El otro lado de la misma regla: el hub que restaura SU PROPIA copia recupera sus series.
+/// Es su numeración volviendo a su sitio (ADR-0113 §1) — sin esto, un redespliegue perdería la
+/// serie con la que el negocio venía numerando.
+#[tokio::test]
+async fn un_hub_que_restaura_su_propia_copia_recupera_sus_series() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+
+    let a = fresh_series("h1").await;
+    create_series(&a, "h1", "FAC", "Facturas", "invoice").await;
+    let bundle = export_hub(&a, "h1", &series_export_selection(), "copia", "es", CREATED_AT)
+        .await
+        .expect("export A");
+    assert_eq!(bundle.manifest.hub.hub_id, "h1", "el bundle registra su hub de origen");
+
+    // El MISMO hub, reconstruido desde cero (redespliegue restaurando su copia).
+    let mut b = fresh_series("h1").await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_series_only(), "h1")
+        .await
+        .expect("restaurar su propia copia");
+    let sec = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/invoice_series")
+        .expect("invoice_series en informe");
+    assert!(matches!(sec.status, SectionStatus::Applied), "debía aplicarse: {:?}", sec.status);
+    let codes: Vec<String> = series_fingerprint(&b, "h1").await.into_iter().map(|(_, c, _)| c).collect();
+    assert_eq!(codes, vec!["FAC".to_string()], "el hub no recuperó su propia serie: {codes:?}");
+}

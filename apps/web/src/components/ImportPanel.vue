@@ -790,6 +790,8 @@ const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
   identity_not_portable: (n) => t('importPage.reasonIdentityNotPortable', { n }),
   settings_not_portable: (n) => t('importPage.reasonSettingsNotPortable', { n }),
   roles_not_activatable: (n) => t('importPage.reasonRolesNotActivatable', { n }),
+  system_table_not_portable: (n) => t('importPage.reasonSystemTableNotPortable', { n }),
+  numbering_not_portable: (n) => t('importPage.reasonNumberingNotPortable', { n }),
 };
 
 /** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */
