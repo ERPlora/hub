@@ -26,7 +26,7 @@ import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
 import { setRuntimeClientKind } from './device';
-import type { ModuleUpdateInfo } from './module-updates';
+import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -440,6 +440,28 @@ export async function listModuleUpdates(): Promise<ModuleUpdateInfo[]> {
   if (!res.ok) return [];
   const env = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: ModuleUpdateInfo[] };
   return env.ok && env.data ? env.data : [];
+}
+
+/**
+ * Entre qué versiones puede elegir este hub para un módulo (`GET /api/modules/{id}/versions`).
+ *
+ * Sirve a las dos puertas: instalar (el módulo aún no está: valen todas las publicadas) y actualizar
+ * (solo hacia delante desde la instalada). El runtime ya aplica ahí la política —fuera cuarentena,
+ * fuera retroceso, y un módulo clavado por soporte no ofrece nada—, así que la pantalla pinta lo que
+ * le llega y no filtra por su cuenta.
+ *
+ * Un fallo devuelve la lista vacía, y el llamante cae a `latest`: sin lista se instala igual que
+ * antes de que existiera el desplegable. Quedarse sin poder instalar porque el Cloud no contestó
+ * sería un precio absurdo por una comodidad.
+ */
+export async function listModuleVersions(moduleId: string): Promise<ModuleVersions> {
+  const empty: ModuleVersions = { module_id: moduleId, installed: null, latest: null, versions: [] };
+  const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/versions`, {
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) return empty;
+  const env = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: ModuleVersions };
+  return env.ok && env.data ? env.data : empty;
 }
 
 export const activateModule = (id: string): Promise<void> => moduleAction(id, 'activate');

@@ -6,7 +6,13 @@
 // 24 módulos donde 23 dicen «sin cambios» es ruido, y el ruido se deja de leer.
 import { describe, expect, it } from 'vitest';
 
-import { pendingUpdate, updateLabel, type ModuleUpdateInfo } from './module-updates';
+import {
+  defaultVersion,
+  pendingUpdate,
+  shouldPickVersion,
+  updateLabel,
+  type ModuleUpdateInfo,
+} from './module-updates';
 
 const info = (over: Partial<ModuleUpdateInfo> = {}): ModuleUpdateInfo => ({
   module_id: 'inventory',
@@ -55,5 +61,34 @@ describe('updateLabel', () => {
 
   it('un módulo sin versión conocida no enseña una flecha huérfana', () => {
     expect(updateLabel('', null)).toBe('');
+  });
+});
+
+// hub#675 — elegir versión. El runtime dice ENTRE QUÉ se puede elegir (`GET
+// /api/modules/:id/versions`, ya sin cuarentena, sin retroceso y sin saltarse el pin); aquí solo
+// está lo que la pantalla hace con esa lista.
+describe('defaultVersion', () => {
+  it('offers the latest, which is the first the runtime returns', () => {
+    expect(defaultVersion(['2.1.0', '2.0.0', '1.0.0'])).toBe('2.1.0');
+  });
+
+  it('falls back to `latest` when the runtime returned nothing', () => {
+    // El Cloud no contestó. Instalar NO puede quedarse bloqueado por eso: `latest` es el centinela
+    // que el runtime resuelve por su cuenta, exactamente igual que antes de que hubiera desplegable.
+    expect(defaultVersion([])).toBe('latest');
+  });
+});
+
+describe('shouldPickVersion', () => {
+  it('asks when there is genuinely something to choose', () => {
+    expect(shouldPickVersion(['2.1.0', '2.0.0'])).toBe(true);
+  });
+
+  it('does NOT ask when there is a single option — un diálogo de una sola opción es un clic de peaje', () => {
+    expect(shouldPickVersion(['2.1.0'])).toBe(false);
+  });
+
+  it('does NOT ask when there is nothing to choose', () => {
+    expect(shouldPickVersion([])).toBe(false);
   });
 });

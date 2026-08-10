@@ -44,3 +44,36 @@ export function updateLabel(installed: string, update: ModuleUpdateInfo | null):
   if (!installed) return '';
   return update ? `${installed} → ${update.latest}` : installed;
 }
+
+/** Lo que dice `GET /api/modules/:id/versions`: entre qué puede elegir este hub (hub#675). */
+export interface ModuleVersions {
+  module_id: string;
+  /** Versión que corre hoy, o `null` si el módulo aún no está instalado (caso de instalar). */
+  installed: string | null;
+  /** La que se ofrece por defecto (= `versions[0]`), o `null` si no hay nada que elegir. */
+  latest: string | null;
+  /** De la más nueva a la más vieja. Ya vienen sin cuarentena, sin retroceso y sin saltarse el pin. */
+  versions: string[];
+}
+
+/**
+ * La versión que se pide cuando nadie elige otra: **la última**, que es la primera de la lista.
+ *
+ * Sin lista se cae a `latest`, el centinela que el runtime resuelve por su cuenta. Esa rama no es
+ * un detalle: si el Cloud no contesta, instalar tiene que seguir funcionando exactamente igual que
+ * antes de que existiera el desplegable — una pantalla que se queda sin lista no puede convertirse
+ * en una pantalla que no instala.
+ */
+export function defaultVersion(versions: readonly string[]): string {
+  return versions[0] ?? 'latest';
+}
+
+/**
+ * ¿Hay algo que preguntar? Solo con **más de una** opción.
+ *
+ * Con una sola —o con ninguna— el diálogo no aporta una decisión: cobra un clic por confirmar lo
+ * único que se podía hacer. El caso común (un módulo con una versión nueva) sigue siendo un clic.
+ */
+export function shouldPickVersion(versions: readonly string[]): boolean {
+  return versions.length > 1;
+}
