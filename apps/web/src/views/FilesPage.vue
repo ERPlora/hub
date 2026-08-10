@@ -57,6 +57,7 @@ import {
   uploadMedia,
   deleteMedia,
   createMediaFolder,
+  moveMedia,
   type MediaFolder,
   type MediaFile,
   renameMedia,
@@ -64,7 +65,6 @@ import {
   type MediaQuota,
   type MediaPolicy,
 } from '../lib/media';
-import { saveDownload, saveDownloadMessageKey } from '../lib/save-download';
 
 const { t } = useI18n();
 
@@ -184,31 +184,32 @@ function downloadPreviewed(): void {
   if (previewFile.value) void downloadFile(previewFile.value.id);
 }
 
-/**
- * Downloads a file of the media folder (hub#480).
- *
- * The bytes always come through the runtime (`/api/media/raw`), never from Object Storage directly:
- * the buckets have no CORS and the signed URL expires, so the runtime is the authority and this
- * fetch carries `X-Hub-Session` (ADR-0047/0171). A `window.open` could attach no such header, which
- * is why the branch that opened an absolute address is gone — the runtime has not returned one
- * since ADR-0171, so it was a dead promise sitting on top of the live path.
- *
- * Where the file then lands is `saveDownload`'s business, because it is not the same answer on
- * every surface: a browser has a download manager and the installed app has none.
- */
+// Descarga un fichero por su URL (raw autenticado del runtime en local, URL firmada en cloud).
 async function downloadFile(id: string): Promise<void> {
   const file = allFiles.find((f) => f.id === id);
   if (!file?.url) {
     toast(t('files.empty'));
     return;
   }
+  if (/^https?:\/\//.test(file.url)) {
+    window.open(file.url, '_blank', 'noopener');
+    return;
+  }
   try {
+    // `window.open` no puede adjuntar `X-Hub-Session`: el fichero local protegido se obtiene como
+    // blob con el fetch autenticado y solo ese object URL temporal llega al navegador.
     const response = await fetch(`${RUNTIME_URL}${file.url}`, { headers: runtimeHeaders() });
     if (!response.ok) throw new Error(String(response.status));
-    const savedTo = await saveDownload(file.name, await response.blob());
-    if (savedTo) toast(t('download.savedTo', { path: savedTo }));
-  } catch (error) {
-    toast(t(saveDownloadMessageKey(error)));
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = file.name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+  } catch {
+    toast(t('files.openError'));
   }
 }
 
@@ -338,6 +339,22 @@ async function onCreateFolder(e: Event): Promise<void> {
   if (ok) await load(selected);
 }
 
+async function onMove(e: Event): Promise<void> {
+  if (!isAdmin.value) {
+    toast(t('files.permissionDenied'));
+    return;
+  }
+  const { from, to } = (e as CustomEvent<{ from: string; to: string }>).detail;
+  if (from === to) return;
+  const ok = await moveMedia(from, to);
+  toast(ok ? t('files.moveSuccess') : t('files.moveError'));
+  if (!ok) return;
+  // Si movimos la carpeta en la que estamos (o algo dentro de la vista actual), recargamos la
+  // carpeta actual; si movimos la propia carpeta activa a otra parte, subimos a su padre.
+  const movedCurrent = from === selected || from.startsWith(`${selected}/`);
+  await load(movedCurrent ? parentOf(from) : selected);
+}
+
 onMounted(async () => {
   const el = fmEl.value;
   if (el) {
@@ -349,6 +366,7 @@ onMounted(async () => {
     el.addEventListener('ok-delete', onDelete as EventListener);
     el.addEventListener('ok-rename', onRename as EventListener);
     el.addEventListener('ok-create-folder', onCreateFolder as EventListener);
+    el.addEventListener('ok-move', onMove as EventListener);
   }
   await load('');
 });
@@ -364,6 +382,7 @@ onBeforeUnmount(() => {
   el.removeEventListener('ok-delete', onDelete as EventListener);
   el.removeEventListener('ok-rename', onRename as EventListener);
   el.removeEventListener('ok-create-folder', onCreateFolder as EventListener);
+  el.removeEventListener('ok-move', onMove as EventListener);
 });
 </script>
 

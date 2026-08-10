@@ -36,6 +36,9 @@ export interface MediaFolder {
   count?: number;
   /** Sub-carpetas. */
   children?: MediaFolder[];
+  /** Carpeta de solo lectura (reservada del hub o de un módulo que no opta en `user_actions`):
+   *  no se puede arrastrar, ni renombrar, ni recibir drops. La calcula el runtime (ADR-0172). */
+  readOnly?: boolean;
 }
 
 /** Fichero del contenido de la carpeta actual. Shape directo de `OkFmFile`. */
@@ -212,6 +215,25 @@ export async function createMediaFolder(parent: string, name: string): Promise<b
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ parent, name }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Mueve un fichero o carpeta de `from` a `to` vía `POST /api/media/move` (ADR-0172).
+ * El runtime valida que el origen pueda modificarse (sacarlo = delete) y el destino recibir
+ * escritura (meterlo = upload): las carpetas de solo lectura no se mueven ni reciben drops.
+ * `to` es la carpeta destino (relativa a `media/`; `''` = raíz). Devuelve `true` si se movió.
+ */
+export async function moveMedia(from: string, to: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/media/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ from, to }),
     });
     return res.ok;
   } catch {
