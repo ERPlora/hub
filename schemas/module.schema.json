@@ -877,6 +877,54 @@
           "description": "Core más NUEVO contra el que el autor probó. Documental: el hub lo parsea y NO lo aplica. Aplicarlo rechazaría un módulo VIEJO en un hub NUEVO, y que esa dirección funcione es justo lo que permite actualizar el hub sin mover los 24 módulos el mismo día."
         }
       }
+    },
+    "protects": {
+      "type": "array",
+      "description": "Guardias de RUTA que este módulo declara sobre la superficie de OTRO módulo (hub#775). El caso canónico es `cash_register`: mientras `enable_cash_register` está on y la ruta de `protected_pos_url` (servida por `sales`) está en juego, ninguna venta puede completarse si `cash_register.current_session` no devuelve ninguna fila (la caja está cerrada). El runtime PARSEA este bloque y lo aplica de forma AUTORITATIVA en el dispatcher de commands (la mitad en la que el shell no se puede confiar): un cliente manipulado, un flow o un `POST /api/command` directo no pueden saltarse el guard. El shell además renderiza `component` (p. ej. `erp-cashregister-open`) en vez de montar el módulo en esa ruta. Cross-módulo a propósito: el módulo que declara el guard no necesita `depends_on` del que protege — protege una RUTA, y el dispatcher saca el módulo protegido de `route_setting`.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "settings_query",
+          "enabled_setting",
+          "route_setting",
+          "guard_query",
+          "expect",
+          "component",
+          "resume_on"
+        ],
+        "properties": {
+          "settings_query": {
+            "type": "string",
+            "description": "Query (del módulo que declara el guard) que devuelve la fila de SETTINGS que lleva `enabled_setting` y `route_setting`. Se resuelve en contexto de sistema: mismo `hub_id`, sin re-check de permiso — el guard es un contrato del módulo, no una acción de usuario (misma regla que `reads`, ADR-0069 §1 regla 2)."
+          },
+          "enabled_setting": {
+            "type": "string",
+            "description": "La columna booleana en esa fila de settings que ARMA el guard. `false` o ausente → el guard está dormido (un hub que no ha activado la caja vende como siempre)."
+          },
+          "route_setting": {
+            "type": "string",
+            "description": "La columna cuyo valor es la RUTA protegida (`/m/sales`). El dispatcher saca de ahí el módulo al que aplica el guard; el shell pinta `component` en vez de montar el módulo en esa ruta."
+          },
+          "guard_query": {
+            "type": "string",
+            "description": "Query (del módulo que declara el guard) cuyas filas deciden si la precondición se cumple. Mismo contexto de sistema que `settings_query`."
+          },
+          "expect": {
+            "type": "string",
+            "enum": ["non_empty"],
+            "description": "Qué debe devolver `guard_query` para que la precondición se cumpla. Hoy solo `non_empty` (hay al menos una sesión abierta)."
+          },
+          "component": {
+            "type": "string",
+            "description": "Web Component del shell a renderizar EN VEZ del módulo protegido mientras la precondición no se cumpla (p. ej. `erp-cashregister-open`). Lo transporta el snapshot del manifest, no lo ejecuta el runtime."
+          },
+          "resume_on": {
+            "type": "string",
+            "description": "Evento que el shell escucha para RE-MONTAR el módulo protegido sin recarga manual (p. ej. `cash_register.session_opened`). Lo transporta el shell, no lo consume el runtime."
+          }
+        }
+      }
     }
   },
   "$defs": {

@@ -2920,6 +2920,12 @@ pub(crate) fn err_status_and_code(
         // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling
         // into the generic `400 {code:"error"}` bucket would have made the whole chain undecidable.
         E::RequiresElevation { .. } => (StatusCode::FORBIDDEN, "requires_elevation".into()),
+        // hub#775: a `protects` guard refused the command because a precondition of the route is
+        // unmet (the drawer is closed). `409`: the request is well-formed and the caller is
+        // allowed, it conflicts with the hub's current state — same shape as the fiscal
+        // precondition and the demo locks. Its own code, never `permission_denied`: the action
+        // that resolves it is "open the drawer", not "ask the manager".
+        E::ProtectsGuard { .. } => (StatusCode::CONFLICT, "protects_guard".into()),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".into()),
         _ => (StatusCode::BAD_REQUEST, "error".into()),
     }
