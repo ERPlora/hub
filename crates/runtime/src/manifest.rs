@@ -657,7 +657,8 @@ pub struct Agent {
 /// ```json
 /// "reads": [
 ///   "taxes.rules.list",
-///   { "query": "inventory.products.unit_of", "params": { "product_id": "payload.product_id" } }
+///   { "query": "inventory.products.unit_of", "params": { "product_id": "payload.product_id" } },
+///   { "query": "taxes.rules.list", "required": true }
 /// ]
 /// ```
 ///
@@ -671,16 +672,27 @@ pub struct Agent {
 /// Los valores de `params` referencian el **payload del command** (`payload.<campo>`). Solo eso:
 /// nada de expresiones ni de leer otras reads, para que el manifest siga siendo declarativo y
 /// auditable de un vistazo.
+///
+/// **`required`** (hub#701) es opt-in y solo vive en la forma objeto. El defecto sigue siendo el
+/// fallo GRACEFUL (regla 3 de ADR-0069): una read que no resuelve se omite y el handler degrada —
+/// cobrar es lo último que puede romperse en un TPV. Pero una read de la que depende el IMPUESTO
+/// no puede admitir adivinar: si falla, el runtime aborta el command con `ReadUnavailable` en vez
+/// de entregarle al handler un catálogo vacío indistinguible de «este hub no tiene reglas». La
+/// forma string no puede ser `required` a propósito: el caso simple sigue siendo el caso graceful.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(untagged)]
 pub enum ReadDef {
-    /// `"taxes.rules.list"` — la query entera, sin filtrar.
+    /// `"taxes.rules.list"` — la query entera, sin filtrar. Nunca `required`.
     Query(String),
-    /// `{ "query": …, "params": { … } }` — filtrada por campos del payload.
+    /// `{ "query": …, "params": { … }, "required": bool }` — filtrada por campos del payload.
     Parameterized {
         query: String,
         #[serde(default)]
         params: HashMap<String, String>,
+        /// `true` ⇒ si la query falla, el command se ABORTA con `ReadUnavailable` en vez de
+        /// omitirse. Default `false`: el defecto sigue siendo graceful. Ver hub#701.
+        #[serde(default)]
+        required: bool,
     },
 }
 
@@ -709,6 +721,12 @@ impl ReadDef {
             }
         }
         out
+    }
+
+    /// ¿Esta read es obligatoria? Solo la forma objeto puede declararlo (hub#701); la forma
+    /// string es siempre graceful, como hasta ahora.
+    pub fn is_required(&self) -> bool {
+        matches!(self, ReadDef::Parameterized { required: true, .. })
     }
 }
 

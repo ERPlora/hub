@@ -152,6 +152,14 @@ pub enum RuntimeError {
     /// del core: el módulo (verifactu, B2B…) solo PIDE la operación, no ve el `.p12`.
     #[error("host.certificate: {0}")]
     Certificate(String),
+    /// A read marked `required` (ADR-0069, hub#701) could not be resolved — the module that owns
+    /// it is absent, inactive, or the query itself failed. Distinct from the GRACEFUL default
+    /// (regla 3 de ADR-0069): a `required` read aborts the command instead of letting the handler
+    /// degrade with a silent empty catalog. The canonical case is the tax catalog: without it a
+    /// handler cannot tell «this category has no rule» from «the catalog never arrived», and
+    /// guessing the rate is exactly what sales#21 prohibits.
+    #[error("required read `{query}` is unavailable — the command was aborted (hub#701)")]
+    ReadUnavailable { query: String },
     /// Fiscal precondition failed (hub#328, ADR-0203): a command whose SQL stamps the hub's
     /// business identity into a document (it references the injected `:business_tax_id` /
     /// `:business_legal_name` params — ADR-0061) cannot run while that identity is missing.

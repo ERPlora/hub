@@ -308,6 +308,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::Notify(_) => "notify",
         E::Storage(_) => "module_storage",
         E::Certificate(_) => "certificate",
+        // hub#701: a required read that cannot be resolved aborts the command. Its own code — not a
+        // flavour of `db` or `query_not_found` — so the TPV can tell «el catálogo fiscal no llegó»
+        // from a generic error and surface it with the query that faltó.
+        E::ReadUnavailable { .. } => "read_unavailable",
         E::FiscalPrecondition { .. } => "fiscal_precondition_failed",
         // hub#376: the SUBJECT is the stable code, one per demo lock — a client that only sees
         // `demo_locked` could not tell which of the three doors refused.
