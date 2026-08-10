@@ -764,6 +764,8 @@ const moduleInstallRows = computed<ReportRow[]>(() =>
       // frase traducida, que NOMBRA lo que hay que contratar (hub#409): decir «falló» a secas es
       // mandar a diagnosticar una avería que no existe.
       // Sin lista no hay frase: «necesita: .» no nombra nada — la etiqueta del estado ya lo dice.
+      // Y una versión SUSTITUIDA (hub#751/#752) entró bien, pero se dice: la plantilla anunciaba
+      // otra, y enterarse por un número distinto meses después es peor que leerlo ahora.
       reason:
         info.kind === 'blocked'
           ? info.blockedOn.length
@@ -771,7 +773,12 @@ const moduleInstallRows = computed<ReportRow[]>(() =>
                 missing: info.blockedOn.map((id) => blockedModuleLabel(id, info.purchase)).join(', '),
               })
             : undefined
-          : info.error,
+          : info.substitutedFor
+            ? t('importPage.reasonVersionSubstituted', {
+                requested: info.substitutedFor,
+                installed: m.version,
+              })
+            : info.error,
     };
   }),
 );

@@ -794,6 +794,12 @@ export interface ModuleInstallResult {
   purchase?: ModuleInstallPurchase[];
   /** Motivo real del motor — solo en `failed`. */
   error?: string;
+  /**
+   * The version the bundle pinned, present ONLY when it is not the one that got installed
+   * (hub#751/#752): the marketplace had already pruned it and the engine fell back to the newest
+   * compatible one. Absent = the pin was honoured exactly.
+   */
+  requested_version?: string;
 }
 
 /** Estado normalizado de UN módulo del informe de import, listo para pintar. */
@@ -805,6 +811,12 @@ export interface ModuleInstallStatusInfo {
   purchase: ModuleInstallPurchase[];
   /** Motivo del motor — solo en `failed`. */
   error?: string;
+  /**
+   * La versión que pedía la plantilla, cuando NO es la que se instaló (hub#751/#752). Se pinta:
+   * una plantilla que instala en silencio otra versión de la que anuncia es justo la sorpresa que
+   * la sustitución evita.
+   */
+  substitutedFor?: string;
 }
 
 /**
@@ -817,7 +829,7 @@ export interface ModuleInstallStatusInfo {
  */
 export function moduleInstallStatusInfo(m: ModuleInstallResult): ModuleInstallStatusInfo {
   if (m.status === 'installed' || m.status === 'already_installed') {
-    return { kind: m.status, blockedOn: [], purchase: [] };
+    return { kind: m.status, blockedOn: [], purchase: [], substitutedFor: m.requested_version };
   }
   if (m.status === 'blocked') {
     return { kind: 'blocked', blockedOn: m.blocked_on ?? [], purchase: m.purchase ?? [] };

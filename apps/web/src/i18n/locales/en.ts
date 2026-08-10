@@ -199,6 +199,10 @@ export default {
       // where, instead of painting a red error over a plan the owner simply has not bought.
       blocked: 'These have to be added to your plan first: {apps}',
       failed: 'Something else did not go in. You can see the detail and try again in Settings › Data.',
+      // hub#751 — the card already knows WHICH apps broke, so it names them: «something else» sent
+      // a hairdresser to hunt for a needle. The generic line above is left for the case where the
+      // failure is not an app and no name would mean anything to her.
+      failedApps: 'These did not go in: {apps}. You can see the detail and try again in Settings › Data.',
       notStartedTitle: 'That template could not be opened',
       notStartedBody: 'Nothing changed in your business. Try again, or load it from Settings › Data.',
       interruptedTitle: 'The set-up did not finish',
@@ -1136,6 +1140,10 @@ export default {
     reasonBlocked:
       'Not installed: it needs modules you have not subscribed to yet: {missing}. Subscribe to them and import again — nothing else was touched.',
     mediaFailed: '{n} not copied',
+    // hub#751/#752 — the template names a version the marketplace no longer publishes, so a newer
+    // compatible one went in. It installed fine; it is said out loud because a template that
+    // quietly installs something other than what it announces is the surprise this avoids.
+    reasonVersionSubstituted: 'The template asked for {requested}; that version is no longer available, so {installed} went in.',
     // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
     // identity of ONE hub: only that hub restoring its own backup gets them back.
     reasonIdentityNotPortable:

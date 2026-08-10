@@ -64,6 +64,29 @@ describe('moduleInstallStatusInfo · states the engine reports', () => {
     expect(info.purchase).toEqual([]);
   });
 
+  // hub#751/#752 — the template pinned a version the marketplace had already pruned, so the
+  // engine installed the newest compatible one instead. That is a success, but NOT a silent one:
+  // a template that installs something other than what it announces is exactly the surprise the
+  // substitution exists to avoid, so the entry has to carry the version that was asked for.
+  it('a substituted version is installed AND names the version the template asked for', () => {
+    const info = moduleInstallStatusInfo({
+      id: 'sales',
+      version: '2.13.10',
+      status: 'installed',
+      requested_version: '2.12.8',
+    });
+
+    expect(info.kind).toBe('installed');
+    expect(info.substitutedFor).toBe('2.12.8');
+  });
+
+  it('an exact install has nothing to substitute and says nothing', () => {
+    const info = moduleInstallStatusInfo({ id: 'sales', version: '2.13.10', status: 'installed' });
+
+    expect(info.kind).toBe('installed');
+    expect(info.substitutedFor).toBeUndefined();
+  });
+
   // Same honesty rule as `sectionStatusInfo`: an unknown shape falls back to a failure, never to
   // an invented success.
   it('an unknown status falls back to failed without inventing a success', () => {
