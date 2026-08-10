@@ -724,6 +724,11 @@ export const SECTION_DISCARD_CODES = [
   'identity_not_portable',
   'settings_not_portable',
   'roles_not_activatable',
+  // ADR-0273 D8 / hub#560. El runtime lo emitía desde entonces y esta lista no lo conocía, así que
+  // la fila del informe enseñaba la cadena cruda.
+  'system_table_not_portable',
+  // hub#753 — la serie de facturación y el libro de números ya entregados son de UNA instalación.
+  'numbering_not_portable',
 ] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */
