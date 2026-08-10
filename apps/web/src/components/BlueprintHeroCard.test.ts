@@ -38,7 +38,15 @@ vi.mock('../lib/nav', () => ({ refreshModuleNav: (...a: unknown[]) => refreshMod
 
 // A real `ref`: the card reads the permission of ADR-0248 off the session the runtime resolved.
 const { session } = vi.hoisted(() => ({ session: { value: null as { permissions?: string[] } | null } }));
-vi.mock('../lib/session', () => ({ user: session }));
+// PARTIAL mock: `user` is stubbed, but `permissionsInclude` must stay REAL. Since hub#506 the
+// wildcard rule lives in exactly one place and `blueprint-hero.ts` imports it from here — a mock
+// that only returns `user` makes it `undefined` and every test in this file dies on the first
+// computed. Stubbing it too would be worse: the point of hub#506 is that there is ONE rule, and a
+// second copy in a test is how the four copies it deleted got there.
+vi.mock('../lib/session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/session')>()),
+  user: session,
+}));
 vi.mock('../lib/hub-settings', () => ({ hubSettings: { value: { country_code: 'ES', language: 'es' } } }));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
