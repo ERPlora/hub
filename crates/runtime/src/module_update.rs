@@ -209,7 +209,10 @@ where
 
 /// `X.Y.Z` → comparable. Devuelve `None` para cualquier otra cosa, que el llamante trata como
 /// «no se puede comparar» en vez de como cero.
-fn parse(version: &str) -> Option<(u64, u64, u64)> {
+/// `pub(crate)` because the update history compares the CORE's versions with the same rule
+/// (hub#564): the number that decides "this is a rollback, not an update" cannot be a second,
+/// slightly different parser, or the two would eventually disagree about the same jump.
+pub(crate) fn parse(version: &str) -> Option<(u64, u64, u64)> {
     let mut parts = version.split('.');
     let major = parts.next()?.parse().ok()?;
     let minor = parts.next()?.parse().ok()?;

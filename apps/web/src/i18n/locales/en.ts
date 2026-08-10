@@ -782,8 +782,22 @@ export default {
     stepInstall: 'Install',
     stepPair: 'Pair',
     stepConfigure: 'Configure',
-    updatesManaged: 'Managed updates',
     updatesCloudHint: 'This web Hub is updated automatically as part of service deployments.',
+    // What we changed on this hub, and from which version (hub#564, ADR-0269 §3.5). We update
+    // without asking, so the least we owe is that the owner can find out WHAT changed. Every
+    // sentence below names an app the way they know it and a version they can compare — never a
+    // digest, never «the image», and never a changelog we made up.
+    updateHistory: "What we've updated",
+    updatesRunning: 'Running {version}',
+    noUpdates: 'Nothing has changed',
+    noUpdatesHint: "We haven't updated anything on this hub recently. When we do, it will show up here.",
+    today: 'Today',
+    yesterday: 'Yesterday',
+    // A rollback is an entry of its own and says so in those words: which version it went back to.
+    // The error behind it is deliberately not shown — it is written for us, not for whoever is
+    // opening the shop.
+    rolledBackTo: 'Went back to {version}: the new one did not start',
+    updateLost: 'This app is not running: we are on it',
     documents: 'Documents',
     noDocuments: 'No documents',
     noDocumentsBucket: "This hub's storage bucket is empty.",

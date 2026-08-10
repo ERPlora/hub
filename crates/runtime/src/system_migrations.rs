@@ -1112,6 +1112,49 @@ CREATE TABLE IF NOT EXISTS _hub_activity (\
   updated_at TEXT NOT NULL, \
   PRIMARY KEY (hub_id));",
     },
+    // ── v40 — hub#564 / ADR-0269 §3.5: `_update_history`, what we changed and from which version ─
+    // We update on our own, without asking. The counterpart is that the owner can find out WHAT we
+    // changed — and that answer cannot be derived from anywhere else: the hub knows its current
+    // version and each module's current version, and a current state cannot be subtracted from
+    // itself to produce a history. The transition has to be written down WHEN it happens.
+    //
+    // One row per **component** (`hub` | `module`), not a `hub_module_update`: the screen puts
+    // `ERPlora 1.1.3 → 1.1.4` and `Inventory 1.1.1 → 1.1.2` on the same list, so a module-only
+    // table would be the wrong shape with its correction migration already behind it (the reason
+    // hub#516 deliberately did not build it).
+    //
+    // `name` is stored, not joined: it is what the owner reads ("Inventory", not `inventory` —
+    // ADR-0254), and it has to survive the module being uninstalled. A history that degrades into
+    // ids the moment an app is removed is a history about us, not about them.
+    //
+    // `outcome = 'baseline'` is bookkeeping, never shown: the first version we ever see is not a
+    // change, but without it the NEXT jump would have no `from`, and `from` is half the value.
+    //
+    // ⚠️ v40, and it was born v39: hub#670 landed `_hub_activity` on that number while this
+    // branch was in flight, so it was renumbered at rebase time. `apply` aborts loudly on a
+    // catalogue entry at or below the maximum applied version — but only once a hub already
+    // carries the higher number, which is far too late to notice. Re-check it against
+    // `origin/develop` at push time (hub#573); do not remember it.
+    SystemMigration {
+        version: 40,
+        name: "update_history",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _update_history (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, \
+  component TEXT NOT NULL, component_id TEXT NOT NULL DEFAULT '', \
+  name TEXT NOT NULL DEFAULT '', \
+  from_version TEXT NOT NULL DEFAULT '', to_version TEXT NOT NULL, \
+  outcome TEXT NOT NULL DEFAULT 'updated', reason TEXT NOT NULL DEFAULT '', \
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  deleted_at TEXT, deleted_by TEXT, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_update_history_recent \
+  ON _update_history (hub_id, created_at);\
+CREATE INDEX IF NOT EXISTS ix_update_history_component \
+  ON _update_history (hub_id, component, component_id, created_at);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2721,13 +2764,13 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        // 36 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
+        // 37 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
         // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731) + `_flow_approvals` (v38, hub#665) +
-        // `_hub_activity` (v39, hub#670). El número está a mano a propósito: añadir una migración
-        // de sistema tiene que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el
-        // catálogo entero antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan
-        // el mismo número, como pasó en esta ola: hub#731 y hub#665 pidieron las dos el v37 y esta
-        // se corrió al v38 al mergear.
-        assert_eq!(MIGRATIONS.len(), 36, "el catálogo cambió de tamaño");
+        // `_hub_activity` (v39, hub#670) + `_update_history` (v40, hub#564). El número está a mano a
+        // propósito: añadir una migración de sistema tiene que ser un gesto CONSCIENTE, y este
+        // assert es lo que obliga a mirar el catálogo entero antes de tocarlo — que es justo lo que
+        // evita que dos ramas en vuelo pidan el mismo número, como pasó en esta ola: hub#731 y
+        // hub#665 pidieron las dos el v37, y hub#670 y hub#564 pidieron las dos el v39.
+        assert_eq!(MIGRATIONS.len(), 37, "el catálogo cambió de tamaño");
     }
 }

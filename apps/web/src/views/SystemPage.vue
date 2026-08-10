@@ -180,18 +180,53 @@
         <PlanLimitsPanel />
       </template>
 
-      <!-- ── Tab: Actualizaciones ───────────────────────────────── -->
+      <!-- ── Tab: Actualizaciones ───────────────────────────────────────────────────────────
+           Qué le hemos cambiado a este hub y desde qué versión (hub#564, ADR-0269 §3.5).
+           SOLO LECTURA a propósito: actualizamos sin preguntar, así que aquí no hay ningún
+           control de update del hub —el botón del dueño se retiró porque contradice ADR-0269—,
+           solo el derecho a SABER. Y solo lo que cambió: un día sin cambios no es una fila que
+           diga «sin cambios», es nada. -->
       <template v-else-if="tab === 'updates'">
         <ion-card class="ion-no-margin">
-          <ion-card-content class="updates-center">
-            <HubIcon name="information-circle-outline" class="updates-icon" />
-            <strong class="updates-title">{{ t('system.updatesManaged') }}</strong>
-            <p class="updates-meta">
-              Hub {{ info?.hubVersion ?? '—' }}
-            </p>
-            <p class="muted-note updates-hint">
-              {{ t('system.updatesCloudHint') }}
-            </p>
+          <ion-card-content>
+            <div class="block-header">
+              <h3 class="block-header__title">{{ t('system.updateHistory') }}</h3>
+              <ok-status-pill tone="info">{{ t('system.updatesRunning', { version: info?.hubVersion ?? '—' }) }}</ok-status-pill>
+            </div>
+            <p class="muted-note updates-hint">{{ t('system.updatesCloudHint') }}</p>
+
+            <!-- Un hub al que no le hemos cambiado nada dice justo eso, y no una lista de 24
+                 módulos «sin cambios»: el ruido se deja de leer. -->
+            <ok-empty-state
+              v-if="!historyGroups.length"
+              icon="checkmark-circle-outline"
+              :heading="t('system.noUpdates')"
+              :message="t('system.noUpdatesHint')"
+            />
+            <div v-else class="history">
+              <section v-for="group in historyGroups" :key="group.key" class="history-day">
+                <!-- Un grupo sin fecha legible no lleva titular: mejor ninguno que uno vacío o,
+                     peor, un «Invalid Date». Lo que cambió sigue siendo cierto sin el cuándo. -->
+                <h4 v-if="group.isToday || group.isYesterday || group.label" class="history-day__title">
+                  {{ group.isToday ? t('system.today') : group.isYesterday ? t('system.yesterday') : group.label }}
+                </h4>
+                <ul class="history-list">
+                  <li v-for="(item, i) in group.entries" :key="`${group.key}-${i}`" class="history-item">
+                    <span class="history-item__time">{{ item.time }}</span>
+                    <span class="history-item__name">{{ item.name }}</span>
+                    <span class="history-item__jump">{{ versionJump(item) }}</span>
+                    <!-- Una vuelta atrás se dice con esas palabras. El error que la causó NO se
+                         pinta: es texto de desarrollo, y lo que hay que leer aquí es la frase. -->
+                    <span v-if="item.outcome === 'rolled_back'" class="history-item__note">
+                      {{ t('system.rolledBackTo', { version: item.to }) }}
+                    </span>
+                    <span v-else-if="item.outcome === 'lost'" class="history-item__note history-item__note--bad">
+                      {{ t('system.updateLost') }}
+                    </span>
+                  </li>
+                </ul>
+              </section>
+            </div>
           </ion-card-content>
         </ion-card>
       </template>
@@ -320,6 +355,12 @@ import {
 import { dataTableLabels } from '../lib/data-table-labels';
 import { listInstalledModules, type InstalledModule } from '../lib/runtime';
 import {
+  fetchUpdateHistory,
+  groupByDay,
+  versionJump,
+  type UpdateHistoryEntry,
+} from '../lib/update-history';
+import {
   isLegacyBackupsHash,
   resolveSystemTab,
   type SystemTab as Tab,
@@ -386,6 +427,11 @@ const hardware = ref<BridgeStatus>({ online: false });
 // not been able to ask», which is a different answer from «no» and is never dressed up as one.
 const printerProbe = ref<BridgeStatus | null>(null);
 const installedModules = ref<InstalledModule[] | null>(null);
+
+// Qué le hemos cambiado a este hub (hub#564). Vacío es una respuesta legítima y frecuente: la
+// mayoría de los hubs, la mayoría de los días, no han cambiado de versión.
+const updateHistory = ref<UpdateHistoryEntry[]>([]);
+const historyGroups = computed(() => groupByDay(updateHistory.value, new Date(), locale.value));
 
 // Are we inside `com.erplora.app`? It changes what there is left to do about a printer, and what
 // this screen is allowed to offer (hub#480). Read once: it cannot change while the page is open.
@@ -613,9 +659,22 @@ async function loadSystemInfo(): Promise<void> {
   applyTableLabels();
 }
 
+/**
+ * El historial de actualizaciones, en el idioma del que mira: los nombres de los módulos los
+ * traduce el runtime con el locale que se le pide, así que un cambio de idioma lo vuelve a pedir.
+ */
+async function loadUpdateHistory(): Promise<void> {
+  updateHistory.value = await fetchUpdateHistory(locale.value);
+}
+
+watch(locale, () => {
+  void loadUpdateHistory();
+});
+
 onMounted(() => {
   void refreshHardware();
   void loadSystemInfo();
+  void loadUpdateHistory();
 });
 </script>
 
@@ -742,30 +801,70 @@ onMounted(() => {
 }
 
 /* ── Pestaña Actualizaciones ── */
-.updates-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 48px 24px;
-  text-align: center;
-}
-.updates-icon {
-  font-size: 48px;
-  color: var(--ion-color-primary);
-}
-.updates-title {
-  font-size: 1.125rem;
-}
-.updates-meta {
-  margin: 0;
-  opacity: 0.6;
-  font-family: monospace;
-  font-size: 0.8125rem;
-}
 .updates-hint {
   max-width: 36rem;
-  text-align: center;
+  margin: 0 0 16px;
+}
+
+/* Historial (hub#564). Cada día es un bloque y cada cambio una línea; en pantalla estrecha la
+   línea se apila para que el nombre del negocio y el salto de versión nunca se recorten. */
+.history-day + .history-day {
+  margin-top: 20px;
+}
+.history-day__title {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.history-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ion-color-step-150, rgba(0, 0, 0, 0.08));
+}
+.history-item__time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  opacity: 0.6;
+}
+.history-item__name {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.history-item__jump {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.history-item__note {
+  grid-column: 2 / -1;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+.history-item__note--bad {
+  color: var(--ion-color-danger);
+  opacity: 1;
+}
+
+/* Móvil: la hora pasa a su propia fila y el salto de versión cae bajo el nombre. */
+@media (max-width: 480px) {
+  .history-item {
+    grid-template-columns: auto 1fr;
+  }
+  .history-item__jump {
+    grid-column: 2;
+  }
 }
 
 .system-feedback {
