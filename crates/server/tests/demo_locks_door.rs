@@ -58,8 +58,12 @@ fn config(hub_id: &str, demo: bool, tag: &str) -> HubConfig {
 async fn fixture(demo: bool, tag: &str) -> (axum::Router, String) {
     let hub_id = "hub-demo";
     let db = fresh_db().await;
-    let rt = Runtime::with_hub_id(Box::new(db), hub_id);
+    let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
     rt.ensure_system_tables().await.unwrap();
+    // Arranca como arranca en producción (hub#684): un hub de demo se siembra su identidad fiscal
+    // y un hub real NO. Sin esto los tests de abajo probarían un estado que no existe.
+    rt.set_demo_hub(demo);
+    rt.ensure_demo_fiscal_identity().await.unwrap();
     let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
     let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
     let state = AppState::with_config(rt, config(hub_id, demo, tag));
@@ -127,7 +131,98 @@ async fn a_demo_refuses_to_write_the_fiscal_identity_over_http() {
         "el cliente tiene que poder distinguir CUÁL de los tres cierres se negó: {body}"
     );
 
-    // Y no se escribió: la lectura sigue vacía.
+    // Y no se escribió: la demo conserva la identidad con la que ARRANCÓ (hub#684). Antes aquí se
+    // afirmaba que seguía vacía; ahora la demo nace con la suya puesta y lo que este test fija es
+    // que el 409 no la mueve — el cierre sigue siendo un cierre, no un hueco.
+    let read = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/settings")
+                .header("x-hub-session", &admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let settings = body_json(read).await;
+    assert_eq!(
+        settings["business_tax_id"],
+        json!(erplora_runtime::settings::DEMO_BUSINESS_TAX_ID)
+    );
+    assert_eq!(
+        settings["business_legal_name"],
+        json!(erplora_runtime::settings::DEMO_BUSINESS_LEGAL_NAME)
+    );
+}
+
+/// 🔴 **Las DOS mitades de hub#684, en la misma prueba.** La demo arranca con identidad fiscal —así
+/// la checklist no le pide al visitante lo único que el producto le prohíbe, y su venta llega a
+/// emitir documento— **y los tres cierres siguen puestos**. Si un día alguien "arregla" la demo
+/// abriendo el cierre en vez de sembrar el dato, este test se cae.
+#[tokio::test]
+async fn the_demo_boots_with_an_identity_and_still_refuses_to_let_anyone_change_it() {
+    let (router, admin) = fixture(true, "seeded").await;
+
+    // (a) La identidad está puesta: es lo que lee el gate fiscal de ADR-0203 y lo que la checklist
+    //     marca como hecho. Sin ella, `invoice.create_from_sale` moría en el outbox.
+    let read = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/settings")
+                .header("x-hub-session", &admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let settings = body_json(read).await;
+    assert!(
+        !settings["business_tax_id"].as_str().unwrap_or_default().is_empty(),
+        "una demo arranca con NIF: {settings}"
+    );
+    assert!(
+        !settings["business_legal_name"].as_str().unwrap_or_default().is_empty(),
+        "…y con razón social: {settings}"
+    );
+
+    // (b) …y sigue siendo de solo lectura. Sembrar el dato NO es abrir la puerta.
+    let response = put(
+        &router,
+        "/api/settings",
+        &admin,
+        json!({ "business_tax_id": "B12345678" }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        error_code(&body_json(response).await),
+        "demo_fiscal_identity_locked"
+    );
+
+    // (c) …y el certificado propio sigue cerrado. Es uno de los dos cierres que de verdad impiden
+    //     que una venta de la demo llegue a la AEAT real, y no se ha tocado.
+    let response = put(
+        &router,
+        "/api/business/certificate",
+        &admin,
+        json!({ "pkcs12_b64": "Zm9v", "password": "x" }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        error_code(&body_json(response).await),
+        "demo_business_certificate_locked"
+    );
+}
+
+/// 🔴 La otra dirección de hub#684: **un hub REAL nace con la identidad VACÍA**. Es su ⛔ pendiente
+/// y el dueño tiene que resolverlo; un NIF que apareciese solo se congelaría en el primer registro
+/// (ADR-0273) y el negocio facturaría con una identidad que no es la suya.
+#[tokio::test]
+async fn a_real_hub_is_never_handed_a_fiscal_identity_at_boot() {
+    let (router, admin) = fixture(false, "real-empty").await;
     let read = router
         .clone()
         .oneshot(

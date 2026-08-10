@@ -546,6 +546,86 @@ fn enforce_demo_fiscal_identity_lock(
     Ok(())
 }
 
+/// The tax id a DEMO hub boots with (hub#684).
+///
+/// All-zero on purpose. It has the shape of a Spanish CIF —letter + 7 digits + a control digit that
+/// checks out for `0000000`— so every screen, document and validator downstream treats it as the
+/// real thing, and **no company has it**: sequential numbering never issues the zero. A random
+/// plausible-looking tax id would eventually be somebody's.
+pub const DEMO_BUSINESS_TAX_ID: &str = "B00000000";
+/// The legal name a DEMO hub boots with. It says *demo* out loud: it is printed on every ticket the
+/// visitor makes, and that ticket has to be readable as an example, not as a real business's.
+pub const DEMO_BUSINESS_LEGAL_NAME: &str = "ERPlora Demo SL";
+/// The address a DEMO hub boots with. Not part of the fiscal gate (`business_address` is not in
+/// [`FISCAL_IDENTITY_SETTINGS`]) and not locked either — it is here so the demo's ticket is a
+/// COMPLETE document instead of one with a blank where the address goes.
+pub const DEMO_BUSINESS_ADDRESS: &str = "Calle de la Demo 1, 28013 Madrid";
+
+/// `updated_by` of the rows this writes: the core did it, no user did.
+const DEMO_IDENTITY_AUTHOR: &str = "system:demo";
+
+/// **A DEMO hub boots with its fiscal identity already filled in** (hub#684).
+///
+/// The onboarding checklist and the fiscal gate read the SAME two settings
+/// (`business_legal_name` ∧ `business_tax_id`), and in a demo both were empty and both had to stay
+/// empty: [`enforce_demo_fiscal_identity_lock`] refuses the only door that writes them. The visitor
+/// was therefore shown a ⛔ *"you need this in order to invoice"* whose button led to a `409`, and
+/// —the expensive half— **their sale went through and the invoice did not**:
+/// `invoice.create_from_sale` stamps `:business_tax_id`, so `commands::enforce_fiscal_precondition`
+/// rejected it and the document died in the outbox. Money taken, nothing issued.
+///
+/// The fix is to put the data there, and it has to be *that* rather than any of the shortcuts:
+///
+/// * **Hiding the item** would make the checklist lie — the gate still refuses, so the first sale
+///   would fail with `fiscal_precondition_failed` and no screen would have warned anybody. The
+///   invariant of [`crate::setup_status`] («the checklist and the gate must answer identically»)
+///   exists for exactly this.
+/// * **Exempting the demo from the fiscal precondition** would open a third hole in the one gate
+///   that stops a hub selling without registering, to save writing two rows.
+///
+/// With the rows written, nothing else has to know: the item is done because it IS done, the gate
+/// passes because it has what it asks for, and `setup_status` never learns what a demo is.
+///
+/// ⚠️ **This does not open any of the three closures of ADR-0197 §4.** It is the core writing the
+/// demo's own placeholder at boot, not a door: the visitor still cannot CHANGE the identity
+/// (`demo_fiscal_identity_locked`), still cannot upload an `own` certificate
+/// (`demo_business_certificate_locked`) and is still pinned to `testing`
+/// (`demo_fiscal_environment_locked`) — which is what keeps a demo sale away from the real AEAT.
+///
+/// **Never overwrites.** Only an EMPTY key is filled, so a demo that got an identity another way (a
+/// blueprint of its own, a restore) keeps it — a default must not outrank a decision. Returns
+/// whether it wrote anything, so the boot can say so once instead of every time.
+pub async fn ensure_demo_fiscal_identity(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    let defaults = [
+        ("business_tax_id", DEMO_BUSINESS_TAX_ID),
+        ("business_legal_name", DEMO_BUSINESS_LEGAL_NAME),
+        ("business_address", DEMO_BUSINESS_ADDRESS),
+    ];
+    let now = now_rfc3339();
+    let mut wrote = false;
+    for (key, value) in defaults {
+        if !stored_value(db, hub_id, key).await?.trim().is_empty() {
+            continue;
+        }
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("key".into(), json!(key));
+        p.insert("value".into(), json!(value));
+        p.insert("now".into(), json!(now));
+        p.insert("updated_by".into(), json!(DEMO_IDENTITY_AUTHOR));
+        db.execute(
+            "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+              VALUES (:hub_id, :key, :value, :now, :updated_by) \
+              ON CONFLICT (hub_id, key) DO UPDATE SET \
+                value = :value, updated_at = :now, updated_by = :updated_by",
+            &p,
+        )
+        .await?;
+        wrote = true;
+    }
+    Ok(wrote)
+}
+
 /// El valor **persistido** de una clave (ya normalizado por su `validate`), o `""` si no hay fila.
 ///
 /// Lectura de una sola clave, sin construir el mapa completo de [`get_all`]: la usa el congelado de
@@ -1475,6 +1555,83 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Europe::Lisbon);
+    }
+
+    // ── The DEMO boots with its fiscal identity ALREADY filled in (hub#684) ───────────────
+    //
+    // The checklist and the fiscal gate read the SAME two settings, so the only way to clear the
+    // demo's ⛔ without making one of them lie is to put the data there for real.
+
+    /// 🔴 A demo hub is handed a fiscal identity at boot, so the gate of ADR-0203 has something to
+    /// read and the ⛔ item is genuinely done — not hidden, not faked.
+    #[tokio::test]
+    async fn a_demo_hub_boots_with_its_fiscal_identity_already_filled_in() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        let seeded = ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap();
+        assert!(seeded, "the demo had nothing: the boot fills it in");
+
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!(DEMO_BUSINESS_TAX_ID));
+        assert_eq!(all["business_legal_name"], json!(DEMO_BUSINESS_LEGAL_NAME));
+        assert_ne!(all["business_address"], json!(""), "a demo ticket carries an address too");
+    }
+
+    /// Idempotent, and it never overwrites: re-running the boot is a no-op, and whatever the hub
+    /// already had is left exactly as it was.
+    #[tokio::test]
+    async fn seeding_the_demo_identity_never_overwrites_what_is_already_there() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        assert!(ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap());
+        // A second boot writes nothing…
+        assert!(!ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap());
+
+        // …and neither does it clobber an identity that got there another way (a blueprint of the
+        // hub's own, a restore). Whoever wrote it meant it more than a default does.
+        db.execute_batch(
+            "UPDATE hub_settings SET value = 'B99999999' \
+             WHERE hub_id = 'hub-1' AND key = 'business_tax_id';",
+        )
+        .await
+        .unwrap();
+        assert!(!ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap());
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!("B99999999"));
+    }
+
+    /// 🔴 The other direction, and the expensive one: a REAL hub is never handed an identity. A
+    /// paying business that found a tax id it never typed would invoice under it — and ADR-0273
+    /// freezes it at the first record, so the mistake would be permanent.
+    #[tokio::test]
+    async fn a_real_hub_is_never_handed_a_fiscal_identity() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        // The seeding function is demo-only by construction: the runtime gates it on `demo_hub`,
+        // and that gate is what this asserts — a real hub keeps its empty identity, which is the
+        // pending ⛔ its owner has to clear.
+        let rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-real");
+        rt.ensure_system_tables().await.unwrap();
+        assert!(!rt.is_demo_hub(), "the default of a runtime is a REAL hub");
+        assert!(!rt.ensure_demo_fiscal_identity().await.unwrap());
+        let all = get_all(rt.db(), "hub-real").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!(""));
+        assert_eq!(all["business_legal_name"], json!(""));
+        let _ = &db;
+    }
+
+    /// …and the demo half of the same door: the runtime DOES seed it when the marker is sealed.
+    #[tokio::test]
+    async fn the_runtime_seeds_the_identity_only_when_the_demo_marker_is_sealed() {
+        let mut rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-demo");
+        rt.ensure_system_tables().await.unwrap();
+        rt.set_demo_hub(true);
+        assert!(rt.ensure_demo_fiscal_identity().await.unwrap());
+        let all = get_all(rt.db(), "hub-demo").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!(DEMO_BUSINESS_TAX_ID));
     }
 
     #[tokio::test]

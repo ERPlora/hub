@@ -630,6 +630,23 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
     }
 
+    // **La DEMO arranca con su identidad fiscal ya puesta** (hub#684). Va AQUÍ, después del seed
+    // (que escribe el `country_code`) y ANTES del perfil fiscal, que es quien deriva `READY` de
+    // «identidad ∧ certificado»: sembrarla después dejaría el perfil calculado sobre un hub sin
+    // identidad hasta el siguiente arranque.
+    //
+    // Es el CORE escribiendo el marcador de posición de la demo, no una puerta: los tres cierres de
+    // ADR-0197 §4 siguen intactos — el visitante no puede CAMBIAR el NIF, ni subir un certificado
+    // `own`, ni salir de `testing`. Lo que se arregla es que la checklist le pedía justo el dato
+    // que el producto le prohibía escribir, y que su venta se cobraba sin llegar a emitir factura
+    // (`invoice.create_from_sale` estampa `:business_tax_id` y el gate de ADR-0203 la rechazaba).
+    match state.runtime.lock().await.ensure_demo_fiscal_identity().await {
+        Ok(true) => eprintln!("demo: identidad fiscal de la demo sembrada (hub#684)"),
+        Ok(false) => {}
+        // No aborta el arranque: un hub que no abre es peor que una demo con la checklist a medias.
+        Err(e) => eprintln!("✗ demo: no se pudo sembrar la identidad fiscal de la demo: {e}"),
+    }
+
     // **Perfil fiscal** (ADR-0273 D2/D4, hub#550): qué debe este hub, resuelto contra lo que hay
     // montado de verdad. Va AQUÍ y no junto a `ensure_system_tables` por dos razones que son la
     // misma: el registry ya está re-hidratado (así se sabe si queda algún proveedor del régimen) y

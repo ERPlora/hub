@@ -634,6 +634,20 @@ impl Runtime {
         self.registry.demo_hub
     }
 
+    /// Fills in the fiscal identity of a **DEMO** hub at boot (hub#684), and does nothing at all in
+    /// a real one. See [`settings::ensure_demo_fiscal_identity`] for why the demo needs the data
+    /// written rather than the checklist taught to look away.
+    ///
+    /// The `demo_hub` guard lives HERE, next to the marker the host seals, and not inside the
+    /// settings function: a real hub that woke up with a tax id it never typed would invoice under
+    /// it, and ADR-0273 freezes that id at the first record — the mistake would be permanent.
+    pub async fn ensure_demo_fiscal_identity(&self) -> Result<bool> {
+        if !self.registry.demo_hub {
+            return Ok(false);
+        }
+        settings::ensure_demo_fiscal_identity(self.db.as_ref(), &self.hub_id).await
+    }
+
     /// Cierra una puerta en un hub de demo (ADR-0197 §4). Devuelve el error con el SUJETO del
     /// cierre, para que el cliente sepa cuál de los tres se negó.
     fn refuse_if_demo(&self, lock: DemoLock) -> Result<()> {
