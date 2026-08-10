@@ -1155,6 +1155,45 @@ CREATE INDEX IF NOT EXISTS ix_update_history_recent \
 CREATE INDEX IF NOT EXISTS ix_update_history_component \
   ON _update_history (hub_id, component, component_id, created_at);",
     },
+    // ── v41 — hub#571: la copia PROPIA del `module.zip` de cada módulo instalado ──────────────
+    //
+    // Hub Cloud es **stateless a propósito** (`HUB_MODULE_CACHE=/tmp/module-cache`, sin volumen —
+    // así el contenedor se reprograma a cualquier worker). El precio era que un crash, un redeploy
+    // o un reschedule dejaba la caché de descargas vacía y la ÚNICA forma de recuperarla era volver
+    // al marketplace: con el SaaS caído, el hub arrancaba **sin un solo módulo** y el bar sin TPV.
+    //
+    // Esta tabla es la copia que sobrevive a eso. Va en la BD del hub y no en Object Storage a
+    // propósito: el hub **no tiene credenciales S3** (infra#44), así que su Object Storage se lee
+    // por el proxy `Hub→Cloud→S3` — es decir, por el SaaS, que es justo lo que puede estar caído.
+    // Su propia base es lo único duradero que no es el SaaS y que tampoco ata el contenedor a un
+    // nodo, y encima viaja con el hub si hay que restaurarlo en otra máquina.
+    //
+    // `zip_base64` y no BYTEA: los parámetros del adaptador son JSON (`Params = Map<String, Json>`),
+    // así que un binario solo viaja como texto — el mismo camino que ya usa el `.p12` fiscal. Un
+    // zip de módulo real pesa 100–400 KB, así que un hub completo son unos pocos MB toasteados.
+    //
+    // `sha256` + `signature_json` viajan CON los bytes porque la copia se repone por la MISMA
+    // puerta verificada que una descarga (`ModuleStore::install`): sin ellos habría que confiar en
+    // la fila, y una caché que confía en sí misma es una vía de carga de código sin verificar.
+    //
+    // Una fila por (hub, módulo): interesa la versión que corre, no el histórico.
+    //
+    // ⚠️ v41, y nació como v39: hub#670 (`_hub_activity`) se llevó el 39 y hub#564
+    // (`_update_history`) el 40 mientras esta rama estaba en vuelo — dos renumerados en el mismo
+    // día. `apply` aborta ruidosamente si una entrada del catálogo cae en o por debajo del máximo
+    // aplicado, pero solo cuando un hub ya lleva el número más alto, que es tardísimo para
+    // enterarse. Recompruébalo contra `origin/develop` en el push (hub#573); no lo recuerdes.
+    SystemMigration {
+        version: 41,
+        name: "hub_module_package",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS hub_module_package (\
+  hub_id TEXT NOT NULL, module_id TEXT NOT NULL, version TEXT NOT NULL, \
+  sha256 TEXT NOT NULL, signature_json TEXT, zip_base64 TEXT NOT NULL, \
+  stored_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id, module_id));",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2764,13 +2803,14 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        // 37 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
+        // 38 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
         // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731) + `_flow_approvals` (v38, hub#665) +
-        // `_hub_activity` (v39, hub#670) + `_update_history` (v40, hub#564). El número está a mano a
-        // propósito: añadir una migración de sistema tiene que ser un gesto CONSCIENTE, y este
-        // assert es lo que obliga a mirar el catálogo entero antes de tocarlo — que es justo lo que
-        // evita que dos ramas en vuelo pidan el mismo número, como pasó en esta ola: hub#731 y
-        // hub#665 pidieron las dos el v37, y hub#670 y hub#564 pidieron las dos el v39.
-        assert_eq!(MIGRATIONS.len(), 37, "el catálogo cambió de tamaño");
+        // `_hub_activity` (v39, hub#670) + `_update_history` (v40, hub#564) + `hub_module_package`
+        // (v41, hub#571). El número está a mano a propósito: añadir una migración de sistema tiene
+        // que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero
+        // antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan el mismo
+        // número, como pasó en esta ola: hub#731 y hub#665 pidieron las dos el v37; hub#670,
+        // hub#564 y hub#571 pidieron las tres el v39.
+        assert_eq!(MIGRATIONS.len(), 38, "el catálogo cambió de tamaño");
     }
 }
