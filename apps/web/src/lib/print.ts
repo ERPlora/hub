@@ -95,6 +95,21 @@ export type EnqueuePrintJob = (job: {
   format?: PrintFormat;
 }) => Promise<boolean>;
 
+/**
+ * ¿Este documento sale por impresora TÉRMICA (y por tanto tiene cola en el hub) o es papel A4?
+ *
+ * Sin Bridge —PWA en el móvil, o la app sin impresora en su red— el térmico se ENCOLA y lo drena
+ * otro equipo (ADR-0196 §6); el A4 (factura, albarán) no tiene cola y va al diálogo del navegador.
+ *
+ * Se enumera en positivo a propósito. La regla era «`receipt` o algo acabado en `_order`», y la
+ * CUENTA previa (`prebill`, hub#748) no es ninguna de las dos: el papel que más veces sale en un
+ * servicio de restaurante se trataba como una factura A4 y acababa en el diálogo del navegador,
+ * que en la app instalada no imprime nada. Añadir un tipo térmico nuevo es añadirlo aquí.
+ */
+export function isThermalDocument(documentType: string): boolean {
+  return documentType === 'receipt' || documentType === 'prebill' || documentType.endsWith('_order');
+}
+
 /** Impresora del Bridge con ese ROL, en el formato que espera `peripherals.print`. */
 export function printerIdForRole(devices: PrintDevice[], role: string): string | undefined {
   const d = (devices || []).find((x) => x?.role === role && x?.ip);
@@ -202,7 +217,7 @@ export function createPrintService(
       // el caso PWA. Antes caía al navegador; ahora ENCOLA en el hub si hay un print host que lo
       // drene (hub#344), y solo si no, al navegador.
       const reason = e instanceof Error ? e.message : String(e);
-      if (documentType !== 'receipt' && !documentType.endsWith('_order')) {
+      if (!isThermalDocument(documentType)) {
         // A4 (facturas/albaranes): no hay cola térmica, va al navegador directo.
         return toBrowser(reason);
       }
