@@ -464,10 +464,14 @@ async fn apply_section(
     // bundle hecho a mano que se declare «de este mismo hub» pasaría el filtro y escribiría un NIF
     // ajeno, dejando en nada el cierre de `settings::set_many`. Una demo no tiene identidad fiscal
     // propia por ninguna puerta (ADR-0197 §4).
+    //
+    // hub#753: y la numeración de OTRA instalación tampoco entra — ver `drop_foreign_numbering`.
+    // `reason` es el código estable que explicará el descarte en el informe; solo se lee cuando de
+    // verdad se descartó algo (`None` = no había filtro que aplicar, así que no hay nada que decir).
     let demo_hub = rt.registry().demo_hub;
     let (sql, discarded, reason) = if section == "hub_settings" && (!same_hub || demo_hub) {
         match keep_portable_settings(&sql, &scope) {
-            Ok((sql, dropped)) => (sql, dropped, ignore_reason::SETTINGS_NOT_PORTABLE),
+            Ok((sql, dropped)) => (sql, dropped, Some(ignore_reason::SETTINGS_NOT_PORTABLE)),
             // Invalid section: it fails WHOLE and without touching the BD, exactly as it did
             // before this filter existed (hub#239). The filter narrows a valid section; it is not
             // a way to salvage a broken one.
@@ -475,16 +479,22 @@ async fn apply_section(
         }
     } else if !same_hub && carries_a_foreign_numbering(&sql) {
         match drop_foreign_numbering(&sql, &scope) {
-            Ok((sql, dropped)) => (sql, dropped, ignore_reason::NUMBERING_NOT_PORTABLE),
+            Ok((sql, dropped)) => (sql, dropped, Some(ignore_reason::NUMBERING_NOT_PORTABLE)),
             Err(e) => return (SectionStatus::Failed(e), 0),
         }
     } else {
-        (sql, 0, ignore_reason::SETTINGS_NOT_PORTABLE)
+        (sql, 0, None)
     };
     if sql.trim().is_empty() {
         // Nothing survived the filter: the section was identity and nothing else. Reporting that
         // as `Applied` over zero rows would read as «I did what you asked».
-        return (SectionStatus::Ignored(reason.into()), discarded);
+        //
+        // Sin filtro (`reason == None`) esto solo puede pasar con un fichero de datos en blanco,
+        // que ya se atendió arriba con `Applied`/0 filas.
+        return (
+            SectionStatus::Ignored(reason.unwrap_or(ignore_reason::SETTINGS_NOT_PORTABLE).into()),
+            discarded,
+        );
     }
     // REGENERAR los `id` del bundle por el hub DESTINO y acotar la guarda por (hub_id, id)
     // (hub#260): en una BD COMPARTIDA por varios hubs de una misma org, los `id` del hub ORIGEN
@@ -509,7 +519,12 @@ async fn apply_section(
     };
     match applied {
         // Applied — but say so honestly when part of it was left out on purpose (hub#405).
-        Ok(_) if discarded > 0 => (SectionStatus::PartiallyApplied(reason.into()), discarded),
+        Ok(_) if discarded > 0 => (
+            SectionStatus::PartiallyApplied(
+                reason.unwrap_or(ignore_reason::SETTINGS_NOT_PORTABLE).into(),
+            ),
+            discarded,
+        ),
         Ok(_) => {
             // hub#464: the `hub_users` section also carries the profile and the preferences, each in
             // its own data file. They are hub-scoped (`(hub_id, user_id)`) and key off the users the
