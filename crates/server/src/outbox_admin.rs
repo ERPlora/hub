@@ -77,6 +77,24 @@ pub async fn list_dead(State(st): State<AppState>, headers: HeaderMap) -> Respon
     }
 }
 
+/// GET /api/hub/events/dead/count — cuántas dead-letters hay AHORA. Count barato (sin payloads)
+/// para alimentar el badge de la campana del topbar por sondeo, sin arrastrar las filas enteras que
+/// pesa el listado. Cuenta SOLO `dead` (no `delivered`/`pending`/`discarded`). Auth = sesión admin.
+pub async fn count_dead(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return rejected(e);
+    }
+    match rt.count_dead_events().await {
+        Ok(n) => Json(json!({ "ok": true, "data": { "count": n } })).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 /// POST /api/hub/events/{id}/retry — devuelve la dead-letter al relay (`pending`, `attempts=0`,
 /// vencida ya). La entrega la hace el relay en su siguiente ciclo, no este handler: el contrato
 /// at-least-once + la idempotencia por `_event_delivery` siguen mandando, así que los listeners
@@ -99,6 +117,26 @@ pub async fn retry_dead(
             Json(json!({ "ok": true, "data": { "id": id, "status": "pending" } })).into_response()
         }
         Ok(false) => not_a_dead_letter(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// POST /api/hub/events/retry-all — devuelve TODAS las dead-letters del hub al relay de golpe.
+/// Para el caso real en el que una caída transitoria (BD momentánea, módulo desactivado a media
+/// entrega) mata varios eventos a la vez: el admin arregla la causa y reenvía todo en un gesto, en
+/// vez de pulsar N veces. El hub no se queda atascado detrás de una cola que solo avanza de uno en
+/// uno. Devuelve cuántas filas movió (0 = no había nada muerto). Auth = sesión admin.
+pub async fn retry_all_dead(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return rejected(e);
+    }
+    match rt.retry_all_dead_events().await {
+        Ok(moved) => Json(json!({ "ok": true, "data": { "retried": moved } })).into_response(),
         Err(e) => crate::err_response(e),
     }
 }
