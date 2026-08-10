@@ -282,6 +282,15 @@ pub async fn status(
             .to_string()
     };
     let country = setting("country_code").to_uppercase();
+    // The locale of the checklist answers (ADR-0055, hub#762). Module items carry their English
+    // title in the payload; without this read, the dashboard showed the shell items in Spanish and
+    // the module items in English in the same list. `language` defaults to `es` and is validated to
+    // a code the registry knows, so an empty value falls back to the canonical English of the
+    // manifest (a third-party module with no `locales/` still renders, just untranslated).
+    let locale = {
+        let lang = setting("language");
+        if lang.is_empty() { "en".to_string() } else { lang }
+    };
     // The second arm of ADR-0203, resolved against THIS hub. Read here for the same reason the
     // settings are: the reserved `hub.` path answers before the dispatcher enriches the context,
     // so `ctx.has_certificate` is not populated yet. Degrading to "absent" matches the gate, which
@@ -382,8 +391,11 @@ pub async fn status(
             state,
             def.required,
             level,
-            &def.title,
-            &def.description,
+            // Localized title/description (ADR-0055, hub#762): `locale → en → manifest`. Before
+            // this, the English `title` of the payload was painted as-is, so the dashboard mixed
+            // core items in Spanish with module items in English.
+            &registry.setup_title_localized(&manifest.id, &def.title, &locale),
+            &registry.setup_description_localized(&manifest.id, &def.description, &locale),
             if def.icon.is_empty() {
                 "settings-outline"
             } else {
