@@ -551,6 +551,12 @@ export default {
     updateUpToDate: '{name} is already on the latest version.',
     updateError: 'Could not update {name}. It keeps running the version it had.',
     updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
+    // Version picker (hub#675). Only shown when there is more than one option; the latest comes
+    // first and preselected, so choosing another one is deliberate.
+    versionPickTitle: 'Choose a version',
+    versionPickBody: 'The latest one is selected. Pick another only if support asked you to.',
+    versionPickConfirm: 'Continue',
+    versionLatest: '{version} (latest)',
     // Names the place, does not open it (hub#479). `purchaseInBrowser`/`purchaseOpenError` went
     // with the button that opened the SaaS checkout.
     needsSubscription: '{name} needs a subscription. Subscribe from your ERPlora account at erplora.com and it will install here.',

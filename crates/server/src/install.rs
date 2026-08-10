@@ -372,18 +372,36 @@ pub async fn resolve_target(
     installed: &str,
     pinned: Option<&str>,
 ) -> erplora_runtime::module_update::Target {
-    use erplora_runtime::module_update::{resolve, Available, Target};
+    use erplora_runtime::module_update::{resolve, Target};
 
     if let Some(pin) = pinned {
         return Target::StayPut(pin.to_string());
     }
+
+    let available = available_versions(http, cloud_base_url, auth, module_id).await;
+
+    resolve(installed, None, &available)
+}
+
+/// Lo que el marketplace publica hoy para un módulo (`versions/`), tal cual.
+///
+/// Si el Cloud no contesta se devuelve **vacío**, y eso NO es «no hay versiones»: es «no lo sé».
+/// Los dos llamantes lo tratan igual porque la conclusión es la misma —el hub se queda donde está y
+/// no se ofrece nada—, y adivinar sería peor que callar.
+pub async fn available_versions(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+) -> Vec<erplora_runtime::module_update::Available> {
+    use erplora_runtime::module_update::Available;
 
     let request = CloudClient::new(cloud_base_url).versions(auth, module_id);
     let mut call = http.get(&request.url);
     for (name, value) in &request.headers {
         call = call.header(*name, value);
     }
-    let available: Vec<Available> = match call.send().await {
+    match call.send().await {
         Ok(response) => response
             .json::<Vec<ModuleVersion>>()
             .await
@@ -402,9 +420,39 @@ pub async fn resolve_target(
             );
             Vec::new()
         }
-    };
+    }
+}
 
-    resolve(installed, None, &available)
+/// Las versiones entre las que este hub puede elegir para `module_id` (hub#675), de la más nueva a
+/// la más vieja. Vacío = no hay nada que elegir.
+///
+/// **No recibe el `Runtime` a propósito**: lo que necesita del hub —la versión instalada y el pin—
+/// se lee antes, se suelta el candado y solo entonces se llama al Cloud. Sostener el `Mutex<Runtime>`
+/// durante un round-trip de red congelaría `/api/query` y `/api/command` —el TPV— mientras el
+/// marketplace tarda en contestar. Es el mismo cuidado que ya tiene `list_module_updates`.
+///
+/// La política la pone `module_update::offer`, **el mismo sitio donde vive la de `resolve`**: que la
+/// lista y la resolución automática no puedan discrepar es el punto — si el desplegable tuviera su
+/// propia política, sería la puerta por la que entra lo que la otra impide.
+pub async fn offered_versions(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+    installed: Option<&str>,
+    pinned: Option<&str>,
+) -> Vec<String> {
+    let available = available_versions(http, cloud_base_url, auth, module_id).await;
+    erplora_runtime::module_update::offer(installed, pinned, &available)
+}
+
+/// La versión que corre este hub, o `None` si el módulo **no está instalado** — que es el caso de
+/// instalar por primera vez, no un error.
+pub fn installed_version(runtime: &erplora_runtime::Runtime, module_id: &str) -> Option<String> {
+    runtime
+        .registry()
+        .is_installed(module_id)
+        .then(|| runtime.registry().module_version(module_id))
 }
 
 /// A qué versión debe ir un módulo instalado si se le pide actualizar (hub#516).
@@ -448,7 +496,7 @@ pub async fn resolve_update_target(
 ///
 /// No es una opción de producto —el dueño no elige— sino la salida de emergencia: dejar a un
 /// cliente en `sales@3.1` mientras se arregla la `3.2`, **sin tocar a los demás**.
-async fn support_pin(runtime: &erplora_runtime::Runtime, module_id: &str) -> Option<String> {
+pub async fn support_pin(runtime: &erplora_runtime::Runtime, module_id: &str) -> Option<String> {
     erplora_runtime::installer::installed_with_pin(runtime.db(), runtime.hub_id())
         .await
         .ok()?

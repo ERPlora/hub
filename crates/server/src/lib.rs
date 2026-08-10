@@ -1054,6 +1054,7 @@ pub fn app(state: AppState) -> Router {
         // imagen. Es también el botón «Actualizar» del dueño, y con `{"version": "…"}` la palanca de
         // soporte.
         .route("/api/modules/:id/update", post(update_module))
+        .route("/api/modules/:id/versions", get(list_module_versions))
         .route(
             "/api/modules/:id/capabilities",
             get(settings::get_module_capabilities).put(settings::put_module_capabilities),
@@ -1855,6 +1856,76 @@ async fn list_module_updates(State(st): State<AppState>, headers: HeaderMap) -> 
         }));
     }
     Json(json!({ "ok": true, "data": out })).into_response()
+}
+
+/// `GET /api/modules/:id/versions` — entre qué versiones puede elegir este hub (hub#675).
+///
+/// Es la lista del **desplegable de versión**, y sirve a las dos puertas: instalar (el módulo aún no
+/// está: valen todas las publicadas) y actualizar (solo hacia delante desde la instalada). Por eso
+/// **no es un 404** pedir las versiones de algo que no está instalado —esa regla es de `update`, no
+/// de esta— y por eso `installed` puede venir `null`.
+///
+/// La política la pone `module_update::offer`, la misma pieza que decide la actualización
+/// automática: fuera la cuarentena, fuera el retroceso, y un módulo clavado por soporte no ofrece
+/// nada. Sin eso, el desplegable sería una segunda puerta con una segunda política.
+///
+/// Auth = **sesión de admin**, igual que instalar y actualizar. Sin ella no se pregunta al Cloud:
+/// la respuesta viaja con la credencial de máquina del hub, y cualquier módulo web same-origin
+/// podría usarla de rebote para leer el catálogo.
+async fn list_module_versions(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+
+    // Todo lo que hace falta del hub, y **se suelta el candado**: la llamada al Cloud viene después.
+    // Sostener el `Mutex<Runtime>` durante un round-trip de red congelaría `/api/query` y
+    // `/api/command` —el TPV— mientras el marketplace tarda en contestar.
+    let (installed, pinned) = {
+        let rt = st.runtime.lock().await;
+        (
+            install::installed_version(&rt, &module_id),
+            install::support_pin(&rt, &module_id).await,
+        )
+    };
+
+    // Sin credencial no se puede preguntar al marketplace. No es un error: es «no lo sé», y «no lo
+    // sé» se pinta como «no hay nada que elegir», nunca como una lista inventada.
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return Json(json!({
+            "ok": true,
+            "data": { "module_id": module_id, "installed": installed, "latest": null, "versions": [] },
+        }))
+        .into_response();
+    };
+
+    let versions = install::offered_versions(
+        &st.http,
+        &st.config.cloud_base_url,
+        &auth,
+        &module_id,
+        installed.as_deref(),
+        pinned.as_deref(),
+    )
+    .await;
+
+    Json(json!({
+        "ok": true,
+        "data": {
+            "module_id": module_id,
+            "installed": installed,
+            // La que se ofrece por defecto: la primera de la lista. `null` = no hay nada que elegir.
+            "latest": versions.first(),
+            "versions": versions,
+        },
+    }))
+    .into_response()
 }
 
 /// Status HTTP de un fallo del pipeline de instalación/actualización. Compartido por

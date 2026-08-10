@@ -102,6 +102,61 @@ pub fn resolve(installed: &str, pinned: Option<&str>, available: &[Available]) -
     }
 }
 
+/// Las versiones que se le pueden **ofrecer** a este hub, de la más nueva a la más vieja.
+///
+/// Es la lista del desplegable de versión (hub#675): instalar y actualizar dejan de tener una sola
+/// opción implícita —«lo que el resolutor decida»— y pasan a poder elegir. `installed = None` es el
+/// caso de instalar por primera vez.
+///
+/// **Elegir no relaja ninguna regla de [`resolve`]**, y esa es la parte que importa: si la lista
+/// tuviera su propia política, el desplegable sería una segunda puerta por la que entra justo lo
+/// que la primera impide.
+///
+/// - **Un pin de soporte no deja nada que elegir.** Si hemos clavado a un cliente en `sales@3.1`
+///   mientras se arregla la `3.2`, un desplegable que ofrezca la `3.2` es la forma de saltárselo.
+/// - **Nada en cuarentena.** Es literalmente para lo que se marca rota una versión.
+/// - **Nada hacia atrás, ni la instalada.** Bajar ejecutaría migraciones ya pasadas sobre datos que
+///   la nueva escribió, y no hay `down` (ADR-0269 §3.4). Bajar a un cliente sigue siendo la palanca
+///   de soporte —versión explícita contra la ruta de update—, no una opción del dueño.
+/// - **Lo que no se puede ordenar, no se ofrece**; y si la ilegible es la instalada, no se ofrece
+///   nada: sin poder comparar no se sabe qué sería «hacia delante».
+///
+/// Devolver la lista vacía es una respuesta legítima y frecuente —el hub ya corre lo último, o el
+/// Cloud no contestó—: no hay nada que elegir, y la pantalla no debe abrir un desplegable.
+pub fn offer(
+    installed: Option<&str>,
+    pinned: Option<&str>,
+    available: &[Available],
+) -> Vec<String> {
+    if pinned.is_some() {
+        return Vec::new();
+    }
+
+    let floor = match installed {
+        Some(version) => match parse(version) {
+            Some(parsed) => Some(parsed),
+            // La instalada no se puede comparar: no se ofrece a ciegas.
+            None => return Vec::new(),
+        },
+        None => None,
+    };
+
+    let mut ordered: Vec<((u64, u64, u64), &str)> = available
+        .iter()
+        .filter(|candidate| candidate.is_active)
+        .filter_map(|candidate| {
+            parse(&candidate.version).map(|parsed| (parsed, candidate.version.as_str()))
+        })
+        .filter(|(parsed, _)| floor.is_none_or(|current| *parsed > current))
+        .collect();
+
+    ordered.sort_by(|a, b| b.0.cmp(&a.0));
+    ordered
+        .into_iter()
+        .map(|(_, version)| version.to_string())
+        .collect()
+}
+
 /// Cómo acabó un intento de actualización.
 #[derive(Debug)]
 pub enum Outcome {
@@ -268,6 +323,92 @@ mod tests {
         let target = resolve("no-semver", None, &[v("1.0.0", true)]);
 
         assert_eq!(target, Target::StayPut("no-semver".into()));
+    }
+
+    // ── Qué versiones se le pueden OFRECER a alguien ─────────────────────────────────
+
+    /// Instalar por primera vez: no hay nada instalado contra lo que comparar, así que valen
+    /// todas las publicadas — y la primera de la lista es la última, que es la que se ofrece.
+    #[test]
+    fn a_first_install_can_choose_among_every_published_version_newest_first() {
+        let offered = offer(None, None, &[v("1.0.0", true), v("2.0.0", true), v("1.5.0", true)]);
+
+        assert_eq!(offered, vec!["2.0.0", "1.5.0", "1.0.0"]);
+    }
+
+    /// La misma regla que `resolve`, y por el mismo motivo: la cuarentena existe para que una
+    /// versión marcada rota no llegue a un hub. Un desplegable que la enseñe es una segunda puerta
+    /// que la deja entrar con un clic.
+    #[test]
+    fn a_quarantined_version_is_never_offered() {
+        let offered = offer(None, None, &[v("1.0.0", true), v("2.0.0", false)]);
+
+        assert_eq!(offered, vec!["1.0.0"]);
+    }
+
+    /// **Elegir versión no es poder bajar de versión.** Retroceder ejecutaría migraciones ya
+    /// pasadas sobre datos que la nueva escribió, y no hay `down` (ADR-0269 §3.4): no es una
+    /// operación que exista. Bajar a alguien sigue siendo la palanca de soporte —versión explícita
+    /// contra la ruta—, no un desplegable del dueño.
+    #[test]
+    fn an_installed_module_is_never_offered_a_downgrade() {
+        let offered = offer(
+            Some("2.0.0"),
+            None,
+            &[v("1.0.0", true), v("2.0.0", true), v("2.1.0", true)],
+        );
+
+        assert_eq!(offered, vec!["2.1.0"], "ni la instalada ni ninguna anterior");
+    }
+
+    #[test]
+    fn the_newest_comes_first_compared_by_number_not_by_text() {
+        let offered = offer(None, None, &[v("1.9.0", true), v("1.10.0", true)]);
+
+        assert_eq!(offered.first().map(String::as_str), Some("1.10.0"));
+    }
+
+    /// Nada que elegir es una respuesta legítima: el hub ya corre lo último. La pantalla no debe
+    /// abrir un desplegable con una sola opción que no cambia nada.
+    #[test]
+    fn a_module_already_on_the_latest_has_nothing_to_offer() {
+        assert!(offer(Some("2.0.0"), None, &[v("2.0.0", true)]).is_empty());
+    }
+
+    #[test]
+    fn a_version_that_cannot_be_ordered_is_not_offered() {
+        let offered = offer(None, None, &[v("latest", true), v("1.0.0", true)]);
+
+        assert_eq!(offered, vec!["1.0.0"], "lo que no se puede colocar no se ofrece");
+    }
+
+    /// Si la instalada no se puede comparar, no se sabe qué sería «hacia delante»: se ofrece nada
+    /// en vez de ofrecer a ciegas. Misma regla que `resolve`.
+    #[test]
+    fn an_installed_version_that_cannot_be_compared_offers_nothing() {
+        assert!(offer(Some("no-semver"), None, &[v("1.0.0", true)]).is_empty());
+    }
+
+    /// El Cloud no contestó (o el módulo se despublicó entero): no hay lista, y no hay desplegable.
+    #[test]
+    fn an_empty_catalogue_offers_nothing() {
+        assert!(offer(None, None, &[]).is_empty());
+        assert!(offer(Some("1.0.0"), None, &[]).is_empty());
+    }
+
+    /// El pin de soporte gana también aquí, y por el mismo motivo que la cuarentena: si lo hemos
+    /// clavado en `3.1` mientras se arregla la `3.2`, un desplegable que ofrezca la `3.2` es
+    /// exactamente la forma de saltárselo. `resolve` ya lo respeta; la lista no puede ser la
+    /// excepción, o el pin dejaría de ser una garantía y pasaría a ser una sugerencia.
+    #[test]
+    fn a_module_pinned_by_support_has_nothing_to_choose() {
+        let offered = offer(
+            Some("3.1.0"),
+            Some("3.1.0"),
+            &[v("3.1.0", true), v("3.2.0", true)],
+        );
+
+        assert!(offered.is_empty(), "el pin no se salta desde la pantalla: {offered:?}");
     }
 
     // ── Actualizar sin quedarse sin módulo ───────────────────────────────────────────

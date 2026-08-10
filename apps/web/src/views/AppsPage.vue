@@ -149,12 +149,15 @@ import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
   getModuleCapabilities, putModuleCapabilities, ModuleActionError, InstallBlockedError,
-  updateModule, listModuleUpdates,
+  updateModule, listModuleUpdates, listModuleVersions,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
 import { isModuleInstalled } from '../lib/apps-catalog';
-import { pendingUpdate, updateLabel, type ModuleUpdateInfo } from '../lib/module-updates';
+import {
+  defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
+  type ModuleUpdateInfo,
+} from '../lib/module-updates';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
 import { isAdmin } from '../lib/session';
 
@@ -459,11 +462,15 @@ let unsubProgress: (() => void) | null = null;
 const consentOpen = ref(false);
 const consentCaps = ref<ModuleCapability[]>([]);
 const consentMod = ref<Mod | null>(null);
+// La versión ya elegida (hub#675): se decide ANTES del consentimiento y viaja hasta la instalación,
+// para que los permisos que se enseñan sean los de la versión que acaba entrando.
+const consentVersion = ref('latest');
 
 function closeConsent(): void {
   consentOpen.value = false;
   consentMod.value = null;
   consentCaps.value = [];
+  consentVersion.value = 'latest';
 }
 
 /**
@@ -480,19 +487,65 @@ function sayItNeedsASubscription(mod: Mod): void {
 }
 
 /**
- * Actualiza un módulo instalado a la versión que el runtime resuelva (hub#516).
+ * Qué versión instalar o actualizar (hub#675). Devuelve `null` si el usuario canceló.
  *
- * El runtime decide **cuál**: nunca una versión en cuarentena, nunca hacia atrás, y el pin de
+ * **Solo pregunta si hay algo que elegir.** Con una sola opción —el caso común: un módulo con una
+ * versión nueva— sigue siendo un clic; el desplegable aparece cuando hay varias de verdad.
+ *
+ * La lista la decide el runtime, no esta pantalla: llega ya sin versiones en cuarentena, sin
+ * ninguna anterior a la instalada y vacía si soporte tiene el módulo clavado. Aquí no se filtra
+ * nada, porque un filtro propio sería una segunda política — y la que manda es la del runtime.
+ *
+ * Si el Cloud no contestó, la lista viene vacía y se pide `latest`: el runtime resuelve por su
+ * cuenta, igual que antes de que existiera el desplegable. Sin lista se instala; no se bloquea.
+ */
+async function chooseVersion(moduleId: string, name: string): Promise<string | null> {
+  const { versions } = await listModuleVersions(moduleId).catch(() => ({ versions: [] as string[] }));
+  if (!shouldPickVersion(versions)) return defaultVersion(versions);
+
+  // Radios en un alert: es el desplegable de Ionic para elegir de una lista (lo mismo que abre un
+  // `ion-select` en modo alert), y ya es el patrón de esta pantalla para confirmar (desinstalar,
+  // cascadas). La última va la PRIMERA y marcada: elegir otra es deliberado, no un descuido.
+  const alert = await alertController.create({
+    header: t('apps.versionPickTitle'),
+    subHeader: name,
+    message: t('apps.versionPickBody'),
+    inputs: versions.map((version, index) => ({
+      type: 'radio' as const,
+      label: index === 0 ? t('apps.versionLatest', { version }) : version,
+      value: version,
+      checked: index === 0,
+    })),
+    buttons: [
+      { text: t('apps.cascadeCancel'), role: 'cancel' },
+      { text: t('apps.versionPickConfirm'), role: 'confirm' },
+    ],
+  });
+  await alert.present();
+  const result = await alert.onDidDismiss();
+  if (result.role !== 'confirm') return null;
+  // `data.values` es la opción marcada. Si el overlay no la trae (dismiss raro), no se inventa:
+  // se cae a la última, que es justo lo que estaba seleccionado.
+  return (result.data as { values?: string } | undefined)?.values ?? defaultVersion(versions);
+}
+
+/**
+ * Actualiza un módulo instalado (hub#516) a la versión elegida, o a la que el runtime resuelva.
+ *
+ * El runtime pone las reglas: nunca una versión en cuarentena, nunca hacia atrás, y el pin de
  * soporte gana. Si el intento falla, el módulo se queda con la versión que ya tenía **funcionando**
  * —eso lo garantiza el runtime, no esta pantalla—, así que aquí solo hay que decirlo.
  */
 async function updateInstalledModule(id: string, name: string): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
   if (updatingIds.value.has(id)) return;
+  // Antes de tocar nada: si hay varias versiones, que elija. Cancelar aquí no deja rastro.
+  const version = await chooseVersion(id, name);
+  if (version === null) return;
   setUpdating(id, true);
   notify(t('apps.updating', { name }), 'primary', 0);
   try {
-    const result = await updateModule(id);
+    const result = await updateModule(id, version);
     if (!result.updated) {
       notify(t('apps.updateUpToDate', { name }), 'primary');
       return;
@@ -545,6 +598,11 @@ async function installModule(mod: Mod): Promise<void> {
     sayItNeedsASubscription(mod);
     return;
   }
+  // Qué versión, ANTES del consentimiento: los permisos que se conceden son los de la versión que
+  // se va a instalar, así que preguntar por ellos y luego cambiar de versión sería enseñar unos y
+  // conceder otros.
+  const version = await chooseVersion(mod.id, mod.name);
+  if (version === null) return;
   // Best-effort: intentamos conocer los permisos que declara el módulo ANTES de instalar. El catálogo
   // Cloud no los expone, así que esto solo encuentra algo si el módulo ya estuvo instalado (runtime lo
   // recuerda); si no, instalamos directo y los permisos se gestionan luego en Ajustes → Permisos.
@@ -557,25 +615,27 @@ async function installModule(mod: Mod): Promise<void> {
   }
   if (declared.length) {
     consentMod.value = mod;
+    consentVersion.value = version;
     consentCaps.value = declared;
     consentOpen.value = true;
     return;
   }
-  await doInstall(mod);
+  await doInstall(mod, version);
 }
 
 /** Confirma el modal: instala y, al terminar, concede todas las capabilities declaradas. */
 async function confirmConsentInstall(): Promise<void> {
   const mod = consentMod.value;
   const caps = consentCaps.value;
+  const version = consentVersion.value;
   if (!mod) return;
   consentOpen.value = false;
-  await doInstall(mod, caps);
+  await doInstall(mod, version, caps);
   closeConsent();
 }
 
 /** Instalación real: pide al runtime instalar y (opcional) concede las capabilities pasadas. */
-async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<void> {
+async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[] = []): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
   // La card pasa a "Instalando…" al instante (fase genérica hasta que llegue el primer evento WS
   // `module.install.progress` con la fase real). El toast persistente se mantiene como refuerzo.
@@ -584,8 +644,10 @@ async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<
   try {
     // Pide la instalación al runtime: descarga el zip firmado (marketplace Cloud), verifica
     // SHA256 y aplica migraciones. La confirmación llega por el evento WS `module.installed`.
-    // Default de versión: 'latest' (el runtime resuelve la última publicada). flag → humano.
-    await requestInstall(mod.id, mod.version ?? 'latest');
+    // `version` viene de `chooseVersion`: la elegida, o `latest` cuando no había nada que elegir
+    // (el runtime la resuelve). Ya NO se usa la del catálogo Cloud: el catálogo dice qué versión
+    // publica el marketplace, no cuál puede instalar ESTE hub.
+    await requestInstall(mod.id, version);
     // Concede los permisos consentidos (PUT solo admin → el runtime revalida). Best-effort: si falla
     // no rompe la instalación; el usuario puede ajustarlos en Ajustes → Permisos.
     if (grantCaps.length) {
