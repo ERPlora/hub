@@ -235,6 +235,25 @@ pub fn render_document(doc: DocumentType, data: &serde_json::Value) -> Result<Ve
             }
         )));
     }
+    // **A bill with no lines is refused, not cut blank.** Every renderer reads by key, so a
+    // document in the SCREEN's shape (`business.name`, `lines[]` — what `ok-receipt` paints) finds
+    // nothing it wants and prints «ERPlora», no lines and TOTAL 0.00 without erroring. Paper that
+    // comes out WRONG is worse than paper that does not come out: nobody re-checks a bill that
+    // printed. It is checked for the bill and not for every document because the others have
+    // legitimately item-less shapes (a label, a cash report), and a guard that fires on a correct
+    // document is a guard somebody deletes.
+    if doc == DocumentType::Prebill
+        && !data
+            .get("items")
+            .and_then(|v| v.as_array())
+            .is_some_and(|items| !items.is_empty())
+    {
+        return Err(crate::PeripheralError::InvalidPayload(
+            "a bill has `items` to charge for; this document has none (is it the screen's shape, \
+             with `lines`?)"
+                .to_string(),
+        ));
+    }
     let mut b = EscposBuilder::new();
     match doc {
         // invoice == receipt (`_print_invoice` delega en `_print_receipt`).
@@ -902,6 +921,37 @@ mod tests {
             text.contains("no es una factura"),
             "the notice has a default: a producer that forgets it must not be able to print a \
              paper that passes for an invoice"
+        );
+    }
+
+    /// **A bill with no lines is REFUSED, not cut blank.**
+    ///
+    /// This is the guard that stops the producer's mistake from becoming paper. The renderer reads
+    /// by key, so a document in the SCREEN's shape (`business.name`, `lines[]` — what `ok-receipt`
+    /// paints) finds none of the fields it wants, takes every default and hands the customer
+    /// «ERPlora», no lines and TOTAL 0.00. Paper that comes out WRONG is worse than paper that does
+    /// not come out: nobody checks a bill that printed.
+    ///
+    /// It matters beyond a typo. The module that produces the bill is installed at its **published**
+    /// version, so between the hub taking this change and the module being republished, the old
+    /// producer is what runs — and it sends exactly that shape (ERPlora/sales#78). Failing loudly
+    /// puts the reason in `_print_queue.last_error` instead of in the customer's hand.
+    #[test]
+    fn a_bill_with_no_lines_is_refused_instead_of_cut_blank() {
+        // The shape `<ok-receipt>` paints on screen: right document, wrong keys.
+        let screen_shape = json!({
+            "business": { "name": "Bar Manolo" },
+            "lines": [{ "name": "Cafe", "qty": 2, "total": 2.4 }],
+            "total": 2.4,
+        });
+        let err = render_document(
+            DocumentType::parse("prebill").expect("`prebill` is a document this printer knows"),
+            &screen_shape,
+        )
+        .expect_err("a bill with no lines the renderer can read is not a bill");
+        assert!(
+            matches!(err, crate::PeripheralError::InvalidPayload(_)),
+            "the refusal says the document is wrong, not the printer: {err}"
         );
     }
 
