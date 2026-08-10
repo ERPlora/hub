@@ -282,7 +282,20 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
             "flow.unknown_schema_version",
         ),
         (
-            // `http` runs since hub#662; `ai` is still only a vocabulary.
+            // `notify` is the last kind that is still only a vocabulary (hub#663 part 2); `http`
+            // runs since hub#662 and `ai` since hub#665.
+            json!({
+                "name": "Too soon",
+                "definition": {
+                    "schema_version": 1,
+                    "steps": [{ "id": "tell", "kind": "notify" }]
+                }
+            }),
+            "flow.step_kind_not_available",
+        ),
+        (
+            // An `ai` step that DOES run is parsed as strictly as any other kind, so an empty one
+            // is refused for its own missing key rather than as unavailable.
             json!({
                 "name": "Thinks",
                 "definition": {
@@ -290,7 +303,7 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
                     "steps": [{ "id": "ask", "kind": "ai" }]
                 }
             }),
-            "flow.step_kind_not_available",
+            "flow.invalid_definition",
         ),
         (
             json!({
@@ -657,7 +670,8 @@ async fn a_secret_goes_in_and_only_its_name_comes_back() {
     std::fs::remove_dir_all(f.temp).ok();
 }
 
-/// The `http` step and its grant stopped being refused (hub#662) — and `ai`/`notify` did not.
+/// The `http` step and its grant stopped being refused (hub#662), and so did `ai` (hub#665) —
+/// `notify` did not.
 #[tokio::test]
 async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
     let f = fixture().await;
@@ -709,8 +723,8 @@ async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
         "flow.invalid_http_pattern"
     );
 
-    // The two that are still only a vocabulary.
-    for kind in ["ai", "notify"] {
+    // The one that is still only a vocabulary.
+    for kind in ["notify"] {
         let response = send(
             &f.router,
             request(
@@ -733,6 +747,31 @@ async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
             "flow.step_kind_not_available"
         );
     }
+
+    // …and an `ai` step SAVES now (hub#665), which is the other half of the same contract: the
+    // list of what this hub cannot do must shrink as each issue lands, or the refusal becomes a
+    // lie the editor repeats.
+    let response = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "Answers WhatsApp",
+                "definition": {
+                    "schema_version": 1,
+                    "steps": [{
+                        "id": "agent", "kind": "ai",
+                        "prompt": "Answer {{input.text}} and book the appointment",
+                        "tools": { "queries": ["agenda.slots.list"] }
+                    }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::CREATED, "an `ai` flow saves since hub#665");
 
     std::fs::remove_dir_all(f.temp).ok();
 }

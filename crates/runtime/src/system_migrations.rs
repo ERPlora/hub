@@ -1045,6 +1045,46 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_flow_secret_name \
         kind: Kind::Expand,
         postgres: "ALTER TABLE _flow_triggers ADD COLUMN IF NOT EXISTS tz TEXT NOT NULL DEFAULT '';",
     },
+    // ── v38 — hub#665 / ADR-0283 D3: `_flow_approvals`, the write that waits for a person ─────
+    // The row an `ai` step writes instead of the booking. Everything a person needs to decide at
+    // 9 AM about something a model proposed at 3 AM is HERE and not in a log line: the `command`
+    // and the `payload` that will run, verbatim, and the `reason` the model gave. A tray that
+    // showed an opaque id would be a button people press without reading.
+    //
+    // `payload` is the whole contract of the feature: approving runs EXACTLY this, re-checking the
+    // grant at that moment, and never re-entering the model (ADR-0283 §7). So it is stored, not
+    // re-derived — a re-derived payload is a different booking with the same name.
+    //
+    // `decided_by`/`decided_at` are written from the resolved SESSION, never from a body (same
+    // rule as `discarded_by` in `outbox_admin.rs`): "who authorised the hub to write while nobody
+    // was watching" is the one fact this table exists to keep.
+    //
+    // `expires_at` bounds it. A proposal is not a standing authorisation, and one left in the tray
+    // for a month is about a Tuesday that has passed.
+    //
+    // ⚠️ v38, and it has been renumbered TWICE: it started life as v36 (hub#662 landed
+    // `_flow_secrets` there while this branch was in flight), was pushed as v37, and hub#731 took
+    // that one too with `_flow_triggers.tz` before this branch merged. `apply` aborts loudly on a
+    // catalogue entry at or below the maximum applied version — but only once a hub already carries
+    // the higher number, which is far too late to notice. Several flow issues wanted a number in
+    // the same wave; re-check it against `origin/develop` at push time, do not remember it.
+    SystemMigration {
+        version: 38,
+        name: "flow_approvals",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_approvals (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, run_id TEXT NOT NULL, flow_id TEXT NOT NULL, \
+  step_id TEXT NOT NULL, command TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', \
+  reason TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', \
+  decided_by TEXT NOT NULL DEFAULT '', decided_at TEXT, expires_at TEXT, \
+  error TEXT NOT NULL DEFAULT '', \
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_flow_approval_tray \
+  ON _flow_approvals (hub_id, status, created_at);\
+CREATE INDEX IF NOT EXISTS ix_flow_approval_run ON _flow_approvals (hub_id, run_id);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2600,11 +2640,12 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        // 34 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
-        // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731). El número está a mano a propósito:
-        // añadir una migración de sistema tiene que ser un gesto CONSCIENTE, y este assert es lo
-        // que obliga a mirar el catálogo entero antes de tocarlo — que es justo lo que evita que
-        // dos ramas en vuelo pidan el mismo número.
-        assert_eq!(MIGRATIONS.len(), 34, "el catálogo cambió de tamaño");
+        // 35 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
+        // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731) + `_flow_approvals` (v38, hub#665).
+        // El número está a mano a propósito: añadir una migración de sistema tiene que ser un gesto
+        // CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero antes de tocarlo —
+        // que es justo lo que evita que dos ramas en vuelo pidan el mismo número, como pasó en esta
+        // ola: hub#731 y hub#665 pidieron las dos el v37 y esta se corrió al v38 al mergear.
+        assert_eq!(MIGRATIONS.len(), 35, "el catálogo cambió de tamaño");
     }
 }

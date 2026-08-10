@@ -12,7 +12,9 @@
 //! This file is the seam. Change one side without the other and it goes red, naming the value.
 use std::collections::BTreeSet;
 
-use erplora_runtime::flows::def::{Op, StepKind, TriggerKind, SCHEMA_VERSION};
+use erplora_runtime::flows::def::{
+    AiPolicy, Op, StepKind, TriggerKind, DEFAULT_MAX_ITERS, MAX_ITERS_CAP, SCHEMA_VERSION,
+};
 
 fn schema() -> serde_json::Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -146,5 +148,67 @@ fn the_document_declares_the_version_this_hub_speaks_and_requires_it() {
         schema["additionalProperties"].as_bool(),
         Some(false),
         "unknown top-level keys are refused, not dropped (hub#521)"
+    );
+}
+
+/// hub#665 — the `ai` step is the newest half of the frozen document, so it is the half most
+/// likely to drift. The policy vocabulary is exactly two values and the DEFAULT is the restrictive
+/// one; a schema that defaulted to `auto` (or accepted a third value) would have an editor happily
+/// saving a flow that writes to the business database unattended.
+#[test]
+fn the_ai_policies_are_the_same_two_on_both_sides_and_default_to_manual() {
+    let schema = schema();
+    let declared = enum_at(&schema, "/$defs/step/properties/policy");
+    let known: BTreeSet<String> = AiPolicy::ALL
+        .iter()
+        .map(|p| p.as_str().to_string())
+        .collect();
+    assert_eq!(declared, known);
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/policy/default"),
+        Some(&serde_json::json!(AiPolicy::Manual.as_str())),
+        "the permissive option is the one nobody writes down and everybody assumes (ADR-0283 D3)"
+    );
+}
+
+/// The loop bound is money — every turn is a metered call through the SaaS proxy — so the number
+/// the editor enforces and the number the hub enforces have to be the same number.
+#[test]
+fn the_agent_loop_bounds_are_the_same_on_both_sides() {
+    let schema = schema();
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/max_iters/default"),
+        Some(&serde_json::json!(DEFAULT_MAX_ITERS))
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/max_iters/maximum"),
+        Some(&serde_json::json!(MAX_ITERS_CAP)),
+        "the runtime REFUSES above the cap; a schema that allowed more would move the refusal \
+         from the editor to a background tick at 3 AM"
+    );
+}
+
+/// Every key the runtime parses for an `ai` step must be declared, or the editor would flag as
+/// unknown something the hub reads — the mirror image of hub#521, and just as confusing.
+#[test]
+fn every_key_of_the_ai_step_is_declared_in_the_schema() {
+    let declared = keys_at(&schema(), "/$defs/step/properties");
+    for key in ["prompt", "tools", "policy", "max_iters"] {
+        assert!(
+            declared.contains(key),
+            "the schema must declare `{key}` of an `ai` step; it has {declared:?}"
+        );
+    }
+    // …and the `tools` block is closed on both sides: `queries` and `commands`, nothing else.
+    let tools = keys_at(&schema(), "/$defs/step/properties/tools/properties");
+    assert_eq!(
+        tools,
+        BTreeSet::from(["commands".to_string(), "queries".to_string()])
+    );
+    assert_eq!(
+        schema()
+            .pointer("/$defs/step/properties/tools/additionalProperties")
+            .and_then(|v| v.as_bool()),
+        Some(false)
     );
 }

@@ -12,9 +12,9 @@
 //!   claim (locked, cheap)  →  I/O (unlocked, in crates/server)  →  complete (locked, cheap)
 //! ```
 //!
-//! [`PendingIo`] is that seam. It is defined and returned here, and NOTHING consumes it yet: the
-//! `http`, `ai` and `notify` steps land with hub#662/#665/#663, and until then a document that
-//! uses them is refused at save time rather than parked forever (`FlowDefinition::parse`).
+//! [`PendingIo`] is that seam, and [`crate::flows::io`] is the far side of it. `ai` crossed with
+//! hub#665 (the server-side agent runner); `http` (hub#662) and `notify` (hub#663 part 2) are
+//! still refused at save time rather than parked forever (`FlowDefinition::parse`).
 //!
 //! ## Where a crash leaves a run
 //!
@@ -63,6 +63,8 @@ const STEP_DONE: &str = "done";
 const STEP_FAILED: &str = "failed";
 const STEP_SLEEPING: &str = "sleeping";
 const STEP_STOPPED: &str = "stopped";
+/// hub#665 — an agent step whose proposed write is waiting for a person to decide.
+const STEP_WAITING_APPROVAL: &str = "waiting_approval";
 
 /// **The claim → I/O → complete seam.** The tick produces one of these instead of performing the
 /// call; the server performs it outside the lock and hands the result back with
@@ -119,6 +121,16 @@ impl PendingIo {
 pub enum IoResult {
     Done(Json),
     Failed(String),
+    /// hub#665 — the agent proposed a WRITE and `policy` says a person decides (ADR-0283 D3). The
+    /// step keeps what the turn produced so far and the run leaves the queue until the approval is
+    /// decided; the payload it will run lives in `_flow_approvals`, not here.
+    ///
+    /// A third answer and not a `Failed`, because nothing went wrong and the run is not over.
+    AwaitingApproval(Json),
+    /// hub#665 — a person REJECTED the proposal. Nothing ran, and the run stops: the steps written
+    /// after an agent step assumed it acted. `cancelled` and not `failed` — a person stopping the
+    /// hub is the design working.
+    Cancelled(String),
 }
 
 /// What one tick did, so the caller can log it without a second query.
@@ -333,7 +345,7 @@ async fn advance_run(
 
 enum Outcome {
     Continue { output: Json },
-    /// The step's work happens outside the lock (`http` today, `ai`/`notify` later). The tick
+    /// The step's work happens outside the lock (`http` and `ai` today, `notify` later). The tick
     /// hands it to the server and this run pauses exactly here, claimed, until it comes back.
     Io { pending: PendingIo },
     /// A `condition` said no. The run is complete, not failed: a guard that does not pass is the
@@ -519,9 +531,30 @@ async fn run_step(
             }
         }
 
-        // `ai` and `notify`. `FlowDefinition::parse` refuses to store a document that reaches here,
-        // so this arm is the seam and not a live path: hub#665/#663 fill it in the way `http`
-        // already is.
+        // **The claim half, for an agent turn** (hub#665). Nothing is called from here: the step
+        // is written `running`, the run keeps its lease so the next tick skips it, and the work
+        // goes back to the server, which performs it with NO lock held. A 60 s LLM turn inside
+        // this lock would freeze every till in the hub.
+        //
+        // Unlike `http`, nothing is PREPARED here: what the model may be offered comes from
+        // `assistant::assemble_tools`, which lives in `crates/server` — the runtime has no network
+        // and no assistant. The server reads the step back through `flows::agent::prepare`.
+        StepSpec::Ai(_) => {
+            write_step(
+                db, hub_id, run_id, index, step, STEP_RUNNING, &json!({}), &json!({}), "", &now,
+            )
+            .await?;
+            Ok(Outcome::Io {
+                pending: PendingIo::Ai {
+                    run_id: run_id.to_string(),
+                    step_id: step.id.clone(),
+                },
+            })
+        }
+
+        // `notify`. `FlowDefinition::parse` refuses to store a document that reaches here, so this
+        // arm is the seam and not a live path: hub#663 part 2 fills it in the way `http` and `ai`
+        // already are.
         StepSpec::Reserved => {
             let error = format!(
                 "step `{}` is of kind `{}`: the claim → I/O → complete path is not implemented \
@@ -793,8 +826,14 @@ pub async fn complete_io(
             &p,
         )
         .await?;
+    // In flight, or parked for a person (hub#665) — the approval path completes this very step
+    // hours later, and it is still the step the run is waiting on.
     let waiting_on = step_row.rows.first().filter(|r| {
-        r["step_id"].as_str() == Some(step_id) && r["status"].as_str() == Some(STEP_RUNNING)
+        r["step_id"].as_str() == Some(step_id)
+            && matches!(
+                r["status"].as_str(),
+                Some(STEP_RUNNING) | Some(STEP_WAITING_APPROVAL)
+            )
     });
     if waiting_on.is_none() {
         eprintln!(
@@ -847,6 +886,46 @@ pub async fn complete_io(
             .await?;
             // v1 is `on_error: "stop"` — the same answer a failed command gets.
             finish(db, run_id, store::STATUS_FAILED, &error).await?;
+        }
+        // The turn stopped on a write a person has to authorise. What it produced so far is kept
+        // on the step, so a decision taken hours later completes the WHOLE turn and not just its
+        // ending; and the run leaves the queue — `waiting_approval` is not a status
+        // `claim_next_run` selects, so no amount of ticking smuggles the write through.
+        IoResult::AwaitingApproval(partial) => {
+            let mut p = Params::new();
+            p.insert("run_id".into(), json!(run_id));
+            p.insert("step_index".into(), json!(index));
+            p.insert("output".into(), json!(partial.to_string()));
+            p.insert("status".into(), json!(STEP_WAITING_APPROVAL));
+            db.execute(
+                "UPDATE _flow_run_steps SET status = :status, output = :output \
+                 WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+                &p,
+            )
+            .await?;
+            let mut p = Params::new();
+            p.insert("id".into(), json!(run_id));
+            p.insert("status".into(), json!(store::STATUS_WAITING_APPROVAL));
+            p.insert("now".into(), json!(now));
+            db.execute(
+                "UPDATE _flow_runs SET status = :status, claim_expires_at = NULL, \
+                                       updated_at = :now WHERE id = :id",
+                &p,
+            )
+            .await?;
+        }
+        IoResult::Cancelled(reason) => {
+            let mut p = Params::new();
+            p.insert("run_id".into(), json!(run_id));
+            p.insert("step_index".into(), json!(index));
+            p.insert("now".into(), json!(now));
+            db.execute(
+                "UPDATE _flow_run_steps SET status = 'stopped', finished_at = :now \
+                 WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+                &p,
+            )
+            .await?;
+            finish(db, run_id, store::STATUS_CANCELLED, &reason).await?;
         }
     }
     Ok(())

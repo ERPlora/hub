@@ -65,6 +65,12 @@ pub const ERR_INVALID_CRON: &str = "flow.invalid_cron";
 /// Same family: `at: "manana por la tarde"` was copied straight into `next_run`.
 pub const ERR_INVALID_AT: &str = "flow.invalid_at";
 
+/// Turns of the agent loop when the document does not say (ADR-0283 §7).
+pub const DEFAULT_MAX_ITERS: i64 = 6;
+/// Hard ceiling, refused above rather than clamped. Every turn is a real call through the SaaS
+/// proxy, which meters it (`AssistantUsage`): a runaway agent loop is money, not just latency.
+pub const MAX_ITERS_CAP: i64 = 10;
+
 fn invalid(code: &str, message: impl Into<String>) -> RuntimeError {
     RuntimeError::Domain {
         code: code.to_string(),
@@ -121,17 +127,17 @@ impl StepKind {
         matches!(self, StepKind::Http | StepKind::Ai | StepKind::Notify)
     }
 
-    /// Can this hub execute this kind? `ai` and `notify` are still only a vocabulary, and a
-    /// document using them is refused **at save time** naming its issue — a flow stored with a step
-    /// nothing performs would park a run forever at 3 AM.
+    /// Can this hub EXECUTE this kind today? The vocabulary is frozen at six; what grows is this
+    /// list — `http` joined it with hub#662 and `ai` with hub#665, leaving only `notify`
+    /// (hub#663 part 2). A document using what is left is refused **at save time** naming its
+    /// issue: a flow stored with a step nothing performs would park a run forever at 3 AM.
     pub fn is_available(self) -> bool {
-        !matches!(self, StepKind::Ai | StepKind::Notify)
+        !matches!(self, StepKind::Notify)
     }
 
     /// The issue that brings the kinds that are not here yet, so the refusal is actionable.
     fn pending_issue(self) -> &'static str {
         match self {
-            StepKind::Ai => "hub#665",
             StepKind::Notify => "hub#663",
             _ => "",
         }
@@ -176,8 +182,59 @@ pub enum StepSpec {
         body: Option<Json>,
         timeout_seconds: u64,
     },
-    /// `ai` / `notify`: accepted by the grammar, refused by [`FlowDefinition::validate`].
+    /// `{"kind":"ai","prompt":…,"tools":{…},"policy":…,"max_iters":N}` — an agent turn performed
+    /// by the server (hub#665). The only step whose behaviour is not fully written in the
+    /// document: what it decides comes from a model. That is exactly why [`AiStep::policy`]
+    /// exists, and why its default is `manual`.
+    Ai(AiStep),
+    /// `notify`: accepted by the grammar, refused by [`FlowDefinition::validate`].
     Reserved,
+}
+
+/// What an `ai` step may do, and how far it is trusted (ADR-0283 §7 / D3).
+#[derive(Debug, Clone, PartialEq)]
+pub struct AiStep {
+    /// The task, in words. Mapped against the run like any other value, so a turn can talk about
+    /// the message that triggered it (`{{input.text}}`).
+    pub prompt: String,
+    /// Reads the model may perform. Intersected with what the flow was granted — declaring a tool
+    /// here does not authorise it.
+    pub queries: Vec<String>,
+    /// Writes the model may PROPOSE. Whether a proposal executes is [`AiStep::policy`].
+    pub commands: Vec<String>,
+    pub policy: AiPolicy,
+    pub max_iters: i64,
+}
+
+/// **What happens to a write the model proposes** (ADR-0283 D3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AiPolicy {
+    /// It runs, in the turn, through the automation gate. The owner said so in writing.
+    Auto,
+    /// It becomes a row in `_flow_approvals` and the turn ends. **The default**: the permissive
+    /// option is the one nobody writes down and everybody assumes, and here it would mean an
+    /// unattended model writing to the business database at 3 AM.
+    Manual,
+}
+
+impl AiPolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AiPolicy::Auto => "auto",
+            AiPolicy::Manual => "manual",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "auto" => Some(AiPolicy::Auto),
+            "manual" => Some(AiPolicy::Manual),
+            _ => None,
+        }
+    }
+    pub fn is_auto(self) -> bool {
+        self == AiPolicy::Auto
+    }
+    pub const ALL: &'static [AiPolicy] = &[AiPolicy::Auto, AiPolicy::Manual];
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -206,6 +263,11 @@ impl StepDef {
                 out.extend(body.clone());
                 out
             }
+            // An `ai` prompt is a mapping expression like any other, so it is listed here for
+            // the same two reasons the rest are: its `{{…}}` resolve against the run, and the
+            // `secret.…` refusal of hub#662 has to reach it — a prompt is precisely where a
+            // credential must never be interpolated, because it would be sent to the model.
+            StepSpec::Ai(ai) => vec![json_str(&ai.prompt)],
             StepSpec::Reserved => Vec::new(),
         }
     }
@@ -898,7 +960,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
     })?;
 
     // The kinds that do not run yet are parsed no further ON PURPOSE: their keys are the contract
-    // of hub#665/#663, and inventing it here would freeze a shape nobody has run.
+    // of hub#663, and inventing it here would freeze a shape nobody has run.
     if !kind.is_available() {
         return Ok(StepDef {
             id,
@@ -912,6 +974,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &["id", "kind", "seconds", "until"],
         StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
+        StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters"],
         _ => &["id", "kind"],
     };
     for key in map.keys() {
@@ -1058,10 +1121,126 @@ fn parse_step(value: &Json) -> Result<StepDef> {
                 timeout_seconds,
             }
         }
+        StepKind::Ai => StepSpec::Ai(parse_ai(&id, map)?),
         _ => StepSpec::Reserved,
     };
 
     Ok(StepDef { id, kind, spec })
+}
+
+/// The keys of an `ai` step (hub#665). Parsed as strictly as every other kind: a `tools` block
+/// silently dropped would hand the model everything the flow was granted instead of the two tools
+/// its author chose, and nobody would be watching when it did.
+fn parse_ai(id: &str, map: &Map<String, Json>) -> Result<AiStep> {
+    let prompt = map
+        .get("prompt")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+    if prompt.trim().is_empty() {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!("step `{id}`: an `ai` step needs a `prompt` saying what to do"),
+        ));
+    }
+
+    let mut queries = Vec::new();
+    let mut commands = Vec::new();
+    match map.get("tools") {
+        None | Some(Json::Null) => {}
+        Some(Json::Object(tools)) => {
+            for key in tools.keys() {
+                if !matches!(key.as_str(), "queries" | "commands") {
+                    return Err(invalid(
+                        ERR_INVALID_DEFINITION,
+                        format!("step `{id}`: unknown key `{key}` in `tools`"),
+                    ));
+                }
+            }
+            queries = string_list(id, tools.get("queries"), "tools.queries")?;
+            commands = string_list(id, tools.get("commands"), "tools.commands")?;
+        }
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `tools` is `{{queries: [], commands: []}}`"),
+            ))
+        }
+    }
+
+    // Absent means MANUAL (ADR-0283 D3). An unknown value is refused rather than defaulted:
+    // `"atuo"` silently becoming "manual" would be merciful, and `"atuo"` silently becoming
+    // "auto" would be a hub writing unattended because of a typo. Neither is acceptable, so it
+    // does not save.
+    let policy = match map.get("policy") {
+        None | Some(Json::Null) => AiPolicy::Manual,
+        Some(Json::String(s)) => AiPolicy::parse(s).ok_or_else(|| {
+            invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `policy` is one of {}",
+                    AiPolicy::ALL
+                        .iter()
+                        .map(|p| p.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            )
+        })?,
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `policy` is a string"),
+            ))
+        }
+    };
+
+    let max_iters = match map.get("max_iters") {
+        None | Some(Json::Null) => DEFAULT_MAX_ITERS,
+        Some(v) => v.as_i64().unwrap_or(-1),
+    };
+    if !(1..=MAX_ITERS_CAP).contains(&max_iters) {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "step `{id}`: `max_iters` must be between 1 and {MAX_ITERS_CAP} (got \
+                 {max_iters}). Refused rather than clamped: every turn is a real call through \
+                 the SaaS proxy, and a document that says one number and runs another is lying \
+                 to whoever wrote it."
+            ),
+        ));
+    }
+
+    Ok(AiStep {
+        prompt,
+        queries,
+        commands,
+        policy,
+        max_iters,
+    })
+}
+
+/// A list of operation names, refused if it is anything else. An entry that is not a string would
+/// otherwise be dropped, and a tool the author believes they declared would not be offered.
+fn string_list(id: &str, value: Option<&Json>, what: &str) -> Result<Vec<String>> {
+    match value {
+        None | Some(Json::Null) => Ok(Vec::new()),
+        Some(Json::Array(items)) => items
+            .iter()
+            .map(|v| {
+                v.as_str().map(str::to_string).ok_or_else(|| {
+                    invalid(
+                        ERR_INVALID_DEFINITION,
+                        format!("step `{id}`: `{what}` is a list of operation names"),
+                    )
+                })
+            })
+            .collect(),
+        Some(_) => Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!("step `{id}`: `{what}` is a list of operation names"),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -1102,16 +1281,33 @@ mod tests {
         assert!(format!("{err}").contains("unless"), "{err}");
     }
 
+    /// The list shrinks one issue at a time, and what is LEFT must keep naming the issue that
+    /// brings it. `http` left with hub#662 and `ai` with hub#665; `notify` is the last one, and a
+    /// document using it must still be refused at save time rather than parked forever at 3 AM.
     #[test]
     fn the_io_steps_this_hub_still_cannot_run_are_refused_by_name() {
-        for (kind, issue) in [("ai", "hub#665"), ("notify", "hub#663")] {
+        for (kind, issue) in [("notify", "hub#663")] {
             let err = FlowDefinition::parse(&json!({
                 "schema_version": 1,
                 "steps": [{ "id": "call", "kind": kind }]
             }))
-            .expect_err("this kernel cannot perform these I/O steps yet");
+            .expect_err("this kernel cannot perform this I/O step yet");
             let text = format!("{err}");
             assert!(text.contains(kind) && text.contains(issue), "{text}");
+        }
+        // …and the two that DID land are no longer refused for being unavailable: they are parsed
+        // strictly, so what they now complain about is their own missing keys.
+        for (kind, complaint) in [("http", "url"), ("ai", "prompt")] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "call", "kind": kind }]
+            }))
+            .expect_err("an empty step of either kind is still invalid, but for its OWN reason");
+            let text = format!("{err}");
+            assert!(
+                text.contains(complaint) && !text.contains("cannot execute yet"),
+                "`{kind}` must be refused for its own missing key, not as unavailable: {text}"
+            );
         }
     }
 
@@ -1245,6 +1441,114 @@ mod tests {
         assert_eq!(
             def.steps[0].secret_names(),
             vec!["KEY".to_string(), "TOKEN".to_string()]
+        );
+    }
+
+    // ── the `ai` step (hub#665, ADR-0283 K5/D3) ───────────────────────────────────────────────
+
+    /// The step saves now, and it saves with its keys parsed strictly — the same treatment
+    /// `command`/`condition`/`delay` get. A step whose `tools` block were silently dropped would
+    /// hand the model every tool the flow was granted instead of the two its author chose.
+    #[test]
+    fn an_ai_step_parses_its_prompt_its_tools_and_its_policy() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "agent",
+                "kind": "ai",
+                "prompt": "Answer {{input.from}} and book the appointment",
+                "tools": {
+                    "queries": ["appointments.slots.list"],
+                    "commands": ["appointments.appointment.create"]
+                },
+                "policy": "auto",
+                "max_iters": 4
+            }]
+        }))
+        .expect("the shape the module `flows` writes for an agent step");
+
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("an `ai` step must parse into its own spec, not into Reserved");
+        };
+        assert_eq!(ai.prompt, "Answer {{input.from}} and book the appointment");
+        assert_eq!(ai.queries, vec!["appointments.slots.list".to_string()]);
+        assert_eq!(
+            ai.commands,
+            vec!["appointments.appointment.create".to_string()]
+        );
+        assert_eq!(ai.policy, AiPolicy::Auto);
+        assert_eq!(ai.max_iters, 4);
+    }
+
+    /// ADR-0283 D3 in one assertion: an `ai` step that says nothing about its policy is
+    /// **manual**. The permissive default is the one nobody writes down and everybody assumes,
+    /// and here it would mean an unattended model writing to the business database.
+    #[test]
+    fn an_ai_step_without_a_policy_is_manual_and_bounded() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi" }]
+        }))
+        .unwrap();
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(
+            ai.policy,
+            AiPolicy::Manual,
+            "writes wait for a person unless the owner opted out IN WRITING"
+        );
+        assert_eq!(ai.max_iters, DEFAULT_MAX_ITERS);
+        assert!(ai.queries.is_empty() && ai.commands.is_empty());
+    }
+
+    /// Every turn of the loop costs a call through the SaaS proxy, which meters real money
+    /// (`AssistantUsage`). The cap is refused rather than clamped: a document that says 50 and
+    /// runs 10 is a document lying to the person who wrote it.
+    #[test]
+    fn max_iters_above_the_cap_is_refused_not_silently_clamped() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi", "max_iters": 50 }]
+        }))
+        .expect_err("a runaway agent loop is real money");
+        let text = format!("{err}");
+        assert!(text.contains("max_iters") && text.contains("10"), "{text}");
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi", "max_iters": 0 }]
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn an_ai_step_without_a_prompt_or_with_an_unknown_key_is_refused() {
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai" }]
+        }))
+        .is_err());
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi", "temperature": 0.9 }]
+        }))
+        .expect_err("hub#521's lesson: a key nobody reads must not look like a setting");
+        assert!(format!("{err}").contains("temperature"), "{err}");
+        // And an unknown policy is a typo that would otherwise read as "auto" or as nothing.
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi", "policy": "atuo" }]
+        }))
+        .is_err());
+    }
+
+    /// The prompt is mapped against the run like any other value, so an agent turn can talk about
+    /// the sale that triggered it. Templates render to text — a prompt is text.
+    #[test]
+    fn the_prompt_is_resolved_against_the_run_like_any_other_mapping() {
+        assert_eq!(
+            resolve(&json!("Reply to {{input.customer.email}}"), &scope()),
+            json!("Reply to marta@example.com")
         );
     }
 
