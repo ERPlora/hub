@@ -386,6 +386,24 @@ export interface ElevationAsk {
  */
 export type ElevationApprover = (ask: ElevationAsk) => Promise<string | null>;
 
+/**
+ * The hub (or the proxy in front of it) did NOT answer with the JSON envelope the runtime always
+ * returns — the transport is down (hub#782).
+ *
+ * Surfaces from `post()` in three shapes that used to escape as raw, code-less errors:
+ *   - a `5xx text/html` error page from the proxy (the hub container died, OOM exit 137 / hub#759;
+ *     any deploy or restart window) — `res.json()` blew up with `SyntaxError: Unexpected token '<'`;
+ *   - a response whose body is not valid JSON regardless of its `Content-Type`;
+ *   - a network-level failure of `fetch` itself (`TypeError: Failed to fetch`, DNS, CORS, abort).
+ *
+ * They collapse to ONE code on purpose: from a module's point of view all three mean «the hub did
+ * not reply with something usable», and the UI shows one message and (maybe) retries — splitting
+ * them would only force every one of the 24 modules to repeat the same `||`. A domain refusal
+ * (`PermissionDenied` → 403 + JSON envelope) is NOT this: it carries its own `code`
+ * (`permission_denied`, `requires_elevation`, …) and flows through `unwrap` untouched.
+ */
+export const SERVER_UNAVAILABLE = 'server_unavailable';
+
 /** Sobre de respuesta estándar del server Axum (`crates/server`). */
 interface Envelope {
   ok: boolean;
@@ -428,6 +446,20 @@ function unwrapPage(data: unknown): unknown {
 const PUSH_RETRY_MIN_MS = 1_000;
 /** Ceiling for the wait while there is no credential to present (a logged-out till). */
 const PUSH_RETRY_MAX_MS = 30_000;
+
+/**
+ * A short, safe label for an unknown error, for {@link ErploraError} messages that must not leak the
+ * raw text of a `SyntaxError`/`TypeError` (hub#782). It keeps the error's `name`/`message` when they
+ * are harmless and degrades to a fixed phrase otherwise — never `undefined`.
+ */
+function safeErr(e: unknown): string {
+  if (e instanceof Error && e.message) {
+    // The exact byte sequence of the proxy's HTML would otherwise reach the cashier. Truncate hard.
+    const m = e.message.trim();
+    return m.length > 120 ? `${m.slice(0, 120)}…` : m;
+  }
+  return 'network error';
+}
 
 /** Control frame of the event channel: the hub accepted the credential (hub#504). */
 export const STREAM_READY = 'stream.ready';
@@ -542,12 +574,52 @@ export class HttpWsTransport implements ErploraTransport {
     body: unknown,
     extraHeaders: Record<string, string> = {},
   ): Promise<unknown> {
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this.headers(), ...extraHeaders },
-      body: JSON.stringify(body),
-    });
-    const env = (await res.json()) as Envelope;
+    // hub#782: the proxy's `5xx text/html` page (the hub container died — OOM exit 137 / hub#759;
+    // any deploy window) used to reach `res.json()` and blow up as a raw `SyntaxError`, which is
+    // NOT an `ErploraError`, carries no `code`, and so no module can orient by it. The runtime
+    // ALWAYS answers `application/json` — even its 4xx domain refusal travels in an envelope with a
+    // `code` — so JSON is the signature of «the hub answered», and anything else is the proxy (or
+    // the network). That is why we key on the CONTENT-TYPE and not on `res.ok`: a 403 envelope with
+    // `permission_denied` is a domain refusal with its own code, not a transport failure.
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...this.headers(), ...extraHeaders },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      // A network-level failure (DNS, CORS, abort, `TypeError: Failed to fetch`): same meaning for
+      // the caller — «the hub did not answer» — collapsed to one code. The raw message is dropped so
+      // nothing of the browser's internals reaches the cashier.
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `request to ${path} failed: ${safeErr(e)}`,
+      );
+    }
+    const ct = res.headers?.get?.('content-type');
+    // hub#782: the runtime ALWAYS answers `application/json`, even on a 4xx domain refusal. The
+    // proxy answers `text/html`. So a content-type that is PRESENT and is NOT JSON is the signature
+    // of the proxy — we refuse it. We do NOT require the header: a fetch mock (and some minimal
+    // HTTP/1.0 responders) omit it, and an envelope that parses is still a valid runtime answer.
+    if (ct !== null && ct !== undefined && !ct.toLowerCase().includes('application/json')) {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `unexpected response from ${path}: HTTP ${res.status} ${ct}`,
+      );
+    }
+    let env: Envelope;
+    try {
+      env = (await res.json()) as Envelope;
+    } catch {
+      // Defense in depth: a proxy can label an HTML page `application/json`, and the JSON parser's
+      // own message echoes that HTML back («Unexpected token '<', "<!DOCTYPE "…»). A fixed phrase
+      // keeps the proxy's internals out of the message the cashier reads.
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `request to ${path} returned an invalid JSON body`,
+      );
+    }
     return unwrap(env);
   }
 
