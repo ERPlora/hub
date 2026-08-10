@@ -1003,6 +1003,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/media/upload", post(media::media_upload))
         .route("/api/media/folder", post(media::media_create_folder))
         .route("/api/media/rename", post(media::media_rename))
+        .route("/api/media/move", post(media::media_move))
         .route("/api/navigation", get(navigation))
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))
