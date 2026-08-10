@@ -16,7 +16,7 @@ import { config } from './config';
 import { openExternal } from './open-external';
 import { toastError } from './toast';
 import { i18n } from '../i18n';
-import { user } from './session';
+import { hasPermission } from './session';
 
 /**
  * The permission that opens this door: the one the core already owns (ADR-0248, hub#435).
@@ -28,20 +28,19 @@ import { user } from './session';
  */
 export const ADMINISTER_PERMISSION = 'hub.administer';
 
-/** The wildcard the shell hands an owner/admin session (mirror of `lib/runtime.ts`). */
-export const ALL_PERMISSIONS = '*';
-
 /**
  * Whether THIS session may be offered the way out to management.
  *
  * A filter, not a wall (ADR-0248): there is no consequence a cashier has to be told about here —
  * managing the plan is simply not their task, and they may not even have an account at erplora.com.
  * The authority is the SaaS anyway (`IsHubAdmin` over `HubMember`); this only decides what to show.
+ *
+ * La regla del comodín vive en un solo sitio (`hasPermission`, hub#506): antes estaba duplicada
+ * aquí y en `app-update.ts`, y ninguna de las dos sabía de la otra.
  */
-export const canOpenManagement: ComputedRef<boolean> = computed(() => {
-  const granted = user.value?.permissions ?? [];
-  return granted.includes(ADMINISTER_PERMISSION) || granted.includes(ALL_PERMISSIONS);
-});
+export const canOpenManagement: ComputedRef<boolean> = computed(() =>
+  hasPermission(ADMINISTER_PERMISSION),
+);
 
 /**
  * The URL of the management panel for the hub this till belongs to.

@@ -31,7 +31,7 @@ import { config } from './config';
 import { getDeviceContext, invokeTauri, isTauri, type DeviceContext } from './device';
 import { ADMINISTER_PERMISSION } from './management-link';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
-import { user } from './session';
+import { hasPermission } from './session';
 import type { HealthState } from './system-health';
 
 /**
@@ -218,14 +218,10 @@ export const appUpdateDestination = ref<string | null>(null);
  * A filter, not a wall (ADR-0248, hub#435): reinstalling the till is not a waiter's job mid-service,
  * and a greyed-out button would only make them ask why. The permission is the core's own
  * `hub.administer` — nothing new is minted here.
- *
- * ⚠️ The wildcard rule below is the THIRD copy of the same two lines (`lib/management-link.ts`,
- * `lib/runtime.ts`). Hoisting it into one place is hub#506, kept out of this change on purpose.
  */
-export const canUpdateApp: ComputedRef<boolean> = computed(() => {
-  const granted = user.value?.permissions ?? [];
-  return granted.includes(ADMINISTER_PERMISSION) || granted.includes('*');
-});
+export const canUpdateApp: ComputedRef<boolean> = computed(() =>
+  hasPermission(ADMINISTER_PERMISSION),
+);
 
 /** Where the till remembers which version it already mentioned, so it mentions it once. */
 const ANNOUNCED_STORAGE_KEY = 'erplora.app_update.announced';
