@@ -58,6 +58,12 @@ pub const ERR_INVALID_DEFINITION: &str = "flow.invalid_definition";
 pub const ERR_STEP_KIND_NOT_AVAILABLE: &str = "flow.step_kind_not_available";
 pub const ERR_UNKNOWN_OPERATOR: &str = "flow.unknown_operator";
 pub const ERR_SECRET_NOT_AVAILABLE: &str = "flow.secret_not_available";
+/// hub#730. A `cron` the engine cannot resolve used to be stored as an ACTIVE trigger with a NULL
+/// `next_run` — armed on the screen, invisible to the claim query, silent forever. It is refused
+/// here, at the door the author knocks on, like every other thing this kernel cannot execute.
+pub const ERR_INVALID_CRON: &str = "flow.invalid_cron";
+/// Same family: `at: "manana por la tarde"` was copied straight into `next_run`.
+pub const ERR_INVALID_AT: &str = "flow.invalid_at";
 
 fn invalid(code: &str, message: impl Into<String>) -> RuntimeError {
     RuntimeError::Domain {
@@ -840,10 +846,29 @@ fn parse_trigger(value: &Json) -> Result<TriggerDef> {
             ERR_INVALID_DEFINITION,
             "a `cron` trigger needs a cron expression",
         )),
+        // hub#730: "not empty" is not the same as "runnable". The engine is asked BEFORE storing,
+        // because everything it cannot resolve ends up as `next_run = NULL` — a trigger the
+        // screen calls active and the claim query never sees again. Same rule as an unknown
+        // operator or an `ai` step: refused at save time, naming what is wrong.
+        TriggerKind::Cron => match crate::scheduler::cron::validate(&trigger.cron) {
+            Ok(()) => Ok(trigger),
+            Err(why) => Err(invalid(ERR_INVALID_CRON, why)),
+        },
         TriggerKind::At if trigger.at.trim().is_empty() => Err(invalid(
             ERR_INVALID_DEFINITION,
             "an `at` trigger needs an RFC-3339 instant",
         )),
+        TriggerKind::At if chrono::DateTime::parse_from_rfc3339(trigger.at.trim()).is_err() => {
+            Err(invalid(
+                ERR_INVALID_AT,
+                format!(
+                    "`{}` is not an instant. An `at` trigger takes RFC-3339 with its offset \
+                     (e.g. `2026-08-11T09:00:00+02:00`); the text was being copied into \
+                     `next_run` as-is and the trigger never fired.",
+                    trigger.at.trim()
+                ),
+            ))
+        }
         _ => Ok(trigger),
     }
 }
@@ -1279,6 +1304,90 @@ mod tests {
         assert!(FlowDefinition::parse(&json!({
             "schema_version": 1,
             "triggers": [{ "kind": "manual" }],
+            "steps": [{ "id": "a", "kind": "delay", "seconds": 1 }]
+        }))
+        .is_ok());
+    }
+
+    /// hub#730. The gate is HERE, at the door the person knocks on. Everything below used to be
+    /// `201 Created` + `enabled: true` + a `next_run` of NULL: a flow the screen calls «activo»
+    /// and that was never going to run. An engine that promises and says nothing is worse than
+    /// one that says no.
+    #[test]
+    fn a_cron_the_engine_cannot_run_is_refused_at_save_time() {
+        for (expr, needle) in [
+            ("esto no es un cron", "esto"),
+            ("0 0 9 * * *", "5 fields"),
+            ("* * *", "5 fields"),
+            ("70 * * * *", "70"),
+            ("0 9 * * FUNDAY", "FUNDAY"),
+            ("*/0 * * * *", "step"),
+            ("5-1 * * * *", "5-1"),
+            ("@reboot", "@reboot"),
+            ("0 0 30 2 *", "never"),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "triggers": [{ "kind": "cron", "cron": expr }],
+                "steps": [{ "id": "a", "kind": "delay", "seconds": 1 }]
+            }))
+            .expect_err("`{expr}` would be stored armed and never fire");
+            let RuntimeError::Domain { code, message } = &err else {
+                panic!("`{expr}`: expected a domain error, got {err}");
+            };
+            assert_eq!(code, ERR_INVALID_CRON, "`{expr}`");
+            assert!(
+                message.contains(needle),
+                "`{expr}`: the author has to be told WHAT is wrong; expected `{needle}` in `{message}`"
+            );
+            // …and the same message tells them what they CAN write.
+            assert!(message.contains("*/N"), "`{expr}`: no syntax help in `{message}`");
+        }
+    }
+
+    /// The other half of hub#730: what a person writes coming from crontab/Zapier/n8n has to
+    /// WORK, not just be refused politely.
+    #[test]
+    fn the_cron_shapes_a_person_actually_writes_are_accepted() {
+        for expr in [
+            "1-5 * * * *",
+            "1,15 * * * *",
+            "0 9 * * MON",
+            "0 9 * * MON-FRI",
+            "30 8,20 * * *",
+            "0-30/10 * * * *",
+            "*/15 * * * *",
+            "@daily",
+            "0 0 29 2 *",
+        ] {
+            FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "triggers": [{ "kind": "cron", "cron": expr }],
+                "steps": [{ "id": "a", "kind": "delay", "seconds": 1 }]
+            }))
+            .unwrap_or_else(|e| panic!("`{expr}` is a cron anybody would write: {e}"));
+        }
+    }
+
+    /// Same family, same silence: `at: "manana por la tarde"` was copied straight into `next_run`.
+    #[test]
+    fn an_at_trigger_that_is_not_an_instant_is_refused() {
+        for at in ["manana por la tarde", "2026-13-45", "tomorrow"] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "triggers": [{ "kind": "at", "at": at }],
+                "steps": [{ "id": "a", "kind": "delay", "seconds": 1 }]
+            }))
+            .expect_err("`{at}` is not an instant");
+            let RuntimeError::Domain { code, message } = &err else {
+                panic!("`{at}`: expected a domain error, got {err}");
+            };
+            assert_eq!(code, ERR_INVALID_AT, "`{at}`");
+            assert!(message.contains("RFC-3339"), "`{at}`: {message}");
+        }
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "triggers": [{ "kind": "at", "at": "2026-08-11T09:00:00+02:00" }],
             "steps": [{ "id": "a", "kind": "delay", "seconds": 1 }]
         }))
         .is_ok());

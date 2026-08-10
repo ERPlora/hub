@@ -33,6 +33,11 @@ export interface HubSettings {
   country_code: string;
   /** Subdivisión fiscal ISO-3166-2, o null si aplica el régimen general del país. */
   region_code?: string | null;
+  /** Zona horaria IANA del NEGOCIO (hub#731), o null = «dedúcela de `country_code`/`region_code`»,
+   *  que es el caso normal. Es el reloj con el que el kernel de flujos lee un trigger `cron`:
+   *  «cierra la caja a las 21:00» son las 21:00 de la tienda, no UTC. Solo hace falta declararla
+   *  en un país con varios husos. Las `scheduled_tasks` de los módulos NO la usan: son UTC. */
+  timezone?: string | null;
   /** Identidad de NEGOCIO (FUENTE ÚNICA país-agnóstica, ADR-0061): identificador fiscal universal
    *  (NIF/CIF en ES, SIREN/SIRET en FR, VAT-ID…) del obligado tributario. La usan invoice (emisor),
    *  los módulos fiscales por país (verifactu…) y los documentos de venta. Vacío hasta configurarse. */
@@ -77,6 +82,9 @@ function setHubSettings(raw: unknown): HubSettings {
       typeof r.region_code === 'string' && r.region_code.trim()
         ? r.region_code.trim().toUpperCase()
         : null,
+    // Nombre IANA tal cual (`Europe/Madrid`): NO se pone en mayúsculas — el runtime valida contra
+    // la tzdb y `EUROPE/MADRID` no existe. `null` = la deduce el hub del país.
+    timezone: typeof r.timezone === 'string' && r.timezone.trim() ? r.timezone.trim() : null,
     business_tax_id: typeof r.business_tax_id === 'string' ? r.business_tax_id : '',
     business_legal_name: typeof r.business_legal_name === 'string' ? r.business_legal_name : '',
     business_address: typeof r.business_address === 'string' ? r.business_address : '',

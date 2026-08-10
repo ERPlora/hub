@@ -260,6 +260,10 @@ pub async fn seed_triggers(
     flow_enabled: bool,
 ) -> Result<()> {
     let now = now_rfc3339();
+    // The clock a `cron` trigger is read on: the BUSINESS one (hub#731). It is resolved once per
+    // save, from the hub's settings — not stored in the document — so that correcting the hub's
+    // country fixes every flow at once instead of asking the owner to re-save each of them.
+    let tz = crate::settings::timezone_of(db, hub_id).await?;
     let mut keys: Vec<String> = Vec::new();
 
     for trigger in &def.triggers {
@@ -267,9 +271,10 @@ pub async fn seed_triggers(
         keys.push(key.clone());
 
         // Only the clock kinds carry a `next_run`. `at` is one-shot: its instant IS its due date,
-        // and firing disables it.
+        // and firing disables it. (`at` needs no zone: the author wrote a full instant, offset
+        // included — that is what makes it RFC-3339 and why the gate now demands it.)
         let next_run = match trigger.kind {
-            TriggerKind::Cron => cron::next_after(&trigger.cron, &now),
+            TriggerKind::Cron => cron::next_after_in_tz(&trigger.cron, &now, tz),
             TriggerKind::At => Some(trigger.at.clone()),
             _ => None,
         };
@@ -290,15 +295,19 @@ pub async fn seed_triggers(
         p.insert("run_at".into(), json!(trigger.at));
         p.insert("enabled".into(), json!(i64::from(flow_enabled)));
         p.insert("next_run".into(), json!(next_run));
+        p.insert(
+            "tz".into(),
+            json!(if trigger.kind == TriggerKind::Cron { tz.name() } else { "" }),
+        );
         p.insert("now".into(), json!(now));
-        // The upsert deliberately does NOT touch `next_run`: re-saving a flow must not reschedule
-        // a nightly job to now (`seed_module_tasks`, hub#570).
+        // The upsert deliberately does NOT touch `next_run` (nor the `tz` it was computed under):
+        // re-saving a flow must not reschedule a nightly job to now (`seed_module_tasks`, hub#570).
         db.execute(
             "INSERT INTO _flow_triggers \
                (id, hub_id, flow_id, trigger_key, kind, event_name, filter, input_map, cron, \
-                run_at, enabled, next_run, created_at, updated_at) \
+                run_at, enabled, next_run, tz, created_at, updated_at) \
              VALUES (:id, :hub_id, :flow_id, :key, :kind, :event_name, :filter, :input_map, :cron, \
-                     :run_at, :enabled, :next_run, :now, :now) \
+                     :run_at, :enabled, :next_run, :tz, :now, :now) \
              ON CONFLICT (hub_id, flow_id, trigger_key) WHERE deleted_at IS NULL DO UPDATE SET \
                kind = :kind, event_name = :event_name, filter = :filter, input_map = :input_map, \
                cron = :cron, run_at = :run_at, enabled = :enabled, updated_at = :now",

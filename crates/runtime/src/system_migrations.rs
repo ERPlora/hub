@@ -1021,6 +1021,30 @@ CREATE TABLE IF NOT EXISTS _flow_secrets (\
 CREATE UNIQUE INDEX IF NOT EXISTS ux_flow_secret_name \
   ON _flow_secrets (hub_id, name) WHERE deleted_at IS NULL;",
     },
+    // ── v37 — hub#731: en qué reloj se armó cada trigger de reloj ──────────────────────────────
+    // `next_run` siempre es UTC (es una columna TEXT que se compara con `<=`, y un `+02:00` en la
+    // cadena ordenaría como otro instante). Lo que cambia con hub#731 es **cómo se lee** el cron:
+    // en la zona del negocio, porque «cierra la caja a las 21:00» son las 21:00 de la tienda.
+    //
+    // Esta columna guarda la zona con la que se calculó el `next_run` que hay en la fila, y con
+    // eso una sola comprobación en el barrido resuelve los DOS casos que el cambio abre:
+    //   1. los triggers que ya estaban armados **en UTC** antes de este arreglo, y
+    //   2. un negocio que se muda de huso (o corrige su país) y espera que sus flujos le sigan.
+    // En ambos la fila dice una zona distinta de la del hub y se re-arma sola en el siguiente
+    // tick. Sin la columna habría que resembrar a mano o dejar el reloj viejo hasta el próximo
+    // disparo, que es medio año de diferencia para un flujo anual.
+    //
+    // `''` = «se calculó antes de que esto existiera» (o sea, UTC), que es justo lo que dispara
+    // el re-armado la primera vez.
+    //
+    // ⚠️ v37: número re-comprobado contra el máximo de `origin/develop` justo antes del push
+    // (hub#573) — hay varias ramas de flujos a la vez y cada una quiere un número.
+    SystemMigration {
+        version: 37,
+        name: "flow_trigger_timezone",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _flow_triggers ADD COLUMN IF NOT EXISTS tz TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2576,10 +2600,11 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        // 33 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
-        // (v36, hub#662). El número está a mano a propósito: añadir una migración de sistema tiene
-        // que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero
-        // antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan el mismo número.
-        assert_eq!(MIGRATIONS.len(), 33, "el catálogo cambió de tamaño");
+        // 34 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
+        // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731). El número está a mano a propósito:
+        // añadir una migración de sistema tiene que ser un gesto CONSCIENTE, y este assert es lo
+        // que obliga a mirar el catálogo entero antes de tocarlo — que es justo lo que evita que
+        // dos ramas en vuelo pidan el mismo número.
+        assert_eq!(MIGRATIONS.len(), 34, "el catálogo cambió de tamaño");
     }
 }
