@@ -191,6 +191,7 @@ export default {
       // en vez de pintar un error rojo sobre un plan que el dueño simplemente no ha contratado.
       blocked: 'Estas hay que añadirlas antes a tu plan: {apps}',
       failed: 'Hay algo más que no ha entrado. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      failedApps: 'Estas no han entrado: {apps}. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
       notStartedTitle: 'No se ha podido abrir esa plantilla',
       notStartedBody: 'No ha cambiado nada en tu negocio. Inténtalo otra vez o cárgala desde Ajustes › Datos.',
       interruptedTitle: 'La configuración no ha terminado',

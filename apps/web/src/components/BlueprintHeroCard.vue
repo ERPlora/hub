@@ -73,7 +73,7 @@
         {{ t('setup.hero.blocked', { apps: blockedApps.join(', ') }) }}
       </p>
       <p v-if="somethingBroke" class="hero-body hero-failed" data-testid="hero-failed">
-        {{ t('setup.hero.failed') }}
+        {{ failedMessage }}
       </p>
 
       <p v-if="outcome?.kind === 'not_started'" class="hero-body" data-testid="hero-not-started">
@@ -234,6 +234,19 @@ const somethingBroke = computed<boolean>(
     outcome.value?.kind === 'partial' &&
     (outcome.value.failedApps.length > 0 || outcome.value.failedParts > 0),
 );
+
+/**
+ * What broke, NAMED when we know the names (hub#751).
+ *
+ * «Something else did not go in» sent a hairdresser to hunt for a needle: the card already knew it
+ * was `verifactu`, and said nothing. When the failure is an app, it is named — that is what she can
+ * act on, and what she can repeat to support. Only a section-level failure keeps the generic
+ * sentence, because there no name would mean anything to her.
+ */
+const failedMessage = computed<string>(() => {
+  const apps = outcome.value?.kind === 'partial' ? outcome.value.failedApps : [];
+  return apps.length ? t('setup.hero.failedApps', { apps: apps.join(', ') }) : t('setup.hero.failed');
+});
 
 const reason = computed<string>(() =>
   outcome.value?.kind === 'not_started' || outcome.value?.kind === 'interrupted'

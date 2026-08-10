@@ -197,6 +197,10 @@ export default {
       // where, instead of painting a red error over a plan the owner simply has not bought.
       blocked: 'These have to be added to your plan first: {apps}',
       failed: 'Something else did not go in. You can see the detail and try again in Settings › Data.',
+      // hub#751 — the card already knows WHICH apps broke, so it names them: «something else» sent
+      // a hairdresser to hunt for a needle. The generic line above is left for the case where the
+      // failure is not an app and no name would mean anything to her.
+      failedApps: 'These did not go in: {apps}. You can see the detail and try again in Settings › Data.',
       notStartedTitle: 'That template could not be opened',
       notStartedBody: 'Nothing changed in your business. Try again, or load it from Settings › Data.',
       interruptedTitle: 'The set-up did not finish',

@@ -344,6 +344,26 @@ describe('what the owner is told afterwards', () => {
     expect(w.find('[data-testid="hero-done"]').exists()).toBe(false);
   });
 
+  // hub#751 — «something else did not go in» sent a hairdresser to look for a needle. The card
+  // already KNOWS which apps broke; naming them is the difference between an unactionable sentence
+  // and one she can act on (or repeat to support).
+  it('NAMES the apps that did not go in, instead of "something else"', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [],
+      installed_modules: [
+        { id: 'sales', version: '2.12.8', status: 'installed' },
+        { id: 'verifactu', version: '1.4.1', status: 'failed', error: 'versión no encontrada: 1.4.1' },
+      ],
+    });
+    const w = await outcomeOf(mountCard());
+
+    const failed = w.find('[data-testid="hero-failed"]');
+    expect(failed.exists()).toBe(true);
+    expect(failed.text()).toContain('verifactu');
+    // …and not the app that DID go in: naming the wrong one is worse than naming none.
+    expect(failed.text()).not.toContain('sales');
+  });
+
   it('raises the same line when every app went in but a PART of the template did not', async () => {
     importBlueprint.mockResolvedValue({
       sections: [{ section: 'hub_settings', status: { Failed: 'db down' } }],
