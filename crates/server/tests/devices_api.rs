@@ -89,7 +89,6 @@ async fn fixture_with_state(hub_id: &str) -> (axum::Router, Sessions, AppState) 
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     let state = AppState::with_config(rt, cfg);
     (app(state.clone()), sessions, state)

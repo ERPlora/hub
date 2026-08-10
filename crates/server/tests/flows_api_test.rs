@@ -71,7 +71,6 @@ async fn fixture() -> Fixture {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     Fixture {
         router: app(AppState::with_config(rt, cfg)),

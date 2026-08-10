@@ -39,7 +39,6 @@ pub mod api_keys;
 pub mod assistant;
 pub mod auth;
 pub mod boot_announce;
-pub mod bootstrap;
 pub mod daily_usage;
 /// `shared` (counter till) vs `personal` (somebody's own device) — plan step 2b, hub#357.
 pub mod device_mode;
@@ -758,15 +757,20 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
-    // Import del blueprint que el SaaS DECLARÓ para este hub (ADR-0212, hub#406): lo que hace que
-    // un hub recién provisionado —la demo— nazca con catálogo en vez de con el asistente de setup.
+    // ⛔ Aquí iba el import del blueprint DECLARADO por el SaaS (ADR-0212 / hub#406), y ya no va:
+    // **un hub nace VACÍO** (ADR-0293). Era el único paso del arranque que instalaba módulos por su
+    // cuenta —`ImportSelection.modules` = todos los del manifest de la plantilla—, así que un hub
+    // recién provisionado amanecía con el vertical entero puesto (13 apps con el blueprint
+    // `restaurante` de la demo).
     //
-    // 🔴 Va en su propia task, NO en el camino de arranque. El seed de arriba se aplica con `?` y
-    // un seed roto aborta el boot a propósito; esto no puede: un blueprint que no se pueda importar
-    // debe dejar un hub que FUNCIONA (degradado, sin catálogo), nunca un visitante sin hub. Por eso
-    // `spawn_declared_blueprint_import` devuelve un handle y no un Result — no hay nada que `?`
-    // pueda propagar hasta aquí. Sin las claves de env no lanza nada y no toca el Cloud.
-    bootstrap::spawn_declared_blueprint_import(&state);
+    // ERPlora es un **ERP genérico, no un POS**: el vertical lo elige el usuario. Un hub nuevo trae
+    // su configuración y nada más, y la primera pantalla le ofrece los blueprints para que importe
+    // el suyo. Sembrárselo al nacer decide por él justo lo que el producto le deja elegir.
+    //
+    // Las dos claves de env (`HUB_BOOTSTRAP_BLUEPRINT`, `HUB_BOOTSTRAP_BLUEPRINT_LOCALE`) siguen
+    // llegando en el despliegue de las demos y **se ignoran a propósito**; `HubConfig::from_env` ya
+    // no las lee. Lo vigila `tests/newborn_hub_is_empty.rs`, que arranca el hub de verdad con ellas
+    // puestas y comprueba que no se le pide un solo blueprint al Cloud.
 
     // Disparadores 1 y 3 del refetch del certificado delegado (ADR-0202 §2 punto 4): el de
     // ARRANQUE y el del FALLO TLS contra la AEAT. (El 2 —el heartbeat— va en el tick de arriba.)

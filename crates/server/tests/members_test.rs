@@ -30,7 +30,6 @@ async fn state_with_token(token: Option<&str>) -> AppState {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     AppState::with_config(rt, cfg)
 }
@@ -145,7 +144,6 @@ async fn admin_state(cloud_base_url: &str) -> AppState {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     AppState::with_config(rt, cfg)
 }
