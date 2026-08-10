@@ -389,6 +389,19 @@ export default {
     hubLanguageDesc: 'Default Hub language for users without their own',
     saved: 'Settings saved',
     saveError: 'Could not save settings',
+    // A refusal the runtime explains, keyed by its STABLE error code (hub#684). The runtime's own
+    // message is written in English for the log; what the person in front of the screen reads has
+    // to be their language, so the code — not the message — is what travels.
+    saveRefused: {
+      demo_fiscal_identity_locked:
+        'This is a demo, so it invoices as “{name}”. Create your own hub to invoice under your business.',
+      demo_business_certificate_locked:
+        'A demo cannot take your certificate: it never files anything for real. Create your own hub to invoice with it.',
+      demo_fiscal_environment_locked:
+        'A demo always stays in the tax authority’s test environment. Create your own hub to file for real.',
+      business_tax_id_frozen:
+        'The tax id can no longer be changed: this hub has already issued under it.',
+    },
     timezone: 'Timezone',
     timezoneDesc: 'Timezone for dates and times',
     country: 'Country',

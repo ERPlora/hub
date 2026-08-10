@@ -373,6 +373,16 @@ export default {
     hubLanguageDesc: 'Idioma por defecto del Hub para los usuarios sin idioma propio',
     saved: 'Ajustes guardados',
     saveError: 'No se pudieron guardar los ajustes',
+    saveRefused: {
+      demo_fiscal_identity_locked:
+        'Esto es una demo, así que factura como «{name}». Crea tu propio hub para facturar con los datos de tu negocio.',
+      demo_business_certificate_locked:
+        'Una demo no puede quedarse tu certificado: no remite nada de verdad. Crea tu propio hub para facturar con él.',
+      demo_fiscal_environment_locked:
+        'Una demo se queda siempre en el entorno de pruebas de la AEAT. Crea tu propio hub para remitir de verdad.',
+      business_tax_id_frozen:
+        'El NIF ya no se puede cambiar: este hub ya ha emitido con él.',
+    },
     timezone: 'Zona horaria',
     timezoneDesc: 'Zona horaria para fechas y horarios',
     country: 'País',
