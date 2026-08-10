@@ -712,10 +712,13 @@ pub(crate) async fn run_import(
                             "phase": phase,
                         }));
                     };
-                    // ADR-0060 (hub#68): `install_from_cloud` pide el PLAN al Cloud y lo ejecuta,
-                    // así que un módulo del blueprint arrastra sus dependencias transitivas
-                    // (p. ej. `invoice` → `taxes`, `sales`) aunque el manifest no las liste.
-                    let outcome = install::install_from_cloud(
+                    // ADR-0060 (hub#68): `install_bundle_module` pide el PLAN al Cloud y lo
+                    // ejecuta, así que un módulo del blueprint arrastra sus dependencias
+                    // transitivas (p. ej. `invoice` → `taxes`, `sales`) aunque el manifest no las
+                    // liste. Y **no** exige la versión exacta del manifest (hub#751/#752): es la
+                    // foto del hub que exportó, y el marketplace poda las versiones viejas — el
+                    // pin caduca solo y con él la plantilla entera.
+                    let outcome = install::install_bundle_module(
                         &st.http,
                         &st.config.cloud_base_url,
                         &st.config.module_cache,
@@ -831,17 +834,28 @@ pub(crate) async fn run_import(
 /// `blocked` (ADR-0060) es un estado propio, NO un `failed`: el módulo no se instaló porque el
 /// plan exige comprar una dependencia — es una decisión del usuario, no una avería. Se nombran
 /// `blocked_on` + `purchase` para que la UI ofrezca la compra en vez de un error opaco.
+///
+/// `requested_version` solo aparece cuando la versión instalada **no** es la que fijaba el manifest
+/// (hub#751/#752): el marketplace ya no publicaba el pin y se cayó a la más nueva compatible. Una
+/// plantilla que instala en silencio algo distinto de lo que anuncia sería justo la sorpresa que la
+/// sustitución trata de evitar, así que el informe lo nombra en vez de esconderlo.
 fn module_install_entry(
     module_id: &str,
     manifest_version: &str,
     result: Result<install::Installed, install::InstallError>,
 ) -> Value {
     match result {
-        Ok(inst) => json!({
-            "id": inst.module_id,
-            "version": inst.version,
-            "status": "installed",
-        }),
+        Ok(inst) => {
+            let mut entry = json!({
+                "id": inst.module_id,
+                "version": inst.version,
+                "status": "installed",
+            });
+            if inst.version != manifest_version {
+                entry["requested_version"] = json!(manifest_version);
+            }
+            entry
+        }
         Err(install::InstallError::Blocked {
             blocked_on,
             purchase,

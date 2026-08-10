@@ -1074,6 +1074,7 @@ export default {
     reasonBlocked:
       'No se ha instalado: necesita módulos que aún no tienes contratados: {missing}. Contrátalos y vuelve a importar — no se ha tocado nada más.',
     mediaFailed: '{n} sin copiar',
+    reasonVersionSubstituted: 'La plantilla pedía la {requested}; esa versión ya no está disponible, así que ha entrado la {installed}.',
     reasonIdentityNotPortable:
       'Los usuarios, roles y PIN son del hub que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso a tu hub.',
     reasonSettingsNotPortable:

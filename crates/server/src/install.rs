@@ -263,6 +263,105 @@ pub async fn install_from_cloud(
     .await
 }
 
+/// Instala un módulo que pidió un BUNDLE (blueprint), tolerando que su versión ya no se publique.
+///
+/// Es [`install_from_cloud`] con **una** diferencia, y es toda la issue hub#751/#752: la versión
+/// que trae `manifest.modules[].version` es una **foto del hub de origen**, no una exigencia del
+/// negocio que importa. El marketplace poda las versiones viejas al publicar (se queda con las
+/// últimas N), así que un pin de hace unos meses simplemente **ya no existe** — y exigirlo dejaba
+/// a la peluquería sin `sales` y sin `verifactu`: sin cobro, sin ticket, sin registro fiscal.
+///
+/// El pin se intenta **primero y tal cual**: la sustitución es una vía de recuperación, no la
+/// norma, así que un pin vivo se instala exacto y no se paga ningún round-trip de más. Solo cuando
+/// el marketplace responde «esa versión no existe» se pregunta qué publica hoy y decide
+/// [`module_update::resolve_bundle_version`] — la más nueva compatible, nunca hacia atrás, nunca
+/// cruzando un major, nunca una en cuarentena.
+///
+/// Ese `requested != installed` **no puede ser mudo**: se devuelve para que el informe del import
+/// lo diga (una plantilla que instala otra versión de la que anuncia sería justo la sorpresa que
+/// esto trata de evitar). `None` = se instaló exactamente lo pineado.
+pub async fn install_bundle_module(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    cache_root: &std::path::Path,
+    auth: &Auth,
+    runtime: &mut erplora_runtime::Runtime,
+    module_id: &str,
+    manifest_version: &str,
+    on_progress: OnProgress<'_>,
+    signature_policy: &cloud_client::SignaturePolicy,
+) -> Result<Installed, InstallError> {
+    let pinned = install_from_cloud(
+        http,
+        cloud_base_url,
+        cache_root,
+        auth,
+        runtime,
+        module_id,
+        manifest_version,
+        on_progress,
+        signature_policy,
+    )
+    .await;
+
+    // Cualquier otro desenlace se respeta: un `blocked` es una compra pendiente, un fallo de firma
+    // o de red es una avería. Solo «esa versión ya no está» abre la puerta a sustituir.
+    let Err(InstallError::VersionNotFound(_)) = &pinned else {
+        return pinned;
+    };
+    if manifest_version.is_empty() || manifest_version == "latest" {
+        // No había pin: el módulo no publica nada instalable y no hay nada que sustituir.
+        return pinned;
+    }
+
+    let available = published_versions(http, cloud_base_url, auth, module_id).await?;
+    let Some(substitute) =
+        erplora_runtime::module_update::resolve_bundle_version(manifest_version, &available)
+    else {
+        return pinned;
+    };
+
+    tracing::warn!(
+        module_id = %module_id,
+        pinned = %manifest_version,
+        installing = %substitute,
+        "el marketplace ya no publica la versión que fija el bundle: se instala la más nueva compatible (hub#751)"
+    );
+    install_from_cloud(
+        http,
+        cloud_base_url,
+        cache_root,
+        auth,
+        runtime,
+        module_id,
+        &substitute,
+        on_progress,
+        signature_policy,
+    )
+    .await
+}
+
+/// Lo que el marketplace publica hoy de un módulo, en la forma que entiende el resolutor del
+/// runtime (`is_active` = la cuarentena, que decide igual aquí que en el auto-update).
+async fn published_versions(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+) -> Result<Vec<erplora_runtime::module_update::Available>, InstallError> {
+    let cloud = CloudClient::new(cloud_base_url);
+    let body = send_text(http, &cloud.versions(auth, module_id)).await?;
+    let versions = ModuleVersion::parse_list(&body)
+        .map_err(|e| InstallError::Cloud(format!("versions/ inválido: {e}")))?;
+    Ok(versions
+        .into_iter()
+        .map(|v| erplora_runtime::module_update::Available {
+            version: v.version,
+            is_active: v.is_active,
+        })
+        .collect())
+}
+
 /// El pipeline compartido por `install` y `update`. `updating` = el módulo que se está
 /// **actualizando** (hub#516): el único al que hay que volver a instalar aunque ya esté instalado.
 #[allow(clippy::too_many_arguments)]
