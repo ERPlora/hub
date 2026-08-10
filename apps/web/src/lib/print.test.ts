@@ -300,6 +300,24 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
+  it('la CUENTA es papel térmico: sin Bridge se ENCOLA, no se manda al navegador (hub#748)', async () => {
+    // La puerta decide «térmico o A4» por el tipo de documento, y la lista era `receipt` + lo que
+    // acabe en `_order`. `prebill` no es ninguna de las dos, así que la cuenta —el papel que más
+    // veces sale en un servicio— se trataba como una factura A4 y se iba al diálogo del navegador:
+    // en la app instalada eso no imprime nada, y en el móvil deja la cola (que existe justo para
+    // este caso) sin usar.
+    const enqueue = vi.fn(async () => true);
+    const browserPrint = vi.fn();
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
+
+    const r = await print({ role: 'receipt', documentType: 'prebill', jobId: 'prebill-o1-3', data: { total: 5.9 }, html: '<i>x</i>' });
+
+    expect(r.via).toBe('queue');
+    expect(enqueue).toHaveBeenCalled();
+    expect(iframePrint).not.toHaveBeenCalled();
+  });
+
   it('un fallo del Bridge al imprimir también va a la cola antes que al navegador', async () => {
     // Hay Bridge y hay impresora del rol, pero print() falla (sin papel, apagada…). El tique no se
     // pierde: a la cola, por si un print host del rol lo saca.

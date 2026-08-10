@@ -95,16 +95,20 @@ pub const MAX_DOCUMENT_BYTES: usize = 512 * 1024;
 /// crate (mDNS, TCP sockets, hardware discovery) and the hub server has no business linking it in
 /// to know the name of a document. What keeps the two honest is a test on **each** side —
 /// [`tests::the_queue_vocabulary_is_the_one_the_renderer_knows`] here, and
-/// `escpos::tests::the_wire_vocabulary_is_exactly_these_seven` there — plus the strict parse at the
+/// `escpos::tests::the_wire_vocabulary_is_exactly_these_eight` there — plus the strict parse at the
 /// printer, which refuses anything that got past this list instead of silently printing it as
 /// `Generic`. Two guards, at two layers, with **different** messages: neither can mask the other.
-pub const DOCUMENT_TYPES: [&str; 7] = [
+pub const DOCUMENT_TYPES: [&str; 8] = [
     "receipt",
     "kitchen_order",
     "invoice",
     "delivery_note",
     "barcode_label",
     "cash_session_report",
+    // The bill taken to the table before charging (ADR-0141, hub#748). It is NOT a receipt and
+    // must not be queued as one: the renderer prints it without series number, payment method or
+    // QR, and with the notice that it is not an invoice.
+    "prebill",
     "generic",
 ];
 
@@ -1007,14 +1011,39 @@ mod tests {
         assert_eq!(all(&db, "h1").await.len(), DOCUMENT_TYPES.len());
     }
 
+    /// **The bill the waiter takes to the table can be queued** (hub#748).
+    ///
+    /// It is the paper a restaurant prints most often — once before every payment — and `prebill`
+    /// was in neither of the two lists, so the queue refused it at the door and the renderer would
+    /// have refused it one layer later. A hub whose queue cannot take the bill is a hub where the
+    /// waiter has nothing to carry to the table.
+    #[tokio::test]
+    async fn the_bill_taken_to_the_table_can_be_queued() {
+        let db = queue_db().await;
+        enqueue(
+            &db,
+            "h1",
+            &NewPrintJob {
+                job_id: "prebill-o1-3".into(),
+                role: "receipt".into(),
+                document_type: "prebill".into(),
+                document: json!({ "items": [{ "name": "Cafe", "quantity": 2, "total": 2.4 }], "total": 2.4 }),
+                format: FORMAT_RECEIPT.into(),
+            },
+        )
+        .await
+        .expect("the bill is a document of this queue");
+        assert_eq!(all(&db, "h1").await.len(), 1, "and it is waiting for a print host");
+    }
+
     /// The queue's vocabulary is **the renderer's**, spelled the way the wire spells it. The
-    /// counterpart lives in `escpos` (`the_wire_vocabulary_is_exactly_these_seven`); this side pins
+    /// counterpart lives in `escpos` (`the_wire_vocabulary_is_exactly_these_eight`); this side pins
     /// that nobody adds a name here that the printer would silently degrade to `Generic`.
     #[test]
     fn the_queue_vocabulary_is_the_one_the_renderer_knows() {
         assert_eq!(
             DOCUMENT_TYPES.len(),
-            7,
+            8,
             "adding a document type means adding it to escpos::DocumentType too"
         );
         for name in DOCUMENT_TYPES {
