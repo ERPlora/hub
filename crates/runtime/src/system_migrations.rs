@@ -1085,6 +1085,33 @@ CREATE INDEX IF NOT EXISTS ix_flow_approval_tray \
   ON _flow_approvals (hub_id, status, created_at);\
 CREATE INDEX IF NOT EXISTS ix_flow_approval_run ON _flow_approvals (hub_id, run_id);",
     },
+    // ── v39 — hub#670: the user-activity mark stops being memory and becomes a row ──────────────
+    // `ActivityState` (ADR-0175) held the only proof that somebody had entered this hub, in an
+    // `AtomicI64`. Fine while a restart was rare; with `order: start-first` (ADR-0269) **every
+    // update kills a task**, and a visit between the mark and the next heartbeat died with the
+    // process. The Cloud counts silence: 60 days ⇒ powered off, 90 ⇒ flagged, **120 ⇒ deleted**.
+    // Losing that mark costs a customer's hub, and deleting is not undoable.
+    //
+    // One row per hub (`hub_id` PK) — the same row contract as the rest of the system schema
+    // (ADR-0201), so a legacy shared database keeps each hub's clock apart. Timestamps are
+    // RFC3339 UTC TEXT like `_print_queue`/`_event_outbox`: fixed width and always `Z`, so the
+    // `GREATEST` of the upsert compares them chronologically without a cast.
+    //
+    // `last_reported_at` is nullable on purpose: NULL is "the Cloud has never confirmed one",
+    // which is a different fact from "the epoch" and is what makes the mark pending again.
+    //
+    // ⚠️ v39: number re-checked against `origin/develop` right before the push (hub#573) — the
+    // flow wave renumbered itself twice in a week.
+    SystemMigration {
+        version: 39,
+        name: "hub_activity",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _hub_activity (\
+  hub_id TEXT NOT NULL, last_activity_at TEXT NOT NULL, last_reported_at TEXT, \
+  updated_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id));",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -1956,6 +1983,60 @@ mod tests {
         assert_eq!(stmts, vec!["CREATE TABLE IF NOT EXISTS a (x);", "DROP TABLE b;"]);
     }
 
+    /// The user-activity mark needs a table of its own (hub#670): kept only in memory it died with
+    /// the process, and with blue/green (ADR-0269) the process dies on every update. The row is
+    /// what stops the Cloud's inactivity clock (ADR-0175) from deleting a free hub at 120 days.
+    ///
+    /// Re-executable on purpose (`CREATE TABLE IF NOT EXISTS`): a rewind of the control table must
+    /// not blow up the second pass, and must not lose a mark that is already there (hub#483).
+    #[tokio::test]
+    async fn apply_creates_the_activity_table_and_can_run_twice_without_losing_the_mark() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+
+        let activity = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_activity")
+            .expect("the activity table is in the catalogue");
+        assert!(
+            max_applied_version(&db).await.unwrap() >= activity.version,
+            "the activity migration must be registered"
+        );
+
+        db.execute_batch(
+            "INSERT INTO _hub_activity (hub_id, last_activity_at, last_reported_at, updated_at) \
+             VALUES ('hub-test', '2026-08-10T09:00:00Z', NULL, '2026-08-10T09:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        // The rewind the suite of hub#436 does: the RECORD is deleted, not the table.
+        let mut p = Params::new();
+        p.insert("version".into(), json!(activity.version));
+        db.execute(
+            "DELETE FROM _hub_system_migrations WHERE version >= :version",
+            &p,
+        )
+        .await
+        .unwrap();
+        apply(&db, "hub-test")
+            .await
+            .expect("the activity migration re-applies over its own table");
+
+        let rows = db
+            .query(
+                "SELECT last_activity_at FROM _hub_activity WHERE hub_id = 'hub-test'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1, "re-applying must not drop the mark");
+        assert_eq!(rows.rows[0]["last_activity_at"], json!("2026-08-10T09:00:00Z"));
+    }
+
     #[tokio::test]
     async fn apply_creates_trusted_device_table_v2() {
         use erplora_db::testutil::fresh_db;
@@ -2640,12 +2721,13 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        // 35 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
-        // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731) + `_flow_approvals` (v38, hub#665).
-        // El número está a mano a propósito: añadir una migración de sistema tiene que ser un gesto
-        // CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero antes de tocarlo —
-        // que es justo lo que evita que dos ramas en vuelo pidan el mismo número, como pasó en esta
-        // ola: hub#731 y hub#665 pidieron las dos el v37 y esta se corrió al v38 al mergear.
-        assert_eq!(MIGRATIONS.len(), 35, "el catálogo cambió de tamaño");
+        // 36 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
+        // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731) + `_flow_approvals` (v38, hub#665) +
+        // `_hub_activity` (v39, hub#670). El número está a mano a propósito: añadir una migración
+        // de sistema tiene que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el
+        // catálogo entero antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan
+        // el mismo número, como pasó en esta ola: hub#731 y hub#665 pidieron las dos el v37 y esta
+        // se corrió al v38 al mergear.
+        assert_eq!(MIGRATIONS.len(), 36, "el catálogo cambió de tamaño");
     }
 }
