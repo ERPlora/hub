@@ -750,6 +750,11 @@ pub async fn uninstall(
         &p,
     )
     .await?;
+    // Y su copia local (hub#571). Va junto al borrado de `hub_module` porque son el mismo hecho:
+    // si el paquete sobreviviera, el primer arranque sin red repondría un módulo que el dueño
+    // quitó — el arranque repone «lo que hub_module dice instalado», y esa fila ya no está, pero
+    // dejar el artefacto ahí es guardar la munición de un bug que no queremos volver a discutir.
+    crate::module_package::forget(db, hub_id, module_id).await?;
     Ok(())
 }
 

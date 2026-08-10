@@ -345,6 +345,139 @@ async fn acquire_and_install(
     .await
 }
 
+/// Guarda en la base del PROPIO hub el paquete que se acaba de verificar e instalar (hub#571).
+///
+/// Es lo que convierte «el hub sabe qué módulos tiene» en «el hub puede volver a montarlos sin
+/// preguntarle a nadie». Se llama SIEMPRE después de `register`, nunca antes: guardar un zip que
+/// no llegó a instalarse sería ofrecer en el próximo arranque algo que ya se sabe que no monta.
+///
+/// **Best-effort a propósito.** Si el guardado falla, el módulo YA está instalado y sirviendo:
+/// tumbar la instalación porque no se pudo escribir la red de seguridad cambiaría un TPV que
+/// funciona por una copia de respaldo. Queda el WARN, y la consecuencia —si algún día hace falta y
+/// no está— la canta `/readyz` (hub#538) en el arranque que la necesite.
+async fn remember_package(
+    runtime: &erplora_runtime::Runtime,
+    module_id: &str,
+    version: &str,
+    sha256: &str,
+    signature: Option<&cloud_client::ModuleSignature>,
+    zip: &[u8],
+) {
+    let signature_json = signature.and_then(|s| serde_json::to_string(s).ok());
+    if let Err(e) = erplora_runtime::module_package::save(
+        runtime.db(),
+        runtime.hub_id(),
+        module_id,
+        version,
+        sha256,
+        signature_json.as_deref(),
+        zip,
+    )
+    .await
+    {
+        tracing::warn!(
+            module_id = %module_id,
+            error = %e,
+            "no se pudo guardar la copia local del módulo (hub#571): este hub no sobrevive a un reinicio sin red"
+        );
+    }
+}
+
+/// Repone los módulos que faltan **desde la copia propia del hub**, sin tocar la red (hub#571).
+///
+/// Es la red de seguridad del arranque: cuando el marketplace no contesta —SaaS caído, DNS torcido,
+/// el router del cliente apagado— esto es lo único que separa «se reinició el TPV» de «el negocio
+/// no puede cobrar». Devuelve los ids repuestos.
+///
+/// **Entra por la MISMA puerta que una descarga** (`ModuleStore::install`): SHA256 obligatorio
+/// (ADR-0015) y firma ed25519 según `signature_policy` (ADR-0193/0194), sobre los bytes guardados.
+/// No hay atajo por ser «local»: si lo hubiera, la copia sería una vía de carga de código sin
+/// verificar, y eso es peor que el problema que resuelve.
+///
+/// Varias pasadas porque `hub_module` no guarda orden topológico y el runtime exige que las
+/// `depends_on` estén registradas: se repite mientras la vuelta anterior haya repuesto algo.
+pub async fn restore_from_local_packages(
+    cache_root: &std::path::Path,
+    runtime: &mut erplora_runtime::Runtime,
+    missing: &[(String, String)],
+    signature_policy: &cloud_client::SignaturePolicy,
+) -> Vec<String> {
+    let mut pending: Vec<String> = missing.iter().map(|(id, _)| id.clone()).collect();
+    let mut restored: Vec<String> = Vec::new();
+
+    while !pending.is_empty() {
+        let mut retry: Vec<String> = Vec::new();
+        let mut progressed = false;
+        for module_id in std::mem::take(&mut pending) {
+            match restore_one(cache_root, runtime, &module_id, signature_policy).await {
+                Ok(true) => {
+                    eprintln!("✓ módulo repuesto de la copia local: {module_id}");
+                    restored.push(module_id);
+                    progressed = true;
+                }
+                // Sin copia guardada no hay nada que reintentar: otra pasada daría lo mismo.
+                Ok(false) => eprintln!(
+                    "✗ {module_id}: sin copia local (se instaló antes de hub#571 o no se pudo guardar)"
+                ),
+                // Con copia pero sin montar: puede ser el turno (le faltaba una dependencia que
+                // otra entrada de esta misma tanda repone), así que vuelve a la cola.
+                Err(e) => {
+                    eprintln!("✗ reposición local de {module_id}: {e}");
+                    retry.push(module_id);
+                }
+            }
+        }
+        if !progressed {
+            break;
+        }
+        pending = retry;
+    }
+    restored
+}
+
+/// Repone UN módulo de su copia local. `Ok(false)` = este hub no tiene copia guardada.
+async fn restore_one(
+    cache_root: &std::path::Path,
+    runtime: &mut erplora_runtime::Runtime,
+    module_id: &str,
+    signature_policy: &cloud_client::SignaturePolicy,
+) -> Result<bool, InstallError> {
+    let stored =
+        erplora_runtime::module_package::load(runtime.db(), runtime.hub_id(), module_id)
+            .await
+            .map_err(|e| InstallError::Runtime(e.to_string()))?;
+    let Some(stored) = stored else {
+        return Ok(false);
+    };
+
+    // La firma se guardó tal cual llegó del marketplace. Ilegible ⇒ `None`, que bajo `Enforce`
+    // es un rechazo — nunca un pase: una firma que no se puede leer no es una firma válida.
+    let signature = stored
+        .signature_json
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<cloud_client::ModuleSignature>(raw).ok());
+    let version = ModuleVersion {
+        version: stored.version.clone(),
+        changelog: String::new(),
+        is_active: true,
+        file_size_bytes: 0,
+        sha256: Some(stored.sha256.clone()),
+        signature: signature.clone(),
+    };
+    let store = ModuleStore::new(cache_root);
+    let dir = acquire(
+        &store,
+        module_id,
+        &version,
+        &stored.sha256,
+        signature,
+        stored.zip,
+        signature_policy,
+    )?;
+    register(runtime, &dir, module_id, None).await?;
+    Ok(true)
+}
+
 /// Resultado de pedir una actualización de módulo (hub#516).
 ///
 /// `updated == false` **no es un fallo**: es «ya está en la versión que le toca». Es el caso normal
@@ -750,13 +883,24 @@ async fn execute_plan(
             &node.module_id,
             &version,
             sha,
-            signature,
-            zip_bytes,
+            signature.clone(),
+            zip_bytes.clone(),
             signature_policy,
         )?;
 
         on_progress(&node.module_id, "installing");
         let installed_id = register(runtime, &dir, &node.module_id, updating).await?;
+
+        // hub#571: la copia propia del hub, para el arranque en el que el marketplace no conteste.
+        remember_package(
+            runtime,
+            &node.module_id,
+            &node.version,
+            sha,
+            signature.as_ref(),
+            &zip_bytes,
+        )
+        .await;
 
         mark_installed(http, &cloud, auth, &node.module_id, &node.version).await;
 
@@ -855,7 +999,7 @@ fn install_recursive<'a>(
             &version,
             &sha,
             version.signature.clone(),
-            zip_bytes,
+            zip_bytes.clone(),
             signature_policy,
         )?;
 
@@ -891,6 +1035,18 @@ fn install_recursive<'a>(
         // (5) Instalar el módulo (migra, registra, activa) — ya con sus deps presentes.
         on_progress(&module_id, "installing");
         let installed_id = register(runtime, &dir, &module_id, updating.as_deref()).await?;
+
+        // (5bis) hub#571: guardar la copia propia del hub, para el arranque en el que el
+        //        marketplace no conteste. Después de instalar, nunca antes.
+        remember_package(
+            runtime,
+            &module_id,
+            &version.version,
+            &sha,
+            version.signature.as_ref(),
+            &zip_bytes,
+        )
+        .await;
 
         // (6) Registrar la instalación en el Cloud (best-effort: no aborta si falla).
         mark_installed(http, &cloud, auth, &module_id, &version.version).await;

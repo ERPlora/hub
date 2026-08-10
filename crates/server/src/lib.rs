@@ -551,6 +551,51 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     missing.len()
                 ),
             }
+
+            // 🛟 **Y si el marketplace no dio, la copia PROPIA del hub** (hub#571). Todo lo de
+            // arriba depende del SaaS: un reinicio con el Cloud caído, un DNS torcido o el router
+            // del cliente apagado dejaban al hub arrancando SIN un solo módulo — `/readyz` en DOWN,
+            // Swarm recreando el contenedor en bucle y el bar sin TPV. Este es el único camino que
+            // no pasa por la red: los bytes se guardaron en la base del propio hub al instalar y se
+            // vuelven a verificar aquí igual que una descarga (SHA256 + firma según la política).
+            //
+            // Va DESPUÉS y no antes a propósito: la vía del marketplace es también la de la
+            // actualización automática (hub#516/ADR-0269), y adelantarla convertiría cada arranque
+            // en «quédate donde estás». Primero se intenta llegar a lo que toca; esto es la red que
+            // impide caer por debajo de lo que ya se tenía.
+            let still_missing = state
+                .runtime
+                .lock()
+                .await
+                .installed_but_unregistered()
+                .await
+                .unwrap_or_default();
+            if !still_missing.is_empty() {
+                eprintln!(
+                    "marketplace inalcanzable para {} módulo(s): reponiendo de la copia local…",
+                    still_missing.len()
+                );
+                let cache_root = state.config.module_cache.clone();
+                let policy = state.config.signature_policy();
+                let orphans = {
+                    let mut rt = state.runtime.lock().await;
+                    install::restore_from_local_packages(
+                        &cache_root,
+                        &mut rt,
+                        &still_missing,
+                        &policy,
+                    )
+                    .await;
+                    rt.installed_but_unregistered().await.unwrap_or_default()
+                };
+                // Ni copia, ni marketplace, ni tarea vieja a la que volver: aquí la regla «nunca con
+                // menos» no se puede cumplir, porque no hay ninguna alternativa que la cumpla. Lo
+                // que NO puede pasar es que sea un silencio — un hub que arranca incompleto tiene
+                // que llegar a alguien, no morir en el log de un contenedor.
+                if !orphans.is_empty() {
+                    report_incomplete_boot(&orphans);
+                }
+            }
         }
     }
 
@@ -1349,6 +1394,60 @@ fn report_failed_module_update(
             "outcome": if fell_back { "stayed_on_previous" } else { "no_module" },
         })),
     );
+}
+
+/// El informe de un arranque **incompleto** (hub#571), sin mandarlo todavía.
+///
+/// Aparte para poder fijarlo con un test: lo que importa de este evento es su **contenido** —el
+/// código estable contra el que se programa y los módulos que faltan—, no que se haya llamado a un
+/// sink global.
+///
+/// Es un fallo **del hub**, no de un módulo: lo que se cayó es el arranque, y colgárselo al primero
+/// de la lista mandaría a mirar donde no es.
+fn incomplete_boot_event(orphans: &[(String, String)]) -> erplora_runtime::error_registry::ErrorEvent {
+    use erplora_runtime::error_registry::{severity, source, ErrorEvent};
+
+    let names: Vec<String> = orphans
+        .iter()
+        .map(|(id, version)| format!("{id}@{version}"))
+        .collect();
+    ErrorEvent::new(
+        source::HUB,
+        "module_boot_incomplete",
+        format!(
+            "el hub arrancó SIN {} módulo(s) instalados: {} — ni el marketplace ni la copia local \
+             pudieron reponerlos",
+            orphans.len(),
+            names.join(", ")
+        ),
+        severity::UNEXPECTED,
+    )
+    .with_context(json!({
+        "count": orphans.len(),
+        "modules": orphans
+            .iter()
+            .map(|(id, version)| json!({ "module_id": id, "version": version }))
+            .collect::<Vec<_>>(),
+    }))
+}
+
+/// Manda al Cloud que este hub arrancó **sin** alguno de sus módulos (hub#571).
+///
+/// Es el caso que ADR-0269 no puede cumplir: no hay copia, no hay versión anterior y no hay tarea
+/// vieja a la que volver. Lo único que sí está en nuestra mano es que **no sea un silencio** — un
+/// hub incompleto que solo lo cuenta en el log de un contenedor es un hub que nadie arregla.
+/// Best-effort por contrato del registro: sin sink (hub sin enrolar) se descarta.
+fn report_incomplete_boot(orphans: &[(String, String)]) {
+    eprintln!(
+        "🔴 el hub arranca SIN {} módulo(s): {}",
+        orphans.len(),
+        orphans
+            .iter()
+            .map(|(id, v)| format!("{id}@{v}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    erplora_runtime::error_registry::ErrorRegistry::global().report(incomplete_boot_event(orphans));
 }
 
 /// La versión que debe correr un módulo en este arranque (hub#516).
@@ -3696,6 +3795,39 @@ async fn mint_session_with_extra(
             Json(payload).into_response()
         }
         Err(e) => err_response(e),
+    }
+}
+
+#[cfg(test)]
+mod incomplete_boot_report_tests {
+    //! hub#571: un hub que arranca SIN alguno de sus módulos no puede ser un silencio.
+    use super::incomplete_boot_event;
+
+    #[test]
+    fn the_report_names_every_module_that_could_not_be_mounted() {
+        let event = incomplete_boot_event(&[
+            ("sales".to_string(), "3.2.0".to_string()),
+            ("taxes".to_string(), "1.4.0".to_string()),
+        ]);
+
+        assert_eq!(event.error_code, "module_boot_incomplete");
+        assert_eq!(event.severity, erplora_runtime::error_registry::severity::UNEXPECTED);
+        // Los módulos, con su versión, para que quien lo lea sepa QUÉ falta sin abrir el hub.
+        assert_eq!(event.context["modules"][0]["module_id"], "sales");
+        assert_eq!(event.context["modules"][0]["version"], "3.2.0");
+        assert_eq!(event.context["modules"][1]["module_id"], "taxes");
+        assert_eq!(event.context["count"], 2);
+        assert!(event.message.contains("sales"), "{}", event.message);
+        assert!(event.message.contains("taxes"), "{}", event.message);
+    }
+
+    /// El evento es del HUB, no de un módulo: no hay un culpable al que colgárselo — lo que falló
+    /// es el arranque, y atribuirlo al primero de la lista mandaría a mirar donde no es.
+    #[test]
+    fn the_failure_belongs_to_the_hub_and_not_to_one_of_the_modules() {
+        let event = incomplete_boot_event(&[("sales".to_string(), "3.2.0".to_string())]);
+        assert_eq!(event.source, erplora_runtime::error_registry::source::HUB);
+        assert_eq!(event.module_id, None);
     }
 }
 
