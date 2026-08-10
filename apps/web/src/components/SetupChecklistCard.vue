@@ -138,9 +138,10 @@ const view = computed(() =>
 const fraction = computed<number>(() => (view.value.total > 0 ? view.value.done / view.value.total : 0));
 
 /**
- * The item's title. A CORE item's key is also its i18n key; the English `title` travelling in the
- * answer is the fallback — and it is all there is for a module item, whose `title` the runtime does
- * not localize yet (`setup-status.md` §7). A raw key is never painted.
+ * The item's title. A CORE item's key is also its i18n key, so the shell translates it directly;
+ * the English `title` in the payload is the fallback. A MODULE item's `title` is already localized
+ * by the runtime against the hub's locale (ADR-0055, hub#762: `locale → en → manifest`), so this
+ * fallback is what a third-party module without `locales/` lands on — and a raw key is never painted.
  */
 function titleOf(item: SetupItem): string {
   return translated(`setup.items.${item.key}.title`) || item.title || item.key;

@@ -1610,14 +1610,31 @@ impl Manifest {
 }
 
 /// Catálogo de traducciones de un módulo para UN idioma (`locales/<lang>.json`, ADR-0055). El
-/// runtime solo resuelve `name` y `navigation[].label`; el bloque `ui` lo consume el Web Component
-/// (lo hornea el toolkit en el `dist`), por eso aquí se ignora.
+/// runtime resuelve `name`, `navigation[].label` y `setup.{title,description}`; el bloque `ui` lo
+/// consume el Web Component (lo hornea el toolkit en el `dist`), por eso aquí se ignora.
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct ModuleLocale {
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub navigation: HashMap<String, NavLocale>,
+    /// Checklist item copy (ADR-0055, hub#762): the translation of the module's `setup.title` /
+    /// `setup.description`. The manifest values stay as the English-canonical fallback
+    /// (`locale → en → manifest`).
+    #[serde(default)]
+    pub setup: SetupLocale,
+}
+
+/// Translation of a module's `setup` block (`locales/<lang>.json`, ADR-0055, hub#762).
+///
+/// Mirrors [`SetupDef::title`] / [`SetupDef::description`]: both are optional, so a module that
+/// ships only the translated title still resolves it and falls back to the manifest for the rest.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct SetupLocale {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 /// Traducción de una entrada de navegación (`navigation.<id>` en el locale del módulo).

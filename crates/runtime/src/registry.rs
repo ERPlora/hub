@@ -292,6 +292,31 @@ impl Registry {
             .unwrap_or_else(|| fallback.to_string())
     }
 
+    /// Localized title of a module's checklist item (ADR-0055, hub#762). Fallback:
+    /// `locale → en → fallback` (the English-canonical `title` from `module.json#setup`).
+    ///
+    /// Without this the dashboard mixed core items (translated by the shell) with module items
+    /// in English: the `title` travelled raw in the payload and the frontend had no shell i18n
+    /// key for that module (hub#762).
+    pub fn setup_title_localized(&self, module_id: &str, fallback: &str, locale: &str) -> String {
+        self.locale_for(module_id, locale)
+            .and_then(|l| l.setup.title.clone())
+            .unwrap_or_else(|| fallback.to_string())
+    }
+
+    /// Localized description of a module's checklist item (ADR-0055, hub#762). Same fallback
+    /// chain as [`Self::setup_title_localized`].
+    pub fn setup_description_localized(
+        &self,
+        module_id: &str,
+        fallback: &str,
+        locale: &str,
+    ) -> String {
+        self.locale_for(module_id, locale)
+            .and_then(|l| l.setup.description.clone())
+            .unwrap_or_else(|| fallback.to_string())
+    }
+
     // ── API pública por módulo (ADR-0057, public-api.md) ─────────────────────────────────────
 
     /// Queries de un módulo **activo** marcadas `expose_api` → `(nombre, &RegisteredQuery)`.
@@ -892,6 +917,113 @@ mod tests {
             RequestContext::new("h1", "u1", Vec::<String>::new()).principal,
             Principal::default(),
             "`new` and the derive must not drift apart"
+        );
+    }
+
+    // ── Setup item i18n (ADR-0055, hub#762) ──────────────────────────────────────────────────
+    //
+    // The checklist used to mix Spanish (core items, translated by the shell) with English (module
+    // items, the raw `title` from the payload). The contract of ADR-0055 already covered
+    // `setup.{title,description}` in `locales/<lang>.json` — these tests pin the half that was
+    // missing: the runtime resolving that locale.
+
+    fn registry_with_setup_locale(
+        module_id: &str,
+        locales: &[(&str, Option<&str>, Option<&str>)],
+    ) -> Registry {
+        use crate::manifest::{ModuleLocale, SetupLocale};
+        let mut reg = Registry::new();
+        let mut map = std::collections::HashMap::new();
+        for (lang, title, desc) in locales {
+            map.insert(
+                (*lang).to_string(),
+                ModuleLocale {
+                    setup: SetupLocale {
+                        title: title.map(|s| s.to_string()),
+                        description: desc.map(|s| s.to_string()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            );
+        }
+        reg.set_locales(module_id, map);
+        reg
+    }
+
+    /// The regression itself (hub#762): a module item title resolves to the hub's locale when the
+    /// module ships a translation for it. Before the fix this returned the English fallback.
+    #[test]
+    fn setup_title_resolves_to_the_hub_locale() {
+        let reg = registry_with_setup_locale(
+            "inventory",
+            &[
+                ("es", Some("Tu catálogo"), Some("Añade un producto.")),
+                ("en", Some("Your catalog"), Some("Add a product.")),
+            ],
+        );
+        assert_eq!(
+            reg.setup_title_localized("inventory", "Your catalog", "es"),
+            "Tu catálogo"
+        );
+        assert_eq!(
+            reg.setup_description_localized("inventory", "Add a product.", "es"),
+            "Añade un producto."
+        );
+    }
+
+    /// A module that did not bother with an English locale still renders: the asked locale wins,
+    /// and when it is missing the registry hands back the manifest fallback rather than `None`.
+    #[test]
+    fn setup_title_falls_back_to_manifest_when_locale_is_missing() {
+        let reg = registry_with_setup_locale(
+            "inventory",
+            &[("es", Some("Tu catálogo"), Some("Añade un producto."))],
+        );
+        // Asked locale present → translated.
+        assert_eq!(
+            reg.setup_title_localized("inventory", "Your catalog", "es"),
+            "Tu catálogo"
+        );
+        // Asked locale absent, no `en` either → the English canonical title of the manifest.
+        assert_eq!(
+            reg.setup_title_localized("inventory", "Your catalog", "fr"),
+            "Your catalog"
+        );
+    }
+
+    /// A third-party module that ships no `locales/` at all must not break the checklist: the
+    /// English canonical of the manifest is the answer, for both title and description.
+    #[test]
+    fn setup_title_falls_back_to_manifest_when_module_has_no_locales() {
+        let reg = Registry::new();
+        assert_eq!(
+            reg.setup_title_localized("acme", "Acme setup", "es"),
+            "Acme setup"
+        );
+        assert_eq!(
+            reg.setup_description_localized("acme", "Configure acme.", "es"),
+            "Configure acme."
+        );
+    }
+
+    /// The fallback chain is `locale → en → manifest`: an `fr` hub whose module ships `en` (but no
+    /// `fr`) renders the English translation, not the raw manifest value.
+    #[test]
+    fn setup_title_falls_back_to_en_before_the_manifest() {
+        let reg = registry_with_setup_locale(
+            "inventory",
+            &[("en", Some("Your catalog"), None)],
+        );
+        assert_eq!(
+            reg.setup_title_localized("inventory", "Your catalog", "fr"),
+            "Your catalog",
+            "`en` matches before the manifest fallback"
+        );
+        // Description was not translated even in `en` → manifest wins.
+        assert_eq!(
+            reg.setup_description_localized("inventory", "Add a product.", "fr"),
+            "Add a product."
         );
     }
 }

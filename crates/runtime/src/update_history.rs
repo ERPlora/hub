@@ -660,6 +660,7 @@ mod tests {
             ModuleLocale {
                 name: Some("Inventario".into()),
                 navigation: HashMap::new(),
+                ..Default::default()
             },
         );
         registry.set_locales("inventory", locales);
