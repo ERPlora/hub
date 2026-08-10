@@ -40,8 +40,10 @@ vi.mock('../lib/device-mode', async () => {
   const { ref } = await import('vue');
   const actual = await vi.importActual<typeof import('../lib/device-mode')>('../lib/device-mode');
   const deviceMode = ref<'shared' | 'personal'>('shared');
+  const deviceTrusted = ref(false);
   return {
     deviceMode,
+    deviceTrusted,
     deviceModeReady: ref(true),
     loadDeviceMode: vi.fn(async () => deviceMode.value),
     setDeviceMode: vi.fn(),
@@ -80,6 +82,7 @@ vi.mock('../components/HubIcon.vue', () => ({ default: { name: 'HubIcon', templa
 
 import LoginPage from './LoginPage.vue';
 import { hubContextReady, machineRegistrationRequired, pinUsers } from '../lib/runtime';
+import { deviceTrusted } from '../lib/device-mode';
 import { runtimePinLogin } from '../lib/cloud';
 import { STRICT_PIN_POLICY, pinPolicy } from '../lib/pin-policy';
 import en from '../i18n/locales/en';
@@ -104,6 +107,7 @@ function seedTill(): void {
   pinUsers.value = [{ id: 'u1', name: 'Marta Ruiz', role: 'employee' }];
   hubContextReady.value = true;
   machineRegistrationRequired.value = false;
+  deviceTrusted.value = true;
 }
 
 async function mountLogin() {
