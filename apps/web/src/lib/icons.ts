@@ -20,6 +20,7 @@ import businessOutline from "~icons/ion/business-outline?raw";
 import cardOutline from "~icons/ion/card-outline?raw";
 import cameraOutline from "~icons/ion/camera-outline?raw";
 import checkmarkCircleOutline from "~icons/ion/checkmark-circle-outline?raw";
+import cloudOutline from "~icons/ion/cloud-outline?raw";
 import cloudUploadOutline from "~icons/ion/cloud-upload-outline?raw";
 import colorPaletteOutline from "~icons/ion/color-palette-outline?raw";
 import cubeOutline from "~icons/ion/cube-outline?raw";
@@ -44,6 +45,7 @@ import phonePortraitOutline from "~icons/ion/phone-portrait-outline?raw";
 import pulseOutline from "~icons/ion/pulse-outline?raw";
 import readerOutline from "~icons/ion/reader-outline?raw";
 import receiptOutline from "~icons/ion/receipt-outline?raw";
+import rocketOutline from "~icons/ion/rocket-outline?raw";
 import refreshOutline from "~icons/ion/refresh-outline?raw";
 import saveOutline from "~icons/ion/save-outline?raw";
 import serverOutline from "~icons/ion/server-outline?raw";
@@ -178,6 +180,7 @@ const SVGS: Record<string, string> = {
   "card-outline": cardOutline,
   "camera-outline": cameraOutline,
   "checkmark-circle-outline": checkmarkCircleOutline,
+  "cloud-outline": cloudOutline,
   "cloud-upload-outline": cloudUploadOutline,
   "color-palette-outline": colorPaletteOutline,
   "cube-outline": cubeOutline,
@@ -202,6 +205,7 @@ const SVGS: Record<string, string> = {
   "pulse-outline": pulseOutline,
   "reader-outline": readerOutline,
   "receipt-outline": receiptOutline,
+  "rocket-outline": rocketOutline,
   "refresh-outline": refreshOutline,
   "save-outline": saveOutline,
   "server-outline": serverOutline,

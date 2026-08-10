@@ -46,7 +46,7 @@
 //! | [`ERR_READ_REQUIRED`] | 403 | a valid key that may not read (a `write_only` feed). It is a different answer from "who are you?" on purpose: if both refusals said the same thing, either guard could be deleted and every test would still pass |
 //! | [`ERR_NOT_READY`] | — | any frame on `/ws` before the socket authenticated |
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
@@ -162,6 +162,85 @@ impl StreamTickets {
 /// short-lived, which is not the same as guessable.
 fn random_ticket_secret() -> String {
     erplora_runtime::api_keys::random_secret()
+}
+
+/// The most simultaneous live connections a single API key may hold on this channel (hub#531).
+///
+/// A hub is one container per business (ADR-0201): there is nowhere to scale to. A key that opens
+/// an unbounded number of sockets — each carrying a `broadcast::Receiver` (256-frame buffer) and a
+/// task — exhausts the hub's descriptors or memory and **stops the till**, which in a POS is worse
+/// than a data leak. The app rarely holds more than a handful (one per tab/device); a reconnection
+/// bug that forgets to close the old socket is what reaches the ceiling.
+pub const MAX_STREAMS_PER_KEY: usize = 16;
+
+/// `events.too_many_connections` — a key with read access that has opened too many simultaneous
+/// sockets. A third refusal (after `unauthenticated` and `events.read_required`): the credential is
+/// correct AND entitled to read, it has just opened too many things. Reusing one of the other two
+/// would let the limiter be deleted with every test still green.
+pub const ERR_TOO_MANY_CONNECTIONS: &str = "events.too_many_connections";
+
+/// Counts the live stream connections held by each API key, so one credential cannot exhaust the
+/// hub by opening N sockets (hub#531). Lives in `AppState` next to [`StreamTickets`], in memory:
+/// like tickets, a count that survives a restart is a count nobody trusts.
+///
+/// The guard ([`StreamSlot`]) is the only public API: `acquire` it when a socket authenticates, and
+/// it decrements on its own when the socket goes away — on a clean close, on an error, on a panic,
+/// on the auth-timeout. A counter that only ever goes up is a ceiling that ends up locking the hub
+/// out of its own channel, which is exactly the failure this exists to prevent.
+#[derive(Default)]
+pub struct StreamLimiter {
+    inner: Mutex<HashMap<String, usize>>,
+}
+
+impl std::fmt::Debug for StreamLimiter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let open = self.inner.lock().map(|m| m.values().sum::<usize>()).unwrap_or(0);
+        write!(f, "StreamLimiter({open} open)")
+    }
+}
+
+impl StreamLimiter {
+    /// Reserves a slot for `key_id`. Returns a guard that releases the slot when dropped, or `None`
+    /// if `key_id` already holds [`MAX_STREAMS_PER_KEY`] live connections.
+    ///
+    /// The guard's `Drop` is the whole safety: whatever path the socket takes out — `break`, an
+    /// `Err`, a `select!` arm that returns, a panic in the loop — the slot is released. Without that
+    /// the counter only goes up and the limit becomes a denial-of-service against the hub's owner.
+    pub fn acquire(self: &Arc<Self>, key_id: &str) -> Option<StreamSlot> {
+        let mut held = self.inner.lock().ok()?;
+        let count = held.entry(key_id.to_string()).or_insert(0);
+        if *count >= MAX_STREAMS_PER_KEY {
+            return None;
+        }
+        *count += 1;
+        Some(StreamSlot { limiter: Arc::clone(self), key_id: key_id.to_string() })
+    }
+
+    /// How many live connections `key_id` holds. Only tests need this: the limiter is correct when
+    /// its observable effect (a 17th socket is refused) is correct, not when a number is.
+    pub fn held_by(&self, key_id: &str) -> usize {
+        self.inner.lock().map(|m| *m.get(key_id).unwrap_or(&0)).unwrap_or(0)
+    }
+}
+
+/// A held stream slot. Dropping it decrements the limiter — the only way the count ever goes down.
+/// Held across the whole life of a socket so the release tracks the socket, not a code path.
+pub struct StreamSlot {
+    limiter: Arc<StreamLimiter>,
+    key_id: String,
+}
+
+impl Drop for StreamSlot {
+    fn drop(&mut self) {
+        if let Ok(mut held) = self.limiter.inner.lock() {
+            if let Some(count) = held.get_mut(&self.key_id) {
+                *count = count.saturating_sub(1);
+                if *count == 0 {
+                    held.remove(&self.key_id);
+                }
+            }
+        }
+    }
 }
 
 /// What presenting a credential to this channel gets you.
@@ -312,21 +391,39 @@ pub async fn sse(
     Query(q): Query<StreamQuery>,
 ) -> Response {
     let credential = http_credential(&headers, q.ticket.as_deref());
-    match authenticate(&st, credential.as_deref()).await {
-        StreamAuth::Granted(_) => {}
+    let principal = match authenticate(&st, credential.as_deref()).await {
+        StreamAuth::Granted(p) => p,
         refusal => return refused(&refusal),
-    }
+    };
+    // hub#531: the per-key cap applies to SSE too — `EventSource` reconnects on its own, and a bug
+    // that spawns reconnections without closing the old one reaches the ceiling the same way.
+    let slot = match st.stream_limiter.acquire(&principal.key_id) {
+        Some(s) => s,
+        None => {
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(json!({
+                    "ok": false,
+                    "error": {
+                        "code": ERR_TOO_MANY_CONNECTIONS,
+                        "message": format!("this key already holds {MAX_STREAMS_PER_KEY} live connections on this channel"),
+                    }
+                })),
+            )
+                .into_response();
+        }
+    };
     let rx = st.events.subscribe();
-    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
+    let stream = futures_util::stream::unfold((rx, slot), |(mut rx, slot)| async move {
         loop {
             match rx.recv().await {
                 Ok(ev) => {
                     let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
-                    return Some((Ok::<Event, std::convert::Infallible>(Event::default().data(data)), rx));
+                    return Some((Ok::<Event, std::convert::Infallible>(Event::default().data(data)), (rx, slot)));
                 }
                 // Suscriptor lento: saltamos lo perdido y seguimos (igual que el WS).
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                // Canal cerrado: termina el stream.
+                // Canal cerrado: termina el stream. `slot` drops here, releasing the limiter count.
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
             }
         }
@@ -428,6 +525,11 @@ pub async fn handle_frame(st: &AppState, conn: &mut StreamConnection, raw: &str)
 /// that never authenticates is dropped.
 async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: Option<String>) {
     let mut conn = StreamConnection::default();
+    // The per-key connection cap (hub#531). `None` until the socket authenticates; once it does, it
+    // holds a slot that is released when `stream_loop` returns — on a clean close, an error, a
+    // panic, the auth-timeout, any `break`. Without a guard tied to the loop's lifetime the counter
+    // only goes up and the limit becomes a denial-of-service against the hub's owner.
+    let mut slot: Option<StreamSlot> = None;
     // Subscribed BEFORE authenticating, and read only after: verifying a credential takes real
     // time (argon2 is slow on purpose), and a sale that happens during the handshake belongs to a
     // listener that turns out to be entitled to it. Holding the receiver is not hearing anything —
@@ -436,7 +538,23 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
     // A client that could set a header is already authenticated; it never sends a frame.
     if let Some(credential) = handshake_credential {
         if let StreamAuth::Granted(principal) = authenticate(&st, Some(&credential)).await {
-            conn.key_id = principal.key_id.clone();
+            // hub#531: a correct, read-entitled key that has opened too many sockets is a third
+            // refusal. The handshake path closes the socket right here.
+            match st.stream_limiter.acquire(&principal.key_id) {
+                Some(s) => {
+                    slot = Some(s);
+                    conn.key_id = principal.key_id.clone();
+                }
+                None => {
+                    let frame = json!({
+                        "type": "stream.error",
+                        "code": ERR_TOO_MANY_CONNECTIONS,
+                        "message": format!("this key already holds {MAX_STREAMS_PER_KEY} live connections on this channel"),
+                    });
+                    let _ = socket.send(Message::Text(frame.to_string())).await;
+                    return;
+                }
+            }
         }
     }
     let auth_deadline =
@@ -455,6 +573,24 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
                 let payload = serde_json::to_string(&frame).unwrap_or_else(|_| "{}".into());
                 if socket.send(Message::Text(payload)).await.is_err() || !keep_open {
                     break;
+                }
+                // hub#531: the first-frame auth path. `handle_frame` set `conn.key_id` on success;
+                // acquire the limiter slot now, or refuse if the key holds too many. This runs only
+                // once per socket (the handshake path acquired earlier, and `handle_frame` refuses
+                // any second `auth`).
+                if conn.is_ready() && slot.is_none() {
+                    match st.stream_limiter.acquire(&conn.key_id) {
+                        Some(s) => slot = Some(s),
+                        None => {
+                            let frame = json!({
+                                "type": "stream.error",
+                                "code": ERR_TOO_MANY_CONNECTIONS,
+                                "message": format!("this key already holds {MAX_STREAMS_PER_KEY} live connections on this channel"),
+                            });
+                            let _ = socket.send(Message::Text(frame.to_string())).await;
+                            break;
+                        }
+                    }
                 }
             }
             event = rx.recv(), if conn.is_ready() => {
@@ -508,7 +644,6 @@ mod tests {
             dev_mode: false,
             dev_modules_dir: None,
             module_trusted_keys: Vec::new(),
-            bootstrap_blueprint: None,
             // hub#376: this hub is not an ephemeral demo.
             demo: false,
         }
@@ -906,5 +1041,56 @@ mod tests {
         let second = send(&f.st, &mut again, auth_frame(&ticket)).await;
         assert_eq!(second.frame["code"], ERR_UNAUTHENTICATED);
         assert!(!again.is_ready());
+    }
+
+    // ── hub#531: per-key socket cap ─────────────────────────────────────────
+
+    /// The limiter counts up to the cap and then refuses. Dropping a slot frees it for the next
+    /// acquire — the whole point of the guard, and the failure mode if it leaks (a counter that
+    /// only goes up locks the hub out of its own channel).
+    #[test]
+    fn limiter_releases_a_slot_when_dropped() {
+        let lim = Arc::new(StreamLimiter::default());
+        let k = "key-A";
+
+        // Fill to the cap.
+        let slots: Vec<StreamSlot> = (0..MAX_STREAMS_PER_KEY)
+            .map(|_| lim.acquire(k).expect("slots under the cap"))
+            .collect();
+        assert_eq!(lim.held_by(k), MAX_STREAMS_PER_KEY);
+
+        // The next one is refused.
+        assert!(lim.acquire(k).is_none(), "the cap is enforced");
+
+        // Dropping one frees exactly one slot.
+        drop(slots);
+        assert_eq!(lim.held_by(k), 0, "all slots released on drop");
+        assert!(lim.acquire(k).is_some(), "a slot is available again after release");
+    }
+
+    /// The cap is per key: a second key is not penalised for the first one's connections.
+    #[test]
+    fn limiter_caps_per_key_not_globally() {
+        let lim = Arc::new(StreamLimiter::default());
+        let _a = lim.acquire("key-A").unwrap();
+        let _many_a: Vec<_> = (0..MAX_STREAMS_PER_KEY - 1).map(|_| lim.acquire("key-A").unwrap()).collect();
+        assert!(lim.acquire("key-A").is_none(), "key-A is at the cap");
+
+        // key-B is untouched.
+        assert_eq!(lim.held_by("key-B"), 0);
+        assert!(lim.acquire("key-B").is_some(), "a different key is not blocked by key-A");
+    }
+
+    /// A socket that authenticates and then disconnects (the common case: a tab closed) leaves the
+    /// counter clean — verified through the limiter directly, since the WS test harness already
+    /// exercises the real close path via `event_stream_ws.rs`.
+    #[test]
+    fn limiter_drops_to_zero_when_the_last_socket_closes() {
+        let lim = Arc::new(StreamLimiter::default());
+        {
+            let _slot = lim.acquire("key-A").unwrap();
+            assert_eq!(lim.held_by("key-A"), 1);
+        } // slot drops here
+        assert_eq!(lim.held_by("key-A"), 0, "the slot was released when the scope ended");
     }
 }

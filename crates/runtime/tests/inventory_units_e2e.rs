@@ -45,7 +45,13 @@ async fn fresh() -> Runtime {
 
 /// Alta de producto; `unit` ausente → la unidad por defecto.
 async fn producto(rt: &Runtime, ctx: &RequestContext, name: &str, unit: Option<&str>) -> String {
-    let mut p = json!({ "name": name, "sku": name.to_lowercase(), "price": 1200, "stock": 0 });
+    let mut p = json!({
+        "name": name, "sku": name.to_lowercase(), "price": 1200, "stock": 0,
+        // Obligatoria desde inventory v1.2.21 (ADR-0289): sin categoría fiscal el producto no es
+        // vendible, así que el alta ya no la acepta vacía. Aquí es ruido — lo que se mide son
+        // unidades y escala, no impuestos.
+        "tax_category_key": "product.generic"
+    });
     if let Some(u) = unit {
         p["unit_code"] = json!(u);
     }
@@ -235,7 +241,7 @@ async fn la_unidad_maestra_se_puede_cambiar_por_update() {
             "low_stock_threshold": 5, "is_active": 1, "ean13": null, "description": "",
             // update es REEMPLAZO completo de lo obligatorio (#178): tax_category_key es
             // required (inventory#21), un caller que lo omita falla alto — no lo borra en silencio.
-            "tax_category_key": null
+            "tax_category_key": "product.generic"
         })),
         &ctx,
     )
@@ -253,7 +259,7 @@ async fn la_unidad_maestra_se_puede_cambiar_por_update() {
         &params(json!({
             "product_id": gambas, "name": "Gambas", "price": 1200, "cost": 0,
             "low_stock_threshold": 5, "is_active": 1, "ean13": null, "description": "",
-            "tax_category_key": null, "unit_code": "ud"
+            "tax_category_key": "product.generic", "unit_code": "ud"
         })),
         &ctx,
     )
@@ -282,7 +288,7 @@ async fn un_precio_sub_centimo_se_guarda_como_importe_por_cien_unidades() {
         .execute_command(
             "inventory.products.create",
             &params(json!({
-                "name": "Tornillo", "sku": "TOR", "stock": 0,
+                "name": "Tornillo", "sku": "TOR", "stock": 0, "tax_category_key": "product.generic",
                 "price": 37, "price_quantity_value": 100 * SCALE, "pricing_unit_code": "ud"
             })),
             &ctx,

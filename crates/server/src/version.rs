@@ -14,7 +14,13 @@
 
 /// The running version, e.g. `1.0.0`. **This is the number that goes on the wire** — the
 /// heartbeat, `error_sink`, anything the Cloud will compare.
-pub const HUB_VERSION: &str = env!("CARGO_PKG_VERSION");
+///
+/// Re-exported from the runtime rather than read again from this crate's `CARGO_PKG_VERSION`
+/// (hub#521): since the runtime started REFUSING a module whose `compatibility.min_erplora_version`
+/// is above the core, the number it refuses with and the number the hub reports must be the same
+/// one. Two `env!` calls in two crates happen to agree today because both inherit
+/// `[workspace.package]` — "happens to agree" is not a property worth relying on for a refusal.
+pub const HUB_VERSION: &str = erplora_runtime::CORE_VERSION;
 
 /// The same number for a human to read, e.g. `v1.0.0`.
 ///

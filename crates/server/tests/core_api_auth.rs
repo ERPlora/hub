@@ -38,7 +38,6 @@ async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     (app(AppState::with_config(rt, cfg)), admin, employee, temp)
 }
@@ -63,6 +62,13 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
         "/api/system",
         "/api/navigation",
         "/api/modules",
+        // hub#516: qué versión ofrece hoy el marketplace por módulo instalado. Es lectura, pero
+        // dice qué corre este hub y con qué pin: sesión de usuario, como el resto del inventario.
+        "/api/modules/updates",
+        // hub#564: qué le hemos cambiado a este hub y desde qué versión. Es la lista de versiones
+        // que corre, o sea el mapa de su superficie de ataque: dárselo a un anónimo es decirle qué
+        // bug conocido le aplica.
+        "/api/system/update-history",
         "/api/entitlement",
         "/api/marketplace/catalog",
         "/api/app/release",
@@ -77,7 +83,13 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
             .unwrap();
         assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED, "{uri}");
     }
-    for uri in ["/api/system", "/api/navigation", "/api/modules"] {
+    for uri in [
+        "/api/system",
+        "/api/navigation",
+        "/api/modules",
+        "/api/modules/updates",
+        "/api/system/update-history",
+    ] {
         let authenticated = router
             .clone()
             .oneshot(request("GET", uri, Some(&employee), None))
@@ -130,6 +142,10 @@ async fn only_admin_can_mutate_module_lifecycle() {
         ("POST", "/api/modules/missing/activate", None),
         ("POST", "/api/modules/missing/deactivate", None),
         ("POST", "/api/modules/missing/uninstall", None),
+        // hub#516: actualizar mueve la versión que corre el hub y usa indirectamente el token de
+        // máquina. Misma puerta que instalar — la sesión de admin no es un detalle: sin ella, un
+        // módulo web same-origin podría disparar actualizaciones con la credencial del hub.
+        ("POST", "/api/modules/missing/update", None),
     ] {
         let anonymous = router
             .clone()

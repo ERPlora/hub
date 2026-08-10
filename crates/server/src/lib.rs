@@ -10,9 +10,14 @@
 //!   POST /api/modules/install   {dir}        instala desde carpeta (extraída por erplora-source).
 //!                                            **Solo dev** (`HUB_DEV_MODE`) y confinado al staging
 //!                                            del hub — ver `install_guard` (hub#239).
+//!   GET  /api/modules/updates                qué versión ofrece hoy el marketplace por módulo
+//!                                            instalado (hub#516). Bajo demanda, no en bucle.
 //!   POST /api/modules/:id/activate
 //!   POST /api/modules/:id/deactivate
 //!   POST /api/modules/:id/uninstall
+//!   POST /api/modules/:id/update {version?}  actualiza un módulo instalado (hub#516). Mismo
+//!                                            pipeline verificado que instalar; sin `version`,
+//!                                            resuelve la que toca (cuarentena y pin mandan).
 //!   POST /api/query   {name, params}
 //!   POST /api/command {name, payload}
 //!   GET  /ws                                 stream de eventos (solo push)
@@ -33,7 +38,7 @@ pub mod activity;
 pub mod api_keys;
 pub mod assistant;
 pub mod auth;
-pub mod bootstrap;
+pub mod boot_announce;
 pub mod daily_usage;
 /// `shared` (counter till) vs `personal` (somebody's own device) — plan step 2b, hub#357.
 pub mod device_mode;
@@ -44,14 +49,22 @@ pub mod elevation;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
+/// **Server-side agent runner** (ADR-0283 K5, hub#665): the tool loop of an `ai` step, in Rust and
+/// outside the runtime's global lock. It lives here and not in the runtime because it needs
+/// `cloud-client` — the runtime has no network by design.
+pub mod agent_runner;
 pub mod event_stream;
 pub mod export_import;
 /// ERPlora's DELEGATED fiscal certificate, fetched from the control plane (ADR-0202 §2 — hub#317).
 pub mod fiscal_certificate;
+/// The I/O half of a flow step (hub#662): the call itself, outside the runtime's global lock.
+pub mod flow_io;
+pub mod flows_api;
 pub mod hub_users;
 pub mod login_throttle;
 pub mod readiness;
 pub mod reset;
+pub mod inbound_poll;
 pub mod ingest;
 pub mod install;
 pub mod install_guard;
@@ -59,6 +72,7 @@ pub mod logging;
 pub mod media;
 pub mod members;
 pub mod module_storage;
+pub mod notify_transport;
 pub mod openapi;
 /// Operable dead-letter of the event outbox: list · retry · discard — hub#660 (ADR-0127 phase 2).
 pub mod outbox_admin;
@@ -68,6 +82,7 @@ pub mod profile;
 pub mod router;
 pub mod settings;
 pub mod state;
+pub mod shutdown;
 pub mod system;
 pub mod system_metrics;
 pub mod tenant;
@@ -354,6 +369,45 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
+    // Marca de actividad de usuario (hub#670): se ADOPTA la que dejó el proceso anterior, y a
+    // partir de aquí se escribe sola cada `HUB_ACTIVITY_PERSIST_SECS`.
+    //
+    // Va justo después de las migraciones (su tabla nace en la v39) y ANTES de que arranquen el
+    // latido y el router: el latido manda `pending()` en su PRIMER tick, y sin la marca adoptada
+    // ese tick diría «aquí no ha entrado nadie» de un hub que sí se usa. Perderla no es cosmético
+    // — es el reloj con el que el Cloud apaga (60d) y BORRA (120d) un hub free, y borrar no se
+    // deshace. Ambas llamadas son best-effort: un hub cuya marca no se pueda leer o escribir tiene
+    // que arrancar igual, con el reloj empezado de nuevo, nunca quedarse sin arrancar.
+    activity::restore_from_db(&state).await;
+    activity::spawn_persistence(&state);
+
+    // **¿Nos han cambiado el binario?** (hub#564, ADR-0269 §3.5). Nadie se lo dice al hub: la imagen
+    // se re-resuelve FUERA del contenedor, la task se sustituye, y el binario nuevo arranca
+    // reportando otro número. Compararlo con el último que anotamos es todo el mecanismo — y es
+    // también lo que hace VISIBLE un rollback automático, porque Swarm revirtiendo un despliegue
+    // malo, visto desde aquí dentro, es exactamente una versión que baja.
+    //
+    // Va justo detrás de `ensure_system_tables` porque necesita su tabla (v40) y nada más: cuanto
+    // más tarde se anote, más ventana hay de que el arranque se caiga antes y el salto se pierda.
+    // Best-effort: no poder escribir el historial nunca impide abrir la tienda.
+    {
+        let rt = state.runtime.lock().await;
+        match erplora_runtime::update_history::note_core_version(
+            rt.db(),
+            &state.hub_id(),
+            version::HUB_VERSION,
+        )
+        .await
+        {
+            Ok(Some(entry)) => eprintln!(
+                "✓ versión del core: {} → {} ({})",
+                entry.from_version, entry.to_version, entry.outcome
+            ),
+            Ok(None) => {}
+            Err(e) => eprintln!("✗ no se pudo anotar la versión del core (hub#564): {e}"),
+        }
+    }
+
     // **Owner sembrado del env** (ADR-0157, corrección de Ioan): el owner es el CREADOR del hub y el
     // despliegue lo trae ya inyectado por el provisioning del SaaS como `HUB_OWNER_EMAIL`. Se siembra
     // un `hub_user` role=admin (cloud_user_id NULL, sin PIN) tras las tablas de sistema —`admin` es
@@ -438,21 +492,57 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                         let target = resolve_module_target(&state, &machine, &id, &version, pins.get(&id).map(String::as_str)).await;
 
                         let mut rt = state.runtime.lock().await;
+                        // El nombre que lee el dueño, capturado ANTES de tocar nada (hub#564): si el
+                        // intento pierde el módulo, el registry ya no lo tiene y la entrada del
+                        // historial se quedaría con el id — que es justo lo que la regla 3 prohíbe.
+                        let module_name = rt
+                            .registry()
+                            .installed
+                            .iter()
+                            .find(|m| m.id == id)
+                            .map(|m| m.name.clone())
+                            .unwrap_or_else(|| id.clone());
                         // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
-                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
-                            Ok(_) if target.is_update() => eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version()),
-                            Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{}", target.version()),
+                        let attempt = match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
+                            Ok(_) if target.is_update() => {
+                                eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version());
+                                Some(erplora_runtime::module_update::Outcome::Updated { from: version.clone(), to: target.version().to_string() })
+                            }
+                            Ok(_) => { eprintln!("✓ módulo re-descargado: {id}@{}", target.version()); None }
                             Err(e) if target.is_update() => {
                                 // ⚠️ Una actualización que falla NO puede dejar al hub SIN el módulo:
                                 // un hub con la versión de ayer funciona, uno sin el módulo no. Se
                                 // cae a la que tenía registrada.
                                 eprintln!("✗ actualización de {id} a {}: {e} — vuelvo a {version}", target.version());
-                                match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await {
+                                let fallback = install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await;
+                                match &fallback {
                                     Ok(_) => eprintln!("✓ {id} sigue en {version}"),
                                     Err(e) => eprintln!("✗ {id}@{version} tampoco: {e}"),
                                 }
+                                // Y no puede ser un silencio (update-model §3.1.1): si actualizamos
+                                // solos, una actualización que se cae —y más aún un hub que arranca
+                                // SIN el módulo— tiene que llegar a alguien, no morir en un log del
+                                // contenedor. Best-effort: sin sink (hub sin enrolar) se descarta.
+                                report_failed_module_update(&id, &version, target.version(), &e.to_string(), fallback.is_ok());
+                                Some(match &fallback {
+                                    Ok(_) => erplora_runtime::module_update::Outcome::RolledBack { stayed_on: version.clone(), error: e.to_string() },
+                                    Err(fe) => erplora_runtime::module_update::Outcome::Lost { module: id.clone(), error: format!("{e}; la vuelta atrás tampoco: {fe}") },
+                                })
                             }
-                            Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
+                            Err(e) => { eprintln!("✗ re-descarga de {id}@{version}: {e}"); None }
+                        };
+
+                        // Y tampoco puede ser un silencio PARA EL DUEÑO (hub#564): el `error_sink`
+                        // de arriba nos avisa a NOSOTROS, pero quien se encuentra la caja distinta
+                        // por la mañana es quien abre la tienda. La misma decisión que usa el botón
+                        // —`from_module_outcome`— para que las dos puertas no cuenten lo mismo de
+                        // dos maneras. Best-effort: el historial nunca impide arrancar.
+                        if let Some(attempt) = attempt {
+                            if let Some(change) = erplora_runtime::update_history::from_module_outcome(&id, &module_name, target.version(), &attempt) {
+                                if let Err(e) = erplora_runtime::update_history::record(rt.db(), &state.hub_id(), change).await {
+                                    eprintln!("✗ no se pudo anotar el historial de {id} (hub#564): {e}");
+                                }
+                            }
                         }
                     }
                 }
@@ -460,6 +550,51 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     "⚠ {} módulo(s) instalados sin caché y hub sin enrolar (sin token de máquina): no se re-descargan",
                     missing.len()
                 ),
+            }
+
+            // 🛟 **Y si el marketplace no dio, la copia PROPIA del hub** (hub#571). Todo lo de
+            // arriba depende del SaaS: un reinicio con el Cloud caído, un DNS torcido o el router
+            // del cliente apagado dejaban al hub arrancando SIN un solo módulo — `/readyz` en DOWN,
+            // Swarm recreando el contenedor en bucle y el bar sin TPV. Este es el único camino que
+            // no pasa por la red: los bytes se guardaron en la base del propio hub al instalar y se
+            // vuelven a verificar aquí igual que una descarga (SHA256 + firma según la política).
+            //
+            // Va DESPUÉS y no antes a propósito: la vía del marketplace es también la de la
+            // actualización automática (hub#516/ADR-0269), y adelantarla convertiría cada arranque
+            // en «quédate donde estás». Primero se intenta llegar a lo que toca; esto es la red que
+            // impide caer por debajo de lo que ya se tenía.
+            let still_missing = state
+                .runtime
+                .lock()
+                .await
+                .installed_but_unregistered()
+                .await
+                .unwrap_or_default();
+            if !still_missing.is_empty() {
+                eprintln!(
+                    "marketplace inalcanzable para {} módulo(s): reponiendo de la copia local…",
+                    still_missing.len()
+                );
+                let cache_root = state.config.module_cache.clone();
+                let policy = state.config.signature_policy();
+                let orphans = {
+                    let mut rt = state.runtime.lock().await;
+                    install::restore_from_local_packages(
+                        &cache_root,
+                        &mut rt,
+                        &still_missing,
+                        &policy,
+                    )
+                    .await;
+                    rt.installed_but_unregistered().await.unwrap_or_default()
+                };
+                // Ni copia, ni marketplace, ni tarea vieja a la que volver: aquí la regla «nunca con
+                // menos» no se puede cumplir, porque no hay ninguna alternativa que la cumpla. Lo
+                // que NO puede pasar es que sea un silencio — un hub que arranca incompleto tiene
+                // que llegar a alguien, no morir en el log de un contenedor.
+                if !orphans.is_empty() {
+                    report_incomplete_boot(&orphans);
+                }
             }
         }
     }
@@ -512,16 +647,24 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         }
     }
 
-    // Transporte de `host.notify` (ADR-0012): cliente real de email/sms/whatsapp. Hoy un MOCK
-    // (decisión de dependencia del humano para el SMTP/SMS reales; ver crates/runtime/host_notify.rs).
-    // El mock pasa por el Outbox como cualquier transporte, así que la mecánica de reintentos/
-    // dead-letter del listener-host queda real. TODO: sustituir por el transporte real (lettre/HTTP).
+    // Transporte de `host.notify` (ADR-0012 + ADR-0283 §5 K4, hub#663): el cliente REAL. Email y
+    // WhatsApp salen por el **proxy del SaaS** (`/api/v1/hub/device/notify/{email,whatsapp}/`) con
+    // la credencial de máquina; el hub nunca guarda credenciales de Meta/SES (patrón del LLM).
+    //
+    // El mock sigue disponible, pero **hay que pedirlo por su nombre** (`HUB_NOTIFY_TRANSPORT=mock`)
+    // y no se cae en él por accidente: un mock devuelve `Sent` sin enviar nada, y el outbox marca
+    // entonces el evento como entregado — un recordatorio que nunca salió y del que nadie se entera.
+    // Un hub sin enrolar falla RUIDOSAMENTE (reintento → dead-letter), que sí se ve.
     state
         .runtime
         .lock()
         .await
-        .set_notify_transport(std::sync::Arc::new(
-            erplora_runtime::host_notify::MockTransport::new(),
+        .set_notify_transport(notify_transport::build(
+            state.http.clone(),
+            &state.config.cloud_base_url,
+            state.hub_id.clone(),
+            state.machine_token.clone(),
+            std::env::var(notify_transport::TRANSPORT_ENV).ok(),
         ));
 
     // Registro GLOBAL de errores ("todo controlado", un único embudo): instala el sink que reenvía
@@ -548,6 +691,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         let scheduler_state = state.clone();
         tokio::spawn(async move {
             loop {
+                // I/O que el tick de flujos deja preparada (hub#662). Se recoge DENTRO del bloque
+                // con lock y se despacha FUERA: el `dispatch` no debe tocar el lock que acabamos de
+                // soltar, y el bucle de 1 s no puede esperar a una llamada de 30 s.
+                let mut pending_io = Vec::new();
                 {
                     let hub_id = scheduler_state.hub_id();
                     let rt = scheduler_state.runtime.lock().await;
@@ -560,8 +707,69 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     if let Err(e) = rt.process_scheduler(&hub_id).await {
                         eprintln!("scheduler: {e}");
                     }
+                    // Kernel de automatización (ADR-0283, hub#661): dispara los triggers de reloj,
+                    // despierta los `delay` vencidos y avanza los runs reclamados. Comparte este
+                    // lock con los dos de arriba, y por eso su trabajo está ACOTADO por tick
+                    // (`MAX_RUNS_PER_TICK` × `MAX_STEPS_PER_TICK`, todos sin I/O): un step `http` o
+                    // un turno de IA aquí dentro congelaría los commands de todo el hub, así que
+                    // esos van por claim → I/O → complete FUERA del lock (hub#662/#665).
+                    match rt.process_flows().await {
+                        Ok(report) => pending_io = report.pending_io,
+                        Err(e) => eprintln!("flows: {e}"),
+                    }
+                }
+                // Ya sin el lock: cada llamada se va a su propia tarea y vuelve por
+                // `complete_flow_io` cuando termine (crates/server/src/flow_io.rs).
+                if !pending_io.is_empty() {
+                    flow_io::dispatch(&scheduler_state, pending_io);
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            }
+        });
+    }
+
+    // **WhatsApp entrante** (ADR-0283 K1c, `architecture/hub/flows.md` §6): el hub POLLEA su
+    // bandeja en el SaaS y convierte cada mensaje en el evento core
+    // `hub.whatsapp.message_received`. El SaaS no puede llamar a un hub (ADR-0213) y los hubs
+    // viven tras NAT, así que la única dirección posible es esta.
+    //
+    // Tick PROPIO y no el bucle de 1s de arriba, por dos razones: su periodo es otro (5s) y, sobre
+    // todo, hace **I/O de red** — meterlo en el bucle del relay tendría el lock del runtime
+    // cogido durante un round-trip HTTP y pararía la entrega de eventos de todo el hub.
+    // `poll_once` coge el lock solo para el gate y para las escrituras (ver su doc).
+    //
+    // El propio tick se auto-gatea: sin el módulo `whatsapp_inbox` activo y con entitlement, no
+    // sale ni una petición (720 GET/hora por hub que sí lo usa).
+    {
+        let poll_state = state.clone();
+        let poller = inbound_poll::InboundPoller::new(
+            state.http.clone(),
+            &state.config.cloud_base_url,
+            state.hub_id.clone(),
+            state.machine_token.clone(),
+        );
+        let secs = inbound_poll::interval_secs(
+            std::env::var(inbound_poll::INTERVAL_ENV).ok().as_deref(),
+        );
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                tick.tick().await;
+                match poller
+                    .poll_once(&poll_state.runtime, &poll_state.entitlement)
+                    .await
+                {
+                    Ok(report) if report.ingested > 0 => tracing::info!(
+                        ingested = report.ingested,
+                        acked = report.acked,
+                        "whatsapp entrante: mensajes ingeridos como evento core"
+                    ),
+                    Ok(_) => {}
+                    // Un fallo de red aquí NO es fatal: los mensajes siguen pendientes en el SaaS
+                    // y el siguiente tick los recoge (nada se pierde por no haber podido leer).
+                    Err(e) => tracing::warn!("whatsapp entrante: {e}"),
+                }
             }
         });
     }
@@ -667,15 +875,20 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
-    // Import del blueprint que el SaaS DECLARÓ para este hub (ADR-0212, hub#406): lo que hace que
-    // un hub recién provisionado —la demo— nazca con catálogo en vez de con el asistente de setup.
+    // ⛔ Aquí iba el import del blueprint DECLARADO por el SaaS (ADR-0212 / hub#406), y ya no va:
+    // **un hub nace VACÍO** (ADR-0293). Era el único paso del arranque que instalaba módulos por su
+    // cuenta —`ImportSelection.modules` = todos los del manifest de la plantilla—, así que un hub
+    // recién provisionado amanecía con el vertical entero puesto (13 apps con el blueprint
+    // `restaurante` de la demo).
     //
-    // 🔴 Va en su propia task, NO en el camino de arranque. El seed de arriba se aplica con `?` y
-    // un seed roto aborta el boot a propósito; esto no puede: un blueprint que no se pueda importar
-    // debe dejar un hub que FUNCIONA (degradado, sin catálogo), nunca un visitante sin hub. Por eso
-    // `spawn_declared_blueprint_import` devuelve un handle y no un Result — no hay nada que `?`
-    // pueda propagar hasta aquí. Sin las claves de env no lanza nada y no toca el Cloud.
-    bootstrap::spawn_declared_blueprint_import(&state);
+    // ERPlora es un **ERP genérico, no un POS**: el vertical lo elige el usuario. Un hub nuevo trae
+    // su configuración y nada más, y la primera pantalla le ofrece los blueprints para que importe
+    // el suyo. Sembrárselo al nacer decide por él justo lo que el producto le deja elegir.
+    //
+    // Las dos claves de env (`HUB_BOOTSTRAP_BLUEPRINT`, `HUB_BOOTSTRAP_BLUEPRINT_LOCALE`) siguen
+    // llegando en el despliegue de las demos y **se ignoran a propósito**; `HubConfig::from_env` ya
+    // no las lee. Lo vigila `tests/newborn_hub_is_empty.rs`, que arranca el hub de verdad con ellas
+    // puestas y comprueba que no se le pide un solo blueprint al Cloud.
 
     // Disparadores 1 y 3 del refetch del certificado delegado (ADR-0202 §2 punto 4): el de
     // ARRANQUE y el del FALLO TLS contra la AEAT. (El 2 —el heartbeat— va en el tick de arriba.)
@@ -692,6 +905,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     if let Some(dir) = cfg.web_dir.as_deref() {
         eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
     }
+    // El router consume el `state`; el aviso de arranque de más abajo necesita el suyo, y el
+    // apagado el suyo (hub#670: el último flush de la marca de actividad).
+    let announce_state = state.clone();
+    let shutdown_state = state.clone();
     let mut router = build_router(state, cfg.web_dir.as_deref());
     // CSP (ADR-0050): con el doc servido por Axum, la CSP de `tauri.conf` no aplica → la emitimos aquí.
     if let Some(csp) = cfg.csp.as_deref() {
@@ -701,10 +918,19 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
     eprintln!("erplora-server escuchando en http://{}", cfg.bind);
     tracing::info!(bind = %cfg.bind, "erplora-server arrancado");
+
+    // «Ya atiendo» (hub#712): en cuanto el agregado de `/readyz` diga `UP`, un latido al Cloud
+    // para que un hub recién desplegado pase a `active` sin esperar al sondeo del SaaS.
+    //
+    // 🔑 Va AQUÍ, después de bindear: el socket ya escucha, así que el aviso no puede adelantar
+    // al hub que anuncia. Antes de este punto marcaríamos listo un hub que todavía no atiende, y
+    // eso es peor que tardar. En su propia task y best-effort, como el import de blueprint y el
+    // refetch del certificado: un plano de control inalcanzable deja un hub que FUNCIONA.
+    boot_announce::spawn(&announce_state);
     // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
     // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).
     axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(shutdown_state))
         .await?;
     Ok(())
 }
@@ -766,7 +992,7 @@ fn install_error_reporting(state: &AppState) {
 
 /// Espera Ctrl-C o (en Unix) SIGTERM. ECS envía SIGTERM al desescalar/desplegar; al recibirla,
 /// `axum::serve` deja de aceptar conexiones nuevas y drena las en vuelo antes de cerrar.
-async fn shutdown_signal() {
+async fn shutdown_signal(state: AppState) {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
@@ -785,7 +1011,24 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
-    eprintln!("apagado: señal recibida, drenando conexiones en vuelo…");
+    // 🔑 Seguir ACEPTANDO antes de cerrar (hub#646). `with_graceful_shutdown` empieza a apagar en
+    // cuanto este future resuelve, así que retrasarlo es lo que mantiene el listener abierto —
+    // justo el tiempo que Traefik tarda en dejar de mandarnos tráfico. Sin esto, cada actualización
+    // devuelve 502 a quien llegue en esa ventana.
+    let drain = shutdown::drain_delay();
+    if !drain.is_zero() {
+        eprintln!(
+            "apagado: señal recibida — sigo aceptando {}s para que Traefik deje de enrutar aquí…",
+            drain.as_secs()
+        );
+        tokio::time::sleep(drain).await;
+    }
+    // Último flush de la marca de actividad (hub#670) antes de cerrar. El write-behind ya la
+    // escribe cada minuto, así que esto solo cierra el último minuto — pero el SIGTERM de un
+    // blue/green (ADR-0269) llega en CADA actualización, y ese minuto es justo el que contiene la
+    // visita de quien estaba usando el hub cuando se desplegó.
+    activity::flush(&state).await;
+    eprintln!("apagado: cierro el listener y dreno las conexiones en vuelo…");
 }
 
 /// Construye el router con todas las rutas montadas sobre `state`.
@@ -802,6 +1045,12 @@ pub fn app(state: AppState) -> Router {
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
         .route("/api/system/metrics", get(system_metrics::system_metrics))
+        // Qué le hemos cambiado a este hub y desde qué versión (hub#564). Solo lectura: la
+        // contrapartida de actualizar sin preguntar (ADR-0269) es que se pueda SABER, no decidir.
+        .route(
+            "/api/system/update-history",
+            get(system::update_history),
+        )
         // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
         // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
         .route(
@@ -905,6 +1154,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))
         .route("/api/modules/request-install", post(request_install))
+        // Qué versión ofrece hoy el marketplace para cada módulo instalado (hub#516). Bajo demanda:
+        // lo pide la pantalla de Apps al abrirse, no un sondeo en bucle.
+        .route("/api/modules/updates", get(list_module_updates))
         // Assets web de un módulo instalado (module.json + `dist/*.esm.js` + wasm/icons) servidos
         // desde la CACHÉ de descargas, resueltos por la VERSIÓN instalada. En Hub Cloud los módulos
         // se descargan en runtime al `module_cache` (NO se hornean en el `web_dir`), así que sin esta
@@ -923,6 +1175,13 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
         .route("/api/modules/:id/uninstall", post(uninstall_module))
+        // Actualizar un módulo SIN reiniciar el contenedor (hub#675/hub#516). Es la pieza que
+        // faltaba: hasta ahora un fix de módulo esperaba a que saliera una imagen nueva del hub,
+        // porque los módulos solo se recogen al arrancar y el rollout excluye a quien ya está en la
+        // imagen. Es también el botón «Actualizar» del dueño, y con `{"version": "…"}` la palanca de
+        // soporte.
+        .route("/api/modules/:id/update", post(update_module))
+        .route("/api/modules/:id/versions", get(list_module_versions))
         .route(
             "/api/modules/:id/capabilities",
             get(settings::get_module_capabilities).put(settings::put_module_capabilities),
@@ -963,8 +1222,8 @@ pub fn app(state: AppState) -> Router {
         .route("/api/keys/:id", axum::routing::delete(api_keys::revoke_key))
         // ── Dead-letter del outbox, operable (hub#660 — ADR-0127 fase 2) ────────────────────
         // Misma puerta que la gestión de keys: sesión local de un humano owner/admin. Reintentar
-        // re-ejecuta el command de otro con los permisos del emisor y descartar cierra un registro
-        // para siempre, así que NO se abren a una API key ni al token de máquina.
+        // re-ejecuta el command de otro módulo con la autoridad de ESE módulo (hub#686) y descartar
+        // cierra un registro para siempre, así que NO se abren a una API key ni al token de máquina.
         .route("/api/hub/events/dead", get(outbox_admin::list_dead))
         .route("/api/hub/events/dead/count", get(outbox_admin::count_dead))
         .route("/api/hub/events/retry-all", post(outbox_admin::retry_all_dead))
@@ -972,6 +1231,59 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/hub/events/:id/discard",
             post(outbox_admin::discard_dead),
+        )
+        // Correlación (hub#666): qué disparó ESTE evento — los runs que arrancó y los eventos que
+        // provocó su entrega. Misma puerta admin: el trace dibuja lo que hace el negocio entero.
+        .route("/api/hub/events/:id/trace", get(outbox_admin::trace_event))
+        // ── Kernel de automatización (ADR-0283 K7, hub#661) ────────────────────────────────
+        // REST del core, NO commands `hub.*`: el core se congela y el dispatcher no es donde se
+        // añade superficie nueva (§9). Misma puerta que las keys y la dead-letter: sesión local de
+        // un humano owner/admin — `PUT …/grants` es la pantalla donde una persona decide qué puede
+        // hacer el hub cuando no hay nadie mirando, y una credencial de integración copiable no
+        // decide eso (podría concederse a sí misma todo el hub a través de un flujo).
+        //
+        // ⚠️ `/flows/runs/:run_id` va ANTES de `/flows/:id/...` en este `Router` solo por
+        // legibilidad: matchit resuelve el segmento estático `runs` con prioridad sobre el
+        // parámetro `:id`, y `tests/flows_api_test.rs` lo comprueba contra el router de verdad.
+        .route(
+            "/api/hub/flows",
+            get(flows_api::list_flows).post(flows_api::create_flow),
+        )
+        .route("/api/hub/flows/runs/:run_id", get(flows_api::get_run))
+        // `secrets` es igual: segmento estático, gana al `:id` (hub#662). El GET devuelve NOMBRES —
+        // no hay endpoint que devuelva un secreto, y esa ausencia es el diseño (ADR-0283 §4).
+        .route("/api/hub/flows/secrets", get(flows_api::list_secrets))
+        .route(
+            "/api/hub/flows/secrets/:name",
+            axum::routing::put(flows_api::put_secret).delete(flows_api::delete_secret),
+        )
+        .route(
+            "/api/hub/flows/:id",
+            get(flows_api::get_flow)
+                .put(flows_api::update_flow)
+                .delete(flows_api::delete_flow),
+        )
+        .route(
+            "/api/hub/flows/:id/grants",
+            get(flows_api::list_grants).put(flows_api::replace_grants),
+        )
+        .route("/api/hub/flows/:id/run", post(flows_api::start_run))
+        .route("/api/hub/flows/:id/runs", get(flows_api::list_runs))
+        // ── Bandeja de aprobación (ADR-0283 D3, hub#665) ───────────────────────────────────
+        // `approvals` es un segmento ESTÁTICO y matchit lo resuelve con prioridad sobre `:id`, así
+        // que no se lo come `/flows/:id` aunque vaya después (igual que `/flows/runs/:run_id`);
+        // `tests/agent_runner_test.rs` lo comprueba contra el router de verdad.
+        // Misma puerta que el resto: sesión local de un humano owner/admin. Aquí es lo esencial —
+        // esta fila ES el registro de una persona autorizando al hub a escribir sin nadie
+        // delante, así que `decided_by` sale de la sesión resuelta y JAMÁS del body.
+        .route("/api/hub/flows/approvals", get(flows_api::list_approvals))
+        .route(
+            "/api/hub/flows/approvals/:id/approve",
+            post(flows_api::approve),
+        )
+        .route(
+            "/api/hub/flows/approvals/:id/reject",
+            post(flows_api::reject),
         )
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
@@ -1053,11 +1365,98 @@ pub fn app(state: AppState) -> Router {
 /// [`readiness::readyz`], y es la que mira el `HEALTHCHECK`. Mezclarlas fue el bug: durante meses
 /// esto FUE el healthcheck del contenedor, así que un hub sin BD, con las migraciones a medias o
 /// sin un solo módulo cargado pasaba por sano.
+/// Manda al Cloud que una actualización automática de módulo se cayó (hub#516).
+///
+/// Si actualizamos solos y sin preguntar (ADR-0269), una actualización que falla no puede quedarse
+/// en un `eprintln!` del contenedor: `outcome` distingue el caso tolerable —el hub siguió con la
+/// versión de ayer— del que no lo es: **el hub arrancó sin el módulo**, que es el único desenlace
+/// que este modelo prohíbe. Best-effort por contrato del registro: sin sink (hub sin enrolar) se
+/// descarta en silencio.
+fn report_failed_module_update(
+    module_id: &str,
+    from: &str,
+    to: &str,
+    error: &str,
+    fell_back: bool,
+) {
+    use erplora_runtime::error_registry::{ErrorEvent, ErrorRegistry};
+
+    ErrorRegistry::global().report(
+        ErrorEvent::new(
+            erplora_runtime::error_registry::source::HUB,
+            "module_update_failed",
+            format!("no se pudo actualizar `{module_id}` de {from} a {to}: {error}"),
+            erplora_runtime::error_registry::severity::UNEXPECTED,
+        )
+        .with_module(module_id.to_string())
+        .with_context(json!({
+            "from": from,
+            "to": to,
+            // `stayed_on_previous` = el hub sirve; `no_module` = arrancó incompleto.
+            "outcome": if fell_back { "stayed_on_previous" } else { "no_module" },
+        })),
+    );
+}
+
+/// El informe de un arranque **incompleto** (hub#571), sin mandarlo todavía.
+///
+/// Aparte para poder fijarlo con un test: lo que importa de este evento es su **contenido** —el
+/// código estable contra el que se programa y los módulos que faltan—, no que se haya llamado a un
+/// sink global.
+///
+/// Es un fallo **del hub**, no de un módulo: lo que se cayó es el arranque, y colgárselo al primero
+/// de la lista mandaría a mirar donde no es.
+fn incomplete_boot_event(orphans: &[(String, String)]) -> erplora_runtime::error_registry::ErrorEvent {
+    use erplora_runtime::error_registry::{severity, source, ErrorEvent};
+
+    let names: Vec<String> = orphans
+        .iter()
+        .map(|(id, version)| format!("{id}@{version}"))
+        .collect();
+    ErrorEvent::new(
+        source::HUB,
+        "module_boot_incomplete",
+        format!(
+            "el hub arrancó SIN {} módulo(s) instalados: {} — ni el marketplace ni la copia local \
+             pudieron reponerlos",
+            orphans.len(),
+            names.join(", ")
+        ),
+        severity::UNEXPECTED,
+    )
+    .with_context(json!({
+        "count": orphans.len(),
+        "modules": orphans
+            .iter()
+            .map(|(id, version)| json!({ "module_id": id, "version": version }))
+            .collect::<Vec<_>>(),
+    }))
+}
+
+/// Manda al Cloud que este hub arrancó **sin** alguno de sus módulos (hub#571).
+///
+/// Es el caso que ADR-0269 no puede cumplir: no hay copia, no hay versión anterior y no hay tarea
+/// vieja a la que volver. Lo único que sí está en nuestra mano es que **no sea un silencio** — un
+/// hub incompleto que solo lo cuenta en el log de un contenedor es un hub que nadie arregla.
+/// Best-effort por contrato del registro: sin sink (hub sin enrolar) se descarta.
+fn report_incomplete_boot(orphans: &[(String, String)]) {
+    eprintln!(
+        "🔴 el hub arranca SIN {} módulo(s): {}",
+        orphans.len(),
+        orphans
+            .iter()
+            .map(|(id, v)| format!("{id}@{v}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    erplora_runtime::error_registry::ErrorRegistry::global().report(incomplete_boot_event(orphans));
+}
+
 /// La versión que debe correr un módulo en este arranque (hub#516).
 ///
-/// Pregunta al marketplace qué versiones hay y deja decidir a
-/// [`erplora_runtime::module_update::resolve`]. Si el Cloud no contesta, **se queda con la que
-/// tiene**: un hub con la versión de ayer funciona; uno sin el módulo, no.
+/// Delega en [`install::resolve_target`] — **el mismo resolutor que usa el botón «Actualizar»** y
+/// que `/api/modules/updates`. Una segunda copia de esta decisión sería una segunda política: la
+/// automática y la manual acabarían ofreciendo cosas distintas.
 async fn resolve_module_target(
     state: &AppState,
     machine: &cloud_client::Auth,
@@ -1065,33 +1464,15 @@ async fn resolve_module_target(
     installed: &str,
     pinned: Option<&str>,
 ) -> erplora_runtime::module_update::Target {
-    use erplora_runtime::module_update::{resolve, Available, Target};
-
-    if let Some(pin) = pinned {
-        return Target::StayPut(pin.to_string());
-    }
-
-    let request = cloud_client::CloudClient::new(&state.config.cloud_base_url).versions(machine, module_id);
-    let mut call = state.http.get(&request.url);
-    for (name, value) in request.headers {
-        call = call.header(name, value);
-    }
-    let available: Vec<Available> = match call.send().await {
-        Ok(response) => response
-            .json::<Vec<cloud_client::ModuleVersion>>()
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|v| Available { version: v.version, is_active: v.is_active })
-            .collect(),
-        // Sin catálogo no se adivina: quedarse donde está es el único movimiento seguro.
-        Err(error) => {
-            eprintln!("⚠ versiones de {module_id}: {error} — se mantiene {installed}");
-            Vec::new()
-        }
-    };
-
-    resolve(installed, None, &available)
+    install::resolve_target(
+        &state.http,
+        &state.config.cloud_base_url,
+        machine,
+        module_id,
+        installed,
+        pinned,
+    )
+    .await
 }
 
 async fn healthz() -> &'static str {
@@ -1206,7 +1587,7 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         Err(error) => return tenant_rejected(error),
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (pin_users, currency, currency_decimals, language) = {
+    let (pin_users, currency, currency_decimals, language, timezone) = {
         let rt = runtime.lock().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
@@ -1243,7 +1624,12 @@ async fn hub_context(State(st): State<AppState>) -> Response {
             .get("language")
             .cloned()
             .unwrap_or_else(|| json!("es"));
-        (pin_users, currency, currency_decimals, language)
+        // La zona horaria del negocio ya RESUELTA (hub#731). En `settings` la clave viaja cruda
+        // (`null` = «dedúcela del país») porque tiene que poder volver por un `PUT`; aquí se
+        // expone el nombre IANA real, que es lo que la UI necesita para enseñar a qué hora local
+        // se va a disparar un flujo. Si la lectura falla, UTC — que es lo que el reloj hará.
+        let timezone = rt.timezone_name().await.unwrap_or_else(|_| "UTC".to_string());
+        (pin_users, currency, currency_decimals, language, timezone)
     };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
@@ -1275,6 +1661,8 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         // Cuántos decimales tiene esa moneda. El front NO puede asumir 2 (ADR-0123 §7).
         "currency_decimals": currency_decimals,
         "language": language,
+        // Nombre IANA del reloj del NEGOCIO (hub#731) — resuelto, nunca `null`.
+        "timezone": timezone,
     }))
     .into_response()
 }
@@ -1342,40 +1730,10 @@ async fn request_install(
 
     match result {
         Ok(installed) => {
-            // Ingestión de embeddings (§9.6): recoge el texto agéntico del módulo (agent.description
-            // + ai.description de queries/commands), lo embebe **vía el proxy del Cloud** (§9.3 — el
-            // Hub nunca llama a un proveedor de embeddings directamente) y lo registra en el índice
-            // vectorial para el routing de tools (§9.2b). Best-effort: un fallo aquí NO aborta la
-            // instalación (el módulo ya está instalado y operativo; el router degrada a "todos").
             let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
             drop(rt);
-            if !chunks.is_empty() {
-                if let Some(store) = &st.vector {
-                    let embedder = embed::CloudEmbedder::new(
-                        st.http.clone(),
-                        &st.config.cloud_base_url,
-                        auth.clone(),
-                    );
-                    match embed::index_chunks(
-                        &embedder,
-                        store.as_ref(),
-                        &st.hub_id(),
-                        &installed.version,
-                        &chunks,
-                    )
-                    .await
-                    {
-                        Ok(n) => {
-                            tracing::info!(module_id = %installed.module_id, chunks = n, "embeddings indexados (§9.6)")
-                        }
-                        Err(e) => {
-                            tracing::warn!(module_id = %installed.module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)")
-                        }
-                    }
-                } else {
-                    tracing::info!(module_id = %installed.module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
-                }
-            }
+            index_module_embeddings(&st, &auth, &installed.module_id, &installed.version, chunks)
+                .await;
 
             // Evento WS con la forma exacta del contrato del frontend.
             st.broadcast(json!({ "type": "module.installed", "module_id": installed.module_id }));
@@ -1399,49 +1757,434 @@ async fn request_install(
                 error = %e,
                 "request-install falló"
             );
-            let code = match &e {
-                install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
-                install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
-                // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
-                // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
-                install::InstallError::Source(source::SourceError::BadSignature(_)) => {
-                    StatusCode::FORBIDDEN
-                }
-                // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
-                // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
-                install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
-                install::InstallError::Cloud(_)
-                | install::InstallError::Source(_)
-                | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
-            };
-            // Canal de errores de dominio (hub#139): además del mensaje humano viaja un `code`
-            // estable contra el que la UI programa y traduce. Un install fallido no es mudo.
-            let mut body = json!({
-                "ok": false,
-                "error": e.to_string(),
-                "code": e.code(),
-            });
-            if let install::InstallError::Blocked {
-                blocked_on,
-                purchase,
-                ..
-            } = &e
-            {
-                body["blocked_on"] = json!(blocked_on);
-                body["purchase"] = json!(purchase
-                    .iter()
-                    .map(|p| json!({
-                        "module_id": p.module_id,
-                        "module_type": p.module_type,
-                        "price": p.price,
-                        "currency": p.currency,
-                        "purchase_url": p.purchase_url,
-                    }))
-                    .collect::<Vec<_>>());
-            }
-            (code, Json(body)).into_response()
+            install_error_response(&e)
         }
     }
+}
+
+/// Ingestión de embeddings (§9.6): recoge el texto agéntico del módulo (`agent.description` +
+/// `ai.description` de queries/commands), lo embebe **vía el proxy del Cloud** (§9.3 — el Hub nunca
+/// llama a un proveedor de embeddings directamente) y lo registra en el índice vectorial para el
+/// routing de tools (§9.2b).
+///
+/// Best-effort: un fallo aquí NO aborta nada (el módulo ya está instalado y operativo; el router
+/// degrada a "todos"). Corre también tras un **update** (hub#516): la versión nueva puede describir
+/// tools distintas, y un índice que se queda con el texto de la versión anterior enruta a ciegas.
+async fn index_module_embeddings(
+    st: &AppState,
+    auth: &cloud_client::Auth,
+    module_id: &str,
+    version: &str,
+    chunks: Vec<ingest::PendingChunk>,
+) {
+    if chunks.is_empty() {
+        return;
+    }
+    let Some(store) = &st.vector else {
+        tracing::info!(module_id = %module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
+        return;
+    };
+    let embedder =
+        embed::CloudEmbedder::new(st.http.clone(), &st.config.cloud_base_url, auth.clone());
+    match embed::index_chunks(&embedder, store.as_ref(), &st.hub_id(), version, &chunks).await {
+        Ok(n) => tracing::info!(module_id = %module_id, chunks = n, "embeddings indexados (§9.6)"),
+        Err(e) => {
+            tracing::warn!(module_id = %module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)")
+        }
+    }
+}
+
+/// Cuerpo (opcional) de `POST /api/modules/:id/update`. Sin `version` = **la última**, que es lo
+/// que se ofrece por defecto; con `version` = la que se eligió (palanca de soporte).
+///
+/// Elegir una versión concreta **no la clava**: el arranque siguiente vuelve a resolver la última
+/// (ADR-0269 — nadie se queda atrás). Clavar es el **pin de soporte**, herramienta nuestra, y no se
+/// toca desde aquí.
+#[derive(Deserialize, Default)]
+struct UpdateModuleReq {
+    #[serde(default)]
+    version: Option<String>,
+}
+
+/// **Actualiza un módulo sin reiniciar el contenedor** (hub#675 + hub#516).
+///
+/// Es lo que hace que un fix de módulo **no espere a una imagen nueva del hub**: los módulos solo se
+/// recogían al arrancar, y `rollout_hub_fleet` excluye a los hubs que ya están en la imagen
+/// objetivo, así que no había campaña que provocase el reinicio.
+///
+/// Va por [`install::update_from_cloud`] y **no** por `install_from_cloud`, y la diferencia no es
+/// cosmética: con el plan del Cloud (ADR-0060) el módulo que ya está instalado viaja en el set
+/// instalado, vuelve como `already_satisfied` y `execute_plan` lo **salta** — el update habría dicho
+/// que sí sin descargar nada. La puerta de update lo excluye del set y no lo salta.
+///
+/// **Si la versión nueva falla, la anterior sigue puesta**, y por dos caminos que se componen: el
+/// runtime repone en memoria lo que el módulo aportaba (hub#516, `Registry::snapshot_module`), y
+/// encima `update_with_fallback` confirma reinstalando la que había. `Outcome::Lost` queda para lo
+/// que de verdad lo es: que ni siquiera eso valga y el hub se quede sin el módulo.
+///
+/// Auth = **sesión local de admin** *más* credencial hub-scoped, igual que `request-install`. La
+/// sesión no es un detalle: sin ella, cualquier módulo web same-origin podría disparar
+/// actualizaciones usando indirectamente el token de máquina del hub.
+async fn update_module(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+    body: Option<Json<UpdateModuleReq>>,
+) -> Response {
+    use erplora_runtime::module_update::{update_with_fallback, Outcome};
+
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response();
+    };
+
+    // La versión que tiene ahora: es a la que hay que volver si la nueva falla.
+    let installed = {
+        let rt = st.runtime.lock().await;
+        rt.registry().module_version(&module_id)
+    };
+    if !st.runtime.lock().await.registry().is_installed(&module_id) {
+        return install_error_response(&install::InstallError::NotInstalled(module_id));
+    }
+
+    // Vacío / `latest` = lo que el resolutor decida (el MISMO del arranque: cuarentena y pin
+    // mandan, nunca hacia atrás). Se resuelve AQUÍ, antes de tocar nada, porque el destino tiene que
+    // ser una versión concreta: es la que se compara con la instalada para saber si hay algo que
+    // hacer, y la que se reporta como `from → to`.
+    let requested = body
+        .map(|Json(b)| b)
+        .unwrap_or_default()
+        .version
+        .unwrap_or_default();
+    let target = {
+        let rt = st.runtime.lock().await;
+        install::resolve_update_target(
+            &st.http,
+            &st.config.cloud_base_url,
+            &auth,
+            &rt,
+            &module_id,
+            &requested,
+        )
+        .await
+    };
+
+    // Mismas fases que instalar (`resolving → downloading → verifying → installing`): la card del
+    // catálogo ya sabe pintarlas, así que actualizar se ve igual de vivo que instalar.
+    let progress_state = st.clone();
+    let root_id = module_id.clone();
+    let on_progress = move |current: &str, phase: &str| {
+        progress_state.broadcast(json!({
+            "type": "module.install.progress",
+            "module_id": current,
+            "root_id": root_id,
+            "phase": phase,
+        }));
+    };
+
+    // El fallo del PRIMER intento se guarda entero, no como texto: un plan `blocked` (dependencia
+    // premium sin comprar) o un `NotInstalled` son decisiones que le tocan al usuario, con su código
+    // y su puntero de compra — convertirlos en «no se pudo, sigues en la anterior» perdería la única
+    // información accionable que llevan.
+    let first_error: std::sync::Arc<std::sync::Mutex<Option<install::InstallError>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+
+    // `update_with_fallback` compara `from`/`to` y decide la secuencia; la instalación real la pone
+    // este closure. Pedir la versión de partida es barato: `update_from_cloud` ve `to == from` y no
+    // descarga nada, así que la vuelta atrás confirma sin repetir trabajo.
+    let outcome = update_with_fallback(&installed, &target, |version| {
+        let st = st.clone();
+        let auth = auth.clone();
+        let module_id = module_id.clone();
+        let on_progress = &on_progress;
+        let first_error = first_error.clone();
+        async move {
+            let mut rt = st.runtime.lock().await;
+            let result = install::update_from_cloud(
+                &st.http,
+                &st.config.cloud_base_url,
+                &st.config.module_cache,
+                &auth,
+                &mut rt,
+                &module_id,
+                &version,
+                on_progress,
+                &st.config.signature_policy(),
+            )
+            .await;
+            match result {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    let message = e.to_string();
+                    first_error.lock().unwrap().get_or_insert(e);
+                    Err(message)
+                }
+            }
+        }
+    })
+    .await;
+
+    // Lo que el dueño verá mañana en Sistema → Actualizaciones (hub#564). Se anota AQUÍ, con el
+    // resultado en la mano: el estado actual del hub no se puede restar de sí mismo para deducir
+    // una transición, así que si no se escribe cuando ocurre, no existe. Misma decisión que el
+    // arranque (`from_module_outcome`), y `AlreadyThere` no escribe nada porque no cambió nada.
+    // Best-effort: no poder anotar el historial no convierte una actualización buena en un error.
+    {
+        let rt = st.runtime.lock().await;
+        let module_name = rt
+            .registry()
+            .installed
+            .iter()
+            .find(|m| m.id == module_id)
+            .map(|m| m.name.clone())
+            .unwrap_or_else(|| module_id.clone());
+        if let Some(change) =
+            erplora_runtime::update_history::from_module_outcome(&module_id, &module_name, &target, &outcome)
+        {
+            if let Err(e) =
+                erplora_runtime::update_history::record(rt.db(), &st.hub_id(), change).await
+            {
+                tracing::warn!(module_id = %module_id, error = %e, "no se pudo anotar el historial de actualización (hub#564)");
+            }
+        }
+    }
+
+    // Un fallo con decisión del usuario detrás (409 `install_blocked`, 404 `update_not_installed`)
+    // se cuenta como lo que es, no como «no se pudo».
+    if !matches!(outcome, Outcome::Updated { .. } | Outcome::AlreadyThere(_)) {
+        if let Some(e) = first_error.lock().unwrap().as_ref() {
+            if matches!(
+                e,
+                install::InstallError::Blocked { .. } | install::InstallError::NotInstalled(_)
+            ) {
+                return install_error_response(e);
+            }
+        }
+    }
+
+    match outcome {
+        Outcome::AlreadyThere(version) => {
+            Json(json!({ "ok": true, "data": { "module_id": module_id, "version": version, "updated": false } })).into_response()
+        }
+        Outcome::Updated { from, to } => {
+            // La versión nueva puede describir tools distintas: un índice que se queda con el texto
+            // de la anterior enruta a ciegas.
+            let chunks = {
+                let rt = st.runtime.lock().await;
+                ingest::collect_chunks(rt.registry(), &module_id)
+            };
+            index_module_embeddings(&st, &auth, &module_id, &to, chunks).await;
+            // Lo único que el dueño ve de toda la maquinaria (ADR-0269 §3.5): qué cambió y de qué
+            // versión a cuál. `module.installed` va detrás porque es el evento que el shell YA
+            // escucha (App.vue) para refrescar entitlement + nav.
+            st.broadcast(json!({
+                "type": "module.updated",
+                "module_id": module_id,
+                "from": from,
+                "to": to,
+            }));
+            st.broadcast(json!({ "type": "module.installed", "module_id": module_id }));
+            Json(json!({ "ok": true, "data": { "module_id": module_id, "from": from, "version": to, "updated": true } })).into_response()
+        }
+        // 200, no 5xx: la actualización no salió, pero **el módulo sigue funcionando**. Devolver un
+        // error haría pensar que el hub se quedó tocado, y no es el caso.
+        Outcome::RolledBack { stayed_on, error } => Json(json!({
+            "ok": true,
+            "data": { "module_id": module_id, "version": stayed_on, "updated": false },
+            "warning": { "code": "module.update_failed_kept_previous", "message": error },
+        }))
+        .into_response(),
+        Outcome::Lost { module, error } => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "ok": false, "error": { "code": "module.update_lost", "message": format!("`{module}`: {error}") } })),
+        )
+            .into_response(),
+    }
+}
+
+/// `GET /api/modules/updates` — qué versión ofrece hoy el marketplace para cada módulo instalado
+/// (hub#516). **Bajo demanda**, no en bucle: lo pregunta la pantalla de Apps cuando alguien la
+/// abre. Un sondeo periódico costaría una llamada por módulo (24) contra el Cloud sin que nadie
+/// esté mirando, y la vía desatendida ya la cubre el arranque, que resuelve la última versión.
+///
+/// Usa **el mismo resolutor** que el arranque, así que lo que el botón ofrece es exactamente lo que
+/// la actualización automática haría sola: nunca una versión en cuarentena, nunca hacia atrás, y el
+/// pin de soporte gana. Si el Cloud no contesta, `latest == installed` y no se ofrece nada —
+/// inventar una versión sería peor que no decir nada.
+async fn list_module_updates(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let installed: Vec<(String, String, Option<String>)> = {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+        match erplora_runtime::installer::installed_with_pin(rt.db(), &st.hub_id()).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "ok": false, "error": e.to_string() })),
+                )
+                    .into_response()
+            }
+        }
+    };
+
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        // Sin credencial no se puede preguntar al marketplace. No es un error: es «no lo sé», y
+        // «no lo sé» nunca se pinta como «hay actualización».
+        return Json(json!({ "ok": true, "data": [] })).into_response();
+    };
+
+    let mut out = Vec::with_capacity(installed.len());
+    for (module_id, version, pinned) in installed {
+        let target = install::resolve_target(
+            &st.http,
+            &st.config.cloud_base_url,
+            &auth,
+            &module_id,
+            &version,
+            pinned.as_deref(),
+        )
+        .await;
+        out.push(json!({
+            "module_id": module_id,
+            "installed": version,
+            "latest": target.version(),
+            "update_available": target.is_update(),
+            "pinned": pinned,
+        }));
+    }
+    Json(json!({ "ok": true, "data": out })).into_response()
+}
+
+/// `GET /api/modules/:id/versions` — entre qué versiones puede elegir este hub (hub#675).
+///
+/// Es la lista del **desplegable de versión**, y sirve a las dos puertas: instalar (el módulo aún no
+/// está: valen todas las publicadas) y actualizar (solo hacia delante desde la instalada). Por eso
+/// **no es un 404** pedir las versiones de algo que no está instalado —esa regla es de `update`, no
+/// de esta— y por eso `installed` puede venir `null`.
+///
+/// La política la pone `module_update::offer`, la misma pieza que decide la actualización
+/// automática: fuera la cuarentena, fuera el retroceso, y un módulo clavado por soporte no ofrece
+/// nada. Sin eso, el desplegable sería una segunda puerta con una segunda política.
+///
+/// Auth = **sesión de admin**, igual que instalar y actualizar. Sin ella no se pregunta al Cloud:
+/// la respuesta viaja con la credencial de máquina del hub, y cualquier módulo web same-origin
+/// podría usarla de rebote para leer el catálogo.
+async fn list_module_versions(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+
+    // Todo lo que hace falta del hub, y **se suelta el candado**: la llamada al Cloud viene después.
+    // Sostener el `Mutex<Runtime>` durante un round-trip de red congelaría `/api/query` y
+    // `/api/command` —el TPV— mientras el marketplace tarda en contestar.
+    let (installed, pinned) = {
+        let rt = st.runtime.lock().await;
+        (
+            install::installed_version(&rt, &module_id),
+            install::support_pin(&rt, &module_id).await,
+        )
+    };
+
+    // Sin credencial no se puede preguntar al marketplace. No es un error: es «no lo sé», y «no lo
+    // sé» se pinta como «no hay nada que elegir», nunca como una lista inventada.
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return Json(json!({
+            "ok": true,
+            "data": { "module_id": module_id, "installed": installed, "latest": null, "versions": [] },
+        }))
+        .into_response();
+    };
+
+    let versions = install::offered_versions(
+        &st.http,
+        &st.config.cloud_base_url,
+        &auth,
+        &module_id,
+        installed.as_deref(),
+        pinned.as_deref(),
+    )
+    .await;
+
+    Json(json!({
+        "ok": true,
+        "data": {
+            "module_id": module_id,
+            "installed": installed,
+            // La que se ofrece por defecto: la primera de la lista. `null` = no hay nada que elegir.
+            "latest": versions.first(),
+            "versions": versions,
+        },
+    }))
+    .into_response()
+}
+
+/// Status HTTP de un fallo del pipeline de instalación/actualización. Compartido por
+/// `request-install` y `update` (hub#516): el mismo fallo tiene que contarse igual por las dos
+/// puertas, o la UI acaba programando contra dos contratos.
+fn install_error_status(e: &install::InstallError) -> StatusCode {
+    match e {
+        install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
+        // Actualizar algo que no está instalado: no hay recurso al que aplicar la operación.
+        install::InstallError::NotInstalled(_) => StatusCode::NOT_FOUND,
+        install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
+        // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
+        install::InstallError::Source(source::SourceError::BadSignature(_)) => StatusCode::FORBIDDEN,
+        // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
+        // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
+        install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
+        install::InstallError::Cloud(_)
+        | install::InstallError::Source(_)
+        | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
+    }
+}
+
+/// Respuesta de un fallo del pipeline, con el canal de errores de dominio (hub#139): además del
+/// mensaje humano viaja un `code` estable contra el que la UI programa y traduce. Un install —o un
+/// update— fallido no es mudo.
+fn install_error_response(e: &install::InstallError) -> Response {
+    let mut body = json!({
+        "ok": false,
+        "error": e.to_string(),
+        "code": e.code(),
+    });
+    if let install::InstallError::Blocked {
+        blocked_on,
+        purchase,
+        ..
+    } = e
+    {
+        body["blocked_on"] = json!(blocked_on);
+        body["purchase"] = json!(purchase
+            .iter()
+            .map(|p| json!({
+                "module_id": p.module_id,
+                "module_type": p.module_type,
+                "price": p.price,
+                "currency": p.currency,
+                "purchase_url": p.purchase_url,
+            }))
+            .collect::<Vec<_>>());
+    }
+    (install_error_status(e), Json(body)).into_response()
 }
 
 /// GET /modules/:id/*path — sirve los assets web (`module.json`, `dist/*.esm.js`, wasm, icons) de un
@@ -2230,8 +2973,8 @@ fn unauthorized(e: auth::AuthError) -> Response {
 
 /// Query param de idioma para los endpoints localizables (ADR-0055). `?locale=es`; default `en`.
 #[derive(serde::Deserialize)]
-struct LocaleQuery {
-    locale: Option<String>,
+pub(crate) struct LocaleQuery {
+    pub(crate) locale: Option<String>,
 }
 
 async fn navigation(
@@ -2301,6 +3044,11 @@ async fn list_modules(
                 "depends_on": m.depends_on,
                 // ADITIVO (ADR-0057): true si el módulo expone alguna query/command `expose_api`.
                 "has_public_api": public_api.contains(&m.id),
+                // ADITIVO (hub#521): lo que el core NO entendió de su `module.json` y aun así
+                // instaló. Vacío en un módulo que encaja con el contrato — que es lo normal. Es la
+                // superficie CONSULTABLE del aviso: sin ella, «el hub lo ignora en silencio» se
+                // arreglaría escribiendo el silencio en un log que nadie mira.
+                "manifest_warnings": m.manifest_warnings,
             })
         })
         .collect();
@@ -3049,6 +3797,39 @@ async fn mint_session_with_extra(
             Json(payload).into_response()
         }
         Err(e) => err_response(e),
+    }
+}
+
+#[cfg(test)]
+mod incomplete_boot_report_tests {
+    //! hub#571: un hub que arranca SIN alguno de sus módulos no puede ser un silencio.
+    use super::incomplete_boot_event;
+
+    #[test]
+    fn the_report_names_every_module_that_could_not_be_mounted() {
+        let event = incomplete_boot_event(&[
+            ("sales".to_string(), "3.2.0".to_string()),
+            ("taxes".to_string(), "1.4.0".to_string()),
+        ]);
+
+        assert_eq!(event.error_code, "module_boot_incomplete");
+        assert_eq!(event.severity, erplora_runtime::error_registry::severity::UNEXPECTED);
+        // Los módulos, con su versión, para que quien lo lea sepa QUÉ falta sin abrir el hub.
+        assert_eq!(event.context["modules"][0]["module_id"], "sales");
+        assert_eq!(event.context["modules"][0]["version"], "3.2.0");
+        assert_eq!(event.context["modules"][1]["module_id"], "taxes");
+        assert_eq!(event.context["count"], 2);
+        assert!(event.message.contains("sales"), "{}", event.message);
+        assert!(event.message.contains("taxes"), "{}", event.message);
+    }
+
+    /// El evento es del HUB, no de un módulo: no hay un culpable al que colgárselo — lo que falló
+    /// es el arranque, y atribuirlo al primero de la lista mandaría a mirar donde no es.
+    #[test]
+    fn the_failure_belongs_to_the_hub_and_not_to_one_of_the_modules() {
+        let event = incomplete_boot_event(&[("sales".to_string(), "3.2.0".to_string())]);
+        assert_eq!(event.source, erplora_runtime::error_registry::source::HUB);
+        assert_eq!(event.module_id, None);
     }
 }
 

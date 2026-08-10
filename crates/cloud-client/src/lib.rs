@@ -443,15 +443,84 @@ impl CloudClient {
     /// por Cloud, que aplica `check_quota`, inyecta el token de Meta de ERPlora y bloquea al
     /// agotar la cuota (el Hub solo refleja el estado). `POST /api/v1/hub/device/notify/whatsapp/`
     /// con la credencial de **máquina** (`X-Hub-Token`, contexto hub-scoped sin usuario; el envío
-    /// lo dispara una scheduled task / un listener del outbox, no un usuario). El body
-    /// (`{to, template, vars}`) lo construye el llamador (server) desde la `NotifyIntent`.
+    /// lo dispara una scheduled task / un listener del outbox, no un usuario).
     ///
-    /// Los canales **del tenant** (email/sms/WhatsApp self-hosted) NO pasan por aquí: usan el
-    /// secreto local cifrado del hub y el host llama directo (sin cuota ERPlora).
+    /// **Body** (lo construye el llamador desde la `NotifyIntent`; contrato verificado contra
+    /// `saas/apps/whatsapp_inbox/api/notify.py`, saas#1353):
+    /// `{"to": "+34…", "body": "texto libre"}` **o**
+    /// `{"to": "+34…", "template": {"name": …, "language": …, "components": […]}}`, más un
+    /// `phone_number_id` opcional (uno de los números de ESTE hub). Uno de `body`/`template` es
+    /// obligatorio; el `template` es un **objeto** que el SaaS reenvía a Meta tal cual, no el
+    /// nombre suelto. Respuesta: `{"message_id": "wamid…"}`.
+    ///
+    /// El resto de canales (email) tiene su propio proxy — ver [`CloudClient::notify_email`].
     pub fn notify_whatsapp(&self, auth: &Auth) -> PreparedRequest {
         PreparedRequest {
             method: "POST",
             url: format!("{}/api/v1/hub/device/notify/whatsapp/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Email del negocio del hub vía el proxy del Cloud** (ADR-0283 §5 K4, saas#1347).
+    ///
+    /// Mismo patrón que el LLM y que WhatsApp: el hub **nunca** guarda credenciales de SES/SMTP.
+    /// Pide al Cloud que envíe, y el Cloud pone el remitente verificado de ERPlora (`From`) y
+    /// resuelve **en el servidor** el `Reply-To` del negocio (owner del hub →
+    /// `BillingProfile.billing_email` → `SUPPORT_EMAIL`). Por eso el body **no** lleva `Reply-To`:
+    /// un `Reply-To` libre convertiría un correo firmado por ERPlora en phishing.
+    ///
+    /// `POST /api/v1/hub/device/notify/email/` con la credencial de **máquina** (`X-Hub-Token` +
+    /// `X-Hub-Id`, `IsHubMachine`). **Body**: `{"to": "a@b.c" | ["a@b.c", …], "subject": "…",
+    /// "text": "…", "html": "…"?}`; respuesta `{"message_id": "<…>"}`.
+    pub fn notify_email(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/notify/email/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Inbound WhatsApp: the hub's own inbox** (ADR-0283 K1c, saas#1353).
+    ///
+    /// The SaaS may not call a hub (ADR-0213) and hubs sit behind NAT, so an incoming message
+    /// waits in `WhatsAppInboundMessage` until its hub comes for it. `GET
+    /// /api/v1/hub/device/whatsapp/inbox/` with the **machine** credential (`X-Hub-Token` +
+    /// `X-Hub-Id`, `IsHubMachine`): the caller is the runtime's poller, with nobody logged in.
+    ///
+    /// Response (contract verified against `saas/apps/whatsapp_inbox/api/inbox.py`):
+    /// `{"messages": [{"wa_message_id", "from", "payload", "received_at"}, …], "cursor": "<iso>"}`,
+    /// oldest first, at most 100 per call.
+    ///
+    /// `after` is an **optional resume cursor**, never a substitute for the ack: the SaaS already
+    /// filters out what this hub acked. Passing it means "skip everything at or before this
+    /// instant", which is only safe for a deliberate replay — see [`CloudClient::whatsapp_inbox_ack`].
+    pub fn whatsapp_inbox(&self, auth: &Auth, after: Option<&str>) -> PreparedRequest {
+        let query = match after.map(str::trim).filter(|s| !s.is_empty()) {
+            // The cursor is ISO-8601, so it carries `:` and (with an offset) `+`. A raw `+` in a
+            // query string decodes to a SPACE, which `parse_datetime` rejects with a 400.
+            Some(cursor) => format!("?after={}", encode_path_segment(cursor)),
+            None => String::new(),
+        };
+        self.get(
+            &format!("/api/v1/hub/device/whatsapp/inbox/{query}"),
+            auth,
+        )
+    }
+
+    /// **Acknowledge the inbound messages this hub has already ingested** (ADR-0283 K1c).
+    ///
+    /// `POST /api/v1/hub/device/whatsapp/inbox/ack/` with the machine credential. **Body**:
+    /// `{"wa_message_ids": ["wamid.…", …]}` (500 max per call); response `{"acked": <count>}` —
+    /// the number of rows this call actually changed, so a repeated ack answers `0` rather than
+    /// failing. That is what makes the ack safe to retry after a crash.
+    pub fn whatsapp_inbox_ack(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!(
+                "{}/api/v1/hub/device/whatsapp/inbox/ack/",
+                self.base_url
+            ),
             headers: auth.headers(),
         }
     }
@@ -1090,6 +1159,26 @@ mod tests {
     }
 
     #[test]
+    fn notify_email_uses_machine_token() {
+        // El email del negocio sale por el MISMO proxy y con la MISMA credencial: lo dispara el
+        // relay del outbox, sin usuario logueado (ADR-0003). El hub no guarda credenciales de SES.
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "machine-tok".into(),
+        };
+        let r = c.notify_email(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/notify/email/");
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+        // Nunca el JWT de un usuario: el endpoint es `IsHubMachine`.
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+    }
+
+    #[test]
     fn report_error_uses_machine_token() {
         // El reporte de error lo dispara el runtime con la credencial de MÁQUINA del hub
         // (X-Hub-Token), sin usuario logueado (registro global de errores → Cloud).
@@ -1341,5 +1430,65 @@ mod tests {
         .unwrap();
         assert_eq!(cert.version, 1);
         assert_eq!(cert.not_after, None);
+    }
+
+    /// Inbound WhatsApp (ADR-0283 K1c, saas#1353): the hub POLLS its own inbox with the MACHINE
+    /// credential — the caller is the Rust runtime's poller, with nobody logged in. Contract read
+    /// off `saas/apps/whatsapp_inbox/urls.py` + `api/inbox.py` on `origin/develop`.
+    #[test]
+    fn whatsapp_inbox_is_a_machine_authenticated_get() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_inbox(&auth, None);
+        assert_eq!(r.method, "GET");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/whatsapp/inbox/");
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+        // Never the user JWT: the poller runs with no session at all.
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+    }
+
+    /// `after` is an ISO-8601 cursor and travels in the query string, so `+` and `:` MUST be
+    /// percent-encoded: a raw `+` decodes to a space server-side and `parse_datetime` then answers
+    /// `400 invalid_cursor`.
+    #[test]
+    fn whatsapp_inbox_percent_encodes_the_after_cursor() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h".into(),
+            token: "t".into(),
+        };
+        let r = c.whatsapp_inbox(&auth, Some("2026-08-09T10:00:00+00:00"));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/inbox/\
+             ?after=2026-08-09T10%3A00%3A00%2B00%3A00"
+        );
+    }
+
+    /// The ack is what ENDS the redelivery loop. Same machine credential; the body
+    /// (`{"wa_message_ids": [...]}`) is the caller's to build, as with every sibling here.
+    #[test]
+    fn whatsapp_inbox_ack_is_a_machine_authenticated_post() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_inbox_ack(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/inbox/ack/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
     }
 }

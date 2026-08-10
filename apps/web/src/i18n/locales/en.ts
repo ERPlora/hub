@@ -17,6 +17,10 @@ export default {
     system: 'System',
     settings: 'Settings',
     apiDocs: 'API',
+    // Account management, not a storefront (hub#479): the label names the task, never a price
+    // or an offer, and it lands on THIS hub's plan page — the customer's own account.
+    upgradePlan: 'Upgrade plan',
+    upgradePlanError: 'We could not open your browser. Go to erplora.com to manage your plan.',
   },
   apiDocs: {
     title: 'API documentation',
@@ -36,10 +40,14 @@ export default {
     // The way out to management (hub#364). It is the only affordance an icon-only action has, and
     // it crosses a product boundary, so it names the destination out loud.
     manage: 'Manage your business at erplora.com',
+    manageError: 'We could not open your browser. Go to erplora.com to manage your business.',
     notifications: 'Notifications',
     noNotifications: 'All caught up. No notifications.',
     deadLettersTitle: 'Failed events',
     deadLettersBody: '{count} event(s) the relay could not deliver. Review and resend them.',
+    // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
+    // only thing a screen reader has to announce it with.
+    more: 'More options',
     configure: 'Configure',
     menu: 'Open menu',
     collapseMenu: 'Collapse menu',
@@ -72,6 +80,9 @@ export default {
     browserHint: 'In your browser menu, choose “Install app” (or “Add to Home Screen”).',
   },
   assistant: {
+    confirmTitle: 'The assistant wants to run an action',
+    confirmCancel: 'Cancel',
+    confirmRun: 'Run it',
     title: 'Assistant',
     empty: 'Ask me about your sales, your inventory or anything about your business.',
     emptySetup: 'Review the hub configuration. Pick an option or type your question.',
@@ -397,7 +408,14 @@ export default {
     showApiDocs: 'Show API documentation',
     showApiDocsDesc: 'Adds an internal page with the Hub public API (Swagger) for integrations',
     hardware: 'Hardware',
-    bridgeDesc: 'Printers, cash drawer, scanner and peripheral hardware connection',
+    // The counter's hardware, said as what it is. `bridgeDesc` named «ERPlora Bridge», an app
+    // ADR-0196 deleted, and sat next to a hardcoded «Disabled» that was wrong inside the app.
+    // Named after the CAPABILITY, not after one vertical's kit: an ERP without a till has no cash
+    // drawer, and «Printer and cash drawer» reads as «not for me» to everyone who is not a shop.
+    hardwareTitle: 'Local and network access',
+    hardwareDesc: 'Printers, scanners and other devices on this computer or its network',
+    hardwareReady: 'Available here',
+    hardwareAppOnly: 'Only from the installed app',
     disabled: 'Disabled',
     fiscalIdentity: 'Business details',
     fiscalIdentityDesc: 'Taxpayer identity (used by invoices and the fiscal modules).',
@@ -505,6 +523,9 @@ export default {
     stateAvailable: 'Available',
     stateUnavailable: 'Unavailable',
     stateInstalling: 'Installing…',
+    // hub#516: installed, but a newer version is published. Names the version — «there is an
+    // update» without saying which one is a nag, not information.
+    stateUpdatable: 'Update to {version}',
     phaseResolving: 'Resolving version…',
     phaseDownloading: 'Downloading…',
     phaseVerifying: 'Verifying integrity…',
@@ -513,6 +534,7 @@ export default {
     actionToggle: 'Activate/Deactivate',
     actionUninstall: 'Uninstall',
     actionInstall: 'Install',
+    actionUpdate: 'Update',
     priceFree: 'Free',
     priceMonthly: '€{price}/month',
     priceYearly: '€{price}/year',
@@ -524,6 +546,19 @@ export default {
     installError: 'Could not start installation of {name}.',
     // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
     installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',
+    // hub#516 — the update button. `updateError` says the one thing that matters: the module did
+    // NOT end up half-updated; it keeps running the version it had.
+    updating: 'Updating {name}…',
+    updateSuccess: '{name} updated: {from} → {to}.',
+    updateUpToDate: '{name} is already on the latest version.',
+    updateError: 'Could not update {name}. It keeps running the version it had.',
+    updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
+    // Version picker (hub#675). Only shown when there is more than one option; the latest comes
+    // first and preselected, so choosing another one is deliberate.
+    versionPickTitle: 'Choose a version',
+    versionPickBody: 'The latest one is selected. Pick another only if support asked you to.',
+    versionPickConfirm: 'Continue',
+    versionLatest: '{version} (latest)',
     // Names the place, does not open it (hub#479). `purchaseInBrowser`/`purchaseOpenError` went
     // with the button that opened the SaaS checkout.
     needsSubscription: '{name} needs a subscription. Subscribe from your ERPlora account at erplora.com and it will install here.',
@@ -749,8 +784,22 @@ export default {
     stepInstall: 'Install',
     stepPair: 'Pair',
     stepConfigure: 'Configure',
-    updatesManaged: 'Managed updates',
     updatesCloudHint: 'This web Hub is updated automatically as part of service deployments.',
+    // What we changed on this hub, and from which version (hub#564, ADR-0269 §3.5). We update
+    // without asking, so the least we owe is that the owner can find out WHAT changed. Every
+    // sentence below names an app the way they know it and a version they can compare — never a
+    // digest, never «the image», and never a changelog we made up.
+    updateHistory: "What we've updated",
+    updatesRunning: 'Running {version}',
+    noUpdates: 'Nothing has changed',
+    noUpdatesHint: "We haven't updated anything on this hub recently. When we do, it will show up here.",
+    today: 'Today',
+    yesterday: 'Yesterday',
+    // A rollback is an entry of its own and says so in those words: which version it went back to.
+    // The error behind it is deliberately not shown — it is written for us, not for whoever is
+    // opening the shop.
+    rolledBackTo: 'Went back to {version}: the new one did not start',
+    updateLost: 'This app is not running: we are on it',
     documents: 'Documents',
     noDocuments: 'No documents',
     noDocumentsBucket: "This hub's storage bucket is empty.",

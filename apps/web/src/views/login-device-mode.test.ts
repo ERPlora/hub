@@ -39,8 +39,10 @@ vi.mock('../lib/device-mode', async () => {
   const { ref } = await import('vue');
   const actual = await vi.importActual<typeof import('../lib/device-mode')>('../lib/device-mode');
   const deviceMode = ref<'shared' | 'personal'>('shared');
+  const deviceTrusted = ref(false);
   return {
     deviceMode,
+    deviceTrusted,
     deviceModeReady: ref(true),
     loadDeviceMode: vi.fn(async () => deviceMode.value),
     setDeviceMode: vi.fn(),
@@ -79,7 +81,7 @@ vi.mock('../components/HubIcon.vue', () => ({ default: { name: 'HubIcon', templa
 
 import LoginPage from './LoginPage.vue';
 import { hubContextReady, machineRegistrationRequired, pinUsers } from '../lib/runtime';
-import { deviceMode, loadDeviceMode, setDeviceMode } from '../lib/device-mode';
+import { deviceMode, deviceTrusted, loadDeviceMode, setDeviceMode } from '../lib/device-mode';
 
 // Read from the vitest root (`apps/web`): under happy-dom `import.meta.url` is not a `file:` URL.
 const source = readFileSync(`${process.cwd()}/src/views/LoginPage.vue`, 'utf8');
@@ -102,6 +104,7 @@ function seedTrustedDevice(): void {
   pinUsers.value = [{ id: 'u1', name: 'Marta Ruiz', role: 'employee' }];
   hubContextReady.value = true;
   machineRegistrationRequired.value = false;
+  deviceTrusted.value = true;
 }
 
 async function mountLogin() {

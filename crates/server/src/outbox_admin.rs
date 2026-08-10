@@ -1,15 +1,14 @@
 //! **Dead-letter operable** del outbox de eventos (hub#660 — ADR-0127 fase 2, ADR-0283 K6a):
-//! `GET /api/hub/events/dead` · `GET /api/hub/events/dead/count` ·
-//! `POST /api/hub/events/{id}/retry` · `POST /api/hub/events/{id}/discard` ·
-//! `POST /api/hub/events/retry-all`.
+//! `GET /api/hub/events/dead` · `POST /api/hub/events/{id}/retry` · `POST /api/hub/events/{id}/discard`.
 //!
 //! `_event_outbox.status='dead'` era TERMINAL. Tras `MAX_ATTEMPTS` la fila dejaba de moverse y la
 //! única ventana era `GET /api/system` (`collect_logs`): 50 filas, sin payload y sin nada que
-//! pulsar. Un evento que moría por una causa **arreglable** —un listener que exige un permiso que
-//! el contexto reconstruido del emisor no lleva, un módulo desactivado a media entrega— era trabajo
-//! perdido que nadie podía ver, reintentar ni cerrar. Y hay dead-letters ESTRUCTURALES en
-//! producción: un empleado cierra una venta → `verifactu.records.ingest_invoice` exige permiso de
-//! manager → 8 intentos → muerta, con la factura sin registrar.
+//! pulsar. Un evento que moría por una causa **arreglable** —un módulo desactivado a media entrega,
+//! un listener roto— era trabajo perdido que nadie podía ver, reintentar ni cerrar. El caso que
+//! motivó esto (un empleado cierra una venta → `verifactu.records.ingest_invoice` exige un permiso
+//! que el emisor no lleva → 8 intentos → muerta, con la factura sin registrar) ya no ocurre: desde
+//! hub#686 un listener corre con la autoridad de SU módulo, no con el rol del cajero. Esta
+//! superficie sigue siendo el rescate de todo lo demás.
 //!
 //! Tres gestos, deliberadamente pequeños: **ver** qué murió (con el payload, que es lo que permite
 //! distinguir una factura perdida de ruido), **reintentar** una fila devolviéndola al relay, y
@@ -169,6 +168,48 @@ pub async fn discard_dead(
         }))
         .into_response(),
         Ok(false) => not_a_dead_letter(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// GET /api/hub/events/{id}/trace — **what this event set off** (hub#666).
+///
+/// The event itself, the flow runs it started, and the events its delivery caused. It is the
+/// forward reading of the correlation columns, and the door that answers «this sale fired these
+/// five steps» from the sale end: a person has the sale, not the run id.
+///
+/// One level only. A recursive walk would be a single request that can traverse the whole outbox of
+/// a busy hub; the caller follows the link it cares about, one hop at a time, and each hop is
+/// bounded and indexed.
+///
+/// Same door as the rest of this file: **a human owner/admin session**. The trace names what every
+/// automation of the hub did, which is the shape of the business — not something a copyable
+/// integration credential gets to read.
+pub async fn trace_event(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return rejected(e);
+    }
+    match rt.trace_event(&id).await {
+        Ok(Some(trace)) => Json(json!({ "ok": true, "data": trace })).into_response(),
+        // Not in this hub: the same `404` as a dead-letter that is not ours. An event of another
+        // tenant is indistinguishable from one that never existed, which is the point.
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "not_found", "message": "no hay ningún evento con ese id" }
+            })),
+        )
+            .into_response(),
         Err(e) => crate::err_response(e),
     }
 }

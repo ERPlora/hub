@@ -148,16 +148,29 @@
 
         <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('settings.hardware') }}</h2>
 
-        <!-- ERPlora Bridge -->
+        <!-- Acceso de ESTE dispositivo a los recursos locales y de red.
+             Se nombra por la CAPACIDAD, no por el kit de un vertical: un ERP sin caja no tiene cajón
+             portamonedas, y «Impresora y cajón» se lee como «esto no es para mí» en todo lo que no
+             sea una tienda. Lo que hay debajo es el mismo acceso —impresoras, escáneres, lo que haya
+             en la red— y quien lo usa cambia según el negocio.
+             Llevaba el nombre del viejo Bridge y, al lado, «Desactivado» — las dos cosas falsas: esa
+             app la eliminó ADR-0196, y el estado era una CADENA LITERAL, así que rezaba
+             «Desactivado» siempre, también dentro de la app instalada con la impresora imprimiendo.
+             El lenguaje lo fijó hub#500 en Sistema: se habla de la impresora del mostrador, no de un
+             proceso — nadie que lleva un bar sabe qué es un «bridge». Aquí solo se dice si ESTE
+             dispositivo puede hablar con el hardware; el detalle y el diagnóstico viven en Sistema,
+             que es a donde lleva la fila (antes tenía flecha de «se pulsa» y no hacía nada). -->
         <ion-card>
           <ion-card-content class="p-0">
-            <ion-item button detail lines="none">
-              <HubIcon slot="start" name="extension-puzzle-outline" />
+            <ion-item button detail lines="none" @click="router.push('/system')">
+              <HubIcon slot="start" name="hardware-chip-outline" />
               <ion-label>
-                <h2>ERPlora Bridge</h2>
-                <p>{{ t('settings.bridgeDesc') }}</p>
+                <h2>{{ t('settings.hardwareTitle') }}</h2>
+                <p>{{ t('settings.hardwareDesc') }}</p>
               </ion-label>
-              <ion-note slot="end">{{ t('settings.disabled') }}</ion-note>
+              <ion-note slot="end">
+                {{ inInstalledApp ? t('settings.hardwareReady') : t('settings.hardwareAppOnly') }}
+              </ion-note>
             </ion-item>
           </ion-card-content>
         </ion-card>
@@ -414,6 +427,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { isTauri } from '../lib/device';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
@@ -466,6 +480,11 @@ type Tab = SettingsTab;
 
 // Deep-link a una pestaña por HASH (/settings#permisos) — la ruta base no cambia, así Ionic
 // no trata el cambio de pestaña como página secundaria (no se desmonta el tabbar ni hay botón back).
+// ¿Estamos DENTRO de la app instalada? Es lo único que decide si este dispositivo puede hablar con
+// el hardware: los periféricos viven en `crates/peripherals`, dentro de la app, no en la web. Se lee
+// una vez — no puede cambiar mientras la pantalla está abierta (mismo criterio que `SystemPage`).
+const inInstalledApp = isTauri();
+
 // Compat: #store (pestaña Tienda retirada por duplicar Hub) se normaliza a #hub.
 const route = useRoute();
 const router = useRouter();

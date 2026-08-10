@@ -48,12 +48,25 @@ pub async fn install(
     dir: &Path,
 ) -> Result<String> {
     let manifest = Manifest::load(dir)?;
+    // hub#521: `load` already REFUSED anything unknown that would change what runs, and collected
+    // the rest. Those go to the log here, once per install, next to the module they belong to —
+    // `/api/modules` carries the same list for whoever asks later, but a boot scrolling past is
+    // where a half-understood manifest is most likely to be noticed.
+    for warning in &manifest.warnings {
+        eprintln!(
+            "⚠️  módulo {}: `{}` — {}",
+            manifest.id, warning.path, warning.detail
+        );
+    }
     // hub#139: id-dependent contract checks (domain error namespaces, exclusive row gates)
     // run BEFORE any side effect — a broken contract never reaches migrations or the registry.
     validate_command_contracts(&manifest)?;
     // hub#351 (paso 2b): same door for the roles the module declares. A manifest may add roles to
     // the hub's catalogue, but it can neither redefine a base role nor hand out administration.
     validate_role_declarations(&manifest)?;
+    // hub#659 (ADR-0283 §7): same door for the commands its `events.listen` subscribes. A module
+    // reacts to anyone's EVENT, but always with a command of its OWN.
+    validate_event_listeners(&manifest)?;
     // ADR-0273 D6 (hub#555): same door for the regime a module claims to implement. What it
     // declares here is what the core will COUNT as a provider, so a malformed block must not be
     // stored — it would read as "no provider installed", which blocks a till.
@@ -93,11 +106,59 @@ pub async fn install(
     // Tablas de sistema del runtime (outbox de eventos): necesarias en cuanto un command emita.
     crate::outbox::ensure_tables(db).await?;
 
-    if registry.is_installed(&manifest.id) {
-        // Reinstalar = volver a registrar capacidades (p. ej. tras update). Limpiamos antes.
+    // 🔁 Instalar sobre un módulo YA instalado **es una actualización** (hub#516), y a partir de
+    // aquí empiezan los efectos: registrar capacidades exige desregistrar las anteriores, migrar
+    // toca el esquema. Si lo que viene falla a medias, el hub se quedaría **sin el módulo** —sin
+    // queries, sin commands, sin navegación— mientras `hub_module` sigue diciendo que está
+    // instalado. Peor que no actualizar. Así que lo que hay se guarda ANTES de tocarlo y vuelve si
+    // el intento se cae: **una actualización que falla deja corriendo la versión que funcionaba**.
+    //
+    // `None` = primera instalación: no hay nada que restaurar, y un fallo debe seguir dejando el
+    // hub exactamente como estaba (sin módulo a medias).
+    let previous = registry.snapshot_module(&manifest.id);
+    if previous.is_some() {
         registry.remove_module(&manifest.id);
     }
 
+    match register_module(db, registry, hub_id, dir, manifest).await {
+        Ok(id) => Ok(id),
+        Err(error) => {
+            if let Some(snapshot) = previous {
+                // Las scheduled tasks se vuelcan por manifest (`seed_module_tasks` borra las que el
+                // manifest ya no declara), así que la vuelta atrás también las repone. Idempotente
+                // y best-effort: si esto fallara, el error que se devuelve sigue siendo el de la
+                // actualización, que es el que explica qué pasó.
+                let restored = snapshot.manifest().clone();
+                registry.restore_module(snapshot);
+                if let Err(e) =
+                    crate::scheduler::seed_module_tasks(db, &restored.id, &restored.scheduled_tasks)
+                        .await
+                {
+                    eprintln!(
+                        "⚠ {}: restoring the previous version's scheduled tasks failed: {e}",
+                        restored.id
+                    );
+                }
+            }
+            Err(error)
+        }
+    }
+}
+
+/// Registers `manifest` (already validated) into the registry: dependencies, migrations, seed,
+/// capabilities, scheduled tasks and the `hub_module` row.
+///
+/// Split out of [`install`] for one reason: everything here has effects, so the caller needs a
+/// single place to put the previous version back if it fails (hub#516). What is **not** undone is
+/// the schema — migrations are forward-only and expand-only (ADR-0269 §3.4/§7), each file is
+/// recorded only once it succeeded, so what landed stays and the one that failed is retried.
+async fn register_module(
+    db: &dyn DatabaseAdapter,
+    registry: &mut Registry,
+    hub_id: &str,
+    dir: &Path,
+    manifest: Manifest,
+) -> Result<String> {
     // Dependencias declaradas deben estar ya instaladas (orden topológico = del llamador).
     for dep in &manifest.depends_on {
         if !registry.is_installed(dep) {
@@ -255,6 +316,59 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
                     manifest.id
                 )));
             }
+        }
+    }
+    Ok(())
+}
+
+/// Validates the `events.listen` block of a manifest (hub#659, ADR-0283 §7): every subscribed
+/// command must belong to the module that declares the listener.
+///
+/// A listener is the one place where a manifest names a command that somebody ELSE will run: the
+/// relay resolves the name from `registry.listeners` long after the install, with no caller in
+/// sight. Until this door existed, `"sale.completed": {"command": "inventory.stock.decrease"}` in a
+/// third-party manifest was registered as written, and the only thing between it and the other
+/// module's data was the permission check at delivery time — an omission, not a decision.
+///
+/// The two sibling doors already refuse the same thing, and this one only puts `events.listen` on
+/// their level:
+///
+/// - [`crate::scheduler`] runs a scheduled task only if `get_command(&command).module_id` is the
+///   module that declared the task.
+/// - `commands::validate_operation` requires a handler's extra operations to be its module's own.
+///
+/// Ownership is the **namespace** (`<module_id>.`), not a string prefix: `inventory_admin.wipe` is
+/// no more `inventory`'s than `hub.users.create` is — the core namespace (ADR-0192) is foreign to
+/// every module too, and the dispatcher resolves it before ever reaching the registry.
+///
+/// What this deliberately does NOT do is stop a module from reacting to a foreign EVENT: that is
+/// the whole design (`inventory` listens to `sale.completed`, `verifactu` to `invoice.created`).
+/// What changes hands is the transformation — a cross-module reaction that has to RUN something of
+/// another module's is the territory of flows with explicit grants (`Origin::Automation`,
+/// ADR-0283), where the grant is visible and revocable, not a line in a zip.
+///
+/// Also deliberately NOT checked: that the command exists. A listener naming a command of its own
+/// module that it never declares is already inert — [`Registry::listeners_for`] only returns
+/// commands that are registered and active — so it is a manifest bug for `erplora validate` to
+/// catch, not a reason to refuse an install and leave the hub without the module.
+///
+/// **The producer twin lives elsewhere and is a WARNING, not this refusal** (hub#709): a command
+/// that emits an event missing from `events.emits` is reported by
+/// `Manifest::undeclared_emit_warnings` and installs. The asymmetry is the ADR-0286 tier rule —
+/// a listener pointing at a foreign command changes WHO RUNS WHAT, while an undeclared emit only
+/// costs a line in the event catalogue, and refusing it here would make a module that has been
+/// running for months vanish at the boot re-registration (ADR-0269).
+fn validate_event_listeners(manifest: &Manifest) -> Result<()> {
+    let namespace = format!("{}.", manifest.id);
+    for (event, listener) in &manifest.events.listen {
+        if !listener.command.starts_with(&namespace) {
+            return Err(RuntimeError::Other(format!(
+                "manifest `{}`: the listener for `{event}` points at `{}`, a command outside the \
+                 module's namespace `{namespace}`. A module reacts to any event, but always with a \
+                 command of its OWN — running another module's command belongs to a flow with an \
+                 explicit grant (ADR-0283), not to a line in a manifest",
+                manifest.id, listener.command
+            )));
         }
     }
     Ok(())
@@ -636,6 +750,11 @@ pub async fn uninstall(
         &p,
     )
     .await?;
+    // Y su copia local (hub#571). Va junto al borrado de `hub_module` porque son el mismo hecho:
+    // si el paquete sobreviviera, el primer arranque sin red repondría un módulo que el dueño
+    // quitó — el arranque repone «lo que hub_module dice instalado», y esa fila ya no está, pero
+    // dejar el artefacto ahí es guardar la munición de un bug que no queremos volver a discutir.
+    crate::module_package::forget(db, hub_id, module_id).await?;
     Ok(())
 }
 

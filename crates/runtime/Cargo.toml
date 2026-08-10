@@ -15,6 +15,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# IANA time zone rules (hub#731). A flow's cron is the BUSINESS clock: «cierra la caja a las 21:00»
+# has to be 21:00 in the shop, and the offset moves twice a year on its own. DST rules are not
+# something to hand-roll — the two cases that matter (an hour that does not exist and one that
+# happens twice) are exactly where a hand-written rule loses a cash close or runs it twice. The
+# whole tzdb is compiled in (~500 KB): a hub can be in any country, and filtering by regex would
+# turn "your zone is not in the binary" into a silent fallback to UTC, which is the bug being fixed.
+chrono-tz = "0.10"
 uuid = { version = "1", features = ["v4", "v5"] }
 sha2 = "0.10"
 # PIN hashing con argon2id + string PHC estándar (`$argon2id$v=19$...`). Decisión humano hub#15:
@@ -35,6 +42,11 @@ jsonschema = { version = "0.33", default-features = false }
 # módulos sin exponerles la clave. `reqwest` (rustls) construye la identidad desde PEM; `base64`
 # decodifica el `.p12`. (OpenSSL — solo non-Android, ver `[target...]` abajo.)
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# El parser WHATWG de URLs (hub#728/#729, `flows/net.rs`). Es **el mismo crate y la misma versión**
+# que usa `reqwest` por dentro, así que `url::Url` y `reqwest::Url` son EL MISMO tipo: la URL que
+# el kernel juzga es literalmente el objeto que el cliente HTTP marca, no una cadena que se vuelve
+# a parsear. Ya estaba en `Cargo.lock` de forma transitiva; aquí solo se declara la arista.
+url = "2"
 base64 = "0.22"
 # Ejecución del handler WASM FUERA del worker async (hub#241): `spawn_blocking` + `timeout`. La
 # llamada a wasmtime es bloqueante; hacerla en el propio worker de Tokio dejaba colgado el runtime

@@ -77,7 +77,6 @@ async fn serve() -> (SocketAddr, AppState, String) {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     let state = AppState::with_config(rt, cfg);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

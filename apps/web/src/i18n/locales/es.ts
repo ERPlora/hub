@@ -18,6 +18,8 @@ export default {
     system: 'Sistema',
     settings: 'Ajustes',
     apiDocs: 'API',
+    upgradePlan: 'Actualizar plan',
+    upgradePlanError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu plan.',
   },
   apiDocs: {
     title: 'Documentación de la API',
@@ -37,10 +39,14 @@ export default {
     // The way out to management (hub#364). It is the only affordance an icon-only action has, and
     // it crosses a product boundary, so it names the destination out loud.
     manage: 'Gestiona tu negocio en erplora.com',
+    manageError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.',
     notifications: 'Notificaciones',
     noNotifications: 'Todo al día. Sin notificaciones.',
     deadLettersTitle: 'Eventos caídos',
     deadLettersBody: 'Hay {count} evento(s) que el relay no pudo entregar. Revísalos y reenvíalos.',
+    // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
+    // lo que un lector de pantalla puede anunciarlo.
+    more: 'Más opciones',
     configure: 'Configurar',
     menu: 'Abrir menú',
     collapseMenu: 'Colapsar menú',
@@ -73,6 +79,9 @@ export default {
     browserHint: 'En el menú de tu navegador, elige «Instalar aplicación» (o «Añadir a pantalla de inicio»).',
   },
   assistant: {
+    confirmTitle: 'El asistente quiere ejecutar una acción',
+    confirmCancel: 'Cancelar',
+    confirmRun: 'Ejecutar',
     title: 'Asistente',
     empty: 'Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.',
     emptySetup: 'Revisa la configuración del hub. Elige una opción o escribe tu duda.',
@@ -383,7 +392,10 @@ export default {
     showApiDocs: 'Mostrar documentación de la API',
     showApiDocsDesc: 'Añade una página interna con la API pública del Hub (Swagger) para integraciones',
     hardware: 'Hardware',
-    bridgeDesc: 'Impresoras, cajón, escáner y conexión de hardware periférico',
+    hardwareTitle: 'Acceso a recursos locales y de red',
+    hardwareDesc: 'Impresoras, escáneres y otros dispositivos de este equipo o de su red',
+    hardwareReady: 'Disponible aquí',
+    hardwareAppOnly: 'Solo desde la app instalada',
     disabled: 'Desactivado',
     fiscalIdentity: 'Datos del negocio',
     fiscalIdentityDesc: 'Identidad del obligado tributario (la usan las facturas y los módulos fiscales).',
@@ -491,6 +503,9 @@ export default {
     stateAvailable: 'Disponible',
     stateUnavailable: 'No disponible',
     stateInstalling: 'Instalando…',
+    // hub#516: instalado, pero hay una versión más nueva publicada. Se nombra la versión — decir
+    // «hay actualización» sin decir cuál es una insistencia, no una información.
+    stateUpdatable: 'Actualizar a {version}',
     phaseResolving: 'Resolviendo versión…',
     phaseDownloading: 'Descargando…',
     phaseVerifying: 'Verificando integridad…',
@@ -499,6 +514,7 @@ export default {
     actionToggle: 'Activar/Desactivar',
     actionUninstall: 'Desinstalar',
     actionInstall: 'Instalar',
+    actionUpdate: 'Actualizar',
     priceFree: 'Gratis',
     priceMonthly: '{price} €/mes',
     priceYearly: '{price} €/año',
@@ -510,6 +526,17 @@ export default {
     installError: 'No se pudo iniciar la instalación de {name}.',
     // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
     installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
+    // hub#516 — el botón de actualizar. `updateError` dice lo único que importa: el módulo NO se
+    // ha quedado a medias, sigue corriendo la versión que tenía.
+    updating: 'Actualizando {name}…',
+    updateSuccess: '{name} actualizado: {from} → {to}.',
+    updateUpToDate: '{name} ya está en la última versión.',
+    updateError: 'No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.',
+    updateBlocked: 'La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.',
+    versionPickTitle: 'Elige una versión',
+    versionPickBody: 'Está seleccionada la última. Elige otra solo si te lo ha pedido soporte.',
+    versionPickConfirm: 'Continuar',
+    versionLatest: '{version} (la última)',
     needsSubscription: '{name} necesita una suscripción. Contrátala desde tu cuenta de ERPlora, en erplora.com, y se instalará aquí.',
     deactivated: '{name} desactivado.',
     activated: '{name} activado.',
@@ -732,8 +759,22 @@ export default {
     stepInstall: 'Instalar',
     stepPair: 'Vincular',
     stepConfigure: 'Configurar',
-    updatesManaged: 'Actualizaciones gestionadas',
     updatesCloudHint: 'Este Hub web se actualiza automáticamente durante los despliegues del servicio.',
+    // Qué le hemos cambiado a este hub y desde qué versión (hub#564, ADR-0269 §3.5). Actualizamos
+    // sin preguntar, así que lo mínimo que le debemos es que pueda SABER qué le cambió. Cada frase
+    // nombra una app como él la conoce y una versión que puede comparar — nunca un digest, nunca
+    // «la imagen», y nunca un changelog inventado.
+    updateHistory: 'Qué te hemos actualizado',
+    updatesRunning: 'Vas por la {version}',
+    noUpdates: 'No te hemos cambiado nada',
+    noUpdatesHint: 'No hemos actualizado nada en este hub últimamente. Cuando lo hagamos, aparecerá aquí.',
+    today: 'Hoy',
+    yesterday: 'Ayer',
+    // Una vuelta atrás es una entrada más y lo dice con esas palabras: a qué versión volvió. El
+    // error que la causó no se enseña a propósito — está escrito para nosotros, no para quien abre
+    // la tienda.
+    rolledBackTo: 'Volvió a la {version}: la nueva no arrancó',
+    updateLost: 'Esta app no está funcionando: estamos en ello',
     documents: 'Documentos',
     noDocuments: 'Sin documentos',
     noDocumentsBucket: 'El bucket de almacenamiento de este hub está vacío.',

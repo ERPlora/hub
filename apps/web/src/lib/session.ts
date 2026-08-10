@@ -52,6 +52,39 @@ export const isAdmin = computed(() => {
   return role === 'owner' || role === 'admin';
 });
 
+/**
+ * El comodín que el shell inyecta a las sesiones owner/admin (`lib/runtime.ts`).
+ *
+ * Una sola definición del símbolo, para que «¿esta sesión puede X?» se responda en un solo sitio
+ * y no en N copias que ninguna sabe de las otras (hub#506). El runtime del backend concede `*`
+ * a los mismos roles que `is_admin_role` acepta; el frontend solo lo refleja para pintar UI.
+ */
+export const ALL_PERMISSIONS = '*';
+
+/**
+ * La regla del comodín, desacoplada de la sesión reactiva.
+ *
+ * Existe por separado para que las funciones puras (p. ej. `mayAdminister`, usada en tests con
+ * permisos concretos) compartan exactamente la misma regla que las que leen la sesión global.
+ * Antes eran copias independientes en `management-link.ts`, `app-update.ts`, `blueprint-hero.ts`
+ * y `runtime.ts` — ninguna sabía de las otras.
+ */
+export function permissionsInclude(
+  granted: readonly string[] | undefined,
+  permission: string,
+): boolean {
+  return !!granted?.some((p) => p === ALL_PERMISSIONS || p === permission);
+}
+
+/**
+ * ¿La sesión actual tiene `permission`, contando el comodín?
+ *
+ * Es un FILTRO de UI, no un gate: el runtime revalida el permiso real en cada endpoint.
+ */
+export function hasPermission(permission: string): boolean {
+  return permissionsInclude(_user.value?.permissions, permission);
+}
+
 export function setUser(u: SessionUser | null): void {
   _user.value = u;
   try {

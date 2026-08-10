@@ -26,6 +26,7 @@ import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
 import { setRuntimeClientKind } from './device';
+import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -366,6 +367,101 @@ async function moduleAction(id: string, action: 'activate' | 'deactivate' | 'uni
       env.error?.code,
     );
   }
+}
+
+/**
+ * Pide al runtime **actualizar** un módulo instalado (hub#516). Mismo pipeline verificado que
+ * instalar (SHA256 + firma ed25519 + manifest + plan de dependencias) y las mismas fases por WS.
+ *
+ * Sin versión, el runtime resuelve la que toca con el resolutor del arranque: nunca una en
+ * cuarentena, nunca hacia atrás, y el pin de soporte gana. `updated: false` **no es un fallo**: es
+ * «ya está en la versión que le toca».
+ *
+ * Los errores llegan con el mismo contrato que `requestInstall`: un 409 por dependencia de pago sin
+ * contratar sale como [`InstallBlockedError`] (nunca se cobra solo), el resto como
+ * [`InstallFailedError`] con su `code` estable.
+ */
+export async function updateModule(moduleId: string, version = ''): Promise<ModuleUpdateResult> {
+  beginRequest();
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ version }),
+    });
+    if (!res.ok) {
+      let body: Record<string, unknown> | null = null;
+      try {
+        body = (await res.json()) as Record<string, unknown>;
+      } catch {
+        body = null;
+      }
+      const message = (body?.error as string) || `update ${moduleId} → ${res.status}`;
+      const code = (body?.code as string) || 'update_failed';
+      if (code === 'install_blocked') {
+        const purchase = Array.isArray(body?.purchase)
+          ? (body!.purchase as Record<string, string>[]).map((p) => ({
+              moduleId: p.module_id,
+              moduleType: p.module_type,
+              price: p.price,
+              currency: p.currency,
+              purchaseUrl: p.purchase_url,
+            }))
+          : [];
+        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase);
+      }
+      throw new InstallFailedError(message, code);
+    }
+    return (await res.json()) as ModuleUpdateResult;
+  } finally {
+    endRequest();
+  }
+}
+
+/** Respuesta de `POST /api/modules/{id}/update`. */
+export interface ModuleUpdateResult {
+  ok: boolean;
+  module_id: string;
+  from: string;
+  to: string;
+  /** `false` = ya estaba en la versión que le toca; no se descargó nada. */
+  updated: boolean;
+}
+
+/**
+ * Qué versión ofrece hoy el marketplace para cada módulo instalado (`GET /api/modules/updates`).
+ *
+ * **Bajo demanda**: lo pide la pantalla de Apps al abrirse. Un sondeo en bucle costaría una llamada
+ * por módulo al Cloud sin que nadie mire, y la vía desatendida ya la cubre el arranque. Un fallo
+ * devuelve lista vacía: sin respuesta no se ofrece nada.
+ */
+export async function listModuleUpdates(): Promise<ModuleUpdateInfo[]> {
+  const res = await fetch(`${RUNTIME_URL}/api/modules/updates`, { headers: runtimeHeaders() });
+  if (!res.ok) return [];
+  const env = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: ModuleUpdateInfo[] };
+  return env.ok && env.data ? env.data : [];
+}
+
+/**
+ * Entre qué versiones puede elegir este hub para un módulo (`GET /api/modules/{id}/versions`).
+ *
+ * Sirve a las dos puertas: instalar (el módulo aún no está: valen todas las publicadas) y actualizar
+ * (solo hacia delante desde la instalada). El runtime ya aplica ahí la política —fuera cuarentena,
+ * fuera retroceso, y un módulo clavado por soporte no ofrece nada—, así que la pantalla pinta lo que
+ * le llega y no filtra por su cuenta.
+ *
+ * Un fallo devuelve la lista vacía, y el llamante cae a `latest`: sin lista se instala igual que
+ * antes de que existiera el desplegable. Quedarse sin poder instalar porque el Cloud no contestó
+ * sería un precio absurdo por una comodidad.
+ */
+export async function listModuleVersions(moduleId: string): Promise<ModuleVersions> {
+  const empty: ModuleVersions = { module_id: moduleId, installed: null, latest: null, versions: [] };
+  const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/versions`, {
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) return empty;
+  const env = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: ModuleVersions };
+  return env.ok && env.data ? env.data : empty;
 }
 
 export const activateModule = (id: string): Promise<void> => moduleAction(id, 'activate');

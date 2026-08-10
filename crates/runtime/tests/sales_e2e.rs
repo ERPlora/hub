@@ -173,7 +173,7 @@ async fn sale_decrements_stock_via_event() {
     rt.execute_command("inventory.products.create", &params(json!({
         "name": "Café", "sku": "CAF", "price": 121, "cost": 50, "stock": 10_000_000,
         "low_stock_threshold": 5, "product_type": "physical",
-        "ean13": null, "description": "", "tax_category_key": null, "image": ""
+        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
     })), &ctx).await.unwrap();
     let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
@@ -651,7 +651,7 @@ async fn media_racion_de_gambas_descuenta_medio_kilo_y_cobra_la_mitad() {
     rt.execute_command("inventory.products.create", &params(json!({
         "name": "Gambas", "sku": "GAM", "price": 1200, "cost": 800, "stock": 2_500_000,
         "unit_code": "kg", "low_stock_threshold": 0, "product_type": "physical",
-        "ean13": null, "description": "", "tax_category_key": null, "image": ""
+        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
     })), &ctx).await.unwrap();
     let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
@@ -697,7 +697,7 @@ async fn una_cantidad_fuera_de_la_rejilla_no_crea_venta_ni_toca_stock() {
     rt.execute_command("inventory.products.create", &params(json!({
         "name": "Azafrán", "sku": "AZA", "price": 900_000, "cost": 0, "stock": 1_000_000,
         "unit_code": "kg", "low_stock_threshold": 0, "product_type": "physical",
-        "ean13": null, "description": "", "tax_category_key": null, "image": ""
+        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
     })), &ctx).await.unwrap();
     let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();

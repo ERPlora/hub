@@ -143,8 +143,9 @@ pub async fn collect_daily_usage(
         orders_today,
         last_sale_at,
         terminals,
-        // La actividad de usuario no sale de la BD: la lleva el `ActivityState` en memoria, y la
-        // rellena el llamador (`serve`) solo si hay algo nuevo que reportar.
+        // La actividad de usuario no se lee AQUÍ: la sirve el `ActivityState`, que la mantiene en
+        // un atómico y la respalda en `_hub_activity` (hub#670). La rellena el llamador (`serve`)
+        // y solo si hay algo nuevo que reportar.
         last_user_activity_at: None,
         // El certificado delegado tampoco sale de aquí: lo rellena el llamador (`serve`) con
         // `fiscal_certificate::delegated_certificate_report`, que sabe distinguir «no tengo» de

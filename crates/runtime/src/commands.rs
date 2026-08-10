@@ -32,10 +32,18 @@ pub(crate) const NEW_IDS_BATCH: usize = 256;
 /// segmento del nombre prefijado `_`): un caller externo nunca debe poder invocar directamente lo
 /// que un módulo emite como implementación (`module._helper`), saltándose la validación,
 /// orquestación y atomicidad del command público que normalmente lo dispara.
+///
+/// [`Origin::Automation`] is the third door (ADR-0283 D2, hub#661): a **flow** executing one of
+/// its steps. It is neither of the other two on purpose. It is not `External`, because there is
+/// no caller and no role to check; and it is not `Internal`, because `Internal` means "the runtime
+/// invoking itself on behalf of a module it already trusts" and would hand a flow every internal
+/// command in the hub. What it has instead is its OWN authorisation — `_flow_grants`,
+/// default-deny — and the same ban on internal commands that `External` has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Origin {
     External,
     Internal,
+    Automation,
 }
 
 /// Ejecuta `name(payload)` con el contexto dado. Aplica permiso, ejecuta el SQL **y persiste
@@ -102,7 +110,7 @@ pub(crate) async fn execute_at(
     // enriquecido. Degrada a vacío si los settings fallan.
     // FIX QA (2026-06-25): la condición original `depth == 0` dejaba SIN enriquecer las commands
     // entregadas por el relay del Outbox (listeners de eventos), que corren a depth>0 con un ctx
-    // RECONSTRUIDO (reconstruct_ctx) cuyo business_tax_id está vacío. El caso real: `sale.completed`
+    // CONSTRUIDO por el relay (`outbox::listener_ctx`) cuyo business_tax_id está vacío. El caso real: `sale.completed`
     // (depth 1) → `invoice.create_from_sale` (listener, depth 1) generaba facturas con issuer_nif
     // vacío → VeriFactu (`ingest_invoice`) no-op (no encadena, 0 registros, 0 QR). Enriquecemos
     // SIEMPRE que falte la identidad fiscal (la cascada con ctx ya enriquecido salta el get_all).
@@ -174,7 +182,13 @@ pub(crate) async fn execute_at(
     // (relay del Outbox, scheduler) lo invoca, siempre con `Origin::Internal`. Sin esto, un
     // `module._helper` "privado" solo por convención era invocable tal cual desde
     // `POST /api/command`, saltándose la orquestación/atomicidad del command público que lo emite.
-    if origin == Origin::External && cmd.def.is_internal(name) {
+    //
+    // hub#661: `Origin::Automation` is gated here too, and for the same reason. A flow is written
+    // in an editor by whoever owns the hub; letting it name `module._helper` would hand it the
+    // half of a module that exists precisely so that the public command controls when it runs.
+    // Cross-module reactions with transformation are what flows are FOR — but through the public
+    // surface, with a grant, not through the back door (ADR-0283 §7).
+    if origin != Origin::Internal && cmd.def.is_internal(name) {
         return Err(RuntimeError::InternalCommand(name.to_string()));
     }
 
@@ -197,33 +211,65 @@ pub(crate) async fn execute_at(
     // it — are written to the runtime's own record right here, BEFORE the command runs. Not by
     // the module: a module that never declares an `approved_by` column would lose the trace in
     // silence, and today that is every module in the catalogue.
+    //
+    // hub#661 (ADR-0283 D2): under `Origin::Automation` this gate is a DIFFERENT question, asked
+    // of a different table. There is no user whose role could answer «may you do this», so the RBAC
+    // check is replaced — not supplemented — by `_flow_grants`: does THIS flow have a live grant
+    // for THIS command? Default-deny, and read **fresh on every step**, which is what makes
+    // revoking a grant stop a run that is already in flight at its next step.
+    //
+    // Three properties come from putting it exactly here and nowhere else:
+    //  · a flow inherits ÍNTEGROS the fiscal gates, the schema validation and the transactional
+    //    outbox below — the reason the ADR insists automation goes through `execute_at` instead of
+    //    getting its own dispatcher;
+    //  · no elevation: a flow is `Principal::Machine`, and the executor passes `grants: None`, so
+    //    there is no manager's PIN to spend and no `RequiresElevation` to offer nobody;
+    //  · no privilege growth: the grant opens THIS command and nothing else. `ctx.permissions` —
+    //    what the executor derived from the granted commands — is not consulted here at all; it
+    //    only answers the questions asked downstream of this point.
     let elevated_ctx;
-    let ctx = match permissions::check_command(registry, ctx, &cmd.def.permission) {
-        Ok(()) => ctx,
-        Err(RuntimeError::RequiresElevation { permission }) => {
-            match spend_approval(grants, ctx, name, payload, &permission) {
-                Some((approved_by, fingerprint)) => {
-                    // No receipt, no elevated action: swallowing this would make «break the
-                    // audit» a way to run a manager-level command leaving no trace at all.
-                    crate::elevation::record_spend(
-                        db,
-                        &ctx.hub_id,
-                        name,
-                        &permission,
-                        &ctx.user_id,
-                        &approved_by,
-                        &fingerprint,
-                    )
-                    .await?;
-                    elevated_ctx = ctx.clone().spent_approval_of(approved_by);
-                    &elevated_ctx
+    let ctx = if origin == Origin::Automation {
+        let Some(automation) = ctx.automation() else {
+            // Automation with no flow identity is a bug in a caller, and the safe reading of a bug
+            // in an authorisation path is "denied".
+            return Err(RuntimeError::Domain {
+                code: crate::flows::grants::ERR_GRANT_DENIED.to_string(),
+                message: format!(
+                    "`{name}` was invoked as automation without a flow identity; refused"
+                ),
+            });
+        };
+        crate::flows::grants::check_command_grant(db, &ctx.hub_id, &automation.flow_id, name)
+            .await?;
+        ctx
+    } else {
+        match permissions::check_command(registry, ctx, &cmd.def.permission) {
+            Ok(()) => ctx,
+            Err(RuntimeError::RequiresElevation { permission }) => {
+                match spend_approval(grants, ctx, name, payload, &permission) {
+                    Some((approved_by, fingerprint)) => {
+                        // No receipt, no elevated action: swallowing this would make «break the
+                        // audit» a way to run a manager-level command leaving no trace at all.
+                        crate::elevation::record_spend(
+                            db,
+                            &ctx.hub_id,
+                            name,
+                            &permission,
+                            &ctx.user_id,
+                            &approved_by,
+                            &fingerprint,
+                        )
+                        .await?;
+                        elevated_ctx = ctx.clone().spent_approval_of(approved_by);
+                        &elevated_ctx
+                    }
+                    // No approval, or one granted for another action, another cashier or another
+                    // hub: all of them mean the same thing to the caller — ask the manager.
+                    None => return Err(RuntimeError::RequiresElevation { permission }),
                 }
-                // No approval, or one granted for another action, another cashier or another hub:
-                // all of them mean the same thing to the caller — go and ask the manager.
-                None => return Err(RuntimeError::RequiresElevation { permission }),
             }
+            Err(e) => return Err(e),
         }
-        Err(e) => return Err(e),
     };
 
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y
@@ -383,7 +429,7 @@ pub(crate) async fn execute_at(
 /// payload y se lo creía. Con `reads`, el handler resuelve el % contra `taxes.rules.list` (el
 /// catálogo del hub) y la pista del cliente queda como mero fallback.
 ///
-/// # Las tres reglas (ADR-0069 §1)
+/// # Las tres reglas (ADR-0069 §1) + la cuarta (hub#701)
 ///
 /// 1. **Alcance por DEPENDENCIA, no por permiso.** Solo queries del propio módulo o de los que
 ///    declara en `depends_on`. Un módulo no puede leerle las tablas a otro con el que no tiene
@@ -392,18 +438,22 @@ pub(crate) async fn execute_at(
 ///    ya se comprobó, y las reads son contrato vouched por el autor del módulo. Un empleado de POS
 ///    sin `taxes.view_tax` igual necesita los tipos para poder cobrar. Se conserva el `hub_id` del
 ///    caller (el tenant NO es negociable) y se usa el wildcard de permisos.
-/// 3. **Fallo GRACEFUL.** Una read que no resuelve se **omite** (no aborta el command). Cobrar es
-///    lo último que puede romperse en un TPV: si `taxes` está raro, el handler degrada a su
-///    fallback, pero la venta se cierra.
+/// 3. **Fallo GRACEFUL (defecto).** Una read que no resuelve se **omite** (no aborta el command).
+///    Cobrar es lo último que puede romperse en un TPV: si `taxes` está raro, el handler degrada
+///    a su fallback, pero la venta se cierra.
+/// 4. **`required` (hub#701, opt-in).** Una read marcada `required` que no resuelve **aborta**
+///    el command con `ReadUnavailable`. Es lo que no admite adivinar: el impuesto. Sin esto, un
+///    catálogo vacío (la read falló) es indistinguible de «este hub no tiene reglas», y el handler
+///    cobra el porcentaje que propone el navegador — exactamente lo que sales#21 prohíbe.
 async fn preload_reads(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     cmd: &RegisteredCommand,
     ctx: &RequestContext,
     payload: &erplora_db::Params,
-) -> Json {
+) -> Result<Json> {
     if cmd.def.reads.is_empty() {
-        return Json::Object(Default::default());
+        return Ok(Json::Object(Default::default()));
     }
 
     // Regla 1 — alcance: el propio módulo + sus `depends_on` declarados en el manifest.
@@ -438,17 +488,26 @@ async fn preload_reads(
         // contra la fila concreta se quedaba sin sitio donde vivir.
         let params = read.resolve_params_from_map(payload);
 
-        // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente), se omite.
         match crate::queries::execute(db, registry, name, &params, &sys).await {
             Ok(rows) => {
                 out.insert(name.to_string(), Json::Array(rows));
             }
             Err(e) => {
+                // Regla 4 (hub#701): una read OBLIGATORIA aborta. Sin esto, el handler recibe un
+                // catálogo vacío indistinguible de «no hay reglas» y degrada al porcentaje del
+                // payload — que es justo lo que no puede admitir adivinar (el impuesto).
+                if read.is_required() {
+                    return Err(RuntimeError::ReadUnavailable {
+                        query: name.to_string(),
+                    });
+                }
+                // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente),
+                // se omite. Cobrar es lo último que puede romperse en un TPV.
                 eprintln!("⚠ reads: `{name}` falló ({e}) → se omite; el handler degradará");
             }
         }
     }
-    Json::Object(out)
+    Ok(Json::Object(out))
 }
 
 async fn execute_wasm(
@@ -479,7 +538,7 @@ async fn execute_wasm(
     // LECTURAS PRE-CARGADAS (ADR-0069). El handler corre en un sandbox y NO puede leer la BD, así
     // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
     // confianza del hub**.
-    let reads = preload_reads(db, registry, cmd, ctx, payload).await;
+    let reads = preload_reads(db, registry, cmd, ctx, payload).await?;
     let input = json!({
         "payload": Json::Object(bound_payload),
         "context": {

@@ -133,10 +133,23 @@ pub struct HubConfig {
     pub jwt_public_key: Option<String>,
     /// Credencial de **máquina** del hub (`cloud_api_token`), enviada como `X-Hub-Token` para
     /// hablar con el Cloud en endpoints hub-scoped (marketplace, entitlement, asistente, install)
-    /// **sin** usuario logueado. La inyecta el despliegue (env `HUB_CLOUD_API_TOKEN`, ECS) o la
-    /// persiste el shell Tauri tras enrolar (`GET /api/v1/hub/device/enroll/`). Es un **secreto**:
-    /// vive solo aquí (runtime), nunca en el navegador. `None` en dev/local sin enrolar → se cae al
-    /// JWT del usuario activo. Ver ARQUITECTURA.md §2.3.
+    /// **sin** usuario logueado.
+    ///
+    /// **La inyecta el aprovisionamiento** como env `HUB_CLOUD_API_TOKEN`: el SaaS acuña el token al
+    /// crear el hub (`Hub.cloud_api_token`) y el hub nace con él puesto. No lo pide nadie.
+    ///
+    /// Es un **secreto del runtime**: vive solo aquí, nunca en el navegador. Y como desde ADR-0154 el
+    /// runtime corre en el contenedor del hub —no dentro de la app instalable—, **la app NUNCA lo
+    /// tiene**: N dispositivos con la app hablan con UN hub, que es quien lo guarda.
+    ///
+    /// ⚠️ Aquí ponía que «la persiste el shell Tauri tras enrolar». Era de cuando la app llevaba el
+    /// runtime dentro, y ADR-0154 se lo llevó: no hay una sola línea en `apps/tauri` que toque este
+    /// token. `cloud-client` sigue exponiendo `GET/POST /api/v1/hub/device/enroll/`, pero **nadie en
+    /// el hub lo llama**.
+    ///
+    /// `None` = hub creado **fuera** del aprovisionamiento (un `pnpm dev` local): el SaaS no sabe que
+    /// existe, así que marketplace, entitlement, asistente y el almacenamiento de VeriFactu quedan
+    /// muertos. Se cae al JWT del usuario activo donde eso basta. Ver ARQUITECTURA.md §2.3.
     pub cloud_api_token: Option<String>,
     /// Raíz de la carpeta `media/` del hub: path por defecto de TODOS los ficheros (adjuntos de
     /// módulos, registros `_logs/`, actividad `_system/`). La navega la pantalla /files
@@ -179,17 +192,6 @@ pub struct HubConfig {
     /// los tests pueden inyectarlas directamente aquí (sin tocar el env global del proceso).
     /// Vacío ⇒ anillo vacío ⇒ **deny-all** bajo [`Self::signature_policy`] en producción.
     pub module_trusted_keys: Vec<String>,
-    /// Blueprint que el SaaS DECLARA para este hub (ADR-0212): `HUB_BOOTSTRAP_BLUEPRINT` (slug) +
-    /// `HUB_BOOTSTRAP_BLUEPRINT_LOCALE`. `None` ⇒ el hub no importa nada al arrancar.
-    ///
-    /// Viaja la **identidad** del bundle, nunca su URL prefirmada: esa lleva credencial, acaba en
-    /// un log de deploy y caduca en 1 h — menos de lo que vive una task que se reprograma. El hub
-    /// resuelve versión y `sha256` con su token de máquina y verifica el hash antes de aplicar.
-    ///
-    /// El nombre es genérico a propósito (`BOOTSTRAP`, no `DEMO`), como `HUB_SEED_SQL`: el
-    /// mecanismo es del runtime y el SaaS decide quién lo recibe. Ojo, `is_demo()` aquí significa
-    /// **modo `dev`**, otra cosa: esto no se ata a ese flag.
-    pub bootstrap_blueprint: Option<crate::bootstrap::BootstrapBlueprint>,
     /// **Este despliegue es una DEMO efímera** (`HUB_DEMO`, ADR-0197 — hub#376). Lo escribe el
     /// provisioning del SaaS al crear la instancia (espejo de su columna `Hub.is_demo`), por el
     /// mismo canal que `HUB_AUTH` o `HUB_CLOUD_API_TOKEN`: env del contenedor.
@@ -237,7 +239,8 @@ impl HubConfig {
         let jwt_public_key = std::env::var("HUB_JWT_PUBLIC_KEY")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        // Token de máquina (ECS lo inyecta como `HUB_CLOUD_API_TOKEN`; Tauri lo setea tras enrolar).
+        // Token de máquina: lo inyecta el APROVISIONAMIENTO como `HUB_CLOUD_API_TOKEN`. Vacío = hub
+        // creado fuera de él (p. ej. `pnpm dev`) → sin marketplace/entitlement/asistente/VeriFactu.
         let cloud_api_token = std::env::var("HUB_CLOUD_API_TOKEN")
             .ok()
             .filter(|s| !s.trim().is_empty());
@@ -278,17 +281,10 @@ impl HubConfig {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        // Blueprint declarado por el SaaS para este hub (ADR-0212). Hermano de `HUB_SECTOR`:
-        // ausente o en blanco ⇒ `None` y el arranque no importa nada.
+        // ⚠️ `HUB_BOOTSTRAP_BLUEPRINT` / `HUB_BOOTSTRAP_BLUEPRINT_LOCALE` ya NO se leen: un hub nace
+        // VACÍO (ADR-0293). El despliegue puede seguir inyectándolas —el SaaS lo hace para las
+        // demos— y el hub las ignora a propósito. Ver `crates/server/src/lib.rs` (final de `serve`).
         //
-        // Sin locale NO se desactiva: un slug declarado sin idioma sigue siendo una declaración, y
-        // callar sería repetir el contrato muerto de `HUB_COUNTRY`. El SaaS contesta 400 si el slug
-        // es ambiguo, y eso es un fallo REPORTADO en vez de un hub que se queda vacío en silencio.
-        let bootstrap_blueprint =
-            crate::bootstrap::BootstrapBlueprint::from_env_values(
-                std::env::var("HUB_BOOTSTRAP_BLUEPRINT").ok().as_deref(),
-                std::env::var("HUB_BOOTSTRAP_BLUEPRINT_LOCALE").ok().as_deref(),
-            );
         // Marcador de DEMO efímera (ADR-0197). Ausente o con cualquier otro valor ⇒ hub normal.
         let demo = parse_demo_flag(std::env::var(DEMO_ENV).ok().as_deref());
         Self {
@@ -304,7 +300,6 @@ impl HubConfig {
             dev_mode,
             dev_modules_dir,
             module_trusted_keys,
-            bootstrap_blueprint,
             demo,
         }
     }
@@ -397,7 +392,6 @@ mod staging_tests {
             dev_mode,
             dev_modules_dir: Some(PathBuf::from("/tmp/modules")),
             module_trusted_keys,
-            bootstrap_blueprint: None,
         }
     }
 
@@ -519,6 +513,9 @@ pub struct AppState {
     /// Short-lived, single-use credentials for the event stream (hub#504). In memory: they must
     /// not survive a restart, and above all they must not travel in a backup or a blueprint.
     pub stream_tickets: Arc<crate::event_stream::StreamTickets>,
+    /// Per-key cap on simultaneous stream connections (hub#531). One API key should not be able to
+    /// exhaust the hub by opening N sockets — a reconnection bug reaches the ceiling, not just malice.
+    pub stream_limiter: Arc<crate::event_stream::StreamLimiter>,
 }
 
 impl AppState {
@@ -576,6 +573,7 @@ impl AppState {
             activity: Arc::new(crate::activity::ActivityState::new()),
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
             stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
+            stream_limiter: Arc::new(crate::event_stream::StreamLimiter::default()),
         }
     }
 

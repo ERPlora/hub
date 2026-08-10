@@ -24,6 +24,18 @@
 //!
 //! Este módulo es solo la decisión: **qué versión**. El cómo lo aplica es el instalador.
 
+/// Una actualización que **ocurrió**: de dónde venía y a dónde fue.
+///
+/// Es lo único que el dueño ve de todo esto (ADR-0269 §3.5, hub#564): *«qué me habéis cambiado y
+/// desde qué versión»*. Por eso viaja el `from` y no solo la versión nueva — «inventory 1.1.2» no
+/// dice nada; «1.1.1 → 1.1.2» sí.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleUpdate {
+    pub module_id: String,
+    pub from: String,
+    pub to: String,
+}
+
 /// Una versión que el marketplace ofrece.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Available {
@@ -90,9 +102,117 @@ pub fn resolve(installed: &str, pinned: Option<&str>, available: &[Available]) -
     }
 }
 
+/// Las versiones que se le pueden **ofrecer** a este hub, de la más nueva a la más vieja.
+///
+/// Es la lista del desplegable de versión (hub#675): instalar y actualizar dejan de tener una sola
+/// opción implícita —«lo que el resolutor decida»— y pasan a poder elegir. `installed = None` es el
+/// caso de instalar por primera vez.
+///
+/// **Elegir no relaja ninguna regla de [`resolve`]**, y esa es la parte que importa: si la lista
+/// tuviera su propia política, el desplegable sería una segunda puerta por la que entra justo lo
+/// que la primera impide.
+///
+/// - **Un pin de soporte no deja nada que elegir.** Si hemos clavado a un cliente en `sales@3.1`
+///   mientras se arregla la `3.2`, un desplegable que ofrezca la `3.2` es la forma de saltárselo.
+/// - **Nada en cuarentena.** Es literalmente para lo que se marca rota una versión.
+/// - **Nada hacia atrás, ni la instalada.** Bajar ejecutaría migraciones ya pasadas sobre datos que
+///   la nueva escribió, y no hay `down` (ADR-0269 §3.4). Bajar a un cliente sigue siendo la palanca
+///   de soporte —versión explícita contra la ruta de update—, no una opción del dueño.
+/// - **Lo que no se puede ordenar, no se ofrece**; y si la ilegible es la instalada, no se ofrece
+///   nada: sin poder comparar no se sabe qué sería «hacia delante».
+///
+/// Devolver la lista vacía es una respuesta legítima y frecuente —el hub ya corre lo último, o el
+/// Cloud no contestó—: no hay nada que elegir, y la pantalla no debe abrir un desplegable.
+pub fn offer(
+    installed: Option<&str>,
+    pinned: Option<&str>,
+    available: &[Available],
+) -> Vec<String> {
+    if pinned.is_some() {
+        return Vec::new();
+    }
+
+    let floor = match installed {
+        Some(version) => match parse(version) {
+            Some(parsed) => Some(parsed),
+            // La instalada no se puede comparar: no se ofrece a ciegas.
+            None => return Vec::new(),
+        },
+        None => None,
+    };
+
+    let mut ordered: Vec<((u64, u64, u64), &str)> = available
+        .iter()
+        .filter(|candidate| candidate.is_active)
+        .filter_map(|candidate| {
+            parse(&candidate.version).map(|parsed| (parsed, candidate.version.as_str()))
+        })
+        .filter(|(parsed, _)| floor.is_none_or(|current| *parsed > current))
+        .collect();
+
+    ordered.sort_by(|a, b| b.0.cmp(&a.0));
+    ordered
+        .into_iter()
+        .map(|(_, version)| version.to_string())
+        .collect()
+}
+
+/// Cómo acabó un intento de actualización.
+#[derive(Debug)]
+pub enum Outcome {
+    /// Ya estaba en esa versión: no se descargó nada ni se migró nada.
+    AlreadyThere(String),
+    Updated { from: String, to: String },
+    /// La nueva falló y **la vieja volvió a quedar instalada y funcionando**.
+    RolledBack { stayed_on: String, error: String },
+    /// La nueva falló **y la vuelta atrás también**. El hub se queda sin el módulo, y por eso este
+    /// caso no puede pasar en silencio: con el readiness duro de hub#538 el arranque siguiente no
+    /// dará `UP`, y Swarm revertirá el despliegue entero.
+    Lost { module: String, error: String },
+}
+
+/// Actualiza, y si falla **deja la versión anterior puesta**.
+///
+/// Un hub con la versión de ayer funciona; uno sin el módulo, no. Antes el arranque omitía con un
+/// log el módulo que no podía bajar, y el módulo **dejaba de existir** para el hub — era el cuarto
+/// punto de hub#516 y el que más duele.
+///
+/// `install` recibe la versión y la instala (descarga, verifica firma y aplica migraciones por el
+/// guard de hub#542). Se pasa como closure para que esta secuencia —que es la parte con reglas— se
+/// pueda probar sin red.
+pub async fn update_with_fallback<F, Fut>(from: &str, to: &str, install: F) -> Outcome
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
+    if from == to {
+        return Outcome::AlreadyThere(to.to_string());
+    }
+
+    match install(to.to_string()).await {
+        Ok(()) => Outcome::Updated {
+            from: from.to_string(),
+            to: to.to_string(),
+        },
+        Err(error) => match install(from.to_string()).await {
+            Ok(()) => Outcome::RolledBack {
+                stayed_on: from.to_string(),
+                error,
+            },
+            Err(second) => Outcome::Lost {
+                module: from.to_string(),
+                error: format!("{error}; y la vuelta a {from} tampoco: {second}"),
+            },
+        },
+    }
+}
+
 /// `X.Y.Z` → comparable. Devuelve `None` para cualquier otra cosa, que el llamante trata como
 /// «no se puede comparar» en vez de como cero.
-fn parse(version: &str) -> Option<(u64, u64, u64)> {
+/// `pub(crate)` because the update history compares the CORE's versions with the same rule
+/// (hub#564): the number that decides "this is a rollback, not an update" cannot be a second,
+/// slightly different parser, or the two would eventually disagree about the same jump.
+pub(crate) fn parse(version: &str) -> Option<(u64, u64, u64)> {
     let mut parts = version.split('.');
     let major = parts.next()?.parse().ok()?;
     let minor = parts.next()?.parse().ok()?;
@@ -206,5 +326,155 @@ mod tests {
         let target = resolve("no-semver", None, &[v("1.0.0", true)]);
 
         assert_eq!(target, Target::StayPut("no-semver".into()));
+    }
+
+    // ── Qué versiones se le pueden OFRECER a alguien ─────────────────────────────────
+
+    /// Instalar por primera vez: no hay nada instalado contra lo que comparar, así que valen
+    /// todas las publicadas — y la primera de la lista es la última, que es la que se ofrece.
+    #[test]
+    fn a_first_install_can_choose_among_every_published_version_newest_first() {
+        let offered = offer(None, None, &[v("1.0.0", true), v("2.0.0", true), v("1.5.0", true)]);
+
+        assert_eq!(offered, vec!["2.0.0", "1.5.0", "1.0.0"]);
+    }
+
+    /// La misma regla que `resolve`, y por el mismo motivo: la cuarentena existe para que una
+    /// versión marcada rota no llegue a un hub. Un desplegable que la enseñe es una segunda puerta
+    /// que la deja entrar con un clic.
+    #[test]
+    fn a_quarantined_version_is_never_offered() {
+        let offered = offer(None, None, &[v("1.0.0", true), v("2.0.0", false)]);
+
+        assert_eq!(offered, vec!["1.0.0"]);
+    }
+
+    /// **Elegir versión no es poder bajar de versión.** Retroceder ejecutaría migraciones ya
+    /// pasadas sobre datos que la nueva escribió, y no hay `down` (ADR-0269 §3.4): no es una
+    /// operación que exista. Bajar a alguien sigue siendo la palanca de soporte —versión explícita
+    /// contra la ruta—, no un desplegable del dueño.
+    #[test]
+    fn an_installed_module_is_never_offered_a_downgrade() {
+        let offered = offer(
+            Some("2.0.0"),
+            None,
+            &[v("1.0.0", true), v("2.0.0", true), v("2.1.0", true)],
+        );
+
+        assert_eq!(offered, vec!["2.1.0"], "ni la instalada ni ninguna anterior");
+    }
+
+    #[test]
+    fn the_newest_comes_first_compared_by_number_not_by_text() {
+        let offered = offer(None, None, &[v("1.9.0", true), v("1.10.0", true)]);
+
+        assert_eq!(offered.first().map(String::as_str), Some("1.10.0"));
+    }
+
+    /// Nada que elegir es una respuesta legítima: el hub ya corre lo último. La pantalla no debe
+    /// abrir un desplegable con una sola opción que no cambia nada.
+    #[test]
+    fn a_module_already_on_the_latest_has_nothing_to_offer() {
+        assert!(offer(Some("2.0.0"), None, &[v("2.0.0", true)]).is_empty());
+    }
+
+    #[test]
+    fn a_version_that_cannot_be_ordered_is_not_offered() {
+        let offered = offer(None, None, &[v("latest", true), v("1.0.0", true)]);
+
+        assert_eq!(offered, vec!["1.0.0"], "lo que no se puede colocar no se ofrece");
+    }
+
+    /// Si la instalada no se puede comparar, no se sabe qué sería «hacia delante»: se ofrece nada
+    /// en vez de ofrecer a ciegas. Misma regla que `resolve`.
+    #[test]
+    fn an_installed_version_that_cannot_be_compared_offers_nothing() {
+        assert!(offer(Some("no-semver"), None, &[v("1.0.0", true)]).is_empty());
+    }
+
+    /// El Cloud no contestó (o el módulo se despublicó entero): no hay lista, y no hay desplegable.
+    #[test]
+    fn an_empty_catalogue_offers_nothing() {
+        assert!(offer(None, None, &[]).is_empty());
+        assert!(offer(Some("1.0.0"), None, &[]).is_empty());
+    }
+
+    /// El pin de soporte gana también aquí, y por el mismo motivo que la cuarentena: si lo hemos
+    /// clavado en `3.1` mientras se arregla la `3.2`, un desplegable que ofrezca la `3.2` es
+    /// exactamente la forma de saltárselo. `resolve` ya lo respeta; la lista no puede ser la
+    /// excepción, o el pin dejaría de ser una garantía y pasaría a ser una sugerencia.
+    #[test]
+    fn a_module_pinned_by_support_has_nothing_to_choose() {
+        let offered = offer(
+            Some("3.1.0"),
+            Some("3.1.0"),
+            &[v("3.1.0", true), v("3.2.0", true)],
+        );
+
+        assert!(offered.is_empty(), "el pin no se salta desde la pantalla: {offered:?}");
+    }
+
+    // ── Actualizar sin quedarse sin módulo ───────────────────────────────────────────
+
+    async fn attempt(fails: &[&str], from: &str, to: &str) -> (Outcome, Vec<String>) {
+        let intentos = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let registro = intentos.clone();
+        let rotas: Vec<String> = fails.iter().map(|s| s.to_string()).collect();
+        let outcome = update_with_fallback(from, to, move |version: String| {
+            let registro = registro.clone();
+            let rotas = rotas.clone();
+            async move {
+                registro.lock().unwrap().push(version.clone());
+                if rotas.contains(&version) {
+                    Err(format!("la {version} no instala"))
+                } else {
+                    Ok(())
+                }
+            }
+        })
+        .await;
+        let hechos = intentos.lock().unwrap().clone();
+        (outcome, hechos)
+    }
+
+    #[tokio::test]
+    async fn a_clean_update_lands_on_the_new_version() {
+        let (outcome, intentos) = attempt(&[], "1.0.0", "1.1.0").await;
+
+        assert!(matches!(outcome, Outcome::Updated { .. }));
+        assert_eq!(intentos, vec!["1.1.0"], "no se reinstala lo que ya estaba");
+    }
+
+    /// **Una actualización que falla NO puede dejar al hub sin el módulo.**
+    ///
+    /// Un hub con la versión de ayer funciona; uno sin el módulo, no. Antes el arranque omitía con
+    /// un log el que no podía bajar y el módulo **dejaba de existir** para el hub.
+    #[tokio::test]
+    async fn a_failed_update_puts_the_old_version_back() {
+        let (outcome, intentos) = attempt(&["1.1.0"], "1.0.0", "1.1.0").await;
+
+        assert!(matches!(outcome, Outcome::RolledBack { .. }), "{outcome:?}");
+        assert_eq!(intentos, vec!["1.1.0", "1.0.0"], "se intenta la nueva y se vuelve a la vieja");
+    }
+
+    /// Y si la vuelta atrás TAMBIÉN falla, se dice — no se finge que salió bien.
+    ///
+    /// Es el caso en que el hub sí se queda sin el módulo, y precisamente por eso no puede pasar
+    /// en silencio: con readiness duro (hub#538) el arranque siguiente no dará `UP`.
+    #[tokio::test]
+    async fn when_even_the_rollback_fails_it_says_so() {
+        let (outcome, intentos) = attempt(&["1.1.0", "1.0.0"], "1.0.0", "1.1.0").await;
+
+        assert!(matches!(outcome, Outcome::Lost { .. }), "{outcome:?}");
+        assert_eq!(intentos, vec!["1.1.0", "1.0.0"]);
+    }
+
+    /// Actualizar a lo que ya tienes no toca nada: ni descarga, ni migraciones, ni riesgo.
+    #[tokio::test]
+    async fn updating_to_the_version_already_installed_does_nothing() {
+        let (outcome, intentos) = attempt(&[], "1.1.0", "1.1.0").await;
+
+        assert!(matches!(outcome, Outcome::AlreadyThere(_)), "{outcome:?}");
+        assert!(intentos.is_empty(), "no se reinstala por gusto");
     }
 }

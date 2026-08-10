@@ -39,7 +39,6 @@ async fn fixture() -> (axum::Router, String) {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     (app(AppState::with_config(rt, cfg)), session)
 }

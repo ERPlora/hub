@@ -259,6 +259,12 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#360: a cashier reaching for something a manager approves is the permission model
         // working, not a Hub bug. Same severity as the flat `PermissionDenied` it refines.
         | E::RequiresElevation { .. }
+        // hub#521: a third-party `module.json` that does not fit this core is the contract doing
+        // its job — the zip is the caller's input, not a bug of the Hub, and filing an issue for
+        // every install of a module built for a newer version would be noise.
+        | E::ManifestUnknownField { .. }
+        | E::CoreVersionTooOld { .. }
+        | E::ManifestCoreFloorUnreadable { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -302,6 +308,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::Notify(_) => "notify",
         E::Storage(_) => "module_storage",
         E::Certificate(_) => "certificate",
+        // hub#701: a required read that cannot be resolved aborts the command. Its own code — not a
+        // flavour of `db` or `query_not_found` — so the TPV can tell «el catálogo fiscal no llegó»
+        // from a generic error and surface it with the query that faltó.
+        E::ReadUnavailable { .. } => "read_unavailable",
         E::FiscalPrecondition { .. } => "fiscal_precondition_failed",
         // hub#376: the SUBJECT is the stable code, one per demo lock — a client that only sees
         // `demo_locked` could not tell which of the three doors refused.
@@ -310,6 +320,13 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // same key that mean opposite things ("this hub is nobody's" vs "this hub already emitted
         // and cannot change taxpayer"), and only one of them has a way out.
         E::BusinessTaxIdFrozen { .. } => "business_tax_id_frozen",
+        // hub#521: three distinct codes for three distinct refusals of a `module.json`. The screen
+        // that offers an install has to say something different for "this app needs a newer
+        // terminal" (act: update) than for "this app declares something we cannot run" (act:
+        // report it to whoever published it).
+        E::ManifestUnknownField { .. } => "manifest_unknown_field",
+        E::CoreVersionTooOld { .. } => "core_version_too_old",
+        E::ManifestCoreFloorUnreadable { .. } => "manifest_core_floor_unreadable",
         E::Other(_) => "other",
     })
 }

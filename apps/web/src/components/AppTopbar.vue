@@ -5,9 +5,13 @@
   Orden/iconos iguales al shell de Cloud:
     start:  menu-button (drawer móvil; Ionic lo oculta en ≥lg) · back contextual
     title:  título de la vista (prop `title`)
-    end:    [slot actions de la vista] · apps (rejilla) · asistente (sparkles)
+    end:    [slot actions de la vista] · apps (rejilla) · gestión (nube) · asistente (sparkles)
             · notificaciones (campana+badge)
     bajo el toolbar: barra de progreso mientras hay peticiones en vuelo.
+
+  En MÓVIL (<768px, `isCompactViewport`) las tres acciones globales se pliegan en un solo menú
+  (`ellipsis-vertical`): en modo `ios` Ionic centra el `ion-title`, así que los iconos no lo empujan
+  — lo tapan. El launcher de apps se queda fuera del menú porque es la puerta a los módulos.
 
   El toggle de tema y el avatar se retiraron (2026-07-16, no cabían en móvil): tema → Ajustes;
   usuario/perfil → cabecera del sidebar (App.vue).
@@ -59,54 +63,133 @@
           @ok-app-select="onAppSelect"
         ></ok-app-launcher>
 
-        <!-- Management (hub#364, PLAN step 8, ADR-0251): the door to the SaaS panel — plans,
-             invoices and businesses are NOT screens of this app, so this LINKS (it does not write).
-             Only whoever administers the hub sees it (`hub.administer`, ADR-0248): a filter, not a
-             wall, because it refuses a cashier nothing — it simply is not their task. `open-outline`
-             is the mark the shell already uses for "this leads to the SaaS" (Billing, Profile,
-             ModuleView). The accessible name says the destination out loud: it is all an icon-only
-             action has, and this one crosses the product boundary. Opens in THIS tab — the reasons
-             live in management-link.ts. Note: the labels of the login→till path ("Mi plan", "Añadir
-             funciones") belong to hub#365; this only names its own button. -->
-        <ion-button
-          v-if="canOpenManagement"
-          data-testid="topbar-manage"
-          fill="clear"
-          :aria-label="t('topbar.manage')"
-          :title="t('topbar.manage')"
-          @click="openManagement"
-        >
-          <HubIcon slot="icon-only" name="open-outline" />
-        </ion-button>
+        <!-- Con sitio (≥768px): las acciones globales, una a una. -->
+        <template v-if="!isCompactViewport">
+          <!-- Management (hub#364, PLAN step 8, ADR-0251): the door to the SaaS panel — plans,
+               invoices and businesses are NOT screens of this app, so this LINKS (it does not
+               write). Only whoever administers the hub sees it (`hub.administer`, ADR-0248): a
+               filter, not a wall, because it refuses a cashier nothing — it simply is not their
+               task. The mark is a CLOUD, not the shell's generic `open-outline`: Billing, Profile
+               and ModuleView use that one next to a sentence that explains it, while this sits
+               icon-only among three other icons and has to name the DESTINATION (the online
+               account), not merely announce that something opens. The accessible name says
+               `erplora.com` out loud, which is all an icon-only action crossing a product boundary
+               has. It leaves through the door OUT — new tab in a browser, system browser in the
+               installed app — and the reasons live in management-link.ts. Note: the labels of the
+               login→till path ("Mi plan", "Añadir funciones") belong to hub#365. -->
+          <ion-button
+            v-if="canOpenManagement"
+            data-testid="topbar-manage"
+            fill="clear"
+            :aria-label="t('topbar.manage')"
+            :title="t('topbar.manage')"
+            @click="openManagement"
+          >
+            <HubIcon slot="icon-only" name="cloud-outline" />
+          </ion-button>
 
-        <!-- Asistente (sparkles): visible cuando la capacidad está disponible. Abre el drawer. -->
-        <ion-button
-          v-if="assistantAvailable"
-          fill="clear"
-          :aria-label="t('topbar.assistant')"
-          :title="t('topbar.assistant')"
-          @click="toggleAssistant"
-        >
-          <HubIcon slot="icon-only" name="sparkles-outline" />
-        </ion-button>
+          <!-- Asistente (sparkles): visible cuando la capacidad está disponible. Abre el drawer. -->
+          <ion-button
+            v-if="assistantAvailable"
+            data-testid="topbar-assistant"
+            fill="clear"
+            :aria-label="t('topbar.assistant')"
+            :title="t('topbar.assistant')"
+            @click="toggleAssistant"
+          >
+            <HubIcon slot="icon-only" name="sparkles-outline" />
+          </ion-button>
 
-        <!-- Campana de notificaciones (hub#660): hoy su única señal real son las dead-letters del
-             outbox. El contador lo alimenta el watcher de lib/dead-letter desde el endpoint de
-             count. Con events caídos, el popover avisa y lleva directo a Sistema → Eventos, donde
-             se reenvían (uno/todos) o se descartan; sin nada, el estado vacío de siempre. -->
-        <ion-button
-          id="topbar-notif-btn"
-          fill="clear"
-          class="topbar-notif"
-          :aria-label="t('topbar.notifications')"
-          :title="t('topbar.notifications')"
-        >
-          <HubIcon slot="icon-only" name="notifications-outline" />
-          <ion-badge v-if="notificationCount > 0" color="danger" class="notif-badge">
-            {{ notificationCount }}
-          </ion-badge>
-        </ion-button>
-        <ion-popover trigger="topbar-notif-btn" trigger-action="click">
+          <!-- Campana de notificaciones (hub#660): el contador lo alimenta el watcher de lib/dead-letter
+               desde el endpoint de count. Con eventos caídos, el popover avisa y lleva directo a
+               Sistema → Eventos, donde se reenvían (uno/todos) o se descartan; sin nada, el estado
+               vacío de siempre. -->
+          <ion-button
+            data-testid="topbar-notifications"
+            fill="clear"
+            class="topbar-notif"
+            :aria-label="t('topbar.notifications')"
+            :title="t('topbar.notifications')"
+            @click="openNotifications"
+          >
+            <HubIcon slot="icon-only" name="notifications-outline" />
+            <ion-badge v-if="notificationCount > 0" color="danger" class="notif-badge">
+              {{ notificationCount }}
+            </ion-badge>
+          </ion-button>
+        </template>
+
+        <!-- Sin sitio (<768px): UN botón. Ionic centra el `ion-title` en modo `ios`, así que estos
+             iconos no empujaban el título — se le ponían encima y lo tapaban (reportado a 390px el
+             2026-08-09). Se pliegan en un menú, que es lo que hace cualquier barra de móvil.
+             `v-if`/`v-else` y no `display:none`: escondidas por CSS las cuatro acciones seguirían en
+             el orden de tabulación y anunciadas, duplicadas. El launcher de apps NO se pliega: es la
+             puerta a los módulos instalados (el TPV), no una acción secundaria, y ya abre su hoja. -->
+        <template v-else>
+          <ion-button
+            data-testid="topbar-more"
+            fill="clear"
+            class="topbar-notif"
+            :aria-label="t('topbar.more')"
+            :title="t('topbar.more')"
+            @click="openMore"
+          >
+            <HubIcon slot="icon-only" name="ellipsis-vertical" />
+            <!-- El badge viaja con el menú: plegar la campana no puede esconder que hay algo. -->
+            <ion-badge v-if="notificationCount > 0" color="danger" class="notif-badge">
+              {{ notificationCount }}
+            </ion-badge>
+          </ion-button>
+          <!-- `keep-contents-mounted`: las filas son tres y así el menú abre pintado, sin el salto
+               de la primera vez (y son observables sin presentar el overlay). -->
+          <ion-popover
+            :is-open="moreOpen"
+            :event="moreEvent"
+            keep-contents-mounted
+            @did-dismiss="moreOpen = false"
+          >
+            <ion-content>
+              <ion-list lines="full">
+                <ion-item
+                  v-if="canOpenManagement"
+                  button
+                  :detail="false"
+                  data-testid="topbar-more-manage"
+                  @click="pick(openManagement)"
+                >
+                  <HubIcon slot="start" name="cloud-outline" />
+                  <ion-label class="ion-text-wrap">{{ t('topbar.manage') }}</ion-label>
+                </ion-item>
+                <ion-item
+                  v-if="assistantAvailable"
+                  button
+                  :detail="false"
+                  data-testid="topbar-more-assistant"
+                  @click="pick(toggleAssistant)"
+                >
+                  <HubIcon slot="start" name="sparkles-outline" />
+                  <ion-label>{{ t('topbar.assistant') }}</ion-label>
+                </ion-item>
+                <ion-item
+                  button
+                  :detail="false"
+                  data-testid="topbar-more-notifications"
+                  @click="pick(openNotifications)"
+                >
+                  <HubIcon slot="start" name="notifications-outline" />
+                  <ion-label>{{ t('topbar.notifications') }}</ion-label>
+                  <ion-badge v-if="notificationCount > 0" slot="end" color="danger">
+                    {{ notificationCount }}
+                  </ion-badge>
+                </ion-item>
+              </ion-list>
+            </ion-content>
+          </ion-popover>
+        </template>
+
+        <!-- La central de notificaciones es UNA, la abran la campana o la fila del menú: por eso va
+             gobernada por `is-open` y no por `trigger`, que solo sabe atarse a un botón. -->
+        <ion-popover :is-open="notifOpen" :event="notifEvent" @did-dismiss="notifOpen = false">
           <ion-content>
             <ion-list lines="full">
               <ion-item v-if="notificationCount > 0" lines="none" button detail @click="goToDeadLetters">
@@ -135,7 +218,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -145,6 +228,7 @@ import {
 import HubIcon from './HubIcon.vue';
 import { assistantAvailable, toggleAssistant, notificationCount, isLoading, railCollapsed } from '../lib/shell';
 import { canOpenManagement, openManagement } from '../lib/management-link';
+import { isCompactViewport } from '../lib/viewport';
 import { moduleNav } from '../lib/nav';
 import { resolveIcon } from '../lib/icons';
 
@@ -198,6 +282,32 @@ const launcherLabels = computed(() => ({
 function onAppSelect(e: Event): void {
   const id = (e as CustomEvent<{ id: string }>).detail?.id;
   if (id) void router.push(id);
+}
+
+// ── Los dos overlays de la barra ────────────────────────────────────────────
+// Ambos van gobernados por `is-open` (y no por `trigger`) porque los abre más de un sitio: la
+// central de notificaciones, la campana o la fila del menú. `event` es lo que ancla el popover al
+// botón que lo abrió; abierto desde el menú no hay ancla viva —esa fila desaparece con el propio
+// menú— y Ionic lo centra, que en un móvil es exactamente donde debe salir.
+const moreOpen = ref(false);
+const moreEvent = ref<Event | undefined>(undefined);
+const notifOpen = ref(false);
+const notifEvent = ref<Event | undefined>(undefined);
+
+function openMore(event: Event): void {
+  moreEvent.value = event;
+  moreOpen.value = true;
+}
+
+function openNotifications(event?: Event): void {
+  notifEvent.value = event;
+  notifOpen.value = true;
+}
+
+/** Elegir en el menú lo CIERRA: una acción ejecutada y el menú aún abierto encima es un menú roto. */
+function pick(action: (event?: Event) => void): void {
+  moreOpen.value = false;
+  action();
 }
 
 function goBack(): void {

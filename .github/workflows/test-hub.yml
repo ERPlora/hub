@@ -43,7 +43,18 @@ jobs:
 
     services:
       postgres:
-        image: postgres:18
+        # pgvector, NO `postgres:18` a secas: `crates/vector/tests/pg_store.rs` hace
+        # `CREATE EXTENSION vector` (ADR-0282) y sobre la imagen de stock sus 9 tests mueren con
+        #   type "public.vector" does not exist
+        # Eso tuvo `main` en ROJO 7 runs seguidos el 2026-08-09, desde que esos tests llegaron ahí.
+        #
+        # ⚠️ El gate local (`.githooks/pre-push`) tenía el MISMO defecto y se arregló en hub#647 —
+        # pero solo esa mitad. Son dos Postgres distintos para la misma suite: si uno cambia de
+        # imagen, el otro también. Cambiar solo uno es lo que produjo esta ventana.
+        #
+        # Mismo major (18) → el data dir es compatible; la extensión queda solo DISPONIBLE y los
+        # tests la siguen creando ellos.
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: hub_test
@@ -91,7 +102,26 @@ jobs:
       # pasarle argumentos al comando del contenedor, y estos tres ajustes necesitan reinicio.
       - name: Raise Postgres lock limits (hub#526)
         run: |
-          PG=$(docker ps --filter "ancestor=postgres:18" --format '{{.ID}}' | head -1)
+          # Se busca por el PUERTO que publica este mismo workflow (5433), no por el nombre de la
+          # imagen. Antes era `--filter ancestor=postgres:18`, y cuando el servicio de arriba pasó
+          # a `pgvector/pgvector:pg18` el filtro dejó de casar: `docker ps` devolvía vacío,
+          # `docker exec ""` daba «invalid container name or ID» y el job moría con exit 1 **antes
+          # de correr un solo test**. `main` estuvo así 10 runs seguidos, ~11 h, sin que nadie lo
+          # viera — el fallo no se parece en nada a un test roto.
+          #
+          # Lo irónico: el comentario del servicio, 50 líneas más arriba, advierte de esta misma
+          # clase de fallo («si uno cambia de imagen, el otro también»)… y se escribió en el mismo
+          # cambio que dejó este filtro sin tocar.
+          #
+          # El puerto sí está acoplado a este fichero: si cambia, cambia dos líneas más arriba y
+          # se ve. El nombre de la imagen no.
+          PG=$(docker ps --filter "publish=5433" --format '{{.ID}}' | head -1)
+          if [ -z "$PG" ]; then
+            echo "::error::no encuentro el contenedor de Postgres publicando el 5433."
+            echo "Contenedores vivos ahora mismo:"
+            docker ps --format '  {{.ID}}  {{.Image}}  {{.Ports}}'
+            exit 1
+          fi
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET max_locks_per_transaction = 4096;"
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';"

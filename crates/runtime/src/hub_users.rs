@@ -60,7 +60,11 @@ pub const ADMINISTER_PERMISSION: &str = "hub.administer";
 /// `setup.status` (hub#369) no es de personal: es el estado de configuración del hub. Vive en
 /// [`crate::setup_status`] y solo se DESPACHA aquí, que es donde el runtime resuelve el namespace
 /// reservado.
-const CORE_QUERIES: &[&str] = &["users.list", "roles.list", "setup.status"];
+///
+/// `approvals.list` (hub#512) es la puerta de lectura del registro de aprobaciones por PIN
+/// (`_elevation_audit`, hub#362). Requiere `hub.administer` (nivel admin, no encargado): quién
+/// aprobó qué es información sobre el personal.
+const CORE_QUERIES: &[&str] = &["users.list", "roles.list", "setup.status", "approvals.list"];
 
 /// Rol más alto del plano de **NEGOCIO**: administra el hub (identidad fiscal, plan, instalar
 /// módulos, reset) y es lo que se siembra al crear el hub ([`identity::seed_owner`]) y el techo del
@@ -774,13 +778,20 @@ pub async fn core_query(
     name: &str,
     rest: &str,
     ctx: &crate::registry::RequestContext,
+    params: &erplora_db::Params,
 ) -> Result<Vec<serde_json::Value>> {
     if !CORE_QUERIES.contains(&rest) {
         // NO es `ModuleNotInstalled`: `hub` no es un módulo ausente, es el core. Un nombre que no
         // existe aquí es un contrato roto y debe explotar (no lo perdona `queryOptional`).
         return Err(RuntimeError::QueryNotFound(name.to_string()));
     }
-    crate::permissions::check(ctx, VIEW_USERS_PERMISSION)?;
+    // Gate por-query: `approvals.list` requiere admin (quién aprobó qué es información sobre el
+    // personal, no del encargado). Las demás queries del core abren con sesión local.
+    if rest == "approvals.list" {
+        crate::permissions::check(ctx, ADMINISTER_PERMISSION)?;
+    } else {
+        crate::permissions::check(ctx, VIEW_USERS_PERMISSION)?;
+    }
     match rest {
         // Estado de configuración del hub (hub#369): UN documento con los ítems del core unidos a
         // los que declaran los módulos instalados. El gate es el mismo del namespace — tener sesión
@@ -788,6 +799,10 @@ pub async fn core_query(
         "setup.status" => Ok(vec![
             crate::setup_status::status(db, registry, hub_id, ctx).await?,
         ]),
+        // Registro de aprobaciones por PIN (hub#362 escribe, hub#512 lee). Doble atribución:
+        // quién pidió la elevación y quién la aprobó. Los ids se resuelven a nombres contra
+        // `hub_user`, o la pantalla enseña UUIDs y no la usa nadie.
+        "approvals.list" => list_approvals(db, hub_id, params).await,
         "users.list" => Ok(list(db, hub_id)
             .await?
             .into_iter()
@@ -807,6 +822,80 @@ pub async fn core_query(
             .map(|r| json!({ "name": r.name, "permissions": r.permissions, "members": r.members }))
             .collect()),
     }
+}
+
+/// Lee el registro de aprobaciones por PIN (`_elevation_audit`, hub#362 escribe / hub#512 lee).
+///
+/// Doble atribución: `created_by` (el cajero que pidió la elevación) y `approved_by` (el encargado
+/// que la aprobó). Los ids son `hub_user.id` y se resuelven a nombres con un JOIN, o la pantalla
+/// enseña UUIDs y no la usa nadie.
+///
+/// Filtros opcionales vía params: `command`, `created_by`, `approved_by`. Sin soft-delete, sin
+/// paginación interna (la lista es por negocio y crece despacio; el paginador genérico del runtime
+/// la recorta si hace falta).
+async fn list_approvals(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    params: &erplora_db::Params,
+) -> Result<Vec<serde_json::Value>> {
+    let mut p = erplora_db::Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+
+    // Filtros dinámicos: solo se añaden los que el caller mandó, para no pegar siempre a un plan
+    // con tres OR. Cada uno es una igualdad exacta — no hay búsqueda libre sobre un registro de
+    // auditoría.
+    let mut conditions = Vec::new();
+    for (field) in ["command", "created_by", "approved_by"] {
+        if let Some(val) = params.get(field) {
+            let bind = format!("filter_{field}");
+            conditions.push(format!("a.{field} = :{bind}"));
+            p.insert(bind, val.clone());
+        }
+    }
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!("AND {}", conditions.join(" AND "))
+    };
+
+    // LEFT JOIN para resolver ambos ids a nombres en una sola pasada. COALESCE: si el usuario fue
+    // borrado (identidad por despliegue, sin soft-delete), el nombre queda vacío en vez de excluir
+    // la fila — un registro de auditoría no puede perderse porque un empleado ya no esté.
+    let sql = format!(
+        "SELECT a.id AS id, a.command AS command, a.permission AS permission, \
+                a.created_by AS created_by, creator.name AS created_by_name, \
+                a.approved_by AS approved_by, approver.name AS approved_by_name, \
+                a.payload_fingerprint AS payload_fingerprint, a.created_at AS created_at \
+           FROM _elevation_audit a \
+           LEFT JOIN hub_user creator  ON creator.id  = a.created_by \
+           LEFT JOIN hub_user approver ON approver.id = a.approved_by \
+          WHERE a.hub_id = :hub_id {where_clause} \
+          ORDER BY a.created_at DESC"
+    );
+
+    let rows = db.query(&sql, &p).await?;
+    Ok(rows
+        .rows
+        .iter()
+        .map(|r| {
+            // Los nombres pueden ser NULL (usuario borrado: identidad por despliegue, sin
+            // soft-delete) → string vacío, para que la fila no se pierda del registro de auditoría.
+            let name = |key: &str| -> String {
+                r[key].as_str().unwrap_or_default().to_string()
+            };
+            json!({
+                "id": r["id"].clone(),
+                "command": r["command"].clone(),
+                "permission": r["permission"].clone(),
+                "created_by": r["created_by"].clone(),
+                "created_by_name": name("created_by_name"),
+                "approved_by": r["approved_by"].clone(),
+                "approved_by_name": name("approved_by_name"),
+                "payload_fingerprint": r["payload_fingerprint"].clone(),
+                "created_at": r["created_at"].clone(),
+            })
+        })
+        .collect())
 }
 
 #[cfg(test)]

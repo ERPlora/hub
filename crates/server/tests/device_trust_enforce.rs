@@ -101,7 +101,6 @@ async fn fixture(enforce: bool, trusted_device: Option<&str>) -> axum::Router {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     app(AppState::with_config(rt, cfg))
 }
@@ -132,7 +131,6 @@ async fn fixture_with_revoked(device_id: &str) -> axum::Router {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     app(AppState::with_config(rt, cfg))
 }
@@ -214,7 +212,6 @@ async fn demo_fixture() -> axum::Router {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     app(AppState::with_config(rt, cfg))
 }

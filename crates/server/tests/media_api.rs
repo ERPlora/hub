@@ -71,7 +71,6 @@ async fn fixture() -> (axum::Router, String, String, Captured) {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     (app(AppState::with_config(rt, cfg)), admin, employee, captured)
 }
@@ -234,7 +233,6 @@ async fn fixture_with_module(user_actions: &str) -> (axum::Router, String, Captu
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     (app(AppState::with_config(rt, cfg)), admin, captured)
 }
@@ -453,7 +451,6 @@ async fn the_listing_serves_files_through_the_runtime_not_a_signed_object_storag
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     let router = app(AppState::with_config(rt, cfg));
 
@@ -548,7 +545,6 @@ async fn raw_downloads_the_file_server_side_and_never_leaks_the_hub_token_to_sto
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     let router = app(AppState::with_config(rt, cfg));
 

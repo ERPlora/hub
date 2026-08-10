@@ -38,6 +38,14 @@ const STRICT: DeviceMode = 'shared';
  */
 export const deviceMode = ref<DeviceMode>(STRICT);
 
+/**
+ * Whether THIS device can use the PIN, as the hub last answered (hub#514). Starts `false` on
+ * purpose: before the hub says otherwise, the pinpad is not offered — the account route, which is
+ * stronger, is what remains. Like {@link deviceMode}, this is NEVER cached in `localStorage`:
+ * the server is the authority, and a stale client-side `true` was exactly the bug this closes.
+ */
+export const deviceTrusted = ref(false);
+
 /** `true` once the hub answered at least once (the UI can tell "strict" from "not asked yet"). */
 export const deviceModeReady = ref(false);
 
@@ -86,6 +94,10 @@ function rejection(body: unknown, status: number): DeviceModeError {
 export async function loadDeviceMode(): Promise<DeviceMode> {
   const answer = await readDeviceAnswer();
   deviceMode.value = answer.mode;
+  // hub#514: trust comes from the SAME answer — the three halves of the pinpad decision (mode,
+  // trust, policy) can never be out of step by one request. Fail-closed: a non-true answer is
+  // `false`, so a dropped request or a 500 takes the pinpad away, never the other way.
+  deviceTrusted.value = answer.trusted === true;
   // The hub's dial travels on the SAME answer (hub#359) and is published from the same place, so
   // the two halves of the pinpad decision can never be out of step by one request. `publishPinPolicy`
   // overwrites unconditionally, which is what takes a previously granted `never` back on a failure.
@@ -94,9 +106,11 @@ export async function loadDeviceMode(): Promise<DeviceMode> {
   return answer.mode;
 }
 
-/** What the hub said about this device: its mode (hub#358) and the hub's dial (hub#359). */
+/** What the hub said about this device: its mode (hub#358), its trust (hub#514) and the dial (hub#359). */
 interface DeviceAnswer {
   mode: DeviceMode;
+  /** hub#514: whether this device can use the PIN. Absent on older servers → `false` (fail-closed). */
+  trusted?: unknown;
   /** `undefined` when the hub did not say — `publishPinPolicy` reads that as "keep asking". */
   policy?: unknown;
 }
@@ -112,10 +126,17 @@ async function readDeviceAnswer(): Promise<DeviceAnswer> {
     // The status is checked FIRST: a 500 from a proxy or a half-written handler must not be read
     // for a mode or a policy, however valid-looking the body it carries is.
     if (!res.ok) return { mode: STRICT };
-    const body = (await res.json()) as { data?: { mode?: unknown; pin_policy?: unknown } };
-    return { mode: parseMode(body?.data?.mode) ?? STRICT, policy: body?.data?.pin_policy };
+    const body = (await res.json()) as {
+      data?: { mode?: unknown; pin_policy?: unknown; trusted?: unknown };
+    };
+    return {
+      mode: parseMode(body?.data?.mode) ?? STRICT,
+      trusted: body?.data?.trusted,
+      policy: body?.data?.pin_policy,
+    };
   } catch {
-    // Offline, 502, malformed body: the hub did not say `personal` and did not say `never`.
+    // Offline, 502, malformed body: the hub did not say `personal`, did not say `never`, and did
+    // not vouch for this device.
     return { mode: STRICT };
   }
 }
