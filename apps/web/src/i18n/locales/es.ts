@@ -757,8 +757,22 @@ export default {
     stepInstall: 'Instalar',
     stepPair: 'Vincular',
     stepConfigure: 'Configurar',
-    updatesManaged: 'Actualizaciones gestionadas',
     updatesCloudHint: 'Este Hub web se actualiza automáticamente durante los despliegues del servicio.',
+    // Qué le hemos cambiado a este hub y desde qué versión (hub#564, ADR-0269 §3.5). Actualizamos
+    // sin preguntar, así que lo mínimo que le debemos es que pueda SABER qué le cambió. Cada frase
+    // nombra una app como él la conoce y una versión que puede comparar — nunca un digest, nunca
+    // «la imagen», y nunca un changelog inventado.
+    updateHistory: 'Qué te hemos actualizado',
+    updatesRunning: 'Vas por la {version}',
+    noUpdates: 'No te hemos cambiado nada',
+    noUpdatesHint: 'No hemos actualizado nada en este hub últimamente. Cuando lo hagamos, aparecerá aquí.',
+    today: 'Hoy',
+    yesterday: 'Ayer',
+    // Una vuelta atrás es una entrada más y lo dice con esas palabras: a qué versión volvió. El
+    // error que la causó no se enseña a propósito — está escrito para nosotros, no para quien abre
+    // la tienda.
+    rolledBackTo: 'Volvió a la {version}: la nueva no arrancó',
+    updateLost: 'Esta app no está funcionando: estamos en ello',
     documents: 'Documentos',
     noDocuments: 'Sin documentos',
     noDocumentsBucket: 'El bucket de almacenamiento de este hub está vacío.',

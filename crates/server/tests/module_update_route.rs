@@ -474,3 +474,89 @@ async fn updating_a_module_this_hub_does_not_have_is_a_404_not_an_install() {
 
     let _ = std::fs::remove_dir_all(temp);
 }
+
+// ── 5. What the owner is told about it afterwards (hub#564) ──────────────────────────────
+
+/// An update that happened has to survive the request that caused it.
+///
+/// The response and the `module.updated` event carry the `from → to`, but both are gone the moment
+/// the screen closes. If the transition is not written down **when it happens** it cannot be
+/// recovered later: the hub knows the version it runs NOW, and a current state cannot be subtracted
+/// from itself to produce a history. This is the assertion that keeps the door wired to the record.
+#[tokio::test]
+async fn an_update_leaves_a_trace_the_owner_can_read_later() {
+    let v2 = parts_package("2.0.0", None);
+    let mut packages = HashMap::new();
+    packages.insert(
+        ("parts".to_string(), "2.0.0".to_string()),
+        (v2.clone(), sha256_hex(&v2)),
+    );
+    let mock = Arc::new(MockCloud {
+        packages,
+        offered: HashMap::from([("parts".to_string(), vec!["2.0.0".to_string()])]),
+        calls: Mutex::new(Vec::new()),
+    });
+    let (router, session, state, temp) = fixture("history", mock).await;
+
+    let response = router.oneshot(update_request(&session, "{}")).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let rt = state.runtime.lock().await;
+    let history = erplora_runtime::update_history::recent(
+        rt.db(),
+        "hub-upd",
+        erplora_runtime::update_history::DEFAULT_LIMIT,
+        erplora_runtime::update_history::DEFAULT_MAX_AGE_DAYS,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(history.len(), 1, "one update, one entry: {history:?}");
+    assert_eq!(history[0].component, "module");
+    assert_eq!(history[0].id, "parts");
+    assert_eq!(
+        history[0].name, "Parts",
+        "the name the owner reads, not the id (ADR-0254)"
+    );
+    assert_eq!(history[0].from_version, "1.0.0", "«2.0.0» alone says nothing");
+    assert_eq!(history[0].to_version, "2.0.0");
+    assert_eq!(history[0].outcome, "updated");
+    drop(rt);
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// A hub already on the latest version writes NOTHING.
+///
+/// Rule 1 of hub#564, checked at the door that gets pressed most: opening Apps and clicking
+/// «Update» on something that is already current is a non-event, and a history that fills up with
+/// non-events is one nobody reads twice.
+#[tokio::test]
+async fn pressing_update_on_something_already_current_writes_nothing() {
+    let mock = Arc::new(MockCloud {
+        packages: HashMap::new(),
+        offered: HashMap::from([("parts".to_string(), vec!["1.0.0".to_string()])]),
+        calls: Mutex::new(Vec::new()),
+    });
+    let (router, session, state, temp) = fixture("nonevent", mock).await;
+
+    let response = router.oneshot(update_request(&session, "{}")).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let rt = state.runtime.lock().await;
+    let history = erplora_runtime::update_history::recent(
+        rt.db(),
+        "hub-upd",
+        erplora_runtime::update_history::DEFAULT_LIMIT,
+        erplora_runtime::update_history::DEFAULT_MAX_AGE_DAYS,
+    )
+    .await
+    .unwrap();
+    assert!(
+        history.is_empty(),
+        "nothing changed, so nothing is written: {history:?}"
+    );
+    drop(rt);
+
+    let _ = std::fs::remove_dir_all(temp);
+}

@@ -60,6 +60,7 @@ pub mod settings;
 pub mod setup_status;
 pub mod system_migrations;
 pub mod ui;
+pub mod update_history;
 pub mod user_profile;
 pub mod wasm;
 

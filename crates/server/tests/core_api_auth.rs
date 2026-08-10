@@ -65,6 +65,10 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
         // hub#516: qué versión ofrece hoy el marketplace por módulo instalado. Es lectura, pero
         // dice qué corre este hub y con qué pin: sesión de usuario, como el resto del inventario.
         "/api/modules/updates",
+        // hub#564: qué le hemos cambiado a este hub y desde qué versión. Es la lista de versiones
+        // que corre, o sea el mapa de su superficie de ataque: dárselo a un anónimo es decirle qué
+        // bug conocido le aplica.
+        "/api/system/update-history",
         "/api/entitlement",
         "/api/marketplace/catalog",
         "/api/app/release",
@@ -84,6 +88,7 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
         "/api/navigation",
         "/api/modules",
         "/api/modules/updates",
+        "/api/system/update-history",
     ] {
         let authenticated = router
             .clone()

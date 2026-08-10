@@ -381,6 +381,33 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     activity::restore_from_db(&state).await;
     activity::spawn_persistence(&state);
 
+    // **¿Nos han cambiado el binario?** (hub#564, ADR-0269 §3.5). Nadie se lo dice al hub: la imagen
+    // se re-resuelve FUERA del contenedor, la task se sustituye, y el binario nuevo arranca
+    // reportando otro número. Compararlo con el último que anotamos es todo el mecanismo — y es
+    // también lo que hace VISIBLE un rollback automático, porque Swarm revirtiendo un despliegue
+    // malo, visto desde aquí dentro, es exactamente una versión que baja.
+    //
+    // Va justo detrás de `ensure_system_tables` porque necesita su tabla (v40) y nada más: cuanto
+    // más tarde se anote, más ventana hay de que el arranque se caiga antes y el salto se pierda.
+    // Best-effort: no poder escribir el historial nunca impide abrir la tienda.
+    {
+        let rt = state.runtime.lock().await;
+        match erplora_runtime::update_history::note_core_version(
+            rt.db(),
+            &state.hub_id(),
+            version::HUB_VERSION,
+        )
+        .await
+        {
+            Ok(Some(entry)) => eprintln!(
+                "✓ versión del core: {} → {} ({})",
+                entry.from_version, entry.to_version, entry.outcome
+            ),
+            Ok(None) => {}
+            Err(e) => eprintln!("✗ no se pudo anotar la versión del core (hub#564): {e}"),
+        }
+    }
+
     // **Owner sembrado del env** (ADR-0157, corrección de Ioan): el owner es el CREADOR del hub y el
     // despliegue lo trae ya inyectado por el provisioning del SaaS como `HUB_OWNER_EMAIL`. Se siembra
     // un `hub_user` role=admin (cloud_user_id NULL, sin PIN) tras las tablas de sistema —`admin` es
@@ -465,10 +492,23 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                         let target = resolve_module_target(&state, &machine, &id, &version, pins.get(&id).map(String::as_str)).await;
 
                         let mut rt = state.runtime.lock().await;
+                        // El nombre que lee el dueño, capturado ANTES de tocar nada (hub#564): si el
+                        // intento pierde el módulo, el registry ya no lo tiene y la entrada del
+                        // historial se quedaría con el id — que es justo lo que la regla 3 prohíbe.
+                        let module_name = rt
+                            .registry()
+                            .installed
+                            .iter()
+                            .find(|m| m.id == id)
+                            .map(|m| m.name.clone())
+                            .unwrap_or_else(|| id.clone());
                         // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
-                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
-                            Ok(_) if target.is_update() => eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version()),
-                            Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{}", target.version()),
+                        let attempt = match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
+                            Ok(_) if target.is_update() => {
+                                eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version());
+                                Some(erplora_runtime::module_update::Outcome::Updated { from: version.clone(), to: target.version().to_string() })
+                            }
+                            Ok(_) => { eprintln!("✓ módulo re-descargado: {id}@{}", target.version()); None }
                             Err(e) if target.is_update() => {
                                 // ⚠️ Una actualización que falla NO puede dejar al hub SIN el módulo:
                                 // un hub con la versión de ayer funciona, uno sin el módulo no. Se
@@ -484,8 +524,25 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                                 // SIN el módulo— tiene que llegar a alguien, no morir en un log del
                                 // contenedor. Best-effort: sin sink (hub sin enrolar) se descarta.
                                 report_failed_module_update(&id, &version, target.version(), &e.to_string(), fallback.is_ok());
+                                Some(match &fallback {
+                                    Ok(_) => erplora_runtime::module_update::Outcome::RolledBack { stayed_on: version.clone(), error: e.to_string() },
+                                    Err(fe) => erplora_runtime::module_update::Outcome::Lost { module: id.clone(), error: format!("{e}; la vuelta atrás tampoco: {fe}") },
+                                })
                             }
-                            Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
+                            Err(e) => { eprintln!("✗ re-descarga de {id}@{version}: {e}"); None }
+                        };
+
+                        // Y tampoco puede ser un silencio PARA EL DUEÑO (hub#564): el `error_sink`
+                        // de arriba nos avisa a NOSOTROS, pero quien se encuentra la caja distinta
+                        // por la mañana es quien abre la tienda. La misma decisión que usa el botón
+                        // —`from_module_outcome`— para que las dos puertas no cuenten lo mismo de
+                        // dos maneras. Best-effort: el historial nunca impide arrancar.
+                        if let Some(attempt) = attempt {
+                            if let Some(change) = erplora_runtime::update_history::from_module_outcome(&id, &module_name, target.version(), &attempt) {
+                                if let Err(e) = erplora_runtime::update_history::record(rt.db(), &state.hub_id(), change).await {
+                                    eprintln!("✗ no se pudo anotar el historial de {id} (hub#564): {e}");
+                                }
+                            }
                         }
                     }
                 }
@@ -943,6 +1000,12 @@ pub fn app(state: AppState) -> Router {
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
         .route("/api/system/metrics", get(system_metrics::system_metrics))
+        // Qué le hemos cambiado a este hub y desde qué versión (hub#564). Solo lectura: la
+        // contrapartida de actualizar sin preguntar (ADR-0269) es que se pueda SABER, no decidir.
+        .route(
+            "/api/system/update-history",
+            get(system::update_history),
+        )
         // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
         // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
         .route(
@@ -1768,6 +1831,31 @@ async fn update_module(
         }
     })
     .await;
+
+    // Lo que el dueño verá mañana en Sistema → Actualizaciones (hub#564). Se anota AQUÍ, con el
+    // resultado en la mano: el estado actual del hub no se puede restar de sí mismo para deducir
+    // una transición, así que si no se escribe cuando ocurre, no existe. Misma decisión que el
+    // arranque (`from_module_outcome`), y `AlreadyThere` no escribe nada porque no cambió nada.
+    // Best-effort: no poder anotar el historial no convierte una actualización buena en un error.
+    {
+        let rt = st.runtime.lock().await;
+        let module_name = rt
+            .registry()
+            .installed
+            .iter()
+            .find(|m| m.id == module_id)
+            .map(|m| m.name.clone())
+            .unwrap_or_else(|| module_id.clone());
+        if let Some(change) =
+            erplora_runtime::update_history::from_module_outcome(&module_id, &module_name, &target, &outcome)
+        {
+            if let Err(e) =
+                erplora_runtime::update_history::record(rt.db(), &st.hub_id(), change).await
+            {
+                tracing::warn!(module_id = %module_id, error = %e, "no se pudo anotar el historial de actualización (hub#564)");
+            }
+        }
+    }
 
     // Un fallo con decisión del usuario detrás (409 `install_blocked`, 404 `update_not_installed`)
     // se cuenta como lo que es, no como «no se pudo».
@@ -2784,8 +2872,8 @@ fn unauthorized(e: auth::AuthError) -> Response {
 
 /// Query param de idioma para los endpoints localizables (ADR-0055). `?locale=es`; default `en`.
 #[derive(serde::Deserialize)]
-struct LocaleQuery {
-    locale: Option<String>,
+pub(crate) struct LocaleQuery {
+    pub(crate) locale: Option<String>,
 }
 
 async fn navigation(

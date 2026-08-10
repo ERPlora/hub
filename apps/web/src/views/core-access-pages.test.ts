@@ -57,8 +57,23 @@ describe('core access and account pages', () => {
 
   it('does not claim that updates were checked when no updater is configured', () => {
     const system = source('SystemPage.vue');
-    expect(system).toContain("t('system.updatesManaged')");
+    // Sigue diciendo QUIÉN gestiona las actualizaciones…
+    expect(system).toContain("t('system.updatesCloudHint')");
+    // …y sigue sin afirmar «estás al día», que sería contar por hecha una comprobación que no
+    // existe. El titular pasó de «actualizaciones gestionadas» al historial (hub#564): la frase
+    // que faltaba no era quién actualiza, era QUÉ te ha cambiado.
     expect(system).not.toContain("t('system.upToDate')");
+    expect(system).toContain("t('system.updateHistory')");
     expect(system).toContain('dataTableLabels(locale.value)');
+  });
+
+  it('the update history is read-only: no update control for the hub sneaks back in', () => {
+    // El botón «Actualizar» del hub para el dueño se retiró a propósito — contradice ADR-0269, que
+    // actualiza siempre y sin preguntar — y ya se quitó de la tarjeta del hub en el SaaS. Esta
+    // pantalla es la CONTRAPARTIDA (saber qué cambió), no la vuelta del control: si alguien añade
+    // aquí una acción de update, este test se lo dice.
+    const system = source('SystemPage.vue');
+    expect(system).not.toContain('updateModule');
+    expect(system).not.toContain('/api/modules/');
   });
 });
