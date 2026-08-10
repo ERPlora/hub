@@ -572,18 +572,35 @@ fn preview(stmt: &str) -> String {
 /// Valida y aplica el SQL de una sección del bundle. Devuelve cuántas sentencias ejecutó.
 ///
 /// La validación va ANTES de tocar la BD: un bundle con DDL no ejecuta ni su primera fila.
+///
+/// **Resiliencia ante colisión de clave natural** (hub#753): la guarda `WHERE NOT EXISTS` que el
+/// export emite ya hace idempotente el re-import por la PRIMARY KEY (`id`), pero una tabla puede
+/// tener una SEGUNDA unicidad sobre una columna natural — `(hub_id, code)` en `invoice_series_series`,
+/// `(hub_id, slug)` en `services_service` — y esa guarda NO la conoce. Un bundle producido antes de
+/// `TEMPLATE_EXCLUDED_TABLES`, o un backup restaurado en un hub que ya tiene la misma clave natural
+/// bajo otro `id`, chocan contra ese índice y abortaban la sección ENTERA. Aquí un `23505` se trata
+/// como el guard ya trata un `id` duplicado: se salta la fila y se sigue. La fila PRESENTE en destino
+/// no se toca — `DO NOTHING`, no `DO UPDATE` — que es justo lo que defiende `TEMPLATE_EXCLUDED_TABLES`:
+/// la plantilla no sobrescribe la numeración del negocio que la importa.
 pub async fn apply(db: &dyn DatabaseAdapter, sql: &str, scope: &TableScope) -> Result<usize> {
     let stmts = validate(sql, scope).map_err(RuntimeError::Other)?;
     let mut applied = 0usize;
     for (i, stmt) in stmts.iter().enumerate() {
-        db.execute_batch(stmt).await.map_err(|e| {
-            RuntimeError::Other(format!(
-                "import: fallo en la sentencia #{} de {}: {e}",
-                i + 1,
-                stmts.len()
-            ))
-        })?;
-        applied += 1;
+        match db.execute_batch(stmt).await {
+            Ok(()) => applied += 1,
+            Err(e) if e.is_unique_violation() => {
+                // Colisión de unicidad por columna natural: la fila ya está (bajo otro `id` o por
+                // otra vía). Se salta — no se aborta la sección — y la fila destino queda intacta.
+                continue;
+            }
+            Err(e) => {
+                return Err(RuntimeError::Other(format!(
+                    "import: fallo en la sentencia #{} de {}: {e}",
+                    i + 1,
+                    stmts.len()
+                )))
+            }
+        }
     }
     Ok(applied)
 }

@@ -734,3 +734,125 @@ async fn cross_hub_en_bd_compartida_applied_implica_filas_reales_bajo_el_destino
     // `Applied` solo es cierto si B realmente tiene la fila bajo su hub_id (antes era 0 filas).
     assert_eq!(product_names(&b, "h2").await, vec!["Café".to_string()]);
 }
+
+// ── hub#753: colisión de clave natural `(hub_id, code)` al importar ──────────────────────────
+
+/// 🔴 [hub#753] El defecto de la plantilla **Peluquería 1.0.4**: un bundle que trae
+/// `invoice_series_series` con `code='FAC'` no puede restaurarse sobre un hub que YA tiene su propia
+/// serie `FAC` (con otro `id`).
+///
+/// La guarda `WHERE NOT EXISTS (id = …)` del export conoce la PRIMARY KEY, pero no el índice único
+/// secundario `uq_invoice_series_hub_code (hub_id, code) WHERE is_deleted = 0`: el bundle trae el
+/// `id` del hub de origen, que en destino no existe (la guarda pasa), y el INSERT choca contra la
+/// unicidad por `code` — abortando la sección ENTERA con `Failed`.
+///
+/// El fix durable (este test): el import trata esa colisión como la guarda ya trata un `id`
+/// duplicado — se salta la fila y sigue, **sin sobrescribir** la numeración del negocio que importa
+/// (que es justo lo que defiende `TEMPLATE_EXCLUDED_TABLES` en el export).
+#[tokio::test]
+async fn un_bundle_que_choca_con_una_clave_natural_no_rompe_la_seccion() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+
+    // Un bundle a mano, exactamente la forma del artefacto publicado de Peluquería 1.0.4: dice ser
+    // `backup` (las publicadas antes de `purpose` leen así) y lleva la serie `FAC` del hub de origen.
+    // Se monta SIN pasar por `export_hub` para reproducir el bundle pre-filtro `TEMPLATE_EXCLUDED_*
+    // TABLES` — el que ya está publicado y es el que hay que curar.
+    let series_sql = "INSERT INTO invoice_series_series \
+        (\"id\", \"hub_id\", \"code\", \"name\", \"document_type\", \"prefix\", \"suffix\", \"format\", \
+         \"country_code\", \"region_code\", \"fiscal_year\", \"current_sequence\", \"is_default\", \
+         \"is_active\", \"is_deleted\", \"created_by\", \"updated_by\", \"created_at\", \"updated_at\") \
+         SELECT 'src-series-fac', '__HUB_ID__', 'FAC', 'Facturas peluquería', 'invoice', 'FAC', '', \
+         '{prefix}-{year}-{seq:05d}', 'ES', '', 2026, 0, 1, 1, 0, 'u-origen', 'u-origen', \
+         '2026-08-10T00:00:00Z', '2026-08-10T00:00:00Z' \
+         WHERE NOT EXISTS (SELECT 1 FROM invoice_series_series WHERE id = 'src-series-fac');\n";
+    let series_bytes = series_sql.as_bytes().to_vec();
+
+    let mut files = std::collections::BTreeMap::new();
+    files.insert("data/invoice_series.sql".into(), series_bytes);
+    let mut sha256 = std::collections::BTreeMap::new();
+    sha256.insert("data/invoice_series.sql".into(), sha256_hex(&files["data/invoice_series.sql"]));
+    let manifest = erplora_runtime::export::BlueprintManifest {
+        schema_version: erplora_runtime::export::SCHEMA_VERSION,
+        purpose: BundlePurpose::Backup,
+        name: "peluqueria".into(),
+        locale: "es".into(),
+        hub: erplora_runtime::export::HubMeta {
+            name: "Peluquería Demo".into(),
+            country: "ES".into(),
+            currency: "EUR".into(),
+            // Origin DISTINTO del destino: un bundle ajeno, como el publicado.
+            hub_id: "h1-origen".into(),
+        },
+        created_at: CREATED_AT.into(),
+        modules: Vec::new(),
+        sections: vec!["modules/invoice_series".into()],
+        active_roles: Vec::new(),
+        sha256,
+    };
+
+    // Hub DESTINO con `invoice_series` instalado y con su PROPIA serie `FAC` (distinto `id`):
+    // reproduce el hub real de un peluquero que ya configuró su numeración antes de importar la
+    // plantilla. La serie existe bajo `is_deleted=0`, así que el índice parcial prohíbe otra `FAC`.
+    let db = fresh_db().await;
+    let mut b = Runtime::with_hub_id(Box::new(db), "h2");
+    b.install_from_dir(&modules_root().join("invoice_series"))
+        .await
+        .expect("instalar invoice_series en destino");
+    let mut seed = Params::new();
+    seed.insert("hub".into(), json!("h2"));
+    b.db()
+        .execute(
+            "INSERT INTO invoice_series_series (id, hub_id, code, name, document_type, prefix, \
+             suffix, format, country_code, region_code, fiscal_year, current_sequence, \
+             is_default, is_active, is_deleted, created_by, updated_by, created_at, updated_at) \
+             VALUES ('own-fac-h2', :hub, 'FAC', 'Facturas del peluquero', 'invoice', 'FAC', '', \
+             '{prefix}-{year}-{seq:05d}', 'ES', '', 2026, 42, 1, 1, 0, 'u-propio', 'u-propio', \
+             '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            &seed,
+        )
+        .await
+        .expect("sembrar la serie FAC propia del destino");
+
+    let sel = ImportSelection {
+        users: false,
+        settings: false,
+        fiscal: false,
+        media: false,
+        modules: vec!["invoice_series".into()],
+    };
+    let report = import_sections(&mut b, &manifest, &files, &sel, "h2")
+        .await
+        .expect("el import NO debe abortar por una colisión de clave natural");
+
+    // 1. La sección se aplica (no aborta): best-effort, la colisión se salta.
+    let section = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/invoice_series")
+        .expect("invoice_series en el informe");
+    assert!(
+        matches!(section.status, SectionStatus::Applied),
+        "una colisión de (hub_id, code) no puede tumbar la sección: {:?}",
+        section.status
+    );
+
+    // 2. La numeración del destino QUEDA INTACTA: la serie propia (`current_sequence=42`,
+    //    `name='Facturas del peluquero'`) no se sobrescribió con la del bundle. Es lo que defiende
+    //    `TEMPLATE_EXCLUDED_TABLES` — la plantilla no decide por el negocio que la importa.
+    let rows = b
+        .execute_query(
+            "invoice_series.series.list",
+            &Params::new(),
+            &ctx("h2"),
+        )
+        .await
+        .expect("listar series de h2");
+    let fac = rows
+        .iter()
+        .find(|r| r["code"].as_str() == Some("FAC"))
+        .expect("la serie FAC propia del destino debe seguir ahí");
+    assert_eq!(fac["id"].as_str(), Some("own-fac-h2"), "el id propio no se reemplazó");
+    assert_eq!(fac["name"].as_str(), Some("Facturas del peluquero"), "el nombre propio fue sobreescrito");
+    assert_eq!(fac["current_sequence"], json!(42), "la secuencia propia fue reseteada por el bundle");
+    assert_eq!(rows.len(), 1, "no debe duplicarse la serie FAC: {rows:?}");
+}

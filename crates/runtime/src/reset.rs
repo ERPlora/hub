@@ -753,6 +753,11 @@ pub async fn apply_tracked_into(
         let returning = format!("{} RETURNING id", stmt.trim_end().trim_end_matches(';'));
         let res = match db.query(&returning, &erplora_db::Params::new()).await {
             Ok(r) => r,
+            // Colisión de unicidad por columna natural (hub#753): la guarda `NOT EXISTS` conoce la
+            // PK (`id`) pero no un índice único secundario como `(hub_id, code)`. La fila ya está en
+            // destino bajo otro `id` — se salta sin registrar (no es nuestra, no la trazamos para
+            // deshacer) y sin abortar la sección. La fila destino queda intacta (DO NOTHING).
+            Err(e) if e.is_unique_violation() => continue,
             // Tabla sin `id` (vínculo M2M) u otra forma no soportada: se aplica sin registrar.
             Err(_) => {
                 db.execute_batch(&stmt).await.map_err(|e| {

@@ -38,6 +38,26 @@ pub enum DbError {
     Sqlx(#[from] sqlx::Error),
 }
 
+impl DbError {
+    /// Is this a **unique violation** (Postgres SQLSTATE `23505`)?
+    ///
+    /// A blueprint `INSERT INTO … SELECT <literals> WHERE NOT EXISTS (…)` is already idempotent for
+    /// the PRIMARY KEY (its guard keys on `id`). But a table can carry a SECOND uniqueness constraint
+    /// on a natural column — `(hub_id, code)` on `invoice_series_series`, `(hub_id, slug)` on
+    /// `services_service`, `(hub_id, sku)` on `inventory_product` — and the guard does NOT know about
+    /// it: a bundle produced before `TEMPLATE_EXCLUDED_TABLES` (hub#753), or any backup restored into
+    /// a hub that already owns the same natural key under another `id`, trips the constraint and takes
+    /// the WHOLE section down. The fix is to treat that failure the same way the guard already treats
+    /// a duplicate `id`: skip the row, keep going. This is the predicate that lets the applier do so
+    /// without coupling the engine to the wire format of sqlx's error.
+    pub fn is_unique_violation(&self) -> bool {
+        let DbError::Sqlx(sqlx::Error::Database(db)) = self else {
+            return false;
+        };
+        db.code().as_deref() == Some("23505")
+    }
+}
+
 /// Result of a **read** (`query`). Wraps the rows so we can add metadata
 /// (pagination, warnings…) without breaking the trait signature. Serialized
 /// into the `data` field of `envelope.schema.json` (§7.6).
