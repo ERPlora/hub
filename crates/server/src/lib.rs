@@ -369,6 +369,18 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
+    // Marca de actividad de usuario (hub#670): se ADOPTA la que dejó el proceso anterior, y a
+    // partir de aquí se escribe sola cada `HUB_ACTIVITY_PERSIST_SECS`.
+    //
+    // Va justo después de las migraciones (su tabla nace en la v39) y ANTES de que arranquen el
+    // latido y el router: el latido manda `pending()` en su PRIMER tick, y sin la marca adoptada
+    // ese tick diría «aquí no ha entrado nadie» de un hub que sí se usa. Perderla no es cosmético
+    // — es el reloj con el que el Cloud apaga (60d) y BORRA (120d) un hub free, y borrar no se
+    // deshace. Ambas llamadas son best-effort: un hub cuya marca no se pueda leer o escribir tiene
+    // que arrancar igual, con el reloj empezado de nuevo, nunca quedarse sin arrancar.
+    activity::restore_from_db(&state).await;
+    activity::spawn_persistence(&state);
+
     // **Owner sembrado del env** (ADR-0157, corrección de Ioan): el owner es el CREADOR del hub y el
     // despliegue lo trae ya inyectado por el provisioning del SaaS como `HUB_OWNER_EMAIL`. Se siembra
     // un `hub_user` role=admin (cloud_user_id NULL, sin PIN) tras las tablas de sistema —`admin` es
@@ -791,8 +803,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     if let Some(dir) = cfg.web_dir.as_deref() {
         eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
     }
-    // El router consume el `state`; el aviso de arranque de más abajo necesita el suyo.
+    // El router consume el `state`; el aviso de arranque de más abajo necesita el suyo, y el
+    // apagado el suyo (hub#670: el último flush de la marca de actividad).
     let announce_state = state.clone();
+    let shutdown_state = state.clone();
     let mut router = build_router(state, cfg.web_dir.as_deref());
     // CSP (ADR-0050): con el doc servido por Axum, la CSP de `tauri.conf` no aplica → la emitimos aquí.
     if let Some(csp) = cfg.csp.as_deref() {
@@ -814,7 +828,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
     // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).
     axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(shutdown_state))
         .await?;
     Ok(())
 }
@@ -876,7 +890,7 @@ fn install_error_reporting(state: &AppState) {
 
 /// Espera Ctrl-C o (en Unix) SIGTERM. ECS envía SIGTERM al desescalar/desplegar; al recibirla,
 /// `axum::serve` deja de aceptar conexiones nuevas y drena las en vuelo antes de cerrar.
-async fn shutdown_signal() {
+async fn shutdown_signal(state: AppState) {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
@@ -907,6 +921,11 @@ async fn shutdown_signal() {
         );
         tokio::time::sleep(drain).await;
     }
+    // Último flush de la marca de actividad (hub#670) antes de cerrar. El write-behind ya la
+    // escribe cada minuto, así que esto solo cierra el último minuto — pero el SIGTERM de un
+    // blue/green (ADR-0269) llega en CADA actualización, y ese minuto es justo el que contiene la
+    // visita de quien estaba usando el hub cuando se desplegó.
+    activity::flush(&state).await;
     eprintln!("apagado: cierro el listener y dreno las conexiones en vuelo…");
 }
 
