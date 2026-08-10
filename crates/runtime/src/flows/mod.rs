@@ -26,6 +26,8 @@
 //! - [`def`] — the frozen document, the mapping language and the conditions;
 //! - [`grants`] — what a flow is allowed to do, read fresh at every step;
 //! - [`secrets`] — the write-only credentials an `http` step carries;
+//! - [`net`] — the ONE place an URL is parsed, so that the URL judged is the URL dialled
+//!   (hub#728/#729);
 //! - [`http`] — building an outbound request, and the allow-list it has to pass first;
 //! - [`store`] — the CRUD the REST layer sits on, plus materialising triggers;
 //! - [`triggers`] — event matching in the relay, and the cron/`at` clock;
@@ -34,6 +36,7 @@ pub mod def;
 pub mod executor;
 pub mod grants;
 pub mod http;
+pub mod net;
 pub mod secrets;
 pub mod store;
 pub mod triggers;

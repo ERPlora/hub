@@ -1332,7 +1332,7 @@ mod tests {
             panic!("an http step becomes an http PendingIo");
         };
         assert_eq!(step_id, "call");
-        assert_eq!(request.url, "https://api.example.com/v1/ping?who=marta");
+        assert_eq!(request.url.as_str(), "https://api.example.com/v1/ping?who=marta");
         assert_eq!(request.method, "GET");
 
         // While it is out there the run is invisible: a second tick does not issue it again.

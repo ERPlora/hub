@@ -366,6 +366,134 @@ async fn a_literal_address_inside_this_network_is_refused_even_with_a_grant_for_
     assert!(error.contains("flow.http_blocked"), "{error}");
 }
 
+/// hub#728 — the bug a QA reproduced on a live hub: `http://2130706433:8791/api/hub/context`
+/// answered 200 with the hub's own context inside it. `2130706433` IS `127.0.0.1` to the parser
+/// the HTTP client uses; it was «some host name» to a guard that did its own string cutting.
+///
+/// The zero is the point, and so is its twin below it: the same decimal URL DOES reach this
+/// server when the guard is deliberately bent, which is what makes the zero mean "refused" and
+/// not "unparseable".
+#[tokio::test]
+async fn an_address_written_in_decimal_is_the_loopback_it_spells() {
+    let server = start_server().await;
+    let rt = runtime().await;
+    let port = server.base.rsplit(':').next().unwrap().to_string();
+    let decimal = format!("http://2130706433:{port}/ok"); // 2130706433 == 127.0.0.1
+
+    let flow_id = flow_calling(&rt, &decimal, 5).await;
+    // The grant an admin would really write, in the notation they would really read.
+    allow(&rt, &flow_id, &server.url("/*")).await;
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+
+    turn(&rt, &Limits::default()).await;
+
+    assert_eq!(server.hits(), 0, "the socket was never opened");
+    let (status, error) = run_status(&rt, &flow_id).await;
+    assert_eq!(status, "failed");
+    assert!(
+        error.contains("flow.http_blocked"),
+        "the allow-list agreed — it is the ADDRESS guard that refuses, and it must be the one \
+         that speaks: {error}"
+    );
+    assert!(
+        error.contains("127.0.0.1"),
+        "the refusal names the address, not the decimal it was hidden behind: {error}"
+    );
+}
+
+#[tokio::test]
+async fn the_same_decimal_address_reaches_the_same_server_when_the_guard_is_bent() {
+    let server = start_server().await;
+    let rt = runtime().await;
+    let port = server.base.rsplit(':').next().unwrap().to_string();
+    let flow_id = flow_calling(&rt, &format!("http://2130706433:{port}/ok"), 5).await;
+    allow(&rt, &flow_id, &server.url("/*")).await;
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+
+    let results = turn(&rt, &Limits::allowing_private_addresses()).await;
+
+    assert_eq!(server.hits(), 1, "`2130706433` is this very server");
+    assert_eq!(
+        results,
+        vec![IoResult::Done(json!({
+            "status": 200, "ok": true, "body_json": { "name": "Marta", "id": 7 }
+        }))]
+    );
+}
+
+/// hub#729 — `…/ok/../boom` matched a grant for `/ok*` and fetched `/boom`. The grant did not
+/// contain what it said it contained.
+#[tokio::test]
+async fn a_dot_segment_that_leaves_the_granted_path_never_reaches_the_server() {
+    let server = start_server().await;
+    let rt = runtime().await;
+    let flow_id = flow_calling(&rt, &server.url("/ok/../boom"), 5).await;
+    allow(&rt, &flow_id, &server.url("/ok*")).await;
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+
+    turn(&rt, &Limits::allowing_private_addresses()).await;
+
+    assert_eq!(server.hits(), 0, "`/boom` was never granted");
+    let (status, error) = run_status(&rt, &flow_id).await;
+    assert_eq!(status, "failed");
+    assert!(error.contains("flow.grant_denied"), "{error}");
+}
+
+/// The twin: a `..` that lands back INSIDE the grant is inside the grant. The path is judged
+/// resolved, not refused for containing a dot — a fix that blocked everything would pass the test
+/// above and break every flow.
+#[tokio::test]
+async fn a_dot_segment_that_lands_back_inside_the_grant_still_goes_out() {
+    let server = start_server().await;
+    let rt = runtime().await;
+    let flow_id = flow_calling(&rt, &server.url("/text/../ok"), 5).await;
+    allow(&rt, &flow_id, &server.url("/ok*")).await;
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+
+    let results = turn(&rt, &Limits::allowing_private_addresses()).await;
+
+    assert_eq!(server.hits(), 1);
+    assert_eq!(
+        results,
+        vec![IoResult::Done(json!({
+            "status": 200, "ok": true, "body_json": { "name": "Marta", "id": 7 }
+        }))],
+        "it was fetched from `/ok`, which is what the grant named"
+    );
+}
+
+/// **The invariant of hub#728 + hub#729, measured at the wire.** The URL the guard judged and the
+/// URL hyper is handed are the same object, so no transformation can be inserted between them
+/// without this failing.
+#[tokio::test]
+async fn the_url_that_is_judged_is_the_url_that_is_dialled() {
+    let server = start_server().await;
+    let rt = runtime().await;
+    let port = server.base.rsplit(':').next().unwrap().to_string();
+    // Every trap of both issues in one URL: a decimal host, a `..`, a `\`, and a default port.
+    let flow_id = flow_calling(&rt, &format!("http://2130706433:{port}/text/..\\ok"), 5).await;
+    allow(&rt, &flow_id, &server.url("/ok*")).await;
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+
+    let report = rt.process_flows().await.unwrap();
+    let PendingIo::Http { request, .. } = &report.pending_io[0] else {
+        panic!("the step asked for an http call: {:?}", report.pending_io);
+    };
+
+    let wire = flow_io::wire_request(request, &Limits::allowing_private_addresses())
+        .expect("the guard let it through");
+    assert_eq!(
+        wire.url(),
+        &request.url,
+        "what goes on the wire is the very URL the allow-list and the guard judged"
+    );
+    assert_eq!(
+        request.url.as_str(),
+        server.url("/ok"),
+        "and that URL is the resolved one, not the text the flow author typed"
+    );
+}
+
 #[tokio::test]
 async fn a_redirect_is_not_followed_because_the_second_hop_was_never_granted() {
     // A 302 is a SECOND request, to a location the server chose — not the admin. Following it

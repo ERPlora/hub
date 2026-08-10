@@ -35,6 +35,11 @@ jsonschema = { version = "0.33", default-features = false }
 # módulos sin exponerles la clave. `reqwest` (rustls) construye la identidad desde PEM; `base64`
 # decodifica el `.p12`. (OpenSSL — solo non-Android, ver `[target...]` abajo.)
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# El parser WHATWG de URLs (hub#728/#729, `flows/net.rs`). Es **el mismo crate y la misma versión**
+# que usa `reqwest` por dentro, así que `url::Url` y `reqwest::Url` son EL MISMO tipo: la URL que
+# el kernel juzga es literalmente el objeto que el cliente HTTP marca, no una cadena que se vuelve
+# a parsear. Ya estaba en `Cargo.lock` de forma transitiva; aquí solo se declara la arista.
+url = "2"
 base64 = "0.22"
 # Ejecución del handler WASM FUERA del worker async (hub#241): `spawn_blocking` + `timeout`. La
 # llamada a wasmtime es bloqueante; hacerla en el propio worker de Tokio dejaba colgado el runtime
