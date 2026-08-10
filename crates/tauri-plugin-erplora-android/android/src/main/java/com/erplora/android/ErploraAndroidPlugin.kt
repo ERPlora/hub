@@ -2,6 +2,7 @@ package com.erplora.android
 
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.Permission
@@ -10,6 +11,7 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import java.io.File
 
 /**
  * Permisos de runtime del TPV en Android.
@@ -80,6 +82,57 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
             return
         }
         requestPermissionForAliases(faltan.toTypedArray(), invoke, "checkPermissions")
+    }
+
+    /**
+     * `save_to_downloads` — puts a file the shell already wrote where the USER can find it
+     * (hub#499).
+     *
+     * The only way a business gets its own data off the tablet it keeps it on: the backup, an
+     * invoice PDF, a document out of `/files`. Until this existed the shell refused on Android,
+     * because the folder Tauri calls Downloads is app-scoped storage that Android 11 closed to
+     * every file manager — a file written there exists and cannot be reached (hub#480, ADR-0259).
+     *
+     * The bytes arrive as a PATH, not as a payload: the shell has already staged them in its own
+     * cache, so a multi-megabyte export crosses the JNI boundary once instead of being copied onto
+     * the tablet's heap a second time.
+     *
+     * Both failures are answered, and they are not the same sentence. An Android too old to have
+     * the collection is rejected with [DownloadPublisher.DOWNLOADS_UNREACHABLE], which the page
+     * turns into *«open your business in a browser»* — the refusal the user can act on. Everything
+     * else keeps its own words, because "this device cannot save files" would be the wrong advice
+     * for a full disk.
+     */
+    @Command
+    fun saveToDownloads(invoke: Invoke) {
+        val args = invoke.getArgs()
+        val sourcePath = args.getString("sourcePath", null)
+        val name = args.getString("name", null)
+        if (sourcePath.isNullOrBlank() || name.isNullOrBlank()) {
+            invoke.reject("save_to_downloads needs both sourcePath and name")
+            return
+        }
+
+        if (!DownloadPublisher.canPublish()) {
+            invoke.reject(
+                "Android ${Build.VERSION.SDK_INT} has no public Downloads collection",
+                DownloadPublisher.DOWNLOADS_UNREACHABLE,
+            )
+            return
+        }
+
+        try {
+            val location = DownloadPublisher.publish(
+                activity.contentResolver,
+                File(sourcePath),
+                name,
+            )
+            invoke.resolve(JSObject().put("location", location))
+        } catch (e: Exception) {
+            // Resolved-with-nothing would read as a save that happened. The page has to be able to
+            // say the file did NOT arrive — that is the whole lesson of hub#475.
+            invoke.reject(e.message ?: e.toString(), e)
+        }
     }
 
     private fun concedidos(): Set<String> =

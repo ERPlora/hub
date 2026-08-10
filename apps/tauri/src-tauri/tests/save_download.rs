@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 
 use erplora_tauri_lib::{
     download_file_name, downloads_dir_is_reachable, free_download_path, reachable_downloads_dir,
-    ShellError,
+    save_target, SaveTarget, ShellError,
 };
 
 // ── Which platforms have a Downloads folder the USER can reach ───────────────────────────────────
@@ -98,6 +98,81 @@ fn a_desktop_with_no_downloads_folder_is_a_plain_failure_not_a_phone() {
     // on a phone or tablet" would be the wrong sentence to put in front of that user.
     let missing = reachable_downloads_dir("linux", None);
     assert!(matches!(missing, Err(ShellError::Io(_))));
+}
+
+// ── WHERE the bytes go, decided per platform (hub#499) ───────────────────────────────────────────
+//
+// `reachable_downloads_dir` above answers one question — *is the folder Tauri resolved one the user
+// can open?* — and on Android the answer is still no. What changed is that a folder is no longer
+// the only way to save: Android has a public **Downloads collection**, published through
+// `MediaStore`, which is not a path at all. `save_target` is the whole decision, so the platform
+// that gets a folder, the platform that gets the collection and the platform that gets nothing are
+// decided in one readable place instead of being spread across the command.
+
+#[test]
+fn android_publishes_into_the_public_downloads_collection() {
+    // hub#499. Refusing was right while there was nowhere to put the file; there is now, and it is
+    // not a folder: `MediaStore.Downloads` is a content collection the Files app browses and every
+    // file manager lists. A tablet till can finally take its own backup off the device.
+    assert_eq!(
+        save_target("android", None).unwrap(),
+        SaveTarget::AndroidDownloads
+    );
+}
+
+#[test]
+fn android_ignores_the_folder_tauri_resolved_for_it() {
+    // The decision must NOT depend on the resolved path. Tauri hands back
+    // `getExternalFilesDir(DIRECTORY_DOWNLOADS)` on Android — app-scoped storage Android 11 closed
+    // to every file manager — so a target picked from that value would keep writing the file into
+    // the one place the user cannot reach.
+    assert_eq!(
+        save_target(
+            "android",
+            Some(PathBuf::from(
+                "/storage/emulated/0/Android/data/com.erplora.app/files/Download"
+            ))
+        )
+        .unwrap(),
+        SaveTarget::AndroidDownloads
+    );
+}
+
+#[test]
+fn the_desktop_still_writes_into_the_users_own_folder() {
+    assert_eq!(
+        save_target("windows", Some(PathBuf::from(r"C:\Users\ana\Downloads"))).unwrap(),
+        SaveTarget::Folder(PathBuf::from(r"C:\Users\ana\Downloads"))
+    );
+}
+
+#[test]
+fn ios_is_still_refused_because_nobody_has_written_that_path_yet() {
+    // The same hole hub#499 closed on Android is still open on iOS, and it needs its own native
+    // work (`UIDocumentPickerViewController` or the share sheet). Until that exists the honest
+    // answer is the refusal the user can act on — not a file saved somewhere nobody can browse.
+    assert!(matches!(
+        save_target("ios", Some(PathBuf::from("/var/mobile/.../Downloads"))),
+        Err(ShellError::DownloadsUnreachable)
+    ));
+}
+
+#[test]
+fn a_platform_nobody_reasoned_about_gets_no_benefit_of_the_doubt() {
+    for os in ["", "freebsd", "ANDROID", "solaris"] {
+        assert!(
+            matches!(
+                save_target(os, Some(PathBuf::from("/downloads"))),
+                Err(ShellError::DownloadsUnreachable)
+            ),
+            "{os:?} was never reasoned about and must not be assumed saveable"
+        );
+    }
+}
+
+#[test]
+fn a_desktop_with_no_downloads_folder_is_still_a_plain_failure() {
+    assert!(matches!(save_target("linux", None), Err(ShellError::Io(_))));
 }
 
 // ── The page names a FILE, never a place ─────────────────────────────────────────────────────────
@@ -278,14 +353,31 @@ fn the_save_command_checks_the_platform_and_the_name_before_it_writes() {
         .expect("src/lib.rs no longer defines `save_download` (hub#480)");
 
     assert!(
-        command.contains("reachable_downloads_dir"),
-        "`save_download` no longer asks whether the user can REACH the folder it writes to: on \
-         Android that is app-scoped storage no file manager opens, and reporting a path there is \
-         hub#475 with a success message on top (hub#480, ADR-0259)."
+        command.contains("save_target"),
+        "`save_download` no longer asks WHERE this platform saves: on Android the folder Tauri \
+         resolves is app-scoped storage no file manager opens, and reporting a path there is \
+         hub#475 with a success message on top (hub#480, ADR-0259, hub#499)."
     );
     assert!(
         command.contains("download_file_name"),
         "`save_download` no longer reduces what the page sent to a single file name: the page gets \
          to choose a path on the till's disk (hub#480, ADR-0259)."
+    );
+}
+
+#[test]
+fn the_android_branch_still_goes_through_the_native_publisher() {
+    // The Android half cannot be reached from a unit test — it needs a device with a `MediaStore` —
+    // and its disappearance is not a type error either: delete the call and the `#[cfg]` block
+    // simply stops publishing, `save_target` keeps answering `AndroidDownloads`, and every test
+    // above stays green while the tablet is back to not saving anything (hub#499).
+    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"))
+        .expect("src/lib.rs");
+
+    assert!(
+        source.contains("save_to_downloads"),
+        "nothing in the shell calls the plugin's `save_to_downloads` any more: on Android there is \
+         no other way to reach the public Downloads collection, so the till silently loses its \
+         backup, its invoices and its `/files` downloads (hub#499)."
     );
 }
