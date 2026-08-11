@@ -17,9 +17,12 @@ import en from './locales/en';
 import es from './locales/es';
 
 /**
- * The namespaces the owner crosses on the way in. `settings`, `profile`, `system`, `files` and the
- * rest are deliberately absent: they are destinations you choose, not the path, and hub#365 is
- * scoped to the path (plus the apps door, which the issue names).
+ * The namespaces the owner crosses on the way in, plus the ones migrated since.
+ *
+ * hub#365 scoped itself to the PATH (plus the apps door). hub#481 pays the rest of the debt: the
+ * screens you CHOOSE were speaking platform too, and one of them —Settings— was holding a sentence
+ * on the path hostage (see the pointer below). Growing this list is how a surface gets migrated;
+ * writing a second test would let the two drift.
  */
 const PATH_NAMESPACES = [
   'login',
@@ -34,7 +37,36 @@ const PATH_NAMESPACES = [
   // namespace most at risk of opening a fourth noun: the thing it updates is the app you install,
   // while «apps» already names the things you add to your business. It says «ERPlora».
   'appUpdate',
+  // ── hub#481 ──────────────────────────────────────────────────────────────────────────────────
+  // Settings and Profile first, because they are what the login pointer names: until the «Hub» tab
+  // had a business name, `login.personalDeviceNote` could not stop saying «Ajustes › Hub».
+  'settings',
+  'profile',
+  // The surfaces the issue lists by name. All of them are read by the owner, none of them is
+  // technical documentation.
+  'assistant',
+  'files',
+  'exportPage',
+  'importPage',
+  'deviceMode',
+  'devices',
+  'pinPolicy',
 ] as const;
+
+/**
+ * Namespaces deliberately NOT migrated, with the reason. Absence from the list above is a decision
+ * here, not an oversight — that is the whole point of writing them down.
+ *
+ * * **`apiDocs`** — it is the public API reference (ADR-0057 §4), read by an INTEGRATOR, not by the
+ *   owner. «Hub» is the correct word there: it is what the API, the manifest and the ADRs call it,
+ *   and translating it for a developer would make the docs disagree with the thing they document.
+ *   The issue asked for this to be DECIDED rather than changed by inertia — this is the decision.
+ * * **`dashboard.widgets`** — «widget» is jargon for a bar owner, but it is the vocabulary of
+ *   ADR-0054 and it names things the user can save into presets. Renaming it is a product decision
+ *   with a data migration behind it, not a copy change, so it does not ride along here. (It already
+ *   passes: «widget» is not a platform noun, it is a UI noun.)
+ */
+const NOT_MIGRATED_ON_PURPOSE = ['apiDocs'] as const;
 
 /**
  * The platform's nouns. Each one asks the reader to hold a piece of OUR architecture in their head
@@ -56,14 +88,13 @@ const PLATFORM_NOUNS: readonly RegExp[] = [
   /\bsaas\b/i,
 ];
 
-/**
- * The one sentence on the path that is allowed to say «Hub», with the reason written down. It is a
- * POINTER: it tells the user where the decision lives, and a pointer has to name its target exactly
- * as the target reads on screen. Settings still calls that tab «Hub», and Settings is not on this
- * path — so renaming the pointer here would make it lie. The tab is renamed with the rest of the
- * Settings surface in hub#481; this line follows it there, not from here.
- */
-const POINTER_TO_A_SCREEN_NOT_ON_THIS_PATH = 'login.personalDeviceNote';
+// hub#481 — the exception is GONE, and its disappearance is the point.
+//
+// `login.personalDeviceNote` was allowed to say «Ajustes › Hub» because it is a POINTER: it must
+// name its target exactly as the target reads on screen, and that tab was still called «Hub».
+// Settings has now been migrated with the rest of this list, the tab is «General», and the pointer
+// follows it — so there is nothing left to exempt. An exception that outlives its cause is how a
+// vocabulary rule rots, so it is deleted rather than kept "just in case".
 
 /**
  * Values that are legitimately identical in both catalogues: proper nouns, protocol words and
@@ -79,6 +110,24 @@ const SAME_IN_BOTH_LANGUAGES = new Set([
   'nav.apiDocs',
   'dashboard.widgets',
   'apps.colModule',
+  // ── hub#481 ──────────────────────────────────────────────────────────────────────────────────
+  // «Apps» is the noun ADR-0254 chose, and Spanish took it unchanged — so every label that is only
+  // that word is identical on purpose, not a translation somebody forgot.
+  'settings.tabHub',
+  'exportPage.modules',
+  'exportPage.colModule',
+  'exportPage.colInclude',
+  'importPage.manifestModules',
+  'importPage.modulesTitle',
+  'importPage.reportModules',
+  'importPage.sectionModule',
+  // Proper nouns and words Spanish uses unchanged.
+  'settings.countryPortugal',
+  'settings.hardware',
+  'exportPage.sectionFiscal',
+  'importPage.sectionFiscal',
+  'importPage.sectionRoles',
+  'pinPolicy.idleMinutes',
 ]);
 
 type Leaf = { key: string; value: string };
@@ -171,9 +220,20 @@ describe('what somebody who cannot install sees', () => {
 describe('the business, never the architecture', () => {
   it('never says a platform noun on the path', () => {
     const offenders = [...pathLeaves(en), ...pathLeaves(es)]
-      .filter(({ key }) => key !== POINTER_TO_A_SCREEN_NOT_ON_THIS_PATH)
       .flatMap(({ key, value }) => offendingNouns(value).map((noun) => `${key}: ${noun} → ${value}`));
     expect(offenders).toEqual([]);
+  });
+
+  // hub#481 — a namespace left out has to be left out ON PURPOSE. Without this, «not migrated yet»
+  // and «decided not to migrate» look identical from the outside, and the next person re-litigates
+  // a decision that was already made. Adding one to the path means deleting it here first, which is
+  // where its reason is written.
+  it('keeps the surfaces that legitimately speak platform out of the path', () => {
+    for (const ns of NOT_MIGRATED_ON_PURPOSE) {
+      expect(PATH_NAMESPACES as readonly string[], `${ns}: read why before adding it`).not.toContain(ns);
+      // …and it must still exist: an exclusion pointing at a namespace nobody ships is dead weight.
+      expect(en, `${ns} no longer exists — drop the exclusion`).toHaveProperty(ns);
+    }
   });
 
   it('calls the tenant «your business» where it used to say «your hub»', () => {
@@ -196,9 +256,13 @@ describe('the business, never the architecture', () => {
     expect(en.setup.blocking.body).toContain('invoice');
   });
 
-  it('leaves the one pointer that must name its target as the target reads', () => {
-    // Deliberate, and the only one: see POINTER_TO_A_SCREEN_NOT_ON_THIS_PATH.
-    expect(es.login.personalDeviceNote).toContain('Ajustes › Hub');
+  // hub#481 — a pointer has to name its target exactly as the target reads on screen. The Settings
+  // tab that owns this decision is no longer called «Hub», so the pointer names the new one. This
+  // assertion is the reason the two can never drift apart again: rename the tab without the
+  // pointer, or the pointer without the tab, and it goes red.
+  it('points at the tab by the name that tab actually shows', () => {
+    expect(es.login.personalDeviceNote).toContain(`Ajustes › ${es.settings.tabHub}`);
+    expect(en.login.personalDeviceNote).toContain(`Settings › ${en.settings.tabHub}`);
   });
 });
 

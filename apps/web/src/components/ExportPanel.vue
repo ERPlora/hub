@@ -343,8 +343,10 @@ function checkboxCell(row: Row, key: 'include' | 'withData'): Node {
   cb.disabled = key === 'withData' && !row.include;
   cb.setAttribute(
     'aria-label',
+    // hub#481: the placeholder is named after what the reader sees — an app — not after our
+    // manifest word. It is an i18n parameter of this shell, so it carries no external contract.
     t(key === 'include' ? 'exportPage.includeOf' : 'exportPage.dataOf', {
-      module: String(row.name),
+      app: String(row.name),
     }),
   );
   cb.addEventListener('ionChange', (e) => {
