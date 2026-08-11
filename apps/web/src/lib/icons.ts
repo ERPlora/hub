@@ -41,6 +41,10 @@ import logOutOutline from "~icons/ion/log-out-outline?raw";
 import mailOutline from "~icons/ion/mail-outline?raw";
 import peopleOutline from "~icons/ion/people-outline?raw";
 import personCircleOutline from "~icons/ion/person-circle-outline?raw";
+import personRemoveOutline from "~icons/ion/person-remove-outline?raw";
+import arrowUpCircleOutline from "~icons/ion/arrow-up-circle-outline?raw";
+import closeCircleOutline from "~icons/ion/close-circle-outline?raw";
+import removeCircleOutline from "~icons/ion/remove-circle-outline?raw";
 import phonePortraitOutline from "~icons/ion/phone-portrait-outline?raw";
 import pulseOutline from "~icons/ion/pulse-outline?raw";
 import readerOutline from "~icons/ion/reader-outline?raw";
@@ -201,6 +205,13 @@ const SVGS: Record<string, string> = {
   "mail-outline": mailOutline,
   "people-outline": peopleOutline,
   "person-circle-outline": personCircleOutline,
+  // Declared in TypeScript, not in the markup: these are the `icon:` of `ok-data-table` actions
+  // (hub#793). The guard only scanned tags, so they had been coming out EMPTY for months — «Dar de
+  // baja» in Employees was, literally, an invisible button.
+  "person-remove-outline": personRemoveOutline,
+  "arrow-up-circle-outline": arrowUpCircleOutline,
+  "close-circle-outline": closeCircleOutline,
+  "remove-circle-outline": removeCircleOutline,
   "phone-portrait-outline": phonePortraitOutline,
   "pulse-outline": pulseOutline,
   "reader-outline": readerOutline,
