@@ -56,7 +56,9 @@ permissions:
 jobs:
   verify:
     name: pnpm verify (vue-tsc + vitest + module-sdk)
-    runs-on: ubuntu-latest
+    # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Este es el
+    # único check que corre de verdad en las PRs del web, así que sin él una PR no se puede mergear.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
 
     env:
