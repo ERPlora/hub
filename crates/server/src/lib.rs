@@ -838,6 +838,59 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
+    // **Retención del historial** (hub#699, `erplora_runtime::retention`): el outbox y los runs de
+    // flujos eran append-only — ninguna fila se borraba nunca — y sus columnas anchas (`input`,
+    // `output`, `payload`, todas TEXT) crecían de por vida en una BD que se paga por GB. A los 90
+    // días se poda lo TERMINAL, y solo eso: un `pending` (aún por entregar) y un `dead` (esperando
+    // decisión humana) sobreviven a cualquier edad, porque son la durabilidad, no el historial.
+    //
+    // Tick PROPIO y horario, no el bucle de 1s: el barrido no es urgente y el bucle de 1s sostiene
+    // el lock del runtime para el relay de eventos. El lock se coge **por pasada**, no para todo el
+    // barrido, así que entre dos DELETE acotados el relay entra sin esperar. Que sea horario y no
+    // diario es lo que deja a un hub con un año de atraso ponerse al día en unas horas en vez de en
+    // meses, sin que ninguna pasada deje de ser pequeña.
+    {
+        let st = state.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(3600));
+            loop {
+                tick.tick().await;
+                let hub_id = st.hub_id();
+                let cutoff = (chrono::Utc::now()
+                    - chrono::Duration::days(erplora_runtime::retention::RETENTION_DAYS))
+                .to_rfc3339();
+                let mut total = erplora_runtime::retention::PruneReport::default();
+                for _ in 0..erplora_runtime::retention::MAX_PASSES {
+                    let runtime = st.runtime.lock().await;
+                    let pass =
+                        erplora_runtime::retention::prune_once(runtime.db(), &hub_id, &cutoff).await;
+                    drop(runtime);
+                    match pass {
+                        Ok(p) if p.is_empty() => break,
+                        Ok(p) => total.merge(p),
+                        Err(e) => {
+                            tracing::warn!(error = %e, "retention: la poda de historial falló");
+                            break;
+                        }
+                    }
+                }
+                // Solo si borró algo: una poda silenciosa es indistinguible de una pérdida de datos
+                // el día que alguien busca un evento viejo y no está, pero "borradas 0 filas" cada
+                // hora es ruido que enseña a no leer el log.
+                if !total.is_empty() {
+                    tracing::info!(
+                        events = total.events,
+                        delivery_markers = total.delivery_markers,
+                        runs = total.runs,
+                        run_steps = total.run_steps,
+                        retention_days = erplora_runtime::retention::RETENTION_DAYS,
+                        "retention: historial terminal podado"
+                    );
+                }
+            }
+        });
+    }
+
     // **WhatsApp entrante** (ADR-0283 K1c, `architecture/hub/flows.md` §6): el hub POLLEA su
     // bandeja en el SaaS y convierte cada mensaje en el evento core
     // `hub.whatsapp.message_received`. El SaaS no puede llamar a un hub (ADR-0213) y los hubs

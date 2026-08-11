@@ -555,12 +555,21 @@ async fn cursor_of(db: &dyn DatabaseAdapter, hub_id: &str, run_id: &str) -> Resu
 /// have no originating event, and an index over their empty string is paid for on every insert to
 /// serve lookups nobody makes.
 ///
+/// `ix_flow_run_prune` backs the retention sweep (hub#699, `crate::retention`), which looks for
+/// runs by the age of their TERMINAL moment — a dimension neither `ix_flow_run_due` (live work,
+/// keyed on `wake_at`) nor `ix_flow_run_flow` (history of one flow) offers. Partial over the three
+/// terminal statuses for the same reason as above: a live run never enters it, so the tick that
+/// claims runs pays nothing, and the sweep's repeated bounded passes are index scans.
+///
 /// Called AFTER `system_migrations::apply`: the tables have to exist first.
 pub async fn ensure_indexes(db: &dyn DatabaseAdapter) -> Result<()> {
     db.execute_batch(
         "CREATE INDEX IF NOT EXISTS ix_flow_run_parent \
            ON _flow_runs (hub_id, parent_event_id) \
-           WHERE parent_event_id <> '' AND deleted_at IS NULL;",
+           WHERE parent_event_id <> '' AND deleted_at IS NULL;\
+         CREATE INDEX IF NOT EXISTS ix_flow_run_prune \
+           ON _flow_runs (hub_id, COALESCE(finished_at, created_at)) \
+           WHERE status IN ('done', 'failed', 'cancelled');",
     )
     .await?;
     Ok(())
