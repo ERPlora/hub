@@ -43,7 +43,10 @@ permissions:
 jobs:
   test:
     name: cargo test -p erplora-tauri
-    runs-on: ubuntu-latest
+    # El único workflow del repo que la PR del interruptor (#837) dejó fuera. No tiene nada de
+    # especial: instala él mismo sus deps GTK con `sudo apt-get`, cosa que el usuario `runner`
+    # puede hacer en `ci-runner-1`.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
 
     env:
