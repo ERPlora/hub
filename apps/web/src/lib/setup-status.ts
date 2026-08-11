@@ -119,12 +119,20 @@ export interface ChecklistView extends Omit<SetupStatus, 'items'> {
 }
 
 export interface ChecklistOptions {
-  /** Show everything the query returned instead of the short view. */
+  /**
+   * Show everything the query returned instead of the short view — **everything**, including what
+   * `alreadyOnScreen` folds away (hub#487). This is the «see the whole list» of the card, so it is
+   * the one view that must hide nothing.
+   */
   expanded?: boolean;
   /**
    * Keys another card on the SAME screen already offers (decision 1 of the plan: the panel has its
-   * own apps card, so the checklist starts at item 2 while that card is up). Deduplicating a
-   * surface is not filtering the list: the item is still counted, and `/setup` still lists it.
+   * own apps card, so the checklist starts at item 2 while that card is up).
+   *
+   * Deduplicating a surface is not filtering the list: the item is still counted, and **expanding
+   * the card lists it again**. That last clause used to read «and `/setup` still lists it» — a
+   * screen nobody ever built (hub#487), which made this justification false in its second half and
+   * left the deduplicated item with no row anywhere on the panel.
    */
   alreadyOnScreen?: readonly string[];
 }
@@ -175,7 +183,13 @@ export function parseSetupStatus(raw: unknown): SetupStatus | null {
 
 /** What the card renders for this document, with the counters untouched. */
 export function checklistView(status: SetupStatus | null, opts: ChecklistOptions = {}): ChecklistView {
-  const items = (status?.items ?? []).filter((i) => !isDuplicated(i, opts.alreadyOnScreen));
+  // hub#487 — the deduplication is a property of the COLLAPSED card, not of the document. Expanded
+  // means «show me everything left to do», so hiding a row because another card on the screen also
+  // offers it is the one thing that view must not do. Until now it deduplicated in both, which left
+  // the `apps` item with no row anywhere on the panel — and made the written justification of this
+  // decision («the item still counts and it is still listed») false in its second half.
+  const all = status?.items ?? [];
+  const items = opts.expanded ? all : all.filter((i) => !isDuplicated(i, opts.alreadyOnScreen));
   const counters = {
     total: status?.total ?? 0,
     pending: status?.pending ?? 0,

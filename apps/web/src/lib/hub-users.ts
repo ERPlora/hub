@@ -32,6 +32,44 @@ export interface HubUser {
   /** `true` si puede entrar con PIN local; el owner normalmente entra por Cloud. */
   has_pin: boolean;
   created_at: string;
+  /**
+   * Por qué el backfill v19 no pudo llevar el email de esta persona a donde se administra el acceso
+   * (hub#436/#463). Ausente —lo normal— si no hay nada que resolver, y también en un runtime
+   * anterior a hub#463, que no manda el campo.
+   */
+  access_email_conflict?: AccessEmailConflict;
+}
+
+/**
+ * Las dos razones por las que una fila puede quedarse sin email de ACCESO, y son **decisiones
+ * distintas** para quien administra:
+ *
+ * * `another_row_answers_for_it` — otra identidad ya responde por esa dirección: la salida es
+ *   editar el email de una de las dos.
+ * * `two_profiles_claim_it` — dos perfiles la reclaman y nada dice cuál es la persona: la salida es
+ *   dar de baja la duplicada. Fusionarlas es irreversible, y por eso la migración no lo hizo.
+ */
+export type AccessEmailConflict = 'another_row_answers_for_it' | 'two_profiles_claim_it';
+
+const ACCESS_EMAIL_CONFLICTS: readonly string[] = [
+  'another_row_answers_for_it',
+  'two_profiles_claim_it',
+];
+
+/**
+ * El motivo por el que el email de esta fila **no revoca nada**, o `null` si no hay ninguno.
+ *
+ * Existe porque la lista de Personal resuelve la dirección con
+ * `COALESCE(hub_user.email, perfil.email)`: una fila así enseña un email de aspecto normal mientras
+ * su baja no revoca la membresía en el SaaS y su primer login aterriza en otra fila. Hasta hub#463
+ * lo único que lo decía era el log de arranque.
+ *
+ * Un motivo que este shell no conoce se trata como **ausencia**: pintar una insignia sin frase
+ * detrás es peor que el silencio que esto viene a arreglar.
+ */
+export function accessEmailWarningOf(user: HubUser): AccessEmailConflict | null {
+  const reason = user.access_email_conflict;
+  return reason && ACCESS_EMAIL_CONFLICTS.includes(reason) ? reason : null;
 }
 
 /** De dónde sale un rol del catálogo (hub#352). */

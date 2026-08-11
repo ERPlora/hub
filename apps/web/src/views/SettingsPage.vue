@@ -907,9 +907,11 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
   try {
     await putModuleCapabilities(m.moduleId, { [cap.id]: checked });
     await toastSuccess(
+      // hub#481: `app`, not `module` — the placeholder is named after what the reader sees. It is
+      // an i18n parameter of this shell, so renaming it breaks no contract.
       t(checked ? 'settings.permissionGranted' : 'settings.permissionRevoked', {
         cap: cap.label,
-        module: m.name,
+        app: m.name,
       }),
     );
   } catch {

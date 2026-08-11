@@ -85,7 +85,7 @@ export default {
     confirmRun: 'Run it',
     title: 'Assistant',
     empty: 'Ask me about your sales, your inventory or anything about your business.',
-    emptySetup: 'Review the hub configuration. Pick an option or type your question.',
+    emptySetup: 'Review how your business is set up. Pick an option or type your question.',
     suggestWhatsMissing: 'What needs configuring?',
     suggestHowTo: 'How do I set up',
     goTo: 'Go to',
@@ -110,7 +110,7 @@ export default {
   },
   files: {
     title: 'Files',
-    subtitle: "Everything the Hub stores in the media folder: module attachments, logs and activity.",
+    subtitle: "Everything stored in the media folder: app attachments, logs and activity.",
     upload: 'Upload file',
     import: 'Import',
     search: 'Search files…',
@@ -126,7 +126,7 @@ export default {
     cancel: 'Cancel',
     retry: 'Retry',
     loadErrorTitle: 'Files could not be loaded',
-    loadErrorBody: 'Check the connection to the Hub and try again.',
+    loadErrorBody: 'Check the connection and try again.',
     permissionDenied: 'Only an administrator can modify files.',
     uploadSuccess: 'Files uploaded.',
     uploadError: 'Files could not be uploaded.',
@@ -147,7 +147,7 @@ export default {
     previewZoomIn: 'Zoom in',
     previewZoomOut: 'Zoom out',
     previewErrorTitle: 'The file could not be opened',
-    previewErrorBody: 'The Hub did not return the file contents. Check the connection and try again.',
+    previewErrorBody: 'The file contents did not come back. Check the connection and try again.',
     previewUnsupportedTitle: 'No preview available',
     previewUnsupportedBody: 'This file type cannot be shown here. Download it to open it with an app on your device.',
     previewPdfTruncated: 'Showing the first {shown} of {total} pages. Download the file to read it in full.',
@@ -277,18 +277,18 @@ export default {
   },
   profile: {
     title: 'My profile',
-    subtitle: 'Your identity and personal preferences in this Hub.',
+    subtitle: 'Your identity and personal preferences in this business.',
     accountTitle: 'Account details',
     preferencesTitle: 'Preferences',
     name: 'Name',
     firstName: 'First name',
     lastName: 'Last name',
     email: 'Email address',
-    role: 'Role in this Hub',
+    role: 'Role in this business',
     accountType: 'Account type',
-    cloudAccount: 'Account linked to ERPlora SaaS',
+    cloudAccount: 'erplora.com account',
     cloudAccountError: 'Your account page could not be opened in your browser. Go to erplora.com to manage it.',
-    localAccount: 'Local user of this Hub',
+    localAccount: 'Local user of this business',
     unavailable: 'Unavailable',
     defaultRole: 'User',
     roleOwner: 'Owner',
@@ -296,11 +296,11 @@ export default {
     roleManager: 'Manager',
     roleEmployee: 'Employee',
     language: 'Language',
-    languageDesc: 'Saved for your user. If you do not choose one, the Hub language is used.',
+    languageDesc: 'Saved for you. If you do not pick one, the business language is used.',
     appearance: 'Appearance',
     appearanceDesc: 'Choose the mode and palette you prefer.',
-    useHubLanguage: 'Use the Hub language',
-    useHubAppearance: 'Use the Hub appearance',
+    useHubLanguage: 'Use the business language',
+    useHubAppearance: 'Use the business appearance',
     changePhoto: 'Change photo',
     removePhoto: 'Remove',
     saveProfile: 'Save my details',
@@ -312,10 +312,10 @@ export default {
     photoError: 'Could not save the photo. Use a JPG, PNG or WebP up to 2 MB.',
     manageTitle: 'Account management',
     manageCloud:
-      'You can edit your own details here. The account remains linked to ERPlora SaaS.',
+      'You can edit your own details here. It is still your erplora.com account.',
     manageLocal:
-      'This identity only belongs to the current Hub. The Hub does not know about or show other businesses or Hubs.',
-    manageInSaas: 'Manage account in SaaS',
+      'This identity belongs to this business only. Other businesses are neither known nor shown here.',
+    manageInSaas: 'Manage account at erplora.com',
   },
   // hub#358 — «this device»: whether this terminal asks who is using it. The copy says the
   // CONSEQUENCE of each mode, never its technical name: the owner of a bar has to be able to tell,
@@ -369,7 +369,7 @@ export default {
   pinPolicy: {
     title: 'PIN pad',
     intro:
-      'Whether this hub shows the PIN pad and asks who is at the till. It applies to the whole business — each device also decides for itself, above.',
+      'Whether the PIN pad is shown and asks who is at the till. It applies to the whole business — each device also decides for itself, above.',
     showPinpad: 'Show PIN pad',
     onConsequence:
       'Staff pick their name and type their PIN, so every sale carries the name of whoever made it.',
@@ -382,7 +382,7 @@ export default {
       'A till nobody has touched for {n} minutes signs the user out and shows the PIN pad, so the next sale carries the next person’s name.',
     idleUntilSignOutConsequence:
       'The till never locks itself for inactivity: the session stays open until whoever signed in signs out, or until the device says it expires.',
-    adminOnly: 'Only an administrator can change whether this hub asks.',
+    adminOnly: 'Only an administrator can change whether it asks.',
     saveError: 'This could not be changed. Check the connection and try again.',
   },
   // El otorgamiento de representación (hub#817): la pantalla donde el cliente FIRMA que ERPlora
@@ -409,11 +409,11 @@ export default {
     submit: 'Sign and send',
   },
   settings: {
-    hubWide: 'Hub settings',
+    hubWide: 'General settings',
     currency: 'Currency',
-    currencyDesc: 'Hub currency for prices and totals (global)',
-    hubLanguage: 'Hub language',
-    hubLanguageDesc: 'Default Hub language for users without their own',
+    currencyDesc: 'Your business currency for prices and totals',
+    hubLanguage: 'Business language',
+    hubLanguageDesc: 'Default language for anyone who has not picked their own',
     saved: 'Settings saved',
     saveError: 'Could not save settings',
     // A refusal the runtime explains, keyed by its STABLE error code (hub#684). The runtime's own
@@ -421,13 +421,13 @@ export default {
     // to be their language, so the code — not the message — is what travels.
     saveRefused: {
       demo_fiscal_identity_locked:
-        'This is a demo, so it invoices as “{name}”. Create your own hub to invoice under your business.',
+        'This is a demo, so it invoices as “{name}”. Create your own business at erplora.com to invoice under your own details.',
       demo_business_certificate_locked:
-        'A demo cannot take your certificate: it never files anything for real. Create your own hub to invoice with it.',
+        'A demo cannot take your certificate: it never files anything for real. Create your own business at erplora.com to invoice with it.',
       demo_fiscal_environment_locked:
-        'A demo always stays in the tax authority’s test environment. Create your own hub to file for real.',
+        'A demo always stays in the tax authority’s test environment. Create your own business at erplora.com to file for real.',
       business_tax_id_frozen:
-        'The tax id can no longer be changed: this hub has already issued under it.',
+        'The tax id can no longer be changed: this business has already issued under it.',
     },
     timezone: 'Timezone',
     timezoneDesc: 'Timezone for dates and times',
@@ -441,12 +441,12 @@ export default {
     themeLight: 'Light',
     themeDark: 'Dark',
     themePalette: 'Theme palette',
-    paletteFollowHub: 'Use the hub palette',
+    paletteFollowHub: 'Use the business palette',
     hubPalette: 'Default palette',
     hubPaletteDesc: 'The palette seen by users who have not picked their own',
     saveChanges: 'Save changes',
     showApiDocs: 'Show API documentation',
-    showApiDocsDesc: 'Adds an internal page with the Hub public API (Swagger) for integrations',
+    showApiDocsDesc: 'Adds an internal page with the API reference (Swagger) for integrations',
     hardware: 'Hardware',
     // The counter's hardware, said as what it is. `bridgeDesc` named «ERPlora Bridge», an app
     // ADR-0196 deleted, and sat next to a hardcoded «Disabled» that was wrong inside the app.
@@ -458,7 +458,7 @@ export default {
     hardwareAppOnly: 'Only from the installed app',
     disabled: 'Disabled',
     fiscalIdentity: 'Business details',
-    fiscalIdentityDesc: 'Taxpayer identity (used by invoices and the fiscal modules).',
+    fiscalIdentityDesc: 'Taxpayer identity (used by invoices and the fiscal apps).',
     fiscalNif: 'Tax ID (NIF/VAT)',
     fiscalName: 'Legal name',
     fiscalAddress: 'Fiscal address',
@@ -471,7 +471,7 @@ export default {
     grantDesc:
       'Your signed consent for ERPlora to file your invoicing records with the tax authority on your behalf. Required before your business can go live.',
     certTitle: 'Fiscal certificate',
-    certDesc: 'Company certificate (.p12) for fiscal signing of invoices. Used by the per-country compliance modules.',
+    certDesc: 'Company certificate (.p12) for fiscal signing of invoices. Used by the per-country compliance apps.',
     certPresent: 'Certificate configured (uploaded on {date})',
     certAbsent: 'No certificate',
     certChooseFile: 'Choose certificate (.p12)',
@@ -496,7 +496,7 @@ export default {
     receiptTemplate: 'Receipt template',
     receiptTemplateDesc: 'Printed and digital receipt settings',
     receiptTemplateMissing: 'Install the Printing app to set up your receipt',
-    tabHub: 'Hub',
+    tabHub: 'General',
     tabTax: 'Business',
     tabTickets: 'Receipts',
     tabPermissions: 'Permissions',
@@ -517,26 +517,26 @@ export default {
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 rows» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} row | {n} rows',
-    resetSubmit: 'Reset hub',
+    resetSubmit: 'Reset the business',
     resetDeleted: '{n} rows deleted',
     resetConfirmTitle: 'This cannot be undone',
     resetConfirmBody: '{total} rows will be permanently deleted:',
     resetConfirmPlaceholder: 'business name',
     resetCancel: 'Cancel',
     resetConfirm: 'Delete permanently',
-    reset_hub_settings: 'Hub settings',
+    reset_hub_settings: 'General settings',
     reset_hub_users: 'Employees',
     reset_media: 'Files and images',
     reset_fiscal: 'Tax configuration',
     reset_roles: 'Active roles',
-    permissionsTitle: 'Module permissions',
-    permissionsDesc: 'Grant or revoke the permissions each module requests (internet access, certificate, printer, notifications). For safety, everything is denied until you grant it.',
+    permissionsTitle: 'App permissions',
+    permissionsDesc: 'Grant or revoke the permissions each app asks for (internet access, certificate, printer, notifications). For safety, everything is denied until you grant it.',
     permissionsAdminOnly: 'Only an administrator can change permissions.',
-    permissionsNoModules: 'No installed module requests permissions.',
-    permissionsModuleNone: 'This module requests no permissions.',
+    permissionsNoModules: 'No installed app asks for permissions.',
+    permissionsModuleNone: 'This app asks for no permissions.',
     permissionsLoadError: 'Could not load permissions.',
-    permissionGranted: '{cap} granted to {module}.',
-    permissionRevoked: '{cap} revoked from {module}.',
+    permissionGranted: '{cap} granted to {app}.',
+    permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
@@ -656,6 +656,16 @@ export default {
     colEmail: 'Email',
     colRole: 'Role',
     colAccess: 'Access',
+    // hub#463 — this address looks fine and administers nothing: their baja revokes no membership
+    // and their next sign-in lands on a different row. Each reason names the way OUT, because the
+    // two are different decisions and only a human can take them.
+    accessEmailConflict: {
+      badge: 'Needs a decision',
+      another_row_answers_for_it:
+        'Somebody else already signs in with this address, so removing this person revokes nothing. Change the address on one of the two.',
+      two_profiles_claim_it:
+        'Two people hold this address, and nothing says which one is them. Removing this person revokes nothing. Remove the duplicate, or give one of them their own address.',
+    },
     colStatus: 'Status',
     colCreatedAt: 'Joined',
     colMembers: 'Members',
@@ -756,7 +766,7 @@ export default {
     toggleAllWrite: 'Write on all modules',
     readOf: 'Read {module}',
     writeOf: 'Write {module}',
-    loadingModules: 'Loading installed modules…',
+    loadingModules: 'Loading installed apps…',
     noModulesTitle: 'No modules installed',
     noModulesHint: 'Install modules from Apps to grant a key access to them.',
     noApiModulesTitle: 'No module exposes an API yet',
@@ -1003,7 +1013,7 @@ export default {
     // device as personal. It states the CONSEQUENCE (it stays signed in), which is what matters if
     // the device is ever lost, and says where the decision lives.
     personalDeviceNote:
-      'This device is set up as personal: it stays signed in and never asks for a PIN. An administrator can change that in Settings › Hub.',
+      'This device is set up as personal: it stays signed in and never asks for a PIN. An administrator can change that in Settings › General.',
     popoverTitle: 'PIN access',
     popoverBody: 'Check this box to sign in with a <strong>PIN</strong> on this device next time, without typing your email and password. If you leave it unchecked, you will always have to sign in with your email.',
     signIn: 'Sign in',
@@ -1084,37 +1094,37 @@ export default {
   },
   exportPage: {
     title: 'Export configuration',
-    lead: 'Package this hub\'s configuration — and optionally its data — as a blueprint you can import into another hub.',
-    adminOnly: 'Only an administrator can export the hub.',
+    lead: 'Package how this business is set up — and optionally its data — as a template you can load into another business.',
+    adminOnly: 'Only an administrator can export the business.',
     name: 'Name',
     language: 'Language',
-    sections: 'Hub sections',
+    sections: 'Sections',
     purposeTitle: 'What is this file for?',
-    purposeBackup: 'Backup of this hub',
-    purposeBackupDesc: 'Private copy to restore or move this hub. Includes your people and their access.',
+    purposeBackup: 'Backup of this business',
+    purposeBackupDesc: 'Private copy to restore or move this business. Includes your people and their access.',
     purposeTemplate: 'Template to share',
     purposeTemplateDesc: 'To publish or hand to another business. Never includes people, PINs or tax certificates.',
     sectionUsers: 'Users',
     sectionUsersDesc: 'Employees, roles and permissions',
     sectionSettings: 'Settings',
-    sectionSettingsDesc: 'Hub settings: currency, language, business identity',
+    sectionSettingsDesc: 'Business settings: currency, language, tax details',
     // hub#405 — a template carries the configuration of the sector, never the identity of the
     // business that made it: its tax id would make another hub invoice under this company's name.
-    sectionSettingsDescTemplate: 'Hub settings: country, currency, language and theme. Never the tax id or the legal name.',
+    sectionSettingsDescTemplate: 'Business settings: country, currency, language and theme. Never the tax id or the legal name.',
     sectionFiscal: 'Fiscal',
     sectionFiscalDesc: 'VeriFactu configuration and the company certificate',
     fiscalWarning: 'Includes the certificate: the .p12 travels as-is and keeps its own password. Share the file only with people you trust.',
     sectionMedia: 'Images and media',
-    sectionMediaDesc: 'Files from the hub media folder',
-    modules: 'Modules',
-    modulesLead: 'Choose which installed modules the blueprint registers, and whether their data travels along.',
-    loadingModules: 'Loading installed modules…',
-    colModule: 'Module',
+    sectionMediaDesc: 'Files from the media folder',
+    modules: 'Apps',
+    modulesLead: 'Choose which installed apps the template registers, and whether their data travels along.',
+    loadingModules: 'Loading installed apps…',
+    colModule: 'App',
     colVersion: 'Version',
-    colInclude: 'Module',
+    colInclude: 'App',
     colData: 'Data',
-    includeOf: 'Include {module}',
-    dataOf: 'Data of {module}',
+    includeOf: 'Include {app}',
+    dataOf: 'Data of {app}',
     selectAll: 'Select all',
     deselectAll: 'Deselect all',
     export: 'Export',
@@ -1127,14 +1137,14 @@ export default {
   },
   importPage: {
     title: 'Import configuration',
-    lead: 'Restore a blueprint: it installs the missing modules, applies their data and copies the images.',
+    lead: 'Load a template: it installs the missing apps, applies their data and copies the images.',
     adminOnly: 'Only an administrator can import.',
     pickTitle: 'Choose what to load',
-    pickDesc: 'Pick a template published for your hub, or upload a .blueprint.zip you exported or backed up.',
+    pickDesc: 'Pick a template published for your business, or upload a .blueprint.zip you exported or backed up.',
     pickFile: 'Choose .blueprint.zip file',
-    fromCloud: 'From the cloud',
+    fromCloud: 'From erplora.com',
     fromLocal: 'Upload from file',
-    fromLocalDesc: 'A .blueprint.zip exported from another hub, or a backup.',
+    fromLocalDesc: 'A .blueprint.zip exported from another business, or a backup.',
     useTemplate: 'Use template',
     searchTemplates: 'Search templates',
     colTemplate: 'Template',
@@ -1144,7 +1154,7 @@ export default {
     colDownloads: 'Downloads',
     colSize: 'Size',
     loadingCatalog: 'Loading templates…',
-    catalogEmpty: 'No templates published for your hub yet.',
+    catalogEmpty: 'No templates published for your business yet.',
     catalogForbidden: 'Only an administrator can browse and import templates.',
     catalogUnavailable: 'Templates could not be loaded right now. You can still import a file.',
     inspecting: 'Reading the file…',
@@ -1152,7 +1162,7 @@ export default {
     manifestName: 'Name',
     manifestLanguage: 'Language',
     manifestCountry: 'Country',
-    manifestModules: 'Modules',
+    manifestModules: 'Apps',
     manifestCreated: 'Created',
     sections: 'Detected sections',
     sectionUsers: 'Users',
@@ -1163,15 +1173,15 @@ export default {
     // hub#354 — the job titles the template switches on (Waiter, Kitchen…). A vertical brings its
     // own role set; the people who fill it are never in the file.
     sectionRoles: 'Roles',
-    sectionModule: 'Module {id}',
-    modulesTitle: 'Modules',
+    sectionModule: 'App {id}',
+    modulesTitle: 'Apps',
     withData: 'includes data',
     import: 'Import',
-    importing: 'Importing… installing modules and applying data.',
+    importing: 'Importing… installing apps and applying data.',
     importErrorTitle: 'Import failed',
     back: 'Choose another file',
     reportTitle: 'Import report',
-    reportModules: 'Modules',
+    reportModules: 'Apps',
     statusApplied: 'Applied',
     statusSkipped: 'Skipped',
     statusIgnored: 'Discarded',
@@ -1182,7 +1192,7 @@ export default {
     // to (with the price the engine sent), never a mute red cross.
     statusBlocked: 'Subscription required',
     reasonBlocked:
-      'Not installed: it needs modules you have not subscribed to yet: {missing}. Subscribe to them and import again — nothing else was touched.',
+      'Not installed: it needs apps you have not subscribed to yet: {missing}. Subscribe to them and load it again — nothing else was touched.',
     mediaFailed: '{n} not copied',
     // hub#751/#752 — the template names a version the marketplace no longer publishes, so a newer
     // compatible one went in. It installed fine; it is said out loud because a template that
@@ -1191,7 +1201,7 @@ export default {
     // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
     // identity of ONE hub: only that hub restoring its own backup gets them back.
     reasonIdentityNotPortable:
-      'Users, roles and PINs belong to the hub that created them. Accounts discarded: {n}. Nobody was given access to your hub.',
+      'Users, roles and PINs belong to the business that created them. Accounts discarded: {n}. Nobody was given access to yours.',
     // hub#405 — the settings that came in and the ones that did not. The tax id is the one that
     // matters: with someone else's, this hub would invoice under their name.
     reasonSettingsNotPortable:
@@ -1200,11 +1210,11 @@ export default {
     // to a module that is not installed, or they are the administrative roles, which no file may
     // switch on. Nothing was created and nobody gained access.
     reasonRolesNotActivatable:
-      'Roles not switched on: {n}. A template can only switch on roles the modules installed here provide, and never the administrative ones.',
+      'Roles not switched on: {n}. A template can only switch on roles the apps installed here provide, and never the administrative ones.',
     // ADR-0273 D8 / hub#560 — the file brought a section over this hub's own system tables (its
     // fiscal profile, its certificate store). No bundle writes those: they are this installation.
     reasonSystemTableNotPortable:
-      "Rows discarded: {n}. The file tried to write this hub's own records — its tax profile and certificate. Those belong to this installation and no file can change them.",
+      "Rows discarded: {n}. The file tried to write this business's own records — its tax profile and certificate. Those belong to this installation and no file can change them.",
     // hub#753 — invoice series and the ledger of numbers already issued belong to ONE installation
     // (RD 1007/2023: no gaps, no duplicates). Yours are untouched; set them up here if you have not.
     reasonNumberingNotPortable:

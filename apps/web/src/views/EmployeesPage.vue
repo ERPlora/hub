@@ -184,6 +184,7 @@ import ApiKeysPanel from './ApiKeysPanel.vue';
 import RolesPanel from './RolesPanel.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
 import {
+  accessEmailWarningOf,
   accessOf,
   assignableRoles,
   canDeactivate,
@@ -314,6 +315,30 @@ function nameCell(row: Row): Node {
   return wrap;
 }
 
+/**
+ * El email, con su aviso si esa dirección no administra nada (hub#463).
+ *
+ * El aviso lleva el MOTIVO, porque las dos razones son decisiones distintas: si otra fila ya
+ * responde por la dirección hay que editar una de las dos, y si dos perfiles la reclaman hay que
+ * decidir cuál es la persona. La salida se dice en el `title`, que es donde cabe la frase entera
+ * sin romper la tabla.
+ */
+function emailCell(row: Row): Node {
+  const wrap = document.createElement('span');
+  wrap.style.cssText = 'display:inline-flex;align-items:center;gap:.45rem';
+  const text = document.createElement('span');
+  text.textContent = String(row.email ?? '') || '—';
+  wrap.append(text);
+
+  const reason = accessEmailWarningOf(row as unknown as HubUser);
+  if (reason) {
+    const badge = badgeCell(t('employees.accessEmailConflict.badge'), 'danger') as HTMLElement;
+    badge.title = t(`employees.accessEmailConflict.${reason}`);
+    wrap.append(badge);
+  }
+  return wrap;
+}
+
 function badgeCell(text: string, tone: 'success' | 'neutral' | 'primary' | 'danger'): Node {
   const ion = tone === 'neutral' ? 'medium' : tone;
   const span = document.createElement('span');
@@ -327,7 +352,12 @@ function badgeCell(text: string, tone: 'success' | 'neutral' | 'primary' | 'dang
 
 const userColumns = computed<DataTableColumn[]>(() => [
   { key: 'name', header: t('employees.colEmployee'), render: nameCell },
-  { key: 'email', header: t('employees.colEmail'), format: (row) => String(row.email ?? '') || '—' },
+  // hub#463 — el email se pinta, y si NO revoca nada se dice ahí mismo. La dirección sale de un
+  // `COALESCE(hub_user.email, perfil.email)`, así que una fila que el backfill v19 no pudo resolver
+  // enseña un email de aspecto sano mientras su baja no revoca la membresía en el SaaS y su primer
+  // login aterriza en otra fila. Va PEGADO a la celda del email —no en una columna aparte— porque
+  // es esa dirección concreta la que no vale.
+  { key: 'email', header: t('employees.colEmail'), render: emailCell },
   {
     key: 'role',
     header: t('employees.colRole'),
