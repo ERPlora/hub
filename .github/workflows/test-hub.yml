@@ -136,11 +136,27 @@ jobs:
           docker exec "$PG" psql -U postgres -tAc \
             "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);"
 
+      # `rustup` viene de serie en la imagen de GitHub, pero en `ci-runner-1` es un fichero más
+      # que algo puede borrar — y algo lo borró (ver el `cache-bin: false` de abajo).
       - name: Toolchain (rust-toolchain.toml)
-        run: rustup show
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup ausente en este runner — instalándolo (no toca ni el PATH ni los toolchains)"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show
 
+      # 🔴 `cache-bin: false`: el paso `Post` de esta acción limpia `$CARGO_HOME/bin` y se lleva
+      # por delante el binario `rustup` del runner propio, rompiendo el job SIGUIENTE con
+      # `rustup: command not found`. Explicación larga en `test-shell.yml`.
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false
 
       # `--exclude erplora-tauri`: el shell de escritorio (ADR-0159) arrastra tauri/wry → GTK/
       # webkit2gtk, system-libs que este runner no tiene y que inflarían el target (el disco ya

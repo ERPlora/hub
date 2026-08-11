@@ -65,11 +65,32 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev libgtk-3-dev pkg-config
 
+      # `rustup` viene de serie en la imagen de GitHub, pero en `ci-runner-1` es un fichero más
+      # que algo puede borrar — y algo lo borró (ver el `cache-bin: false` de abajo). Un runner
+      # que se repara solo es lo que separa «un job en rojo» de «media tarde de CI parada».
       - name: Toolchain (rust-toolchain.toml)
-        run: rustup show
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup ausente en este runner — instalándolo (no toca ni el PATH ni los toolchains)"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show
 
+      # 🔴 `cache-bin: false` NO es una optimización. Por defecto esta acción cachea
+      # `$CARGO_HOME/bin`, y su paso `Post` lo LIMPIA («... Cleaning cargo/bin ...») borrando el
+      # binario `rustup` y dejando los 13 shims (`cargo`, `rustc`, …) apuntando a la nada.
+      # En un runner de GitHub da igual: la máquina se tira al acabar el job. En `ci-runner-1`
+      # persiste, así que el job SIGUIENTE —cualquiera, de cualquier repo— muere con
+      # `rustup: command not found` en 12 s, un rojo que no se parece en nada a su causa.
+      # Vivido el 2026-08-11 a las 20:48 UTC: dejó sin CI de Rust a toda la máquina.
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false
 
       - name: cargo test -p erplora-tauri
         run: cargo test -p erplora-tauri -p tauri-plugin-erplora-android

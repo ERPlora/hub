@@ -93,8 +93,13 @@ jobs:
       - uses: actions/checkout@v4
 
       # Dependencias de sistema de Tauri en Linux (webkit2gtk, appindicator, rsvg, patchelf…).
+      #
+      # ⚠️ La condición mira la ETIQUETA, no `matrix.os`. Desde que Linux sale al runner propio
+      # (#848) `matrix.os` vale `self-hosted`, así que `== 'ubuntu-latest'` era falso y este paso
+      # se saltaba entero: el bundle de Linux se quedaba sin `librsvg2-dev`, `libappindicator3-dev`
+      # ni `patchelf`, y fallaba al empaquetar. `matrix.label` no depende de dónde corra.
       - name: Install Linux build deps
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.label == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -124,13 +129,30 @@ jobs:
       #
       # Guarded by scripts/pack-msix.test.sh: bring a `beforeBuildCommand` back and that test
       # fails until the setup steps come back with it.
+      # `dtolnay/rust-toolchain` NO instala rustup: lo USA. En los runners de GitHub siempre está;
+      # en `ci-runner-1` es un fichero que el `Post` de `rust-cache` llegó a borrar (ver abajo).
+      - name: Bootstrap rustup (runner propio)
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup ausente en este runner — instalándolo"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      # 🔴 `cache-bin: false`: el paso `Post` de esta acción limpia `$CARGO_HOME/bin` y borra el
+      # `rustup` del runner propio, rompiendo el job SIGUIENTE. Explicación en `test-shell.yml`.
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
+          cache-bin: false
 
       # En tag push, fija la versión del bundle a partir del tag (`v1.2.3` → `1.2.3`) para que la
       # app reporte su versión. En main se queda con la de `tauri.conf.json` (build "latest").
@@ -286,15 +308,31 @@ jobs:
           sdkmanager --install "ndk;27.1.12297006" "platforms;android-36" "build-tools;36.0.0"
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.1.12297006" >> "$GITHUB_ENV"
 
+      # Mismo motivo que en el job de escritorio: la acción de abajo USA rustup, no lo instala.
+      - name: Bootstrap rustup (runner propio)
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup ausente en este runner — instalándolo"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
 
+      # 🔴 `cache-bin: false`: ver `test-shell.yml`. Aquí además el job hace
+      # `cargo install tauri-cli`, que escribe justo en `$CARGO_HOME/bin`.
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
+          cache-bin: false
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
