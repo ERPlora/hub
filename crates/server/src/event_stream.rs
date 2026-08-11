@@ -8,6 +8,20 @@
 //!
 //! > **Nobody reads `/ws` or `/api/events` without an API key of this hub that may read.**
 //!
+//! # …and a key only hears what it was given (hub#529)
+//!
+//! hub#504 put the door there and left the fan-out all-or-nothing: once inside, every frame of
+//! every module went to everybody. So the accountant's `custom` key with read on `invoice`
+//! (ADR-0057 §7) also heard `sale.completed`, the cash register and the kitchen orders, payloads
+//! and all — the permission decided who entered and not what they took, which makes the module ×
+//! {read, write} matrix decoration on this channel.
+//!
+//! [`may_receive`] is the filter, and it is **one function for both transports**. What it filters
+//! on is the [`crate::state::FRAME_MODULE`] field the sink writes from
+//! [`erplora_runtime::EventSource`] — the emitting module as the *dispatcher* knows it, not the
+//! prefix of the event's name, which is a convention nothing verifies: a module may declare
+//! `emit: ["invoice.paid"]` and hand itself another module's audience.
+//!
 //! # Our own app is not an exception
 //!
 //! The shell — the webview that prints tickets and refreshes the dashboard — needs this channel.
@@ -54,11 +68,11 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_runtime::api_keys::ApiKeyPrincipal;
+use erplora_runtime::api_keys::{ApiKeyAccess, ApiKeyPrincipal, ApiKeyScope};
 use serde_json::{json, Value};
 
 use crate::auth;
-use crate::state::AppState;
+use crate::state::{AppState, WsEvent, FRAME_MODULE};
 
 /// Marks a stream ticket apart from an API key token (`erpl_live_…`), so one door can take both
 /// and neither is ever mistaken for the other.
@@ -243,6 +257,41 @@ impl Drop for StreamSlot {
     }
 }
 
+/// **The one filter: what a listener may be sent** (hub#529).
+///
+/// hub#504 decided *who enters*; this decides *what they take*. Without it the per-module matrix
+/// of ADR-0057 was decoration on this channel: a `custom` key with read on `invoice` — the
+/// accountant's key of §7 — also heard every `sale.completed`, the cash register and the kitchen
+/// orders, payloads included.
+///
+/// | Key | Gets |
+/// |-----|------|
+/// | `full` / `read_only` (blanket) | everything, including the hub's own frames. This is the shell: the app reads with the hub's own `read_only` key, and the owner watching their own till is not who this filter is for |
+/// | `custom` | exactly the modules ticked with `read` — and **nothing** that belongs to no module |
+/// | `write_only` | nothing (it never gets past [`authenticate`] either; two guards that agree) |
+///
+/// **A frame with no [`FRAME_MODULE`] is the hub's own**: `module.installed`,
+/// `module.install.progress`, `print.queued`, a flow approval, an inbound WhatsApp message. Those
+/// are facts about the business as a whole, not rows of a module, and a key that was handed a list
+/// of modules was never handed the hub. Refusing them is the fail-closed reading, and it is also
+/// the one that survives a new core event being added by someone who never reads this file.
+///
+/// It is deliberately **one function** for both transports. The issue asked for that in so many
+/// words: a rule written twice is a rule one copy of which can be deleted with the suite green.
+pub fn may_receive(scope: &ApiKeyScope, frame: &WsEvent) -> bool {
+    match scope.access {
+        ApiKeyAccess::Full | ApiKeyAccess::ReadOnly => true,
+        ApiKeyAccess::WriteOnly => false,
+        ApiKeyAccess::Custom => match frame.get(FRAME_MODULE).and_then(Value::as_str) {
+            Some(module) => scope
+                .modules
+                .iter()
+                .any(|entry| entry.read && entry.module == module),
+            None => false,
+        },
+    }
+}
+
 /// What presenting a credential to this channel gets you.
 #[derive(Debug)]
 pub enum StreamAuth {
@@ -414,12 +463,18 @@ pub async fn sse(
         }
     };
     let rx = st.events.subscribe();
-    let stream = futures_util::stream::unfold((rx, slot), |(mut rx, slot)| async move {
+    // hub#529: the same filter the socket applies, from the same function. The scope travels with
+    // the stream so a later frame is judged by the key that opened it, not by a re-read.
+    let scope = principal.scope.clone();
+    let stream = futures_util::stream::unfold((rx, slot, scope), |(mut rx, slot, scope)| async move {
         loop {
             match rx.recv().await {
                 Ok(ev) => {
+                    if !may_receive(&scope, &ev) {
+                        continue;
+                    }
                     let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
-                    return Some((Ok::<Event, std::convert::Infallible>(Event::default().data(data)), (rx, slot)));
+                    return Some((Ok::<Event, std::convert::Infallible>(Event::default().data(data)), (rx, slot, scope)));
                 }
                 // Suscriptor lento: saltamos lo perdido y seguimos (igual que el WS).
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
@@ -448,11 +503,22 @@ pub async fn upgrade(State(st): State<AppState>, headers: HeaderMap, ws: WebSock
 #[derive(Debug, Default)]
 pub struct StreamConnection {
     key_id: String,
+    /// What the key that opened this socket may read (hub#529). The default —
+    /// [`ApiKeyAccess::Custom`] with no modules — grants **nothing**, so a socket that somehow
+    /// reached the fan-out without going through [`handle_frame`] is sent nothing rather than
+    /// everything.
+    scope: ApiKeyScope,
 }
 
 impl StreamConnection {
     pub fn is_ready(&self) -> bool {
         !self.key_id.is_empty()
+    }
+
+    /// Whether this socket is entitled to `frame`. Delegates to [`may_receive`] — the socket loop
+    /// must not grow a second copy of the rule.
+    pub fn may_receive(&self, frame: &WsEvent) -> bool {
+        may_receive(&self.scope, frame)
     }
 }
 
@@ -504,6 +570,10 @@ pub async fn handle_frame(st: &AppState, conn: &mut StreamConnection, raw: &str)
     match authenticate(st, Some(token)).await {
         StreamAuth::Granted(principal) => {
             conn.key_id = principal.key_id.clone();
+            // hub#529: what this socket may be sent is decided here, once, from the credential it
+            // presented — not re-read per frame, where a revoked key would change the answer
+            // mid-stream in a way nothing tests.
+            conn.scope = principal.scope.clone();
             Reply {
                 frame: json!({ "type": "stream.ready" }),
                 keep_open: true,
@@ -544,6 +614,10 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
                 Some(s) => {
                     slot = Some(s);
                     conn.key_id = principal.key_id.clone();
+                    // hub#529: the handshake path sets the scope too. Setting only the id here is
+                    // exactly how a socket would end up entitled to nothing (or, before the
+                    // fail-closed default, to everything).
+                    conn.scope = principal.scope.clone();
                 }
                 None => {
                     let frame = json!({
@@ -596,6 +670,10 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
             event = rx.recv(), if conn.is_ready() => {
                 match event {
                     Ok(ev) => {
+                        // hub#529: entitled to listen is not entitled to THIS. Same filter as SSE.
+                        if !conn.may_receive(&ev) {
+                            continue;
+                        }
                         let text = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
                         if socket.send(Message::Text(text)).await.is_err() {
                             break;
@@ -1092,5 +1170,167 @@ mod tests {
             assert_eq!(lim.held_by("key-A"), 1);
         } // slot drops here
         assert_eq!(lim.held_by("key-A"), 0, "the slot was released when the scope ended");
+    }
+
+    // ── hub#529: what a listener may be sent ────────────────────────────────
+
+    use erplora_runtime::api_keys::ScopeEntry;
+    use erplora_runtime::EventSource;
+
+    /// A frame built by the **production** builder, so these tests cannot drift from the wire.
+    fn frame_of(source: EventSource<'_>, name: &str) -> Value {
+        crate::state::event_frame(source, name, &json!({ "total_cents": 4_250 }))
+    }
+
+    fn accountant() -> ApiKeyScope {
+        ApiKeyScope::custom(vec![ScopeEntry {
+            module: "invoice".into(),
+            read: true,
+            write: false,
+        }])
+    }
+
+    /// **The hole, at the filter.** A key scoped to `invoice` used to be sent everything.
+    #[test]
+    fn a_scoped_key_gets_its_module_and_not_the_neighbour() {
+        let scope = accountant();
+        assert!(may_receive(
+            &scope,
+            &frame_of(EventSource::Module("invoice"), "invoice.issued")
+        ));
+        assert!(!may_receive(
+            &scope,
+            &frame_of(EventSource::Module("sales"), "sale.completed")
+        ));
+    }
+
+    /// **The name is not the module.** `sales` emitting `invoice.paid` is a module choosing its own
+    /// event name, which nothing verifies — the filter reads who emitted, not what it is called.
+    /// An implementation that split on `.` passes every other test here.
+    #[test]
+    fn the_filter_reads_the_emitter_not_the_event_name() {
+        let scope = accountant();
+        assert!(
+            !may_receive(
+                &scope,
+                &frame_of(EventSource::Module("sales"), "invoice.paid")
+            ),
+            "an event NAMED after `invoice` but emitted by `sales` is `sales`'"
+        );
+        assert!(
+            may_receive(
+                &scope,
+                &frame_of(EventSource::Module("invoice"), "something.else")
+            ),
+            "…and one emitted by `invoice` is `invoice`'s, whatever it is called"
+        );
+    }
+
+    /// `write` on a module is not `read` on it. The matrix has two columns and this channel is the
+    /// read one — a key ticked only for writing on `invoice` hears nothing of it.
+    #[test]
+    fn write_on_a_module_is_not_permission_to_listen_to_it() {
+        let feed = ApiKeyScope::custom(vec![
+            ScopeEntry { module: "invoice".into(), read: false, write: true },
+            ScopeEntry { module: "sales".into(), read: true, write: false },
+        ]);
+        assert!(!may_receive(
+            &feed,
+            &frame_of(EventSource::Module("invoice"), "invoice.issued")
+        ));
+        assert!(may_receive(
+            &feed,
+            &frame_of(EventSource::Module("sales"), "sale.completed")
+        ));
+    }
+
+    /// **The shell.** The app reads with the hub's own blanket `read_only` key: it hears every
+    /// module and the hub's own frames too. The owner watching their own till is not who this
+    /// filter is for, and a filter that caught them would show up as a dead dashboard.
+    #[test]
+    fn a_blanket_read_key_hears_the_whole_hub() {
+        for access in [ApiKeyAccess::ReadOnly, ApiKeyAccess::Full] {
+            let scope = ApiKeyScope::blanket(access);
+            assert!(may_receive(
+                &scope,
+                &frame_of(EventSource::Module("sales"), "sale.completed")
+            ));
+            assert!(may_receive(
+                &scope,
+                &frame_of(EventSource::Core, "flow.approval.created")
+            ));
+            assert!(
+                may_receive(&scope, &json!({ "type": "module.installed", "module_id": "sales" })),
+                "including the raw system frames the installer publishes"
+            );
+        }
+    }
+
+    /// **A frame of no module belongs to the hub**, and a key handed a list of modules was not
+    /// handed the hub. Fail-closed on purpose: the next core event will be added by somebody who
+    /// never reads this file, and it must not leak by default.
+    #[test]
+    fn a_scoped_key_gets_nothing_that_belongs_to_no_module() {
+        let scope = accountant();
+        assert!(!may_receive(
+            &scope,
+            &frame_of(EventSource::Core, "hub.whatsapp.message_received")
+        ));
+        assert!(!may_receive(
+            &scope,
+            &json!({ "type": "print.queued", "role": "kitchen" })
+        ));
+        assert!(
+            !may_receive(
+                &scope,
+                &json!({ "type": "module.installed", "module_id": "invoice" })
+            ),
+            "not even one that NAMES its module in the payload: the field the filter reads is the \
+             one the sink writes, and a raw system frame has none"
+        );
+    }
+
+    /// A scope nobody could parse grants nothing — same reading `scope_of_row` gives it — and so
+    /// does the default a socket starts with. The fan-out's fail-closed floor.
+    #[test]
+    fn an_empty_scope_is_sent_nothing() {
+        let nothing = ApiKeyScope::default();
+        assert!(!may_receive(
+            &nothing,
+            &frame_of(EventSource::Module("invoice"), "invoice.issued")
+        ));
+        assert!(!may_receive(&nothing, &frame_of(EventSource::Core, "anything")));
+        assert!(!StreamConnection::default()
+            .may_receive(&frame_of(EventSource::Module("invoice"), "invoice.issued")));
+    }
+
+    /// A write-only feed never gets past [`authenticate`]; the filter says the same thing anyway.
+    /// Two guards that agree are one that cannot be quietly bypassed by whichever path forgets the
+    /// other.
+    #[test]
+    fn a_write_only_key_is_sent_nothing_even_if_it_got_in() {
+        let feed = ApiKeyScope::blanket(ApiKeyAccess::WriteOnly);
+        assert!(!may_receive(
+            &feed,
+            &frame_of(EventSource::Module("sales"), "sale.completed")
+        ));
+        assert!(!may_receive(&feed, &frame_of(EventSource::Core, "anything")));
+    }
+
+    /// The frame really does carry the emitter, in the field the filter reads. If the builder
+    /// stopped writing it, every `custom` key would go silent instead of over-hearing — a
+    /// regression that is invisible until an integration complains.
+    #[test]
+    fn the_frame_carries_the_emitting_module_beside_the_payload() {
+        let frame = frame_of(EventSource::Module("sales"), "sale.completed");
+        assert_eq!(frame["name"], "sale.completed");
+        assert_eq!(frame[crate::state::FRAME_MODULE], "sales");
+        assert_eq!(frame["payload"]["total_cents"], 4_250);
+
+        let core = frame_of(EventSource::Core, "flow.approval.created");
+        assert!(
+            core.get(crate::state::FRAME_MODULE).is_none(),
+            "the hub's own events name no module: {core}"
+        );
     }
 }

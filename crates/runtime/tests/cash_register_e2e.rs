@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use erplora_db::{Params, testutil::fresh_db};
-use erplora_runtime::{EventSink, RequestContext, Runtime};
+use erplora_runtime::{EventSink, EventSource, RequestContext, Runtime};
 use serde_json::json;
 
 /// Sink mínimo que captura los NOMBRES de los eventos emitidos (para asertar el `emit` de un command).
@@ -15,7 +15,7 @@ struct Sink {
     names: Mutex<Vec<String>>,
 }
 impl EventSink for Sink {
-    fn emit(&self, name: &str, _payload: &serde_json::Value) {
+    fn emit(&self, _source: EventSource<'_>, name: &str, _payload: &serde_json::Value) {
         self.names.lock().unwrap().push(name.to_string());
     }
 }
