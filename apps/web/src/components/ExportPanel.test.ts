@@ -91,6 +91,37 @@ describe('ExportPanel · propósito del bundle (ADR-0195)', () => {
   });
 });
 
+describe('ExportPanel · error accionable ante fallo (hub#765)', () => {
+  // El export ahora tiene deadline: si el runtime no responde, el fetch aborta y exportHub rechaza
+  // con `export → timeout`. El panel debe traducir ese mensaje interno a una frase que el usuario
+  // pueda accionar (reintentar), no dejar el identificador técnico en pantalla.
+  it('un timeout del runtime se muestra con la cadena traducida, no con el mensaje crudo', async () => {
+    exportHub.mockRejectedValue(new Error('export → timeout'));
+    const w = mountPanel();
+    await flushPromises();
+
+    await (w.vm as unknown as { doExport: () => Promise<void> }).doExport();
+    await flushPromises();
+
+    const err = w.find('[data-testid="export-error"]');
+    expect(err.exists()).toBe(true);
+    // La cadena traducida (no el identificador `export → timeout`) es lo que llega al usuario.
+    expect(err.text()).not.toContain('export → timeout');
+    expect(err.text().length).toBeGreaterThan('export → timeout'.length);
+  });
+
+  it('un error del servidor conserva su mensaje HONESTO (no se aplana a genérico)', async () => {
+    exportHub.mockRejectedValue(new Error('disk full'));
+    const w = mountPanel();
+    await flushPromises();
+
+    await (w.vm as unknown as { doExport: () => Promise<void> }).doExport();
+    await flushPromises();
+
+    expect(w.find('[data-testid="export-error"]').text()).toContain('disk full');
+  });
+});
+
 
 describe('ExportPanel · casillas por TABLA (hub#534)', () => {
   const conInventory = () => {

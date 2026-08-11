@@ -943,18 +943,41 @@ export async function fetchExportTables(): Promise<ExportModuleTables[]> {
   }
 }
 
+/**
+ * Deadline del export (hub#765). El POST empaqueta datos de cada módulo + media, así que puede
+ * tardar más que un `fetch` normal; pero NO puede ser infinito. Sin deadline, un runtime o proxy
+ * colgado deja el spinner girando hasta que el usuario se rinde — y se va pensando que la copia
+ * existe. Dos minutos cubre los zips grandes (módulos + imágenes) y sigue siendo finito: una copia
+ * que no sabe decir que falló es peor que una que suelta el error.
+ */
+const EXPORT_DEADLINE_MS = 120_000;
+
 export async function exportHub(
   name: string,
   locale: string,
   selection: ExportSelection,
 ): Promise<{ blob: Blob; filename: string }> {
   beginRequest(); // volcar datos + empaquetar puede tardar → barra de progreso del shell
+  // El AbortController es lo que convierte un cuelgue en un error accionable: cuando salta el
+  // deadline, el fetch rechaza con un nombre legible en vez de quedarse abierto para siempre.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), EXPORT_DEADLINE_MS);
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/hub/export`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
-      body: JSON.stringify({ name, locale, selection }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${RUNTIME_URL}/api/hub/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+        body: JSON.stringify({ name, locale, selection }),
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      // `AbortController#abort()` rechaza como `DOMException` nombre `TimeoutError` (o `AbortError`
+      // en algunos navegadores). Ese es el caso del deadline: el runtime no respondió a tiempo.
+      if (ctrl.signal.aborted) throw new Error('export → timeout');
+      // Otro error de red (runtime caído, sin conexión): que el mensaje original llegue al usuario.
+      throw e instanceof Error ? e : new Error(String(e));
+    }
     if (!res.ok) throw new Error(await readErrorMessage(res, `export → ${res.status}`));
     const blob = await res.blob();
     const filename =
@@ -962,6 +985,7 @@ export async function exportHub(
       `${name}_${locale}.blueprint.zip`;
     return { blob, filename };
   } finally {
+    clearTimeout(timer);
     endRequest();
   }
 }

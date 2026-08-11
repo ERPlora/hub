@@ -461,7 +461,9 @@ export default {
     resetUndo: 'Deshacer',
     resetUndoTitle: 'Deshacer «{name}»',
     resetUndoBody: 'Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
-    resetRows: '{n} filas',
+    // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
+    // «1 filas» (hub#765). El `n` que pasa la llamada elige la forma.
+    resetRows: '{n} fila | {n} filas',
     resetSubmit: 'Restablecer el hub',
     resetDeleted: '{n} filas borradas',
     resetConfirmTitle: 'Esto no se puede deshacer',
@@ -1043,6 +1045,9 @@ export default {
     exporting: 'Exportando…',
     done: '{filename} descargado.',
     errorTitle: 'La exportación falló',
+    // hub#765: el runtime no respondió antes del plazo. Sin timeout el spinner giraba para siempre;
+    // ahora aborta y lo dice, para que el usuario pueda reintentar en vez de irse sin saber.
+    timeout: 'El servidor está tardando demasiado en generar la copia. Inténtalo de nuevo en un momento.',
   },
   importPage: {
     title: 'Importar configuración',
