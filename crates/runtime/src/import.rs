@@ -76,6 +76,12 @@ pub struct SectionResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ImportReport {
     pub sections: Vec<SectionResult>,
+    /// The batch this import ran under, so its report can be recovered after navigation/reload
+    /// (hub#763). Skipped on the wire: the shell's contract is `sections` (+ the server's
+    /// `installed_modules`/`media`/`fiscal`), and a server that does not know the field must still
+    /// round-trip. The client reads it through the persisted report, not this field.
+    #[serde(default, skip_serializing, skip_deserializing)]
+    pub batch_id: Option<String>,
 }
 
 /// Aplica en el hub las secciones seleccionadas del bundle, bajo el tenant `target_hub_id`
@@ -177,6 +183,20 @@ pub async fn import_sections(
             discarded_rows,
         });
     }
+    // ── Persist the actionable report under its batch (hub#763) ──────────────
+    // The engine's report used to live ONLY in the return value — so once the caller navigated
+    // away (the Dashboard hero → Settings › Data path), the report was gone and the Data tab could
+    // only show the catalogue again. Storing it under the same `batch_id` the batch opened lets
+    // the Data tab recover it on mount, after a reload or a new session. A failure here MUST NOT
+    // abort the import (the engine already ran): losing it costs this traceability, not the data.
+    // The server UPSERTs the EXTENDED report (sections + installed_modules/media/fiscal) over the
+    // same `batch_id` once its orchestration finishes, so what a reload reads is the full picture.
+    if let Some(ref batch) = batch_id {
+        if let Ok(json) = serde_json::to_string(&report) {
+            let _ = crate::reset::store_import_report(rt, target_hub_id, batch, &manifest.name, &json).await;
+        }
+    }
+    report.batch_id = batch_id;
     Ok(report)
 }
 

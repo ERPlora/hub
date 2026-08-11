@@ -1133,6 +1133,12 @@ export default {
     back: 'Elegir otro fichero',
     reportTitle: 'Informe de la importación',
     reportModules: 'Apps',
+    // hub#763 — este informe se ha RECUPERADO, no es el de una importación que acabas de correr.
+    // El Dashboard manda a Datos tras un import parcial; este aviso dice de QUÉ import es el
+    // informe (su nombre y cuándo fue) para que no aparezca de la nada.
+    reportRecovered: 'Este es el informe de tu última importación de {name} ({when}). No todo entró.',
+    // La vuelta al catálogo tras leer el informe recuperado, para que el admin pueda reintentar.
+    reportDismiss: 'Ver las plantillas',
     statusApplied: 'Aplicado',
     statusSkipped: 'Saltado',
     statusIgnored: 'Descartado',

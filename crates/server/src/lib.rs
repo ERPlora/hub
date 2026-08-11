@@ -1312,6 +1312,9 @@ pub fn app(state: AppState) -> Router {
         // tocar lo que el usuario creó después.
         .route("/api/hub/import/batches", get(reset::import_batches))
         .route("/api/hub/import/undo", post(reset::undo_import_batch))
+        // Último informe de importación persistido (hub#763): lo que el Dashboard anuncia y la
+        // pestaña Datos recupera al montarse, para que la navegación no pierda el informe accionable.
+        .route("/api/hub/import/report", get(reset::import_report))
         // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
         .route(
             "/api/media",

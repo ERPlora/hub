@@ -1349,6 +1349,30 @@ export async function fetchImportBatches(): Promise<ImportBatch[]> {
 }
 
 /**
+ * El último informe de importación persistido del hub (hub#763): lo que el Dashboard anuncia y la
+ * pestaña Datos recupera al montarse, para que navegar fuera del hero (o recargar) no pierda el
+ * informe accionable. `null` = sin import reciente, o el último lote ya se deshizo.
+ */
+export interface StoredImportReport {
+  /** `batch_id` del lote — para deshacerlo o reintentarlo. */
+  batch_id: string;
+  /** Nombre del blueprint, como lo reconoce el usuario. */
+  name: string;
+  /** Cuándo se corrió el import (RFC3339). */
+  created_at: string;
+  /** El informe extendido: `sections` + `installed_modules` + `media` + `fiscal`. */
+  report: ImportReport;
+}
+
+/** Recupera el último informe de importación del hub (`GET /api/hub/import/report`, hub#763). */
+export async function fetchImportReport(): Promise<StoredImportReport | null> {
+  const res = await fetch(`${RUNTIME_URL}/api/hub/import/report`, { headers: runtimeHeaders() });
+  if (!res.ok) throw new Error(await readErrorMessage(res, `import/report → ${res.status}`));
+  const body = (await res.json()) as { ok: boolean; report?: StoredImportReport | null };
+  return body.report ?? null;
+}
+
+/**
  * Deshace una importación (`POST /api/hub/import/undo`): borra solo lo que trajo ese blueprint,
  * conservando lo que el usuario creó después. Un lote ya deshecho es un no-op.
  */

@@ -217,6 +217,16 @@
 
     <!-- ── Paso 3b: INFORME final por sección (best-effort: Applied/Skipped/Failed) ── -->
     <template v-else-if="step === 'report' && report">
+      <!-- hub#763 — cuando este informe se recuperó al montar (un import previo parcial), se dice:
+           no es el de «acabo de correr», es el último que quedó a medias, con su nombre y su fecha.
+           Sin este encabezado, el admin llega a Datos desde el Dashboard y ve un informe sin saber
+           de qué import es ni por qué está ahí. -->
+      <div v-if="recoveredReport" class="recovered-banner" data-testid="import-report-recovered">
+        <HubIcon name="time-outline" />
+        <span>
+          {{ t('importPage.reportRecovered', { name: recoveredReport.name, when: recoveredLabel }) }}
+        </span>
+      </div>
       <h2 class="section-title">{{ t('importPage.reportTitle') }}</h2>
       <ion-card data-testid="import-report">
         <ion-card-content class="p-0">
@@ -251,6 +261,18 @@
       <ion-button data-testid="import-done" class="mt-3" expand="block" @click="finish">
         <HubIcon slot="start" name="home-outline" />
         {{ t('importPage.done') }}
+      </ion-button>
+      <!-- hub#763 — tras leer el informe recuperado, el admin necesita volver al catálogo para
+           reintentar (o cargar otra cosa). «Hecho» se va al Dashboard; este botón se queda en Datos. -->
+      <ion-button
+        v-if="recoveredReport"
+        expand="block"
+        fill="clear"
+        color="medium"
+        data-testid="import-report-dismiss"
+        @click="dismissRecovered"
+      >
+        {{ t('importPage.reportDismiss') }}
       </ion-button>
     </template>
   </section>
@@ -290,11 +312,13 @@ import {
   moduleInstallStatusInfo,
   fetchBlueprintCatalog,
   downloadBlueprint,
+  fetchImportReport,
   type BlueprintManifest,
   type CatalogBlueprint,
   type ImportReport,
   type ModuleInstallPurchase,
   type SectionDiscardCode,
+  type StoredImportReport,
 } from '../lib/runtime';
 import { formatAmount } from '../lib/money';
 
@@ -558,11 +582,69 @@ async function loadCatalog(): Promise<void> {
 onMounted(() => {
   if (isAdmin.value) {
     void loadCatalog();
+    // hub#763 — recupera el último informe de importación persistido. El Dashboard anuncia
+    // «ver el detalle en Ajustes › Datos» tras un import parcial, y esta pantalla lo perdía al
+    // montarse (empezaba siempre en el catálogo). Si hubo un import incompleto, lo mostramos en
+    // vez del catálogo: es el siguiente paso seguro que se le prometió al administrador.
+    void loadRecoveredReport();
   } else {
     // No se pide el catálogo (importar es admin-only), así que no sabemos si hay plantillas.
     catalogState.value = 'forbidden';
   }
 });
+
+// ── hub#763 — recuperación del último informe al montar ───────────────────────
+// El informe del import vive persistido en el runtime (una fila por `batch_id`); al montar la
+// pestaña Datos lo pedimos. Si el último import NO quedó limpio (algo falló, se descartó o entró a
+// medias, o un módulo no se instaló), lo pintamos en el paso `report` en vez del catálogo — es lo
+// que el Dashboard anunció y a lo que el admin vino. Un import totalmente aplicado no se muestra:
+// ya está hecho, y el catálogo es lo siguiente que el admin quiere ver.
+const recoveredReport = ref<StoredImportReport | null>(null);
+
+/**
+ * ¿Merece mostrarse al llegar a Datos? Solo si NO quedó todo aplicado/omitido-limpio: un import
+ * totalmente verde no le dice nada nuevo al admin, y enterrar el catálogo bajo un informe antiguo
+ * al 100% es peor que mostrar las plantillas.
+ */
+function reportWarrantsAttention(r: ImportReport): boolean {
+  const sectionNeedsAttention = (r.sections ?? []).some((s) => {
+    const info = sectionStatusInfo(s.status);
+    return info.kind === 'failed' || info.kind === 'ignored' || info.kind === 'partial';
+  });
+  const moduleNeedsAttention = (r.installed_modules ?? []).some((m) => {
+    const info = moduleInstallStatusInfo(m);
+    return info.kind === 'failed' || info.kind === 'blocked';
+  });
+  return sectionNeedsAttention || moduleNeedsAttention;
+}
+
+async function loadRecoveredReport(): Promise<void> {
+  try {
+    const stored = await fetchImportReport();
+    if (!stored) return;
+    if (!reportWarrantsAttention(stored.report)) return;
+    recoveredReport.value = stored;
+    report.value = stored.report;
+    step.value = 'report';
+  } catch {
+    // Best-effort como el catálogo: un hub local o una red caída no deben gritar un banner al
+    // llegar a Datos. El catálogo sigue siendo el fallback.
+  }
+}
+
+/** Fecha legible del informe recuperado (la que pintó el browser, no la cruda RFC3339). */
+const recoveredLabel = computed<string>(() => {
+  const raw = recoveredReport.value?.created_at;
+  if (!raw) return '';
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? raw : d.toLocaleString();
+});
+
+/** Descarta el informe recuperado y vuelve al catálogo: el admin ya lo leyó y quiere reintentar. */
+function dismissRecovered(): void {
+  recoveredReport.value = null;
+  resetToPick();
+}
 
 onBeforeUnmount(() => {
   blueprintTable.value?.removeEventListener('rowAction', handleBlueprintAction);
@@ -893,6 +975,21 @@ ok-data-table {
 }
 .fail-reason {
   color: var(--ion-color-danger);
+}
+/* hub#763 — aviso de que este informe es uno RECUPERADO de un import previo, no el que acaba de
+   correr. El tono es informativo (medium), no de alarma: nada está roto, es un informe que se
+   conservó para que el admin pudiera volver a leerlo. */
+.recovered-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--ok-radius-sm, 10px);
+  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
+  background: var(--ion-color-light, #f4f5f8);
+  color: var(--ion-color-medium);
+  font-size: 0.8125rem;
 }
 
 @media (max-width: 36rem) {

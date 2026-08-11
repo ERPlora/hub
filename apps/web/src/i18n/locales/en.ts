@@ -1184,6 +1184,12 @@ export default {
     back: 'Choose another file',
     reportTitle: 'Import report',
     reportModules: 'Apps',
+    // hub#763 — this report was RECOVERED, not just run. The Dashboard points an admin at Datos
+    // after a partial import; this banner tells them WHICH import they are looking at (its name and
+    // when it ran) so the report is not a mystery that appears out of nowhere.
+    reportRecovered: 'This is the report of your last import of {name} ({when}). It did not all go in.',
+    // The way back to the catalogue after reading a recovered report, so the admin can retry.
+    reportDismiss: 'See the templates',
     statusApplied: 'Applied',
     statusSkipped: 'Skipped',
     statusIgnored: 'Discarded',
