@@ -22,6 +22,12 @@ use crate::scheduler::cron;
 
 pub const ERR_FLOW_NOT_FOUND: &str = "flow.not_found";
 
+/// The reason stamped on a run that was still in flight when its flow was deleted (hub#771). The
+/// executor's [`crate::flows::executor::ERR_FLOW_GONE`] is the same idea discovered later — by a
+/// tick that wakes a sleeping run and finds the definition missing — and this is the door that
+/// shuts before the delay ever comes due.
+pub const ERR_FLOW_DELETED: &str = "flow.flow_deleted";
+
 /// A flow as the API shows it. `definition` travels as the parsed document, not as a string: the
 /// caller sent JSON and gets JSON back.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -194,9 +200,12 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Flow>> {
     Ok(res.rows.iter().map(flow_row).collect())
 }
 
-/// Soft-deletes a flow, disarms its triggers and **revokes its grants**. The three go together:
-/// leaving a live grant behind would be an authorisation whose owner no longer exists, and a live
-/// trigger would keep creating runs for a flow the owner believes is gone.
+/// Soft-deletes a flow, disarms its triggers, **cancels its not-yet-finished runs** and
+/// **revokes its grants**. These go together: leaving a live grant behind would be an
+/// authorisation whose owner no longer exists; a live trigger would keep creating runs for a flow
+/// the owner believes is gone; and a run left `sleeping` on a `delay` (or `pending` in the queue)
+/// would keep lying in the history — «waiting» about a flow that no longer exists — until the
+/// delay came due and the tick woke it to find the definition missing (hub#771).
 pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, id: &str, by: &str) -> Result<()> {
     get(db, hub_id, id).await?;
     let now = now_rfc3339();
@@ -215,6 +224,48 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, id: &str, by: &str) 
         "UPDATE _flow_triggers SET deleted_at = :now, enabled = 0, updated_at = :now \
          WHERE flow_id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
         &p,
+    )
+    .await?;
+    // Cancel the runs that have NOT finished yet, in the same gesture as the delete. A run parked
+    // on a `delay` (`sleeping`, `wake_at` in the future) is the bug this closes (hub#771): before,
+    // it survived the delete and only changed to `cancelled` when the delay came due and the tick
+    // woke it to find a definition that was no longer there — days late, with a history that lied
+    // in the meantime. `pending` is the same honesty for a run that never got its first tick.
+    //
+    // Only `sleeping` and `pending` are touched: `done`/`failed`/`cancelled` are HISTORY (the run
+    // happened, and the row is the record of it), and a run that is genuinely `running` — claimed
+    // by a tick, or holding a lease while its I/O is in flight — is left to the seam that already
+    // knows what to do with a flow that disappears mid-flight: the executor's `definition_gone`
+    // door and `complete_io`'s «a run whose flow is gone must not resume just because a server
+    // answered». Cancelling an in-flight run here would race that seam for no gain — the lease and
+    // the re-read are already the control.
+    //
+    // `wake_at` is cleared so a cancelled run is not also «waiting to wake», and `finished_at` is
+    // set so it reads as over, the same shape `executor::finish` gives a run that stops itself.
+    db.execute(
+        "UPDATE _flow_runs \
+            SET status = 'cancelled', \
+                last_error = :reason, \
+                wake_at = NULL, claim_expires_at = NULL, finished_at = :now, updated_at = :now \
+          WHERE flow_id = :id AND hub_id = :hub_id \
+            AND status IN ('sleeping', 'pending') \
+            AND deleted_at IS NULL",
+        &{
+            // The `last_error` carries the stable code (hub#139) so the half a caller programs
+            // against is the same shape as the one the executor stamps on the late discovery
+            // (`flow.definition_gone`), not just the prose.
+            let mut q = Params::new();
+            q.insert("id".into(), json!(id));
+            q.insert("hub_id".into(), json!(hub_id));
+            q.insert("now".into(), json!(now));
+            q.insert(
+                "reason".into(),
+                json!(format!(
+                    "{ERR_FLOW_DELETED}: the flow was deleted while this run was still in flight"
+                )),
+            );
+            q
+        },
     )
     .await?;
     grants::revoke_all(db, hub_id, id, by).await
@@ -960,6 +1011,193 @@ mod tests {
             .unwrap()
             .rows;
         assert!(live.is_empty(), "no trigger keeps creating runs for a deleted flow");
+    }
+
+    /// **hub#771** — deleting a flow must cancel the runs it left behind that have not finished yet,
+    /// in the SAME gesture as the delete. The bug this closes: a run parked on a `delay`
+    /// (`sleeping`, `wake_at` in the future) survived the delete and only changed to `cancelled`
+    /// days later, when the delay came due and the tick woke it to discover a flow that no longer
+    /// existed. For the whole interval the run history lied — it said «waiting» about a flow whose
+    /// owner had withdrawn it.
+    ///
+    /// The fix cancels `sleeping` and `pending` runs (the not-yet-finished ones) inside `delete`,
+    /// so the row reflects reality from the moment the owner presses the button. The neighbour's
+    /// sleeping run is untouched: cancellation is scoped to the deleted flow's hub AND flow id.
+    #[tokio::test]
+    async fn deleting_a_flow_cancels_its_sleeping_runs_in_the_same_gesture() {
+        use crate::flows::executor;
+
+        let db = db().await;
+        let reg = crate::registry::Registry::new();
+        // A long delay: the run parks as `sleeping` and stays there.
+        let flow = create(
+            &db,
+            HUB,
+            &NewFlow {
+                name: "Sleepy".into(),
+                enabled: true,
+                definition: json!({
+                    "schema_version": 1,
+                    "steps": [{ "id": "wait", "kind": "delay", "seconds": 3600 }]
+                }),
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let sleeping_run = start_run(&db, HUB, &flow.id, "", "manual", "", &json!({}), 0, "hub_user:1")
+            .await
+            .unwrap();
+        // Run the tick that parks it on the delay.
+        executor::tick(&db, &reg, HUB).await.unwrap();
+        let parked = get_run(&db, HUB, &sleeping_run).await.unwrap().0;
+        assert_eq!(
+            parked.status, STATUS_SLEEPING,
+            "precondition: the run reached the delay before the delete"
+        );
+
+        // ── neighbour: a sleeping run of ANOTHER hub must survive the delete unchanged ──
+        const NEIGHBOUR: &str = "hub-store-neighbour";
+        test_support::ensure_schema(&db, NEIGHBOUR).await;
+        let neighbour_flow = create(
+            &db,
+            NEIGHBOUR,
+            &NewFlow {
+                name: "Theirs".into(),
+                enabled: true,
+                definition: json!({
+                    "schema_version": 1,
+                    "steps": [{ "id": "wait", "kind": "delay", "seconds": 3600 }]
+                }),
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let neighbour_run =
+            start_run(&db, NEIGHBOUR, &neighbour_flow.id, "", "manual", "", &json!({}), 0, "hub_user:1")
+                .await
+                .unwrap();
+        executor::tick(&db, &reg, NEIGHBOUR).await.unwrap();
+        assert_eq!(
+            get_run(&db, NEIGHBOUR, &neighbour_run).await.unwrap().0.status,
+            STATUS_SLEEPING,
+            "precondition: the neighbour is also sleeping"
+        );
+
+        // The gesture under test: delete the flow. No clock advance, no second tick — the
+        // cancellation has to land here, not days later when the delay comes due.
+        delete(&db, HUB, &flow.id, "hub_user:1").await.unwrap();
+
+        let cancelled = get_run(&db, HUB, &sleeping_run).await.unwrap().0;
+        assert_eq!(
+            cancelled.status, STATUS_CANCELLED,
+            "the sleeping run is cancelled by the delete, not left lying about a flow that is gone"
+        );
+        assert!(
+            cancelled.last_error.contains("flow_deleted"),
+            "the reason is recorded for whoever reads the history later: {}",
+            cancelled.last_error
+        );
+        assert!(
+            cancelled.wake_at.is_none(),
+            "a cancelled run is not also waiting to wake: {}",
+            cancelled.wake_at.unwrap_or_default()
+        );
+
+        // The neighbour slept through it: a delete in one hub never reaches into another.
+        let still_theirs = get_run(&db, NEIGHBOUR, &neighbour_run).await.unwrap().0;
+        assert_eq!(
+            still_theirs.status, STATUS_SLEEPING,
+            "the neighbour's sleeping run is untouched by a delete in another hub"
+        );
+        assert!(still_theirs.wake_at.is_some(), "and still waiting to wake");
+    }
+
+    /// A `pending` run (queued, not yet started) is also not-yet-finished, so deleting the flow
+    /// cancels it too — the same honesty, for a run that never got its first tick.
+    #[tokio::test]
+    async fn deleting_a_flow_cancels_its_pending_runs_too() {
+        let db = db().await;
+        let flow = create(
+            &db,
+            HUB,
+            &NewFlow {
+                name: "Queued".into(),
+                enabled: true,
+                definition: json!({
+                    "schema_version": 1,
+                    "steps": [{ "id": "wait", "kind": "delay", "seconds": 3600 }]
+                }),
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let pending_run =
+            start_run(&db, HUB, &flow.id, "", "manual", "", &json!({}), 0, "hub_user:1")
+                .await
+                .unwrap();
+        assert_eq!(
+            get_run(&db, HUB, &pending_run).await.unwrap().0.status,
+            STATUS_PENDING,
+            "precondition: never ticked, so still queued"
+        );
+
+        delete(&db, HUB, &flow.id, "hub_user:1").await.unwrap();
+
+        let cancelled = get_run(&db, HUB, &pending_run).await.unwrap().0;
+        assert_eq!(
+            cancelled.status, STATUS_CANCELLED,
+            "a pending run is cancelled with its flow, not stranded in a queue for a ghost"
+        );
+        assert!(cancelled.last_error.contains("flow_deleted"));
+    }
+
+    /// Finished runs are HISTORY — the delete must not rewrite them. A `done` run stays `done`,
+    /// a `failed` run stays `failed`, and a run already `cancelled` keeps its original reason.
+    #[tokio::test]
+    async fn deleting_a_flow_leaves_its_finished_runs_as_history() {
+        let db = db().await;
+        let flow = create(
+            &db,
+            HUB,
+            &NewFlow {
+                name: "Done".into(),
+                enabled: true,
+                definition: json!({
+                    "schema_version": 1,
+                    "steps": [{ "id": "wait", "kind": "delay", "seconds": 3600 }]
+                }),
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let done_run =
+            start_run(&db, HUB, &flow.id, "", "manual", "", &json!({}), 0, "hub_user:1")
+                .await
+                .unwrap();
+        // Mark it finished by hand — the run row is what the delete sees, not how it got there.
+        let mut p = Params::new();
+        p.insert("id".into(), json!(done_run));
+        p.insert("now".into(), json!(now_rfc3339()));
+        db.execute(
+            "UPDATE _flow_runs SET status = 'done', last_error = 'ran fine', finished_at = :now \
+             WHERE id = :id",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        delete(&db, HUB, &flow.id, "hub_user:1").await.unwrap();
+
+        let still_done = get_run(&db, HUB, &done_run).await.unwrap().0;
+        assert_eq!(still_done.status, STATUS_DONE, "history is not rewritten");
+        assert_eq!(
+            still_done.last_error, "ran fine",
+            "and neither is the reason it ended the way it did"
+        );
     }
 
     #[tokio::test]
