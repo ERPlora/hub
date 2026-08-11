@@ -211,6 +211,9 @@ export default {
       interruptedBody: 'Part of it may already be in. Check it in Settings › Data before trying again.',
       continue: 'Continue',
       retry: 'Try again',
+      // hub#763 — the door to the report the sentences above name. The report survives navigation
+      // now, so this button leads somewhere instead of to an empty template catalogue.
+      seeReport: 'See the report',
     },
     // The blocking strip (hub#374): the surface for the screens the checklist is not on. It says the
     // CONSEQUENCE, not the severity — ⛔ means the runtime refuses the document, so that is what it

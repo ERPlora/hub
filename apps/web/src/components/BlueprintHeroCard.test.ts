@@ -364,6 +364,43 @@ describe('what the owner is told afterwards', () => {
     expect(failed.text()).not.toContain('sales');
   });
 
+  // hub#763 — the card SAID «you can see the detail in Settings › Data» and then left the owner to
+  // find that screen on their own. The report is persisted now, so the sentence has somewhere to
+  // point: the card must carry the door, not just its address.
+  it('takes the owner to the report it promised, instead of only naming the screen', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [{ section: 'hub_settings', status: { Failed: 'db down' } }],
+      installed_modules: [{ id: 'pos', version: '1.0.0', status: 'failed', error: 'boom' }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    const link = w.find('[data-testid="hero-see-report"]');
+    expect(link.exists()).toBe(true);
+    // `router-link` is a PROP of ion-button, not a plain attribute, so `attributes()` returns
+    // `undefined` for it and would pass on ANY destination, including none. The stub renders the
+    // resolved prop into its markup, which is where the destination can actually be read.
+    expect(link.html()).toContain('routerlink="/settings?tab=data"');
+  });
+
+  it('an import where NOTHING broke offers no report to read', async () => {
+    const w = await outcomeOf(mountCard());
+
+    // Everything landed: sending the owner to a report of a clean run is noise, not help.
+    expect(w.find('[data-testid="hero-see-report"]').exists()).toBe(false);
+  });
+
+  // An app that is merely unsubscribed is a purchase decision, not a breakage (ADR-0060, hub#409) —
+  // and there IS a report saying which one, so this door stays open for it too.
+  it('offers the report when an app is only blocked on the plan', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [],
+      installed_modules: [{ id: 'invoice', version: '1.0.0', status: 'blocked', blocked_on: ['invoice'] }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    expect(w.find('[data-testid="hero-see-report"]').exists()).toBe(true);
+  });
+
   it('raises the same line when every app went in but a PART of the template did not', async () => {
     importBlueprint.mockResolvedValue({
       sections: [{ section: 'hub_settings', status: { Failed: 'db down' } }],

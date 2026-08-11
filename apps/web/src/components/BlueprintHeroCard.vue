@@ -100,6 +100,20 @@
         >
           {{ t('setup.hero.retry') }}
         </ion-button>
+        <!-- hub#763 — the sentences above name Settings › Data; this is the door itself. The report
+             is persisted per batch now, so the destination really does have something to show: it
+             is no longer an address the owner has to walk to and find empty. Only offered when
+             there IS something to read — a clean import has no detail worth a trip. -->
+        <ion-button
+          v-if="somethingBroke || blockedApps.length"
+          size="small"
+          fill="outline"
+          router-link="/settings?tab=data"
+          router-direction="forward"
+          data-testid="hero-see-report"
+        >
+          {{ t('setup.hero.seeReport') }}
+        </ion-button>
       </div>
     </div>
   </section>
