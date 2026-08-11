@@ -567,16 +567,20 @@ async fn run_step(
             )
             .await
             {
-                Ok(prepared) => {
+                Ok(notify::Prepared {
+                    queue_op,
+                    recorded_input,
+                    output,
+                }) => {
                     let ops = [
-                        prepared.queue_op.clone(),
+                        queue_op,
                         write_step_op(
                             hub_id,
                             run_id,
                             index,
                             step,
                             STEP_COMMITTED,
-                            &prepared.recorded_input,
+                            &recorded_input,
                             &json!({}),
                             "",
                             &now,
@@ -584,10 +588,8 @@ async fn run_step(
                         advance_index_op(run_id, index + 1, &now),
                     ];
                     db.execute_tx(&ops).await?;
-                    complete_step(db, run_id, index, &prepared.output, &now).await?;
-                    Ok(Outcome::Continue {
-                        output: prepared.output,
-                    })
+                    complete_step(db, run_id, index, &output, &now).await?;
+                    Ok(Outcome::Continue { output })
                 }
                 Err(e) => {
                     // Denied, nobody to write to, or a column that is not an address: NOTHING was
