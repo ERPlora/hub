@@ -206,7 +206,10 @@ const filledAnexo = computed(() =>
  */
 const canSubmit = computed(
   () =>
+    // Las dos mitades del obligado: el Anexo I lo identifica por NIF **y** por razón social, así
+    // que con el nombre vacío se archivaría una prueba legal a medio rellenar.
     !!props.obligadoNif.trim() &&
+    !!props.obligadoName.trim() &&
     !!signerNif.value.trim() &&
     !!signerName.value.trim() &&
     !!signature.value &&

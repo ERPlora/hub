@@ -150,6 +150,18 @@ describe('qué hace falta para poder firmar', () => {
     expect(panel.canSubmit).toBe(false);
   });
 
+  it('sin la RAZÓN SOCIAL del obligado tampoco: el documento nombraría a nadie', async () => {
+    // El Anexo I identifica al obligado por NIF **y** por razón social. Con el nombre vacío se
+    // archivaría «OBLIGADO TRIBUTARIO REPRESENTADO: , con NIF B12345678», que es una prueba legal
+    // a medio rellenar. Se arregla donde se configura la identidad fiscal, justo encima.
+    const w = mountPanel({ obligadoName: '' });
+    await flushPromises();
+    const panel = vm(w);
+    fillIn(panel);
+
+    expect(panel.canSubmit).toBe(false);
+  });
+
   it('sin confirmación explícita tampoco', async () => {
     const w = mountPanel();
     await flushPromises();

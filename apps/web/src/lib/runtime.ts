@@ -598,11 +598,20 @@ export async function publishFiscalIdentity(): Promise<void> {
 // no cruza a este navegador (ADR-0003). El runtime pone la cabecera, compone el documento y lo
 // manda; este lado no guarda ni el trazo ni el DNI.
 
-/** Estado del otorgamiento + el texto que hay que enseñar. `status: ''` = el runtime no contestó. */
-export interface RepresentationGrantState {
+/** Lo que las dos rutas contestan siempre. `status: ''` = el runtime no contestó. */
+export interface RepresentationGrantStatus {
   status: '' | 'absent' | 'vigente' | 'revocado';
   /** Fecha DEL ESTADO: cuándo se firmó si está vigente, cuándo se revocó si está revocado. */
   at: string;
+}
+
+/**
+ * Lo que contesta el **GET**: el estado más el texto que hay que enseñar.
+ *
+ * `anexo_text` viaja solo aquí, y por eso es un tipo aparte: el POST no lo devuelve, y declararlo
+ * en el tipo común diría que sí — que es justo la clase de mentira que un tipo existe para evitar.
+ */
+export interface RepresentationGrantState extends RepresentationGrantStatus {
   /** El texto del Anexo I con sus placeholders, servido por el runtime (fuente única). */
   anexo_text: string;
 }
@@ -638,7 +647,7 @@ export async function getRepresentationGrant(): Promise<RepresentationGrantState
  */
 export async function postRepresentationGrant(
   capture: RepresentationGrantCapture,
-): Promise<RepresentationGrantState> {
+): Promise<RepresentationGrantStatus> {
   const form = new FormData();
   form.append('obligado_nif', capture.obligado_nif);
   form.append('obligado_name', capture.obligado_name);
@@ -652,7 +661,7 @@ export async function postRepresentationGrant(
     body: form,
   });
   if (!res.ok) throw new Error(`post-representation-grant → ${res.status}`);
-  return (await res.json()) as RepresentationGrantState;
+  return (await res.json()) as RepresentationGrantStatus;
 }
 
 /**
