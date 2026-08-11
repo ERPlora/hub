@@ -828,6 +828,38 @@ fn rewrite_insert(
         return format!("{trimmed}\n");
     }
 
+    // 🔴 hub#497: `hub_user` y `hub_session` GANARON `hub_id NOT NULL`, y los bundles ya publicados
+    // traen la forma vieja (sin la columna). Ese `INSERT` moriría ahora contra el `NOT NULL` y se
+    // llevaría la sección Usuarios entera — exactamente el fallo de 2026-08-03, del revés. Así que
+    // se INYECTA el hub destino cuando el bundle no lo trae: importar a una persona ES darla de
+    // alta en el hub que importa, que es lo mismo que `__HUB_ID__` hace en todas las demás tablas.
+    //
+    // Se inyecta **solo el valor**, y no se toca nada más: el `id` se sigue conservando (derivarlo
+    // rompería la idempotencia del re-import y dejaría colgadas las FKs de
+    // `hub_user_profile`/`hub_user_pref` del mismo bundle, que apuntan a él) y la guarda sigue
+    // yendo por `id` a secas. Por eso va aquí y no en la 1ª pasada de `remap_section_ids`: aquella
+    // decide QUÉ ids se remapean, y estas filas siguen sin remapearse.
+    //
+    // La lista es explícita —no «toda tabla del core»— porque es un puente de compatibilidad con
+    // una forma concreta de bundle: un bundle nuevo ya trae la columna y esta rama ni se mira.
+    //
+    // ⚠️ `hub_scoped` se decide con la lista de columnas que trae EL BUNDLE, capturada ANTES de
+    // inyectar. Si la inyección la hiciera cierta, esta fila pasaría además a remapear su `id` y a
+    // llevar guarda `(hub_id, id)` — y ninguna de las dos cosas puede cambiar aquí: el `id` es a
+    // quien apuntan `hub_user_profile`/`hub_user_pref` del MISMO bundle (que no se remapean, porque
+    // la 1ª pasada solo mapea filas que el bundle ya declaraba hub-scoped), así que derivarlo los
+    // dejaría colgados; y cambiar la guarda rompería la idempotencia de un bundle ya importado.
+    let bundle_says_hub_scoped = cols.iter().any(|c| c == "hub_id");
+    let (cols, vals) = if matches!(table, "hub_user" | "hub_session") && !bundle_says_hub_scoped {
+        let mut cols = cols;
+        let mut vals = vals;
+        cols.push("hub_id".to_string());
+        vals.push(quote_string_literal(target_hub_id));
+        (cols, vals)
+    } else {
+        (cols, vals)
+    };
+
     // ¿Esta tabla está acotada por hub? Lo dice la PROPIA fila: el export vuelca `SELECT *`, así
     // que su lista de columnas ES la de la tabla. Autodescriptivo, sin lista negra que mantener.
     //
@@ -843,7 +875,7 @@ fn rewrite_insert(
     //     apuntan a ids inexistentes (`violates foreign key constraint`, visto importando el
     //     blueprint `restaurante` de verdad).
     // Lo común a ambos: la guarda no puede nombrar una columna que la tabla no tiene.
-    let hub_scoped = cols.iter().any(|c| c == "hub_id");
+    let hub_scoped = bundle_says_hub_scoped;
 
     // Remapear: el `id` propio y cualquier FK interna (columnas `id`/`*_id`/`parent_id`) cuyo
     // literal esté en el mapa. La columna `id` solo se reescribe si la fila es hub-scoped.
@@ -1393,26 +1425,54 @@ mod tests {
     /// 🔴 El SQL que rompía la sección **Usuarios** en producción (2026-08-03):
     /// `reset: aplicar sentencia: sqlx: … column "hub_id" does not exist`.
     ///
-    /// `rewrite_insert` metía `"hub_id" = <destino>` en la guarda de TODA tabla con `id`, pero
-    /// `hub_user` es identidad del CORE y **no tiene columna `hub_id`** (`identity.rs`: id, name,
-    /// pin_hash, role, cloud_user_id, is_active, created_at, email).
+    /// `rewrite_insert` metía `"hub_id" = <destino>` en la guarda de TODA tabla con `id`, y
+    /// `hub_user` no tenía esa columna, así que la sección Usuarios entera moría con
+    /// `column "hub_id" does not exist` (producción, 2026-08-03).
+    ///
+    /// 🔴 **Y desde hub#497 sí la tiene, `NOT NULL`** — lo que da la vuelta al problema: un bundle
+    /// **ya publicado** (los cuatro blueprints) trae la forma VIEJA, sin `hub_id`, y su `INSERT`
+    /// moriría ahora contra el `NOT NULL`, perdiendo otra vez la sección entera. Así que el import
+    /// **inyecta** el hub destino cuando el bundle no lo trae: importar a una persona ES darla de
+    /// alta en el hub que importa. Este es el test que lo sujeta, con la forma REAL del
+    /// `data/hub_users.sql` del blueprint `restaurante` publicado.
     #[test]
-    fn una_tabla_sin_hub_id_no_puede_llevarlo_en_la_guarda() {
-        // Forma REAL del `data/hub_users.sql` del blueprint `restaurante` publicado.
+    fn un_bundle_viejo_sin_hub_id_lo_recibe_del_hub_destino() {
         let sql = "INSERT INTO hub_user (\"cloud_user_id\", \"created_at\", \"id\", \"name\", \"role\") \
                    SELECT NULL, '2026-01-01T00:00:00+00:00', 'bp-user-manager-000000000000000', 'Manager', 'manager' \
                    WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'bp-user-manager-000000000000000');";
         let out = remap_section_ids(sql, "56f2bbe7-792e-44d3-adfe-c18891cfc925", &Default::default());
 
         assert!(
-            !out.contains("hub_id"),
-            "`hub_user` no tiene columna hub_id: nombrarla revienta la sección entera:\n{out}"
+            out.contains("\"hub_id\"") && out.contains("'56f2bbe7-792e-44d3-adfe-c18891cfc925'"),
+            "la fila del bundle viejo tiene que salir con el hub DESTINO o el NOT NULL la tumba:\n{out}"
         );
-        // Su id se CONSERVA: sin hub_id no hay colisión entre hermanos que evitar, y derivarlo
-        // metería un «Manager» duplicado por cada hub de la organización (la tabla es compartida).
+        // Su id se CONSERVA. Derivarlo por hub rompería la idempotencia del re-import de un bundle
+        // ya importado, y las FKs de `hub_user_profile`/`hub_user_pref` del mismo bundle apuntan a
+        // él: el remap solo alcanza a las filas que el bundle YA declaraba hub-scoped.
         assert!(
             out.contains("'bp-user-manager-000000000000000'"),
-            "una fila no-hub-scoped conserva su id (idempotencia para toda la org):\n{out}"
+            "el id de la persona se conserva:\n{out}"
+        );
+        // Y la guarda sigue yendo por `id` a secas: la que el bundle traía, sin inventar columnas.
+        assert!(
+            out.contains("WHERE id = 'bp-user-manager-000000000000000'"),
+            "la guarda de idempotencia no cambia:\n{out}"
+        );
+    }
+
+    /// Un bundle NUEVO ya trae `hub_id` (el export vuelca `SELECT *`), y entonces manda el camino
+    /// de siempre: `__HUB_ID__` → destino, sin que la inyección se meta por medio.
+    #[test]
+    fn un_bundle_nuevo_ya_trae_su_hub_id_y_no_se_duplica() {
+        let sql = "INSERT INTO hub_user (\"hub_id\", \"id\", \"name\", \"role\") \
+                   SELECT '__HUB_ID__', 'u-1', 'Ana', 'admin' \
+                   WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'u-1');";
+        let out = remap_section_ids(sql, "hub-destino", &Default::default());
+
+        assert_eq!(
+            out.matches("\"hub_id\"").count(),
+            2,
+            "una en la lista de columnas y una en la guarda — ni una tercera inyectada:\n{out}"
         );
     }
 

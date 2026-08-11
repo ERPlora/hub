@@ -144,7 +144,7 @@ async fn a_backup_carries_the_staff_profile_and_preferences() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     // A user with a real profile + preferences set.
-    let uid = erplora_runtime::identity::create_user(rt.db(), "Ana", "1234", "cashier", None)
+    let uid = erplora_runtime::identity::create_user(rt.db(), &rt.hub_id(), "Ana", "1234", "cashier", None)
         .await
         .expect("crear usuario");
     let mut p = Params::new();
@@ -202,7 +202,7 @@ async fn a_backup_carries_the_staff_profile_and_preferences() {
 async fn a_template_carries_neither_profile_nor_preferences() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
-    let _uid = erplora_runtime::identity::create_user(rt.db(), "Ana", "1234", "cashier", None)
+    let _uid = erplora_runtime::identity::create_user(rt.db(), &rt.hub_id(), "Ana", "1234", "cashier", None)
         .await
         .unwrap();
 
@@ -574,10 +574,10 @@ async fn export_vuelca_las_tablas_en_orden_de_dependencia() {
 async fn export_desvincula_los_usuarios_de_su_cuenta_cloud_sin_perder_su_rol() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
-    erplora_runtime::identity::create_user(rt.db(), "Manager", "1234", "manager", None)
+    erplora_runtime::identity::create_user(rt.db(), &rt.hub_id(), "Manager", "1234", "manager", None)
         .await
         .expect("usuario local");
-    erplora_runtime::identity::create_user(rt.db(), "support", "", "owner", Some("4"))
+    erplora_runtime::identity::create_user(rt.db(), &rt.hub_id(), "support", "", "owner", Some("4"))
         .await
         .expect("usuario cloud");
 

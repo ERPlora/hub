@@ -130,8 +130,11 @@ pub async fn collect_daily_usage(
 
     let terminals = db
         .query(
+            // Acotado por `hub_id` desde hub#497: este número viaja al SaaS y alimenta el
+            // límite de dispositivos del plan. Sin el filtro, en una BD compartida un hub
+            // reportaba las terminales del negocio de al lado como suyas.
             "SELECT COUNT(DISTINCT device_id) AS terminals FROM hub_session \
-             WHERE expires_at > :now AND device_id IS NOT NULL",
+             WHERE hub_id = :hub_id AND expires_at > :now AND device_id IS NOT NULL",
             &params,
         )
         .await
@@ -212,7 +215,7 @@ mod tests {
                is_deleted BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL\
              );\
              CREATE TABLE hub_session (\
-               token TEXT PRIMARY KEY, device_id TEXT, expires_at TEXT NOT NULL\
+               token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, device_id TEXT, expires_at TEXT NOT NULL\
              );\
              INSERT INTO sales_sale VALUES\
                ('s1', 'hub-a', 'completed', 0, '2026-07-27T09:00:00Z'),\
@@ -222,11 +225,12 @@ mod tests {
                ('deleted', 'hub-a', 'completed', 1, '2026-07-27T13:00:00Z'),\
                ('other', 'hub-b', 'completed', 0, '2026-07-27T14:00:00Z');\
              INSERT INTO hub_session VALUES\
-               ('a1', 'device-a', '2026-07-28T00:00:00Z'),\
-               ('a2', 'device-a', '2026-07-28T00:00:00Z'),\
-               ('b1', 'device-b', '2026-07-28T00:00:00Z'),\
-               ('expired', 'device-c', '2026-07-27T00:00:00Z'),\
-               ('unknown', NULL, '2026-07-28T00:00:00Z');",
+               ('a1', 'hub-a', 'device-a', '2026-07-28T00:00:00Z'),\
+               ('a2', 'hub-a', 'device-a', '2026-07-28T00:00:00Z'),\
+               ('b1', 'hub-a', 'device-b', '2026-07-28T00:00:00Z'),\
+               ('expired', 'hub-a', 'device-c', '2026-07-27T00:00:00Z'),\
+               ('unknown', 'hub-a', NULL, '2026-07-28T00:00:00Z'),\
+               ('next-door', 'hub-b', 'device-z', '2026-07-28T00:00:00Z');",
         )
         .await
         .unwrap();
@@ -234,7 +238,11 @@ mod tests {
         let usage = collect_daily_usage(&db, "hub-a", "2026-07-27T15:00:00Z").await;
         assert_eq!(usage.orders_today, Some(2));
         assert_eq!(usage.last_sale_at.as_deref(), Some("2026-07-27T11:30:00Z"));
-        assert_eq!(usage.terminals, Some(2));
+        assert_eq!(
+            usage.terminals,
+            Some(2),
+            "dos terminales de ESTE hub — la del negocio de al lado (`next-door`, hub-b) no cuenta              como nuestra, y este número alimenta el límite de dispositivos del plan (hub#497)"
+        );
     }
 
     #[tokio::test]
@@ -242,7 +250,7 @@ mod tests {
         let db = fresh_db().await;
         db.execute_batch(
             "CREATE TABLE hub_session (\
-               token TEXT PRIMARY KEY, device_id TEXT, expires_at TEXT NOT NULL\
+               token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, device_id TEXT, expires_at TEXT NOT NULL\
              );",
         )
         .await
@@ -564,7 +572,7 @@ mod tests {
                is_deleted BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL\
              );\
              CREATE TABLE hub_session (\
-               token TEXT PRIMARY KEY, device_id TEXT, expires_at TEXT NOT NULL\
+               token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, device_id TEXT, expires_at TEXT NOT NULL\
              );",
         )
         .await

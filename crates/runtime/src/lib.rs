@@ -1020,22 +1020,22 @@ impl Runtime {
         role: &str,
         cloud_user_id: Option<&str>,
     ) -> Result<String> {
-        identity::create_user(self.db.as_ref(), name, pin, role, cloud_user_id).await
+        identity::create_user(self.db.as_ref(), &self.hub_id, name, pin, role, cloud_user_id).await
     }
 
     #[doc(hidden)]
     pub async fn ensure_dev_user(&self, id: &str, name: &str, role: &str) -> Result<()> {
-        identity::ensure_dev_user(self.db.as_ref(), id, name, role).await
+        identity::ensure_dev_user(self.db.as_ref(), &self.hub_id, id, name, role).await
     }
 
     /// Verifica el PIN de un usuario por nombre. `Some(user)` si encaja.
     pub async fn verify_pin(&self, name: &str, pin: &str) -> Result<Option<identity::HubUser>> {
-        identity::verify_pin(self.db.as_ref(), name, pin).await
+        identity::verify_pin(self.db.as_ref(), &self.hub_id, name, pin).await
     }
 
     /// Usuarios activos del hub con PIN (para mostrar el grid de login local). `(id, name, role)`.
     pub async fn list_pin_users(&self) -> Result<Vec<(String, String, String)>> {
-        identity::list_pin_users(self.db.as_ref()).await
+        identity::list_pin_users(self.db.as_ref(), &self.hub_id).await
     }
 
     /// **The manager approves one action** (hub#361, PLAN paso 2b rules 2 and 4).
@@ -1109,7 +1109,7 @@ impl Runtime {
             ));
         }
 
-        let approver = identity::verify_pin(self.db.as_ref(), req.approver_name, req.pin)
+        let approver = identity::verify_pin(self.db.as_ref(), &self.hub_id, req.approver_name, req.pin)
             .await?
             // One answer for an unknown name, a wrong PIN and a deactivated user: a dialog at the
             // counter must not become a way to find out who works here.
@@ -1201,7 +1201,7 @@ impl Runtime {
     /// **Siembra el owner del hub** desde el env del provisioning (`HUB_OWNER_EMAIL`, ADR-0157): el
     /// owner es el CREADOR del hub. Idempotente (no duplica ni cambia si ya existe). `true` si sembró.
     pub async fn seed_owner(&self, email: &str) -> Result<bool> {
-        identity::seed_owner(self.db.as_ref(), email).await
+        identity::seed_owner(self.db.as_ref(), &self.hub_id, email).await
     }
 
     /// Resuelve (o enlaza/provisiona) el `hub_user` de una identidad cloud (mapeo del JWT). Enlaza
@@ -1220,6 +1220,7 @@ impl Runtime {
     ) -> Result<identity::HubUser> {
         identity::get_or_link_cloud_user(
             self.db.as_ref(),
+            &self.hub_id,
             cloud_user_id,
             default_name,
             default_role,
@@ -1237,22 +1238,22 @@ impl Runtime {
         cloud_user_id: &str,
         email: Option<&str>,
     ) -> Result<usize> {
-        identity::revoke_cloud_access(self.db.as_ref(), cloud_user_id, email).await
+        identity::revoke_cloud_access(self.db.as_ref(), &self.hub_id, cloud_user_id, email).await
     }
 
     /// **Alta** de un usuario-login por email + rol (flujo admin, ADR-0157 §7). Upsert por email.
     pub async fn create_login_user(&self, email: &str, role: &str) -> Result<identity::HubUser> {
-        identity::create_login_user(self.db.as_ref(), email, role).await
+        identity::create_login_user(self.db.as_ref(), &self.hub_id, email, role).await
     }
 
     /// **Baja** de un usuario-login por email (flujo admin, ADR-0157 §7). Desactiva; `true` si afectó.
     pub async fn deactivate_login_user(&self, email: &str) -> Result<bool> {
-        identity::deactivate_login_user(self.db.as_ref(), email).await
+        identity::deactivate_login_user(self.db.as_ref(), &self.hub_id, email).await
     }
 
     /// Lista los usuarios-login del hub (los `hub_user` con email) para el panel admin.
     pub async fn list_login_users(&self) -> Result<Vec<identity::LoginUser>> {
-        identity::list_login_users(self.db.as_ref()).await
+        identity::list_login_users(self.db.as_ref(), &self.hub_id).await
     }
 
     /// Personas cuyo email **solo** está en su perfil y no se pudo llevar a donde se administra el
@@ -1266,7 +1267,7 @@ impl Runtime {
 
     /// Fija (o cambia) el PIN de un usuario existente por id (alta de PIN tras login cloud).
     pub async fn set_pin(&self, user_id: &str, pin: &str) -> Result<()> {
-        identity::set_pin(self.db.as_ref(), user_id, pin).await
+        identity::set_pin(self.db.as_ref(), &self.hub_id, user_id, pin).await
     }
 
     /// Abre una sesión server-side para `user_id`; devuelve el token opaco. `device_id` = identidad
@@ -1277,7 +1278,7 @@ impl Runtime {
         ttl_secs: i64,
         device_id: Option<&str>,
     ) -> Result<String> {
-        identity::create_session(self.db.as_ref(), user_id, ttl_secs, device_id).await
+        identity::create_session(self.db.as_ref(), &self.hub_id, user_id, ttl_secs, device_id).await
     }
 
     /// Aplica el límite de dispositivos del plan ANTES de abrir sesión (ADR-0154): con
@@ -1288,17 +1289,17 @@ impl Runtime {
         max_devices: u32,
         device_id: Option<&str>,
     ) -> Result<()> {
-        identity::enforce_device_limit(self.db.as_ref(), max_devices, device_id).await
+        identity::enforce_device_limit(self.db.as_ref(), &self.hub_id, max_devices, device_id).await
     }
 
     /// Resuelve una sesión válida a su `hub_user` activo (o `None`).
     pub async fn resolve_session(&self, token: &str) -> Result<Option<identity::HubUser>> {
-        identity::resolve_session(self.db.as_ref(), token).await
+        identity::resolve_session(self.db.as_ref(), &self.hub_id, token).await
     }
 
     /// Cierra una sesión (logout).
     pub async fn delete_session(&self, token: &str) -> Result<()> {
-        identity::delete_session(self.db.as_ref(), token).await
+        identity::delete_session(self.db.as_ref(), &self.hub_id, token).await
     }
 
     /// Perfil y preferencias del usuario actual, aislados por `(hub_id, user_id)`.

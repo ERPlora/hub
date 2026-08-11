@@ -260,12 +260,18 @@ async fn read_database(db: &dyn DatabaseAdapter, limit_bytes: Option<u64>) -> Db
 /// Sesiones activas (no caducadas) y nº de dispositivos distintos (`device_id` no nulo), más el
 /// `max_devices` del plan. La comparación `expires_at > :now` sobre ISO-8601 es lexicográfica
 /// (misma técnica que `identity::resolve_session`), portable SQLite/Postgres.
-async fn read_sessions(db: &dyn DatabaseAdapter, max_devices: u32, now: &str) -> SessionMetric {
+async fn read_sessions(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    max_devices: u32,
+    now: &str,
+) -> SessionMetric {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("now".into(), json!(now));
     let active = scalar_i64(
         db,
-        "SELECT count(*) AS n FROM hub_session WHERE expires_at > :now",
+        "SELECT count(*) AS n FROM hub_session WHERE hub_id = :hub_id AND expires_at > :now",
         &p,
     )
     .await
@@ -273,7 +279,7 @@ async fn read_sessions(db: &dyn DatabaseAdapter, max_devices: u32, now: &str) ->
     let devices = scalar_i64(
         db,
         "SELECT count(DISTINCT device_id) AS n FROM hub_session \
-         WHERE expires_at > :now AND device_id IS NOT NULL",
+         WHERE hub_id = :hub_id AND expires_at > :now AND device_id IS NOT NULL",
         &p,
     )
     .await
@@ -340,7 +346,7 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
         let db = rt.db();
         (
             read_database(db, database_limit).await,
-            read_sessions(db, max_devices, &now).await,
+            read_sessions(db, &st.hub_id(), max_devices, &now).await,
         )
     };
 
