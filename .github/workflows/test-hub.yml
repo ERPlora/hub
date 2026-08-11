@@ -38,7 +38,9 @@ permissions:
 jobs:
   test:
     name: cargo test --workspace
-    runs-on: ubuntu-latest
+    # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Ojo: el
+    # runner es UNA máquina, así que esta suite (la más larga) serializa con el build de la imagen.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 40
 
     services:
