@@ -36,6 +36,15 @@ vi.mock('../lib/runtime', async () => {
 const refreshModuleNav = vi.fn();
 vi.mock('../lib/nav', () => ({ refreshModuleNav: (...a: unknown[]) => refreshModuleNav(...a) }));
 
+// hub#488 — human names of the apps. Empty by default, which IS the «no name known» case: the
+// sentence must then fall back to the id rather than go blank.
+const appNames = vi.hoisted(() => new Map<string, string>());
+vi.mock('../lib/app-names', async () => {
+  const actual = await vi.importActual<typeof import('../lib/app-names')>('../lib/app-names');
+  // `appLabel` stays REAL: «a name, or the id, never an invention» is the rule under test.
+  return { appLabel: actual.appLabel, loadAppNames: async () => appNames };
+});
+
 // A real `ref`: the card reads the permission of ADR-0248 off the session the runtime resolved.
 const { session } = vi.hoisted(() => ({ session: { value: null as { permissions?: string[] } | null } }));
 // PARTIAL mock: `user` is stubbed, but `permissionsInclude` must stay REAL. Since hub#506 the
@@ -140,6 +149,7 @@ beforeEach(() => {
   inspectBlueprint.mockReset().mockResolvedValue({ ok: true, upload_id: 'up-1', manifest: MANIFEST });
   importBlueprint.mockReset().mockResolvedValue({ sections: [], installed_modules: [] });
   refreshModuleNav.mockReset();
+  appNames.clear();
   session.value = { permissions: ['hub.administer'] };
 });
 
@@ -399,6 +409,37 @@ describe('what the owner is told afterwards', () => {
     const w = await outcomeOf(mountCard());
 
     expect(w.find('[data-testid="hero-see-report"]').exists()).toBe(true);
+  });
+
+  // hub#488 — this is the FIRST screen of a new business, and the sentence is actionable: it sends
+  // the owner to subscribe. `cash_register` is our manifest key, not the name he will find in the
+  // marketplace.
+  it('names the apps the way the owner will find them, not by their manifest id', async () => {
+    appNames.set('cash_register', 'Caja registradora');
+    appNames.set('verifactu', 'VeriFactu · AEAT');
+    importBlueprint.mockResolvedValue({
+      sections: [],
+      installed_modules: [
+        { id: 'cash_register', version: '1.0.0', status: 'blocked', blocked_on: ['cash_register'] },
+        { id: 'verifactu', version: '1.4.1', status: 'failed', error: 'boom' },
+      ],
+    });
+    const w = await outcomeOf(mountCard());
+
+    expect(w.find('[data-testid="hero-blocked"]').text()).toContain('Caja registradora');
+    expect(w.find('[data-testid="hero-failed"]').text()).toContain('VeriFactu · AEAT');
+    // The developer key must not survive next to the name: two names for one app is worse than one.
+    expect(w.find('[data-testid="hero-outcome"]').text()).not.toContain('cash_register');
+  });
+
+  it('an app with no known name is still named — by its id, never left blank', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [],
+      installed_modules: [{ id: 'cash_register', version: '1.0.0', status: 'blocked', blocked_on: ['cash_register'] }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    expect(w.find('[data-testid="hero-blocked"]').text()).toContain('cash_register');
   });
 
   it('raises the same line when every app went in but a PART of the template did not', async () => {

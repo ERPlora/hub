@@ -321,6 +321,7 @@ import {
   type StoredImportReport,
 } from '../lib/runtime';
 import { formatAmount } from '../lib/money';
+import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -587,6 +588,11 @@ onMounted(() => {
     // montarse (empezaba siempre en el catálogo). Si hubo un import incompleto, lo mostramos en
     // vez del catálogo: es el siguiente paso seguro que se le prometió al administrador.
     void loadRecoveredReport();
+    // hub#488 — los nombres humanos de las apps, para que el informe no hable en ids. Llega tarde
+    // sin romper nada: las filas son `computed`, así que se repintan solas cuando el mapa entra.
+    void loadAppNames().then((names) => {
+      appNames.value = names;
+    });
   } else {
     // No se pide el catálogo (importar es admin-only), así que no sabemos si hay plantillas.
     catalogState.value = 'forbidden';
@@ -824,12 +830,19 @@ const moduleStatus = {
   failed: 'failed',
 } as const;
 
-/** «invoice (9,00 €)» — el precio SOLO si el motor lo mandó; nunca se inventa. */
+// hub#488 — nombres humanos de las apps para el informe. Se resuelven al PINTAR (nunca se hornean
+// en el informe): el id es la clave estable y un nombre congelado envejece y se queda en el idioma
+// de quien importó — y desde hub#763 este informe se relee después, quizá por otra persona.
+// Best-effort: sin nombres, cada fila cae a su id, que es legible aunque no sea bonito.
+const appNames = ref<AppNames>(new Map());
+
+/** «Facturación (9,00 €)» — el precio SOLO si el motor lo mandó; nunca se inventa. */
 function blockedModuleLabel(id: string, purchase: ModuleInstallPurchase[]): string {
+  const name = appLabel(id, appNames.value);
   const offer = purchase.find((p) => p.module_id === id);
   const price = Number(offer?.price);
-  if (!offer?.currency || !Number.isFinite(price)) return id;
-  return `${id} (${formatAmount(price, { currency: offer.currency })})`;
+  if (!offer?.currency || !Number.isFinite(price)) return name;
+  return `${name} (${formatAmount(price, { currency: offer.currency })})`;
 }
 
 const moduleInstallRows = computed<ReportRow[]>(() =>
@@ -838,7 +851,8 @@ const moduleInstallRows = computed<ReportRow[]>(() =>
     const v = visual[moduleStatus[info.kind]];
     return {
       section: `installed_modules/${m.id}`,
-      label: m.id,
+      // hub#488: el nombre que el dueño reconoce del marketplace, no nuestra clave de manifest.
+      label: appLabel(m.id, appNames.value),
       icon: v.icon,
       color: v.color,
       statusLabel: v.label(),

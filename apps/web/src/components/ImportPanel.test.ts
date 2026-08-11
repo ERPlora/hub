@@ -27,6 +27,14 @@ vi.mock('../lib/runtime', async () => {
     moduleInstallStatusInfo: actual.moduleInstallStatusInfo,
   };
 });
+// hub#488 — los nombres humanos de las apps. Mutable por test: la mayoría no pone ninguno, que es
+// el caso «no hay nombre» y debe seguir pintando el id.
+const appNames = vi.hoisted(() => new Map<string, string>());
+vi.mock('../lib/app-names', async () => {
+  const actual = await vi.importActual<typeof import('../lib/app-names')>('../lib/app-names');
+  // `appLabel` NO se stubea: la regla de «nombre o id, nunca un invento» es el contrato bajo prueba.
+  return { appLabel: actual.appLabel, loadAppNames: async () => appNames };
+});
 // Ref mutable: varios tests necesitan alternar owner/admin ↔ sin permiso.
 const isAdminRef = vi.hoisted(() => ({ value: true }));
 vi.mock('../lib/session', () => ({ isAdmin: isAdminRef }));
@@ -56,6 +64,7 @@ beforeEach(() => {
   fetchBlueprintCatalog.mockReset();
   downloadBlueprint.mockReset();
   fetchImportReport.mockReset();
+  appNames.clear();
   isAdminRef.value = true;
 });
 
@@ -259,6 +268,29 @@ describe('ImportPanel · report: a module blocked by entitlement (ADR-0060)', ()
     expect(text).toContain(en.importPage.statusBlocked);
     expect(text).not.toContain(en.importPage.statusFailed);
     expect(text).not.toContain('Subscribe to them');
+  });
+
+  // hub#488 — the row and the sentence both named the app by our manifest key. The owner is being
+  // asked to go and subscribe to it; `invoice` is not what the marketplace calls it.
+  it('names the blocked app the way the marketplace does, not by its manifest id', async () => {
+    appNames.set('verifactu', 'VeriFactu · AEAT');
+    appNames.set('invoice', 'Facturación');
+    const report = await reportWithBlockedModule();
+    const text = report.text();
+
+    expect(text).toContain('VeriFactu · AEAT');
+    expect(text).toContain('Facturación');
+    // The price still comes from the engine, next to the name the owner will recognise.
+    expect(text).toMatch(/9[.,]00/);
+    // And the raw key is gone from the row: leaving both would just be noise.
+    expect(text).not.toMatch(/\binvoice\b/);
+  });
+
+  it('an app the shell has no name for keeps its id, and the report still paints', async () => {
+    const report = await reportWithBlockedModule();
+
+    expect(report.text()).toContain('invoice');
+    expect(report.text()).toContain(en.importPage.statusBlocked);
   });
 
   it('the other three states keep their visual', async () => {

@@ -139,7 +139,7 @@
 //   pending. The card says that before the click and hands the rest to the checklist below.
 // * **It degrades in silence.** A hub with no cloud credential (local, dev) or a catalogue that
 //   cannot be reached gets no card and no error banner — the other doors are all still there.
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IonButton, IonSpinner } from '@ionic/vue';
 
@@ -163,6 +163,7 @@ import {
   type CatalogBlueprint,
 } from '../lib/runtime';
 import { user } from '../lib/session';
+import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
 import type { SetupStatus } from '../lib/setup-status';
 
 const props = defineProps<{
@@ -238,8 +239,21 @@ const outcomeTitle = computed<string>(() => {
   return t('setup.hero.partialTitle');
 });
 
+// hub#488 — the sentences below ask the owner to go and subscribe to an app, so they must call it
+// what the marketplace calls it. Resolved when painting, never baked into the engine's report: the
+// id is the stable key, and this card is the FIRST screen a new business sees. Best-effort — the
+// computed repaints on its own when the map lands, and an unknown app keeps its id.
+const appNames = ref<AppNames>(new Map());
+onMounted(() => {
+  void loadAppNames().then((names) => {
+    appNames.value = names;
+  });
+});
+
 const blockedApps = computed<string[]>(() =>
-  outcome.value?.kind === 'partial' ? outcome.value.blockedApps : [],
+  outcome.value?.kind === 'partial'
+    ? outcome.value.blockedApps.map((id) => appLabel(id, appNames.value))
+    : [],
 );
 
 /** Something actually broke — as opposed to an app that merely has to be added to the plan. */
@@ -259,7 +273,10 @@ const somethingBroke = computed<boolean>(
  */
 const failedMessage = computed<string>(() => {
   const apps = outcome.value?.kind === 'partial' ? outcome.value.failedApps : [];
-  return apps.length ? t('setup.hero.failedApps', { apps: apps.join(', ') }) : t('setup.hero.failed');
+  // hub#488: named the way the owner knows them, so «these did not go in» is a sentence he can act
+  // on and repeat to support — not a list of our manifest keys.
+  const named = apps.map((id) => appLabel(id, appNames.value));
+  return named.length ? t('setup.hero.failedApps', { apps: named.join(', ') }) : t('setup.hero.failed');
 });
 
 const reason = computed<string>(() =>
