@@ -48,6 +48,12 @@ const LEASE_SECONDS: i64 = 300;
 /// created by the runtime before the migration engine runs at all — a hub with zero modules still
 /// has an outbox — so their shape cannot depend on a numbered version. It also keeps additive
 /// columns out of the way of the number races between parallel branches.
+///
+/// `ix_outbox_prune` backs the retention sweep (hub#699, `crate::retention`), which scans by
+/// terminal age and not by `next_attempt_at`, so `ix_outbox_due` does not serve it. It is
+/// **partial** over the two terminal statuses: a row is born `pending` and only enters this index
+/// when it stops moving, so the relay's hot path pays nothing for it, and the sweep's repeated
+/// bounded passes stop being a table scan each.
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS _event_outbox (\
   id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, user_id TEXT NOT NULL, \
@@ -68,6 +74,9 @@ CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_
 CREATE INDEX IF NOT EXISTS ix_outbox_run ON _event_outbox (hub_id, run_id) WHERE run_id <> '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_parent ON _event_outbox (hub_id, parent_event_id) \
   WHERE parent_event_id <> '';\
+CREATE INDEX IF NOT EXISTS ix_outbox_prune \
+  ON _event_outbox (hub_id, COALESCE(delivered_at, discarded_at, created_at)) \
+  WHERE status IN ('delivered', 'discarded');\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
   PRIMARY KEY (event_id, listener_command));";
@@ -676,9 +685,15 @@ pub async fn retry(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<b
 /// Closes a dead-letter for good: status [`STATUS_DISCARDED`] + who and when. `false` if there is
 /// no dead-letter with that id in this hub.
 ///
-/// **The row is CONSERVED — never `DELETE`.** It is the only record that the event existed, and a
-/// discard is a decision somebody made; both have to survive it. The relay cannot take it again
-/// because [`claim_next_due`] only ever claims `pending`.
+/// **The gesture never `DELETE`s.** The row is the only record that the event existed, and a
+/// discard is a decision somebody made; both have to survive the gesture that closed them. The
+/// relay cannot take it again because [`claim_next_due`] only ever claims `pending`.
+///
+/// What *does* eventually remove it is retention (hub#699, `crate::retention`): ninety days after
+/// it was discarded it is pruned like any other terminal row. That is not a contradiction — it is
+/// the difference between an operator closing a case, which must leave evidence, and history
+/// ageing out long after anybody would look. `dead`, which is still waiting for that decision, has
+/// no maximum age at all.
 ///
 /// `discarded_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`), never
 /// something the caller sent in the body.

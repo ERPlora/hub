@@ -53,6 +53,7 @@ pub mod print_queue;
 pub mod queries;
 pub mod registry;
 pub mod reset;
+pub mod retention;
 pub mod roles;
 pub mod scheduler;
 pub mod secret_box;
