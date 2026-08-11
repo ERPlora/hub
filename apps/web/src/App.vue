@@ -84,8 +84,8 @@
         </ion-content>
 
         <!-- Footer: brand (logo + wordmark, click → home) + versión de la app. El usuario se
-             movió a la cabecera del menú; el botón «Instalar app» lo sustituye el modal PWA
-             (PwaInstallModal). -->
+             movió a la cabecera del menú. Aquí NO hay nada de instalar: el hub es una PWA y quien
+             la quiera instalada la instala desde su navegador — el shell no lo pide (hub#685). -->
         <ion-footer class="ion-no-border sidebar-foot">
           <!-- The app on this counter is older than the one we publish (hub#400). In the FOOTER on
                purpose: it is the one part of the sidebar that never scrolls away, and the issue
@@ -140,9 +140,6 @@
          AUTOMÁTICAMENTE al runtime (lib/error-report), sin modal ni acción del usuario. -->
     <template v-if="isAuthed">
       <AssistantDrawer />
-      <!-- Modal «vista nativa» (PWA): se ofrece al entrar mientras la app no esté instalada;
-           lib/pwa decide (standalone/Tauri/descartado-para-siempre → no se abre). -->
-      <PwaInstallModal />
       <!-- El diálogo de aprobación por PIN (hub#363). Se monta UNA vez, aquí, y lo abre el
            TRANSPORTE ante un `requires_elevation` — nunca un módulo ni una pantalla: así el
            encargado aprueba igual venga la acción de la app que venga, y ninguna se lo deja sin
@@ -163,7 +160,6 @@ import {
 } from '@ionic/vue';
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
-import PwaInstallModal from './components/PwaInstallModal.vue';
 import ElevationDialog from './components/ElevationDialog.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import { user, isAuthed, logout } from './lib/session';
@@ -175,7 +171,6 @@ import { resolveEntitlement, needsActivation } from './lib/entitlement';
 import { railCollapsed } from './lib/shell';
 import { SHELL_MENU_ID, runAfterShellMenuCloses } from './lib/shell-menu';
 import { PROFILE_ROUTE } from './lib/routes';
-import { maybeShowInstallModal } from './lib/pwa';
 import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
 import { installIdleLogout } from './lib/idle-logout';
@@ -312,16 +307,6 @@ installIdleLogout(() => {
   logout();
   void router.replace('/login');
 });
-// Modal PWA «vista nativa»: se ofrece al ENTRAR (autenticado y ya FUERA de /login — el login
-// cloud crea sesión antes de terminar, p. ej. en el paso «crea tu PIN», y el modal no debe
-// taparlo). lib/pwa garantiza como mucho una oferta por sesión.
-watch(
-  () => isAuthed.value && !route.path.startsWith('/login'),
-  (entered) => {
-    if (entered) maybeShowInstallModal();
-  },
-  { immediate: true },
-);
 // La franja bloqueante NO se puede descartar (hub#374): la única forma de que desaparezca es que el
 // hub deje de estar bloqueado, así que el documento se relee al navegar. Es también lo que detecta
 // un gate que APARECE a mitad de sesión —instalar el módulo que pide certificado añade un ⛔ que en

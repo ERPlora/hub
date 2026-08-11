@@ -68,16 +68,6 @@ export default {
     cancel: 'Ahora no',
     failed: 'No hemos podido abrir tu navegador. Entra en erplora.com para conseguir la nueva versión.',
   },
-  // Modal de instalación PWA (PwaInstallModal.vue) — sustituye al botón «Instalar app» del sidebar.
-  pwa: {
-    title: 'Llévate la experiencia completa',
-    hook: 'Usa ERPlora como una app nativa: pantalla completa, su propio icono y acceso al instante — sin barras del navegador de por medio.',
-    nativeView: 'Vista nativa',
-    cancel: 'Ahora no',
-    dontShowAgain: 'No volver a mostrar',
-    iosHint: 'En iPhone/iPad: toca Compartir (el cuadrado con la flecha) y elige «Añadir a pantalla de inicio».',
-    browserHint: 'En el menú de tu navegador, elige «Instalar aplicación» (o «Añadir a pantalla de inicio»).',
-  },
   assistant: {
     confirmTitle: 'El asistente quiere ejecutar una acción',
     confirmCancel: 'Cancelar',
