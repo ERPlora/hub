@@ -151,6 +151,7 @@ mod tests {
         let flow = store::create(
             db,
             HUB,
+            &crate::registry::Registry::new(),
             &NewFlow {
                 name: "A".into(),
                 enabled: true,

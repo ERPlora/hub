@@ -1,7 +1,7 @@
 {
   "id": "agenda",
   "name": "Agenda",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "agent": { "description": "Appointments: free slots and bookings" },
   "permissions": ["agenda.view", "agenda.book", "agenda.cancel"],
   "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
@@ -32,12 +32,6 @@
       "transaction": true,
       "sql": ["commands/booking_cancel.sql"],
       "ai": { "description": "Cancel a booked appointment." }
-    },
-    "agenda._purge_slots": {
-      "permission": "agenda.cancel",
-      "transaction": true,
-      "sql": ["commands/purge_slots.sql"],
-      "internal": true
     }
   }
 }

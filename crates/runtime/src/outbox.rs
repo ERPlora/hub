@@ -32,6 +32,11 @@ pub const REMINDER_DUE_SUFFIX: &str = ".reminder.due";
 /// No es un command de módulo: lo entrega el runtime vía el transporte de notificación.
 pub const HOST_NOTIFY_LISTENER: &str = "host.notify";
 
+/// El evento que encola un step `notify` de un flujo (hub#821). Lleva el sufijo de arriba a
+/// propósito: es el MISMO camino de entrega que el de un módulo —transporte, reintentos, backoff,
+/// dead-letter— y lo único que cambia es cómo se autorizó el destinatario.
+pub const FLOW_NOTIFY_EVENT: &str = "flow.reminder.due";
+
 /// Tamaño de lote por ciclo del relay (mantiene el lock del runtime acotado).
 const BATCH: i64 = 50;
 
@@ -270,7 +275,8 @@ async fn claim_next_due(db: &dyn DatabaseAdapter, now: &str) -> Result<Option<Js
                  WHERE status = 'pending' AND next_attempt_at <= :now \
                    AND (claim_expires_at IS NULL OR claim_expires_at <= :now) \
                  ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED) \
-               RETURNING id, hub_id, user_id, permissions, event_name, module_id, payload, depth, attempts";
+               RETURNING id, hub_id, user_id, permissions, event_name, module_id, payload, depth, \
+                         attempts, run_id";
     let res = db.query(sql, &p).await?;
     Ok(res.rows.into_iter().next())
 }
@@ -356,7 +362,9 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // (listener sintético `host.notify`) y, si el transporte falla, reintento/backoff/dead-letter.
     if event_name.ends_with(REMINDER_DUE_SUFFIX) {
         let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
-        if let Err(e) = deliver_host_notify(db, registry, &id, &module_id, &ctx.hub_id, &payload).await
+        let run_id = row["run_id"].as_str().unwrap_or_default().to_string();
+        if let Err(e) =
+            deliver_host_notify(db, registry, &id, &module_id, &run_id, &ctx.hub_id, &payload).await
         {
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {e}"));
@@ -409,11 +417,20 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
 ///  2. el canal es uno de los que ese módulo **declara** en `capabilities.notify.channels`;
 ///  3. el destinatario **se resuelve desde datos del hub** — nunca una dirección libre del payload
 ///     ([`host_notify::assert_recipient_allowed`]).
+///
+/// **La cuarta puerta, para lo que encola un FLUJO** (hub#821). Un flujo no es un módulo, así que
+/// las puertas 1 y 2 no tienen a quién preguntar; lo que ocupa su sitio son sus dos grants, y el
+/// destinatario no sale de la allowlist sino de una query concedida. La fila sigue ese camino solo
+/// si es **del kernel y de un run** — `module_id` vacío **y** `run_id` presente—, y eso un módulo no
+/// lo puede fabricar: `run_id` lo estampa el runtime desde el contexto de automatización (hub#666),
+/// jamás desde el payload, y toda fila emitida por un command lleva su `module_id`. Copiar un
+/// `resolved_via` ajeno en el payload propio no abre nada: se cae por las tres puertas de siempre.
 async fn deliver_host_notify(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     event_id: &str,
     module_id: &str,
+    run_id: &str,
     hub_id: &str,
     payload: &Params,
 ) -> Result<()> {
@@ -423,29 +440,50 @@ async fn deliver_host_notify(
     if delivery_exists(db, event_id, HOST_NOTIFY_LISTENER).await? {
         return Ok(()); // ya enviado en un intento previo (idempotencia)
     }
-    // Puerta 1 — capability del MÓDULO emisor (no del hub): sin `notify` concedida, no hay envío.
-    // Sin `module_id` (filas anteriores a la atribución) tampoco: no se puede autorizar a nadie.
-    if module_id.trim().is_empty() {
-        return Err(RuntimeError::Notify(
-            "evento de notificación sin módulo emisor atribuido: no se puede comprobar la \
-             capability `notify` → no se envía"
-                .to_string(),
-        ));
-    }
-    crate::capabilities::require(
-        db,
-        registry,
-        module_id,
-        hub_id,
-        crate::manifest::CapabilityKind::Notify,
-    )
-    .await?;
-
     let intent = NotifyIntent::from_event_payload(payload)?;
-    // Puerta 2 — el canal tiene que estar declarado por el módulo emisor.
-    host_notify::assert_channel_declared(registry, module_id, intent.channel)?;
-    // Puerta 3 — el destinatario sale de los datos del hub, no del payload del handler.
-    host_notify::assert_recipient_allowed(db, hub_id, &intent).await?;
+    let released_by_flow = module_id.trim().is_empty() && !run_id.trim().is_empty();
+
+    if released_by_flow {
+        // Puerta 4 — la autorización del flujo, **releída ahora**: revocar cualquiera de los dos
+        // grants corta un mensaje que ya estaba en la cola. La forma del destinatario se comprueba
+        // igual: que salga de una query concedida no lo convierte en una dirección válida.
+        let resolved_via = payload
+            .get(host_notify::RESOLVED_VIA_KEY)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default();
+        crate::flows::grants::check_notify_release(
+            db,
+            hub_id,
+            run_id,
+            resolved_via,
+            intent.channel,
+        )
+        .await?;
+        host_notify::check_recipient_syntax(intent.channel, &intent.to)?;
+    } else {
+        // Puerta 1 — capability del MÓDULO emisor (no del hub): sin `notify` concedida, no hay
+        // envío. Sin `module_id` (filas anteriores a la atribución) tampoco: no se puede autorizar
+        // a nadie.
+        if module_id.trim().is_empty() {
+            return Err(RuntimeError::Notify(
+                "evento de notificación sin módulo emisor atribuido: no se puede comprobar la \
+                 capability `notify` → no se envía"
+                    .to_string(),
+            ));
+        }
+        crate::capabilities::require(
+            db,
+            registry,
+            module_id,
+            hub_id,
+            crate::manifest::CapabilityKind::Notify,
+        )
+        .await?;
+        // Puerta 2 — el canal tiene que estar declarado por el módulo emisor.
+        host_notify::assert_channel_declared(registry, module_id, intent.channel)?;
+        // Puerta 3 — el destinatario sale de los datos del hub, no del payload del handler.
+        host_notify::assert_recipient_allowed(db, hub_id, &intent).await?;
+    }
 
     // ¿WhatsApp premium de ERPlora? → proxy Cloud con cuota; si no, secreto local del tenant.
     let premium = !registry.premium_whatsapp_modules.is_empty();

@@ -25,12 +25,19 @@ use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
 use crate::flows::net::{self, Url};
+use crate::host_notify::{Channel, FLOW_GRANT_PREFIX};
 use crate::registry::{new_id, now_rfc3339, Registry};
 
 pub const ERR_GRANT_DENIED: &str = "flow.grant_denied";
 pub const ERR_UNKNOWN_GRANT_KIND: &str = "flow.unknown_grant_kind";
 pub const ERR_GRANT_KIND_NOT_AVAILABLE: &str = "flow.grant_kind_not_available";
 pub const ERR_INVALID_HTTP_PATTERN: &str = "flow.invalid_http_pattern";
+/// hub#821 — a `notify` grant that names a channel this hub cannot send on, or no channel at all.
+pub const ERR_INVALID_NOTIFY_GRANT: &str = "flow.invalid_notify_grant";
+/// hub#821 — a `recipient_query` grant that is not `<query>#<field>`.
+pub const ERR_INVALID_RECIPIENT_GRANT: &str = "flow.invalid_recipient_grant";
+/// hub#824 — a command a flow can never invoke, named where a flow names commands.
+pub const ERR_INTERNAL_COMMAND: &str = "flow.internal_command";
 
 /// The five kinds of ADR-0283 §2. The vocabulary is frozen here; what grows is which of them can
 /// be CREATED, because a grant for something the kernel cannot do yet would tell an owner that
@@ -42,12 +49,17 @@ pub enum GrantKind {
     /// an agent step offers the model ("assembled ∩ declared by the step ∩ granted"), and without
     /// it that intersection would have nothing behind it for reads.
     Query,
-    /// Reserved — hub#663 part 2 (`notify` per channel).
+    /// hub#821 — **one channel** a `notify` step may leave by (`email`, `whatsapp`). Separate from
+    /// [`GrantKind::RecipientQuery`] on purpose: "may this flow spend WhatsApp messages" and "whose
+    /// address may it reach" are two questions an owner answers separately, and a flow that may
+    /// email its customers must not gain their phone the day somebody adds a second channel.
     Notify,
     /// hub#662 — one URL pattern, `https://host/path*`, matched against the URL the step really
     /// built (see [`Authority::allows_http`]).
     Http,
-    /// Reserved — hub#663 part 2 (`<query>#<field>`, contacting customers of a module's tables).
+    /// hub#821 — `<query>#<field>`: the ONE field of the ONE read a `notify` step may take a
+    /// recipient from. Customers live in a module's table, so this is the only way a flow ever
+    /// reaches one — never an address out of the event payload.
     RecipientQuery,
 }
 
@@ -71,13 +83,12 @@ impl GrantKind {
             _ => return None,
         })
     }
-    /// Can this kind be created today? The others are refused by name, with the issue that brings
-    /// them, instead of being stored as a promise nothing keeps.
+    /// Can this kind be created today? The list grew one issue at a time — `http` with hub#662,
+    /// `query` with hub#665, and `notify`/`recipient_query` with hub#821 — because a grant for
+    /// something the kernel cannot do would tell an owner their flow may message a customer when
+    /// it cannot. With hub#821 the five of ADR-0283 §2 are all real.
     pub fn is_available(self) -> bool {
-        matches!(
-            self,
-            GrantKind::Command | GrantKind::Http | GrantKind::Query
-        )
+        true
     }
     pub const ALL: &'static [GrantKind] = &[
         GrantKind::Command,
@@ -145,6 +156,14 @@ impl Authority {
                 // the flow's gate and then be refused by the permission check inside
                 // `queries::execute`: the grant would open one door and the next one would be shut.
                 GrantKind::Query => registry.get_query(name).map(|q| q.def.permission.clone()),
+                // Same reason for the read behind a `recipient_query` (hub#821): the `notify` step
+                // runs it through the very same `queries::execute`. It does NOT make that query a
+                // tool an `ai` step may call — that is [`Authority::allows_query`], and it stays
+                // false here: the grant authorises taking ONE field out of the row to address a
+                // message, not handing the row to a model.
+                GrantKind::RecipientQuery => split_recipient(name)
+                    .and_then(|(query, _)| registry.get_query(query))
+                    .map(|q| q.def.permission.clone()),
                 _ => None,
             })
             .filter(|p| !p.is_empty() && p != "*")
@@ -166,6 +185,27 @@ impl Authority {
             .iter()
             .filter(|(kind, _)| *kind == GrantKind::Http)
             .any(|(_, pattern)| url_matches(pattern, url))
+    }
+
+    /// May this flow send by this channel RIGHT NOW? (hub#821)
+    ///
+    /// Per channel and not per "may notify", because the channels do not cost the same: a WhatsApp
+    /// message is metered and billed through Meta, an email is not. An owner who allows the
+    /// reminder by email has not agreed to pay for it by WhatsApp.
+    pub fn allows_notify(&self, channel: Channel) -> bool {
+        self.granted
+            .contains(&(GrantKind::Notify, channel.as_str().to_string()))
+    }
+
+    /// May this flow take a recipient from THIS field of THIS query RIGHT NOW? (hub#821)
+    ///
+    /// The pair is compared whole. A grant over `crm.customer.get#phone` is not a grant over the
+    /// same customer's email, nor over the phone in a query that returns the whole address book:
+    /// what a recipient grant contains is one column of one declared read, and everything else is
+    /// the same default answer as always.
+    pub fn allows_recipient(&self, query: &str, field: &str) -> bool {
+        self.granted
+            .contains(&(GrantKind::RecipientQuery, recipient_value(query, field)))
     }
 
     pub fn is_empty(&self) -> bool {
@@ -296,6 +336,116 @@ fn check_http_pattern(pattern: &str) -> Result<()> {
     Ok(())
 }
 
+/// `<query>#<field>` taken apart, or `None` when it is not that shape.
+fn split_recipient(value: &str) -> Option<(&str, &str)> {
+    let (query, field) = value.split_once('#')?;
+    if query.is_empty() || field.is_empty() || field.contains('#') {
+        return None;
+    }
+    Some((query, field))
+}
+
+/// How a `recipient_query` grant is written down. One function so the value that is STORED, the
+/// value that is MATCHED and the value shown on the grants screen cannot drift apart.
+pub fn recipient_value(query: &str, field: &str) -> String {
+    format!("{query}#{field}")
+}
+
+/// Refuses a `notify` grant that does not name one channel this hub can actually send on.
+///
+/// `sms` is refused by name: ADR-0012 lists it, and neither the SaaS proxy nor the hub has a
+/// transport for it. A grant for it would read as permission on the screen and turn into eight
+/// retries and a dead-letter the first night the flow ran.
+fn check_notify_channel(value: &str) -> Result<()> {
+    let refuse = |why: String| {
+        Err(RuntimeError::Domain {
+            code: ERR_INVALID_NOTIFY_GRANT.to_string(),
+            message: format!("`{value}` is not a usable notify grant: {why}."),
+        })
+    };
+    match Channel::parse(value.trim()) {
+        Some(channel) if channel.is_deliverable() => Ok(()),
+        Some(channel) => refuse(format!(
+            "this hub has no transport for `{}` — the SaaS proxies email and whatsapp, and the hub \
+             holds no provider credential of its own",
+            channel.as_str()
+        )),
+        None => refuse(format!(
+            "a notify grant names ONE channel, one of {}",
+            Channel::DELIVERABLE
+                .iter()
+                .map(|c| c.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    }
+}
+
+/// **Refuses a command that `Origin::Automation` can never invoke** (hub#824).
+///
+/// An internal command (`_` on the last segment, or `internal: true` — [`CommandDef::is_internal`])
+/// is barred to automation exactly as it is to an external caller: it is the half of a module that
+/// exists so the public command decides when it runs (flows.md §2, and the gate in
+/// `commands::execute_at`). Before this, only that gate asked — three seconds too late, with the run
+/// already `failed` and the grants screen still saying «granted».
+///
+/// **An unknown command is NOT this function's business.** It answers one question, and each door
+/// decides what «not in the registry» means for it: a GRANT refuses it (a grant naming nothing reads
+/// as authorisation), while a DOCUMENT may legitimately name a module that is not installed yet —
+/// a blueprint lands its flows and its modules in whatever order.
+///
+/// One function on purpose: the grants door and the save door must refuse the same names with the
+/// same code, or one of them becomes the lenient one.
+pub fn refuse_internal_command(registry: &Registry, command: &str) -> Result<()> {
+    match registry.get_command(command) {
+        Some(cmd) if cmd.def.is_internal(command) => Err(RuntimeError::Domain {
+            code: ERR_INTERNAL_COMMAND.to_string(),
+            message: format!(
+                "`{command}` is an INTERNAL command: only the runtime itself invokes it, so an \
+                 automation could never run it. Refused here rather than accepted and denied at \
+                 execution — a permission nobody enforces reads as one that was granted. Name the \
+                 public command that orchestrates it instead."
+            ),
+        }),
+        _ => Ok(()),
+    }
+}
+
+/// Refuses a `recipient_query` grant that is not «one field of one declared read».
+///
+/// The query has to exist, for the same reason a `command` grant's does: a grant naming nothing
+/// reads as authorisation on the screen. And the field has to be a plain column name — a path like
+/// `customer.phone` would look like it walks into the row and does not (the recipient is taken from
+/// the row's own column), so it is refused instead of silently resolving to nothing at 3 AM.
+fn check_recipient_pattern(registry: &Registry, value: &str) -> Result<()> {
+    let refuse = |why: String| {
+        Err(RuntimeError::Domain {
+            code: ERR_INVALID_RECIPIENT_GRANT.to_string(),
+            message: format!(
+                "`{value}` is not a usable recipient grant: {why}. The shape is `<query>#<field>` \
+                 (e.g. `crm.customer.get#phone`)."
+            ),
+        })
+    };
+    let Some((query, field)) = split_recipient(value) else {
+        return refuse("it must name a query and a field, separated by `#`".to_string());
+    };
+    if registry.get_query(query).is_none() {
+        return Err(RuntimeError::QueryNotFound(query.to_string()));
+    }
+    if !field
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        || field.chars().next().is_some_and(|c| c.is_ascii_digit())
+    {
+        return refuse(format!(
+            "`{field}` is not a column name; the recipient is ONE column of the row the query \
+             returns"
+        ));
+    }
+    Ok(())
+}
+
 /// Reads the live grants of a flow. One query, and the caller decides what to ask of the result.
 pub async fn authority(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) -> Result<Authority> {
     let mut p = Params::new();
@@ -361,6 +511,140 @@ pub async fn check_query_grant(
     })
 }
 
+/// The gate a `notify` step passes before anything is queued (hub#821): the CHANNEL and the
+/// RECIPIENT are two grants, and both have to be live at this instant.
+///
+/// Returns the **id** of the recipient grant, which is what travels with the queued event as
+/// `resolved_via` and is re-read at delivery ([`check_notify_release`]). Returning the id rather
+/// than a bool is the point: the release the message carries names the very row that authorised it,
+/// so revoking that row is what stops the message.
+pub async fn check_notify_grants(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    flow_id: &str,
+    authority: &Authority,
+    channel: Channel,
+    query: &str,
+    field: &str,
+) -> Result<String> {
+    let deny = |what: String| RuntimeError::Domain {
+        code: ERR_GRANT_DENIED.to_string(),
+        message: format!(
+            "flow `{flow_id}` has no live {what}. A flow messages the people an owner listed for \
+             it, through the channel they allowed, and nothing else (ADR-0283 §5)."
+        ),
+    };
+    if !authority.allows_notify(channel) {
+        return Err(deny(format!(
+            "`notify` grant for the channel `{}`",
+            channel.as_str()
+        )));
+    }
+    if !authority.allows_recipient(query, field) {
+        return Err(deny(format!(
+            "`recipient_query` grant for `{}`",
+            recipient_value(query, field)
+        )));
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("flow_id".into(), json!(flow_id));
+    p.insert("value".into(), json!(recipient_value(query, field)));
+    p.insert("kind".into(), json!(GrantKind::RecipientQuery.as_str()));
+    let res = db
+        .query(
+            "SELECT id FROM _flow_grants \
+             WHERE hub_id = :hub_id AND flow_id = :flow_id AND kind = :kind AND value = :value \
+               AND deleted_at IS NULL",
+            &p,
+        )
+        .await?;
+    res.rows
+        .first()
+        .and_then(|r| r["id"].as_str().map(|s| s.to_string()))
+        .ok_or_else(|| {
+            deny(format!(
+                "`recipient_query` grant for `{}`",
+                recipient_value(query, field)
+            ))
+        })
+}
+
+/// **The release, re-read at delivery** (hub#821) — the property the whole design turns on.
+///
+/// A queued message is durable: it survives a restart, it is retried with backoff, and a `delay`
+/// step can put hours between the decision and the send. If the grants were only checked when the
+/// event was built, revoking one would stop the NEXT message and let the one already in the queue
+/// through — and «I revoked it» has to mean the message does not go.
+///
+/// So the outbox asks again, here, with the row in front of it: the run still exists, the grant it
+/// names is still alive and still belongs to that run's flow, and the channel is still allowed.
+/// Any of those gone and the send is refused — the row is not marked delivered, it retries and it
+/// ends in the dead-letter, visibly, instead of quietly going out.
+pub async fn check_notify_release(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+    resolved_via: &str,
+    channel: Channel,
+) -> Result<()> {
+    let refuse = |why: String| {
+        Err(RuntimeError::Notify(format!(
+            "el destinatario lo autorizó un flujo (`{resolved_via}`) y esa autorización ya no vale: \
+             {why} → no se envía"
+        )))
+    };
+    let Some(grant_id) = resolved_via.strip_prefix(FLOW_GRANT_PREFIX) else {
+        return refuse("no nombra un grant de flujo".to_string());
+    };
+
+    // The flow is read from the RUN, never from the payload: `run_id` is stamped by the runtime
+    // from the automation context (hub#666) and a module cannot put one there.
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("run_id".into(), json!(run_id));
+    let res = db
+        .query(
+            "SELECT flow_id FROM _flow_runs WHERE id = :run_id AND hub_id = :hub_id \
+               AND deleted_at IS NULL",
+            &p,
+        )
+        .await?;
+    let Some(flow_id) = res
+        .rows
+        .first()
+        .and_then(|r| r["flow_id"].as_str().map(|s| s.to_string()))
+    else {
+        return refuse("el run que la pidió ya no existe".to_string());
+    };
+
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("flow_id".into(), json!(flow_id));
+    p.insert("id".into(), json!(grant_id));
+    p.insert("kind".into(), json!(GrantKind::RecipientQuery.as_str()));
+    let res = db
+        .query(
+            "SELECT value FROM _flow_grants \
+             WHERE id = :id AND hub_id = :hub_id AND flow_id = :flow_id AND kind = :kind \
+               AND deleted_at IS NULL",
+            &p,
+        )
+        .await?;
+    if res.rows.is_empty() {
+        return refuse(format!(
+            "el grant `recipient_query` del flujo `{flow_id}` fue REVOCADO"
+        ));
+    }
+    if !authority(db, hub_id, &flow_id).await?.allows_notify(channel) {
+        return refuse(format!(
+            "el flujo `{flow_id}` ya no tiene grant `notify` para el canal `{}`",
+            channel.as_str()
+        ));
+    }
+    Ok(())
+}
+
 /// Replaces the whole grant list of a flow (the `PUT …/grants` contract): what disappears is
 /// **revoked** (soft-delete + `revoked_by`), what stays is left alone with its original
 /// `granted_by`, and what is new is inserted.
@@ -377,27 +661,40 @@ pub async fn replace(
     granted_by: &str,
 ) -> Result<()> {
     for (kind, value) in wanted {
+        // The five kinds of ADR-0283 §2 are all real since hub#821, so nothing lands here any
+        // more. The guard stays because the rule it enforces is the one that got them here one at a
+        // time: a grant is stored only when something enforces it.
         if !kind.is_available() {
             return Err(RuntimeError::Domain {
                 code: ERR_GRANT_KIND_NOT_AVAILABLE.to_string(),
                 message: format!(
-                    "grants of kind `{}` cannot be created yet (http: hub#662, notify and \
-                     recipient_query: hub#663 part 2). Refused rather than stored as a permission \
-                     nothing enforces.",
+                    "grants of kind `{}` cannot be created yet. Refused rather than stored as a \
+                     permission nothing enforces.",
                     kind.as_str()
                 ),
             });
         }
         // A grant naming an operation that does not exist is a promise about nothing — and, worse,
         // it reads as authorisation on the screen. `PUT …/grants` refuses the whole list (§9).
-        if *kind == GrantKind::Command && registry.get_command(value).is_none() {
-            return Err(RuntimeError::CommandNotFound(value.clone()));
+        if *kind == GrantKind::Command {
+            if registry.get_command(value).is_none() {
+                return Err(RuntimeError::CommandNotFound(value.clone()));
+            }
+            // hub#824: existing is not enough. An internal command exists AND is unreachable, which
+            // is the worst combination for a screen — it looks granted and it is denied at 3 AM.
+            refuse_internal_command(registry, value)?;
         }
         if *kind == GrantKind::Query && registry.get_query(value).is_none() {
             return Err(RuntimeError::QueryNotFound(value.clone()));
         }
         if *kind == GrantKind::Http {
             check_http_pattern(value)?;
+        }
+        if *kind == GrantKind::Notify {
+            check_notify_channel(value)?;
+        }
+        if *kind == GrantKind::RecipientQuery {
+            check_recipient_pattern(registry, value)?;
         }
     }
 
@@ -559,6 +856,17 @@ mod tests {
             "sales.sale.void".into(),
             crate::flows::test_support::command("sales", "sales.void_sale", "SELECT 1;", vec![]),
         );
+        // hub#824 — the two spellings of «internal», both real in the catalogue: the legacy `_`
+        // convention on the last segment, and the explicit `internal: true` on a name that does not
+        // carry it. A door that only knew the first would still let the second through.
+        reg.commands.insert(
+            "sales._insert_sale".into(),
+            crate::flows::test_support::command("sales", "sales.add_sale", "SELECT 1;", vec![]),
+        );
+        let mut flagged =
+            crate::flows::test_support::command("sales", "sales.add_sale", "SELECT 1;", vec![]);
+        flagged.def.internal = true;
+        reg.commands.insert("sales.reindex".into(), flagged);
         reg.queries.insert(
             "sales.sale.list".into(),
             crate::flows::test_support::query("sales", "sales.view_sale", "SELECT 1;"),
@@ -574,6 +882,15 @@ mod tests {
         let db = fresh_db().await;
         crate::flows::test_support::ensure_schema(&db, HUB).await;
         db
+    }
+
+    /// The stable CODE of a domain refusal. `Display` carries only the message, and the code is the
+    /// half the editor programs against (flows.md §13.8).
+    fn code_of(err: &RuntimeError) -> &str {
+        match err {
+            RuntimeError::Domain { code, .. } => code,
+            other => panic!("expected a domain refusal, got {other}"),
+        }
     }
 
     /// An URL the way the kernel really produces one: through the single parse of [`net`]. Nothing
@@ -694,15 +1011,366 @@ mod tests {
         assert!(format!("{err}").contains("ghost.command"), "{err}");
     }
 
+    /// **hub#824** — an INTERNAL command exists in the registry, so the «does it exist» check waves
+    /// it through; and `execute_at` will refuse it three seconds later, because `Origin::Automation`
+    /// is barred from internals exactly like `External` (flows.md §2). Between those two moments the
+    /// grants screen says «granted» about something that can never run — and a grant that promises
+    /// what nobody enforces is worse than its absence, because the owner reads it as authorisation.
+    ///
+    /// So the refusal moves to the door that already resolves the name, and it is refused by CODE:
+    /// the editor has to be able to say «that one is internal», not «error».
     #[tokio::test]
-    async fn the_kinds_the_kernel_cannot_enforce_yet_are_refused_by_name() {
+    async fn an_internal_command_cannot_be_granted_even_though_it_exists() {
         let db = db_with_schema().await;
-        for kind in [GrantKind::Notify, GrantKind::RecipientQuery] {
-            let err = replace(&db, HUB, FLOW, &registry(), &[(kind, "x".into())], "hub_user:1")
-                .await
-                .expect_err("a permission nothing enforces must not be stored");
-            assert!(format!("{err}").contains(kind.as_str()), "{err}");
+        for internal in ["sales._insert_sale", "sales.reindex"] {
+            let err = replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[(GrantKind::Command, internal.into())],
+                "hub_user:1",
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                code_of(&err),
+                ERR_INTERNAL_COMMAND,
+                "`{internal}` must be refused by its own code: {err}"
+            );
+            assert!(
+                format!("{err}").contains(internal),
+                "the refusal names the command so the screen can point at it: {err}"
+            );
         }
+
+        // The whole list is refused, so the owner never half-grants: nothing landed, not even the
+        // public command that shared the request.
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[
+                (GrantKind::Command, "sales.sale.create".into()),
+                (GrantKind::Command, "sales._insert_sale".into()),
+            ],
+            "hub_user:1",
+        )
+        .await
+        .expect_err("one bad grant refuses the list (§9)");
+        assert!(
+            list(&db, HUB, FLOW).await.unwrap().is_empty(),
+            "a refused PUT stores nothing at all"
+        );
+
+        // …and the ordinary command still goes through, which is the half that must not regress.
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[(GrantKind::Command, "sales.sale.create".into())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        assert!(authority(&db, HUB, FLOW)
+            .await
+            .unwrap()
+            .allows_command("sales.sale.create"));
+    }
+
+    /// hub#821 closes the list: every kind of ADR-0283 §2 is now something the kernel enforces, so
+    /// none of them is refused for being a promise. What still gets refused is a VALUE the kernel
+    /// cannot enforce — which is the same rule, one level down.
+    #[tokio::test]
+    async fn every_kind_of_the_frozen_vocabulary_is_creatable_now() {
+        let db = db_with_schema().await;
+        for (kind, value) in [
+            (GrantKind::Command, "sales.sale.create"),
+            (GrantKind::Query, "sales.sale.list"),
+            (GrantKind::Http, "https://api.example.com/v1/send*"),
+            (GrantKind::Notify, "whatsapp"),
+            (GrantKind::RecipientQuery, "sales.sale.list#email"),
+        ] {
+            replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[(kind, value.into())],
+                "hub_user:1",
+            )
+            .await
+            .unwrap_or_else(|e| panic!("`{}` is enforced by this kernel: {e}", kind.as_str()));
+        }
+        assert!(GrantKind::ALL.iter().all(|k| k.is_available()));
+    }
+
+    // ── notify and recipient_query (hub#821) ──────────────────────────────────────────────────
+
+    /// The two grants are SEPARATE, and each one is a whole veto. Being allowed to email a
+    /// customer is not being allowed to WhatsApp them (Meta meters and bills every message), and
+    /// being allowed the channel says nothing about whose address may be dialled.
+    #[tokio::test]
+    async fn the_channel_and_the_recipient_are_two_independent_permissions() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[
+                (GrantKind::Notify, "email".into()),
+                (GrantKind::RecipientQuery, "sales.sale.list#email".into()),
+            ],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let authority = authority(&db, HUB, FLOW).await.unwrap();
+
+        assert!(authority.allows_notify(Channel::Email));
+        assert!(
+            !authority.allows_notify(Channel::Whatsapp),
+            "the channel that costs money is not thrown in with the one that does not"
+        );
+        assert!(authority.allows_recipient("sales.sale.list", "email"));
+        // Another field of the same query, and the same field of another query: two different
+        // permissions with the same default answer.
+        assert!(!authority.allows_recipient("sales.sale.list", "phone"));
+        assert!(!authority.allows_recipient("sales.sale.totals", "email"));
+        // …and a recipient grant is NOT a query grant: it authorises taking one column out to
+        // address a message, never handing the row to an `ai` step.
+        assert!(
+            !authority.allows_query("sales.sale.list"),
+            "a recipient grant must not become a read the model can call"
+        );
+    }
+
+    /// `check_notify_grants` is the door the step goes through, and it answers with the ID of the
+    /// row that authorised it — which is what makes revoking that row stop the message later.
+    #[tokio::test]
+    async fn the_step_gate_returns_the_id_of_the_grant_that_authorised_the_recipient() {
+        let db = db_with_schema().await;
+        let grants = [
+            (GrantKind::Notify, "whatsapp".to_string()),
+            (GrantKind::RecipientQuery, "sales.sale.list#phone".to_string()),
+        ];
+        replace(&db, HUB, FLOW, &registry(), &grants, "hub_user:1")
+            .await
+            .unwrap();
+
+        let authority = authority(&db, HUB, FLOW).await.unwrap();
+        let id = check_notify_grants(
+            &db,
+            HUB,
+            FLOW,
+            &authority,
+            Channel::Whatsapp,
+            "sales.sale.list",
+            "phone",
+        )
+        .await
+        .expect("both grants are live");
+        let live = list(&db, HUB, FLOW).await.unwrap();
+        assert!(
+            live.iter().any(|g| g.id == id && g.kind == "recipient_query"),
+            "the id names the recipient grant itself"
+        );
+
+        // The channel it was not given, and the field it was not given: refused by name.
+        assert!(check_notify_grants(
+            &db,
+            HUB,
+            FLOW,
+            &authority,
+            Channel::Email,
+            "sales.sale.list",
+            "phone"
+        )
+        .await
+        .is_err());
+        assert!(check_notify_grants(
+            &db,
+            HUB,
+            FLOW,
+            &authority,
+            Channel::Whatsapp,
+            "sales.sale.list",
+            "email"
+        )
+        .await
+        .is_err());
+    }
+
+    /// The release a queued message carries is re-read at delivery, and REVOKING cuts it. The two
+    /// grants are two vetoes: either one gone and the message does not go.
+    #[tokio::test]
+    async fn a_release_stops_being_valid_the_moment_either_grant_is_revoked() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        let grants = [
+            (GrantKind::Notify, "whatsapp".to_string()),
+            (GrantKind::RecipientQuery, "sales.sale.list#phone".to_string()),
+        ];
+        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1").await.unwrap();
+        let authority = authority(&db, HUB, FLOW).await.unwrap();
+        let id = check_notify_grants(
+            &db,
+            HUB,
+            FLOW,
+            &authority,
+            Channel::Whatsapp,
+            "sales.sale.list",
+            "phone",
+        )
+        .await
+        .unwrap();
+        let release = crate::host_notify::flow_grant_release(&id);
+
+        // A run of this flow, which is what the outbox row would point at.
+        let run_id = crate::flows::store::start_run(
+            &db, HUB, FLOW, "", "manual", "", &json!({}), 0, "hub_user:1",
+        )
+        .await
+        .unwrap();
+        check_notify_release(&db, HUB, &run_id, &release, Channel::Whatsapp)
+            .await
+            .expect("both grants alive, the message may go");
+
+        // A release that names a grant of ANOTHER flow, or nothing at all, is not a release.
+        assert!(check_notify_release(&db, HUB, &run_id, "flow_grant:made-up", Channel::Whatsapp)
+            .await
+            .is_err());
+        assert!(check_notify_release(&db, HUB, &run_id, &id, Channel::Whatsapp)
+            .await
+            .is_err(), "without the prefix it names nothing");
+
+        // Revoke the recipient grant only: the channel is still allowed and the message still
+        // stops, because whose address it was is the question that was withdrawn.
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[(GrantKind::Notify, "whatsapp".to_string())],
+            "hub_user:2",
+        )
+        .await
+        .unwrap();
+        let err = check_notify_release(&db, HUB, &run_id, &release, Channel::Whatsapp)
+            .await
+            .expect_err("a revoked grant stops a message that was already queued");
+        assert!(format!("{err}").contains("REVOCADO"), "{err}");
+
+        // And the mirror: recipient back, channel gone.
+        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:3").await.unwrap();
+        let regranted = super::authority(&db, HUB, FLOW).await.unwrap();
+        let id = check_notify_grants(
+            &db,
+            HUB,
+            FLOW,
+            &regranted,
+            Channel::Whatsapp,
+            "sales.sale.list",
+            "phone",
+        )
+        .await
+        .unwrap();
+        let release = crate::host_notify::flow_grant_release(&id);
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[(GrantKind::RecipientQuery, "sales.sale.list#phone".to_string())],
+            "hub_user:4",
+        )
+        .await
+        .unwrap();
+        assert!(
+            check_notify_release(&db, HUB, &run_id, &release, Channel::Whatsapp)
+                .await
+                .is_err(),
+            "the channel grant is a live veto too"
+        );
+    }
+
+    /// A `notify` grant names ONE channel this hub can really send on. `sms` is in ADR-0012's
+    /// vocabulary and has no transport anywhere: granting it would read as permission and turn
+    /// into eight retries and a dead-letter the first night the flow ran.
+    #[tokio::test]
+    async fn a_notify_grant_for_a_channel_with_no_transport_is_refused_by_name() {
+        let db = db_with_schema().await;
+        for value in ["sms", "", "carrier_pigeon", "email,whatsapp"] {
+            let err = replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[(GrantKind::Notify, value.into())],
+                "hub_user:1",
+            )
+            .await
+            .expect_err("a grant nothing can honour must not be stored");
+            assert!(
+                format!("{err}").contains("channel") || format!("{err}").contains("transport"),
+                "{err}"
+            );
+        }
+    }
+
+    /// A recipient grant that does not name «one field of one declared read» is refused, for the
+    /// same reason an http pattern that does not name one host is: nobody could read it correctly.
+    #[tokio::test]
+    async fn a_recipient_grant_that_is_not_one_field_of_one_query_is_refused() {
+        let db = db_with_schema().await;
+        for value in [
+            "sales.sale.list",             // no field
+            "#email",                      // no query
+            "sales.sale.list#",            // no field
+            "ghost.query#email",           // a query that does not exist
+            "sales.sale.list#customer.email", // a path, not a column
+            "sales.sale.list#*",           // not a column name either
+        ] {
+            let err = replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[(GrantKind::RecipientQuery, value.into())],
+                "hub_user:1",
+            )
+            .await
+            .expect_err("a grant naming nothing reads as authorisation on the screen");
+            assert!(
+                format!("{err}").contains(value) || format!("{err}").contains("ghost.query"),
+                "{err}"
+            );
+        }
+    }
+
+    /// The permission union carries the read behind a recipient grant, or the `notify` step would
+    /// pass the flow's gate and be refused by the permission check inside `queries::execute` — one
+    /// door open and the next one shut, the same trap the `query` grant had.
+    #[tokio::test]
+    async fn the_context_permissions_include_the_read_behind_a_recipient_grant() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[(GrantKind::RecipientQuery, "sales.sale.list#email".into())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let permissions = authority(&db, HUB, FLOW).await.unwrap().permissions(&reg);
+        assert_eq!(permissions, HashSet::from(["sales.view_sale".to_string()]));
     }
 
     // ── the http allow-list (hub#662) ─────────────────────────────────────────────────────────

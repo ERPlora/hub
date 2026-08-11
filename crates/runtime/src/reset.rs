@@ -98,10 +98,17 @@ pub async fn plan_reset(rt: &Runtime, hub_id: &str) -> crate::Result<ResetPlan> 
         rows: count_where(rt, "hub_settings", "TRUE", hub_id).await,
         blocked_by: None,
     });
-    // `hub_user` NO lleva `hub_id` (identidad por despliegue, `identity.rs`): se cuenta entera.
+    // Desde hub#497 `hub_user` SÍ lleva `hub_id`: se cuentan las personas de ESTE hub. Antes se
+    // contaba la tabla entera, así que en una BD compartida el plan del reset prometía borrar —y el
+    // borrado se llevaba— al personal del negocio de al lado.
     sections.push(SectionPlan {
         section: "hub_users".into(),
-        rows: count_raw(rt, "SELECT count(*) AS n FROM hub_user", hub_id).await,
+        rows: count_raw(
+            rt,
+            "SELECT count(*) AS n FROM hub_user WHERE hub_id = :hub_id",
+            hub_id,
+        )
+        .await,
         blocked_by: None,
     });
     // The role set (hub#417). Counted from the table and not from the catalogue: the catalogue
@@ -288,12 +295,12 @@ pub async fn execute_reset(
         ));
     }
     if selection.users && existing.iter().any(|t| t == "hub_user") {
-        // Nunca al actor: un owner no puede quedarse fuera de su propio hub con un clic.
-        // `hub_user` no lleva `hub_id` (identidad por despliegue), así que NO se acota por él.
+        // Nunca al actor: un owner no puede quedarse fuera de su propio hub con un clic. Y nunca
+        // fuera de este hub: desde hub#497 `hub_user` lleva `hub_id` y el borrado se acota por él.
         ops.push((
             "hub_users".into(),
             "hub_user".into(),
-            "DELETE FROM hub_user WHERE id <> :actor".into(),
+            "DELETE FROM hub_user WHERE hub_id = :hub_id AND id <> :actor".into(),
         ));
     }
     // The role set (hub#417) — the half of the mirror the reset never had. Once the export learned

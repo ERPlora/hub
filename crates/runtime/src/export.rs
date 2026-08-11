@@ -303,8 +303,11 @@ pub async fn export_hub(
     // auto_transmit) son del hub de ORIGEN, así que siguen la misma regla.
     let fiscal = selection.fiscal && carries_identity;
     if selection.users && carries_identity {
-        // `hub_user` NO lleva hub_id (identidad por despliegue, identity.rs): se vuelca entera.
-        let mut rows = fetch_rows(db, "hub_user", None).await.unwrap_or_default();
+        // Solo las personas de ESTE hub (hub#497: `hub_user` ya lleva `hub_id`). Antes se volcaba
+        // la tabla entera, así que en una BD compartida el backup de un negocio se llevaba dentro
+        // al personal del de al lado —con su rol y su `pin_hash`— y restaurarlo en cualquier sitio
+        // los daba de alta ahí.
+        let mut rows = fetch_rows(db, "hub_user", Some(hub_id)).await.unwrap_or_default();
         // …pero DESVINCULADA de las cuentas Cloud. `cloud_user_id` es la identidad de una
         // PERSONA del SaaS: el usuario que dispara el export acaba dentro del bundle y, si se
         // publica como blueprint, cada hub que lo importe se lo lleva como usuario suyo —con su

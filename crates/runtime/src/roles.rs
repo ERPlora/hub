@@ -183,11 +183,13 @@ pub async fn active_keys(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<BTree
 }
 
 /// Roles carried by the **active** users of this hub, whatever their origin.
-async fn roles_in_use(db: &dyn DatabaseAdapter) -> Result<BTreeSet<String>> {
+async fn roles_in_use(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<BTreeSet<String>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
-            "SELECT DISTINCT role FROM hub_user WHERE is_active = 1",
-            &Params::new(),
+            "SELECT DISTINCT role FROM hub_user WHERE hub_id = :hub_id AND is_active = 1",
+            &p,
         )
         .await?;
     Ok(res
@@ -211,7 +213,7 @@ pub async fn catalog(
 ) -> Result<Vec<CatalogRole>> {
     let declared = declared(registry);
     let active = active_keys(db, hub_id).await?;
-    let in_use = roles_in_use(db).await?;
+    let in_use = roles_in_use(db, hub_id).await?;
 
     let mut out: Vec<CatalogRole> = BASE_ROLES
         .iter()

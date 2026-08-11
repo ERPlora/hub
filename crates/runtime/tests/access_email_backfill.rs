@@ -96,8 +96,8 @@ async fn row_written_before_the_fix(
         ("now", json!("2026-08-01T10:00:00Z")),
     ]);
     raw.execute(
-        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-           VALUES (:id, :name, '', :role, NULL, 1, :now, '')",
+        "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+           VALUES (:id, :hub_id, :name, '', :role, NULL, 1, :now, '')",
         &params,
     )
     .await
@@ -372,9 +372,9 @@ async fn a_rival_profile_of_another_hub_does_not_block_this_hub() {
     let (_, raw) = hub_deployed_before_the_fix(&tdb).await;
     row_written_before_the_fix(&raw, "u-ana", "Ana Soto", "manager", "ana@example.com").await;
     raw.execute(
-        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-           VALUES ('u-other', 'Ana del otro hub', '', 'employee', NULL, 1, :now, '')",
-        &p(&[("now", json!("2026-08-01T10:00:00Z"))]),
+        "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+           VALUES ('u-other', :hub_id, 'Ana del otro hub', '', 'employee', NULL, 1, :now, '')",
+        &p(&[("hub_id", json!(HUB)), ("now", json!("2026-08-01T10:00:00Z"))]),
     )
     .await
     .unwrap();
@@ -392,17 +392,17 @@ async fn a_rival_profile_of_another_hub_does_not_block_this_hub() {
     assert_eq!(access_email(&raw, "u-other").await, "", "the other hub's row is not this run's");
 }
 
-/// The profile of **another hub** is not this hub's to read. `hub_user` has no `hub_id` (since
-/// ADR-0201 each hub owns its database) but `hub_user_profile` does, and a database shared by
-/// several hubs predates that: the runtime only ever speaks for its own deployment.
+/// The profile of **another hub** is not this hub's to read. Both tables carry `hub_id` now
+/// (hub#497), and a database shared by several hubs predates that: the runtime only ever speaks
+/// for its own deployment.
 #[tokio::test]
 async fn a_profile_belonging_to_another_hub_is_not_copied() {
     let tdb = TestDb::new().await;
     let (_, raw) = hub_deployed_before_the_fix(&tdb).await;
     raw.execute(
-        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-           VALUES ('u-ana', 'Ana Soto', '', 'manager', NULL, 1, :now, '')",
-        &p(&[("now", json!("2026-08-01T10:00:00Z"))]),
+        "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+           VALUES ('u-ana', :hub_id, 'Ana Soto', '', 'manager', NULL, 1, :now, '')",
+        &p(&[("hub_id", json!(HUB)), ("now", json!("2026-08-01T10:00:00Z"))]),
     )
     .await
     .unwrap();

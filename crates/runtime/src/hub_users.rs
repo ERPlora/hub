@@ -341,15 +341,18 @@ fn split_name(name: &str) -> (String, String) {
 /// (`identity::verify_pin`), así que un duplicado haría ambiguo quién entra.
 async fn ensure_name_is_free(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     name: &str,
     excluding_id: Option<&str>,
 ) -> Result<()> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("name".into(), json!(name));
     p.insert("id".into(), json!(excluding_id.unwrap_or_default()));
     let res = db
         .query(
-            "SELECT id FROM hub_user WHERE name = :name AND is_active = 1 AND id != :id",
+            "SELECT id FROM hub_user \
+              WHERE hub_id = :hub_id AND name = :name AND is_active = 1 AND id != :id",
             &p,
         )
         .await?;
@@ -366,10 +369,11 @@ async fn ensure_name_is_free(
 /// [`identity::pin_is_taken`] para por qué no se puede resolver con una restricción de la BD.
 async fn ensure_pin_is_free(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     pin: &str,
     excluding_id: Option<&str>,
 ) -> Result<()> {
-    if identity::pin_is_taken(db, pin, excluding_id).await? {
+    if identity::pin_is_taken(db, hub_id, pin, excluding_id).await? {
         return Err(reject(
             "pin_in_use",
             "another active user already has this PIN: a PIN says who is at the till, so no two \
@@ -400,6 +404,7 @@ async fn ensure_pin_is_free(
 ///    que es una decisión explícita y auditada del administrador.
 async fn ensure_local_identity(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     name: &str,
     email: &str,
     pin: &str,
@@ -425,7 +430,7 @@ async fn ensure_local_identity(
              never from a PIN",
         ));
     }
-    if identity::name_is_known(db, name).await? {
+    if identity::name_is_known(db, hub_id, name).await? {
         return Err(reject(
             "name_taken",
             format!(
@@ -488,7 +493,12 @@ pub(crate) fn ensure_account_role_is_grantable(role: &str) -> Result<()> {
 ///    nueva y limpia — nada allí puede notar que este hub había cerrado esa puerta (regla D,
 ///    hub#348). Reincorporar es [`update`]: una decisión explícita y auditada del administrador,
 ///    no el efecto de volver a teclear un email.
-async fn ensure_account_identity(db: &dyn DatabaseAdapter, email: &str, role: &str) -> Result<()> {
+async fn ensure_account_identity(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    email: &str,
+    role: &str,
+) -> Result<()> {
     if email.is_empty() {
         return Err(reject(
             "account_needs_email",
@@ -497,7 +507,7 @@ async fn ensure_account_identity(db: &dyn DatabaseAdapter, email: &str, role: &s
         ));
     }
     ensure_account_role_is_grantable(role)?;
-    ensure_email_is_free(db, email, None).await
+    ensure_email_is_free(db, hub_id, email, None).await
 }
 
 /// Rechaza un email que este hub ya conoce (activo o no). Compartido por el alta y la edición: sin
@@ -505,10 +515,11 @@ async fn ensure_account_identity(db: &dyn DatabaseAdapter, email: &str, role: &s
 /// otro— y el hub acaba con dos filas peleándose por una sola membresía.
 async fn ensure_email_is_free(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     email: &str,
     excluding_id: Option<&str>,
 ) -> Result<()> {
-    if !identity::email_is_known(db, email, excluding_id).await? {
+    if !identity::email_is_known(db, hub_id, email, excluding_id).await? {
         return Ok(());
     }
     Err(reject(
@@ -538,6 +549,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
                     COALESCE(NULLIF(u.email, ''), p.email, '') AS email \
                FROM hub_user u \
                LEFT JOIN hub_user_profile p ON p.user_id = u.id AND p.hub_id = :hub_id \
+              WHERE u.hub_id = :hub_id \
               ORDER BY u.is_active DESC, u.name",
             &p,
         )
@@ -600,14 +612,14 @@ pub async fn create(
     let email = clean_email(&input.email)?;
     crate::roles::ensure_assignable(db, registry, hub_id, &role).await?;
     if input.local {
-        ensure_local_identity(db, &name, &email, &pin, &role).await?;
+        ensure_local_identity(db, hub_id, &name, &email, &pin, &role).await?;
     } else {
-        ensure_account_identity(db, &email, &role).await?;
-        ensure_name_is_free(db, &name, None).await?;
+        ensure_account_identity(db, hub_id, &email, &role).await?;
+        ensure_name_is_free(db, hub_id, &name, None).await?;
     }
-    ensure_pin_is_free(db, &pin, None).await?;
+    ensure_pin_is_free(db, hub_id, &pin, None).await?;
 
-    let id = identity::create_user(db, &name, &pin, &role, None).await?;
+    let id = identity::create_user(db, hub_id, &name, &pin, &role, None).await?;
     if !email.is_empty() {
         write_email(db, hub_id, &id, &name, &email).await?;
     }
@@ -625,7 +637,7 @@ async fn write_email(
     name: &str,
     email: &str,
 ) -> Result<()> {
-    identity::set_email(db, user_id, email).await?;
+    identity::set_email(db, hub_id, user_id, email).await?;
     let (first, last) = split_name(name);
     user_profile::set_identity(db, hub_id, user_id, &first, &last, email).await
 }
@@ -666,22 +678,23 @@ pub async fn update(
         crate::roles::ensure_assignable(db, registry, hub_id, &role).await?;
     }
     if is_active && name != current.name {
-        ensure_name_is_free(db, &name, Some(user_id)).await?;
+        ensure_name_is_free(db, hub_id, &name, Some(user_id)).await?;
     }
     // Un PIN nuevo tiene que seguir siendo suyo (hub#355). Se comprueba ANTES de escribir nada:
     // si el alta rechaza el PIN del encargado pero la edición lo acepta, la guarda no existe.
     if let Some(pin) = pin.as_deref() {
-        ensure_pin_is_free(db, pin, Some(user_id)).await?;
+        ensure_pin_is_free(db, hub_id, pin, Some(user_id)).await?;
     }
     // Y un email nuevo tiene que seguir siendo suyo, por lo mismo (hub#356): mover el email de una
     // ficha al de otra dejaría dos filas peleándose por una sola membresía del SaaS, y el login por
     // email resolvería a la que devolviese primero la BD.
     if let Some(email) = email.as_deref().filter(|e| !e.is_empty()) {
-        ensure_email_is_free(db, email, Some(user_id)).await?;
+        ensure_email_is_free(db, hub_id, email, Some(user_id)).await?;
     }
 
     let mut p = Params::new();
     p.insert("id".into(), json!(user_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("name".into(), json!(name));
     p.insert("role".into(), json!(role));
     p.insert("is_active".into(), json!(i64::from(is_active)));
@@ -695,9 +708,10 @@ pub async fn update(
     db.execute(
         if touches_the_door {
             "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active, \
-               cloud_revoked_at = '' WHERE id = :id"
+               cloud_revoked_at = '' WHERE id = :id AND hub_id = :hub_id"
         } else {
-            "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active WHERE id = :id"
+            "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active \
+               WHERE id = :id AND hub_id = :hub_id"
         },
         &p,
     )
@@ -707,14 +721,18 @@ pub async fn update(
         write_email(db, hub_id, user_id, &name, &email).await?;
     }
     if let Some(pin) = pin {
-        identity::set_pin(db, user_id, &pin).await?;
+        identity::set_pin(db, hub_id, user_id, &pin).await?;
     }
     // Desactivar cierra sus sesiones abiertas: la baja tiene que ser inmediata, no esperar al TTL.
     if !is_active {
         let mut p = Params::new();
         p.insert("id".into(), json!(user_id));
-        db.execute("DELETE FROM hub_session WHERE user_id = :id", &p)
-            .await?;
+        p.insert("hub_id".into(), json!(hub_id));
+        db.execute(
+            "DELETE FROM hub_session WHERE user_id = :id AND hub_id = :hub_id",
+            &p,
+        )
+        .await?;
     }
 
     get(db, hub_id, user_id)
@@ -737,10 +755,13 @@ pub async fn list_roles(
     registry: &Registry,
     hub_id: &str,
 ) -> Result<Vec<HubRole>> {
+    let mut scope = Params::new();
+    scope.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
-            "SELECT role, COUNT(*) AS members FROM hub_user WHERE is_active = 1 GROUP BY role",
-            &Params::new(),
+            "SELECT role, COUNT(*) AS members FROM hub_user \
+              WHERE hub_id = :hub_id AND is_active = 1 GROUP BY role",
+            &scope,
         )
         .await?;
     let mut members: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
@@ -903,6 +924,9 @@ mod tests {
     use super::*;
     use erplora_db::{testutil::fresh_db, PgAdapter};
 
+    /// The hub these unit tests belong to (hub#497).
+    const HUB: &str = "hub-users-test";
+
     async fn db() -> PgAdapter {
         let db = fresh_db().await;
         identity::ensure_tables(&db).await.unwrap();
@@ -1010,16 +1034,16 @@ mod tests {
     #[tokio::test]
     async fn rejects_two_active_users_with_the_same_name() {
         let db = db().await;
-        identity::create_user(&db, "Marta", "1234", "cashier", None)
+        identity::create_user(&db, HUB, "Marta", "1234", "cashier", None)
             .await
             .unwrap();
-        let err = ensure_name_is_free(&db, "Marta", None).await.unwrap_err();
+        let err = ensure_name_is_free(&db, HUB, "Marta", None).await.unwrap_err();
         assert!(err.to_string().contains("Marta"), "{err}");
         // Editarse a uno mismo con el mismo nombre no choca consigo mismo.
-        let id = identity::create_user(&db, "Luis", "2222", "cashier", None)
+        let id = identity::create_user(&db, HUB, "Luis", "2222", "cashier", None)
             .await
             .unwrap();
-        ensure_name_is_free(&db, "Luis", Some(&id)).await.unwrap();
+        ensure_name_is_free(&db, HUB, "Luis", Some(&id)).await.unwrap();
     }
 
     #[test]

@@ -12,7 +12,7 @@
 //!    what the hub may do unattended; a copyable integration credential able to write them could
 //!    grant itself every command in the hub through a flow.
 //! 3. **A document that does not parse never lands.** The refusal carries the kernel's stable
-//!    code (`flow.unknown_schema_version`, `flow.step_kind_not_available`) so the editor can say
+//!    code (`flow.unknown_schema_version`, `flow.invalid_definition`) so the editor can say
 //!    which line is wrong instead of "error".
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -43,9 +43,24 @@ async fn body_json(response: axum::response::Response) -> Value {
 }
 
 async fn fixture() -> Fixture {
+    build_fixture(false).await
+}
+
+/// The same hub with a real module installed, for the tests that need the registry to have
+/// something in it: `agenda` ships a public command **and** an internal one (`agenda._purge_slots`),
+/// which is the pair hub#824 is about.
+async fn fixture_with_modules() -> Fixture {
+    build_fixture(true).await
+}
+
+async fn build_fixture(install_modules: bool) -> Fixture {
     let db = fresh_db().await;
-    let rt = Runtime::with_hub_id(Box::new(db), HUB);
+    let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
+    if install_modules {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_agent/agenda");
+        rt.install_from_dir(&dir).await.unwrap();
+    }
 
     let admin_id = rt.create_user("Ioan", "1111", "admin", None).await.unwrap();
     let employee_id = rt.create_user("Marta", "2222", "cashier", None).await.unwrap();
@@ -282,16 +297,16 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
             "flow.unknown_schema_version",
         ),
         (
-            // `notify` is the last kind that is still only a vocabulary (hub#663 part 2); `http`
-            // runs since hub#662 and `ai` since hub#665.
+            // Every kind runs now (`notify` since hub#821), so each one is parsed as strictly as
+            // the rest: an empty `notify` is refused for its OWN missing key, not as unavailable.
             json!({
-                "name": "Too soon",
+                "name": "To nobody",
                 "definition": {
                     "schema_version": 1,
                     "steps": [{ "id": "tell", "kind": "notify" }]
                 }
             }),
-            "flow.step_kind_not_available",
+            "flow.invalid_definition",
         ),
         (
             // An `ai` step that DOES run is parsed as strictly as any other kind, so an empty one
@@ -507,22 +522,40 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
     .await;
     assert_eq!(refused.status(), StatusCode::NOT_FOUND);
 
-    // A kind the kernel cannot enforce yet is refused BY NAME rather than stored as a promise.
-    // (`http` left this list with hub#662 — see `an_http_flow_saves_now_and_…` below.)
-    let not_yet = send(
+    // Every kind of the frozen vocabulary is creatable now (hub#821 brought the last two), so what
+    // is refused by name is a VALUE the kernel cannot enforce — the same rule, one level down.
+    // `sms` is in ADR-0012's vocabulary and no transport can send it.
+    let no_transport = send(
         &f.router,
         request(
             "PUT",
             &format!("/api/hub/flows/{id}/grants"),
             Some(&f.admin),
-            Some(json!({ "grants": [{ "kind": "notify", "value": "whatsapp" }] })),
+            Some(json!({ "grants": [{ "kind": "notify", "value": "sms" }] })),
         ),
     )
     .await;
-    assert_eq!(not_yet.status(), StatusCode::CONFLICT);
+    assert_eq!(no_transport.status(), StatusCode::CONFLICT);
     assert_eq!(
-        body_json(not_yet).await["error"]["code"],
-        "flow.grant_kind_not_available"
+        body_json(no_transport).await["error"]["code"],
+        "flow.invalid_notify_grant"
+    );
+
+    // …and a recipient grant that is not «one field of one declared read» is refused too.
+    let loose_recipient = send(
+        &f.router,
+        request(
+            "PUT",
+            &format!("/api/hub/flows/{id}/grants"),
+            Some(&f.admin),
+            Some(json!({ "grants": [{ "kind": "recipient_query", "value": "crm.customer.get" }] })),
+        ),
+    )
+    .await;
+    assert_eq!(loose_recipient.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(loose_recipient).await["error"]["code"],
+        "flow.invalid_recipient_grant"
     );
 
     // And a typo in `kind` is refused, not silently dropped into "denied".
@@ -537,6 +570,117 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
     )
     .await;
     assert_eq!(typo.status(), StatusCode::CONFLICT);
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// **hub#824 — the door does not promise what the engine will refuse.**
+///
+/// An INTERNAL command exists in the registry, so "does it exist" waved it through: `PUT …/grants`
+/// answered `200` and the grants screen said «granted», the document saved with `201`, and only the
+/// run said no — `failed`, at 3 AM, on a permission the owner believed they had given. Both doors
+/// now refuse it here, with the SAME stable code, so the editor can say «that one is internal»
+/// instead of «error». (A command that does not exist keeps its own `404`: different question,
+/// different remedy.)
+#[tokio::test]
+async fn an_internal_command_is_refused_at_the_grants_door_and_at_the_save_door() {
+    let f = fixture_with_modules().await;
+    const INTERNAL: &str = "agenda._purge_slots";
+
+    // 1. The DOCUMENT. A step naming it never lands.
+    let saved = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "QA internal",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "i", "kind": "command", "command": INTERNAL, "params": {} }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(saved.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(saved).await["error"]["code"],
+        "flow.internal_command"
+    );
+    let listed = body_json(send(
+        &f.router,
+        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    )
+    .await)
+    .await;
+    assert!(
+        listed["data"].as_array().unwrap().is_empty(),
+        "a document the hub can never execute is not stored: {listed}"
+    );
+
+    // 2. The GRANT, on a flow that is otherwise fine.
+    let id = create(&f, welcome_flow()).await;
+    let granted = send(
+        &f.router,
+        request(
+            "PUT",
+            &format!("/api/hub/flows/{id}/grants"),
+            Some(&f.admin),
+            Some(json!({ "grants": [{ "kind": "command", "value": INTERNAL }] })),
+        ),
+    )
+    .await;
+    assert_eq!(granted.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(granted).await["error"]["code"],
+        "flow.internal_command"
+    );
+    let live = body_json(send(
+        &f.router,
+        request("GET", &format!("/api/hub/flows/{id}/grants"), Some(&f.admin), None),
+    )
+    .await)
+    .await;
+    assert!(
+        live["data"].as_array().unwrap().is_empty(),
+        "the screen must never read «granted» about this: {live}"
+    );
+
+    // 3. …and the PUBLIC command of the same module still goes through both doors, which is the
+    // half that must not regress.
+    let ok = send(
+        &f.router,
+        request(
+            "PUT",
+            &format!("/api/hub/flows/{id}/grants"),
+            Some(&f.admin),
+            Some(json!({ "grants": [{ "kind": "command", "value": "agenda.booking.create" }] })),
+        ),
+    )
+    .await;
+    assert_eq!(ok.status(), StatusCode::OK);
+    let public_step = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "QA public",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "i", "kind": "command",
+                                "command": "agenda.booking.create", "params": {} }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(public_step.status(), StatusCode::CREATED);
 
     std::fs::remove_dir_all(f.temp).ok();
 }
@@ -805,10 +949,11 @@ async fn a_secret_goes_in_and_only_its_name_comes_back() {
     std::fs::remove_dir_all(f.temp).ok();
 }
 
-/// The `http` step and its grant stopped being refused (hub#662), and so did `ai` (hub#665) —
-/// `notify` did not.
+/// The list of what this hub cannot do had to shrink as each issue landed — `http` with hub#662,
+/// `ai` with hub#665, `notify` with hub#821 — or the refusal becomes a lie the editor repeats.
+/// It is empty now: what is left refused is a bad VALUE, not an unimplemented kind.
 #[tokio::test]
-async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
+async fn every_step_kind_saves_now_and_what_is_refused_is_a_bad_value() {
     let f = fixture().await;
 
     let id = create(
@@ -858,30 +1003,62 @@ async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
         "flow.invalid_http_pattern"
     );
 
-    // The one that is still only a vocabulary.
-    for kind in ["notify"] {
-        let response = send(
-            &f.router,
-            request(
-                "POST",
-                "/api/hub/flows",
-                Some(&f.admin),
-                Some(json!({
-                    "name": "Too soon",
-                    "definition": {
-                        "schema_version": 1,
-                        "steps": [{ "id": "s", "kind": kind }]
-                    }
-                })),
-            ),
-        )
-        .await;
-        assert_eq!(response.status(), StatusCode::CONFLICT, "`{kind}` still cannot run");
-        assert_eq!(
-            body_json(response).await["error"]["code"],
-            "flow.step_kind_not_available"
-        );
-    }
+    // A `notify` step SAVES now (hub#821) — with its recipient named as one field of one query,
+    // which is the only shape there is.
+    let notifying = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "Reminds the customer",
+                "definition": {
+                    "schema_version": 1,
+                    "steps": [{
+                        "id": "remind", "kind": "notify", "channel": "whatsapp",
+                        "to": {
+                            "query": "crm.customer.get",
+                            "params": { "id": "input.customer_id" },
+                            "field": "phone"
+                        },
+                        "template": "appointment_reminder",
+                        "vars": { "text": "Te esperamos" }
+                    }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(notifying.status(), StatusCode::CREATED, "a `notify` step saves since hub#821");
+
+    // …and the same step with a free address does NOT, which is the refusal that matters: there is
+    // no syntax for one, so nothing an author writes can put an address from the event payload in
+    // front of the transport.
+    let by_hand = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "To whoever",
+                "definition": {
+                    "schema_version": 1,
+                    "steps": [{
+                        "id": "remind", "kind": "notify", "channel": "email",
+                        "to": "{{input.email}}", "vars": { "text": "hola" }
+                    }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(by_hand.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(by_hand).await["error"]["code"],
+        "flow.invalid_definition"
+    );
 
     // …and an `ai` step SAVES now (hub#665), which is the other half of the same contract: the
     // list of what this hub cannot do must shrink as each issue lands, or the refusal becomes a

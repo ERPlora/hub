@@ -12,9 +12,11 @@
 //!   claim (locked, cheap)  →  I/O (unlocked, in crates/server)  →  complete (locked, cheap)
 //! ```
 //!
-//! [`PendingIo`] is that seam, and [`crate::flows::io`] is the far side of it. `ai` crossed with
-//! hub#665 (the server-side agent runner); `http` (hub#662) and `notify` (hub#663 part 2) are
-//! still refused at save time rather than parked forever (`FlowDefinition::parse`).
+//! [`PendingIo`] is that seam, and `crates/server/src/flow_io.rs` is the far side of it. `http`
+//! crossed with hub#662 and `ai` with hub#665. `notify` (hub#821) deliberately does not: it
+//! resolves its recipient with a local read and QUEUES a host-notify event, and the outbox relay —
+//! which has had the retries, the backoff, the dead-letter and the transport since ADR-0012 — is
+//! what talks to the network.
 //!
 //! ## Where a crash leaves a run
 //!
@@ -35,7 +37,7 @@ use crate::commands::{self, Origin};
 use crate::errors::{Result, RuntimeError};
 use crate::flows::def::{self, FlowDefinition, StepDef, StepSpec};
 use crate::flows::http::HttpRequest;
-use crate::flows::{grants, http, store, triggers};
+use crate::flows::{grants, http, notify, store, triggers};
 use crate::registry::{new_id, now_rfc3339, AutomationCtx, Registry, RequestContext};
 
 /// How many runs one tick advances. The tick happens every second, so this is a throughput knob,
@@ -70,10 +72,12 @@ const STEP_WAITING_APPROVAL: &str = "waiting_approval";
 /// call; the server performs it outside the lock and hands the result back with
 /// [`complete_io`].
 ///
-/// It is deliberately an enum of the three I/O kinds and not a generic "do this HTTP thing": each
-/// one has different limits, a different allow-list and a different grant, and flattening them
-/// would make the agent runner (hub#665) look like an HTTP call with a longer timeout, which is
-/// exactly what it is not.
+/// It is deliberately an enum of the two I/O kinds that cross it and not a generic "do this HTTP
+/// thing": each one has different limits, a different allow-list and a different grant, and
+/// flattening them would make the agent runner (hub#665) look like an HTTP call with a longer
+/// timeout, which is exactly what it is not. `notify` is NOT one of them (hub#821): it queues a
+/// host-notify event and the outbox relay — which already retries, backs off and dead-letters — is
+/// what reaches the network.
 ///
 /// **The run stays claimed while its I/O is in flight** — status `running`, lease held — so the
 /// next tick skips it and advances everybody else. If the process dies mid-call the lease expires,
@@ -91,25 +95,19 @@ pub enum PendingIo {
     },
     /// hub#665 — the server-side agent runner.
     Ai { run_id: String, step_id: String },
-    /// hub#663 part 2 — `notify` with `recipient_query`.
-    Notify { run_id: String, step_id: String },
 }
 
 impl PendingIo {
     /// The run this I/O belongs to, for a caller that only needs to route it.
     pub fn run_id(&self) -> &str {
         match self {
-            PendingIo::Http { run_id, .. }
-            | PendingIo::Ai { run_id, .. }
-            | PendingIo::Notify { run_id, .. } => run_id,
+            PendingIo::Http { run_id, .. } | PendingIo::Ai { run_id, .. } => run_id,
         }
     }
 
     pub fn step_id(&self) -> &str {
         match self {
-            PendingIo::Http { step_id, .. }
-            | PendingIo::Ai { step_id, .. }
-            | PendingIo::Notify { step_id, .. } => step_id,
+            PendingIo::Http { step_id, .. } | PendingIo::Ai { step_id, .. } => step_id,
         }
     }
 }
@@ -345,8 +343,8 @@ async fn advance_run(
 
 enum Outcome {
     Continue { output: Json },
-    /// The step's work happens outside the lock (`http` and `ai` today, `notify` later). The tick
-    /// hands it to the server and this run pauses exactly here, claimed, until it comes back.
+    /// The step's work happens outside the lock (`http` and `ai`). The tick hands it to the server
+    /// and this run pauses exactly here, claimed, until it comes back.
     Io { pending: PendingIo },
     /// A `condition` said no. The run is complete, not failed: a guard that does not pass is the
     /// flow working exactly as written.
@@ -552,21 +550,60 @@ async fn run_step(
             })
         }
 
-        // `notify`. `FlowDefinition::parse` refuses to store a document that reaches here, so this
-        // arm is the seam and not a live path: hub#663 part 2 fills it in the way `http` and `ai`
-        // already are.
-        StepSpec::Reserved => {
-            let error = format!(
-                "step `{}` is of kind `{}`: the claim → I/O → complete path is not implemented \
-                 yet (ai: hub#665, notify: hub#663)",
-                step.id,
-                step.kind.as_str()
-            );
-            write_step(
-                db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}), &error, &now,
+        // **The message to a customer** (hub#821). The only I/O step that does NOT cross the
+        // `PendingIo` seam: it resolves the recipient with a local read and QUEUES a host-notify
+        // event, and the outbox relay — retries, backoff, dead-letter, transport — is what talks to
+        // the network. Reaching it from here would mean building all of that again beside it.
+        //
+        // The queue row, the step and the run's advance commit in ONE transaction, exactly like a
+        // `command` step: a runtime that dies mid-step never sends the same reminder twice. The
+        // step is written `committed` inside it and completed with its output right after, so the
+        // crash window between the two is the one `interrupted_step` already fails the run on.
+        StepSpec::Notify(_) => {
+            let authority = grants::authority(db, hub_id, flow_id).await?;
+            match notify::prepare(
+                db, registry, hub_id, flow_id, run_id, parent_event_id, depth, step, scope,
+                &authority,
             )
-            .await?;
-            Ok(Outcome::Failed { error })
+            .await
+            {
+                Ok(notify::Prepared {
+                    queue_op,
+                    recorded_input,
+                    output,
+                }) => {
+                    let ops = [
+                        queue_op,
+                        write_step_op(
+                            hub_id,
+                            run_id,
+                            index,
+                            step,
+                            STEP_COMMITTED,
+                            &recorded_input,
+                            &json!({}),
+                            "",
+                            &now,
+                        ),
+                        advance_index_op(run_id, index + 1, &now),
+                    ];
+                    db.execute_tx(&ops).await?;
+                    complete_step(db, run_id, index, &output, &now).await?;
+                    Ok(Outcome::Continue { output })
+                }
+                Err(e) => {
+                    // Denied, nobody to write to, or a column that is not an address: NOTHING was
+                    // queued, and the run says why — at the step, not eight retries later in a
+                    // dead-letter.
+                    let error = format!("step `{}`: {}", step.id, error_text(&e));
+                    write_step(
+                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
+                        &error, &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Failed { error })
+                }
+            }
         }
     }
 }
@@ -992,6 +1029,7 @@ mod tests {
         store::create(
             db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "F".into(),
                 enabled: true,
@@ -1267,6 +1305,7 @@ mod tests {
             &db,
             HUB,
             &flow_id,
+            &registry(),
             &NewFlow {
                 name: "F".into(),
                 enabled: false,

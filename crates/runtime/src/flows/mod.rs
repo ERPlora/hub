@@ -29,6 +29,8 @@
 //! - [`net`] — the ONE place an URL is parsed, so that the URL judged is the URL dialled
 //!   (hub#728/#729);
 //! - [`http`] — building an outbound request, and the allow-list it has to pass first;
+//! - [`notify`] — the message to a CUSTOMER: the recipient read, its two grants, and the row that
+//!   carries it to the outbox (hub#821);
 //! - [`store`] — the CRUD the REST layer sits on, plus materialising triggers;
 //! - [`triggers`] — event matching in the relay, and the cron/`at` clock;
 //! - [`executor`] — the tick that advances runs, and the claim → I/O → complete seam;
@@ -43,6 +45,7 @@ pub mod executor;
 pub mod grants;
 pub mod http;
 pub mod net;
+pub mod notify;
 pub mod schema;
 pub mod secrets;
 pub mod store;
@@ -155,6 +158,12 @@ mod tests {
             secrets::ERR_SECRETS_KEY_MISSING,
             secrets::ERR_INVALID_SECRET_NAME,
             secrets::ERR_SECRET_UNREADABLE,
+            grants::ERR_INVALID_NOTIFY_GRANT,
+            grants::ERR_INVALID_RECIPIENT_GRANT,
+            grants::ERR_INTERNAL_COMMAND,
+            notify::ERR_RECIPIENT_NOT_FOUND,
+            notify::ERR_RECIPIENT_AMBIGUOUS,
+            notify::ERR_RECIPIENT_INVALID,
             store::ERR_FLOW_NOT_FOUND,
             approvals::ERR_APPROVAL_NOT_FOUND,
             approvals::ERR_APPROVAL_ALREADY_DECIDED,
