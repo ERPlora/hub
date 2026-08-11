@@ -32,7 +32,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use erplora_db::testutil::{test_database_url, TestDb};
 use erplora_db::{DatabaseAdapter, Params};
-use erplora_server::{AuthMode, HubConfig, ServeConfig};
+use erplora_server::{default_csp, AuthMode, HubConfig, ServeConfig};
 use serde_json::{json, Value};
 
 /// El slug que el SaaS declara hoy para las demos (`DEMO_BLUEPRINT_SLUG`, ADR-0212).
@@ -138,7 +138,8 @@ async fn boot_hub(hub_id: &str, schema: &str, cloud: &str, tag: &str) -> String 
         machine_token_cell: None,
         hub_id_cell: None,
         web_dir: None,
-        csp: None,
+        // Lo que sirve un hub real: la política ya no es opcional (hub#708).
+        csp: default_csp(cloud),
     };
     let url = format!("http://{}", cfg.bind);
     // En su propio hilo con su propio runtime: el futuro de `serve()` no es `Send` (su error es un
