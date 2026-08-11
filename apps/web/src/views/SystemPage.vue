@@ -307,9 +307,17 @@
                     <span class="event-row__when">{{ formatWhen(ev.created_at) }}</span>
                   </div>
                   <div class="event-row__error" :title="ev.last_error">{{ ev.last_error }}</div>
+                  <!-- hub#827: una fila que NO se puede reintentar dice qué sí ayuda, en vez de
+                       ofrecer un botón que vuelve a `pending` y muere igual. -->
+                  <div class="events-hint" v-if="!ev.retryable">{{ t('system.deadEventNotRetryable') }}</div>
                 </div>
                 <div class="event-row__actions">
-                  <ion-button size="small" fill="clear" color="success" :disabled="eventsBusyId === ev.id" @click="retryOne(ev.id)">
+                  <ion-button
+                    v-if="ev.retryable"
+                    size="small" fill="clear" color="success"
+                    :disabled="eventsBusyId === ev.id"
+                    @click="retryOne(ev.id)"
+                  >
                     <HubIcon slot="icon-only" name="refresh-outline" />
                   </ion-button>
                   <ion-button size="small" fill="clear" color="medium" :disabled="eventsBusyId === ev.id" @click="discardOne(ev.id)">

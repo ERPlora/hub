@@ -39,16 +39,44 @@
 //! to show a customer's email address to render the option. A withheld field arrives with
 //! `redacted: true` and no `sample`, and the picker shows «Email del cliente» with no example.
 //!
-//! Three signals, any one of them enough:
+//! Four signals, any one of them enough:
 //!
 //! 1. **The path.** A segment — the leaf or any ancestor — whose words name a person, a credential
 //!    or a personal container: `customer.name`, `client_email`, `tax_id`, `iban`, `pin`. Ancestors
 //!    count, which is why the container list can stay short and blunt: everything under `customer`
 //!    is withheld and `product.name` is not.
-//! 2. **The key is free text** — `note`, `comment`, `description`. A hairdresser's note field can
+//! 2. **The name of the EVENT**, for the payload that is flat. See below.
+//! 3. **The key is free text** — `note`, `comment`, `description`. A hairdresser's note field can
 //!    hold anything, up to and including health data, and no value-level rule sees that coming.
-//! 3. **The value.** An email address, an IBAN, a card-length run of digits, a `+34…` phone —
+//! 4. **The value.** An email address, an IBAN, a card-length run of digits, a `+34…` phone —
 //!    wherever the key happens to be called.
+//!
+//! # The signal the payload does not carry: the event's own name (hub#826)
+//!
+//! Signal 1 reads the path, and a flat payload has no path to read. `customers.create` emits the
+//! whole card at the root — `name`, `city`, `company_name`, `email` — so there is no `customer.`
+//! ancestor anywhere and the container rule, whose documented example is literally `customer.name`,
+//! never fired for the case it was written for. `customer.created` handed over a real client's name
+//! and city to any marketplace module holding `manage_flows`; `email` and `phone` were saved only
+//! by signal 4, which reads values and cannot help with a name.
+//!
+//! The entity is in the event NAME, which the caller has and the payload dropped. So the entity of
+//! `<entity>.<verb>` is read as an implicit root of every path — but it is a **weaker** signal than
+//! an ancestor that is really there, and deliberately:
+//!
+//! - a `customer` **object inside a payload** is that person's record; everything in it was put
+//!   there because of them, so the whole subtree goes (`customer.id` included);
+//! - the event **name** is not in the payload. A `customer.created` payload mixes the person's own
+//!   fields with the hub's bookkeeping ABOUT them — `lifecycle_stage`, `created_at`, `source`,
+//!   what they have spent. Promoting the whole payload would cost the picker every amount, date,
+//!   quantity and state it exists to show, and none of those is personal data. So the name
+//!   promotes only the keys that name a person ([`PERSONAL_WHEN_ABOUT_A_PERSON`]): `name` is a
+//!   haircut under `product.created` and a client under `customer.created`.
+//!
+//! `declared_by` is computed next door and is NOT used for this: it depends on which modules happen
+//! to be installed, so the same event would answer differently on two hubs, and a module called
+//! `reminders` declaring `customer.created` does not change whose data it is. The name is the
+//! contract; the install list is not.
 //!
 //! It errs towards withholding on purpose: a false positive costs the editor one example, a false
 //! negative puts a customer's phone number on somebody's screen. And it is **minimisation, not
@@ -151,6 +179,37 @@ const PERSONAL_CONTAINERS: &[&str] = &[
     "payer",
 ];
 
+/// Words that name a person **only once something else says the record is about one** (hub#826).
+///
+/// They cannot go in [`PERSONAL_WORDS`] — that would withhold `product.name`, the example the
+/// picker most needs — and they cannot go in [`PERSONAL_CONTAINERS`]: these are leaves, not
+/// containers. What promotes them is the entity of the event name ([`event_is_about_a_person`]) or
+/// a personal ancestor in the path, which is the only context in which `name` and `city` stop being
+/// a haircut and a branch and become a client and where they live.
+const PERSONAL_WHEN_ABOUT_A_PERSON: &[&str] = &[
+    "name",
+    "firstname",
+    "lastname",
+    "surname",
+    "fullname",
+    "nickname",
+    "initials",
+    "company",
+    "companyname",
+    "city",
+    "town",
+    "locality",
+    "village",
+    "province",
+    "region",
+    "gender",
+    "age",
+    "nationality",
+    "avatar",
+    "photo",
+    "picture",
+];
+
 /// Keys whose value is FREE TEXT. Nothing about the value tells you what a person typed there, so
 /// the sample never leaves.
 const FREE_TEXT_WORDS: &[&str] = &[
@@ -231,10 +290,15 @@ struct Acc {
 ///
 /// Newest first is load-bearing: a path's sample comes from the most recent event that carried it,
 /// which is the one whose numbers the owner recognises.
-pub fn infer(payloads: &[Json]) -> Vec<EventField> {
+///
+/// `event_name` is not decoration: it is the only thing that says whose data a FLAT payload is
+/// (hub#826 — see the module header). Pass the name the caller asked for, not one reconstructed
+/// from the rows.
+pub fn infer(event_name: &str, payloads: &[Json]) -> Vec<EventField> {
+    let about_a_person = event_is_about_a_person(event_name);
     let mut acc: BTreeMap<String, Acc> = BTreeMap::new();
     for payload in payloads {
-        walk(payload, "", 0, &mut acc);
+        walk(payload, "", 0, about_a_person, &mut acc);
     }
     acc.into_iter()
         .map(|(path, a)| EventField {
@@ -249,7 +313,13 @@ pub fn infer(payloads: &[Json]) -> Vec<EventField> {
         .collect()
 }
 
-fn walk(value: &Json, prefix: &str, depth: usize, acc: &mut BTreeMap<String, Acc>) {
+fn walk(
+    value: &Json,
+    prefix: &str,
+    depth: usize,
+    about_a_person: bool,
+    acc: &mut BTreeMap<String, Acc>,
+) {
     // A payload that is not an object has no paths to offer. `_event_outbox.payload` is always
     // written from a params map, so this is the unparseable-row case, not a shape.
     let Json::Object(map) = value else {
@@ -260,9 +330,9 @@ fn walk(value: &Json, prefix: &str, depth: usize, acc: &mut BTreeMap<String, Acc
         if acc.len() >= MAX_FIELDS && !acc.contains_key(&path) {
             continue;
         }
-        record(&path, child, acc);
+        record(&path, child, about_a_person, acc);
         if matches!(child, Json::Object(_)) && depth + 1 < MAX_DEPTH {
-            walk(child, &path, depth + 1, acc);
+            walk(child, &path, depth + 1, about_a_person, acc);
         }
     }
 }
@@ -275,9 +345,9 @@ fn join(prefix: &str, key: &str) -> String {
     }
 }
 
-fn record(path: &str, value: &Json, acc: &mut BTreeMap<String, Acc>) {
+fn record(path: &str, value: &Json, about_a_person: bool, acc: &mut BTreeMap<String, Acc>) {
     let kind = kind_of(value);
-    let withheld = withhold(path, value);
+    let withheld = withhold(path, value, about_a_person);
     let (sample, truncated) = if withheld {
         (None, false)
     } else {
@@ -351,15 +421,44 @@ fn sample_of(value: &Json) -> (Option<Json>, bool) {
     }
 }
 
-/// Whether this value's example stays inside the hub. The three signals of the module header.
-fn withhold(path: &str, value: &Json) -> bool {
+/// Whether this value's example stays inside the hub. The four signals of the module header.
+///
+/// `about_a_person` is signal 2: the event's own name said this payload is somebody's record, so
+/// the keys that name a person count even without an ancestor in the path (hub#826).
+fn withhold(path: &str, value: &Json, about_a_person: bool) -> bool {
     if path_is_personal(path) || key_is_free_text(path) {
+        return true;
+    }
+    if about_a_person && path_names_a_person(path) {
         return true;
     }
     match value {
         Json::String(s) => value_looks_personal(s),
         _ => false,
     }
+}
+
+/// **Is this event about a person?** Read from the entity of `<entity>.<verb>` — the first segment
+/// — against the same list of containers signal 1 uses, in singular and in plural: a module is
+/// named `customers` and declares `customer.created`, and both spellings turn up in manifests.
+///
+/// `sale.completed` and `product.created` are not about a person, which is what keeps «Total de la
+/// venta — 42,50 €» and «Corte de pelo» in the picker (see the module header for why this signal is
+/// deliberately weaker than a container that is really in the path).
+fn event_is_about_a_person(event_name: &str) -> bool {
+    let entity = event_name.split('.').next().unwrap_or_default();
+    terms(entity).any(|t| {
+        let singular = t.strip_suffix('s').unwrap_or(t.as_str());
+        PERSONAL_CONTAINERS.contains(&t.as_str()) || PERSONAL_CONTAINERS.contains(&singular)
+    })
+}
+
+/// Any segment of the path naming something that is a person's ONLY once the record is known to be
+/// about one ([`PERSONAL_WHEN_ABOUT_A_PERSON`]).
+fn path_names_a_person(path: &str) -> bool {
+    path.split('.').any(|segment| {
+        terms(segment).any(|t| PERSONAL_WHEN_ABOUT_A_PERSON.contains(&t.as_str()))
+    })
 }
 
 /// Any segment of the path — the leaf or any ancestor — naming a person, a credential or a
@@ -458,11 +557,82 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    /// The shape of an event that is not about a person, which is where the path rules are judged
+    /// on their own. The name matters since hub#826 — see [`shape_of`].
     fn shape(payloads: &[Json]) -> BTreeMap<String, EventField> {
-        infer(payloads)
+        shape_of("sale.completed", payloads)
+    }
+
+    fn shape_of(event_name: &str, payloads: &[Json]) -> BTreeMap<String, EventField> {
+        infer(event_name, payloads)
             .into_iter()
             .map(|f| (f.path.clone(), f))
             .collect()
+    }
+
+    /// **The event name says whose flat payload this is** (hub#826).
+    ///
+    /// `customers.create` emits the whole card at the ROOT — `name`, `city`, `company_name` — with
+    /// no `customer.` ancestor anywhere. So the container rule that this module's own header
+    /// quotes as its example («everything under `customer` is withheld and `product.name` is not»)
+    /// never fired for the canonical case, and `GET /api/hub/events/shape?name=customer.created`
+    /// handed a real client's name and city to any marketplace module holding `manage_flows`.
+    #[test]
+    fn a_flat_payload_is_judged_by_the_entity_its_event_name_carries() {
+        let fields = shape_of(
+            "customer.created",
+            &[json!({
+                "name": "Berta Segunda",
+                "city": "Madrid",
+                "company_name": "Segunda SL",
+                "email": "berta@example.test",
+                "lifecycle_stage": "lead",
+                "created_at": "2026-08-11T10:30:00Z",
+                "visits": 12,
+                "total_spent": "42.50"
+            })],
+        );
+
+        for withheld in ["name", "city", "company_name", "email"] {
+            assert!(fields[withheld].redacted, "{withheld} was handed over");
+            assert_eq!(fields[withheld].sample, None, "{withheld}");
+        }
+        // And the picker still works. An amount, a date, a quantity and a state are not personal
+        // data; withholding those too would leave the owner choosing between six options that all
+        // read «(sin ejemplo)», which is the failure this whole module exists to avoid.
+        for kept in ["lifecycle_stage", "created_at", "visits", "total_spent"] {
+            assert!(!fields[kept].redacted, "{kept} lost its example");
+            assert!(fields[kept].sample.is_some(), "{kept} lost its example");
+        }
+    }
+
+    /// The other half, without which the rule is a blanket: the same bare keys under an event that
+    /// is not about a person keep their examples. `product.created` carries a haircut, not a client.
+    #[test]
+    fn the_same_flat_keys_under_an_impersonal_event_keep_their_examples() {
+        let fields = shape_of(
+            "product.created",
+            &[json!({ "name": "Corte de pelo", "city": "Madrid", "total": "42.50" })],
+        );
+
+        for kept in ["name", "city", "total"] {
+            assert!(!fields[kept].redacted, "{kept} lost its example");
+        }
+        assert_eq!(fields["name"].sample, Some(json!("Corte de pelo")));
+    }
+
+    /// The entity is read the way event names are actually written: plural (`customers.imported`,
+    /// which is how the module that emits them is named) and with a verb of more than one segment.
+    /// An event whose name carries no entity at all decides nothing on its own.
+    #[test]
+    fn the_entity_is_recognised_in_plural_and_in_a_longer_name() {
+        for name in ["customers.imported", "customer.contact.updated"] {
+            let fields = shape_of(name, &[json!({ "name": "Berta Segunda" })]);
+            assert!(fields["name"].redacted, "{name} handed over a person's name");
+        }
+        // No entity, no promotion: the path and the value rules are all there is, exactly as before.
+        let fields = shape_of("reminder.due", &[json!({ "name": "Corte de pelo" })]);
+        assert!(!fields["name"].redacted);
     }
 
     /// A path is offered only where the mapping language can walk it: into objects, never into an
@@ -609,7 +779,10 @@ mod tests {
     /// A payload that is not an object has no paths, and does not panic on the way to saying so.
     #[test]
     fn a_payload_that_is_not_an_object_has_no_fields() {
-        assert_eq!(infer(&[json!("just a string"), json!(7), json!(null)]), Vec::new());
+        assert_eq!(
+            infer("sale.completed", &[json!("just a string"), json!(7), json!(null)]),
+            Vec::new()
+        );
     }
 
     /// A pathological payload cannot make the reply unbounded.
@@ -619,13 +792,13 @@ mod tests {
         for i in 0..(MAX_FIELDS * 2) {
             wide.insert(format!("f{i}"), json!(i));
         }
-        assert!(infer(&[Json::Object(wide)]).len() <= MAX_FIELDS);
+        assert!(infer("sale.completed", &[Json::Object(wide)]).len() <= MAX_FIELDS);
 
         let mut deep = json!({ "leaf": 1 });
         for _ in 0..(MAX_DEPTH * 3) {
             deep = json!({ "n": deep });
         }
-        assert!(infer(&[deep])
+        assert!(infer("sale.completed", &[deep])
             .iter()
             .all(|f| f.path.split('.').count() <= MAX_DEPTH));
     }
