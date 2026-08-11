@@ -76,7 +76,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # Linux es el ÚNICO de los tres que puede salir del presupuesto de Actions:
+          # `ci-runner-1` es una máquina Linux. Windows y macOS se quedan donde están porque no
+          # hay dónde llevarlos — Hetzner no ofrece imágenes Windows y macOS exige hardware
+          # Apple. No es una decisión de coste: es que no existe la alternativa.
+          - os: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
             label: linux
           - os: windows-latest
             label: windows
@@ -256,7 +260,10 @@ jobs:
   # ------------------------------------------------------------------------------
   build-android:
     name: Build android
-    runs-on: ubuntu-latest
+    # Android es Linux: sale del presupuesto igual que el resto. Ojo con lo que este job da por
+    # supuesto de la imagen — el `node -e` de más abajo usa «el Node preinstalado del runner»
+    # (declarado a propósito, hub#465). `ci-runner-1` lo trae instalado a nivel de sistema por eso.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -409,7 +416,9 @@ jobs:
     name: Publish to Google Play
     needs: build-android
     if: startsWith(github.ref, 'refs/tags/v') && vars.PLAY_PACKAGE_NAME != ''
-    runs-on: ubuntu-latest
+    # `jarsigner` (JDK) es lo que este job necesita de la imagen y no instala: en `ci-runner-1`
+    # va el JDK 17 del sistema, el mismo major que compila el módulo Kotlin del plugin.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - name: Download AAB
@@ -447,7 +456,9 @@ jobs:
     needs: [build, build-android]
     # tag v* → sube a v{version}/ + latest/ ; dispatch manual → refresca latest/.
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    # De la imagen usa `aws` (CLI v2) y el `node -p` que lee la versión de `tauri.conf.json`;
+    # ninguno de los dos lo instala este job. `ci-runner-1` trae ambos a nivel de sistema.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     # Un `aws s3 cp` colgado (red/endpoint) no debe quedarse horas ocupando el run: mejor fallar
     # rápido y re-lanzar solo este job (`gh run rerun --failed`, los artifacts persisten). Visto
     # 2026-07-09: el upload del run de #82 se quedó colgado 15 min hasta que el run se canceló.
