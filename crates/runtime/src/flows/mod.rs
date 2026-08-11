@@ -160,6 +160,7 @@ mod tests {
             secrets::ERR_SECRET_UNREADABLE,
             grants::ERR_INVALID_NOTIFY_GRANT,
             grants::ERR_INVALID_RECIPIENT_GRANT,
+            grants::ERR_INTERNAL_COMMAND,
             notify::ERR_RECIPIENT_NOT_FOUND,
             notify::ERR_RECIPIENT_AMBIGUOUS,
             notify::ERR_RECIPIENT_INVALID,

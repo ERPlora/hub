@@ -402,6 +402,7 @@ mod tests {
         store::create(
             db,
             HUB,
+            &crate::registry::Registry::new(),
             &NewFlow {
                 name: "T".into(),
                 enabled: true,
@@ -515,6 +516,7 @@ mod tests {
             &db,
             HUB,
             &flow,
+            &crate::registry::Registry::new(),
             &NewFlow {
                 name: "T".into(),
                 enabled: false,

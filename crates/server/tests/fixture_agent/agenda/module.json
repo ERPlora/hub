@@ -32,6 +32,12 @@
       "transaction": true,
       "sql": ["commands/booking_cancel.sql"],
       "ai": { "description": "Cancel a booked appointment." }
+    },
+    "agenda._purge_slots": {
+      "permission": "agenda.cancel",
+      "transaction": true,
+      "sql": ["commands/purge_slots.sql"],
+      "internal": true
     }
   }
 }

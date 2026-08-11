@@ -15,9 +15,9 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
-use crate::flows::def::{FlowDefinition, TriggerDef, TriggerKind};
+use crate::flows::def::{FlowDefinition, StepSpec, TriggerDef, TriggerKind};
 use crate::flows::grants;
-use crate::registry::{new_id, now_rfc3339};
+use crate::registry::{new_id, now_rfc3339, Registry};
 use crate::scheduler::cron;
 
 pub const ERR_FLOW_NOT_FOUND: &str = "flow.not_found";
@@ -110,15 +110,45 @@ fn not_found(id: &str) -> RuntimeError {
 
 // ── flows ─────────────────────────────────────────────────────────────────────────────────────
 
+/// Every command a document NAMES: the `command` steps, and the writes an `ai` step declares as
+/// tools. Both are places where an author says «this flow may call that», and both are judged by
+/// the same rule (hub#824).
+fn commands_named_by(def: &FlowDefinition) -> Vec<&str> {
+    def.steps
+        .iter()
+        .flat_map(|step| match &step.spec {
+            StepSpec::Command { command, .. } => vec![command.as_str()],
+            StepSpec::Ai(ai) => ai.commands.iter().map(String::as_str).collect(),
+            _ => Vec::new(),
+        })
+        .collect()
+}
+
+/// **The save-time half of hub#824.** A document naming an INTERNAL command is a flow this hub can
+/// never execute — `execute_at` bars internals to `Origin::Automation` as it does to `External`
+/// (flows.md §2) — so it is refused here, which is what §13.2 already demands of everything else the
+/// hub cannot run: refused at save, not stored to stall forever.
+///
+/// It shares [`grants::refuse_internal_command`] with the grants door on purpose, and inherits its
+/// silence about UNKNOWN commands: a flow may name a module that is not installed yet.
+fn check_commands(registry: &Registry, def: &FlowDefinition) -> Result<()> {
+    for command in commands_named_by(def) {
+        grants::refuse_internal_command(registry, command)?;
+    }
+    Ok(())
+}
+
 pub async fn create(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
+    registry: &Registry,
     new: &NewFlow,
     by: &str,
 ) -> Result<Flow> {
     // Parse BEFORE writing: a stored document that does not parse is a flow that fails at 3 AM
     // instead of at the screen where it was written.
     let def = FlowDefinition::parse(&new.definition)?;
+    check_commands(registry, &def)?;
     let id = new_id();
     let now = now_rfc3339();
     let mut p = Params::new();
@@ -146,10 +176,12 @@ pub async fn update(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     id: &str,
+    registry: &Registry,
     new: &NewFlow,
     by: &str,
 ) -> Result<Flow> {
     let def = FlowDefinition::parse(&new.definition)?;
+    check_commands(registry, &def)?;
     get(db, hub_id, id).await?; // 404 before mutating, and scoped to this hub.
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
@@ -830,6 +862,26 @@ mod tests {
         db
     }
 
+    /// The catalogue a save is judged against (hub#824): one public command and the two spellings
+    /// of «internal» — the legacy `_` on the last segment and the explicit `internal: true`.
+    fn registry() -> crate::registry::Registry {
+        let mut reg = crate::registry::Registry::new();
+        reg.status
+            .insert("sales".into(), crate::registry::ModuleStatus::Active);
+        reg.commands.insert(
+            "sales.sale.create".into(),
+            test_support::command("sales", "sales.add_sale", "SELECT 1;", vec![]),
+        );
+        reg.commands.insert(
+            "sales._insert_sale".into(),
+            test_support::command("sales", "sales.add_sale", "SELECT 1;", vec![]),
+        );
+        let mut flagged = test_support::command("sales", "sales.add_sale", "SELECT 1;", vec![]);
+        flagged.def.internal = true;
+        reg.commands.insert("sales.reindex".into(), flagged);
+        reg
+    }
+
     /// When the cron trigger of `flow_id` is next due, straight from the table.
     async fn cron_next_run(db: &dyn DatabaseAdapter, flow_id: &str) -> String {
         let mut p = Params::new();
@@ -853,6 +905,7 @@ mod tests {
         let flow = create(
             &db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "Welcome".into(),
                 enabled: true,
@@ -891,6 +944,7 @@ mod tests {
         let flow = create(
             &db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "Nightly".into(),
                 enabled: true,
@@ -907,6 +961,7 @@ mod tests {
             &db,
             HUB,
             &flow.id,
+            &registry(),
             &NewFlow {
                 name: "Nightly (v2)".into(),
                 enabled: true,
@@ -926,6 +981,7 @@ mod tests {
         let flow = create(
             &db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "Two".into(),
                 enabled: true,
@@ -940,6 +996,7 @@ mod tests {
             &db,
             HUB,
             &flow.id,
+            &registry(),
             &NewFlow {
                 name: "One".into(),
                 enabled: true,
@@ -973,15 +1030,11 @@ mod tests {
     #[tokio::test]
     async fn deleting_a_flow_revokes_its_grants_and_disarms_its_triggers() {
         let db = db().await;
-        let mut registry = crate::registry::Registry::new();
-        registry.status.insert("sales".into(), crate::registry::ModuleStatus::Active);
-        registry.commands.insert(
-            "sales.sale.create".into(),
-            test_support::command("sales", "sales.add_sale", "SELECT 1;", vec![]),
-        );
+        let reg = registry();
         let flow = create(
             &db,
             HUB,
+            &reg,
             &NewFlow {
                 name: "Gone".into(),
                 enabled: true,
@@ -995,7 +1048,7 @@ mod tests {
             &db,
             HUB,
             &flow.id,
-            &registry,
+            &reg,
             &[(grants::GrantKind::Command, "sales.sale.create".into())],
             "hub_user:1",
         )
@@ -1044,6 +1097,7 @@ mod tests {
         let flow = create(
             &db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "Sleepy".into(),
                 enabled: true,
@@ -1073,6 +1127,7 @@ mod tests {
         let neighbour_flow = create(
             &db,
             NEIGHBOUR,
+            &registry(),
             &NewFlow {
                 name: "Theirs".into(),
                 enabled: true,
@@ -1133,6 +1188,7 @@ mod tests {
         let flow = create(
             &db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "Queued".into(),
                 enabled: true,
@@ -1173,6 +1229,7 @@ mod tests {
         let flow = create(
             &db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "Done".into(),
                 enabled: true,
@@ -1218,6 +1275,7 @@ mod tests {
         let flow = create(
             &db,
             "hub-other",
+            &registry(),
             &NewFlow {
                 name: "Theirs".into(),
                 enabled: true,
@@ -1292,6 +1350,7 @@ mod tests {
         let flow = create(
             &db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "Busy".into(),
                 enabled: true,
@@ -1336,6 +1395,7 @@ mod tests {
         let theirs = create(
             &db,
             "hub-other",
+            &registry(),
             &NewFlow {
                 name: "Theirs".into(),
                 enabled: true,
@@ -1488,12 +1548,149 @@ mod tests {
         assert_eq!(steps[0].input["headers"]["Authorization"], json!(REDACTED));
     }
 
+    /// **hub#824, the other half of the same hole.** The grants screen is not the only place that
+    /// names a command: a `command` step does, and so does the tool list of an `ai` step. A document
+    /// that names an INTERNAL one is a flow the hub can never execute — `execute_at` refuses
+    /// internals to `Origin::Automation` exactly as it does to `External` (flows.md §2) — so it is
+    /// refused AT SAVE, which is what §13.2 already demands of everything else the hub cannot run.
+    #[tokio::test]
+    async fn a_document_that_names_an_internal_command_is_refused_at_save() {
+        let db = db().await;
+        let reg = registry();
+        let code_of = |err: &RuntimeError| match err {
+            RuntimeError::Domain { code, .. } => code.clone(),
+            other => panic!("expected a domain refusal, got {other}"),
+        };
+
+        for (what, definition) in [
+            (
+                "a `command` step",
+                json!({
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "i", "kind": "command", "command": "sales._insert_sale",
+                                "params": {} }]
+                }),
+            ),
+            (
+                "the tool list of an `ai` step",
+                json!({
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "think", "kind": "ai", "prompt": "do it",
+                                "tools": { "commands": ["sales.reindex"] } }]
+                }),
+            ),
+        ] {
+            let err = match create(
+                &db,
+                HUB,
+                &reg,
+                &NewFlow {
+                    name: "QA internal".into(),
+                    enabled: true,
+                    definition,
+                },
+                "hub_user:1",
+            )
+            .await
+            {
+                Err(e) => e,
+                Ok(_) => panic!("{what} naming an internal command must not be stored"),
+            };
+            assert_eq!(
+                code_of(&err),
+                crate::flows::grants::ERR_INTERNAL_COMMAND,
+                "{what}: {err}"
+            );
+        }
+        assert!(
+            list(&db, HUB).await.unwrap().is_empty(),
+            "nothing was stored, so nothing waits to fail at 3 AM"
+        );
+
+        // The same shape with a PUBLIC command saves, which is the half that must not regress…
+        let saved = create(
+            &db,
+            HUB,
+            &reg,
+            &NewFlow {
+                name: "QA public".into(),
+                enabled: true,
+                definition: json!({
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "i", "kind": "command", "command": "sales.sale.create",
+                                "params": {} }]
+                }),
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        // …and the door is the same one on the way back in: an EDIT cannot smuggle it either.
+        let err = update(
+            &db,
+            HUB,
+            &saved.id,
+            &reg,
+            &NewFlow {
+                name: "QA public".into(),
+                enabled: true,
+                definition: json!({
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "i", "kind": "command", "command": "sales._insert_sale",
+                                "params": {} }]
+                }),
+            },
+            "hub_user:1",
+        )
+        .await
+        .expect_err("editing is the same door as creating");
+        assert_eq!(code_of(&err), crate::flows::grants::ERR_INTERNAL_COMMAND);
+        assert_eq!(
+            get(&db, HUB, &saved.id).await.unwrap().definition["steps"][0]["command"],
+            json!("sales.sale.create"),
+            "a refused edit leaves the stored document untouched"
+        );
+    }
+
+    /// A document may legitimately name a command that is not installed **yet** — a blueprint lands
+    /// its flows and its modules in whatever order, and refusing here would make importing one a
+    /// question of luck. The unknown name is caught where it costs nothing to be strict: the GRANT,
+    /// which is what actually opens the door.
+    #[tokio::test]
+    async fn a_document_may_name_a_command_this_hub_has_not_installed_yet() {
+        let db = db().await;
+        create(
+            &db,
+            HUB,
+            &registry(),
+            &NewFlow {
+                name: "Not yet".into(),
+                enabled: true,
+                definition: json!({
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "i", "kind": "command", "command": "loyalty.points.add",
+                                "params": {} }]
+                }),
+            },
+            "hub_user:1",
+        )
+        .await
+        .expect("a module that is not installed yet is not a broken document");
+    }
+
     #[tokio::test]
     async fn a_definition_that_does_not_parse_is_never_stored() {
         let db = db().await;
         let err = create(
             &db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "Broken".into(),
                 enabled: true,

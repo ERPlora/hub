@@ -36,6 +36,8 @@ pub const ERR_INVALID_HTTP_PATTERN: &str = "flow.invalid_http_pattern";
 pub const ERR_INVALID_NOTIFY_GRANT: &str = "flow.invalid_notify_grant";
 /// hub#821 — a `recipient_query` grant that is not `<query>#<field>`.
 pub const ERR_INVALID_RECIPIENT_GRANT: &str = "flow.invalid_recipient_grant";
+/// hub#824 — a command a flow can never invoke, named where a flow names commands.
+pub const ERR_INTERNAL_COMMAND: &str = "flow.internal_command";
 
 /// The five kinds of ADR-0283 §2. The vocabulary is frozen here; what grows is which of them can
 /// be CREATED, because a grant for something the kernel cannot do yet would tell an owner that
@@ -379,6 +381,36 @@ fn check_notify_channel(value: &str) -> Result<()> {
     }
 }
 
+/// **Refuses a command that `Origin::Automation` can never invoke** (hub#824).
+///
+/// An internal command (`_` on the last segment, or `internal: true` — [`CommandDef::is_internal`])
+/// is barred to automation exactly as it is to an external caller: it is the half of a module that
+/// exists so the public command decides when it runs (flows.md §2, and the gate in
+/// `commands::execute_at`). Before this, only that gate asked — three seconds too late, with the run
+/// already `failed` and the grants screen still saying «granted».
+///
+/// **An unknown command is NOT this function's business.** It answers one question, and each door
+/// decides what «not in the registry» means for it: a GRANT refuses it (a grant naming nothing reads
+/// as authorisation), while a DOCUMENT may legitimately name a module that is not installed yet —
+/// a blueprint lands its flows and its modules in whatever order.
+///
+/// One function on purpose: the grants door and the save door must refuse the same names with the
+/// same code, or one of them becomes the lenient one.
+pub fn refuse_internal_command(registry: &Registry, command: &str) -> Result<()> {
+    match registry.get_command(command) {
+        Some(cmd) if cmd.def.is_internal(command) => Err(RuntimeError::Domain {
+            code: ERR_INTERNAL_COMMAND.to_string(),
+            message: format!(
+                "`{command}` is an INTERNAL command: only the runtime itself invokes it, so an \
+                 automation could never run it. Refused here rather than accepted and denied at \
+                 execution — a permission nobody enforces reads as one that was granted. Name the \
+                 public command that orchestrates it instead."
+            ),
+        }),
+        _ => Ok(()),
+    }
+}
+
 /// Refuses a `recipient_query` grant that is not «one field of one declared read».
 ///
 /// The query has to exist, for the same reason a `command` grant's does: a grant naming nothing
@@ -644,8 +676,13 @@ pub async fn replace(
         }
         // A grant naming an operation that does not exist is a promise about nothing — and, worse,
         // it reads as authorisation on the screen. `PUT …/grants` refuses the whole list (§9).
-        if *kind == GrantKind::Command && registry.get_command(value).is_none() {
-            return Err(RuntimeError::CommandNotFound(value.clone()));
+        if *kind == GrantKind::Command {
+            if registry.get_command(value).is_none() {
+                return Err(RuntimeError::CommandNotFound(value.clone()));
+            }
+            // hub#824: existing is not enough. An internal command exists AND is unreachable, which
+            // is the worst combination for a screen — it looks granted and it is denied at 3 AM.
+            refuse_internal_command(registry, value)?;
         }
         if *kind == GrantKind::Query && registry.get_query(value).is_none() {
             return Err(RuntimeError::QueryNotFound(value.clone()));
@@ -819,6 +856,17 @@ mod tests {
             "sales.sale.void".into(),
             crate::flows::test_support::command("sales", "sales.void_sale", "SELECT 1;", vec![]),
         );
+        // hub#824 — the two spellings of «internal», both real in the catalogue: the legacy `_`
+        // convention on the last segment, and the explicit `internal: true` on a name that does not
+        // carry it. A door that only knew the first would still let the second through.
+        reg.commands.insert(
+            "sales._insert_sale".into(),
+            crate::flows::test_support::command("sales", "sales.add_sale", "SELECT 1;", vec![]),
+        );
+        let mut flagged =
+            crate::flows::test_support::command("sales", "sales.add_sale", "SELECT 1;", vec![]);
+        flagged.def.internal = true;
+        reg.commands.insert("sales.reindex".into(), flagged);
         reg.queries.insert(
             "sales.sale.list".into(),
             crate::flows::test_support::query("sales", "sales.view_sale", "SELECT 1;"),
@@ -834,6 +882,15 @@ mod tests {
         let db = fresh_db().await;
         crate::flows::test_support::ensure_schema(&db, HUB).await;
         db
+    }
+
+    /// The stable CODE of a domain refusal. `Display` carries only the message, and the code is the
+    /// half the editor programs against (flows.md §13.8).
+    fn code_of(err: &RuntimeError) -> &str {
+        match err {
+            RuntimeError::Domain { code, .. } => code,
+            other => panic!("expected a domain refusal, got {other}"),
+        }
     }
 
     /// An URL the way the kernel really produces one: through the single parse of [`net`]. Nothing
@@ -952,6 +1009,76 @@ mod tests {
         .await
         .expect_err("a grant naming nothing reads as authorisation on the screen");
         assert!(format!("{err}").contains("ghost.command"), "{err}");
+    }
+
+    /// **hub#824** — an INTERNAL command exists in the registry, so the «does it exist» check waves
+    /// it through; and `execute_at` will refuse it three seconds later, because `Origin::Automation`
+    /// is barred from internals exactly like `External` (flows.md §2). Between those two moments the
+    /// grants screen says «granted» about something that can never run — and a grant that promises
+    /// what nobody enforces is worse than its absence, because the owner reads it as authorisation.
+    ///
+    /// So the refusal moves to the door that already resolves the name, and it is refused by CODE:
+    /// the editor has to be able to say «that one is internal», not «error».
+    #[tokio::test]
+    async fn an_internal_command_cannot_be_granted_even_though_it_exists() {
+        let db = db_with_schema().await;
+        for internal in ["sales._insert_sale", "sales.reindex"] {
+            let err = replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[(GrantKind::Command, internal.into())],
+                "hub_user:1",
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                code_of(&err),
+                ERR_INTERNAL_COMMAND,
+                "`{internal}` must be refused by its own code: {err}"
+            );
+            assert!(
+                format!("{err}").contains(internal),
+                "the refusal names the command so the screen can point at it: {err}"
+            );
+        }
+
+        // The whole list is refused, so the owner never half-grants: nothing landed, not even the
+        // public command that shared the request.
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[
+                (GrantKind::Command, "sales.sale.create".into()),
+                (GrantKind::Command, "sales._insert_sale".into()),
+            ],
+            "hub_user:1",
+        )
+        .await
+        .expect_err("one bad grant refuses the list (§9)");
+        assert!(
+            list(&db, HUB, FLOW).await.unwrap().is_empty(),
+            "a refused PUT stores nothing at all"
+        );
+
+        // …and the ordinary command still goes through, which is the half that must not regress.
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[(GrantKind::Command, "sales.sale.create".into())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        assert!(authority(&db, HUB, FLOW)
+            .await
+            .unwrap()
+            .allows_command("sales.sale.create"));
     }
 
     /// hub#821 closes the list: every kind of ADR-0283 §2 is now something the kernel enforces, so

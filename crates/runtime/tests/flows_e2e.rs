@@ -385,15 +385,72 @@ async fn a_grant_for_one_command_does_not_open_its_neighbour() {
     assert_eq!(run.status, store::STATUS_FAILED);
 }
 
+/// An internal command is a module's own implementation; the public command that fires it is where
+/// its orchestration lives, so a flow may not name it (flows.md §2).
+///
+/// **hub#824 moved where that is said.** It used to be said only by the engine — the document saved
+/// with `201`, the grant answered `200` and the grants screen read «granted», and the refusal
+/// arrived at 3 AM with the run `failed`. Now both doors refuse it by name, which is the half this
+/// test pins first.
 #[tokio::test]
-async fn an_internal_command_is_as_closed_to_a_flow_as_it_is_to_the_outside_world() {
+async fn an_internal_command_is_refused_at_the_door_and_still_at_the_gate() {
     let rt = runtime().await;
+
     let mut definition = welcome_definition();
     definition["steps"][0]["command"] = json!("crm._purge_notes");
-    let flow_id = create_flow(&rt, definition).await;
-    // Even WITH the grant: an `_`-prefixed command is a module's own implementation, and the
-    // public command that normally fires it is where its orchestration lives.
-    grant(&rt, &flow_id, "crm._purge_notes").await;
+    let refused = rt
+        .create_flow(
+            &NewFlow {
+                name: "Purge".into(),
+                enabled: true,
+                definition,
+            },
+            "hub_user:owner",
+        )
+        .await
+        .expect_err("a document the kernel can never execute is not stored");
+    assert!(format!("{refused}").contains("crm._purge_notes"), "{refused}");
+
+    let flow_id = create_flow(&rt, welcome_definition()).await;
+    let refused = rt
+        .replace_flow_grants(
+            &flow_id,
+            &[(GrantKind::Command, "crm._purge_notes".to_string())],
+            "hub_user:owner",
+        )
+        .await
+        .expect_err("a grant nobody can honour reads as authorisation on the screen");
+    assert!(format!("{refused}").contains("crm._purge_notes"), "{refused}");
+    assert!(rt.list_flow_grants(&flow_id).await.unwrap().is_empty());
+
+    // …and the ENGINE still refuses, which is the half that must never be traded for the doors.
+    // The rows below are what a hub written before this door existed already has — and what a
+    // module update creates the day it marks a published command `internal`. Written straight to
+    // the tables on purpose: that is the only way in that does not go past the two doors above.
+    grant(&rt, &flow_id, "crm.note.add").await;
+    let mut p = Params::new();
+    p.insert("flow".into(), json!(flow_id));
+    let internal_document = json!({
+        "schema_version": 1,
+        "triggers": [{ "kind": "event", "event": "sale.completed" }],
+        "steps": [{ "id": "note", "kind": "command", "command": "crm._purge_notes",
+                    "params": {} }]
+    });
+    p.insert("definition".into(), json!(internal_document.to_string()));
+    rt.db_for_test()
+        .execute(
+            "UPDATE _flow SET definition = :definition WHERE id = :flow",
+            &p,
+        )
+        .await
+        .unwrap();
+    rt.db_for_test()
+        .execute(
+            "UPDATE _flow_grants SET value = 'crm._purge_notes' WHERE flow_id = :flow",
+            &p,
+        )
+        .await
+        .unwrap();
 
     complete_sale(&rt, "120.50").await;
     rt.drain_outbox().await.unwrap();
