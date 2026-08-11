@@ -55,25 +55,63 @@ export const i18n = createI18n({
   messages,
 });
 
+/**
+ * The key module Web Components read to know which language they are in (ADR-0055).
+ *
+ * A module WC is a FOREIGN custom element with its own bundle: it cannot call into the shell's
+ * vue-i18n. The SDK (`ErploraClient.locale`) gives it a SYNCHRONOUS bridge that reads this key,
+ * falling back to `'es'`. That it is `localStorage` and not a variable in memory is deliberate:
+ * the module reads it in its `connectedCallback`, before anybody can hand it anything.
+ */
+export const MODULE_LOCALE_KEY = 'erplora.locale';
+
 function reflectDocumentLocale(locale: Locale): void {
   if (typeof document !== 'undefined') document.documentElement.lang = locale;
 }
 
-reflectDocumentLocale(i18n.global.locale.value);
-
-/** Cambia el idioma del shell en caliente. La persistencia personal vive en `/api/profile`. */
-export function setLocale(locale: Locale): void {
-  if (!messages[locale]) return; // idioma sin fichero → no-op (defensivo)
-  personalLocale = locale;
+/**
+ * Publishes the EFFECTIVE language: applies it to the shell and mirrors it for the modules
+ * (hub#790).
+ *
+ * This is where the defect lived, and it was one line on each side pointing in opposite
+ * directions: the SDK read `erplora.locale` and `applyUserLocale` did `removeItem` on that very
+ * key. NOBODY ever wrote it. A user on English had the whole shell in English and the till in
+ * Spanish, always — the module was reading the SDK's fallback.
+ *
+ * The key is a derived MIRROR, not the preference: the authority is still `/api/profile`. That is
+ * why it is rewritten on every change and removed on none — `localStorage` outlives the session
+ * and every user of that till shares it, so an absent key is read as `'es'` by every module, which
+ * is exactly how a hub whose own language is English ended up with Spanish modules.
+ *
+ * One path for the three doors (`setLocale`, `applyUserLocale`, `bootHubLanguage`): three copies
+ * of this is how the two that existed drifted apart.
+ */
+function publishLocale(locale: Locale): void {
   i18n.global.locale.value = locale;
   reflectDocumentLocale(locale);
-  // ADR-0055: notifica el cambio de idioma a los Web Components de módulo montados (que leen
-  // `globalThis.erplora.locale` y resuelven `erplora.t()`) y a quien re-fetche la navegación.
+  try {
+    localStorage.setItem(MODULE_LOCALE_KEY, locale);
+  } catch {
+    /* storage refused: the module falls back, but the shell stays in its language. */
+  }
+  // ADR-0055: mounted WCs do not re-read `localStorage` by themselves — the event repaints them.
   try {
     window.dispatchEvent(new CustomEvent('erplora:locale-changed', { detail: { locale } }));
   } catch {
     /* noop */
   }
+}
+
+// At boot: the bridge has to exist BEFORE the first module mounts. A WC that connects on the
+// first render reads the key at that instant, and if it is not there it stays on its fallback
+// until something changes it — which may never happen.
+publishLocale(i18n.global.locale.value);
+
+/** Changes the shell language on the fly. The personal preference is persisted in `/api/profile`. */
+export function setLocale(locale: Locale): void {
+  if (!messages[locale]) return; // a language with no file → no-op (defensive)
+  personalLocale = locale;
+  publishLocale(locale);
 }
 
 /** Idioma activo actual. Para usar FUERA de componentes (p.ej. al llamar al runtime con
@@ -91,14 +129,7 @@ export function hasUserLocaleOverride(): boolean {
 export function applyUserLocale(locale: Locale | null, hubDefault?: Locale | null): void {
   personalLocale = locale && messages[locale] ? locale : null;
   const effective = personalLocale ?? (hubDefault && messages[hubDefault] ? hubDefault : DEFAULT);
-  i18n.global.locale.value = effective;
-  reflectDocumentLocale(effective);
-  try {
-    localStorage.removeItem('erplora.locale');
-    window.dispatchEvent(new CustomEvent('erplora:locale-changed', { detail: { locale: effective } }));
-  } catch {
-    /* noop */
-  }
+  publishLocale(effective);
 }
 
 export function resetUserLocale(hubDefault?: Locale | null): void {
@@ -119,12 +150,5 @@ export function bootHubLanguage(hubDefault: string | null | undefined): void {
   if (hasUserLocaleOverride()) return; // el override personal manda
   if (!hubDefault || !messages[hubDefault]) return; // sin default válido del hub → deja 'es'
   if (i18n.global.locale.value === hubDefault) return;
-  i18n.global.locale.value = hubDefault;
-  reflectDocumentLocale(hubDefault);
-  // Notifica el cambio a los Web Components de módulo montados (ADR-0055), igual que setLocale.
-  try {
-    window.dispatchEvent(new CustomEvent('erplora:locale-changed', { detail: { locale: hubDefault } }));
-  } catch {
-    /* noop */
-  }
+  publishLocale(hubDefault);
 }
