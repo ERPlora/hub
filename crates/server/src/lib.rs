@@ -1644,11 +1644,14 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
     router.fallback_service(ServeDir::new(web_dir).fallback(ServeFile::new(index)))
 }
 
-/// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). Cuando el documento
-/// lo sirve el propio Axum (Hub Local mismo-origen, o Hub Cloud), la CSP de `tauri.conf` ya **no**
-/// aplica al doc (solo la inyecta el protocolo de assets de Tauri), así que el runtime debe emitirla.
-/// En las respuestas de API el header es inocuo. El valor lo decide el llamador (es columna de
-/// seguridad/humano): en Tauri lo fija `embedded_serve_config`; en ECS sale de `HUB_CSP` (o `None`).
+/// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). La CSP de
+/// `tauri.conf` **no** aplica a este documento —solo la inyecta el protocolo de assets de Tauri, y
+/// la ventana de la app instalada navega a ESTE servidor (ADR-0159)—, así que el runtime es el
+/// único que puede emitirla. En las respuestas de API el header es inocuo.
+///
+/// El valor sale siempre de [`resolve_csp`]: [`default_csp`] salvo que `HUB_CSP` lo sustituya. La
+/// mención a un `embedded_serve_config` y a un `None` que había aquí quedó obsoleta: el runtime
+/// embebido del shell ya no existe, y desde hub#708 tampoco existe el caso «sin política».
 pub fn with_csp(router: Router, csp: &str) -> Router {
     use axum::http::header::CONTENT_SECURITY_POLICY;
     // No abortar el arranque por una CSP mal formada (un salto de línea, un byte no-ASCII), pero
