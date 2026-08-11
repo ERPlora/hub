@@ -469,6 +469,7 @@ export default {
     verifactuDesc: 'Invoice reporting compliant with regulations',
     receiptTemplate: 'Receipt template',
     receiptTemplateDesc: 'Printed and digital receipt settings',
+    receiptTemplateMissing: 'Install the Printing app to set up your receipt',
     tabHub: 'Hub',
     tabTax: 'Business',
     tabTickets: 'Receipts',

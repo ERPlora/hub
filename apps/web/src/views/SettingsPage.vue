@@ -321,11 +321,16 @@
       <template v-else-if="tab === 'tickets'">
         <ion-card>
           <ion-card-content class="p-0">
-            <ion-item button detail lines="none">
+            <!-- hub#761: esta fila era un `ion-item button detail` SIN `@click` — un callejón sin
+                 salida. La plantilla del tique no vive en el shell sino en el módulo `printing`, así
+                 que aquí solo se resuelve a dónde llevar; y si la app no está, se DICE y se lleva a
+                 instalarla, en vez de enseñar un botón mudo. -->
+            <ion-item button detail lines="none" class="receipt-template"
+                      @click="router.push(receiptTemplate.route)">
               <HubIcon slot="start" name="ticket-outline" />
               <ion-label>
                 <h2>{{ t('settings.receiptTemplate') }}</h2>
-                <p>{{ t('settings.receiptTemplateDesc') }}</p>
+                <p>{{ receiptTemplate.missingApp ? t('settings.receiptTemplateMissing') : t('settings.receiptTemplateDesc') }}</p>
               </ion-label>
             </ion-item>
           </ion-card-content>
@@ -428,6 +433,10 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { isTauri } from '../lib/device';
+// hub#761: la plantilla del tique la configura el módulo `printing`; el shell solo resuelve a
+// dónde llevar, y si la app falta lo dice en vez de enseñar un botón mudo.
+import { receiptTemplateTarget } from '../lib/receipt-template';
+import { moduleNav } from '../lib/nav';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
@@ -488,6 +497,11 @@ const inInstalledApp = isTauri();
 // Compat: #store (pestaña Tienda retirada por duplicar Hub) se normaliza a #hub.
 const route = useRoute();
 const router = useRouter();
+
+// Plantilla del tique (hub#761): la configura el módulo `printing`, no el shell. Reactivo porque
+// `moduleNav` se rellena cuando el runtime contesta `/api/navigation` y cambia al instalar la app
+// desde otra pestaña — la fila deja de mandar a la tienda en cuanto está instalada, sin recargar.
+const receiptTemplate = computed(() => receiptTemplateTarget(moduleNav.value));
 const initialTab = resolveSettingsTab(route.hash);
 const tab = ref<Tab>(initialTab);
 if (route.hash && route.hash !== `#${initialTab}`) {

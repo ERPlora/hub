@@ -443,6 +443,7 @@ export default {
     verifactuDesc: 'Reporte de facturas conforme a la normativa',
     receiptTemplate: 'Plantilla de tique',
     receiptTemplateDesc: 'Configuración del recibo impreso y digital',
+    receiptTemplateMissing: 'Instala la app Impresión para configurar tu tique',
     tabHub: 'Hub',
     tabTax: 'Negocio',
     tabTickets: 'Tiques',
