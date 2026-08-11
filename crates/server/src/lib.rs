@@ -1398,6 +1398,11 @@ pub fn app(state: AppState) -> Router {
         // Correlación (hub#666): qué disparó ESTE evento — los runs que arrancó y los eventos que
         // provocó su entrega. Misma puerta admin: el trace dibuja lo que hace el negocio entero.
         .route("/api/hub/events/:id/trace", get(outbox_admin::trace_event))
+        // Catálogo de campos de un evento (hub#715): lo que el picker del editor de flujos ofrece.
+        // Segmento estático de un solo tramo, así que no compite con `/:id/…`. Puerta admin **y**
+        // capability `manage_flows` si quien llama es un módulo — lo que traen los eventos de un
+        // negocio es la forma de ese negocio, y no la lee cualquier módulo instalado.
+        .route("/api/hub/events/shape", get(outbox_admin::event_shape))
         // ── Kernel de automatización (ADR-0283 K7, hub#661) ────────────────────────────────
         // REST del core, NO commands `hub.*`: el core se congela y el dispatcher no es donde se
         // añade superficie nueva (§9). Misma puerta que las keys y la dead-letter: sesión local de

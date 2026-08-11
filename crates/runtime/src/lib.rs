@@ -24,6 +24,7 @@ pub mod e2e_support;
 pub mod elevation;
 pub mod error_registry;
 pub mod errors;
+pub mod event_shape;
 pub mod events;
 pub mod export;
 pub mod fiscal_profile;
@@ -1787,6 +1788,43 @@ impl Runtime {
     /// without dragging the payloads the listing carries.
     pub async fn count_dead_events(&self) -> Result<i64> {
         outbox::count_dead(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// **What one event carries**, inferred from the last `limit` real events of this hub
+    /// (hub#715) — the read the flow editor's data picker is built from, so an owner chooses
+    /// «Total de la venta — 42,50 €» instead of `sale.total`.
+    ///
+    /// What comes back is the SHAPE, never the stored payloads: keys, types and one sample each,
+    /// with the sample withheld wherever the value could be about a person
+    /// ([`crate::event_shape`] explains where that line is drawn and why it is minimisation and
+    /// not anonymisation).
+    ///
+    /// Three answers, and the middle one is the reason this returns an `Option` rather than an
+    /// empty shape:
+    ///
+    /// - `Some(shape)` with samples — the event has happened here;
+    /// - `Some(shape)` with `samples: 0` — an installed module declares it and no example
+    ///   survives: it has never fired, or the last one aged out of the ninety-day retention window
+    ///   (hub#699). An infrequent event lives here, and the editor must still offer it;
+    /// - `None` — nobody declares it and it has never been seen. Only THAT is «no such event».
+    pub async fn event_shape(
+        &self,
+        event_name: &str,
+        limit: i64,
+    ) -> Result<Option<event_shape::EventShape>> {
+        let declared_by = self.registry.modules_emitting(event_name);
+        let samples = outbox::sample_payloads(self.db.as_ref(), &self.hub_id, event_name, limit).await?;
+        if declared_by.is_empty() && samples.is_empty() {
+            return Ok(None);
+        }
+        let payloads: Vec<Json> = samples.iter().map(|s| s.payload.clone()).collect();
+        Ok(Some(event_shape::EventShape {
+            event_name: event_name.to_string(),
+            declared_by,
+            samples: samples.len(),
+            last_seen_at: samples.first().map(|s| s.created_at.clone()),
+            fields: event_shape::infer(&payloads),
+        }))
     }
 
     /// Un ciclo del barrido del **scheduler** (ADR-0011): ejecuta las scheduled tasks vencidas de

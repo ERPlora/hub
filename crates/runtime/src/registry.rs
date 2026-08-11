@@ -374,6 +374,32 @@ impl Registry {
             .unwrap_or_else(|| "0.0.0".to_string())
     }
 
+    /// Installed modules that **declare they emit** `event_name` (hub#715), sorted, deduplicated.
+    ///
+    /// Both places a module can say it count: `events.emits` — which hub#709/#722 widened to mean
+    /// *the whole catalogue* of what a module emits — and the `emit` of a declarative command,
+    /// because a manifest that has not been updated yet only carries the second one and hub#722
+    /// deliberately made that a warning rather than a refusal.
+    ///
+    /// It is what separates «this hub has never heard of that event» from «that event exists here
+    /// and has not happened yet»: the second is an ordinary state of an infrequent event once
+    /// retention has pruned its last occurrence (hub#699), and answering `404` to it would have
+    /// the flow editor telling an owner that something in their own business does not exist.
+    pub fn modules_emitting(&self, event_name: &str) -> Vec<String> {
+        let mut ids: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        for module in &self.installed {
+            let declared = module.events.emits.iter().any(|e| e == event_name)
+                || module
+                    .commands
+                    .values()
+                    .any(|c| c.emit.iter().any(|e| e == event_name));
+            if declared {
+                ids.insert(module.id.clone());
+            }
+        }
+        ids.into_iter().collect()
+    }
+
     /// Ids de los módulos **activos** que exponen al menos una query/command `expose_api`
     /// (orden estable por id). Lo usan el generador OpenAPI y la matriz de scope de la UI.
     pub fn modules_with_public_api(&self) -> Vec<String> {

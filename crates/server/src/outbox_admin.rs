@@ -1,6 +1,11 @@
 //! **Dead-letter operable** del outbox de eventos (hub#660 — ADR-0127 fase 2, ADR-0283 K6a):
 //! `GET /api/hub/events/dead` · `POST /api/hub/events/{id}/retry` · `POST /api/hub/events/{id}/discard`.
 //!
+//! Y, desde hub#715, la otra lectura del outbox: `GET /api/hub/events/shape?name=…` — **qué campos
+//! trae un evento**, inferido de los eventos reales de este hub, que es lo que el editor de flujos
+//! necesita para ofrecer «el Total de la venta — 42,50 €» en vez de `sale.total`. Devuelve la
+//! FORMA (claves + tipo + una muestra), nunca el payload guardado: ver [`event_shape`].
+//!
 //! `_event_outbox.status='dead'` era TERMINAL. Tras `MAX_ATTEMPTS` la fila dejaba de moverse y la
 //! única ventana era `GET /api/system` (`collect_logs`): 50 filas, sin payload y sin nada que
 //! pulsar. Un evento que moría por una causa **arreglable** —un módulo desactivado a media entrega,
@@ -20,7 +25,7 @@
 //! emisor, y descartar cierra un registro fiscal para siempre; ninguna de las dos es una gestión
 //! que le toque a un token de integración — la key solo habla `/api/v1` (`auth::authenticate`).
 //! `discarded_by` sale SIEMPRE de la sesión resuelta, jamás del cuerpo de la petición.
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -207,6 +212,86 @@ pub async fn trace_event(
             Json(json!({
                 "ok": false,
                 "error": { "code": "not_found", "message": "no hay ningún evento con ese id" }
+            })),
+        )
+            .into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// Query of `GET /api/hub/events/shape`. The event name travels as a parameter and not as a path
+/// segment because event names contain dots (`sale.completed`), and a dot in a path segment is a
+/// thing `fetch` normalises.
+#[derive(serde::Deserialize)]
+pub struct ShapeQuery {
+    name: Option<String>,
+    limit: Option<i64>,
+}
+
+/// `GET /api/hub/events/shape?name=<event>&limit=<n>` — **what an event carries** (hub#715).
+///
+/// The flow editor (pm#110) has to offer «el Total de la venta — 42,50 €», not `sale.total`, and
+/// nothing served that: there is no payload schema (ADR-0127 phase 3, never built) and the only
+/// endpoint that ever returned a payload is the dead-letter queue — failed events, which a healthy
+/// hub does not have. So the shape is inferred from real events of this hub.
+///
+/// **The shape, not the payload.** Keys, types and one sample each, with the sample withheld
+/// wherever the value could be about a person; the field is still listed, because the editor has
+/// to be able to map «Email del cliente» even when it must not display one. The reasoning, and the
+/// honest limits of it, are in `erplora_runtime::event_shape`. The dead-letter queue keeps
+/// returning whole payloads and that stays right: there an operator is deciding whether to replay
+/// one specific row, and the payload IS the decision.
+///
+/// **Two gates.** The admin session of this file, and — when the caller names a module — the same
+/// `manage_flows` capability the flows door demands (hub#714). Both are needed: what the events of
+/// a business carry is the shape of that business, and handing it to every installed module
+/// because an administrator happens to be logged in is the escalation the capability exists to
+/// prevent.
+///
+/// `404` means this hub has never heard of the event. An event that is declared but has no
+/// surviving example answers `200` with `samples: 0` — which is what an infrequent event looks
+/// like once retention has pruned its last occurrence (hub#699), and telling the owner it does not
+/// exist would be a lie about their own business.
+pub async fn event_shape(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<ShapeQuery>,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return rejected(e);
+    }
+    if let Err(response) = crate::flows_api::require_flows_capability(&headers, &rt).await {
+        return response;
+    }
+    let name = q.name.unwrap_or_default().trim().to_string();
+    if name.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "invalid_payload", "message": "hace falta `name`: el nombre del evento" }
+            })),
+        )
+            .into_response();
+    }
+    let limit = q
+        .limit
+        .unwrap_or(erplora_runtime::event_shape::DEFAULT_SAMPLES);
+    match rt.event_shape(&name, limit).await {
+        Ok(Some(shape)) => Json(json!({ "ok": true, "data": shape })).into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({
+                "ok": false,
+                "error": {
+                    "code": "not_found",
+                    "message": "este hub no conoce ningún evento con ese nombre"
+                }
             })),
         )
             .into_response(),

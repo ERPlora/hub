@@ -915,6 +915,9 @@ export interface TauriBridge {
 /** Where the kernel's REST surface lives. **Every** path this surface can build starts here. */
 export const FLOWS_BASE_PATH = '/api/hub/flows';
 
+/** Where the hub's event catalogue lives. Every path {@link EventsApi} can build starts here. */
+export const EVENTS_BASE_PATH = '/api/hub/events';
+
 /** How a call names the module it acts for. Read by `crates/server/src/flows_api.rs`, nowhere else. */
 export const MODULE_HEADER = 'X-Erplora-Module';
 
@@ -956,6 +959,14 @@ const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
  * `{{secret.NAME}}`, so one with a dot or a brace in it is a different thing entirely.
  */
 const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+/**
+ * An event name: `sale.completed`, `hub.whatsapp.message_received`. Dots are allowed here and not
+ * in {@link ID_PATTERN} because a name travels in a QUERY STRING, where `URLSearchParams` encodes
+ * it — the reason it is still checked is that a surface which accepts anything is one
+ * path-building change away from being the proxy this SDK refuses to be.
+ */
+const EVENT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/;
 
 function checkedSegment(kind: string, value: string, pattern: RegExp): string {
   if (typeof value === 'string' && pattern.test(value)) return value;
@@ -1163,6 +1174,77 @@ export class FlowsApi {
   }
 }
 
+/**
+ * One field of an event payload (hub#715): a path the flow mapping language can resolve, its type
+ * and — when the value could not be about a person — one real example from this hub.
+ */
+export interface EventFieldShape {
+  /** `total`, `customer.id`. Paste it as `event.<path>` into a mapping and it resolves. */
+  path: string;
+  /** `string` · `number` · `boolean` · `object` · `array` · `null`. */
+  type: string;
+  /** A real value from a real event. Absent when redacted, and for objects and arrays. */
+  sample?: unknown;
+  /**
+   * The example was withheld because the value could be about a person. **The field still
+   * exists** — offer it in the picker, just without an example beside it.
+   */
+  redacted: boolean;
+  /** The example was cut short. */
+  truncated: boolean;
+  /** Items in the newest sample, for an array. Nothing is offered from INSIDE one: the mapping
+   *  language has no array indexing. */
+  items?: number;
+  /** In how many of the sampled events the path was present. Below `samples` = **optional**. */
+  seen_in: number;
+}
+
+/** What `GET /api/hub/events/shape` answers. */
+export interface EventShape {
+  event_name: string;
+  /** Installed modules that declare they emit it. */
+  declared_by: string[];
+  /**
+   * How many real events the shape came from. **`0` means «no examples yet», not «no such
+   * event»**: an infrequent event whose last occurrence aged out of the ninety-day retention
+   * window lands here, and the picker should say so instead of hiding the trigger.
+   */
+  samples: number;
+  last_seen_at?: string;
+  fields: EventFieldShape[];
+}
+
+/**
+ * **The hub's event catalogue** (hub#715) — what an event carries, learned from events that
+ * really happened in THIS hub.
+ *
+ * Not the live event bus: to react to events, use `subscribe`. This is the read the flow editor's
+ * data picker is built from, so the owner chooses «Total de la venta — 42,50 €» and not
+ * `sale.total`.
+ *
+ * One method, one route, no method that takes a path — the same discipline as {@link FlowsApi},
+ * pinned by the same test file.
+ */
+export class EventsApi {
+  constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+
+  /**
+   * `GET /api/hub/events/shape?name=…` — the fields of an event, with an example each.
+   *
+   * The hub answers the SHAPE, never a stored payload: a value that could be about a person
+   * arrives with `redacted: true` and no `sample`, and the field is still there to be mapped. A
+   * `not_found` refusal means this hub has never heard of the event at all — one that simply has
+   * no surviving examples answers with `samples: 0`.
+   */
+  async shape(name: string, opts: { limit?: number } = {}): Promise<EventShape> {
+    const event = checkedSegment('event name', name, EVENT_NAME_PATTERN);
+    return this.send({
+      method: 'GET',
+      path: `${EVENTS_BASE_PATH}/shape${queryString({ name: event, limit: opts.limit })}`,
+    }) as Promise<EventShape>;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Cliente que usan los Web Components.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1172,6 +1254,7 @@ export class ErploraClient {
   /** The module this client acts FOR, set only by {@link ErploraClient.forModule}. */
   private moduleId?: string;
   private flowsApi?: FlowsApi;
+  private eventsApi?: EventsApi;
 
   constructor(
     private readonly transport: ErploraTransport,
@@ -1231,8 +1314,9 @@ export class ErploraClient {
     }
     const scoped = Object.create(this) as ErploraClient;
     scoped.moduleId = id;
-    // Not inherited: the parent's memoised surface belongs to the parent's scope (or to none).
+    // Not inherited: the parent's memoised surfaces belong to the parent's scope (or to none).
     scoped.flowsApi = undefined;
+    scoped.eventsApi = undefined;
     return scoped;
   }
 
@@ -1262,6 +1346,37 @@ export class ErploraClient {
       );
     }
     return (this.flowsApi ??= new FlowsApi((req) =>
+      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
+  }
+
+  /**
+   * **What the hub's events carry** (hub#715) — the catalogue the flow editor's data picker is
+   * built from, so the owner picks «Total de la venta — 42,50 €» and not `sale.total`.
+   *
+   * Module-scoped and gated exactly like {@link flows}: an owner/admin session the runtime checks,
+   * plus `manage_flows` declared in the module's `module.json` and granted by the owner. What the
+   * events of a business carry is the shape of that business, and it is not something every
+   * installed module gets to read.
+   *
+   * This is **not** the live event bus — `subscribe` is.
+   */
+  get events(): EventsApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'the event catalogue is module-scoped: use `erplora.forModule("<your module id>").events`',
+      );
+    }
+    const transport = this.transport as Partial<CoreApiTransport>;
+    if (typeof transport.coreRequest !== 'function') {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        'this transport cannot reach the core REST surface',
+      );
+    }
+    return (this.eventsApi ??= new EventsApi((req) =>
       transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
     ));
   }

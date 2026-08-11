@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import {
   ErploraClient,
   ErploraError,
+  EVENTS_BASE_PATH,
   FLOWS_BASE_PATH,
   HttpWsTransport,
   MODULE_HEADER,
@@ -292,4 +293,75 @@ test('hub#716: the editor ASKS the hub for the flow contract instead of carrying
   assert.equal(calls[0].url, `http://hub${FLOWS_BASE_PATH}/schema`);
   assert.equal(calls[0].method, 'GET');
   assert.equal(calls[0].headers[MODULE_HEADER], EDITOR, 'same gate as the rest of the surface');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hub#715 — the event catalogue the editor's data picker is built from.
+//
+// Same discipline as the flows surface and for the same reason: one method per route, no method
+// that takes a path, module-scoped so the `manage_flows` gate has something to read. What an event
+// carries is the shape of the business, and it is not something every installed module may read.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('hub#715: the event catalogue is module-scoped, like the kernel it feeds', () => {
+  const client = new ErploraClient(new HttpWsTransport({ baseUrl: '' }));
+  assert.throws(
+    () => client.events,
+    (e: unknown) => e instanceof ErploraError && e.code === MODULE_SCOPE_REQUIRED,
+    'an unscoped client cannot read what the business events carry',
+  );
+});
+
+test('hub#715: the surface is one route, and every id it can paste in one is checked', async () => {
+  const { client, calls } = scoped({ ok: true, data: { event_name: 'sale.completed', fields: [] } });
+  const events = client.events;
+
+  const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(events))
+    .filter((n) => n !== 'constructor')
+    .sort();
+  assert.deepEqual(methods, ['shape'], 'adding an escape hatch here turns this red on purpose');
+
+  await events.shape('sale.completed');
+  await events.shape('hub.whatsapp.message_received', { limit: 3 });
+
+  assert.deepEqual(
+    calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
+    [
+      'GET /api/hub/events/shape?name=sale.completed',
+      'GET /api/hub/events/shape?name=hub.whatsapp.message_received&limit=3',
+    ],
+  );
+  for (const call of calls) {
+    assert.ok(call.url.startsWith(`http://hub${EVENTS_BASE_PATH}`));
+    assert.equal(call.headers[MODULE_HEADER], EDITOR, 'the call names the module the gate reads');
+    assert.equal(call.headers['X-Hub-Session'], SESSION, 'the SHELL owns the session, as always');
+  }
+
+  // The name travels in a query string rather than a path segment, but it is still checked: a
+  // surface that accepts anything is one path-building change away from being a proxy.
+  const before = calls.length;
+  for (const bad of ['', '   ', '../secrets', 'a/b', 'a'.repeat(200), '1leading']) {
+    await assert.rejects(
+      () => events.shape(bad),
+      (e: unknown) => e instanceof ErploraError && e.code === 'invalid_argument',
+      `\`${bad}\` must be refused as an event name`,
+    );
+  }
+  assert.equal(calls.length, before, 'not one of those became an HTTP request');
+});
+
+test('hub#715: «no examples yet» reaches the editor as data, not as an error', async () => {
+  // With a ninety-day retention (hub#699) an infrequent event has no surviving sample. That is a
+  // 200 with `samples: 0` — a 404 would have the editor telling the owner the event does not
+  // exist, about their own business.
+  const { client } = scoped({
+    ok: true,
+    data: { event_name: 'shop.refund_issued', declared_by: ['shop'], samples: 0, fields: [] },
+  });
+
+  const shape = await client.events.shape('shop.refund_issued');
+
+  assert.equal(shape.samples, 0);
+  assert.deepEqual(shape.fields, []);
+  assert.deepEqual(shape.declared_by, ['shop']);
 });
