@@ -29,6 +29,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use erplora_runtime::flows::{approvals, grants, store, NewFlow};
+use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::RuntimeError;
 use serde_json::{json, Value};
 
@@ -116,8 +117,51 @@ fn new_flow(body: &Value) -> Result<NewFlow, Response> {
     })
 }
 
+/// The header by which a caller names **the module it is acting for** (hub#714).
+///
+/// The editor of flows is a module (pm#110) and had no declared way in here: the SDK speaks
+/// `query`/`command` to the dispatcher, and this surface is core REST on purpose. What it *could*
+/// do was lift the session token out of `localStorage` and call the door itself — the module's Web
+/// Component runs in the shell's own document, same origin, no sandbox. That works only while the
+/// user is an admin and breaks the day the shell moves the session into an httpOnly cookie.
+///
+/// So `@erplora/module-sdk` gained a typed `flows` surface that stamps this header, and the header
+/// is read HERE and nowhere else in the core: it is not an "act as this module" switch.
+///
+/// ⚠️ **It is a DECLARATION, not an authentication.** In a browser where every module shares one
+/// document, nothing stops a module from writing another's id — but nothing stops it from reading
+/// the session token either, so this is one gap, not two, and it closes when module components are
+/// isolated. What the gate buys today is still real: the modules that may EVER administer flows
+/// are fixed at install time by a **signed manifest** the owner saw and a grant they can revoke,
+/// and the enforcement already lives server-side — the day the shell can prove who is calling,
+/// only the provenance of this header improves and the kernel does not move.
+const MODULE_HEADER: &str = "x-erplora-module";
+
+/// The module the caller says it is acting for, if any. Blank is the same as absent: the shell
+/// itself, `curl` with an admin session and the QA agent are not modules and name none.
+fn calling_module(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(MODULE_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
 /// Resolves the admin session and hands back the runtime plus «who is doing this», already in the
 /// `hub_user:<id>` form the audit columns store.
+///
+/// **Two gates, and the order is not cosmetic** (hub#714). First the human: `require_admin_session`
+/// is untouched, so an anonymous caller still gets `401` and a cashier still gets `403` — putting
+/// the capability first would answer `403` to a caller who never authenticated. Then the module:
+/// if the request names one, that module needs `manage_flows` **declared and granted**.
+///
+/// Both are mandatory and neither replaces the other. The session says «a person allowed to
+/// administer this hub is here»; the capability says «and the owner chose THIS module as the tool
+/// they administer it with». Without the second one, adding a flows surface to the SDK would have
+/// handed the kernel to every installed module for free: the inventory app the owner installed
+/// could write an automation that runs commands in their name while nobody is watching. That is an
+/// escalation this change would have introduced, so it is gated in the same change.
 macro_rules! admin_session {
     ($st:expr, $headers:expr) => {{
         let arc = match $st.runtime_for(&$st.hub_id()).await {
@@ -129,6 +173,14 @@ macro_rules! admin_session {
             Ok(admin) => admin,
             Err(e) => return rejected(e),
         };
+        if let Some(module) = calling_module(&$headers) {
+            if let Err(e) = rt
+                .require_module_capability(&module, CapabilityKind::ManageFlows)
+                .await
+            {
+                return crate::err_response(e);
+            }
+        }
         let who = format!("hub_user:{}", admin.id);
         (arc.clone(), who)
     }};

@@ -3075,6 +3075,12 @@ pub(crate) fn err_status_and_code(
         // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling
         // into the generic `400 {code:"error"}` bucket would have made the whole chain undecidable.
         E::RequiresElevation { .. } => (StatusCode::FORBIDDEN, "requires_elevation".into()),
+        // hub#714: the module→host permission the OWNER grants (ADR-0079). `403` with its own
+        // stable code — the same one `error_registry::error_code_of` already publishes — because
+        // it is a refusal with a remedy nobody could guess from a bare `400 {code:"error"}`: go to
+        // Settings → Permissions and grant it. It is NOT `permission_denied` (that is the user's
+        // RBAC, another axis entirely) and NOT `requires_elevation` (no manager's PIN opens it).
+        E::CapabilityDenied { .. } => (StatusCode::FORBIDDEN, "capability_denied".into()),
         // hub#775: a `protects` guard refused the command because a precondition of the route is
         // unmet (the drawer is closed). `409`: the request is well-formed and the caller is
         // allowed, it conflicts with the hub's current state — same shape as the fiscal
