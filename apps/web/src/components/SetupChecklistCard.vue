@@ -114,21 +114,23 @@ const props = withDefaults(
     status: SetupStatus | null;
     /**
      * Keys ANOTHER card on the same screen already offers (decision 1 of the plan: in the panel the
-     * checklist starts at item 2 while the apps card is visible). It does not filter the list: the
-     * item still counts and `/setup` still shows it.
+     * checklist starts at item 2 while the apps card is visible).
+     *
+     * It does not remove the item: the counters are the query's and never change, and **expanding
+     * the card lists it again** (hub#487). That second half used to say «and `/setup` still shows
+     * it» — a screen that was never built, which left the `apps` item with no row anywhere on the
+     * panel and this justification half false.
      */
     alreadyOnScreen?: readonly string[];
-    /** Starts expanded (used by `/setup`, where there is nothing else to look at). */
-    expandedByDefault?: boolean;
   }>(),
-  { alreadyOnScreen: () => [], expandedByDefault: false },
+  { alreadyOnScreen: () => [] },
 );
 
 const emit = defineEmits<{ (e: 'review'): void }>();
 
 const { t, te } = useI18n();
 
-const expanded = ref<boolean>(props.expandedByDefault);
+const expanded = ref(false);
 
 const view = computed(() =>
   checklistView(props.status, { expanded: expanded.value, alreadyOnScreen: props.alreadyOnScreen }),
@@ -201,8 +203,9 @@ function pillLabel(item: SetupItem): string {
 </script>
 
 <style scoped>
-/* The configuration card: the way into `/setup` and a progress meter at once. Neutral tone with
-   the brand accent — this is not an error nor an alarm, it is work still to do. */
+/* The configuration card: the whole checklist and a progress meter at once — the toggle opens the
+   full list in place, which is the «long path» hub#487 found nobody had ever built as `/setup`.
+   Neutral tone with the brand accent — this is not an error nor an alarm, it is work still to do. */
 .setup-card {
   margin: 0.25rem 0 1rem;
   padding: 1rem 1.1rem;
