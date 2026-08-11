@@ -606,6 +606,16 @@ export default {
     colEmail: 'Email',
     colRole: 'Rol',
     colAccess: 'Acceso',
+    // hub#463 — esta dirección parece correcta y no administra nada: su baja no revoca ninguna
+    // membresía y su próximo login aterriza en otra fila. Cada motivo nombra la SALIDA, porque son
+    // decisiones distintas y solo una persona puede tomarlas.
+    accessEmailConflict: {
+      badge: 'Hay que decidir',
+      another_row_answers_for_it:
+        'Otra persona ya entra con esta dirección, así que dar de baja a esta no revoca nada. Cambia el email de una de las dos.',
+      two_profiles_claim_it:
+        'Dos personas tienen esta dirección y nada dice cuál es. Dar de baja a esta no revoca nada. Quita la duplicada, o dale a una su propia dirección.',
+    },
     colStatus: 'Estado',
     colCreatedAt: 'Alta',
     colMembers: 'Miembros',

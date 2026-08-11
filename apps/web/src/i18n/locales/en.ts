@@ -639,6 +639,16 @@ export default {
     colEmail: 'Email',
     colRole: 'Role',
     colAccess: 'Access',
+    // hub#463 — this address looks fine and administers nothing: their baja revokes no membership
+    // and their next sign-in lands on a different row. Each reason names the way OUT, because the
+    // two are different decisions and only a human can take them.
+    accessEmailConflict: {
+      badge: 'Needs a decision',
+      another_row_answers_for_it:
+        'Somebody else already signs in with this address, so removing this person revokes nothing. Change the address on one of the two.',
+      two_profiles_claim_it:
+        'Two people hold this address, and nothing says which one is them. Removing this person revokes nothing. Remove the duplicate, or give one of them their own address.',
+    },
     colStatus: 'Status',
     colCreatedAt: 'Joined',
     colMembers: 'Members',
