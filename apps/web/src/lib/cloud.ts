@@ -101,13 +101,24 @@ function getRefreshToken(): string | null {
 }
 
 /**
- * El runtime local/dev (hub_id vacío o DEV_HUB_ID) mantiene una sesión Runtime/PIN independiente
- * del JWT Cloud. ADR-0159: correr dentro del shell Tauri ya NO cuenta — el shell es un cliente
- * fino de la MISMA PWA cloud, así que la expiración de sesión se comporta igual que en el
- * navegador (la rama "Tauri enrolado" era del producto Hub Local, retirado por ADR-0154).
+ * ¿Se sostiene esta sesión en un plano que el Cloud NO emitió?
+ *
+ * Tres credenciales, cada una para su plano (ADR-0003): el JWT Cloud autoriza lo atribuido al
+ * usuario (facturas, compras) y la sesión del RUNTIME autoriza el hub. Un 401 del Cloud solo puede
+ * expirar el plano que lo emitió.
+ *
+ * hub#764 — esto decía únicamente [`isLocalHub`], y en un hub Cloud REAL eso es falso. Pero el día
+ * a día del TPV es sesión local/PIN: el runtime emite su propia sesión y no hay JWT Cloud ninguno.
+ * Al abrir «Mi plan» el 401 no encontraba refresh que rotar, se leía como «sesión caducada» y
+ * tiraba abajo la sesión del runtime —que seguía perfectamente viva— expulsando al cajero al PIN.
+ * Con el token de sesión del runtime delante, el 401 limpia solo las credenciales Cloud y la
+ * pantalla de billing degrada a su estado «hace falta cuenta Cloud», que ya existe.
+ *
+ * ADR-0159 sigue en pie: correr dentro del shell Tauri NO cuenta —es un cliente fino de la misma
+ * PWA cloud—, y una sesión sin NINGÚN plano vivo se expira igual que antes.
  */
 export function hasIndependentLocalSession(): boolean {
-  return isLocalHub();
+  return isLocalHub() || getHubSession() != null;
 }
 
 // --- Refresh-on-401 (rotación de tokens del usuario activo) ------------------
