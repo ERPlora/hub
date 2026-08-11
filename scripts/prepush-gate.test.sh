@@ -246,6 +246,166 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     && ok "no blueprints on disk: the gate still runs" \
     || bad "no blueprints on disk: the gate still runs" "exit=$code"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 14–18 — the attestation must never fail SILENTLY (hub#739)
+#
+# Everything above drives the publish step through HUB_GATE_STATUS_CMD, which is
+# precisely the path that never broke. The one that did is the DEFAULT: plain
+# `gh`. When the active account cannot see the repo, the suite ran green, the
+# status was never posted, and the hook said nothing — so what the human meets
+# later is a PR with NO CHECKS, indistinguishable from "Actions is down". The
+# natural reaction to that is to force the merge, which is the exact thing the
+# CI-silence guard exists to prevent (it is how saas#1184 got in unverified).
+#
+# These tests point PATH at a fake `gh` so the real default path runs without
+# ever calling GitHub.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Write a fake `gh` and echo the directory to prepend to PATH.
+make_gh() {
+    local dir=$1/ghbin
+    mkdir -p "$dir"
+    { echo '#!/usr/bin/env bash'; cat; } > "$dir/gh"
+    chmod +x "$dir/gh"
+    echo "$dir"
+}
+
+# A PATH with every tool the hook needs EXCEPT gh, so "gh is not installed" is a
+# real absence and not a stub pretending to be one.
+make_path_without_gh() {
+    local dir=$1/nogh b p
+    mkdir -p "$dir"
+    for b in git bash sh mkdir rmdir sleep cat rm ln env printf echo sed grep tr wc uname dirname basename docker cargo; do
+        p=$(command -v "$b" 2>/dev/null) && ln -sf "$p" "$dir/$b"
+    done
+    echo "$dir"
+}
+
+# ── 14. The account cannot see the repo → say so, do not exit 0 in silence ────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<'GH'
+case "$1 $2" in
+    "repo view")
+        echo 'gh: HTTP 404: Not Found (https://api.github.com/repos/ERPlora/hub)' >&2
+        exit 1 ;;
+    "auth status")
+        echo 'github.com'                                              >&2
+        echo '  ✓ Logged in to github.com account other-company (keyring)' >&2
+        exit 0 ;;
+esac
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_TEST_CMD="true")
+sleep 1
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                  || errs="$errs exit=$code(want 0)"
+grep -qi 'could not be published' <<<"$out"      || errs="$errs no-verdict"
+grep -q 'HTTP 404' <<<"$out"                     || errs="$errs no-gh-error"
+grep -q 'other-company' <<<"$out"                || errs="$errs no-account"
+grep -q 'local-gate/hub-tests' <<<"$out"         || errs="$errs no-context"
+grep -qi 'without checks\|no checks' <<<"$out"   || errs="$errs no-symptom"
+[ -z "$errs" ] \
+    && ok "unpublishable status: the hook names the account and gh's error" \
+    || bad "unpublishable status: the hook names the account and gh's error" "$errs"
+
+# ── 15. …and the push still goes through: the suite WAS green ─────────────────
+#    Aborting here would punish a green tree for a credential problem, and Ioan
+#    switches the account by hand. The hook reports; it does not block.
+[ "$code" = 0 ] && grep -qi 'green' <<<"$out" \
+    && ok "unpublishable status: the push is not blocked, the green is stated" \
+    || bad "unpublishable status: the push is not blocked, the green is stated" "exit=$code"
+
+# ── 16. The failure is also left on disk, because it is printed asynchronously ─
+#    The publish step outlives the hook, so its shout can land after the shell
+#    prompt is back. A log makes it recoverable instead of merely scrolled past.
+log="$repo/.state/publish-status.log"
+[ -s "$log" ] && grep -q 'HTTP 404' "$log" \
+    && ok "unpublishable status: the reason is recorded in publish-status.log" \
+    || bad "unpublishable status: the reason is recorded in publish-status.log" "log=$(cat "$log" 2>/dev/null | head -3)"
+
+# ── 17. `gh` not installed at all is the same silent hole ─────────────────────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+noghdir=$(make_path_without_gh "$repo")
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$noghdir" \
+    HUB_GATE_TEST_CMD="true")
+sleep 1
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                             || errs="$errs exit=$code(want 0)"
+grep -qi 'could not be published' <<<"$out" || errs="$errs no-verdict"
+grep -qi "gh.*not\( on\)\? \(installed\|on PATH\)\|not on PATH" <<<"$out" || errs="$errs no-reason"
+[ -z "$errs" ] \
+    && ok "no gh on PATH: the hook says the attestation is missing" \
+    || bad "no gh on PATH: the hook says the attestation is missing" "$errs"
+
+# ── 18. The POST itself failing must shout too, not just the repo lookup ──────
+#    This is the half that runs in the background, after the commit lands.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<'GH'
+case "$1 $2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status")
+        echo '  ✓ Logged in to github.com account other-company (keyring)' >&2
+        exit 0 ;;
+esac
+# `gh api …` — reading the commit works, writing the status does not.
+for a in "$@"; do [ "$a" = "-X" ] && { echo 'gh: HTTP 403: Resource not accessible by integration' >&2; exit 1; }; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+log="$repo/.state/publish-status.log"
+errs=""
+[ "$code" = 0 ]                             || errs="$errs exit=$code(want 0)"
+grep -qi 'could not be published' "$log" 2>/dev/null || errs="$errs no-verdict"
+grep -q 'HTTP 403' "$log" 2>/dev/null       || errs="$errs no-gh-error"
+grep -q 'other-company' "$log" 2>/dev/null  || errs="$errs no-account"
+[ -z "$errs" ] \
+    && ok "the status POST failing is reported, not swallowed" \
+    || bad "the status POST failing is reported, not swallowed" "$errs log=$(head -3 "$log" 2>/dev/null)"
+
+# ── 19. The happy default path still publishes — and says it did ──────────────
+#    The regression guard for 14–18: making failure loud must not make success
+#    stop working, and this is the only test that drives `gh` all the way.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                    || errs="$errs exit=$code(want 0)"
+[ -f "$repo/POSTED" ]              || errs="$errs not-posted"
+grep -qi 'could not be published' <<<"$out" && errs="$errs false-alarm"
+[ -z "$errs" ] \
+    && ok "green + a working gh: the status is posted and nothing cries wolf" \
+    || bad "green + a working gh: the status is posted and nothing cries wolf" "$errs"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
