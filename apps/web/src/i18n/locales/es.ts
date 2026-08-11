@@ -497,6 +497,9 @@ export default {
     tabCatalog: 'Añadir apps',
     tabPaid: 'De pago',
     emptyInstalled: 'Aún no tienes apps. Abre «Añadir apps» para instalar la primera.',
+    loadingInstalled: 'Cargando tus apps…',
+    installedLoadError:
+      'No hemos podido leer tus apps. No ha habido respuesta, o esta sesión ya no es válida — vuelve a entrar si sigue pasando.',
     emptyCatalog: 'No hay apps que coincidan con tu búsqueda.',
     catalogLoadError:
       'No se pudo cargar el catálogo. Revisa la conexión o el registro de este dispositivo.',

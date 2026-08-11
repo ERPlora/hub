@@ -109,6 +109,32 @@ describe('Apps · what an installed app card offers', () => {
     expect(source).not.toContain('if (mod.installed) {');
   });
 
+  // hub#770 — «My apps» said «You have no apps yet» while it was still asking, and again when the
+  // ask FAILED, because `catch` assigned `[]`. A revoked session (a second device on the Free plan
+  // displaces the first) came out as «somebody uninstalled everything» on a screen whose only offer
+  // is «install your first one», with the till still selling in the next tab.
+  it('never turns «I could not ask» into «this hub has no apps»', () => {
+    const fn = source.slice(
+      source.indexOf('async function loadInstalled'),
+      source.indexOf('async function loadModuleUpdates'),
+    );
+    // The list survives the failure: the last known-good answer beats every message we could put in
+    // its place, and the failure is said next to the data, not instead of it.
+    expect(fn).not.toContain('installedModules.value = []');
+    expect(fn).toContain("installedState.value = 'error'");
+    expect(fn).toContain("installedState.value = 'ready'");
+    // And it boots not-knowing: the first paint happens before any request has come back.
+    expect(source).toContain("const installedState = ref<ListLoadState>('loading')");
+  });
+
+  it('the empty line of «My apps» is only said about an answer that came back empty', () => {
+    expect(source).toContain('listDisplay(installedState.value');
+    // The three states are mutually exclusive and each has its own sentence.
+    expect(source).toContain('apps.loadingInstalled');
+    expect(source).toContain('apps.installedLoadError');
+    expect(source).toContain('apps.emptyInstalled');
+  });
+
   it('names the apps that uninstalling would break, before uninstalling', () => {
     const fn = source.slice(
       source.indexOf('async function removeModule'),

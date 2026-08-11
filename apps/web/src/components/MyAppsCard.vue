@@ -6,8 +6,14 @@
 
     <!-- A hub with no apps is not a hub with an empty grid: the ＋ tile below is the way out, and
          this line says what the grid will hold. It never names a «module» — that word asks a bar
-         owner to understand our architecture before serving a coffee. -->
-    <p v-if="!ordered.length" class="apps-card-empty" data-testid="apps-empty">
+         owner to understand our architecture before serving a coffee.
+
+         Only when the runtime has ANSWERED and said so (hub#770). While the list is on its way, and
+         when the request failed, this line would be a claim about the hub that nobody checked: a
+         restaurant with twelve apps was told it had none for the three seconds of a cold load, and
+         again whenever a second device displaced its session. Silence is the honest state there —
+         the ＋ tile below is still true. -->
+    <p v-if="display === 'empty'" class="apps-card-empty" data-testid="apps-empty">
       {{ t('dashboard.appsEmpty') }}
     </p>
 
@@ -64,14 +70,23 @@ import { IonButton } from '@ionic/vue';
 
 import HubIcon from './HubIcon.vue';
 import { orderAppsByUsage, recordAppLaunch } from '../lib/app-usage';
+import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import type { ModuleNavItem } from '../lib/nav';
 
 const props = withDefaults(
   defineProps<{
     /** Installed apps, as the runtime reported them (`/api/navigation` → `moduleNav`). */
     apps?: readonly ModuleNavItem[];
+    /**
+     * What the caller KNOWS about that list (hub#770) — `moduleNavState`.
+     *
+     * `ready` by default: a caller that hands over a list and says nothing else is saying «this is
+     * the list». The panel passes the real state, because there the first paint happens before any
+     * request has finished.
+     */
+    state?: ListLoadState;
   }>(),
-  { apps: () => [] },
+  { apps: () => [], state: 'ready' },
 );
 
 const { t } = useI18n();
@@ -79,6 +94,9 @@ const { t } = useI18n();
 // Ordered once per render of the card: re-sorting while a finger is on its way to a tile would move
 // the target out from under it.
 const ordered = computed<ModuleNavItem[]>(() => orderAppsByUsage(props.apps));
+
+/** Which of «apps / still asking / it failed / genuinely none» this card is looking at (hub#770). */
+const display = computed(() => listDisplay(props.state, ordered.value.length));
 
 /** Opening an app is what counts it — the catalogue tile is not an app and never enters the rank. */
 function remember(path: string): void {

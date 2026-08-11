@@ -523,6 +523,11 @@ export default {
     tabCatalog: 'Add apps',
     tabPaid: 'Paid',
     emptyInstalled: 'You have no apps yet. Open “Add apps” to install your first one.',
+    // hub#770: «you have no apps» is a fact about the hub, so it is only ever said about an
+    // answer that came back and said so. These two are the other two things the screen can know.
+    loadingInstalled: 'Loading your apps…',
+    installedLoadError:
+      'We could not read your apps. There was no answer, or this session is no longer valid — sign in again if it keeps happening.',
     emptyCatalog: 'No apps match your search.',
     catalogLoadError:
       'The catalog could not be loaded. Check the connection or this device registration.',

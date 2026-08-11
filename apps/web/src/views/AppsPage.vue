@@ -21,6 +21,15 @@
           {{ t('apps.retryCatalog') }}
         </ion-button>
       </ok-inline-feedback>
+      <!-- El fallo se DICE, y se dice al lado de la lista, no en su lugar (hub#770). «Añadir apps»
+           ya pintaba su error; «Mis apps» se lo tragaba y se quedaba en un vacío que parecía un
+           hecho sobre el hub. -->
+      <ok-inline-feedback v-if="installedDisplay === 'error' && tab === 'mine'" tone="danger" class="mb-3">
+        <span>{{ t('apps.installedLoadError') }}</span>
+        <ion-button size="small" fill="clear" @click="loadInstalled">
+          {{ t('apps.retryCatalog') }}
+        </ion-button>
+      </ok-inline-feedback>
 
       <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida. -->
       <ok-data-table
@@ -35,7 +44,7 @@
         :actions="mineActions"
         :labels="tableLabels"
         :search-placeholder="t('apps.searchInstalled')"
-        :empty-message="t('apps.emptyInstalled')"
+        :empty-message="installedEmptyMessage"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -155,6 +164,7 @@ import {
 import { moduleNav, refreshModuleNav } from '../lib/nav';
 import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import { catalogActionFor, catalogRowState, isModuleInstalled, type CatalogRowState } from '../lib/apps-catalog';
+import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import {
   defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
   type ModuleUpdateInfo,
@@ -217,6 +227,9 @@ interface DataTableAction {
 // --- Estado ---
 const modules = ref<Mod[]>([]);
 const installedModules = ref<InstalledModule[]>([]);
+// Qué sabe la pantalla de esa lista (hub#770). Arranca en `loading`: el primer pintado ocurre antes
+// de que ninguna petición haya vuelto, y nacer en `ready` es decir «no tienes apps» en cada carga.
+const installedState = ref<ListLoadState>('loading');
 // Qué versión ofrece hoy el marketplace por módulo instalado (hub#516). Se pide BAJO DEMANDA al
 // abrir la pantalla, no en bucle: el resolutor vive en el runtime (el mismo del arranque), así que
 // esto es solo lo que hay que enseñar. Vacío = no se ofrece nada (incluido «no se pudo preguntar»).
@@ -356,6 +369,22 @@ const filteredModules = computed<Row[]>(() => {
     };
   });
 });
+
+/**
+ * Qué mira la pestaña «Mis apps»: sus apps, la espera, el fallo o un vacío de verdad (hub#770).
+ *
+ * Las tres frases son excluyentes y ninguna se dice por la otra. La tabla solo sabe pintar UN texto
+ * cuando no hay filas (`empty-message`), así que es ese texto el que cambia — «Aún no tienes apps»
+ * queda para la única situación en la que es cierto: una respuesta que volvió y venía vacía.
+ */
+const installedDisplay = computed(() => listDisplay(installedState.value, installedModules.value.length));
+const installedEmptyMessage = computed(() =>
+  installedDisplay.value === 'loading'
+    ? t('apps.loadingInstalled')
+    : installedDisplay.value === 'error'
+      ? t('apps.installedLoadError')
+      : t('apps.emptyInstalled'),
+);
 
 // Instalados desde el runtime, como filas de la tabla. Se les cuelga la actualización pendiente
 // (hub#516) para que la celda de versión y el predicado de la acción la vean sin recalcularla.
@@ -717,12 +746,21 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
   }
 }
 
-/** Carga los módulos instalados desde el RUNTIME (fuente de verdad local, no el catálogo Cloud). */
+/**
+ * Carga los módulos instalados desde el RUNTIME (fuente de verdad local, no el catálogo Cloud).
+ *
+ * El `catch` ponía `[]`, y eso convertía «no he podido preguntar» en «este hub no tiene apps»
+ * (hub#770) — una afirmación sobre el hub que nadie había comprobado. Con una sesión desplazada por
+ * un segundo dispositivo (plan Free), «Mis apps» decía «Aún no tienes apps» mientras el TPV de la
+ * pestaña de al lado seguía vendiendo. Ahora la lista SOBREVIVE al fallo y lo que cambia es lo que
+ * la pantalla sabe de ella.
+ */
 async function loadInstalled(): Promise<void> {
   try {
     installedModules.value = await listInstalledModules();
+    installedState.value = 'ready';
   } catch {
-    installedModules.value = [];
+    installedState.value = 'error';
   }
 }
 
