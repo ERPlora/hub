@@ -487,7 +487,9 @@ export default {
     resetUndo: 'Undo',
     resetUndoTitle: 'Undo “{name}”',
     resetUndoBody: '{n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
-    resetRows: '{n} rows',
+    // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
+    // «1 rows» (hub#765). El `n` que pasa la llamada elige la forma.
+    resetRows: '{n} row | {n} rows',
     resetSubmit: 'Reset hub',
     resetDeleted: '{n} rows deleted',
     resetConfirmTitle: 'This cannot be undone',
@@ -1080,6 +1082,9 @@ export default {
     exporting: 'Exporting…',
     done: '{filename} downloaded.',
     errorTitle: 'Export failed',
+    // hub#765: the runtime did not answer before the deadline. Without a timeout the spinner spun
+    // forever; now it aborts and says so honestly, so the user can retry instead of walking away.
+    timeout: 'The server is taking too long to build the backup. Try again in a moment.',
   },
   importPage: {
     title: 'Import configuration',

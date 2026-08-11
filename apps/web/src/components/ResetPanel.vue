@@ -115,9 +115,11 @@ import {
 import {
   fetchImportBatches,
   fetchResetPlan,
+  listInstalledModules,
   resetHub,
   undoImport,
   type ImportBatch,
+  type InstalledModule,
   type ResetPlan,
   type ResetReport,
   type ResetSectionPlan,
@@ -133,6 +135,9 @@ const sections = ref<ResetSectionPlan[]>([]);
 const selected = ref<Set<string>>(new Set());
 const report = ref<ResetReport | null>(null);
 const batches = ref<ImportBatch[]>([]);
+// Id → nombre legible de cada módulo instalado (hub#765): para que `modules/inventory` se lea
+// «Inventario» y no el slug interno. Best-effort: si la lista no carga, `label()` cae al slug.
+const moduleNames = ref<Map<string, string>>(new Map());
 
 /**
  * Lo que se pinta: secciones CON filas, más las bloqueadas (aunque estén a cero, explican por
@@ -154,6 +159,10 @@ onMounted(async () => {
     sections.value = plan.sections;
     // Las importaciones son informativas: si fallan, el reset por secciones sigue disponible.
     batches.value = await fetchImportBatches().catch(() => []);
+    // Nombres legibles de los módulos (hub#765): para traducir `modules/<id>` en `label()`.
+    // Best-effort: si la lista no carga, el slug sigue siendo legible como fallback.
+    const installed = await listInstalledModules().catch(() => [] as InstalledModule[]);
+    moduleNames.value = new Map(installed.map((m) => [m.id, m.name]));
   } finally {
     loading.value = false;
   }
@@ -185,9 +194,18 @@ async function undo(batchId: string): Promise<void> {
   sections.value = (await fetchResetPlan()).sections;
 }
 
-/** Nombre legible de una sección (`modules/inventory` → «inventory»). */
+/**
+ * Nombre legible de una sección. Una sección de módulo (`modules/inventory`) prefiere el NOMBRE
+ * humano del módulo (hub#765): el slug es un identificador de desarrollador y no le dice nada al
+ * dueño que está decidiendo qué borrar. Si el módulo no está en la lista de instalados (datos
+ * huérfanos tras desinstalar), cae al slug — algo legible, nunca en blanco.
+ */
 function label(section: string): string {
-  return section.startsWith('modules/') ? section.slice('modules/'.length) : t(`settings.reset_${section}`);
+  if (section.startsWith('modules/')) {
+    const id = section.slice('modules/'.length);
+    return moduleNames.value.get(id) ?? id;
+  }
+  return t(`settings.reset_${section}`);
 }
 
 function toggle(section: string): void {

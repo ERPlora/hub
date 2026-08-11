@@ -6,18 +6,20 @@
 //   - confirmar exige ESCRIBIR el nombre del hub (patrón GitHub), no un simple «Aceptar»,
 //   - sin selección no se puede disparar nada.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 
 const fetchResetPlan = vi.fn();
 const resetHub = vi.fn();
 const fetchImportBatches = vi.fn();
 const undoImport = vi.fn();
+const listInstalledModules = vi.fn();
 vi.mock('../lib/runtime', () => ({
   fetchResetPlan: (...a: unknown[]) => fetchResetPlan(...a),
   resetHub: (...a: unknown[]) => resetHub(...a),
   fetchImportBatches: (...a: unknown[]) => fetchImportBatches(...a),
   undoImport: (...a: unknown[]) => undoImport(...a),
+  listInstalledModules: (...a: unknown[]) => listInstalledModules(...a),
 }));
 
 // El nombre del hub que hay que teclear para confirmar sale de los settings del hub.
@@ -45,7 +47,8 @@ const i18n = createI18n({
       settings: {
         resetIntro: 'Deleting is permanent.',
         resetExportFirst: 'Export a backup first',
-        resetRows: '{n} rows',
+        // Pluralización de vue-i18n: `singular | plural`. El `n` de las opciones decide cuál.
+        resetRows: '{n} row | {n} rows',
         resetSubmit: 'Reset hub',
         resetDeleted: '{n} rows deleted',
         resetConfirmTitle: 'This cannot be undone',
@@ -91,10 +94,18 @@ function mountPanel() {
   return mount(ResetPanel, { global: { plugins: [i18n], renderStubDefaultSlot: true }, shallow: true });
 }
 
-/** Espera a que el `onMounted` async (carga del plan) haya resuelto. */
+/**
+ * Espera a que el `onMounted` async (plan + lotes + nombres de módulos) haya resuelto.
+ *
+ * El onMounted encadena tres awaits secuenciales (fetchResetPlan → fetchImportBatches →
+ * listInstalledModules, hub#765). `flushPromises` vacía la cola de microtasks, pero los mocks
+ * resuelven en el orden en que se esperan, así que hay que darle suficientes vueltas para que la
+ * última promesa se asiente antes de que el test lea el DOM.
+ */
 async function flush(w: ReturnType<typeof mountPanel>) {
-  await Promise.resolve();
-  await Promise.resolve();
+  await flushPromises();
+  await flushPromises();
+  await flushPromises();
   await w.vm.$nextTick();
 }
 
@@ -106,6 +117,13 @@ beforeEach(() => {
     { id: 'batch-1', name: 'restaurante_es', rows: 312, created_at: '2026-07-31T10:14:00Z' },
   ]);
   undoImport.mockResolvedValue({ sections: [{ section: 'inventory_product', rows_deleted: 312 }] });
+  // El nombre legible de cada módulo instalado (hub#765): el panel de reset lo usa para que una
+  // sección `modules/inventory` se lea «Inventario» y no el slug interno crudo.
+  listInstalledModules.mockResolvedValue([
+    { id: 'inventory', name: 'Inventory', version: '1.0.0' },
+    { id: 'customers', name: 'Customers', version: '1.0.0' },
+    { id: 'verifactu', name: 'VeriFactu', version: '1.0.0' },
+  ]);
   // Por defecto el usuario teclea bien el nombre y confirma.
   alertCreate.mockResolvedValue({
     present: vi.fn(),
@@ -281,6 +299,48 @@ describe('ResetPanel', () => {
     expect(backup.exists()).toBe(true);
     await backup.trigger('click');
     expect(w.emitted('go-export')).toBeTruthy();
+  });
+
+  // hub#765: una sección de módulo (`modules/inventory`) se mostraba con el SLUG crudo —
+  // «inventory», «tables», «invoice_series» — porque `label()` solo recortaba el prefijo. El
+  // nombre legible ya vive en `listInstalledModules`; usarlo convierte la lista de borrar en algo
+  // que el dueño reconoce, no un manojo de identificadores internos.
+  it('una sección de módulo se muestra con su NOMBRE legible, no con el slug interno', async () => {
+    const w = mountPanel();
+    await flush(w);
+
+    const html = w.html();
+    expect(html).toContain('Inventory');
+    expect(html).toContain('Customers');
+    // El slug NO puede ser lo que ve el usuario: es un identificador de desarrollador.
+    expect(html).not.toContain('>inventory<');
+    expect(html).not.toContain('>customers<');
+  });
+
+  // Y si un módulo no está en la lista de instalados (p. ej. sus datos quedaron tras desinstalar),
+  // el slug sigue siendo legible: cae al identificador en vez de quedar en blanco.
+  it('un módulo desconocido cae al slug en vez de quedar sin etiqueta', async () => {
+    fetchResetPlan.mockResolvedValue({
+      sections: [{ section: 'modules/orphan_module', rows: 5, blocked_by: null }],
+    });
+    const w = mountPanel();
+    await flush(w);
+
+    expect(w.html()).toContain('orphan_module');
+  });
+
+  // hub#765: la gramática concordaba con el número. «1 filas» se leía en cada sección con un
+  // solo elemento — feo, pero sobre todo señal de que el recuento no se había pensado para el
+  // singular. La pluralización de vue-i18n (pipe `|`) lo resuelve sin tocar la llamada.
+  it('una sección con UNA fila dice «1 row», no «1 rows»', async () => {
+    fetchResetPlan.mockResolvedValue({
+      sections: [{ section: 'modules/lonely', rows: 1, blocked_by: null }],
+    });
+    const w = mountPanel();
+    await flush(w);
+
+    expect(w.html()).toContain('1 row');
+    expect(w.html()).not.toContain('1 rows');
   });
 });
 
