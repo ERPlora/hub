@@ -500,6 +500,26 @@ async fn dispatch(
     // A WRITE. Under `manual` — the default — it becomes a row and the turn ends here.
     if !request.policy.is_auto() {
         let rt = st.runtime.lock().await;
+
+        // **hub#825 — the tray only ever shows what, if approved, runs.** The payload is judged
+        // against the command's JSON Schema HERE, before the row exists, by the same code that will
+        // judge it at execution (`Runtime::validate_command_payload`).
+        //
+        // Without this, `manual` — the DEFAULT, the policy that exists precisely so a person is
+        // involved — postponed a failure the hub could already see until after somebody had decided:
+        // the owner opened the tray at 9 AM, pressed «approve», got a `422`, and was left with a row
+        // marked `approved` **with an error**, a `failed` run, nothing to edit and no way to retry.
+        // Her decision was spent on a proposal that was never executable.
+        //
+        // The path out already existed one branch below: under `policy:"auto"` the same refusal goes
+        // back to the model as a tool RESULT and the run survives, because a model that asks for
+        // something it cannot have must be able to say so to the customer (flows.md §14.9). Schema
+        // validation is a tool failure like any other, so `manual` takes that path too and the model
+        // corrects itself in the same turn — the person never sees the impossible version.
+        if let Err(e) = rt.validate_command_payload(&call.name, &params) {
+            return Ok(Dispatched::Result(json!({ "error": format!("{e}") })));
+        }
+
         rt.request_flow_approval(&NewApproval {
             run_id: request.run_id.clone(),
             flow_id: request.flow_id.clone(),

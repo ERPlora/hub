@@ -140,6 +140,13 @@ fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_agent/agenda")
 }
 
+/// The SAME module, one version later, with a stricter schema for `agenda.booking.create`
+/// (`minutes` becomes required). It exists to reproduce the one thing validating at proposal time
+/// cannot cover: the contract moving between the proposal and the approval (hub#825).
+fn stricter_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_agent/agenda_v2")
+}
+
 fn config(cloud_base_url: String, tag: &str) -> HubConfig {
     let temp = std::env::temp_dir().join(format!("erplora-agent-{tag}-{}", std::process::id()));
     HubConfig {
@@ -688,6 +695,229 @@ async fn max_iters_stops_a_runaway_loop_and_fails_the_step() {
         "the failure names the cap: {}",
         run.last_error
     );
+}
+
+// ── hub#825: the tray only ever shows what, if approved, runs ─────────────────────────────────
+
+/// **The proposal the hub could refute before writing it down.**
+///
+/// The owner opens the tray at 9 AM, reads «book Marta in», presses **Approve** — and gets a
+/// validation error. The row is left `approved` **with an error**, the run `failed`, and there is
+/// nothing she can do: she cannot edit the payload, cannot retry, and the model never comes back.
+/// Her decision was spent on a proposal the hub already knew it could not execute when it wrote it.
+///
+/// The kernel proves it knew: under `policy:"auto"` the SAME invalid payload comes back to the model
+/// as a tool result and the run survives (§14.9). So the fix is not a new mechanism — it is making
+/// `manual` take the path `auto` already takes: validate against the command's JSON Schema **before**
+/// the approval row exists, hand the failure to the model as a tool result, and let it correct in the
+/// same turn. Nothing impossible reaches a person.
+///
+/// Both of the QA's payloads are reproduced: a missing required property, and a `null` / wrong type.
+#[tokio::test]
+async fn an_invalid_proposal_never_reaches_the_tray_and_the_model_corrects_it_in_the_same_turn() {
+    for (what, invalid) in [
+        // Missing required properties — what a model does with a command whose schema asks for
+        // more than the conversation gave it.
+        ("missing required", json!({ "customer": "Marta" })),
+        // …and the other shape the QA saw: a null where a string is required, and a type that is
+        // not the declared one.
+        (
+            "null / wrong type",
+            json!({ "customer": "Marta", "starts_at": null, "minutes": "half an hour" }),
+        ),
+    ] {
+        let cloud = FakeCloud::with(vec![
+            sse_call("agenda.booking.create", "c1", invalid),
+            // The correction: same turn, same model, now with a payload the schema accepts.
+            sse_call(
+                "agenda.booking.create",
+                "c2",
+                json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 30 }),
+            ),
+        ]);
+        let h = hub(
+            cloud.serve().await,
+            "invalid-proposal",
+            agent_step("manual"),
+            &[(GrantKind::Command, "agenda.booking.create".into())],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "book me" })).await;
+
+        perform(&h, &run_id).await;
+
+        // The model was TOLD, in the same turn, exactly as `auto` tells it.
+        assert_eq!(
+            cloud.turns(),
+            2,
+            "{what}: the refutable payload must come back to the model, not end the turn"
+        );
+        let second = &cloud.bodies()[1];
+        let tool_answer = second["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["role"] == "tool")
+            .unwrap_or_else(|| panic!("{what}: the refusal goes back as a tool result: {second}"))
+            ["content"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            tool_answer.contains("agenda.booking.create"),
+            "{what}: the model has to be told WHICH call failed and why: {tool_answer}"
+        );
+
+        // …and the tray holds ONE row: the corrected proposal. The impossible one was never written.
+        let rt = h.state.runtime.lock().await;
+        let pending = rt
+            .list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap();
+        drop(rt);
+        assert_eq!(
+            pending.len(),
+            1,
+            "{what}: a person must only ever be shown what, if approved, runs"
+        );
+        assert_eq!(pending[0].payload["starts_at"], "2026-08-10T10:00:00Z");
+        assert_eq!(
+            run_status(&h, &run_id).await,
+            store::STATUS_WAITING_APPROVAL,
+            "{what}: the run waits for the person, as it should"
+        );
+    }
+}
+
+/// A model that cannot produce a valid payload does not turn into a broken proposal either: it
+/// answers in words, the run finishes, and the tray stays empty. The alternative — parking whatever
+/// it last said — is the bug this closes wearing a different hat.
+#[tokio::test]
+async fn a_model_that_never_gets_the_payload_right_ends_in_words_not_in_the_tray() {
+    let cloud = FakeCloud::with(vec![
+        sse_call("agenda.booking.create", "c1", json!({ "customer": "Marta" })),
+        sse_text("I could not book that: I am missing the start time."),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "gives-up",
+        agent_step("manual"),
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+
+    perform(&h, &run_id).await;
+
+    let rt = h.state.runtime.lock().await;
+    assert!(
+        rt.list_flow_approvals(None, 50).await.unwrap().is_empty(),
+        "nothing impossible was parked for a person"
+    );
+    drop(rt);
+    tick(&h).await;
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_DONE);
+    assert!(
+        step_output(&h, &run_id).await["text"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("could not"),
+        "the model's honest answer is the step's output"
+    );
+}
+
+/// **The net, for the one case validating at proposal time cannot cover: the schema CHANGED.**
+///
+/// A module updates between 3 AM and 9 AM and the command now asks for a field the stored payload
+/// does not have. Approving must still not execute it — but the row must NOT be burnt as `approved`
+/// either. `approved` + error is the state §14.8 reserves for «the person approved and the COMMAND
+/// broke»: something ran, or could have. Here nothing could: the refusal happens before the door,
+/// exactly like the revoked grant of §7.2, and the remedy is the same — the row stays **pending**, so
+/// the person can still reject it and end the run cleanly instead of re-launching the whole flow.
+#[tokio::test]
+async fn a_schema_that_changed_after_the_proposal_refuses_the_approval_without_burning_it() {
+    let cloud = FakeCloud::with(vec![sse_call(
+        "agenda.booking.create",
+        "c1",
+        json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }),
+    )]);
+    let h = hub(
+        cloud.serve().await,
+        "schema-moved",
+        agent_step("manual"),
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+
+    let id = {
+        let rt = h.state.runtime.lock().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()[0]
+            .id
+            .clone()
+    };
+
+    // The module updates overnight: `minutes` becomes required, and the stored payload has none.
+    {
+        let mut rt = h.state.runtime.lock().await;
+        rt.update_from_dir(&stricter_fixture()).await.unwrap();
+    }
+
+    let response = h
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/api/hub/flows/approvals/{id}/approve"),
+            Some(&h.admin_session),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let refusal = body_json(response).await["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(
+        refusal.contains("minutes"),
+        "the person is told WHAT no longer fits: {refusal}"
+    );
+
+    assert!(bookings(&h).await.is_empty(), "nothing was written");
+    let rt = h.state.runtime.lock().await;
+    let row = rt.get_flow_approval(&id).await.unwrap();
+    drop(rt);
+    assert_eq!(
+        row.status,
+        approvals::STATUS_PENDING,
+        "a decision that could not be carried out is not a decision: the row must not read \
+         `approved` about something that never happened"
+    );
+    assert!(row.decided_by.is_empty(), "nobody is recorded as having approved it");
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_WAITING_APPROVAL,
+        "the run still waits, so rejecting is still a way out"
+    );
+
+    // …and rejecting IS still a way out: the person ends the run cleanly.
+    let rejected = h
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/api/hub/flows/approvals/{id}/reject"),
+            Some(&h.admin_session),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(rejected.status(), StatusCode::OK);
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_CANCELLED);
 }
 
 /// The tray is not a public screen. It is where a person authorises the hub to write while nobody
