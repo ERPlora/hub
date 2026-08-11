@@ -154,7 +154,7 @@ import {
 } from '../lib/runtime';
 import { moduleNav, refreshModuleNav } from '../lib/nav';
 import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
-import { isModuleInstalled } from '../lib/apps-catalog';
+import { catalogActionFor, catalogRowState, isModuleInstalled, type CatalogRowState } from '../lib/apps-catalog';
 import {
   defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
   type ModuleUpdateInfo,
@@ -327,15 +327,18 @@ const filteredModules = computed<Row[]>(() => {
     // Instalado PERO con versión nueva: estado propio (hub#516). Antes todo lo instalado caía en
     // «Instalado» con el botón muerto, así que el arreglo publicado no tenía por dónde entrar.
     const update = isInstalled ? pendingUpdate(m.id, moduleUpdates.value) : null;
-    const state = prog || updatingIds.value.has(m.id)
-      ? 'installing'
-      : update
-        ? 'updatable'
-        : isInstalled
-          ? 'installed'
-          : m.available
-            ? 'available'
-            : 'unavailable';
+    // Un SOLO sitio decide instalar-o-actualizar (hub#795). Antes se decidía aquí para pintar el
+    // badge y OTRA VEZ dentro del click, leyendo el flag del Cloud a secas: los dos discrepaban
+    // justo cuando importa (`mark_installed` va por detrás), y la fila entraba por instalar algo
+    // que tocaba actualizar.
+    const state = catalogRowState({
+      cloudInstalled: m.installed,
+      id: m.id,
+      localInstalledIds: installedIds.value,
+      hasUpdate: update !== null,
+      available: m.available,
+      busy: prog !== null || updatingIds.value.has(m.id),
+    });
     return {
       ...m,
       state,
@@ -435,15 +438,28 @@ const catalogColumns = computed<DataTableColumn[]>(() => [
   // valor crudo de la fila → el filtro select y el buscador ven la misma etiqueta que el usuario.
   { key: 'stateLabel', header: t('apps.colStatus'), align: 'center', filterable: true, filterType: 'select', render: (r) => stateCell(r) },
 ]);
+// DOS acciones, no una con dos significados (hub#795). Antes había un solo botón «Instalar» que
+// servía también para actualizar: la columna de estado decía «Update to 1.2.22» y el nombre
+// accesible del botón de al lado seguía siendo «Install». Con actions solo-icono el `label` ES lo
+// único que se lee (aria-label + tooltip), así que a un teclado y a un lector de pantalla se les
+// estaba diciendo el verbo equivocado de la operación que iban a lanzar.
+//
+// Cada una vive exactamente donde su operación aplica; `catalogActionFor` decide, y es la misma
+// función que los tests fijan. Nunca están las dos vivas en la misma fila.
 const catalogActions = computed<DataTableAction[]>(() => isAdmin.value && !config.demo
   ? [
       {
         id: 'install',
         label: t('apps.actionInstall'),
         icon: 'download-outline',
-        // Instalado sin novedades o en curso → botón muerto; en curso → spinner en su lugar.
-        // `updatable` (hub#516) SÍ es accionable: el mismo botón lleva la versión nueva.
-        disabled: (row) => row.state !== 'available' && row.state !== 'updatable',
+        disabled: (row) => catalogActionFor(row.state as CatalogRowState) !== 'install',
+        loading: (row) => row.state === 'installing',
+      },
+      {
+        id: 'update',
+        label: t('apps.actionUpdate'),
+        icon: 'arrow-up-circle-outline',
+        disabled: (row) => catalogActionFor(row.state as CatalogRowState) !== 'update',
         loading: (row) => row.state === 'installing',
       },
     ]
@@ -597,10 +613,11 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
 /** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
 async function installModule(mod: Mod): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
-  if (mod.installed) {
-    // Antes esto cortaba con «ya instalado» y ahí se acababa el camino: publicar la v2 de un módulo
-    // con un bug corregido no llegaba a ningún hub que ya tuviera la v1 (hub#516). Ahora, si hay
-    // versión nueva, el botón ACTUALIZA; y si no la hay, sigue diciendo que ya está.
+  // Ya está aquí: la RUTA de actualizar es la suya propia (hub#795) y esta se limita a decirlo. La
+  // verdad la pone el runtime cruzado con el catálogo (`isModuleInstalled`), nunca el flag del Cloud
+  // a secas: `mark_installed` es best-effort y va por detrás justo después de instalar, que es
+  // cuando este camino se recorre.
+  if (isModuleInstalled(mod.installed, mod.id, installedIds.value)) {
     if (pendingUpdate(mod.id, moduleUpdates.value)) {
       await updateInstalledModule(mod.id, mod.name);
     } else {
@@ -925,7 +942,13 @@ function handleMineAction(e: Event): void {
 }
 function handleCatalogAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
-  if (actionId === 'install') void installModule(row as unknown as Mod);
+  const mod = row as unknown as Mod;
+  // Por el ESTADO de la fila, que ya cruzó el Cloud con el runtime — no por el flag del Cloud
+  // (hub#795). Se vuelve a comprobar aquí y no solo en `disabled`: el evento puede llegar de un
+  // teclado sobre una fila que acaba de cambiar de estado.
+  const offered = catalogActionFor(row.state as CatalogRowState);
+  if (actionId === 'update' && offered === 'update') void updateInstalledModule(mod.id, mod.name);
+  else if (actionId === 'install' && offered === 'install') void installModule(mod);
 }
 
 // Cablea una tabla (labels del locale activo + listener de rowAction). La vista inicial = tarjetas la fija el

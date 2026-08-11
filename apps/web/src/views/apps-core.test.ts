@@ -81,6 +81,34 @@ describe('Apps · what an installed app card offers', () => {
     expect(fn.indexOf('confirmToggle')).toBeLessThan(fn.indexOf('deactivateModule('));
   });
 
+  // hub#795 — the status column said «Update to 1.2.22» and the button on the same row was still
+  // called «Install». Icon-only actions mean the label is the accessible name: a keyboard and a
+  // screen reader were told the wrong verb for the operation about to run.
+  it('offers UPDATE and INSTALL as two actions, so the name matches the operation', () => {
+    const start = source.indexOf('const catalogActions');
+    const catalogActions = source.slice(start, source.indexOf('// --- Handlers ---', start));
+    expect(start, 'catalogActions must exist').toBeGreaterThan(-1);
+    expect(catalogActions).toContain("id: 'install'");
+    expect(catalogActions).toContain("id: 'update'");
+    // Each one lives exactly where its own operation applies — never both on the same row.
+    expect(catalogActions).toContain("catalogActionFor(row.state as CatalogRowState) !== 'install'");
+    expect(catalogActions).toContain("catalogActionFor(row.state as CatalogRowState) !== 'update'");
+  });
+
+  it('routes the catalog press by the ROW state, not by the Cloud flag', () => {
+    const fn = source.slice(
+      source.indexOf('function handleCatalogAction'),
+      source.indexOf('function wireTable'),
+    );
+    expect(fn).toContain("actionId === 'update'");
+    expect(fn).toContain('updateInstalledModule(');
+    // And the state itself comes from the one function that crosses Cloud with the runtime.
+    expect(source).toContain('catalogRowState(');
+    // `mark_installed` is best-effort: right after installing, the Cloud still says false while the
+    // runtime already has the module. Deciding install-or-update off that flag is hub#795 itself.
+    expect(source).not.toContain('if (mod.installed) {');
+  });
+
   it('names the apps that uninstalling would break, before uninstalling', () => {
     const fn = source.slice(
       source.indexOf('async function removeModule'),
