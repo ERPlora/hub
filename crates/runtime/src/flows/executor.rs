@@ -1029,6 +1029,7 @@ mod tests {
         store::create(
             db,
             HUB,
+            &registry(),
             &NewFlow {
                 name: "F".into(),
                 enabled: true,
@@ -1304,6 +1305,7 @@ mod tests {
             &db,
             HUB,
             &flow_id,
+            &registry(),
             &NewFlow {
                 name: "F".into(),
                 enabled: false,

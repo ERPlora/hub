@@ -1884,8 +1884,11 @@ impl Runtime {
         flows::store::get(self.db.as_ref(), &self.hub_id, id).await
     }
 
+    /// Saves a flow. The registry travels with it because the document names COMMANDS, and a
+    /// document naming one the kernel can never invoke is refused at save (hub#824) — same reason
+    /// `replace_flow_grants` carries it.
     pub async fn create_flow(&self, new: &flows::NewFlow, by: &str) -> Result<flows::Flow> {
-        flows::store::create(self.db.as_ref(), &self.hub_id, new, by).await
+        flows::store::create(self.db.as_ref(), &self.hub_id, &self.registry, new, by).await
     }
 
     pub async fn update_flow(
@@ -1894,7 +1897,7 @@ impl Runtime {
         new: &flows::NewFlow,
         by: &str,
     ) -> Result<flows::Flow> {
-        flows::store::update(self.db.as_ref(), &self.hub_id, id, new, by).await
+        flows::store::update(self.db.as_ref(), &self.hub_id, id, &self.registry, new, by).await
     }
 
     pub async fn delete_flow(&self, id: &str, by: &str) -> Result<()> {

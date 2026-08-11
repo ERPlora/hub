@@ -43,9 +43,24 @@ async fn body_json(response: axum::response::Response) -> Value {
 }
 
 async fn fixture() -> Fixture {
+    build_fixture(false).await
+}
+
+/// The same hub with a real module installed, for the tests that need the registry to have
+/// something in it: `agenda` ships a public command **and** an internal one (`agenda._purge_slots`),
+/// which is the pair hub#824 is about.
+async fn fixture_with_modules() -> Fixture {
+    build_fixture(true).await
+}
+
+async fn build_fixture(install_modules: bool) -> Fixture {
     let db = fresh_db().await;
-    let rt = Runtime::with_hub_id(Box::new(db), HUB);
+    let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
+    if install_modules {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_agent/agenda");
+        rt.install_from_dir(&dir).await.unwrap();
+    }
 
     let admin_id = rt.create_user("Ioan", "1111", "admin", None).await.unwrap();
     let employee_id = rt.create_user("Marta", "2222", "cashier", None).await.unwrap();
@@ -555,6 +570,117 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
     )
     .await;
     assert_eq!(typo.status(), StatusCode::CONFLICT);
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// **hub#824 — the door does not promise what the engine will refuse.**
+///
+/// An INTERNAL command exists in the registry, so "does it exist" waved it through: `PUT …/grants`
+/// answered `200` and the grants screen said «granted», the document saved with `201`, and only the
+/// run said no — `failed`, at 3 AM, on a permission the owner believed they had given. Both doors
+/// now refuse it here, with the SAME stable code, so the editor can say «that one is internal»
+/// instead of «error». (A command that does not exist keeps its own `404`: different question,
+/// different remedy.)
+#[tokio::test]
+async fn an_internal_command_is_refused_at_the_grants_door_and_at_the_save_door() {
+    let f = fixture_with_modules().await;
+    const INTERNAL: &str = "agenda._purge_slots";
+
+    // 1. The DOCUMENT. A step naming it never lands.
+    let saved = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "QA internal",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "i", "kind": "command", "command": INTERNAL, "params": {} }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(saved.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(saved).await["error"]["code"],
+        "flow.internal_command"
+    );
+    let listed = body_json(send(
+        &f.router,
+        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    )
+    .await)
+    .await;
+    assert!(
+        listed["data"].as_array().unwrap().is_empty(),
+        "a document the hub can never execute is not stored: {listed}"
+    );
+
+    // 2. The GRANT, on a flow that is otherwise fine.
+    let id = create(&f, welcome_flow()).await;
+    let granted = send(
+        &f.router,
+        request(
+            "PUT",
+            &format!("/api/hub/flows/{id}/grants"),
+            Some(&f.admin),
+            Some(json!({ "grants": [{ "kind": "command", "value": INTERNAL }] })),
+        ),
+    )
+    .await;
+    assert_eq!(granted.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        body_json(granted).await["error"]["code"],
+        "flow.internal_command"
+    );
+    let live = body_json(send(
+        &f.router,
+        request("GET", &format!("/api/hub/flows/{id}/grants"), Some(&f.admin), None),
+    )
+    .await)
+    .await;
+    assert!(
+        live["data"].as_array().unwrap().is_empty(),
+        "the screen must never read «granted» about this: {live}"
+    );
+
+    // 3. …and the PUBLIC command of the same module still goes through both doors, which is the
+    // half that must not regress.
+    let ok = send(
+        &f.router,
+        request(
+            "PUT",
+            &format!("/api/hub/flows/{id}/grants"),
+            Some(&f.admin),
+            Some(json!({ "grants": [{ "kind": "command", "value": "agenda.booking.create" }] })),
+        ),
+    )
+    .await;
+    assert_eq!(ok.status(), StatusCode::OK);
+    let public_step = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "QA public",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "manual" }],
+                    "steps": [{ "id": "i", "kind": "command",
+                                "command": "agenda.booking.create", "params": {} }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(public_step.status(), StatusCode::CREATED);
 
     std::fs::remove_dir_all(f.temp).ok();
 }
