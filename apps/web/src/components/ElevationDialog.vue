@@ -53,6 +53,7 @@
         <template v-else>
           <ion-input
             data-testid="elevation-name"
+            mode="md"
             fill="outline"
             label-placement="floating"
             :label="t('elevation.approverName')"

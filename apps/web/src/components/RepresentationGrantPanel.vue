@@ -26,6 +26,7 @@
            cadena y viaja como `IDEmisorFactura`. Se cambia en la identidad fiscal, no aquí. -->
       <ion-input
         class="mt-2"
+        mode="md"
         fill="outline"
         label-placement="floating"
         readonly
@@ -35,6 +36,7 @@
       />
       <ion-input
         class="mt-2"
+        mode="md"
         fill="outline"
         label-placement="floating"
         readonly
@@ -47,6 +49,7 @@
            que se pide abajo es la SUYA, no la de la sociedad. -->
       <ion-input
         class="mt-3"
+        mode="md"
         fill="outline"
         label-placement="floating"
         :label="t('grant.signerNif')"
@@ -56,6 +59,7 @@
       />
       <ion-input
         class="mt-2"
+        mode="md"
         fill="outline"
         label-placement="floating"
         :label="t('grant.signerName')"
@@ -154,6 +158,19 @@
  */
 import { ref, computed, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+// hub#797 — los `ion-*` se IMPORTAN. Este componente no importaba ninguno: funcionaba solo porque
+// otra pantalla ya montada los había registrado antes, así que abrirlo el primero (deep-link,
+// recarga en esta ruta) lo dejaba pintando etiquetas desconocidas. En una pantalla donde se FIRMA
+// el otorgamiento del certificado fiscal, eso no es un detalle de estilo.
+import {
+  IonButton,
+  IonCheckbox,
+  IonInput,
+  IonItem,
+  IonLabel,
+  IonNote,
+  IonSpinner,
+} from '@ionic/vue';
 import { getRepresentationGrant, postRepresentationGrant } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
 import HubIcon from './HubIcon.vue';

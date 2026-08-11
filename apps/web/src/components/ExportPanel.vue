@@ -10,6 +10,7 @@
       <ion-card-content>
         <ion-input
           data-testid="export-name"
+          mode="md"
           fill="outline"
           label-placement="floating"
           :label="t('exportPage.name')"

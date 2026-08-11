@@ -189,6 +189,7 @@
             </ion-label>
             <ion-input
               class="mt-2"
+              mode="md"
               fill="outline"
               label-placement="floating"
               :label="t('settings.fiscalNif')"
@@ -198,6 +199,7 @@
             />
             <ion-input
               class="mt-2"
+              mode="md"
               fill="outline"
               label-placement="floating"
               :label="t('settings.fiscalName')"
@@ -207,6 +209,7 @@
             />
             <ion-textarea
               class="mt-2"
+              mode="md"
               fill="outline"
               label-placement="floating"
               :label="t('settings.fiscalAddress')"
@@ -284,6 +287,7 @@
             <ion-input
               class="mt-2"
               type="password"
+              mode="md"
               fill="outline"
               label-placement="floating"
               :label="t('settings.certPassword')"
