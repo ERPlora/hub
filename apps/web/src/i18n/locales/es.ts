@@ -501,7 +501,7 @@ export default {
     reset_fiscal: 'Configuración fiscal',
     reset_roles: 'Roles activos',
     permissionsTitle: 'Permisos de las apps',
-    permissionsDesc: 'Concede o revoca los permisos que cada app pide (acceso a internet, certificado, impresora, notificaciones). Por seguridad, todo está denegado hasta que lo concedas.',
+    permissionsDesc: 'Concede o revoca los permisos que cada app pide (acceso a internet, certificado, impresora, notificaciones, administrar automatizaciones). Por seguridad, todo está denegado hasta que lo concedas.',
     permissionsAdminOnly: 'Solo un administrador puede cambiar los permisos.',
     permissionsNoModules: 'Ninguna app instalada pide permisos.',
     permissionsModuleNone: 'Esta app no pide permisos.',
@@ -603,6 +603,8 @@ export default {
     consentIntro: 'Esta app solicita estos permisos. Podrás revisarlos después en Ajustes → Permisos.',
     consentInstallGrant: 'Instalar y conceder',
     consentCancel: 'Cancelar',
+    installedButNoPermissions: '«{name}» se instaló, pero no se pudieron conceder sus permisos. Sin ellos no funcionará: actívalos en Ajustes → Permisos.',
+    goToPermissions: 'Ir a Permisos',
   },
   employees: {
     searchEmployee: 'Buscar usuario…',
