@@ -68,7 +68,6 @@ pub const ERR_HTTP_BLOCKED: &str = "flow.http_blocked";
 pub const ERR_HTTP_FAILED: &str = "flow.http_failed";
 pub const ERR_HTTP_TIMEOUT: &str = "flow.http_timeout";
 pub const ERR_HTTP_STATUS: &str = "flow.http_status";
-pub const ERR_IO_NOT_IMPLEMENTED: &str = "flow.io_not_implemented";
 
 /// How much of an answer a step keeps. A megabyte is a generous JSON payload and a small file; past
 /// it the response is truncated and the step says so, because the alternative is a run row the size
@@ -125,13 +124,6 @@ pub fn dispatch(state: &AppState, pending: Vec<PendingIo>) {
                 PendingIo::Ai { .. } => {
                     crate::agent_runner::run_turn(&state, &run_id, &step_id).await
                 }
-                // hub#663 (`notify`) fills this in. Until then a document using it is refused at
-                // save time, so this arm is unreachable — and if it ever is reached, the run FAILS
-                // by name instead of hanging until its lease expires.
-                other => IoResult::Failed(format!(
-                    "{ERR_IO_NOT_IMPLEMENTED}: step `{}` needs an I/O this hub does not perform yet",
-                    other.step_id()
-                )),
             };
             let rt = state.runtime.lock().await;
             if let Err(e) = rt.complete_flow_io(&run_id, &step_id, result).await {

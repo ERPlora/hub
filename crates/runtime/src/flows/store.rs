@@ -681,9 +681,9 @@ pub const REDACTED: &str = "«secret»";
 ///
 /// The first line of defence is that a resolved secret is never persisted at all (flows.md §4: they
 /// are resolved when the `PendingIo` is built and never written to `_flow_run_steps`). This is the
-/// second: the read door does not depend on the write door having been careful, because the step
-/// kinds that carry credentials — `http`, `notify` — are still being written (hub#662, hub#663) and
-/// "we will remember" is not a control.
+/// second: the read door does not depend on the write door having been careful. Both step kinds
+/// that can carry something private are written now — `http` (hub#662) and `notify` (hub#821) — and
+/// "we will remember" was never a control anyway.
 ///
 /// The rule is by **key name**, learnt from the step's own definition and applied at any depth: a
 /// key that holds a secret in the document holds one in the row. Two keys sharing a name inside one
@@ -692,8 +692,10 @@ pub const REDACTED: &str = "«secret»";
 /// ⚠️ **What this canNOT cover, and whoever writes the I/O steps has to**: `error` is free-form
 /// prose, so a message that interpolated a credential (`request to https://x?key=sk-live failed`)
 /// is not something a key-name rule can find — catching it would need the secret's VALUE, which
-/// this layer deliberately does not have. The rule for hub#662/#663 stands: a step never writes a
-/// resolved secret ANYWHERE, its own error message included.
+/// this layer deliberately does not have. The rule stands for both of them: a step never writes a
+/// resolved secret ANYWHERE, its own error message included — and, since hub#821, a resolved
+/// RECIPIENT is treated the same way, because a customer's phone number is not the hub's to leave
+/// lying in a run's history.
 fn redact_step(definition: &Json, mut step: FlowRunStep) -> FlowRunStep {
     let secret_keys = secret_keys_of(definition, &step.step_id);
     if secret_keys.is_empty() {
