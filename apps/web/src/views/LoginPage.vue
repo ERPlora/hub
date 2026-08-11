@@ -67,6 +67,7 @@
                   type="email"
                   autocomplete="username"
                   required
+                  mode="md"
                   fill="outline"
                   :placeholder="t('login.emailPlaceholder')"
                   @ion-input="emailVal = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
@@ -78,6 +79,7 @@
                   type="password"
                   autocomplete="current-password"
                   required
+                  mode="md"
                   fill="outline"
                   placeholder="••••••••"
                   @ion-input="passwordVal = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
@@ -190,6 +192,7 @@
                   inputmode="numeric"
                   autocomplete="one-time-code"
                   required
+                  mode="md"
                   fill="outline"
                   :placeholder="t('login.twoFactorCodePlaceholder')"
                   @ion-input="twoFactorCode = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"

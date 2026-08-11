@@ -56,6 +56,7 @@
             </ok-inline-feedback>
             <ion-input
               v-model="form.name"
+              mode="md"
               fill="outline"
               label-placement="floating"
               :label="t('employeeForm.fullName')"
@@ -76,6 +77,7 @@
             <ion-input
               v-if="!form.local"
               v-model="form.email"
+              mode="md"
               fill="outline"
               label-placement="floating"
               type="email"
@@ -88,6 +90,7 @@
             />
             <ion-select
               v-model="form.role"
+              mode="md"
               fill="outline"
               label-placement="floating"
               interface="popover"
@@ -103,6 +106,7 @@
             </ion-select>
             <ion-input
               v-model="form.pin"
+              mode="md"
               fill="outline"
               label-placement="floating"
               inputmode="numeric"
