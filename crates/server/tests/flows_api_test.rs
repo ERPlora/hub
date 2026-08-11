@@ -282,16 +282,16 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
             "flow.unknown_schema_version",
         ),
         (
-            // `notify` is the last kind that is still only a vocabulary (hub#663 part 2); `http`
-            // runs since hub#662 and `ai` since hub#665.
+            // Every kind runs now (`notify` since hub#821), so each one is parsed as strictly as
+            // the rest: an empty `notify` is refused for its OWN missing key, not as unavailable.
             json!({
-                "name": "Too soon",
+                "name": "To nobody",
                 "definition": {
                     "schema_version": 1,
                     "steps": [{ "id": "tell", "kind": "notify" }]
                 }
             }),
-            "flow.step_kind_not_available",
+            "flow.invalid_definition",
         ),
         (
             // An `ai` step that DOES run is parsed as strictly as any other kind, so an empty one

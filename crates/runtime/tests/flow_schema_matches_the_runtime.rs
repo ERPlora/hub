@@ -15,6 +15,7 @@ use std::collections::BTreeSet;
 use erplora_runtime::flows::def::{
     AiPolicy, Op, StepKind, TriggerKind, DEFAULT_MAX_ITERS, MAX_ITERS_CAP, SCHEMA_VERSION,
 };
+use erplora_runtime::host_notify::Channel;
 
 fn schema() -> serde_json::Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -188,11 +189,88 @@ fn the_agent_loop_bounds_are_the_same_on_both_sides() {
     );
 }
 
+/// hub#821 — the `notify` step. Two halves have to agree, and each for its own reason:
+///
+/// - the **channels**, because the runtime refuses one it cannot send on (`sms`) and a schema that
+///   offered it would move that refusal from the editor to a background tick;
+/// - the **shape of `to`**, which is the whole security property of the step. It is an object of
+///   `{query, params, field}` and NOTHING else. A schema that allowed a string there would have an
+///   editor happily saving «send it to `{{input.email}}`» — the address out of the event payload,
+///   which is precisely what a recipient grant exists to make impossible.
+#[test]
+fn the_notify_channels_and_the_shape_of_a_recipient_are_the_same_on_both_sides() {
+    let schema = schema();
+    let declared = enum_at(&schema, "/$defs/step/properties/channel");
+    let deliverable: BTreeSet<String> = Channel::DELIVERABLE
+        .iter()
+        .map(|c| c.as_str().to_string())
+        .collect();
+    assert_eq!(
+        declared, deliverable,
+        "a channel in one list and not the other is either a step the editor refuses and the hub \
+         runs, or one it saves and the hub dead-letters"
+    );
+
+    let recipient = keys_at(&schema, "/$defs/recipient/properties");
+    assert_eq!(
+        recipient,
+        BTreeSet::from([
+            "field".to_string(),
+            "params".to_string(),
+            "query".to_string()
+        ])
+    );
+    assert_eq!(
+        schema
+            .pointer("/$defs/recipient/additionalProperties")
+            .and_then(|v| v.as_bool()),
+        Some(false),
+        "an extra key in `to` is refused on both sides: that object is the only way a flow names \
+         anybody, and it must not grow one that reads like an address"
+    );
+    let required: BTreeSet<String> = schema["$defs"]["recipient"]["required"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    assert_eq!(
+        required,
+        BTreeSet::from(["field".to_string(), "query".to_string()]),
+        "a recipient is one field of one query; neither half is optional"
+    );
+
+    // And the runtime really does accept exactly this document, and really does refuse a `to` that
+    // is an address.
+    let step = |to: serde_json::Value| {
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "remind", "kind": "notify", "channel": "whatsapp", "to": to,
+                "template": "reminder", "vars": { "text": "hola" }
+            }]
+        }))
+    };
+    assert!(step(serde_json::json!({
+        "query": "crm.customer.get",
+        "params": { "id": "input.customer_id" },
+        "field": "phone"
+    }))
+    .is_ok());
+    assert!(step(serde_json::json!("{{input.phone}}")).is_err());
+}
+
 /// Every key the runtime parses for an `ai` step must be declared, or the editor would flag as
 /// unknown something the hub reads — the mirror image of hub#521, and just as confusing.
 #[test]
 fn every_key_of_the_ai_step_is_declared_in_the_schema() {
     let declared = keys_at(&schema(), "/$defs/step/properties");
+    for key in ["channel", "to", "template", "vars"] {
+        assert!(
+            declared.contains(key),
+            "the schema must declare `{key}` of a `notify` step; it has {declared:?}"
+        );
+    }
     for key in ["prompt", "tools", "policy", "max_iters"] {
         assert!(
             declared.contains(key),
