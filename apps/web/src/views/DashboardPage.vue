@@ -3,7 +3,7 @@
        bloqueante (hub#374) se retira — la tarjeta dice más de lo mismo, con la misma vía de entrada,
        una pantalla más abajo. Es la MISMA condición que pinta la tarjeta (la pestaña Resumen): dos
        condiciones distintas para una sola pantalla acabarían enseñándolo dos veces, o ninguna. -->
-  <AppPage :title="t('nav.home')" :setup-checklist-on-screen="tab === 'resumen'">
+  <AppPage :title="t('nav.home')" :setup-checklist-on-screen="tab === 'resumen'" heading-on-screen>
       <!-- ── Resumen ── -->
       <template v-if="tab === 'resumen'">
         <!-- Zone 1 — The header: the BUSINESS the hub belongs to + today's date (hub#366, PLAN
