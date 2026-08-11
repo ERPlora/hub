@@ -121,19 +121,50 @@ fi
 major="${version%%.*}"
 minor="${version%.*}"   # X.Y.Z → X.Y
 
+# Las etiquetas que el REGISTRO dice tener, una por línea. Devuelve ≠0 si no se puede leer: el
+# que llama decide, y decide negarse.
+#
+# Antes esto se lo preguntaba a la API de paquetes de la ORGANIZACIÓN
+# (`gh api /orgs/<org>/packages/container/<pkg>/versions`), lo que ataba el build a dos cosas que
+# no hacen falta: el binario `gh` y un token con alcance de organización. El 2026-08-11, al mover
+# la CI al runner propio (`ci-runner-1`), esa llamada empezó a fallar y este guardarraíl —que se
+# niega por defecto, y hace bien— bloqueó una release entera sin que el tag tuviera nada malo.
+# El registro es la fuente que importa (es donde se publica) y el workflow ya se ha autenticado
+# contra él con el `docker login` del paso anterior, así que basta el mismo `GITHUB_TOKEN`.
+registry_tags() { # $1 = <owner>/<package>
+    local repo="$1" base token url headers body
+    base="${IMAGE_TAGS_REGISTRY_BASE:-https://ghcr.io}"
+    token=$(curl -fsS --max-time 30 -u "${GITHUB_ACTOR:-github-actions}:${GH_TOKEN:-}" \
+        "$base/token?service=ghcr.io&scope=repository:${repo}:pull" 2>/dev/null |
+        jq -r '.token // empty' 2>/dev/null) || return 1
+    [ -n "$token" ] || return 1
+
+    headers=$(mktemp); body=$(mktemp)
+    # `n=1000` y aun así se pagina: cada push a `main` publica un tag por commit, así que la lista
+    # crece sin parar. Una página perdida es una versión que no se ve — y una versión que no se ve
+    # es una que este guardarraíl dejaría republicar encima de la que ya está en producción.
+    url="$base/v2/${repo}/tags/list?n=1000"
+    while [ -n "$url" ]; do
+        if ! curl -fsS --max-time 60 -D "$headers" -o "$body" \
+            -H "Authorization: Bearer $token" "$url" 2>/dev/null; then
+            rm -f "$headers" "$body"
+            return 1
+        fi
+        jq -r '.tags[]?' < "$body" 2>/dev/null
+        # Link: <...>; rel="next"  → ruta relativa al registro.
+        url=$(sed -n 's/.*[Ll]ink:[[:space:]]*<\([^>]*\)>;[[:space:]]*rel="next".*/\1/p' "$headers" | head -1)
+        [ -n "$url" ] && url="$base$url"
+    done
+    rm -f "$headers" "$body"
+}
+
 # ── El tag no se cree a ciegas ───────────────────────────────────────────────
 if [ "$is_release" -eq 1 ]; then
     published_cmd="${IMAGE_TAGS_PUBLISHED_CMD:-}"
     if [ -n "$published_cmd" ]; then
         published=$("$published_cmd") || published_failed=1
     else
-        # Por defecto: las etiquetas del paquete en GHCR. Necesita `packages: read`, que el
-        # workflow ya tiene.
-        owner="${image#ghcr.io/}"; owner="${owner%%/*}"
-        package="${image##*/}"
-        published=$(gh api --paginate \
-            "/orgs/$owner/packages/container/$package/versions" \
-            --jq '.[].metadata.container.tags[]' 2>/dev/null) || published_failed=1
+        published=$(registry_tags "${image#ghcr.io/}") || published_failed=1
     fi
 
     if [ "${published_failed:-0}" = "1" ] && [ "${IMAGE_TAGS_ALLOW_UNVERIFIED:-0}" != "1" ]; then
@@ -149,7 +180,11 @@ if [ "$is_release" -eq 1 ]; then
 
     if printf '%s\n' "$published" | grep -qxF "$version"; then
         echo "❌ image-tags: '$image:$version' YA está publicado." >&2
-        echo "   Un tag inmutable que se puede mover convierte «vuelve a $version» en una promesa" >&2
+        # `${version}` con llaves a propósito: pegado a `»` (un byte alto), bash se come el primer
+        # byte del carácter como parte del nombre y `set -u` mata el script con «unbound variable»
+        # JUSTO en la rama que existe para explicar la negativa. Salía con código 1, sí, pero el
+        # operador leía un error del intérprete en vez del motivo.
+        echo "   Un tag inmutable que se puede mover convierte «vuelve a ${version}» en una promesa" >&2
         echo "   vacía — y es el tag del que depende el rollback. Sube la versión y re-etiqueta." >&2
         exit 1
     fi
