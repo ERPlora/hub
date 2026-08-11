@@ -1249,10 +1249,28 @@ mod tests {
                     discarded_rows: 0,
                 },
             ],
+            batch_id: None,
         };
         let json = serde_json::to_string(&r).unwrap();
         let back: ImportReport = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
+
+        // `batch_id` NO viaja por el cable (hub#763): el contrato del shell son las `sections` (más
+        // lo que el servidor añade encima), y un servidor que no conozca el campo tiene que poder
+        // hacer round-trip igual. El cliente lo lee del informe PERSISTIDO, no de aquí.
+        assert!(!json.contains("batch_id"), "el batch_id no se serializa: {json}");
+    }
+
+    /// Y el lote sí acompaña al informe DENTRO del proceso, que es como el motor se lo pasa al
+    /// servidor para que haga el UPSERT del informe extendido sobre el mismo `batch_id`.
+    #[test]
+    fn the_batch_travels_in_memory_but_not_on_the_wire() {
+        let r = ImportReport { sections: Vec::new(), batch_id: Some("b-1".into()) };
+
+        let back: ImportReport = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+
+        assert_eq!(r.batch_id.as_deref(), Some("b-1"));
+        assert_eq!(back.batch_id, None, "al deserializar no se inventa un lote que no vino");
     }
 
     /// A manifest whose only interesting part is where it comes from (hub#331 gate).
