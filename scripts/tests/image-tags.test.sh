@@ -164,4 +164,44 @@ PUBLISHED="" run "refs/heads/main"
 [ "$status" -ne 0 ] || fail "a non-semver version must be REFUSED"
 passed=$((passed + 1))
 
+# ── The default lookup asks the REGISTRY, and never `gh` ─────────────────────────────
+# Every case above stubs the lookup through the seam, so the path that actually runs in CI was
+# the one nothing covered. It used to be `gh api /orgs/<org>/packages/...`, which tied the build
+# to the `gh` binary and to a token with ORGANIZATION scope. On 2026-08-11, moving CI to the
+# self-hosted `ci-runner-1` made that call fail, and this guard — refuse-by-default, correctly —
+# blocked the whole release with nothing wrong in the tag. The published versions live in the
+# registry: it is where they get published, and the workflow has already `docker login`ed to it.
+#
+# Unreachable registry (port 1, nothing listens) so this stays hermetic and offline: it asserts
+# WHO gets asked, not what the network answers. The refusal itself is the case below it.
+gh_sentinel="$tmp_dir/gh-was-called"
+mkdir -p "$tmp_dir/fakebin"
+cat > "$tmp_dir/fakebin/gh" <<EOF
+#!/bin/sh
+touch "$gh_sentinel"
+exit 1
+EOF
+chmod +x "$tmp_dir/fakebin/gh"
+
+make_manifest "1.4.0"
+rm -f "$gh_sentinel"
+PATH="$tmp_dir/fakebin:$PATH" IMAGE_TAGS_REGISTRY_BASE="http://127.0.0.1:1" \
+    "$script" --manifest "$tmp_dir/repo/Cargo.toml" --image ghcr.io/erplora/hub \
+              --ref "refs/tags/v1.4.0" --sha abc1234def > "$tmp_dir/out" 2>&1
+status=$?
+[ ! -e "$gh_sentinel" ] || fail "the guard still asks \`gh\`: an org-scoped API call is a CI dependency it does not need"
+[ "$status" -ne 0 ] || fail "a registry it cannot read must be REFUSED, not assumed empty"
+grep -q "no he podido leer las versiones publicadas" "$tmp_dir/out" ||
+    fail "an unreadable registry should say so, not fail silently"
+passed=$((passed + 1))
+
+# ── …and an unreadable registry is still overridable, on purpose ─────────────────────
+make_manifest "1.4.0"
+IMAGE_TAGS_REGISTRY_BASE="http://127.0.0.1:1" IMAGE_TAGS_ALLOW_UNVERIFIED=1 \
+    "$script" --manifest "$tmp_dir/repo/Cargo.toml" --image ghcr.io/erplora/hub \
+              --ref "refs/tags/v1.4.0" --sha abc1234def > "$tmp_dir/out" 2>&1
+status=$?
+[ "$status" -eq 0 ] || fail "IMAGE_TAGS_ALLOW_UNVERIFIED=1 is the documented escape hatch and must work"
+passed=$((passed + 1))
+
 printf 'PASS: %s image-tags contract cases\n' "$passed"
