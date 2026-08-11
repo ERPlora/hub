@@ -315,6 +315,24 @@
             </ion-button>
           </ion-card-content>
         </ion-card>
+
+        <!-- Otorgamiento de representación (hub#817): ERPlora remite los registros VERI*FACTU EN
+             NOMBRE del negocio, y eso exige su consentimiento firmado (Anexo I). Va aquí, junto a
+             la identidad fiscal y al certificado, porque las tres son la misma decisión del dueño
+             — y porque sin otorgamiento vigente el paso a producción se niega. -->
+        <ion-card class="mt-3">
+          <ion-card-content>
+            <ion-label>
+              <h2>{{ t('settings.grantTitle') }}</h2>
+              <p>{{ t('settings.grantDesc') }}</p>
+            </ion-label>
+            <RepresentationGrantPanel
+              class="mt-2"
+              :obligado-nif="businessTaxId"
+              :obligado-name="businessLegalName"
+            />
+          </ion-card-content>
+        </ion-card>
       </template>
 
       <!-- ── Tab: Tickets ── -->
@@ -455,6 +473,7 @@ import DataPanel from '../components/DataPanel.vue';
 import DeviceModeCard from '../components/DeviceModeCard.vue';
 import DevicesCard from '../components/DevicesCard.vue';
 import PinPolicyCard from '../components/PinPolicyCard.vue';
+import RepresentationGrantPanel from '../components/RepresentationGrantPanel.vue';
 import { bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';

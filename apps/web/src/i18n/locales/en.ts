@@ -385,6 +385,29 @@ export default {
     adminOnly: 'Only an administrator can change whether this hub asks.',
     saveError: 'This could not be changed. Check the connection and try again.',
   },
+  // El otorgamiento de representación (hub#817): la pantalla donde el cliente FIRMA que ERPlora
+  // puede remitir sus registros VERI*FACTU en su nombre. El TEXTO del Anexo I no está aquí: lo
+  // sirve el runtime, que es quien lo archiva — una copia en el bundle sería el mismo documento
+  // diciendo dos cosas. Y va en español pase lo que pase: es un instrumento dirigido a la AEAT.
+  grant: {
+    intro:
+      'ERPlora files your invoicing records with the tax authority ON YOUR BEHALF. Spanish law needs your signed consent for that, and this is it. Read it, sign it and attach a copy of your ID.',
+    stateVigente: 'Signed on {date}. ERPlora may file on your behalf.',
+    stateRevoked: 'Revoked on {date}. ERPlora cannot file on your behalf.',
+    stateAbsent: 'Not signed yet. Your business cannot go live until it is.',
+    stateUnknown: 'Checking with ERPlora…',
+    obligadoNif: 'Taxpayer ID (your business)',
+    obligadoName: 'Legal name (your business)',
+    signerNif: 'ID number of the person signing',
+    signerName: 'Full name of the person signing',
+    signatureTitle: 'Signature',
+    signatureHint:
+      'Draw your signature. For a company, the legal representative signs — and the ID copy below is theirs, not the company\u2019s.',
+    signatureClear: 'Clear signature',
+    dniChoose: 'Attach a copy of the ID',
+    confirm: 'I have read the grant above and I sign it.',
+    submit: 'Sign and send',
+  },
   settings: {
     hubWide: 'Hub settings',
     currency: 'Currency',
@@ -444,6 +467,9 @@ export default {
     shareWithErploraDone: 'Details shared with ERPlora.',
     shareWithErploraError: 'Could not share the details with ERPlora.',
     shareWithErploraNeedsTaxId: 'Fill in the tax id first.',
+    grantTitle: 'Representation grant',
+    grantDesc:
+      'Your signed consent for ERPlora to file your invoicing records with the tax authority on your behalf. Required before your business can go live.',
     certTitle: 'Fiscal certificate',
     certDesc: 'Company certificate (.p12) for fiscal signing of invoices. Used by the per-country compliance modules.',
     certPresent: 'Certificate configured (uploaded on {date})',
