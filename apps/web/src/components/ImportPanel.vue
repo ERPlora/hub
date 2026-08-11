@@ -277,6 +277,7 @@ import {
   IonCheckbox,
   IonButton,
   IonSpinner,
+  IonItemDivider,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { dataTableLabels } from '../lib/data-table-labels';

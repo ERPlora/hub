@@ -156,7 +156,7 @@ import { useI18n } from 'vue-i18n';
 import {
   IonApp, IonSplitPane, IonMenu, IonMenuToggle, IonHeader, IonToolbar,
   IonContent, IonList, IonListHeader, IonItem, IonLabel, IonFooter,
-  IonPopover, IonRouterOutlet,
+  IonPopover, IonRouterOutlet, IonButton,
 } from '@ionic/vue';
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
