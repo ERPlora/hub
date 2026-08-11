@@ -71,7 +71,6 @@ async fn fixture() -> Fixture {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     Fixture {
         router: app(AppState::with_config(rt, cfg)),
@@ -283,7 +282,20 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
             "flow.unknown_schema_version",
         ),
         (
-            // `http` runs since hub#662; `ai` is still only a vocabulary.
+            // `notify` is the last kind that is still only a vocabulary (hub#663 part 2); `http`
+            // runs since hub#662 and `ai` since hub#665.
+            json!({
+                "name": "Too soon",
+                "definition": {
+                    "schema_version": 1,
+                    "steps": [{ "id": "tell", "kind": "notify" }]
+                }
+            }),
+            "flow.step_kind_not_available",
+        ),
+        (
+            // An `ai` step that DOES run is parsed as strictly as any other kind, so an empty one
+            // is refused for its own missing key rather than as unavailable.
             json!({
                 "name": "Thinks",
                 "definition": {
@@ -291,7 +303,7 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
                     "steps": [{ "id": "ask", "kind": "ai" }]
                 }
             }),
-            "flow.step_kind_not_available",
+            "flow.invalid_definition",
         ),
         (
             json!({
@@ -328,6 +340,141 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
     .await)
     .await;
     assert!(listed["data"].as_array().unwrap().is_empty());
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+// hub#730 (reopened 2026-08-10): a freshly-provisioned Cloud Hub accepted `esto no es un cron`
+// and `manana por la tarde` with `201 Created` and armed them — because the published image
+// predates fix #737, which lives in `develop` behind the still-open release PR #743. The unit
+// tests in `scheduler::cron` cover the parser; NOTHING here pinned that the API is the door. This
+// is the contract the reopen asks for: the same POSTs a QA can make against any hub must be
+// refused at THIS layer with the kernel's stable code, and nothing may land. If the door is ever
+// bypassed again (a seed path, a new route), this goes red against the real router.
+#[tokio::test]
+async fn a_trigger_the_engine_cannot_read_is_refused_at_the_door_with_its_stable_code() {
+    let f = fixture().await;
+
+    // Each is a real trigger a person writes, and each is one the engine cannot run. The refusal
+    // carries the stable code the editor programs against, exactly like the step/operator refusals
+    // above — never `201 Created`.
+    let cases = [
+        // Free text is not a schedule (hub#730 reopen: returned `201` on a freshly-made hub).
+        (
+            json!({
+                "name": "Not a cron",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "cron", "cron": "esto no es un cron" }],
+                    "steps": [{ "id": "c", "kind": "condition", "when": { "input.x": { "exists": false } } }]
+                }
+            }),
+            "flow.invalid_cron",
+        ),
+        // Six fields is a different calendar (crontab-with-seconds); this hub reads five.
+        (
+            json!({
+                "name": "Six fields",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "cron", "cron": "0 0 9 * * *" }],
+                    "steps": [{ "id": "c", "kind": "condition", "when": { "input.x": { "exists": false } } }]
+                }
+            }),
+            "flow.invalid_cron",
+        ),
+        // A value out of range names itself; the author fixes the line, not the whole document.
+        (
+            json!({
+                "name": "Out of range",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "cron", "cron": "70 * * * *" }],
+                    "steps": [{ "id": "c", "kind": "condition", "when": { "input.x": { "exists": false } } }]
+                }
+            }),
+            "flow.invalid_cron",
+        ),
+        // A date that never happens (February has no 30th) is refused, not saved-and-silent.
+        (
+            json!({
+                "name": "Never",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "cron", "cron": "0 0 30 2 *" }],
+                    "steps": [{ "id": "c", "kind": "condition", "when": { "input.x": { "exists": false } } }]
+                }
+            }),
+            "flow.invalid_cron",
+        ),
+        // The `at` twin (hub#730 reopen): prose was copied verbatim into `next_run` and armed.
+        (
+            json!({
+                "name": "Not a date",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "at", "at": "manana por la tarde" }],
+                    "steps": [{ "id": "c", "kind": "condition", "when": { "input.x": { "exists": false } } }]
+                }
+            }),
+            "flow.invalid_at",
+        ),
+    ];
+
+    for (body, code) in cases {
+        let response = send(
+            &f.router,
+            request("POST", "/api/hub/flows", Some(&f.admin), Some(body)),
+        )
+        .await;
+        assert_eq!(
+            response.status(),
+            StatusCode::CONFLICT,
+            "a trigger the engine cannot read must not be saved as active"
+        );
+        let json = body_json(response).await;
+        assert_eq!(
+            json["error"]["code"], code,
+            "the editor programs against the CODE: {json}"
+        );
+        // The message has to be actionable — it names what is wrong and what the grammar is.
+        let message = json["error"]["message"].as_str().unwrap_or("");
+        assert!(!message.is_empty(), "the refusal must explain itself: {json}");
+    }
+
+    // …and NOTHING landed: none of the unreadable triggers is armed.
+    let listed = body_json(send(
+        &f.router,
+        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    )
+    .await)
+    .await;
+    assert!(
+        listed["data"].as_array().unwrap().is_empty(),
+        "an unreadable trigger must not appear in the list as active: {listed}"
+    );
+
+    // The other half of the same contract: a cron this hub CAN read saves. The grammar grew in
+    // #737 (ranges, lists, names) so that what people write works; this is the floor, not the
+    // ceiling, and it must keep saving or the refusal above has become a lie the editor repeats.
+    let saved = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "Every five minutes",
+                "definition": {
+                    "schema_version": 1,
+                    "triggers": [{ "kind": "cron", "cron": "*/5 * * * *" }],
+                    "steps": [{ "id": "c", "kind": "condition", "when": { "input.x": { "exists": false } } }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(saved.status(), StatusCode::CREATED, "a readable cron saves");
 
     std::fs::remove_dir_all(f.temp).ok();
 }
@@ -658,7 +805,8 @@ async fn a_secret_goes_in_and_only_its_name_comes_back() {
     std::fs::remove_dir_all(f.temp).ok();
 }
 
-/// The `http` step and its grant stopped being refused (hub#662) — and `ai`/`notify` did not.
+/// The `http` step and its grant stopped being refused (hub#662), and so did `ai` (hub#665) —
+/// `notify` did not.
 #[tokio::test]
 async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
     let f = fixture().await;
@@ -710,8 +858,8 @@ async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
         "flow.invalid_http_pattern"
     );
 
-    // The two that are still only a vocabulary.
-    for kind in ["ai", "notify"] {
+    // The one that is still only a vocabulary.
+    for kind in ["notify"] {
         let response = send(
             &f.router,
             request(
@@ -734,6 +882,31 @@ async fn an_http_flow_saves_now_and_the_kinds_that_still_cannot_run_do_not() {
             "flow.step_kind_not_available"
         );
     }
+
+    // …and an `ai` step SAVES now (hub#665), which is the other half of the same contract: the
+    // list of what this hub cannot do must shrink as each issue lands, or the refusal becomes a
+    // lie the editor repeats.
+    let response = send(
+        &f.router,
+        request(
+            "POST",
+            "/api/hub/flows",
+            Some(&f.admin),
+            Some(json!({
+                "name": "Answers WhatsApp",
+                "definition": {
+                    "schema_version": 1,
+                    "steps": [{
+                        "id": "agent", "kind": "ai",
+                        "prompt": "Answer {{input.text}} and book the appointment",
+                        "tools": { "queries": ["agenda.slots.list"] }
+                    }]
+                }
+            })),
+        ),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::CREATED, "an `ai` flow saves since hub#665");
 
     std::fs::remove_dir_all(f.temp).ok();
 }

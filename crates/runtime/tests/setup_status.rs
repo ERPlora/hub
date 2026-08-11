@@ -221,6 +221,131 @@ async fn set_business_identity(rt: &Runtime) {
     rt.set_settings(&updates, "u1").await.unwrap();
 }
 
+/// A module with a Tier-0 command that STAMPS the business identity — the shape
+/// `enforce_fiscal_precondition` keys on (`invoice.create_from_sale` in production). Running it is
+/// the only way to ask the GATE the same question the checklist answers.
+fn identity_stamping_module(id: &str) -> PathBuf {
+    module_fixture(
+        json!({
+            "id": id,
+            "name": id,
+            "version": "1.0.0",
+            "permissions": [format!("{id}.issue")],
+            "migrations": { "postgres": ["migrations/pg/001.sql"] },
+            "commands": {
+                format!("{id}.issue"): {
+                    "permission": format!("{id}.issue"),
+                    "sql": ["commands/issue.sql"]
+                }
+            }
+        }),
+        &[
+            (
+                "migrations/pg/001.sql",
+                "CREATE TABLE billing_doc (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, issuer TEXT NOT NULL)",
+            ),
+            (
+                "commands/issue.sql",
+                "INSERT INTO billing_doc (id, hub_id, issuer) VALUES (:id, :hub_id, :business_tax_id)",
+            ),
+        ],
+    )
+}
+
+// ── The DEMO: no wall, because it BOOTS with its fiscal identity (hub#684) ────────────────────
+//
+// The demo used to show the visitor a ⛔ «you need this in order to invoice» whose button led to a
+// `409 demo_fiscal_identity_locked` — the screen asking for the one thing the product forbids. And
+// the expensive half: the sale went through and `invoice.create_from_sale` did not, because it
+// stamps `:business_tax_id` and the gate rejected it. Money taken, no document.
+//
+// The fix is data, not a special case in the checklist: with the two settings written, the item is
+// done because it IS done and the gate passes because it has what it asks for. These two tests pin
+// the halves TOGETHER — a checklist and a gate that disagree in a demo is the failure this whole
+// design keeps failing away from.
+
+#[tokio::test]
+async fn a_demo_boots_without_a_wall_because_its_fiscal_identity_is_already_there() {
+    let mut rt = runtime("hub-demo").await;
+    rt.set_demo_hub(true);
+    assert!(
+        rt.ensure_demo_fiscal_identity().await.unwrap(),
+        "the boot fills in the demo's identity"
+    );
+
+    let doc = status(&rt, &ctx("hub-demo", ADMIN_SESSION)).await;
+    assert_eq!(
+        must(&doc, "business_identity")["state"],
+        "done",
+        "the ⛔ item is DONE — not hidden and not faked: {doc}"
+    );
+    assert_eq!(
+        doc["blocking_pending"], 0,
+        "no wall left, so the blocking strip stays down: {doc}"
+    );
+}
+
+#[tokio::test]
+async fn the_checklist_and_the_gate_agree_in_a_demo() {
+    // The invariant of `setup_status`'s module docs, written as a test: if the checklist says the
+    // fiscal identity is done, the dispatcher has to accept the transaction that stamps it. Before
+    // hub#684 the two disagreed in a demo in the worst possible direction — ⛔ pending forever, and
+    // a gate nobody could satisfy.
+    let mut rt = runtime("hub-demo").await;
+    rt.set_demo_hub(true);
+    rt.ensure_demo_fiscal_identity().await.unwrap();
+
+    let dir = identity_stamping_module("billing");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(&rt, &ctx("hub-demo", ADMIN_SESSION)).await;
+    assert_eq!(must(&doc, "business_identity")["state"], "done");
+
+    let mut payload = Params::new();
+    payload.insert("id".into(), json!("doc-1"));
+    rt.execute_command(
+        "billing.issue",
+        &payload,
+        &ctx("hub-demo", &[SESSION, ADMINISTER, "billing.issue"]),
+    )
+    .await
+    .expect("the gate lets the demo issue: the checklist promised nothing was missing");
+}
+
+/// 🔴 And the direction that must NOT change: a REAL hub with an empty identity still gets the
+/// wall, and its gate still refuses. A demo fix that leaked here would leave a paying business
+/// invoicing with a blank issuer, and ADR-0189 does not re-send an accepted record.
+#[tokio::test]
+async fn a_real_hub_still_gets_the_wall_and_the_refusal() {
+    let mut rt = runtime("hub-real").await;
+    assert!(!rt.ensure_demo_fiscal_identity().await.unwrap());
+
+    let dir = identity_stamping_module("billing");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(&rt, &ctx("hub-real", ADMIN_SESSION)).await;
+    assert_eq!(must(&doc, "business_identity")["state"], "pending");
+    assert_eq!(must(&doc, "business_identity")["level"], "legal");
+    assert_eq!(doc["blocking_pending"], 1, "the wall is up: {doc}");
+
+    let mut payload = Params::new();
+    payload.insert("id".into(), json!("doc-1"));
+    let err = rt
+        .execute_command(
+            "billing.issue",
+            &payload,
+            &ctx("hub-real", &[SESSION, ADMINISTER, "billing.issue"]),
+        )
+        .await
+        .expect_err("no identity, no fiscal document");
+    assert!(
+        format!("{err:?}").contains("business_tax_id"),
+        "the refusal names what is missing: {err:?}"
+    );
+}
+
 // ── The core half: a hub with nothing installed still has a checklist ─────────────────────────
 
 #[tokio::test]

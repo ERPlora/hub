@@ -480,12 +480,17 @@ async function doExport(): Promise<void> {
     // Dos fallos distintos con la misma salida. El del EXPORT trae el mensaje HONESTO del server
     // (exportHub ya extrajo el envelope/texto) y se conserva tal cual. El de la DESCARGA no es una
     // frase — `save_download_failed: hub.zip` no le dice nada a nadie —, así que se traduce.
-    error.value =
-      e instanceof SaveDownloadError
-        ? t(saveDownloadMessageKey(e))
-        : e instanceof Error
-          ? e.message
-          : String(e);
+    //
+    // El TIMEOUT va aparte (hub#765): sin deadline, un runtime colgado dejaba el spinner infinito.
+    // Ahora el fetch aborta, pero «export → timeout» no es una frase que el usuario pueda accionar:
+    // hay que decirle que el servidor no respondió a tiempo y que puede reintentar.
+    if (e instanceof SaveDownloadError) {
+      error.value = t(saveDownloadMessageKey(e));
+    } else if (e instanceof Error && e.message === 'export → timeout') {
+      error.value = t('exportPage.timeout');
+    } else {
+      error.value = e instanceof Error ? e.message : String(e);
+    }
   } finally {
     exporting.value = false;
   }

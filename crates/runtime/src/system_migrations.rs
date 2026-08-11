@@ -1021,6 +1021,179 @@ CREATE TABLE IF NOT EXISTS _flow_secrets (\
 CREATE UNIQUE INDEX IF NOT EXISTS ux_flow_secret_name \
   ON _flow_secrets (hub_id, name) WHERE deleted_at IS NULL;",
     },
+    // ── v37 — hub#731: en qué reloj se armó cada trigger de reloj ──────────────────────────────
+    // `next_run` siempre es UTC (es una columna TEXT que se compara con `<=`, y un `+02:00` en la
+    // cadena ordenaría como otro instante). Lo que cambia con hub#731 es **cómo se lee** el cron:
+    // en la zona del negocio, porque «cierra la caja a las 21:00» son las 21:00 de la tienda.
+    //
+    // Esta columna guarda la zona con la que se calculó el `next_run` que hay en la fila, y con
+    // eso una sola comprobación en el barrido resuelve los DOS casos que el cambio abre:
+    //   1. los triggers que ya estaban armados **en UTC** antes de este arreglo, y
+    //   2. un negocio que se muda de huso (o corrige su país) y espera que sus flujos le sigan.
+    // En ambos la fila dice una zona distinta de la del hub y se re-arma sola en el siguiente
+    // tick. Sin la columna habría que resembrar a mano o dejar el reloj viejo hasta el próximo
+    // disparo, que es medio año de diferencia para un flujo anual.
+    //
+    // `''` = «se calculó antes de que esto existiera» (o sea, UTC), que es justo lo que dispara
+    // el re-armado la primera vez.
+    //
+    // ⚠️ v37: número re-comprobado contra el máximo de `origin/develop` justo antes del push
+    // (hub#573) — hay varias ramas de flujos a la vez y cada una quiere un número.
+    SystemMigration {
+        version: 37,
+        name: "flow_trigger_timezone",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _flow_triggers ADD COLUMN IF NOT EXISTS tz TEXT NOT NULL DEFAULT '';",
+    },
+    // ── v38 — hub#665 / ADR-0283 D3: `_flow_approvals`, the write that waits for a person ─────
+    // The row an `ai` step writes instead of the booking. Everything a person needs to decide at
+    // 9 AM about something a model proposed at 3 AM is HERE and not in a log line: the `command`
+    // and the `payload` that will run, verbatim, and the `reason` the model gave. A tray that
+    // showed an opaque id would be a button people press without reading.
+    //
+    // `payload` is the whole contract of the feature: approving runs EXACTLY this, re-checking the
+    // grant at that moment, and never re-entering the model (ADR-0283 §7). So it is stored, not
+    // re-derived — a re-derived payload is a different booking with the same name.
+    //
+    // `decided_by`/`decided_at` are written from the resolved SESSION, never from a body (same
+    // rule as `discarded_by` in `outbox_admin.rs`): "who authorised the hub to write while nobody
+    // was watching" is the one fact this table exists to keep.
+    //
+    // `expires_at` bounds it. A proposal is not a standing authorisation, and one left in the tray
+    // for a month is about a Tuesday that has passed.
+    //
+    // ⚠️ v38, and it has been renumbered TWICE: it started life as v36 (hub#662 landed
+    // `_flow_secrets` there while this branch was in flight), was pushed as v37, and hub#731 took
+    // that one too with `_flow_triggers.tz` before this branch merged. `apply` aborts loudly on a
+    // catalogue entry at or below the maximum applied version — but only once a hub already carries
+    // the higher number, which is far too late to notice. Several flow issues wanted a number in
+    // the same wave; re-check it against `origin/develop` at push time, do not remember it.
+    SystemMigration {
+        version: 38,
+        name: "flow_approvals",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_approvals (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, run_id TEXT NOT NULL, flow_id TEXT NOT NULL, \
+  step_id TEXT NOT NULL, command TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', \
+  reason TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', \
+  decided_by TEXT NOT NULL DEFAULT '', decided_at TEXT, expires_at TEXT, \
+  error TEXT NOT NULL DEFAULT '', \
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_flow_approval_tray \
+  ON _flow_approvals (hub_id, status, created_at);\
+CREATE INDEX IF NOT EXISTS ix_flow_approval_run ON _flow_approvals (hub_id, run_id);",
+    },
+    // ── v39 — hub#670: the user-activity mark stops being memory and becomes a row ──────────────
+    // `ActivityState` (ADR-0175) held the only proof that somebody had entered this hub, in an
+    // `AtomicI64`. Fine while a restart was rare; with `order: start-first` (ADR-0269) **every
+    // update kills a task**, and a visit between the mark and the next heartbeat died with the
+    // process. The Cloud counts silence: 60 days ⇒ powered off, 90 ⇒ flagged, **120 ⇒ deleted**.
+    // Losing that mark costs a customer's hub, and deleting is not undoable.
+    //
+    // One row per hub (`hub_id` PK) — the same row contract as the rest of the system schema
+    // (ADR-0201), so a legacy shared database keeps each hub's clock apart. Timestamps are
+    // RFC3339 UTC TEXT like `_print_queue`/`_event_outbox`: fixed width and always `Z`, so the
+    // `GREATEST` of the upsert compares them chronologically without a cast.
+    //
+    // `last_reported_at` is nullable on purpose: NULL is "the Cloud has never confirmed one",
+    // which is a different fact from "the epoch" and is what makes the mark pending again.
+    //
+    // ⚠️ v39: number re-checked against `origin/develop` right before the push (hub#573) — the
+    // flow wave renumbered itself twice in a week.
+    SystemMigration {
+        version: 39,
+        name: "hub_activity",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _hub_activity (\
+  hub_id TEXT NOT NULL, last_activity_at TEXT NOT NULL, last_reported_at TEXT, \
+  updated_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id));",
+    },
+    // ── v40 — hub#564 / ADR-0269 §3.5: `_update_history`, what we changed and from which version ─
+    // We update on our own, without asking. The counterpart is that the owner can find out WHAT we
+    // changed — and that answer cannot be derived from anywhere else: the hub knows its current
+    // version and each module's current version, and a current state cannot be subtracted from
+    // itself to produce a history. The transition has to be written down WHEN it happens.
+    //
+    // One row per **component** (`hub` | `module`), not a `hub_module_update`: the screen puts
+    // `ERPlora 1.1.3 → 1.1.4` and `Inventory 1.1.1 → 1.1.2` on the same list, so a module-only
+    // table would be the wrong shape with its correction migration already behind it (the reason
+    // hub#516 deliberately did not build it).
+    //
+    // `name` is stored, not joined: it is what the owner reads ("Inventory", not `inventory` —
+    // ADR-0254), and it has to survive the module being uninstalled. A history that degrades into
+    // ids the moment an app is removed is a history about us, not about them.
+    //
+    // `outcome = 'baseline'` is bookkeeping, never shown: the first version we ever see is not a
+    // change, but without it the NEXT jump would have no `from`, and `from` is half the value.
+    //
+    // ⚠️ v40, and it was born v39: hub#670 landed `_hub_activity` on that number while this
+    // branch was in flight, so it was renumbered at rebase time. `apply` aborts loudly on a
+    // catalogue entry at or below the maximum applied version — but only once a hub already
+    // carries the higher number, which is far too late to notice. Re-check it against
+    // `origin/develop` at push time (hub#573); do not remember it.
+    SystemMigration {
+        version: 40,
+        name: "update_history",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _update_history (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, \
+  component TEXT NOT NULL, component_id TEXT NOT NULL DEFAULT '', \
+  name TEXT NOT NULL DEFAULT '', \
+  from_version TEXT NOT NULL DEFAULT '', to_version TEXT NOT NULL, \
+  outcome TEXT NOT NULL DEFAULT 'updated', reason TEXT NOT NULL DEFAULT '', \
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  deleted_at TEXT, deleted_by TEXT, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_update_history_recent \
+  ON _update_history (hub_id, created_at);\
+CREATE INDEX IF NOT EXISTS ix_update_history_component \
+  ON _update_history (hub_id, component, component_id, created_at);",
+    },
+    // ── v41 — hub#571: la copia PROPIA del `module.zip` de cada módulo instalado ──────────────
+    //
+    // Hub Cloud es **stateless a propósito** (`HUB_MODULE_CACHE=/tmp/module-cache`, sin volumen —
+    // así el contenedor se reprograma a cualquier worker). El precio era que un crash, un redeploy
+    // o un reschedule dejaba la caché de descargas vacía y la ÚNICA forma de recuperarla era volver
+    // al marketplace: con el SaaS caído, el hub arrancaba **sin un solo módulo** y el bar sin TPV.
+    //
+    // Esta tabla es la copia que sobrevive a eso. Va en la BD del hub y no en Object Storage a
+    // propósito: el hub **no tiene credenciales S3** (infra#44), así que su Object Storage se lee
+    // por el proxy `Hub→Cloud→S3` — es decir, por el SaaS, que es justo lo que puede estar caído.
+    // Su propia base es lo único duradero que no es el SaaS y que tampoco ata el contenedor a un
+    // nodo, y encima viaja con el hub si hay que restaurarlo en otra máquina.
+    //
+    // `zip_base64` y no BYTEA: los parámetros del adaptador son JSON (`Params = Map<String, Json>`),
+    // así que un binario solo viaja como texto — el mismo camino que ya usa el `.p12` fiscal. Un
+    // zip de módulo real pesa 100–400 KB, así que un hub completo son unos pocos MB toasteados.
+    //
+    // `sha256` + `signature_json` viajan CON los bytes porque la copia se repone por la MISMA
+    // puerta verificada que una descarga (`ModuleStore::install`): sin ellos habría que confiar en
+    // la fila, y una caché que confía en sí misma es una vía de carga de código sin verificar.
+    //
+    // Una fila por (hub, módulo): interesa la versión que corre, no el histórico.
+    //
+    // ⚠️ v41, y nació como v39: hub#670 (`_hub_activity`) se llevó el 39 y hub#564
+    // (`_update_history`) el 40 mientras esta rama estaba en vuelo — dos renumerados en el mismo
+    // día. `apply` aborta ruidosamente si una entrada del catálogo cae en o por debajo del máximo
+    // aplicado, pero solo cuando un hub ya lleva el número más alto, que es tardísimo para
+    // enterarse. Recompruébalo contra `origin/develop` en el push (hub#573); no lo recuerdes.
+    SystemMigration {
+        version: 41,
+        name: "hub_module_package",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS hub_module_package (\
+  hub_id TEXT NOT NULL, module_id TEXT NOT NULL, version TEXT NOT NULL, \
+  sha256 TEXT NOT NULL, signature_json TEXT, zip_base64 TEXT NOT NULL, \
+  stored_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id, module_id));",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -1892,6 +2065,60 @@ mod tests {
         assert_eq!(stmts, vec!["CREATE TABLE IF NOT EXISTS a (x);", "DROP TABLE b;"]);
     }
 
+    /// The user-activity mark needs a table of its own (hub#670): kept only in memory it died with
+    /// the process, and with blue/green (ADR-0269) the process dies on every update. The row is
+    /// what stops the Cloud's inactivity clock (ADR-0175) from deleting a free hub at 120 days.
+    ///
+    /// Re-executable on purpose (`CREATE TABLE IF NOT EXISTS`): a rewind of the control table must
+    /// not blow up the second pass, and must not lose a mark that is already there (hub#483).
+    #[tokio::test]
+    async fn apply_creates_the_activity_table_and_can_run_twice_without_losing_the_mark() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+
+        let activity = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_activity")
+            .expect("the activity table is in the catalogue");
+        assert!(
+            max_applied_version(&db).await.unwrap() >= activity.version,
+            "the activity migration must be registered"
+        );
+
+        db.execute_batch(
+            "INSERT INTO _hub_activity (hub_id, last_activity_at, last_reported_at, updated_at) \
+             VALUES ('hub-test', '2026-08-10T09:00:00Z', NULL, '2026-08-10T09:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        // The rewind the suite of hub#436 does: the RECORD is deleted, not the table.
+        let mut p = Params::new();
+        p.insert("version".into(), json!(activity.version));
+        db.execute(
+            "DELETE FROM _hub_system_migrations WHERE version >= :version",
+            &p,
+        )
+        .await
+        .unwrap();
+        apply(&db, "hub-test")
+            .await
+            .expect("the activity migration re-applies over its own table");
+
+        let rows = db
+            .query(
+                "SELECT last_activity_at FROM _hub_activity WHERE hub_id = 'hub-test'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1, "re-applying must not drop the mark");
+        assert_eq!(rows.rows[0]["last_activity_at"], json!("2026-08-10T09:00:00Z"));
+    }
+
     #[tokio::test]
     async fn apply_creates_trusted_device_table_v2() {
         use erplora_db::testutil::fresh_db;
@@ -2576,10 +2803,14 @@ mod kind_contract_tests {
             );
             previous = migration.version;
         }
-        // 33 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
-        // (v36, hub#662). El número está a mano a propósito: añadir una migración de sistema tiene
+        // 38 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
+        // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731) + `_flow_approvals` (v38, hub#665) +
+        // `_hub_activity` (v39, hub#670) + `_update_history` (v40, hub#564) + `hub_module_package`
+        // (v41, hub#571). El número está a mano a propósito: añadir una migración de sistema tiene
         // que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero
-        // antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan el mismo número.
-        assert_eq!(MIGRATIONS.len(), 33, "el catálogo cambió de tamaño");
+        // antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan el mismo
+        // número, como pasó en esta ola: hub#731 y hub#665 pidieron las dos el v37; hub#670,
+        // hub#564 y hub#571 pidieron las tres el v39.
+        assert_eq!(MIGRATIONS.len(), 38, "el catálogo cambió de tamaño");
     }
 }

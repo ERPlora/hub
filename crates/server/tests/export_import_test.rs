@@ -39,7 +39,6 @@ fn test_config(auth_mode: AuthMode, tag: &str) -> HubConfig {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     }
 }
 

@@ -21,13 +21,83 @@
 //!
 //! Contrato (camelCase) consumido por `hub/apps/web/src/lib/system.ts`.
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Map, Value};
 
-use crate::{auth, AppState};
+use crate::{auth, AppState, LocaleQuery};
+
+/// `GET /api/system/update-history` — what we changed on this hub, and from which version
+/// (hub#564, ADR-0269 §3.5).
+///
+/// We update on our own, always, without asking and without cutting service. The counterpart we owe
+/// the owner is **transparency**: they do not get to choose *when*, so they are owed *what*. This is
+/// the door that answers it, and it is READ-ONLY on purpose — there is no update control for the
+/// owner here and there must not be one, because a button to postpone is the thing ADR-0269
+/// decided against.
+///
+/// Only what MOVED comes back (a hub nobody has updated answers an empty list), newest first, no
+/// further back than the window. Names are the ones the owner reads, translated to `?locale=`.
+///
+/// `reason` travels but the screen does not print it: it is the verbatim error behind a rollback,
+/// which is the first thing we ask for on an incident and the last thing to put in front of
+/// somebody running a hairdresser's.
+pub async fn update_history(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<LocaleQuery>,
+) -> Response {
+    // Which versions this hub runs is a map of its attack surface: an unauthenticated reader would
+    // learn exactly which known bug applies. Same session gate as `/api/system`.
+    let locale = q.locale.as_deref().unwrap_or("en");
+    let rt = st.runtime.lock().await;
+    if let Err(error) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return (
+            axum::http::StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": error.message() })),
+        )
+            .into_response();
+    }
+
+    let entries = match erplora_runtime::update_history::recent(
+        rt.db(),
+        &st.hub_id(),
+        erplora_runtime::update_history::DEFAULT_LIMIT,
+        erplora_runtime::update_history::DEFAULT_MAX_AGE_DAYS,
+    )
+    .await
+    {
+        Ok(entries) => entries,
+        Err(e) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "ok": false, "error": e.to_string() })),
+            )
+                .into_response()
+        }
+    };
+
+    let registry = rt.registry();
+    let data: Vec<Value> = entries
+        .iter()
+        .map(|e| {
+            json!({
+                "component": e.component,
+                "id": e.id,
+                "name": erplora_runtime::update_history::display_name(registry, e, locale),
+                "from": e.from_version,
+                "to": e.to_version,
+                "outcome": e.outcome,
+                "reason": e.reason,
+                "at": e.at,
+            })
+        })
+        .collect();
+
+    Json(json!({ "ok": true, "data": data })).into_response()
+}
 
 /// GET /api/system — métricas + base de datos reales, según el despliegue.
 pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Response {

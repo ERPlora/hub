@@ -6,8 +6,13 @@
 // drain reports `failed` and the hub gives the ticket to the next host instead of losing it.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { bootPrintHost, createJobPrinter, printChannelUrl, type PrintHostClient } from './print-host';
+import { bootPrintHost, createJobPrinter, printChannelUrl, printerRolesOfDevices, type PrintHostClient } from './print-host';
 import type { DrainJob } from './print-drain';
+
+/** A socket that does nothing: these tests care about whether one was opened, not what it said. */
+function socket() {
+  return { send: () => {}, close: () => {}, onopen: null, onmessage: null, onclose: null, onerror: null };
+}
 
 function job(overrides: Partial<DrainJob> = {}): DrainJob {
   return {
@@ -155,6 +160,62 @@ describe('print host — booting it in the shell', () => {
     bootPrintHost.reset();
   });
 
+  // **The alta is what turns the queue on** (hub#749). `POST /api/print/hosts` was built in hub#342
+  // and had no caller anywhere: no screen, no app, no module. Without it the hub refuses every
+  // drain with `print.host_not_registered`, the drain treats that as configuration (it stops, and
+  // it is right to) and every queued ticket waits for ever with nobody the wiser. So the boot of
+  // the device that HAS the printer is what says «this equipment prints receipts».
+  it('el equipo con la impresora SE DA DE ALTA como host de su rol (hub#749)', async () => {
+    const registered: string[] = [];
+    const c = client([{ role: 'receipt', ip: '10.0.0.5' }]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async (role: string) => { registered.push(role); return { heartbeatSeconds: 30 }; },
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(registered).toEqual(['receipt']);
+  });
+
+  // Two printers sharing a role are ONE role (desserts come out of the bar printer), a box the
+  // owner has not routed yet is not a role at all — claiming a queue nobody assigned would be
+  // inventing the answer — and neither is one with no address, which cannot take a job.
+  it('los roles de alta son los que este equipo puede imprimir de verdad', () => {
+    expect(
+      printerRolesOfDevices([
+        { role: 'receipt', ip: '10.0.0.5' },
+        { role: 'kitchen', ip: '10.0.0.6' },
+        { role: 'kitchen', ip: '10.0.0.7' },
+        { role: null, ip: '10.0.0.8' },
+        { role: 'bar', ip: null },
+      ]),
+    ).toEqual(['receipt', 'kitchen']);
+  });
+
+  // **The drain must not connect before the alta.** It does not retry a configuration refusal —
+  // rightly, or a phone would hammer the hub for ever — so a socket opened one tick too early
+  // spends its single attempt on `print.host_not_registered` and this device never drains again
+  // until somebody restarts the app.
+  it('no abre el canal hasta que el alta ha salido bien', async () => {
+    const opened: string[] = [];
+    const c = client([{ role: 'receipt', ip: '10.0.0.5' }]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: (url: string) => { opened.push(url); return socket(); },
+      registerHost: async () => { throw new Error('401'); },
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(opened).toEqual([]);
+  });
+
   // **Booting twice must not drain twice.** Two loops on the same device would each claim, and the
   // hub hands two claims two DIFFERENT jobs (`SKIP LOCKED`) — so a second boot would not duplicate a
   // ticket, it would race for them. A hot reload, or a second call from a future caller, must be a
@@ -163,19 +224,17 @@ describe('print host — booting it in the shell', () => {
     const opened: string[] = [];
     const openSocket = (url: string) => {
       opened.push(url);
-      return {
-        send: () => {},
-        close: () => {},
-        onopen: null,
-        onmessage: null,
-        onclose: null,
-        onerror: null,
-      };
+      return socket();
     };
     const c = client([{ role: 'receipt', ip: '10.0.0.5' }]);
+    // The alta is what starts the drain now (hub#749), so the boot needs its two doors fed.
+    const registry = {
+      registerHost: async () => ({ heartbeatSeconds: 30 }),
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    };
 
-    await bootPrintHost(c, { url: 'ws://h/ws/print', session: () => 's', deviceId: async () => 'till-1', openSocket });
-    await bootPrintHost(c, { url: 'ws://h/ws/print', session: () => 's', deviceId: async () => 'till-1', openSocket });
+    await bootPrintHost(c, { url: 'ws://h/ws/print', session: () => 's', deviceId: async () => 'till-1', openSocket, ...registry });
+    await bootPrintHost(c, { url: 'ws://h/ws/print', session: () => 's', deviceId: async () => 'till-1', openSocket, ...registry });
 
     expect(opened).toEqual(['ws://h/ws/print']);
   });

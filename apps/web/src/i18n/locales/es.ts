@@ -42,6 +42,8 @@ export default {
     manageError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.',
     notifications: 'Notificaciones',
     noNotifications: 'Todo al día. Sin notificaciones.',
+    deadLettersTitle: 'Eventos caídos',
+    deadLettersBody: 'Hay {count} evento(s) que el relay no pudo entregar. Revísalos y reenvíalos.',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',
@@ -191,6 +193,7 @@ export default {
       // en vez de pintar un error rojo sobre un plan que el dueño simplemente no ha contratado.
       blocked: 'Estas hay que añadirlas antes a tu plan: {apps}',
       failed: 'Hay algo más que no ha entrado. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      failedApps: 'Estas no han entrado: {apps}. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
       notStartedTitle: 'No se ha podido abrir esa plantilla',
       notStartedBody: 'No ha cambiado nada en tu negocio. Inténtalo otra vez o cárgala desde Ajustes › Datos.',
       interruptedTitle: 'La configuración no ha terminado',
@@ -371,6 +374,16 @@ export default {
     hubLanguageDesc: 'Idioma por defecto del Hub para los usuarios sin idioma propio',
     saved: 'Ajustes guardados',
     saveError: 'No se pudieron guardar los ajustes',
+    saveRefused: {
+      demo_fiscal_identity_locked:
+        'Esto es una demo, así que factura como «{name}». Crea tu propio hub para facturar con los datos de tu negocio.',
+      demo_business_certificate_locked:
+        'Una demo no puede quedarse tu certificado: no remite nada de verdad. Crea tu propio hub para facturar con él.',
+      demo_fiscal_environment_locked:
+        'Una demo se queda siempre en el entorno de pruebas de la AEAT. Crea tu propio hub para remitir de verdad.',
+      business_tax_id_frozen:
+        'El NIF ya no se puede cambiar: este hub ya ha emitido con él.',
+    },
     timezone: 'Zona horaria',
     timezoneDesc: 'Zona horaria para fechas y horarios',
     country: 'País',
@@ -448,7 +461,9 @@ export default {
     resetUndo: 'Deshacer',
     resetUndoTitle: 'Deshacer «{name}»',
     resetUndoBody: 'Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
-    resetRows: '{n} filas',
+    // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
+    // «1 filas» (hub#765). El `n` que pasa la llamada elige la forma.
+    resetRows: '{n} fila | {n} filas',
     resetSubmit: 'Restablecer el hub',
     resetDeleted: '{n} filas borradas',
     resetConfirmTitle: 'Esto no se puede deshacer',
@@ -531,6 +546,10 @@ export default {
     updateUpToDate: '{name} ya está en la última versión.',
     updateError: 'No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.',
     updateBlocked: 'La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.',
+    versionPickTitle: 'Elige una versión',
+    versionPickBody: 'Está seleccionada la última. Elige otra solo si te lo ha pedido soporte.',
+    versionPickConfirm: 'Continuar',
+    versionLatest: '{version} (la última)',
     needsSubscription: '{name} necesita una suscripción. Contrátala desde tu cuenta de ERPlora, en erplora.com, y se instalará aquí.',
     deactivated: '{name} desactivado.',
     activated: '{name} activado.',
@@ -753,8 +772,26 @@ export default {
     stepInstall: 'Instalar',
     stepPair: 'Vincular',
     stepConfigure: 'Configurar',
-    updatesManaged: 'Actualizaciones gestionadas',
     updatesCloudHint: 'Este Hub web se actualiza automáticamente durante los despliegues del servicio.',
+    // Qué le hemos cambiado a este hub y desde qué versión (hub#564, ADR-0269 §3.5). Actualizamos
+    // sin preguntar, así que lo mínimo que le debemos es que pueda SABER qué le cambió. Cada frase
+    // nombra una app como él la conoce y una versión que puede comparar — nunca un digest, nunca
+    // «la imagen», y nunca un changelog inventado.
+    updateHistory: 'Qué te hemos actualizado',
+    updatesRunning: 'Vas por la {version}',
+    noUpdates: 'No te hemos cambiado nada',
+    noUpdatesHint: 'No hemos actualizado nada en este hub últimamente. Cuando lo hagamos, aparecerá aquí.',
+    today: 'Hoy',
+    yesterday: 'Ayer',
+    // Una vuelta atrás es una entrada más y lo dice con esas palabras: a qué versión volvió. El
+    // error que la causó no se enseña a propósito — está escrito para nosotros, no para quien abre
+    // la tienda.
+    rolledBackTo: 'Volvió a la {version}: la nueva no arrancó',
+    updateLost: 'Esta app no está funcionando: estamos en ello',
+    documents: 'Documentos',
+    noDocuments: 'Sin documentos',
+    noDocumentsBucket: 'El bucket de almacenamiento de este hub está vacío.',
+    searchDocument: 'Buscar documento…',
     loadErrorTitle: 'No se pudo consultar el sistema',
     loadErrorBody: 'Las métricas y los registros no están disponibles ahora. Puedes volver a intentarlo.',
     retry: 'Reintentar',
@@ -766,6 +803,20 @@ export default {
     tabPlan: 'Plan y límites',
     tabUpdates: 'Actualizaciones',
     tabLogs: 'Registros',
+    tabEvents: 'Eventos caídos',
+    deadEvents: 'Eventos caídos',
+    deadEventsHint: 'Arregla la causa (permiso, módulo caído…) y reenvía. El contenido no se edita: si la causa sigue, el evento vuelve a morir aquí.',
+    noDeadEvents: 'Todo en orden',
+    noDeadEventsHint: 'No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio nunca la pierde.',
+    deadEventsLoadError: 'No se pudo cargar la cola de eventos caídos. Comprueba la conexión y reintenta.',
+    attempts: 'intentos',
+    retryAll: 'Reenviar todos',
+    retryDone: 'Evento reenviado al relay.',
+    retryAllDone: '{count} evento(s) reenviado(s) al relay.',
+    retryFailed: 'No se pudo reenviar: {reason}',
+    discardDone: 'Evento descartado (se conserva para auditoría).',
+    discardFailed: 'No se pudo descartar: {reason}',
+    discardConfirm: '¿Descartar este evento para siempre? La fila se conserva (auditable), pero el relay no volverá a entregarla. Úsalo solo si el evento no debe registrarse.',
     resourcesCloud: 'Recursos en la nube',
     resourcesSystem: 'Recursos del sistema',
     sourceCloud: 'Nube',
@@ -988,6 +1039,9 @@ export default {
     exporting: 'Exportando…',
     done: '{filename} descargado.',
     errorTitle: 'La exportación falló',
+    // hub#765: el runtime no respondió antes del plazo. Sin timeout el spinner giraba para siempre;
+    // ahora aborta y lo dice, para que el usuario pueda reintentar en vez de irse sin saber.
+    timeout: 'El servidor está tardando demasiado en generar la copia. Inténtalo de nuevo en un momento.',
   },
   importPage: {
     title: 'Importar configuración',
@@ -1046,12 +1100,17 @@ export default {
     reasonBlocked:
       'No se ha instalado: necesita módulos que aún no tienes contratados: {missing}. Contrátalos y vuelve a importar — no se ha tocado nada más.',
     mediaFailed: '{n} sin copiar',
+    reasonVersionSubstituted: 'La plantilla pedía la {requested}; esa versión ya no está disponible, así que ha entrado la {installed}.',
     reasonIdentityNotPortable:
       'Los usuarios, roles y PIN son del hub que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso a tu hub.',
     reasonSettingsNotPortable:
       'Se han aplicado el país, la moneda y el idioma. Ajustes descartados: {n} — el NIF, la razón social y demás datos son del negocio que creó el fichero; los tuyos se quedan como están.',
     reasonRolesNotActivatable:
       'Roles sin activar: {n}. Una plantilla solo puede activar roles que traigan los módulos instalados aquí, y nunca los administrativos.',
+    reasonSystemTableNotPortable:
+      'Filas descartadas: {n}. El fichero intentaba escribir los registros propios de este hub — su perfil fiscal y su certificado. Son de esta instalación y ningún fichero puede cambiarlos.',
+    reasonNumberingNotPortable:
+      'Numeración descartada: {n}. Las series de facturación y los números ya emitidos son del negocio que creó el fichero. Tu numeración se queda como está — si aún no tienes series, configúralas en Ajustes.',
     done: 'Ir al inicio',
   },
   moduleView: {
@@ -1061,6 +1120,8 @@ export default {
     retry: 'Reintentar',
     blockedTitle: 'Suscripción necesaria',
     blockedHint: 'Este módulo está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y vuelven en cuanto vuelva la suscripción — se gestiona desde tu cuenta de ERPlora, en erplora.com.',
+    protectedTitle: 'Abre la caja primero',
+    protectedHint: 'Esta pantalla está bloqueada mientras la caja esté cerrada. Abre una sesión de caja para empezar a vender — la pantalla se recarga sola en cuanto se abre la caja.',
   },
   moduleSettings: {
     tab: 'Ajustes',

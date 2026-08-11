@@ -64,6 +64,7 @@ fn every_block_the_runtime_judges_has_the_same_fields_as_the_schema() {
         ("/properties/roles/items", "roles[]"),
         ("/$defs/scheduledTask", "scheduled_tasks[]"),
         ("/properties/navigation/items", "navigation[]"),
+        ("/properties/protects/items", "protects[]"),
         ("/$defs/widget", "widgets.*"),
         ("/properties/setup", "setup"),
         ("/properties/settings", "settings"),

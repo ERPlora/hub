@@ -435,3 +435,99 @@ async fn the_neighbours_records_are_still_theirs_afterwards() {
     let ours: Vec<&Json> = rows.iter().filter(|r| r["hub_id"] == json!("h1")).collect();
     assert_eq!(ours.len(), 1, "and ours is stamped with OUR hub");
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hub#512 — the record is READABLE: hub.approvals.list (the door that was missing)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// An admin reads the audit trail through the core query `hub.approvals.list`. Both attributions
+/// arrive, and — the point of #512 — their **names** arrive with them: no UUIDs on the screen.
+#[tokio::test]
+async fn an_admin_reads_the_audit_with_names_resolved() {
+    let (_db, rt) = fresh_hub().await;
+    let token = approve(&rt, "till.sale.take_payment", &ticket()).await;
+    rt.execute_command(
+        "till.sale.take_payment",
+        &ticket(),
+        &cashier().with_elevation_token(&token),
+    )
+    .await
+    .expect("the approved payment");
+
+    let rows = rt
+        .execute_query("hub.approvals.list", &Params::new(), &admin())
+        .await
+        .expect("an admin may read the audit");
+
+    assert_eq!(rows.len(), 1, "one approval spent, one row");
+    assert_eq!(rows[0]["command"], json!("till.sale.take_payment"));
+    assert_eq!(rows[0]["permission"], json!("till.take_payment"));
+    assert_eq!(rows[0]["created_by"], json!("u-cashier"), "who was at the till");
+    // The manager's name is resolved by JOIN against hub_user — the whole point of #512.
+    // (The cashier id "u-cashier" is a fixture stand-in that does not exist as a hub_user, so its
+    // name resolves to "" — which is also the right behaviour: a deleted employee's audit row must
+    // not disappear.)
+    assert_eq!(rows[0]["approved_by_name"], json!("Sofía"), "not a UUID: a name");
+    assert!(
+        !rows[0]["payload_fingerprint"].as_str().unwrap_or_default().is_empty(),
+        "the fingerprint travels"
+    );
+}
+
+/// The cashier who **used** the approval cannot read the audit: only an admin can. `hub.approvals.list`
+/// is about the staff, not about the till.
+#[tokio::test]
+async fn a_cashier_cannot_read_the_audit() {
+    let (_db, rt) = fresh_hub().await;
+    let token = approve(&rt, "till.sale.take_payment", &ticket()).await;
+    rt.execute_command(
+        "till.sale.take_payment",
+        &ticket(),
+        &cashier().with_elevation_token(&token),
+    )
+    .await
+    .expect("the approved payment");
+
+    let err = rt
+        .execute_query("hub.approvals.list", &Params::new(), &cashier())
+        .await
+        .expect_err("the cashier lacks hub.administer");
+    assert!(
+        matches!(err, RuntimeError::PermissionDenied(_)),
+        "got {err:?}"
+    );
+}
+
+/// The filter by `command` narrows the audit to one kind of action.
+#[tokio::test]
+async fn the_audit_filters_by_command() {
+    let (_db, rt) = fresh_hub().await;
+    // Two approvals: one payment, one drawer open.
+    let pay_token = approve(&rt, "till.sale.take_payment", &ticket()).await;
+    rt.execute_command(
+        "till.sale.take_payment",
+        &ticket(),
+        &cashier().with_elevation_token(&pay_token),
+    )
+    .await
+    .unwrap();
+
+    let drawer_payload = params(json!({ "reason": "change" }));
+    let drawer_token = approve(&rt, "till.drawer.open", &drawer_payload).await;
+    rt.execute_command(
+        "till.drawer.open",
+        &drawer_payload,
+        &cashier().with_elevation_token(&drawer_token),
+    )
+    .await
+    .unwrap();
+
+    let mut filter = Params::new();
+    filter.insert("command".into(), json!("till.sale.take_payment"));
+    let rows = rt
+        .execute_query("hub.approvals.list", &filter, &admin())
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 1, "only the payment, not the drawer");
+    assert_eq!(rows[0]["command"], json!("till.sale.take_payment"));
+}

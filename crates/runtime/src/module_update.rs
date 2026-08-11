@@ -102,6 +102,122 @@ pub fn resolve(installed: &str, pinned: Option<&str>, available: &[Available]) -
     }
 }
 
+/// Las versiones que se le pueden **ofrecer** a este hub, de la más nueva a la más vieja.
+///
+/// Es la lista del desplegable de versión (hub#675): instalar y actualizar dejan de tener una sola
+/// opción implícita —«lo que el resolutor decida»— y pasan a poder elegir. `installed = None` es el
+/// caso de instalar por primera vez.
+///
+/// **Elegir no relaja ninguna regla de [`resolve`]**, y esa es la parte que importa: si la lista
+/// tuviera su propia política, el desplegable sería una segunda puerta por la que entra justo lo
+/// que la primera impide.
+///
+/// - **Un pin de soporte no deja nada que elegir.** Si hemos clavado a un cliente en `sales@3.1`
+///   mientras se arregla la `3.2`, un desplegable que ofrezca la `3.2` es la forma de saltárselo.
+/// - **Nada en cuarentena.** Es literalmente para lo que se marca rota una versión.
+/// - **Nada hacia atrás, ni la instalada.** Bajar ejecutaría migraciones ya pasadas sobre datos que
+///   la nueva escribió, y no hay `down` (ADR-0269 §3.4). Bajar a un cliente sigue siendo la palanca
+///   de soporte —versión explícita contra la ruta de update—, no una opción del dueño.
+/// - **Lo que no se puede ordenar, no se ofrece**; y si la ilegible es la instalada, no se ofrece
+///   nada: sin poder comparar no se sabe qué sería «hacia delante».
+///
+/// Devolver la lista vacía es una respuesta legítima y frecuente —el hub ya corre lo último, o el
+/// Cloud no contestó—: no hay nada que elegir, y la pantalla no debe abrir un desplegable.
+pub fn offer(
+    installed: Option<&str>,
+    pinned: Option<&str>,
+    available: &[Available],
+) -> Vec<String> {
+    if pinned.is_some() {
+        return Vec::new();
+    }
+
+    let floor = match installed {
+        Some(version) => match parse(version) {
+            Some(parsed) => Some(parsed),
+            // La instalada no se puede comparar: no se ofrece a ciegas.
+            None => return Vec::new(),
+        },
+        None => None,
+    };
+
+    let mut ordered: Vec<((u64, u64, u64), &str)> = available
+        .iter()
+        .filter(|candidate| candidate.is_active)
+        .filter_map(|candidate| {
+            parse(&candidate.version).map(|parsed| (parsed, candidate.version.as_str()))
+        })
+        .filter(|(parsed, _)| floor.is_none_or(|current| *parsed > current))
+        .collect();
+
+    ordered.sort_by(|a, b| b.0.cmp(&a.0));
+    ordered
+        .into_iter()
+        .map(|(_, version)| version.to_string())
+        .collect()
+}
+
+/// Qué versión instalar por la que un BUNDLE anotó (`manifest.modules[].version`, hub#751/#752).
+///
+/// La versión de un blueprint **no es un requisito, es una foto**: el exportador escribe lo que el
+/// hub de origen tenía puesto ese día. El marketplace, en cambio, **borra** las versiones viejas al
+/// publicar (se queda con las últimas N), así que a los pocos meses el zip pineado ya no existe y
+/// una plantilla por lo demás perfecta deja al negocio sin poder vender — que es lo que tumbó a la
+/// vez a las cuatro plantillas publicadas (`sales@2.12.8`, `verifactu@1.4.1`).
+///
+/// Exigir la versión exacta convierte el pin en una **fecha de caducidad silenciosa**; instalar
+/// cualquier cosa lo convierte en un adorno. En medio está lo que hace esta función:
+///
+/// - **Si el pin sigue publicado, gana el pin.** La sustitución es un rescate, nunca una subida de
+///   versión por la espalda: dos hubs que importan la misma plantilla el mismo día tienen que
+///   acabar igual.
+/// - **Si no está, la más nueva COMPATIBLE.** Compatible = mismo *major* (y, con *major* `0`,
+///   también mismo *minor*: en `0.x` cada minor puede romper — es la regla del `^` de Cargo/npm).
+///   Cruzar un major sí es una sorpresa de las caras: las filas del bundle se escribieron contra
+///   ese contrato, y ninguna migración de módulo sabe traducirlas.
+/// - **Nunca hacia atrás.** Igual que [`resolve`]: no hay `down` (ADR-0269), bajar ejecutaría
+///   migraciones ya pasadas.
+/// - **Nada en cuarentena**, ni siquiera cuando la cuarentena es el propio pin. `is_active = false`
+///   es «esta versión está rota»: servirla porque la pidió una plantilla sería la segunda puerta
+///   por la que entra justo lo que la primera impide.
+/// - **Lo que no se puede comparar, no se sustituye.** Un pin con formato raro solo se resuelve si
+///   está publicado tal cual; adivinar a qué línea pertenece sería inventar.
+///
+/// `None` = no hay nada instalable, y eso **sigue siendo un fallo que hay que contar**: es la
+/// diferencia entre «te he puesto la siguiente» y «esta plantilla ya no se puede importar».
+pub fn resolve_bundle_version(requested: &str, available: &[Available]) -> Option<String> {
+    let installable = |candidate: &&Available| candidate.is_active;
+
+    // El pin vivo manda — incluso si no se puede parsear (un id de versión exótico publicado tal
+    // cual es instalable aunque no sea ordenable).
+    if let Some(exact) = available
+        .iter()
+        .filter(installable)
+        .find(|candidate| candidate.version == requested)
+    {
+        return Some(exact.version.clone());
+    }
+
+    let pinned = parse(requested)?;
+    available
+        .iter()
+        .filter(installable)
+        .filter_map(|candidate| parse(&candidate.version).map(|parsed| (parsed, &candidate.version)))
+        .filter(|(parsed, _)| *parsed > pinned && compatible(pinned, *parsed))
+        .max_by_key(|(parsed, _)| *parsed)
+        .map(|(_, version)| version.clone())
+}
+
+/// `true` si `candidate` puede sustituir a `pinned` sin cambiar el contrato con el que se
+/// escribieron las filas del bundle: mismo *major*, y con *major* `0` también mismo *minor*
+/// (semántica `^`: en `0.x` el minor es el eje que rompe).
+fn compatible(pinned: (u64, u64, u64), candidate: (u64, u64, u64)) -> bool {
+    if pinned.0 != candidate.0 {
+        return false;
+    }
+    pinned.0 != 0 || pinned.1 == candidate.1
+}
+
 /// Cómo acabó un intento de actualización.
 #[derive(Debug)]
 pub enum Outcome {
@@ -154,7 +270,10 @@ where
 
 /// `X.Y.Z` → comparable. Devuelve `None` para cualquier otra cosa, que el llamante trata como
 /// «no se puede comparar» en vez de como cero.
-fn parse(version: &str) -> Option<(u64, u64, u64)> {
+/// `pub(crate)` because the update history compares the CORE's versions with the same rule
+/// (hub#564): the number that decides "this is a rollback, not an update" cannot be a second,
+/// slightly different parser, or the two would eventually disagree about the same jump.
+pub(crate) fn parse(version: &str) -> Option<(u64, u64, u64)> {
     let mut parts = version.split('.');
     let major = parts.next()?.parse().ok()?;
     let minor = parts.next()?.parse().ok()?;
@@ -270,6 +389,92 @@ mod tests {
         assert_eq!(target, Target::StayPut("no-semver".into()));
     }
 
+    // ── Qué versiones se le pueden OFRECER a alguien ─────────────────────────────────
+
+    /// Instalar por primera vez: no hay nada instalado contra lo que comparar, así que valen
+    /// todas las publicadas — y la primera de la lista es la última, que es la que se ofrece.
+    #[test]
+    fn a_first_install_can_choose_among_every_published_version_newest_first() {
+        let offered = offer(None, None, &[v("1.0.0", true), v("2.0.0", true), v("1.5.0", true)]);
+
+        assert_eq!(offered, vec!["2.0.0", "1.5.0", "1.0.0"]);
+    }
+
+    /// La misma regla que `resolve`, y por el mismo motivo: la cuarentena existe para que una
+    /// versión marcada rota no llegue a un hub. Un desplegable que la enseñe es una segunda puerta
+    /// que la deja entrar con un clic.
+    #[test]
+    fn a_quarantined_version_is_never_offered() {
+        let offered = offer(None, None, &[v("1.0.0", true), v("2.0.0", false)]);
+
+        assert_eq!(offered, vec!["1.0.0"]);
+    }
+
+    /// **Elegir versión no es poder bajar de versión.** Retroceder ejecutaría migraciones ya
+    /// pasadas sobre datos que la nueva escribió, y no hay `down` (ADR-0269 §3.4): no es una
+    /// operación que exista. Bajar a alguien sigue siendo la palanca de soporte —versión explícita
+    /// contra la ruta—, no un desplegable del dueño.
+    #[test]
+    fn an_installed_module_is_never_offered_a_downgrade() {
+        let offered = offer(
+            Some("2.0.0"),
+            None,
+            &[v("1.0.0", true), v("2.0.0", true), v("2.1.0", true)],
+        );
+
+        assert_eq!(offered, vec!["2.1.0"], "ni la instalada ni ninguna anterior");
+    }
+
+    #[test]
+    fn the_newest_comes_first_compared_by_number_not_by_text() {
+        let offered = offer(None, None, &[v("1.9.0", true), v("1.10.0", true)]);
+
+        assert_eq!(offered.first().map(String::as_str), Some("1.10.0"));
+    }
+
+    /// Nada que elegir es una respuesta legítima: el hub ya corre lo último. La pantalla no debe
+    /// abrir un desplegable con una sola opción que no cambia nada.
+    #[test]
+    fn a_module_already_on_the_latest_has_nothing_to_offer() {
+        assert!(offer(Some("2.0.0"), None, &[v("2.0.0", true)]).is_empty());
+    }
+
+    #[test]
+    fn a_version_that_cannot_be_ordered_is_not_offered() {
+        let offered = offer(None, None, &[v("latest", true), v("1.0.0", true)]);
+
+        assert_eq!(offered, vec!["1.0.0"], "lo que no se puede colocar no se ofrece");
+    }
+
+    /// Si la instalada no se puede comparar, no se sabe qué sería «hacia delante»: se ofrece nada
+    /// en vez de ofrecer a ciegas. Misma regla que `resolve`.
+    #[test]
+    fn an_installed_version_that_cannot_be_compared_offers_nothing() {
+        assert!(offer(Some("no-semver"), None, &[v("1.0.0", true)]).is_empty());
+    }
+
+    /// El Cloud no contestó (o el módulo se despublicó entero): no hay lista, y no hay desplegable.
+    #[test]
+    fn an_empty_catalogue_offers_nothing() {
+        assert!(offer(None, None, &[]).is_empty());
+        assert!(offer(Some("1.0.0"), None, &[]).is_empty());
+    }
+
+    /// El pin de soporte gana también aquí, y por el mismo motivo que la cuarentena: si lo hemos
+    /// clavado en `3.1` mientras se arregla la `3.2`, un desplegable que ofrezca la `3.2` es
+    /// exactamente la forma de saltárselo. `resolve` ya lo respeta; la lista no puede ser la
+    /// excepción, o el pin dejaría de ser una garantía y pasaría a ser una sugerencia.
+    #[test]
+    fn a_module_pinned_by_support_has_nothing_to_choose() {
+        let offered = offer(
+            Some("3.1.0"),
+            Some("3.1.0"),
+            &[v("3.1.0", true), v("3.2.0", true)],
+        );
+
+        assert!(offered.is_empty(), "el pin no se salta desde la pantalla: {offered:?}");
+    }
+
     // ── Actualizar sin quedarse sin módulo ───────────────────────────────────────────
 
     async fn attempt(fails: &[&str], from: &str, to: &str) -> (Outcome, Vec<String>) {
@@ -332,5 +537,85 @@ mod tests {
 
         assert!(matches!(outcome, Outcome::AlreadyThere(_)), "{outcome:?}");
         assert!(intentos.is_empty(), "no se reinstala por gusto");
+    }
+
+    // ── La versión que anotó un bundle (hub#751/#752) ────────────────────────────────
+
+    /// El caso real: el marketplace podó `sales@2.12.8` y la plantilla se quedó sin ventas.
+    #[test]
+    fn a_pinned_version_the_marketplace_pruned_falls_back_to_the_newest_compatible() {
+        let resolved =
+            resolve_bundle_version("2.12.8", &[v("2.13.10", true), v("2.13.9", true)]);
+
+        assert_eq!(resolved.as_deref(), Some("2.13.10"));
+    }
+
+    /// La sustitución es un rescate, no una subida de versión por la espalda.
+    #[test]
+    fn a_pinned_version_that_is_still_published_wins_over_a_newer_one() {
+        let resolved = resolve_bundle_version("2.13.9", &[v("2.13.10", true), v("2.13.9", true)]);
+
+        assert_eq!(resolved.as_deref(), Some("2.13.9"));
+    }
+
+    /// Cruzar un major no es sustituir: las filas del bundle se escribieron contra el contrato
+    /// viejo y ninguna migración de módulo sabe traducirlas.
+    #[test]
+    fn a_newer_major_is_not_a_substitute() {
+        let resolved = resolve_bundle_version("1.4.1", &[v("2.0.0", true)]);
+
+        assert_eq!(resolved, None, "no se cruza un major a la brava");
+    }
+
+    /// En `0.x` el eje que rompe es el minor (semántica `^`): `printing@0.1.5` puede caer a
+    /// `0.1.7`, nunca a `0.2.0`.
+    #[test]
+    fn below_one_point_zero_the_minor_is_the_breaking_axis() {
+        assert_eq!(
+            resolve_bundle_version("0.1.5", &[v("0.1.7", true)]).as_deref(),
+            Some("0.1.7"),
+        );
+        assert_eq!(resolve_bundle_version("0.1.5", &[v("0.2.0", true)]), None);
+    }
+
+    /// **Nunca hacia atrás**, igual que `resolve`: no hay `down` (ADR-0269).
+    #[test]
+    fn an_older_version_is_never_a_substitute() {
+        let resolved = resolve_bundle_version("2.12.8", &[v("2.11.0", true)]);
+
+        assert_eq!(resolved, None, "bajar ejecutaría migraciones ya pasadas");
+    }
+
+    /// La cuarentena no se salta por venir de una plantilla: si se saltara, el bundle sería una
+    /// segunda puerta por la que entra justo la versión que se marcó rota.
+    #[test]
+    fn a_quarantined_version_is_not_served_even_when_the_bundle_pins_it() {
+        assert_eq!(
+            resolve_bundle_version("2.12.8", &[v("2.12.8", false), v("2.13.1", true)]).as_deref(),
+            Some("2.13.1"),
+            "el pin en cuarentena se sustituye, no se instala",
+        );
+        assert_eq!(
+            resolve_bundle_version("2.12.8", &[v("2.13.1", false)]),
+            None,
+            "sin nada sano compatible no hay sustituta",
+        );
+    }
+
+    /// Un pin ilegible solo se resuelve si está publicado tal cual: adivinar a qué línea
+    /// pertenece sería inventar.
+    #[test]
+    fn an_unparseable_pin_resolves_only_when_it_is_still_published() {
+        assert_eq!(
+            resolve_bundle_version("2026-07-31", &[v("2026-07-31", true)]).as_deref(),
+            Some("2026-07-31"),
+        );
+        assert_eq!(resolve_bundle_version("2026-07-31", &[v("2.13.10", true)]), None);
+    }
+
+    /// Un módulo que ya no publica NADA no tiene sustituta — y el llamante debe contarlo.
+    #[test]
+    fn a_module_with_nothing_published_has_no_substitute() {
+        assert_eq!(resolve_bundle_version("1.4.1", &[]), None);
     }
 }

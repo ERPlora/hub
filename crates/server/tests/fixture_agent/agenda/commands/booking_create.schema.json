@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "customer": { "type": "string", "description": "Customer name or phone" },
+    "starts_at": { "type": "string", "description": "RFC-3339 start instant of the slot" },
+    "minutes": { "type": "integer", "description": "Duration of the service in minutes" }
+  },
+  "required": ["customer", "starts_at"]
+}

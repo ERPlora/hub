@@ -668,7 +668,9 @@ function buildComponentRender(
         // Mismo patrón que ModuleView/provides_slots: el WC recibe el cliente por propiedad y
         // consulta sus datos él mismo (WC → SDK → Rust; nunca toca la BD).
         const el = document.createElement(tag) as HTMLElement & { client?: unknown };
-        el.client = client;
+        // Con el scope de su módulo, igual que ModuleView (hub#714): el widget es tan módulo como
+        // la página, y el id lo pone quien monta, no quien se monta.
+        el.client = client.forModule(mod.moduleId);
         card.body.appendChild(el);
       })
       .catch(() => {

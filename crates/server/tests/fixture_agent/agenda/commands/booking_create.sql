@@ -1,0 +1,1 @@
+INSERT INTO agenda_booking (id, hub_id, created_by, customer, starts_at, minutes) VALUES (:new_id, :hub_id, :current_user_id, COALESCE(:customer, ''), COALESCE(:starts_at, ''), COALESCE(:minutes, 30));

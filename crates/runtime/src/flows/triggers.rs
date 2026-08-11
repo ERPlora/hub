@@ -140,6 +140,10 @@ pub async fn on_event(
 /// "in three days, send X".
 pub async fn sweep_schedules(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<usize> {
     let now = now_rfc3339();
+    let tz = crate::settings::timezone_of(db, hub_id).await?;
+    // Before claiming anything: re-arm whatever was armed on a different clock (hub#731).
+    retime_to_current_zone(db, hub_id, &now, tz).await?;
+
     let mut started = 0usize;
     // Bounded per tick for the same reason the outbox batches: this runs inside the runtime's
     // global lock, and a backlog must not hold it.
@@ -154,7 +158,7 @@ pub async fn sweep_schedules(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u
 
         if runs_in_last_minute(db, hub_id, &flow_id).await? >= MAX_RUNS_PER_MINUTE {
             eprintln!("flows: flow {flow_id} exceeded {MAX_RUNS_PER_MINUTE} runs/min (schedule)");
-            advance_schedule(db, &trigger_id, &kind, &expr, &now).await?;
+            advance_schedule(db, &trigger_id, &kind, &expr, &now, tz).await?;
             continue;
         }
 
@@ -175,11 +179,57 @@ pub async fn sweep_schedules(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u
         );
         // Firing and moving the clock commit together: if the insert fails the trigger stays due,
         // and if it succeeds the trigger cannot fire twice for the same instant.
-        let advance = advance_schedule_op(&trigger_id, &kind, &expr, &now);
+        let advance = advance_schedule_op(&trigger_id, &kind, &expr, &now, tz);
         db.execute_tx(&[(sql, params), advance]).await?;
         started += 1;
     }
     Ok(started)
+}
+
+/// Re-arms the `cron` triggers whose `next_run` was computed on a clock that is no longer the
+/// hub's (hub#731). One statement's worth of work in the normal case (nothing matches), and it is
+/// what answers the two questions the change opens:
+///
+/// - **The triggers that already existed, read in UTC.** They migrate on the first tick after the
+///   upgrade instead of firing once at the old hour — for a nightly flow that is one wrong run,
+///   for an annual one it is half a year.
+/// - **A business that changes zone** (moves, or just fixes its `country_code`). Its flows follow
+///   without anybody re-saving them one by one, which is what the owner assumes happened.
+///
+/// It cannot loop: it only touches rows whose stored zone differs, and it writes that zone.
+async fn retime_to_current_zone(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    now: &str,
+    tz: cron::Tz,
+) -> Result<()> {
+    let mut q = Params::new();
+    q.insert("hub_id".into(), json!(hub_id));
+    q.insert("tz".into(), json!(tz.name()));
+    let stale = db
+        .query(
+            "SELECT id, cron FROM _flow_triggers \
+             WHERE hub_id = :hub_id AND kind = 'cron' AND deleted_at IS NULL AND tz <> :tz \
+             LIMIT 100",
+            &q,
+        )
+        .await?;
+    for row in &stale.rows {
+        let id = row["id"].as_str().unwrap_or_default().to_string();
+        let expr = row["cron"].as_str().unwrap_or_default();
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("tz".into(), json!(tz.name()));
+        p.insert("now".into(), json!(now));
+        p.insert("next_run".into(), json!(cron::next_after_in_tz(expr, now, tz)));
+        db.execute(
+            "UPDATE _flow_triggers SET next_run = :next_run, tz = :tz, updated_at = :now \
+             WHERE id = :id",
+            &p,
+        )
+        .await?;
+    }
+    Ok(())
 }
 
 /// Claims one due clock trigger atomically (`FOR UPDATE SKIP LOCKED` + lease), the same shape as
@@ -208,16 +258,35 @@ async fn claim_due_schedule(
     Ok(res.rows.into_iter().next())
 }
 
-/// Moves a fired trigger's clock: a `cron` to its next occurrence strictly after now (collapsing a
-/// backlog, like the scheduler), an `at` to never (`enabled = 0` — it was one-shot).
-fn advance_schedule_op(trigger_id: &str, kind: &str, expr: &str, now: &str) -> (String, Params) {
+/// Moves a fired trigger's clock: a `cron` to its next occurrence strictly after now **on the
+/// business clock** (collapsing a backlog, like the scheduler), an `at` to never (`enabled = 0` —
+/// it was one-shot).
+fn advance_schedule_op(
+    trigger_id: &str,
+    kind: &str,
+    expr: &str,
+    now: &str,
+    tz: cron::Tz,
+) -> (String, Params) {
     let mut p = Params::new();
     p.insert("id".into(), json!(trigger_id));
     p.insert("now".into(), json!(now));
     let sql = if kind == "cron" {
-        let next = cron::next_after(expr, now).unwrap_or_else(|| now.to_string());
+        // hub#730: the fallback used to be `now`, which means "due again on the very next tick" —
+        // a runaway held back only by `MAX_RUNS_PER_MINUTE`. It is unreachable now (the API gate
+        // refuses what does not parse, and an unreachable date like 29 February is refused too),
+        // so if it ever happens the row stops instead of spinning, and says so.
+        let next = cron::next_after_in_tz(expr, now, tz);
+        if next.is_none() {
+            eprintln!(
+                "flows: trigger {trigger_id}: `{expr}` has no next occurrence on {}; the trigger \
+                 is disarmed instead of firing every tick",
+                tz.name()
+            );
+        }
         p.insert("next_run".into(), json!(next));
-        "UPDATE _flow_triggers SET next_run = :next_run, last_run = :now, \
+        p.insert("tz".into(), json!(tz.name()));
+        "UPDATE _flow_triggers SET next_run = :next_run, tz = :tz, last_run = :now, \
          claim_expires_at = NULL, updated_at = :now WHERE id = :id"
     } else {
         "UPDATE _flow_triggers SET enabled = 0, next_run = NULL, last_run = :now, \
@@ -232,8 +301,9 @@ async fn advance_schedule(
     kind: &str,
     expr: &str,
     now: &str,
+    tz: cron::Tz,
 ) -> Result<()> {
-    let (sql, p) = advance_schedule_op(trigger_id, kind, expr, now);
+    let (sql, p) = advance_schedule_op(trigger_id, kind, expr, now, tz);
     db.execute(&sql, &p).await?;
     Ok(())
 }
@@ -565,5 +635,113 @@ mod tests {
             next > now_rfc3339(),
             "the backlog collapses forward, it does not replay: {next}"
         );
+    }
+
+    // ── The business clock (hub#731) ──────────────────────────────────────────────────────────
+    //
+    // `Asia/Kolkata` (+05:30, no DST ever) is the fixture on purpose: the assertion is the same
+    // whatever day the suite runs, and the half hour makes an accidental "it was UTC all along"
+    // impossible to mistake for a rounding.
+
+    async fn trigger_row(db: &dyn DatabaseAdapter, flow: &str, col: &str) -> String {
+        let mut p = Params::new();
+        p.insert("f".into(), json!(flow));
+        db.query(
+            &format!("SELECT {col} AS v FROM _flow_triggers WHERE flow_id = :f"),
+            &p,
+        )
+        .await
+        .unwrap()
+        .rows[0]["v"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string()
+    }
+
+    async fn set_zone(db: &dyn DatabaseAdapter, zone: &str) {
+        let mut updates = serde_json::Map::new();
+        updates.insert("timezone".into(), json!(zone));
+        crate::settings::set_many(db, HUB, &updates, "hub_user:1", false)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_cron_trigger_is_armed_on_the_business_clock_not_on_utc() {
+        let db = db().await;
+        set_zone(&db, "Asia/Kolkata").await;
+        let flow = flow_with(
+            &db,
+            json!({
+                "schema_version": 1,
+                "triggers": [{ "kind": "cron", "cron": "0 9 * * *" }],
+                "steps": [{ "id": "wait", "kind": "delay", "seconds": 1 }]
+            }),
+        )
+        .await;
+        // 09:00 in the shop is 03:30 UTC. Stored UTC, because `next_run <= :now` is a TEXT
+        // comparison and an offset in the string would sort as a different instant.
+        let next = trigger_row(&db, &flow, "next_run").await;
+        assert!(next.ends_with("T03:30:00+00:00"), "got {next}");
+        assert_eq!(trigger_row(&db, &flow, "tz").await, "Asia/Kolkata");
+    }
+
+    #[tokio::test]
+    async fn moving_the_business_to_another_zone_retimes_what_is_already_armed() {
+        let db = db().await;
+        let flow = flow_with(
+            &db,
+            json!({
+                "schema_version": 1,
+                "triggers": [{ "kind": "cron", "cron": "0 9 * * *" }],
+                "steps": [{ "id": "wait", "kind": "delay", "seconds": 1 }]
+            }),
+        )
+        .await;
+        // Armed as a Spanish hub (the default `country_code`), so 09:00 Madrid.
+        let before = trigger_row(&db, &flow, "next_run").await;
+        assert!(
+            before.ends_with("T07:00:00+00:00") || before.ends_with("T08:00:00+00:00"),
+            "09:00 in Madrid is 07:00Z (CEST) or 08:00Z (CET): {before}"
+        );
+
+        set_zone(&db, "Asia/Kolkata").await;
+        // The sweep is self-healing: a trigger whose `next_run` was computed under another zone
+        // is re-armed on the next tick. Nobody has to re-save the flow, and this is also what
+        // migrates the triggers that were armed in UTC before this fix.
+        sweep_schedules(&db, HUB).await.unwrap();
+        let after = trigger_row(&db, &flow, "next_run").await;
+        assert!(after.ends_with("T03:30:00+00:00"), "got {after}");
+
+        // …and it is a ONE-OFF: a second sweep must not keep moving the clock forward.
+        sweep_schedules(&db, HUB).await.unwrap();
+        assert_eq!(trigger_row(&db, &flow, "next_run").await, after);
+    }
+
+    #[tokio::test]
+    async fn firing_advances_on_the_business_clock_too() {
+        let db = db().await;
+        set_zone(&db, "Asia/Kolkata").await;
+        let flow = flow_with(
+            &db,
+            json!({
+                "schema_version": 1,
+                "triggers": [{ "kind": "cron", "cron": "0 9 * * *" }],
+                "steps": [{ "id": "wait", "kind": "delay", "seconds": 1 }]
+            }),
+        )
+        .await;
+        let mut p = Params::new();
+        p.insert("f".into(), json!(flow));
+        db.execute(
+            "UPDATE _flow_triggers SET next_run = '2020-01-01T00:00:00+00:00' WHERE flow_id = :f",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(sweep_schedules(&db, HUB).await.unwrap(), 1);
+        let next = trigger_row(&db, &flow, "next_run").await;
+        assert!(next.ends_with("T03:30:00+00:00"), "advancing keeps the zone: {next}");
     }
 }

@@ -152,6 +152,34 @@ pub enum RuntimeError {
     /// del core: el módulo (verifactu, B2B…) solo PIDE la operación, no ve el `.p12`.
     #[error("host.certificate: {0}")]
     Certificate(String),
+    /// A read marked `required` (ADR-0069, hub#701) could not be resolved — the module that owns
+    /// it is absent, inactive, or the query itself failed. Distinct from the GRACEFUL default
+    /// (regla 3 de ADR-0069): a `required` read aborts the command instead of letting the handler
+    /// degrade with a silent empty catalog. The canonical case is the tax catalog: without it a
+    /// handler cannot tell «this category has no rule» from «the catalog never arrived», and
+    /// guessing the rate is exactly what sales#21 prohibits.
+    #[error("required read `{query}` is unavailable — the command was aborted (hub#701)")]
+    ReadUnavailable { query: String },
+    /// A `protects` guard declared by one module over another refused the command (hub#775).
+    ///
+    /// The canonical case is `cash_register` blocking every `sales.*` command while
+    /// `enable_cash_register` is on and `cash_register.current_session` returns no row — the
+    /// drawer is closed, so the sale cannot complete. Before hub#775 the manifest's `protects`
+    /// block was reported as an unknown field and dropped, and a cash sale went through with the
+    /// drawer closed: the `_movement_for_open_session.sql` INSERT…SELECT silently matched no row,
+    /// so the movement was never written and the money vanished from the reconciliation without an
+    /// error. This refusal is the authoritative half the shell's route guard cannot be trusted
+    /// with — it runs in the dispatcher, the only funnel every surface goes through.
+    ///
+    /// The fields carry enough for the UI to explain the refusal without parsing the message:
+    /// which module declared the guard, which module it protected, and which query came back empty
+    /// (so the screen can name the action that would satisfy it, e.g. "open the drawer").
+    #[error("`{protected_module}` is protected by `{declaring_module}`: open a register session first (guard `{guard_query}` was empty)")]
+    ProtectsGuard {
+        declaring_module: String,
+        protected_module: String,
+        guard_query: String,
+    },
     /// Fiscal precondition failed (hub#328, ADR-0203): a command whose SQL stamps the hub's
     /// business identity into a document (it references the injected `:business_tax_id` /
     /// `:business_legal_name` params — ADR-0061) cannot run while that identity is missing.

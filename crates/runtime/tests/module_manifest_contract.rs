@@ -106,14 +106,17 @@ async fn install_accepts_an_unknown_optional_block_and_records_a_visible_warning
     let db = fresh_db().await;
     let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-manifest-contract");
     runtime.ensure_system_tables().await.unwrap();
-    // The real shape of `cash_register`: a top-level `protects` block nothing in the hub reads.
-    // It costs a screen, not correctness, so the module installs — but never in silence.
+    // An unknown top-level block the shell MIGHT one day read (here, a hypothetical `experiments`
+    // toggle). It costs a screen, not correctness, so the module installs — but never in silence.
+    //
+    // (hub#775 retired `protects` from this role: it is now parsed and acted on by the dispatcher,
+    // so it no longer reaches this warning tier. A genuinely unknown root field still does.)
     let dir = fixture(
         r#"{
           "id":"cash_register",
           "name":"Cash register",
           "version":"1.0.0",
-          "protects":[{"guard_query":"cash_register.current_session"}]
+          "experiments":[{"flag":"beta_drawer"}]
         }"#,
     );
 
@@ -132,8 +135,62 @@ async fn install_accepts_an_unknown_optional_block_and_records_a_visible_warning
         module
             .manifest_warnings
             .iter()
-            .any(|w| w.path == "protects"),
+            .any(|w| w.path == "experiments"),
         "the warning must be consultable on the module, naming the block: {:?}",
+        module.manifest_warnings
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
+async fn install_parses_a_protects_block_without_warning() {
+    // hub#775: `protects` was the canonical "unknown optional block" of this file until the issue
+    // taught the runtime to PARSE it and act on it authoritatively. Now it must install CLEAN — no
+    // warning, no refusal — and the guard must be reachable on the installed manifest.
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-manifest-contract");
+    runtime.ensure_system_tables().await.unwrap();
+    let dir = fixture(
+        r#"{
+          "id":"cash_register",
+          "name":"Cash register",
+          "version":"1.0.0",
+          "permissions":["cash_register.view_session"],
+          "queries":{
+            "cash_register.settings.get":{"permission":"cash_register.view_session","sql":"queries/s.sql"},
+            "cash_register.current_session":{"permission":"cash_register.view_session","sql":"queries/cs.sql"}
+          },
+          "protects":[{
+            "settings_query":"cash_register.settings.get",
+            "enabled_setting":"enable_cash_register",
+            "route_setting":"protected_pos_url",
+            "guard_query":"cash_register.current_session",
+            "expect":"non_empty",
+            "component":"erp-cashregister-open",
+            "resume_on":"cash_register.session_opened"
+          }]
+        }"#,
+    );
+    std::fs::create_dir_all(dir.join("queries")).unwrap();
+    std::fs::write(dir.join("queries/s.sql"), "SELECT 1").unwrap();
+    std::fs::write(dir.join("queries/cs.sql"), "SELECT 1").unwrap();
+
+    runtime
+        .install_from_dir(&dir)
+        .await
+        .expect("a well-formed protects block must install clean");
+
+    let module = runtime
+        .modules()
+        .into_iter()
+        .find(|m| m.id == "cash_register")
+        .expect("the module is installed");
+    assert!(
+        !module
+            .manifest_warnings
+            .iter()
+            .any(|w| w.path.starts_with("protects")),
+        "`protects` is now parsed and acted on — it must NOT warn: {:?}",
         module.manifest_warnings
     );
     std::fs::remove_dir_all(dir).unwrap();
@@ -329,6 +386,61 @@ fn no_published_manifest_is_refused_by_the_contract() {
         loaded >= 20,
         "expected the published catalogue (~24 modules), only {loaded} loaded from {}",
         root.display()
+    );
+}
+
+/// hub#709 — the other half of that guard: the published catalogue does not only LOAD, it also
+/// **declares what it emits**.
+///
+/// Before this, 23 of the 24 manifests had `events.emits` empty or absent, and `sale.completed` —
+/// emitted on every sale, listened to by `inventory`, `customers`, `cash_register`, `invoice` and
+/// `tables` — appeared in no manifest at all. The hub's event catalogue is the aggregation of what
+/// each installed module declares, so the list a flow can react to came out with the eleven events
+/// of `whatsapp_inbox` and nothing else.
+///
+/// The rule is a WARNING and not a refusal (see `Manifest::undeclared_emit_warnings`), so nothing
+/// here can stop a till. What this test buys is that the catalogue stays true: put back a command
+/// that emits without declaring, and this goes red naming the module and the event.
+#[test]
+fn no_published_manifest_hides_an_event_it_emits() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let root = erplora_runtime::modules_root();
+    let mut holes: Vec<String> = Vec::new();
+    let mut loaded = 0;
+    for entry in std::fs::read_dir(&root)
+        .expect("modules root is readable")
+        .flatten()
+    {
+        let dir = entry.path();
+        if !dir.join("module.json").is_file() {
+            continue;
+        }
+        let module = dir
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        let manifest = erplora_runtime::Manifest::load(&dir)
+            .unwrap_or_else(|e| panic!("`{module}` is PUBLISHED and must keep loading: {e}"));
+        for warning in &manifest.warnings {
+            if warning.path == "events.emits" {
+                holes.push(format!("  {module}: {}", warning.detail));
+            }
+        }
+        loaded += 1;
+    }
+    assert!(
+        loaded >= 20,
+        "expected the published catalogue (~24 modules), only {loaded} loaded from {}",
+        root.display()
+    );
+    assert!(
+        holes.is_empty(),
+        "these published modules emit events they do not declare, so the hub's event catalogue \
+         cannot offer them:\n{}",
+        holes.join("\n")
     );
 }
 

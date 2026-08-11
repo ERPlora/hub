@@ -8,8 +8,8 @@ const contract = readFileSync(new URL('./system.ts', import.meta.url), 'utf8');
 describe('navegación de Sistema', () => {
   it('reserva Sistema para diagnóstico y retira copias y documentos', () => {
     // `plan` = telemetría de recursos vs límites del plan (ADR-0154). Va tras `resources`.
-    // `documents` se retiró: los documentos del hub viven en /files (gestor de `media/`).
-    expect(SYSTEM_TABS).toEqual(['resources', 'plan', 'updates', 'logs']);
+    // `events` = dead-letters operables del outbox (hub#660). Va antes de `logs` (el registro crudo).
+    expect(SYSTEM_TABS).toEqual(['resources', 'plan', 'updates', 'events', 'logs']);
     expect(source).not.toContain('value="backups"');
     expect(source).not.toContain("tab === 'backups'");
     expect(source).not.toContain('value="documents"');

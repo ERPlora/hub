@@ -48,14 +48,19 @@ pub(crate) fn device_id_of(headers: &HeaderMap) -> &str {
 
 /// The answer of the read door: what this device asks of the person in front of it.
 ///
-/// It carries **both** controls (hub#358 + hub#359) because both are needed to decide whether the
-/// pinpad is painted, and the login screen has one chance to ask: splitting them across two
-/// requests would mean a window in which the screen has half an answer and has to guess the rest.
-/// The write doors stay separate — the mode is of the device, the policy is of the hub.
-fn ok(mode: DeviceMode, policy: PinPolicy) -> Response {
+/// It carries **all three** controls (hub#358 + hub#359 + hub#514) because all three are needed to
+/// decide whether the pinpad is painted, and the login screen has one chance to ask: splitting them
+/// across two requests would mean a window in which the screen has half an answer and has to guess
+/// the rest. The write doors stay separate — the mode is of the device, the policy is of the hub.
+///
+/// `trusted` (hub#514) says whether **this device** did an online login here before — i.e. whether
+/// a PIN is even usable on it. Before #514 the client sourced this bit from `localStorage`, which
+/// desynchronised from the server on revoke and on first use of a new device. Now the server — the
+/// authority — says it, on the same door that already answers without session.
+fn ok(mode: DeviceMode, policy: PinPolicy, trusted: bool) -> Response {
     Json(json!({
         "ok": true,
-        "data": { "mode": mode.as_str(), "pin_policy": policy.as_str() },
+        "data": { "mode": mode.as_str(), "pin_policy": policy.as_str(), "trusted": trusted },
     }))
     .into_response()
 }
@@ -87,16 +92,28 @@ pub async fn get_device_mode(State(st): State<AppState>, headers: HeaderMap) -> 
         Err(response) => return response,
     };
     let rt = arc.lock().await;
-    let mode = match rt.device_mode(device_id_of(&headers)).await {
+    let device_id = device_id_of(&headers);
+    let mode = match rt.device_mode(device_id).await {
         Ok(mode) => mode,
         Err(e) => return crate::err_response(e),
+    };
+    // hub#514: whether THIS device can use the PIN. The server is the authority — before, the
+    // client guessed from localStorage and offered a pinpad that the runtime would then refuse.
+    // `personal` mode already implies trust (the mode lives in the trust row), so this only
+    // disambiguates `shared`; but asking unconditionally is cheaper than special-casing and the
+    // answer is the same single bit the login screen needs.
+    let trusted = match rt.is_device_trusted(device_id).await {
+        Ok(t) => t,
+        // Fail-closed: a device we cannot look up is not trusted. The login screen falls back to
+        // the account door, which is stronger — never the other way.
+        Err(_) => false,
     };
     // The dial the business chose (hub#359). It travels on THIS door, and not on `/api/settings`,
     // for one reason: the screen that needs it has no session. Nothing is given away by saying it
     // — the login screen would show the same thing by simply not painting a pinpad — and the value
     // that matters is only ever *reported* here; writing it is the admin door of the settings.
     match rt.pin_policy().await {
-        Ok(policy) => ok(mode, policy),
+        Ok(policy) => ok(mode, policy, trusted),
         Err(e) => crate::err_response(e),
     }
 }
@@ -145,9 +162,11 @@ pub async fn put_device_mode(
         return crate::err_response(e);
     }
     // The answer describes the device AFTER the write, dial included — this door does not touch the
-    // dial, so it is read back rather than assumed.
+    // dial, so it is read back rather than assumed. `trusted` is read back too: PUT runs on a known
+    // device with an admin session, so it is always trusted, but the answer is one shape.
+    let trusted = rt.is_device_trusted(target).await.unwrap_or(false);
     match rt.pin_policy().await {
-        Ok(policy) => ok(mode, policy),
+        Ok(policy) => ok(mode, policy, trusted),
         Err(e) => crate::err_response(e),
     }
 }

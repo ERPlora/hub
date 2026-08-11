@@ -1,6 +1,6 @@
 //! Parseo de `module.json` (el contrato declarativo del módulo). Espejo del JSON Schema
 //! en `schemas/module.schema.json`. ARQUITECTURA.md §5.2.
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
 use crate::errors::{Result, RuntimeError};
@@ -160,6 +160,21 @@ pub struct Manifest {
     /// module can say "I need a newer terminal" and be believed.
     #[serde(default)]
     pub compatibility: Option<Compatibility>,
+    /// **Route guards this module declares over ANOTHER module's surface** (hub#775).
+    ///
+    /// A module that owns a precondition for an entire screen declares it here instead of patching
+    /// every caller: `cash_register` blocks entry to the POS and the completion of a sale while no
+    /// register session is open. The block is parsed here and acted on AUTHORITATIVELY by the
+    /// command dispatcher ([`crate::commands::enforce_protects`]) and by the shell (rendered as
+    /// `component` instead of mounting the module), so the contract it declares is no longer a
+    /// wish the runtime logs and ignores.
+    ///
+    /// Cross-module by design: the guard runs against the module that owns the protected ROUTE
+    /// (parsed out of `route_setting`'s value, e.g. `/m/sales` → `sales`), so a module does not
+    /// need to `depends_on` the one it protects. Empty for every published manifest except
+    /// `cash_register`, which is the canonical shape.
+    #[serde(default)]
+    pub protects: Vec<ProtectsDef>,
     /// What this core did **not** understand of the manifest, and chose to install anyway
     /// (hub#521). Filled by [`Manifest::load`], never by serde — it describes what serde DROPPED,
     /// so it cannot come from serde.
@@ -193,6 +208,79 @@ pub struct Compatibility {
     /// for.
     #[serde(default)]
     pub max_erplora_version: Option<String>,
+}
+
+/// A **route guard** one module declares over another module's surface (hub#775).
+///
+/// The contract `cash_register` has been carrying since v1.x: "while `enable_cash_register` is on,
+/// the screen at `protected_pos_url` and every sale that goes through it must wait for an open
+/// register session." Until hub#775 the runtime reported the block as an unknown field and dropped
+/// it — the POS loaded, a cash sale completed, and the money vanished from the drawer reconciliation
+/// without an error. The block is now PARSED, and the dispatcher enforces it authoritatively (see
+/// [`crate::commands::enforce_protects`]).
+///
+/// Cross-module on purpose. `cash_register` does not `depends_on` `sales`: it protects a ROUTE the
+/// shell happens to serve with `sales`. The dispatcher derives the protected module from
+/// `route_setting` (its value is `/m/<module>`), so the guard is read on EVERY command whose owner
+/// is that module — not only on the one named in the issue.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ProtectsDef {
+    /// Query (of the module that declares the guard) that returns the SETTINGS row carrying
+    /// `enabled_setting` and `route_setting`. Resolved in a system context: same `hub_id`, no
+    /// permission re-check — the guard is a contract vouched by the module's author, not a user
+    /// action (the same rule as `reads`, ADR-0069 §1 rule 2).
+    pub settings_query: String,
+    /// The boolean column in that settings row that ARMMS the guard. `false` or absent → the guard
+    /// is dormant (e.g. a hub that has not turned the cash register on sells as it always did).
+    pub enabled_setting: String,
+    /// The column whose value is the protected ROUTE (`/m/sales`). The dispatcher parses the module
+    /// out of it to decide which commands the guard applies to; the shell renders `component`
+    /// instead of mounting the module at that route.
+    pub route_setting: String,
+    /// Query (of the module that declares the guard) whose rows decide whether the precondition is
+    /// met. Resolved in the same system context as `settings_query`.
+    pub guard_query: String,
+    /// What `guard_query` must return for the precondition to be MET. Today only `non_empty`
+    /// ("there is at least one open session"); a future flavour could add `empty`.
+    pub expect: ProtectsExpect,
+    /// Shell-side Web Component to render INSTEAD of the protected module while the precondition
+    /// is unmet (e.g. `erp-cashregister-open`). Transported to the shell by the manifest snapshot,
+    /// never executed by the runtime.
+    pub component: String,
+    /// Event the shell listens for to RE-MOUNT the protected module without a manual reload (e.g.
+    /// `cash_register.session_opened`). Transported to the shell, not consumed by the runtime.
+    pub resume_on: String,
+}
+
+/// What [`ProtectsDef::guard_query`] must return for the guard to be SATISFIED (hub#775).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProtectsExpect {
+    /// The precondition is met when `guard_query` returns at least one row (e.g. there is an open
+    /// register session). The default reading of a cash drawer: "the drawer is open".
+    NonEmpty,
+}
+
+impl Default for ProtectsExpect {
+    fn default() -> Self {
+        Self::NonEmpty
+    }
+}
+
+impl ProtectsDef {
+    /// Parses the protected MODULE out of `route_setting`'s value (`/m/sales` → `sales`).
+    ///
+    /// Returns `None` when the value is empty or does not match the `/m/<module>` shape the shell's
+    /// router serves: a guard pointing at a route this hub does not know how to mount is inert, and
+    /// the dispatcher treats it as such rather than refusing the install over a typo.
+    pub fn protected_module<'a>(&self, route_value: &'a str) -> Option<&'a str> {
+        let stripped = route_value.strip_prefix("/m/")?;
+        let module = stripped.split('/').next()?;
+        if module.is_empty() {
+            return None;
+        }
+        Some(module)
+    }
 }
 
 /// Something in a `module.json` this core does not act on, reported instead of dropped (hub#521).
@@ -379,6 +467,8 @@ pub struct Capabilities {
     pub printer: Option<PrinterCapability>,
     #[serde(default)]
     pub notify: Option<NotifyCapability>,
+    #[serde(default)]
+    pub manage_flows: Option<ManageFlowsCapability>,
 }
 
 /// Acceso al certificado PKCS#12 del negocio (firma/transmisión fiscal). El host firma; el
@@ -394,6 +484,18 @@ pub struct CertificateCapability {
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct PrinterCapability {}
 
+/// **Administrar el kernel de automatización** del hub — `/api/hub/flows*` (hub#714, ADR-0283 §9).
+/// Marcador sin parámetros: no hay grados, o el módulo edita los flujos del negocio o no.
+///
+/// Es la capability con más alcance de todas, y por eso existe: un flujo ejecuta commands con
+/// `Origin::Automation` bajo los grants que `PUT …/grants` escribe, así que quien administra
+/// flujos puede hacer que el hub actúe **sin nadie delante**. El resto de capabilities dan un
+/// primitivo (red, certificado, impresora, aviso); esta da el resto de primitivos a través de un
+/// flujo. Que un módulo de inventario la tuviera por el mero hecho de estar cargado en la sesión
+/// de un admin sería una escalada silenciosa — y hasta hub#714 lo era.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ManageFlowsCapability {}
+
 /// Clases de capability que el host conoce y puede gatear (ADR-0079). El nombre canónico (kebab)
 /// es la clave de grant en `_module_capability_grants` y la etiqueta de la UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -402,6 +504,8 @@ pub enum CapabilityKind {
     Certificate,
     Printer,
     Notify,
+    /// Administrar los flujos del hub (hub#714). Ver [`ManageFlowsCapability`].
+    ManageFlows,
 }
 
 impl CapabilityKind {
@@ -412,6 +516,7 @@ impl CapabilityKind {
             CapabilityKind::Certificate => "certificate",
             CapabilityKind::Printer => "printer",
             CapabilityKind::Notify => "notify",
+            CapabilityKind::ManageFlows => "manage_flows",
         }
     }
     /// Parsea un nombre canónico; `None` si no es una capability conocida.
@@ -421,6 +526,7 @@ impl CapabilityKind {
             "certificate" => Some(CapabilityKind::Certificate),
             "printer" => Some(CapabilityKind::Printer),
             "notify" => Some(CapabilityKind::Notify),
+            "manage_flows" => Some(CapabilityKind::ManageFlows),
             _ => None,
         }
     }
@@ -443,6 +549,9 @@ impl Manifest {
         }
         if self.capabilities.notify.is_some() || self.notify.is_some() {
             out.push(CapabilityKind::Notify);
+        }
+        if self.capabilities.manage_flows.is_some() {
+            out.push(CapabilityKind::ManageFlows);
         }
         out
     }
@@ -657,7 +766,8 @@ pub struct Agent {
 /// ```json
 /// "reads": [
 ///   "taxes.rules.list",
-///   { "query": "inventory.products.unit_of", "params": { "product_id": "payload.product_id" } }
+///   { "query": "inventory.products.unit_of", "params": { "product_id": "payload.product_id" } },
+///   { "query": "taxes.rules.list", "required": true }
 /// ]
 /// ```
 ///
@@ -671,16 +781,27 @@ pub struct Agent {
 /// Los valores de `params` referencian el **payload del command** (`payload.<campo>`). Solo eso:
 /// nada de expresiones ni de leer otras reads, para que el manifest siga siendo declarativo y
 /// auditable de un vistazo.
+///
+/// **`required`** (hub#701) es opt-in y solo vive en la forma objeto. El defecto sigue siendo el
+/// fallo GRACEFUL (regla 3 de ADR-0069): una read que no resuelve se omite y el handler degrada —
+/// cobrar es lo último que puede romperse en un TPV. Pero una read de la que depende el IMPUESTO
+/// no puede admitir adivinar: si falla, el runtime aborta el command con `ReadUnavailable` en vez
+/// de entregarle al handler un catálogo vacío indistinguible de «este hub no tiene reglas». La
+/// forma string no puede ser `required` a propósito: el caso simple sigue siendo el caso graceful.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(untagged)]
 pub enum ReadDef {
-    /// `"taxes.rules.list"` — la query entera, sin filtrar.
+    /// `"taxes.rules.list"` — la query entera, sin filtrar. Nunca `required`.
     Query(String),
-    /// `{ "query": …, "params": { … } }` — filtrada por campos del payload.
+    /// `{ "query": …, "params": { … }, "required": bool }` — filtrada por campos del payload.
     Parameterized {
         query: String,
         #[serde(default)]
         params: HashMap<String, String>,
+        /// `true` ⇒ si la query falla, el command se ABORTA con `ReadUnavailable` en vez de
+        /// omitirse. Default `false`: el defecto sigue siendo graceful. Ver hub#701.
+        #[serde(default)]
+        required: bool,
     },
 }
 
@@ -709,6 +830,12 @@ impl ReadDef {
             }
         }
         out
+    }
+
+    /// ¿Esta read es obligatoria? Solo la forma objeto puede declararlo (hub#701); la forma
+    /// string es siempre graceful, como hasta ahora.
+    pub fn is_required(&self) -> bool {
+        matches!(self, ReadDef::Parameterized { required: true, .. })
     }
 }
 
@@ -1096,18 +1223,25 @@ pub struct HandlerRef {
 pub struct Events {
     #[serde(default)]
     pub listen: HashMap<String, Listener>,
-    /// Eventos que el módulo **emite desde sus handlers** (WASM/nativo). Es el allowlist que el
-    /// runtime comprueba antes de encolar en el outbox un evento devuelto por un handler (hub#240).
+    /// **El catálogo completo de eventos que el módulo emite** — los de sus commands declarativos
+    /// y los que devuelven sus handlers (WASM/nativo).
     ///
-    /// Por qué existe: `emit` declara los eventos de un command **declarativo**; los que devuelve
-    /// un handler no tenían dónde declararse, así que no se validaban contra nada — el handler
-    /// elegía el nombre y el relay se lo entregaba a los listeners de otros módulos y al
-    /// **listener-host de `host.notify`** (`*.reminder.due` → email/SMS/WhatsApp).
+    /// Nació (hub#240) como el allowlist de lo que un HANDLER puede encolar en el outbox: `emit`
+    /// declaraba los de un command declarativo y los del handler no tenían dónde declararse, así
+    /// que no se validaban contra nada — el handler elegía el nombre y el relay se lo entregaba a
+    /// los listeners de otros módulos y al **listener-host de `host.notify`** (`*.reminder.due` →
+    /// email/SMS/WhatsApp).
     ///
-    /// Declarar esta lista pone al módulo en **modo estricto**: solo estos nombres (más los `emit`
-    /// de sus commands) pueden salir de sus handlers. Un manifest que no la declara mantiene la
-    /// compatibilidad con lo ya publicado, pero sigue sujeto a las dos reglas duras: no emitir en
-    /// el namespace de otro módulo instalado y no emitir `*.reminder.due` sin la capability
+    /// hub#709 la ensancha a **catálogo**: el hub no tiene un registro central de eventos (se
+    /// desincronizaría del código el primer día) — la lista de «cosas que pueden pasar en mi
+    /// negocio» que ofrece el editor de flujos ES la agregación de este campo en los módulos
+    /// instalados. Por eso un `emit` de command que no aparezca aquí queda REPORTADO en
+    /// [`Manifest::warnings`] (aviso, no rechazo: ver `Manifest::undeclared_emit_warnings`).
+    ///
+    /// Declarar esta lista pone además al módulo en **modo estricto**: solo estos nombres (más los
+    /// `emit` de sus commands) pueden salir de sus handlers. Un manifest que no la declara mantiene
+    /// la compatibilidad con lo ya publicado, pero sigue sujeto a las dos reglas duras: no emitir
+    /// en el namespace de otro módulo instalado y no emitir `*.reminder.due` sin la capability
     /// `notify`. Ver `commands::validate_handler_event`.
     #[serde(default)]
     pub emits: Vec<String>,
@@ -1177,6 +1311,7 @@ const ROOT_FIELDS: &[&str] = &[
     "billing",
     "seed",
     "compatibility",
+    "protects",
 ];
 
 const COMMAND_FIELDS: &[&str] = &[
@@ -1197,11 +1332,26 @@ const COMMAND_FIELDS: &[&str] = &[
 const QUERY_FIELDS: &[&str] = &["permission", "sql", "schema", "list", "ai", "expose_api"];
 const EVENTS_FIELDS: &[&str] = &["listen", "emits"];
 const LISTENER_FIELDS: &[&str] = &["command"];
-const CAPABILITY_FIELDS: &[&str] = &["network", "certificate", "printer", "notify"];
+const CAPABILITY_FIELDS: &[&str] = &[
+    "network",
+    "certificate",
+    "printer",
+    "notify",
+    "manage_flows",
+];
 const DIALECT_FIELDS: &[&str] = &["sqlite", "postgres"];
 const ROLE_FIELDS: &[&str] = &["key", "label", "extends"];
 const SCHEDULED_TASK_FIELDS: &[&str] = &["name", "command", "cron", "payload", "catch_up"];
 const NAV_FIELDS: &[&str] = &["id", "label", "icon", "component", "chrome", "actions"];
+const PROTECTS_FIELDS: &[&str] = &[
+    "settings_query",
+    "enabled_setting",
+    "route_setting",
+    "guard_query",
+    "expect",
+    "component",
+    "resume_on",
+];
 const WIDGET_FIELDS: &[&str] = &[
     "title",
     "icon",
@@ -1254,6 +1404,7 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
         "roles[]" => ROLE_FIELDS,
         "scheduled_tasks[]" => SCHEDULED_TASK_FIELDS,
         "navigation[]" => NAV_FIELDS,
+        "protects[]" => PROTECTS_FIELDS,
         "widgets.*" => WIDGET_FIELDS,
         "setup" => SETUP_FIELDS,
         "settings" => SETTINGS_FIELDS,
@@ -1341,7 +1492,12 @@ impl Manifest {
         let mut manifest: Manifest = serde_json::from_str(&text).map_err(to_err)?;
         let raw: serde_json::Value = serde_json::from_str(&text).map_err(to_err)?;
         manifest.require_core_version()?;
-        manifest.warnings = manifest.audit(&raw)?;
+        let mut warnings = manifest.audit(&raw)?;
+        // hub#709: and the same channel for a manifest this core understands PERFECTLY but that
+        // does not declare what it emits. It is not an unknown field — it is a hole in the event
+        // catalogue the whole hub is built out of. See `undeclared_emit_warnings`.
+        warnings.extend(manifest.undeclared_emit_warnings());
+        manifest.warnings = warnings;
         Ok(manifest)
     }
 
@@ -1427,6 +1583,7 @@ impl Manifest {
             ("roles", "roles[]"),
             ("scheduled_tasks", "scheduled_tasks[]"),
             ("navigation", "navigation[]"),
+            ("protects", "protects[]"),
         ] {
             if let Some(items) = root.get(block).and_then(|v| v.as_array()) {
                 for (i, item) in items.iter().enumerate() {
@@ -1486,6 +1643,73 @@ impl Manifest {
         Ok(())
     }
 
+    /// The PRODUCER side of the event contract (hub#709): every event a command declares in
+    /// `emit` has to be listed in `events.emits`.
+    ///
+    /// # Why it exists
+    ///
+    /// `installer::validate_event_listeners` (hub#659) already forces the CONSUMER to declare
+    /// well. Nothing forced the producer, and the result was not a rough edge: `sale.completed` —
+    /// the hub's central event, emitted on every sale and listened to by `inventory`, `customers`,
+    /// `cash_register`, `invoice` and `tables` — was declared in NO place the runtime could read.
+    /// The catalogue of "things that can happen in my business" that the flow editor offers the
+    /// owner is the aggregation of what every installed module declares in its own manifest (it is
+    /// not a central registry — that would drift from the code on day one), so a module that keeps
+    /// quiet does not appear in it at all.
+    ///
+    /// # Why a WARNING and not a refusal
+    ///
+    /// ADR-0286 (hub#521) settled the tier by the RADIUS OF THE DAMAGE: what changes what RUNS or
+    /// who may run it is refused; what costs a screen, a button or a checklist item installs and
+    /// is REPORTED. An undeclared emit is squarely the second: the event still leaves (a
+    /// declarative `emit` goes into the outbox without passing through
+    /// [`crate::commands::validate_handler_event`], which only judges what a HANDLER returns), the
+    /// listeners still receive it, and nothing about permissions changes. What is lost is a line
+    /// in a catalogue.
+    ///
+    /// And the enforcement would cost far more than the mistake: `Manifest::load` is also the door
+    /// the boot scan re-registers every INSTALLED module through, so refusing here would make a
+    /// module that has been running for months VANISH from a till over a missing line — with no
+    /// way to update it out of trouble (ADR-0269). Better a warning that travels in
+    /// `/api/modules` than a POS that stops.
+    ///
+    /// The warning is per EVENT, not per emit: two commands emitting the same undeclared name is
+    /// one hole in the catalogue. Sorted by event name because `commands` is a `HashMap` and a
+    /// warning that reshuffles on every boot is one nobody can diff.
+    fn undeclared_emit_warnings(&self) -> Vec<ManifestWarning> {
+        let declared: HashSet<&str> = self.events.emits.iter().map(String::as_str).collect();
+        let mut by_event: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+        for (name, command) in &self.commands {
+            for event in &command.emit {
+                if declared.contains(event.as_str()) {
+                    continue;
+                }
+                by_event
+                    .entry(event.as_str())
+                    .or_default()
+                    .insert(name.as_str());
+            }
+        }
+        by_event
+            .into_iter()
+            .map(|(event, commands)| {
+                let commands = commands
+                    .into_iter()
+                    .map(|c| format!("`{c}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                ManifestWarning {
+                    path: "events.emits".to_string(),
+                    detail: format!(
+                        "`{event}` is emitted by {commands} and is not declared in \
+                         `events.emits`: the hub's event catalogue is the aggregation of what \
+                         each installed module declares, so nothing can be built to react to it"
+                    ),
+                }
+            })
+            .collect()
+    }
+
     /// Carga las traducciones del módulo desde `<dir>/locales/*.json` → `lang → ModuleLocale`
     /// (ADR-0055). Best-effort: si no hay carpeta o un fichero está roto, se omite (un locale
     /// inválido NUNCA rompe la instalación; siempre queda el fallback al manifest).
@@ -1513,14 +1737,31 @@ impl Manifest {
 }
 
 /// Catálogo de traducciones de un módulo para UN idioma (`locales/<lang>.json`, ADR-0055). El
-/// runtime solo resuelve `name` y `navigation[].label`; el bloque `ui` lo consume el Web Component
-/// (lo hornea el toolkit en el `dist`), por eso aquí se ignora.
+/// runtime resuelve `name`, `navigation[].label` y `setup.{title,description}`; el bloque `ui` lo
+/// consume el Web Component (lo hornea el toolkit en el `dist`), por eso aquí se ignora.
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct ModuleLocale {
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub navigation: HashMap<String, NavLocale>,
+    /// Checklist item copy (ADR-0055, hub#762): the translation of the module's `setup.title` /
+    /// `setup.description`. The manifest values stay as the English-canonical fallback
+    /// (`locale → en → manifest`).
+    #[serde(default)]
+    pub setup: SetupLocale,
+}
+
+/// Translation of a module's `setup` block (`locales/<lang>.json`, ADR-0055, hub#762).
+///
+/// Mirrors [`SetupDef::title`] / [`SetupDef::description`]: both are optional, so a module that
+/// ships only the translated title still resolves it and falls back to the manifest for the rest.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct SetupLocale {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 /// Traducción de una entrada de navegación (`navigation.<id>` en el locale del módulo).
@@ -1995,5 +2236,110 @@ mod tests {
             "an old module on a new hub keeps installing: that is the tolerance that makes \
              upgrading a hub possible"
         );
+    }
+
+    // ── The producer side of the event contract (hub#709) ────────────────────────────────────
+
+    /// 🔴 The hole this closes. `installer::validate_event_listeners` (hub#659) already forces the
+    /// CONSUMER to declare well; nothing forced the PRODUCER, so `sale.completed` — the hub's
+    /// central event — was declared in no place the runtime could read, and the catalogue the
+    /// flow editor builds out of the installed manifests came out empty.
+    #[test]
+    fn an_emit_missing_from_events_emits_is_reported() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                "commands":{"sales.void":{"permission":"sales.void","sql":[],
+                            "emit":["sale.voided"]}}}"#,
+        )
+        .unwrap();
+
+        let warnings = manifest.undeclared_emit_warnings();
+
+        assert_eq!(warnings.len(), 1, "one warning per undeclared event");
+        assert_eq!(warnings[0].path, "events.emits");
+        assert!(
+            warnings[0].detail.contains("sale.voided") && warnings[0].detail.contains("sales.void"),
+            "the warning has to name the event AND the command that emits it: {}",
+            warnings[0].detail
+        );
+    }
+
+    /// The rule is satisfiable and it does not nag a manifest that already declares what it emits
+    /// — otherwise the 24 published modules would warn forever and the channel would be noise.
+    #[test]
+    fn an_emit_listed_in_events_emits_says_nothing() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                "commands":{"sales.void":{"permission":"sales.void","sql":[],
+                            "emit":["sale.voided"]}},
+                "events":{"emits":["sale.voided","sale.completed"]}}"#,
+        )
+        .unwrap();
+
+        assert!(
+            manifest.undeclared_emit_warnings().is_empty(),
+            "a declared emit is exactly what this rule asks for"
+        );
+        // And declaring MORE than the commands emit is not an error: `events.emits` is also where
+        // the handler's own events live (`sale.completed` comes out of the WASM, not a command).
+    }
+
+    /// Two commands emitting the same undeclared name is ONE hole in the catalogue, not two — and
+    /// the order has to be stable, because `commands` is a `HashMap` and a warning that reshuffles
+    /// on every boot is unreadable.
+    #[test]
+    fn the_same_undeclared_event_is_reported_once_with_every_command_that_emits_it() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"cash_register","name":"Cash","version":"1.0.0",
+                "commands":{
+                  "cash_register.movement.add":{"permission":"p","sql":[],
+                        "emit":["cash_register.movement_added"]},
+                  "cash_register.record_sale":{"permission":"p","sql":[],
+                        "emit":["cash_register.movement_added"]},
+                  "cash_register.session.open":{"permission":"p","sql":[],
+                        "emit":["cash_register.session_opened"]}}}"#,
+        )
+        .unwrap();
+
+        let warnings = manifest.undeclared_emit_warnings();
+
+        assert_eq!(warnings.len(), 2, "two distinct events, not three emits");
+        assert!(
+            warnings[0].detail.contains("cash_register.movement_added"),
+            "sorted by event name so two boots read the same: {warnings:?}"
+        );
+        assert!(
+            warnings[0].detail.contains("cash_register.movement.add")
+                && warnings[0].detail.contains("cash_register.record_sale"),
+            "both commands that emit it get named: {}",
+            warnings[0].detail
+        );
+    }
+
+    /// Wired into the door every module goes through — install AND the boot re-registration — so
+    /// the warning rides on `Manifest::warnings` into `/api/modules` like the hub#521 ones.
+    #[test]
+    fn load_carries_the_undeclared_emit_warning() {
+        let dir = std::env::temp_dir().join(format!("erplora-emits-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("module.json"),
+            r#"{"id":"sales","name":"Sales","version":"1.0.0",
+                "commands":{"sales.void":{"permission":"sales.void","sql":[],
+                            "emit":["sale.voided"]}}}"#,
+        )
+        .unwrap();
+
+        let manifest = Manifest::load(&dir).expect("an under-declared producer still INSTALLS");
+
+        assert!(
+            manifest
+                .warnings
+                .iter()
+                .any(|w| w.path == "events.emits" && w.detail.contains("sale.voided")),
+            "the warning travels with the manifest: {:?}",
+            manifest.warnings
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

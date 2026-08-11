@@ -52,6 +52,39 @@ export const isAdmin = computed(() => {
   return role === 'owner' || role === 'admin';
 });
 
+/**
+ * El comodín que el shell inyecta a las sesiones owner/admin (`lib/runtime.ts`).
+ *
+ * Una sola definición del símbolo, para que «¿esta sesión puede X?» se responda en un solo sitio
+ * y no en N copias que ninguna sabe de las otras (hub#506). El runtime del backend concede `*`
+ * a los mismos roles que `is_admin_role` acepta; el frontend solo lo refleja para pintar UI.
+ */
+export const ALL_PERMISSIONS = '*';
+
+/**
+ * La regla del comodín, desacoplada de la sesión reactiva.
+ *
+ * Existe por separado para que las funciones puras (p. ej. `mayAdminister`, usada en tests con
+ * permisos concretos) compartan exactamente la misma regla que las que leen la sesión global.
+ * Antes eran copias independientes en `management-link.ts`, `app-update.ts`, `blueprint-hero.ts`
+ * y `runtime.ts` — ninguna sabía de las otras.
+ */
+export function permissionsInclude(
+  granted: readonly string[] | undefined,
+  permission: string,
+): boolean {
+  return !!granted?.some((p) => p === ALL_PERMISSIONS || p === permission);
+}
+
+/**
+ * ¿La sesión actual tiene `permission`, contando el comodín?
+ *
+ * Es un FILTRO de UI, no un gate: el runtime revalida el permiso real en cada endpoint.
+ */
+export function hasPermission(permission: string): boolean {
+  return permissionsInclude(_user.value?.permissions, permission);
+}
+
 export function setUser(u: SessionUser | null): void {
   _user.value = u;
   try {
@@ -89,18 +122,40 @@ export function setHubSession(token: string | null): void {
   }
 }
 
+/**
+ * Apaga un subsistema al cerrar sesión, **sin esperarlo y sin dejar el rechazo suelto**.
+ *
+ * Cerrar sesión no puede quedarse colgado de que cargue un chunk, así que estos `import()` van
+ * sueltos a propósito. Lo que no puede quedar suelto es su RECHAZO: un chunk que no llega (red
+ * caída a mitad de un deploy; en los tests, el entorno desmontado antes de que resuelva) dejaba una
+ * promesa rechazada sin dueño. No rompía nada visible —ningún test fallaba— pero `vitest run`
+ * terminaba con código 1 por un `EnvironmentTeardownError` que no era de nadie.
+ *
+ * Se traga con comentario porque aquí NO hay remedio: si el módulo no carga, tampoco hay a quién
+ * decírselo, y cada apagado es idempotente y protegido por su propia guarda de sesión (el sondeo de
+ * dead-letters, por ejemplo, ya no hace nada sin `isAuthed`).
+ */
+function shutDown<T>(load: Promise<T>, apply: (m: T) => void): void {
+  void load.then(apply).catch(() => {
+    /* noop: ver la doc de arriba */
+  });
+}
+
 export function logout(): void {
   // Revoca la sesión server-side del runtime ANTES de borrar el token local (best-effort).
   const token = getHubSession();
-  if (token) void import('./cloud').then((m) => m.runtimeLogout(token));
+  if (token) shutDown(import('./cloud'), (m) => m.runtimeLogout(token));
   setUser(null);
   setHubSession(null);
-  void import('./cloud').then((m) => m.clearTokens());
-  void import('./user-profile').then((m) => m.resetUserProfile());
-  void import('./theme').then((m) => m.resetUserThemePreferences());
-  void import('../i18n').then((m) => m.resetUserLocale());
+  shutDown(import('./cloud'), (m) => m.clearTokens());
+  shutDown(import('./user-profile'), (m) => m.resetUserProfile());
+  shutDown(import('./theme'), (m) => m.resetUserThemePreferences());
+  shutDown(import('../i18n'), (m) => m.resetUserLocale());
   // Olvida el entitlement resuelto: el próximo login lo recalcula para el hub activo.
-  void import('./entitlement').then((m) => m.resetEntitlement());
+  shutDown(import('./entitlement'), (m) => m.resetEntitlement());
   // El historial del AED muere con la sesión (ADR-0149): el Cloud ya no guarda copia.
-  void import('./assistant-history').then((m) => m.clearAssistantHistory());
+  shutDown(import('./assistant-history'), (m) => m.clearAssistantHistory());
+  // La campana de dead-letters deja de sondear y se limpia (hub#660): sin sesión no hay cola que
+  // mirar, y el badge no debe sobrevivir al logout.
+  shutDown(import('./dead-letter'), (m) => m.stopDeadLetterWatch());
 }

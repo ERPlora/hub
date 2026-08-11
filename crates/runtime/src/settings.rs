@@ -69,6 +69,18 @@ const KNOWN: &[Setting] = &[
         validate: validate_region,
         parse_stored: |s| if s.is_empty() { Value::Null } else { json!(s) },
     },
+    // LA ZONA HORARIA DEL NEGOCIO (hub#731). `null` = «dedúcela del país», que es el caso normal:
+    // el dueño ya contestó dónde está su negocio al darlo de alta, y volver a preguntárselo sería
+    // inventarse un ajuste que ya existe. La clave explícita solo hace falta donde el país NO
+    // puede contestar — un país con varios husos (US, BR…) — y es lo que hace auditable la
+    // deducción. Un nombre IANA (`Europe/Madrid`), nunca un offset: `+02:00` no sabe de DST, y el
+    // desfase que se mueve solo dos veces al año es la mitad del problema que esto arregla.
+    Setting {
+        key: "timezone",
+        default: || Value::Null,
+        validate: validate_timezone,
+        parse_stored: |s| if s.is_empty() { Value::Null } else { json!(s) },
+    },
     // Los decimales de la moneda. `null` = «resuélvelos del registro ISO-4217» (el caso normal);
     // un número = el hub los declara a mano, para una moneda que el registro no conoce.
     Setting {
@@ -223,6 +235,119 @@ fn validate_region(v: &Value) -> std::result::Result<String, String> {
         }
         _ => Err("debe ser un string ISO-3166-2 (p. ej. \"ES-CN\") o null".to_string()),
     }
+}
+
+/// `timezone`: nombre IANA (`Europe/Madrid`) o vacío/`null` = dedúcela del país (hub#731).
+///
+/// Se rechaza cualquier cosa que `chrono-tz` no conozca — incluidas las abreviaturas (`CEST`) y los
+/// offsets (`+02:00`), que son justo lo que no sirve: no llevan las reglas de cambio de hora.
+fn validate_timezone(v: &Value) -> std::result::Result<String, String> {
+    match v {
+        Value::Null => Ok(String::new()),
+        Value::String(s) if s.trim().is_empty() => Ok(String::new()),
+        Value::String(s) => {
+            let name = s.trim();
+            name.parse::<chrono_tz::Tz>()
+                .map(|_| name.to_string())
+                .map_err(|_| {
+                    format!(
+                        "zona horaria inválida `{name}`: se espera un nombre IANA \
+                         (p. ej. Europe/Madrid), no una abreviatura ni un offset"
+                    )
+                })
+        }
+        _ => Err("debe ser un string IANA (p. ej. \"Europe/Madrid\") o null".to_string()),
+    }
+}
+
+/// La zona que le corresponde a un país (y, cuando hace falta, a su región). Solo se deduce donde
+/// la respuesta es **única**: un país con varios husos se queda en UTC hasta que el hub declare el
+/// suyo, porque adivinar «la ciudad más grande» sería exactamente el mismo silencio que hub#731
+/// denuncia — hacer algo razonable sin decirlo y a la hora que no era.
+pub fn zone_for_country(country_code: &str, region_code: &str) -> chrono_tz::Tz {
+    use chrono_tz::{Atlantic, Europe, Tz};
+    // La región rompe el empate donde el país no puede: Canarias no es Madrid.
+    match region_code.trim().to_ascii_uppercase().as_str() {
+        "ES-CN" => return Atlantic::Canary,
+        "PT-20" => return Atlantic::Azores,
+        "PT-30" => return Atlantic::Madeira,
+        _ => {}
+    }
+    match country_code.trim().to_ascii_uppercase().as_str() {
+        "ES" => Europe::Madrid,
+        "PT" => Europe::Lisbon,
+        "AD" => Europe::Andorra,
+        "AT" => Europe::Vienna,
+        "BE" => Europe::Brussels,
+        "BG" => Europe::Sofia,
+        "CH" => Europe::Zurich,
+        "CZ" => Europe::Prague,
+        "DE" => Europe::Berlin,
+        "DK" => Europe::Copenhagen,
+        "EE" => Europe::Tallinn,
+        "FI" => Europe::Helsinki,
+        "FR" => Europe::Paris,
+        "GB" => Europe::London,
+        "GR" => Europe::Athens,
+        "HR" => Europe::Zagreb,
+        "HU" => Europe::Budapest,
+        "IE" => Europe::Dublin,
+        "IS" => Atlantic::Reykjavik,
+        "IT" => Europe::Rome,
+        "LT" => Europe::Vilnius,
+        "LU" => Europe::Luxembourg,
+        "LV" => Europe::Riga,
+        "MT" => Europe::Malta,
+        "NL" => Europe::Amsterdam,
+        "NO" => Europe::Oslo,
+        "PL" => Europe::Warsaw,
+        "RO" => Europe::Bucharest,
+        "SE" => Europe::Stockholm,
+        "SI" => Europe::Ljubljana,
+        "SK" => Europe::Bratislava,
+        // Un país con varios husos (US, BR, CA, AU, RU…) o uno que no está en la tabla: el hub lo
+        // declara con `timezone` y hasta entonces el reloj es UTC, que al menos no miente.
+        _ => Tz::UTC,
+    }
+}
+
+/// La zona horaria del negocio: la clave `timezone` si está declarada y vale, si no la deducida de
+/// `country_code`/`region_code` (hub#731). Tolerante como [`country_code_of`]: una fila corrupta o
+/// una tabla que aún no existe degradan a la deducción en vez de reventar a las 3 de la mañana.
+/// Las tres claves en UNA consulta a propósito: el barrido de flujos pregunta esto **en cada tick**
+/// (una vez por segundo), y tres viajes a la base de datos por segundo para leer una zona que casi
+/// nunca cambia serían un peaje permanente por una funcionalidad de calendario.
+pub async fn timezone_of(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<chrono_tz::Tz> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    // Tolerante como `country_code_of`: si la tabla aún no existe (hub vacío antes de
+    // `ensure_system_tables`), se deduce del país por defecto en vez de reventar.
+    let rows = match db
+        .query(
+            "SELECT key, value FROM hub_settings WHERE hub_id = :hub_id \
+               AND key IN ('timezone', 'country_code', 'region_code')",
+            &p,
+        )
+        .await
+    {
+        Ok(res) => res.rows,
+        Err(_) => Vec::new(),
+    };
+    let read = |key: &str| -> String {
+        rows.iter()
+            .find(|r| r["key"].as_str() == Some(key))
+            .and_then(|r| r["value"].as_str())
+            .unwrap_or_default()
+            .to_string()
+    };
+
+    // Lo declarado gana; una fila corrupta degrada a la deducción, no a UTC a secas.
+    if let Ok(tz) = read("timezone").parse::<chrono_tz::Tz>() {
+        return Ok(tz);
+    }
+    let country = read("country_code");
+    let country = if validate_country(&json!(country)).is_ok() { country } else { "ES".to_string() };
+    Ok(zone_for_country(&country, &read("region_code")))
 }
 
 /// `currency_decimals`: cuántos decimales tiene la moneda del hub.
@@ -419,6 +544,86 @@ fn enforce_demo_fiscal_identity_lock(
         });
     }
     Ok(())
+}
+
+/// The tax id a DEMO hub boots with (hub#684).
+///
+/// All-zero on purpose. It has the shape of a Spanish CIF —letter + 7 digits + a control digit that
+/// checks out for `0000000`— so every screen, document and validator downstream treats it as the
+/// real thing, and **no company has it**: sequential numbering never issues the zero. A random
+/// plausible-looking tax id would eventually be somebody's.
+pub const DEMO_BUSINESS_TAX_ID: &str = "B00000000";
+/// The legal name a DEMO hub boots with. It says *demo* out loud: it is printed on every ticket the
+/// visitor makes, and that ticket has to be readable as an example, not as a real business's.
+pub const DEMO_BUSINESS_LEGAL_NAME: &str = "ERPlora Demo SL";
+/// The address a DEMO hub boots with. Not part of the fiscal gate (`business_address` is not in
+/// [`FISCAL_IDENTITY_SETTINGS`]) and not locked either — it is here so the demo's ticket is a
+/// COMPLETE document instead of one with a blank where the address goes.
+pub const DEMO_BUSINESS_ADDRESS: &str = "Calle de la Demo 1, 28013 Madrid";
+
+/// `updated_by` of the rows this writes: the core did it, no user did.
+const DEMO_IDENTITY_AUTHOR: &str = "system:demo";
+
+/// **A DEMO hub boots with its fiscal identity already filled in** (hub#684).
+///
+/// The onboarding checklist and the fiscal gate read the SAME two settings
+/// (`business_legal_name` ∧ `business_tax_id`), and in a demo both were empty and both had to stay
+/// empty: [`enforce_demo_fiscal_identity_lock`] refuses the only door that writes them. The visitor
+/// was therefore shown a ⛔ *"you need this in order to invoice"* whose button led to a `409`, and
+/// —the expensive half— **their sale went through and the invoice did not**:
+/// `invoice.create_from_sale` stamps `:business_tax_id`, so `commands::enforce_fiscal_precondition`
+/// rejected it and the document died in the outbox. Money taken, nothing issued.
+///
+/// The fix is to put the data there, and it has to be *that* rather than any of the shortcuts:
+///
+/// * **Hiding the item** would make the checklist lie — the gate still refuses, so the first sale
+///   would fail with `fiscal_precondition_failed` and no screen would have warned anybody. The
+///   invariant of [`crate::setup_status`] («the checklist and the gate must answer identically»)
+///   exists for exactly this.
+/// * **Exempting the demo from the fiscal precondition** would open a third hole in the one gate
+///   that stops a hub selling without registering, to save writing two rows.
+///
+/// With the rows written, nothing else has to know: the item is done because it IS done, the gate
+/// passes because it has what it asks for, and `setup_status` never learns what a demo is.
+///
+/// ⚠️ **This does not open any of the three closures of ADR-0197 §4.** It is the core writing the
+/// demo's own placeholder at boot, not a door: the visitor still cannot CHANGE the identity
+/// (`demo_fiscal_identity_locked`), still cannot upload an `own` certificate
+/// (`demo_business_certificate_locked`) and is still pinned to `testing`
+/// (`demo_fiscal_environment_locked`) — which is what keeps a demo sale away from the real AEAT.
+///
+/// **Never overwrites.** Only an EMPTY key is filled, so a demo that got an identity another way (a
+/// blueprint of its own, a restore) keeps it — a default must not outrank a decision. Returns
+/// whether it wrote anything, so the boot can say so once instead of every time.
+pub async fn ensure_demo_fiscal_identity(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    let defaults = [
+        ("business_tax_id", DEMO_BUSINESS_TAX_ID),
+        ("business_legal_name", DEMO_BUSINESS_LEGAL_NAME),
+        ("business_address", DEMO_BUSINESS_ADDRESS),
+    ];
+    let now = now_rfc3339();
+    let mut wrote = false;
+    for (key, value) in defaults {
+        if !stored_value(db, hub_id, key).await?.trim().is_empty() {
+            continue;
+        }
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("key".into(), json!(key));
+        p.insert("value".into(), json!(value));
+        p.insert("now".into(), json!(now));
+        p.insert("updated_by".into(), json!(DEMO_IDENTITY_AUTHOR));
+        db.execute(
+            "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+              VALUES (:hub_id, :key, :value, :now, :updated_by) \
+              ON CONFLICT (hub_id, key) DO UPDATE SET \
+                value = :value, updated_at = :now, updated_by = :updated_by",
+            &p,
+        )
+        .await?;
+        wrote = true;
+    }
+    Ok(wrote)
 }
 
 /// El valor **persistido** de una clave (ya normalizado por su `validate`), o `""` si no hay fila.
@@ -1281,6 +1486,152 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result["pin_inactivity_minutes"], json!(10));
+    }
+
+    // ── THE BUSINESS CLOCK (hub#731) ──────────────────────────────────────────────────────────
+    //
+    // «Cierra la caja a las 21:00» has to be 21:00 in the shop. The zone is NOT a new question
+    // asked to the owner: it is derived from the `country_code` they already answered when they
+    // set up the hub, and the explicit setting only exists for the countries a country cannot
+    // answer for (a country with several zones) — and it is what makes the derivation auditable.
+
+    #[test]
+    fn the_zone_comes_from_the_country_the_hub_already_declared() {
+        assert_eq!(zone_for_country("ES", ""), chrono_tz::Europe::Madrid);
+        assert_eq!(zone_for_country("PT", ""), chrono_tz::Europe::Lisbon);
+        assert_eq!(zone_for_country("FR", ""), chrono_tz::Europe::Paris);
+        // …and the region breaks the tie where the country cannot: Canarias is NOT Madrid, and a
+        // hub in Las Palmas closing the till at 21:00 would otherwise close it at 20:00.
+        assert_eq!(zone_for_country("ES", "ES-CN"), chrono_tz::Atlantic::Canary);
+        assert_eq!(zone_for_country("PT", "PT-20"), chrono_tz::Atlantic::Azores);
+        assert_eq!(zone_for_country("PT", "PT-30"), chrono_tz::Atlantic::Madeira);
+    }
+
+    #[test]
+    fn a_country_with_several_zones_stays_utc_until_the_hub_says_which_one() {
+        // Guessing "the biggest city" for the US or Brazil would be the same silent wrong answer
+        // this issue is about. UTC + an explicit setting is the honest one.
+        for country in ["US", "BR", "CA", "AU", "RU", "XX"] {
+            assert_eq!(zone_for_country(country, ""), chrono_tz::UTC, "{country}");
+        }
+    }
+
+    #[test]
+    fn a_timezone_is_a_real_iana_name_or_it_is_refused() {
+        assert_eq!(
+            validate_timezone(&json!("Europe/Madrid")),
+            Ok("Europe/Madrid".to_string())
+        );
+        assert_eq!(validate_timezone(&Value::Null), Ok(String::new()));
+        assert_eq!(validate_timezone(&json!("")), Ok(String::new()));
+        for bad in [json!("Europa/Madrid"), json!("CEST"), json!("+02:00"), json!(2)] {
+            assert!(validate_timezone(&bad).is_err(), "{bad}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_hub_zone_is_derived_unless_it_is_declared() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        // Nothing stored: the default country (`ES`) answers.
+        assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Europe::Madrid);
+
+        let mut updates = serde_json::Map::new();
+        updates.insert("country_code".into(), json!("PT"));
+        set_many(&db, "hub-1", &updates, "hub_user:1", false).await.unwrap();
+        assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Europe::Lisbon);
+
+        // An explicit zone WINS over the derivation — that is the point of having it.
+        let mut updates = serde_json::Map::new();
+        updates.insert("timezone".into(), json!("Atlantic/Azores"));
+        set_many(&db, "hub-1", &updates, "hub_user:1", false).await.unwrap();
+        assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Atlantic::Azores);
+
+        // …and a garbage row degrades to the derivation instead of exploding at 3 AM.
+        db.execute_batch(
+            "UPDATE hub_settings SET value = 'Marte/Olympus' \
+             WHERE hub_id = 'hub-1' AND key = 'timezone';",
+        )
+        .await
+        .unwrap();
+        assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Europe::Lisbon);
+    }
+
+    // ── The DEMO boots with its fiscal identity ALREADY filled in (hub#684) ───────────────
+    //
+    // The checklist and the fiscal gate read the SAME two settings, so the only way to clear the
+    // demo's ⛔ without making one of them lie is to put the data there for real.
+
+    /// 🔴 A demo hub is handed a fiscal identity at boot, so the gate of ADR-0203 has something to
+    /// read and the ⛔ item is genuinely done — not hidden, not faked.
+    #[tokio::test]
+    async fn a_demo_hub_boots_with_its_fiscal_identity_already_filled_in() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        let seeded = ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap();
+        assert!(seeded, "the demo had nothing: the boot fills it in");
+
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!(DEMO_BUSINESS_TAX_ID));
+        assert_eq!(all["business_legal_name"], json!(DEMO_BUSINESS_LEGAL_NAME));
+        assert_ne!(all["business_address"], json!(""), "a demo ticket carries an address too");
+    }
+
+    /// Idempotent, and it never overwrites: re-running the boot is a no-op, and whatever the hub
+    /// already had is left exactly as it was.
+    #[tokio::test]
+    async fn seeding_the_demo_identity_never_overwrites_what_is_already_there() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        assert!(ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap());
+        // A second boot writes nothing…
+        assert!(!ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap());
+
+        // …and neither does it clobber an identity that got there another way (a blueprint of the
+        // hub's own, a restore). Whoever wrote it meant it more than a default does.
+        db.execute_batch(
+            "UPDATE hub_settings SET value = 'B99999999' \
+             WHERE hub_id = 'hub-1' AND key = 'business_tax_id';",
+        )
+        .await
+        .unwrap();
+        assert!(!ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap());
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!("B99999999"));
+    }
+
+    /// 🔴 The other direction, and the expensive one: a REAL hub is never handed an identity. A
+    /// paying business that found a tax id it never typed would invoice under it — and ADR-0273
+    /// freezes it at the first record, so the mistake would be permanent.
+    #[tokio::test]
+    async fn a_real_hub_is_never_handed_a_fiscal_identity() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        // The seeding function is demo-only by construction: the runtime gates it on `demo_hub`,
+        // and that gate is what this asserts — a real hub keeps its empty identity, which is the
+        // pending ⛔ its owner has to clear.
+        let rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-real");
+        rt.ensure_system_tables().await.unwrap();
+        assert!(!rt.is_demo_hub(), "the default of a runtime is a REAL hub");
+        assert!(!rt.ensure_demo_fiscal_identity().await.unwrap());
+        let all = get_all(rt.db(), "hub-real").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!(""));
+        assert_eq!(all["business_legal_name"], json!(""));
+        let _ = &db;
+    }
+
+    /// …and the demo half of the same door: the runtime DOES seed it when the marker is sealed.
+    #[tokio::test]
+    async fn the_runtime_seeds_the_identity_only_when_the_demo_marker_is_sealed() {
+        let mut rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-demo");
+        rt.ensure_system_tables().await.unwrap();
+        rt.set_demo_hub(true);
+        assert!(rt.ensure_demo_fiscal_identity().await.unwrap());
+        let all = get_all(rt.db(), "hub-demo").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!(DEMO_BUSINESS_TAX_ID));
     }
 
     #[tokio::test]

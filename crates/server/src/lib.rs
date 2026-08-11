@@ -25,7 +25,7 @@
 
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -38,7 +38,7 @@ pub mod activity;
 pub mod api_keys;
 pub mod assistant;
 pub mod auth;
-pub mod bootstrap;
+pub mod boot_announce;
 pub mod daily_usage;
 /// `shared` (counter till) vs `personal` (somebody's own device) — plan step 2b, hub#357.
 pub mod device_mode;
@@ -49,6 +49,10 @@ pub mod elevation;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
+/// **Server-side agent runner** (ADR-0283 K5, hub#665): the tool loop of an `ai` step, in Rust and
+/// outside the runtime's global lock. It lives here and not in the runtime because it needs
+/// `cloud-client` — the runtime has no network by design.
+pub mod agent_runner;
 pub mod event_stream;
 pub mod export_import;
 /// ERPlora's DELEGATED fiscal certificate, fetched from the control plane (ADR-0202 §2 — hub#317).
@@ -113,9 +117,100 @@ pub struct ServeConfig {
     /// `HUB_WEB_DIR`. `None` ⇒ solo API (dev con Vite, que proxya, o binario sin front).
     pub web_dir: Option<String>,
     /// Valor del header `Content-Security-Policy` a emitir (ADR-0050). Cuando el doc lo sirve Axum
-    /// (mismo origen), el runtime lo emite. `None` ⇒ no se añade header (estado previo). El
-    /// contenido es columna de seguridad/humano.
-    pub csp: Option<String>,
+    /// —que es SIEMPRE, en cloud y en la app instalada, porque la ventana de Tauri navega a este
+    /// mismo servidor— la CSP de `tauri.conf` no alcanza al documento y esta es la única que hay.
+    ///
+    /// `String`, no `Option<String>`: «hub sin política» dejó de ser un estado representable
+    /// (hub#708). Lo era, y por eso la flota entera sirvió la app a pelo durante semanas. Se
+    /// rellena con [`resolve_csp`], que solo deja pasar un valor que el navegador pueda recibir.
+    pub csp: String,
+}
+
+/// La parte de la política que NO depende del despliegue (hub#708). Es el gemelo de la CSP del
+/// shell de Tauri (`apps/tauri/src-tauri/tauri.conf.json`), y las diferencias están enumeradas una
+/// a una en `crates/server/tests/cloud_csp.rs` — un test falla si aparece una que nadie explicó.
+///
+/// Cada ensanche respecto del shell tiene un motivo concreto:
+/// - `img-src blob:` / `media-src blob:` — el visor de `/files` y el avatar pintan bytes que YA
+///   trajo el runtime, vía `URL.createObjectURL`; el navegador nunca toca el almacenamiento
+///   (ADR-0047). Sin `media-src` explícito la etiqueta `<video>` cae en `default-src` y no pinta.
+/// - `script-src 'self'` y `worker-src 'self'` explícitos aunque `default-src` ya los cubra: son
+///   las dos directivas que deciden si un módulo puede ejecutar código ajeno, y así ensanchar
+///   `default-src` mañana no las ensancha de rebote.
+///
+/// Y lo que NO lleva, también a propósito: **`form-action`**. No hereda de `default-src`, así que
+/// su ausencia es una decisión: fijarla rompe el login con Google, cuya cadena de redirección sale
+/// del hub, pasa por el SaaS y vuelve — sin error que el usuario pueda accionar.
+const CSP_BASE: &str = "default-src 'self'; \
+                        script-src 'self'; \
+                        worker-src 'self'; \
+                        style-src 'self' 'unsafe-inline'; \
+                        img-src 'self' data: blob:; \
+                        media-src 'self' blob:; \
+                        frame-src 'none'; \
+                        object-src 'none'; \
+                        base-uri 'self'";
+
+/// El `connect-src` mínimo: el propio origen **y el canal IPC de Tauri**.
+///
+/// Lo segundo no es cosmético y es fácil de pasar por alto: la ventana de la app instalada NO carga
+/// un `dist` empaquetado, navega a `https://<hub>.erplora.com` (ADR-0159, `remote.urls` de
+/// `capabilities/default.json`), así que el documento que gobierna esta política ES el de la app —
+/// y su `invoke` viaja por `fetch("ipc://localhost/<cmd>")` (`tauri/src/ipc/protocol.rs`), que en
+/// Windows y Android reescribe a `http://ipc.localhost/<cmd>`. Sin estas dos fuentes, `connect-src`
+/// tumba TODO el hardware de la app instalada —imprimir, cajón, descubrimiento— en silencio.
+///
+/// En un navegador a secas son inertes: `ipc:` no es un esquema navegable y `ipc.localhost` no
+/// resuelve. Cuestan cero fuera de la app.
+const CSP_CONNECT_BASE: &str = "connect-src 'self' ipc: http://ipc.localhost";
+
+/// La política que sirve este hub. Lo único que no puede ser constante es el **origen del Cloud**:
+/// el front habla directo con él para el login, el refresh de JWT y las facturas
+/// (`apps/web/src/lib/cloud.ts`), así que con `connect-src 'self'` a secas el hub se queda sin
+/// login cloud. Sale de `HUB_CLOUD_API_URL` —lo que ESTE hub tiene configurado— y no de una
+/// constante `https://erplora.com`, que es justo el pendiente (c) de ADR-0050: un self-host o un
+/// staging con otro `VITE_CLOUD_API_URL` quedaba bloqueado por su propia CSP.
+///
+/// Sin Cloud configurado (dev, binario suelto) la política se queda en `'self'`: nada que permitir.
+pub fn default_csp(cloud_base_url: &str) -> String {
+    match cloud_origin(cloud_base_url) {
+        Some(origin) => format!("{CSP_BASE}; {CSP_CONNECT_BASE} {origin}"),
+        None => format!("{CSP_BASE}; {CSP_CONNECT_BASE}"),
+    }
+}
+
+/// `https://erplora.com/algo/` → `https://erplora.com`. Una fuente de CSP es un ORIGEN: con la
+/// ruta pegada el navegador la trata como path-matching y deja de casar con `/api/v1/...`.
+/// Devuelve `None` si el valor no es una URL absoluta con host (incluye el string vacío).
+fn cloud_origin(cloud_base_url: &str) -> Option<String> {
+    let raw = cloud_base_url.trim();
+    let (scheme, rest) = raw.split_once("://")?;
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return None;
+    }
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    // Un host con espacios, comillas o `;` rompería el header o inyectaría otra directiva.
+    if authority.is_empty()
+        || !authority
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '[' | ']'))
+    {
+        return None;
+    }
+    Some(format!("{}://{}", scheme.to_ascii_lowercase(), authority))
+}
+
+/// Resuelve la CSP que va a servir el hub a partir del valor crudo de `HUB_CSP` (hub#708).
+///
+/// `HUB_CSP` **sustituye** la política; no la quita. Vacío, en blanco o imposible de meter en un
+/// header (un salto de línea, un byte no-ASCII) cae a [`default_csp`] en vez de dejar el hub
+/// desnudo — que es exactamente cómo se sirvió la flota entera hasta ahora: el aprovisionador
+/// escribía `HUB_CSP_ENFORCE` y el runtime leía `HUB_CSP`, así que la rama "no hay valor" era la
+/// única que corría y no emitía nada.
+pub fn resolve_csp(raw: Option<String>, cloud_base_url: &str) -> String {
+    raw.map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty() && HeaderValue::from_str(value).is_ok())
+        .unwrap_or_else(|| default_csp(cloud_base_url))
 }
 
 impl ServeConfig {
@@ -123,6 +218,8 @@ impl ServeConfig {
     /// [`HubConfig::from_env`].
     pub fn from_env() -> Self {
         let hub = HubConfig::from_env();
+        // Antes del literal: `hub` se mueve dentro y la política necesita su `cloud_base_url`.
+        let csp = resolve_csp(std::env::var("HUB_CSP").ok(), &hub.cloud_base_url);
         Self {
             database_url: std::env::var("HUB_DATABASE_URL").unwrap_or_default(),
             bind: std::env::var("HUB_BIND").unwrap_or_else(|_| "127.0.0.1:8787".into()),
@@ -137,8 +234,8 @@ impl ServeConfig {
             hub_id_cell: None,
             // ECS/binario: el `dist/` se sirve de disco por `HUB_WEB_DIR` (paridad Hub Cloud).
             web_dir: std::env::var("HUB_WEB_DIR").ok().filter(|s| !s.is_empty()),
-            // CSP opcional vía env (None por defecto = comportamiento previo). En Tauri la fija el shell.
-            csp: std::env::var("HUB_CSP").ok().filter(|s| !s.is_empty()),
+            // Nunca `None`: `HUB_CSP` solo puede SUSTITUIR la política (ver `resolve_csp`).
+            csp,
         }
     }
 }
@@ -365,6 +462,45 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
+    // Marca de actividad de usuario (hub#670): se ADOPTA la que dejó el proceso anterior, y a
+    // partir de aquí se escribe sola cada `HUB_ACTIVITY_PERSIST_SECS`.
+    //
+    // Va justo después de las migraciones (su tabla nace en la v39) y ANTES de que arranquen el
+    // latido y el router: el latido manda `pending()` en su PRIMER tick, y sin la marca adoptada
+    // ese tick diría «aquí no ha entrado nadie» de un hub que sí se usa. Perderla no es cosmético
+    // — es el reloj con el que el Cloud apaga (60d) y BORRA (120d) un hub free, y borrar no se
+    // deshace. Ambas llamadas son best-effort: un hub cuya marca no se pueda leer o escribir tiene
+    // que arrancar igual, con el reloj empezado de nuevo, nunca quedarse sin arrancar.
+    activity::restore_from_db(&state).await;
+    activity::spawn_persistence(&state);
+
+    // **¿Nos han cambiado el binario?** (hub#564, ADR-0269 §3.5). Nadie se lo dice al hub: la imagen
+    // se re-resuelve FUERA del contenedor, la task se sustituye, y el binario nuevo arranca
+    // reportando otro número. Compararlo con el último que anotamos es todo el mecanismo — y es
+    // también lo que hace VISIBLE un rollback automático, porque Swarm revirtiendo un despliegue
+    // malo, visto desde aquí dentro, es exactamente una versión que baja.
+    //
+    // Va justo detrás de `ensure_system_tables` porque necesita su tabla (v40) y nada más: cuanto
+    // más tarde se anote, más ventana hay de que el arranque se caiga antes y el salto se pierda.
+    // Best-effort: no poder escribir el historial nunca impide abrir la tienda.
+    {
+        let rt = state.runtime.lock().await;
+        match erplora_runtime::update_history::note_core_version(
+            rt.db(),
+            &state.hub_id(),
+            version::HUB_VERSION,
+        )
+        .await
+        {
+            Ok(Some(entry)) => eprintln!(
+                "✓ versión del core: {} → {} ({})",
+                entry.from_version, entry.to_version, entry.outcome
+            ),
+            Ok(None) => {}
+            Err(e) => eprintln!("✗ no se pudo anotar la versión del core (hub#564): {e}"),
+        }
+    }
+
     // **Owner sembrado del env** (ADR-0157, corrección de Ioan): el owner es el CREADOR del hub y el
     // despliegue lo trae ya inyectado por el provisioning del SaaS como `HUB_OWNER_EMAIL`. Se siembra
     // un `hub_user` role=admin (cloud_user_id NULL, sin PIN) tras las tablas de sistema —`admin` es
@@ -449,10 +585,23 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                         let target = resolve_module_target(&state, &machine, &id, &version, pins.get(&id).map(String::as_str)).await;
 
                         let mut rt = state.runtime.lock().await;
+                        // El nombre que lee el dueño, capturado ANTES de tocar nada (hub#564): si el
+                        // intento pierde el módulo, el registry ya no lo tiene y la entrada del
+                        // historial se quedaría con el id — que es justo lo que la regla 3 prohíbe.
+                        let module_name = rt
+                            .registry()
+                            .installed
+                            .iter()
+                            .find(|m| m.id == id)
+                            .map(|m| m.name.clone())
+                            .unwrap_or_else(|| id.clone());
                         // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
-                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
-                            Ok(_) if target.is_update() => eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version()),
-                            Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{}", target.version()),
+                        let attempt = match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
+                            Ok(_) if target.is_update() => {
+                                eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version());
+                                Some(erplora_runtime::module_update::Outcome::Updated { from: version.clone(), to: target.version().to_string() })
+                            }
+                            Ok(_) => { eprintln!("✓ módulo re-descargado: {id}@{}", target.version()); None }
                             Err(e) if target.is_update() => {
                                 // ⚠️ Una actualización que falla NO puede dejar al hub SIN el módulo:
                                 // un hub con la versión de ayer funciona, uno sin el módulo no. Se
@@ -468,8 +617,25 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                                 // SIN el módulo— tiene que llegar a alguien, no morir en un log del
                                 // contenedor. Best-effort: sin sink (hub sin enrolar) se descarta.
                                 report_failed_module_update(&id, &version, target.version(), &e.to_string(), fallback.is_ok());
+                                Some(match &fallback {
+                                    Ok(_) => erplora_runtime::module_update::Outcome::RolledBack { stayed_on: version.clone(), error: e.to_string() },
+                                    Err(fe) => erplora_runtime::module_update::Outcome::Lost { module: id.clone(), error: format!("{e}; la vuelta atrás tampoco: {fe}") },
+                                })
                             }
-                            Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
+                            Err(e) => { eprintln!("✗ re-descarga de {id}@{version}: {e}"); None }
+                        };
+
+                        // Y tampoco puede ser un silencio PARA EL DUEÑO (hub#564): el `error_sink`
+                        // de arriba nos avisa a NOSOTROS, pero quien se encuentra la caja distinta
+                        // por la mañana es quien abre la tienda. La misma decisión que usa el botón
+                        // —`from_module_outcome`— para que las dos puertas no cuenten lo mismo de
+                        // dos maneras. Best-effort: el historial nunca impide arrancar.
+                        if let Some(attempt) = attempt {
+                            if let Some(change) = erplora_runtime::update_history::from_module_outcome(&id, &module_name, target.version(), &attempt) {
+                                if let Err(e) = erplora_runtime::update_history::record(rt.db(), &state.hub_id(), change).await {
+                                    eprintln!("✗ no se pudo anotar el historial de {id} (hub#564): {e}");
+                                }
+                            }
                         }
                     }
                 }
@@ -477,6 +643,51 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     "⚠ {} módulo(s) instalados sin caché y hub sin enrolar (sin token de máquina): no se re-descargan",
                     missing.len()
                 ),
+            }
+
+            // 🛟 **Y si el marketplace no dio, la copia PROPIA del hub** (hub#571). Todo lo de
+            // arriba depende del SaaS: un reinicio con el Cloud caído, un DNS torcido o el router
+            // del cliente apagado dejaban al hub arrancando SIN un solo módulo — `/readyz` en DOWN,
+            // Swarm recreando el contenedor en bucle y el bar sin TPV. Este es el único camino que
+            // no pasa por la red: los bytes se guardaron en la base del propio hub al instalar y se
+            // vuelven a verificar aquí igual que una descarga (SHA256 + firma según la política).
+            //
+            // Va DESPUÉS y no antes a propósito: la vía del marketplace es también la de la
+            // actualización automática (hub#516/ADR-0269), y adelantarla convertiría cada arranque
+            // en «quédate donde estás». Primero se intenta llegar a lo que toca; esto es la red que
+            // impide caer por debajo de lo que ya se tenía.
+            let still_missing = state
+                .runtime
+                .lock()
+                .await
+                .installed_but_unregistered()
+                .await
+                .unwrap_or_default();
+            if !still_missing.is_empty() {
+                eprintln!(
+                    "marketplace inalcanzable para {} módulo(s): reponiendo de la copia local…",
+                    still_missing.len()
+                );
+                let cache_root = state.config.module_cache.clone();
+                let policy = state.config.signature_policy();
+                let orphans = {
+                    let mut rt = state.runtime.lock().await;
+                    install::restore_from_local_packages(
+                        &cache_root,
+                        &mut rt,
+                        &still_missing,
+                        &policy,
+                    )
+                    .await;
+                    rt.installed_but_unregistered().await.unwrap_or_default()
+                };
+                // Ni copia, ni marketplace, ni tarea vieja a la que volver: aquí la regla «nunca con
+                // menos» no se puede cumplir, porque no hay ninguna alternativa que la cumpla. Lo
+                // que NO puede pasar es que sea un silencio — un hub que arranca incompleto tiene
+                // que llegar a alguien, no morir en el log de un contenedor.
+                if !orphans.is_empty() {
+                    report_incomplete_boot(&orphans);
+                }
             }
         }
     }
@@ -510,6 +721,23 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     if let Some(seed_sql) = load_seed_sql()? {
         let n = state.runtime.lock().await.apply_seed(&seed_sql).await?;
         eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
+    }
+
+    // **La DEMO arranca con su identidad fiscal ya puesta** (hub#684). Va AQUÍ, después del seed
+    // (que escribe el `country_code`) y ANTES del perfil fiscal, que es quien deriva `READY` de
+    // «identidad ∧ certificado»: sembrarla después dejaría el perfil calculado sobre un hub sin
+    // identidad hasta el siguiente arranque.
+    //
+    // Es el CORE escribiendo el marcador de posición de la demo, no una puerta: los tres cierres de
+    // ADR-0197 §4 siguen intactos — el visitante no puede CAMBIAR el NIF, ni subir un certificado
+    // `own`, ni salir de `testing`. Lo que se arregla es que la checklist le pedía justo el dato
+    // que el producto le prohibía escribir, y que su venta se cobraba sin llegar a emitir factura
+    // (`invoice.create_from_sale` estampa `:business_tax_id` y el gate de ADR-0203 la rechazaba).
+    match state.runtime.lock().await.ensure_demo_fiscal_identity().await {
+        Ok(true) => eprintln!("demo: identidad fiscal de la demo sembrada (hub#684)"),
+        Ok(false) => {}
+        // No aborta el arranque: un hub que no abre es peor que una demo con la checklist a medias.
+        Err(e) => eprintln!("✗ demo: no se pudo sembrar la identidad fiscal de la demo: {e}"),
     }
 
     // **Perfil fiscal** (ADR-0273 D2/D4, hub#550): qué debe este hub, resuelto contra lo que hay
@@ -606,6 +834,59 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     flow_io::dispatch(&scheduler_state, pending_io);
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            }
+        });
+    }
+
+    // **Retención del historial** (hub#699, `erplora_runtime::retention`): el outbox y los runs de
+    // flujos eran append-only — ninguna fila se borraba nunca — y sus columnas anchas (`input`,
+    // `output`, `payload`, todas TEXT) crecían de por vida en una BD que se paga por GB. A los 90
+    // días se poda lo TERMINAL, y solo eso: un `pending` (aún por entregar) y un `dead` (esperando
+    // decisión humana) sobreviven a cualquier edad, porque son la durabilidad, no el historial.
+    //
+    // Tick PROPIO y horario, no el bucle de 1s: el barrido no es urgente y el bucle de 1s sostiene
+    // el lock del runtime para el relay de eventos. El lock se coge **por pasada**, no para todo el
+    // barrido, así que entre dos DELETE acotados el relay entra sin esperar. Que sea horario y no
+    // diario es lo que deja a un hub con un año de atraso ponerse al día en unas horas en vez de en
+    // meses, sin que ninguna pasada deje de ser pequeña.
+    {
+        let st = state.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(3600));
+            loop {
+                tick.tick().await;
+                let hub_id = st.hub_id();
+                let cutoff = (chrono::Utc::now()
+                    - chrono::Duration::days(erplora_runtime::retention::RETENTION_DAYS))
+                .to_rfc3339();
+                let mut total = erplora_runtime::retention::PruneReport::default();
+                for _ in 0..erplora_runtime::retention::MAX_PASSES {
+                    let runtime = st.runtime.lock().await;
+                    let pass =
+                        erplora_runtime::retention::prune_once(runtime.db(), &hub_id, &cutoff).await;
+                    drop(runtime);
+                    match pass {
+                        Ok(p) if p.is_empty() => break,
+                        Ok(p) => total.merge(p),
+                        Err(e) => {
+                            tracing::warn!(error = %e, "retention: la poda de historial falló");
+                            break;
+                        }
+                    }
+                }
+                // Solo si borró algo: una poda silenciosa es indistinguible de una pérdida de datos
+                // el día que alguien busca un evento viejo y no está, pero "borradas 0 filas" cada
+                // hora es ruido que enseña a no leer el log.
+                if !total.is_empty() {
+                    tracing::info!(
+                        events = total.events,
+                        delivery_markers = total.delivery_markers,
+                        runs = total.runs,
+                        run_steps = total.run_steps,
+                        retention_days = erplora_runtime::retention::RETENTION_DAYS,
+                        "retention: historial terminal podado"
+                    );
+                }
             }
         });
     }
@@ -757,15 +1038,20 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
-    // Import del blueprint que el SaaS DECLARÓ para este hub (ADR-0212, hub#406): lo que hace que
-    // un hub recién provisionado —la demo— nazca con catálogo en vez de con el asistente de setup.
+    // ⛔ Aquí iba el import del blueprint DECLARADO por el SaaS (ADR-0212 / hub#406), y ya no va:
+    // **un hub nace VACÍO** (ADR-0293). Era el único paso del arranque que instalaba módulos por su
+    // cuenta —`ImportSelection.modules` = todos los del manifest de la plantilla—, así que un hub
+    // recién provisionado amanecía con el vertical entero puesto (13 apps con el blueprint
+    // `restaurante` de la demo).
     //
-    // 🔴 Va en su propia task, NO en el camino de arranque. El seed de arriba se aplica con `?` y
-    // un seed roto aborta el boot a propósito; esto no puede: un blueprint que no se pueda importar
-    // debe dejar un hub que FUNCIONA (degradado, sin catálogo), nunca un visitante sin hub. Por eso
-    // `spawn_declared_blueprint_import` devuelve un handle y no un Result — no hay nada que `?`
-    // pueda propagar hasta aquí. Sin las claves de env no lanza nada y no toca el Cloud.
-    bootstrap::spawn_declared_blueprint_import(&state);
+    // ERPlora es un **ERP genérico, no un POS**: el vertical lo elige el usuario. Un hub nuevo trae
+    // su configuración y nada más, y la primera pantalla le ofrece los blueprints para que importe
+    // el suyo. Sembrárselo al nacer decide por él justo lo que el producto le deja elegir.
+    //
+    // Las dos claves de env (`HUB_BOOTSTRAP_BLUEPRINT`, `HUB_BOOTSTRAP_BLUEPRINT_LOCALE`) siguen
+    // llegando en el despliegue de las demos y **se ignoran a propósito**; `HubConfig::from_env` ya
+    // no las lee. Lo vigila `tests/newborn_hub_is_empty.rs`, que arranca el hub de verdad con ellas
+    // puestas y comprueba que no se le pide un solo blueprint al Cloud.
 
     // Disparadores 1 y 3 del refetch del certificado delegado (ADR-0202 §2 punto 4): el de
     // ARRANQUE y el del FALLO TLS contra la AEAT. (El 2 —el heartbeat— va en el tick de arriba.)
@@ -782,19 +1068,31 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     if let Some(dir) = cfg.web_dir.as_deref() {
         eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
     }
-    let mut router = build_router(state, cfg.web_dir.as_deref());
-    // CSP (ADR-0050): con el doc servido por Axum, la CSP de `tauri.conf` no aplica → la emitimos aquí.
-    if let Some(csp) = cfg.csp.as_deref() {
-        router = with_csp(router, csp);
-    }
+    // El router consume el `state`; el aviso de arranque de más abajo necesita el suyo, y el
+    // apagado el suyo (hub#670: el último flush de la marca de actividad).
+    let announce_state = state.clone();
+    let shutdown_state = state.clone();
+    // CSP (ADR-0050, hub#708): con el doc servido por Axum —que es SIEMPRE, también en la app
+    // instalada, cuya ventana navega aquí— la de `tauri.conf` no alcanza al documento. Sin rama:
+    // la política se emite siempre, y `cfg.csp` es `String` para que "sin CSP" ni se pueda escribir.
+    let router = build_serving_router(state, cfg.web_dir.as_deref(), &cfg.csp);
 
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
     eprintln!("erplora-server escuchando en http://{}", cfg.bind);
     tracing::info!(bind = %cfg.bind, "erplora-server arrancado");
+
+    // «Ya atiendo» (hub#712): en cuanto el agregado de `/readyz` diga `UP`, un latido al Cloud
+    // para que un hub recién desplegado pase a `active` sin esperar al sondeo del SaaS.
+    //
+    // 🔑 Va AQUÍ, después de bindear: el socket ya escucha, así que el aviso no puede adelantar
+    // al hub que anuncia. Antes de este punto marcaríamos listo un hub que todavía no atiende, y
+    // eso es peor que tardar. En su propia task y best-effort, como el import de blueprint y el
+    // refetch del certificado: un plano de control inalcanzable deja un hub que FUNCIONA.
+    boot_announce::spawn(&announce_state);
     // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
     // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).
     axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(shutdown_state))
         .await?;
     Ok(())
 }
@@ -856,7 +1154,7 @@ fn install_error_reporting(state: &AppState) {
 
 /// Espera Ctrl-C o (en Unix) SIGTERM. ECS envía SIGTERM al desescalar/desplegar; al recibirla,
 /// `axum::serve` deja de aceptar conexiones nuevas y drena las en vuelo antes de cerrar.
-async fn shutdown_signal() {
+async fn shutdown_signal(state: AppState) {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
@@ -887,6 +1185,11 @@ async fn shutdown_signal() {
         );
         tokio::time::sleep(drain).await;
     }
+    // Último flush de la marca de actividad (hub#670) antes de cerrar. El write-behind ya la
+    // escribe cada minuto, así que esto solo cierra el último minuto — pero el SIGTERM de un
+    // blue/green (ADR-0269) llega en CADA actualización, y ese minuto es justo el que contiene la
+    // visita de quien estaba usando el hub cuando se desplegó.
+    activity::flush(&state).await;
     eprintln!("apagado: cierro el listener y dreno las conexiones en vuelo…");
 }
 
@@ -904,6 +1207,12 @@ pub fn app(state: AppState) -> Router {
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
         .route("/api/system/metrics", get(system_metrics::system_metrics))
+        // Qué le hemos cambiado a este hub y desde qué versión (hub#564). Solo lectura: la
+        // contrapartida de actualizar sin preguntar (ADR-0269) es que se pueda SABER, no decidir.
+        .route(
+            "/api/system/update-history",
+            get(system::update_history),
+        )
         // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
         // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
         .route(
@@ -1035,6 +1344,7 @@ pub fn app(state: AppState) -> Router {
         // imagen. Es también el botón «Actualizar» del dueño, y con `{"version": "…"}` la palanca de
         // soporte.
         .route("/api/modules/:id/update", post(update_module))
+        .route("/api/modules/:id/versions", get(list_module_versions))
         .route(
             "/api/modules/:id/capabilities",
             get(settings::get_module_capabilities).put(settings::put_module_capabilities),
@@ -1078,6 +1388,8 @@ pub fn app(state: AppState) -> Router {
         // re-ejecuta el command de otro módulo con la autoridad de ESE módulo (hub#686) y descartar
         // cierra un registro para siempre, así que NO se abren a una API key ni al token de máquina.
         .route("/api/hub/events/dead", get(outbox_admin::list_dead))
+        .route("/api/hub/events/dead/count", get(outbox_admin::count_dead))
+        .route("/api/hub/events/retry-all", post(outbox_admin::retry_all_dead))
         .route("/api/hub/events/:id/retry", post(outbox_admin::retry_dead))
         .route(
             "/api/hub/events/:id/discard",
@@ -1086,6 +1398,11 @@ pub fn app(state: AppState) -> Router {
         // Correlación (hub#666): qué disparó ESTE evento — los runs que arrancó y los eventos que
         // provocó su entrega. Misma puerta admin: el trace dibuja lo que hace el negocio entero.
         .route("/api/hub/events/:id/trace", get(outbox_admin::trace_event))
+        // Catálogo de campos de un evento (hub#715): lo que el picker del editor de flujos ofrece.
+        // Segmento estático de un solo tramo, así que no compite con `/:id/…`. Puerta admin **y**
+        // capability `manage_flows` si quien llama es un módulo — lo que traen los eventos de un
+        // negocio es la forma de ese negocio, y no la lee cualquier módulo instalado.
+        .route("/api/hub/events/shape", get(outbox_admin::event_shape))
         // ── Kernel de automatización (ADR-0283 K7, hub#661) ────────────────────────────────
         // REST del core, NO commands `hub.*`: el core se congela y el dispatcher no es donde se
         // añade superficie nueva (§9). Misma puerta que las keys y la dead-letter: sesión local de
@@ -1101,6 +1418,11 @@ pub fn app(state: AppState) -> Router {
             get(flows_api::list_flows).post(flows_api::create_flow),
         )
         .route("/api/hub/flows/runs/:run_id", get(flows_api::get_run))
+        // `schema` is a static segment too (hub#716): the contract the editor builds its UI from,
+        // served by the hub instead of copied into every module's bundle. It goes here for the
+        // same reason as `runs` — matchit resolves the static segment ahead of `:id`, and
+        // `tests/flows_schema_route.rs` checks it against the real router.
+        .route("/api/hub/flows/schema", get(flows_api::get_schema))
         // `secrets` es igual: segmento estático, gana al `:id` (hub#662). El GET devuelve NOMBRES —
         // no hay endpoint que devuelva un secreto, y esa ausencia es el diseño (ADR-0283 §4).
         .route("/api/hub/flows/secrets", get(flows_api::list_secrets))
@@ -1120,6 +1442,22 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/hub/flows/:id/run", post(flows_api::start_run))
         .route("/api/hub/flows/:id/runs", get(flows_api::list_runs))
+        // ── Bandeja de aprobación (ADR-0283 D3, hub#665) ───────────────────────────────────
+        // `approvals` es un segmento ESTÁTICO y matchit lo resuelve con prioridad sobre `:id`, así
+        // que no se lo come `/flows/:id` aunque vaya después (igual que `/flows/runs/:run_id`);
+        // `tests/agent_runner_test.rs` lo comprueba contra el router de verdad.
+        // Misma puerta que el resto: sesión local de un humano owner/admin. Aquí es lo esencial —
+        // esta fila ES el registro de una persona autorizando al hub a escribir sin nadie
+        // delante, así que `decided_by` sale de la sesión resuelta y JAMÁS del body.
+        .route("/api/hub/flows/approvals", get(flows_api::list_approvals))
+        .route(
+            "/api/hub/flows/approvals/:id/approve",
+            post(flows_api::approve),
+        )
+        .route(
+            "/api/hub/flows/approvals/:id/reject",
+            post(flows_api::reject),
+        )
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
         .route("/api/v1/:module/c/:command", post(api_keys::data_command))
@@ -1233,6 +1571,60 @@ fn report_failed_module_update(
     );
 }
 
+/// El informe de un arranque **incompleto** (hub#571), sin mandarlo todavía.
+///
+/// Aparte para poder fijarlo con un test: lo que importa de este evento es su **contenido** —el
+/// código estable contra el que se programa y los módulos que faltan—, no que se haya llamado a un
+/// sink global.
+///
+/// Es un fallo **del hub**, no de un módulo: lo que se cayó es el arranque, y colgárselo al primero
+/// de la lista mandaría a mirar donde no es.
+fn incomplete_boot_event(orphans: &[(String, String)]) -> erplora_runtime::error_registry::ErrorEvent {
+    use erplora_runtime::error_registry::{severity, source, ErrorEvent};
+
+    let names: Vec<String> = orphans
+        .iter()
+        .map(|(id, version)| format!("{id}@{version}"))
+        .collect();
+    ErrorEvent::new(
+        source::HUB,
+        "module_boot_incomplete",
+        format!(
+            "el hub arrancó SIN {} módulo(s) instalados: {} — ni el marketplace ni la copia local \
+             pudieron reponerlos",
+            orphans.len(),
+            names.join(", ")
+        ),
+        severity::UNEXPECTED,
+    )
+    .with_context(json!({
+        "count": orphans.len(),
+        "modules": orphans
+            .iter()
+            .map(|(id, version)| json!({ "module_id": id, "version": version }))
+            .collect::<Vec<_>>(),
+    }))
+}
+
+/// Manda al Cloud que este hub arrancó **sin** alguno de sus módulos (hub#571).
+///
+/// Es el caso que ADR-0269 no puede cumplir: no hay copia, no hay versión anterior y no hay tarea
+/// vieja a la que volver. Lo único que sí está en nuestra mano es que **no sea un silencio** — un
+/// hub incompleto que solo lo cuenta en el log de un contenedor es un hub que nadie arregla.
+/// Best-effort por contrato del registro: sin sink (hub sin enrolar) se descarta.
+fn report_incomplete_boot(orphans: &[(String, String)]) {
+    eprintln!(
+        "🔴 el hub arranca SIN {} módulo(s): {}",
+        orphans.len(),
+        orphans
+            .iter()
+            .map(|(id, v)| format!("{id}@{v}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    erplora_runtime::error_registry::ErrorRegistry::global().report(incomplete_boot_event(orphans));
+}
+
 /// La versión que debe correr un módulo en este arranque (hub#516).
 ///
 /// Delega en [`install::resolve_target`] — **el mismo resolutor que usa el botón «Actualizar»** y
@@ -1316,27 +1708,36 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
     router.fallback_service(ServeDir::new(web_dir).fallback(ServeFile::new(index)))
 }
 
-/// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). Cuando el documento
-/// lo sirve el propio Axum (Hub Local mismo-origen, o Hub Cloud), la CSP de `tauri.conf` ya **no**
-/// aplica al doc (solo la inyecta el protocolo de assets de Tauri), así que el runtime debe emitirla.
-/// En las respuestas de API el header es inocuo. El valor lo decide el llamador (es columna de
-/// seguridad/humano): en Tauri lo fija `embedded_serve_config`; en ECS sale de `HUB_CSP` (o `None`).
+/// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). La CSP de
+/// `tauri.conf` **no** aplica a este documento —solo la inyecta el protocolo de assets de Tauri, y
+/// la ventana de la app instalada navega a ESTE servidor (ADR-0159)—, así que el runtime es el
+/// único que puede emitirla. En las respuestas de API el header es inocuo.
+///
+/// El valor sale siempre de [`resolve_csp`]: [`default_csp`] salvo que `HUB_CSP` lo sustituya. La
+/// mención a un `embedded_serve_config` y a un `None` que había aquí quedó obsoleta: el runtime
+/// embebido del shell ya no existe, y desde hub#708 tampoco existe el caso «sin política».
 pub fn with_csp(router: Router, csp: &str) -> Router {
     use axum::http::header::CONTENT_SECURITY_POLICY;
-    use axum::http::HeaderValue;
-    // No abortar el arranque por una CSP mal formada (p. ej. `HUB_CSP` de ECS con un salto de línea o
-    // byte no-ASCII): se loguea y se sigue SIN header en vez de panicar. En Tauri el input es la const
-    // `LOOPBACK_CSP` (siempre válida); este guard protege el camino ECS (`HUB_CSP` del entorno).
-    match HeaderValue::from_str(csp) {
-        Ok(value) => router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
-            CONTENT_SECURITY_POLICY,
-            value,
-        )),
-        Err(e) => {
-            eprintln!("CSP inválida ignorada (no se emite header Content-Security-Policy): {e}");
-            router
-        }
-    }
+    // No abortar el arranque por una CSP mal formada (un salto de línea, un byte no-ASCII), pero
+    // TAMPOCO servir sin política: se cae a la de por defecto y se avisa. `resolve_csp` ya filtra
+    // el camino de `HUB_CSP`; esto cubre a cualquier otro llamador. Servir sin header era la rama
+    // que dejó a la flota entera sin CSP (hub#708), así que aquí ya no existe.
+    let value = HeaderValue::from_str(csp).unwrap_or_else(|e| {
+        eprintln!("CSP inválida ({e}): se sirve la política por defecto en su lugar");
+        HeaderValue::from_str(&default_csp("")).expect("la CSP por defecto siempre es un header")
+    });
+    router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
+        CONTENT_SECURITY_POLICY,
+        value,
+    ))
+}
+
+/// El router que monta [`serve`] de verdad: API + (opcional) front estático + la CSP, que **no** es
+/// opcional. Extraído por el mismo motivo que [`build_router`] en su día: para poder afirmar sobre
+/// la composición REAL sin bindear un puerto. Que la cabecera no dependa de una rama `if let` es el
+/// contrato que fija `crates/server/tests/cloud_csp.rs`.
+pub fn build_serving_router(state: AppState, web_dir: Option<&str>, csp: &str) -> Router {
+    with_csp(build_router(state, web_dir), csp)
 }
 
 /// Compone el router de API (`app`) con, opcionalmente, el frontend estático servido en el **MISMO
@@ -1368,7 +1769,7 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         Err(error) => return tenant_rejected(error),
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (pin_users, currency, currency_decimals, language) = {
+    let (pin_users, currency, currency_decimals, language, timezone) = {
         let rt = runtime.lock().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
@@ -1405,7 +1806,12 @@ async fn hub_context(State(st): State<AppState>) -> Response {
             .get("language")
             .cloned()
             .unwrap_or_else(|| json!("es"));
-        (pin_users, currency, currency_decimals, language)
+        // La zona horaria del negocio ya RESUELTA (hub#731). En `settings` la clave viaja cruda
+        // (`null` = «dedúcela del país») porque tiene que poder volver por un `PUT`; aquí se
+        // expone el nombre IANA real, que es lo que la UI necesita para enseñar a qué hora local
+        // se va a disparar un flujo. Si la lectura falla, UTC — que es lo que el reloj hará.
+        let timezone = rt.timezone_name().await.unwrap_or_else(|_| "UTC".to_string());
+        (pin_users, currency, currency_decimals, language, timezone)
     };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
@@ -1437,6 +1843,8 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         // Cuántos decimales tiene esa moneda. El front NO puede asumir 2 (ADR-0123 §7).
         "currency_decimals": currency_decimals,
         "language": language,
+        // Nombre IANA del reloj del NEGOCIO (hub#731) — resuelto, nunca `null`.
+        "timezone": timezone,
     }))
     .into_response()
 }
@@ -1707,6 +2115,31 @@ async fn update_module(
     })
     .await;
 
+    // Lo que el dueño verá mañana en Sistema → Actualizaciones (hub#564). Se anota AQUÍ, con el
+    // resultado en la mano: el estado actual del hub no se puede restar de sí mismo para deducir
+    // una transición, así que si no se escribe cuando ocurre, no existe. Misma decisión que el
+    // arranque (`from_module_outcome`), y `AlreadyThere` no escribe nada porque no cambió nada.
+    // Best-effort: no poder anotar el historial no convierte una actualización buena en un error.
+    {
+        let rt = st.runtime.lock().await;
+        let module_name = rt
+            .registry()
+            .installed
+            .iter()
+            .find(|m| m.id == module_id)
+            .map(|m| m.name.clone())
+            .unwrap_or_else(|| module_id.clone());
+        if let Some(change) =
+            erplora_runtime::update_history::from_module_outcome(&module_id, &module_name, &target, &outcome)
+        {
+            if let Err(e) =
+                erplora_runtime::update_history::record(rt.db(), &st.hub_id(), change).await
+            {
+                tracing::warn!(module_id = %module_id, error = %e, "no se pudo anotar el historial de actualización (hub#564)");
+            }
+        }
+    }
+
     // Un fallo con decisión del usuario detrás (409 `install_blocked`, 404 `update_not_installed`)
     // se cuenta como lo que es, no como «no se pudo».
     if !matches!(outcome, Outcome::Updated { .. } | Outcome::AlreadyThere(_)) {
@@ -1813,6 +2246,76 @@ async fn list_module_updates(State(st): State<AppState>, headers: HeaderMap) -> 
         }));
     }
     Json(json!({ "ok": true, "data": out })).into_response()
+}
+
+/// `GET /api/modules/:id/versions` — entre qué versiones puede elegir este hub (hub#675).
+///
+/// Es la lista del **desplegable de versión**, y sirve a las dos puertas: instalar (el módulo aún no
+/// está: valen todas las publicadas) y actualizar (solo hacia delante desde la instalada). Por eso
+/// **no es un 404** pedir las versiones de algo que no está instalado —esa regla es de `update`, no
+/// de esta— y por eso `installed` puede venir `null`.
+///
+/// La política la pone `module_update::offer`, la misma pieza que decide la actualización
+/// automática: fuera la cuarentena, fuera el retroceso, y un módulo clavado por soporte no ofrece
+/// nada. Sin eso, el desplegable sería una segunda puerta con una segunda política.
+///
+/// Auth = **sesión de admin**, igual que instalar y actualizar. Sin ella no se pregunta al Cloud:
+/// la respuesta viaja con la credencial de máquina del hub, y cualquier módulo web same-origin
+/// podría usarla de rebote para leer el catálogo.
+async fn list_module_versions(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+
+    // Todo lo que hace falta del hub, y **se suelta el candado**: la llamada al Cloud viene después.
+    // Sostener el `Mutex<Runtime>` durante un round-trip de red congelaría `/api/query` y
+    // `/api/command` —el TPV— mientras el marketplace tarda en contestar.
+    let (installed, pinned) = {
+        let rt = st.runtime.lock().await;
+        (
+            install::installed_version(&rt, &module_id),
+            install::support_pin(&rt, &module_id).await,
+        )
+    };
+
+    // Sin credencial no se puede preguntar al marketplace. No es un error: es «no lo sé», y «no lo
+    // sé» se pinta como «no hay nada que elegir», nunca como una lista inventada.
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return Json(json!({
+            "ok": true,
+            "data": { "module_id": module_id, "installed": installed, "latest": null, "versions": [] },
+        }))
+        .into_response();
+    };
+
+    let versions = install::offered_versions(
+        &st.http,
+        &st.config.cloud_base_url,
+        &auth,
+        &module_id,
+        installed.as_deref(),
+        pinned.as_deref(),
+    )
+    .await;
+
+    Json(json!({
+        "ok": true,
+        "data": {
+            "module_id": module_id,
+            "installed": installed,
+            // La que se ofrece por defecto: la primera de la lista. `null` = no hay nada que elegir.
+            "latest": versions.first(),
+            "versions": versions,
+        },
+    }))
+    .into_response()
 }
 
 /// Status HTTP de un fallo del pipeline de instalación/actualización. Compartido por
@@ -2582,6 +3085,18 @@ pub(crate) fn err_status_and_code(
         // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling
         // into the generic `400 {code:"error"}` bucket would have made the whole chain undecidable.
         E::RequiresElevation { .. } => (StatusCode::FORBIDDEN, "requires_elevation".into()),
+        // hub#714: the module→host permission the OWNER grants (ADR-0079). `403` with its own
+        // stable code — the same one `error_registry::error_code_of` already publishes — because
+        // it is a refusal with a remedy nobody could guess from a bare `400 {code:"error"}`: go to
+        // Settings → Permissions and grant it. It is NOT `permission_denied` (that is the user's
+        // RBAC, another axis entirely) and NOT `requires_elevation` (no manager's PIN opens it).
+        E::CapabilityDenied { .. } => (StatusCode::FORBIDDEN, "capability_denied".into()),
+        // hub#775: a `protects` guard refused the command because a precondition of the route is
+        // unmet (the drawer is closed). `409`: the request is well-formed and the caller is
+        // allowed, it conflicts with the hub's current state — same shape as the fiscal
+        // precondition and the demo locks. Its own code, never `permission_denied`: the action
+        // that resolves it is "open the drawer", not "ask the manager".
+        E::ProtectsGuard { .. } => (StatusCode::CONFLICT, "protects_guard".into()),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".into()),
         _ => (StatusCode::BAD_REQUEST, "error".into()),
     }
@@ -2652,8 +3167,8 @@ fn unauthorized(e: auth::AuthError) -> Response {
 
 /// Query param de idioma para los endpoints localizables (ADR-0055). `?locale=es`; default `en`.
 #[derive(serde::Deserialize)]
-struct LocaleQuery {
-    locale: Option<String>,
+pub(crate) struct LocaleQuery {
+    pub(crate) locale: Option<String>,
 }
 
 async fn navigation(
@@ -3476,6 +3991,39 @@ async fn mint_session_with_extra(
             Json(payload).into_response()
         }
         Err(e) => err_response(e),
+    }
+}
+
+#[cfg(test)]
+mod incomplete_boot_report_tests {
+    //! hub#571: un hub que arranca SIN alguno de sus módulos no puede ser un silencio.
+    use super::incomplete_boot_event;
+
+    #[test]
+    fn the_report_names_every_module_that_could_not_be_mounted() {
+        let event = incomplete_boot_event(&[
+            ("sales".to_string(), "3.2.0".to_string()),
+            ("taxes".to_string(), "1.4.0".to_string()),
+        ]);
+
+        assert_eq!(event.error_code, "module_boot_incomplete");
+        assert_eq!(event.severity, erplora_runtime::error_registry::severity::UNEXPECTED);
+        // Los módulos, con su versión, para que quien lo lea sepa QUÉ falta sin abrir el hub.
+        assert_eq!(event.context["modules"][0]["module_id"], "sales");
+        assert_eq!(event.context["modules"][0]["version"], "3.2.0");
+        assert_eq!(event.context["modules"][1]["module_id"], "taxes");
+        assert_eq!(event.context["count"], 2);
+        assert!(event.message.contains("sales"), "{}", event.message);
+        assert!(event.message.contains("taxes"), "{}", event.message);
+    }
+
+    /// El evento es del HUB, no de un módulo: no hay un culpable al que colgárselo — lo que falló
+    /// es el arranque, y atribuirlo al primero de la lista mandaría a mirar donde no es.
+    #[test]
+    fn the_failure_belongs_to_the_hub_and_not_to_one_of_the_modules() {
+        let event = incomplete_boot_event(&[("sales".to_string(), "3.2.0".to_string())]);
+        assert_eq!(event.source, erplora_runtime::error_registry::source::HUB);
+        assert_eq!(event.module_id, None);
     }
 }
 

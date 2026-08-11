@@ -340,7 +340,8 @@ fn tokenize(stmt: &str) -> std::result::Result<Vec<Tok>, String> {
 /// ```text
 /// INSERT INTO <tabla> ( <col> {, <col>} )
 ///     ( VALUES ( <lit> {, <lit>} ) {, ( … )} | SELECT <lit> {, <lit>} )
-///     [ WHERE NOT EXISTS ( SELECT 1 FROM <tabla> WHERE <col> ( = <lit> | IS NULL ) {AND …} ) ] ;
+///     [ WHERE <guarda> {AND <guarda>} ] ;
+/// <guarda> ::= NOT EXISTS ( SELECT 1 FROM <tabla> WHERE <col> ( = <lit> | IS NULL ) {AND …} )
 /// ```
 ///
 /// Las dos `<tabla>` deben pertenecer al `scope`. Mirar solo el prefijo `INSERT INTO` no basta:
@@ -482,9 +483,20 @@ fn literal_list(toks: &[Tok], mut p: usize) -> Option<usize> {
     }
 }
 
-/// `WHERE NOT EXISTS ( SELECT 1 FROM <tabla> WHERE <col> (= <lit> | IS NULL) {AND …} )` — la ÚNICA
-/// lectura que admite el subconjunto (la guarda de idempotencia del export), y solo sobre una
-/// tabla de la propia sección.
+/// `WHERE NOT EXISTS (…) {AND NOT EXISTS (…)}` — la ÚNICA lectura que admite el subconjunto (las
+/// guardas de idempotencia del import), y solo sobre tablas de la propia sección.
+///
+/// Cada guarda es `NOT EXISTS ( SELECT 1 FROM <tabla> WHERE <col> (= <lit> | IS NULL) {AND …} )`.
+/// Se admite **más de una encadenada por `AND`** porque una fila tiene más de una identidad y hay
+/// que preguntar por todas antes de insertarla (hub#753): la técnica —`(hub_id, id)`— y cada
+/// **clave natural** que el esquema del destino declara (`(hub_id, code)` de una serie de
+/// facturación, `(hub_id, sku)` de un producto). Preguntar solo por el `id` derivado dejaba pasar
+/// el INSERT contra una fila equivalente que ya estaba, y la unicidad lo mataba llevándose la
+/// sección entera por delante.
+///
+/// Encadenar guardas solo puede insertar MENOS filas, nunca más ni otras: cada una se valida con
+/// las mismas reglas (tabla dentro del scope, condiciones contra literales), así que la superficie
+/// que abre es la misma que la de una sola.
 fn not_exists_guard(
     toks: &[Tok],
     mut p: usize,
@@ -500,63 +512,72 @@ fn not_exists_guard(
         }
     };
     p = expect_kw(p, "WHERE")?;
-    p = expect_kw(p, "NOT")?;
-    p = expect_kw(p, "EXISTS")?;
-    if toks.get(p) != Some(&Tok::Punct('(')) {
-        return Err(bad("falta el paréntesis de la guarda `NOT EXISTS`"));
-    }
-    p += 1;
-    p = expect_kw(p, "SELECT")?;
-    if !toks.get(p).is_some_and(Tok::is_literal) {
-        return Err(bad("la guarda solo puede proyectar un literal (`SELECT 1`)"));
-    }
-    p += 1;
-    p = expect_kw(p, "FROM")?;
-    let table = toks
-        .get(p)
-        .and_then(Tok::ident)
-        .ok_or_else(|| bad("la tabla de la guarda no es un identificador simple"))?;
-    if crate::export::is_system_table(table) {
-        return Err(system_table_error(table, "leer"));
-    }
-    if !scope.allows(table) {
-        return Err(format!(
-            "la sección solo puede leer {}; se encontró una guarda sobre `{table}`",
-            scope.describe()
-        ));
-    }
-    p += 1;
-    p = expect_kw(p, "WHERE")?;
-    // <col> = <lit> | <col> IS NULL, encadenados por AND.
+    // Una o más guardas `NOT EXISTS (…)` encadenadas por `AND` (hub#753).
     loop {
-        toks.get(p)
-            .and_then(Tok::ident)
-            .ok_or_else(|| bad("la condición de la guarda debe comparar una columna"))?;
-        p += 1;
-        if toks.get(p) == Some(&Tok::Punct('=')) {
-            if !toks.get(p + 1).is_some_and(Tok::is_literal) {
-                return Err(bad(
-                    "la condición de la guarda solo compara contra literales (nada de subconsultas)",
-                ));
-            }
-            p += 2;
-        } else if toks.get(p).is_some_and(|t| t.is_kw("IS"))
-            && toks.get(p + 1).is_some_and(|t| t.is_kw("NULL"))
-        {
-            p += 2;
-        } else {
-            return Err(bad("condición no admitida en la guarda"));
+        p = expect_kw(p, "NOT")?;
+        p = expect_kw(p, "EXISTS")?;
+        if toks.get(p) != Some(&Tok::Punct('(')) {
+            return Err(bad("falta el paréntesis de la guarda `NOT EXISTS`"));
         }
+        p += 1;
+        p = expect_kw(p, "SELECT")?;
+        if !toks.get(p).is_some_and(Tok::is_literal) {
+            return Err(bad("la guarda solo puede proyectar un literal (`SELECT 1`)"));
+        }
+        p += 1;
+        p = expect_kw(p, "FROM")?;
+        let table = toks
+            .get(p)
+            .and_then(Tok::ident)
+            .ok_or_else(|| bad("la tabla de la guarda no es un identificador simple"))?;
+        if crate::export::is_system_table(table) {
+            return Err(system_table_error(table, "leer"));
+        }
+        if !scope.allows(table) {
+            return Err(format!(
+                "la sección solo puede leer {}; se encontró una guarda sobre `{table}`",
+                scope.describe()
+            ));
+        }
+        p += 1;
+        p = expect_kw(p, "WHERE")?;
+        // <col> = <lit> | <col> IS NULL, encadenados por AND. El `AND` que separa DOS guardas no
+        // entra aquí: esta cadena termina siempre en el `)` de su propio `NOT EXISTS`.
+        loop {
+            toks.get(p)
+                .and_then(Tok::ident)
+                .ok_or_else(|| bad("la condición de la guarda debe comparar una columna"))?;
+            p += 1;
+            if toks.get(p) == Some(&Tok::Punct('=')) {
+                if !toks.get(p + 1).is_some_and(Tok::is_literal) {
+                    return Err(bad(
+                        "la condición de la guarda solo compara contra literales (nada de subconsultas)",
+                    ));
+                }
+                p += 2;
+            } else if toks.get(p).is_some_and(|t| t.is_kw("IS"))
+                && toks.get(p + 1).is_some_and(|t| t.is_kw("NULL"))
+            {
+                p += 2;
+            } else {
+                return Err(bad("condición no admitida en la guarda"));
+            }
+            if toks.get(p).is_some_and(|t| t.is_kw("AND")) {
+                p += 1;
+            } else {
+                break;
+            }
+        }
+        if toks.get(p) != Some(&Tok::Punct(')')) {
+            return Err(bad("falta el cierre de la guarda `NOT EXISTS`"));
+        }
+        p += 1;
         if toks.get(p).is_some_and(|t| t.is_kw("AND")) {
             p += 1;
         } else {
-            break;
+            return Ok(p);
         }
     }
-    if toks.get(p) != Some(&Tok::Punct(')')) {
-        return Err(bad("falta el cierre de la guarda `NOT EXISTS`"));
-    }
-    Ok(p + 1)
 }
 
 /// Recorte legible de una sentencia para el mensaje de error (sin volcar datos enteros).
@@ -630,6 +651,44 @@ mod tests {
             "SELECT pg_sleep(10);",
         ] {
             assert!(validate(sql, &scope).is_err(), "{sql} debería rechazarse");
+        }
+    }
+
+    /// Guardas ENCADENADAS por `AND` (hub#753): la forma que emite el import cuando pregunta por
+    /// la identidad técnica **y** por cada clave natural del destino.
+    #[test]
+    fn dos_guardas_not_exists_encadenadas_se_aceptan() {
+        let scope = TableScope::Module("invoice_series".into());
+        let sql = "INSERT INTO invoice_series_series (\"id\", \"hub_id\", \"code\", \"is_deleted\") \
+                   SELECT 'new-id', 'h2', 'FAC', 0 \
+                   WHERE NOT EXISTS (SELECT 1 FROM invoice_series_series WHERE \"hub_id\" = 'h2' AND id = 'new-id') \
+                     AND NOT EXISTS (SELECT 1 FROM invoice_series_series WHERE \"hub_id\" = 'h2' AND \"code\" = 'FAC' AND \"is_deleted\" = 0);";
+        assert_eq!(validate(sql, &scope).expect("guardas encadenadas").len(), 1);
+    }
+
+    /// Encadenar guardas no abre la gramática: cada una sigue siendo un `NOT EXISTS` sobre una
+    /// tabla de la propia sección, con condiciones contra literales. Nada más entra por ese `AND`.
+    #[test]
+    fn el_and_entre_guardas_no_admite_cualquier_cosa() {
+        let scope = TableScope::Module("invoice_series".into());
+        let base = "INSERT INTO invoice_series_series (\"id\") SELECT 'x' \
+                    WHERE NOT EXISTS (SELECT 1 FROM invoice_series_series WHERE id = 'x')";
+        for cola in [
+            // Otra sección: la guarda solo puede leer las tablas de la suya.
+            " AND NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'x');",
+            // Tabla de SISTEMA del hub: no la alcanza ninguna sección (ADR-0273 D8).
+            " AND NOT EXISTS (SELECT 1 FROM _hub_fiscal_profile WHERE id = 'x');",
+            // Comparar contra una subconsulta, no contra un literal.
+            " AND NOT EXISTS (SELECT 1 FROM invoice_series_series WHERE id = (SELECT id FROM hub_user));",
+            // `EXISTS` a secas (afirmativo) no es una guarda de idempotencia.
+            " AND EXISTS (SELECT 1 FROM invoice_series_series WHERE id = 'x');",
+            // `AND` colgando sin guarda detrás.
+            " AND;",
+        ] {
+            assert!(
+                validate(&format!("{base}{cola}"), &scope).is_err(),
+                "`{cola}` no puede colarse tras el AND de las guardas"
+            );
         }
     }
 

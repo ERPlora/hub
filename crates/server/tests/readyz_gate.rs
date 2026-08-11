@@ -174,4 +174,40 @@ async fn a_fresh_hub_with_zero_modules_booted_the_real_way_is_ready() {
     assert_eq!(status, StatusCode::OK, "un hub virgen debe estar READY; cuerpo: {body}");
     assert_eq!(body["checks"]["migrations"]["status"], "UP", "cuerpo: {body}");
     assert_eq!(body["checks"]["modules"]["status"], "UP", "cero módulos esperados = cero cargados: {body}");
+    // Y **cero de verdad**: desde ADR-0293 un hub nace vacío, así que este ya no es el caso raro de
+    // un provisioning a medias — es el estado normal del primer arranque de todo hub. Contarlo aquí
+    // deja el número a la vista: si algo volviera a instalar módulos al nacer, se vería en el 0.
+    assert_eq!(body["checks"]["modules"]["expected"], json!(0), "cuerpo: {body}");
+    assert_eq!(body["checks"]["modules"]["registered"], json!(0), "cuerpo: {body}");
+}
+
+/// **…y sigue READY en cuanto instala el primero.** El otro extremo de ADR-0293: nacer vacío solo
+/// vale si el camino de salida —el usuario elige su blueprint y lo importa— no deja el hub en
+/// `DOWN`. Instalar escribe la fila de `hub_module` **y** registra el módulo en el mismo gesto, así
+/// que esperados y cargados se mueven juntos; el test lo fija para que no puedan separarse.
+#[tokio::test]
+async fn installing_the_first_module_keeps_the_hub_ready() {
+    let db = fresh_db().await;
+    let mut runtime = Runtime::new(Box::new(db));
+    runtime.ensure_system_tables().await.unwrap();
+
+    // Un módulo mínimo en disco: lo que importa aquí es que entre por `install_from_dir`, que es la
+    // puerta por la que pasa cualquier install (marketplace o import de blueprint).
+    let dir = std::env::temp_dir().join(format!("erplora-readyz-first-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("module.json"),
+        r#"{"id":"first","name":"First","version":"1.0.0"}"#,
+    )
+    .unwrap();
+    runtime.install_from_dir(&dir).await.unwrap();
+
+    let state = AppState::with_config(runtime, HubConfig::from_env_with_auth(AuthMode::Dev));
+    let (status, body) = get(state, "/readyz").await;
+
+    assert_eq!(status, StatusCode::OK, "cuerpo: {body}");
+    assert_eq!(body["checks"]["modules"]["expected"], json!(1), "cuerpo: {body}");
+    assert_eq!(body["checks"]["modules"]["registered"], json!(1), "cuerpo: {body}");
+    let _ = std::fs::remove_dir_all(&dir);
 }

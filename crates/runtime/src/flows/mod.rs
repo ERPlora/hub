@@ -26,21 +26,34 @@
 //! - [`def`] — the frozen document, the mapping language and the conditions;
 //! - [`grants`] — what a flow is allowed to do, read fresh at every step;
 //! - [`secrets`] — the write-only credentials an `http` step carries;
+//! - [`net`] — the ONE place an URL is parsed, so that the URL judged is the URL dialled
+//!   (hub#728/#729);
 //! - [`http`] — building an outbound request, and the allow-list it has to pass first;
 //! - [`store`] — the CRUD the REST layer sits on, plus materialising triggers;
 //! - [`triggers`] — event matching in the relay, and the cron/`at` clock;
-//! - [`executor`] — the tick that advances runs.
+//! - [`executor`] — the tick that advances runs, and the claim → I/O → complete seam;
+//! - [`agent`] — the parked `ai` step the server-side agent runner performs (hub#665);
+//! - [`approvals`] — the write a model proposed, waiting for a person (ADR-0283 D3);
+//! - [`schema`] — the shipped `flow.schema.json`, embedded so the hub can SERVE its own contract
+//!   to the editor instead of every editor carrying a copy of it (hub#716).
+pub mod agent;
+pub mod approvals;
 pub mod def;
 pub mod executor;
 pub mod grants;
 pub mod http;
+pub mod net;
+pub mod schema;
 pub mod secrets;
 pub mod store;
 pub mod triggers;
 
-pub use def::{Condition, FlowDefinition, StepKind, TriggerKind, SCHEMA_VERSION};
+pub use agent::AiRequest;
+pub use approvals::{Approval, NewApproval};
+pub use def::{AiPolicy, AiStep, Condition, FlowDefinition, StepKind, TriggerKind, SCHEMA_VERSION};
 pub use executor::{tick, IoResult, PendingIo, TickReport};
 pub use http::HttpRequest;
+pub use schema::{flow_schema, FLOW_SCHEMA_JSON};
 pub use store::{Flow, FlowRun, FlowRunStep, NewFlow};
 
 /// Identity of the flow behind an [`crate::commands::Origin::Automation`] call, carried in the
@@ -85,6 +98,28 @@ pub(crate) mod test_support {
         }
     }
 
+    /// A declarative query, the shape the installer produces. Its `ai` block is what makes it a
+    /// tool the agent runner can be offered (hub#665).
+    pub(crate) fn query(module: &str, permission: &str, sql: &str) -> crate::registry::RegisteredQuery {
+        use crate::manifest::{AiTool, QueryDef};
+        crate::registry::RegisteredQuery {
+            module_id: module.to_string(),
+            def: QueryDef {
+                permission: permission.to_string(),
+                sql: sql.to_string(),
+                schema: None,
+                list: None,
+                ai: Some(AiTool {
+                    description: "a read the assistant may perform".to_string(),
+                    name: None,
+                }),
+                expose_api: false,
+            },
+            sql: sql.to_string(),
+            schema: None,
+        }
+    }
+
     /// The system schema a real boot lays down, so the flow tables exist as they will in a hub.
     pub(crate) async fn ensure_schema(db: &dyn DatabaseAdapter, hub_id: &str) {
         crate::installer::ensure_hub_module_table(db).await.unwrap();
@@ -121,6 +156,10 @@ mod tests {
             secrets::ERR_INVALID_SECRET_NAME,
             secrets::ERR_SECRET_UNREADABLE,
             store::ERR_FLOW_NOT_FOUND,
+            approvals::ERR_APPROVAL_NOT_FOUND,
+            approvals::ERR_APPROVAL_ALREADY_DECIDED,
+            approvals::ERR_APPROVAL_EXPIRED,
+            agent::ERR_NOT_IN_FLIGHT,
         ] {
             assert!(
                 code.starts_with("flow."),

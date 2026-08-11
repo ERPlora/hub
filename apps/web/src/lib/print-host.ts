@@ -21,8 +21,10 @@
 // `_print_queue.last_error`. A swallowed error here would be a lost ticket nobody could see.
 import { createPrintDrain, type DrainDiagnostic, type DrainSocket, type DrainJob } from './print-drain';
 import { printerIdForRole, type PrintDevice } from './print';
+import { createPrintHostRegistration } from './print-host-registration';
 import { getHubSession } from './session';
 import { resolveDeviceId } from './device';
+import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
 /** The minimum of the client this needs. Injected so the tests need no hardware. */
 export interface PrintHostClient {
@@ -89,6 +91,43 @@ interface BootOptions {
   deviceId?: () => Promise<string | null>;
   openSocket?: (url: string) => DrainSocket;
   onDiagnostic?: (event: DrainDiagnostic) => void;
+  /** `POST /api/print/hosts` (hub#749). Injected so the test needs no fetch. */
+  registerHost?: (role: string, deviceId: string) => Promise<{ heartbeatSeconds: number }>;
+  /** `POST /api/print/hosts/heartbeat`. */
+  heartbeatHost?: (deviceId: string) => Promise<{ refreshed: number; heartbeatSeconds: number }>;
+  setTimer?: (fn: () => void, ms: number) => unknown;
+  clearTimer?: (handle: unknown) => void;
+}
+
+/**
+ * The printer roles this device can actually print: the roles of the printers **it can reach**,
+ * without duplicates. A box with no role assigned yet is not a role — the owner has not said what
+ * it prints, and claiming a nameless queue would be inventing the answer.
+ */
+export function printerRolesOfDevices(devices: PrintDevice[]): string[] {
+  const roles = new Set<string>();
+  for (const device of devices ?? []) {
+    const role = device?.role?.trim();
+    // `ip` is what makes it reachable: a registry entry without one cannot take a job.
+    if (role && device?.ip) roles.add(role);
+  }
+  return [...roles];
+}
+
+/** `POST` to the runtime with the device identity the print host registry keys on. */
+async function postToRuntime(path: string, deviceId: string, body?: unknown): Promise<unknown> {
+  const res = await fetch(`${RUNTIME_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...runtimeHeaders(), 'X-Device-Id': deviceId },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: { message?: string } } | null;
+  // A refusal must THROW, never resolve: a swallowed one would leave this device believing it
+  // drains a role the hub never gave it, and the queue with nobody taking its paper out.
+  if (!res.ok || payload?.ok !== true) {
+    throw new Error(payload?.error?.message || `${path} → HTTP ${res.status}`);
+  }
+  return payload;
 }
 
 /** The one drain of this shell. Module-level because a second one would be a second print host. */
@@ -130,6 +169,7 @@ export async function bootPrintHost(
   // environment and does not change while the process lives, so asking once here is enough.
   const hardware = await client.peripherals.detect().catch(() => ({ online: false }));
   if (!hardware.online) return () => {};
+  const session = options.session ?? getHubSession;
   const drain = createPrintDrain({
     url: options.url ?? printChannelUrl(globalThis.location),
     printJob: createJobPrinter(client),
@@ -144,10 +184,47 @@ export async function bootPrintHost(
         }
       }),
   });
-  running = drain;
-  drain.start();
+  // **The alta comes first, and it is what starts the drain** (hub#749). The drain does not retry a
+  // configuration refusal, so a socket opened before this device is a registered host spends its one
+  // attempt on `print.host_not_registered` and never drains again until the app is restarted.
+  const registration = createPrintHostRegistration({
+    rolesOnThisDevice: async () => printerRolesOfDevices(await client.peripherals.getDevices()),
+    register:
+      options.registerHost
+        ? (role) => options.registerHost!(role, deviceId)
+        : async (role) => {
+            const body = (await postToRuntime('/api/print/hosts', deviceId, { role })) as {
+              heartbeatSeconds?: number;
+            };
+            return { heartbeatSeconds: Number(body?.heartbeatSeconds) || 0 };
+          },
+    heartbeat:
+      options.heartbeatHost
+        ? () => options.heartbeatHost!(deviceId)
+        : async () => {
+            const body = (await postToRuntime('/api/print/hosts/heartbeat', deviceId)) as {
+              refreshed?: number;
+              heartbeatSeconds?: number;
+            };
+            return {
+              refreshed: Number(body?.refreshed) || 0,
+              heartbeatSeconds: Number(body?.heartbeatSeconds) || 0,
+            };
+          },
+    session,
+    onRegistered: () => drain.start(),
+    onDiagnostic: (event) => console.warn('[print-host]', event.kind, event.role ?? '', event.message),
+    setTimer: options.setTimer,
+    clearTimer: options.clearTimer,
+  });
+  running = { stop: () => { registration.stop(); drain.stop(); } };
+  // The first pass is AWAITED before the loop starts: the boot is over once this device either is a
+  // print host or is not one, instead of leaving the answer in flight.
+  await registration.tick();
+  registration.start();
+  const stop = running;
   return () => {
-    drain.stop();
+    stop.stop();
     running = null;
   };
 }

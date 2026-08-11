@@ -351,6 +351,13 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
 /// module that it never declares is already inert — [`Registry::listeners_for`] only returns
 /// commands that are registered and active — so it is a manifest bug for `erplora validate` to
 /// catch, not a reason to refuse an install and leave the hub without the module.
+///
+/// **The producer twin lives elsewhere and is a WARNING, not this refusal** (hub#709): a command
+/// that emits an event missing from `events.emits` is reported by
+/// `Manifest::undeclared_emit_warnings` and installs. The asymmetry is the ADR-0286 tier rule —
+/// a listener pointing at a foreign command changes WHO RUNS WHAT, while an undeclared emit only
+/// costs a line in the event catalogue, and refusing it here would make a module that has been
+/// running for months vanish at the boot re-registration (ADR-0269).
 fn validate_event_listeners(manifest: &Manifest) -> Result<()> {
     let namespace = format!("{}.", manifest.id);
     for (event, listener) in &manifest.events.listen {
@@ -743,6 +750,11 @@ pub async fn uninstall(
         &p,
     )
     .await?;
+    // Y su copia local (hub#571). Va junto al borrado de `hub_module` porque son el mismo hecho:
+    // si el paquete sobreviviera, el primer arranque sin red repondría un módulo que el dueño
+    // quitó — el arranque repone «lo que hub_module dice instalado», y esa fila ya no está, pero
+    // dejar el artefacto ahí es guardar la munición de un bug que no queremos volver a discutir.
+    crate::module_package::forget(db, hub_id, module_id).await?;
     Ok(())
 }
 

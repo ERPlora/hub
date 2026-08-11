@@ -64,6 +64,19 @@ describe('sectionDiscardCode · motivo traducible vs prosa heredada', () => {
     expect(sectionDiscardCode('roles_not_activatable')).toBe('roles_not_activatable');
   });
 
+  // hub#753 — la numeración fiscal de OTRA instalación (serie + libro de números ya entregados)
+  // no aterriza en este hub. Sin código, la fila del informe le enseñaría al hostelero la cadena
+  // cruda `numbering_not_portable`, que es peor que no decir nada.
+  it('reconoce el código de una numeración fiscal que no es de este hub', () => {
+    expect(sectionDiscardCode('numbering_not_portable')).toBe('numbering_not_portable');
+  });
+
+  // ADR-0273 D8 / hub#560 — el runtime ya emitía este código y el shell no lo conocía: se pintaba
+  // en crudo. Mismo contrato que los demás.
+  it('reconoce el código de una sección sobre una tabla de sistema del hub', () => {
+    expect(sectionDiscardCode('system_table_not_portable')).toBe('system_table_not_portable');
+  });
+
   it('un motivo en prosa NO es un código: se pinta tal cual', () => {
     const prosa = 'una plantilla no aplica identidades: la sección `hub_users` se ha descartado';
     expect(sectionDiscardCode(prosa)).toBeNull();

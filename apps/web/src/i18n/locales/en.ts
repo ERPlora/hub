@@ -43,6 +43,8 @@ export default {
     manageError: 'We could not open your browser. Go to erplora.com to manage your business.',
     notifications: 'Notifications',
     noNotifications: 'All caught up. No notifications.',
+    deadLettersTitle: 'Failed events',
+    deadLettersBody: '{count} event(s) the relay could not deliver. Review and resend them.',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',
@@ -197,6 +199,10 @@ export default {
       // where, instead of painting a red error over a plan the owner simply has not bought.
       blocked: 'These have to be added to your plan first: {apps}',
       failed: 'Something else did not go in. You can see the detail and try again in Settings › Data.',
+      // hub#751 — the card already knows WHICH apps broke, so it names them: «something else» sent
+      // a hairdresser to hunt for a needle. The generic line above is left for the case where the
+      // failure is not an app and no name would mean anything to her.
+      failedApps: 'These did not go in: {apps}. You can see the detail and try again in Settings › Data.',
       notStartedTitle: 'That template could not be opened',
       notStartedBody: 'Nothing changed in your business. Try again, or load it from Settings › Data.',
       interruptedTitle: 'The set-up did not finish',
@@ -387,6 +393,19 @@ export default {
     hubLanguageDesc: 'Default Hub language for users without their own',
     saved: 'Settings saved',
     saveError: 'Could not save settings',
+    // A refusal the runtime explains, keyed by its STABLE error code (hub#684). The runtime's own
+    // message is written in English for the log; what the person in front of the screen reads has
+    // to be their language, so the code — not the message — is what travels.
+    saveRefused: {
+      demo_fiscal_identity_locked:
+        'This is a demo, so it invoices as “{name}”. Create your own hub to invoice under your business.',
+      demo_business_certificate_locked:
+        'A demo cannot take your certificate: it never files anything for real. Create your own hub to invoice with it.',
+      demo_fiscal_environment_locked:
+        'A demo always stays in the tax authority’s test environment. Create your own hub to file for real.',
+      business_tax_id_frozen:
+        'The tax id can no longer be changed: this hub has already issued under it.',
+    },
     timezone: 'Timezone',
     timezoneDesc: 'Timezone for dates and times',
     country: 'Country',
@@ -468,7 +487,9 @@ export default {
     resetUndo: 'Undo',
     resetUndoTitle: 'Undo “{name}”',
     resetUndoBody: '{n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
-    resetRows: '{n} rows',
+    // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
+    // «1 rows» (hub#765). El `n` que pasa la llamada elige la forma.
+    resetRows: '{n} row | {n} rows',
     resetSubmit: 'Reset hub',
     resetDeleted: '{n} rows deleted',
     resetConfirmTitle: 'This cannot be undone',
@@ -551,6 +572,12 @@ export default {
     updateUpToDate: '{name} is already on the latest version.',
     updateError: 'Could not update {name}. It keeps running the version it had.',
     updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
+    // Version picker (hub#675). Only shown when there is more than one option; the latest comes
+    // first and preselected, so choosing another one is deliberate.
+    versionPickTitle: 'Choose a version',
+    versionPickBody: 'The latest one is selected. Pick another only if support asked you to.',
+    versionPickConfirm: 'Continue',
+    versionLatest: '{version} (latest)',
     // Names the place, does not open it (hub#479). `purchaseInBrowser`/`purchaseOpenError` went
     // with the button that opened the SaaS checkout.
     needsSubscription: '{name} needs a subscription. Subscribe from your ERPlora account at erplora.com and it will install here.',
@@ -776,8 +803,26 @@ export default {
     stepInstall: 'Install',
     stepPair: 'Pair',
     stepConfigure: 'Configure',
-    updatesManaged: 'Managed updates',
     updatesCloudHint: 'This web Hub is updated automatically as part of service deployments.',
+    // What we changed on this hub, and from which version (hub#564, ADR-0269 §3.5). We update
+    // without asking, so the least we owe is that the owner can find out WHAT changed. Every
+    // sentence below names an app the way they know it and a version they can compare — never a
+    // digest, never «the image», and never a changelog we made up.
+    updateHistory: "What we've updated",
+    updatesRunning: 'Running {version}',
+    noUpdates: 'Nothing has changed',
+    noUpdatesHint: "We haven't updated anything on this hub recently. When we do, it will show up here.",
+    today: 'Today',
+    yesterday: 'Yesterday',
+    // A rollback is an entry of its own and says so in those words: which version it went back to.
+    // The error behind it is deliberately not shown — it is written for us, not for whoever is
+    // opening the shop.
+    rolledBackTo: 'Went back to {version}: the new one did not start',
+    updateLost: 'This app is not running: we are on it',
+    documents: 'Documents',
+    noDocuments: 'No documents',
+    noDocumentsBucket: "This hub's storage bucket is empty.",
+    searchDocument: 'Search document…',
     loadErrorTitle: 'System information is unavailable',
     loadErrorBody: 'Metrics and logs are unavailable right now. You can try again.',
     retry: 'Try again',
@@ -789,6 +834,20 @@ export default {
     tabPlan: 'Plan & limits',
     tabUpdates: 'Updates',
     tabLogs: 'Logs',
+    tabEvents: 'Failed events',
+    deadEvents: 'Failed events',
+    deadEventsHint: 'Fix the cause (permission, a module that was down…) and resend. The content is never edited: if the cause persists, the event dies again and reappears here.',
+    noDeadEvents: 'All clear',
+    noDeadEventsHint: 'No failed events. The event queue lives in the database: a restart never loses it.',
+    deadEventsLoadError: 'Could not load the failed-event queue. Check the connection and retry.',
+    attempts: 'attempts',
+    retryAll: 'Resend all',
+    retryDone: 'Event resent to the relay.',
+    retryAllDone: '{count} event(s) resent to the relay.',
+    retryFailed: 'Could not resend: {reason}',
+    discardDone: 'Event discarded (kept for audit).',
+    discardFailed: 'Could not discard: {reason}',
+    discardConfirm: 'Discard this event for good? The row is kept (auditable), but the relay will never redeliver it. Use only if the event must not be recorded.',
     resourcesCloud: 'Cloud resources',
     resourcesSystem: 'System resources',
     sourceCloud: 'Cloud',
@@ -1017,6 +1076,9 @@ export default {
     exporting: 'Exporting…',
     done: '{filename} downloaded.',
     errorTitle: 'Export failed',
+    // hub#765: the runtime did not answer before the deadline. Without a timeout the spinner spun
+    // forever; now it aborts and says so honestly, so the user can retry instead of walking away.
+    timeout: 'The server is taking too long to build the backup. Try again in a moment.',
   },
   importPage: {
     title: 'Import configuration',
@@ -1077,6 +1139,10 @@ export default {
     reasonBlocked:
       'Not installed: it needs modules you have not subscribed to yet: {missing}. Subscribe to them and import again — nothing else was touched.',
     mediaFailed: '{n} not copied',
+    // hub#751/#752 — the template names a version the marketplace no longer publishes, so a newer
+    // compatible one went in. It installed fine; it is said out loud because a template that
+    // quietly installs something other than what it announces is the surprise this avoids.
+    reasonVersionSubstituted: 'The template asked for {requested}; that version is no longer available, so {installed} went in.',
     // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
     // identity of ONE hub: only that hub restoring its own backup gets them back.
     reasonIdentityNotPortable:
@@ -1090,6 +1156,14 @@ export default {
     // switch on. Nothing was created and nobody gained access.
     reasonRolesNotActivatable:
       'Roles not switched on: {n}. A template can only switch on roles the modules installed here provide, and never the administrative ones.',
+    // ADR-0273 D8 / hub#560 — the file brought a section over this hub's own system tables (its
+    // fiscal profile, its certificate store). No bundle writes those: they are this installation.
+    reasonSystemTableNotPortable:
+      "Rows discarded: {n}. The file tried to write this hub's own records — its tax profile and certificate. Those belong to this installation and no file can change them.",
+    // hub#753 — invoice series and the ledger of numbers already issued belong to ONE installation
+    // (RD 1007/2023: no gaps, no duplicates). Yours are untouched; set them up here if you have not.
+    reasonNumberingNotPortable:
+      'Invoice numbering discarded: {n}. Series and the numbers already issued belong to the business that created the file. Your own numbering is untouched — set up your series in Settings if you have not yet.',
     done: 'Go to home',
   },
   moduleView: {
@@ -1099,6 +1173,8 @@ export default {
     retry: 'Try again',
     blockedTitle: 'Subscription required',
     blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',
+    protectedTitle: 'Open the cash drawer first',
+    protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
   },
   moduleSettings: {
     tab: 'Settings',

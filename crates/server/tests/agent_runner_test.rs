@@ -1,0 +1,728 @@
+//! **The agent runner, end to end** (hub#665 — ADR-0283 K5/D3): the piece that makes the star
+//! case possible — *the AI answers WhatsApp at 3 AM, reads the diary, reasons about how long the
+//! service takes, and books the appointment; the sensitive writes wait for a person.*
+//!
+//! Everything here runs against a **fake SaaS**: a real HTTP server on `127.0.0.1:0` speaking the
+//! same SSE dialect as `saas/apps/assistant/api/views.py::proxy_chat_stream`. Not a mocked client
+//! — the actual bytes, over the actual socket, through the actual `reqwest` in `AppState`. The one
+//! thing that cannot be faked away is exactly what this issue is most likely to get wrong.
+//!
+//! ## The spike (`flows.md` §12.2): are the `function_call` arguments complete?
+//!
+//! Two different questions hide behind that sentence, and only one of them is a real hazard.
+//!
+//! 1. **Across SSE events** — no. The SaaS orchestrator accumulates the provider's streamed
+//!    tool-call deltas itself (`openai_provider`: `frag["arguments"] += fn.arguments`) and only
+//!    yields ONE `function_call` event per call, after the provider stream closes, with the whole
+//!    normalised `arguments` string. Nothing to reassemble at the event level.
+//! 2. **Across TCP chunks** — YES, and this is the failure that would have been silent. A single
+//!    `data: {…}` line arrives split wherever the network split it, and half a JSON object parses
+//!    as nothing. `translate_sse_line` would then fall through to its non-JSON branch and emit the
+//!    fragment as a *token*: the tool call would simply vanish, the model would be told nothing
+//!    happened, and the appointment would never be booked — with no error anywhere.
+//!
+//! So the runner buffers by LINE and only translates complete ones (the same discipline the
+//! browser path uses in `assistant_chat_stream`), and it accumulates `arguments` per `call_id`
+//! across events as belt and braces, in case a future provider path streams them. Both are pinned
+//! below by `a_tool_call_split_across_tcp_chunks_is_reassembled_not_lost`, which cuts the line in
+//! the middle of the arguments on purpose.
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use axum::response::Response as AxumResponse;
+use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::{approvals, store, NewFlow};
+use erplora_runtime::Runtime;
+use erplora_server::{agent_runner, app, AppState, AuthMode, HubConfig};
+use http_body_util::BodyExt;
+use serde_json::{json, Value};
+use tower::ServiceExt;
+
+const HUB: &str = "hub-agent-runner";
+
+// ── the fake SaaS ─────────────────────────────────────────────────────────────────────────────
+
+/// A scripted assistant proxy. Each request pops the next script; the bodies it received are kept
+/// so a test can assert **what the hub offered the model**, which is where the three-way tool
+/// intersection either happens or does not.
+/// One scripted turn, as a list of the **network chunks** it is delivered in. A turn is normally
+/// one chunk; the spike test hands over two, cut mid-JSON.
+type Turn = Vec<String>;
+
+#[derive(Clone, Default)]
+struct FakeCloud {
+    scripts: Arc<Mutex<Vec<Turn>>>,
+    seen: Arc<Mutex<Vec<Value>>>,
+}
+
+impl FakeCloud {
+    fn with(scripts: Vec<Turn>) -> Self {
+        Self {
+            // Popped from the back after reversing, so the script reads in turn order.
+            scripts: Arc::new(Mutex::new(scripts.into_iter().rev().collect())),
+            seen: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    fn bodies(&self) -> Vec<Value> {
+        self.seen.lock().unwrap().clone()
+    }
+
+    fn turns(&self) -> usize {
+        self.seen.lock().unwrap().len()
+    }
+
+    /// Binds the fake SaaS and returns its base URL. It lives for the whole test.
+    async fn serve(&self) -> String {
+        let state = self.clone();
+        let router = axum::Router::new().route(
+            "/api/v1/hub/device/assistant/chat/stream/",
+            axum::routing::post(move |axum::Json(body): axum::Json<Value>| {
+                let state = state.clone();
+                async move {
+                    state.seen.lock().unwrap().push(body);
+                    let turn = state
+                        .scripts
+                        .lock()
+                        .unwrap()
+                        .pop()
+                        .unwrap_or_else(|| sse_text("(no script left)"));
+                    // Each element is written as its OWN chunk, with a yield between them, so a
+                    // split line really crosses a read boundary on the hub's side.
+                    let stream = futures_util::stream::iter(
+                        turn.into_iter()
+                            .map(|chunk| Ok::<_, std::io::Error>(axum::body::Bytes::from(chunk))),
+                    );
+                    AxumResponse::builder()
+                        .header("content-type", "text/event-stream")
+                        .body(Body::from_stream(stream))
+                        .unwrap()
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        format!("http://{address}")
+    }
+}
+
+/// A turn that answers in plain text and stops.
+fn sse_text(text: &str) -> Turn {
+    vec![format!(
+        "data: {}\n\ndata: [DONE]\n\n",
+        json!({ "type": "text_delta", "text": text })
+    )]
+}
+
+/// A turn that asks for one tool call, exactly as the SaaS emits it: one event, whole arguments
+/// (the orchestrator has already accumulated the provider's deltas — see the spike note above).
+fn sse_call(name: &str, call_id: &str, arguments: Value) -> Turn {
+    vec![format!(
+        "data: {}\n\ndata: [DONE]\n\n",
+        json!({
+            "type": "function_call",
+            "name": name,
+            "call_id": call_id,
+            "arguments": arguments.to_string()
+        })
+    )]
+}
+
+// ── the hub ───────────────────────────────────────────────────────────────────────────────────
+
+fn fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_agent/agenda")
+}
+
+fn config(cloud_base_url: String, tag: &str) -> HubConfig {
+    let temp = std::env::temp_dir().join(format!("erplora-agent-{tag}-{}", std::process::id()));
+    HubConfig {
+        demo: false,
+        hub_id: HUB.into(),
+        cloud_base_url,
+        module_cache: temp.join("modules-cache"),
+        auth_mode: AuthMode::Session,
+        jwt_public_key: None,
+        // The runner talks to the SaaS with the hub's MACHINE credential: there is nobody logged
+        // in at 3 AM, which is the entire point of the feature.
+        cloud_api_token: Some("machine-secret".into()),
+        device_trust_enforce: false,
+        media_dir: temp,
+        sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
+    }
+}
+
+struct Hub {
+    state: AppState,
+    router: axum::Router,
+    admin_session: String,
+    admin_id: String,
+    flow_id: String,
+}
+
+/// A hub with the `agenda` module installed, one flow whose only step is the agent turn, and the
+/// grants the story needs: read the diary, write a booking.
+async fn hub(cloud_base_url: String, tag: &str, step: Value, grants: &[(GrantKind, String)]) -> Hub {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
+    rt.ensure_system_tables().await.unwrap();
+    rt.install_from_dir(&fixture()).await.unwrap();
+    let admin = rt.create_user("Ioan", "1111", "admin", None).await.unwrap();
+    let admin_session = rt.create_session(&admin, 3600, None).await.unwrap();
+
+    let flow = rt
+        .create_flow(
+            &NewFlow {
+                name: "WhatsApp booking".into(),
+                enabled: true,
+                definition: json!({ "schema_version": 1, "steps": [step] }),
+            },
+            "hub_user:owner",
+        )
+        .await
+        .unwrap();
+    rt.replace_flow_grants(&flow.id, grants, "hub_user:owner")
+        .await
+        .unwrap();
+
+    let state = AppState::with_config(rt, config(cloud_base_url, tag));
+    Hub {
+        router: app(state.clone()),
+        state,
+        admin_session,
+        admin_id: admin,
+        flow_id: flow.id,
+    }
+}
+
+/// The step of the story: read the diary, then book.
+fn agent_step(policy: &str) -> Value {
+    json!({
+        "id": "agent",
+        "kind": "ai",
+        "prompt": "A customer wrote at 3 AM: «{{input.text}}». Book them in.",
+        "tools": {
+            "queries": ["agenda.slots.list"],
+            "commands": ["agenda.booking.create"]
+        },
+        "policy": policy
+    })
+}
+
+async fn start_run(h: &Hub, input: Value) -> String {
+    let rt = h.state.runtime.lock().await;
+    rt.start_flow_run(&h.flow_id, &input, "hub_user:owner")
+        .await
+        .unwrap();
+    let report = rt.process_flows().await.unwrap();
+    match report.pending_io.first() {
+        Some(erplora_runtime::flows::executor::PendingIo::Ai { run_id, .. }) => run_id.clone(),
+        other => panic!("the tick must hand the agent turn to the server: {other:?}"),
+    }
+}
+
+async fn bookings(h: &Hub) -> Vec<Value> {
+    let rt = h.state.runtime.lock().await;
+    rt.db_for_test()
+        .query(
+            "SELECT customer, starts_at, minutes, created_by FROM agenda_booking ORDER BY starts_at",
+            &Params::new(),
+        )
+        .await
+        .unwrap()
+        .rows
+}
+
+/// Performs the parked agent turn exactly as production does: the runner answers with an
+/// [`IoResult`] and `flow_io::dispatch` hands it to `complete_flow_io`. Doing both here — rather
+/// than calling the runner alone — is what keeps these tests honest about the seam.
+async fn perform(h: &Hub, run_id: &str) {
+    let result = agent_runner::run_turn(&h.state, run_id, "agent").await;
+    let rt = h.state.runtime.lock().await;
+    rt.complete_flow_io(run_id, "agent", result).await.unwrap();
+}
+
+/// One turn of the background loop. The tick — never the runner — is what carries a run past the
+/// step the agent finished, exactly as it does for every other kind of step.
+async fn tick(h: &Hub) {
+    let rt = h.state.runtime.lock().await;
+    rt.process_flows().await.unwrap();
+}
+
+async fn run_status(h: &Hub, run_id: &str) -> String {
+    let rt = h.state.runtime.lock().await;
+    rt.get_flow_run(run_id).await.unwrap().0.status
+}
+
+async fn step_output(h: &Hub, run_id: &str) -> Value {
+    let rt = h.state.runtime.lock().await;
+    let (_, steps) = rt.get_flow_run(run_id).await.unwrap();
+    steps
+        .iter()
+        .find(|s| s.step_id == "agent")
+        .map(|s| s.output.clone())
+        .unwrap_or(Value::Null)
+}
+
+async fn seed_slots(h: &Hub) {
+    let rt = h.state.runtime.lock().await;
+    let mut p = Params::new();
+    p.insert("hub".into(), json!(HUB));
+    rt.db_for_test()
+        .execute(
+            "INSERT INTO agenda_slot (id, hub_id, starts_at, minutes) \
+             VALUES ('slot-1', :hub, '2026-08-10T10:00:00Z', 30)",
+            &p,
+        )
+        .await
+        .unwrap();
+}
+
+async fn body_json(response: axum::response::Response) -> Value {
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+fn request(method: &str, uri: &str, session: Option<&str>, body: Option<Value>) -> Request<Body> {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(token) = session {
+        builder = builder.header("x-hub-session", token);
+    }
+    match body {
+        Some(value) => builder
+            .header("content-type", "application/json")
+            .body(Body::from(value.to_string()))
+            .unwrap(),
+        None => builder.body(Body::empty()).unwrap(),
+    }
+}
+
+// ── the star case ─────────────────────────────────────────────────────────────────────────────
+
+/// The whole story, at 3 AM, with nobody at the counter: the model reads the diary on its own
+/// (a query runs unattended — it changes nothing), then proposes the booking, and THAT waits.
+#[tokio::test]
+async fn the_agent_reads_the_diary_by_itself_and_the_booking_waits_for_a_person() {
+    let cloud = FakeCloud::with(vec![
+        sse_call("agenda.slots.list", "c1", json!({})),
+        sse_call(
+            "agenda.booking.create",
+            "c2",
+            json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 30 }),
+        ),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "star",
+        agent_step("manual"),
+        &[
+            (GrantKind::Query, "agenda.slots.list".into()),
+            (GrantKind::Command, "agenda.booking.create".into()),
+        ],
+    )
+    .await;
+    seed_slots(&h).await;
+    let run_id = start_run(&h, json!({ "text": "can I come tomorrow at 10?" })).await;
+
+    perform(&h, &run_id).await;
+
+    // The read ran on its own — that is the "consults the diary" half of the case.
+    assert_eq!(
+        cloud.turns(),
+        2,
+        "the query's result was fed back and the turn continued"
+    );
+    let second = &cloud.bodies()[1];
+    let roles: Vec<&str> = second["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|m| m["role"].as_str())
+        .collect();
+    assert!(
+        roles.contains(&"tool"),
+        "the query's rows go back to the model as a tool result: {second}"
+    );
+
+    // The write did NOT run — it became a row a person will read in the morning.
+    assert!(
+        bookings(&h).await.is_empty(),
+        "an unattended model does not write to the business database (ADR-0283 D3)"
+    );
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_WAITING_APPROVAL);
+
+    let rt = h.state.runtime.lock().await;
+    let pending = rt
+        .list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+        .await
+        .unwrap();
+    drop(rt);
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].command, "agenda.booking.create");
+    assert_eq!(
+        pending[0].payload["customer"], "Marta",
+        "the tray shows exactly what will run, not an opaque id"
+    );
+    assert_eq!(
+        pending[0].payload["minutes"], 30,
+        "including the duration the model reasoned about"
+    );
+
+    // …and the turn ENDED there: no third call to the model while it waits.
+    assert_eq!(
+        cloud.turns(),
+        2,
+        "a proposal awaiting approval ends the turn; it does not keep the model spinning"
+    );
+}
+
+/// Approving from the tray executes exactly what was proposed — through the automation door, so
+/// the grant is re-checked and the row is attributed to the flow — and never re-enters the model.
+#[tokio::test]
+async fn approving_from_the_tray_books_the_appointment_without_asking_the_model_again() {
+    let cloud = FakeCloud::with(vec![sse_call(
+        "agenda.booking.create",
+        "c1",
+        json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 45 }),
+    )]);
+    let h = hub(
+        cloud.serve().await,
+        "approve",
+        agent_step("manual"),
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+
+    let id = {
+        let rt = h.state.runtime.lock().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()[0]
+            .id
+            .clone()
+    };
+
+    let response = h
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/api/hub/flows/approvals/{id}/approve"),
+            Some(&h.admin_session),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let decided = body_json(response).await;
+    assert_eq!(decided["data"]["status"], approvals::STATUS_APPROVED);
+    assert_eq!(
+        decided["data"]["decided_by"],
+        json!(format!("hub_user:{}", h.admin_id)),
+        "who decided comes from the resolved session, never from the body"
+    );
+
+    let rows = bookings(&h).await;
+    assert_eq!(rows.len(), 1, "exactly one booking, exactly as proposed");
+    assert_eq!(rows[0]["customer"], "Marta");
+    assert_eq!(rows[0]["minutes"], 45);
+    assert!(
+        rows[0]["created_by"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("flow:"),
+        "the audit says a flow wrote this: {rows:?}"
+    );
+    assert_eq!(
+        cloud.turns(),
+        1,
+        "approving runs the proposal; it does not re-plan (re-planning is product, not kernel)"
+    );
+    tick(&h).await;
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_DONE,
+        "the run was handed back to the tick, which carried it to the end"
+    );
+}
+
+/// Rejecting is worth as much as approving: nothing is written, and the run stops rather than
+/// carrying on as if the booking had happened.
+#[tokio::test]
+async fn rejecting_from_the_tray_books_nothing() {
+    let cloud = FakeCloud::with(vec![sse_call(
+        "agenda.booking.create",
+        "c1",
+        json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }),
+    )]);
+    let h = hub(
+        cloud.serve().await,
+        "reject",
+        agent_step("manual"),
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+    let id = {
+        let rt = h.state.runtime.lock().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()[0]
+            .id
+            .clone()
+    };
+
+    let response = h
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/api/hub/flows/approvals/{id}/reject"),
+            Some(&h.admin_session),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    assert!(bookings(&h).await.is_empty(), "a rejection writes nothing");
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_CANCELLED);
+    assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
+}
+
+/// `policy: "auto"` is the owner saying, in writing, "do it". Then the command runs in the turn
+/// and the model is told what happened, so it can answer the customer.
+#[tokio::test]
+async fn under_policy_auto_the_command_runs_in_the_turn() {
+    let cloud = FakeCloud::with(vec![
+        sse_call(
+            "agenda.booking.create",
+            "c1",
+            json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 30 }),
+        ),
+        sse_text("Booked for tomorrow at 10."),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "auto",
+        agent_step("auto"),
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(bookings(&h).await.len(), 1);
+    tick(&h).await;
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_DONE);
+    assert_eq!(
+        step_output(&h, &run_id).await["text"],
+        "Booked for tomorrow at 10.",
+        "the answer the model produced is the step's output, readable by later steps"
+    );
+}
+
+/// The gate is the grant, and it is the SAME gate the kernel's own `command` steps go through
+/// (`Origin::Automation`). Under `policy:"auto"` a command the flow was not granted is refused by
+/// the runtime, not by the runner's good manners.
+#[tokio::test]
+async fn a_command_without_a_grant_is_refused_even_under_policy_auto() {
+    let cloud = FakeCloud::with(vec![
+        sse_call("agenda.booking.cancel", "c1", json!({ "id": "whatever" })),
+        sse_text("I could not do that."),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "nogrant",
+        json!({
+            "id": "agent", "kind": "ai", "prompt": "cancel it", "policy": "auto",
+            // The document DECLARES the tool; the grant is what is missing.
+            "tools": { "commands": ["agenda.booking.cancel"] }
+        }),
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({})).await;
+
+    perform(&h, &run_id).await;
+
+    let bodies = cloud.bodies();
+    let offered: Vec<&str> = bodies[0]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|t| t["name"].as_str())
+        .collect();
+    assert!(
+        !offered.contains(&"agenda.booking.cancel"),
+        "a tool outside the grants is not even OFFERED to the model: {offered:?}"
+    );
+}
+
+/// The three-way intersection of ADR-0283 §7, asserted on the wire. A tool has to be (1) assembled
+/// from the registry under the flow's own permissions, (2) declared by the step, and (3) granted.
+/// Two out of three is not enough — and the one that is easiest to forget is the step's list, which
+/// is how an author bounds what a specific agent turn may touch.
+#[tokio::test]
+async fn the_model_is_offered_the_intersection_of_the_registry_the_step_and_the_grants() {
+    let cloud = FakeCloud::with(vec![sse_text("nothing to do")]);
+    let h = hub(
+        cloud.serve().await,
+        "intersect",
+        json!({
+            "id": "agent", "kind": "ai", "prompt": "just look",
+            // Declares ONE of the two granted reads. `agenda.bookings.list` is granted but not
+            // declared: this turn is about free slots.
+            "tools": { "queries": ["agenda.slots.list"] }
+        }),
+        &[
+            (GrantKind::Query, "agenda.slots.list".into()),
+            (GrantKind::Query, "agenda.bookings.list".into()),
+            (GrantKind::Command, "agenda.booking.create".into()),
+        ],
+    )
+    .await;
+    let run_id = start_run(&h, json!({})).await;
+
+    perform(&h, &run_id).await;
+
+    let bodies = cloud.bodies();
+    let offered: Vec<&str> = bodies[0]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|t| t["name"].as_str())
+        .collect();
+    assert_eq!(
+        offered,
+        vec!["agenda.slots.list"],
+        "granted but not declared by the step is still not offered: {offered:?}"
+    );
+}
+
+/// **The spike, pinned.** The `data:` line carrying the tool call is cut in half mid-JSON, exactly
+/// as a TCP chunk boundary would cut it. Without line buffering the fragment parses as nothing,
+/// `translate_sse_line` emits it as a token, the call disappears and the appointment is never
+/// booked — silently, which is the worst failure this piece can have.
+#[tokio::test]
+async fn a_tool_call_split_across_tcp_chunks_is_reassembled_not_lost() {
+    let whole = sse_call(
+        "agenda.booking.create",
+        "c1",
+        json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 30 }),
+    )
+    .remove(0);
+    // Cut in the middle of the arguments string — mid-JSON, mid-line, mid-value. Same bytes,
+    // delivered in two writes.
+    let cut = whole.find("starts_at").unwrap();
+    let split = vec![whole[..cut].to_string(), whole[cut..].to_string()];
+
+    let cloud = FakeCloud::with(vec![split]);
+    let h = hub(
+        cloud.serve().await,
+        "chunked",
+        agent_step("auto"),
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({})).await;
+
+    perform(&h, &run_id).await;
+
+    let rows = bookings(&h).await;
+    assert_eq!(
+        rows.len(),
+        1,
+        "the split line must be reassembled before it is parsed"
+    );
+    assert_eq!(rows[0]["starts_at"], "2026-08-10T10:00:00Z");
+}
+
+/// A model that keeps calling tools forever is real money: every turn goes through the SaaS proxy,
+/// which meters it (`AssistantUsage`). The cap is enforced server-side, and hitting it FAILS the
+/// step — it does not quietly answer as if the loop had finished.
+#[tokio::test]
+async fn max_iters_stops_a_runaway_loop_and_fails_the_step() {
+    let scripts = (0..12)
+        .map(|i| sse_call("agenda.slots.list", &format!("c{i}"), json!({})))
+        .collect();
+    let cloud = FakeCloud::with(scripts);
+    let h = hub(
+        cloud.serve().await,
+        "maxiters",
+        json!({
+            "id": "agent", "kind": "ai", "prompt": "look forever", "policy": "auto",
+            "max_iters": 3,
+            "tools": { "queries": ["agenda.slots.list"] }
+        }),
+        &[(GrantKind::Query, "agenda.slots.list".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({})).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(
+        cloud.turns(),
+        3,
+        "the cap is counted server-side, not trusted to the model"
+    );
+    let rt = h.state.runtime.lock().await;
+    let (run, _) = rt.get_flow_run(&run_id).await.unwrap();
+    assert_eq!(run.status, store::STATUS_FAILED);
+    assert!(
+        run.last_error.contains(agent_runner::ERR_MAX_ITERS),
+        "the failure names the cap: {}",
+        run.last_error
+    );
+}
+
+/// The tray is not a public screen. It is where a person authorises the hub to write while nobody
+/// is watching, so it takes an owner/admin session — never an API key, never the machine token
+/// (`flows_api.rs` door, ADR-0283 §9).
+#[tokio::test]
+async fn the_approval_tray_takes_an_admin_session_and_nothing_else() {
+    let cloud = FakeCloud::with(vec![sse_text("hi")]);
+    let h = hub(
+        cloud.serve().await,
+        "door",
+        agent_step("manual"),
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+
+    let anonymous = h
+        .router
+        .clone()
+        .oneshot(request("GET", "/api/hub/flows/approvals", None, None))
+        .await
+        .unwrap();
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+
+    let signed_in = h
+        .router
+        .clone()
+        .oneshot(request(
+            "GET",
+            "/api/hub/flows/approvals",
+            Some(&h.admin_session),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(signed_in.status(), StatusCode::OK);
+    assert_eq!(body_json(signed_in).await["data"], json!([]));
+}

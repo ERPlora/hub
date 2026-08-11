@@ -386,6 +386,24 @@ export interface ElevationAsk {
  */
 export type ElevationApprover = (ask: ElevationAsk) => Promise<string | null>;
 
+/**
+ * The hub (or the proxy in front of it) did NOT answer with the JSON envelope the runtime always
+ * returns — the transport is down (hub#782).
+ *
+ * Surfaces from `post()` in three shapes that used to escape as raw, code-less errors:
+ *   - a `5xx text/html` error page from the proxy (the hub container died, OOM exit 137 / hub#759;
+ *     any deploy or restart window) — `res.json()` blew up with `SyntaxError: Unexpected token '<'`;
+ *   - a response whose body is not valid JSON regardless of its `Content-Type`;
+ *   - a network-level failure of `fetch` itself (`TypeError: Failed to fetch`, DNS, CORS, abort).
+ *
+ * They collapse to ONE code on purpose: from a module's point of view all three mean «the hub did
+ * not reply with something usable», and the UI shows one message and (maybe) retries — splitting
+ * them would only force every one of the 24 modules to repeat the same `||`. A domain refusal
+ * (`PermissionDenied` → 403 + JSON envelope) is NOT this: it carries its own `code`
+ * (`permission_denied`, `requires_elevation`, …) and flows through `unwrap` untouched.
+ */
+export const SERVER_UNAVAILABLE = 'server_unavailable';
+
 /** Sobre de respuesta estándar del server Axum (`crates/server`). */
 interface Envelope {
   ok: boolean;
@@ -428,6 +446,20 @@ function unwrapPage(data: unknown): unknown {
 const PUSH_RETRY_MIN_MS = 1_000;
 /** Ceiling for the wait while there is no credential to present (a logged-out till). */
 const PUSH_RETRY_MAX_MS = 30_000;
+
+/**
+ * A short, safe label for an unknown error, for {@link ErploraError} messages that must not leak the
+ * raw text of a `SyntaxError`/`TypeError` (hub#782). It keeps the error's `name`/`message` when they
+ * are harmless and degrades to a fixed phrase otherwise — never `undefined`.
+ */
+function safeErr(e: unknown): string {
+  if (e instanceof Error && e.message) {
+    // The exact byte sequence of the proxy's HTML would otherwise reach the cashier. Truncate hard.
+    const m = e.message.trim();
+    return m.length > 120 ? `${m.slice(0, 120)}…` : m;
+  }
+  return 'network error';
+}
 
 /** Control frame of the event channel: the hub accepted the credential (hub#504). */
 export const STREAM_READY = 'stream.ready';
@@ -542,12 +574,76 @@ export class HttpWsTransport implements ErploraTransport {
     body: unknown,
     extraHeaders: Record<string, string> = {},
   ): Promise<unknown> {
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this.headers(), ...extraHeaders },
-      body: JSON.stringify(body),
-    });
-    const env = (await res.json()) as Envelope;
+    return this.send('POST', path, body, extraHeaders);
+  }
+
+  /**
+   * **The hub's own REST surface** (hub#714) — `/api/hub/flows*` today. Same envelope discipline as
+   * every other call, a different verb and a path the CALLER's surface built from a fixed table.
+   *
+   * This method takes a path and is therefore exactly the shape of a generic proxy, which is why it
+   * is not reachable from module code: `ErploraClient` never exposes the transport, and the only
+   * thing on the client that can call it is {@link FlowsApi}, whose method list is pinned by a test.
+   */
+  coreRequest(req: CoreRequest, extraHeaders: Record<string, string> = {}): Promise<unknown> {
+    return this.send(req.method, req.path, req.body, extraHeaders);
+  }
+
+  private async send(
+    method: string,
+    path: string,
+    body: unknown,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<unknown> {
+    // hub#782: the proxy's `5xx text/html` page (the hub container died — OOM exit 137 / hub#759;
+    // any deploy window) used to reach `res.json()` and blow up as a raw `SyntaxError`, which is
+    // NOT an `ErploraError`, carries no `code`, and so no module can orient by it. The runtime
+    // ALWAYS answers `application/json` — even its 4xx domain refusal travels in an envelope with a
+    // `code` — so JSON is the signature of «the hub answered», and anything else is the proxy (or
+    // the network). That is why we key on the CONTENT-TYPE and not on `res.ok`: a 403 envelope with
+    // `permission_denied` is a domain refusal with its own code, not a transport failure.
+    let res: Response;
+    // A `GET`/`DELETE` carries no body and must not announce one: some proxies reject the pair.
+    const framing: Record<string, string> =
+      body === undefined ? {} : { 'Content-Type': 'application/json' };
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method,
+        headers: { ...framing, ...this.headers(), ...extraHeaders },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    } catch (e) {
+      // A network-level failure (DNS, CORS, abort, `TypeError: Failed to fetch`): same meaning for
+      // the caller — «the hub did not answer» — collapsed to one code. The raw message is dropped so
+      // nothing of the browser's internals reaches the cashier.
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `request to ${path} failed: ${safeErr(e)}`,
+      );
+    }
+    const ct = res.headers?.get?.('content-type');
+    // hub#782: the runtime ALWAYS answers `application/json`, even on a 4xx domain refusal. The
+    // proxy answers `text/html`. So a content-type that is PRESENT and is NOT JSON is the signature
+    // of the proxy — we refuse it. We do NOT require the header: a fetch mock (and some minimal
+    // HTTP/1.0 responders) omit it, and an envelope that parses is still a valid runtime answer.
+    if (ct !== null && ct !== undefined && !ct.toLowerCase().includes('application/json')) {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `unexpected response from ${path}: HTTP ${res.status} ${ct}`,
+      );
+    }
+    let env: Envelope;
+    try {
+      env = (await res.json()) as Envelope;
+    } catch {
+      // Defense in depth: a proxy can label an HTML page `application/json`, and the JSON parser's
+      // own message echoes that HTML back («Unexpected token '<', "<!DOCTYPE "…»). A fixed phrase
+      // keeps the proxy's internals out of the message the cashier reads.
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `request to ${path} returned an invalid JSON body`,
+      );
+    }
     return unwrap(env);
   }
 
@@ -798,11 +894,367 @@ export interface TauriBridge {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The automation kernel, as a MODULE may reach it (hub#714, ADR-0283 §9).
+//
+// The visual flow editor is a module (pm#110) and had no declared way in: `query`/`command` speak
+// to the dispatcher, and flows are core REST on purpose — the ADR froze that and «commands
+// `hub.flows.*`» is exactly the surface it froze shut. What a module COULD do was read the session
+// token out of `localStorage` and `fetch('/api/hub/flows')` itself: same document as the shell,
+// same origin, no sandbox. It would work — while the user is an admin — and it would break the day
+// the shell moves the session into an httpOnly cookie. A contract that leans on that is not one.
+//
+// So the way in is explicit, typed and module-scoped. What it is NOT is a proxy: there is no
+// method that takes a path, every path is built here from the frozen §9 table, and every id is
+// checked before it can be pasted into one. `flows.test.ts` pins both — the method list and the
+// URLs — so an escape hatch cannot be added quietly.
+//
+// The gate stays in Rust and does not move: `require_admin_session` first (a cashier still gets
+// 403, an API key is still refused), and then the `manage_flows` capability of the calling module.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Where the kernel's REST surface lives. **Every** path this surface can build starts here. */
+export const FLOWS_BASE_PATH = '/api/hub/flows';
+
+/** Where the hub's event catalogue lives. Every path {@link EventsApi} can build starts here. */
+export const EVENTS_BASE_PATH = '/api/hub/events';
+
+/** How a call names the module it acts for. Read by `crates/server/src/flows_api.rs`, nowhere else. */
+export const MODULE_HEADER = 'X-Erplora-Module';
+
+/** Asking for a module-scoped surface through a client that is not scoped to any module. */
+export const MODULE_SCOPE_REQUIRED = 'module_scope_required';
+
+/** A value this SDK refuses to put in a URL. It never becomes a request. */
+export const INVALID_ARGUMENT = 'invalid_argument';
+
+/** Verbs the kernel's REST surface answers. There is no `PATCH` and no `HEAD`: §9 has neither. */
+export type CoreMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+
+/** One call to the hub's own REST surface. `path` is always built by the surface, never received. */
+export interface CoreRequest {
+  method: CoreMethod;
+  path: string;
+  body?: unknown;
+}
+
+/** A transport that can reach the core's REST surface (as opposed to the dispatcher). */
+export interface CoreApiTransport {
+  coreRequest(req: CoreRequest, headers?: Record<string, string>): Promise<unknown>;
+}
+
+/**
+ * An id that may be pasted into a path segment. Flow, run and approval ids are UUIDv4 in the
+ * runtime (`registry::new_id`), so this is generous — and it is not the point.
+ *
+ * The point is that `fetch` NORMALISES a URL: `/api/hub/flows/../../settings` leaves the process as
+ * `/api/settings`. An id concatenated into a path is therefore the generic proxy arriving by the
+ * back door, whatever the surface's method list says. Hence: no `/`, no `.`, no `%`, no `?`, no
+ * `#`, and a length cap.
+ */
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+/**
+ * A secret name, as `flows/secrets.rs` defines it: UPPER_SNAKE_CASE, starting with a letter, ≤ 64.
+ * Checked here too because it also travels in a path — and because the name is read back as
+ * `{{secret.NAME}}`, so one with a dot or a brace in it is a different thing entirely.
+ */
+const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+/**
+ * An event name: `sale.completed`, `hub.whatsapp.message_received`. Dots are allowed here and not
+ * in {@link ID_PATTERN} because a name travels in a QUERY STRING, where `URLSearchParams` encodes
+ * it — the reason it is still checked is that a surface which accepts anything is one
+ * path-building change away from being the proxy this SDK refuses to be.
+ */
+const EVENT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/;
+
+function checkedSegment(kind: string, value: string, pattern: RegExp): string {
+  if (typeof value === 'string' && pattern.test(value)) return value;
+  throw new ErploraError(
+    INVALID_ARGUMENT,
+    `\`${String(value)}\` is not a valid ${kind}: it would have to be pasted into a URL`,
+  );
+}
+
+/** `?a=1&b=2`, or `''` when nothing was asked for (a bare `?` is noise the hub has to parse). */
+function queryString(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value));
+  }
+  const out = search.toString();
+  return out ? `?${out}` : '';
+}
+
+/** A flow as the kernel stores it. `definition` travels as JSON, never as an escaped string. */
+export interface Flow {
+  id: string;
+  name: string;
+  enabled: boolean;
+  definition: Record<string, unknown>;
+  created_by?: string;
+  updated_by?: string;
+  [k: string]: unknown;
+}
+
+/** What `POST`/`PUT /api/hub/flows[/{id}]` accept. `enabled` defaults to true in the runtime. */
+export interface FlowInput {
+  name: string;
+  definition: Record<string, unknown>;
+  enabled?: boolean;
+}
+
+/**
+ * What `GET /api/hub/flows/schema` answers (hub#716): the JSON Schema the hub judges a flow
+ * document with, and which core is doing the judging.
+ */
+export interface FlowSchema {
+  /** The document version this core enforces (`1` today). A flow declaring another is refused. */
+  schema_version: number;
+  /** The hub's own version, e.g. `1.2.3` — the reason this is asked instead of bundled. */
+  core_version: string;
+  /** The JSON Schema itself, verbatim from `schemas/flow.schema.json` as that core ships it. */
+  schema: Record<string, unknown>;
+}
+
+/** One page of run history. `next_cursor` comes only when the page was FULL (`§9`). */
+export interface RunPage<T = unknown> {
+  data: T[];
+  next_cursor?: string;
+}
+
+/**
+ * **The frozen §9 flows contract, and nothing else.** One method per route, no method that takes a
+ * path, no method that takes a URL. Adding one turns `flows.test.ts` red on purpose.
+ */
+export class FlowsApi {
+  constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+
+  /** `GET /api/hub/flows` */
+  async list(): Promise<Flow[]> {
+    return this.send({ method: 'GET', path: FLOWS_BASE_PATH }) as Promise<Flow[]>;
+  }
+
+  /** `POST /api/hub/flows` */
+  async create(flow: FlowInput): Promise<Flow> {
+    return this.send({ method: 'POST', path: FLOWS_BASE_PATH, body: flow }) as Promise<Flow>;
+  }
+
+  /** `GET /api/hub/flows/{id}` */
+  async get(id: string): Promise<Flow> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/${flow}` }) as Promise<Flow>;
+  }
+
+  /** `PUT /api/hub/flows/{id}` — revalidates the document and re-seeds the triggers. */
+  async update(id: string, flow: FlowInput): Promise<Flow> {
+    const target = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({
+      method: 'PUT',
+      path: `${FLOWS_BASE_PATH}/${target}`,
+      body: flow,
+    }) as Promise<Flow>;
+  }
+
+  /** `DELETE /api/hub/flows/{id}` — soft-delete: the row survives as the record it existed. */
+  async remove(id: string): Promise<unknown> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({ method: 'DELETE', path: `${FLOWS_BASE_PATH}/${flow}` });
+  }
+
+  /** `GET /api/hub/flows/{id}/grants` — what this flow is allowed to do unattended. */
+  async grants(id: string): Promise<unknown[]> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({
+      method: 'GET',
+      path: `${FLOWS_BASE_PATH}/${flow}/grants`,
+    }) as Promise<unknown[]>;
+  }
+
+  /** `PUT /api/hub/flows/{id}/grants` — a COMPLETE replace; `granted_by` comes from the session. */
+  async replaceGrants(id: string, grants: unknown[]): Promise<unknown[]> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({
+      method: 'PUT',
+      path: `${FLOWS_BASE_PATH}/${flow}/grants`,
+      body: { grants },
+    }) as Promise<unknown[]>;
+  }
+
+  /** `POST /api/hub/flows/{id}/run` — the manual trigger. */
+  async run(id: string, input?: Record<string, unknown>): Promise<unknown> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/${flow}/run`,
+      ...(input === undefined ? {} : { body: input }),
+    });
+  }
+
+  /** `GET /api/hub/flows/{id}/runs` — history, paged by CURSOR (a short page IS the end). */
+  async runs(id: string, page: { limit?: number; before?: string } = {}): Promise<RunPage> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    const search = queryString({ limit: page.limit, before: page.before });
+    return this.send({
+      method: 'GET',
+      path: `${FLOWS_BASE_PATH}/${flow}/runs${search}`,
+    }) as Promise<RunPage>;
+  }
+
+  /** `GET /api/hub/flows/runs/{run_id}` — the run with its steps and the events it emitted. */
+  async getRun(runId: string): Promise<unknown> {
+    const run = checkedSegment('run id', runId, ID_PATTERN);
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/runs/${run}` });
+  }
+
+  /** `GET /api/hub/flows/approvals[?status=]` — the tray. `status` is an enum in the kernel
+   *  (`pending`/`approved`/`rejected`), so it is checked like a segment even though it travels as a
+   *  query param that `URLSearchParams` already encodes: nothing on this surface is free text. */
+  async approvals(status?: string): Promise<unknown[]> {
+    const filter = status === undefined ? '' : checkedSegment('status', status, ID_PATTERN);
+    return this.send({
+      method: 'GET',
+      path: `${FLOWS_BASE_PATH}/approvals${queryString({ status: filter })}`,
+    }) as Promise<unknown[]>;
+  }
+
+  /** `POST /api/hub/flows/approvals/{id}/approve` — `decided_by` is the session, never the body. */
+  async approve(approvalId: string, body?: Record<string, unknown>): Promise<unknown> {
+    const approval = checkedSegment('approval id', approvalId, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/approvals/${approval}/approve`,
+      ...(body === undefined ? {} : { body }),
+    });
+  }
+
+  /** `POST /api/hub/flows/approvals/{id}/reject` */
+  async reject(approvalId: string, body?: Record<string, unknown>): Promise<unknown> {
+    const approval = checkedSegment('approval id', approvalId, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/approvals/${approval}/reject`,
+      ...(body === undefined ? {} : { body }),
+    });
+  }
+
+  /** `GET /api/hub/flows/secrets` — the NAMES. There is no endpoint that returns a value, and
+   *  that absence is the design (ADR-0283 §4). */
+  async secrets(): Promise<unknown> {
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/secrets` });
+  }
+
+  /** `PUT /api/hub/flows/secrets/{name}` — write-only. */
+  async putSecret(name: string, value: string): Promise<unknown> {
+    const secret = checkedSegment('secret name', name, SECRET_NAME_PATTERN);
+    return this.send({
+      method: 'PUT',
+      path: `${FLOWS_BASE_PATH}/secrets/${secret}`,
+      body: { value },
+    });
+  }
+
+  /** `DELETE /api/hub/flows/secrets/{name}` */
+  async deleteSecret(name: string): Promise<unknown> {
+    const secret = checkedSegment('secret name', name, SECRET_NAME_PATTERN);
+    return this.send({ method: 'DELETE', path: `${FLOWS_BASE_PATH}/secrets/${secret}` });
+  }
+
+  /**
+   * `GET /api/hub/flows/schema` — **the flow contract THIS hub enforces** (hub#716).
+   *
+   * Ask it once, when the editor opens, and build the palette from the answer. The alternative —
+   * bundling `flow.schema.json` — is a photo of whichever core the module was built against, and
+   * a module updates on its own clock (hub#516): ahead of its hub it offers a step the hub
+   * refuses to save, behind it it hides one that works. `core_version` is there so the editor can
+   * say which of the two is happening instead of showing a validation error nobody can act on.
+   */
+  async schema(): Promise<FlowSchema> {
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/schema` }) as Promise<FlowSchema>;
+  }
+}
+
+/**
+ * One field of an event payload (hub#715): a path the flow mapping language can resolve, its type
+ * and — when the value could not be about a person — one real example from this hub.
+ */
+export interface EventFieldShape {
+  /** `total`, `customer.id`. Paste it as `event.<path>` into a mapping and it resolves. */
+  path: string;
+  /** `string` · `number` · `boolean` · `object` · `array` · `null`. */
+  type: string;
+  /** A real value from a real event. Absent when redacted, and for objects and arrays. */
+  sample?: unknown;
+  /**
+   * The example was withheld because the value could be about a person. **The field still
+   * exists** — offer it in the picker, just without an example beside it.
+   */
+  redacted: boolean;
+  /** The example was cut short. */
+  truncated: boolean;
+  /** Items in the newest sample, for an array. Nothing is offered from INSIDE one: the mapping
+   *  language has no array indexing. */
+  items?: number;
+  /** In how many of the sampled events the path was present. Below `samples` = **optional**. */
+  seen_in: number;
+}
+
+/** What `GET /api/hub/events/shape` answers. */
+export interface EventShape {
+  event_name: string;
+  /** Installed modules that declare they emit it. */
+  declared_by: string[];
+  /**
+   * How many real events the shape came from. **`0` means «no examples yet», not «no such
+   * event»**: an infrequent event whose last occurrence aged out of the ninety-day retention
+   * window lands here, and the picker should say so instead of hiding the trigger.
+   */
+  samples: number;
+  last_seen_at?: string;
+  fields: EventFieldShape[];
+}
+
+/**
+ * **The hub's event catalogue** (hub#715) — what an event carries, learned from events that
+ * really happened in THIS hub.
+ *
+ * Not the live event bus: to react to events, use `subscribe`. This is the read the flow editor's
+ * data picker is built from, so the owner chooses «Total de la venta — 42,50 €» and not
+ * `sale.total`.
+ *
+ * One method, one route, no method that takes a path — the same discipline as {@link FlowsApi},
+ * pinned by the same test file.
+ */
+export class EventsApi {
+  constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+
+  /**
+   * `GET /api/hub/events/shape?name=…` — the fields of an event, with an example each.
+   *
+   * The hub answers the SHAPE, never a stored payload: a value that could be about a person
+   * arrives with `redacted: true` and no `sample`, and the field is still there to be mapped. A
+   * `not_found` refusal means this hub has never heard of the event at all — one that simply has
+   * no surviving examples answers with `samples: 0`.
+   */
+  async shape(name: string, opts: { limit?: number } = {}): Promise<EventShape> {
+    const event = checkedSegment('event name', name, EVENT_NAME_PATTERN);
+    return this.send({
+      method: 'GET',
+      path: `${EVENTS_BASE_PATH}/shape${queryString({ name: event, limit: opts.limit })}`,
+    }) as Promise<EventShape>;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Cliente que usan los Web Components.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class ErploraClient {
   private bridge?: BridgeTransport;
+  /** The module this client acts FOR, set only by {@link ErploraClient.forModule}. */
+  private moduleId?: string;
+  private flowsApi?: FlowsApi;
+  private eventsApi?: EventsApi;
 
   constructor(
     private readonly transport: ErploraTransport,
@@ -838,6 +1290,95 @@ export class ErploraClient {
    */
   get peripherals(): BridgeTransport {
     return (this.bridge ??= new UnavailableBridgeTransport());
+  }
+
+  /**
+   * **This client, acting for a named module** (hub#714). The only way to reach {@link flows}.
+   *
+   * The shell calls it when it MOUNTS a module's Web Component (`ModuleView.vue`), which is the one
+   * place that genuinely knows which module is being loaded — so for every component the shell
+   * mounts, the id comes from the loader and not from something the module wrote about itself.
+   * A module that instead grabs `globalThis.erplora` gets the unscoped client, which has no `flows`
+   * at all: it would have to call this and name itself, and that naming is visible in its source.
+   *
+   * It is a **view, not a copy**: the scope delegates to this very instance through the prototype
+   * chain. That is deliberate and load-bearing — `apps/web/src/main.ts` bolts `print` and
+   * `loadSlot` onto the one client object AFTER constructing it, and a scope built with
+   * `new ErploraClient(…)` would silently lose both. The symptom would be «this module cannot
+   * print» in a shop, a long way from here.
+   */
+  forModule(moduleId: string): ErploraClient {
+    const id = typeof moduleId === 'string' ? moduleId.trim() : '';
+    if (!id) {
+      throw new ErploraError(INVALID_ARGUMENT, 'forModule() needs the id of the calling module');
+    }
+    const scoped = Object.create(this) as ErploraClient;
+    scoped.moduleId = id;
+    // Not inherited: the parent's memoised surfaces belong to the parent's scope (or to none).
+    scoped.flowsApi = undefined;
+    scoped.eventsApi = undefined;
+    return scoped;
+  }
+
+  /**
+   * **The hub's automation kernel** (`/api/hub/flows*`, ADR-0283 §9) — flows, their grants, their
+   * secrets and the approval tray. The typed way in for the flow editor module (pm#110).
+   *
+   * Reaching it needs THREE things, and this getter is only the first: the client must be scoped to
+   * a module ({@link forModule}); the user must hold a local owner/admin session, which the runtime
+   * checks and this SDK never second-guesses; and the module must have `manage_flows` declared in
+   * its `module.json` and granted by the owner in Settings → Permissions. A refusal arrives as
+   * `capability_denied`, so the editor can ask for the grant instead of showing «error».
+   */
+  get flows(): FlowsApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'the flows surface is module-scoped: use `erplora.forModule("<your module id>").flows`',
+      );
+    }
+    const transport = this.transport as Partial<CoreApiTransport>;
+    if (typeof transport.coreRequest !== 'function') {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        'this transport cannot reach the core REST surface',
+      );
+    }
+    return (this.flowsApi ??= new FlowsApi((req) =>
+      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
+  }
+
+  /**
+   * **What the hub's events carry** (hub#715) — the catalogue the flow editor's data picker is
+   * built from, so the owner picks «Total de la venta — 42,50 €» and not `sale.total`.
+   *
+   * Module-scoped and gated exactly like {@link flows}: an owner/admin session the runtime checks,
+   * plus `manage_flows` declared in the module's `module.json` and granted by the owner. What the
+   * events of a business carry is the shape of that business, and it is not something every
+   * installed module gets to read.
+   *
+   * This is **not** the live event bus — `subscribe` is.
+   */
+  get events(): EventsApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'the event catalogue is module-scoped: use `erplora.forModule("<your module id>").events`',
+      );
+    }
+    const transport = this.transport as Partial<CoreApiTransport>;
+    if (typeof transport.coreRequest !== 'function') {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        'this transport cannot reach the core REST surface',
+      );
+    }
+    return (this.eventsApi ??= new EventsApi((req) =>
+      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
   }
 
   /**

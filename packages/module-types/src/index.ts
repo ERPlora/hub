@@ -72,7 +72,36 @@ export interface ModuleManifest {
    * pestaña `settings` del módulo cuando no hay `component`.
    */
   settings?: ModuleSettingsDef;
+  /**
+   * Route guards this module declares over ANOTHER module's surface (hub#775). The canonical case
+   * is `cash_register`: while `enable_cash_register` is on and the route at `protected_pos_url`
+   * (served by `sales`) is in play, the shell renders `component` (e.g. `erp-cashregister-open`)
+   * instead of mounting the POS, until `guard_query` returns a row (a drawer is open). The runtime
+   * enforces the same precondition AUTHORITATIVELY in the dispatcher; this is the shell half.
+   */
+  protects?: ModuleProtectsDef[];
   // queries/commands/events/ai_tools/network/scheduled_tasks → ver schemas/module.schema.json
+}
+
+/**
+ * A route guard one module declares over another module's surface (hub#775). See
+ * `ModuleManifest.protects`.
+ */
+export interface ModuleProtectsDef {
+  /** Query of the declaring module that returns the SETTINGS row (system context, same hub_id). */
+  settings_query: string;
+  /** Boolean column in that row that arms the guard (`false`/absent → dormant). */
+  enabled_setting: string;
+  /** Column whose value is the protected ROUTE (`/m/sales`). */
+  route_setting: string;
+  /** Query of the declaring module whose rows decide whether the precondition is met. */
+  guard_query: string;
+  /** What `guard_query` must return for the precondition to be met. Today: `non_empty`. */
+  expect: 'non_empty';
+  /** Shell-side Web Component to render INSTEAD of the protected module while unmet. */
+  component: string;
+  /** Event the shell listens for to re-mount the protected module without a manual reload. */
+  resume_on: string;
 }
 
 /** Bloque `settings` del manifest (settings declarativos estilo widgets). */

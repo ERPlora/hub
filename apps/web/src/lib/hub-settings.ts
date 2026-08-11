@@ -33,6 +33,11 @@ export interface HubSettings {
   country_code: string;
   /** Subdivisión fiscal ISO-3166-2, o null si aplica el régimen general del país. */
   region_code?: string | null;
+  /** Zona horaria IANA del NEGOCIO (hub#731), o null = «dedúcela de `country_code`/`region_code`»,
+   *  que es el caso normal. Es el reloj con el que el kernel de flujos lee un trigger `cron`:
+   *  «cierra la caja a las 21:00» son las 21:00 de la tienda, no UTC. Solo hace falta declararla
+   *  en un país con varios husos. Las `scheduled_tasks` de los módulos NO la usan: son UTC. */
+  timezone?: string | null;
   /** Identidad de NEGOCIO (FUENTE ÚNICA país-agnóstica, ADR-0061): identificador fiscal universal
    *  (NIF/CIF en ES, SIREN/SIRET en FR, VAT-ID…) del obligado tributario. La usan invoice (emisor),
    *  los módulos fiscales por país (verifactu…) y los documentos de venta. Vacío hasta configurarse. */
@@ -77,6 +82,9 @@ function setHubSettings(raw: unknown): HubSettings {
       typeof r.region_code === 'string' && r.region_code.trim()
         ? r.region_code.trim().toUpperCase()
         : null,
+    // Nombre IANA tal cual (`Europe/Madrid`): NO se pone en mayúsculas — el runtime valida contra
+    // la tzdb y `EUROPE/MADRID` no existe. `null` = la deduce el hub del país.
+    timezone: typeof r.timezone === 'string' && r.timezone.trim() ? r.timezone.trim() : null,
     business_tax_id: typeof r.business_tax_id === 'string' ? r.business_tax_id : '',
     business_legal_name: typeof r.business_legal_name === 'string' ? r.business_legal_name : '',
     business_address: typeof r.business_address === 'string' ? r.business_address : '',
@@ -108,8 +116,31 @@ export async function getHubSettings(): Promise<HubSettings> {
 }
 
 /**
+ * El rechazo del runtime, tal y como lo escribió (hub#684).
+ *
+ * `PUT /api/settings` contesta `{error:{code,message}}` y ese `message` está redactado para leerlo
+ * —el de la demo es *«this is a demo hub: its tax id and legal name are read-only — to issue real
+ * invoices, create your own hub»*—. Antes se tiraba entero y la pantalla pintaba un «no se pudieron
+ * guardar los ajustes» plano: la única explicación que el producto tenía no llegaba a nadie.
+ */
+export class HubSettingsError extends Error {
+  /** Código estable del runtime (`demo_fiscal_identity_locked`, `business_tax_id_frozen`…). */
+  readonly code: string;
+  /** Estado HTTP, para quien necesite distinguir un 409 de un 403 sin mirar el código. */
+  readonly status: number;
+
+  constructor(message: string, code: string, status: number) {
+    super(message);
+    this.name = 'HubSettingsError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+/**
  * Actualiza (parcial) los settings del hub (`PUT /api/settings`). El runtime exige owner/admin y
- * devuelve el objeto COMPLETO, que cacheamos. Lanza si falla (403 si no es admin, etc.).
+ * devuelve el objeto COMPLETO, que cacheamos. Lanza [`HubSettingsError`] si falla (403 si no es
+ * admin, 409 si el cierre de la demo o el congelado del NIF se niegan…).
  */
 export async function updateHubSettings(partial: Partial<HubSettings>): Promise<HubSettings> {
   const res = await fetch(`${RUNTIME_URL}/api/settings`, {
@@ -117,6 +148,18 @@ export async function updateHubSettings(partial: Partial<HubSettings>): Promise<
     headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
     body: JSON.stringify(partial),
   });
-  if (!res.ok) throw new Error(`settings PUT → ${res.status}`);
+  if (!res.ok) {
+    // Un cuerpo ilegible NO se convierte en un mensaje vacío: degrada a la línea de estado, que al
+    // menos dice que algo pasó. Un toast en blanco se lee como «no ha pasado nada».
+    const body = (await res.json().catch(() => null)) as
+      | { error?: { code?: string; message?: string } | string }
+      | null;
+    const error = typeof body?.error === 'object' ? body?.error : undefined;
+    throw new HubSettingsError(
+      error?.message || `settings PUT → ${res.status}`,
+      error?.code || (typeof body?.error === 'string' ? body.error : 'settings_save_failed'),
+      res.status,
+    );
+  }
   return setHubSettings(await res.json());
 }

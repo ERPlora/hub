@@ -14,9 +14,11 @@
 //!    apagado, se ejecuta **una sola vez** y se reprograma al siguiente vencimiento futuro (no se
 //!    corre el backlog acumulado). `catch_up=skip` no ejecuta el backlog, solo reprograma.
 //!
-//! El cron es un parser mínimo de 5 campos (sin dependencia nueva; ver [`cron`]). Adoptar el crate
-//! `cron`/`croner` para la gramática completa (rangos `1-5`, listas `1,15`, `L`/`#`) queda para
-//! cuando un módulo la necesite; hoy se cubren los casos del ADR (`*/5`, `@daily`, `@hourly`).
+//! El cron es un parser propio de 5 campos con la gramática de `crontab(5)` (rangos `1-5`, listas
+//! `1,15`, pasos `*/N`/`a-b/N` y nombres `MON`/`JAN`; ver [`cron`], hub#730). **Estas tareas se
+//! interpretan en UTC** y eso NO cambia (hub#731): el `cron` de una `scheduled_task` lo escribe un
+//! programador en el manifest, meses antes de saber en qué país vive el hub. El reloj del negocio
+//! es cosa de los flujos, que sí los escribe el dueño — ver `flows/triggers.rs`.
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
@@ -33,6 +35,12 @@ const BATCH: i64 = 50;
 /// muere a media tarea no la deje bloqueada hasta el siguiente reinicio. Cuando el lease expira, la
 /// condición del `WHERE` del claim la vuelve a ver y otra instancia la reclama.
 const LEASE_SECONDS: i64 = 300;
+
+/// Dónde va a parar una tarea cuyo cron el motor no sabe leer (hub#730). `next_run` es `NOT NULL`,
+/// así que no se puede "desprogramar" una fila: se manda tan lejos que no vuelve. Es un caso
+/// inalcanzable desde el manifest (`seed_module_tasks` ya lo rechaza) — esto cubre las filas
+/// escritas antes del gate.
+const PARKED_FOREVER: &str = "9999-12-31T00:00:00+00:00";
 
 const ENSURE_TABLE: &str = "\
 CREATE TABLE IF NOT EXISTS _scheduled_tasks (\
@@ -64,7 +72,20 @@ pub async fn seed_module_tasks(
 
     // 1) Upsert de cada tarea declarada (preserva next_run/last_run si ya existía).
     for t in tasks {
-        let next_run = cron::next_after(&t.cron, &now).unwrap_or_else(|| now.clone());
+        // hub#730: el fallback era `unwrap_or_else(|| now)`, o sea que un cron que el motor NO
+        // sabe leer quedaba **vencido en cada tick** — un bucle caliente disfrazado de tarea. Una
+        // tarea que no se puede programar NO se programa, y se grita: la tabla es el registro de
+        // lo que va a correr, y una fila que miente es peor que una fila que falta.
+        let Some(next_run) = cron::next_after(&t.cron, &now) else {
+            eprintln!(
+                "scheduler: {}.{}: `{}` is not a cron this hub can run, task NOT scheduled — {}",
+                module_id,
+                t.name,
+                t.cron,
+                cron::validate(&t.cron).err().unwrap_or_default()
+            );
+            continue;
+        };
         let payload = t
             .payload
             .as_ref()
@@ -218,7 +239,17 @@ async fn run_task(
     let catch_up = row["catch_up"].as_str().unwrap_or("collapse");
 
     // Próximo vencimiento estrictamente posterior a `now` (collapse del backlog acumulado).
-    let next_run = cron::next_after(&cron, now).unwrap_or_else(|| now.to_string());
+    // hub#730: si el cron no se puede leer, la fila se APARCA (no se pone a `now`, que la dejaba
+    // vencida en cada tick). Solo es alcanzable con una fila anterior al gate de `seed_module_tasks`
+    // — el manifest es la fuente de verdad y ahí ya se rechaza —, así que se grita una vez y no
+    // vuelve a molestar en lugar de repetir el aviso cada segundo.
+    let next_run = cron::next_after(&cron, now).unwrap_or_else(|| {
+        eprintln!(
+            "scheduler: {module_id}.{name}: `{cron}` is not a cron this hub can run; the task is \
+             parked instead of being due on every tick. Reinstall the module with a valid cron."
+        );
+        PARKED_FOREVER.to_string()
+    });
 
     // ¿Ejecutamos el command en este barrido?
     //  - barrido normal del relay: sí (la fila está vencida).
@@ -306,103 +337,327 @@ fn parse_payload(row: &Json) -> Params {
         .unwrap_or_default()
 }
 
-/// Parser de cron mínimo (5 campos `min hora dom mes dow` + atajos), **sin dependencia nueva**.
-/// Soporta lo que pide el ADR-0011: `*` (cualquiera), `*/N` (cada N), un entero fijo, y los atajos
-/// `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`. NO soporta rangos (`1-5`) ni listas (`1,15`)
-/// — adoptar un crate de cron cuando algún módulo necesite la gramática completa.
+/// Cron of 5 fields (`minute hour day-of-month month day-of-week`) + the `@` shortcuts, with the
+/// grammar of `crontab(5)`: `*`, a value, a range `a-b`, a list `a,b`, a step `*/N` or `a-b/N`, and
+/// names for month and day-of-week (`JAN…DEC`, `SUN…SAT`).
+///
+/// **Why it grew (hub#730).** It used to understand only `*`, `*/N` and a fixed number, and
+/// [`parse`] returned `None` for everything else — which the callers turned into a trigger that is
+/// armed and never fires. Rejecting `1-5` at the door was the floor; understanding it is what
+/// anybody who has ever written a crontab (or used Zapier/n8n) expects on the first day. The
+/// parser now returns a **message saying what is wrong**, and that message is what the API hands
+/// back, so a cron the engine cannot run can no longer be saved.
+///
+/// **Which clock (hub#731).** [`next_after`] resolves the expression in **UTC** — that is the
+/// contract of `_scheduled_tasks`, written by a module programmer in a manifest, and it does not
+/// move. [`next_after_in_tz`] resolves it in the **business** zone, and that is what a flow's cron
+/// uses: the owner writes «cierra la caja a las 21:00» and means 21:00 in the shop. Both return the
+/// instant in UTC, because `next_run` is a TEXT column compared with `<=` in SQL and a `+02:00` in
+/// the string would sort as a different instant.
 pub mod cron {
-    use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
+    use chrono::{DateTime, Datelike, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone, Utc};
+    pub use chrono_tz::Tz;
 
-    /// Devuelve el siguiente instante (RFC3339) que cumple `expr` **estrictamente posterior** a
-    /// `after` (RFC3339). `None` si la expresión es inválida o `after` no parsea. El "collapse" del
-    /// catch-up sale gratis: siempre se busca hacia adelante desde `now`, nunca se acumula backlog.
+    /// What a person is allowed to write, in one line. It is appended to every refusal: the whole
+    /// point of hub#730 is that the author is told what to type instead.
+    pub const SYNTAX_HELP: &str = "Accepted per field: `*`, a value, a range `a-b`, a list `a,b`, \
+        a step `*/N` or `a-b/N`; month and day-of-week also take names (JAN…DEC, SUN…SAT, e.g. \
+        `0 9 * * MON-FRI`). Shortcuts: @hourly, @daily, @weekly, @monthly, @yearly.";
+
+    /// How far ahead the search goes. Eight years, not one: `0 0 29 2 *` is legal and the next 29
+    /// February can be four years away (eight across a non-leap century year). The old 366-day
+    /// window returned `None` for it, and `None` is exactly what the callers mistranslated into
+    /// "never" (flows) or "due on every tick" (scheduler).
+    const SEARCH_DAYS: i32 = 8 * 366;
+
+    const MONTH_NAMES: &[(&str, u32)] = &[
+        ("JAN", 1), ("FEB", 2), ("MAR", 3), ("APR", 4), ("MAY", 5), ("JUN", 6),
+        ("JUL", 7), ("AUG", 8), ("SEP", 9), ("OCT", 10), ("NOV", 11), ("DEC", 12),
+    ];
+    const DAY_NAMES: &[(&str, u32)] = &[
+        ("SUN", 0), ("MON", 1), ("TUE", 2), ("WED", 3), ("THU", 4), ("FRI", 5), ("SAT", 6),
+    ];
+
+    /// Next instant (RFC-3339, UTC) matching `expr` **strictly after** `after`, resolved on the
+    /// UTC clock. `None` if `expr` is not runnable or `after` is not an instant. The catch-up
+    /// "collapse" is free: the search always goes forward from `now`, so no backlog accumulates.
     pub fn next_after(expr: &str, after: &str) -> Option<String> {
-        let parsed = parse(expr)?;
+        next_after_in_tz(expr, after, Tz::UTC)
+    }
+
+    /// Same, resolved on the clock of `tz` — the **business** clock. The returned instant is still
+    /// UTC; only the reading of the expression changes.
+    ///
+    /// ## The two days a year this is not arithmetic
+    ///
+    /// - **The hour that does not exist** (spring forward: Madrid goes 02:00 → 03:00). A `0 2 * * *`
+    ///   has no instant that day. It fires **at the moment the clock jumps over it** — i.e. 03:00
+    ///   local, the first real instant at or after the one that was asked for. A cash close is not
+    ///   silently dropped because the calendar skipped an hour.
+    /// - **The hour that happens twice** (autumn: 03:00 → 02:00, so local 02:xx runs twice). The
+    ///   **first** (pre-transition) occurrence is taken and the second is never produced, so the
+    ///   close is booked once. The cost is that a sub-hourly cron loses that repeated hour — which
+    ///   is what `crontab` and `systemd` timers do too, and is the right side to err on: skipping
+    ///   an interval tick is recoverable, booking a day twice is not.
+    pub fn next_after_in_tz(expr: &str, after: &str, tz: Tz) -> Option<String> {
+        let cron = parse(expr).ok()?;
         let from: DateTime<Utc> = DateTime::parse_from_rfc3339(after).ok()?.with_timezone(&Utc);
-        // Empieza en el siguiente minuto (resolución mínima del cron) y avanza minuto a minuto
-        // hasta encontrar coincidencia. Tope de búsqueda: ~366 días (cubre @yearly) por seguridad.
-        let mut t = (from + Duration::minutes(1))
-            .with_second(0)?
-            .with_nanosecond(0)?;
-        for _ in 0..(366 * 24 * 60) {
-            if parsed.matches(&t) {
-                return Some(t.to_rfc3339());
+
+        let hours = values(cron.hour);
+        let minutes = values(cron.minute);
+        // Walk LOCAL days, not UTC minutes: the expression is written on the wall clock, and this
+        // also makes a rare date (29 February) cheap instead of two million minute steps.
+        let mut date = from.with_timezone(&tz).date_naive();
+        for _ in 0..SEARCH_DAYS {
+            if cron.matches_date(&date) {
+                for hour in &hours {
+                    for minute in &minutes {
+                        let naive = date.and_hms_opt(*hour, *minute, 0)?;
+                        let utc = local_to_utc(&naive, tz);
+                        // Strictly after: on both DST days the local→UTC map is only
+                        // non-decreasing, so this is what keeps a fired trigger from firing again.
+                        if utc > from {
+                            return Some(utc.to_rfc3339());
+                        }
+                    }
+                }
             }
-            t += Duration::minutes(1);
+            date = date.succ_opt()?;
         }
         None
     }
 
-    /// Cron parseado: por campo, `None` = comodín (`*`), `Some((step, fixed))`.
-    struct Cron {
-        minute: Field,
-        hour: Field,
-        dom: Field,
-        month: Field,
-        dow: Field,
+    /// `Ok(())` if this hub can actually run `expr`, `Err(what is wrong)` otherwise. This is the
+    /// gate the API calls before storing a trigger (hub#730).
+    pub fn validate(expr: &str) -> std::result::Result<(), String> {
+        parse(expr).map(|_| ())
     }
 
-    /// Un campo de cron: comodín, "cada N" (`*/N`) o valor fijo.
-    enum Field {
-        Any,
-        Step(u32),
-        Fixed(u32),
+    /// One local wall-clock time as an instant, with the two DST cases decided (see
+    /// [`next_after_in_tz`]).
+    fn local_to_utc(naive: &NaiveDateTime, tz: Tz) -> DateTime<Utc> {
+        match tz.from_local_datetime(naive) {
+            LocalResult::Single(dt) => dt.with_timezone(&Utc),
+            // Twice: the earlier one, once.
+            LocalResult::Ambiguous(earliest, _) => earliest.with_timezone(&Utc),
+            // Never: the instant the clock jumped over it. Found by bisection rather than by
+            // assuming the jump is one hour — it is 30 minutes in Lord Howe, and a hard-coded
+            // hour is how a "should be fine everywhere" rule becomes a wrong close somewhere.
+            LocalResult::None => gap_end(naive, tz),
+        }
     }
 
-    impl Field {
-        fn matches(&self, value: u32) -> bool {
-            match self {
-                Field::Any => true,
-                Field::Step(n) if *n == 0 => false,
-                Field::Step(n) => value % n == 0,
-                Field::Fixed(v) => value == *v,
+    /// The first instant whose local time has reached `naive`, when `naive` itself never happens.
+    fn gap_end(naive: &NaiveDateTime, tz: Tz) -> DateTime<Utc> {
+        // A 60 h window around the wall-clock time brackets any real transition (the largest UTC
+        // offset in the tz database is ±14 h), so the predicate is false at `lo` and true at `hi`.
+        let base = *naive - Duration::hours(30);
+        let (mut lo, mut hi) = (0i64, 60 * 60i64);
+        while lo < hi {
+            let mid = (lo + hi) / 2;
+            let candidate = Utc.from_utc_datetime(&(base + Duration::minutes(mid)));
+            if candidate.with_timezone(&tz).naive_local() >= *naive {
+                hi = mid;
+            } else {
+                lo = mid + 1;
             }
         }
+        Utc.from_utc_datetime(&(base + Duration::minutes(lo)))
+    }
+
+    /// A parsed cron. Each field is a bitmask of the values it matches, which makes "is this
+    /// minute in the set?" one instruction and "which minutes?" one iteration.
+    #[derive(Debug)]
+    pub struct Cron {
+        minute: u64,
+        hour: u64,
+        dom: u64,
+        month: u64,
+        dow: u64,
+        /// Whether the author restricted the field (i.e. did not write `*`). Only used to pick
+        /// between AND and OR on the two day fields — see [`Cron::matches_date`].
+        dom_restricted: bool,
+        dow_restricted: bool,
     }
 
     impl Cron {
-        fn matches(&self, t: &DateTime<Utc>) -> bool {
-            self.minute.matches(t.minute())
-                && self.hour.matches(t.hour())
-                && self.dom.matches(t.day())
-                && self.month.matches(t.month())
-                // chrono: lunes=0..domingo=6; cron: domingo=0..sábado=6. Normalizamos a cron.
-                && self.dow.matches(t.weekday().num_days_from_sunday())
+        fn matches_date(&self, date: &NaiveDate) -> bool {
+            if self.month & bit(date.month()) == 0 {
+                return false;
+            }
+            let by_dom = self.dom & bit(date.day()) != 0;
+            let by_dow = self.dow & bit(date.weekday().num_days_from_sunday()) != 0;
+            // `crontab(5)`: when BOTH day fields are restricted they are ORed — `0 9 1 * MON` is
+            // "the 1st, and every Monday". When only one is, the other is `*` and ANDing is the
+            // same thing. (The old parser ANDed always, which quietly meant "the 1st, but only if
+            // it is a Monday" — eleven months of the year that is no run at all.)
+            if self.dom_restricted && self.dow_restricted {
+                by_dom || by_dow
+            } else {
+                by_dom && by_dow
+            }
+        }
+
+        /// Is there any (month, day) this can ever land on? `0 0 30 2 *` parses field by field and
+        /// then never happens; refusing it here is the difference between "saved and silent" and
+        /// "told at save time".
+        fn is_reachable(&self) -> bool {
+            if self.dow_restricted {
+                // Any weekday recurs in every month, so a non-empty month set is enough.
+                return self.month != 0 && self.dow != 0;
+            }
+            (1..=12).any(|m| {
+                self.month & bit(m) != 0
+                    && (1..=days_in_month(m)).any(|d| self.dom & bit(d) != 0)
+            })
         }
     }
 
-    fn parse_field(s: &str) -> Option<Field> {
-        if s == "*" {
-            return Some(Field::Any);
+    /// Longest this month can ever be (February counted as a leap year).
+    fn days_in_month(month: u32) -> u32 {
+        match month {
+            2 => 29,
+            4 | 6 | 9 | 11 => 30,
+            _ => 31,
         }
-        if let Some(rest) = s.strip_prefix("*/") {
-            return rest.parse::<u32>().ok().map(Field::Step);
-        }
-        s.parse::<u32>().ok().map(Field::Fixed)
     }
 
-    fn parse(expr: &str) -> Option<Cron> {
-        let expr = expr.trim();
-        // Atajos comunes → expansión a 5 campos.
-        let expanded = match expr {
-            "@yearly" | "@annually" => "0 0 1 1 *".to_string(),
-            "@monthly" => "0 0 1 * *".to_string(),
-            "@weekly" => "0 0 * * 0".to_string(),
-            "@daily" | "@midnight" => "0 0 * * *".to_string(),
-            "@hourly" => "0 * * * *".to_string(),
-            other => other.to_string(),
+    fn bit(value: u32) -> u64 {
+        1u64 << value
+    }
+
+    fn values(mask: u64) -> Vec<u32> {
+        (0..64).filter(|v| mask & bit(*v) != 0).collect()
+    }
+
+    /// Parses `expr`, or says what is wrong with it in a sentence the author can act on.
+    pub fn parse(expr: &str) -> std::result::Result<Cron, String> {
+        let raw = expr.trim();
+        let expanded = match raw.to_ascii_lowercase().as_str() {
+            "@yearly" | "@annually" => "0 0 1 1 *",
+            "@monthly" => "0 0 1 * *",
+            "@weekly" => "0 0 * * 0",
+            "@daily" | "@midnight" => "0 0 * * *",
+            "@hourly" => "0 * * * *",
+            _ => raw,
         };
+        if expanded.starts_with('@') {
+            // `@reboot` is the usual one, and it is not a schedule — it is an event this hub does
+            // not have. Saying so beats parsing it into a trigger that never fires.
+            return Err(format!("`{raw}` is not a shortcut this hub knows. {SYNTAX_HELP}"));
+        }
         let parts: Vec<&str> = expanded.split_whitespace().collect();
         if parts.len() != 5 {
-            return None;
+            return Err(format!(
+                "`{raw}`: a cron has 5 fields — `minute hour day-of-month month day-of-week` — \
+                 and this has {}. {SYNTAX_HELP}",
+                parts.len()
+            ));
         }
-        Some(Cron {
-            minute: parse_field(parts[0])?,
-            hour: parse_field(parts[1])?,
-            dom: parse_field(parts[2])?,
-            month: parse_field(parts[3])?,
-            dow: parse_field(parts[4])?,
-        })
+
+        // Left to right, so the complaint is about the FIRST field that is wrong — which is the
+        // one the author's eye goes to. (`esto no es un cron` happens to be five words; reporting
+        // the last field would tell them about `cron` instead of about `esto`.)
+        let minute = field(parts[0], 0, 59, "minute", &[])?;
+        let hour = field(parts[1], 0, 23, "hour", &[])?;
+        let dom = field(parts[2], 1, 31, "day-of-month", &[])?;
+        let month = field(parts[3], 1, 12, "month", MONTH_NAMES)?;
+        let dow_raw = field(parts[4], 0, 7, "day-of-week", DAY_NAMES)?;
+        let cron = Cron {
+            minute,
+            hour,
+            dom,
+            month,
+            // Both 0 and 7 mean Sunday in crontab, and somebody will write each of them.
+            dow: if dow_raw & bit(7) != 0 { (dow_raw | 1) & !bit(7) } else { dow_raw },
+            dom_restricted: parts[2] != "*",
+            dow_restricted: parts[4] != "*",
+        };
+        if !cron.is_reachable() {
+            return Err(format!(
+                "`{raw}`: that day never happens (day {} of month {}), so the schedule would \
+                 never fire. {SYNTAX_HELP}",
+                parts[2], parts[3]
+            ));
+        }
+        Ok(cron)
+    }
+
+    /// One field → the set of values it matches. `names` is the alias table for the two fields
+    /// that have one (month, day-of-week); empty elsewhere.
+    fn field(
+        spec: &str,
+        min: u32,
+        max: u32,
+        name: &str,
+        names: &[(&str, u32)],
+    ) -> std::result::Result<u64, String> {
+        let mut mask = 0u64;
+        for item in spec.split(',') {
+            let item = item.trim();
+            if item.is_empty() {
+                return Err(format!(
+                    "{name} `{spec}`: an empty item in the list. {SYNTAX_HELP}"
+                ));
+            }
+            let (range, step) = match item.split_once('/') {
+                Some((range, step)) => {
+                    let n: u32 = step.trim().parse().map_err(|_| {
+                        format!("{name} `{item}`: the step after `/` must be a whole number. {SYNTAX_HELP}")
+                    })?;
+                    if n == 0 {
+                        return Err(format!(
+                            "{name} `{item}`: a step of 0 matches nothing. {SYNTAX_HELP}"
+                        ));
+                    }
+                    (range.trim(), n)
+                }
+                None => (item, 1),
+            };
+            let (lo, hi) = if range == "*" {
+                (min, max)
+            } else if let Some((from, to)) = range.split_once('-') {
+                let (from, to) = (value(from, min, max, name, names)?, value(to, min, max, name, names)?);
+                if from > to {
+                    return Err(format!(
+                        "{name} `{item}`: the range runs backwards ({from} is after {to}). {SYNTAX_HELP}"
+                    ));
+                }
+                (from, to)
+            } else {
+                let v = value(range, min, max, name, names)?;
+                // `a/N` is `a` through the end of the field, every N — the crontab reading.
+                if step == 1 { (v, v) } else { (v, max) }
+            };
+            let mut v = lo;
+            while v <= hi {
+                mask |= bit(v);
+                v += step;
+            }
+        }
+        Ok(mask)
+    }
+
+    fn value(
+        token: &str,
+        min: u32,
+        max: u32,
+        name: &str,
+        names: &[(&str, u32)],
+    ) -> std::result::Result<u32, String> {
+        let token = token.trim();
+        if let Some((_, v)) = names.iter().find(|(n, _)| n.eq_ignore_ascii_case(token)) {
+            return Ok(*v);
+        }
+        let parsed: u32 = token.parse().map_err(|_| {
+            format!("{name} `{token}`: expected a number {min}-{max}. {SYNTAX_HELP}")
+        })?;
+        if parsed < min || parsed > max {
+            return Err(format!(
+                "{name} `{token}`: out of range, it has to be {min}-{max}. {SYNTAX_HELP}"
+            ));
+        }
+        Ok(parsed)
     }
 
     #[cfg(test)]
@@ -448,6 +703,189 @@ pub mod cron {
             // no se acumula backlog (catch-up collapse estructural).
             let n = next_after("*/5 * * * *", "2026-06-13T10:02:00+00:00").unwrap();
             assert!(n.starts_with("2026-06-13T10:05:00"), "got {n}");
+        }
+
+        // ── The grammar a person actually writes (hub#730) ────────────────────────────────────
+        //
+        // Before this, `1-5`, `1,15` and `MON` parsed to `None`, which the callers turned into
+        // "armed and never fires". Refusing them at the gate is the floor; understanding them is
+        // what anybody coming from crontab/Zapier/n8n expects the first day.
+
+        #[test]
+        fn a_range_fires_on_every_minute_of_the_range() {
+            let mut at = "2026-06-13T10:00:30+00:00".to_string();
+            let mut got = Vec::new();
+            for _ in 0..5 {
+                at = next_after("1-5 * * * *", &at).unwrap();
+                got.push(at[11..16].to_string());
+            }
+            assert_eq!(got, ["10:01", "10:02", "10:03", "10:04", "10:05"]);
+            // …and then jumps the hour instead of matching :06.
+            let n = next_after("1-5 * * * *", &at).unwrap();
+            assert!(n.starts_with("2026-06-13T11:01:00"), "got {n}");
+        }
+
+        #[test]
+        fn a_list_fires_on_each_listed_value() {
+            let a = next_after("1,15 * * * *", "2026-06-13T10:00:00+00:00").unwrap();
+            assert!(a.starts_with("2026-06-13T10:01:00"), "got {a}");
+            let b = next_after("1,15 * * * *", &a).unwrap();
+            assert!(b.starts_with("2026-06-13T10:15:00"), "got {b}");
+            let c = next_after("1,15 * * * *", &b).unwrap();
+            assert!(c.starts_with("2026-06-13T11:01:00"), "got {c}");
+        }
+
+        #[test]
+        fn a_step_over_a_range_stays_inside_the_range() {
+            let mut at = "2026-06-13T09:59:00+00:00".to_string();
+            let mut got = Vec::new();
+            for _ in 0..5 {
+                at = next_after("0-30/10 * * * *", &at).unwrap();
+                got.push(at[11..16].to_string());
+            }
+            assert_eq!(got, ["10:00", "10:10", "10:20", "10:30", "11:00"]);
+        }
+
+        #[test]
+        fn day_and_month_names_are_understood() {
+            // 2026-06-13 is a Saturday; the next Monday is the 15th.
+            let n = next_after("0 9 * * MON", "2026-06-13T10:00:00+00:00").unwrap();
+            assert!(n.starts_with("2026-06-15T09:00:00"), "got {n}");
+            // Case does not matter, and a range of names works too (Mon..Fri → Monday the 15th).
+            let n = next_after("0 9 * * mon-fri", "2026-06-13T10:00:00+00:00").unwrap();
+            assert!(n.starts_with("2026-06-15T09:00:00"), "got {n}");
+            let n = next_after("0 0 1 JAN *", "2026-06-13T10:00:00+00:00").unwrap();
+            assert!(n.starts_with("2027-01-01T00:00:00"), "got {n}");
+        }
+
+        #[test]
+        fn sunday_is_both_zero_and_seven() {
+            // 2026-06-13 Saturday → Sunday the 14th, whichever number the author wrote.
+            for expr in ["0 9 * * 0", "0 9 * * 7", "0 9 * * SUN"] {
+                let n = next_after(expr, "2026-06-13T10:00:00+00:00").unwrap();
+                assert!(n.starts_with("2026-06-14T09:00:00"), "{expr} got {n}");
+            }
+        }
+
+        #[test]
+        fn day_of_month_and_day_of_week_are_ored_like_crontab() {
+            // `0 9 1 * MON`: the 1st OR any Monday — crontab's rule when BOTH are restricted.
+            // From Sat 2026-06-13: Monday the 15th comes before the 1st of July.
+            let a = next_after("0 9 1 * MON", "2026-06-13T10:00:00+00:00").unwrap();
+            assert!(a.starts_with("2026-06-15T09:00:00"), "got {a}");
+            // …and the 1st of July (a Wednesday) still fires, even though it is not a Monday.
+            let b = next_after("0 9 1 * MON", "2026-06-30T10:00:00+00:00").unwrap();
+            assert!(b.starts_with("2026-07-01T09:00:00"), "got {b}");
+        }
+
+        #[test]
+        fn a_step_counts_from_the_start_of_the_field_range() {
+            // Day-of-month starts at 1, so `*/5` is 1,6,11,… — the crontab meaning. (The old
+            // parser did `day % 5`, i.e. 5,10,15…, which is a different calendar.)
+            let n = next_after("0 0 */5 * *", "2026-06-02T00:00:00+00:00").unwrap();
+            assert!(n.starts_with("2026-06-06T00:00:00"), "got {n}");
+        }
+
+        #[test]
+        fn a_rare_date_further_than_a_year_away_is_still_found() {
+            // 29 February only exists on a leap year: the old 366-day window returned `None`,
+            // and `None` is exactly what the callers turned into "never" or "every tick".
+            let n = next_after("0 0 29 2 *", "2026-06-13T10:00:00+00:00").unwrap();
+            assert!(n.starts_with("2028-02-29T00:00:00"), "got {n}");
+        }
+
+        // ── What the engine refuses, and why it says so (hub#730) ─────────────────────────────
+
+        #[test]
+        fn every_shape_the_engine_cannot_run_is_refused_by_name() {
+            for (expr, needle) in [
+                ("esto no es un cron", "esto"),
+                ("0 0 9 * * *", "5 fields"),
+                ("* * *", "5 fields"),
+                ("", "5 fields"),
+                ("70 * * * *", "70"),
+                ("0 25 * * *", "25"),
+                ("0 9 * * FUNDAY", "FUNDAY"),
+                ("0 9 * 13 *", "13"),
+                ("*/0 * * * *", "step"),
+                ("5-1 * * * *", "5-1"),
+                ("1,,2 * * * *", "empty"),
+                ("@reboot", "@reboot"),
+                ("0 0 30 2 *", "never"),
+                ("0 0 31 4 *", "never"),
+            ] {
+                let err = parse(expr).expect_err("`{expr}` is not runnable and must be refused");
+                assert!(
+                    err.contains(needle),
+                    "`{expr}`: the message has to say WHAT is wrong; expected `{needle}` in `{err}`"
+                );
+                assert!(next_after(expr, "2026-06-13T10:00:00+00:00").is_none(), "{expr}");
+            }
+        }
+
+        #[test]
+        fn the_help_text_lists_what_is_accepted() {
+            // The message a person reads is the whole fix for hub#730: it has to be actionable.
+            for shape in ["*/N", "a-b", "a,b", "@daily", "MON"] {
+                assert!(SYNTAX_HELP.contains(shape), "`{shape}` missing from {SYNTAX_HELP}");
+            }
+        }
+
+        // ── The business clock (hub#731) ──────────────────────────────────────────────────────
+
+        const MADRID: chrono_tz::Tz = chrono_tz::Europe::Madrid;
+
+        #[test]
+        fn nine_in_the_morning_is_nine_on_the_business_clock() {
+            // Summer (CEST, +02:00): 09:00 in the shop is 07:00 UTC.
+            let n = next_after_in_tz("0 9 * * *", "2026-08-10T00:00:00+00:00", MADRID).unwrap();
+            assert_eq!(n, "2026-08-10T07:00:00+00:00");
+            // Winter (CET, +01:00): the SAME expression is 08:00 UTC. Nobody edited the flow.
+            let n = next_after_in_tz("0 9 * * *", "2026-01-10T00:00:00+00:00", MADRID).unwrap();
+            assert_eq!(n, "2026-01-10T08:00:00+00:00");
+        }
+
+        #[test]
+        fn the_stored_instant_is_always_utc() {
+            // `next_run` is a TEXT column compared with `<=` in SQL: a `+02:00` string would sort
+            // as if it were two hours later and the trigger would be claimed late (or early).
+            let n = next_after_in_tz("0 21 * * *", "2026-08-10T00:00:00+00:00", MADRID).unwrap();
+            assert!(n.ends_with("+00:00"), "got {n}");
+            assert_eq!(n, "2026-08-10T19:00:00+00:00");
+        }
+
+        #[test]
+        fn spring_forward_does_not_lose_the_run() {
+            // 2026-03-29 Madrid: 02:00 CET → 03:00 CEST. Local 02:00 NEVER HAPPENS that day, and
+            // a cash close at 02:00 that is simply skipped is a day of takings unaccounted for.
+            // The rule: fire at the instant the clock jumps over it (01:00 UTC = 03:00 local).
+            let n = next_after_in_tz("0 2 * * *", "2026-03-28T12:00:00+00:00", MADRID).unwrap();
+            assert_eq!(n, "2026-03-29T01:00:00+00:00");
+            // …once, not once per minute of the hour that does not exist.
+            let n2 = next_after_in_tz("0 2 * * *", &n, MADRID).unwrap();
+            assert_eq!(n2, "2026-03-30T00:00:00+00:00");
+        }
+
+        #[test]
+        fn fall_back_does_not_run_it_twice() {
+            // 2026-10-25 Madrid: 03:00 CEST → 02:00 CET. Local 02:00 HAPPENS TWICE (00:00 UTC and
+            // 01:00 UTC). A cash close that runs twice books the day twice.
+            let n = next_after_in_tz("0 2 * * *", "2026-10-24T12:00:00+00:00", MADRID).unwrap();
+            assert_eq!(n, "2026-10-25T00:00:00+00:00", "the first 02:00 fires");
+            let n2 = next_after_in_tz("0 2 * * *", &n, MADRID).unwrap();
+            assert_eq!(
+                n2, "2026-10-26T01:00:00+00:00",
+                "the SECOND 02:00 (01:00 UTC) must be skipped; next is the following day"
+            );
+        }
+
+        #[test]
+        fn utc_is_still_utc_when_no_zone_is_given() {
+            // `next_after` is what `_scheduled_tasks` calls, and its contract does not move.
+            assert_eq!(
+                next_after("0 9 * * *", "2026-08-10T00:00:00+00:00").unwrap(),
+                "2026-08-10T09:00:00+00:00"
+            );
         }
     }
 }
@@ -602,6 +1040,61 @@ mod tests {
         // Una tarea retirada del manifest se borra.
         seed_module_tasks(&db, "m", &[]).await.unwrap();
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _scheduled_tasks").await, 0);
+    }
+
+    /// hub#731: **the module contract does NOT move.** A flow's cron is the business clock because
+    /// the owner writes it; a `scheduled_tasks` cron is written by a module programmer in a
+    /// manifest, months before anybody knows where the hub is, and it means UTC. Reinterpreting it
+    /// would silently shift `verifactu.process_contingency` and every other task in production for
+    /// no gain — the ones that exist are intervals (`*/5`, `*/15`), where a zone means nothing.
+    #[tokio::test]
+    async fn a_module_task_stays_on_utc_whatever_zone_the_business_is_in() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+        db.execute_batch(
+            "CREATE TABLE hub_settings (\
+              hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
+              updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+              PRIMARY KEY (hub_id, key));",
+        )
+        .await
+        .unwrap();
+        let mut updates = serde_json::Map::new();
+        updates.insert("timezone".into(), json!("Asia/Kolkata"));
+        crate::settings::set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .unwrap();
+
+        seed_module_tasks(&db, "m", &[task("nine", "m.nine", "0 9 * * *", CatchUp::Collapse)])
+            .await
+            .unwrap();
+        let r = db
+            .query("SELECT next_run FROM _scheduled_tasks WHERE name='nine'", &Params::new())
+            .await
+            .unwrap();
+        let next = r.rows[0]["next_run"].as_str().unwrap();
+        assert!(next.ends_with("T09:00:00+00:00"), "09:00 UTC, not 03:30: {next}");
+    }
+
+    /// The opposite fallback of the flows one, and the more dangerous: `unwrap_or_else(|| now)`
+    /// made an unrunnable cron **due on every tick**. A task the engine cannot schedule is left
+    /// unscheduled and shouted about — never turned into a hot loop.
+    #[tokio::test]
+    async fn a_task_whose_cron_cannot_run_is_not_scheduled_for_right_now() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+        seed_module_tasks(&db, "m", &[task("bad", "m.bad", "1-5 9 * * FUNDAY", CatchUp::Collapse)])
+            .await
+            .unwrap();
+        let r = db
+            .query("SELECT next_run FROM _scheduled_tasks WHERE name='bad'", &Params::new())
+            .await
+            .unwrap();
+        assert!(
+            r.rows.is_empty() || r.rows[0]["next_run"].as_str().is_none(),
+            "an unrunnable cron must not become a task that is due forever: {:?}",
+            r.rows
+        );
     }
 
     /// Catch-up en arranque: `collapse` ejecuta una sola vez el backlog; `skip` no ejecuta, solo

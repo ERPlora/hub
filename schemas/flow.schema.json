@@ -21,13 +21,17 @@
     "triggers": {
       "type": "array",
       "description": "Qué arranca el flujo. Se materializan a `_flow_triggers` al guardar (idempotente, conservando `next_run`). Un flujo sin triggers solo se dispara a mano.",
-      "items": { "$ref": "#/$defs/trigger" }
+      "items": {
+        "$ref": "#/$defs/trigger"
+      }
     },
     "steps": {
       "type": "array",
       "minItems": 1,
       "description": "Los pasos, EN ORDEN. v1 es lineal y `on_error` es siempre `stop`: un fallo detiene el run (reintentar un command de negocio por su cuenta es como se cobra dos veces una venta).",
-      "items": { "$ref": "#/$defs/step" }
+      "items": {
+        "$ref": "#/$defs/step"
+      }
     }
   },
   "$defs": {
@@ -49,8 +53,12 @@
         "properties": {
           "eq": {},
           "neq": {},
-          "in": { "type": "array" },
-          "exists": { "type": "boolean" },
+          "in": {
+            "type": "array"
+          },
+          "exists": {
+            "type": "boolean"
+          },
           "contains": {},
           "gt": {},
           "gte": {},
@@ -61,11 +69,18 @@
     },
     "trigger": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
         "kind": {
-          "enum": ["event", "cron", "at", "manual"],
+          "enum": [
+            "event",
+            "cron",
+            "at",
+            "manual"
+          ],
           "description": "`event`: casa en el relay del outbox y SOLO inserta el run (el tick lo ejecuta). `cron`/`at`: reloj propio en `_flow_triggers` reutilizando `scheduler::cron::next_after` (NO se tocan las `_scheduled_tasks`); `at` es one-shot y es lo que da los «dentro de 3 días…». `manual`: `POST /api/hub/flows/{id}/run`."
         },
         "event": {
@@ -82,25 +97,35 @@
         },
         "cron": {
           "type": "string",
-          "description": "Solo `kind: cron` — expresión de 5 campos o atajo (`@daily`, `@hourly`). Obligatoria ahí."
+          "description": "Solo `kind: cron` — expresión de 5 campos `min hora dom mes dow` o atajo (`@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`). Obligatoria ahí. Por campo: `*`, un valor, un rango `a-b`, una lista `a,b`, un paso `*/N` o `a-b/N`; mes y día de semana admiten nombres (`JAN`…`DEC`, `SUN`…`SAT`, p. ej. `0 9 * * MON-FRI`). **Se lee en la ZONA HORARIA DEL NEGOCIO** (`timezone` de los settings, o la deducida de `country_code`/`region_code`) — «a las 9:00» son las 9:00 de la tienda (hub#731). Lo que el hub no sepa ejecutar se **rechaza al guardar** con `flow.invalid_cron` (hub#730): nunca se guarda un trigger activo que no va a disparar."
         },
         "at": {
           "type": "string",
-          "description": "Solo `kind: at` — instante RFC-3339. Obligatorio ahí."
+          "description": "Solo `kind: at` — instante RFC-3339 CON offset (p. ej. `2026-08-11T09:00:00+02:00`). Obligatorio ahí. Lo que no parsee se rechaza al guardar con `flow.invalid_at` (hub#730). No lleva zona aparte: el offset ya está en el propio instante."
         }
       }
     },
     "step": {
       "type": "object",
-      "required": ["id", "kind"],
+      "required": [
+        "id",
+        "kind"
+      ],
       "properties": {
         "id": {
           "type": "string",
           "description": "Identidad del paso DENTRO del flujo: es como lo leen los pasos posteriores (`steps.<id>.<campo>`). Único en el documento."
         },
         "kind": {
-          "enum": ["command", "condition", "delay", "http", "ai", "notify"],
-          "description": "Vocabulario CONGELADO. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http` (hub#662) sigue el contrato claim → I/O → complete: el tick lo prepara y el server lo ejecuta FUERA del lock. `ai`/`notify` todavía NO están implementados: un documento que los use se RECHAZA al guardar nombrando su issue (ai: hub#665, notify: hub#663), en vez de guardarse y quedarse colgado a las 3 de la mañana."
+          "enum": [
+            "command",
+            "condition",
+            "delay",
+            "http",
+            "ai",
+            "notify"
+          ],
+          "description": "Vocabulario CONGELADO. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http` (hub#662) y `ai` (hub#665) siguen el contrato claim → I/O → complete: el tick los prepara y el server los ejecuta FUERA del lock. `notify` todavía NO está implementado: un documento que lo use se RECHAZA al guardar nombrando su issue (hub#663), en vez de guardarse y quedarse colgado a las 3 de la mañana."
         },
         "command": {
           "type": "string",
@@ -124,7 +149,13 @@
           "description": "Solo `kind: delay` — ruta a un instante RFC-3339. Alternativa a `seconds`; hace falta uno de los dos."
         },
         "method": {
-          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
           "description": "Solo `kind: http` — método. Por defecto `GET`. El conjunto está CONGELADO y es pequeño a propósito: `CONNECT`/`TRACE` son la forma de convertir una URL permitida en un túnel."
         },
         "url": {
@@ -143,6 +174,46 @@
           "minimum": 1,
           "maximum": 30,
           "description": "Solo `kind: http` — segundos de espera. Por defecto 10, máximo 30: el run mantiene su lease todo ese rato, así que es también lo que cuesta un error. La respuesta se trunca a 1 MB y no se siguen redirecciones (un 3xx es una segunda petición a un sitio que nadie concedió)."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Solo `kind: ai` — la tarea, en palabras. Obligatorio ahí. Se mapea contra el run como cualquier otro valor, así que admite plantillas `{{input.texto}}`: un turno puede hablar del mensaje que lo disparó. Un `{{secret.X}}` aquí se RECHAZA al guardar: un prompt es justo donde una credencial no puede interpolarse, porque se enviaría al modelo."
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Solo `kind: ai` — qué puede llamar el modelo EN ESTE step. Es la segunda de tres cribas: lo que se le ofrece es `assemble_tools` (registry + permisos del flujo) ∩ esto ∩ los grants vivos del flujo. Declarar una tool aquí NO la autoriza; hace falta su grant.",
+          "properties": {
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Lecturas. Cada una necesita un grant `query` vivo (hub#665)."
+            },
+            "commands": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Escrituras que el modelo puede PROPONER. Que se ejecuten o no lo decide `policy`."
+            }
+          }
+        },
+        "policy": {
+          "enum": [
+            "auto",
+            "manual"
+          ],
+          "default": "manual",
+          "description": "Solo `kind: ai` — qué pasa con una escritura que propone el modelo (ADR-0283 D3). `manual` (POR DEFECTO): se convierte en una fila de `_flow_approvals` y el turno TERMINA; al aprobar se ejecuta EXACTAMENTE lo propuesto, con re-chequeo del grant en ese momento y sin volver a entrar al modelo. `auto`: se ejecuta en el turno, por la puerta de `Origin::Automation`. El defecto es el restrictivo a propósito: la opción permisiva es la que nadie escribe y todo el mundo asume, y aquí significaría un modelo escribiendo en la base de datos del negocio a las 3 de la mañana."
+        },
+        "max_iters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 6,
+          "description": "Solo `kind: ai` — vueltas del bucle de tools. Se RECHAZA por encima del tope en vez de recortarse: cada turno es una llamada real por el proxy del SaaS, que la mide (`AssistantUsage`), y un documento que dice 50 y ejecuta 10 le miente a quien lo escribió."
         }
       }
     }

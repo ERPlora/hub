@@ -355,7 +355,7 @@ import {
   machineRegistrationRequired,
   pinUsers,
 } from '../lib/runtime';
-import { deviceMode, loadDeviceMode, offersPinLogin } from '../lib/device-mode';
+import { deviceMode, deviceTrusted, loadDeviceMode, offersPinLogin } from '../lib/device-mode';
 import { pinPolicy } from '../lib/pin-policy';
 import { isDark, toggleTheme } from '../lib/theme';
 import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
@@ -395,9 +395,6 @@ function onLogoError(ev: Event): void {
 // Cloud (ARQUITECTURA.md §2.9) se implementa en cloud.ts; aquí solo leemos
 // el flag y la lista para mostrar/ocultar los pasos.
 // ---------------------------------------------------------------------------
-function readTrusted(): boolean {
-  try { return localStorage.getItem('erplora.trusted') === '1'; } catch { return false; }
-}
 function readTrustedUsers(): TrustedUser[] {
   try {
     const raw = localStorage.getItem('erplora.trusted_users');
@@ -414,23 +411,26 @@ function saveTrustedFlag(val: boolean): void {
   } catch { /* ignore */ }
 }
 
-const trusted = ref<boolean>(readTrusted());
 const trustedUsers = ref<TrustedUser[]>(readTrustedUsers());
 
 // ---------------------------------------------------------------------------
 // Flujo de pasos
 // ---------------------------------------------------------------------------
-// ¿Ofrece esta pantalla el pinpad? Lo deciden el MODO DEL DISPOSITIVO (hub#357/#358) y el DIAL DEL
-// NEGOCIO (hub#359), no lo que haya en este navegador: el mostrador —donde varias personas se
-// turnan— pregunta quién está delante; el equipo propio del dueño entra con su cuenta; y la tienda
-// de una sola persona puede decir que no se pregunte («nunca»), asumiendo que las ventas dejan de
-// llevar el nombre de quien las hizo.
+// ¿Ofrece esta pantalla el pinpad? Lo deciden el MODO DEL DISPOSITIVO (hub#357/#358), la CONFIANZA
+// DEL DISPOSITIVO (hub#514 — ahora del servidor, no de localStorage) y el DIAL DEL NEGOCIO
+// (hub#359), no lo que haya en este navegador: el mostrador —donde varias personas se turnan—
+// pregunta quién está delante; el equipo propio del dueño entra con su cuenta; y la tienda de una
+// sola persona puede decir que no se pregunte («nunca»), asumiendo que las ventas dejan de llevar
+// el nombre de quien las hizo.
 //
 // La regla vive entera en `offersPinLogin` (shared **y** dispositivo de confianza **y** un dial que
 // sigue preguntando): duplicarla aquí la haría derivar. Hasta que el hub responde, `deviceMode`
-// vale `shared` y `pinPolicy` vale `per_shift` → el pinpad es el estado por defecto, que es el lado
-// seguro. Esta pantalla solo LEE las dos: escribirlas exige sesión admin.
-const pinAvailable = computed(() => offersPinLogin(deviceMode.value, trusted.value, pinPolicy.value));
+// vale `shared` y `pinPolicy` vale `per_shift` pero `deviceTrusted` vale `false` → sin respuesta
+// del servidor no se pinta el pinpad (hub#514, fail-closed). Esta pantalla solo LEE las tres:
+// escribirlas exige sesión admin.
+const pinAvailable = computed(() =>
+  offersPinLogin(deviceMode.value, deviceTrusted.value, pinPolicy.value),
+);
 const step = ref<Step>(pinAvailable.value ? 'pin' : 'email');
 const showTabs = computed(() => pinAvailable.value && step.value !== 'setup' && step.value !== 'twoFactor');
 
@@ -440,18 +440,19 @@ const showTabs = computed(() => pinAvailable.value && step.value !== 'setup' && 
 // "conservaban" los de localStorage ausentes del runtime → podía resucitar usuarios obsoletos
 // (drift); ya no. El flujo de seguridad (§2.9) NO cambia: esto solo decide qué pestaña se muestra;
 // la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
-// `deviceMode` y `pinPolicy` entran como fuentes porque el hub responde DESPUÉS del montaje: sin
-// ellas, un portátil marcado `personal` —o un hub cuyo dial dice «nunca»— se quedaría con el pinpad
-// ya pintado hasta recargar, y una pantalla de login no la recarga nadie.
+// `deviceMode`, `deviceTrusted` y `pinPolicy` entran como fuentes porque el hub responde DESPUÉS
+// del montaje: sin ellas, un portátil marcado `personal` —o un hub cuyo dial dice «nunca»— se
+// quedaría con el pinpad ya pintado hasta recargar, y una pantalla de login no la recarga nadie.
+// `deviceTrusted` (hub#514) reemplaza al flag de localStorage: el servidor dice si ESTE dispositivo
+// puede usar el PIN, no la propia pantalla al ver que hay usuarios con PIN.
 watch(
-  [pinUsers, hubContextReady, machineRegistrationRequired, deviceMode, pinPolicy],
+  [pinUsers, hubContextReady, machineRegistrationRequired, deviceMode, deviceTrusted, pinPolicy],
   ([users, contextReady, registrationRequired]) => {
     if (!contextReady || step.value === 'setup' || step.value === 'twoFactor') return;
     // Una máquina real sin vínculo no puede entrar por un PIN heredado/cacheado: primero debe
     // acreditar una cuenta Cloud y completar el alta de ESTA instalación. Demo es la única
     // excepción y el runtime ya la expresa con `registration_required=false`.
     if (registrationRequired) {
-      trusted.value = false;
       step.value = 'email';
       return;
     }
@@ -460,7 +461,6 @@ watch(
       // volvemos al acceso online. Si el context no responde, en cambio, conservamos el modo
       // offline; `hubContextReady` permanece false.
       trustedUsers.value = [];
-      trusted.value = false;
       saveTrustedUsers([]);
       saveTrustedFlag(false);
       step.value = 'email';
@@ -475,10 +475,8 @@ watch(
     }));
     saveTrustedUsers(trustedUsers.value);
     saveTrustedFlag(true);
-    trusted.value = true;
-    // El dispositivo puede entrar por PIN, pero solo el mostrador lo OFRECE. En un equipo personal
-    // los usuarios con PIN se conservan (volver a `shared` devuelve las mismas caras): lo que el
-    // modo cambia es la puerta que se enseña, no lo que el hub sabe.
+    // El pinpad se ofrece o no según `pinAvailable` (modo + trust del servidor + dial). Ya no
+    // ponemos `trusted = true` aquí: la confianza la decide el hub en `GET /api/device/mode`.
     step.value = pinAvailable.value ? 'pin' : 'email';
   },
   { immediate: true },
@@ -577,12 +575,23 @@ async function finalizeCloudLogin(result: LoginResult): Promise<void> {
     trustedUsers.value = [userEntry, ...existing];
     saveTrustedUsers(trustedUsers.value);
     saveTrustedFlag(true);
-    trusted.value = true;
+    // hub#514: la confianza la decide el servidor. Tras un login cloud con "confiar", el runtime
+    // acaba de registrar el dispositivo → recargamos el device mode para que `deviceTrusted` (la
+    // fuente del pinpad) se actualice YA, sin esperar a la próxima carga de la pantalla de login.
+    await loadDeviceMode();
     // El alta de PIN solo tiene sentido donde el PIN se va a pedir. En un dispositivo `personal`
     // sería un callejón sin salida: cuatro dígitos que nadie volvería a preguntar (hub#358).
     if (pinAvailable.value) {
-      step.value = 'setup';
-      return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
+      // hub#772: el PIN es del USUARIO, no del dispositivo. La rama solo comprobaba si el pinpad
+      // estaba disponible aquí → todo login online con «confiar» reabría el alta y `onSetupComplete`
+      // sobrescribía el PIN existente. Si el usuario ya tiene PIN (su id está en `pin_users`, la
+      // MISMA autoridad que pinta el pinpad), se conserva y se entra directo. Cambiar el PIN es una
+      // decisión separada y explícita, no un efecto de confiar un dispositivo.
+      const userAlreadyHasPin = pinUsers.value.some((u) => u.id === sess.user.id);
+      if (!userAlreadyHasPin) {
+        step.value = 'setup';
+        return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
+      }
     }
   }
 

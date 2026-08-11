@@ -26,7 +26,7 @@ import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
 import { setRuntimeClientKind } from './device';
-import type { ModuleUpdateInfo } from './module-updates';
+import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -442,6 +442,28 @@ export async function listModuleUpdates(): Promise<ModuleUpdateInfo[]> {
   return env.ok && env.data ? env.data : [];
 }
 
+/**
+ * Entre qué versiones puede elegir este hub para un módulo (`GET /api/modules/{id}/versions`).
+ *
+ * Sirve a las dos puertas: instalar (el módulo aún no está: valen todas las publicadas) y actualizar
+ * (solo hacia delante desde la instalada). El runtime ya aplica ahí la política —fuera cuarentena,
+ * fuera retroceso, y un módulo clavado por soporte no ofrece nada—, así que la pantalla pinta lo que
+ * le llega y no filtra por su cuenta.
+ *
+ * Un fallo devuelve la lista vacía, y el llamante cae a `latest`: sin lista se instala igual que
+ * antes de que existiera el desplegable. Quedarse sin poder instalar porque el Cloud no contestó
+ * sería un precio absurdo por una comodidad.
+ */
+export async function listModuleVersions(moduleId: string): Promise<ModuleVersions> {
+  const empty: ModuleVersions = { module_id: moduleId, installed: null, latest: null, versions: [] };
+  const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/versions`, {
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) return empty;
+  const env = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: ModuleVersions };
+  return env.ok && env.data ? env.data : empty;
+}
+
 export const activateModule = (id: string): Promise<void> => moduleAction(id, 'activate');
 export const deactivateModule = (id: string): Promise<void> => moduleAction(id, 'deactivate');
 export const uninstallModule = (id: string): Promise<void> => moduleAction(id, 'uninstall');
@@ -702,6 +724,11 @@ export const SECTION_DISCARD_CODES = [
   'identity_not_portable',
   'settings_not_portable',
   'roles_not_activatable',
+  // ADR-0273 D8 / hub#560. El runtime lo emitía desde entonces y esta lista no lo conocía, así que
+  // la fila del informe enseñaba la cadena cruda.
+  'system_table_not_portable',
+  // hub#753 — la serie de facturación y el libro de números ya entregados son de UNA instalación.
+  'numbering_not_portable',
 ] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */
@@ -772,6 +799,12 @@ export interface ModuleInstallResult {
   purchase?: ModuleInstallPurchase[];
   /** Motivo real del motor — solo en `failed`. */
   error?: string;
+  /**
+   * The version the bundle pinned, present ONLY when it is not the one that got installed
+   * (hub#751/#752): the marketplace had already pruned it and the engine fell back to the newest
+   * compatible one. Absent = the pin was honoured exactly.
+   */
+  requested_version?: string;
 }
 
 /** Estado normalizado de UN módulo del informe de import, listo para pintar. */
@@ -783,6 +816,12 @@ export interface ModuleInstallStatusInfo {
   purchase: ModuleInstallPurchase[];
   /** Motivo del motor — solo en `failed`. */
   error?: string;
+  /**
+   * La versión que pedía la plantilla, cuando NO es la que se instaló (hub#751/#752). Se pinta:
+   * una plantilla que instala en silencio otra versión de la que anuncia es justo la sorpresa que
+   * la sustitución evita.
+   */
+  substitutedFor?: string;
 }
 
 /**
@@ -795,7 +834,7 @@ export interface ModuleInstallStatusInfo {
  */
 export function moduleInstallStatusInfo(m: ModuleInstallResult): ModuleInstallStatusInfo {
   if (m.status === 'installed' || m.status === 'already_installed') {
-    return { kind: m.status, blockedOn: [], purchase: [] };
+    return { kind: m.status, blockedOn: [], purchase: [], substitutedFor: m.requested_version };
   }
   if (m.status === 'blocked') {
     return { kind: 'blocked', blockedOn: m.blocked_on ?? [], purchase: m.purchase ?? [] };
@@ -904,18 +943,41 @@ export async function fetchExportTables(): Promise<ExportModuleTables[]> {
   }
 }
 
+/**
+ * Deadline del export (hub#765). El POST empaqueta datos de cada módulo + media, así que puede
+ * tardar más que un `fetch` normal; pero NO puede ser infinito. Sin deadline, un runtime o proxy
+ * colgado deja el spinner girando hasta que el usuario se rinde — y se va pensando que la copia
+ * existe. Dos minutos cubre los zips grandes (módulos + imágenes) y sigue siendo finito: una copia
+ * que no sabe decir que falló es peor que una que suelta el error.
+ */
+const EXPORT_DEADLINE_MS = 120_000;
+
 export async function exportHub(
   name: string,
   locale: string,
   selection: ExportSelection,
 ): Promise<{ blob: Blob; filename: string }> {
   beginRequest(); // volcar datos + empaquetar puede tardar → barra de progreso del shell
+  // El AbortController es lo que convierte un cuelgue en un error accionable: cuando salta el
+  // deadline, el fetch rechaza con un nombre legible en vez de quedarse abierto para siempre.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), EXPORT_DEADLINE_MS);
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/hub/export`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
-      body: JSON.stringify({ name, locale, selection }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${RUNTIME_URL}/api/hub/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+        body: JSON.stringify({ name, locale, selection }),
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      // `AbortController#abort()` rechaza como `DOMException` nombre `TimeoutError` (o `AbortError`
+      // en algunos navegadores). Ese es el caso del deadline: el runtime no respondió a tiempo.
+      if (ctrl.signal.aborted) throw new Error('export → timeout');
+      // Otro error de red (runtime caído, sin conexión): que el mensaje original llegue al usuario.
+      throw e instanceof Error ? e : new Error(String(e));
+    }
     if (!res.ok) throw new Error(await readErrorMessage(res, `export → ${res.status}`));
     const blob = await res.blob();
     const filename =
@@ -923,6 +985,7 @@ export async function exportHub(
       `${name}_${locale}.blueprint.zip`;
     return { blob, filename };
   } finally {
+    clearTimeout(timer);
     endRequest();
   }
 }

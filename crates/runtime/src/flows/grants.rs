@@ -24,6 +24,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
+use crate::flows::net::{self, Url};
 use crate::registry::{new_id, now_rfc3339, Registry};
 
 pub const ERR_GRANT_DENIED: &str = "flow.grant_denied";
@@ -31,12 +32,15 @@ pub const ERR_UNKNOWN_GRANT_KIND: &str = "flow.unknown_grant_kind";
 pub const ERR_GRANT_KIND_NOT_AVAILABLE: &str = "flow.grant_kind_not_available";
 pub const ERR_INVALID_HTTP_PATTERN: &str = "flow.invalid_http_pattern";
 
-/// The five kinds of ADR-0283 §2. The vocabulary is frozen here; only `command` can be created in
-/// this delivery, because a grant for something the kernel cannot do yet would tell an owner that
+/// The five kinds of ADR-0283 §2. The vocabulary is frozen here; what grows is which of them can
+/// be CREATED, because a grant for something the kernel cannot do yet would tell an owner that
 /// their flow may call an URL or message a customer when it cannot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GrantKind {
     Command,
+    /// A read the flow may perform. Creatable since hub#665: it is the third filter over the tools
+    /// an agent step offers the model ("assembled ∩ declared by the step ∩ granted"), and without
+    /// it that intersection would have nothing behind it for reads.
     Query,
     /// Reserved — hub#663 part 2 (`notify` per channel).
     Notify,
@@ -70,7 +74,10 @@ impl GrantKind {
     /// Can this kind be created today? The others are refused by name, with the issue that brings
     /// them, instead of being stored as a promise nothing keeps.
     pub fn is_available(self) -> bool {
-        matches!(self, GrantKind::Command | GrantKind::Http)
+        matches!(
+            self,
+            GrantKind::Command | GrantKind::Http | GrantKind::Query
+        )
     }
     pub const ALL: &'static [GrantKind] = &[
         GrantKind::Command,
@@ -106,6 +113,14 @@ impl Authority {
             .contains(&(GrantKind::Command, command.to_string()))
     }
 
+    /// May this flow run this query RIGHT NOW? Same default-deny, same freshness. A read is not
+    /// harmless just because it writes nothing: an agent step's whole job is to put what it reads
+    /// in front of a model, and a hub's tables hold its customers.
+    pub fn allows_query(&self, query: &str) -> bool {
+        self.granted
+            .contains(&(GrantKind::Query, query.to_string()))
+    }
+
     /// The permissions a run carries in its [`crate::registry::RequestContext`]: **only** the
     /// `permission` of the commands this flow was granted.
     ///
@@ -124,9 +139,14 @@ impl Authority {
     pub fn permissions(&self, registry: &Registry) -> HashSet<String> {
         self.granted
             .iter()
-            .filter(|(kind, _)| *kind == GrantKind::Command)
-            .filter_map(|(_, name)| registry.get_command(name))
-            .map(|cmd| cmd.def.permission.clone())
+            .filter_map(|(kind, name)| match kind {
+                GrantKind::Command => registry.get_command(name).map(|c| c.def.permission.clone()),
+                // The granted READS have to be here too, or a query with a live grant would pass
+                // the flow's gate and then be refused by the permission check inside
+                // `queries::execute`: the grant would open one door and the next one would be shut.
+                GrantKind::Query => registry.get_query(name).map(|q| q.def.permission.clone()),
+                _ => None,
+            })
             .filter(|p| !p.is_empty() && p != "*")
             .collect()
     }
@@ -134,9 +154,14 @@ impl Authority {
     /// May this flow call this URL RIGHT NOW? (hub#662)
     ///
     /// The caller passes the URL **as it will really be requested** — templates rendered, secrets
-    /// substituted. Matching the un-templated form would authorise
-    /// `https://api.example.com/{{input.path}}` and then call whatever the event carried.
-    pub fn allows_http(&self, url: &str) -> bool {
+    /// substituted, and **already parsed** ([`flows::net::parse`](crate::flows::net::parse)).
+    /// Matching the un-templated form would authorise `https://api.example.com/{{input.path}}` and
+    /// then call whatever the event carried; matching the un-parsed form was hub#729 — the string
+    /// `…/anything/../status/418` starts with `/anything`, and the request goes to `/status/418`.
+    ///
+    /// It takes a [`Url`] and not a `&str` on purpose: a caller cannot reach this gate without
+    /// having produced the very object the request will be built from.
+    pub fn allows_http(&self, url: &Url) -> bool {
         self.granted
             .iter()
             .filter(|(kind, _)| *kind == GrantKind::Http)
@@ -148,64 +173,95 @@ impl Authority {
     }
 }
 
-/// Splits `scheme://host[:port]` from the rest of an URL. `None` if it is not an absolute http(s)
-/// URL — which is also how a pattern that names no host is refused.
-fn split_origin(url: &str) -> Option<(String, &str)> {
-    let after_scheme = ["http://", "https://"].iter().find_map(|scheme| {
-        url.get(..scheme.len())
-            .filter(|head| head.eq_ignore_ascii_case(scheme))
-            .map(|_| (scheme.len(), *scheme))
-    })?;
-    let (offset, scheme) = after_scheme;
-    let rest = &url[offset..];
-    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-    let authority = &rest[..end];
-    if authority.is_empty() {
-        return None;
-    }
-    // `user:pass@host` is not accepted anywhere in this kernel: an allow-list that has to reason
-    // about credentials in the authority is one that can be fooled (`https://api.example.com@evil`).
-    if authority.contains('@') {
-        return None;
-    }
-    Some((
-        format!("{}{}", scheme.to_ascii_lowercase(), authority.to_ascii_lowercase()),
-        &rest[end..],
-    ))
+/// One `http` grant, taken apart with **the same parser that will take apart the URL it judges**
+/// ([`net::parse`]). That identity is the fix for hub#729: before it, the pattern was split by
+/// hand and compared against raw text, so `…/anything/../status/418` «started with» `/anything`
+/// and was fetched from `/status/418`.
+struct HttpPattern {
+    /// `scheme://host[:port]`, normalised — compared **whole**.
+    origin: String,
+    /// Path + query + fragment, with dot segments resolved — compared by **prefix**.
+    prefix: String,
+    /// Was there a trailing `*`?
+    wildcard: bool,
 }
 
-/// Does `url` fall under `pattern`?
-///
-/// **The origin is compared whole and the path only by prefix.** That asymmetry is the whole
-/// security of the allow-list: a plain `starts_with` over the entire URL would let
-/// `https://api.example.com.evil.test/…` through a grant for `https://api.example.com/…`, which is
-/// the oldest allow-list escape there is.
-///
-/// A trailing `*` extends the match to anything below the prefix; without it the path must be
-/// exactly the one granted. `*` anywhere else is not a wildcard — it is a literal, because
-/// `https://*.example.com` reads like containment and is not (nothing stops `a.b.evil.example.com`
-/// from being somebody else's server).
-fn url_matches(pattern: &str, url: &str) -> bool {
-    let (Some((p_origin, p_path)), Some((u_origin, u_path))) =
-        (split_origin(pattern), split_origin(url))
-    else {
-        return false;
-    };
-    if p_origin != u_origin {
-        return false;
+impl HttpPattern {
+    /// `None` when the pattern is not «one scheme, one host, one path prefix». The reasons are
+    /// spelled out one by one in [`check_http_pattern`], which is what an admin reads; here an
+    /// unusable pattern simply covers nothing, so a row that somehow got stored is default-deny
+    /// rather than a wildcard.
+    fn parse(pattern: &str) -> Option<Self> {
+        let (head, wildcard) = match pattern.strip_suffix('*') {
+            Some(head) => (head, true),
+            None => (pattern, false),
+        };
+        // A grant must name a path: `https://host` on its own reads like containment of the host
+        // and would silently become «the root document», which is not what anybody means.
+        if !head.split_once("//")?.1.contains(['/', '?', '#']) {
+            return None;
+        }
+        let url = net::parse(head).ok()?;
+        Some(Self {
+            origin: net::origin_of(&url).to_string(),
+            prefix: net::tail_of(&url).to_string(),
+            wildcard,
+        })
     }
-    match p_path.strip_suffix('*') {
-        Some(prefix) => u_path.starts_with(prefix),
-        None => u_path == p_path,
+
+    /// The pattern as it will really be matched. When this is not what was typed, the grant does
+    /// not read as what it covers — see [`check_http_pattern`].
+    fn canonical(&self) -> String {
+        format!(
+            "{}{}{}",
+            self.origin,
+            self.prefix,
+            if self.wildcard { "*" } else { "" }
+        )
     }
+
+    /// **The origin is compared whole and the path only by prefix.** That asymmetry is the whole
+    /// security of the allow-list: a plain `starts_with` over the entire URL would let
+    /// `https://api.example.com.evil.test/…` through a grant for `https://api.example.com/…`,
+    /// which is the oldest allow-list escape there is.
+    ///
+    /// A trailing `*` extends the match to anything below the prefix; without it the path must be
+    /// exactly the one granted. `*` anywhere else is not a wildcard — it is a literal, because
+    /// `https://*.example.com` reads like containment and is not (nothing stops
+    /// `a.b.evil.example.com` from being somebody else's server).
+    fn covers(&self, url: &Url) -> bool {
+        if self.origin != net::origin_of(url) {
+            return false;
+        }
+        let tail = net::tail_of(url);
+        if self.wildcard {
+            tail.starts_with(&self.prefix)
+        } else {
+            tail == self.prefix
+        }
+    }
+}
+
+/// Does `url` fall under `pattern`? Both sides normalised, by construction.
+fn url_matches(pattern: &str, url: &Url) -> bool {
+    HttpPattern::parse(pattern).is_some_and(|p| p.covers(url))
 }
 
 /// Refuses a pattern that is not «one scheme, one host, one path prefix» — the only shape the
 /// matcher can enforce. Everything else (`*`, `https://*`, a bare host) reads as containment on the
 /// grants screen while covering more than the owner believes, and a grant nobody can read
 /// correctly is worse than no grant at all.
+///
+/// hub#728 added the last of the refusals, and it is the same invariant as everywhere else in this
+/// file: **the pattern has to be written the way it will be matched.** `http://2130706433/api*` IS
+/// `http://127.0.0.1/api*` and `http://2852039166/latest*` IS the cloud metadata service; a
+/// pattern spelled like that authorises something nobody reading the grants screen would recognise.
+/// It is refused with its canonical form in the message, so an admin who really wants it writes it
+/// down in the notation everybody can read — and then the ADDRESS guard, not the allow-list, is
+/// what refuses to dial it. Those stay two separate questions on purpose: an admin may grant a LAN
+/// address by mistake, and the answer is still no at call time.
 fn check_http_pattern(pattern: &str) -> Result<()> {
-    let refuse = |why: &str| {
+    let refuse = |why: String| {
         Err(RuntimeError::Domain {
             code: ERR_INVALID_HTTP_PATTERN.to_string(),
             message: format!(
@@ -214,17 +270,28 @@ fn check_http_pattern(pattern: &str) -> Result<()> {
             ),
         })
     };
-    let Some((origin, path)) = split_origin(pattern) else {
-        return refuse("it must start with an absolute `http://` or `https://` origin");
+    let head = pattern.strip_suffix('*').unwrap_or(pattern);
+    let url = match net::parse(head) {
+        Ok(url) => url,
+        Err(why) => return refuse(why),
     };
-    if origin.contains('*') {
-        return refuse("the host cannot contain a wildcard");
+    if url.host_str().unwrap_or_default().contains('*') {
+        return refuse("the host cannot contain a wildcard".to_string());
     }
-    if path.is_empty() {
-        return refuse("it must name a path (use `/*` to mean the whole host, deliberately)");
+    let Some(parsed) = HttpPattern::parse(pattern) else {
+        return refuse(
+            "it must name a path (use `/*` to mean the whole host, deliberately)".to_string(),
+        );
+    };
+    if parsed.prefix.contains('*') {
+        return refuse("`*` is only a wildcard at the very end".to_string());
     }
-    if path.trim_end_matches('*').contains('*') {
-        return refuse("`*` is only a wildcard at the very end");
+    let canonical = parsed.canonical();
+    if canonical != pattern {
+        return refuse(format!(
+            "it is not written the way it will be matched — it means `{canonical}`, and a grant \
+             has to read as what it covers"
+        ));
     }
     Ok(())
 }
@@ -273,6 +340,27 @@ pub async fn check_command_grant(
     })
 }
 
+/// The same gate for a READ (hub#665). It is the door `Runtime::execute_flow_query` goes through,
+/// so a query the flow was not granted is refused by the runtime and not by the agent runner's
+/// good manners — the runner is the caller, and a gate a caller can skip is not a gate.
+pub async fn check_query_grant(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    flow_id: &str,
+    query: &str,
+) -> Result<()> {
+    if authority(db, hub_id, flow_id).await?.allows_query(query) {
+        return Ok(());
+    }
+    Err(RuntimeError::Domain {
+        code: ERR_GRANT_DENIED.to_string(),
+        message: format!(
+            "flow `{flow_id}` has no live grant for query `{query}`. A flow reads only what it was \
+             explicitly granted (ADR-0283 D2)."
+        ),
+    })
+}
+
 /// Replaces the whole grant list of a flow (the `PUT …/grants` contract): what disappears is
 /// **revoked** (soft-delete + `revoked_by`), what stays is left alone with its original
 /// `granted_by`, and what is new is inserted.
@@ -294,16 +382,19 @@ pub async fn replace(
                 code: ERR_GRANT_KIND_NOT_AVAILABLE.to_string(),
                 message: format!(
                     "grants of kind `{}` cannot be created yet (http: hub#662, notify and \
-                     recipient_query: hub#663 part 2, query tools: hub#665). Refused rather than \
-                     stored as a permission nothing enforces.",
+                     recipient_query: hub#663 part 2). Refused rather than stored as a permission \
+                     nothing enforces.",
                     kind.as_str()
                 ),
             });
         }
-        // A grant naming a command that does not exist is a promise about nothing — and, worse, it
-        // reads as authorisation on the screen. `PUT …/grants` refuses the whole list (§9).
+        // A grant naming an operation that does not exist is a promise about nothing — and, worse,
+        // it reads as authorisation on the screen. `PUT …/grants` refuses the whole list (§9).
         if *kind == GrantKind::Command && registry.get_command(value).is_none() {
             return Err(RuntimeError::CommandNotFound(value.clone()));
+        }
+        if *kind == GrantKind::Query && registry.get_query(value).is_none() {
+            return Err(RuntimeError::QueryNotFound(value.clone()));
         }
         if *kind == GrantKind::Http {
             check_http_pattern(value)?;
@@ -468,6 +559,14 @@ mod tests {
             "sales.sale.void".into(),
             crate::flows::test_support::command("sales", "sales.void_sale", "SELECT 1;", vec![]),
         );
+        reg.queries.insert(
+            "sales.sale.list".into(),
+            crate::flows::test_support::query("sales", "sales.view_sale", "SELECT 1;"),
+        );
+        reg.queries.insert(
+            "sales.sale.totals".into(),
+            crate::flows::test_support::query("sales", "sales.view_sale", "SELECT 1;"),
+        );
         reg
     }
 
@@ -475,6 +574,12 @@ mod tests {
         let db = fresh_db().await;
         crate::flows::test_support::ensure_schema(&db, HUB).await;
         db
+    }
+
+    /// An URL the way the kernel really produces one: through the single parse of [`net`]. Nothing
+    /// in these tests may hand the allow-list a string, because nothing in the kernel can.
+    fn url(raw: &str) -> Url {
+        net::parse(raw).unwrap_or_else(|e| panic!("`{raw}`: {e}"))
     }
 
     #[tokio::test]
@@ -592,7 +697,7 @@ mod tests {
     #[tokio::test]
     async fn the_kinds_the_kernel_cannot_enforce_yet_are_refused_by_name() {
         let db = db_with_schema().await;
-        for kind in [GrantKind::Notify, GrantKind::RecipientQuery, GrantKind::Query] {
+        for kind in [GrantKind::Notify, GrantKind::RecipientQuery] {
             let err = replace(&db, HUB, FLOW, &registry(), &[(kind, "x".into())], "hub_user:1")
                 .await
                 .expect_err("a permission nothing enforces must not be stored");
@@ -620,24 +725,147 @@ mod tests {
         .unwrap();
         let authority = authority(&db, HUB, FLOW).await.unwrap();
 
-        assert!(authority.allows_http("https://api.example.com/v1/messages"));
-        assert!(authority.allows_http("https://api.example.com/v1/messages/42?dry=1"));
+        assert!(authority.allows_http(&url("https://api.example.com/v1/messages")));
+        assert!(authority.allows_http(&url("https://api.example.com/v1/messages/42?dry=1")));
         // Another path of the same host is a different permission.
-        assert!(!authority.allows_http("https://api.example.com/v1/customers"));
+        assert!(!authority.allows_http(&url("https://api.example.com/v1/customers")));
         // A host that merely STARTS with the granted one is the classic allow-list escape
         // (`api.example.com.evil.test`); the origin is compared whole, never by prefix.
-        assert!(!authority.allows_http("https://api.example.com.evil.test/v1/messages"));
+        assert!(!authority.allows_http(&url("https://api.example.com.evil.test/v1/messages")));
         // The scheme is part of the origin: a grant for https never authorises cleartext.
-        assert!(!authority.allows_http("http://api.example.com/v1/messages"));
+        assert!(!authority.allows_http(&url("http://api.example.com/v1/messages")));
         // And an URL that merely CONTAINS the pattern is not covered by it.
-        assert!(!authority.allows_http("https://evil.test/?u=https://api.example.com/v1/messages"));
+        assert!(!authority.allows_http(&url("https://evil.test/?u=https://api.example.com/v1/messages")));
     }
 
     #[tokio::test]
     async fn a_flow_with_no_http_grant_may_call_nothing() {
         let db = db_with_schema().await;
         let authority = authority(&db, HUB, FLOW).await.unwrap();
-        assert!(!authority.allows_http("https://api.example.com/v1/messages"));
+        assert!(!authority.allows_http(&url("https://api.example.com/v1/messages")));
+    }
+
+    /// hub#729 — the allow-list compares the path a client will really request, not the one that
+    /// was typed. `/v1/send/../../admin/keys` READS as covered by `/v1/send*` and is fetched from
+    /// `/admin/keys`, so a grant for "only the send endpoint" hands over the whole API with the
+    /// key that was given to it.
+    #[tokio::test]
+    async fn a_dot_segment_cannot_walk_out_of_the_granted_path() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[(GrantKind::Http, "https://api.example.com/v1/send*".into())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let authority = authority(&db, HUB, FLOW).await.unwrap();
+
+        for escape in [
+            "https://api.example.com/v1/send/../../admin/keys",
+            // WHATWG turns `\` into `/` for special schemes, so this is the same escape.
+            r"https://api.example.com/v1/send\..\..\admin\keys",
+            // …and it treats a percent-encoded dot as a dot when resolving segments.
+            "https://api.example.com/v1/send/%2e%2e/%2e%2e/admin/keys",
+            "https://api.example.com/v1/send/./../admin/keys",
+        ] {
+            assert!(
+                !authority.allows_http(&url(escape)),
+                "`{escape}` is fetched from /admin/keys, which nobody granted"
+            );
+        }
+
+        // The twin that must keep working, or the fix would just be "block everything": the path
+        // is judged RESOLVED, so a `..` that lands back inside the grant is inside the grant.
+        assert!(authority.allows_http(&url("https://api.example.com/v1/send/42")));
+        assert!(authority.allows_http(&url("https://api.example.com/v1/messages/../send/42")));
+        // And normalisation is the same on both sides: a default port and a shouted host are the
+        // same origin, not a different one.
+        assert!(authority.allows_http(&url("https://API.EXAMPLE.COM:443/v1/send/42")));
+    }
+
+    /// hub#728 — a pattern is refused unless it is **written the way it will be matched**.
+    ///
+    /// `http://2130706433:8791/api*` IS `http://127.0.0.1:8791/api*`, and nobody reads it that way
+    /// on the grants screen; `http://2852039166/latest*` is the cloud metadata service and reads
+    /// like a phone number. The refusal says what the pattern really means, so an admin who wants
+    /// it has to write it down in the notation everybody can read — and it is the ADDRESS guard,
+    /// not the allow-list, that then refuses to dial it (that separation is deliberate: an admin
+    /// may legitimately grant a LAN address, and the answer is still no at call time).
+    #[tokio::test]
+    async fn a_pattern_must_be_written_the_way_it_will_be_matched() {
+        let db = db_with_schema().await;
+        for (pattern, reads_as) in [
+            ("http://2130706433:8791/api*", "http://127.0.0.1:8791/api*"),
+            ("http://0x7f000001/x*", "http://127.0.0.1/x*"),
+            ("http://127.1/x*", "http://127.0.0.1/x*"),
+            ("http://2852039166/latest*", "http://169.254.169.254/latest*"),
+            // A pattern that does not say what it covers: it reads `/v1/…` and grants `/admin*`.
+            (
+                "https://api.example.com/v1/../admin*",
+                "https://api.example.com/admin*",
+            ),
+            (
+                r"https://api.example.com/v1\..\admin*",
+                "https://api.example.com/admin*",
+            ),
+            // A shouted host and a default port are the same origin written twice.
+            ("https://API.EXAMPLE.COM:443/v1*", "https://api.example.com/v1*"),
+        ] {
+            let err = replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[(GrantKind::Http, pattern.into())],
+                "hub_user:1",
+            )
+            .await
+            .expect_err("a grant nobody can read correctly is worse than no grant");
+            let text = format!("{err}");
+            assert!(text.contains(pattern), "{text}");
+            assert!(
+                text.contains(reads_as),
+                "the refusal has to say what it really covers, or it is not actionable: {text}"
+            );
+        }
+
+        // Credentials in the authority are not something an allow-list can reason about, and there
+        // is no canonical form to suggest — that one is refused outright.
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[(GrantKind::Http, "https://user:pass@api.example.com/v1*".into())],
+            "hub_user:1",
+        )
+        .await
+        .expect_err("`https://api.example.com@evil.test` is the oldest trick there is");
+
+        // …and everything an admin would really type is still grantable — including, deliberately,
+        // an address inside the network, which the guard refuses at call time and not here.
+        for ok in [
+            "https://api.example.com/v1/send*",
+            "http://127.0.0.1:8791/api*",
+            "http://169.254.169.254/latest*",
+            "http://[::1]/x*",
+            "https://api.example.com/v1/send",
+        ] {
+            replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[(GrantKind::Http, ok.into())],
+                "hub_user:1",
+            )
+            .await
+            .unwrap_or_else(|e| panic!("`{ok}` is a perfectly readable pattern: {e}"));
+        }
     }
 
     #[tokio::test]
@@ -663,6 +891,79 @@ mod tests {
             .expect_err("a grant that does not name one host and one path prefix is no containment");
             assert!(format!("{err}").contains(pattern), "{err}");
         }
+    }
+
+    // ── query grants (hub#665) ────────────────────────────────────────────────────────────────
+
+    /// hub#665 opens the third kind. Until the agent runner existed, `query` was refused with the
+    /// rest — a grant nothing enforced. Now it is the third filter over the tools the model is
+    /// offered ("assembled ∩ declared by the step ∩ granted"), and it is a real gate: without it,
+    /// intersecting reads with the grants would be a sentence with nothing behind it.
+    #[tokio::test]
+    async fn a_query_grant_opens_exactly_the_query_it_names() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[(GrantKind::Query, "sales.sale.list".into())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        check_query_grant(&db, HUB, FLOW, "sales.sale.list")
+            .await
+            .expect("the granted query runs");
+        assert!(
+            check_query_grant(&db, HUB, FLOW, "sales.sale.totals")
+                .await
+                .is_err(),
+            "a sibling query is a different question with the same default answer: no"
+        );
+        // And granting a READ never opens a WRITE, whatever they share.
+        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn a_query_grant_naming_a_query_that_does_not_exist_is_refused() {
+        let db = db_with_schema().await;
+        let err = replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[(GrantKind::Query, "ghost.query".into())],
+            "hub_user:1",
+        )
+        .await
+        .expect_err("a grant naming nothing reads as authorisation on the screen");
+        assert!(format!("{err}").contains("ghost.query"), "{err}");
+    }
+
+    /// The permission union has to carry the granted QUERIES too, or a query with a live grant
+    /// would still be refused downstream by the permission check inside `queries::execute` — the
+    /// grant would open one door and the next one would be shut.
+    #[tokio::test]
+    async fn the_context_permissions_include_the_granted_queries() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[(GrantKind::Query, "sales.sale.list".into())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let permissions = authority(&db, HUB, FLOW).await.unwrap().permissions(&reg);
+        assert_eq!(permissions, HashSet::from(["sales.view_sale".to_string()]));
     }
 
     #[tokio::test]

@@ -764,6 +764,8 @@ const moduleInstallRows = computed<ReportRow[]>(() =>
       // frase traducida, que NOMBRA lo que hay que contratar (hub#409): decir «falló» a secas es
       // mandar a diagnosticar una avería que no existe.
       // Sin lista no hay frase: «necesita: .» no nombra nada — la etiqueta del estado ya lo dice.
+      // Y una versión SUSTITUIDA (hub#751/#752) entró bien, pero se dice: la plantilla anunciaba
+      // otra, y enterarse por un número distinto meses después es peor que leerlo ahora.
       reason:
         info.kind === 'blocked'
           ? info.blockedOn.length
@@ -771,7 +773,12 @@ const moduleInstallRows = computed<ReportRow[]>(() =>
                 missing: info.blockedOn.map((id) => blockedModuleLabel(id, info.purchase)).join(', '),
               })
             : undefined
-          : info.error,
+          : info.substitutedFor
+            ? t('importPage.reasonVersionSubstituted', {
+                requested: info.substitutedFor,
+                installed: m.version,
+              })
+            : info.error,
     };
   }),
 );
@@ -783,6 +790,8 @@ const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
   identity_not_portable: (n) => t('importPage.reasonIdentityNotPortable', { n }),
   settings_not_portable: (n) => t('importPage.reasonSettingsNotPortable', { n }),
   roles_not_activatable: (n) => t('importPage.reasonRolesNotActivatable', { n }),
+  system_table_not_portable: (n) => t('importPage.reasonSystemTableNotPortable', { n }),
+  numbering_not_portable: (n) => t('importPage.reasonNumberingNotPortable', { n }),
 };
 
 /** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */

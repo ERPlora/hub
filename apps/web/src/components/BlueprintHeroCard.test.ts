@@ -38,7 +38,15 @@ vi.mock('../lib/nav', () => ({ refreshModuleNav: (...a: unknown[]) => refreshMod
 
 // A real `ref`: the card reads the permission of ADR-0248 off the session the runtime resolved.
 const { session } = vi.hoisted(() => ({ session: { value: null as { permissions?: string[] } | null } }));
-vi.mock('../lib/session', () => ({ user: session }));
+// PARTIAL mock: `user` is stubbed, but `permissionsInclude` must stay REAL. Since hub#506 the
+// wildcard rule lives in exactly one place and `blueprint-hero.ts` imports it from here — a mock
+// that only returns `user` makes it `undefined` and every test in this file dies on the first
+// computed. Stubbing it too would be worse: the point of hub#506 is that there is ONE rule, and a
+// second copy in a test is how the four copies it deleted got there.
+vi.mock('../lib/session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/session')>()),
+  user: session,
+}));
 vi.mock('../lib/hub-settings', () => ({ hubSettings: { value: { country_code: 'ES', language: 'es' } } }));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
@@ -334,6 +342,26 @@ describe('what the owner is told afterwards', () => {
     expect(w.find('[data-testid="hero-outcome-title"]').text()).toBe(enCatalogue.setup.hero.partialTitle);
     // «Almost» is not «done»: the happy sentence must not be up next to a failure.
     expect(w.find('[data-testid="hero-done"]').exists()).toBe(false);
+  });
+
+  // hub#751 — «something else did not go in» sent a hairdresser to look for a needle. The card
+  // already KNOWS which apps broke; naming them is the difference between an unactionable sentence
+  // and one she can act on (or repeat to support).
+  it('NAMES the apps that did not go in, instead of "something else"', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [],
+      installed_modules: [
+        { id: 'sales', version: '2.12.8', status: 'installed' },
+        { id: 'verifactu', version: '1.4.1', status: 'failed', error: 'versión no encontrada: 1.4.1' },
+      ],
+    });
+    const w = await outcomeOf(mountCard());
+
+    const failed = w.find('[data-testid="hero-failed"]');
+    expect(failed.exists()).toBe(true);
+    expect(failed.text()).toContain('verifactu');
+    // …and not the app that DID go in: naming the wrong one is worse than naming none.
+    expect(failed.text()).not.toContain('sales');
   });
 
   it('raises the same line when every app went in but a PART of the template did not', async () => {

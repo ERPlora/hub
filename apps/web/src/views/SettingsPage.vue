@@ -474,7 +474,7 @@ import {
   type BusinessCertificate,
 } from '../lib/runtime';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 
 type Tab = SettingsTab;
 
@@ -600,10 +600,25 @@ async function persistHubSettings(
   try {
     await updateHubSettings(partial);
     await toastSuccess(t('settings.saved'));
-  } catch {
+  } catch (e) {
     revert();
-    await toastError(t('settings.saveError'));
+    await toastError(refusalMessage(e));
   }
+}
+
+/**
+ * Lo que se lee cuando el runtime dice que NO (hub#684).
+ *
+ * El rechazo viaja con un código ESTABLE (`demo_fiscal_identity_locked`…) y ese código tiene su
+ * cadena traducida; el `message` del runtime va en inglés y es para el log, no para la pantalla. Un
+ * código sin traducción cae en el genérico de siempre, así que un motivo nuevo nunca deja el toast
+ * en blanco — se lee peor, pero se lee.
+ */
+function refusalMessage(error: unknown): string {
+  const code = (error as { code?: string } | null)?.code;
+  const key = code ? `settings.saveRefused.${code}` : '';
+  if (!key || !te(key)) return t('settings.saveError');
+  return t(key, { name: hubSettings.value?.business_legal_name ?? '' });
 }
 
 // Moneda del hub (GLOBAL): persiste al instante. money.ts la lee de la cache → todo el dinero se

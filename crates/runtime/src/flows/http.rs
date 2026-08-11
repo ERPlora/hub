@@ -30,6 +30,7 @@ use serde_json::{json, Map, Value as Json};
 use crate::errors::{Result, RuntimeError};
 use crate::flows::def::{self, StepDef, StepSpec};
 use crate::flows::grants::{Authority, ERR_GRANT_DENIED};
+use crate::flows::net::{self, Url};
 use crate::flows::secrets;
 
 /// What a secret looks like once it is written down.
@@ -45,10 +46,21 @@ pub const ERR_HTTP_URL_INVALID: &str = "flow.http_url_invalid";
 #[derive(Clone, PartialEq)]
 pub struct HttpRequest {
     pub method: String,
-    pub url: String,
+    /// **The URL, parsed exactly once** ([`net::parse`]) — an object, not a string.
+    ///
+    /// It is the object the allow-list judged, the object the address guard judges and the object
+    /// handed to the HTTP client. hub#728 and hub#729 were both the same shape of bug: a string
+    /// travelled, somebody downstream parsed it again, and the second URL was not the one anybody
+    /// had approved. A `Url` cannot be re-parsed into something else — parsing it again is a
+    /// no-op — so the hole has no place left to open.
+    pub url: Url,
     pub headers: Vec<(String, String)>,
     pub body: Option<String>,
     pub timeout_seconds: u64,
+    /// The same URL with [`REDACTED`] where each secret was, rendered SEPARATELY rather than
+    /// derived by search-and-replace: normalising can percent-encode a credential, and a redaction
+    /// that depends on finding the exact bytes would then miss it.
+    shown_url: String,
     /// The secret VALUES that went into the fields above. Kept so that everything coming back —
     /// the response, and the text of any error — can be [`scrub`](Self::scrub)bed of them before it
     /// is written anywhere. A server that echoes the credential it was sent must not be able to get
@@ -72,10 +84,10 @@ impl HttpRequest {
         out
     }
 
-    /// Same as [`scrub`](Self::scrub), for the URL and headers this request already holds — used by
-    /// the server when it has to name the request in an error.
+    /// How this request may be named in writing: the URL with `***` where the secrets were. Used
+    /// by the server whenever an error has to say which call failed.
     pub fn redacted_url(&self) -> String {
-        self.scrub(&self.url)
+        self.scrub(&self.shown_url)
     }
 }
 
@@ -147,19 +159,29 @@ pub(crate) async fn prepare(
     let real_url = as_text(&def::resolve(&json!(url), &real));
     let shown_url = as_text(&def::resolve(&json!(url), &shown));
 
-    if !def::is_http_url(&real_url) {
-        return Err(RuntimeError::Domain {
-            code: ERR_HTTP_URL_INVALID.to_string(),
-            message: format!(
-                "step `{}`: `{shown_url}` is not an absolute http(s) URL once the run filled it in",
-                step.id
-            ),
-        });
-    }
+    // **The one parse** (hub#728/#729). Everything from here on — the allow-list, the address
+    // guard in `flow_io`, the HTTP client — works on THIS object. Nothing downstream ever sees the
+    // text again, so there is no second parse to disagree with this one.
+    let target = match net::parse(&real_url) {
+        Ok(target) => target,
+        Err(why) => {
+            return Err(RuntimeError::Domain {
+                code: ERR_HTTP_URL_INVALID.to_string(),
+                message: format!(
+                    "step `{}`: `{shown_url}` {why} once the run filled it in",
+                    step.id
+                ),
+            })
+        }
+    };
+    // The redacted twin, normalised the same way, so the run history and every refusal name the
+    // URL that would REALLY have been fetched — `…/v1/send/../../admin/keys` is `/admin/keys`, and
+    // an audit trail that still showed `/v1/send` would argue the grant had been respected.
+    let shown_url = net::parse(&shown_url).map_or(shown_url, |u| u.to_string());
 
     // **The allow-list**, on the URL that would really be called, as the last thing before the
     // request crosses the seam. Default-deny: no live `http` grant covering it, no call.
-    if !authority.allows_http(&real_url) {
+    if !authority.allows_http(&target) {
         return Err(RuntimeError::Domain {
             code: ERR_GRANT_DENIED.to_string(),
             message: format!(
@@ -198,10 +220,11 @@ pub(crate) async fn prepare(
     Ok(Prepared {
         request: HttpRequest {
             method: method.clone(),
-            url: real_url,
+            url: target,
             headers: out_headers,
             body: real_body,
             timeout_seconds: *timeout_seconds,
+            shown_url,
             secrets: values.into_values().filter(|v| !v.is_empty()).collect(),
         },
         recorded_input,
@@ -318,7 +341,7 @@ mod tests {
         // What goes out: templated, with the real credential.
         assert_eq!(prepared.request.method, "POST");
         assert_eq!(
-            prepared.request.url,
+            prepared.request.url.as_str(),
             "https://api.example.com/v1/send?to=+34600111222"
         );
         assert!(prepared
@@ -399,6 +422,83 @@ mod tests {
         assert!(prepare(&db, HUB, FLOW, &templated, &outside, &authority)
             .await
             .is_err());
+    }
+
+    /// **The invariant behind hub#728 and hub#729**, and the reason they are one fix: the URL that
+    /// is JUDGED and the URL that is CALLED are the same URL.
+    ///
+    /// It is pinned by the only property that survives somebody adding another transformation in
+    /// the middle: what the request carries is a **fixed point of the parser** — parsing it again,
+    /// which is exactly what an HTTP client does with a string, changes nothing. The day the
+    /// request starts carrying the raw text again (`…/../…`, `2130706433`, a shouted host), the
+    /// second parse moves it and this test falls over.
+    #[tokio::test]
+    async fn the_url_the_allow_list_judged_is_the_url_the_request_carries() {
+        let _lock = env_lock();
+        let _key = EnvVarGuard::set(&test_key_b64(3));
+        let db = db().await;
+        let authority = allow(&db, "https://api.example.com/v1/*").await;
+        let templated = step(json!({ "id": "call", "kind": "http", "url": "{{input.target}}" }));
+
+        for (target, dialled) in [
+            (
+                "https://api.example.com/v1/send",
+                "https://api.example.com/v1/send",
+            ),
+            // Resolved BEFORE the allow-list saw it, and carried resolved.
+            (
+                "https://api.example.com/v1/messages/../send",
+                "https://api.example.com/v1/send",
+            ),
+            // A default port and a shouted host are the same origin; the request says so.
+            (
+                "https://API.EXAMPLE.COM:443/v1/send",
+                "https://api.example.com/v1/send",
+            ),
+        ] {
+            let scope = json!({ "input": { "target": target }, "steps": {} });
+            let prepared = prepare(&db, HUB, FLOW, &templated, &scope, &authority)
+                .await
+                .unwrap_or_else(|e| panic!("`{target}` is inside the grant: {e}"));
+
+            assert_eq!(
+                prepared.request.url.as_str(),
+                dialled,
+                "`{target}` goes out as the URL the allow-list judged"
+            );
+            // Parsing it again is what an HTTP client does to a string. It must change nothing.
+            assert_eq!(
+                net::parse(prepared.request.url.as_str()).unwrap(),
+                prepared.request.url,
+                "`{target}` moved on the second parse — the gap hub#728/#729 came through"
+            );
+        }
+    }
+
+    /// hub#729 at the seam that matters: the refusal happens with the RESOLVED path, so nothing is
+    /// prepared at all — no secret is decrypted into a request that then gets denied downstream.
+    #[tokio::test]
+    async fn a_dot_segment_that_leaves_the_grant_is_refused_before_the_request_exists() {
+        let _lock = env_lock();
+        let _key = EnvVarGuard::set(&test_key_b64(3));
+        let db = db().await;
+        let authority = allow(&db, "https://api.example.com/v1/send*").await;
+        let templated = step(json!({ "id": "call", "kind": "http", "url": "{{input.target}}" }));
+
+        let scope = json!({
+            "input": { "target": "https://api.example.com/v1/send/../../admin/keys" },
+            "steps": {}
+        });
+        let err = prepare(&db, HUB, FLOW, &templated, &scope, &authority)
+            .await
+            .expect_err("`/admin/keys` is not `/v1/send`");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_GRANT_DENIED),
+            "{err}"
+        );
+        // The refusal names the URL that would really have been fetched, not the one that was
+        // typed — otherwise the run history would argue the grant was right.
+        assert!(format!("{err}").contains("/admin/keys"), "{err}");
     }
 
     #[tokio::test]

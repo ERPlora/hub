@@ -11,6 +11,7 @@ import {
   IpcBridgeTransport,
   LocalNetworkPermissionDeniedError,
   LOCAL_NETWORK_PERMISSION_DENIED,
+  SERVER_UNAVAILABLE,
   eurosToCents,
   centsToEuros,
   majorToMinor,
@@ -139,6 +140,89 @@ test('headers() se inyectan en cada POST (auth X-Hub-Id, etc.)', async () => {
   await t.query('q');
   assert.equal(hdrs['X-Hub-Id'], 'h1');
   assert.equal(hdrs['Content-Type'], 'application/json');
+});
+
+// ── hub#782: a non-JSON / non-2xx answer from the proxy is an ErploraError, not a SyntaxError ─
+//
+// The hub's runtime ALWAYS answers JSON — even its 4xx domain refusal travels in an envelope with a
+// `code`. The proxy in front of it answers HTML (a 502 when the container OOMs at exit 137, hub#759;
+// any deploy/restart window). Before this fix `post()` called `res.json()` without checking either,
+// so a downed hub surfaced as a raw, code-less `SyntaxError: Unexpected token '<'` — not an
+// `ErploraError`, so no module could orient by `code` and the HTML of the error page leaked through.
+
+/** A `fetch` that answers `status` + `contentType` + `body` (the three things `post()` must check). */
+function htmlishFetch(status: number, contentType: string, body: string): typeof fetch {
+  return (async () => ({
+    ok: false,
+    status,
+    headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => JSON.parse(body), // explodes for HTML — that is the whole point
+  })) as unknown as typeof fetch;
+}
+
+test('hub#782: a 502 text/html from the proxy is ErploraError(server_unavailable), not a SyntaxError', async () => {
+  const fetchImpl = htmlishFetch(502, 'text/html; charset=utf-8', '<!DOCTYPE html><html>bad gateway</html>');
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.query('inventory.products.list'),
+    (e: unknown) =>
+      e instanceof ErploraError &&
+      e.code === SERVER_UNAVAILABLE &&
+      // The HTML of the proxy's error page must NOT leak: the cashier sees a message, never a trace.
+      !String(e.message).includes('<') &&
+      !String(e.message).includes('DOCTYPE'),
+  );
+});
+
+test('hub#782: a response that IS JSON-shaped but reports a non-JSON content-type is transport error', async () => {
+  // A misconfigured proxy that wraps even a good payload in text/plain would slip past a `res.ok`
+  // guard; the content-type is what flags it as not the runtime's envelope.
+  const fetchImpl = htmlishFetch(200, 'text/plain', '{"ok":true,"data":1}');
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.command('x.y'),
+    (e: unknown) => e instanceof ErploraError && e.code === SERVER_UNAVAILABLE,
+  );
+});
+
+test('hub#782: a body that is not JSON even with an application/json content-type is wrapped, not thrown raw', async () => {
+  // Defense in depth: some proxies/CDNs rewrite content-type but the body is still HTML.
+  const fetchImpl = htmlishFetch(200, 'application/json', '<html>still not json</html>');
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.query('q'),
+    (e: unknown) =>
+      e instanceof ErploraError && e.code === SERVER_UNAVAILABLE && !String(e.message).includes('<'),
+  );
+});
+
+test('hub#782: a network-level fetch failure (TypeError) is wrapped as server_unavailable', async () => {
+  const fetchImpl = (async () => {
+    throw new TypeError('Failed to fetch');
+  }) as unknown as typeof fetch;
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.query('q'),
+    (e: unknown) =>
+      e instanceof ErploraError && e.code === SERVER_UNAVAILABLE && e.message !== 'Failed to fetch',
+  );
+});
+
+test('hub#782: a 4xx domain refusal still flows through as its own code (NOT transport error)', async () => {
+  // The runtime's domain refusals travel INSIDE a JSON envelope with a `code` — permission_denied,
+  // requires_elevation, … They are NOT a transport failure, even when HTTP-status is 4xx. This is
+  // the test that pins why the guard keys on Content-Type, not on `res.ok`.
+  const fetchImpl = (async () => ({
+    ok: false,
+    status: 403,
+    headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'application/json' : null) },
+    json: async () => ({ ok: false, error: { code: 'permission_denied', message: 'no' } }),
+  })) as unknown as typeof fetch;
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.command('x.y'),
+    (e: unknown) => e instanceof ErploraError && e.code === 'permission_denied',
+  );
 });
 
 // ── HttpWsTransport: WS de eventos (solo push) ──────────────────────────────

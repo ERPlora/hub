@@ -180,18 +180,53 @@
         <PlanLimitsPanel />
       </template>
 
-      <!-- ── Tab: Actualizaciones ───────────────────────────────── -->
+      <!-- ── Tab: Actualizaciones ───────────────────────────────────────────────────────────
+           Qué le hemos cambiado a este hub y desde qué versión (hub#564, ADR-0269 §3.5).
+           SOLO LECTURA a propósito: actualizamos sin preguntar, así que aquí no hay ningún
+           control de update del hub —el botón del dueño se retiró porque contradice ADR-0269—,
+           solo el derecho a SABER. Y solo lo que cambió: un día sin cambios no es una fila que
+           diga «sin cambios», es nada. -->
       <template v-else-if="tab === 'updates'">
         <ion-card class="ion-no-margin">
-          <ion-card-content class="updates-center">
-            <HubIcon name="information-circle-outline" class="updates-icon" />
-            <strong class="updates-title">{{ t('system.updatesManaged') }}</strong>
-            <p class="updates-meta">
-              Hub {{ info?.hubVersion ?? '—' }}
-            </p>
-            <p class="muted-note updates-hint">
-              {{ t('system.updatesCloudHint') }}
-            </p>
+          <ion-card-content>
+            <div class="block-header">
+              <h3 class="block-header__title">{{ t('system.updateHistory') }}</h3>
+              <ok-status-pill tone="info">{{ t('system.updatesRunning', { version: info?.hubVersion ?? '—' }) }}</ok-status-pill>
+            </div>
+            <p class="muted-note updates-hint">{{ t('system.updatesCloudHint') }}</p>
+
+            <!-- Un hub al que no le hemos cambiado nada dice justo eso, y no una lista de 24
+                 módulos «sin cambios»: el ruido se deja de leer. -->
+            <ok-empty-state
+              v-if="!historyGroups.length"
+              icon="checkmark-circle-outline"
+              :heading="t('system.noUpdates')"
+              :message="t('system.noUpdatesHint')"
+            />
+            <div v-else class="history">
+              <section v-for="group in historyGroups" :key="group.key" class="history-day">
+                <!-- Un grupo sin fecha legible no lleva titular: mejor ninguno que uno vacío o,
+                     peor, un «Invalid Date». Lo que cambió sigue siendo cierto sin el cuándo. -->
+                <h4 v-if="group.isToday || group.isYesterday || group.label" class="history-day__title">
+                  {{ group.isToday ? t('system.today') : group.isYesterday ? t('system.yesterday') : group.label }}
+                </h4>
+                <ul class="history-list">
+                  <li v-for="(item, i) in group.entries" :key="`${group.key}-${i}`" class="history-item">
+                    <span class="history-item__time">{{ item.time }}</span>
+                    <span class="history-item__name">{{ item.name }}</span>
+                    <span class="history-item__jump">{{ versionJump(item) }}</span>
+                    <!-- Una vuelta atrás se dice con esas palabras. El error que la causó NO se
+                         pinta: es texto de desarrollo, y lo que hay que leer aquí es la frase. -->
+                    <span v-if="item.outcome === 'rolled_back'" class="history-item__note">
+                      {{ t('system.rolledBackTo', { version: item.to }) }}
+                    </span>
+                    <span v-else-if="item.outcome === 'lost'" class="history-item__note history-item__note--bad">
+                      {{ t('system.updateLost') }}
+                    </span>
+                  </li>
+                </ul>
+              </section>
+            </div>
           </ion-card-content>
         </ion-card>
       </template>
@@ -220,6 +255,73 @@
         </ion-card>
       </template>
 
+      <!-- ── Tab: Eventos caídos (dead-letters, hub#660) ───────────────────────
+           Solo un admin gestiona dead-letters: el endpoint revalida el rol, así que a un no-admin
+           la pestaña le muestra vacío (no es un agujero de permiso, es que no hay nada para él). El
+           flujo es «arreglar la causa y reenviar tal cual» — el payload nunca se edita (inmutabilidad
+           de la cadena fiscal, ADR-0189); si la causa sigue, la fila vuelve a morir y reaparece. -->
+      <template v-else-if="tab === 'events'">
+        <ion-card class="ion-no-margin">
+          <ion-card-content>
+            <div class="events-head">
+              <h3 class="logs-title">{{ t('system.deadEvents') }}</h3>
+              <div class="events-actions" v-if="deadLetters.length">
+                <ion-button size="small" fill="outline" color="success" :disabled="eventsBusy" @click="retryAll">
+                  <HubIcon slot="start" name="refresh-outline" />
+                  {{ t('system.retryAll') }}
+                </ion-button>
+              </div>
+            </div>
+            <p class="events-hint" v-if="deadLetters.length">{{ t('system.deadEventsHint') }}</p>
+
+            <ion-spinner v-if="eventsLoading" name="crescent" class="events-spinner" />
+
+            <!-- Un fallo de carga NO es "no hay eventos": distinguirlos evita que un error de red o
+                 un 403 se lea como «Todo en orden» y el operador crea que no hay nada (pudiendo ser
+                 fiscal). Con reintentar se recupera sin salir de la pestaña. -->
+            <ok-empty-state
+              v-else-if="eventsError"
+              icon="cloud-offline-outline"
+              :heading="t('system.loadErrorTitle')"
+              :message="t('system.deadEventsLoadError')"
+            >
+              <ion-button slot="actions" size="small" fill="outline" @click="loadDeadLetters">
+                {{ t('system.retry') }}
+              </ion-button>
+            </ok-empty-state>
+
+            <ok-empty-state
+              v-else-if="!deadLetters.length"
+              icon="checkmark-circle-outline"
+              :heading="t('system.noDeadEvents')"
+              :message="t('system.noDeadEventsHint')"
+            />
+
+            <div v-else class="events-list">
+              <div v-for="ev in deadLetters" :key="ev.id" class="event-row">
+                <div class="event-row__main">
+                  <div class="event-row__top">
+                    <code class="event-row__name">{{ ev.event_name }}</code>
+                    <ion-badge color="warning" class="event-row__attempts">{{ ev.attempts }}× {{ t('system.attempts') }}</ion-badge>
+                    <span class="event-row__module" v-if="ev.module_id">{{ ev.module_id }}</span>
+                    <span class="event-row__when">{{ formatWhen(ev.created_at) }}</span>
+                  </div>
+                  <div class="event-row__error" :title="ev.last_error">{{ ev.last_error }}</div>
+                </div>
+                <div class="event-row__actions">
+                  <ion-button size="small" fill="clear" color="success" :disabled="eventsBusyId === ev.id" @click="retryOne(ev.id)">
+                    <HubIcon slot="icon-only" name="refresh-outline" />
+                  </ion-button>
+                  <ion-button size="small" fill="clear" color="medium" :disabled="eventsBusyId === ev.id" @click="discardOne(ev.id)">
+                    <HubIcon slot="icon-only" name="trash-outline" />
+                  </ion-button>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </template>
+
     </template>
 
     <!-- ── Footer con ion-segment (tabs) ─────────────────────────── -->
@@ -238,6 +340,10 @@
             <ion-segment-button value="updates">
               <HubIcon name="refresh-outline" />
               <ion-label>{{ t('system.tabUpdates') }}</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="events">
+              <HubIcon name="alert-circle-outline" />
+              <ion-label>{{ t('system.tabEvents') }}</ion-label>
             </ion-segment-button>
             <ion-segment-button value="logs">
               <HubIcon name="document-text-outline" />
@@ -287,10 +393,26 @@ import {
 import { dataTableLabels } from '../lib/data-table-labels';
 import { listInstalledModules, type InstalledModule } from '../lib/runtime';
 import {
+  fetchUpdateHistory,
+  groupByDay,
+  versionJump,
+  type UpdateHistoryEntry,
+} from '../lib/update-history';
+import {
   isLegacyBackupsHash,
   resolveSystemTab,
   type SystemTab as Tab,
 } from '../lib/system-tabs';
+import {
+  fetchDeadLetters,
+  retryDeadLetter,
+  retryAllDeadLetters,
+  discardDeadLetter,
+  refreshDeadLetterCount,
+  type DeadEvent,
+} from '../lib/dead-letter';
+import { isAdmin } from '../lib/session';
+import { toastSuccess, toastError } from '../lib/toast';
 
 const { t, locale } = useI18n();
 
@@ -353,6 +475,11 @@ const hardware = ref<BridgeStatus>({ online: false });
 // not been able to ask», which is a different answer from «no» and is never dressed up as one.
 const printerProbe = ref<BridgeStatus | null>(null);
 const installedModules = ref<InstalledModule[] | null>(null);
+
+// Qué le hemos cambiado a este hub (hub#564). Vacío es una respuesta legítima y frecuente: la
+// mayoría de los hubs, la mayoría de los días, no han cambiado de versión.
+const updateHistory = ref<UpdateHistoryEntry[]>([]);
+const historyGroups = computed(() => groupByDay(updateHistory.value, new Date(), locale.value));
 
 // Are we inside `com.erplora.app`? It changes what there is left to do about a printer, and what
 // this screen is allowed to offer (hub#480). Read once: it cannot change while the page is open.
@@ -551,9 +678,117 @@ async function loadSystemInfo(): Promise<void> {
   applyTableLabels();
 }
 
+// ── Dead-letters (hub#660) ────────────────────────────────────────────────────
+// El flujo del operador: ver la cola → arreglar la causa → reenviar (uno o todos) o descartar.
+// El payload NUNCA se edita (inmutabilidad fiscal, ADR-0189): si la causa sigue, la fila vuelve a
+// morir y reaparece aquí. Solo un admin gestiona dead-letters; un no-admin recibe 403 del runtime.
+const deadLetters = ref<DeadEvent[]>([]);
+const eventsLoading = ref(false);
+const eventsBusy = ref(false);
+const eventsBusyId = ref<string | null>(null);
+// Un fallo de carga NO es "no hay eventos": hay que distinguirlos. Sin esto, un error de red o un
+// 403 mostraban «Todo en orden» — el operador cree que no hay nada cuando sí lo hay (y es fiscal).
+const eventsError = ref(false);
+
+async function loadDeadLetters(): Promise<void> {
+  if (!isAdmin.value) return; // el endpoint revalida; evitamos el 403 ruidoso del no-admin
+  eventsLoading.value = true;
+  eventsError.value = false;
+  try {
+    deadLetters.value = await fetchDeadLetters();
+  } catch {
+    // NO dejamos el array vacío como si nada: un fallo aquí es un estado distinto de "cola vacía".
+    // Conservamos lo que ya había (no borrarmos la lista visible por un blip de red) y señalamos el
+    // error para que el empty-state no mienta.
+    eventsError.value = true;
+  } finally {
+    eventsLoading.value = false;
+  }
+}
+
+function formatWhen(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+async function retryOne(id: string): Promise<void> {
+  eventsBusyId.value = id;
+  try {
+    await retryDeadLetter(id);
+    void toastSuccess(t('system.retryDone'));
+    await loadDeadLetters();
+    void refreshDeadLetterCount(); // actualiza el badge de la campana
+  } catch (e) {
+    void toastError(t('system.retryFailed', { reason: (e as Error).message }));
+  } finally {
+    eventsBusyId.value = null;
+  }
+}
+
+async function retryAll(): Promise<void> {
+  eventsBusy.value = true;
+  try {
+    const moved = await retryAllDeadLetters();
+    void toastSuccess(t('system.retryAllDone', { count: moved }));
+    await loadDeadLetters();
+    void refreshDeadLetterCount();
+  } catch (e) {
+    void toastError(t('system.retryFailed', { reason: (e as Error).message }));
+  } finally {
+    eventsBusy.value = false;
+  }
+}
+
+async function discardOne(id: string): Promise<void> {
+  // Descartar es definitivo (la fila se conserva, pero el relay no la vuelve a tocar). Un
+  // doble-check evita el clic accidental sobre un evento fiscal que luego nadie registra.
+  const confirmed = window.confirm(t('system.discardConfirm'));
+  if (!confirmed) return;
+  eventsBusyId.value = id;
+  try {
+    await discardDeadLetter(id);
+    void toastSuccess(t('system.discardDone'));
+    await loadDeadLetters();
+    void refreshDeadLetterCount();
+  } catch (e) {
+    void toastError(t('system.discardFailed', { reason: (e as Error).message }));
+  } finally {
+    eventsBusyId.value = null;
+  }
+}
+
+// Carga la cola al entrar en la pestaña de eventos, y también cuando la sesión pasa a admin: si el
+// usuario entró directo a /system#events antes de que la sesión estuviera resuelta, isAdmin era
+// false y loadDeadLetters se saltó — sin este segundo disparo la cola quedaría vacía hasta recargar.
+// `immediate`: si ya se aterriza en /system#events, tab es 'events' desde el setup y un watch sin
+// immediate NO dispara (no hay cambio) → la cola quedaría vacía hasta cambiar de pestaña y volver.
+watch(
+  () => tab.value === 'events' && isAdmin.value,
+  (ready) => {
+    if (ready) void loadDeadLetters();
+  },
+  { immediate: true },
+);
+
+/**
+ * El historial de actualizaciones, en el idioma del que mira: los nombres de los módulos los
+ * traduce el runtime con el locale que se le pide, así que un cambio de idioma lo vuelve a pedir.
+ */
+async function loadUpdateHistory(): Promise<void> {
+  updateHistory.value = await fetchUpdateHistory(locale.value);
+}
+
+watch(locale, () => {
+  void loadUpdateHistory();
+});
+
 onMounted(() => {
   void refreshHardware();
   void loadSystemInfo();
+  void loadUpdateHistory();
 });
 </script>
 
@@ -680,30 +915,70 @@ onMounted(() => {
 }
 
 /* ── Pestaña Actualizaciones ── */
-.updates-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 48px 24px;
-  text-align: center;
-}
-.updates-icon {
-  font-size: 48px;
-  color: var(--ion-color-primary);
-}
-.updates-title {
-  font-size: 1.125rem;
-}
-.updates-meta {
-  margin: 0;
-  opacity: 0.6;
-  font-family: monospace;
-  font-size: 0.8125rem;
-}
 .updates-hint {
   max-width: 36rem;
-  text-align: center;
+  margin: 0 0 16px;
+}
+
+/* Historial (hub#564). Cada día es un bloque y cada cambio una línea; en pantalla estrecha la
+   línea se apila para que el nombre del negocio y el salto de versión nunca se recorten. */
+.history-day + .history-day {
+  margin-top: 20px;
+}
+.history-day__title {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.history-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ion-color-step-150, rgba(0, 0, 0, 0.08));
+}
+.history-item__time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  opacity: 0.6;
+}
+.history-item__name {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.history-item__jump {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.history-item__note {
+  grid-column: 2 / -1;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+.history-item__note--bad {
+  color: var(--ion-color-danger);
+  opacity: 1;
+}
+
+/* Móvil: la hora pasa a su propia fila y el salto de versión cae bajo el nombre. */
+@media (max-width: 480px) {
+  .history-item {
+    grid-template-columns: auto 1fr;
+  }
+  .history-item__jump {
+    grid-column: 2;
+  }
 }
 
 .system-feedback {
@@ -714,5 +989,72 @@ onMounted(() => {
 .logs-title {
   margin: 0 0 12px;
   font-weight: 600;
+}
+
+/* ── Pestaña Eventos caídos (hub#660) ── */
+.events-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.events-head .logs-title {
+  margin: 0;
+}
+.events-hint {
+  margin: 0 0 12px;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+.events-spinner {
+  display: block;
+  margin: 16px auto;
+}
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.event-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ion-color-light-shade, #e0e0e0);
+  border-radius: 8px;
+}
+.event-row__main {
+  min-width: 0;
+  flex: 1;
+}
+.event-row__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.event-row__name {
+  font-weight: 600;
+  font-size: 0.9em;
+}
+.event-row__module,
+.event-row__when {
+  font-size: 0.8em;
+  opacity: 0.6;
+}
+.event-row__error {
+  font-size: 0.82em;
+  color: var(--ion-color-danger, #eb445a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.event-row__actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
 }
 </style>

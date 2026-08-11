@@ -11,7 +11,7 @@
 // hub#405) — and it never carries people (§5). So after the click the checklist below is NOT empty:
 // «your business details» (⛔) and «your team» are still the owner's to answer. The copy says that
 // before the click and again after it.
-import { ADMINISTER_PERMISSION, ALL_PERMISSIONS } from './management-link';
+import { ADMINISTER_PERMISSION } from './management-link';
 import {
   moduleInstallStatusInfo,
   sectionStatusInfo,
@@ -20,6 +20,7 @@ import {
   type ImportReport,
   type ImportSelection,
 } from './runtime';
+import { permissionsInclude } from './session';
 import { STATE_DONE, type SetupStatus } from './setup-status';
 
 /**
@@ -64,11 +65,11 @@ export function hubIsEmpty(status: SetupStatus | null): boolean {
  *
  * It reuses the ONE permission the core already owns (`hub.administer`, ADR-0248) instead of minting
  * a second name for the same thing — and no `module.json` could mint it anyway, because
- * `permissions_for_role` ignores the reserved `hub.` namespace. The wildcard is what the shell hands
- * an owner/admin session.
+ * `permissions_for_role` ignores the reserved `hub.` namespace. La regla del comodín vive en
+ * `permissionsInclude` (hub#506), compartida con el resto de la UI.
  */
 export function mayAdminister(permissions: readonly string[] | undefined): boolean {
-  return !!permissions?.some((p) => p === ADMINISTER_PERMISSION || p === ALL_PERMISSIONS);
+  return permissionsInclude(permissions, ADMINISTER_PERMISSION);
 }
 
 /** Where this business is, as far as the offer is concerned. Both halves may be unknown. */

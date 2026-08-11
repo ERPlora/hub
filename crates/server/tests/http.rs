@@ -501,7 +501,6 @@ async fn hub_context_returns_configured_hub_id() {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app
@@ -524,6 +523,11 @@ async fn hub_context_returns_configured_hub_id() {
     // El sector se expone como `business_type` + alias `sector` (ADR-0054, contrato del frontend).
     assert_eq!(j["business_type"], json!("hosteleria"));
     assert_eq!(j["sector"], json!("hosteleria"));
+    // hub#731: la zona horaria del negocio, ya RESUELTA (la declarada, o la deducida del país).
+    // `/api/settings` devuelve la clave cruda —`null` mientras se deduzca—, así que sin esto la
+    // UI no tiene forma de decir a qué hora local va a dispararse un flujo, que es justo lo que
+    // el issue pide enseñar al lado del campo.
+    assert_eq!(j["timezone"], json!("Europe/Madrid"));
 }
 
 #[tokio::test]
@@ -548,7 +552,6 @@ async fn hub_context_adopts_machine_identity_without_restart() {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
     let token: MachineToken = Arc::new(RwLock::new(None));
     let hub_id: HubId = Arc::new(RwLock::new(erplora_server::DEV_HUB_ID.into()));
@@ -639,7 +642,6 @@ async fn demo_catalog_uses_public_saas_metadata_without_hub_credentials() {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
 
     let response = app(AppState::with_config(rt, cfg))
@@ -714,7 +716,6 @@ async fn real_catalog_uses_private_saas_endpoint_with_machine_credentials() {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
 
     let response = app(AppState::with_config(rt, cfg))
@@ -756,7 +757,6 @@ async fn real_machine_cannot_use_business_api_before_registration() {
         dev_mode: false,
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
-        bootstrap_blueprint: None,
     };
 
     let resp = app(AppState::with_config(rt, cfg))

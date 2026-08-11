@@ -1,0 +1,1 @@
+SELECT id, customer_id, text FROM crm_note WHERE hub_id = :hub_id ORDER BY text;

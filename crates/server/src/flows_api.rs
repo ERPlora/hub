@@ -7,6 +7,9 @@
 //! POST            /api/hub/flows/{id}/run       disparo manual
 //! GET             /api/hub/flows/{id}/runs      · GET /api/hub/flows/runs/{run_id} (con steps)
 //! GET             /api/hub/flows/secrets        NOMBRES · PUT/DELETE …/secrets/{name} (write-only)
+//! GET             /api/hub/flows/approvals      la bandeja (hub#665)
+//! POST            /api/hub/flows/approvals/{id}/approve|reject
+//! GET             /api/hub/flows/schema         el contrato que ESTE core aplica (hub#716)
 //! ```
 //!
 //! **Core REST, not `hub.*` commands.** The dispatcher is deliberately not where this goes
@@ -26,7 +29,8 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_runtime::flows::{grants, store, NewFlow};
+use erplora_runtime::flows::{approvals, grants, store, NewFlow};
+use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::RuntimeError;
 use serde_json::{json, Value};
 
@@ -71,7 +75,9 @@ fn bad_request(code: &str, message: &str) -> Response {
 fn flow_err(e: RuntimeError) -> Response {
     if let RuntimeError::Domain { code, message } = &e {
         let status = match code.as_str() {
-            store::ERR_FLOW_NOT_FOUND => Some(StatusCode::NOT_FOUND),
+            store::ERR_FLOW_NOT_FOUND | approvals::ERR_APPROVAL_NOT_FOUND => {
+                Some(StatusCode::NOT_FOUND)
+            }
             grants::ERR_GRANT_DENIED => Some(StatusCode::FORBIDDEN),
             _ => None,
         };
@@ -112,8 +118,70 @@ fn new_flow(body: &Value) -> Result<NewFlow, Response> {
     })
 }
 
+/// The header by which a caller names **the module it is acting for** (hub#714).
+///
+/// The editor of flows is a module (pm#110) and had no declared way in here: the SDK speaks
+/// `query`/`command` to the dispatcher, and this surface is core REST on purpose. What it *could*
+/// do was lift the session token out of `localStorage` and call the door itself — the module's Web
+/// Component runs in the shell's own document, same origin, no sandbox. That works only while the
+/// user is an admin and breaks the day the shell moves the session into an httpOnly cookie.
+///
+/// So `@erplora/module-sdk` gained a typed `flows` surface that stamps this header, and the header
+/// is read HERE and nowhere else in the core: it is not an "act as this module" switch.
+///
+/// ⚠️ **It is a DECLARATION, not an authentication.** In a browser where every module shares one
+/// document, nothing stops a module from writing another's id — but nothing stops it from reading
+/// the session token either, so this is one gap, not two, and it closes when module components are
+/// isolated. What the gate buys today is still real: the modules that may EVER administer flows
+/// are fixed at install time by a **signed manifest** the owner saw and a grant they can revoke,
+/// and the enforcement already lives server-side — the day the shell can prove who is calling,
+/// only the provenance of this header improves and the kernel does not move.
+const MODULE_HEADER: &str = "x-erplora-module";
+
+/// The module the caller says it is acting for, if any. Blank is the same as absent: the shell
+/// itself, `curl` with an admin session and the QA agent are not modules and name none.
+fn calling_module(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(MODULE_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// The `manage_flows` half of the gate: if the request NAMES a module, that module must have the
+/// capability declared in its manifest and granted by the owner. A request that names none passes
+/// — the shell and `curl` with an admin session are not modules.
+///
+/// Shared with the event-shape door (`outbox_admin::event_shape`, hub#715), which the same editor
+/// reads through and which therefore has to be behind the same two gates. One implementation on
+/// purpose: two copies of a default-deny check is how one of them ends up being the lenient one.
+pub(crate) async fn require_flows_capability(
+    headers: &HeaderMap,
+    rt: &erplora_runtime::Runtime,
+) -> Result<(), Response> {
+    let Some(module) = calling_module(headers) else {
+        return Ok(());
+    };
+    rt.require_module_capability(&module, CapabilityKind::ManageFlows)
+        .await
+        .map_err(crate::err_response)
+}
+
 /// Resolves the admin session and hands back the runtime plus «who is doing this», already in the
 /// `hub_user:<id>` form the audit columns store.
+///
+/// **Two gates, and the order is not cosmetic** (hub#714). First the human: `require_admin_session`
+/// is untouched, so an anonymous caller still gets `401` and a cashier still gets `403` — putting
+/// the capability first would answer `403` to a caller who never authenticated. Then the module:
+/// if the request names one, that module needs `manage_flows` **declared and granted**.
+///
+/// Both are mandatory and neither replaces the other. The session says «a person allowed to
+/// administer this hub is here»; the capability says «and the owner chose THIS module as the tool
+/// they administer it with». Without the second one, adding a flows surface to the SDK would have
+/// handed the kernel to every installed module for free: the inventory app the owner installed
+/// could write an automation that runs commands in their name while nobody is watching. That is an
+/// escalation this change would have introduced, so it is gated in the same change.
 macro_rules! admin_session {
     ($st:expr, $headers:expr) => {{
         let arc = match $st.runtime_for(&$st.hub_id()).await {
@@ -125,6 +193,9 @@ macro_rules! admin_session {
             Ok(admin) => admin,
             Err(e) => return rejected(e),
         };
+        if let Err(response) = crate::flows_api::require_flows_capability(&$headers, &rt).await {
+            return response;
+        }
         let who = format!("hub_user:{}", admin.id);
         (arc.clone(), who)
     }};
@@ -319,6 +390,42 @@ pub struct RunsPage {
     before: Option<String>,
 }
 
+// ── the contract itself (hub#716) ─────────────────────────────────────────────────────────────
+
+/// `GET /api/hub/flows/schema` — **the flow contract this core enforces**, plus the version that
+/// enforces it.
+///
+/// `schemas/flow.schema.json` shipped with the hub and was reachable by nobody: no route, no npm
+/// package. The visual editor is a module installed from the marketplace and updated on its own
+/// clock (hub#516), so it would have had to carry a copy — a photo of whichever core it was built
+/// against. On a park of hubs running different versions that copy is wrong for somebody by
+/// construction: an editor ahead of its hub offers a step the hub refuses to save, and an editor
+/// behind it hides one that works. Asking the hub is the only answer that survives the park.
+///
+/// The body is [`erplora_runtime::flows::flow_schema`], which is the file EMBEDDED at compile
+/// time — not a copy maintained here, and not a file read from disk next to the binary.
+/// `crates/runtime/tests/flow_schema_matches_the_runtime.rs` already keeps that file honest
+/// against `flows::def`, so serving those exact bytes extends the guarantee to the consumer:
+/// what the editor validates against is what the hub judges with.
+///
+/// **Same door as the rest of §9**, and the document is not the reason. An unauthenticated route
+/// that reports the exact core version is a fingerprint of the hub for anyone who can reach the
+/// origin, and a surface with one exception is a surface nobody remembers the rule of.
+pub async fn get_schema(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let (_arc, _) = admin_session!(st, headers);
+    Json(json!({
+        "ok": true,
+        "data": {
+            // The document version, so an editor can refuse to open something this core cannot run.
+            "schema_version": erplora_runtime::flows::SCHEMA_VERSION,
+            // …and WHICH core answered, which is the whole reason this is asked instead of bundled.
+            "core_version": crate::version::HUB_VERSION,
+            "schema": erplora_runtime::flows::flow_schema(),
+        }
+    }))
+    .into_response()
+}
+
 // ── secrets (hub#662) ─────────────────────────────────────────────────────────────────────────
 
 /// `GET /api/hub/flows/secrets` — **the names, never the values**.
@@ -395,6 +502,61 @@ pub async fn get_run(
     };
     Json(json!({ "ok": true, "data": { "run": run, "steps": steps, "events": events } }))
         .into_response()
+}
+
+// ── approvals: the tray (hub#665, ADR-0283 D3) ────────────────────────────────────────────────
+
+/// How many approvals `GET …/approvals` returns.
+const APPROVALS_PAGE: i64 = 100;
+
+/// `GET /api/hub/flows/approvals[?status=pending]` — what the hub proposed to do while nobody was
+/// watching. Without `status` it lists everything, which is the audit of what it actually did.
+pub async fn list_approvals(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let (arc, _) = admin_session!(st, headers);
+    let rt = arc.lock().await;
+    let status = params.get("status").map(String::as_str).filter(|s| !s.is_empty());
+    match rt.list_flow_approvals(status, APPROVALS_PAGE).await {
+        Ok(items) => Json(json!({ "ok": true, "data": items })).into_response(),
+        Err(e) => flow_err(e),
+    }
+}
+
+/// `POST /api/hub/flows/approvals/{id}/approve` — runs **exactly** the proposed command, with the
+/// grant re-checked at this moment and **without re-entering the model**
+/// (`Runtime::decide_flow_approval`).
+///
+/// `decided_by` comes from the RESOLVED SESSION and is never read from the body — the same rule as
+/// `discarded_by` in `outbox_admin.rs`, and here it is the whole audit: this row is the record of a
+/// person authorising the hub to write.
+pub async fn approve(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    decide(st, headers, id, true).await
+}
+
+/// `POST /api/hub/flows/approvals/{id}/reject` — nothing runs, and the run stops: the steps written
+/// after an agent step assumed it acted.
+pub async fn reject(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    decide(st, headers, id, false).await
+}
+
+async fn decide(st: AppState, headers: HeaderMap, id: String, approve: bool) -> Response {
+    let (arc, who) = admin_session!(st, headers);
+    let rt = arc.lock().await;
+    match rt.decide_flow_approval(&id, approve, &who).await {
+        Ok(approval) => Json(json!({ "ok": true, "data": approval })).into_response(),
+        Err(e) => flow_err(e),
+    }
 }
 
 #[cfg(test)]

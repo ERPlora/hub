@@ -735,6 +735,102 @@ pub(crate) async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str
         .any(|n| n == col)
 }
 
+/// Una **clave natural** de la tabla: las columnas de un índice ÚNICO que NO es la clave primaria.
+///
+/// Es la identidad REAL del dato, la que el negocio reconoce — el `code` de una serie de
+/// facturación, el `sku` de un producto, la `key` de una categoría fiscal— frente al `id`, que es
+/// identidad técnica y cambia de instalación a instalación. Sale del CATÁLOGO de la BD del hub
+/// DESTINO (no se adivina por el nombre ni se declara en el manifest de módulo): lo que decide si
+/// un INSERT choca es el índice que está creado ahí, no lo que diga un fichero.
+pub(crate) struct NaturalKey {
+    /// Columnas del índice único.
+    pub(crate) cols: Vec<String>,
+    /// Condiciones `columna = literal` del predicado, cuando el índice es PARCIAL
+    /// (`… WHERE is_deleted = 0`). Sin ellas la guarda miraría filas que el índice no cubre y
+    /// saltaría una fila que sí cabía (una serie borrada no impide volver a crear su código).
+    pub(crate) predicate: Vec<(String, String)>,
+}
+
+/// Claves naturales DECLARADAS por `table` en la BD (índices únicos no primarios), leídas del
+/// catálogo (ADR-0154: Postgres, esquema activo).
+///
+/// **Fail-open y a propósito**: un índice que no se pueda leer con certeza —sobre expresiones
+/// (`lower(email)`), con columnas `INCLUDE`, o con un predicado que no sea una conjunción de
+/// `columna = literal`— se DESCARTA en vez de traducirse a medias. Una guarda construida a partir
+/// de un índice mal entendido saltaría filas legítimas en silencio, que es peor que el fallo ruidoso
+/// que ya teníamos. Lo que se descarta aquí se comporta como antes de hub#753.
+pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &str) -> Vec<NaturalKey> {
+    if !safe_ident(table) {
+        return Vec::new();
+    }
+    let sql = format!(
+        "SELECT i.indnatts::int AS natts, i.indnkeyatts::int AS nkeyatts, \
+                pg_get_expr(i.indpred, i.indrelid) AS predicate, \
+                (SELECT string_agg(a.attname, ',' ORDER BY a.attnum) FROM pg_attribute a \
+                  WHERE a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)) AS cols \
+         FROM pg_index i \
+         JOIN pg_class c ON c.oid = i.indrelid \
+         JOIN pg_namespace n ON n.oid = c.relnamespace \
+         WHERE c.relname = '{table}' AND n.nspname = current_schema() \
+           AND i.indisunique AND NOT i.indisprimary AND i.indisvalid"
+    );
+    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else { return Vec::new() };
+    res.rows
+        .iter()
+        .filter_map(|r| {
+            let natts = r.get("natts")?.as_i64()?;
+            let nkeyatts = r.get("nkeyatts")?.as_i64()?;
+            // Columnas `INCLUDE`: no participan en la unicidad. Meterlas en la guarda la haría
+            // MÁS estricta que el índice y la fila volvería a chocar.
+            if natts != nkeyatts {
+                return None;
+            }
+            let cols: Vec<String> = r
+                .get("cols")
+                .and_then(|v| v.as_str())?
+                .split(',')
+                .map(str::to_string)
+                .collect();
+            // Menos columnas que las del índice ⇒ alguna es una EXPRESIÓN (`attnum` 0, sin fila en
+            // `pg_attribute`): la guarda sería más laxa que el índice y saltaría filas legítimas.
+            if cols.len() as i64 != nkeyatts || !cols.iter().all(|c| safe_ident(c)) {
+                return None;
+            }
+            let predicate = match r.get("predicate").and_then(|v| v.as_str()) {
+                None | Some("") => Vec::new(),
+                Some(expr) => parse_index_predicate(expr)?,
+            };
+            Some(NaturalKey { cols, predicate })
+        })
+        .collect()
+}
+
+/// Traduce el predicado de un índice PARCIAL (`pg_get_expr`) a pares `(columna, literal)`.
+///
+/// Solo entiende una conjunción de igualdades contra un literal —`(is_deleted = 0)`, que es la
+/// forma que usan los módulos—; cualquier otra cosa (`source_id IS NOT NULL`, un `OR`, una llamada
+/// a función) devuelve `None` y su índice se descarta entero. Fail-open deliberado: ver
+/// [`natural_keys`].
+fn parse_index_predicate(expr: &str) -> Option<Vec<(String, String)>> {
+    let mut out = Vec::new();
+    for part in expr.split(" AND ") {
+        let part = part.trim().trim_start_matches('(').trim_end_matches(')').trim();
+        let (col, lit) = part.split_once('=')?;
+        let (col, lit) = (col.trim(), lit.trim());
+        if !safe_ident(col) {
+            return None;
+        }
+        // Literal escalar: número o cadena entrecomillada. Nada de casts (`'x'::text`) ni funciones.
+        let numeric = !lit.is_empty() && lit.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '-');
+        let quoted = lit.len() >= 2 && lit.starts_with('\'') && lit.ends_with('\'') && !lit[1..lit.len() - 1].contains('\'');
+        if !numeric && !quoted {
+            return None;
+        }
+        out.push((col.to_string(), lit.to_string()));
+    }
+    (!out.is_empty()).then_some(out)
+}
+
 /// Una FK declarada por la tabla: `from` (columna local) → `parent`.`to`.
 pub(crate) struct ForeignKey {
     pub(crate) from: String,

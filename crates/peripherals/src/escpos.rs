@@ -24,6 +24,12 @@ pub enum DocumentType {
     DeliveryNote,
     BarcodeLabel,
     CashSessionReport,
+    /// **The bill taken to the table before charging** (ADR-0141, hub#748). Deliberately a document
+    /// of its own and not a `Receipt`: it is the same list of lines, but it must NOT carry a series
+    /// number, a payment method or a VeriFactu QR — the numbering is consumed on payment and there
+    /// is no billing record yet — and it must carry the printed notice that it is not an invoice.
+    /// Handing a customer paper that passes for an invoice is a legal problem, not a cosmetic one.
+    Prebill,
     Generic,
 }
 
@@ -49,6 +55,7 @@ impl DocumentType {
             "delivery_note" => Self::DeliveryNote,
             "barcode_label" => Self::BarcodeLabel,
             "cash_session_report" => Self::CashSessionReport,
+            "prebill" => Self::Prebill,
             "generic" => Self::Generic,
             _ => return None,
         })
@@ -101,9 +108,10 @@ impl EscposBuilder {
     }
 
     /// Texto (cp437, reemplazando lo no representable por '?'). Porta `_RawNetworkPrinter.text`
-    /// (`txt.encode('cp437', errors='replace')`).
+    /// (`txt.encode('cp437', errors='replace')`), con la transliteración de [`to_printable`]
+    /// delante: sin ella la puntuación tipográfica de un texto traducido llega al papel como `?`.
     pub fn text(&mut self, txt: &str) -> &mut Self {
-        for cp in txt.to_cp_lossy::<Cp437>() {
+        for cp in to_printable(txt).to_cp_lossy::<Cp437>() {
             self.buf.push(cp.0);
         }
         self
@@ -227,10 +235,33 @@ pub fn render_document(doc: DocumentType, data: &serde_json::Value) -> Result<Ve
             }
         )));
     }
+    // **A bill with no lines is refused, not cut blank.** Every renderer reads by key, so a
+    // document in the SCREEN's shape (`business.name`, `lines[]` — what `ok-receipt` paints) finds
+    // nothing it wants and prints «ERPlora», no lines and TOTAL 0.00 without erroring. Paper that
+    // comes out WRONG is worse than paper that does not come out: nobody re-checks a bill that
+    // printed. It is checked for the bill and not for every document because the others have
+    // legitimately item-less shapes (a label, a cash report), and a guard that fires on a correct
+    // document is a guard somebody deletes.
+    if doc == DocumentType::Prebill
+        && !data
+            .get("items")
+            .and_then(|v| v.as_array())
+            .is_some_and(|items| !items.is_empty())
+    {
+        return Err(crate::PeripheralError::InvalidPayload(
+            "a bill has `items` to charge for; this document has none (is it the screen's shape, \
+             with `lines`?)"
+                .to_string(),
+        ));
+    }
     let mut b = EscposBuilder::new();
     match doc {
         // invoice == receipt (`_print_invoice` delega en `_print_receipt`).
         DocumentType::Receipt | DocumentType::Invoice => render_receipt(&mut b, data),
+        // NOT an arm of `render_receipt` with a flag: what the bill must not print is precisely
+        // what a receipt exists to print, so sharing the body would put the fiscal furniture one
+        // forgotten `if` away from the paper the waiter hands over.
+        DocumentType::Prebill => render_prebill(&mut b, data),
         DocumentType::KitchenOrder => render_kitchen_order(&mut b, data),
         DocumentType::DeliveryNote => render_delivery_note(&mut b, data),
         DocumentType::BarcodeLabel => render_barcode_label(&mut b, data),
@@ -425,6 +456,97 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.cut();
 }
 
+/// **The bill taken to the table before charging** (ADR-0141, hub#748).
+///
+/// The waiter's most frequent piece of paper: it comes out once before every payment, so more often
+/// than the fiscal ticket. It is the same list of lines as a receipt and, on purpose, **not the
+/// same document**:
+///
+/// - **no series number** — the numbering is consumed by `complete_sale`, not before;
+/// - **no VeriFactu QR** — there is no billing record to point at yet;
+/// - **no payment method, amount tendered or change** — nothing has been charged;
+/// - **a printed notice** that this is not an invoice.
+///
+/// Those four are dropped **here**, not trusted to the producer: a caller that hands over its
+/// receipt document by mistake gets a bill, never a paper that passes for an invoice. Handing a
+/// customer one of those is a legal problem, not a cosmetic one.
+///
+/// The Spanish literals are the ones this whole file prints (`COCINA`, `TOTAL`, `Fecha`): the paper
+/// is composed at the device, which has no translator, so what the producer wants said in the
+/// customer's language it sends — that is what `notice` is for.
+fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
+    // The title is the first thing anyone reads and the cheapest way to tell this paper from a
+    // ticket at a glance — the same job `COCINA` does for the kitchen order.
+    b.set(Align::Center, true, true, false);
+    b.text("CUENTA\n");
+
+    b.set(Align::Center, true, false, false);
+    b.text(&format!("{}\n", str_field(data, "business_name", "ERPlora")));
+
+    if is_truthy(data, "business_address") {
+        b.set(Align::Center, false, false, false);
+        b.text(&format!("{}\n", str_field(data, "business_address", "")));
+    }
+
+    b.text("================================\n");
+
+    b.set(Align::Left, false, false, false);
+    // What identifies a bill is the table, not a number: it is how the waiter knows which of the
+    // six he is holding.
+    if is_truthy(data, "customer_name") {
+        b.text(&format!("Mesa/Cliente: {}\n", str_field(data, "customer_name", "")));
+    }
+    b.text(&format!("Fecha: {}\n", now_dmy_hm()));
+    b.text("--------------------------------\n");
+
+    if let Some(items) = data.get("items").and_then(|v| v.as_array()) {
+        for item in items {
+            let name = str_field(item, "name", "");
+            let qty = item.get("quantity").and_then(|v| v.as_f64()).unwrap_or(1.0);
+            let total = item.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            b.set(Align::Left, false, false, false);
+            b.total_line(&format!("{}x {name}", fmt_qty(item.get("quantity"), qty)), total);
+            if is_truthy(item, "notes") {
+                b.text(&format!("  > {}\n", str_field(item, "notes", "")));
+            }
+        }
+    }
+
+    b.text("--------------------------------\n");
+
+    if let Some(subtotal) = data.get("subtotal").and_then(|v| v.as_f64()) {
+        b.total_line("Subtotal", subtotal);
+    }
+    if let Some(tax_amount) = data.get("tax_amount").and_then(|v| v.as_f64()) {
+        b.total_line(str_field(data, "tax_label", "IVA"), tax_amount);
+    }
+    if let Some(discount) = data.get("discount").and_then(|v| v.as_f64()) {
+        if discount > 0.0 {
+            b.total_line("Descuento", -discount);
+        }
+    }
+
+    b.text("================================\n");
+    b.set(Align::Left, true, true, false);
+    b.total_line("TOTAL", data.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0));
+    b.set(Align::Left, false, false, false);
+    b.text("================================\n\n");
+
+    // The notice is what makes this paper legal, so it has a default: a producer that forgets to
+    // send it must not be able to print something that passes for an invoice.
+    b.set(Align::Center, false, false, false);
+    let notice = match data.get("notice").and_then(|v| v.as_str()) {
+        Some(text) if !text.trim().is_empty() => text,
+        _ => "Cuenta - no es una factura. El tiquet fiscal se entrega al cobrar.",
+    };
+    for line in wrap_to_width(notice, LINE_WIDTH) {
+        b.text(&format!("{line}\n"));
+    }
+
+    b.text("\n");
+    b.cut();
+}
+
 /// Porta `_print_kitchen_order`.
 fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.set(Align::Center, true, true, true);
@@ -602,13 +724,13 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// **The wire vocabulary, pinned from this side.** The hub's queue keeps the same seven names
+    /// **The wire vocabulary, pinned from this side.** The hub's queue keeps the same eight names
     /// (`erplora_runtime::print_queue::DOCUMENT_TYPES`) and refuses anything else at the door; the
     /// two lists are duplicated on purpose (the hub server has no business linking the hardware
     /// crate), so each side pins its own or they drift — and a name the queue accepts becomes a
     /// job the printer refuses, one layer too late to tell the producer.
     #[test]
-    fn the_wire_vocabulary_is_exactly_these_seven() {
+    fn the_wire_vocabulary_is_exactly_these_eight() {
         let vocabulary = [
             ("receipt", DocumentType::Receipt),
             ("kitchen_order", DocumentType::KitchenOrder),
@@ -616,6 +738,7 @@ mod tests {
             ("delivery_note", DocumentType::DeliveryNote),
             ("barcode_label", DocumentType::BarcodeLabel),
             ("cash_session_report", DocumentType::CashSessionReport),
+            ("prebill", DocumentType::Prebill),
             ("generic", DocumentType::Generic),
         ];
         for (wire, expected) in vocabulary {
@@ -711,6 +834,198 @@ mod tests {
             "and the paper is cut, or the next ticket comes out attached to this one"
         );
     }
+
+    /// **The bill the waiter takes to the table is a document this printer knows** (hub#748).
+    ///
+    /// It is the most frequently printed paper of a restaurant service — it comes out before every
+    /// payment, so more often than the fiscal ticket — and until now `prebill` was not in the
+    /// vocabulary at all, so the only door refused it and no printer could produce it.
+    ///
+    /// Named through `parse` and not the variant on purpose: this is the string the hub's queue
+    /// stores and the drain frame carries, so the test pins the **wire**, which is the contract.
+    #[test]
+    fn the_bill_taken_to_the_table_is_a_document_this_printer_knows() {
+        assert!(
+            DocumentType::parse("prebill").is_some(),
+            "`prebill` is the bill taken to the table before charging; refusing it leaves the \
+             waiter with nothing to carry"
+        );
+    }
+
+    /// **The bill is NOT a ticket, and the paper has to say so** (ADR-0141).
+    ///
+    /// A bill with a series number, a payment method or a VeriFactu QR is a piece of paper that
+    /// looks like an invoice without being one, which is a legal problem rather than a cosmetic
+    /// one: the numbering is consumed when charging, not before, and there is no billing record
+    /// yet. So the renderer must print the lines and the total — the waiter has to be able to
+    /// collect — and must **not** print any of the fiscal furniture, whatever the producer sends.
+    #[test]
+    fn the_bill_prints_its_lines_but_none_of_the_fiscal_furniture() {
+        let doc = json!({
+            "business_name": "Bar Manolo",
+            "customer_name": "Mesa 4",
+            "items": [
+                { "name": "Cafe", "quantity": 2, "total": 2.4 },
+                { "name": "Tostada", "quantity": 1, "total": 3.5 },
+            ],
+            "total": 5.9,
+            "notice": "Cuenta - no es una factura. El tiquet fiscal se entrega al cobrar.",
+            // Sent on purpose: even if a producer hands over fiscal fields, a bill must not print
+            // them. Dropping them here is cheaper than trusting every caller to omit them.
+            "receipt_id": "T-42",
+            "payment_method": "Efectivo",
+            "qr_data": "https://prevalidacion.aeat.es/verifactu",
+        });
+        let bytes = render_document(
+            DocumentType::parse("prebill").expect("`prebill` is a document this printer knows"),
+            &doc,
+        )
+        .expect("a well-formed bill renders");
+        let text = String::from_utf8_lossy(&bytes);
+
+        assert!(text.contains("Bar Manolo"), "the business name is on the paper");
+        assert!(text.contains("Mesa 4"), "the table is on the paper: it is what identifies the bill");
+        assert!(text.contains("2x Cafe"), "the lines are on the paper");
+        assert!(text.contains("TOTAL"), "the total is on the paper — it is what gets collected");
+        assert!(
+            text.contains("no es una factura"),
+            "the notice is PRINTED: paper that looks like an invoice without being one is a legal \
+             problem, not a cosmetic one"
+        );
+
+        assert!(!text.contains("T-42"), "a bill carries no series number: numbering is consumed on payment");
+        assert!(!text.contains("Efectivo"), "a bill carries no payment method: nothing has been charged yet");
+        assert!(
+            !bytes.windows(3).any(|w| w == [0x1d, 0x28, 0x6b]),
+            "a bill carries no VeriFactu QR: there is no billing record to point at yet"
+        );
+        assert_eq!(
+            &bytes[bytes.len() - 3..],
+            &[0x1d, 0x56, 0x01],
+            "and the paper is cut, or the bill comes out attached to the next one"
+        );
+    }
+
+    /// **A bill with no notice still says it is not an invoice.** The producer sends the translated
+    /// text (`ui.prebillNotice`), but the guarantee cannot depend on every producer remembering:
+    /// what is at stake is handing a customer a paper that passes for an invoice.
+    #[test]
+    fn a_bill_without_a_notice_still_says_it_is_not_an_invoice() {
+        let bytes = render_document(
+            DocumentType::parse("prebill").expect("`prebill` is a document this printer knows"),
+            &json!({ "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }], "total": 1.2 }),
+        )
+        .expect("a bill with no notice still renders");
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(
+            text.contains("no es una factura"),
+            "the notice has a default: a producer that forgets it must not be able to print a \
+             paper that passes for an invoice"
+        );
+    }
+
+    /// **A bill with no lines is REFUSED, not cut blank.**
+    ///
+    /// This is the guard that stops the producer's mistake from becoming paper. The renderer reads
+    /// by key, so a document in the SCREEN's shape (`business.name`, `lines[]` — what `ok-receipt`
+    /// paints) finds none of the fields it wants, takes every default and hands the customer
+    /// «ERPlora», no lines and TOTAL 0.00. Paper that comes out WRONG is worse than paper that does
+    /// not come out: nobody checks a bill that printed.
+    ///
+    /// It matters beyond a typo. The module that produces the bill is installed at its **published**
+    /// version, so between the hub taking this change and the module being republished, the old
+    /// producer is what runs — and it sends exactly that shape (ERPlora/sales#78). Failing loudly
+    /// puts the reason in `_print_queue.last_error` instead of in the customer's hand.
+    #[test]
+    fn a_bill_with_no_lines_is_refused_instead_of_cut_blank() {
+        // The shape `<ok-receipt>` paints on screen: right document, wrong keys.
+        let screen_shape = json!({
+            "business": { "name": "Bar Manolo" },
+            "lines": [{ "name": "Cafe", "qty": 2, "total": 2.4 }],
+            "total": 2.4,
+        });
+        let err = render_document(
+            DocumentType::parse("prebill").expect("`prebill` is a document this printer knows"),
+            &screen_shape,
+        )
+        .expect_err("a bill with no lines the renderer can read is not a bill");
+        assert!(
+            matches!(err, crate::PeripheralError::InvalidPayload(_)),
+            "the refusal says the document is wrong, not the printer: {err}"
+        );
+    }
+
+    /// **Typographic punctuation reaches the paper as punctuation, not as `?`.**
+    ///
+    /// The printer speaks cp437 and the encoder replaces what it cannot represent with `?`, so the
+    /// translated notice — «Cuenta — no es una factura» with a real em dash — came out as
+    /// «Cuenta ? no es una factura». The text is written by translators in a text editor, so the
+    /// dashes and curly quotes are not a mistake anybody is going to stop making; the encoder is
+    /// the place that has to cope.
+    #[test]
+    fn typographic_punctuation_reaches_the_paper_as_punctuation() {
+        let mut b = EscposBuilder::new();
+        b.text("Cuenta — no es una factura: “Bar Manolo’s”…\n");
+        let text = String::from_utf8_lossy(&b.finish()).to_string();
+        assert!(
+            !text.contains('?'),
+            "nothing on the paper turned into a question mark, got: {text}"
+        );
+        assert!(text.contains("Cuenta - no es una factura"), "the em dash prints as a dash: {text}");
+        assert!(text.contains("\"Bar Manolo's\""), "quotes print as quotes: {text}");
+        assert!(text.contains("..."), "the ellipsis prints as three dots: {text}");
+    }
+}
+
+/// **Typographic punctuation → what a cp437 printer can actually produce.**
+///
+/// The encoder replaces whatever cp437 cannot represent with `?`, so the translated bill notice
+/// («Cuenta — no es una factura», with the em dash a translator naturally types) reached the paper
+/// as «Cuenta ? no es una factura». Curly quotes, ellipses and non-breaking spaces do the same, and
+/// they come from people writing in a text editor — not a habit anybody is going to stop having, so
+/// this is the layer that copes. Accented Spanish needs none of this: cp437 has it.
+fn to_printable(txt: &str) -> String {
+    let mut out = String::with_capacity(txt.len());
+    for c in txt.chars() {
+        match c {
+            // Hyphen..horizontal bar (en/em dash included) and the minus sign.
+            '\u{2010}'..='\u{2015}' | '\u{2212}' => out.push('-'),
+            '\u{2018}'..='\u{201B}' | '\u{2032}' => out.push('\''),
+            '\u{201C}'..='\u{201F}' | '\u{2033}' => out.push('"'),
+            '\u{2026}' => out.push_str("..."),
+            // Every space that is not the plain one; a printer column does not care which it was.
+            '\u{00A0}' | '\u{2007}' | '\u{2009}' | '\u{202F}' => out.push(' '),
+            // cp437 predates the euro. A footer saying `EUR` beats one saying `?`.
+            '\u{20AC}' => out.push_str("EUR"),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// Parte un texto en líneas de como mucho `width` columnas, **por palabras**.
+///
+/// La impresora corta por columna sin mirar dónde: sin esto, el aviso de la cuenta salía partido a
+/// mitad de palabra. Una palabra más larga que el ancho se deja tal cual — partirla la haría
+/// ilegible y es preferible que la impresora la doble.
+fn wrap_to_width(txt: &str, width: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for word in txt.split_whitespace() {
+        if current.is_empty() {
+            current.push_str(word);
+        } else if current.chars().count() + 1 + word.chars().count() <= width {
+            current.push(' ');
+            current.push_str(word);
+        } else {
+            lines.push(std::mem::take(&mut current));
+            current.push_str(word);
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines
 }
 
 /// Formatea la cantidad como lo hace `f"{qty}x …"` en Python: si el JSON trae un entero

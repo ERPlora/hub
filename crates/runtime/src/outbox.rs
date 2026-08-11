@@ -48,6 +48,16 @@ const LEASE_SECONDS: i64 = 300;
 /// created by the runtime before the migration engine runs at all — a hub with zero modules still
 /// has an outbox — so their shape cannot depend on a numbered version. It also keeps additive
 /// columns out of the way of the number races between parallel branches.
+///
+/// `ix_outbox_prune` backs the retention sweep (hub#699, `crate::retention`), which scans by
+/// terminal age and not by `next_attempt_at`, so `ix_outbox_due` does not serve it. It is
+/// **partial** over the two terminal statuses: a row is born `pending` and only enters this index
+/// when it stops moving, so the relay's hot path pays nothing for it, and the sweep's repeated
+/// bounded passes stop being a table scan each.
+///
+/// `ix_outbox_name` backs [`sample_payloads`] (hub#715), which reads the last few events of ONE
+/// name to infer its shape. Without it that is a sequential scan of a table whose widest column is
+/// the payload — ninety days of a busy till — to return five rows, every time an editor opens.
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS _event_outbox (\
   id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, user_id TEXT NOT NULL, \
@@ -68,6 +78,10 @@ CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_
 CREATE INDEX IF NOT EXISTS ix_outbox_run ON _event_outbox (hub_id, run_id) WHERE run_id <> '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_parent ON _event_outbox (hub_id, parent_event_id) \
   WHERE parent_event_id <> '';\
+CREATE INDEX IF NOT EXISTS ix_outbox_prune \
+  ON _event_outbox (hub_id, COALESCE(delivered_at, discarded_at, created_at)) \
+  WHERE status IN ('delivered', 'discarded');\
+CREATE INDEX IF NOT EXISTS ix_outbox_name ON _event_outbox (hub_id, event_name, created_at);\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
   PRIMARY KEY (event_id, listener_command));";
@@ -647,6 +661,59 @@ fn dead_event(row: &Json) -> DeadEvent {
     }
 }
 
+/// One stored event, reduced to what inferring a shape needs (hub#715).
+#[derive(Debug, Clone)]
+pub struct PayloadSample {
+    pub payload: Json,
+    pub created_at: String,
+}
+
+/// The last `limit` events of ONE name in this hub, newest first, with their payloads.
+///
+/// This is the raw material of [`crate::event_shape`], and the only caller: what leaves the hub is
+/// the SHAPE, never these rows. Every status counts — `pending`, `delivered`, `dead`,
+/// `discarded` — because the question is «what does this event carry», and a delivery failure does
+/// not change the answer.
+///
+/// Backed by `ix_outbox_name`. An unparseable stored payload comes back as a JSON string rather
+/// than being dropped, the same way [`list_dead`] treats it: what is in the row is what there is.
+pub async fn sample_payloads(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_name: &str,
+    limit: i64,
+) -> Result<Vec<PayloadSample>> {
+    if event_name.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("name".into(), json!(event_name));
+    p.insert(
+        "lim".into(),
+        json!(limit.clamp(1, crate::event_shape::MAX_SAMPLES)),
+    );
+    let res = db
+        .query(
+            "SELECT payload, created_at FROM _event_outbox \
+             WHERE hub_id = :hub_id AND event_name = :name \
+             ORDER BY created_at DESC, id DESC LIMIT :lim",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .map(|row| {
+            let raw = row["payload"].as_str().unwrap_or_default().to_string();
+            PayloadSample {
+                payload: serde_json::from_str(&raw).unwrap_or(Json::String(raw)),
+                created_at: row["created_at"].as_str().unwrap_or_default().to_string(),
+            }
+        })
+        .collect())
+}
+
 /// Puts a dead-letter back in front of the relay: `pending`, attempts reset, due now, lease
 /// cleared. `false` if there is no dead-letter with that id in this hub.
 ///
@@ -676,9 +743,15 @@ pub async fn retry(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<b
 /// Closes a dead-letter for good: status [`STATUS_DISCARDED`] + who and when. `false` if there is
 /// no dead-letter with that id in this hub.
 ///
-/// **The row is CONSERVED — never `DELETE`.** It is the only record that the event existed, and a
-/// discard is a decision somebody made; both have to survive it. The relay cannot take it again
-/// because [`claim_next_due`] only ever claims `pending`.
+/// **The gesture never `DELETE`s.** The row is the only record that the event existed, and a
+/// discard is a decision somebody made; both have to survive the gesture that closed them. The
+/// relay cannot take it again because [`claim_next_due`] only ever claims `pending`.
+///
+/// What *does* eventually remove it is retention (hub#699, `crate::retention`): ninety days after
+/// it was discarded it is pruned like any other terminal row. That is not a contradiction — it is
+/// the difference between an operator closing a case, which must leave evidence, and history
+/// ageing out long after anybody would look. `dead`, which is still waiting for that decision, has
+/// no maximum age at all.
 ///
 /// `discarded_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`), never
 /// something the caller sent in the body.
@@ -704,6 +777,56 @@ pub async fn discard(
         )
         .await?;
     Ok(res.affected > 0)
+}
+
+/// Puts **every** dead-letter of this hub back in front of the relay at once — the bulk gesture
+/// (hub#660). Returns how many rows it moved. The one-by-one [`retry`] is for the case an operator
+/// inspects; this is for the other real case: a transient outage (the DB went down, a module was
+/// deactivated mid-flight) burnt through `MAX_ATTEMPTS` on several events at the same time, and
+/// the cause is now fixed. Telling the operator to retry thirty rows one by one is the thing this
+/// exists to remove — **the hub must never be stuck behind a queue that only moves one click at a
+/// time**.
+///
+/// Same semantics as [`retry`], applied to the set: only `dead` rows of **this hub** move
+/// (`hub_id` isolation, ADR-0201), each gets `attempts = 0`, `next_attempt_at = now`, a cleared
+/// lease and a wiped `last_error`. Delivered/pending/discarded rows are untouched. Idempotent: a
+/// second call moves nothing (there are no `dead` rows left). If a row's cause is still there it
+/// dies again and reappears in [`list_dead`]; the queue is self-healing, not magic.
+pub async fn retry_all(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u64> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("status".into(), json!(STATUS_DEAD));
+    p.insert("now".into(), json!(now_rfc3339()));
+    let res = db
+        .execute(
+            "UPDATE _event_outbox SET status = 'pending', attempts = 0, next_attempt_at = :now, \
+             last_error = '', claim_expires_at = NULL \
+             WHERE hub_id = :hub_id AND status = :status",
+            &p,
+        )
+        .await?;
+    Ok(res.affected)
+}
+
+/// How many dead-letters this hub has right now (hub#660). Cheap `SELECT COUNT(*)` — the listing
+/// ([`list_dead`]) carries the payloads and is capped, so it is the wrong thing to poll for a badge.
+/// This powers the bell in the topbar: an admin sees, without going anywhere, that something died.
+///
+/// Counts **only** `dead` rows: `delivered`/`pending` are not failures, and `discarded` are closed
+/// failures an admin already decided to keep closed — neither is "something that needs you".
+pub async fn count_dead(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<i64> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("status".into(), json!(STATUS_DEAD));
+    let res = db
+        .query(
+            "SELECT COUNT(*) AS c FROM _event_outbox WHERE hub_id = :hub_id AND status = :status",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.first()
+        .and_then(|r| r["c"].as_i64().or_else(|| r["c"].as_f64().map(|f| f as i64)))
+        .unwrap_or(0))
 }
 
 // ─────────────────────────── Correlation (hub#666 — ADR-0283 §8) ───────────────────────────────
@@ -2109,5 +2232,104 @@ mod tests {
             .as_str()
             .unwrap()
             .to_string()
+    }
+
+    /// Inserts a dead-letter row directly (skips the relay/backoff dance) so a test can stage
+    /// several at once without the fixture's single-event loop. `hub_id`/`status` are parameters so
+    /// the same helper builds the foreign-tenant and non-dead rows the assertions need.
+    async fn seed_row(db: &PgAdapter, id: &str, hub_id: &str, status: &str) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        p.insert("status".into(), json!(status));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, module_id, payload, status, attempts, \
+              next_attempt_at, last_error, created_at) \
+             VALUES (:id, :hub_id, 'u1', '[]', 'e', 'm', '{}', :status, 8, :at, 'boom', :at)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// `retry_all` clears the whole dead-letter queue of this hub in one gesture — the case a
+    /// transient outage (the DB went down, a module was off mid-flight) killed several events at
+    /// once. Every `dead` row goes back to `pending` with a fresh retry budget; the operator does
+    /// not click N times. Delivered/pending/discarded rows are left alone, and it is scoped to the
+    /// hub (a foreign tenant's dead-letters never move).
+    #[tokio::test]
+    async fn retry_all_moves_every_dead_letter_of_this_hub_back_to_the_relay() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+
+        // Three dead rows in this hub, plus one in another hub, plus non-dead rows that must NOT
+        // move (a delivered and a discarded one).
+        seed_row(&db, "d1", "h1", STATUS_DEAD).await;
+        seed_row(&db, "d2", "h1", STATUS_DEAD).await;
+        seed_row(&db, "d3", "h1", STATUS_DEAD).await;
+        seed_row(&db, "fx", "h2", STATUS_DEAD).await;
+        seed_row(&db, "ok", "h1", "delivered").await;
+        seed_row(&db, "dc", "h1", STATUS_DISCARDED).await;
+
+        let moved = retry_all(&db, "h1").await.unwrap();
+        assert_eq!(moved, 3, "only this hub's dead rows move (not h2, not delivered/discarded)");
+
+        // The three dead rows are now pending, fresh budget, lease cleared, error wiped.
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=0 AND claim_expires_at IS NULL AND last_error=''").await,
+            3,
+            "every revived row is pending with a full retry budget and a clean lease"
+        );
+        // The foreign hub's dead row is untouched (tenancy).
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='fx' AND status='dead'").await,
+            1,
+            "another hub's dead-letter is not revived"
+        );
+        // The delivered/discarded rows stayed where they were.
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='ok' AND status='delivered'").await,
+            1,
+            "a delivered row is not an operator gesture — untouched"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='dc' AND status='discarded'").await,
+            1,
+            "a discarded row is a closed decision — untouched"
+        );
+
+        // Idempotent: a second call moves nothing (no dead rows left).
+        let moved_again = retry_all(&db, "h1").await.unwrap();
+        assert_eq!(moved_again, 0, "retry-all is idempotent — the queue is already clear");
+    }
+
+    /// `count_dead` is the cheap number the topbar bell polls. It counts ONLY `dead` rows of this
+    /// hub: delivered/pending are not failures, and discarded ones are failures an admin already
+    /// chose to keep closed — none of those is "something that needs you".
+    #[tokio::test]
+    async fn count_dead_counts_only_this_hubs_dead_rows() {
+        let db = fresh_db().await;
+        ensure_tables(&db).await.unwrap();
+
+        seed_row(&db, "d1", "h1", STATUS_DEAD).await;
+        seed_row(&db, "d2", "h1", STATUS_DEAD).await;
+        seed_row(&db, "fx", "h2", STATUS_DEAD).await; // another hub — not ours
+        seed_row(&db, "ok", "h1", "delivered").await; // not a failure
+        seed_row(&db, "pn", "h1", "pending").await; // still in flight, not a failure
+        seed_row(&db, "dc", "h1", STATUS_DISCARDED).await; // closed by an admin, not open
+
+        assert_eq!(
+            count_dead(&db, "h1").await.unwrap(),
+            2,
+            "only this hub's dead rows (not h2, not delivered/pending/discarded)"
+        );
+        assert_eq!(count_dead(&db, "h2").await.unwrap(), 1, "the foreign hub sees its own");
+        assert_eq!(count_dead(&db, "lonely").await.unwrap(), 0, "an empty hub has zero");
+
+        // The bell drops to zero once the admin clears the queue.
+        retry_all(&db, "h1").await.unwrap();
+        assert_eq!(count_dead(&db, "h1").await.unwrap(), 0, "the bell clears when nothing is dead");
     }
 }
