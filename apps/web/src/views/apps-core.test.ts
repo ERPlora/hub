@@ -42,3 +42,52 @@ describe('Apps destructive actions', () => {
     expect(source).toContain('catalogError.value = true');
   });
 });
+
+// hub#773 — a card of an installed app ended in two unnamed pictograms and no way in.
+//
+// The screen is `ok-data-table` in cards mode: what it paints for a row is decided by the `actions`
+// this file declares, and the actions are icon-only by rule (Ioan, 2026-07-16, on top of ADR-0133 —
+// the `label` is the accessible name and the tooltip, never visible text). So the questions a person
+// has before pressing cannot be answered by the button face; they have to be answered by the action
+// SET being right and by what the confirmation says. That is what these read.
+describe('Apps · what an installed app card offers', () => {
+  const start = source.indexOf('const mineActions');
+  const mineActions = source.slice(start, source.indexOf('const catalogColumns', start));
+
+  it('offers OPEN as the first action — the one thing a person came to the card for', () => {
+    expect(start, 'mineActions must exist').toBeGreaterThan(-1);
+    expect(mineActions).toContain("id: 'open'");
+    expect(mineActions).toContain("t('apps.actionOpen')");
+    // First in the list = first button on the card. The primary action does not sit behind the bin.
+    expect(mineActions.indexOf("id: 'open'")).toBeLessThan(mineActions.indexOf("id: 'toggle'"));
+    // Only when there is a screen to open: `canOpenModule` is the one that decides, and it is
+    // covered by its own tests. Here we only check the card asks it.
+    expect(mineActions).toContain('canOpenModule(');
+    expect(source).toContain("import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions'");
+  });
+
+  it('always asks before flipping the switch, and the question names the future state', () => {
+    const fn = source.slice(
+      source.indexOf('async function toggleModule'),
+      source.indexOf('async function removeModule'),
+    );
+    // Not only when the cascade drags others down: a press that changes whether the till can sell
+    // must say so first, and say which direction it goes in.
+    expect(fn).toContain('toggleIntent(');
+    expect(fn).toContain('confirmToggle');
+    expect(source).toContain('apps.toggleOffTitle');
+    expect(source).toContain('apps.toggleOnTitle');
+    // And the answer still gates the call: no confirmation, no runtime call.
+    expect(fn.indexOf('confirmToggle')).toBeLessThan(fn.indexOf('deactivateModule('));
+  });
+
+  it('names the apps that uninstalling would break, before uninstalling', () => {
+    const fn = source.slice(
+      source.indexOf('async function removeModule'),
+      source.indexOf('function toViewModule'),
+    );
+    expect(fn).toContain('dependentsOf(');
+    expect(fn.indexOf('dependentsOf(')).toBeLessThan(fn.indexOf('uninstallModule('));
+    expect(source).toContain('apps.uninstallBreaks');
+  });
+});

@@ -152,7 +152,8 @@ import {
   updateModule, listModuleUpdates, listModuleVersions,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
-import { refreshModuleNav } from '../lib/nav';
+import { moduleNav, refreshModuleNav } from '../lib/nav';
+import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import { isModuleInstalled } from '../lib/apps-catalog';
 import {
   defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
@@ -386,8 +387,29 @@ const mineColumns = computed<DataTableColumn[]>(() => [
     ),
   },
 ]);
-const mineActions = computed<DataTableAction[]>(() => isAdmin.value
-  ? [
+const mineActions = computed<DataTableAction[]>(() => {
+  if (!isAdmin.value) return [];
+  // Read here, in the computed BODY, not inside the `disabled` closure: that is what makes this
+  // computed depend on the nav, so a module that was just switched on produces a NEW actions array
+  // and okdt re-renders its buttons. Read lazily inside the closure, the list would be right and
+  // the screen would still show the old one until something else happened to change a row.
+  const nav = moduleNav.value;
+  return [
+      {
+        // FIRST, and on purpose (hub#773): what a person opens this card for is the app itself.
+        // Until now the row ended in a switch and a bin — two ways to take the app away and none
+        // to get into it — so the only route in was the launcher grid in the topbar.
+        //
+        // Icon-only like every other action (regla de Ioan 2026-07-16 sobre ADR-0133): the `label`
+        // is what okdt puts in `aria-label` and `title`, never visible text.
+        id: 'open',
+        label: t('apps.actionOpen'),
+        icon: 'open-outline',
+        color: 'primary',
+        // A module that paints nothing, or one that is switched off, has no screen to open — and a
+        // button that lands on an empty page is worse than no button. `canOpenModule` decides.
+        disabled: (row) => !canOpenModule(row as unknown as InstalledModule, nav),
+      },
       {
         // El botón «Actualizar» de ADR-0269 §3.5: **por módulo**, para ADELANTAR. Que el sistema
         // acabe haciéndolo solo al arrancar no quita que se pueda pedir ahora.
@@ -400,8 +422,8 @@ const mineActions = computed<DataTableAction[]>(() => isAdmin.value
       },
       { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
       { id: 'uninstall', label: t('apps.actionUninstall'), icon: 'trash', color: 'danger' },
-    ]
-  : []);
+  ];
+});
 
 const catalogColumns = computed<DataTableColumn[]>(() => [
   { key: 'name', header: t('apps.colModule') },
@@ -738,17 +760,31 @@ function inactiveDepsOf(id: string): InstalledModule[] {
   return out;
 }
 
-/** Confirmación cuando el toggle va a arrastrar a OTROS módulos (ADR-0128): la cascada nunca
- *  sorprende — se lista lo afectado antes de tocar nada. Sin afectados, ni se pregunta. */
-async function confirmCascade(titleKey: string, msgKey: string, m: InstalledModule, affected: InstalledModule[]): Promise<boolean> {
-  if (!affected.length) return true;
+/**
+ * Preguntar ANTES de mover el interruptor, diciendo hacia dónde va (hub#773).
+ *
+ * Antes solo se preguntaba cuando la cascada de ADR-0128 arrastraba a otros módulos; en el caso
+ * normal —el 90 %— el icono de encendido apagaba el TPV sin una palabra, y el propio icono no dice
+ * nada: es el mismo dibujo para encender que para apagar. Ahora la pregunta es siempre, y su título
+ * NOMBRA la app y el estado al que va («Desactivar Ventas»), que es la información que faltaba.
+ *
+ * La cascada no desaparece: cuando hay arrastrados, se listan dentro de la misma pregunta. Un solo
+ * diálogo, no dos.
+ */
+async function confirmToggle(m: InstalledModule, affected: InstalledModule[]): Promise<boolean> {
+  const off = toggleIntent(m.status) === 'deactivate';
+  const lines = [t(off ? 'apps.toggleOffBody' : 'apps.toggleOnBody', { name: m.name })];
+  if (affected.length) {
+    lines.push(t(off ? 'apps.cascadeOffMsg' : 'apps.cascadeOnMsg', { name: m.name }));
+    lines.push(affected.map((a) => `· ${a.name}`).join('\n'));
+  }
   const alert = await alertController.create({
-    header: t(titleKey, { name: m.name }),
-    message: `${t(msgKey, { name: m.name })}\n${affected.map((a) => `· ${a.name}`).join('\n')}`,
+    header: t(off ? 'apps.toggleOffTitle' : 'apps.toggleOnTitle', { name: m.name }),
+    message: lines.join('\n'),
     cssClass: 'cascade-alert',
     buttons: [
       { text: t('apps.cascadeCancel'), role: 'cancel' },
-      { text: t('apps.cascadeConfirm'), role: 'confirm' },
+      { text: t(off ? 'apps.toggleOffConfirm' : 'apps.toggleOnConfirm'), role: 'confirm' },
     ],
   });
   await alert.present();
@@ -772,12 +808,12 @@ function reasonOf(e: unknown, fallback: string): string {
 async function toggleModule(m: InstalledModule): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
   try {
-    if (m.status === 'active') {
-      if (!(await confirmCascade('apps.cascadeOffTitle', 'apps.cascadeOffMsg', m, activeDependentsOf(m.id)))) return;
+    if (toggleIntent(m.status) === 'deactivate') {
+      if (!(await confirmToggle(m, activeDependentsOf(m.id)))) return;
       await deactivateModule(m.id);
       notify(t('apps.deactivated', { name: m.name }), 'primary');
     } else {
-      if (!(await confirmCascade('apps.cascadeOnTitle', 'apps.cascadeOnMsg', m, inactiveDepsOf(m.id)))) return;
+      if (!(await confirmToggle(m, inactiveDepsOf(m.id)))) return;
       await activateModule(m.id);
       notify(t('apps.activated', { name: m.name }), 'success');
     }
@@ -791,9 +827,19 @@ async function toggleModule(m: InstalledModule): Promise<void> {
 /** Desinstala un módulo y refresca la lista + la nav del shell. */
 async function removeModule(m: InstalledModule): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
+  // Qué se lleva por delante, ANTES de llevárselo (hub#773). El diálogo decía qué se CONSERVA
+  // («los datos y archivos se guardan») y callaba lo único irreversible del momento: las otras apps
+  // que dependen de esta se quedan sin ella. Se nombran, transitivamente y aunque estén apagadas —
+  // desinstalar no es desactivar: el paquete se va, así que una dependiente apagada ya no se podrá
+  // volver a encender.
+  const breaks = dependentsOf(m.id, installedModules.value);
+  const body = breaks.length
+    ? `${t('apps.uninstallBreaks', { name: m.name })}\n${breaks.map((a) => `· ${a.name}`).join('\n')}\n\n${t('apps.uninstallBody')}`
+    : t('apps.uninstallBody');
   const alert = await alertController.create({
     header: t('apps.uninstallTitle', { name: m.name }),
-    message: t('apps.uninstallBody'),
+    message: body,
+    cssClass: 'cascade-alert',
     buttons: [
       { text: t('apps.cascadeCancel'), role: 'cancel' },
       {
@@ -866,6 +912,13 @@ const catalogTable = ref<HTMLElement | null>(null);
 function handleMineAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
   const m = row as unknown as InstalledModule;
+  // Abrir la app (hub#773). `canOpenModule` ya deshabilitó el botón cuando no hay pantalla, pero se
+  // vuelve a preguntar aquí: el evento puede llegar de un teclado sobre un estado recién cambiado, y
+  // navegar a `/m/<id>` de un módulo apagado deja al usuario en una pantalla vacía sin explicación.
+  if (actionId === 'open') {
+    if (canOpenModule(m, moduleNav.value)) void router.push(moduleRoutePath(m.id));
+    return;
+  }
   if (actionId === 'toggle') void toggleModule(m);
   else if (actionId === 'uninstall') void removeModule(m);
   else if (actionId === 'update') void updateInstalledModule(m.id, m.name);
@@ -924,6 +977,10 @@ onMounted(() => {
   window.addEventListener('focus', recheckEntitlement);
   void loadCatalog();
   void loadInstalled();
+  // Qué módulos publican pantalla, para el botón «Abrir» (hub#773). El shell ya la carga al entrar,
+  // pero esta pantalla no puede depender de eso: entrar por `/apps` directamente (deep-link, F5)
+  // dejaría todos los «Abrir» en gris hasta que algo más la refrescase.
+  void refreshModuleNav();
   // Bajo demanda, al abrir la pantalla (hub#516): una llamada por módulo instalado, y solo cuando
   // alguien está mirando. La vía desatendida la cubre el arranque, que resuelve la última versión.
   void loadModuleUpdates();
