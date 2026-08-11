@@ -2058,6 +2058,17 @@ impl Runtime {
         r
     }
 
+    /// **Would this payload be accepted by `name`, if it were run right now?** — asked without
+    /// running anything, and answered by the same code that will judge it at execution
+    /// ([`commands::validate_payload`]).
+    ///
+    /// hub#825: the agent runner asks this BEFORE parking a proposal in the approval tray. A
+    /// proposal the hub can already refute must never become a question for a person — approving it
+    /// would spend her decision on something that cannot happen.
+    pub fn validate_command_payload(&self, name: &str, payload: &Params) -> Result<()> {
+        commands::validate_payload(&self.registry, name, payload)
+    }
+
     /// The context a flow acts under: attributed to the flow, machine-principal (never offered a
     /// manager's PIN), and carrying only the permissions of what it was granted.
     async fn automation_ctx(&self, flow_id: &str, run_id: &str) -> Result<RequestContext> {
@@ -2198,6 +2209,34 @@ impl Runtime {
             .as_object()
             .cloned()
             .unwrap_or_default();
+
+        // Step 3a (hub#825) — **the net, not the first line.** The runner refuses to park a payload
+        // the schema already rejects, so nothing reaches this tray that could not run when it was
+        // written. What this covers is the one thing that check cannot: the contract MOVING between
+        // 3 AM and 9 AM, because a module updated in between.
+        //
+        // It refuses like the revoked grant of §7.2 and NOT like §14.8: the row stays **pending**
+        // and nobody is recorded as having decided it. `approved` with an error is the honest record
+        // of «the person approved and the COMMAND broke» — something ran, or could have. Here
+        // nothing could: this is refused before the door, so burning the approval would leave the
+        // worst possible row, one that says a person authorised something that never happened, and
+        // would take away her only remaining exit (rejecting, which ends the run cleanly).
+        if let Err(e) = commands::validate_payload(&self.registry, &approval.command, &payload) {
+            return Err(match e {
+                RuntimeError::InvalidPayload { name, detail } => RuntimeError::InvalidPayload {
+                    name,
+                    detail: format!(
+                        "{detail}. This proposal was written when `{}` accepted it; the command's \
+                         contract changed in between, so approving cannot run it. Nothing was \
+                         executed and the proposal is still PENDING: reject it to close the flow, \
+                         or decide again once the command accepts this payload.",
+                        approval.command
+                    ),
+                },
+                other => other,
+            });
+        }
+
         let (run, _) = flows::store::get_run(self.db.as_ref(), &self.hub_id, &approval.run_id)
             .await?;
         let outcome = self
