@@ -582,8 +582,16 @@ async function finalizeCloudLogin(result: LoginResult): Promise<void> {
     // El alta de PIN solo tiene sentido donde el PIN se va a pedir. En un dispositivo `personal`
     // sería un callejón sin salida: cuatro dígitos que nadie volvería a preguntar (hub#358).
     if (pinAvailable.value) {
-      step.value = 'setup';
-      return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
+      // hub#772: el PIN es del USUARIO, no del dispositivo. La rama solo comprobaba si el pinpad
+      // estaba disponible aquí → todo login online con «confiar» reabría el alta y `onSetupComplete`
+      // sobrescribía el PIN existente. Si el usuario ya tiene PIN (su id está en `pin_users`, la
+      // MISMA autoridad que pinta el pinpad), se conserva y se entra directo. Cambiar el PIN es una
+      // decisión separada y explícita, no un efecto de confiar un dispositivo.
+      const userAlreadyHasPin = pinUsers.value.some((u) => u.id === sess.user.id);
+      if (!userAlreadyHasPin) {
+        step.value = 'setup';
+        return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
+      }
     }
   }
 
