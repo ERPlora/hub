@@ -37,6 +37,24 @@ pub const HOST_NOTIFY_LISTENER: &str = "host.notify";
 /// dead-letter— y lo único que cambia es cómo se autorizó el destinatario.
 pub const FLOW_NOTIFY_EVENT: &str = "flow.reminder.due";
 
+/// **Why a row is terminal when the answer is not "it ran out of attempts"** (hub#827).
+///
+/// `_event_outbox.failure_kind` is `''` for every row the relay may try again — which is every row
+/// there ever was until this: a failure was a failure, and the only question asked of one was how
+/// many had come before it. A revoked authorisation is a different kind of no, and the column is
+/// what lets the queue, the screen and the retry all say so without parsing `last_error`.
+///
+/// A non-empty value means: **do not retry, and do not offer to.**
+pub const FAILURE_RELEASE_REVOKED: &str = "flow.release_revoked";
+
+/// The key that replaces the recipient in the payload of a row that can never be delivered — the
+/// same word the run history already uses (`crate::flows::notify`), so an operator meets one
+/// vocabulary and not two.
+const RECIPIENT_REDACTED_KEY: &str = "recipient_redacted";
+
+/// The recipient's key inside a `host.notify` intent.
+const RECIPIENT_KEY: &str = "to";
+
 /// Tamaño de lote por ciclo del relay (mantiene el lock del runtime acotado).
 const BATCH: i64 = 50;
 
@@ -79,6 +97,7 @@ ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS run_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS parent_event_id TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS failure_kind TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_at);\
 CREATE INDEX IF NOT EXISTS ix_outbox_run ON _event_outbox (hub_id, run_id) WHERE run_id <> '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_parent ON _event_outbox (hub_id, parent_event_id) \
@@ -324,6 +343,11 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // que falló (idempotencia). El contrato at-least-once + idempotencia por listener se mantiene.
     let listeners = registry.listeners_for(&event_name);
     let mut first_err: Option<String> = None;
+    // How many things failed this pass, and whether the failure is one that can never succeed
+    // (hub#827). Counting matters: a row is only killed outright when the permanent refusal is
+    // the ONLY failure it had — a sibling listener that merely stumbled still deserves its ladder.
+    let mut failures = 0usize;
+    let mut permanent: Option<&'static str> = None;
     for listener in &listeners {
         if delivery_exists(db, &id, listener).await? {
             continue; // ya entregado en un intento previo (idempotencia)
@@ -350,6 +374,7 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         {
             // Registras el fallo y SIGUES: los hermanos se entregan igual este ciclo. El difierido
             // de la fila (backoff/dead-letter) se hace una vez al final, con el primer error.
+            failures += 1;
             if first_err.is_none() {
                 first_err = Some(format!("{listener}: {e}"));
             }
@@ -363,11 +388,13 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     if event_name.ends_with(REMINDER_DUE_SUFFIX) {
         let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
         let run_id = row["run_id"].as_str().unwrap_or_default().to_string();
-        if let Err(e) =
+        if let Err(f) =
             deliver_host_notify(db, registry, &id, &module_id, &run_id, &ctx.hub_id, &payload).await
         {
+            failures += 1;
+            permanent = f.permanent;
             if first_err.is_none() {
-                first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {e}"));
+                first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {}", f.error));
             }
         }
     }
@@ -392,6 +419,7 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     )
     .await
     {
+        failures += 1;
         if first_err.is_none() {
             first_err = Some(format!("flows: {e}"));
         }
@@ -400,10 +428,60 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // Si algún listener falló, la fila se difiere/dead-lettera (NO se marca entregada): el/los
     // listeners fallidos se reintentarán; los que sí se entregaron ya tienen su marcador.
     if let Some(err) = first_err {
+        // …unless the only thing that failed can never succeed (hub#827): then the row is terminal
+        // NOW, with its reason recorded, instead of climbing a ladder to the same answer.
+        if let (1, Some(kind)) = (failures, permanent) {
+            return kill_permanently(db, &id, &err, kind, &payload).await;
+        }
         return defer_or_dead(db, &id, attempts, &err).await;
     }
 
     mark_delivered(db, &id).await
+}
+
+/// Why a host-notify did not go out **and whether trying again could ever change that** (hub#827).
+///
+/// The relay used to ask one question of a failure — how many attempts had it burnt — and a revoked
+/// authorisation answered it eight times. It is not a stumble: an owner took a permission away, so
+/// the eighth attempt knows exactly as much as the first. Everything that is NOT that stays
+/// retryable by construction (see the `From` below), so a database blip or a transport 500 keeps
+/// its backoff ladder untouched.
+#[derive(Debug)]
+struct NotifyFailure {
+    error: RuntimeError,
+    /// The classification the row is stamped with when this is terminal ([`FAILURE_RELEASE_REVOKED`]).
+    /// `None` = retryable.
+    permanent: Option<&'static str>,
+}
+
+impl NotifyFailure {
+    /// A refusal that will never resolve on its own.
+    fn permanent(kind: &'static str, error: RuntimeError) -> Self {
+        Self {
+            error,
+            permanent: Some(kind),
+        }
+    }
+}
+
+/// Anything reaching this through `?` — a database error, an unparseable intent, a transport that
+/// blew up — is **retryable**, which is the behaviour every one of them already had. Permanence is
+/// only ever claimed explicitly, at the one place that knows.
+impl From<RuntimeError> for NotifyFailure {
+    fn from(error: RuntimeError) -> Self {
+        Self {
+            error,
+            permanent: None,
+        }
+    }
+}
+
+/// A database error is the retryable failure par excellence — it is what the backoff ladder was
+/// built for — so it reaches here the same way.
+impl From<erplora_db::DbError> for NotifyFailure {
+    fn from(error: erplora_db::DbError) -> Self {
+        RuntimeError::from(error).into()
+    }
 }
 
 /// Entrega un evento `*.reminder.due` al transporte de `host.notify` (ADR-0012), con idempotencia
@@ -433,7 +511,7 @@ async fn deliver_host_notify(
     run_id: &str,
     hub_id: &str,
     payload: &Params,
-) -> Result<()> {
+) -> std::result::Result<(), NotifyFailure> {
     let Some(transport) = &registry.notify_transport else {
         return Ok(()); // capacidad no disponible: no se envía nada (ni se reintenta).
     };
@@ -451,14 +529,20 @@ async fn deliver_host_notify(
             .get(host_notify::RESOLVED_VIA_KEY)
             .and_then(|v| v.as_str())
             .unwrap_or_default();
-        crate::flows::grants::check_notify_release(
+        // Not `?`: a release that is gone is the one refusal the relay must not retry (hub#827).
+        // The owner took the permission away — the eighth attempt would know exactly what the first
+        // one did, and would have spent eight more minutes holding a customer's address in a queue.
+        if let Err(e) = crate::flows::grants::check_notify_release(
             db,
             hub_id,
             run_id,
             resolved_via,
             intent.channel,
         )
-        .await?;
+        .await
+        {
+            return Err(NotifyFailure::permanent(FAILURE_RELEASE_REVOKED, e));
+        }
         host_notify::check_recipient_syntax(intent.channel, &intent.to)?;
     } else {
         // Puerta 1 — capability del MÓDULO emisor (no del hub): sin `notify` concedida, no hay
@@ -469,7 +553,8 @@ async fn deliver_host_notify(
                 "evento de notificación sin módulo emisor atribuido: no se puede comprobar la \
                  capability `notify` → no se envía"
                     .to_string(),
-            ));
+            )
+            .into());
         }
         crate::capabilities::require(
             db,
@@ -604,6 +689,50 @@ async fn mark_dead(db: &dyn DatabaseAdapter, id: &str, err: &str) -> Result<()> 
     Ok(())
 }
 
+/// **Ends a row that can never be delivered** (hub#827), in one gesture and on the first pass.
+///
+/// Two things happen here that `mark_dead` does not do, and each answers a separate half of the
+/// same complaint:
+///
+///  1. **The reason is recorded** in `failure_kind`, so the queue can show it, [`retry`] can refuse
+///     with it, and neither has to read English out of `last_error`.
+///  2. **The recipient is scrubbed from the stored payload.** `crate::flows::notify` puts the
+///     address in the queue row and nowhere else precisely because that row «TIENE que llevarlo» —
+///     the transport needs something to dial, which is why the run history shows only
+///     `recipient_redacted`. A row that will never be dialled stops having to carry it, and leaving
+///     it there means ninety days of the customer's contact sitting in the operator's dead-letter:
+///     the very contact the owner had just decided not to use.
+///
+/// What stays is what the OWNER decided — the channel, the template, the copy they wrote, the
+/// release that authorised it. That is what tells one row from another, and none of it is the
+/// customer's. The point is not to blind the operator; it is to stop keeping one field.
+async fn kill_permanently(
+    db: &dyn DatabaseAdapter,
+    id: &str,
+    err: &str,
+    failure_kind: &str,
+    payload: &Params,
+) -> Result<()> {
+    let mut scrubbed = payload.clone();
+    if scrubbed.remove(RECIPIENT_KEY).is_some() {
+        // Said out loud rather than simply removed: a payload with no `to` at all would read like
+        // the message never had a recipient.
+        scrubbed.insert(RECIPIENT_REDACTED_KEY.into(), json!(true));
+    }
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("err".into(), json!(err));
+    p.insert("kind".into(), json!(failure_kind));
+    p.insert("payload".into(), json!(Json::Object(scrubbed).to_string()));
+    db.execute(
+        "UPDATE _event_outbox SET status = 'dead', last_error = :err, failure_kind = :kind, \
+         payload = :payload, claim_expires_at = NULL WHERE id = :id",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
 /// Reintento: incrementa `attempts`, reprograma con backoff; si supera `MAX_ATTEMPTS` → dead.
 /// Limpia el lease (`claim_expires_at = NULL`) para que la fila diferida —que sigue `pending`—
 /// vuelva a ser reclamable en cuanto venza su `next_attempt_at`.
@@ -663,6 +792,14 @@ pub struct DeadEvent {
     pub attempts: i64,
     pub depth: i64,
     pub created_at: String,
+    /// Why this row is terminal, when the answer is not «it burnt its attempts» (hub#827). Empty
+    /// for every ordinary dead-letter; [`FAILURE_RELEASE_REVOKED`] when a flow's authorisation was
+    /// taken away while the message was queued.
+    pub failure_kind: String,
+    /// Whether [`retry`] can do anything with this row. **The screen must not offer a button that
+    /// cannot work**: retrying a revoked release returned `200`, reset `attempts` and died again for
+    /// the same reason — a loop with no exit, presented as the remedy.
+    pub retryable: bool,
 }
 
 /// Dead-letters of this hub, newest first. `limit` is clamped to [`MAX_DEAD_PAGE`].
@@ -673,7 +810,8 @@ pub async fn list_dead(db: &dyn DatabaseAdapter, hub_id: &str, limit: i64) -> Re
     p.insert("lim".into(), json!(limit.clamp(1, MAX_DEAD_PAGE)));
     let res = db
         .query(
-            "SELECT id, event_name, module_id, user_id, payload, last_error, attempts, depth, created_at \
+            "SELECT id, event_name, module_id, user_id, payload, last_error, attempts, depth, \
+                    created_at, failure_kind \
              FROM _event_outbox WHERE hub_id = :hub_id AND status = :status \
              ORDER BY created_at DESC LIMIT :lim",
             &p,
@@ -686,6 +824,7 @@ fn dead_event(row: &Json) -> DeadEvent {
     let s = |k: &str| row[k].as_str().unwrap_or_default().to_string();
     let n = |k: &str| row[k].as_i64().or_else(|| row[k].as_f64().map(|f| f as i64)).unwrap_or(0);
     let raw = s("payload");
+    let failure_kind = s("failure_kind");
     DeadEvent {
         id: s("id"),
         event_name: s("event_name"),
@@ -696,6 +835,8 @@ fn dead_event(row: &Json) -> DeadEvent {
         attempts: n("attempts"),
         depth: n("depth"),
         created_at: s("created_at"),
+        retryable: failure_kind.is_empty(),
+        failure_kind,
     }
 }
 
@@ -752,8 +893,25 @@ pub async fn sample_payloads(
         .collect())
 }
 
+/// What [`retry`] did — three answers, because the caller has to tell them apart (hub#827).
+///
+/// It used to be a `bool`, and `false` meant «there is no such dead-letter»: a `404`. That left
+/// nowhere to put the third answer — the row is right there and cannot be replayed — so the gesture
+/// returned `200` and the message died again for the same reason, forever.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RetryOutcome {
+    /// Back in front of the relay with a fresh budget.
+    Requeued,
+    /// No dead-letter with that id **in this hub** (never existed, already delivered, discarded, or
+    /// another tenant's — the last two are indistinguishable on purpose).
+    NotFound,
+    /// The row is a dead-letter and retrying it can never work. `failure_kind` names why, so the
+    /// caller can say what WOULD help instead of showing a dead end.
+    NotRetryable { failure_kind: String },
+}
+
 /// Puts a dead-letter back in front of the relay: `pending`, attempts reset, due now, lease
-/// cleared. `false` if there is no dead-letter with that id in this hub.
+/// cleared.
 ///
 /// Only a `dead` row is replayable. A `delivered` one is not an operator gesture (the delivery
 /// markers in `_event_delivery` already make it a no-op), and a `pending` one is the relay's.
@@ -761,21 +919,51 @@ pub async fn sample_payloads(
 /// Resetting `attempts` to 0 is what makes the retry meaningful: the row gets the full budget of
 /// [`MAX_ATTEMPTS`] again, so a transient cause gets its backoff ladder back instead of dying on
 /// the first stumble. If the cause is still there, it simply dies again — and is listed again.
-pub async fn retry(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<bool> {
+///
+/// **Unless the cause is one that cannot come back** (hub#827). A row stamped with a
+/// [`FAILURE_RELEASE_REVOKED`] is refused with its reason: the address it needed is gone from the
+/// payload and the permission that produced it was withdrawn, so the remedy is to grant the
+/// permission again and run the flow — not to replay this row. It is the rule §13.6 already applies
+/// to the rate-guard: retrying a runaway forever is the same runaway.
+pub async fn retry(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<RetryOutcome> {
+    // Read WHY first: the three answers are distinguishable only before the UPDATE, since a refusal
+    // and a missing row would both come back as `affected = 0`.
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("status".into(), json!(STATUS_DEAD));
+    let res = db
+        .query(
+            "SELECT failure_kind FROM _event_outbox \
+             WHERE id = :id AND hub_id = :hub_id AND status = :status",
+            &p,
+        )
+        .await?;
+    let Some(failure_kind) = res
+        .rows
+        .first()
+        .map(|r| r["failure_kind"].as_str().unwrap_or_default().to_string())
+    else {
+        return Ok(RetryOutcome::NotFound);
+    };
+    if !failure_kind.is_empty() {
+        return Ok(RetryOutcome::NotRetryable { failure_kind });
+    }
+
     p.insert("now".into(), json!(now_rfc3339()));
     let res = db
         .execute(
             "UPDATE _event_outbox SET status = 'pending', attempts = 0, next_attempt_at = :now, \
              last_error = '', claim_expires_at = NULL \
-             WHERE id = :id AND hub_id = :hub_id AND status = :status",
+             WHERE id = :id AND hub_id = :hub_id AND status = :status AND failure_kind = ''",
             &p,
         )
         .await?;
-    Ok(res.affected > 0)
+    Ok(if res.affected > 0 {
+        RetryOutcome::Requeued
+    } else {
+        RetryOutcome::NotFound
+    })
 }
 
 /// Closes a dead-letter for good: status [`STATUS_DISCARDED`] + who and when. `false` if there is
@@ -830,6 +1018,10 @@ pub async fn discard(
 /// lease and a wiped `last_error`. Delivered/pending/discarded rows are untouched. Idempotent: a
 /// second call moves nothing (there are no `dead` rows left). If a row's cause is still there it
 /// dies again and reappears in [`list_dead`]; the queue is self-healing, not magic.
+///
+/// Rows with a `failure_kind` are **skipped**, for the reason this gesture exists at all: it is for
+/// a cause that has since been fixed, and a withdrawn authorisation is not one (hub#827). Sweeping
+/// them along would be the one-by-one dead end multiplied by thirty.
 pub async fn retry_all(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u64> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -839,7 +1031,7 @@ pub async fn retry_all(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u64> {
         .execute(
             "UPDATE _event_outbox SET status = 'pending', attempts = 0, next_attempt_at = :now, \
              last_error = '', claim_expires_at = NULL \
-             WHERE hub_id = :hub_id AND status = :status",
+             WHERE hub_id = :hub_id AND status = :status AND failure_kind = ''",
             &p,
         )
         .await?;
@@ -1311,6 +1503,200 @@ mod tests {
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await, 1, "dead-letter");
     }
 
+    /// Queues a message the way `flows::notify` does: **no module, a run, and the release the grant
+    /// authorised**. That emptiness plus the `run_id` is what tells the relay this row carries a
+    /// flow's authorisation (and is not something a module can fabricate).
+    async fn seed_flow_notify(db: &PgAdapter, id: &str, run_id: &str, grant_id: &str, to: &str) {
+        let mut payload = reminder_payload(to);
+        payload.insert(
+            crate::host_notify::RESOLVED_VIA_KEY.into(),
+            json!(crate::host_notify::flow_grant_release(grant_id)),
+        );
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("run_id".into(), json!(run_id));
+        p.insert("name".into(), json!(FLOW_NOTIFY_EVENT));
+        p.insert("payload".into(), json!(Json::Object(payload).to_string()));
+        p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, module_id, run_id, payload, status, \
+              attempts, next_attempt_at, last_error, created_at) \
+             VALUES (:id, 'h1', '', '[]', :name, '', :run_id, :payload, 'pending', 0, :at, '', :at)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    async fn seed_flow_run(db: &PgAdapter, run_id: &str, flow_id: &str) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(run_id));
+        p.insert("flow_id".into(), json!(flow_id));
+        p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute(
+            "INSERT INTO _flow_runs (id, hub_id, flow_id, status, created_at, updated_at) \
+             VALUES (:id, 'h1', :flow_id, 'done', :at, :at)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    async fn one_text(db: &PgAdapter, sql: &str) -> String {
+        let res = db.query(sql, &Params::new()).await.unwrap();
+        res.rows
+            .first()
+            .and_then(|r| r["c"].as_str().map(|s| s.to_string()))
+            .unwrap_or_default()
+    }
+
+    /// **hub#827 — a revoked authorisation is a definitive NO, not a stumble.**
+    ///
+    /// Revoking `recipient_query` with a message already queued stops the send, and that half is
+    /// right (§5) and is not what this covers. What was wrong is everything after it: the row spent
+    /// its **eight attempts** against a permission that was never coming back, and every one of
+    /// them was work the hub did knowing the answer.
+    ///
+    /// The relay now asks a different question of a failure — *can this ever succeed?* — and a
+    /// release that no longer exists answers no. The row is terminal on the first pass, with its
+    /// own [`FAILURE_RELEASE_REVOKED`] so the queue can say why and the retry can refuse.
+    #[tokio::test]
+    async fn a_notify_whose_release_was_revoked_dies_at_once_instead_of_burning_eight_attempts() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+
+        // The run exists; the grant it names does NOT — the owner revoked it while the message was
+        // in the queue, which is exactly the QA's step 5.
+        seed_flow_run(&db, "run-1", "flow-1").await;
+        seed_flow_notify(&db, "ev-1", "run-1", "grant-gone", "ana.perez@example.test").await;
+
+        process_once(&db, &reg).await.unwrap();
+
+        assert!(transport.sent().is_empty(), "revoking has to stop the send");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            1,
+            "a revoked release is terminal on the first pass, not after eight"
+        );
+        assert_eq!(
+            count(&db, "SELECT attempts AS c FROM _event_outbox WHERE id='ev-1'").await,
+            0,
+            "no retry ladder was climbed against an answer that is not coming back"
+        );
+        assert_eq!(
+            one_text(&db, "SELECT failure_kind AS c FROM _event_outbox WHERE id='ev-1'").await,
+            FAILURE_RELEASE_REVOKED,
+            "the queue records WHY, so the screen and the retry do not have to guess"
+        );
+    }
+
+    /// **hub#827 — the address does not stay in the dead-letter.**
+    ///
+    /// `flows::notify` justifies putting the recipient in the queue row precisely because that row
+    /// «TIENE que llevarlo»: the transport needs an address to dial, which is why the run history
+    /// shows `recipient_redacted` and the queue does not. A row that can never be delivered stops
+    /// having to carry it — and the ninety days it would otherwise sit in the operator's dead-letter
+    /// are ninety days of keeping the contact the owner had just decided not to use.
+    ///
+    /// The rest of the payload stays: the channel, the template, the copy the owner wrote and the
+    /// release that authorised it are what let an operator tell this row from noise, and none of
+    /// them is the customer's.
+    #[tokio::test]
+    async fn the_dead_letter_of_a_revoked_notify_keeps_the_decision_and_drops_the_recipient() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::new()));
+        seed_flow_run(&db, "run-1", "flow-1").await;
+        seed_flow_notify(&db, "ev-1", "run-1", "grant-gone", "ana.perez@example.test").await;
+
+        process_once(&db, &reg).await.unwrap();
+
+        let dead = list_dead(&db, "h1", 10).await.unwrap();
+        assert_eq!(dead.len(), 1);
+        let payload = &dead[0].payload;
+        let whole = payload.to_string();
+        assert!(
+            !whole.contains("ana.perez@example.test"),
+            "the customer's address is still in the queue an operator reads: {whole}"
+        );
+        assert_eq!(payload["recipient_redacted"], json!(true), "{whole}");
+        // Not blind: what the OWNER decided is all still there.
+        assert_eq!(payload["channel"], json!("email"));
+        assert_eq!(payload["template"], json!("appointment_reminder"));
+        assert_eq!(payload["vars"]["when"], json!("10:00"));
+        assert!(
+            payload[crate::host_notify::RESOLVED_VIA_KEY]
+                .as_str()
+                .unwrap_or_default()
+                .contains("grant-gone"),
+            "the release that authorised it names the grant to restore: {whole}"
+        );
+        assert!(
+            dead[0].last_error.contains("REVOC"),
+            "and the reason is readable: {}",
+            dead[0].last_error
+        );
+    }
+
+    /// **hub#827 — the button must not lie.**
+    ///
+    /// `Reintentar` on a revoked row returned `200`, reset `attempts` to `0` and let the row die
+    /// again for the same reason: a loop with no exit, offered by the screen as the remedy. It is
+    /// the rule §13.6 already applies to the rate-guard — retrying a runaway forever is the same
+    /// runaway. The refusal names its own reason, so the screen can say what to do instead
+    /// (re-grant the permission and run the flow again) rather than showing a dead end.
+    ///
+    /// The bulk gesture skips them for the same reason: `retry-all` exists for a transient outage
+    /// that is now fixed, and this is not one.
+    #[tokio::test]
+    async fn a_revoked_dead_letter_refuses_the_retry_instead_of_promising_one() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::new()));
+        seed_flow_run(&db, "run-1", "flow-1").await;
+        seed_flow_notify(&db, "ev-1", "run-1", "grant-gone", "ana.perez@example.test").await;
+        process_once(&db, &reg).await.unwrap();
+
+        match retry(&db, "h1", "ev-1").await.unwrap() {
+            RetryOutcome::NotRetryable { failure_kind } => {
+                assert_eq!(failure_kind, FAILURE_RELEASE_REVOKED)
+            }
+            other => panic!("a retry that can never work must be refused, got {other:?}"),
+        }
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            1,
+            "and the row stays where it was, not back on the relay"
+        );
+
+        assert_eq!(
+            retry_all(&db, "h1").await.unwrap(),
+            0,
+            "the bulk gesture is for a cause that got fixed; a revocation is not one"
+        );
+
+        // A dead-letter that CAN be retried still is: the refusal is about this failure, not about
+        // the gesture.
+        seed_row(&db, "d1", "h1", STATUS_DEAD).await;
+        assert!(matches!(
+            retry(&db, "h1", "d1").await.unwrap(),
+            RetryOutcome::Requeued
+        ));
+        assert!(matches!(
+            retry(&db, "h1", "nope").await.unwrap(),
+            RetryOutcome::NotFound
+        ));
+    }
+
     /// **hub#142 — un listener que falla NO bloquea a sus hermanos.** Antes, `process_row`
     /// hacía `return defer_or_dead(...)` al primer fallo: si `cash_register._reverse_sale`
     /// reventaba, `inventory._restock_on_void` (otro listener del MISMO `sale.voided`) no corría
@@ -1670,7 +2056,11 @@ mod tests {
         // The operator fixes the cause (here: the listener now works) and replays the event.
         reg.commands
             .insert("m.apply".into(), cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]));
-        assert!(retry(&db, "h1", &dead_id(&db).await).await.unwrap(), "the row was requeued");
+        assert_eq!(
+            retry(&db, "h1", &dead_id(&db).await).await.unwrap(),
+            RetryOutcome::Requeued,
+            "the row was requeued"
+        );
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=0").await,
             1,
@@ -1689,7 +2079,10 @@ mod tests {
         );
 
         // Only a dead-letter is replayable: replaying a delivered row is not an operator gesture.
-        assert!(!retry(&db, "h1", &id_of(&db, "delivered").await).await.unwrap());
+        assert_eq!(
+            retry(&db, "h1", &id_of(&db, "delivered").await).await.unwrap(),
+            RetryOutcome::NotFound
+        );
     }
 
     /// `discard` closes a dead-letter without deleting it: the row STAYS, stamped with who
@@ -1754,9 +2147,13 @@ mod tests {
         let (db, _reg) = hub_with_a_dead_letter().await;
         let id = dead_id(&db).await;
 
-        assert!(!retry(&db, "other-hub", &id).await.unwrap(), "another hub cannot replay it");
+        assert_eq!(
+            retry(&db, "other-hub", &id).await.unwrap(),
+            RetryOutcome::NotFound,
+            "another hub cannot replay it"
+        );
         assert!(!discard(&db, "other-hub", &id, "hub_user:x").await.unwrap());
-        assert!(!retry(&db, "h1", "no-such-event").await.unwrap());
+        assert_eq!(retry(&db, "h1", "no-such-event").await.unwrap(), RetryOutcome::NotFound);
         assert!(!discard(&db, "h1", "no-such-event", "hub_user:x").await.unwrap());
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,

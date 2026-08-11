@@ -806,6 +806,7 @@ export default {
     tabEvents: 'Eventos caídos',
     deadEvents: 'Eventos caídos',
     deadEventsHint: 'Arregla la causa (permiso, módulo caído…) y reenvía. El contenido no se edita: si la causa sigue, el evento vuelve a morir aquí.',
+    deadEventNotRetryable: 'Este no se puede reenviar: la autorización que lo permitía se retiró y el destinatario ya no está en la fila. Vuelve a conceder el permiso y relanza el flujo.',
     noDeadEvents: 'Todo en orden',
     noDeadEventsHint: 'No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio nunca la pierde.',
     deadEventsLoadError: 'No se pudo cargar la cola de eventos caídos. Comprueba la conexión y reintenta.',

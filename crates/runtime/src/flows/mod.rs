@@ -169,6 +169,9 @@ mod tests {
             approvals::ERR_APPROVAL_ALREADY_DECIDED,
             approvals::ERR_APPROVAL_EXPIRED,
             agent::ERR_NOT_IN_FLIGHT,
+            // Lives in `outbox` because it classifies an OUTBOX row, but it is a flow's refusal and
+            // the screen catches it by code like any other (hub#827).
+            crate::outbox::FAILURE_RELEASE_REVOKED,
         ] {
             assert!(
                 code.starts_with("flow."),

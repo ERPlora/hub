@@ -104,11 +104,18 @@ pub async fn count_dead(State(st): State<AppState>, headers: HeaderMap) -> Respo
 /// vencida ya). La entrega la hace el relay en su siguiente ciclo, no este handler: el contrato
 /// at-least-once + la idempotencia por `_event_delivery` siguen mandando, así que los listeners
 /// que YA se entregaron en un intento anterior no se re-ejecutan. Auth = sesión admin.
+///
+/// **`409` cuando el reintento no puede funcionar nunca** (hub#827). Una fila que murió porque el
+/// dueño RETIRÓ la autorización del flujo devolvía `200`, volvía a `pending` y moría otra vez por lo
+/// mismo: un bucle sin salida ofrecido como remedio. Ahora se niega con su motivo
+/// (`flow.release_revoked`), que es lo que permite a la pantalla decir qué SÍ ayuda —volver a
+/// conceder el permiso y relanzar el flujo— en vez de un callejón.
 pub async fn retry_dead(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
+    use erplora_runtime::outbox::RetryOutcome;
     let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
@@ -118,10 +125,23 @@ pub async fn retry_dead(
         return rejected(e);
     }
     match rt.retry_dead_event(&id).await {
-        Ok(true) => {
+        Ok(RetryOutcome::Requeued) => {
             Json(json!({ "ok": true, "data": { "id": id, "status": "pending" } })).into_response()
         }
-        Ok(false) => not_a_dead_letter(),
+        Ok(RetryOutcome::NotFound) => not_a_dead_letter(),
+        Ok(RetryOutcome::NotRetryable { failure_kind }) => (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "ok": false,
+                "error": {
+                    "code": failure_kind,
+                    "message": "this dead-letter cannot be replayed: the authorisation that \
+                                produced it was withdrawn, and the recipient is no longer in the \
+                                row. Grant the permission again and run the flow."
+                }
+            })),
+        )
+            .into_response(),
         Err(e) => crate::err_response(e),
     }
 }

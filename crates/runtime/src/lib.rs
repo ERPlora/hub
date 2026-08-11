@@ -1766,9 +1766,10 @@ impl Runtime {
         outbox::list_dead(self.db.as_ref(), &self.hub_id, limit).await
     }
 
-    /// Puts a dead-letter back in front of the relay (`pending`, attempts reset). `false` if there
-    /// is no dead-letter with that id **in this hub**.
-    pub async fn retry_dead_event(&self, id: &str) -> Result<bool> {
+    /// Puts a dead-letter back in front of the relay (`pending`, attempts reset). Three answers,
+    /// because a row that CANNOT be replayed is neither a success nor a missing id
+    /// ([`outbox::RetryOutcome`], hub#827).
+    pub async fn retry_dead_event(&self, id: &str) -> Result<outbox::RetryOutcome> {
         outbox::retry(self.db.as_ref(), &self.hub_id, id).await
     }
 
@@ -1824,7 +1825,9 @@ impl Runtime {
             declared_by,
             samples: samples.len(),
             last_seen_at: samples.first().map(|s| s.created_at.clone()),
-            fields: event_shape::infer(&payloads),
+            // The NAME travels into the inference: for a flat payload it is the only thing that
+            // says whose data this is (hub#826).
+            fields: event_shape::infer(event_name, &payloads),
         }))
     }
 

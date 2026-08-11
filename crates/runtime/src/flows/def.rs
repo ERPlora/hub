@@ -276,9 +276,10 @@ impl StepDef {
     fn expressions(&self) -> Vec<Json> {
         match &self.spec {
             StepSpec::Command { params, .. } => vec![Json::Object(params.clone())],
-            StepSpec::Condition { when } => {
-                vec![Json::Array(when.paths().map(|p| json_str(p)).collect())]
-            }
+            // Both sides of every clause (hub#828): the paths it reads and the values it compares
+            // against. Scanning only the paths left `{"input.x": {"eq": "{{secret.K}}"}}` saving
+            // as literal text — a guard that never matches and never says so.
+            StepSpec::Condition { when } => when.expressions(),
             StepSpec::Delay { until, .. } => {
                 until.iter().map(|u| json_str(u)).collect::<Vec<_>>()
             }
@@ -515,9 +516,26 @@ impl Condition {
         })
     }
 
-    /// Every path this condition reads — used to refuse `secret.…` at save time.
-    fn paths(&self) -> impl Iterator<Item = &String> {
-        self.0.keys()
+    /// **Everything this condition names**, as expressions for the save-time scan: the paths it
+    /// READS (the left of each clause) *and* the values it compares against (the right of every
+    /// operator, including each item of an `in` array).
+    ///
+    /// The two halves are here for two different reasons, and only the first one was ever scanned:
+    ///
+    /// - the **left** is resolved against the run, so `secret.API_KEY` there is a real read — and
+    ///   with `lt`/`contains` a machine that guesses the credential byte by byte. That is the
+    ///   dangerous shape, and it has been refused since hub#662.
+    /// - the **right** is never resolved: it is literal text. `{"input.x": {"eq":
+    ///   "{{secret.K}}"}}` compared the answer against the eighteen characters `{{secret.K}}`, so
+    ///   the guard its author wrote never matched and no error, run status or log said why
+    ///   (hub#828). It is not a leak; it is a flow that does something other than what its
+    ///   document says, which §13.2 refuses at save time rather than storing.
+    fn expressions(&self) -> Vec<Json> {
+        let mut out: Vec<Json> = self.0.keys().map(|p| json_str(p)).collect();
+        for ops in self.0.values() {
+            out.extend(ops.iter().map(|(_, expected)| expected.clone()));
+        }
+        out
     }
 }
 
@@ -863,7 +881,12 @@ impl FlowDefinition {
         let mut paths: Vec<String> = Vec::new();
         for trigger in &self.triggers {
             template_paths(&Json::Object(trigger.input.clone()), &mut paths);
-            paths.extend(trigger.filter.paths().cloned());
+            // Both sides of the filter, for the same reason a `condition` step gets both (hub#828):
+            // a filter is that same language, and a secret on either side of it is either a read
+            // nothing may do or a comparison that silently means its own source text.
+            for expr in trigger.filter.expressions() {
+                template_paths(&expr, &mut paths);
+            }
         }
         if let Some(path) = paths.iter().find(|p| p.starts_with("secret.")) {
             return Err(invalid(
@@ -1626,6 +1649,81 @@ mod tests {
                 .expect_err("a secret only leaves the hub through an http step");
             assert!(format!("{err}").contains("secret"), "{err}");
         }
+    }
+
+    /// **Both sides of a condition** (hub#828). The scan read the paths a condition READS — the
+    /// left of each clause — and never the values it compares AGAINST, so
+    /// `{"input.x": {"eq": "{{secret.K}}"}}` saved with a `201` and then meant the literal text
+    /// `{{secret.K}}`: the guard its author wrote («only continue if the answer carries my key»)
+    /// never matched, the run ended `done` like any guard that stops, and nothing anywhere said
+    /// so. `command`, `notify` and `ai` all refused the same string. §13.2 is the rule that was
+    /// missing here: what this hub cannot execute is refused at save time instead of stored and
+    /// stalled forever.
+    #[test]
+    fn a_condition_cannot_name_a_secret_on_either_side_of_a_clause() {
+        for when in [
+            json!({ "input.x": { "eq": "{{secret.API_KEY}}" } }),
+            json!({ "input.x": { "contains": "{{secret.API_KEY}}" } }),
+            json!({ "input.x": { "in": ["ok", "{{secret.API_KEY}}"] } }),
+            json!({ "input.x": { "neq": "secret.API_KEY" } }),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "c", "kind": "condition", "when": when }]
+            }))
+            .expect_err("a flow that does not do what its author wrote must not save");
+            assert!(format!("{err}").contains("API_KEY"), "{err}");
+        }
+
+        // A trigger's filter is the same document in the same language, and its scope is the EVENT:
+        // there is nothing a secret could mean there either, on either side.
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "triggers": [{ "kind": "event", "event": "sale.completed",
+                           "filter": { "event.ref": { "eq": "{{secret.API_KEY}}" } } }],
+            "steps": [{ "id": "c", "kind": "condition", "when": { "input.x": { "eq": "1" } } }]
+        }))
+        .expect_err("a trigger cannot read a flow secret either");
+        assert!(format!("{err}").contains("API_KEY"), "{err}");
+    }
+
+    /// **The oracle stays closed.** This is the regression guard for the fix above, not a new
+    /// rule: the DANGEROUS shape is the secret as the PATH — the left of the clause — because
+    /// `lt`/`contains` over a value the hub resolves is a byte-by-byte guessing machine. It was
+    /// already refused (that is why hub#828 is a P2 and not a leak), and widening the scan to the
+    /// right-hand values must not cost it.
+    #[test]
+    fn a_secret_as_the_path_of_a_condition_is_still_refused() {
+        for when in [
+            json!({ "secret.API_KEY": { "exists": true } }),
+            json!({ "secret.API_KEY": { "lt": "m" } }),
+            json!({ "secret.API_KEY": { "contains": "sk-" } }),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "c", "kind": "condition", "when": when }]
+            }))
+            .expect_err("the oracle: a condition must never resolve a secret");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_SECRET_NOT_AVAILABLE),
+                "{err:?}"
+            );
+        }
+    }
+
+    /// The other half of the rule: a condition that names no secret still saves. A scan that
+    /// refuses every string with a dot in it would close the oracle by making conditions useless.
+    #[test]
+    fn a_condition_that_names_no_secret_still_saves() {
+        FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "c", "kind": "condition", "when": {
+                "input.total": { "gte": "100" },
+                "event.status": { "in": ["paid", "sent"] },
+                "steps.a.ok": { "eq": true }
+            } }]
+        }))
+        .expect("an ordinary guard must keep saving");
     }
 
     #[test]
