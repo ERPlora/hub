@@ -72,8 +72,8 @@ pub use errors::{DemoLock, Result, RuntimeError};
 pub use manifest::{Manifest, ManifestWarning, CORE_VERSION};
 pub use module_update::ModuleUpdate;
 pub use registry::{
-    AutomationCtx, EventSink, ModuleSnapshot, ModuleStatus, NavEntry, Principal, Registry,
-    RequestContext,
+    AutomationCtx, EventSink, EventSource, ModuleSnapshot, ModuleStatus, NavEntry, Principal,
+    Registry, RequestContext,
 };
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
@@ -2101,6 +2101,7 @@ impl Runtime {
         payload.insert("command".into(), Json::from(approval.command.clone()));
         events::notify_sink(
             &self.registry,
+            registry::EventSource::Core,
             flows::approvals::EVENT_APPROVAL_CREATED,
             &payload,
         );

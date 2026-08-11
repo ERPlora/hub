@@ -426,9 +426,15 @@ pub(crate) async fn execute_at(
     seal_first_record_if_fiscal(db, ctx, &cmd.def.emit).await;
 
     // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
-    // durable a listeners la hace el relay desde el outbox.
+    // durable a listeners la hace el relay desde el outbox. El emisor viaja con el evento
+    // (hub#529): es lo único que el canal puede creerse para filtrar por módulo.
     for event in &cmd.def.emit {
-        events::notify_sink(registry, event, &bound);
+        events::notify_sink(
+            registry,
+            crate::registry::EventSource::Module(&cmd.module_id),
+            event,
+            &bound,
+        );
     }
 
     // El id que este command acaba de crear, igual que en el camino WASM (§5.3): `system_params`
@@ -939,12 +945,15 @@ async fn persist_handler_output(
     tx_ops.extend_from_slice(extra_ops);
     db.execute_tx(&tx_ops).await?;
 
-    // Notificación al WS (UI en vivo) tras commit; entrega durable a listeners = relay.
+    // Notificación al WS (UI en vivo) tras commit; entrega durable a listeners = relay. Los
+    // eventos del handler salen con el módulo del command (hub#529) — que es también el único
+    // namespace en el que hub#240 les deja llamarse.
+    let source = crate::registry::EventSource::Module(&cmd.module_id);
     for event in &cmd.def.emit {
-        events::notify_sink(registry, event, &declared_payload);
+        events::notify_sink(registry, source, event, &declared_payload);
     }
     for (name, payload) in &handler_events {
-        events::notify_sink(registry, name, payload);
+        events::notify_sink(registry, source, name, payload);
     }
 
     Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))
