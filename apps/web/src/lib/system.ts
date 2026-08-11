@@ -52,17 +52,6 @@ export interface DatabaseInfo {
   connectionsLimit?: number | null;
 }
 
-/** Un documento de almacenamiento (objeto S3 del hub, servido vía el Cloud). */
-export interface StorageDoc {
-  name: string;
-  sizeLabel: string;
-  /** ISO 8601. */
-  modified: string;
-  kind?: string | null;
-  /** URL firmada S3 (vía el Cloud); `null` si no descargable. */
-  url?: string | null;
-}
-
 /** Una línea del registro de eventos del runtime. */
 export interface SystemLogEntry {
   /** ISO 8601 o "HH:MM:SS". */
@@ -86,7 +75,6 @@ export interface SystemInfo {
   storageSource?: 's3' | null;
   /** Capacidad de almacenamiento formateada para la barra (p.ej. "2,1 GB / 8 GB"). */
   storageUsed?: UsageMetric | null;
-  documents?: StorageDoc[];
   logs?: SystemLogEntry[];
 }
 

@@ -231,35 +231,6 @@
         </ion-card>
       </template>
 
-      <!-- ── Tab: Documentos (S3, siempre vía el Cloud) ─────────── -->
-      <template v-else-if="tab === 'documents'">
-        <ion-card class="ion-no-margin">
-          <ion-card-content>
-            <div class="block-header">
-              <h3 class="block-header__title">{{ t('system.documents') }}</h3>
-              <ok-status-pill tone="info">{{ storageSourceLabel }}</ok-status-pill>
-            </div>
-            <ok-empty-state
-              v-if="!documents.length"
-              icon="folder-open-outline"
-              :heading="t('system.noDocuments')"
-              :message="t('system.noDocumentsBucket')"
-            />
-            <ok-data-table
-              v-else
-              ref="docsTable"
-              :columns="docColumns"
-              :rows="documents"
-              :searchKeys="['name', 'kind']"
-              :search-placeholder="t('system.searchDocument')"
-              page-size="12"
-              csv
-              csv-name="documentos"
-            ></ok-data-table>
-          </ion-card-content>
-        </ion-card>
-      </template>
-
       <!-- ── Tab: Registros ─────────────────────────────────────── -->
       <template v-else-if="tab === 'logs'">
         <ion-card class="ion-no-margin">
@@ -369,10 +340,6 @@
             <ion-segment-button value="updates">
               <HubIcon name="refresh-outline" />
               <ion-label>{{ t('system.tabUpdates') }}</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="documents">
-              <HubIcon name="folder-outline" />
-              <ion-label>{{ t('system.tabDocuments') }}</ion-label>
             </ion-segment-button>
             <ion-segment-button value="events">
               <HubIcon name="alert-circle-outline" />
@@ -601,22 +568,11 @@ const connectionsLimitLabel = computed<string>(() =>
     : t('system.connectionsActive')
 );
 
-// Cloud-only (ADR-0154): el almacenamiento SIEMPRE es S3 vía el Cloud.
-const storageSourceLabel = computed<string>(() => t('system.storageS3'));
-
-const documents = computed<Row[]>(() => (info.value?.documents ?? []) as unknown as Row[]);
 const logs = computed(() => info.value?.logs ?? []);
 const logRows = computed<Row[]>(() => logs.value as unknown as Row[]);
 
 // ── Formato ──────────────────────────────────────────────────────
 
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(
-    locale.value === 'en' ? 'en-GB' : 'es-ES',
-    { day: '2-digit', month: 'short', year: 'numeric' },
-  );
-}
 function fmtDateTime(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(
@@ -636,20 +592,6 @@ function levelPill(row: Row): Node {
 }
 
 // ── Columnas de tabla ────────────────────────────────────────────
-
-const docColumns = computed<DataTableColumn[]>(() => [
-  { key: 'name', header: t('system.colName') },
-  { key: 'kind', header: t('system.colType'), filterable: true, filterType: 'select', format: (r) => String(r.kind ?? '—') },
-  { key: 'sizeLabel', header: t('system.colSize'), align: 'right' },
-  { key: 'modified', header: t('system.colModified'), filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.modified)) },
-]);
-// No row action here, on purpose (hub#480). There WAS one — «Download» — and it was greyed out on
-// every row of every hub since the day it was written: `crates/server/src/system.rs` builds each
-// document with a null address, and the action disabled itself whenever that address was missing,
-// which was always. A button that can never be pressed is a promise the API does not carry; this
-// tab lists what the bucket holds and `/files` is where files are handled. If the Cloud ever starts
-// exposing a document address, the action comes back through `saveDownload`, like every other
-// download in the app (hub#498).
 
 const logColumns = computed<DataTableColumn[]>(() => [
   { key: 'when', header: t('system.colTime'), format: (r) => fmtDateTime(String(r.when)) },
@@ -707,14 +649,10 @@ async function refreshHardware(): Promise<void> {
   }
 }
 
-const docsTable = ref<HTMLElement | null>(null);
 const logsTable = ref<HTMLElement | null>(null);
 
 function applyTableLabels(): void {
   const labels = dataTableLabels(locale.value);
-  if (docsTable.value) {
-    (docsTable.value as HTMLElement & { labels: Record<string, string> }).labels = labels;
-  }
   if (logsTable.value) {
     (logsTable.value as HTMLElement & { labels: Record<string, string> }).labels = labels;
   }

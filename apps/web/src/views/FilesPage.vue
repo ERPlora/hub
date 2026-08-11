@@ -57,6 +57,7 @@ import {
   uploadMedia,
   deleteMedia,
   createMediaFolder,
+  moveMedia,
   type MediaFolder,
   type MediaFile,
   renameMedia,
@@ -338,6 +339,22 @@ async function onCreateFolder(e: Event): Promise<void> {
   if (ok) await load(selected);
 }
 
+async function onMove(e: Event): Promise<void> {
+  if (!isAdmin.value) {
+    toast(t('files.permissionDenied'));
+    return;
+  }
+  const { from, to } = (e as CustomEvent<{ from: string; to: string }>).detail;
+  if (from === to) return;
+  const ok = await moveMedia(from, to);
+  toast(ok ? t('files.moveSuccess') : t('files.moveError'));
+  if (!ok) return;
+  // Si movimos la carpeta en la que estamos (o algo dentro de la vista actual), recargamos la
+  // carpeta actual; si movimos la propia carpeta activa a otra parte, subimos a su padre.
+  const movedCurrent = from === selected || from.startsWith(`${selected}/`);
+  await load(movedCurrent ? parentOf(from) : selected);
+}
+
 onMounted(async () => {
   const el = fmEl.value;
   if (el) {
@@ -349,6 +366,7 @@ onMounted(async () => {
     el.addEventListener('ok-delete', onDelete as EventListener);
     el.addEventListener('ok-rename', onRename as EventListener);
     el.addEventListener('ok-create-folder', onCreateFolder as EventListener);
+    el.addEventListener('ok-move', onMove as EventListener);
   }
   await load('');
 });
@@ -364,6 +382,7 @@ onBeforeUnmount(() => {
   el.removeEventListener('ok-delete', onDelete as EventListener);
   el.removeEventListener('ok-rename', onRename as EventListener);
   el.removeEventListener('ok-create-folder', onCreateFolder as EventListener);
+  el.removeEventListener('ok-move', onMove as EventListener);
 });
 </script>
 
