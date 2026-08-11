@@ -993,6 +993,19 @@ export interface FlowInput {
   enabled?: boolean;
 }
 
+/**
+ * What `GET /api/hub/flows/schema` answers (hub#716): the JSON Schema the hub judges a flow
+ * document with, and which core is doing the judging.
+ */
+export interface FlowSchema {
+  /** The document version this core enforces (`1` today). A flow declaring another is refused. */
+  schema_version: number;
+  /** The hub's own version, e.g. `1.2.3` — the reason this is asked instead of bundled. */
+  core_version: string;
+  /** The JSON Schema itself, verbatim from `schemas/flow.schema.json` as that core ships it. */
+  schema: Record<string, unknown>;
+}
+
 /** One page of run history. `next_cursor` comes only when the page was FULL (`§9`). */
 export interface RunPage<T = unknown> {
   data: T[];
@@ -1134,6 +1147,19 @@ export class FlowsApi {
   async deleteSecret(name: string): Promise<unknown> {
     const secret = checkedSegment('secret name', name, SECRET_NAME_PATTERN);
     return this.send({ method: 'DELETE', path: `${FLOWS_BASE_PATH}/secrets/${secret}` });
+  }
+
+  /**
+   * `GET /api/hub/flows/schema` — **the flow contract THIS hub enforces** (hub#716).
+   *
+   * Ask it once, when the editor opens, and build the palette from the answer. The alternative —
+   * bundling `flow.schema.json` — is a photo of whichever core the module was built against, and
+   * a module updates on its own clock (hub#516): ahead of its hub it offers a step the hub
+   * refuses to save, behind it it hides one that works. `core_version` is there so the editor can
+   * say which of the two is happening instead of showing a validation error nobody can act on.
+   */
+  async schema(): Promise<FlowSchema> {
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/schema` }) as Promise<FlowSchema>;
   }
 }
 

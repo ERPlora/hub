@@ -9,6 +9,7 @@
 //! GET             /api/hub/flows/secrets        NOMBRES · PUT/DELETE …/secrets/{name} (write-only)
 //! GET             /api/hub/flows/approvals      la bandeja (hub#665)
 //! POST            /api/hub/flows/approvals/{id}/approve|reject
+//! GET             /api/hub/flows/schema         el contrato que ESTE core aplica (hub#716)
 //! ```
 //!
 //! **Core REST, not `hub.*` commands.** The dispatcher is deliberately not where this goes
@@ -373,6 +374,42 @@ pub struct RunsPage {
     limit: Option<i64>,
     /// The id of the last run of the previous page — "older than this one".
     before: Option<String>,
+}
+
+// ── the contract itself (hub#716) ─────────────────────────────────────────────────────────────
+
+/// `GET /api/hub/flows/schema` — **the flow contract this core enforces**, plus the version that
+/// enforces it.
+///
+/// `schemas/flow.schema.json` shipped with the hub and was reachable by nobody: no route, no npm
+/// package. The visual editor is a module installed from the marketplace and updated on its own
+/// clock (hub#516), so it would have had to carry a copy — a photo of whichever core it was built
+/// against. On a park of hubs running different versions that copy is wrong for somebody by
+/// construction: an editor ahead of its hub offers a step the hub refuses to save, and an editor
+/// behind it hides one that works. Asking the hub is the only answer that survives the park.
+///
+/// The body is [`erplora_runtime::flows::flow_schema`], which is the file EMBEDDED at compile
+/// time — not a copy maintained here, and not a file read from disk next to the binary.
+/// `crates/runtime/tests/flow_schema_matches_the_runtime.rs` already keeps that file honest
+/// against `flows::def`, so serving those exact bytes extends the guarantee to the consumer:
+/// what the editor validates against is what the hub judges with.
+///
+/// **Same door as the rest of §9**, and the document is not the reason. An unauthenticated route
+/// that reports the exact core version is a fingerprint of the hub for anyone who can reach the
+/// origin, and a surface with one exception is a surface nobody remembers the rule of.
+pub async fn get_schema(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let (_arc, _) = admin_session!(st, headers);
+    Json(json!({
+        "ok": true,
+        "data": {
+            // The document version, so an editor can refuse to open something this core cannot run.
+            "schema_version": erplora_runtime::flows::SCHEMA_VERSION,
+            // …and WHICH core answered, which is the whole reason this is asked instead of bundled.
+            "core_version": crate::version::HUB_VERSION,
+            "schema": erplora_runtime::flows::flow_schema(),
+        }
+    }))
+    .into_response()
 }
 
 // ── secrets (hub#662) ─────────────────────────────────────────────────────────────────────────

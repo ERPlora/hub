@@ -33,7 +33,9 @@
 //! - [`triggers`] — event matching in the relay, and the cron/`at` clock;
 //! - [`executor`] — the tick that advances runs, and the claim → I/O → complete seam;
 //! - [`agent`] — the parked `ai` step the server-side agent runner performs (hub#665);
-//! - [`approvals`] — the write a model proposed, waiting for a person (ADR-0283 D3).
+//! - [`approvals`] — the write a model proposed, waiting for a person (ADR-0283 D3);
+//! - [`schema`] — the shipped `flow.schema.json`, embedded so the hub can SERVE its own contract
+//!   to the editor instead of every editor carrying a copy of it (hub#716).
 pub mod agent;
 pub mod approvals;
 pub mod def;
@@ -41,6 +43,7 @@ pub mod executor;
 pub mod grants;
 pub mod http;
 pub mod net;
+pub mod schema;
 pub mod secrets;
 pub mod store;
 pub mod triggers;
@@ -50,6 +53,7 @@ pub use approvals::{Approval, NewApproval};
 pub use def::{AiPolicy, AiStep, Condition, FlowDefinition, StepKind, TriggerKind, SCHEMA_VERSION};
 pub use executor::{tick, IoResult, PendingIo, TickReport};
 pub use http::HttpRequest;
+pub use schema::{flow_schema, FLOW_SCHEMA_JSON};
 pub use store::{Flow, FlowRun, FlowRunStep, NewFlow};
 
 /// Identity of the flow behind an [`crate::commands::Origin::Automation`] call, carried in the

@@ -218,6 +218,9 @@ fn every_flows_route(id: &str) -> Vec<(&'static str, String, Option<Value>)> {
             Some(json!({ "value": "sk-live-42" })),
         ),
         ("DELETE", "/api/hub/flows/secrets/API_KEY".to_string(), None),
+        // hub#716 — the contract the editor builds its UI from. It is served, not shipped in the
+        // module's bundle, so it comes through the same door and under the same gate as the rest.
+        ("GET", "/api/hub/flows/schema".to_string(), None),
     ]
 }
 

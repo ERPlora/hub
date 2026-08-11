@@ -1413,6 +1413,11 @@ pub fn app(state: AppState) -> Router {
             get(flows_api::list_flows).post(flows_api::create_flow),
         )
         .route("/api/hub/flows/runs/:run_id", get(flows_api::get_run))
+        // `schema` is a static segment too (hub#716): the contract the editor builds its UI from,
+        // served by the hub instead of copied into every module's bundle. It goes here for the
+        // same reason as `runs` — matchit resolves the static segment ahead of `:id`, and
+        // `tests/flows_schema_route.rs` checks it against the real router.
+        .route("/api/hub/flows/schema", get(flows_api::get_schema))
         // `secrets` es igual: segmento estático, gana al `:id` (hub#662). El GET devuelve NOMBRES —
         // no hay endpoint que devuelva un secreto, y esa ausencia es el diseño (ADR-0283 §4).
         .route("/api/hub/flows/secrets", get(flows_api::list_secrets))
