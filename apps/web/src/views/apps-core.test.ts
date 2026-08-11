@@ -135,6 +135,16 @@ describe('Apps · what an installed app card offers', () => {
     expect(source).toContain('apps.emptyInstalled');
   });
 
+  // hub#781 — the names in «My apps» are localized BY THE RUNTIME and travel baked into the answer
+  // (`/api/modules?locale=`, ADR-0055). On a language change this screen reloaded the CATALOGUE and
+  // left the installed list behind, stuck in the language of the first request.
+  it('reloads the installed apps too when the language changes, not only the catalogue', () => {
+    const fn = source.slice(source.indexOf('watch(locale, () => {'), source.length);
+    const body = fn.slice(0, fn.indexOf('});'));
+    expect(body).toContain('loadCatalog()');
+    expect(body).toContain('loadInstalled()');
+  });
+
   it('names the apps that uninstalling would break, before uninstalling', () => {
     const fn = source.slice(
       source.indexOf('async function removeModule'),

@@ -1063,6 +1063,11 @@ watch(locale, () => {
   // La preferencia personal se hidrata después del shell. Recargamos con `Accept-Language`
   // efectivo para no mezclar cabeceras traducidas con metadatos del catálogo en otro idioma.
   void loadCatalog();
+  // Y los INSTALADOS (hub#781). Sus nombres los traduce el runtime y viajan horneados en la
+  // respuesta (`/api/modules?locale=`, ADR-0055): sin volver a pedirlos, «Mis apps» se quedaba con
+  // los de la primera petición — el chrome en inglés y las apps en `Clientes`, `Impuestos`,
+  // `Inventario`, que es el idioma con el que arrancó el shell antes de que llegase el perfil.
+  void loadInstalled();
 });
 
 // --- Fetch + suscripción al evento de instalación al montar ---
