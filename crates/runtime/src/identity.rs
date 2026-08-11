@@ -27,14 +27,36 @@ pub const DEFAULT_SESSION_TTL_SECS: i64 = 60 * 60 * 24 * 30;
 /// hub»; este dice «el hub te cerró la puerta», y solo el hub la reabre.
 pub const DEACTIVATED_ERROR_CODE: &str = "user_deactivated";
 
+/// The baseline (v0) schema of the identity tables.
+///
+/// **`hub_id` is `NOT NULL` with no default** (hub#497). Both tables were the last system tables
+/// without a tenant while every other one — `hub_settings`, `hub_api_key`, `hub_module`,
+/// `hub_user_profile`, and since hub#489 `hub_trusted_device` — is keyed on `(hub_id, …)`. The
+/// *profile* of a person was per hub; the person was not, and a session was not either, so in a
+/// shared database a token of one hub authenticated against another.
+///
+/// No default on purpose: a default would let an `INSERT` that forgot the column succeed and write
+/// an unattributable row, and on an authentication table that row is somebody who can sign in
+/// nowhere or — worse, if the empty string ever became a hub id — everywhere. Without it the
+/// statement fails, loudly, at the first test that runs it.
+///
+/// The primary keys are **not** recomposed to `(hub_id, …)`, and that is a decision rather than an
+/// omission: `hub_user.id` is a UUID and `hub_session.token` is 32 random bytes, so neither can
+/// collide across hubs — a composite key would buy no uniqueness and would break every reference
+/// that already travels by id alone (`hub_user_profile(hub_id, user_id)`, the `hub_user:<id>` of
+/// every audit column, exported bundles, sessions already issued). What was missing was never a
+/// key; it was a `WHERE`.
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS hub_user (\
-  id TEXT PRIMARY KEY, name TEXT NOT NULL, pin_hash TEXT NOT NULL DEFAULT '', \
+  id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL, pin_hash TEXT NOT NULL DEFAULT '', \
   role TEXT NOT NULL DEFAULT '', cloud_user_id TEXT, is_active INTEGER NOT NULL DEFAULT 1, \
   created_at TEXT NOT NULL);\
 CREATE TABLE IF NOT EXISTS hub_session (\
-  token TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);\
-CREATE INDEX IF NOT EXISTS ix_hub_user_cloud ON hub_user (cloud_user_id);";
+  token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, user_id TEXT NOT NULL, created_at TEXT NOT NULL, \
+  expires_at TEXT NOT NULL);\
+CREATE INDEX IF NOT EXISTS ix_hub_user_cloud ON hub_user (cloud_user_id);\
+CREATE INDEX IF NOT EXISTS ix_hub_user_hub ON hub_user (hub_id, name);\
+CREATE INDEX IF NOT EXISTS ix_hub_session_hub ON hub_session (hub_id);";
 
 /// Crea las tablas de identidad (idempotente).
 pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
@@ -152,6 +174,7 @@ fn hex_lower(bytes: &[u8]) -> String {
 /// Crea un usuario local. `pin` vacío = usuario sin PIN (login por otro método). Devuelve su id.
 pub async fn create_user(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     name: &str,
     pin: &str,
     role: &str,
@@ -165,14 +188,15 @@ pub async fn create_user(
     };
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("name".into(), json!(name));
     p.insert("pin_hash".into(), json!(pin_hash));
     p.insert("role".into(), json!(role));
     p.insert("cloud_user_id".into(), json!(cloud_user_id));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
-        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-          VALUES (:id, :name, :pin_hash, :role, :cloud_user_id, 1, :now)",
+        "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+          VALUES (:id, :hub_id, :name, :pin_hash, :role, :cloud_user_id, 1, :now)",
         &p,
     )
     .await?;
@@ -183,18 +207,20 @@ pub async fn create_user(
 /// cabeceras y puede traer un id demo ya persistido. No cambia una identidad existente.
 pub async fn ensure_dev_user(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     id: &str,
     name: &str,
     role: &str,
 ) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("name".into(), json!(name));
     p.insert("role".into(), json!(role));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
-        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-         VALUES (:id, :name, '', :role, NULL, 1, :now) \
+        "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+         VALUES (:id, :hub_id, :name, '', :role, NULL, 1, :now) \
          ON CONFLICT (id) DO NOTHING",
         &p,
     )
@@ -205,7 +231,12 @@ pub async fn ensure_dev_user(
 /// Fija (o cambia) el PIN de un usuario **existente** por id. Lo usa el alta de PIN tras el primer
 /// login cloud (§2.9): el usuario ya está provisionado (sin PIN) y elige su PIN en el dispositivo de
 /// confianza. `pin` vacío borra el PIN (deja el usuario no autenticable por PIN). Idempotente.
-pub async fn set_pin(db: &dyn DatabaseAdapter, user_id: &str, pin: &str) -> Result<()> {
+pub async fn set_pin(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    user_id: &str,
+    pin: &str,
+) -> Result<()> {
     // Siempre escribe argon2id (string PHC); `pin` vacío deja el hash vacío (no autenticable).
     let pin_hash = if pin.is_empty() {
         String::new()
@@ -214,9 +245,10 @@ pub async fn set_pin(db: &dyn DatabaseAdapter, user_id: &str, pin: &str) -> Resu
     };
     let mut p = Params::new();
     p.insert("id".into(), json!(user_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("pin_hash".into(), json!(pin_hash));
     db.execute(
-        "UPDATE hub_user SET pin_hash = :pin_hash WHERE id = :id",
+        "UPDATE hub_user SET pin_hash = :pin_hash WHERE id = :id AND hub_id = :hub_id",
         &p,
     )
     .await?;
@@ -236,15 +268,17 @@ fn row_to_user(row: &serde_json::Value) -> HubUser {
 /// Verifica el PIN de un usuario activo por **nombre**. `Some(user)` si el PIN encaja.
 pub async fn verify_pin(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     name: &str,
     pin: &str,
 ) -> Result<Option<HubUser>> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("name".into(), json!(name));
     let res = db
         .query(
             "SELECT id, name, role, cloud_user_id, is_active, pin_hash FROM hub_user \
-              WHERE name = :name AND is_active = 1",
+              WHERE hub_id = :hub_id AND name = :name AND is_active = 1",
             &p,
         )
         .await?;
@@ -259,13 +293,18 @@ pub async fn verify_pin(
 /// Lista los usuarios **activos con PIN** del hub `(id, name, role)`, ordenados por nombre. Lo usa
 /// `GET /api/hub/context` para que el shell muestre el grid de PIN directamente (sin depender de un
 /// flag en localStorage). Solo usuarios con `pin_hash` no vacío (los que pueden hacer login local).
-pub async fn list_pin_users(db: &dyn DatabaseAdapter) -> Result<Vec<(String, String, String)>> {
+pub async fn list_pin_users(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Vec<(String, String, String)>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
             "SELECT id, name, role FROM hub_user \
-              WHERE is_active = 1 AND pin_hash IS NOT NULL AND pin_hash != '' \
+              WHERE hub_id = :hub_id AND is_active = 1 AND pin_hash IS NOT NULL AND pin_hash != '' \
               ORDER BY name",
-            &Params::new(),
+            &p,
         )
         .await?;
     Ok(res
@@ -296,17 +335,20 @@ pub async fn list_pin_users(db: &dyn DatabaseAdapter) -> Result<Vec<(String, Str
 /// alternative would burn PINs forever and leak that a given PIN once belonged to somebody.
 pub async fn pin_is_taken(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     pin: &str,
     excluding_id: Option<&str>,
 ) -> Result<bool> {
     if pin.is_empty() {
         return Ok(false); // no PIN, no collision.
     }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
             "SELECT id, pin_hash FROM hub_user \
-              WHERE is_active = 1 AND pin_hash IS NOT NULL AND pin_hash != ''",
-            &Params::new(),
+              WHERE hub_id = :hub_id AND is_active = 1 AND pin_hash IS NOT NULL AND pin_hash != ''",
+            &p,
         )
         .await?;
     for row in &res.rows {
@@ -333,11 +375,15 @@ pub async fn pin_is_taken(
 /// Case-insensitive because the pinpad is: `marta ruiz` and `Marta Ruiz` are two rows the cashier
 /// cannot tell apart on the login grid, and "which of the two Martas is this?" is exactly the
 /// question a PIN exists to answer.
-pub async fn name_is_known(db: &dyn DatabaseAdapter, name: &str) -> Result<bool> {
+pub async fn name_is_known(db: &dyn DatabaseAdapter, hub_id: &str, name: &str) -> Result<bool> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("name".into(), json!(name.trim().to_lowercase()));
     let res = db
-        .query("SELECT id FROM hub_user WHERE LOWER(name) = :name", &p)
+        .query(
+            "SELECT id FROM hub_user WHERE hub_id = :hub_id AND LOWER(name) = :name",
+            &p,
+        )
         .await?;
     Ok(!res.rows.is_empty())
 }
@@ -355,6 +401,7 @@ pub async fn name_is_known(db: &dyn DatabaseAdapter, name: &str) -> Result<bool>
 /// fresh membership. Reopening the door is [`crate::hub_users::update`] — explicit and audited.
 pub async fn email_is_known(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     email: &str,
     excluding_id: Option<&str>,
 ) -> Result<bool> {
@@ -363,11 +410,13 @@ pub async fn email_is_known(
         return Ok(false);
     }
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("email".into(), json!(email));
     p.insert("id".into(), json!(excluding_id.unwrap_or_default()));
     let res = db
         .query(
-            "SELECT id FROM hub_user WHERE LOWER(email) = :email AND id != :id",
+            "SELECT id FROM hub_user \
+              WHERE hub_id = :hub_id AND LOWER(email) = :email AND id != :id",
             &p,
         )
         .await?;
@@ -383,11 +432,20 @@ pub async fn email_is_known(
 /// person's profile shows — so writing only that one (what the Personal alta used to do) produced a
 /// row the login could not find: it fell through to provisioning a SECOND identity with the
 /// least-privilege role, losing the role the administrator had granted.
-pub async fn set_email(db: &dyn DatabaseAdapter, user_id: &str, email: &str) -> Result<()> {
+pub async fn set_email(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    user_id: &str,
+    email: &str,
+) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(user_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("email".into(), json!(email.trim()));
-    db.execute("UPDATE hub_user SET email = :email WHERE id = :id", &p)
+    db.execute(
+        "UPDATE hub_user SET email = :email WHERE id = :id AND hub_id = :hub_id",
+        &p,
+    )
         .await?;
     Ok(())
 }
@@ -422,15 +480,19 @@ fn name_from_email(email: &str) -> String {
 /// un rol/estado existente). Devuelve `true` si sembró una fila nueva, `false` si ya existía.
 /// Sustituye al bootstrap «primer login = owner» (retirado): el owner ya no depende de quién entre
 /// primero, sino de quién creó el hub.
-pub async fn seed_owner(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
+pub async fn seed_owner(db: &dyn DatabaseAdapter, hub_id: &str, email: &str) -> Result<bool> {
     let email = email.trim();
     if email.is_empty() {
         return Ok(false);
     }
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("email".into(), json!(email));
     let existing = db
-        .query("SELECT id FROM hub_user WHERE email = :email", &p)
+        .query(
+            "SELECT id FROM hub_user WHERE hub_id = :hub_id AND email = :email",
+            &p,
+        )
         .await?;
     if !existing.rows.is_empty() {
         return Ok(false); // ya sembrado: idempotente, no cambia nada.
@@ -438,13 +500,14 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
     let id = new_id();
     let mut ins = Params::new();
     ins.insert("id".into(), json!(id));
+    ins.insert("hub_id".into(), json!(hub_id));
     ins.insert("name".into(), json!(name_from_email(email)));
     ins.insert("email".into(), json!(email));
     ins.insert("role".into(), json!(crate::hub_users::ADMIN_ROLE));
     ins.insert("now".into(), json!(now_rfc3339()));
     db.execute(
-        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-          VALUES (:id, :name, '', :role, NULL, 1, :now, :email)",
+        "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+          VALUES (:id, :hub_id, :name, '', :role, NULL, 1, :now, :email)",
         &ins,
     )
     .await?;
@@ -470,6 +533,7 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
 ///    sale de `HUB_OWNER_EMAIL`, no de un token).
 async fn raise_role_to_floor(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     user: HubUser,
     floor: Option<&str>,
 ) -> Result<HubUser> {
@@ -487,8 +551,12 @@ async fn raise_role_to_floor(
     };
     let mut p = Params::new();
     p.insert("id".into(), json!(user.id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("role".into(), json!(floor));
-    db.execute("UPDATE hub_user SET role = :role WHERE id = :id", &p)
+    db.execute(
+        "UPDATE hub_user SET role = :role WHERE id = :id AND hub_id = :hub_id",
+        &p,
+    )
         .await?;
     Ok(HubUser {
         role: floor.to_string(),
@@ -513,25 +581,30 @@ async fn raise_role_to_floor(
 /// confianza. Idempotente: solo toca filas activas. Devuelve cuántas cerró.
 pub async fn revoke_cloud_access(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     cloud_user_id: &str,
     email: Option<&str>,
 ) -> Result<usize> {
     let mut ids: Vec<String> = Vec::new();
     let mut by_cloud_id = Params::new();
+    by_cloud_id.insert("hub_id".into(), json!(hub_id));
     by_cloud_id.insert("cuid".into(), json!(cloud_user_id));
     let linked = db
         .query(
-            "SELECT id FROM hub_user WHERE cloud_user_id = :cuid AND is_active = 1",
+            "SELECT id FROM hub_user \
+              WHERE hub_id = :hub_id AND cloud_user_id = :cuid AND is_active = 1",
             &by_cloud_id,
         )
         .await?;
     push_ids(&linked, &mut ids);
     if let Some(email) = email.map(str::trim).filter(|s| !s.is_empty()) {
         let mut by_email = Params::new();
+        by_email.insert("hub_id".into(), json!(hub_id));
         by_email.insert("email".into(), json!(email));
         let invited = db
             .query(
-                "SELECT id FROM hub_user WHERE email = :email AND is_active = 1",
+                "SELECT id FROM hub_user \
+                  WHERE hub_id = :hub_id AND email = :email AND is_active = 1",
                 &by_email,
             )
             .await?;
@@ -541,14 +614,19 @@ pub async fn revoke_cloud_access(
     for id in &ids {
         let mut p = Params::new();
         p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub_id));
         p.insert("now".into(), json!(now));
         db.execute(
-            "UPDATE hub_user SET is_active = 0, cloud_revoked_at = :now WHERE id = :id",
+            "UPDATE hub_user SET is_active = 0, cloud_revoked_at = :now \
+              WHERE id = :id AND hub_id = :hub_id",
             &p,
         )
         .await?;
-        db.execute("DELETE FROM hub_session WHERE user_id = :id", &p)
-            .await?;
+        db.execute(
+            "DELETE FROM hub_session WHERE user_id = :id AND hub_id = :hub_id",
+            &p,
+        )
+        .await?;
     }
     Ok(ids.len())
 }
@@ -579,6 +657,7 @@ fn push_ids(res: &erplora_db::QueryResult, out: &mut Vec<String>) {
 ///    rechaza con [`DEACTIVATED_ERROR_CODE`] **sin** provisionar nada.
 async fn reinstate_or_reject(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     user: HubUser,
     revoked_by_cloud: bool,
     default_role: &str,
@@ -592,9 +671,11 @@ async fn reinstate_or_reject(
     }
     let mut p = Params::new();
     p.insert("id".into(), json!(user.id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("role".into(), json!(default_role));
     db.execute(
-        "UPDATE hub_user SET is_active = 1, cloud_revoked_at = '', role = :role WHERE id = :id",
+        "UPDATE hub_user SET is_active = 1, cloud_revoked_at = '', role = :role \
+          WHERE id = :id AND hub_id = :hub_id",
         &p,
     )
     .await?;
@@ -640,6 +721,7 @@ fn was_revoked_by_cloud(row: &serde_json::Value) -> bool {
 /// membresía ha vuelto) o se rechaza (la cerró el hub).
 pub async fn get_or_link_cloud_user(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     cloud_user_id: &str,
     default_name: &str,
     default_role: &str,
@@ -648,11 +730,12 @@ pub async fn get_or_link_cloud_user(
 ) -> Result<HubUser> {
     // 1) Por cloud_user_id (ya enlazado), activa o no.
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("cuid".into(), json!(cloud_user_id));
     let res = db
         .query(
             "SELECT id, name, role, cloud_user_id, is_active, cloud_revoked_at FROM hub_user \
-              WHERE cloud_user_id = :cuid",
+              WHERE hub_id = :hub_id AND cloud_user_id = :cuid",
             &p,
         )
         .await?;
@@ -661,18 +744,19 @@ pub async fn get_or_link_cloud_user(
         let user = if user.is_active {
             user
         } else {
-            reinstate_or_reject(db, user, was_revoked_by_cloud(row), default_role).await?
+            reinstate_or_reject(db, hub_id, user, was_revoked_by_cloud(row), default_role).await?
         };
-        return raise_role_to_floor(db, user, role_floor).await;
+        return raise_role_to_floor(db, hub_id, user, role_floor).await;
     }
     // 2) Por email: fila pre-provisionada (owner sembrado / invitado) sin cloud_user_id → enlazar.
     if let Some(email) = email.map(str::trim).filter(|s| !s.is_empty()) {
         let mut pe = Params::new();
+        pe.insert("hub_id".into(), json!(hub_id));
         pe.insert("email".into(), json!(email));
         let by_email = db
             .query(
                 "SELECT id, name, role, cloud_user_id, is_active, cloud_revoked_at FROM hub_user \
-                  WHERE email = :email AND cloud_user_id IS NULL",
+                  WHERE hub_id = :hub_id AND email = :email AND cloud_user_id IS NULL",
                 &pe,
             )
             .await?;
@@ -683,13 +767,15 @@ pub async fn get_or_link_cloud_user(
             let user = if user.is_active {
                 user
             } else {
-                reinstate_or_reject(db, user, was_revoked_by_cloud(row), default_role).await?
+                reinstate_or_reject(db, hub_id, user, was_revoked_by_cloud(row), default_role)
+                    .await?
             };
             let mut up = Params::new();
             up.insert("id".into(), json!(user.id));
+            up.insert("hub_id".into(), json!(hub_id));
             up.insert("cuid".into(), json!(cloud_user_id));
             db.execute(
-                "UPDATE hub_user SET cloud_user_id = :cuid WHERE id = :id",
+                "UPDATE hub_user SET cloud_user_id = :cuid WHERE id = :id AND hub_id = :hub_id",
                 &up,
             )
             .await?;
@@ -697,7 +783,7 @@ pub async fn get_or_link_cloud_user(
                 cloud_user_id: Some(cloud_user_id.to_string()),
                 ..user
             };
-            return raise_role_to_floor(db, linked, role_floor).await;
+            return raise_role_to_floor(db, hub_id, linked, role_floor).await;
         }
     }
     // 3) Provisiona una fila nueva (rol de mínimo privilegio) con su email si vino. El suelo se
@@ -706,7 +792,7 @@ pub async fn get_or_link_cloud_user(
     //    mismo rol de cuenta, así que en la práctica es un no-op; lo que evita es que un llamador
     //    futuro pase un suelo y se olvide del rol por defecto y la fila nueva nazca por debajo.
     let email = email.map(str::trim).unwrap_or("");
-    let id = create_login_user_row(db, &new_id(), default_name, "", default_role, Some(cloud_user_id), email).await?;
+    let id = create_login_user_row(db, hub_id, &new_id(), default_name, "", default_role, Some(cloud_user_id), email).await?;
     let created = HubUser {
         id,
         name: default_name.to_string(),
@@ -714,13 +800,14 @@ pub async fn get_or_link_cloud_user(
         cloud_user_id: Some(cloud_user_id.to_string()),
         is_active: true,
     };
-    raise_role_to_floor(db, created, role_floor).await
+    raise_role_to_floor(db, hub_id, created, role_floor).await
 }
 
 /// INSERT de bajo nivel de un `hub_user` con `email` explícito (lo comparten el provisioning por
 /// email y el enlace-o-crea del login). No comprueba duplicados (los llamadores lo hacen).
 async fn create_login_user_row(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     id: &str,
     name: &str,
     pin: &str,
@@ -735,6 +822,7 @@ async fn create_login_user_row(
     };
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("name".into(), json!(name));
     p.insert("pin_hash".into(), json!(pin_hash));
     p.insert("role".into(), json!(role));
@@ -742,8 +830,8 @@ async fn create_login_user_row(
     p.insert("email".into(), json!(email));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
-        "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-          VALUES (:id, :name, :pin_hash, :role, :cloud_user_id, 1, :now, :email)",
+        "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+          VALUES (:id, :hub_id, :name, :pin_hash, :role, :cloud_user_id, 1, :now, :email)",
         &p,
     )
     .await?;
@@ -757,6 +845,7 @@ async fn create_login_user_row(
 /// Devuelve el `hub_user` resultante. La notificación al SaaS (`members_add`) la hace el server.
 pub async fn create_login_user(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     email: &str,
     role: &str,
 ) -> Result<HubUser> {
@@ -766,10 +855,12 @@ pub async fn create_login_user(
     // una sin ella sería guardar el candado y dejar la ventana abierta.
     crate::hub_users::ensure_account_role_is_grantable(role)?;
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("email".into(), json!(email));
     let existing = db
         .query(
-            "SELECT id, name, role, cloud_user_id, is_active FROM hub_user WHERE email = :email",
+            "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
+              WHERE hub_id = :hub_id AND email = :email",
             &p,
         )
         .await?;
@@ -777,12 +868,14 @@ pub async fn create_login_user(
         let user = row_to_user(row);
         let mut up = Params::new();
         up.insert("id".into(), json!(user.id));
+        up.insert("hub_id".into(), json!(hub_id));
         up.insert("role".into(), json!(role));
         // `cloud_revoked_at = ''`: reactivar cierra el episodio de la regla D (hub#348). Si no se
         // limpiase, una baja POSTERIOR del admin heredaría la marca del cloud y un login podría
         // reabrirla — el hub dejaría de ser dueño de su propia baja.
         db.execute(
-            "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' WHERE id = :id",
+            "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' \
+              WHERE id = :id AND hub_id = :hub_id",
             &up,
         )
         .await?;
@@ -793,7 +886,7 @@ pub async fn create_login_user(
         });
     }
     let id = new_id();
-    create_login_user_row(db, &id, &name_from_email(email), "", role, None, email).await?;
+    create_login_user_row(db, hub_id, &id, &name_from_email(email), "", role, None, email).await?;
     Ok(HubUser {
         id,
         name: name_from_email(email),
@@ -813,14 +906,19 @@ pub async fn create_login_user(
 /// Escribe `cloud_revoked_at = ''` a propósito: **esta baja es del hub**, no del SaaS, así que
 /// ningún login la reabre (paso 2b regla D, hub#348 — ver [`reinstate_or_reject`]). Solo el hub la
 /// levanta, con el alta/re-invitación ([`create_login_user`]).
-pub async fn deactivate_login_user(db: &dyn DatabaseAdapter, email: &str) -> Result<bool> {
+pub async fn deactivate_login_user(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    email: &str,
+) -> Result<bool> {
     let email = email.trim();
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("email".into(), json!(email));
     let res = db
         .execute(
             "UPDATE hub_user SET is_active = 0, cloud_revoked_at = '' \
-              WHERE email = :email AND is_active = 1",
+              WHERE hub_id = :hub_id AND email = :email AND is_active = 1",
             &p,
         )
         .await?;
@@ -828,8 +926,8 @@ pub async fn deactivate_login_user(db: &dyn DatabaseAdapter, email: &str) -> Res
         return Ok(false);
     }
     db.execute(
-        "DELETE FROM hub_session WHERE user_id IN \
-          (SELECT id FROM hub_user WHERE email = :email)",
+        "DELETE FROM hub_session WHERE hub_id = :hub_id AND user_id IN \
+          (SELECT id FROM hub_user WHERE hub_id = :hub_id AND email = :email)",
         &p,
     )
     .await?;
@@ -839,12 +937,14 @@ pub async fn deactivate_login_user(db: &dyn DatabaseAdapter, email: &str) -> Res
 /// Lista los **usuarios-login** del hub (los `hub_user` con email = cuenta cloud) para el panel
 /// admin. Incluye los desactivados (`is_active = 0`) para que el admin los vea y pueda re-activar.
 /// Ordenados por email.
-pub async fn list_login_users(db: &dyn DatabaseAdapter) -> Result<Vec<LoginUser>> {
+pub async fn list_login_users(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<LoginUser>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
             "SELECT id, email, name, role, is_active FROM hub_user \
-              WHERE email IS NOT NULL AND email != '' ORDER BY email",
-            &Params::new(),
+              WHERE hub_id = :hub_id AND email IS NOT NULL AND email != '' ORDER BY email",
+            &p,
         )
         .await?;
     Ok(res
@@ -870,6 +970,7 @@ pub async fn list_login_users(db: &dyn DatabaseAdapter) -> Result<Vec<LoginUser>
 /// paso aparte que el server ejecuta ANTES según el plan.
 pub async fn create_session(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     user_id: &str,
     ttl_secs: i64,
     device_id: Option<&str>,
@@ -878,13 +979,14 @@ pub async fn create_session(
     let expires = (chrono::Utc::now() + chrono::Duration::seconds(ttl_secs)).to_rfc3339();
     let mut p = Params::new();
     p.insert("token".into(), json!(token));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("user_id".into(), json!(user_id));
     p.insert("now".into(), json!(now_rfc3339()));
     p.insert("expires".into(), json!(expires));
     p.insert("device_id".into(), json!(device_id));
     db.execute(
-        "INSERT INTO hub_session (token, user_id, created_at, expires_at, device_id) \
-          VALUES (:token, :user_id, :now, :expires, :device_id)",
+        "INSERT INTO hub_session (token, hub_id, user_id, created_at, expires_at, device_id) \
+          VALUES (:token, :hub_id, :user_id, :now, :expires, :device_id)",
         &p,
     )
     .await?;
@@ -905,8 +1007,12 @@ pub async fn create_session(
 ///
 /// El borrado es *hub-wide* sobre `hub_session` a propósito: `max_devices` es un límite del plan,
 /// no del usuario, así que el segundo dispositivo desaloja al primero sea quien sea el operario.
+/// **Hub-wide, no database-wide** (hub#497): sin el `hub_id` este `DELETE` barría también las
+/// sesiones de los demás hubs de la base — abrir la caja aquí firmaba la salida del negocio de al
+/// lado, y ni su personal ni el nuestro tenían forma de saber por qué.
 pub async fn enforce_device_limit(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     max_devices: u32,
     device_id: Option<&str>,
 ) -> Result<()> {
@@ -915,11 +1021,13 @@ pub async fn enforce_device_limit(
         return Ok(());
     };
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     // `!=` no casa NULL en SQL (NULL != 'x' es NULL, no TRUE): expandimos a «NULL o distinto» para
     // desalojar también las sesiones sin device_id. Portable SQLite/Postgres (sin `IS DISTINCT FROM`).
     db.execute(
-        "DELETE FROM hub_session WHERE device_id IS NULL OR device_id != :device_id",
+        "DELETE FROM hub_session \
+          WHERE hub_id = :hub_id AND (device_id IS NULL OR device_id != :device_id)",
         &p,
     )
     .await?;
@@ -927,15 +1035,27 @@ pub async fn enforce_device_limit(
 }
 
 /// Resuelve una sesión válida (no caducada) a su `hub_user` activo. `None` si no existe/caducó.
-pub async fn resolve_session(db: &dyn DatabaseAdapter, token: &str) -> Result<Option<HubUser>> {
+///
+/// **The door** (hub#497). A session token is a bearer credential: whoever holds it is signed in as
+/// whoever it names. Matched by `token` alone — as this did until now — a token minted by another
+/// hub of the same database resolved here, with the role its holder has *there*. That is not
+/// "seeing too much", it is getting in, and it is why both sides of the join are scoped: the
+/// session row must be this hub's **and** so must the person it names.
+pub async fn resolve_session(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    token: &str,
+) -> Result<Option<HubUser>> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("token".into(), json!(token));
     p.insert("now".into(), json!(now_rfc3339()));
     let res = db
         .query(
             "SELECT u.id, u.name, u.role, u.cloud_user_id, u.is_active \
-              FROM hub_session s JOIN hub_user u ON u.id = s.user_id \
-              WHERE s.token = :token AND s.expires_at > :now AND u.is_active = 1",
+              FROM hub_session s JOIN hub_user u ON u.id = s.user_id AND u.hub_id = s.hub_id \
+              WHERE s.hub_id = :hub_id AND s.token = :token \
+                AND s.expires_at > :now AND u.is_active = 1",
             &p,
         )
         .await?;
@@ -943,10 +1063,14 @@ pub async fn resolve_session(db: &dyn DatabaseAdapter, token: &str) -> Result<Op
 }
 
 /// Cierra una sesión (logout).
-pub async fn delete_session(db: &dyn DatabaseAdapter, token: &str) -> Result<()> {
+pub async fn delete_session(db: &dyn DatabaseAdapter, hub_id: &str, token: &str) -> Result<()> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("token".into(), json!(token));
-    db.execute("DELETE FROM hub_session WHERE token = :token", &p)
+    db.execute(
+        "DELETE FROM hub_session WHERE hub_id = :hub_id AND token = :token",
+        &p,
+    )
         .await?;
     Ok(())
 }
@@ -1134,6 +1258,10 @@ pub fn session_permissions(registry: &Registry, role: &str) -> HashSet<String> {
 mod tests {
     use super::*;
     use erplora_db::{testutil::fresh_db, PgAdapter};
+
+    /// The hub these unit tests are the identity of (hub#497). Every scoped call passes it, so a
+    /// statement that lost its `hub_id` fails here rather than silently reading the whole table.
+    const HUB: &str = "hub-identity";
 
     /// Prepara la identidad para los unit tests. La columna `hub_session.device_id` la añade la
     /// **migración de sistema v8** (ADR-0154); en los unit tests de identidad la creamos a mano
@@ -1332,25 +1460,25 @@ mod tests {
         let db = fresh_db().await;
         setup_identity(&db).await;
 
-        let uid = create_user(&db, "María", "1234", "manager", None)
+        let uid = create_user(&db, HUB, "María", "1234", "manager", None)
             .await
             .unwrap();
 
         // PIN correcto resuelve al usuario; PIN incorrecto no.
-        let ok = verify_pin(&db, "María", "1234").await.unwrap();
+        let ok = verify_pin(&db, HUB, "María", "1234").await.unwrap();
         assert_eq!(ok.as_ref().map(|u| u.id.clone()), Some(uid.clone()));
         assert_eq!(ok.unwrap().role, "manager");
-        assert!(verify_pin(&db, "María", "0000").await.unwrap().is_none());
+        assert!(verify_pin(&db, HUB, "María", "0000").await.unwrap().is_none());
 
         // Sesión: crear → resolver → logout.
-        let token = create_session(&db, &uid, 3600, None).await.unwrap();
-        assert_eq!(resolve_session(&db, &token).await.unwrap().unwrap().id, uid);
-        delete_session(&db, &token).await.unwrap();
-        assert!(resolve_session(&db, &token).await.unwrap().is_none());
+        let token = create_session(&db, HUB, &uid, 3600, None).await.unwrap();
+        assert_eq!(resolve_session(&db, HUB, &token).await.unwrap().unwrap().id, uid);
+        delete_session(&db, HUB, &token).await.unwrap();
+        assert!(resolve_session(&db, HUB, &token).await.unwrap().is_none());
 
         // Sesión caducada no resuelve.
-        let expired = create_session(&db, &uid, -10, None).await.unwrap();
-        assert!(resolve_session(&db, &expired).await.unwrap().is_none());
+        let expired = create_session(&db, HUB, &uid, -10, None).await.unwrap();
+        assert!(resolve_session(&db, HUB, &expired).await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -1359,17 +1487,17 @@ mod tests {
         // NULL cuando el login no lo aporta (None).
         let db = fresh_db().await;
         setup_identity(&db).await;
-        let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None).await.unwrap();
 
-        let with_dev = create_session(&db, &uid, 3600, Some("dev-A")).await.unwrap();
+        let with_dev = create_session(&db, HUB, &uid, 3600, Some("dev-A")).await.unwrap();
         assert_eq!(session_device_id(&db, &with_dev).await.as_deref(), Some("dev-A"));
 
-        let without = create_session(&db, &uid, 3600, None).await.unwrap();
+        let without = create_session(&db, HUB, &uid, 3600, None).await.unwrap();
         assert_eq!(session_device_id(&db, &without).await, None);
 
         // Ambas resuelven al usuario (el device_id no cambia la resolución de la sesión).
-        assert_eq!(resolve_session(&db, &with_dev).await.unwrap().unwrap().id, uid);
-        assert_eq!(resolve_session(&db, &without).await.unwrap().unwrap().id, uid);
+        assert_eq!(resolve_session(&db, HUB, &with_dev).await.unwrap().unwrap().id, uid);
+        assert_eq!(resolve_session(&db, HUB, &without).await.unwrap().unwrap().id, uid);
     }
 
     #[tokio::test]
@@ -1379,22 +1507,22 @@ mod tests {
         // logins que no aportaron device_id—; las del MISMO dispositivo sobreviven.
         let db = fresh_db().await;
         setup_identity(&db).await;
-        let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None).await.unwrap();
 
-        let tok_a = create_session(&db, &uid, 3600, Some("dev-A")).await.unwrap();
-        let tok_null = create_session(&db, &uid, 3600, None).await.unwrap();
-        let tok_a2 = create_session(&db, &uid, 3600, Some("dev-A")).await.unwrap();
+        let tok_a = create_session(&db, HUB, &uid, 3600, Some("dev-A")).await.unwrap();
+        let tok_null = create_session(&db, HUB, &uid, 3600, None).await.unwrap();
+        let tok_a2 = create_session(&db, HUB, &uid, 3600, Some("dev-A")).await.unwrap();
 
         // Llega un login del dispositivo B: desaloja A y la sesión sin device_id, no la de B aún.
-        enforce_device_limit(&db, 1, Some("dev-B")).await.unwrap();
-        assert!(resolve_session(&db, &tok_a).await.unwrap().is_none(), "A desalojado");
-        assert!(resolve_session(&db, &tok_null).await.unwrap().is_none(), "NULL desalojado");
-        assert!(resolve_session(&db, &tok_a2).await.unwrap().is_none(), "otra de A desalojada");
+        enforce_device_limit(&db, HUB, 1, Some("dev-B")).await.unwrap();
+        assert!(resolve_session(&db, HUB, &tok_a).await.unwrap().is_none(), "A desalojado");
+        assert!(resolve_session(&db, HUB, &tok_null).await.unwrap().is_none(), "NULL desalojado");
+        assert!(resolve_session(&db, HUB, &tok_a2).await.unwrap().is_none(), "otra de A desalojada");
 
         // Ahora abre B; una segunda sesión del MISMO dispositivo B no se auto-desaloja.
-        let tok_b = create_session(&db, &uid, 3600, Some("dev-B")).await.unwrap();
-        enforce_device_limit(&db, 1, Some("dev-B")).await.unwrap();
-        assert!(resolve_session(&db, &tok_b).await.unwrap().is_some(), "B (mismo device) sobrevive");
+        let tok_b = create_session(&db, HUB, &uid, 3600, Some("dev-B")).await.unwrap();
+        enforce_device_limit(&db, HUB, 1, Some("dev-B")).await.unwrap();
+        assert!(resolve_session(&db, HUB, &tok_b).await.unwrap().is_some(), "B (mismo device) sobrevive");
     }
 
     #[tokio::test]
@@ -1402,20 +1530,20 @@ mod tests {
         // max_devices == 0 (ilimitado, p. ej. Hub Cloud) o sin device_id → no se desaloja a nadie.
         let db = fresh_db().await;
         setup_identity(&db).await;
-        let uid = create_user(&db, "Ada", "1234", "admin", None).await.unwrap();
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None).await.unwrap();
 
-        let tok_a = create_session(&db, &uid, 3600, Some("dev-A")).await.unwrap();
-        let tok_b = create_session(&db, &uid, 3600, Some("dev-B")).await.unwrap();
+        let tok_a = create_session(&db, HUB, &uid, 3600, Some("dev-A")).await.unwrap();
+        let tok_b = create_session(&db, HUB, &uid, 3600, Some("dev-B")).await.unwrap();
 
         // Ilimitado: aunque llegue un device nuevo, nadie cae.
-        enforce_device_limit(&db, 0, Some("dev-C")).await.unwrap();
-        assert!(resolve_session(&db, &tok_a).await.unwrap().is_some());
-        assert!(resolve_session(&db, &tok_b).await.unwrap().is_some());
+        enforce_device_limit(&db, HUB, 0, Some("dev-C")).await.unwrap();
+        assert!(resolve_session(&db, HUB, &tok_a).await.unwrap().is_some());
+        assert!(resolve_session(&db, HUB, &tok_b).await.unwrap().is_some());
 
         // max_devices == 1 pero SIN device_id (login que no identifica dispositivo): tampoco desaloja.
-        enforce_device_limit(&db, 1, None).await.unwrap();
-        assert!(resolve_session(&db, &tok_a).await.unwrap().is_some());
-        assert!(resolve_session(&db, &tok_b).await.unwrap().is_some());
+        enforce_device_limit(&db, HUB, 1, None).await.unwrap();
+        assert!(resolve_session(&db, HUB, &tok_a).await.unwrap().is_some());
+        assert!(resolve_session(&db, HUB, &tok_b).await.unwrap().is_some());
     }
 
     #[tokio::test]
@@ -1423,26 +1551,26 @@ mod tests {
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
         // Cloud-linked user provisioned without a PIN (first online login).
-        let user = get_or_link_cloud_user(&db, "7", "Ada", "admin", None, None)
+        let user = get_or_link_cloud_user(&db, HUB, "7", "Ada", "admin", None, None)
             .await
             .unwrap();
         assert!(
-            verify_pin(&db, "Ada", "4242").await.unwrap().is_none(),
+            verify_pin(&db, HUB, "Ada", "4242").await.unwrap().is_none(),
             "no PIN yet"
         );
 
-        set_pin(&db, &user.id, "4242").await.unwrap();
-        let ok = verify_pin(&db, "Ada", "4242").await.unwrap();
+        set_pin(&db, HUB, &user.id, "4242").await.unwrap();
+        let ok = verify_pin(&db, HUB, "Ada", "4242").await.unwrap();
         assert_eq!(ok.map(|u| u.id), Some(user.id.clone()));
         assert!(
-            verify_pin(&db, "Ada", "0000").await.unwrap().is_none(),
+            verify_pin(&db, HUB, "Ada", "0000").await.unwrap().is_none(),
             "wrong PIN rejected"
         );
 
         // Empty PIN clears it again.
-        set_pin(&db, &user.id, "").await.unwrap();
+        set_pin(&db, HUB, &user.id, "").await.unwrap();
         assert!(
-            verify_pin(&db, "Ada", "4242").await.unwrap().is_none(),
+            verify_pin(&db, HUB, "Ada", "4242").await.unwrap().is_none(),
             "PIN cleared"
         );
     }
@@ -1459,28 +1587,28 @@ mod tests {
         ensure_identity_email(&db).await;
 
         assert!(
-            seed_owner(&db, "boss@bar.com").await.unwrap(),
+            seed_owner(&db, HUB, "boss@bar.com").await.unwrap(),
             "primera siembra → true (fila nueva)"
         );
-        let users = list_login_users(&db).await.unwrap();
+        let users = list_login_users(&db, HUB).await.unwrap();
         assert_eq!(users.len(), 1, "un único creador sembrado");
         assert_eq!(users[0].email, "boss@bar.com");
         assert_eq!(users[0].role, "admin", "sembrado como admin, nunca `owner`");
 
         // Idempotente: re-sembrar el MISMO email no duplica ni cambia.
         assert!(
-            !seed_owner(&db, "boss@bar.com").await.unwrap(),
+            !seed_owner(&db, HUB, "boss@bar.com").await.unwrap(),
             "segunda siembra → false (ya existía)"
         );
         assert_eq!(
-            list_login_users(&db).await.unwrap().len(),
+            list_login_users(&db, HUB).await.unwrap().len(),
             1,
             "sigue habiendo un solo creador (no duplica)"
         );
 
         // Email vacío = no-op (no siembra nada).
-        assert!(!seed_owner(&db, "  ").await.unwrap());
-        assert_eq!(list_login_users(&db).await.unwrap().len(), 1);
+        assert!(!seed_owner(&db, HUB, "  ").await.unwrap());
+        assert_eq!(list_login_users(&db, HUB).await.unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -1489,22 +1617,22 @@ mod tests {
         // conservando su rol (NO cae a `employee`). Un segundo login usa el cloud_user_id.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        seed_owner(&db, "boss@bar.com").await.unwrap();
+        seed_owner(&db, HUB, "boss@bar.com").await.unwrap();
 
         // Primer login: enlaza por email → conserva el rol sembrado.
-        let user = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"), None)
+        let user = get_or_link_cloud_user(&db, HUB, "99", "Boss", "employee", Some("boss@bar.com"), None)
             .await
             .unwrap();
         assert_eq!(user.role, "admin", "el creador sembrado conserva su rol");
         assert_eq!(user.cloud_user_id.as_deref(), Some("99"), "queda enlazado");
         assert_eq!(
-            list_login_users(&db).await.unwrap().len(),
+            list_login_users(&db, HUB).await.unwrap().len(),
             1,
             "NO crea una segunda fila: reusa la fila sembrada"
         );
 
         // Segundo login (ya enlazado): resuelve por cloud_user_id, mismo usuario/rol.
-        let again = get_or_link_cloud_user(&db, "99", "Boss", "employee", Some("boss@bar.com"), None)
+        let again = get_or_link_cloud_user(&db, HUB, "99", "Boss", "employee", Some("boss@bar.com"), None)
             .await
             .unwrap();
         assert_eq!(again.id, user.id);
@@ -1518,11 +1646,11 @@ mod tests {
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
 
-        let user = get_or_link_cloud_user(&db, "5", "Nuevo", "employee", Some("nuevo@bar.com"), None)
+        let user = get_or_link_cloud_user(&db, HUB, "5", "Nuevo", "employee", Some("nuevo@bar.com"), None)
             .await
             .unwrap();
         assert_eq!(user.role, "employee");
-        let listed = list_login_users(&db).await.unwrap();
+        let listed = list_login_users(&db, HUB).await.unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].email, "nuevo@bar.com", "email persistido");
     }
@@ -1531,10 +1659,10 @@ mod tests {
     async fn cloud_user_link_is_idempotent() {
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let a = get_or_link_cloud_user(&db, "42", "Demo", "cashier", None, None)
+        let a = get_or_link_cloud_user(&db, HUB, "42", "Demo", "cashier", None, None)
             .await
             .unwrap();
-        let b = get_or_link_cloud_user(&db, "42", "OtroNombre", "admin", None, None)
+        let b = get_or_link_cloud_user(&db, HUB, "42", "OtroNombre", "admin", None, None)
             .await
             .unwrap();
         assert_eq!(a.id, b.id, "el mismo cloud_user_id reusa el hub_user");
@@ -1569,12 +1697,12 @@ mod tests {
         // reached the hub. Same row, raised — not a second user.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let first = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, None)
+        let first = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", None, None)
             .await
             .unwrap();
         assert_eq!(first.role, "employee");
 
-        let second = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, Some("admin"))
+        let second = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", None, Some("admin"))
             .await
             .unwrap();
         assert_eq!(second.id, first.id, "misma fila, no una nueva");
@@ -1593,8 +1721,8 @@ mod tests {
         // login of the owner would quietly rewrite their role.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        seed_owner(&db, "boss@bar.com").await.unwrap();
-        let linked = get_or_link_cloud_user(&db, "1", "Boss", "employee", Some("boss@bar.com"), Some("admin"))
+        seed_owner(&db, HUB, "boss@bar.com").await.unwrap();
+        let linked = get_or_link_cloud_user(&db, HUB, "1", "Boss", "employee", Some("boss@bar.com"), Some("admin"))
             .await
             .unwrap();
         assert_eq!(linked.role, "admin", "el creador sembrado sigue siendo admin");
@@ -1613,12 +1741,12 @@ mod tests {
         // La fila se fabrica a mano, sin pasar por el alta: desde hub#356 **ninguna** puerta del
         // alta escribe `owner` —el SaaS no lo concede—, así que usarla aquí probaría lo contrario
         // de lo que este test dice. Una fila así llega restaurando un backup o importando.
-        create_login_user_row(&db, &new_id(), "Boss", "", "owner", None, "legacy@bar.com")
+        create_login_user_row(&db, HUB, &new_id(), "Boss", "", "owner", None, "legacy@bar.com")
             .await
             .unwrap();
 
         let linked =
-            get_or_link_cloud_user(&db, "1", "Boss", "employee", Some("legacy@bar.com"), Some("admin"))
+            get_or_link_cloud_user(&db, HUB, "1", "Boss", "employee", Some("legacy@bar.com"), Some("admin"))
                 .await
                 .unwrap();
         assert_eq!(linked.role, "owner", "un `owner` legacy no se degrada");
@@ -1633,13 +1761,13 @@ mod tests {
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
         // As the real caller does it: an account admin gets both the default role AND the floor.
-        let raised = get_or_link_cloud_user(&db, "42", "Ada", "admin", None, Some("admin"))
+        let raised = get_or_link_cloud_user(&db, HUB, "42", "Ada", "admin", None, Some("admin"))
             .await
             .unwrap();
         assert_eq!(raised.role, "admin");
 
         // Demoted in the cloud: no floor any more, and the local role stays untouched.
-        let demoted_in_cloud = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, None)
+        let demoted_in_cloud = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", None, None)
             .await
             .unwrap();
         assert_eq!(demoted_in_cloud.role, "admin", "el suelo sube, nunca baja");
@@ -1653,7 +1781,7 @@ mod tests {
         // it; it guards a future caller that passes a floor and forgets the default.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let user = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, Some("admin"))
+        let user = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", None, Some("admin"))
             .await
             .unwrap();
         assert_eq!(user.role, "admin");
@@ -1666,15 +1794,15 @@ mod tests {
         // the floor applies on the very login that links the row, not only from the second one on.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        create_login_user(&db, "socia@bar.com", "employee").await.unwrap();
+        create_login_user(&db, HUB, "socia@bar.com", "employee").await.unwrap();
 
-        let linked = get_or_link_cloud_user(&db, "77", "Socia", "employee", Some("socia@bar.com"), Some("admin"))
+        let linked = get_or_link_cloud_user(&db, HUB, "77", "Socia", "employee", Some("socia@bar.com"), Some("admin"))
             .await
             .unwrap();
         assert_eq!(linked.role, "admin");
         assert_eq!(linked.cloud_user_id.as_deref(), Some("77"), "queda enlazada");
         assert_eq!(
-            list_login_users(&db).await.unwrap().len(),
+            list_login_users(&db, HUB).await.unwrap().len(),
             1,
             "reusa la fila invitada, no crea otra"
         );
@@ -1688,12 +1816,12 @@ mod tests {
         // to prevent — so an unranked role is raised.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let user = get_or_link_cloud_user(&db, "42", "Ada", "bartender", None, None)
+        let user = get_or_link_cloud_user(&db, HUB, "42", "Ada", "bartender", None, None)
             .await
             .unwrap();
         assert_eq!(user.role, "bartender");
 
-        let raised = get_or_link_cloud_user(&db, "42", "Ada", "bartender", None, Some("admin"))
+        let raised = get_or_link_cloud_user(&db, HUB, "42", "Ada", "bartender", None, Some("admin"))
             .await
             .unwrap();
         assert_eq!(raised.role, "admin");
@@ -1705,11 +1833,11 @@ mod tests {
         // Hub ownership comes from `HUB_OWNER_EMAIL` (ADR-0157) and no token may grant it.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        get_or_link_cloud_user(&db, "42", "Ada", "employee", None, None)
+        get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", None, None)
             .await
             .unwrap();
 
-        let user = get_or_link_cloud_user(&db, "42", "Ada", "employee", None, Some("owner"))
+        let user = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", None, Some("owner"))
             .await
             .unwrap();
         assert_eq!(user.role, "admin", "un suelo `owner` se acota a `admin`");
@@ -1722,12 +1850,12 @@ mod tests {
         // either direction. Guards against a future caller passing the raw cloud role through.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let first = get_or_link_cloud_user(&db, "42", "Ada", "cashier", None, None)
+        let first = get_or_link_cloud_user(&db, HUB, "42", "Ada", "cashier", None, None)
             .await
             .unwrap();
 
         for bogus in ["manager", "employee", "member", ""] {
-            let user = get_or_link_cloud_user(&db, "42", "Ada", "cashier", None, Some(bogus))
+            let user = get_or_link_cloud_user(&db, HUB, "42", "Ada", "cashier", None, Some(bogus))
                 .await
                 .unwrap();
             assert_eq!(user.role, "cashier", "`{bogus}` no es un suelo");
@@ -1744,30 +1872,30 @@ mod tests {
         // future readmission cannot revive a token minted before the revocation (TTL 30 days).
         let db = fresh_db().await;
         ensure_identity_with_sessions(&db).await;
-        let user = get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+        let user = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", Some("ada@bar.com"), None)
             .await
             .unwrap();
-        set_pin(&db, &user.id, "1234").await.unwrap();
-        let token = create_session(&db, &user.id, 3600, None).await.unwrap();
-        assert!(resolve_session(&db, &token).await.unwrap().is_some());
+        set_pin(&db, HUB, &user.id, "1234").await.unwrap();
+        let token = create_session(&db, HUB, &user.id, 3600, None).await.unwrap();
+        assert!(resolve_session(&db, HUB, &token).await.unwrap().is_some());
 
         assert_eq!(
-            revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap(),
+            revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com")).await.unwrap(),
             1,
             "closes the one row of that cloud identity",
         );
 
         assert!(!stored_is_active(&db, &user.id).await, "the row is deactivated");
         assert!(
-            resolve_session(&db, &token).await.unwrap().is_none(),
+            resolve_session(&db, HUB, &token).await.unwrap().is_none(),
             "the session opened before the revocation is gone",
         );
         assert!(
-            verify_pin(&db, "Ada", "1234").await.unwrap().is_none(),
+            verify_pin(&db, HUB, "Ada", "1234").await.unwrap().is_none(),
             "the PIN is not a side door around the revocation",
         );
         assert!(
-            list_pin_users(&db).await.unwrap().is_empty(),
+            list_pin_users(&db, HUB).await.unwrap().is_empty(),
             "and they disappear from the pinpad grid",
         );
         assert_eq!(
@@ -1776,7 +1904,7 @@ mod tests {
             "the session rows are deleted, not merely invalidated by the JOIN",
         );
         assert_eq!(
-            revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap(),
+            revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com")).await.unwrap(),
             0,
             "idempotent: a second revocation touches nothing",
         );
@@ -1789,13 +1917,13 @@ mod tests {
         // signature the presence gate trusts, so it is the key that finds them.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        create_login_user(&db, "socia@bar.com", "admin").await.unwrap();
+        create_login_user(&db, HUB, "socia@bar.com", "admin").await.unwrap();
 
         assert_eq!(
-            revoke_cloud_access(&db, "99", Some("socia@bar.com")).await.unwrap(),
+            revoke_cloud_access(&db, HUB, "99", Some("socia@bar.com")).await.unwrap(),
             1,
         );
-        assert!(!list_login_users(&db).await.unwrap()[0].is_active);
+        assert!(!list_login_users(&db, HUB).await.unwrap()[0].is_active);
     }
 
     #[tokio::test]
@@ -1805,12 +1933,12 @@ mod tests {
         // default role. Shutting the door has to survive the next login.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let user = get_or_link_cloud_user(&db, "42", "Ada", "manager", Some("ada@bar.com"), None)
+        let user = get_or_link_cloud_user(&db, HUB, "42", "Ada", "manager", Some("ada@bar.com"), None)
             .await
             .unwrap();
-        revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap();
+        revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com")).await.unwrap();
 
-        let back = get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+        let back = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", Some("ada@bar.com"), None)
             .await
             .unwrap();
         assert_eq!(back.id, user.id, "the SAME row comes back, not a twin");
@@ -1824,21 +1952,21 @@ mod tests {
         // still comes back as `admin` on the very same login.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        get_or_link_cloud_user(&db, "42", "Ada", "manager", Some("ada@bar.com"), None)
+        get_or_link_cloud_user(&db, HUB, "42", "Ada", "manager", Some("ada@bar.com"), None)
             .await
             .unwrap();
-        revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap();
+        revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com")).await.unwrap();
 
-        let back = get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+        let back = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", Some("ada@bar.com"), None)
             .await
             .unwrap();
         assert!(back.is_active, "the membership reopens the door it closed");
         assert_eq!(back.role, "employee", "`manager` is NOT resurrected");
         assert_eq!(stored_role(&db, &back.id).await, "employee");
 
-        revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap();
+        revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com")).await.unwrap();
         let as_admin =
-            get_or_link_cloud_user(&db, "42", "Ada", "admin", Some("ada@bar.com"), Some("admin"))
+            get_or_link_cloud_user(&db, HUB, "42", "Ada", "admin", Some("ada@bar.com"), Some("admin"))
                 .await
                 .unwrap();
         assert_eq!(as_admin.role, "admin", "the floor of rule C applies on readmission too");
@@ -1852,10 +1980,10 @@ mod tests {
         // walk somebody the hub threw out straight back in.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let user = create_login_user(&db, "ana@bar.com", "manager").await.unwrap();
-        assert!(deactivate_login_user(&db, "ana@bar.com").await.unwrap());
+        let user = create_login_user(&db, HUB, "ana@bar.com", "manager").await.unwrap();
+        assert!(deactivate_login_user(&db, HUB, "ana@bar.com").await.unwrap());
 
-        let err = get_or_link_cloud_user(&db, "42", "Ana", "employee", Some("ana@bar.com"), None)
+        let err = get_or_link_cloud_user(&db, HUB, "42", "Ana", "employee", Some("ana@bar.com"), None)
             .await
             .unwrap_err();
         match err {
@@ -1880,15 +2008,15 @@ mod tests {
         // the next login walk back in. Both alta paths (re-invitation and Personal) clear it.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+        get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", Some("ada@bar.com"), None)
             .await
             .unwrap();
-        revoke_cloud_access(&db, "42", Some("ada@bar.com")).await.unwrap();
+        revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com")).await.unwrap();
 
-        create_login_user(&db, "ada@bar.com", "employee").await.unwrap();
-        assert!(deactivate_login_user(&db, "ada@bar.com").await.unwrap());
+        create_login_user(&db, HUB, "ada@bar.com", "employee").await.unwrap();
+        assert!(deactivate_login_user(&db, HUB, "ada@bar.com").await.unwrap());
 
-        let err = get_or_link_cloud_user(&db, "42", "Ada", "employee", Some("ada@bar.com"), None)
+        let err = get_or_link_cloud_user(&db, HUB, "42", "Ada", "employee", Some("ada@bar.com"), None)
             .await
             .unwrap_err();
         assert!(
@@ -1929,26 +2057,26 @@ mod tests {
         ensure_identity_email(&db).await;
 
         // Alta nueva.
-        let u = create_login_user(&db, "ana@bar.com", "manager").await.unwrap();
+        let u = create_login_user(&db, HUB, "ana@bar.com", "manager").await.unwrap();
         assert_eq!(u.role, "manager");
         assert!(u.cloud_user_id.is_none(), "aún sin login → sin cloud_user_id");
         assert!(u.is_active);
 
         // Re-alta (mismo email, rol nuevo) = upsert: misma fila, rol actualizado.
-        let u2 = create_login_user(&db, "ana@bar.com", "admin").await.unwrap();
+        let u2 = create_login_user(&db, HUB, "ana@bar.com", "admin").await.unwrap();
         assert_eq!(u2.id, u.id, "reusa la fila del email (no duplica)");
         assert_eq!(u2.role, "admin", "actualiza el rol");
-        assert_eq!(list_login_users(&db).await.unwrap().len(), 1);
+        assert_eq!(list_login_users(&db, HUB).await.unwrap().len(), 1);
 
         // Baja: desactiva (true la primera vez, false si ya estaba inactiva = idempotente).
-        assert!(deactivate_login_user(&db, "ana@bar.com").await.unwrap());
-        assert!(!deactivate_login_user(&db, "ana@bar.com").await.unwrap());
-        let listed = list_login_users(&db).await.unwrap();
+        assert!(deactivate_login_user(&db, HUB, "ana@bar.com").await.unwrap());
+        assert!(!deactivate_login_user(&db, HUB, "ana@bar.com").await.unwrap());
+        let listed = list_login_users(&db, HUB).await.unwrap();
         assert_eq!(listed.len(), 1, "sigue listada (audit), pero inactiva");
         assert!(!listed[0].is_active);
 
         // Re-alta reactiva la misma fila.
-        let u3 = create_login_user(&db, "ana@bar.com", "employee").await.unwrap();
+        let u3 = create_login_user(&db, HUB, "ana@bar.com", "employee").await.unwrap();
         assert_eq!(u3.id, u.id);
         assert!(u3.is_active, "el alta reactiva");
         assert_eq!(u3.role, "employee");
@@ -1959,7 +2087,7 @@ mod tests {
         // create_user/set_pin escriben siempre argon2id (string PHC `$argon2id$...`).
         let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
-        create_user(&db, "Eva", "1111", "cashier", None)
+        create_user(&db, HUB, "Eva", "1111", "cashier", None)
             .await
             .unwrap();
         let mut p = Params::new();
@@ -1974,9 +2102,9 @@ mod tests {
             "hash debe ser argon2id PHC, fue: {stored}"
         );
         // Verifica argon2id directamente.
-        let ok = verify_pin(&db, "Eva", "1111").await.unwrap();
+        let ok = verify_pin(&db, HUB, "Eva", "1111").await.unwrap();
         assert!(ok.is_some());
-        assert!(verify_pin(&db, "Eva", "2222").await.unwrap().is_none());
+        assert!(verify_pin(&db, HUB, "Eva", "2222").await.unwrap().is_none());
     }
 
     #[tokio::test]

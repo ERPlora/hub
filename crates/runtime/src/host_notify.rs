@@ -285,10 +285,12 @@ pub async fn assert_recipient_allowed(
     // 2) Email de un usuario del hub activo.
     if intent.channel == Channel::Email {
         let mut p = erplora_db::Params::new();
+        p.insert("hub_id".into(), serde_json::json!(hub_id));
         p.insert("email".into(), serde_json::json!(to.to_ascii_lowercase()));
         let res = db
             .query(
-                "SELECT id FROM hub_user WHERE LOWER(email) = :email AND is_active = 1",
+                "SELECT id FROM hub_user \
+                  WHERE hub_id = :hub_id AND LOWER(email) = :email AND is_active = 1",
                 &p,
             )
             .await?;
@@ -529,7 +531,7 @@ mod tests {
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "h1").await.unwrap();
 
-        crate::identity::create_login_user(&db, "empleado@hub.com", "employee")
+        crate::identity::create_login_user(&db, "h1", "empleado@hub.com", "employee")
             .await
             .unwrap();
         assert_recipient_allowed(&db, "h1", &intent(Channel::Email, "Empleado@Hub.com"))
@@ -550,7 +552,7 @@ mod tests {
         );
 
         // Baja del usuario → la puerta se cierra.
-        crate::identity::deactivate_login_user(&db, "empleado@hub.com")
+        crate::identity::deactivate_login_user(&db, "h1", "empleado@hub.com")
             .await
             .unwrap();
         assert!(

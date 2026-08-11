@@ -339,10 +339,10 @@ async fn reset_de_usuarios_conserva_a_quien_lo_ejecuta() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let rt = fresh().await;
     let db = rt.db();
-    let owner = erplora_runtime::identity::create_user(db, "Dueño", "1234", "owner", None)
+    let owner = erplora_runtime::identity::create_user(db, &rt.hub_id(), "Dueño", "1234", "owner", None)
         .await
         .expect("crear owner");
-    let empleado = erplora_runtime::identity::create_user(db, "Empleado", "5678", "cashier", None)
+    let empleado = erplora_runtime::identity::create_user(db, &rt.hub_id(), "Empleado", "5678", "cashier", None)
         .await
         .expect("crear empleado");
 

@@ -10,7 +10,7 @@
 -- `:hub_id` lo liga el runtime (`seed::apply`) con el hub_id del despliegue, no el fichero.
 --
 -- Esquema real (no tocar nombres de columna sin re-validar el test `seed.rs`):
---   hub_user(id, name, pin_hash, role, cloud_user_id, is_active, created_at)   crates/runtime/src/identity.rs
+--   hub_user(id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at)  crates/runtime/src/identity.rs
 --   hub_trusted_device(hub_id, device_id, label, trusted_at)                   crates/runtime/src/system_migrations.rs (v2 + v23)
 --
 -- PIN "0000" en formato LEGACY `salt_hex:hash_hex` que `identity.rs::check_pin` acepta y rehashea
@@ -21,11 +21,11 @@
 
 -- Usuario "Demo": rol "admin" (el rol con más cobertura de permisos en los módulos POS), activo,
 -- sin vínculo cloud, PIN "0000".
-INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at)
-SELECT 'demo-user-0000000000000000000000', 'Demo',
+INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at)
+SELECT 'demo-user-0000000000000000000000', :hub_id, 'Demo',
        'demo-seed-salt:1dc5326634c5a049052910edddc64689c1389d7812621b2f5c6fe6b1bb065628',
        'admin', NULL, 1, '2026-01-01T00:00:00+00:00'
-WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE name = 'Demo');
+WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE hub_id = :hub_id AND name = 'Demo');
 
 -- 🔴 AQUÍ HABÍA un dispositivo de confianza sembrado, `demo-trusted-device`, para que el login por
 -- PIN funcionase sin login online previo. NO funcionaba, y no podía (hub#630): el `device_id` se lo
