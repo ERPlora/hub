@@ -267,7 +267,7 @@ async function mount(): Promise<void> {
         if (outlet.value) {
           outlet.value.replaceChildren();
           const el = document.createElement(settings.value.component) as HTMLElement & { client?: unknown };
-          el.client = client;
+          el.client = client.forModule(moduleId);
           outlet.value.appendChild(el);
         }
       } else if (outlet.value) {
@@ -309,7 +309,9 @@ async function mount(): Promise<void> {
         if (protectsOutlet.value) {
           protectsOutlet.value.replaceChildren();
           const el = document.createElement(guard.def.component) as HTMLElement & { client?: unknown };
-          el.client = client;
+          // El componente del guard lo aporta OTRO módulo (el que declara el `protects`), así que
+          // el scope es el suyo y no el de la página que se está bloqueando (hub#714).
+          el.client = client.forModule(guard.declaringModule);
           protectsOutlet.value.appendChild(el);
         }
       }
@@ -330,7 +332,12 @@ async function mount(): Promise<void> {
       const el = document.createElement(tag) as HTMLElement & { client?: unknown };
       // Inyecta el cliente del runtime ANTES de append: el WC (Lit) lo recibe en su
       // primer render y lo usa para query/command/eventos. WC → SDK → Rust (ARQUITECTURA.md §7.5).
-      el.client = client;
+      //
+      // Va con el SCOPE del módulo (hub#714): el id sale de AQUÍ, del cargador —el único que sabe
+      // de verdad qué módulo está montando—, no de lo que el módulo diga de sí mismo. Es lo que
+      // habilita `client.flows` (kernel de automatización, ADR-0283 §9) y lo que el runtime lee
+      // para exigir la capability `manage_flows`.
+      el.client = client.forModule(moduleId);
       outlet.value.appendChild(el);
     }
     status.value = 'ready';

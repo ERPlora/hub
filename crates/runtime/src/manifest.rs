@@ -467,6 +467,8 @@ pub struct Capabilities {
     pub printer: Option<PrinterCapability>,
     #[serde(default)]
     pub notify: Option<NotifyCapability>,
+    #[serde(default)]
+    pub manage_flows: Option<ManageFlowsCapability>,
 }
 
 /// Acceso al certificado PKCS#12 del negocio (firma/transmisión fiscal). El host firma; el
@@ -482,6 +484,18 @@ pub struct CertificateCapability {
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct PrinterCapability {}
 
+/// **Administrar el kernel de automatización** del hub — `/api/hub/flows*` (hub#714, ADR-0283 §9).
+/// Marcador sin parámetros: no hay grados, o el módulo edita los flujos del negocio o no.
+///
+/// Es la capability con más alcance de todas, y por eso existe: un flujo ejecuta commands con
+/// `Origin::Automation` bajo los grants que `PUT …/grants` escribe, así que quien administra
+/// flujos puede hacer que el hub actúe **sin nadie delante**. El resto de capabilities dan un
+/// primitivo (red, certificado, impresora, aviso); esta da el resto de primitivos a través de un
+/// flujo. Que un módulo de inventario la tuviera por el mero hecho de estar cargado en la sesión
+/// de un admin sería una escalada silenciosa — y hasta hub#714 lo era.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ManageFlowsCapability {}
+
 /// Clases de capability que el host conoce y puede gatear (ADR-0079). El nombre canónico (kebab)
 /// es la clave de grant en `_module_capability_grants` y la etiqueta de la UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -490,6 +504,8 @@ pub enum CapabilityKind {
     Certificate,
     Printer,
     Notify,
+    /// Administrar los flujos del hub (hub#714). Ver [`ManageFlowsCapability`].
+    ManageFlows,
 }
 
 impl CapabilityKind {
@@ -500,6 +516,7 @@ impl CapabilityKind {
             CapabilityKind::Certificate => "certificate",
             CapabilityKind::Printer => "printer",
             CapabilityKind::Notify => "notify",
+            CapabilityKind::ManageFlows => "manage_flows",
         }
     }
     /// Parsea un nombre canónico; `None` si no es una capability conocida.
@@ -509,6 +526,7 @@ impl CapabilityKind {
             "certificate" => Some(CapabilityKind::Certificate),
             "printer" => Some(CapabilityKind::Printer),
             "notify" => Some(CapabilityKind::Notify),
+            "manage_flows" => Some(CapabilityKind::ManageFlows),
             _ => None,
         }
     }
@@ -531,6 +549,9 @@ impl Manifest {
         }
         if self.capabilities.notify.is_some() || self.notify.is_some() {
             out.push(CapabilityKind::Notify);
+        }
+        if self.capabilities.manage_flows.is_some() {
+            out.push(CapabilityKind::ManageFlows);
         }
         out
     }
@@ -1311,7 +1332,13 @@ const COMMAND_FIELDS: &[&str] = &[
 const QUERY_FIELDS: &[&str] = &["permission", "sql", "schema", "list", "ai", "expose_api"];
 const EVENTS_FIELDS: &[&str] = &["listen", "emits"];
 const LISTENER_FIELDS: &[&str] = &["command"];
-const CAPABILITY_FIELDS: &[&str] = &["network", "certificate", "printer", "notify"];
+const CAPABILITY_FIELDS: &[&str] = &[
+    "network",
+    "certificate",
+    "printer",
+    "notify",
+    "manage_flows",
+];
 const DIALECT_FIELDS: &[&str] = &["sqlite", "postgres"];
 const ROLE_FIELDS: &[&str] = &["key", "label", "extends"];
 const SCHEDULED_TASK_FIELDS: &[&str] = &["name", "command", "cron", "payload", "catch_up"];

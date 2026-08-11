@@ -670,6 +670,12 @@
               "description": "Canales que necesita el módulo."
             }
           }
+        },
+        "manage_flows": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Administrar el KERNEL DE AUTOMATIZACIÓN del hub: leer y escribir flujos, sus grants, sus secretos y su bandeja de aprobación (`/api/hub/flows*`, ADR-0283 §9). La declara el editor visual de flujos y prácticamente nadie más. Es la capability de mayor alcance: un flujo ejecuta commands con `Origin::Automation` bajo los grants que `PUT …/grants` escribe, así que quien administra flujos consigue que el hub actúe SIN NADIE DELANTE. Sigue exigiéndose además la sesión de un humano owner/admin — la capability no la sustituye, se suma (hub#714).",
+          "properties": {}
         }
       }
     },

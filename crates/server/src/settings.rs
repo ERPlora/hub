@@ -96,6 +96,12 @@ fn capability_meta(id: &str) -> (&'static str, &'static str) {
             "Notificaciones",
             "Permite enviar notificaciones por email, SMS o WhatsApp.",
         ),
+        // hub#714. La descripción dice lo que el dueño arriesga, no el nombre técnico: quien
+        // administra flujos consigue que el hub actúe cuando no hay nadie delante.
+        "manage_flows" => (
+            "Administrar automatizaciones",
+            "Permite crear, editar y borrar los flujos del hub, sus permisos y sus secretos. Un flujo ejecuta acciones en tu negocio sin nadie delante, así que concédelo solo al módulo con el que quieras editarlos.",
+        ),
         _ => ("Permiso", "Permiso solicitado por el módulo."),
     }
 }

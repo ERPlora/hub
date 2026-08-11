@@ -574,6 +574,27 @@ export class HttpWsTransport implements ErploraTransport {
     body: unknown,
     extraHeaders: Record<string, string> = {},
   ): Promise<unknown> {
+    return this.send('POST', path, body, extraHeaders);
+  }
+
+  /**
+   * **The hub's own REST surface** (hub#714) — `/api/hub/flows*` today. Same envelope discipline as
+   * every other call, a different verb and a path the CALLER's surface built from a fixed table.
+   *
+   * This method takes a path and is therefore exactly the shape of a generic proxy, which is why it
+   * is not reachable from module code: `ErploraClient` never exposes the transport, and the only
+   * thing on the client that can call it is {@link FlowsApi}, whose method list is pinned by a test.
+   */
+  coreRequest(req: CoreRequest, extraHeaders: Record<string, string> = {}): Promise<unknown> {
+    return this.send(req.method, req.path, req.body, extraHeaders);
+  }
+
+  private async send(
+    method: string,
+    path: string,
+    body: unknown,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<unknown> {
     // hub#782: the proxy's `5xx text/html` page (the hub container died — OOM exit 137 / hub#759;
     // any deploy window) used to reach `res.json()` and blow up as a raw `SyntaxError`, which is
     // NOT an `ErploraError`, carries no `code`, and so no module can orient by it. The runtime
@@ -582,11 +603,14 @@ export class HttpWsTransport implements ErploraTransport {
     // the network). That is why we key on the CONTENT-TYPE and not on `res.ok`: a 403 envelope with
     // `permission_denied` is a domain refusal with its own code, not a transport failure.
     let res: Response;
+    // A `GET`/`DELETE` carries no body and must not announce one: some proxies reject the pair.
+    const framing: Record<string, string> =
+      body === undefined ? {} : { 'Content-Type': 'application/json' };
     try {
       res = await this.fetchImpl(`${this.baseUrl}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...this.headers(), ...extraHeaders },
-        body: JSON.stringify(body),
+        method,
+        headers: { ...framing, ...this.headers(), ...extraHeaders },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch (e) {
       // A network-level failure (DNS, CORS, abort, `TypeError: Failed to fetch`): same meaning for
@@ -870,11 +894,258 @@ export interface TauriBridge {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The automation kernel, as a MODULE may reach it (hub#714, ADR-0283 §9).
+//
+// The visual flow editor is a module (pm#110) and had no declared way in: `query`/`command` speak
+// to the dispatcher, and flows are core REST on purpose — the ADR froze that and «commands
+// `hub.flows.*`» is exactly the surface it froze shut. What a module COULD do was read the session
+// token out of `localStorage` and `fetch('/api/hub/flows')` itself: same document as the shell,
+// same origin, no sandbox. It would work — while the user is an admin — and it would break the day
+// the shell moves the session into an httpOnly cookie. A contract that leans on that is not one.
+//
+// So the way in is explicit, typed and module-scoped. What it is NOT is a proxy: there is no
+// method that takes a path, every path is built here from the frozen §9 table, and every id is
+// checked before it can be pasted into one. `flows.test.ts` pins both — the method list and the
+// URLs — so an escape hatch cannot be added quietly.
+//
+// The gate stays in Rust and does not move: `require_admin_session` first (a cashier still gets
+// 403, an API key is still refused), and then the `manage_flows` capability of the calling module.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Where the kernel's REST surface lives. **Every** path this surface can build starts here. */
+export const FLOWS_BASE_PATH = '/api/hub/flows';
+
+/** How a call names the module it acts for. Read by `crates/server/src/flows_api.rs`, nowhere else. */
+export const MODULE_HEADER = 'X-Erplora-Module';
+
+/** Asking for a module-scoped surface through a client that is not scoped to any module. */
+export const MODULE_SCOPE_REQUIRED = 'module_scope_required';
+
+/** A value this SDK refuses to put in a URL. It never becomes a request. */
+export const INVALID_ARGUMENT = 'invalid_argument';
+
+/** Verbs the kernel's REST surface answers. There is no `PATCH` and no `HEAD`: §9 has neither. */
+export type CoreMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+
+/** One call to the hub's own REST surface. `path` is always built by the surface, never received. */
+export interface CoreRequest {
+  method: CoreMethod;
+  path: string;
+  body?: unknown;
+}
+
+/** A transport that can reach the core's REST surface (as opposed to the dispatcher). */
+export interface CoreApiTransport {
+  coreRequest(req: CoreRequest, headers?: Record<string, string>): Promise<unknown>;
+}
+
+/**
+ * An id that may be pasted into a path segment. Flow, run and approval ids are UUIDv4 in the
+ * runtime (`registry::new_id`), so this is generous — and it is not the point.
+ *
+ * The point is that `fetch` NORMALISES a URL: `/api/hub/flows/../../settings` leaves the process as
+ * `/api/settings`. An id concatenated into a path is therefore the generic proxy arriving by the
+ * back door, whatever the surface's method list says. Hence: no `/`, no `.`, no `%`, no `?`, no
+ * `#`, and a length cap.
+ */
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+/**
+ * A secret name, as `flows/secrets.rs` defines it: UPPER_SNAKE_CASE, starting with a letter, ≤ 64.
+ * Checked here too because it also travels in a path — and because the name is read back as
+ * `{{secret.NAME}}`, so one with a dot or a brace in it is a different thing entirely.
+ */
+const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+function checkedSegment(kind: string, value: string, pattern: RegExp): string {
+  if (typeof value === 'string' && pattern.test(value)) return value;
+  throw new ErploraError(
+    INVALID_ARGUMENT,
+    `\`${String(value)}\` is not a valid ${kind}: it would have to be pasted into a URL`,
+  );
+}
+
+/** `?a=1&b=2`, or `''` when nothing was asked for (a bare `?` is noise the hub has to parse). */
+function queryString(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value));
+  }
+  const out = search.toString();
+  return out ? `?${out}` : '';
+}
+
+/** A flow as the kernel stores it. `definition` travels as JSON, never as an escaped string. */
+export interface Flow {
+  id: string;
+  name: string;
+  enabled: boolean;
+  definition: Record<string, unknown>;
+  created_by?: string;
+  updated_by?: string;
+  [k: string]: unknown;
+}
+
+/** What `POST`/`PUT /api/hub/flows[/{id}]` accept. `enabled` defaults to true in the runtime. */
+export interface FlowInput {
+  name: string;
+  definition: Record<string, unknown>;
+  enabled?: boolean;
+}
+
+/** One page of run history. `next_cursor` comes only when the page was FULL (`§9`). */
+export interface RunPage<T = unknown> {
+  data: T[];
+  next_cursor?: string;
+}
+
+/**
+ * **The frozen §9 flows contract, and nothing else.** One method per route, no method that takes a
+ * path, no method that takes a URL. Adding one turns `flows.test.ts` red on purpose.
+ */
+export class FlowsApi {
+  constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+
+  /** `GET /api/hub/flows` */
+  async list(): Promise<Flow[]> {
+    return this.send({ method: 'GET', path: FLOWS_BASE_PATH }) as Promise<Flow[]>;
+  }
+
+  /** `POST /api/hub/flows` */
+  async create(flow: FlowInput): Promise<Flow> {
+    return this.send({ method: 'POST', path: FLOWS_BASE_PATH, body: flow }) as Promise<Flow>;
+  }
+
+  /** `GET /api/hub/flows/{id}` */
+  async get(id: string): Promise<Flow> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/${flow}` }) as Promise<Flow>;
+  }
+
+  /** `PUT /api/hub/flows/{id}` — revalidates the document and re-seeds the triggers. */
+  async update(id: string, flow: FlowInput): Promise<Flow> {
+    const target = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({
+      method: 'PUT',
+      path: `${FLOWS_BASE_PATH}/${target}`,
+      body: flow,
+    }) as Promise<Flow>;
+  }
+
+  /** `DELETE /api/hub/flows/{id}` — soft-delete: the row survives as the record it existed. */
+  async remove(id: string): Promise<unknown> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({ method: 'DELETE', path: `${FLOWS_BASE_PATH}/${flow}` });
+  }
+
+  /** `GET /api/hub/flows/{id}/grants` — what this flow is allowed to do unattended. */
+  async grants(id: string): Promise<unknown[]> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({
+      method: 'GET',
+      path: `${FLOWS_BASE_PATH}/${flow}/grants`,
+    }) as Promise<unknown[]>;
+  }
+
+  /** `PUT /api/hub/flows/{id}/grants` — a COMPLETE replace; `granted_by` comes from the session. */
+  async replaceGrants(id: string, grants: unknown[]): Promise<unknown[]> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({
+      method: 'PUT',
+      path: `${FLOWS_BASE_PATH}/${flow}/grants`,
+      body: { grants },
+    }) as Promise<unknown[]>;
+  }
+
+  /** `POST /api/hub/flows/{id}/run` — the manual trigger. */
+  async run(id: string, input?: Record<string, unknown>): Promise<unknown> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/${flow}/run`,
+      ...(input === undefined ? {} : { body: input }),
+    });
+  }
+
+  /** `GET /api/hub/flows/{id}/runs` — history, paged by CURSOR (a short page IS the end). */
+  async runs(id: string, page: { limit?: number; before?: string } = {}): Promise<RunPage> {
+    const flow = checkedSegment('flow id', id, ID_PATTERN);
+    const search = queryString({ limit: page.limit, before: page.before });
+    return this.send({
+      method: 'GET',
+      path: `${FLOWS_BASE_PATH}/${flow}/runs${search}`,
+    }) as Promise<RunPage>;
+  }
+
+  /** `GET /api/hub/flows/runs/{run_id}` — the run with its steps and the events it emitted. */
+  async getRun(runId: string): Promise<unknown> {
+    const run = checkedSegment('run id', runId, ID_PATTERN);
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/runs/${run}` });
+  }
+
+  /** `GET /api/hub/flows/approvals[?status=]` — the tray. `status` is an enum in the kernel
+   *  (`pending`/`approved`/`rejected`), so it is checked like a segment even though it travels as a
+   *  query param that `URLSearchParams` already encodes: nothing on this surface is free text. */
+  async approvals(status?: string): Promise<unknown[]> {
+    const filter = status === undefined ? '' : checkedSegment('status', status, ID_PATTERN);
+    return this.send({
+      method: 'GET',
+      path: `${FLOWS_BASE_PATH}/approvals${queryString({ status: filter })}`,
+    }) as Promise<unknown[]>;
+  }
+
+  /** `POST /api/hub/flows/approvals/{id}/approve` — `decided_by` is the session, never the body. */
+  async approve(approvalId: string, body?: Record<string, unknown>): Promise<unknown> {
+    const approval = checkedSegment('approval id', approvalId, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/approvals/${approval}/approve`,
+      ...(body === undefined ? {} : { body }),
+    });
+  }
+
+  /** `POST /api/hub/flows/approvals/{id}/reject` */
+  async reject(approvalId: string, body?: Record<string, unknown>): Promise<unknown> {
+    const approval = checkedSegment('approval id', approvalId, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/approvals/${approval}/reject`,
+      ...(body === undefined ? {} : { body }),
+    });
+  }
+
+  /** `GET /api/hub/flows/secrets` — the NAMES. There is no endpoint that returns a value, and
+   *  that absence is the design (ADR-0283 §4). */
+  async secrets(): Promise<unknown> {
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/secrets` });
+  }
+
+  /** `PUT /api/hub/flows/secrets/{name}` — write-only. */
+  async putSecret(name: string, value: string): Promise<unknown> {
+    const secret = checkedSegment('secret name', name, SECRET_NAME_PATTERN);
+    return this.send({
+      method: 'PUT',
+      path: `${FLOWS_BASE_PATH}/secrets/${secret}`,
+      body: { value },
+    });
+  }
+
+  /** `DELETE /api/hub/flows/secrets/{name}` */
+  async deleteSecret(name: string): Promise<unknown> {
+    const secret = checkedSegment('secret name', name, SECRET_NAME_PATTERN);
+    return this.send({ method: 'DELETE', path: `${FLOWS_BASE_PATH}/secrets/${secret}` });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Cliente que usan los Web Components.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class ErploraClient {
   private bridge?: BridgeTransport;
+  /** The module this client acts FOR, set only by {@link ErploraClient.forModule}. */
+  private moduleId?: string;
+  private flowsApi?: FlowsApi;
 
   constructor(
     private readonly transport: ErploraTransport,
@@ -910,6 +1181,63 @@ export class ErploraClient {
    */
   get peripherals(): BridgeTransport {
     return (this.bridge ??= new UnavailableBridgeTransport());
+  }
+
+  /**
+   * **This client, acting for a named module** (hub#714). The only way to reach {@link flows}.
+   *
+   * The shell calls it when it MOUNTS a module's Web Component (`ModuleView.vue`), which is the one
+   * place that genuinely knows which module is being loaded — so for every component the shell
+   * mounts, the id comes from the loader and not from something the module wrote about itself.
+   * A module that instead grabs `globalThis.erplora` gets the unscoped client, which has no `flows`
+   * at all: it would have to call this and name itself, and that naming is visible in its source.
+   *
+   * It is a **view, not a copy**: the scope delegates to this very instance through the prototype
+   * chain. That is deliberate and load-bearing — `apps/web/src/main.ts` bolts `print` and
+   * `loadSlot` onto the one client object AFTER constructing it, and a scope built with
+   * `new ErploraClient(…)` would silently lose both. The symptom would be «this module cannot
+   * print» in a shop, a long way from here.
+   */
+  forModule(moduleId: string): ErploraClient {
+    const id = typeof moduleId === 'string' ? moduleId.trim() : '';
+    if (!id) {
+      throw new ErploraError(INVALID_ARGUMENT, 'forModule() needs the id of the calling module');
+    }
+    const scoped = Object.create(this) as ErploraClient;
+    scoped.moduleId = id;
+    // Not inherited: the parent's memoised surface belongs to the parent's scope (or to none).
+    scoped.flowsApi = undefined;
+    return scoped;
+  }
+
+  /**
+   * **The hub's automation kernel** (`/api/hub/flows*`, ADR-0283 §9) — flows, their grants, their
+   * secrets and the approval tray. The typed way in for the flow editor module (pm#110).
+   *
+   * Reaching it needs THREE things, and this getter is only the first: the client must be scoped to
+   * a module ({@link forModule}); the user must hold a local owner/admin session, which the runtime
+   * checks and this SDK never second-guesses; and the module must have `manage_flows` declared in
+   * its `module.json` and granted by the owner in Settings → Permissions. A refusal arrives as
+   * `capability_denied`, so the editor can ask for the grant instead of showing «error».
+   */
+  get flows(): FlowsApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'the flows surface is module-scoped: use `erplora.forModule("<your module id>").flows`',
+      );
+    }
+    const transport = this.transport as Partial<CoreApiTransport>;
+    if (typeof transport.coreRequest !== 'function') {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        'this transport cannot reach the core REST surface',
+      );
+    }
+    return (this.flowsApi ??= new FlowsApi((req) =>
+      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
   }
 
   /**

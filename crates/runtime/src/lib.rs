@@ -1650,6 +1650,28 @@ impl Runtime {
             .await
     }
 
+    /// **Gate de UNA capability** para un módulo (ADR-0079, default-deny): tiene que estar
+    /// DECLARADA en su `module.json` **y** CONCEDIDA por el dueño. Es [`capabilities::require`]
+    /// con el `db`/`registry`/`hub_id` de este runtime ya puestos.
+    ///
+    /// La usa el server donde el host ejerce el primitivo. Hoy: la puerta del kernel de flujos
+    /// (`/api/hub/flows*`, hub#714), que **suma** este gate al de sesión admin — nunca lo
+    /// sustituye.
+    pub async fn require_module_capability(
+        &self,
+        module_id: &str,
+        kind: manifest::CapabilityKind,
+    ) -> Result<()> {
+        capabilities::require(
+            self.db.as_ref(),
+            &self.registry,
+            module_id,
+            &self.hub_id,
+            kind,
+        )
+        .await
+    }
+
     /// Concede/revoca una capability de un módulo (ADR-0079). `by` = `hub_user:<id>` admin.
     pub async fn set_module_capability(
         &self,
