@@ -25,7 +25,7 @@
 
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -117,9 +117,100 @@ pub struct ServeConfig {
     /// `HUB_WEB_DIR`. `None` ⇒ solo API (dev con Vite, que proxya, o binario sin front).
     pub web_dir: Option<String>,
     /// Valor del header `Content-Security-Policy` a emitir (ADR-0050). Cuando el doc lo sirve Axum
-    /// (mismo origen), el runtime lo emite. `None` ⇒ no se añade header (estado previo). El
-    /// contenido es columna de seguridad/humano.
-    pub csp: Option<String>,
+    /// —que es SIEMPRE, en cloud y en la app instalada, porque la ventana de Tauri navega a este
+    /// mismo servidor— la CSP de `tauri.conf` no alcanza al documento y esta es la única que hay.
+    ///
+    /// `String`, no `Option<String>`: «hub sin política» dejó de ser un estado representable
+    /// (hub#708). Lo era, y por eso la flota entera sirvió la app a pelo durante semanas. Se
+    /// rellena con [`resolve_csp`], que solo deja pasar un valor que el navegador pueda recibir.
+    pub csp: String,
+}
+
+/// La parte de la política que NO depende del despliegue (hub#708). Es el gemelo de la CSP del
+/// shell de Tauri (`apps/tauri/src-tauri/tauri.conf.json`), y las diferencias están enumeradas una
+/// a una en `crates/server/tests/cloud_csp.rs` — un test falla si aparece una que nadie explicó.
+///
+/// Cada ensanche respecto del shell tiene un motivo concreto:
+/// - `img-src blob:` / `media-src blob:` — el visor de `/files` y el avatar pintan bytes que YA
+///   trajo el runtime, vía `URL.createObjectURL`; el navegador nunca toca el almacenamiento
+///   (ADR-0047). Sin `media-src` explícito la etiqueta `<video>` cae en `default-src` y no pinta.
+/// - `script-src 'self'` y `worker-src 'self'` explícitos aunque `default-src` ya los cubra: son
+///   las dos directivas que deciden si un módulo puede ejecutar código ajeno, y así ensanchar
+///   `default-src` mañana no las ensancha de rebote.
+///
+/// Y lo que NO lleva, también a propósito: **`form-action`**. No hereda de `default-src`, así que
+/// su ausencia es una decisión: fijarla rompe el login con Google, cuya cadena de redirección sale
+/// del hub, pasa por el SaaS y vuelve — sin error que el usuario pueda accionar.
+const CSP_BASE: &str = "default-src 'self'; \
+                        script-src 'self'; \
+                        worker-src 'self'; \
+                        style-src 'self' 'unsafe-inline'; \
+                        img-src 'self' data: blob:; \
+                        media-src 'self' blob:; \
+                        frame-src 'none'; \
+                        object-src 'none'; \
+                        base-uri 'self'";
+
+/// El `connect-src` mínimo: el propio origen **y el canal IPC de Tauri**.
+///
+/// Lo segundo no es cosmético y es fácil de pasar por alto: la ventana de la app instalada NO carga
+/// un `dist` empaquetado, navega a `https://<hub>.erplora.com` (ADR-0159, `remote.urls` de
+/// `capabilities/default.json`), así que el documento que gobierna esta política ES el de la app —
+/// y su `invoke` viaja por `fetch("ipc://localhost/<cmd>")` (`tauri/src/ipc/protocol.rs`), que en
+/// Windows y Android reescribe a `http://ipc.localhost/<cmd>`. Sin estas dos fuentes, `connect-src`
+/// tumba TODO el hardware de la app instalada —imprimir, cajón, descubrimiento— en silencio.
+///
+/// En un navegador a secas son inertes: `ipc:` no es un esquema navegable y `ipc.localhost` no
+/// resuelve. Cuestan cero fuera de la app.
+const CSP_CONNECT_BASE: &str = "connect-src 'self' ipc: http://ipc.localhost";
+
+/// La política que sirve este hub. Lo único que no puede ser constante es el **origen del Cloud**:
+/// el front habla directo con él para el login, el refresh de JWT y las facturas
+/// (`apps/web/src/lib/cloud.ts`), así que con `connect-src 'self'` a secas el hub se queda sin
+/// login cloud. Sale de `HUB_CLOUD_API_URL` —lo que ESTE hub tiene configurado— y no de una
+/// constante `https://erplora.com`, que es justo el pendiente (c) de ADR-0050: un self-host o un
+/// staging con otro `VITE_CLOUD_API_URL` quedaba bloqueado por su propia CSP.
+///
+/// Sin Cloud configurado (dev, binario suelto) la política se queda en `'self'`: nada que permitir.
+pub fn default_csp(cloud_base_url: &str) -> String {
+    match cloud_origin(cloud_base_url) {
+        Some(origin) => format!("{CSP_BASE}; {CSP_CONNECT_BASE} {origin}"),
+        None => format!("{CSP_BASE}; {CSP_CONNECT_BASE}"),
+    }
+}
+
+/// `https://erplora.com/algo/` → `https://erplora.com`. Una fuente de CSP es un ORIGEN: con la
+/// ruta pegada el navegador la trata como path-matching y deja de casar con `/api/v1/...`.
+/// Devuelve `None` si el valor no es una URL absoluta con host (incluye el string vacío).
+fn cloud_origin(cloud_base_url: &str) -> Option<String> {
+    let raw = cloud_base_url.trim();
+    let (scheme, rest) = raw.split_once("://")?;
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return None;
+    }
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    // Un host con espacios, comillas o `;` rompería el header o inyectaría otra directiva.
+    if authority.is_empty()
+        || !authority
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '[' | ']'))
+    {
+        return None;
+    }
+    Some(format!("{}://{}", scheme.to_ascii_lowercase(), authority))
+}
+
+/// Resuelve la CSP que va a servir el hub a partir del valor crudo de `HUB_CSP` (hub#708).
+///
+/// `HUB_CSP` **sustituye** la política; no la quita. Vacío, en blanco o imposible de meter en un
+/// header (un salto de línea, un byte no-ASCII) cae a [`default_csp`] en vez de dejar el hub
+/// desnudo — que es exactamente cómo se sirvió la flota entera hasta ahora: el aprovisionador
+/// escribía `HUB_CSP_ENFORCE` y el runtime leía `HUB_CSP`, así que la rama "no hay valor" era la
+/// única que corría y no emitía nada.
+pub fn resolve_csp(raw: Option<String>, cloud_base_url: &str) -> String {
+    raw.map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty() && HeaderValue::from_str(value).is_ok())
+        .unwrap_or_else(|| default_csp(cloud_base_url))
 }
 
 impl ServeConfig {
@@ -127,6 +218,8 @@ impl ServeConfig {
     /// [`HubConfig::from_env`].
     pub fn from_env() -> Self {
         let hub = HubConfig::from_env();
+        // Antes del literal: `hub` se mueve dentro y la política necesita su `cloud_base_url`.
+        let csp = resolve_csp(std::env::var("HUB_CSP").ok(), &hub.cloud_base_url);
         Self {
             database_url: std::env::var("HUB_DATABASE_URL").unwrap_or_default(),
             bind: std::env::var("HUB_BIND").unwrap_or_else(|_| "127.0.0.1:8787".into()),
@@ -141,8 +234,8 @@ impl ServeConfig {
             hub_id_cell: None,
             // ECS/binario: el `dist/` se sirve de disco por `HUB_WEB_DIR` (paridad Hub Cloud).
             web_dir: std::env::var("HUB_WEB_DIR").ok().filter(|s| !s.is_empty()),
-            // CSP opcional vía env (None por defecto = comportamiento previo). En Tauri la fija el shell.
-            csp: std::env::var("HUB_CSP").ok().filter(|s| !s.is_empty()),
+            // Nunca `None`: `HUB_CSP` solo puede SUSTITUIR la política (ver `resolve_csp`).
+            csp,
         }
     }
 }
@@ -926,11 +1019,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // apagado el suyo (hub#670: el último flush de la marca de actividad).
     let announce_state = state.clone();
     let shutdown_state = state.clone();
-    let mut router = build_router(state, cfg.web_dir.as_deref());
-    // CSP (ADR-0050): con el doc servido por Axum, la CSP de `tauri.conf` no aplica → la emitimos aquí.
-    if let Some(csp) = cfg.csp.as_deref() {
-        router = with_csp(router, csp);
-    }
+    // CSP (ADR-0050, hub#708): con el doc servido por Axum —que es SIEMPRE, también en la app
+    // instalada, cuya ventana navega aquí— la de `tauri.conf` no alcanza al documento. Sin rama:
+    // la política se emite siempre, y `cfg.csp` es `String` para que "sin CSP" ni se pueda escribir.
+    let router = build_serving_router(state, cfg.web_dir.as_deref(), &cfg.csp);
 
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
     eprintln!("erplora-server escuchando en http://{}", cfg.bind);
@@ -1553,27 +1645,36 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
     router.fallback_service(ServeDir::new(web_dir).fallback(ServeFile::new(index)))
 }
 
-/// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). Cuando el documento
-/// lo sirve el propio Axum (Hub Local mismo-origen, o Hub Cloud), la CSP de `tauri.conf` ya **no**
-/// aplica al doc (solo la inyecta el protocolo de assets de Tauri), así que el runtime debe emitirla.
-/// En las respuestas de API el header es inocuo. El valor lo decide el llamador (es columna de
-/// seguridad/humano): en Tauri lo fija `embedded_serve_config`; en ECS sale de `HUB_CSP` (o `None`).
+/// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). La CSP de
+/// `tauri.conf` **no** aplica a este documento —solo la inyecta el protocolo de assets de Tauri, y
+/// la ventana de la app instalada navega a ESTE servidor (ADR-0159)—, así que el runtime es el
+/// único que puede emitirla. En las respuestas de API el header es inocuo.
+///
+/// El valor sale siempre de [`resolve_csp`]: [`default_csp`] salvo que `HUB_CSP` lo sustituya. La
+/// mención a un `embedded_serve_config` y a un `None` que había aquí quedó obsoleta: el runtime
+/// embebido del shell ya no existe, y desde hub#708 tampoco existe el caso «sin política».
 pub fn with_csp(router: Router, csp: &str) -> Router {
     use axum::http::header::CONTENT_SECURITY_POLICY;
-    use axum::http::HeaderValue;
-    // No abortar el arranque por una CSP mal formada (p. ej. `HUB_CSP` de ECS con un salto de línea o
-    // byte no-ASCII): se loguea y se sigue SIN header en vez de panicar. En Tauri el input es la const
-    // `LOOPBACK_CSP` (siempre válida); este guard protege el camino ECS (`HUB_CSP` del entorno).
-    match HeaderValue::from_str(csp) {
-        Ok(value) => router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
-            CONTENT_SECURITY_POLICY,
-            value,
-        )),
-        Err(e) => {
-            eprintln!("CSP inválida ignorada (no se emite header Content-Security-Policy): {e}");
-            router
-        }
-    }
+    // No abortar el arranque por una CSP mal formada (un salto de línea, un byte no-ASCII), pero
+    // TAMPOCO servir sin política: se cae a la de por defecto y se avisa. `resolve_csp` ya filtra
+    // el camino de `HUB_CSP`; esto cubre a cualquier otro llamador. Servir sin header era la rama
+    // que dejó a la flota entera sin CSP (hub#708), así que aquí ya no existe.
+    let value = HeaderValue::from_str(csp).unwrap_or_else(|e| {
+        eprintln!("CSP inválida ({e}): se sirve la política por defecto en su lugar");
+        HeaderValue::from_str(&default_csp("")).expect("la CSP por defecto siempre es un header")
+    });
+    router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
+        CONTENT_SECURITY_POLICY,
+        value,
+    ))
+}
+
+/// El router que monta [`serve`] de verdad: API + (opcional) front estático + la CSP, que **no** es
+/// opcional. Extraído por el mismo motivo que [`build_router`] en su día: para poder afirmar sobre
+/// la composición REAL sin bindear un puerto. Que la cabecera no dependa de una rama `if let` es el
+/// contrato que fija `crates/server/tests/cloud_csp.rs`.
+pub fn build_serving_router(state: AppState, web_dir: Option<&str>, csp: &str) -> Router {
+    with_csp(build_router(state, web_dir), csp)
 }
 
 /// Compone el router de API (`app`) con, opcionalmente, el frontend estático servido en el **MISMO

@@ -1,8 +1,11 @@
-//! ADR-0050 (Hub Local, mismo origen): el runtime embebido —construido DESDE la config con `web_dir`
-//! seteado, igual que `embedded_serve_config` del shell Tauri— sirve el `dist/` Y la API en el MISMO
-//! router (mismo origen `127.0.0.1:8787`, sin CORS), para que `HttpWsTransport` (RUNTIME_URL='')
-//! alcance el loopback. Cubre el camino REAL config→router (`build_router`), no `with_static_frontend`
-//! aislado (que ya cubre `spa_frontend.rs` con un router de API falso).
+//! ADR-0050 (mismo origen): el runtime —construido DESDE la config con `web_dir` seteado— sirve el
+//! `dist/` Y la API en el MISMO router (sin CORS), para que `HttpWsTransport` (RUNTIME_URL='')
+//! alcance el servidor. Cubre el camino REAL config→router (`build_router`), no
+//! `with_static_frontend` aislado (que ya cubre `spa_frontend.rs` con un router de API falso).
+//!
+//! (Decía «igual que `embedded_serve_config` del shell Tauri»: ese runtime embebido ya no existe —
+//! la ventana navega al servidor remoto, ADR-0159.) La CSP vive ahora en `cloud_csp.rs`; lo que
+//! queda aquí de `with_csp` es solo que el header sale en la respuesta.
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
