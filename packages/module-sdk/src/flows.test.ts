@@ -112,6 +112,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
     'replaceGrants',
     'run',
     'runs',
+    'schema',
     'secrets',
     'update',
   ]);
@@ -134,6 +135,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
   await flows.secrets();
   await flows.putSecret('API_KEY', 'sk-live-42');
   await flows.deleteSecret('API_KEY');
+  await flows.schema();
 
   assert.deepEqual(
     calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
@@ -154,6 +156,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
       'GET /api/hub/flows/secrets',
       'PUT /api/hub/flows/secrets/API_KEY',
       'DELETE /api/hub/flows/secrets/API_KEY',
+      'GET /api/hub/flows/schema',
     ],
   );
   for (const call of calls) {
@@ -268,4 +271,25 @@ test('hub#714: forModule refuses an empty id instead of sending an anonymous cal
       (e: unknown) => e instanceof ErploraError && e.code === 'invalid_argument',
     );
   }
+});
+
+test('hub#716: the editor ASKS the hub for the flow contract instead of carrying a copy', async () => {
+  // The editor is a module installed from the marketplace and updated on its own clock (hub#516),
+  // so a schema baked into its bundle is a photo of whatever core it was built against. What the
+  // hub answers is what the hub ENFORCES — including the version, so the editor can say «this hub
+  // is older than what you are drawing» rather than producing a document that gets refused.
+  const contract = {
+    schema_version: 1,
+    core_version: '1.2.3',
+    schema: { $id: 'https://erplora.com/schemas/flow.schema.json', type: 'object' },
+  };
+  const { client, calls } = scoped({ ok: true, data: contract });
+
+  const served = await client.flows.schema();
+
+  assert.deepEqual(served, contract);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, `http://hub${FLOWS_BASE_PATH}/schema`);
+  assert.equal(calls[0].method, 'GET');
+  assert.equal(calls[0].headers[MODULE_HEADER], EDITOR, 'same gate as the rest of the surface');
 });
