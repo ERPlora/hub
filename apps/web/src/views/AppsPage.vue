@@ -158,7 +158,7 @@ import { config } from '../lib/config';
 import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
-  getModuleCapabilities, putModuleCapabilities, ModuleActionError, InstallBlockedError,
+  getModuleCapabilities, putModuleCapabilities, InstallBlockedError,
   updateModule, listModuleUpdates, listModuleVersions,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
@@ -167,6 +167,7 @@ import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../l
 import { catalogActionFor, catalogRowState, isModuleInstalled, type CatalogRowState } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
+import { moduleFailureMessage } from '../lib/module-failure-message';
 import {
   defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
   type ModuleUpdateInfo,
@@ -659,8 +660,10 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
         0,
       );
     } else {
-      // Lo importante de este mensaje: el módulo NO se ha quedado a medias.
-      notify(t('apps.updateError', { name }), 'danger');
+      // What the RUNTIME said, and only if it said anything (hub#673). What matters about the
+      // message is still that the module was NOT left half-done — the runtime guarantees that,
+      // not the sentence.
+      notify(moduleFailureMessage(e, t('apps.updateError', { name })), 'danger');
     }
   } finally {
     setUpdating(id, false);
@@ -779,7 +782,12 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
         0,
       );
     } else {
-      notify(t('apps.installError', { name: mod.name }), 'danger');
+      // This is where the second discard of hub#673 lived. `e` carried the runtime's sentence —no
+      // machine token, bad signature, missing version, unresolved dependency, SHA-256 mismatch,
+      // migration blown up— and this `else` threw it away to print the same line every time. With
+      // six causes indistinguishable, the fleet-wide install breakage of 08-09 (saas#1352) was
+      // invisible from the till.
+      notify(moduleFailureMessage(e, t('apps.installError', { name: mod.name })), 'danger');
     }
   } finally {
     clearProgress(mod.id);
@@ -887,18 +895,6 @@ async function confirmToggle(m: InstalledModule, affected: InstalledModule[]): P
   return role === 'confirm';
 }
 
-/**
- * Motivo REAL de un rechazo del runtime, o `fallback` si no lo hubo.
- *
- * hub#314: desactivar/desinstalar un módulo que aún debe registros a la AEAT se rechaza con un
- * código de dominio (`verifactu.unsent_records`) y un mensaje que dice cuántos quedan. Aplanar eso
- * a «no se pudo desinstalar» dejaba al usuario sin saber ni qué pasa ni qué hacer — la guarda
- * volvía a ser un no-op mudo. Sin `code` (fallo de red/500) no hay motivo que enseñar: genérico.
- */
-function reasonOf(e: unknown, fallback: string): string {
-  return e instanceof ModuleActionError && e.code && e.message ? e.message : fallback;
-}
-
 /** Activa o desactiva un módulo (hot-plug) y refresca la lista + la nav del shell. */
 async function toggleModule(m: InstalledModule): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
@@ -915,7 +911,7 @@ async function toggleModule(m: InstalledModule): Promise<void> {
     await loadInstalled();
     void refreshModuleNav();
   } catch (e) {
-    notify(reasonOf(e, t('apps.toggleError', { name: m.name })), 'danger');
+    notify(moduleFailureMessage(e, t('apps.toggleError', { name: m.name })), 'danger');
   }
 }
 
@@ -953,7 +949,7 @@ async function removeModule(m: InstalledModule): Promise<void> {
     await Promise.all([loadInstalled(), loadCatalog()]);
     void refreshModuleNav();
   } catch (e) {
-    notify(reasonOf(e, t('apps.uninstallError', { name: m.name })), 'danger');
+    notify(moduleFailureMessage(e, t('apps.uninstallError', { name: m.name })), 'danger');
   }
 }
 
@@ -1063,10 +1059,10 @@ watch(locale, () => {
   // La preferencia personal se hidrata después del shell. Recargamos con `Accept-Language`
   // efectivo para no mezclar cabeceras traducidas con metadatos del catálogo en otro idioma.
   void loadCatalog();
-  // Y los INSTALADOS (hub#781). Sus nombres los traduce el runtime y viajan horneados en la
-  // respuesta (`/api/modules?locale=`, ADR-0055): sin volver a pedirlos, «Mis apps» se quedaba con
-  // los de la primera petición — el chrome en inglés y las apps en `Clientes`, `Impuestos`,
-  // `Inventario`, que es el idioma con el que arrancó el shell antes de que llegase el perfil.
+  // And the INSTALLED ones (hub#781). Their names are localized by the runtime and travel baked
+  // into the answer (`/api/modules?locale=`, ADR-0055): without asking again, «My apps» kept the
+  // ones from the first request — the chrome in English and the apps as `Clientes`, `Impuestos`,
+  // `Inventario`, the language the shell booted with before the profile arrived.
   void loadInstalled();
 });
 
