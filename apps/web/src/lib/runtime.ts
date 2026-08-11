@@ -590,6 +590,80 @@ export async function publishFiscalIdentity(): Promise<void> {
   if (!res.ok) throw new Error(`publish-fiscal-identity → ${res.status}`);
 }
 
+// ── Otorgamiento de representación (hub#817 / saas#1438) ──────────────────────────────────────
+// ERPlora remite los registros VERI*FACTU EN NOMBRE del obligado, y eso exige su consentimiento
+// firmado (Anexo I, Resolución DG AEAT 18/12/2024). Se firma aquí y lo CUSTODIA el SaaS.
+//
+// 🔴 Las dos llamadas van al RUNTIME, nunca al SaaS: el token de máquina del hub es secreto suyo y
+// no cruza a este navegador (ADR-0003). El runtime pone la cabecera, compone el documento y lo
+// manda; este lado no guarda ni el trazo ni el DNI.
+
+/** Lo que las dos rutas contestan siempre. `status: ''` = el runtime no contestó. */
+export interface RepresentationGrantStatus {
+  status: '' | 'absent' | 'vigente' | 'revocado';
+  /** Fecha DEL ESTADO: cuándo se firmó si está vigente, cuándo se revocó si está revocado. */
+  at: string;
+}
+
+/**
+ * Lo que contesta el **GET**: el estado más el texto que hay que enseñar.
+ *
+ * `anexo_text` viaja solo aquí, y por eso es un tipo aparte: el POST no lo devuelve, y declararlo
+ * en el tipo común diría que sí — que es justo la clase de mentira que un tipo existe para evitar.
+ */
+export interface RepresentationGrantState extends RepresentationGrantStatus {
+  /** El texto del Anexo I con sus placeholders, servido por el runtime (fuente única). */
+  anexo_text: string;
+}
+
+/** Lo que la pantalla manda a firmar. `signature` es el trazo; el documento lo monta el runtime. */
+export interface RepresentationGrantCapture {
+  obligado_nif: string;
+  obligado_name: string;
+  signer_nif: string;
+  signer_name: string;
+  signature: Blob;
+  dni_copy: File;
+}
+
+/**
+ * Lee el estado del otorgamiento (`GET /api/fiscal/representation-grant`). Cualquier sesión.
+ *
+ * **Lanza** si el runtime no contesta, en vez de degradar a «ausente»: «no lo sé» y «no has
+ * firmado» no son lo mismo, y enseñar el segundo cuando pasa el primero manda a alguien a firmar
+ * un otorgamiento que ya tiene.
+ */
+export async function getRepresentationGrant(): Promise<RepresentationGrantState> {
+  const res = await fetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) throw new Error(`get-representation-grant → ${res.status}`);
+  return (await res.json()) as RepresentationGrantState;
+}
+
+/**
+ * Sube el otorgamiento firmado (`POST /api/fiscal/representation-grant`, multipart). Solo admin
+ * (el runtime revalida). Lanza si el runtime o el SaaS lo rechazan.
+ */
+export async function postRepresentationGrant(
+  capture: RepresentationGrantCapture,
+): Promise<RepresentationGrantStatus> {
+  const form = new FormData();
+  form.append('obligado_nif', capture.obligado_nif);
+  form.append('obligado_name', capture.obligado_name);
+  form.append('signer_nif', capture.signer_nif);
+  form.append('signer_name', capture.signer_name);
+  form.append('signature', capture.signature, 'signature.png');
+  form.append('dni_copy', capture.dni_copy, capture.dni_copy.name);
+  const res = await fetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
+    method: 'POST',
+    headers: runtimeHeaders(),
+    body: form,
+  });
+  if (!res.ok) throw new Error(`post-representation-grant → ${res.status}`);
+  return (await res.json()) as RepresentationGrantStatus;
+}
+
 /**
  * Elimina el certificado fiscal del negocio (`DELETE /api/business/certificate`). Solo admin (401
  * si no). Lanza si el runtime rechaza.

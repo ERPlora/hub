@@ -189,6 +189,15 @@ pub enum RefetchTrigger {
     /// certificate was revoked, replaced or simply refused, and the whole point of this trigger is
     /// to converge on a failure it does not understand. The budget is what bounds it.
     TlsFailure,
+    /// **The customer just signed the Anexo I** (hub#817). Fires only for a hub that holds no
+    /// delegated certificate — the same predicate as [`RefetchTrigger::Boot`], because that is
+    /// exactly the state signing gets a hub out of: without a vigente grant the control plane
+    /// refuses the key (saas#1438), so the hub has been coming up empty.
+    ///
+    /// It exists because the trigger that would otherwise pick this up is the heartbeat, and the
+    /// heartbeat runs **once a day**. Waiting for it would mean the person who just signed sits in
+    /// front of a go-live that still refuses, for up to 24 hours, with nothing to tell them why.
+    GrantSigned,
 }
 
 /// How many refetches this hub allows itself per rolling hour, across ALL three triggers.
@@ -365,7 +374,7 @@ pub async fn refetch_once(
     hub_id: &str,
 ) -> RefetchOutcome {
     let needed = match trigger {
-        RefetchTrigger::Boot => {
+        RefetchTrigger::Boot | RefetchTrigger::GrantSigned => {
             let rt = runtime.lock().await;
             boot_requires_refetch(rt.db(), hub_id).await
         }
@@ -422,6 +431,35 @@ pub async fn refetch_once(
             RefetchOutcome::Failed(error)
         }
     }
+}
+
+/// **Asks for the certificate the signature just unlocked** (hub#817), off the request path.
+///
+/// Spawned rather than awaited: the person who signed gets their `201` back straight away, and a
+/// control plane that is slow or down must not turn a successful capture into a failed one. Its
+/// outcome is deliberately dropped — the grant is archived either way, and the hub converges by the
+/// boot and heartbeat triggers if this attempt does not land.
+///
+/// Spends the SAME hourly budget as the other three (`AppState::certificate_budget`): the control
+/// plane counts one total per hub, so a fourth trigger with a budget of its own would be a fourth
+/// way to blow the allowance.
+pub fn refetch_after_grant(st: &AppState) {
+    let Some(auth) = crate::auth::machine_auth(st) else {
+        return;
+    };
+    let (st, hub_id) = (st.clone(), st.hub_id());
+    tokio::spawn(async move {
+        refetch_once(
+            RefetchTrigger::GrantSigned,
+            &st.certificate_budget,
+            &st.http,
+            &st.config.cloud_base_url,
+            &auth,
+            &st.runtime,
+            &hub_id,
+        )
+        .await;
+    });
 }
 
 /// Starts the two refetch triggers that need a task of their own: **boot** and **TLS failure**.

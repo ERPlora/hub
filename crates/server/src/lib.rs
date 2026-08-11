@@ -79,6 +79,8 @@ pub mod outbox_admin;
 pub mod print;
 pub mod print_ws;
 pub mod profile;
+/// El otorgamiento de representación firmado (hub#817): se captura aquí y lo custodia el SaaS.
+pub mod representation_grant;
 pub mod router;
 pub mod settings;
 pub mod state;
@@ -948,7 +950,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // plano de control, así que una rotación converge por la llamada que YA se hacía, sin canal de
     // push ni scheduler nuevo. El presupuesto es compartido con los otros dos disparadores
     // (`fiscal_certificate::RefetchBudget`) porque el Cloud cuenta un solo total por hub.
-    let certificate_budget = std::sync::Arc::new(fiscal_certificate::RefetchBudget::hourly());
+    // Un solo presupuesto por proceso, y vive en `AppState` porque desde hub#817 hay un CUARTO
+    // disparador (firmar el Anexo I) que sale de una petición, no de estos bucles.
+    let certificate_budget = state.certificate_budget.clone();
     {
         let st = state.clone();
         let certificate_budget = certificate_budget.clone();
@@ -1270,6 +1274,11 @@ pub fn app(state: AppState) -> Router {
         // Identidad fiscal hacia el SaaS (ADR-0201 7/11): la casilla «usar estos datos también
         // para mi factura de ERPlora». La llamada la hace el RUNTIME — el cloud_api_token nunca
         // cruza al navegador.
+        .route(
+            "/api/fiscal/representation-grant",
+            get(representation_grant::get_representation_grant)
+                .post(representation_grant::post_representation_grant),
+        )
         .route(
             "/api/business/fiscal-identity",
             post(settings::publish_fiscal_identity),

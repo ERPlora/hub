@@ -366,6 +366,26 @@ export default {
     adminOnly: 'Solo un administrador puede cambiar si este hub pregunta.',
     saveError: 'No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.',
   },
+  // Ver la nota del bloque equivalente en `en.ts`.
+  grant: {
+    intro:
+      'ERPlora remite tus registros de facturación a la Agencia Tributaria EN TU NOMBRE. La ley exige tu consentimiento firmado para eso, y esto es ese consentimiento. Léelo, fírmalo y adjunta una copia del DNI.',
+    stateVigente: 'Firmado el {date}. ERPlora puede remitir en tu nombre.',
+    stateRevoked: 'Revocado el {date}. ERPlora no puede remitir en tu nombre.',
+    stateAbsent: 'Sin firmar. Tu negocio no puede pasar a producción hasta que lo firmes.',
+    stateUnknown: 'Consultando con ERPlora…',
+    obligadoNif: 'NIF del obligado (tu negocio)',
+    obligadoName: 'Razón social (tu negocio)',
+    signerNif: 'NIF/NIE de quien firma',
+    signerName: 'Nombre y apellidos de quien firma',
+    signatureTitle: 'Firma',
+    signatureHint:
+      'Dibuja tu firma. En una empresa firma el representante legal — y la copia del DNI de abajo es la SUYA, no la de la sociedad.',
+    signatureClear: 'Borrar firma',
+    dniChoose: 'Adjuntar copia del DNI/NIE',
+    confirm: 'He leído el otorgamiento de arriba y lo firmo.',
+    submit: 'Firmar y enviar',
+  },
   settings: {
     hubWide: 'Ajustes del Hub',
     currency: 'Moneda',
@@ -418,6 +438,9 @@ export default {
     shareWithErploraDone: 'Datos compartidos con ERPlora.',
     shareWithErploraError: 'No se han podido compartir los datos con ERPlora.',
     shareWithErploraNeedsTaxId: 'Rellena antes el NIF.',
+    grantTitle: 'Otorgamiento de representación',
+    grantDesc:
+      'Tu consentimiento firmado para que ERPlora remita tus registros de facturación a la Agencia Tributaria en tu nombre. Obligatorio antes de que el negocio pase a producción.',
     certTitle: 'Certificado fiscal',
     certDesc: 'Certificado de empresa (.p12) para la firma fiscal de facturas. Lo usan los módulos de cumplimiento por país.',
     certPresent: 'Certificado configurado (subido el {date})',

@@ -184,6 +184,26 @@ impl CloudClient {
         self.get("/api/v1/hub/device/fiscal/certificate/", auth)
     }
 
+    /// **El otorgamiento de representación firmado** (hub#817 / saas#1438).
+    ///
+    /// `POST` archiva el Anexo I firmado + la copia del DNI (multipart, lo monta el server);
+    /// `GET` contesta su estado (vigente / revocado / ausente + fecha) y **nunca** los documentos.
+    /// Misma URL para los dos verbos, así que el builder es uno.
+    ///
+    /// Credencial de **máquina**, como sus vecinas: la persona que firma en el mostrador no tiene
+    /// un JWT del SaaS vivo (ADR-0003), y el `cloud_api_token` no cruza al navegador — la pantalla
+    /// llama al runtime y es el runtime quien pone la cabecera.
+    pub fn representation_grant(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!(
+                "{}/api/v1/hub/device/fiscal/representation-grant/",
+                self.base_url
+            ),
+            headers: auth.headers(),
+        }
+    }
+
     /// **Identidad fiscal del negocio hacia el SaaS** (ADR-0201 decisión 5, 7/11 — hub#333).
     /// `POST /api/v1/hub/device/fiscal-identity/` con la credencial de máquina; el body (razón
     /// social, NIF, dirección) lo construye el server desde `hub_settings`, que es donde el

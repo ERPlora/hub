@@ -1248,6 +1248,41 @@ ALTER TABLE hub_session ALTER COLUMN hub_id SET NOT NULL;\
 CREATE INDEX IF NOT EXISTS ix_hub_user_hub ON hub_user (hub_id, name);\
 CREATE INDEX IF NOT EXISTS ix_hub_session_hub ON hub_session (hub_id);",
     },
+    // ── v43 — hub#817 / saas#1438: el OTORGAMIENTO firmado, recordado en el perfil ─────────────
+    // ERPlora remite los registros **en nombre del** obligado, y eso exige su consentimiento
+    // firmado (Anexo I de la Resolución DG AEAT de 18/12/2024, bajo el Convenio 17). El documento
+    // lo **custodia el SaaS** —es a ERPlora a quien se otorga—, así que este hub no puede ser la
+    // autoridad sobre un papel que no guarda: estas dos columnas son una COPIA de lo que el plano
+    // de control contestó.
+    //
+    // Por qué se copia en vez de preguntar: `fiscal_profile::go_live` es una transición de base de
+    // datos, y meterle una llamada de red la haría fallar cuando el SaaS no responde —justo el
+    // momento en que un negocio menos quiere que le bloqueen el paso a producción— o la obligaría
+    // a adivinar. Guardada, la respuesta **sobrevive al reinicio**: en memoria, un redespliegue la
+    // convertiría en «no sé», que es o una puerta abierta o una atascada.
+    //
+    // `''` = «nunca se preguntó», distinto de `absent` = «se preguntó y no hay ninguno». Son dos
+    // estados distintos para la pantalla: uno dice «cargando», el otro «tienes que firmar». Las dos
+    // columnas siguen el contrato de fila: TEXT, `''` para «desconocido», nunca NULL.
+    //
+    // ⚠️ v43, y nació como v42: `hub_identity_hub_scoped` (hub#497) se llevó el 42 mientras esta
+    // rama estaba en vuelo, y el rebase lo destapó como conflicto — que es exactamente para lo
+    // que sirve tener el número a mano. `apply` aborta ruidosamente si una entrada del catálogo
+    // cae en o por debajo del máximo aplicado, pero solo cuando un hub ya lleva el número más
+    // alto: tardísimo para enterarse. Recompruébalo contra `origin/develop` en el push
+    // (hub#573); no lo recuerdes.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`. `tests/access_email_backfill.rs`
+    // rebobina la tabla de control y reaplica todo lo posterior sobre una BD que ya tiene los
+    // objetos; un `ADD COLUMN` pelado falla 42701 y se lleva esa suite por delante.
+    SystemMigration {
+        version: 43,
+        name: "hub_fiscal_representation",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_status TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_at TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2957,11 +2992,14 @@ mod kind_contract_tests {
         // 38 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
         // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731) + `_flow_approvals` (v38, hub#665) +
         // `_hub_activity` (v39, hub#670) + `_update_history` (v40, hub#564) + `hub_module_package`
-        // (v41, hub#571). El número está a mano a propósito: añadir una migración de sistema tiene
+        // (v41, hub#571) + `hub_identity_hub_scoped` (v42, hub#497) + el otorgamiento de
+        // representación en el perfil fiscal (v43, hub#817).
+        // El número está a mano a propósito: añadir una migración de sistema tiene
         // que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero
         // antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan el mismo
         // número, como pasó en esta ola: hub#731 y hub#665 pidieron las dos el v37; hub#670,
-        // hub#564 y hub#571 pidieron las tres el v39. Y `hub_identity_hub_scoped` (v42, hub#497).
-        assert_eq!(MIGRATIONS.len(), 39, "el catálogo cambió de tamaño");
+        // hub#564 y hub#571 pidieron las tres el v39. Y `hub_identity_hub_scoped` (v42, hub#497)
+        // se llevó el 42 que había pedido el otorgamiento de representación, que pasó al v43.
+        assert_eq!(MIGRATIONS.len(), 40, "el catálogo cambió de tamaño");
     }
 }
