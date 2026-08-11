@@ -550,6 +550,11 @@ export default {
     tabCatalog: 'Add apps',
     tabPaid: 'Paid',
     emptyInstalled: 'You have no apps yet. Open “Add apps” to install your first one.',
+    // hub#770: «you have no apps» is a fact about the hub, so it is only ever said about an
+    // answer that came back and said so. These two are the other two things the screen can know.
+    loadingInstalled: 'Loading your apps…',
+    installedLoadError:
+      'We could not read your apps. There was no answer, or this session is no longer valid — sign in again if it keeps happening.',
     emptyCatalog: 'No apps match your search.',
     catalogLoadError:
       'The catalog could not be loaded. Check the connection or this device registration.',
@@ -581,6 +586,9 @@ export default {
     actionUninstall: 'Uninstall',
     actionInstall: 'Install',
     actionUpdate: 'Update',
+    // Icon-only like every action (Ioan 2026-07-16 on ADR-0133): okdt puts this in `aria-label`
+    // and `title`, never on the face of the button.
+    actionOpen: 'Open',
     priceFree: 'Free',
     priceMonthly: '€{price}/month',
     priceYearly: '€{price}/year',
@@ -610,13 +618,22 @@ export default {
     needsSubscription: '{name} needs a subscription. Subscribe from your ERPlora account at erplora.com and it will install here.',
     deactivated: '{name} deactivated.',
     activated: '{name} activated.',
-    cascadeOffTitle: 'Deactivate {name}',
     cascadeOffMsg: 'These will also be deactivated (they depend on {name}):',
-    cascadeOnTitle: 'Activate {name}',
     cascadeOnMsg: 'These will also be activated ({name} needs them):',
-    cascadeConfirm: 'Continue',
     cascadeCancel: 'Cancel',
+    // The switch on an app card is the SAME pictogram for on and for off (hub#773), so the
+    // question it opens is the only place a person is told which way the press goes. Title names
+    // the app and the direction; the body says what changes on the till.
+    toggleOffTitle: 'Deactivate {name}',
+    toggleOffBody: '{name} disappears from the till and its screens stop opening. Nothing is deleted: switching it back on leaves it as it was.',
+    toggleOffConfirm: 'Deactivate',
+    toggleOnTitle: 'Activate {name}',
+    toggleOnBody: '{name} comes back to the till, with the data it already had.',
+    toggleOnConfirm: 'Activate',
     uninstallTitle: 'Uninstall {name}',
+    // What the old text said was what is KEPT. This is the half it left out: the apps that need
+    // this one stop working, and unlike deactivating, there is no switching them back on.
+    uninstallBreaks: 'These apps need {name} and will stop working:',
     uninstallBody: 'The app will no longer be available. Its data and files will be kept for a later reinstall.',
     uninstallConfirm: 'Uninstall',
     toggleError: 'Could not change the status of {name}.',

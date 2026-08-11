@@ -21,6 +21,15 @@
           {{ t('apps.retryCatalog') }}
         </ion-button>
       </ok-inline-feedback>
+      <!-- El fallo se DICE, y se dice al lado de la lista, no en su lugar (hub#770). «Añadir apps»
+           ya pintaba su error; «Mis apps» se lo tragaba y se quedaba en un vacío que parecía un
+           hecho sobre el hub. -->
+      <ok-inline-feedback v-if="installedDisplay === 'error' && tab === 'mine'" tone="danger" class="mb-3">
+        <span>{{ t('apps.installedLoadError') }}</span>
+        <ion-button size="small" fill="clear" @click="loadInstalled">
+          {{ t('apps.retryCatalog') }}
+        </ion-button>
+      </ok-inline-feedback>
 
       <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida. -->
       <ok-data-table
@@ -35,7 +44,7 @@
         :actions="mineActions"
         :labels="tableLabels"
         :search-placeholder="t('apps.searchInstalled')"
-        :empty-message="t('apps.emptyInstalled')"
+        :empty-message="installedEmptyMessage"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -152,8 +161,10 @@ import {
   updateModule, listModuleUpdates, listModuleVersions,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
-import { refreshModuleNav } from '../lib/nav';
-import { isModuleInstalled } from '../lib/apps-catalog';
+import { moduleNav, refreshModuleNav } from '../lib/nav';
+import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
+import { catalogActionFor, catalogRowState, isModuleInstalled, type CatalogRowState } from '../lib/apps-catalog';
+import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import {
   defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
   type ModuleUpdateInfo,
@@ -216,6 +227,9 @@ interface DataTableAction {
 // --- Estado ---
 const modules = ref<Mod[]>([]);
 const installedModules = ref<InstalledModule[]>([]);
+// Qué sabe la pantalla de esa lista (hub#770). Arranca en `loading`: el primer pintado ocurre antes
+// de que ninguna petición haya vuelto, y nacer en `ready` es decir «no tienes apps» en cada carga.
+const installedState = ref<ListLoadState>('loading');
 // Qué versión ofrece hoy el marketplace por módulo instalado (hub#516). Se pide BAJO DEMANDA al
 // abrir la pantalla, no en bucle: el resolutor vive en el runtime (el mismo del arranque), así que
 // esto es solo lo que hay que enseñar. Vacío = no se ofrece nada (incluido «no se pudo preguntar»).
@@ -326,15 +340,18 @@ const filteredModules = computed<Row[]>(() => {
     // Instalado PERO con versión nueva: estado propio (hub#516). Antes todo lo instalado caía en
     // «Instalado» con el botón muerto, así que el arreglo publicado no tenía por dónde entrar.
     const update = isInstalled ? pendingUpdate(m.id, moduleUpdates.value) : null;
-    const state = prog || updatingIds.value.has(m.id)
-      ? 'installing'
-      : update
-        ? 'updatable'
-        : isInstalled
-          ? 'installed'
-          : m.available
-            ? 'available'
-            : 'unavailable';
+    // Un SOLO sitio decide instalar-o-actualizar (hub#795). Antes se decidía aquí para pintar el
+    // badge y OTRA VEZ dentro del click, leyendo el flag del Cloud a secas: los dos discrepaban
+    // justo cuando importa (`mark_installed` va por detrás), y la fila entraba por instalar algo
+    // que tocaba actualizar.
+    const state = catalogRowState({
+      cloudInstalled: m.installed,
+      id: m.id,
+      localInstalledIds: installedIds.value,
+      hasUpdate: update !== null,
+      available: m.available,
+      busy: prog !== null || updatingIds.value.has(m.id),
+    });
     return {
       ...m,
       state,
@@ -352,6 +369,22 @@ const filteredModules = computed<Row[]>(() => {
     };
   });
 });
+
+/**
+ * Qué mira la pestaña «Mis apps»: sus apps, la espera, el fallo o un vacío de verdad (hub#770).
+ *
+ * Las tres frases son excluyentes y ninguna se dice por la otra. La tabla solo sabe pintar UN texto
+ * cuando no hay filas (`empty-message`), así que es ese texto el que cambia — «Aún no tienes apps»
+ * queda para la única situación en la que es cierto: una respuesta que volvió y venía vacía.
+ */
+const installedDisplay = computed(() => listDisplay(installedState.value, installedModules.value.length));
+const installedEmptyMessage = computed(() =>
+  installedDisplay.value === 'loading'
+    ? t('apps.loadingInstalled')
+    : installedDisplay.value === 'error'
+      ? t('apps.installedLoadError')
+      : t('apps.emptyInstalled'),
+);
 
 // Instalados desde el runtime, como filas de la tabla. Se les cuelga la actualización pendiente
 // (hub#516) para que la celda de versión y el predicado de la acción la vean sin recalcularla.
@@ -386,8 +419,29 @@ const mineColumns = computed<DataTableColumn[]>(() => [
     ),
   },
 ]);
-const mineActions = computed<DataTableAction[]>(() => isAdmin.value
-  ? [
+const mineActions = computed<DataTableAction[]>(() => {
+  if (!isAdmin.value) return [];
+  // Read here, in the computed BODY, not inside the `disabled` closure: that is what makes this
+  // computed depend on the nav, so a module that was just switched on produces a NEW actions array
+  // and okdt re-renders its buttons. Read lazily inside the closure, the list would be right and
+  // the screen would still show the old one until something else happened to change a row.
+  const nav = moduleNav.value;
+  return [
+      {
+        // FIRST, and on purpose (hub#773): what a person opens this card for is the app itself.
+        // Until now the row ended in a switch and a bin — two ways to take the app away and none
+        // to get into it — so the only route in was the launcher grid in the topbar.
+        //
+        // Icon-only like every other action (regla de Ioan 2026-07-16 sobre ADR-0133): the `label`
+        // is what okdt puts in `aria-label` and `title`, never visible text.
+        id: 'open',
+        label: t('apps.actionOpen'),
+        icon: 'open-outline',
+        color: 'primary',
+        // A module that paints nothing, or one that is switched off, has no screen to open — and a
+        // button that lands on an empty page is worse than no button. `canOpenModule` decides.
+        disabled: (row) => !canOpenModule(row as unknown as InstalledModule, nav),
+      },
       {
         // El botón «Actualizar» de ADR-0269 §3.5: **por módulo**, para ADELANTAR. Que el sistema
         // acabe haciéndolo solo al arrancar no quita que se pueda pedir ahora.
@@ -400,8 +454,8 @@ const mineActions = computed<DataTableAction[]>(() => isAdmin.value
       },
       { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
       { id: 'uninstall', label: t('apps.actionUninstall'), icon: 'trash', color: 'danger' },
-    ]
-  : []);
+  ];
+});
 
 const catalogColumns = computed<DataTableColumn[]>(() => [
   { key: 'name', header: t('apps.colModule') },
@@ -413,15 +467,28 @@ const catalogColumns = computed<DataTableColumn[]>(() => [
   // valor crudo de la fila → el filtro select y el buscador ven la misma etiqueta que el usuario.
   { key: 'stateLabel', header: t('apps.colStatus'), align: 'center', filterable: true, filterType: 'select', render: (r) => stateCell(r) },
 ]);
+// DOS acciones, no una con dos significados (hub#795). Antes había un solo botón «Instalar» que
+// servía también para actualizar: la columna de estado decía «Update to 1.2.22» y el nombre
+// accesible del botón de al lado seguía siendo «Install». Con actions solo-icono el `label` ES lo
+// único que se lee (aria-label + tooltip), así que a un teclado y a un lector de pantalla se les
+// estaba diciendo el verbo equivocado de la operación que iban a lanzar.
+//
+// Cada una vive exactamente donde su operación aplica; `catalogActionFor` decide, y es la misma
+// función que los tests fijan. Nunca están las dos vivas en la misma fila.
 const catalogActions = computed<DataTableAction[]>(() => isAdmin.value && !config.demo
   ? [
       {
         id: 'install',
         label: t('apps.actionInstall'),
         icon: 'download-outline',
-        // Instalado sin novedades o en curso → botón muerto; en curso → spinner en su lugar.
-        // `updatable` (hub#516) SÍ es accionable: el mismo botón lleva la versión nueva.
-        disabled: (row) => row.state !== 'available' && row.state !== 'updatable',
+        disabled: (row) => catalogActionFor(row.state as CatalogRowState) !== 'install',
+        loading: (row) => row.state === 'installing',
+      },
+      {
+        id: 'update',
+        label: t('apps.actionUpdate'),
+        icon: 'arrow-up-circle-outline',
+        disabled: (row) => catalogActionFor(row.state as CatalogRowState) !== 'update',
         loading: (row) => row.state === 'installing',
       },
     ]
@@ -575,10 +642,11 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
 /** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
 async function installModule(mod: Mod): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
-  if (mod.installed) {
-    // Antes esto cortaba con «ya instalado» y ahí se acababa el camino: publicar la v2 de un módulo
-    // con un bug corregido no llegaba a ningún hub que ya tuviera la v1 (hub#516). Ahora, si hay
-    // versión nueva, el botón ACTUALIZA; y si no la hay, sigue diciendo que ya está.
+  // Ya está aquí: la RUTA de actualizar es la suya propia (hub#795) y esta se limita a decirlo. La
+  // verdad la pone el runtime cruzado con el catálogo (`isModuleInstalled`), nunca el flag del Cloud
+  // a secas: `mark_installed` es best-effort y va por detrás justo después de instalar, que es
+  // cuando este camino se recorre.
+  if (isModuleInstalled(mod.installed, mod.id, installedIds.value)) {
     if (pendingUpdate(mod.id, moduleUpdates.value)) {
       await updateInstalledModule(mod.id, mod.name);
     } else {
@@ -678,12 +746,21 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
   }
 }
 
-/** Carga los módulos instalados desde el RUNTIME (fuente de verdad local, no el catálogo Cloud). */
+/**
+ * Carga los módulos instalados desde el RUNTIME (fuente de verdad local, no el catálogo Cloud).
+ *
+ * El `catch` ponía `[]`, y eso convertía «no he podido preguntar» en «este hub no tiene apps»
+ * (hub#770) — una afirmación sobre el hub que nadie había comprobado. Con una sesión desplazada por
+ * un segundo dispositivo (plan Free), «Mis apps» decía «Aún no tienes apps» mientras el TPV de la
+ * pestaña de al lado seguía vendiendo. Ahora la lista SOBREVIVE al fallo y lo que cambia es lo que
+ * la pantalla sabe de ella.
+ */
 async function loadInstalled(): Promise<void> {
   try {
     installedModules.value = await listInstalledModules();
+    installedState.value = 'ready';
   } catch {
-    installedModules.value = [];
+    installedState.value = 'error';
   }
 }
 
@@ -738,17 +815,31 @@ function inactiveDepsOf(id: string): InstalledModule[] {
   return out;
 }
 
-/** Confirmación cuando el toggle va a arrastrar a OTROS módulos (ADR-0128): la cascada nunca
- *  sorprende — se lista lo afectado antes de tocar nada. Sin afectados, ni se pregunta. */
-async function confirmCascade(titleKey: string, msgKey: string, m: InstalledModule, affected: InstalledModule[]): Promise<boolean> {
-  if (!affected.length) return true;
+/**
+ * Preguntar ANTES de mover el interruptor, diciendo hacia dónde va (hub#773).
+ *
+ * Antes solo se preguntaba cuando la cascada de ADR-0128 arrastraba a otros módulos; en el caso
+ * normal —el 90 %— el icono de encendido apagaba el TPV sin una palabra, y el propio icono no dice
+ * nada: es el mismo dibujo para encender que para apagar. Ahora la pregunta es siempre, y su título
+ * NOMBRA la app y el estado al que va («Desactivar Ventas»), que es la información que faltaba.
+ *
+ * La cascada no desaparece: cuando hay arrastrados, se listan dentro de la misma pregunta. Un solo
+ * diálogo, no dos.
+ */
+async function confirmToggle(m: InstalledModule, affected: InstalledModule[]): Promise<boolean> {
+  const off = toggleIntent(m.status) === 'deactivate';
+  const lines = [t(off ? 'apps.toggleOffBody' : 'apps.toggleOnBody', { name: m.name })];
+  if (affected.length) {
+    lines.push(t(off ? 'apps.cascadeOffMsg' : 'apps.cascadeOnMsg', { name: m.name }));
+    lines.push(affected.map((a) => `· ${a.name}`).join('\n'));
+  }
   const alert = await alertController.create({
-    header: t(titleKey, { name: m.name }),
-    message: `${t(msgKey, { name: m.name })}\n${affected.map((a) => `· ${a.name}`).join('\n')}`,
+    header: t(off ? 'apps.toggleOffTitle' : 'apps.toggleOnTitle', { name: m.name }),
+    message: lines.join('\n'),
     cssClass: 'cascade-alert',
     buttons: [
       { text: t('apps.cascadeCancel'), role: 'cancel' },
-      { text: t('apps.cascadeConfirm'), role: 'confirm' },
+      { text: t(off ? 'apps.toggleOffConfirm' : 'apps.toggleOnConfirm'), role: 'confirm' },
     ],
   });
   await alert.present();
@@ -772,12 +863,12 @@ function reasonOf(e: unknown, fallback: string): string {
 async function toggleModule(m: InstalledModule): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
   try {
-    if (m.status === 'active') {
-      if (!(await confirmCascade('apps.cascadeOffTitle', 'apps.cascadeOffMsg', m, activeDependentsOf(m.id)))) return;
+    if (toggleIntent(m.status) === 'deactivate') {
+      if (!(await confirmToggle(m, activeDependentsOf(m.id)))) return;
       await deactivateModule(m.id);
       notify(t('apps.deactivated', { name: m.name }), 'primary');
     } else {
-      if (!(await confirmCascade('apps.cascadeOnTitle', 'apps.cascadeOnMsg', m, inactiveDepsOf(m.id)))) return;
+      if (!(await confirmToggle(m, inactiveDepsOf(m.id)))) return;
       await activateModule(m.id);
       notify(t('apps.activated', { name: m.name }), 'success');
     }
@@ -791,9 +882,19 @@ async function toggleModule(m: InstalledModule): Promise<void> {
 /** Desinstala un módulo y refresca la lista + la nav del shell. */
 async function removeModule(m: InstalledModule): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
+  // Qué se lleva por delante, ANTES de llevárselo (hub#773). El diálogo decía qué se CONSERVA
+  // («los datos y archivos se guardan») y callaba lo único irreversible del momento: las otras apps
+  // que dependen de esta se quedan sin ella. Se nombran, transitivamente y aunque estén apagadas —
+  // desinstalar no es desactivar: el paquete se va, así que una dependiente apagada ya no se podrá
+  // volver a encender.
+  const breaks = dependentsOf(m.id, installedModules.value);
+  const body = breaks.length
+    ? `${t('apps.uninstallBreaks', { name: m.name })}\n${breaks.map((a) => `· ${a.name}`).join('\n')}\n\n${t('apps.uninstallBody')}`
+    : t('apps.uninstallBody');
   const alert = await alertController.create({
     header: t('apps.uninstallTitle', { name: m.name }),
-    message: t('apps.uninstallBody'),
+    message: body,
+    cssClass: 'cascade-alert',
     buttons: [
       { text: t('apps.cascadeCancel'), role: 'cancel' },
       {
@@ -866,13 +967,26 @@ const catalogTable = ref<HTMLElement | null>(null);
 function handleMineAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
   const m = row as unknown as InstalledModule;
+  // Abrir la app (hub#773). `canOpenModule` ya deshabilitó el botón cuando no hay pantalla, pero se
+  // vuelve a preguntar aquí: el evento puede llegar de un teclado sobre un estado recién cambiado, y
+  // navegar a `/m/<id>` de un módulo apagado deja al usuario en una pantalla vacía sin explicación.
+  if (actionId === 'open') {
+    if (canOpenModule(m, moduleNav.value)) void router.push(moduleRoutePath(m.id));
+    return;
+  }
   if (actionId === 'toggle') void toggleModule(m);
   else if (actionId === 'uninstall') void removeModule(m);
   else if (actionId === 'update') void updateInstalledModule(m.id, m.name);
 }
 function handleCatalogAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
-  if (actionId === 'install') void installModule(row as unknown as Mod);
+  const mod = row as unknown as Mod;
+  // Por el ESTADO de la fila, que ya cruzó el Cloud con el runtime — no por el flag del Cloud
+  // (hub#795). Se vuelve a comprobar aquí y no solo en `disabled`: el evento puede llegar de un
+  // teclado sobre una fila que acaba de cambiar de estado.
+  const offered = catalogActionFor(row.state as CatalogRowState);
+  if (actionId === 'update' && offered === 'update') void updateInstalledModule(mod.id, mod.name);
+  else if (actionId === 'install' && offered === 'install') void installModule(mod);
 }
 
 // Cablea una tabla (labels del locale activo + listener de rowAction). La vista inicial = tarjetas la fija el
@@ -924,6 +1038,10 @@ onMounted(() => {
   window.addEventListener('focus', recheckEntitlement);
   void loadCatalog();
   void loadInstalled();
+  // Qué módulos publican pantalla, para el botón «Abrir» (hub#773). El shell ya la carga al entrar,
+  // pero esta pantalla no puede depender de eso: entrar por `/apps` directamente (deep-link, F5)
+  // dejaría todos los «Abrir» en gris hasta que algo más la refrescase.
+  void refreshModuleNav();
   // Bajo demanda, al abrir la pantalla (hub#516): una llamada por módulo instalado, y solo cuando
   // alguien está mirando. La vía desatendida la cubre el arranque, que resuelve la última versión.
   void loadModuleUpdates();
