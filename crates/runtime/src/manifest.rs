@@ -160,6 +160,21 @@ pub struct Manifest {
     /// module can say "I need a newer terminal" and be believed.
     #[serde(default)]
     pub compatibility: Option<Compatibility>,
+    /// **Route guards this module declares over ANOTHER module's surface** (hub#775).
+    ///
+    /// A module that owns a precondition for an entire screen declares it here instead of patching
+    /// every caller: `cash_register` blocks entry to the POS and the completion of a sale while no
+    /// register session is open. The block is parsed here and acted on AUTHORITATIVELY by the
+    /// command dispatcher ([`crate::commands::enforce_protects`]) and by the shell (rendered as
+    /// `component` instead of mounting the module), so the contract it declares is no longer a
+    /// wish the runtime logs and ignores.
+    ///
+    /// Cross-module by design: the guard runs against the module that owns the protected ROUTE
+    /// (parsed out of `route_setting`'s value, e.g. `/m/sales` → `sales`), so a module does not
+    /// need to `depends_on` the one it protects. Empty for every published manifest except
+    /// `cash_register`, which is the canonical shape.
+    #[serde(default)]
+    pub protects: Vec<ProtectsDef>,
     /// What this core did **not** understand of the manifest, and chose to install anyway
     /// (hub#521). Filled by [`Manifest::load`], never by serde — it describes what serde DROPPED,
     /// so it cannot come from serde.
@@ -193,6 +208,79 @@ pub struct Compatibility {
     /// for.
     #[serde(default)]
     pub max_erplora_version: Option<String>,
+}
+
+/// A **route guard** one module declares over another module's surface (hub#775).
+///
+/// The contract `cash_register` has been carrying since v1.x: "while `enable_cash_register` is on,
+/// the screen at `protected_pos_url` and every sale that goes through it must wait for an open
+/// register session." Until hub#775 the runtime reported the block as an unknown field and dropped
+/// it — the POS loaded, a cash sale completed, and the money vanished from the drawer reconciliation
+/// without an error. The block is now PARSED, and the dispatcher enforces it authoritatively (see
+/// [`crate::commands::enforce_protects`]).
+///
+/// Cross-module on purpose. `cash_register` does not `depends_on` `sales`: it protects a ROUTE the
+/// shell happens to serve with `sales`. The dispatcher derives the protected module from
+/// `route_setting` (its value is `/m/<module>`), so the guard is read on EVERY command whose owner
+/// is that module — not only on the one named in the issue.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ProtectsDef {
+    /// Query (of the module that declares the guard) that returns the SETTINGS row carrying
+    /// `enabled_setting` and `route_setting`. Resolved in a system context: same `hub_id`, no
+    /// permission re-check — the guard is a contract vouched by the module's author, not a user
+    /// action (the same rule as `reads`, ADR-0069 §1 rule 2).
+    pub settings_query: String,
+    /// The boolean column in that settings row that ARMMS the guard. `false` or absent → the guard
+    /// is dormant (e.g. a hub that has not turned the cash register on sells as it always did).
+    pub enabled_setting: String,
+    /// The column whose value is the protected ROUTE (`/m/sales`). The dispatcher parses the module
+    /// out of it to decide which commands the guard applies to; the shell renders `component`
+    /// instead of mounting the module at that route.
+    pub route_setting: String,
+    /// Query (of the module that declares the guard) whose rows decide whether the precondition is
+    /// met. Resolved in the same system context as `settings_query`.
+    pub guard_query: String,
+    /// What `guard_query` must return for the precondition to be MET. Today only `non_empty`
+    /// ("there is at least one open session"); a future flavour could add `empty`.
+    pub expect: ProtectsExpect,
+    /// Shell-side Web Component to render INSTEAD of the protected module while the precondition
+    /// is unmet (e.g. `erp-cashregister-open`). Transported to the shell by the manifest snapshot,
+    /// never executed by the runtime.
+    pub component: String,
+    /// Event the shell listens for to RE-MOUNT the protected module without a manual reload (e.g.
+    /// `cash_register.session_opened`). Transported to the shell, not consumed by the runtime.
+    pub resume_on: String,
+}
+
+/// What [`ProtectsDef::guard_query`] must return for the guard to be SATISFIED (hub#775).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProtectsExpect {
+    /// The precondition is met when `guard_query` returns at least one row (e.g. there is an open
+    /// register session). The default reading of a cash drawer: "the drawer is open".
+    NonEmpty,
+}
+
+impl Default for ProtectsExpect {
+    fn default() -> Self {
+        Self::NonEmpty
+    }
+}
+
+impl ProtectsDef {
+    /// Parses the protected MODULE out of `route_setting`'s value (`/m/sales` → `sales`).
+    ///
+    /// Returns `None` when the value is empty or does not match the `/m/<module>` shape the shell's
+    /// router serves: a guard pointing at a route this hub does not know how to mount is inert, and
+    /// the dispatcher treats it as such rather than refusing the install over a typo.
+    pub fn protected_module<'a>(&self, route_value: &'a str) -> Option<&'a str> {
+        let stripped = route_value.strip_prefix("/m/")?;
+        let module = stripped.split('/').next()?;
+        if module.is_empty() {
+            return None;
+        }
+        Some(module)
+    }
 }
 
 /// Something in a `module.json` this core does not act on, reported instead of dropped (hub#521).
@@ -1202,6 +1290,7 @@ const ROOT_FIELDS: &[&str] = &[
     "billing",
     "seed",
     "compatibility",
+    "protects",
 ];
 
 const COMMAND_FIELDS: &[&str] = &[
@@ -1227,6 +1316,15 @@ const DIALECT_FIELDS: &[&str] = &["sqlite", "postgres"];
 const ROLE_FIELDS: &[&str] = &["key", "label", "extends"];
 const SCHEDULED_TASK_FIELDS: &[&str] = &["name", "command", "cron", "payload", "catch_up"];
 const NAV_FIELDS: &[&str] = &["id", "label", "icon", "component", "chrome", "actions"];
+const PROTECTS_FIELDS: &[&str] = &[
+    "settings_query",
+    "enabled_setting",
+    "route_setting",
+    "guard_query",
+    "expect",
+    "component",
+    "resume_on",
+];
 const WIDGET_FIELDS: &[&str] = &[
     "title",
     "icon",
@@ -1279,6 +1377,7 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
         "roles[]" => ROLE_FIELDS,
         "scheduled_tasks[]" => SCHEDULED_TASK_FIELDS,
         "navigation[]" => NAV_FIELDS,
+        "protects[]" => PROTECTS_FIELDS,
         "widgets.*" => WIDGET_FIELDS,
         "setup" => SETUP_FIELDS,
         "settings" => SETTINGS_FIELDS,
@@ -1457,6 +1556,7 @@ impl Manifest {
             ("roles", "roles[]"),
             ("scheduled_tasks", "scheduled_tasks[]"),
             ("navigation", "navigation[]"),
+            ("protects", "protects[]"),
         ] {
             if let Some(items) = root.get(block).and_then(|v| v.as_array()) {
                 for (i, item) in items.iter().enumerate() {

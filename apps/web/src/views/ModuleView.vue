@@ -42,11 +42,34 @@
       </ion-card-content>
     </ion-card>
 
+    <!--
+      hub#775 — el guard `protects` bloquea la pantalla (la mitad cosmética; la autoritativa es el
+      dispatcher). La caja está activada y cerrada: el POS no se monta. Si el módulo que declara el
+      guard trae un Web Component (`component`, p. ej. `erp-cashregister-open`), se monta ESE; si no,
+      fallback genérico del shell con título + pista. Al recibir `resume_on` (`cash_register.session_opened`)
+      se re-monta sin recarga manual.
+    -->
+    <div
+      v-if="status === 'ready' && protectsGuard && !isPlanTab && !isGenericSettingsTab"
+      ref="protectsOutlet"
+      class="outlet protects-outlet"
+    >
+      <ion-card v-if="!protectsGuard.def.component" color="warning" class="blocked-card">
+        <ion-card-content>
+          <strong>{{ t('moduleView.protectedTitle') }}</strong>
+          <p class="blocked-hint">{{ t('moduleView.protectedHint') }}</p>
+          <ion-button slot="actions" size="small" fill="outline" @click="mount">
+            {{ t('moduleView.retry') }}
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
     <!-- El WebComponent (Lit) de la pestaña activa se monta aquí en runtime (createElement + append). -->
     <div
       ref="outlet"
       class="outlet"
-      v-show="status === 'ready' && !isPlanTab && !isGenericSettingsTab && !isBlocked"
+      v-show="status === 'ready' && !isPlanTab && !isGenericSettingsTab && !isBlocked && !protectsGuard"
     />
 
     <!-- Tabbar secundario del módulo: las pestañas salen de `navigation[]` del manifest
@@ -94,6 +117,7 @@ import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
 import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
 import { clientInjectionKey, getClient } from '../lib/runtime';
+import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
@@ -114,6 +138,8 @@ const router = useRouter();
 // Cliente del runtime inyectado en el boot (provide en main.ts); fallback al singleton.
 const client = inject(clientInjectionKey) ?? getClient();
 const outlet = ref<HTMLDivElement | null>(null);
+/** Outlet del guard `protects` (hub#775): aquí se monta el WC `component` del módulo que declara el guard. */
+const protectsOutlet = ref<HTMLDivElement | null>(null);
 /** El `ion-segment` del tabbar de footer (ver `revealActiveTab`). */
 const tabbar = ref<{ $el?: HTMLElement } | null>(null);
 const status = ref<'loading' | 'ready' | 'error'>('loading');
@@ -121,6 +147,12 @@ const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
 const activeNavId = ref<string>('');
+/**
+ * Guard `protects` activo para esta ruta (hub#775), o `null` si la ruta no está protegida ahora
+ * mismo. Lo resuelve `mount()` antes de montar el WC del módulo; al recibir `resume_on` se anula
+ * y se re-monta sin recarga manual.
+ */
+const protectsGuard = ref<ActiveProtectsGuard | null>(null);
 /** Bloque `billing` del manifest del módulo activo (si lo trae) → habilita la pestaña "Plan". */
 const billing = ref<ModuleBilling | null>(null);
 /**
@@ -183,11 +215,25 @@ function params(): { moduleId: string; navId: string } {
 }
 
 let mountGeneration = 0;
+/**
+ * Limpieza de la suscripción a `resume_on` del guard `protects` activo (hub#775). Se anulaba
+ * implícitamente al remontar; ahora se guarda para poder quitarla al desmontar la vista.
+ */
+let protectsUnsub: (() => void) | null = null;
+function clearProtectsSubscription(): void {
+  if (protectsUnsub) {
+    protectsUnsub();
+    protectsUnsub = null;
+  }
+}
 
 async function mount(): Promise<void> {
   const generation = ++mountGeneration;
   const { moduleId, navId } = params();
   status.value = 'loading';
+  // Cada montaje empieza SIN guard: o se vuelve a evaluar abajo, o no aplica (p. ej. pestaña Plan).
+  protectsGuard.value = null;
+  clearProtectsSubscription();
   try {
     const menu = await loadMenu();
     if (generation !== mountGeneration) return;
@@ -239,6 +285,43 @@ async function mount(): Promise<void> {
     }
     moduleName.value = entry.moduleName;
     activeNavId.value = entry.nav.id;
+
+    // hub#775 — el guard `protects` sobre ESTA ruta. Si está armado y la precondición no se cumple
+    // (la caja está cerrada), el POS no se monta: se renderiza el `component` del módulo que declara
+    // el guard (p. ej. `erp-cashregister-open`) o, si no trae WC, el fallback genérico del shell.
+    // La mitad autoritativa la sigue haciendo el dispatcher; esto es UX.
+    const guard = await resolveProtectsGuard(client, route.path);
+    if (generation !== mountGeneration) return;
+    if (guard) {
+      protectsGuard.value = guard;
+      if (outlet.value) outlet.value.replaceChildren(); // el WC previo no debe quedar montado
+      if (guard.def.component) {
+        // Registra el custom element del módulo que DECLARA el guard (cash_register), no el protegido.
+        // Su bundle se resuelve por cualquiera de sus propias entradas de navegación.
+        try {
+          const declaringMenu = await loadMenu();
+          const declaringEntry = declaringMenu.find((m) => m.moduleId === guard.declaringModule);
+          if (declaringEntry) await loadComponent(declaringEntry);
+        } catch {
+          // sin bundle → el fallback genérico del template se queda
+        }
+        if (generation !== mountGeneration) return;
+        if (protectsOutlet.value) {
+          protectsOutlet.value.replaceChildren();
+          const el = document.createElement(guard.def.component) as HTMLElement & { client?: unknown };
+          el.client = client;
+          protectsOutlet.value.appendChild(el);
+        }
+      }
+      // Escucha `resume_on` para re-montar sin recarga manual en cuanto se abra la caja.
+      if (typeof client.on === 'function') {
+        protectsUnsub = client.on(guard.def.resume_on, () => {
+          void mount().then(revealActiveTab);
+        });
+      }
+      status.value = 'ready';
+      return;
+    }
 
     const tag = await loadComponent(entry);
     if (generation !== mountGeneration) return;
@@ -300,7 +383,9 @@ watch(
 onBeforeUnmount(() => {
   window.removeEventListener('focus', recheckEntitlement);
   mountGeneration += 1;
+  clearProtectsSubscription();
   outlet.value?.replaceChildren();
+  protectsOutlet.value?.replaceChildren();
 });
 </script>
 

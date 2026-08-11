@@ -192,6 +192,29 @@ pub(crate) async fn execute_at(
         return Err(RuntimeError::InternalCommand(name.to_string()));
     }
 
+    // hub#775 — the AUTHORITATIVE `protects` guard. A module that declares a `protects` block over
+    // the module this command belongs to can block it until a precondition holds (cash_register
+    // blocks every `sales.*` command while `enable_cash_register` is on and no session is open).
+    // This is the half the shell cannot be trusted with: a cosmetic route guard stops a click, but
+    // a tampered client or a flow that names `sales.complete_sale` directly would complete a cash
+    // sale with the drawer closed and the money would vanish from the reconciliation without an
+    // error. The dispatcher is the only funnel every surface (HTTP, public API, assistant, outbox
+    // relay, scheduler) goes through, so the check lives HERE.
+    //
+    // Cross-module by design: `cash_register` does not `depends_on` `sales`, it protects a ROUTE
+    // the shell serves with `sales`. The protected module is parsed out of `route_setting`. The
+    // guard runs BEFORE the RBAC gate so "the drawer is closed" is the signal a cashier sees, not
+    // a permission refusal that masks it; and BEFORE the schema/payload work, because the guard is
+    // a property of the command's owner, not of the payload the caller happened to send.
+    //
+    // `Origin::Internal` is exempt: the relay re-running `record_sale` after a `sale.completed`,
+    // the scheduler and a seeding entrypoint are the runtime authorising itself, and a protects
+    // guard would deadlock `cash_register.record_sale` (a listener of the very event the guard
+    // would have blocked). The PUBLIC door — `commands::execute` — never passes `Internal`.
+    if origin != Origin::Internal {
+        enforce_protects(db, registry, &cmd.module_id, ctx).await?;
+    }
+
     // El handler corre bajo el permiso del command que lo invoca (no re-eleva).
     //
     // hub#360 (paso 2b, rule 1): the same gate, with a refusal a MANAGER could approve reported as
@@ -508,6 +531,119 @@ async fn preload_reads(
         }
     }
     Ok(Json::Object(out))
+}
+
+/// hub#775 — the AUTHORITATIVE `protects` guard.
+///
+/// A module that declares a `protects` block (see [`crate::manifest::ProtectsDef`]) over the module
+/// `protected_module_id` can refuse a command while a precondition is unmet. The canonical case is
+/// `cash_register`: while `enable_cash_register` is on and `cash_register.current_session` returns
+/// no row (no drawer is open), every `sales.*` command is refused — not just the POS click that
+/// opened the screen. The shell renders `erp-cashregister-open` instead of mounting the POS; this
+/// function is the half the shell cannot be trusted with, because a client that bypasses the route
+/// guard (a flow, a tampered SPA, a direct `POST /api/command`) would otherwise complete a cash sale
+/// whose movement the `_movement_for_open_session.sql` INSERT…SELECT silently drops.
+///
+/// # How it resolves
+///
+/// For each `protects` block declared by an INSTALLED and ACTIVE module:
+/// 1. the `settings_query` runs in a SYSTEM context (same `hub_id`, no permission re-check — the
+///    guard is a contract vouched by the declaring module, the same rule as `reads`, ADR-0069 §1
+///    rule 2);
+/// 2. if its first row's `enabled_setting` column is true, the guard is ARMED;
+/// 3. if the `route_setting` column does not point at `/m/<protected_module_id>`, the guard does
+///    not apply to this command (a future guard could protect a different module's route);
+/// 4. the `guard_query` runs in the same system context, and if `expect` is not satisfied (today:
+///    `non_empty` with zero rows) the command is refused with [`RuntimeError::ProtectsGuard`].
+///
+/// # Why it degrades OPEN
+///
+/// A guard that cannot be evaluated (the declaring module is gone, the settings query fails, the
+/// columns are missing) does NOT block the sale: a till that stops ringing over a broken read is a
+/// worse failure than one that lets a sale through. The only refusal is a guard that evaluated
+/// cleanly and found the precondition unmet — exactly the case `cash_register` ships. Compare with
+/// `preload_reads`, which degrades the same way for the same reason.
+pub(crate) async fn enforce_protects(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    protected_module_id: &str,
+    ctx: &RequestContext,
+) -> Result<()> {
+    for manifest in &registry.installed {
+        if !registry.is_active(&manifest.id) {
+            continue;
+        }
+        for guard in &manifest.protects {
+            // System context: same hub (tenant is non-negotiable), wildcard permissions. The
+            // guard is a module-authored contract, not a user action — same rule as `reads`.
+            let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
+
+            // (1) the settings row. Degrade open on any failure — see "Why it degrades OPEN".
+            let settings = match crate::queries::execute(db, registry, &guard.settings_query, &Params::new(), &sys).await {
+                Ok(rows) => rows.into_iter().next().unwrap_or(Json::Null),
+                Err(e) => {
+                    eprintln!(
+                        "⚠ protects: `{}` settings_query `{}` failed ({e}) → guard skipped (open)",
+                        manifest.id, guard.settings_query
+                    );
+                    continue;
+                }
+            };
+
+            // (2) armed? The settings row may be missing entirely (a hub that never configured the
+            // declaring module) or the column may be absent on an older schema — both mean OFF.
+            //
+            // Postgres stores booleans as `INTEGER` (0/1) in several module schemas
+            // (`cash_register_settings.enable_cash_register` among them), and the driver surfaces
+            // those as a JSON NUMBER, not a JSON BOOL — so `as_bool()` alone misses them. The same
+            // `as_bool().unwrap_or_else(|| as_i64() == 1)` shape `hub_users::truthy` uses keeps the
+            // reading honest for both representations.
+            let armed = settings
+                .get(&guard.enabled_setting)
+                .map(|v| v.as_bool().unwrap_or_else(|| v.as_i64().unwrap_or(0) != 0))
+                .unwrap_or(false);
+            if !armed {
+                continue;
+            }
+
+            // (3) does this guard protect the module the command belongs to? `route_setting`'s
+            // value is `/m/<module>`; a guard whose route does not parse or points elsewhere does
+            // not apply to THIS command.
+            let route_value = settings
+                .get(&guard.route_setting)
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if guard.protected_module(route_value) != Some(protected_module_id) {
+                continue;
+            }
+
+            // (4) is the precondition met? Degrade open on a query failure — the alternative is a
+            // till that refuses every sale because a read broke.
+            let rows = match crate::queries::execute(db, registry, &guard.guard_query, &Params::new(), &sys).await {
+                Ok(rows) => rows,
+                Err(e) => {
+                    eprintln!(
+                        "⚠ protects: `{}` guard_query `{}` failed ({e}) → guard skipped (open)",
+                        manifest.id, guard.guard_query
+                    );
+                    continue;
+                }
+            };
+            let satisfied = match guard.expect {
+                crate::manifest::ProtectsExpect::NonEmpty => !rows.is_empty(),
+            };
+            if satisfied {
+                continue;
+            }
+
+            return Err(RuntimeError::ProtectsGuard {
+                declaring_module: manifest.id.clone(),
+                protected_module: protected_module_id.to_string(),
+                guard_query: guard.guard_query.clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 async fn execute_wasm(

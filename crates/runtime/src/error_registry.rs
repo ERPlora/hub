@@ -265,6 +265,10 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         | E::ManifestUnknownField { .. }
         | E::CoreVersionTooOld { .. }
         | E::ManifestCoreFloorUnreadable { .. }
+        // hub#775: a `protects` guard refusing a sale because the drawer is closed is the guard
+        // doing its job — the state of the hub (no open session), not a bug of the Hub. Same
+        // severity as the other business-state refusals above.
+        | E::ProtectsGuard { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -327,6 +331,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::ManifestUnknownField { .. } => "manifest_unknown_field",
         E::CoreVersionTooOld { .. } => "core_version_too_old",
         E::ManifestCoreFloorUnreadable { .. } => "manifest_core_floor_unreadable",
+        // hub#775: its own code, NOT a flavour of `permission_denied`. A protects guard is a
+        // different door from RBAC (it is a module's precondition over another module's surface),
+        // and the screen that explains it has to say "open the drawer", not "ask the manager".
+        E::ProtectsGuard { .. } => "protects_guard",
         E::Other(_) => "other",
     })
 }

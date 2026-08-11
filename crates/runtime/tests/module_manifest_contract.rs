@@ -106,14 +106,17 @@ async fn install_accepts_an_unknown_optional_block_and_records_a_visible_warning
     let db = fresh_db().await;
     let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-manifest-contract");
     runtime.ensure_system_tables().await.unwrap();
-    // The real shape of `cash_register`: a top-level `protects` block nothing in the hub reads.
-    // It costs a screen, not correctness, so the module installs — but never in silence.
+    // An unknown top-level block the shell MIGHT one day read (here, a hypothetical `experiments`
+    // toggle). It costs a screen, not correctness, so the module installs — but never in silence.
+    //
+    // (hub#775 retired `protects` from this role: it is now parsed and acted on by the dispatcher,
+    // so it no longer reaches this warning tier. A genuinely unknown root field still does.)
     let dir = fixture(
         r#"{
           "id":"cash_register",
           "name":"Cash register",
           "version":"1.0.0",
-          "protects":[{"guard_query":"cash_register.current_session"}]
+          "experiments":[{"flag":"beta_drawer"}]
         }"#,
     );
 
@@ -132,8 +135,62 @@ async fn install_accepts_an_unknown_optional_block_and_records_a_visible_warning
         module
             .manifest_warnings
             .iter()
-            .any(|w| w.path == "protects"),
+            .any(|w| w.path == "experiments"),
         "the warning must be consultable on the module, naming the block: {:?}",
+        module.manifest_warnings
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
+async fn install_parses_a_protects_block_without_warning() {
+    // hub#775: `protects` was the canonical "unknown optional block" of this file until the issue
+    // taught the runtime to PARSE it and act on it authoritatively. Now it must install CLEAN — no
+    // warning, no refusal — and the guard must be reachable on the installed manifest.
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-manifest-contract");
+    runtime.ensure_system_tables().await.unwrap();
+    let dir = fixture(
+        r#"{
+          "id":"cash_register",
+          "name":"Cash register",
+          "version":"1.0.0",
+          "permissions":["cash_register.view_session"],
+          "queries":{
+            "cash_register.settings.get":{"permission":"cash_register.view_session","sql":"queries/s.sql"},
+            "cash_register.current_session":{"permission":"cash_register.view_session","sql":"queries/cs.sql"}
+          },
+          "protects":[{
+            "settings_query":"cash_register.settings.get",
+            "enabled_setting":"enable_cash_register",
+            "route_setting":"protected_pos_url",
+            "guard_query":"cash_register.current_session",
+            "expect":"non_empty",
+            "component":"erp-cashregister-open",
+            "resume_on":"cash_register.session_opened"
+          }]
+        }"#,
+    );
+    std::fs::create_dir_all(dir.join("queries")).unwrap();
+    std::fs::write(dir.join("queries/s.sql"), "SELECT 1").unwrap();
+    std::fs::write(dir.join("queries/cs.sql"), "SELECT 1").unwrap();
+
+    runtime
+        .install_from_dir(&dir)
+        .await
+        .expect("a well-formed protects block must install clean");
+
+    let module = runtime
+        .modules()
+        .into_iter()
+        .find(|m| m.id == "cash_register")
+        .expect("the module is installed");
+    assert!(
+        !module
+            .manifest_warnings
+            .iter()
+            .any(|w| w.path.starts_with("protects")),
+        "`protects` is now parsed and acted on — it must NOT warn: {:?}",
         module.manifest_warnings
     );
     std::fs::remove_dir_all(dir).unwrap();
