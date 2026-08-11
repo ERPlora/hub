@@ -20,8 +20,10 @@
 //!    administration to every installed module for free — the inventory app the owner installed
 //!    could write an automation that runs commands in their name while nobody is watching. That is
 //!    an escalation this change would have INTRODUCED, so it is gated in the same change.
-//! 3. **The gate is on the flows door and nowhere else.** `X-Erplora-Module` is not a general
-//!    "act as this module" switch: outside `/api/hub/flows*` it means nothing and changes nothing.
+//! 3. **The gate is on the editor's doors and nowhere else.** `X-Erplora-Module` is not a general
+//!    "act as this module" switch: outside `/api/hub/flows*` — and `GET /api/hub/events/shape`,
+//!    which hub#715 put behind the same capability because it is the same editor reading what the
+//!    business's events carry — it means nothing and changes nothing.
 //!
 //! ⚠️ Honest limit, written down because pretending otherwise would be worse: in the browser the
 //! module id is DECLARED, not authenticated — the shell stamps it when it mounts the component
@@ -378,11 +380,14 @@ async fn the_granted_module_does_not_let_a_cashier_or_an_api_key_in() {
     std::fs::remove_dir_all(f.temp).ok();
 }
 
-/// **Not a generic "act as module" switch.** The header is read at ONE door. Anywhere else in the
-/// core it is inert — naming a module (granted or not) must not change a single answer. The day
-/// somebody wires this header into a shared middleware, this test is what says no.
+/// **Not a generic "act as module" switch.** The header is read only where the editor's own
+/// surface lives — `/api/hub/flows*` and, since hub#715, `GET /api/hub/events/shape`, both gated
+/// by `manage_flows`. Anywhere else in the core it is inert: naming a module (granted or not) must
+/// not change a single answer, including on the OTHER `/api/hub/events/*` routes, which are the
+/// dead-letter queue and belong to an operator, not to the editor. The day somebody wires this
+/// header into a shared middleware, this test is what says no.
 #[tokio::test]
-async fn the_module_header_means_nothing_outside_the_flows_door() {
+async fn the_module_header_means_nothing_outside_the_editors_doors() {
     let f = fixture(true).await;
 
     for uri in [

@@ -1,0 +1,17 @@
+{
+  "id": "shop",
+  "name": "Shop",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "shop.sell": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/sell.sql"],
+      "emit": ["shop.sale_completed"]
+    }
+  },
+  "events": {
+    "emits": ["shop.sale_completed", "shop.refund_issued"]
+  }
+}

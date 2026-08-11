@@ -149,6 +149,25 @@ fn calling_module(headers: &HeaderMap) -> Option<String> {
         .map(str::to_string)
 }
 
+/// The `manage_flows` half of the gate: if the request NAMES a module, that module must have the
+/// capability declared in its manifest and granted by the owner. A request that names none passes
+/// — the shell and `curl` with an admin session are not modules.
+///
+/// Shared with the event-shape door (`outbox_admin::event_shape`, hub#715), which the same editor
+/// reads through and which therefore has to be behind the same two gates. One implementation on
+/// purpose: two copies of a default-deny check is how one of them ends up being the lenient one.
+pub(crate) async fn require_flows_capability(
+    headers: &HeaderMap,
+    rt: &erplora_runtime::Runtime,
+) -> Result<(), Response> {
+    let Some(module) = calling_module(headers) else {
+        return Ok(());
+    };
+    rt.require_module_capability(&module, CapabilityKind::ManageFlows)
+        .await
+        .map_err(crate::err_response)
+}
+
 /// Resolves the admin session and hands back the runtime plus «who is doing this», already in the
 /// `hub_user:<id>` form the audit columns store.
 ///
@@ -174,13 +193,8 @@ macro_rules! admin_session {
             Ok(admin) => admin,
             Err(e) => return rejected(e),
         };
-        if let Some(module) = calling_module(&$headers) {
-            if let Err(e) = rt
-                .require_module_capability(&module, CapabilityKind::ManageFlows)
-                .await
-            {
-                return crate::err_response(e);
-            }
+        if let Err(response) = crate::flows_api::require_flows_capability(&$headers, &rt).await {
+            return response;
         }
         let who = format!("hub_user:{}", admin.id);
         (arc.clone(), who)

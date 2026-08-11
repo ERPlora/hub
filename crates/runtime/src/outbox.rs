@@ -54,6 +54,10 @@ const LEASE_SECONDS: i64 = 300;
 /// **partial** over the two terminal statuses: a row is born `pending` and only enters this index
 /// when it stops moving, so the relay's hot path pays nothing for it, and the sweep's repeated
 /// bounded passes stop being a table scan each.
+///
+/// `ix_outbox_name` backs [`sample_payloads`] (hub#715), which reads the last few events of ONE
+/// name to infer its shape. Without it that is a sequential scan of a table whose widest column is
+/// the payload — ninety days of a busy till — to return five rows, every time an editor opens.
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS _event_outbox (\
   id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, user_id TEXT NOT NULL, \
@@ -77,6 +81,7 @@ CREATE INDEX IF NOT EXISTS ix_outbox_parent ON _event_outbox (hub_id, parent_eve
 CREATE INDEX IF NOT EXISTS ix_outbox_prune \
   ON _event_outbox (hub_id, COALESCE(delivered_at, discarded_at, created_at)) \
   WHERE status IN ('delivered', 'discarded');\
+CREATE INDEX IF NOT EXISTS ix_outbox_name ON _event_outbox (hub_id, event_name, created_at);\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
   PRIMARY KEY (event_id, listener_command));";
@@ -654,6 +659,59 @@ fn dead_event(row: &Json) -> DeadEvent {
         depth: n("depth"),
         created_at: s("created_at"),
     }
+}
+
+/// One stored event, reduced to what inferring a shape needs (hub#715).
+#[derive(Debug, Clone)]
+pub struct PayloadSample {
+    pub payload: Json,
+    pub created_at: String,
+}
+
+/// The last `limit` events of ONE name in this hub, newest first, with their payloads.
+///
+/// This is the raw material of [`crate::event_shape`], and the only caller: what leaves the hub is
+/// the SHAPE, never these rows. Every status counts — `pending`, `delivered`, `dead`,
+/// `discarded` — because the question is «what does this event carry», and a delivery failure does
+/// not change the answer.
+///
+/// Backed by `ix_outbox_name`. An unparseable stored payload comes back as a JSON string rather
+/// than being dropped, the same way [`list_dead`] treats it: what is in the row is what there is.
+pub async fn sample_payloads(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_name: &str,
+    limit: i64,
+) -> Result<Vec<PayloadSample>> {
+    if event_name.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("name".into(), json!(event_name));
+    p.insert(
+        "lim".into(),
+        json!(limit.clamp(1, crate::event_shape::MAX_SAMPLES)),
+    );
+    let res = db
+        .query(
+            "SELECT payload, created_at FROM _event_outbox \
+             WHERE hub_id = :hub_id AND event_name = :name \
+             ORDER BY created_at DESC, id DESC LIMIT :lim",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .map(|row| {
+            let raw = row["payload"].as_str().unwrap_or_default().to_string();
+            PayloadSample {
+                payload: serde_json::from_str(&raw).unwrap_or(Json::String(raw)),
+                created_at: row["created_at"].as_str().unwrap_or_default().to_string(),
+            }
+        })
+        .collect())
 }
 
 /// Puts a dead-letter back in front of the relay: `pending`, attempts reset, due now, lease
