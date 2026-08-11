@@ -87,6 +87,57 @@ mkdir -p "$STATE_DIR"
 tree="$(git rev-parse "${pushed_sha}^{tree}" 2>/dev/null)" || exit 1
 green="$STATE_DIR/$tree.green"
 
+PUBLISH_LOG="$STATE_DIR/publish-status.log"
+
+# Everything the human needs to tell "the attestation was not published" apart from
+# "GitHub Actions is down" — because from the PR page the two look IDENTICAL (no
+# checks), and only one of them is a reason to go anywhere near the merge button.
+# This block used to not exist: the publish step `exit 0`'d in silence (hub#739).
+unpublished_report() {
+    # $4 is the repo when we got far enough to know it — so the copy-paste command
+    # below is the real one, not a template the reader has to fill in.
+    local reason=$1 detail=$2 sha=$3 slug=${4:-<owner>/<repo>}
+    echo "⚠️  pre-push: the Hub suite was GREEN, but its attestation could not be published."
+    echo "    context : $CONTEXT"
+    echo "    commit  : $sha"
+    echo "    reason  : $reason"
+    if [ -n "$detail" ]; then
+        printf '    gh said : %s\n' "$(printf '%s' "$detail" | head -5)"
+    fi
+    echo "    the gh account it tried:"
+    if command -v gh >/dev/null 2>&1; then
+        gh auth status 2>&1 | sed 's/^[[:space:]]*/      /'
+    else
+        echo "      (none — gh is not on PATH)"
+    fi
+    echo "    Consequence: the PR will show up WITHOUT CHECKS, exactly like a dead CI."
+    echo "    Do NOT force the merge on that — merge-pr.sh refuses on silence by design"
+    echo "    (pm#58/#60; forcing past it is how saas#1184 landed unverified)."
+    echo "    Switch gh to an account that can see the repo and push again, or post it by hand:"
+    echo "      gh api -X POST repos/<owner>/<repo>/statuses/$sha \\"
+    echo "        -f state=success -f context=$CONTEXT -f description='local gate green'"
+}
+
+# Two channels, on purpose.
+#   · the LOG is the durable one: the publish step outlives the hook, so a message
+#     printed when it finally fails can land after the shell prompt is already back.
+#   · the terminal is the loud one. In the background half it is /dev/tty, opened
+#     here rather than inherited: a background writer holding git's stderr pipe can
+#     stall the push for the whole two minutes the poll lasts.
+log_report() {
+    { printf '\n===== %s =====\n' "$(date '+%F %T')"; printf '%s\n' "$1"; } >>"$PUBLISH_LOG" 2>/dev/null || true
+}
+report_sync() {
+    local msg; msg="$(unpublished_report "$@")"
+    log_report "$msg"
+    printf '%s\n' "$msg" >&2
+}
+report_async() {
+    local msg; msg="$(unpublished_report "$@")"
+    log_report "$msg"
+    printf '%s\n' "$msg" >/dev/tty 2>/dev/null || true
+}
+
 # Publish the attestation in the background: the commit does not exist on the
 # remote until the push we are gating actually lands.
 publish_status() {
@@ -95,19 +146,45 @@ publish_status() {
         ( set -- "$sha"; eval "$HUB_GATE_STATUS_CMD" ) >/dev/null 2>&1 &
         return 0
     fi
+
+    # Resolved SYNCHRONOUSLY and on purpose: this is the call that fails when the
+    # active gh account cannot see the repo (Ioan carries one account per company,
+    # each checkout its own), and a warning printed here lands while the human is
+    # still watching the push, instead of behind their prompt two minutes later.
+    if ! command -v gh >/dev/null 2>&1; then
+        report_sync "gh is not on PATH, so nothing can attest this run" "" "$sha"
+        return 0
+    fi
+    local repo rc err out="$STATE_DIR/.repo.$$"
+    err="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>&1 1>"$out")"
+    rc=$?
+    repo="$(cat "$out" 2>/dev/null)"
+    rm -f "$out"
+    if [ "$rc" -ne 0 ] || [ -z "$repo" ]; then
+        report_sync "the active gh account cannot resolve this repository" "$err" "$sha"
+        return 0
+    fi
+
     (
-        local repo tries=0
-        repo="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)" || exit 0
+        local tries=0 seen=0 perr
         while [ "$tries" -lt 24 ]; do
-            gh api "repos/$repo/commits/$sha" >/dev/null 2>&1 && break
+            gh api "repos/$repo/commits/$sha" >/dev/null 2>&1 && { seen=1; break; }
             sleep 5
             tries=$((tries + 1))
         done
-        gh api -X POST "repos/$repo/statuses/$sha" \
-            -f state=success \
-            -f context="$CONTEXT" \
-            -f description="cargo test --workspace green on the pusher's machine" \
-            >/dev/null 2>&1
+        if [ "$seen" != 1 ]; then
+            report_async "commit $sha never appeared on $repo after 120s — did the push land?" "" "$sha"
+            exit 0
+        fi
+        if ! perr="$(gh api -X POST "repos/$repo/statuses/$sha" \
+                -f state=success \
+                -f context="$CONTEXT" \
+                -f description="cargo test --workspace green on the pusher's machine" \
+                2>&1 >/dev/null)"; then
+            report_async "gh refused to post the status to $repo" "$perr" "$sha"
+            exit 0
+        fi
+        log_report "published $CONTEXT=success on $repo@$sha"
     ) >/dev/null 2>&1 &
     disown 2>/dev/null || true
 }
