@@ -47,7 +47,14 @@ permissions:
 jobs:
   build-and-push:
     name: Build & Push erplora/hub
-    runs-on: ubuntu-latest
+    # Dónde corre: lo decide la Variable `CI_RUNNER_LABEL`, y sin ella se queda en los runners de
+    # GitHub como siempre. El 2026-08-11 la org agotó el presupuesto de Actions y los jobs dejaron
+    # de ARRANCAR — `The job was not started because an Actions budget is preventing further use`,
+    # que desde la PR no se distingue de un fallo de build. Con la imagen sin construir no hay nada
+    # que rodar a la flota. `ci-runner-1` (Hetzner, dedicado) sale de ese presupuesto.
+    # Un interruptor y no un valor fijo porque el runner es UNA máquina: si se cae o se recicla,
+    # borrar la Variable devuelve la CI a GitHub sin tocar ningún workflow.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
       contents: read
