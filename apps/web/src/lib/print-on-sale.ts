@@ -3,10 +3,19 @@
 // escuchar SIEMPRE, no solo cuando la pantalla de ventas está montada (ADR-0017).
 //
 // Flujo: escucha el evento de dominio `sale.completed` (ADR-0010) → lee los ajustes de `printing`
-// → resuelve impresoras por ROL en el Bridge (`receipt`/`kitchen`/`bar`) → según los flags:
-//   - `auto_print_on_sale` → ticket por la impresora con rol `receipt` (formato `receipt` ESC/POS).
-//   - `open_drawer_on_sale` → kick del cajón por la misma impresora de recibo.
-// Todo defensivo: si falta el módulo printing, los ajustes, o el Bridge → no-op silencioso.
+// → según los flags:
+//   - `auto_print_on_sale` → tique por la PUERTA GLOBAL (`erplora.print`), rol `receipt`.
+//   - `open_drawer_on_sale` → kick del cajón por la impresora con rol `receipt` (hardware directo:
+//     un cajón no se puede encolar, o está aquí o no está).
+//
+// ⚠️ El tique va por la puerta y NO por `peripherals.print` (hub#862). Esta era la rama que dejaba
+// al TPV sin papel con el interruptor puesto: aquí se resolvía rol→impresora a mano, así que con la
+// impresora descubierta pero SIN ROL —lo que le pasa a toda impresora recién encontrada— no había
+// `receiptPrinterId`, los dos `if` salían en falso y la función **volvía en silencio**: ni Bridge,
+// ni cola del hub, ni navegador, ni aviso, ni una línea en el log. Igual con `getDevices()`
+// lanzando (PWA en el navegador): `catch { return; }`. La puerta ya sabe hacer todo eso —impresora
+// del rol, cola del hub si no hay, y decir la verdad cuando no ha entregado—, y esto solo tenía que
+// llamarla.
 //
 // La COMANDA de cocina ya NO se imprime aquí (ADR-0144): colgaba de `sale.completed`, o sea que
 // mandaba la comida a la plancha **cuando el cliente pagaba** — el final del servicio. Ahora sale
@@ -15,7 +24,7 @@
 // libre `receipt|kitchen|bar`, sin relación con las estaciones reales).
 // `printing.print_kitchen` y `printing.routing.*` quedan OBSOLETOS: no los lee nadie.
 import type { BridgeDevice, ErploraClient } from '@erplora/module-sdk';
-import { printerIdForRole } from './print';
+import { printerIdForRole, type PrintRequest, type PrintResult } from './print';
 import { buildReceiptDocument, type ReceiptSettings, type SaleLine } from './receipt-document';
 
 interface PrintingSettings extends ReceiptSettings {
@@ -23,14 +32,30 @@ interface PrintingSettings extends ReceiptSettings {
   open_drawer_on_sale?: number;
 }
 
+/** El tique que NO salió: lo que necesita la caja para enterarse y reimprimirlo. */
+export interface SaleTicketFailure {
+  saleId: string;
+  error: string;
+}
+
+interface Deps {
+  /** La puerta global del hub (`erplora.print`). La inyecta el shell, igual que en `print-comanda`. */
+  print: (req: PrintRequest) => Promise<PrintResult>;
+  /**
+   * Aviso de que el tique no ha llegado a ningún sitio. Sin él el fallo es MUDO, que es justo lo
+   * que se arregla: el cajero cierra la venta creyendo que el papel está saliendo.
+   */
+  onFailure?: (f: SaleTicketFailure) => void;
+}
+
 /** Arranca el escuchador en el boot del shell. Devuelve la función para cancelar. */
-export function bootPrintOnSale(client: ErploraClient): () => void {
+export function bootPrintOnSale(client: ErploraClient, deps: Deps): () => void {
   return client.on('sale.completed', (payload) => {
-    void onSaleCompleted(client, payload).catch((e) => console.warn('[print-on-sale]', e));
+    void onSaleCompleted(client, deps, payload).catch((e) => console.warn('[print-on-sale]', e));
   });
 }
 
-async function onSaleCompleted(client: ErploraClient, payload: unknown): Promise<void> {
+async function onSaleCompleted(client: ErploraClient, deps: Deps, payload: unknown): Promise<void> {
   const saleId = saleIdOf(payload);
   if (!saleId) return;
 
@@ -46,18 +71,6 @@ async function onSaleCompleted(client: ErploraClient, payload: unknown): Promise
   const openDrawer = flag(settings.open_drawer_on_sale);
   if (!autoPrint && !openDrawer) return;
 
-  // Impresoras por ROL desde el registro del Bridge. El rol físico vive en el Bridge
-  // (devices.json); printing solo decide QUÉ se imprime y a QUÉ estación lógica va.
-  let devices: BridgeDevice[];
-  try {
-    devices = await client.peripherals.getDevices();
-  } catch {
-    return; // Bridge no disponible
-  }
-  // Resolución rol→impresora COMPARTIDA con la puerta global `erplora.print` (lib/print.ts):
-  // una sola definición de "qué impresora es el rol receipt/kitchen/bar".
-  const printerByRole = (role: string): string | undefined => printerIdForRole(devices, role);
-
   // Datos autoritativos de la venta (el payload del evento es un resumen, no la fuente).
   const sale = first(
     await client
@@ -69,16 +82,43 @@ async function onSaleCompleted(client: ErploraClient, payload: unknown): Promise
     .query<SaleLine[]>('sales.lines', { sale_id: saleId })
     .catch(() => [] as SaleLine[]);
 
-  const receiptPrinterId = printerByRole('receipt');
-
-  if (autoPrint && receiptPrinterId) {
-    await client.peripherals
-      .print(receiptPrinterId, 'receipt', buildReceiptDocument(settings, sale, lines), `sale-${saleId}`)
-      .catch((e) => console.warn('[print-on-sale] ticket', e));
+  if (autoPrint) {
+    // Por la PUERTA: impresora del rol `receipt` si la hay, cola del hub si no (un print host la
+    // drena, ADR-0196 §6). El documento va ESTRUCTURADO (hub#501) — sin `html`, porque el respaldo
+    // del navegador no es una forma de entregar un tique térmico: si la puerta no entrega, se avisa.
+    let result: PrintResult;
+    try {
+      result = await deps.print({
+        role: 'receipt',
+        documentType: 'receipt',
+        // Mismo tique reimpreso = mismo trabajo: la cola (y el equipo que la drena) deduplica.
+        jobId: `sale-${saleId}`,
+        data: buildReceiptDocument(settings, sale, lines),
+      });
+    } catch (e) {
+      result = { via: 'none', role: 'receipt', error: e instanceof Error ? e.message : String(e) };
+    }
+    // Solo la impresora y la cola son entrega. `browser` en la app instalada no imprime nada, y
+    // `none` es explícitamente «por ningún sitio»: las dos se avisan.
+    if (result.via !== 'bridge' && result.via !== 'queue') {
+      deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora' });
+    }
   }
 
-  if (openDrawer && receiptPrinterId) {
-    await client.peripherals.openDrawer(receiptPrinterId).catch(() => undefined);
+  if (openDrawer) {
+    // El cajón SÍ necesita hardware aquí y ahora: no hay cola para un kick ESC/POS. Si este equipo
+    // no alcanza la impresora de tiques, no se abre — y no puede arrastrar al tique consigo, que es
+    // lo que pasaba cuando los dos colgaban del mismo `receiptPrinterId`.
+    let devices: BridgeDevice[] = [];
+    try {
+      devices = await client.peripherals.getDevices();
+    } catch {
+      devices = []; // Este equipo no llega al hardware (PWA en el navegador).
+    }
+    // Resolución rol→impresora COMPARTIDA con la puerta global (`printerIdForRole`): una sola
+    // definición de «qué impresora es el rol receipt».
+    const receiptPrinterId = printerIdForRole(devices, 'receipt');
+    if (receiptPrinterId) await client.peripherals.openDrawer(receiptPrinterId).catch(() => undefined);
   }
 }
 

@@ -28,12 +28,14 @@ function job(overrides: Partial<DrainJob> = {}): DrainJob {
 
 /** A device with the printers the test names, and a record of everything printed. */
 function client(
-  devices: { role: string | null; ip: string | null; port?: number }[],
+  devices: { key?: string; mac?: string; role: string | null; ip: string | null; port?: number }[],
   onPrint?: (...args: unknown[]) => Promise<void>,
-): PrintHostClient & { printed: unknown[][] } {
+): PrintHostClient & { printed: unknown[][]; rolesSet: [string, string][] } {
   const printed: unknown[][] = [];
+  const rolesSet: [string, string][] = [];
   return {
     printed,
+    rolesSet,
     peripherals: {
       detect: () => Promise.resolve({ online: true }),
       getDevices: () => Promise.resolve(devices),
@@ -41,8 +43,15 @@ function client(
         printed.push(args);
         if (onPrint) await onPrint(...args);
       },
+      // El registro de verdad devuelve el registro actualizado; aquí se muta la misma lista para
+      // que lo que se lea después (los roles del alta) sea lo que quedó asignado.
+      setDeviceRole: async (keyOrMac: string, role: string) => {
+        rolesSet.push([keyOrMac, role]);
+        for (const d of devices) if (d.key === keyOrMac || d.mac === keyOrMac) d.role = role;
+        return devices;
+      },
     },
-  } as PrintHostClient & { printed: unknown[][] };
+  } as unknown as PrintHostClient & { printed: unknown[][]; rolesSet: [string, string][] };
 }
 
 describe('print host — a queued job becomes paper', () => {
@@ -285,5 +294,90 @@ describe('print host — booting it in the shell', () => {
     });
 
     expect(opened).toEqual([]);
+  });
+});
+
+// ── hub#862: una impresora descubierta NACE SIN ROL y nada lo dice ─────────────────────────────
+// El descubrimiento registra la impresora, pero el rol lo tiene que poner alguien a mano en el
+// módulo `printing`. Hasta que lo haga: el rol `receipt` no resuelve a ninguna impresora (no sale el
+// tique) Y este equipo se da de alta como host de CERO roles (nadie drena la cola), o sea que lo
+// encolado tampoco sale. Dos silencios que se suman al mismo síntoma: «no imprime y no dice nada».
+// La red de seguridad es el caso mayoritario del TPV: una impresora sola es la de tiques.
+describe('red de seguridad: la primera impresora sin rol es la de TIQUES (hub#862)', () => {
+  afterEach(() => {
+    bootPrintHost.reset();
+  });
+
+  it('la única impresora descubierta se queda con el rol receipt y este equipo se da de alta', async () => {
+    const registered: string[] = [];
+    const c = client([{ key: '192.168.100.196:9100', mac: 'aa:bb', role: null, ip: '192.168.100.196', port: 9100 }]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async (role: string) => { registered.push(role); return { heartbeatSeconds: 30 }; },
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(c.rolesSet).toEqual([['192.168.100.196:9100', 'receipt']]);
+    expect(registered).toEqual(['receipt']);
+  });
+
+  it('NO toca una instalación ya configurada (algún rol puesto a mano)', async () => {
+    // Quien ya repartió los roles sabe lo que hace: una segunda impresora sin rol puede ser la de
+    // etiquetas esperando su sitio, y adjudicarle los tiques sacaría el tique por la etiquetadora.
+    const c = client([
+      { key: 'k1', role: 'kitchen', ip: '10.0.0.6' },
+      { key: 'k2', role: null, ip: '10.0.0.7' },
+    ]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async () => ({ heartbeatSeconds: 30 }),
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(c.rolesSet).toEqual([]);
+  });
+
+  it('con DOS impresoras sin rol no adivina: no toca ninguna', async () => {
+    // Una sola impresora en una tienda es la de tiques con casi total seguridad. Dos ya son un
+    // reparto (tiques + etiquetas, tiques + cocina) y elegir por orden de descubrimiento sacaría el
+    // tique del cliente por la etiquetadora. Ahí el aviso lo tiene que dar la pantalla de printing.
+    const c = client([
+      { key: 'k1', role: null, ip: '10.0.0.6' },
+      { key: 'k2', role: null, ip: '10.0.0.7' },
+    ]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async () => ({ heartbeatSeconds: 30 }),
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(c.rolesSet).toEqual([]);
+  });
+
+  it('una entrada sin dirección no es una impresora: no se le asigna nada', async () => {
+    const c = client([{ key: 'k3', role: null, ip: null }]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async () => ({ heartbeatSeconds: 30 }),
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(c.rolesSet).toEqual([]);
   });
 });

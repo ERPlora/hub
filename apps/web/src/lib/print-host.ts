@@ -38,7 +38,39 @@ export interface PrintHostClient {
       data: Record<string, unknown>,
       jobId?: string,
     ): Promise<void>;
+    /**
+     * Asigna un rol a un dispositivo del registro (por `key` o MAC). Opcional aquí: solo la usa la
+     * red de seguridad de abajo, y un transporte sin ella (un doble de test viejo) sigue arrancando.
+     */
+    setDeviceRole?(keyOrMac: string, role: string): Promise<PrintDevice[]>;
   };
+}
+
+/**
+ * **La primera impresora descubierta es la de TIQUES** — y si no, no imprime nada y nadie lo dice
+ * (hub#862).
+ *
+ * Una impresora recién encontrada nace SIN ROL, y el rol lo tiene que poner alguien a mano en el
+ * módulo `printing`. Hasta que lo haga se suman dos silencios: el rol `receipt` no resuelve a
+ * ninguna impresora (el tique no sale por hardware) y este equipo se da de alta como host de CERO
+ * roles (nadie drena la cola), así que lo encolado tampoco sale. El síntoma es «la impresora está
+ * online, el interruptor está puesto y no pasa nada».
+ *
+ * Devuelve la clave del dispositivo al que hay que darle `receipt`, o `undefined` si no hay que
+ * tocar nada. Solo actúa en el caso inequívoco: **una** impresora alcanzable y **ningún** rol
+ * asignado en todo el registro. Con dos ya hay un reparto que adivinar (¿cuál es la etiquetadora?)
+ * y con alguna rolada la instalación ya está configurada — en ambos casos, manos fuera.
+ */
+export function printerNeedingDefaultRole(devices: PrintDevice[]): string | undefined {
+  const list = devices ?? [];
+  if (list.some((d) => d?.role?.trim())) return undefined;
+  // `ip` es lo que la hace alcanzable: una entrada sin dirección no puede tomar un trabajo.
+  const reachable = list.filter((d) => d?.ip);
+  if (reachable.length !== 1) return undefined;
+  const only = reachable[0]!;
+  // `key` es la clave del registro; la MAC vale igual (el registro resuelve las dos) y en Android
+  // no hay MAC, así que se prefiere la clave.
+  return only.key ?? only.mac ?? undefined;
 }
 
 /**
@@ -169,6 +201,11 @@ export async function bootPrintHost(
   // environment and does not change while the process lives, so asking once here is enough.
   const hardware = await client.peripherals.detect().catch(() => ({ online: false }));
   if (!hardware.online) return () => {};
+  // **Red de seguridad ANTES del alta** (hub#862): si la única impresora de este equipo no tiene rol,
+  // se le da `receipt` aquí, de modo que el alta de abajo ya la cuente y el tique del TPV encuentre
+  // su impresora. Best-effort: si el registro se niega, el arranque sigue — sin rol se imprime menos,
+  // pero no arrancar no imprime nada.
+  await ensureDefaultPrinterRole(client);
   const session = options.session ?? getHubSession;
   const drain = createPrintDrain({
     url: options.url ?? printChannelUrl(globalThis.location),
@@ -227,6 +264,20 @@ export async function bootPrintHost(
     stop.stop();
     running = null;
   };
+}
+
+/** Aplica {@link printerNeedingDefaultRole} si hay algo que aplicar. Nunca propaga. */
+async function ensureDefaultPrinterRole(client: PrintHostClient): Promise<void> {
+  const setRole = client.peripherals.setDeviceRole;
+  if (!setRole) return;
+  try {
+    const target = printerNeedingDefaultRole(await client.peripherals.getDevices());
+    if (!target) return;
+    await setRole.call(client.peripherals, target, 'receipt');
+    console.warn('[print-host] la única impresora sin rol pasa a ser la de tiques (receipt):', target);
+  } catch (e) {
+    console.warn('[print-host] no se pudo asignar el rol receipt por defecto', e);
+  }
 }
 
 /** Forgets the running drain. For tests only — production has exactly one shell boot. */

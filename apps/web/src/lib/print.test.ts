@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { printerIdForRole, createPrintService, printHtmlInIframe } from './print';
+import { printerIdForRole, createPrintService, printHtmlInIframe, type EnqueuePrintJob } from './print';
 
 // El Hub expone UNA puerta de impresión para TODOS los módulos (sales, kitchen, cash_register…).
 // Dos vías: si hay Bridge se imprime por la impresora del ROL pedido (ESC/POS); si no, se cae al
@@ -276,16 +276,21 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     expect(r.via).toBe('browser');
   });
 
-  it('sin jobId no se encola (sin idempotencia, cada reintento duplicaría): cae al navegador', async () => {
-    const enqueue = vi.fn();
-    const browserPrint = vi.fn();
-    const iframePrint = vi.fn();
-    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
+  // DEROGADO por hub#862. Este test fijaba «sin `jobId` no se encola: al navegador», y ese contrato
+  // era el fallo: convertía «el caller no puso la clave de idempotencia» en «este documento no se
+  // imprime en ningún sitio» —y en la app instalada el navegador no imprime—, sin dejar ni un
+  // `POST /api/print/jobs` en el log del hub con el que enterarse. Un tique duplicado se tira; uno
+  // que no sale no existe. Lo que sigue siendo cierto es lo que se pinta abajo: el `jobId` del
+  // caller es el que dedupe entre SUS reintentos, y quien lo trae manda.
+  it('el jobId del caller es el que viaja a la cola (es su clave de idempotencia)', async () => {
+    const encolados: string[] = [];
+    const enqueue: EnqueuePrintJob = async (job) => { encolados.push(job.jobId); return true; };
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint: vi.fn() });
 
-    const r = await print({ role: 'receipt', documentType: 'receipt', html: '<i>x</i>' });
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: {} });
 
-    expect(r.via).toBe('browser');
-    expect(enqueue).not.toHaveBeenCalled();
+    expect(r.via).toBe('queue');
+    expect(encolados).toEqual(['sale-42']);
   });
 
   it('A4 (facturas/albaranes) no encola: no hay cola térmica, va al navegador', async () => {
@@ -346,5 +351,98 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', html: '<i>x</i>' });
 
     expect(r.via).toBe('browser');
+  });
+});
+
+// ── hub#862: TODO lo que entraba por la puerta MORÍA ────────────────────────────────────────────
+// QA en un hub real (app instalada, EPSON TM-T88III alcanzable y `ready`): el «Probar» del módulo
+// printing —que NO pasa por aquí— saca papel, y todo lo que pasa por la puerta no saca nada. Tres
+// ventanas de log del hub sin un solo `POST /api/print/jobs`: la puerta ni encolaba ni enviaba, y
+// devolvía `via:'browser'` como si hubiera impreso.
+describe('la puerta ENTREGA (hub#862)', () => {
+  const noBridge = { getDevices: vi.fn(async () => { throw new Error('hardware_unavailable'); }) };
+  /** El caso de QA: la impresora está descubierta y registrada, pero NADIE le dio un rol. */
+  const sinRol = { getDevices: vi.fn(async () => [{ mac: 'z', role: null, ip: '192.168.100.196', port: 9100 }]) };
+
+  it('la ETIQUETA de código de barras es papel TÉRMICO: se encola, no va al navegador', async () => {
+    // `barcode_label` está en el vocabulario de la cola del hub (`print_queue::DOCUMENT_TYPES`),
+    // así que tiene dónde encolarse. La puerta lo trataba como A4 y lo mandaba al navegador.
+    const enqueue = vi.fn(async () => true);
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, iframePrint });
+
+    const r = await print({ role: 'label', documentType: 'barcode_label', jobId: 'barcode-SKU1', data: { sku: 'SKU1' }, html: '<i>x</i>' });
+
+    expect(r.via).toBe('queue');
+    expect(iframePrint).not.toHaveBeenCalled();
+  });
+
+  it('el arqueo de caja también es térmico: se encola', async () => {
+    const enqueue = vi.fn(async () => true);
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, iframePrint: vi.fn() });
+
+    const r = await print({ documentType: 'cash_session_report', jobId: 'z-1', data: {} });
+
+    expect(r.via).toBe('queue');
+  });
+
+  it('sin jobId ENCOLA IGUAL con uno propio (antes se lo tragaba en silencio)', async () => {
+    // Exigir `jobId` convertía «el caller no puso la clave de idempotencia» en «este documento no
+    // se imprime en ningún sitio», sin una línea en el log del hub. Un tique duplicado se tira; uno
+    // que no sale no existe.
+    const encolados: string[] = [];
+    const enqueue: EnqueuePrintJob = async (job) => { encolados.push(job.jobId); return true; };
+    const browserPrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', data: { total: 3 } });
+
+    expect(r.via).toBe('queue');
+    expect(encolados).toHaveLength(1);
+    expect(encolados[0]).toMatch(/\S/);
+    expect(browserPrint).not.toHaveBeenCalled();
+  });
+
+  it('la impresora descubierta SIN ROL manda el documento a la cola, no al vacío', async () => {
+    // Exactamente el hub de QA: hay hardware y hay impresora, pero su rol está vacío. La puerta
+    // llegaba a `toQueue()` y ahí se caía por no traer `jobId`.
+    const enqueue = vi.fn(async () => true);
+    const print = createPrintService(fakeClient({ peripherals: sinRol }), { enqueue, browserPrint: vi.fn() });
+
+    const r = await print({ role: 'receipt', documentType: 'prebill', data: { total: 9 } });
+
+    expect(r.via).toBe('queue');
+  });
+
+  it('DENTRO de la app instalada el respaldo del navegador NO es éxito', async () => {
+    // En el WKWebView de la app `window.print()` no imprime nada. Devolver `via:'browser'` es lo
+    // que ha hecho invisible el fallo durante toda la QA: el caller lo daba por impreso.
+    const iframePrint = vi.fn();
+    const browserPrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), {
+      iframePrint,
+      browserPrint,
+      installedApp: () => true,
+    });
+
+    const r = await print({ role: 'receipt', documentType: 'invoice', format: 'a4', jobId: 'inv-1', html: '<i>x</i>' });
+
+    expect(r.via).toBe('none');
+    expect(r.error).toMatch(/app/i);
+    expect(iframePrint).not.toHaveBeenCalled();
+    expect(browserPrint).not.toHaveBeenCalled();
+  });
+
+  it('en el NAVEGADOR el respaldo sigue siendo éxito (ahí sí imprime)', async () => {
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), {
+      iframePrint,
+      installedApp: () => false,
+    });
+
+    const r = await print({ role: 'receipt', documentType: 'invoice', format: 'a4', jobId: 'inv-1', html: '<i>x</i>' });
+
+    expect(r.via).toBe('browser');
+    expect(iframePrint).toHaveBeenCalledTimes(1);
   });
 });

@@ -166,7 +166,15 @@ const erploraClient = getClient();
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
 
 // Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
-bootPrintOnSale(getClient());
+// Sale por la MISMA puerta que todo lo demás (hub#862): resolvía él mismo rol→impresora y llamaba al
+// hardware directo, así que con la impresora sin rol —o sin hardware en este equipo— el tique
+// desaparecía sin cola, sin navegador y sin aviso.
+bootPrintOnSale(getClient(), {
+  print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  onFailure: (f) => {
+    void toastError(`El tique de la venta ${f.saleId} NO se imprimió: ${f.error}`);
+  },
+});
 
 // HOST DE IMPRESIÓN (ADR-0196 §6, hub#343 + hub#501 + hub#749): este equipo se DA DE ALTA como host
 // de los roles que puede imprimir de verdad y drena la cola del hub. Se arranca SIEMPRE y en todos
