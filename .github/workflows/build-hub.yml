@@ -10,6 +10,7 @@
 #   - ghcr.io/erplora/hub:latest      (tag móvil que consumen los HUBS REALES: el provisioning
 #                                      del Cloud/Dokploy registra el servicio con `…/hub:latest`).
 #                                      ESTE es el tag canónico — sin él no se puede hacer pull.
+#                                      SOLO se mueve desde `main` o un tag `v*` (hub#872).
 #   - ghcr.io/erplora/hub:<git-sha>   (tag inmutable por commit, para pin/rollback)
 #   - ghcr.io/erplora/hub:<semver>    (solo en tag v*: :1.2.3 inmutable + :1.2 y :1 móviles,
 #                                      para poder decir "la última 1.x" y distinguir un parche de
@@ -18,7 +19,11 @@
 # Pipeline:
 #   push a main       ─► build ─► push GHCR (:latest + :<sha>)
 #   tag v*            ─► build ─► push GHCR (:latest + :<sha> + :<semver>)  + reescribe Cargo
-#   workflow_dispatch ─► build ─► push GHCR (manual)
+#   workflow_dispatch ─► build ─► push GHCR (manual). Desde `main`/`v*` etiqueta como arriba;
+#                        desde CUALQUIER otra rama publica SOLO `:<sha>` (hub#872): un build
+#                        manual de `develop` no debe mover `:latest` — cambiaría el código de
+#                        TODA la flota. El `:<sha>` inmutable sirve para probar esa imagen en
+#                        UN hub concreto repuntando su servicio.
 #
 # Auth: `GITHUB_TOKEN` del propio workflow (permiso `packages: write`). No hacen falta claves
 # estáticas ni OIDC de AWS. El paquete queda PRIVADO por defecto; para que Dokploy/provisioning
@@ -149,12 +154,16 @@ jobs:
           provenance: false
           sbom: false
 
+      # Prints the tags the guard actually computed: after hub#872 a dispatch from a
+      # non-main branch publishes only `:<sha>`, so hardcoding `:latest` here would lie.
       - name: Output image URIs
+        env:
+          TAGS: ${{ steps.tags.outputs.tags }}
         run: |
           echo "Imagen publicada (GHCR, privada):"
-          echo "  ${{ steps.tags.outputs.image }}:latest   (hubs reales — Cloud/Dokploy provisioning)"
-          echo "  ${{ steps.tags.outputs.image }}:${GITHUB_SHA}"
+          printf '%s\n' "$TAGS" | sed 's/^/  /'
           echo ""
+          echo "(:latest = hubs reales — solo se mueve desde main o un tag v*, hub#872)"
           echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
 
 # ==============================================================================

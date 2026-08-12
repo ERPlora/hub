@@ -17,11 +17,15 @@
 #   <image>:X.Y.Z      ← immutable, RELEASE ONLY. What a rollback pins to.
 #   <image>:X.Y        ← moving: "the latest 1.2.*"
 #   <image>:X          ← moving: "the latest 1.*"
-#   <image>:latest     ← the tag the provisioning registers on every real hub
+#   <image>:latest     ← the tag the provisioning registers on every real hub.
+#                        ONLY from `main` or a `v*` tag (hub#872): a `workflow_dispatch`
+#                        from any other branch must not move the whole fleet's code.
 #   <image>:<sha>      ← immutable per commit
 #
 # On a push to `main` only `:latest` and `:<sha>` are published: `main` is an integration build,
 # not a release, and minting `:X.Y.Z` there would move an immutable tag on every merge.
+# On any other ref (a manual `workflow_dispatch` from `develop` or a work branch) only the
+# immutable `:<sha>` is published — usable to point ONE hub at a develop build for testing.
 #
 # NIEGA la publicación (exit 1) cuando:
 #   · la versión no es semver `X.Y.Z`, o sigue siendo el hueco `0.0.0`;
@@ -203,6 +207,16 @@ if [ "$is_release" -eq 1 ]; then
 fi
 
 # ── The tags ─────────────────────────────────────────────────────────────────
+# `:latest` is the tag every real hub's service is registered with (Cloud/Dokploy
+# provisioning), so it may only move from `main` or from a release tag `v*` (hub#872).
+# `workflow_dispatch` runs this from ANY ref: a manual build from `develop` or a work
+# branch publishes ONLY the immutable `:<sha>` — enough to point one specific hub at it
+# without changing the code of the whole fleet.
+publish_latest="$is_release"
+case "$ref" in
+    refs/heads/main) publish_latest=1 ;;
+esac
+
 tags=""
 if [ "$is_release" -eq 1 ]; then
     tags="$image:$version
@@ -210,8 +224,11 @@ $image:$minor
 $image:$major
 "
 fi
-tags="$tags$image:latest
-$image:$sha"
+if [ "$publish_latest" -eq 1 ]; then
+    tags="$tags$image:latest
+"
+fi
+tags="$tags$image:$sha"
 
 echo "version=$version"
 printf '%s\n' "$tags"
