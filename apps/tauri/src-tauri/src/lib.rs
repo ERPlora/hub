@@ -1040,7 +1040,30 @@ impl Serialize for HardwareError {
 /// hardware existe (en el shell siempre existe: el shell ES el bridge). Devuelve la versión.
 #[tauri::command]
 fn erplora_bridge_status() -> serde_json::Value {
-    serde_json::json!({ "version": env!("CARGO_PKG_VERSION") })
+    serde_json::json!({ "version": bridge_status_version() })
+}
+
+/// La versión que la app declara al resto del sistema (la pantalla de impresión la enseña).
+///
+/// Sale de `tauri.conf.json`, que es lo que **sella la release** (`tauri-release.yml` escribe ahí
+/// el tag antes de construir). `CARGO_PKG_VERSION` no lo sella nadie: el `Cargo.toml` de este shell
+/// vale `0.0.0` en todas las builds, así que una app 1.0.0 instalada se presentaba como
+/// «Impresora lista · v0.0.0.» (hub#862).
+///
+/// Se lee la conf con `include_str!` y no `AppHandle::package_info()` para que esto sea una función
+/// pura y comprobable en un test de unidad — el mismo fichero que lee `generate_context!`.
+fn bridge_status_version() -> String {
+    tauri_conf_version(include_str!("../tauri.conf.json"))
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string())
+}
+
+/// El campo `version` de una `tauri.conf.json`, o `None` si no hay uno legible.
+fn tauri_conf_version(conf: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(conf)
+        .ok()?
+        .get("version")?
+        .as_str()
+        .map(str::to_string)
 }
 
 /// Reads the Android runtime-permission map and says whether the printer sweep may run.
@@ -1729,5 +1752,31 @@ mod tests {
                 permission: ACCESS_LOCAL_NETWORK.to_string(),
             }
         );
+    }
+
+    // ── hub#862: la app decía ser la «v0.0.0» ────────────────────────────────────────────────
+    // La pantalla de impresión enseña la versión que contesta `erplora_bridge_status`, y contestaba
+    // `CARGO_PKG_VERSION` — que NADIE sella: la release (`tauri-release.yml`) escribe la versión en
+    // `tauri.conf.json`, y el `Cargo.toml` de este shell se queda en 0.0.0 para siempre. Así que una
+    // app 1.0.0 instalada se presentaba como «Impresora lista · v0.0.0.» y no había forma de saber
+    // desde dentro qué binario estaba corriendo.
+
+    #[test]
+    fn la_version_del_estado_no_es_la_del_crate() {
+        // Si esto falla es que alguien empezó a sellar el Cargo.toml — buena noticia, pero entonces
+        // este test ya no prueba nada y hay que decidir cuál de las dos versiones manda.
+        assert_eq!(env!("CARGO_PKG_VERSION"), "0.0.0");
+        assert_ne!(bridge_status_version(), "0.0.0");
+    }
+
+    #[test]
+    fn la_version_sale_de_tauri_conf_json() {
+        assert_eq!(
+            tauri_conf_version(r#"{"productName":"ERPlora","version":"1.2.3"}"#),
+            Some("1.2.3".to_string())
+        );
+        // Una conf ilegible no puede tumbar la pantalla de ajustes: se contesta que no se sabe.
+        assert_eq!(tauri_conf_version("{ no es json"), None);
+        assert_eq!(tauri_conf_version(r#"{"version":42}"#), None);
     }
 }
