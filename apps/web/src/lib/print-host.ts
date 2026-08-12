@@ -39,37 +39,37 @@ export interface PrintHostClient {
       jobId?: string,
     ): Promise<void>;
     /**
-     * Asigna un rol a un dispositivo del registro (por `key` o MAC). Opcional aquí: solo la usa la
-     * red de seguridad de abajo, y un transporte sin ella (un doble de test viejo) sigue arrancando.
+     * Gives a device in the registry a role (by `key` or MAC). Optional here: only the safety net
+     * below uses it, and a transport without it (an older test double) still boots.
      */
     setDeviceRole?(keyOrMac: string, role: string): Promise<PrintDevice[]>;
   };
 }
 
 /**
- * **La primera impresora descubierta es la de TIQUES** — y si no, no imprime nada y nadie lo dice
- * (hub#862).
+ * **The first printer found is the RECEIPT printer** — and without that, nothing prints and nobody
+ * says so (hub#862).
  *
- * Una impresora recién encontrada nace SIN ROL, y el rol lo tiene que poner alguien a mano en el
- * módulo `printing`. Hasta que lo haga se suman dos silencios: el rol `receipt` no resuelve a
- * ninguna impresora (el tique no sale por hardware) y este equipo se da de alta como host de CERO
- * roles (nadie drena la cola), así que lo encolado tampoco sale. El síntoma es «la impresora está
- * online, el interruptor está puesto y no pasa nada».
+ * A freshly discovered printer is born with NO ROLE, and somebody has to give it one by hand in the
+ * `printing` module. Until they do, two silences add up: the `receipt` role resolves to no printer
+ * (the ticket cannot go out through hardware) AND this device registers as a print host for ZERO
+ * roles (nobody drains the queue), so what got queued does not come out either. The symptom is
+ * "the printer is online, the switch is on, and nothing happens".
  *
- * Devuelve la clave del dispositivo al que hay que darle `receipt`, o `undefined` si no hay que
- * tocar nada. Solo actúa en el caso inequívoco: **una** impresora alcanzable y **ningún** rol
- * asignado en todo el registro. Con dos ya hay un reparto que adivinar (¿cuál es la etiquetadora?)
- * y con alguna rolada la instalación ya está configurada — en ambos casos, manos fuera.
+ * Returns the key of the device that should get `receipt`, or `undefined` when nothing should be
+ * touched. It acts only on the unambiguous case: **one** reachable printer and **no** role anywhere
+ * in the registry. With two there is a routing decision to guess (which one is the label printer?)
+ * and with any role already set the install is configured — hands off in both.
  */
 export function printerNeedingDefaultRole(devices: PrintDevice[]): string | undefined {
   const list = devices ?? [];
   if (list.some((d) => d?.role?.trim())) return undefined;
-  // `ip` es lo que la hace alcanzable: una entrada sin dirección no puede tomar un trabajo.
+  // `ip` is what makes it reachable: an entry with no address cannot take a job.
   const reachable = list.filter((d) => d?.ip);
   if (reachable.length !== 1) return undefined;
   const only = reachable[0]!;
-  // `key` es la clave del registro; la MAC vale igual (el registro resuelve las dos) y en Android
-  // no hay MAC, así que se prefiere la clave.
+  // `key` is the registry's key; a MAC works too (the registry resolves both), and on Android there
+  // is no MAC at all — so the key comes first.
   return only.key ?? only.mac ?? undefined;
 }
 
@@ -201,10 +201,10 @@ export async function bootPrintHost(
   // environment and does not change while the process lives, so asking once here is enough.
   const hardware = await client.peripherals.detect().catch(() => ({ online: false }));
   if (!hardware.online) return () => {};
-  // **Red de seguridad ANTES del alta** (hub#862): si la única impresora de este equipo no tiene rol,
-  // se le da `receipt` aquí, de modo que el alta de abajo ya la cuente y el tique del TPV encuentre
-  // su impresora. Best-effort: si el registro se niega, el arranque sigue — sin rol se imprime menos,
-  // pero no arrancar no imprime nada.
+  // **Safety net BEFORE the registration** (hub#862): if the only printer on this device has no role,
+  // it gets `receipt` here, so the alta below already counts it and the till's ticket finds its
+  // printer. Best-effort: if the registry refuses, the boot carries on — without a role less gets
+  // printed, but not booting prints nothing at all.
   await ensureDefaultPrinterRole(client);
   const session = options.session ?? getHubSession;
   const drain = createPrintDrain({
@@ -266,7 +266,7 @@ export async function bootPrintHost(
   };
 }
 
-/** Aplica {@link printerNeedingDefaultRole} si hay algo que aplicar. Nunca propaga. */
+/** Applies {@link printerNeedingDefaultRole} when there is something to apply. Never propagates. */
 async function ensureDefaultPrinterRole(client: PrintHostClient): Promise<void> {
   const setRole = client.peripherals.setDeviceRole;
   if (!setRole) return;
@@ -274,9 +274,9 @@ async function ensureDefaultPrinterRole(client: PrintHostClient): Promise<void> 
     const target = printerNeedingDefaultRole(await client.peripherals.getDevices());
     if (!target) return;
     await setRole.call(client.peripherals, target, 'receipt');
-    console.warn('[print-host] la única impresora sin rol pasa a ser la de tiques (receipt):', target);
+    console.warn('[print-host] the only printer had no role — it is now the receipt one:', target);
   } catch (e) {
-    console.warn('[print-host] no se pudo asignar el rol receipt por defecto', e);
+    console.warn('[print-host] could not assign the default receipt role', e);
   }
 }
 

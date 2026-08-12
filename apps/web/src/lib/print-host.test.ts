@@ -43,8 +43,8 @@ function client(
         printed.push(args);
         if (onPrint) await onPrint(...args);
       },
-      // El registro de verdad devuelve el registro actualizado; aquí se muta la misma lista para
-      // que lo que se lea después (los roles del alta) sea lo que quedó asignado.
+      // The real registry answers with the updated registry; here the same list is mutated so that
+      // what gets read afterwards (the roles of the alta) is what ended up assigned.
       setDeviceRole: async (keyOrMac: string, role: string) => {
         rolesSet.push([keyOrMac, role]);
         for (const d of devices) if (d.key === keyOrMac || d.mac === keyOrMac) d.role = role;
@@ -297,18 +297,18 @@ describe('print host — booting it in the shell', () => {
   });
 });
 
-// ── hub#862: una impresora descubierta NACE SIN ROL y nada lo dice ─────────────────────────────
-// El descubrimiento registra la impresora, pero el rol lo tiene que poner alguien a mano en el
-// módulo `printing`. Hasta que lo haga: el rol `receipt` no resuelve a ninguna impresora (no sale el
-// tique) Y este equipo se da de alta como host de CERO roles (nadie drena la cola), o sea que lo
-// encolado tampoco sale. Dos silencios que se suman al mismo síntoma: «no imprime y no dice nada».
-// La red de seguridad es el caso mayoritario del TPV: una impresora sola es la de tiques.
-describe('red de seguridad: la primera impresora sin rol es la de TIQUES (hub#862)', () => {
+// ── hub#862: a discovered printer is BORN WITH NO ROLE and nothing says so ─────────────────────
+// Discovery registers the printer, but somebody has to give it a role by hand in the `printing`
+// module. Until they do: the `receipt` role resolves to no printer (no ticket comes out) AND this
+// device registers as a host for ZERO roles (nobody drains the queue), so what got queued does not
+// come out either. Two silences adding up to one symptom: "it does not print and it says nothing".
+// The safety net covers the till's majority case: a single printer is the receipt printer.
+describe('safety net: the first printer with no role is the RECEIPT one (hub#862)', () => {
   afterEach(() => {
     bootPrintHost.reset();
   });
 
-  it('la única impresora descubierta se queda con el rol receipt y este equipo se da de alta', async () => {
+  it('the only discovered printer keeps the receipt role and this device registers for it', async () => {
     const registered: string[] = [];
     const c = client([{ key: '192.168.100.196:9100', mac: 'aa:bb', role: null, ip: '192.168.100.196', port: 9100 }]);
 
@@ -325,9 +325,10 @@ describe('red de seguridad: la primera impresora sin rol es la de TIQUES (hub#86
     expect(registered).toEqual(['receipt']);
   });
 
-  it('NO toca una instalación ya configurada (algún rol puesto a mano)', async () => {
-    // Quien ya repartió los roles sabe lo que hace: una segunda impresora sin rol puede ser la de
-    // etiquetas esperando su sitio, y adjudicarle los tiques sacaría el tique por la etiquetadora.
+  it('does NOT touch an install that is already configured (some role set by hand)', async () => {
+    // Whoever already handed out the roles knows what they are doing: a second printer with no role
+    // may be the label one waiting for its turn, and giving it the receipts would print the
+    // customer's ticket on label stock.
     const c = client([
       { key: 'k1', role: 'kitchen', ip: '10.0.0.6' },
       { key: 'k2', role: null, ip: '10.0.0.7' },
@@ -345,10 +346,10 @@ describe('red de seguridad: la primera impresora sin rol es la de TIQUES (hub#86
     expect(c.rolesSet).toEqual([]);
   });
 
-  it('con DOS impresoras sin rol no adivina: no toca ninguna', async () => {
-    // Una sola impresora en una tienda es la de tiques con casi total seguridad. Dos ya son un
-    // reparto (tiques + etiquetas, tiques + cocina) y elegir por orden de descubrimiento sacaría el
-    // tique del cliente por la etiquetadora. Ahí el aviso lo tiene que dar la pantalla de printing.
+  it('with TWO role-less printers it does not guess: it touches neither', async () => {
+    // A single printer in a shop is the receipt one with near certainty. Two are already a routing
+    // decision (receipts + labels, receipts + kitchen) and picking by discovery order would print
+    // the customer's ticket on label stock. There the warning belongs to the printing screen.
     const c = client([
       { key: 'k1', role: null, ip: '10.0.0.6' },
       { key: 'k2', role: null, ip: '10.0.0.7' },
@@ -366,7 +367,7 @@ describe('red de seguridad: la primera impresora sin rol es la de TIQUES (hub#86
     expect(c.rolesSet).toEqual([]);
   });
 
-  it('una entrada sin dirección no es una impresora: no se le asigna nada', async () => {
+  it('an entry with no address is not a printer: nothing is assigned to it', async () => {
     const c = client([{ key: 'k3', role: null, ip: null }]);
 
     await bootPrintHost(c, {

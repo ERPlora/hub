@@ -1,12 +1,12 @@
-// hub#862 — «Imprimir ticket al cobrar» estaba ON, la impresora ONLINE… y no salía papel ni había
-// aviso, y el log del hub no tenía UNA línea de la cola de impresión.
+// hub#862 — «print the ticket on payment» was ON, the printer was ONLINE… and no paper came out, no
+// warning appeared, and the hub's log did not have ONE line about the print queue.
 //
-// La causa: este fichero NO pasaba por la puerta global (`erplora.print`). Resolvía él mismo
-// rol→impresora y llamaba a `peripherals.print` directo, así que:
-//   - impresora descubierta pero SIN ROL (el caso de QA) → `receiptPrinterId` undefined → los dos
-//     `if` en falso → **return silencioso**: ni Bridge, ni cola, ni navegador, ni aviso;
-//   - `getDevices()` que lanza (PWA en el navegador) → `catch { return; }` → lo mismo.
-// Y la cola del hub —que existe justo para esto— no se usaba nunca por este camino.
+// The cause: this file did not go through the global door (`erplora.print`). It resolved
+// role→printer itself and called `peripherals.print` directly, so:
+//   - a discovered printer with NO ROLE (the QA case) → `receiptPrinterId` undefined → both `if`s
+//     false → **silent return**: no bridge, no queue, no browser, no warning;
+//   - `getDevices()` throwing (the PWA in a browser) → `catch { return; }` → the same.
+// And the hub's queue — which exists for exactly this — was never used along this path.
 import { describe, it, expect, vi } from 'vitest';
 
 import { bootPrintOnSale } from './print-on-sale';
@@ -14,7 +14,7 @@ import type { PrintRequest, PrintResult } from './print';
 
 type Listener = (payload: unknown) => void;
 
-/** Cliente mínimo: el evento de venta, las queries que lee y el hardware del cajón. */
+/** The minimum client: the sale event, the queries it reads and the drawer's hardware. */
 function fakeClient(over: {
   devices?: () => Promise<{ role: string | null; ip: string | null; port?: number }[]>;
   settings?: Record<string, unknown>;
@@ -43,13 +43,13 @@ function fakeClient(over: {
     openDrawer,
     emit: async (payload: unknown) => {
       for (const cb of listeners['sale.completed'] ?? []) cb(payload);
-      // El listener es sincrónico y lanza el trabajo asíncrono: se le da un turno para acabar.
+      // The listener is synchronous and fires async work: give it a turn to finish.
       await new Promise((r) => setTimeout(r, 0));
     },
   };
 }
 
-/** La puerta global, espiada: qué se le pidió imprimir y qué contestó. */
+/** The global door, spied on: what it was asked to print and what it answered. */
 function fakeGate(result: PrintResult = { via: 'queue', role: 'receipt' }) {
   const calls: PrintRequest[] = [];
   return {
@@ -61,8 +61,8 @@ function fakeGate(result: PrintResult = { via: 'queue', role: 'receipt' }) {
   };
 }
 
-describe('tique al cobrar (hub#862)', () => {
-  it('con la impresora SIN ROL el tique sale por la puerta global, que lo encola', async () => {
+describe('the ticket on payment (hub#862)', () => {
+  it('with the printer holding NO ROLE the ticket leaves through the door, which queues it', async () => {
     const gate = fakeGate();
     const { client, emit } = fakeClient();
     bootPrintOnSale(client, { print: gate.print });
@@ -72,17 +72,16 @@ describe('tique al cobrar (hub#862)', () => {
     expect(gate.calls).toHaveLength(1);
     expect(gate.calls[0]!.role).toBe('receipt');
     expect(gate.calls[0]!.documentType).toBe('receipt');
-    // Idempotencia: el mismo tique reimpreso es UN trabajo, no dos papeles.
+    // Idempotency: the same ticket reprinted is ONE job, not two pieces of paper.
     expect(gate.calls[0]!.jobId).toBe('sale-42');
-    // El documento va ESTRUCTURADO (hub#501): lo que lee el renderizador ESC/POS, no HTML.
+    // The document travels STRUCTURED (hub#501): what the ESC/POS renderer reads, never HTML.
     expect(gate.calls[0]!.data).toMatchObject({ items: expect.anything() });
   });
 
-  it('es impresión DESATENDIDA: no abre el diálogo del navegador', async () => {
-    // Nadie ha pedido imprimir: se cobra y el papel debe salir solo. Un diálogo del navegador aquí
-    // sacaría la APP en un folio (este camino no lleva `html` del documento) y dejaría el TPV
-    // bloqueado esperando un clic. Si no hay dónde imprimir, se avisa — mismo criterio que la
-    // comanda de cocina (`print-comanda`).
+  it('is UNATTENDED printing: it never opens the browser dialog', async () => {
+    // Nobody asked to print: the sale was paid. A browser dialog here would print the APP on a sheet
+    // (this path carries no document `html`) and leave the till waiting for a click. With nowhere to
+    // print, it warns — the same rule as the kitchen docket (`print-comanda`).
     const gate = fakeGate();
     const { client, emit } = fakeClient();
     bootPrintOnSale(client, { print: gate.print });
@@ -93,7 +92,7 @@ describe('tique al cobrar (hub#862)', () => {
     expect(gate.calls[0]!.html).toBeUndefined();
   });
 
-  it('sin hardware en este equipo (PWA) el tique TAMBIÉN sale por la puerta', async () => {
+  it('with no hardware on this device (PWA) the ticket ALSO leaves through the door', async () => {
     const gate = fakeGate();
     const { client, emit } = fakeClient({
       devices: async () => { throw new Error('hardware_unavailable'); },
@@ -105,8 +104,8 @@ describe('tique al cobrar (hub#862)', () => {
     expect(gate.print).toHaveBeenCalledTimes(1);
   });
 
-  it('si la puerta NO entrega, se avisa (un tique que no sale no puede ser silencioso)', async () => {
-    const gate = fakeGate({ via: 'browser', role: 'receipt', error: 'sin impresora' });
+  it('when the door does NOT deliver it is reported (a ticket that never came out cannot be silent)', async () => {
+    const gate = fakeGate({ via: 'browser', role: 'receipt', error: 'no printer' });
     const onFailure = vi.fn();
     const { client, emit } = fakeClient();
     bootPrintOnSale(client, { print: gate.print, onFailure });
@@ -117,7 +116,7 @@ describe('tique al cobrar (hub#862)', () => {
     expect(onFailure.mock.calls[0]![0]).toMatchObject({ saleId: '42' });
   });
 
-  it('si la puerta entrega (cola o impresora) no molesta con avisos', async () => {
+  it('when the door delivers (queue or printer) it keeps quiet', async () => {
     const onFailure = vi.fn();
     const { client, emit } = fakeClient();
     bootPrintOnSale(client, { print: fakeGate({ via: 'bridge', role: 'receipt' }).print, onFailure });
@@ -127,7 +126,7 @@ describe('tique al cobrar (hub#862)', () => {
     expect(onFailure).not.toHaveBeenCalled();
   });
 
-  it('con el ajuste apagado no imprime nada', async () => {
+  it('with the setting off it prints nothing', async () => {
     const gate = fakeGate();
     const { client, emit } = fakeClient({ settings: { auto_print_on_sale: 0 } });
     bootPrintOnSale(client, { print: gate.print });
@@ -137,7 +136,7 @@ describe('tique al cobrar (hub#862)', () => {
     expect(gate.print).not.toHaveBeenCalled();
   });
 
-  it('el cajón sigue abriéndose por la impresora del rol receipt', async () => {
+  it('the drawer still opens through the printer holding the receipt role', async () => {
     const gate = fakeGate();
     const { client, openDrawer, emit } = fakeClient({
       devices: async () => [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }],
@@ -150,7 +149,7 @@ describe('tique al cobrar (hub#862)', () => {
     expect(openDrawer).toHaveBeenCalledWith('network:10.0.0.5:9100');
   });
 
-  it('sin impresora con rol receipt el cajón no se abre, pero el tique se imprime igual', async () => {
+  it('with no receipt-role printer the drawer stays shut, but the ticket still prints', async () => {
     const gate = fakeGate();
     const { client, openDrawer, emit } = fakeClient({
       settings: { auto_print_on_sale: 1, open_drawer_on_sale: 1 },
