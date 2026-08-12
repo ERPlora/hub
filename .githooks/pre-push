@@ -35,6 +35,8 @@
 #
 # Injection points, used by scripts/prepush-gate.test.sh:
 #   HUB_GATE_TEST_CMD · HUB_GATE_STATUS_CMD · HUB_GATE_STATE_DIR · HUB_GATE_LOCK_WAIT
+#   HUB_GATE_UNPROTECTED_LOCK_WAIT (hub#788: lock-wait cap while the SSH
+#   connection has no keepalive; the rule is keepalive margin > max lock wait)
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
@@ -52,6 +54,14 @@ PG_DSN=postgres://postgres:test@localhost:5433/hub_test
 # default (64) runs out mid-run.
 PG_IMAGE=pgvector/pgvector:pg18
 PG_ARGS="-c max_locks_per_transaction=1024 -c max_connections=300 -c shared_buffers=512MB"
+# hub#788: `git push` opens the SSH transport BEFORE this hook runs, so every
+# second spent waiting on the gate lock is spent on an IDLE connection that
+# GitHub eventually closes — the push then dies in silence with zero tests run.
+# The keepalive below gives a margin of Interval × CountMax = 7200s, and the
+# INEQUALITY that must hold is: keepalive margin > maximum lock wait
+# (HUB_GATE_LOCK_WAIT, default 3600s). The hook enforces it by clamping the
+# wait, never by trusting the connection; see ensure_ssh_keepalive.
+KEEPALIVE_SSH="ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=240 -o TCPKeepAlive=yes"
 
 armed="$(git config --bool hooks.hubPrepushGate 2>/dev/null || echo false)"
 if [ "$armed" != "true" ]; then
@@ -109,6 +119,43 @@ hook_drift_check() {
     fi
 }
 hook_drift_check
+
+# ── hub#788: keepalive in the repo, and never wait longer than it protects ───
+# The keepalive can only be effective if it was configured BEFORE git opened
+# this push's SSH connection. So: if it is already there, this run is
+# protected; if not, the hook installs it for every FUTURE push (self-healing
+# — the fix used to live in one machine's .git/config only) and treats the
+# CURRENT run as unprotected, capping its lock wait so the connection dies
+# after the hook has already failed fast with a clear retry message, not
+# mid-transfer in silence.
+SSH_PROTECTED=0
+ssh_keepalive_margin() {   # echoes Interval × CountMax in seconds; empty if no keepalive
+    local cmd interval countmax
+    cmd="${GIT_SSH_COMMAND:-}"
+    [ -n "$cmd" ] || cmd="$(git config core.sshCommand 2>/dev/null || true)"
+    interval="$(printf '%s' "$cmd" | sed -n 's/.*ServerAliveInterval[= ]\([0-9][0-9]*\).*/\1/p')"
+    countmax="$(printf '%s' "$cmd" | sed -n 's/.*ServerAliveCountMax[= ]\([0-9][0-9]*\).*/\1/p')"
+    [ -n "$interval" ] || return 0
+    [ -n "$countmax" ] || countmax=3   # OpenSSH default
+    echo $((interval * countmax))
+}
+ensure_ssh_keepalive() {
+    if [ -n "$(ssh_keepalive_margin)" ]; then
+        SSH_PROTECTED=1
+        return 0
+    fi
+    # GIT_SSH_COMMAND overrides the config, so writing the config would not
+    # help; and an existing core.sshCommand without keepalive is someone's
+    # deliberate setup — warn rather than rewrite.
+    if [ -z "${GIT_SSH_COMMAND:-}" ] && [ -z "$(git config core.sshCommand 2>/dev/null || true)" ]; then
+        if git config --local core.sshCommand "$KEEPALIVE_SSH" 2>/dev/null; then
+            echo "ℹ️  pre-push: no SSH keepalive was configured — armed core.sshCommand for future pushes (hub#788)." >&2
+        fi
+    else
+        echo "⚠️  pre-push: the effective SSH command has no keepalive (ServerAliveInterval) — add one, or lock waits will outlive the connection (hub#788)." >&2
+    fi
+}
+ensure_ssh_keepalive
 
 STATE_DIR="${HUB_GATE_STATE_DIR:-$(git rev-parse --git-common-dir)/hub-gate}"
 mkdir -p "$STATE_DIR"
@@ -250,6 +297,27 @@ write_lock_owner() {
     } > "$LOCK/owner" 2>/dev/null || true
 }
 lock_wait="${HUB_GATE_LOCK_WAIT:-3600}"
+# hub#788: the connection must outlive the wait — cap the wait, never trust
+# the connection. Two cases:
+#   · protected (keepalive was active when git opened the connection): keep
+#     lock_wait strictly BELOW the keepalive margin;
+#   · unprotected (keepalive just installed, or absent): GitHub will close the
+#     idle connection long before an hour — fail fast with a retry message
+#     instead of dying mid-transfer in silence.
+if [ "$SSH_PROTECTED" = 1 ]; then
+    margin="$(ssh_keepalive_margin)"
+    if [ -n "$margin" ] && [ "$lock_wait" -ge "$margin" ] 2>/dev/null; then
+        clamped=$((margin / 2))
+        echo "⚠️  pre-push: HUB_GATE_LOCK_WAIT (${lock_wait}s) ≥ SSH keepalive margin (${margin}s) — clamped the wait to ${clamped}s so the connection outlives it (hub#788)." >&2
+        lock_wait=$clamped
+    fi
+else
+    unprotected_wait="${HUB_GATE_UNPROTECTED_LOCK_WAIT:-240}"
+    if [ "$lock_wait" -gt "$unprotected_wait" ] 2>/dev/null; then
+        echo "⚠️  pre-push: this push's SSH connection has NO keepalive — capping the lock wait at ${unprotected_wait}s. If it times out, just retry: the next connection is protected (hub#788)." >&2
+        lock_wait=$unprotected_wait
+    fi
+fi
 waited=0
 announced=0
 while ! mkdir "$LOCK" 2>/dev/null; do

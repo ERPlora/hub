@@ -580,6 +580,84 @@ errs=""
     && ok "ownerless lock: waits conservatively instead of breaking it" \
     || bad "ownerless lock: waits conservatively instead of breaking it" "$errs"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 27–29 — the SSH keepalive lives in the REPO, and the lock wait must never
+# outlast what the connection tolerates (hub#788)
+#
+# `git push` opens the SSH transport BEFORE this hook runs. A lock wait of
+# 3600s against an idle connection gets closed by GitHub, and the push dies in
+# silence having run zero tests. The keepalive used to live only in one
+# machine's .git/config; the hook now guarantees it, and keeps the inequality
+# keepalive margin (Interval × CountMax) > max lock wait — by capping the
+# wait, never by trusting the connection.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 27. A repo without keepalive: the hook installs it for the NEXT pushes ────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true")
+sshcmd=$(git -C "$repo" config core.sshCommand 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                 || errs="$errs exit=$code(want 0)"
+grep -q 'ServerAliveInterval' <<<"$sshcmd"      || errs="$errs keepalive-not-installed sshCommand='$sshcmd'"
+[ -z "$errs" ] \
+    && ok "no keepalive configured: the hook arms core.sshCommand itself" \
+    || bad "no keepalive configured: the hook arms core.sshCommand itself" "$errs"
+
+# ── 28. UNPROTECTED connection: fail fast on lock contention, never wait 1h ───
+#    The keepalive the hook just installed does not protect THIS push — its
+#    connection was opened before. Waiting the full HUB_GATE_LOCK_WAIT on it
+#    reproduces the silent death; the hook must cap the wait and say why.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+mkdir -p "$repo/.state/lock"
+printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
+start=$SECONDS
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=3600 HUB_GATE_UNPROTECTED_LOCK_WAIT=2 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+took=$((SECONDS - start))
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                       || errs="$errs exit=$code(want 1)"
+[ "$took" -lt 60 ]                    || errs="$errs took=${took}s(want fast fail)"
+[ ! -f "$repo/RAN" ]                  || errs="$errs suite-ran"
+grep -qi 'keepalive' <<<"$out"        || errs="$errs no-keepalive-explanation"
+[ -z "$errs" ] \
+    && ok "unprotected connection + lock contention: capped wait, fast clear failure" \
+    || bad "unprotected connection + lock contention: capped wait, fast clear failure" "$errs out='$out'"
+
+# ── 29. PROTECTED connection: the wait is clamped BELOW the keepalive margin ──
+#    The inequality margin > wait must hold even if someone raises
+#    HUB_GATE_LOCK_WAIT: the hook clamps the wait to the margin, it never
+#    trusts the connection past what the keepalive guarantees.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+git -C "$repo" config core.sshCommand "ssh -o ServerAliveInterval=1 -o ServerAliveCountMax=4"
+sha=$(git -C "$repo" rev-parse HEAD)
+mkdir -p "$repo/.state/lock"
+printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
+start=$SECONDS
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=3600 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+took=$((SECONDS - start))
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                       || errs="$errs exit=$code(want 1)"
+[ "$took" -lt 60 ]                    || errs="$errs took=${took}s(want clamped to ~2s margin/2)"
+[ ! -f "$repo/RAN" ]                  || errs="$errs suite-ran"
+grep -qi 'clamp' <<<"$out"            || errs="$errs no-clamp-message"
+[ -z "$errs" ] \
+    && ok "wait ≥ keepalive margin: clamped below it, with a message naming both" \
+    || bad "wait ≥ keepalive margin: clamped below it, with a message naming both" "$errs out='$out'"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
