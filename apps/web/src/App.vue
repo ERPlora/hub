@@ -104,7 +104,7 @@
                llegar al SaaS manda `IsHubAdmin`, que es la autoridad de verdad.
                Sale por `openExternal`: dentro de la app instalada `window.open` no abre NADA
                (hub#475), y un botón muerto justo donde el dueño va a pagar es el peor sitio. -->
-          <ion-menu-toggle :auto-hide="false">
+          <ion-menu-toggle v-if="canOfferPlanUpgrade" :auto-hide="false">
             <ion-button
               class="sidebar-upgrade"
               fill="clear"
@@ -151,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -167,8 +167,9 @@ import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';
 import { toastError } from './lib/toast';
 import { openExternal } from './lib/open-external';
-import { upgradePlanUrl } from './lib/upgrade-plan-link';
+import { planUpgradeIsOfferable, upgradePlanUrl } from './lib/upgrade-plan-link';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
+import { getDeviceContext } from './lib/device';
 import { railCollapsed } from './lib/shell';
 import { SHELL_MENU_ID, runAfterShellMenuCloses } from './lib/shell-menu';
 import { PROFILE_ROUTE } from './lib/routes';
@@ -222,6 +223,16 @@ const appVersion = __APP_VERSION__;
 
 /** Sale a gestionar el plan de este hub en el SaaS. Si el viaje no se puede hacer, se DICE:
  *  un botón que no hace nada al pulsarlo es el defecto que hub#475 tuvo que arreglar diez veces. */
+// hub#756 — la copia que reparte Google Play NO lleva este control: su revisor lo trata como
+// steering hacia el pago. El corte es la DISTRIBUCIÓN, no el sistema: un APK de lado corre en el
+// mismo Android y Google no lo gobierna. Arranca en `true` porque el navegador —la mayoría de las
+// sesiones— nunca manda `distribution`, y esconderlo ahí sería quitar acceso sin motivo.
+const canOfferPlanUpgrade = ref(true);
+onMounted(async () => {
+  const context = await getDeviceContext();
+  canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+});
+
 async function onUpgradePlan(): Promise<void> {
   try {
     await openExternal(upgradePlanUrl());
