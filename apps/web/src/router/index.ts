@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
-import type { RouteRecordRaw } from 'vue-router';
+import type { RouteLocationNormalized, RouteLocationRaw, RouteRecordRaw } from 'vue-router';
+import { courierBootPending } from '../lib/courier';
 import { isAuthed, logout } from '../lib/session';
 import { isModuleEntitled, needsActivation } from '../lib/entitlement';
 import { apiDocsEnabled } from '../lib/api-docs';
@@ -55,8 +56,23 @@ export const router = createRouter({
   routes,
 });
 
-// Auth-gate: rutas con meta.auth requieren sesión; si no, a /login. (Vue-router nativo, sin React.)
-router.beforeEach((to) => {
+/**
+ * Auth-gate: rutas con `meta.auth` requieren sesión; si no, a `/login`. (Vue-router nativo.)
+ *
+ * **Es `async` por una razón (hub#858).** `main.ts` instala el router al evaluar el módulo, así que
+ * la navegación inicial arranca ANTES de que el canje del courier del shell (dos viajes de red)
+ * pueda terminar. Este gate contestaba entonces «sin sesión → /login» y nadie volvía a navegar: el
+ * courier abría la sesión un instante después y el usuario acababa viendo un formulario de login
+ * dentro de un shell ya autenticado —el doble login del alta—. Esperar a que el canje **se
+ * resuelva** (con éxito o no) es lo que convierte el salto SaaS→hub en un solo inicio de sesión.
+ *
+ * Exportado para que el contrato se pueda probar sin montar la app (`auth-gate.test.ts`).
+ */
+export async function authGate(to: RouteLocationNormalized): Promise<true | RouteLocationRaw> {
+  // Un courier en vuelo: no se decide nada hasta que exista (o se descarte) la sesión que trae.
+  // `null` es el caso normal —navegador corriente, y toda navegación posterior a la primera—, así
+  // que esto no añade espera a nadie más.
+  await courierBootPending();
   // Compat legacy: las tabs antes iban en query (?tab=) y ahora van en el HASH (#permisos).
   // Redirige el query viejo al hash para no romper bookmarks/enlaces antiguos.
   const legacyTab = to.query.tab;
@@ -99,4 +115,6 @@ router.beforeEach((to) => {
     return { name: 'dashboard' };
   }
   return true;
-});
+}
+
+router.beforeEach(authGate);
