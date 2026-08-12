@@ -25,7 +25,27 @@ pub struct QueryPage {
     pub offset: u64,
 }
 
-/// Ejecuta `name(params)` y devuelve **solo las filas** (compat: lista ⇒ filas de la página).
+/// Ceiling for a whole-set read, so a runaway loop cannot eat the process alive (hub#650).
+///
+/// It is deliberately far above any catalogue this is meant for — tax rules, payment methods,
+/// recipients — and hitting it is a LOUD error, never a quiet truncation. Silence is the exact
+/// failure this function stopped having.
+const WHOLE_SET_CAP: usize = 100_000;
+
+/// Ejecuta `name(params)` y devuelve **todas las filas** que la query da para esos `params`.
+///
+/// hub#650 — antes devolvía `execute_page(...).rows`, es decir **una sola página**, y ese era el
+/// contrato equivocado: quien llama aquí quiere un CONJUNTO, no una pantalla. Quien quiere una
+/// página llama a [`execute_page`], que es lo que hace la capa HTTP de las listas. Los que pasaban
+/// por aquí son justo los que no pueden trabajar con la mitad de los datos:
+///
+///   - el bloque `reads` de un command (`sales.complete_sale` precarga `taxes.rules.list`, que
+///     declara `page_size: 50`) — un impuesto calculado contra un catálogo truncado sale MAL;
+///   - el `guard_query` de un command — un guard que solo ve 50 filas tiene un agujero;
+///   - el `recipient_query` de `host.notify` — a los de la fila 51 no se les avisa nunca.
+///
+/// **Un `limit` explícito sigue mandando**: es el tope que puso el llamador, y es la misma regla
+/// que ya seguía `queryAll` en el SDK del cliente. Sin ella, «dame todo» no tendría contrario.
 pub async fn execute(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
@@ -33,7 +53,41 @@ pub async fn execute(
     params: &Params,
     ctx: &RequestContext,
 ) -> Result<Vec<Json>> {
-    Ok(execute_page(db, registry, name, params, ctx).await?.rows)
+    // El llamador puso su propio tope: se respeta tal cual, en un solo viaje.
+    if params.get("limit").and_then(|v| v.as_u64()).is_some() {
+        return Ok(execute_page(db, registry, name, params, ctx).await?.rows);
+    }
+
+    // La PRIMERA página se pide con los `params` TAL CUAL llegaron, sin añadir nada.
+    //
+    // Esto no es una optimización, es corrección: muchas queries validan su payload contra un JSON
+    // Schema con `additionalProperties: false`, así que meterles un `offset` que no declaran las
+    // hace fallar. Y fallaba justo donde más duele — el `settings_query` de un `protects` se
+    // saltaba con «guard skipped (open)», o sea que el arreglo ABRÍA un guard que debía denegar.
+    let first = execute_page(db, registry, name, params, ctx).await?;
+    let total = first.total;
+    let mut offset = first.offset + first.rows.len() as u64;
+    let mut out = first.rows;
+
+    // Una query SIN bloque `list` devuelve todo de una y `total` = nº de filas: sale por aquí sin
+    // un segundo viaje y sin haber visto jamás un `offset`. Solo se pagina lo que de verdad pagina.
+    while !out.is_empty() && offset < total {
+        if out.len() > WHOLE_SET_CAP {
+            return Err(crate::RuntimeError::Other(format!(
+                "query `{name}`: más de {WHOLE_SET_CAP} filas para una lectura completa; \
+                 acota con `limit` en vez de cargarlas todas"
+            )));
+        }
+        let mut page_params = params.clone();
+        page_params.insert("offset".into(), serde_json::json!(offset));
+        let page = execute_page(db, registry, name, &page_params, ctx).await?;
+        if page.rows.is_empty() {
+            break; // el `total` mentía; parar es mejor que girar en vacío
+        }
+        offset += page.rows.len() as u64;
+        out.extend(page.rows);
+    }
+    Ok(out)
 }
 
 /// Ejecuta `name(params)` devolviendo la página completa (`rows` + `total` + `limit`/`offset`).
