@@ -17,6 +17,7 @@ import { createPrintService } from './lib/print';
 import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
+import { bootModuleNavLocale } from './lib/nav';
 import { bootActionFeedback, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 import { bootCourier, takeCourierCode } from './lib/courier';
@@ -98,6 +99,12 @@ import './theme/global.css';
 
 // Aplica el modo de tema guardado (claro/oscuro/system) antes del primer render.
 bootTheme();
+
+// Module names are localized BY THE RUNTIME and travel baked into the navigation (ADR-0055), so it
+// has to be ASKED FOR AGAIN when the language changes: the personal preference arrives after the
+// first render, and without this the list stayed in the language it booted with (hub#781).
+// See lib/nav.ts.
+bootModuleNavLocale();
 
 // Registra el service worker y engancha el botón «Instalar app» (PWA, ver lib/pwa.ts).
 bootPwa();

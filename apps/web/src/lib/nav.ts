@@ -61,3 +61,29 @@ export async function refreshModuleNav(): Promise<void> {
     moduleNavState.value = 'error';
   }
 }
+
+let localeWatchInstalled = false;
+
+/**
+ * Asks for the navigation again when the effective language changes (hub#781).
+ *
+ * The names in this list are localized BY THE RUNTIME (`/api/navigation?locale=`, ADR-0055): they
+ * come from each module's own `locales/<lang>.json`, so the language is BAKED into the answer, not
+ * resolved when it is painted. And the list was fetched exactly once, at boot — before
+ * `/api/profile` had answered, so with the shell still on its default `es`.
+ *
+ * The result: a user whose preference was English saw Home, Employees, Settings and every other
+ * chrome string in English, and their apps as `Clientes`, `Mesas`, `Impuestos`, `Inventario` — in
+ * the sidebar, in the topbar launcher and on the panel card, which all read this one list.
+ *
+ * The shell already announced `erplora:locale-changed` on every change. Nobody in the shell was
+ * listening: the event existed only to repaint module Web Components.
+ *
+ * Idempotent: two listeners would mean two fetches per change and a race over which answer lands
+ * last — which is exactly how a list ends up in the wrong language after being right for a moment.
+ */
+export function bootModuleNavLocale(): void {
+  if (localeWatchInstalled || typeof window === 'undefined') return;
+  localeWatchInstalled = true;
+  window.addEventListener('erplora:locale-changed', () => void refreshModuleNav());
+}

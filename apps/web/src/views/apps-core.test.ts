@@ -24,15 +24,43 @@ describe('Apps destructive actions', () => {
   // hub#314 (ADR-0202 R2): the runtime refuses to disable/uninstall a module that still owes
   // records to the AEAT, and says how many are left. That reason travels in the error message —
   // collapsing it into a generic "could not do it" toast turns the guard back into a mute no-op.
-  it('shows the runtime reason when a module refuses to be disabled or removed', () => {
-    for (const fn of ['async function toggleModule', 'async function removeModule']) {
+  // hub#673 — every install failure came out as the same toast. The runtime says which of the six
+  // causes it was (no machine token, bad signature, missing version, unresolved dependency, SHA-256
+  // mismatch, migration error), and the `else` branch reached for `apps.installError` regardless.
+  // It is what made the fleet-wide breakage of saas#1352 invisible.
+  //
+  // The guard is deliberately about the SHAPE: every failure path of this screen goes through
+  // `moduleFailureMessage`, so a seventh cause added next year is explained without anyone
+  // remembering this issue. Reading a mounted toast would only cover the ones we know about.
+  it('shows the runtime reason for EVERY failed module action, install included', () => {
+    for (const fn of [
+      'async function toggleModule',
+      'async function removeModule',
+      'async function updateInstalledModule',
+      'async function doInstall',
+    ]) {
       const start = source.indexOf(fn);
       expect(start, `${fn} must exist`).toBeGreaterThan(-1);
       const implementation = source.slice(start, source.indexOf('\n}', start));
       expect(implementation, `${fn} must capture the error`).toMatch(/catch\s*\(/);
-      expect(implementation, `${fn} must surface the reason`).toContain('reasonOf(');
+      expect(implementation, `${fn} must surface the reason`).toContain('moduleFailureMessage(');
     }
-    expect(source).toContain('function reasonOf');
+    // And the private helper that knew the rule for two of the four is gone: being private to this
+    // file is exactly why install never got it.
+    expect(source).not.toContain('function reasonOf');
+    expect(source).toContain("from '../lib/module-failure-message'");
+  });
+
+  it('never throws a caught error away — no bare `catch {` on a module action', () => {
+    // `catch {` with no binding is the first of the two discards of hub#673: the reason cannot be
+    // shown because it was never bound to anything.
+    const offenders: string[] = [];
+    for (const fn of ['async function updateInstalledModule', 'async function doInstall']) {
+      const start = source.indexOf(fn);
+      const implementation = source.slice(start, source.indexOf('\n}', start));
+      if (/catch\s*\{/.test(implementation)) offenders.push(fn);
+    }
+    expect(offenders).toEqual([]);
   });
 
   it('never falls back to a locally invented demo catalog', () => {
@@ -133,6 +161,16 @@ describe('Apps · what an installed app card offers', () => {
     expect(source).toContain('apps.loadingInstalled');
     expect(source).toContain('apps.installedLoadError');
     expect(source).toContain('apps.emptyInstalled');
+  });
+
+  // hub#781 — the names in «My apps» are localized BY THE RUNTIME and travel baked into the answer
+  // (`/api/modules?locale=`, ADR-0055). On a language change this screen reloaded the CATALOGUE and
+  // left the installed list behind, stuck in the language of the first request.
+  it('reloads the installed apps too when the language changes, not only the catalogue', () => {
+    const fn = source.slice(source.indexOf('watch(locale, () => {'), source.length);
+    const body = fn.slice(0, fn.indexOf('});'));
+    expect(body).toContain('loadCatalog()');
+    expect(body).toContain('loadInstalled()');
   });
 
   it('names the apps that uninstalling would break, before uninstalling', () => {
