@@ -1,0 +1,47 @@
+{
+  "id": "paging",
+  "name": "Paging Fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "paging.write",
+    "paging.read"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ]
+  },
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "paging.rows.list": {
+      "permission": "paging.read",
+      "sql": "queries/rows_list.sql",
+      "list": {
+        "sort": [
+          "n"
+        ],
+        "default_sort": "n",
+        "default_dir": "asc",
+        "page_size": 2
+      }
+    },
+    "paging.strict.get": {
+      "permission": "paging.read",
+      "sql": "queries/rows_list.sql",
+      "schema": "schemas/strict.json"
+    }
+  },
+  "commands": {
+    "paging.rows.create": {
+      "permission": "paging.write",
+      "transaction": true,
+      "sql": [
+        "commands/rows_create.sql"
+      ]
+    }
+  }
+}

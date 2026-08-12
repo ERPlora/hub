@@ -1,5 +1,5 @@
 <template>
-  <AppPage :title="t('profile.title')" back-href="/dashboard" content-layout="detail">
+  <AppPage :title="t('profile.title')" back-href="/dashboard" content-layout="detail" heading-on-screen>
     <main class="profile-page">
       <section class="profile-hero" aria-labelledby="profile-name">
         <ok-avatar
@@ -64,6 +64,7 @@
             <div class="profile-form">
               <ion-input
                 v-model="firstName"
+                mode="md"
                 fill="outline"
                 :label="t('profile.firstName')"
                 label-placement="stacked"
@@ -71,6 +72,7 @@
               />
               <ion-input
                 v-model="lastName"
+                mode="md"
                 fill="outline"
                 :label="t('profile.lastName')"
                 label-placement="stacked"
@@ -78,6 +80,7 @@
               />
               <ion-input
                 v-model="email"
+                mode="md"
                 fill="outline"
                 type="email"
                 :label="t('profile.email')"
@@ -515,18 +518,11 @@ onMounted(async () => {
   gap: 14px;
 }
 
+/* No hand-drawn border here: `fill="outline"` + mode="md" draws the real one (hub#760). This used
+   to paint its own box because the Ionic outline was a silent no-op in `ios` mode — keeping it now
+   would stack a second border, and its hardcoded light background ignores the dark palette. */
 .profile-form ion-input {
-  min-height: 62px;
-  padding: 0 12px !important;
-  border: 1px solid var(--ion-color-light-shade);
-  border-radius: 12px;
-  background: rgba(var(--ion-color-light-rgb), 0.42);
   --highlight-color-focused: var(--ion-color-primary);
-}
-
-.profile-form ion-input.ion-focused {
-  border-color: var(--ion-color-primary);
-  box-shadow: 0 0 0 2px rgba(var(--ion-color-primary-rgb), 0.1);
 }
 
 .readonly-summary {

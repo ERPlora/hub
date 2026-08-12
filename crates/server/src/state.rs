@@ -536,6 +536,14 @@ pub struct AppState {
     /// Per-key cap on simultaneous stream connections (hub#531). One API key should not be able to
     /// exhaust the hub by opening N sockets — a reconnection bug reaches the ceiling, not just malice.
     pub stream_limiter: Arc<crate::event_stream::StreamLimiter>,
+    /// **One rolling budget for every delegated-certificate refetch this process makes**
+    /// (ADR-0202 §2 point 4). It used to be a local of `serve()`, which was enough while the only
+    /// callers were the loops `serve()` itself spawns; capturing the Anexo I adds a **fourth
+    /// trigger** on a request path (hub#817), and a trigger that made its own budget would defeat
+    /// the property the other three exist to hold — the control plane allows 20/h per hub, and a
+    /// hub that spends its allowance locks itself out of the call that installs a working
+    /// certificate. Living here means the four share one count, which is what the SaaS counts.
+    pub certificate_budget: Arc<crate::fiscal_certificate::RefetchBudget>,
 }
 
 impl AppState {
@@ -594,6 +602,7 @@ impl AppState {
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
             stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
             stream_limiter: Arc::new(crate::event_stream::StreamLimiter::default()),
+            certificate_budget: Arc::new(crate::fiscal_certificate::RefetchBudget::hourly()),
         }
     }
 

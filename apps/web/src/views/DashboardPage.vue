@@ -3,7 +3,7 @@
        bloqueante (hub#374) se retira — la tarjeta dice más de lo mismo, con la misma vía de entrada,
        una pantalla más abajo. Es la MISMA condición que pinta la tarjeta (la pestaña Resumen): dos
        condiciones distintas para una sola pantalla acabarían enseñándolo dos veces, o ninguna. -->
-  <AppPage :title="t('nav.home')" :setup-checklist-on-screen="tab === 'resumen'">
+  <AppPage :title="t('nav.home')" :setup-checklist-on-screen="tab === 'resumen'" heading-on-screen>
       <!-- ── Resumen ── -->
       <template v-if="tab === 'resumen'">
         <!-- Zone 1 — The header: the BUSINESS the hub belongs to + today's date (hub#366, PLAN
@@ -34,7 +34,7 @@
              needs a history nobody has on day one — so the launcher goes FIRST and cannot be
              removed. It is the only widget that works with zero data. Same source as the topbar
              launcher (`moduleNav` ← `/api/navigation`): one list of installed apps, not two. -->
-        <MyAppsCard :apps="moduleNav" />
+        <MyAppsCard :apps="moduleNav" :state="moduleNavState" />
 
         <!-- Zone 3 — The configuration checklist: ONE read of `hub.setup.status` (hub#372,
              `architecture/hub/setup-status.md`). It used to be a banner fed by a loop in the
@@ -187,7 +187,7 @@ import { dataTableLabels } from '../lib/data-table-labels';
 import { getClient, getHubSector, listInstalledModules, type InstalledModule } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
-import { moduleNav } from '../lib/nav';
+import { moduleNav, moduleNavState } from '../lib/nav';
 import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
 import { openAssistantForSetup } from '../lib/shell';
 import { detectPeripherals, type BridgeStatus } from '../lib/bridge-transport';
@@ -244,6 +244,13 @@ type WidgetBoardEl = HTMLElement & {
 const board = ref<WidgetBoardEl | null>(null);
 const loadingWidgets = ref<boolean>(true);
 
+// The catalogue OUTLIVES the element that shows it (hub#768). The Summary tab is a `v-if`, so
+// leaving for Activity DESTROYS the <ok-widget-board> and coming back mounts a BRAND NEW one —
+// and everything the board knows travels by PROPERTY (`attribute: false` in OutfitKit), which no
+// fresh element inherits. Holding the catalogue here lets a remount be dressed again immediately,
+// without asking every installed module for its widgets a second time.
+const catalog = ref<{ widgets: WidgetDef[]; presets: WidgetPreset[] } | null>(null);
+
 // ── Widget CORE de export/import (ADR-0113 §4; decisión humano 2026-07-12) ──────────────────
 // Es un widget DEL BOARD como los de módulo: entra en el catálogo y en TODOS los presets (sin
 // estado guardado el board activa el primer preset → debe incluirlo para verse por defecto), y
@@ -288,21 +295,52 @@ async function loadWidgets(): Promise<void> {
   } catch {
     /* degrada: solo el widget core */
   }
-  const el = board.value;
-  if (el) {
-    el.widgets = widgets;
-    el.presets = presets;
-    el.labels = {
-      customize: t('dashboard.customizePanel'),
-      close: t('dashboard.closePanel'),
-      presets: t('dashboard.presetsTitle'),
-      active: t('dashboard.activeWidgets'),
-      available: t('dashboard.availableWidgets'),
-      empty: t('dashboard.emptyPanel'),
-    };
-  }
+  catalog.value = { widgets, presets };
+  if (board.value) applyBoard(board.value);
   loadingWidgets.value = false;
 }
+
+/**
+ * The picker's texts, in the language that is active RIGHT NOW.
+ *
+ * OutfitKit ships English defaults BY CONTRACT (`DEFAULT_LABELS`, overridden through `.labels`), so
+ * a board nobody hands labels to speaks English inside a Spanish hub. The Spanish is not missing —
+ * it has been in `i18n/locales/es.ts` all along; what was missing was handing it over again.
+ */
+function boardLabels(): Partial<OkWidgetBoardLabels> {
+  return {
+    customize: t('dashboard.customizePanel'),
+    close: t('dashboard.closePanel'),
+    presets: t('dashboard.presetsTitle'),
+    active: t('dashboard.activeWidgets'),
+    available: t('dashboard.availableWidgets'),
+    empty: t('dashboard.emptyPanel'),
+  };
+}
+
+/** Hands the element everything it cannot keep by itself. Idempotent and cheap on purpose. */
+function applyBoard(el: WidgetBoardEl): void {
+  if (catalog.value) {
+    el.widgets = catalog.value.widgets;
+    el.presets = catalog.value.presets;
+  }
+  // Labels go on even while the catalogue is still loading: the picker is already reachable.
+  el.labels = boardLabels();
+}
+
+// A board that has just come into the DOM is BARE — first paint, and every return from Activity.
+// Same shape as the `watch(activityTable)` below, which the sibling ok-data-table has needed all
+// along for exactly the same reason; the board simply never got it (hub#768).
+watch(board, (el) => {
+  if (el) applyBoard(el);
+});
+
+// The language is a setting the user changes mid-session, and these texts are ours to pass. The
+// whole catalogue is rebuilt rather than just relabelled because the widget TITLES are translated
+// too (`coreBlueprintWidget`, and the empty/error labels handed to the collector).
+watch(locale, () => {
+  void loadWidgets();
+});
 
 // Formateador de dinero con la MONEDA DEL HUB (money.ts; no más 'EUR' hardcodeado). Datos en
 // unidades mayores. Sin decimales para los KPI, con 2 para el feed.
@@ -439,7 +477,13 @@ function reviewSetup(): void {
 
 onMounted(async () => {
   // Widgets (KPIs de módulos), salud del sistema y actividad en paralelo (cada uno degrada por su
-  // cuenta). El board está en el DOM por v-show, así que el ref ya existe en onMounted.
+  // cuenta).
+  //
+  // ⚠️ The board is NOT simply "in the DOM thanks to v-show" — that is what this comment used to
+  // claim, and it is what made hub#768 hard to see. The `v-show` only governs the loading state;
+  // the whole Summary block above it hangs off a `v-if` on the tab, so the element is created and
+  // destroyed on every tab change. Nothing here may assume the ref stays the same element: what
+  // keeps the board dressed is `watch(board)`, not this hook.
   await nextTick();
   void loadWidgets();
   void loadSystemHealth();

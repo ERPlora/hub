@@ -36,6 +36,15 @@ vi.mock('../lib/runtime', async () => {
 const refreshModuleNav = vi.fn();
 vi.mock('../lib/nav', () => ({ refreshModuleNav: (...a: unknown[]) => refreshModuleNav(...a) }));
 
+// hub#488 — human names of the apps. Empty by default, which IS the «no name known» case: the
+// sentence must then fall back to the id rather than go blank.
+const appNames = vi.hoisted(() => new Map<string, string>());
+vi.mock('../lib/app-names', async () => {
+  const actual = await vi.importActual<typeof import('../lib/app-names')>('../lib/app-names');
+  // `appLabel` stays REAL: «a name, or the id, never an invention» is the rule under test.
+  return { appLabel: actual.appLabel, loadAppNames: async () => appNames };
+});
+
 // A real `ref`: the card reads the permission of ADR-0248 off the session the runtime resolved.
 const { session } = vi.hoisted(() => ({ session: { value: null as { permissions?: string[] } | null } }));
 // PARTIAL mock: `user` is stubbed, but `permissionsInclude` must stay REAL. Since hub#506 the
@@ -140,6 +149,7 @@ beforeEach(() => {
   inspectBlueprint.mockReset().mockResolvedValue({ ok: true, upload_id: 'up-1', manifest: MANIFEST });
   importBlueprint.mockReset().mockResolvedValue({ sections: [], installed_modules: [] });
   refreshModuleNav.mockReset();
+  appNames.clear();
   session.value = { permissions: ['hub.administer'] };
 });
 
@@ -362,6 +372,74 @@ describe('what the owner is told afterwards', () => {
     expect(failed.text()).toContain('verifactu');
     // …and not the app that DID go in: naming the wrong one is worse than naming none.
     expect(failed.text()).not.toContain('sales');
+  });
+
+  // hub#763 — the card SAID «you can see the detail in Settings › Data» and then left the owner to
+  // find that screen on their own. The report is persisted now, so the sentence has somewhere to
+  // point: the card must carry the door, not just its address.
+  it('takes the owner to the report it promised, instead of only naming the screen', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [{ section: 'hub_settings', status: { Failed: 'db down' } }],
+      installed_modules: [{ id: 'pos', version: '1.0.0', status: 'failed', error: 'boom' }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    const link = w.find('[data-testid="hero-see-report"]');
+    expect(link.exists()).toBe(true);
+    // `router-link` is a PROP of ion-button, not a plain attribute, so `attributes()` returns
+    // `undefined` for it and would pass on ANY destination, including none. The stub renders the
+    // resolved prop into its markup, which is where the destination can actually be read.
+    expect(link.html()).toContain('routerlink="/settings?tab=data"');
+  });
+
+  it('an import where NOTHING broke offers no report to read', async () => {
+    const w = await outcomeOf(mountCard());
+
+    // Everything landed: sending the owner to a report of a clean run is noise, not help.
+    expect(w.find('[data-testid="hero-see-report"]').exists()).toBe(false);
+  });
+
+  // An app that is merely unsubscribed is a purchase decision, not a breakage (ADR-0060, hub#409) —
+  // and there IS a report saying which one, so this door stays open for it too.
+  it('offers the report when an app is only blocked on the plan', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [],
+      installed_modules: [{ id: 'invoice', version: '1.0.0', status: 'blocked', blocked_on: ['invoice'] }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    expect(w.find('[data-testid="hero-see-report"]').exists()).toBe(true);
+  });
+
+  // hub#488 — this is the FIRST screen of a new business, and the sentence is actionable: it sends
+  // the owner to subscribe. `cash_register` is our manifest key, not the name he will find in the
+  // marketplace.
+  it('names the apps the way the owner will find them, not by their manifest id', async () => {
+    appNames.set('cash_register', 'Caja registradora');
+    appNames.set('verifactu', 'VeriFactu · AEAT');
+    importBlueprint.mockResolvedValue({
+      sections: [],
+      installed_modules: [
+        { id: 'cash_register', version: '1.0.0', status: 'blocked', blocked_on: ['cash_register'] },
+        { id: 'verifactu', version: '1.4.1', status: 'failed', error: 'boom' },
+      ],
+    });
+    const w = await outcomeOf(mountCard());
+
+    expect(w.find('[data-testid="hero-blocked"]').text()).toContain('Caja registradora');
+    expect(w.find('[data-testid="hero-failed"]').text()).toContain('VeriFactu · AEAT');
+    // The developer key must not survive next to the name: two names for one app is worse than one.
+    expect(w.find('[data-testid="hero-outcome"]').text()).not.toContain('cash_register');
+  });
+
+  it('an app with no known name is still named — by its id, never left blank', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [],
+      installed_modules: [{ id: 'cash_register', version: '1.0.0', status: 'blocked', blocked_on: ['cash_register'] }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    expect(w.find('[data-testid="hero-blocked"]').text()).toContain('cash_register');
   });
 
   it('raises the same line when every app went in but a PART of the template did not', async () => {

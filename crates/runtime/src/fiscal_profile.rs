@@ -163,6 +163,21 @@ pub struct FiscalProfile {
     pub adopted_from: String,
     /// And who decided it.
     pub adopted_by: String,
+    /// **What ERPlora holds of this hub's signed Anexo I** (hub#817 / saas#1438): `""` = never
+    /// asked, [`REPRESENTATION_ABSENT`] = asked and there is none, [`REPRESENTATION_VIGENTE`],
+    /// [`REPRESENTATION_REVOKED`].
+    ///
+    /// It is a **copy**, and the original lives in the SaaS — ERPlora is the custodian, so this hub
+    /// cannot be the authority on a document it does not keep. What it buys is that [`go_live`]
+    /// —a database transition— can ask the question without a network call, and that the answer
+    /// survives a restart instead of being a value in memory that a redeploy would turn into
+    /// "unknown" and therefore into either an open door or a stuck one.
+    ///
+    /// Written only by [`record_representation`], from what the control plane actually answered.
+    pub representation_status: String,
+    /// The instant of that state — signed when vigente, revoked when revoked. `""` when unknown.
+    /// One column and not two because the screen shows the date of the state it is showing.
+    pub representation_at: String,
 }
 
 /// Why a hub that went live is not operating (ADR-0273 D2, hub#550). Derived, never stored.
@@ -420,6 +435,20 @@ pub const NOT_READY: &str = "fiscal.not_ready";
 pub const GO_LIVE_FORBIDDEN: &str = "fiscal.go_live_forbidden";
 pub const ALREADY_EMITTED: &str = "fiscal.already_emitted";
 
+/// **Nothing signed, nothing filed for real** (hub#817 / saas#1438). Its own code, deliberately not
+/// [`NOT_READY`]: what this hub is missing is not configuration but a **signed document**, and the
+/// screen has to be able to say which — one sends the user to the checklist, the other to a form.
+pub const NO_REPRESENTATION: &str = "fiscal.no_representation_grant";
+
+/// The three answers the control plane gives about the grant, plus `""` for "never asked".
+///
+/// They are the SaaS's own words (`vigente` / `revocado` / `absent`), copied rather than translated:
+/// a mapping in the middle is one more place for the two sides to drift apart, and this value is
+/// what decides whether a business may invoice for real.
+pub const REPRESENTATION_VIGENTE: &str = "vigente";
+pub const REPRESENTATION_REVOKED: &str = "revocado";
+pub const REPRESENTATION_ABSENT: &str = "absent";
+
 /// **The hub ceased activity** (ADR-0273 D2, hub#557). One code, two doors: the dispatcher rejects
 /// writes with it ([`crate::commands`]), and so does an attempt to start issuing again — because
 /// from the outside they are the same answer, *this business closed*.
@@ -475,6 +504,20 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
             code: GO_LIVE_FORBIDDEN.to_string(),
             message: "this hub may never file for real: it is a demo. Create a hub of your own to \
                       go live"
+                .to_string(),
+        });
+    }
+    // The signed Anexo I, BEFORE the readiness check and not after it (hub#817). The order is not
+    // cosmetic: a hub that signs nothing is refused ERPlora's delegated certificate (saas#1438), so
+    // it never becomes `READY` in the first place — and `NOT_READY` would send its owner to hunt
+    // for a certificate that only signing can unlock. Signing is the FIRST thing missing, so it is
+    // the first thing said.
+    if profile.representation_status != REPRESENTATION_VIGENTE {
+        return Err(RuntimeError::Domain {
+            code: NO_REPRESENTATION.to_string(),
+            message: "this hub has not signed the representation grant: ERPlora files these \
+                      records ON BEHALF of the taxpayer, and that needs their signed consent \
+                      (Anexo I). Sign it in Settings → Business and try again"
                 .to_string(),
         });
     }
@@ -824,7 +867,8 @@ pub async fn load(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<Fisca
         .query(
             "SELECT country_code, taxpayer_id, fiscal_system, status, environment, activated_at, \
                     first_record_at, system_id, fiscal_trigger_events, can_go_live, needs_review, \
-                    closed_at, closed_by, adopted_at, adopted_from, adopted_by \
+                    closed_at, closed_by, adopted_at, adopted_from, adopted_by, \
+                    representation_status, representation_at \
              FROM _hub_fiscal_profile WHERE hub_id = :hub_id",
             &p,
         )
@@ -859,7 +903,41 @@ pub async fn load(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<Fisca
         adopted_at: text("adopted_at"),
         adopted_from: text("adopted_from"),
         adopted_by: text("adopted_by"),
+        representation_status: text("representation_status"),
+        representation_at: text("representation_at"),
     }))
+}
+
+/// **Writes down what ERPlora answered about this hub's signed Anexo I** (hub#817 / saas#1438).
+///
+/// Called by the host after talking to the control plane — on a successful capture, and whenever the
+/// screen refreshes the status. Nothing else writes these two columns, so the hub never invents an
+/// answer about a document it does not hold.
+///
+/// It is a plain overwrite, in both directions: a grant the customer revoked has to be able to
+/// close the door again (they can revoke alone and without telling us), and one that was signed
+/// after a refusal has to open it without anybody clearing state by hand.
+///
+/// **A row that does not exist yet is not created here.** This is a fact ABOUT a profile, and a
+/// hub whose profile has not been bootstrapped has not asked anybody for anything — writing one
+/// would invent a fiscal profile out of a network answer.
+pub async fn record_representation(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    status: &str,
+    at: &str,
+) -> Result<()> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("status".into(), json!(status));
+    p.insert("at".into(), json!(at));
+    db.execute(
+        "UPDATE _hub_fiscal_profile \
+         SET representation_status = :status, representation_at = :at WHERE hub_id = :hub_id",
+        &p,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Resolves and persists the profile of `hub_id`. Idempotent, runs on **every** boot.
@@ -1201,6 +1279,8 @@ mod tests {
             adopted_at: String::new(),
             adopted_from: String::new(),
             adopted_by: String::new(),
+            representation_status: REPRESENTATION_VIGENTE.into(),
+            representation_at: "2026-08-11T09:00:00Z".into(),
         }
     }
 
@@ -1518,8 +1598,19 @@ mod tests {
 
     // ── D3: el go-live ES `testing → production`, y muere con el primer ENVÍO (hub#551) ───────
 
-    /// Deja el hub en `READY` de verdad: identidad + certificado + proveedor montado.
+    /// Deja el hub en `READY` **y con el otorgamiento firmado**: es el fixture de «un hub que puede
+    /// facturar», y desde hub#817 firmar es parte de poder. La variante sin firmar
+    /// ([`hub_ready_without_grant`]) existe para los tests que prueban justo esa puerta.
     async fn hub_ready(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
+        let reg = hub_ready_without_grant(db, hub_id).await;
+        record_representation(db, hub_id, REPRESENTATION_VIGENTE, "2026-08-11T09:00:00Z")
+            .await
+            .expect("el fixture firma el Anexo I");
+        reg
+    }
+
+    /// Deja el hub en `READY` de verdad: identidad + certificado + proveedor montado.
+    async fn hub_ready_without_grant(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
         booted_hub(db, hub_id, Some("ES")).await;
         set_setting(db, hub_id, "business_tax_id", "B12345678").await;
         set_setting(db, hub_id, "business_legal_name", "Bar Pepe SL").await;
@@ -1550,6 +1641,85 @@ mod tests {
         reg
     }
 
+    // ── El OTORGAMIENTO firmado es precondición del go-live (hub#817 / saas#1438) ─────────────
+
+    /// 🔴 **Sin otorgamiento firmado no se factura de verdad.** ERPlora remite los registros **en
+    /// nombre del** obligado, y para eso hace falta su consentimiento firmado — el Anexo I de la
+    /// Resolución DG AEAT de 18/12/2024 bajo el Convenio 17. Un hub que por lo demás está listo
+    /// pero no ha firmado se niega con **su propio motivo**, no con `NOT_READY`: lo que le falta no
+    /// es configuración, es un papel, y la pantalla tiene que poder decir cuál.
+    #[tokio::test]
+    async fn a_hub_that_has_not_signed_the_grant_cannot_go_live() {
+        let db = fresh_db().await;
+        hub_ready_without_grant(&db, "hub-es").await;
+
+        let err = go_live(&db, "hub-es")
+            .await
+            .expect_err("sin otorgamiento no se remite en nombre de nadie");
+
+        assert_eq!(code_of(&err), NO_REPRESENTATION);
+    }
+
+    /// **Revocado NO es firmado.** El cliente puede revocar solo y sin avisarnos (§6.2 de
+    /// `verifactu-gateway.md`), así que un otorgamiento que existió y ya no vale tiene que cerrar
+    /// la puerta igual que uno que nunca existió.
+    #[tokio::test]
+    async fn a_revoked_grant_does_not_open_the_go_live() {
+        let db = fresh_db().await;
+        hub_ready_without_grant(&db, "hub-es").await;
+        record_representation(&db, "hub-es", REPRESENTATION_REVOKED, "2026-08-11T10:00:00Z")
+            .await
+            .unwrap();
+
+        let err = go_live(&db, "hub-es").await.expect_err("revocado no es firmado");
+
+        assert_eq!(code_of(&err), NO_REPRESENTATION);
+    }
+
+    /// Y con el otorgamiento vigente, la puerta se abre.
+    #[tokio::test]
+    async fn a_signed_grant_opens_the_go_live() {
+        let db = fresh_db().await;
+        hub_ready(&db, "hub-es").await;
+
+        let after = go_live(&db, "hub-es").await.expect("firmado ⇒ puede facturar");
+
+        assert_eq!(after.status, FiscalStatus::Active);
+    }
+
+    /// Lo que el hub recuerda del otorgamiento **sobrevive a la recarga**: es una columna del perfil,
+    /// no un estado en memoria que se pierda al reiniciar y deje el go-live abierto o cerrado por
+    /// accidente.
+    #[tokio::test]
+    async fn the_recorded_grant_survives_a_reload() {
+        let db = fresh_db().await;
+        booted_hub(&db, "hub-es", Some("ES")).await;
+        ensure(&db, "hub-es").await.unwrap();
+
+        record_representation(&db, "hub-es", REPRESENTATION_VIGENTE, "2026-08-11T09:00:00Z")
+            .await
+            .unwrap();
+
+        let profile = load(&db, "hub-es").await.unwrap().unwrap();
+        assert_eq!(profile.representation_status, REPRESENTATION_VIGENTE);
+        assert_eq!(profile.representation_at, "2026-08-11T09:00:00Z");
+    }
+
+    /// **Una demo se niega POR SER DEMO**, aunque tampoco tenga otorgamiento. Los dos motivos son
+    /// ciertos a la vez y el que se devuelve importa: a la demo no le falta un papel —no hay
+    /// obligado que pueda firmarlo— y ofrecerle la pantalla de firma sería mandarla a un callejón.
+    #[tokio::test]
+    async fn a_demo_is_refused_for_being_a_demo_not_for_the_missing_grant() {
+        let db = fresh_db().await;
+        let mut reg = hub_ready_without_grant(&db, "hub-demo").await;
+        reg.demo_hub = true;
+        refresh(&db, &reg, "hub-demo").await.unwrap();
+
+        let err = go_live(&db, "hub-demo").await.expect_err("una demo no factura de verdad");
+
+        assert_eq!(code_of(&err), GO_LIVE_FORBIDDEN);
+    }
+
     /// El go-live y el `environment` son **la misma transición**: `READY → ACTIVE` ES
     /// `testing → production`. Un solo camino y un solo sitio donde guardarlo.
     #[tokio::test]
@@ -1570,10 +1740,18 @@ mod tests {
 
     /// **Solo se puede encender si todo está configurado**, que es la misma condición que ya
     /// evalúa el core — no una segunda lista que mantener.
+    ///
+    /// El otorgamiento va firmado en el fixture **a propósito**: desde hub#817 se comprueba ANTES
+    /// que la configuración (sin firmar no llega el certificado delegado, así que el hub nunca
+    /// llegaría a `READY`), y sin firmarlo aquí este test dejaría de probar lo que dice su nombre.
     #[tokio::test]
     async fn a_hub_that_is_not_ready_cannot_go_live() {
         let db = fresh_db().await;
         booted_hub(&db, "hub-es", Some("ES")).await;
+        ensure(&db, "hub-es").await.unwrap();
+        record_representation(&db, "hub-es", REPRESENTATION_VIGENTE, "2026-08-11T09:00:00Z")
+            .await
+            .unwrap();
 
         let err = go_live(&db, "hub-es").await.expect_err("sin configurar no se enciende");
         assert_eq!(code_of(&err), NOT_READY);

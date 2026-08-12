@@ -170,6 +170,16 @@ pub struct HubUserRow {
     /// `true` si puede entrar con PIN local. El owner suele entrar por Cloud, así que es `false`.
     pub has_pin: bool,
     pub created_at: String,
+    /// Por qué el backfill v19 NO pudo llevar el email de esta persona a donde se administra el
+    /// acceso (hub#436/#463); `None` —lo normal— si no hay nada que resolver.
+    ///
+    /// Va **en la fila** y no en un endpoint aparte a propósito: `email` de arriba sale de un
+    /// `COALESCE(hub_user.email, perfil.email)`, así que una fila así enseña una dirección de
+    /// aspecto sano mientras su baja **no revoca** la membresía en el SaaS y su primer login
+    /// aterriza en otra fila. Con el motivo pegado a la fila, el aviso no puede acabar junto a la
+    /// persona equivocada, y la pantalla deja de prometer algo que no va a pasar.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access_email_conflict: Option<crate::access_email::AccessEmailConflict>,
 }
 
 /// Un rol del hub con lo que concede y cuánta gente lo tiene.
@@ -554,18 +564,29 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
             &p,
         )
         .await?;
+    // hub#463 — las filas que el backfill v19 dejó en paz, por id. Es una consulta más sobre dos
+    // tablas pequeñas y solo en una pantalla de administración; el precio de NO hacerla es una lista
+    // en la que una fila irrevocable es idéntica a una sana.
+    let conflicts = crate::access_email::unresolved(db, hub_id).await?;
     Ok(res
         .rows
         .iter()
-        .map(|r| HubUserRow {
-            id: r["id"].as_str().unwrap_or_default().to_string(),
-            name: r["name"].as_str().unwrap_or_default().to_string(),
-            email: r["email"].as_str().unwrap_or_default().to_string(),
-            role: r["role"].as_str().unwrap_or_default().to_string(),
-            cloud_user_id: r["cloud_user_id"].as_str().map(ToString::to_string),
-            is_active: truthy(&r["is_active"]),
-            has_pin: truthy(&r["has_pin"]),
-            created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
+        .map(|r| {
+            let id = r["id"].as_str().unwrap_or_default().to_string();
+            HubUserRow {
+                access_email_conflict: conflicts
+                    .iter()
+                    .find(|c| c.user_id == id)
+                    .map(|c| c.reason),
+                id,
+                name: r["name"].as_str().unwrap_or_default().to_string(),
+                email: r["email"].as_str().unwrap_or_default().to_string(),
+                role: r["role"].as_str().unwrap_or_default().to_string(),
+                cloud_user_id: r["cloud_user_id"].as_str().map(ToString::to_string),
+                is_active: truthy(&r["is_active"]),
+                has_pin: truthy(&r["has_pin"]),
+                created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
+            }
         })
         .collect())
 }

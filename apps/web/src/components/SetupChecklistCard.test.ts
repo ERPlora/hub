@@ -94,7 +94,6 @@ function status(items: Record<string, unknown>[], over: Record<string, unknown> 
 interface CardProps {
   status: SetupStatus | null;
   alreadyOnScreen?: readonly string[];
-  expandedByDefault?: boolean;
 }
 
 function mountCard(props: CardProps) {
@@ -105,15 +104,31 @@ function mountCard(props: CardProps) {
   });
 }
 
+/**
+ * The card with its whole list open — the way a person opens it, by TAPPING the toggle (hub#487).
+ *
+ * It used to be a prop (`expandedByDefault`) whose only consumer was this file: documented as
+ * «used by `/setup`», a screen that never existed. Going through the real control means these
+ * tests would also catch a toggle that stopped working, which the prop could never do.
+ */
+async function mountExpanded(props: CardProps) {
+  const w = mountCard(props);
+  // No toggle means there was nothing folded, so the list is already whole — which is what the
+  // caller asked for. Demanding the control here would fail on the short lists instead of on the
+  // thing under test.
+  const toggle = w.find('[data-testid="setup-toggle"]');
+  if (toggle.exists()) await toggle.trigger('click');
+  return w;
+}
+
 describe('the states are distinguishable on screen', () => {
-  it('done, pending and unavailable paint rows you can tell apart', () => {
-    const w = mountCard({
+  it('done, pending and unavailable paint rows you can tell apart', async () => {
+    const w = await mountExpanded({
       status: status([
         item('apps', { state: 'unavailable' }),
         item('taxes.setup', { state: 'pending' }),
         item('inventory.setup', { state: 'done' }),
       ]),
-      expandedByDefault: true,
     });
 
     const state = (key: string) => w.find(`[data-testid="setup-item-${key}"]`).attributes('data-state');
@@ -124,21 +139,20 @@ describe('the states are distinguishable on screen', () => {
     expect(new Set([state('apps'), state('taxes.setup'), state('inventory.setup')]).size).toBe(3);
   });
 
-  it('the fourth state — omitted — is not painted: what did not come in the query is not here', () => {
-    const w = mountCard({ status: status([item('apps')]), expandedByDefault: true });
+  it('the fourth state — omitted — is not painted: what did not come in the query is not here', async () => {
+    const w = await mountExpanded({ status: status([item('apps')]) });
 
     expect(w.findAll('[data-testid^="setup-item-"]')).toHaveLength(1);
     expect(w.find('[data-testid="setup-item-verifactu.setup"]').exists()).toBe(false);
   });
 
-  it('each state carries its mark: pill and icon are not repeated across states', () => {
-    const w = mountCard({
+  it('each state carries its mark: pill and icon are not repeated across states', async () => {
+    const w = await mountExpanded({
       status: status([
         item('apps', { state: 'unavailable' }),
         item('taxes.setup', { state: 'pending' }),
         item('inventory.setup', { state: 'done' }),
       ]),
-      expandedByDefault: true,
     });
 
     const pill = (key: string) => w.find(`[data-testid="setup-item-${key}"] ok-status-pill`);
@@ -177,10 +191,9 @@ describe('the states are distinguishable on screen', () => {
 });
 
 describe('`unavailable` offers no action', () => {
-  it('the broken row carries neither a button nor a route to send anyone to', () => {
-    const w = mountCard({
+  it('the broken row carries neither a button nor a route to send anyone to', async () => {
+    const w = await mountExpanded({
       status: status([item('apps', { state: 'unavailable', route: '/apps#catalog' })]),
-      expandedByDefault: true,
     });
 
     const row = w.find('[data-testid="setup-item-apps"]');
@@ -190,10 +203,9 @@ describe('`unavailable` offers no action', () => {
     expect(row.html()).not.toContain('/apps#catalog');
   });
 
-  it('and it says WHY: with no explanation, a mute item looks like a broken product', () => {
-    const w = mountCard({
+  it('and it says WHY: with no explanation, a mute item looks like a broken product', async () => {
+    const w = await mountExpanded({
       status: status([item('apps', { state: 'unavailable' })]),
-      expandedByDefault: true,
     });
 
     expect(w.find('[data-testid="setup-note-apps"]').exists()).toBe(true);
@@ -209,8 +221,8 @@ describe('`unavailable` offers no action', () => {
     expect(cta.html()).toContain('/m/taxes/rules');
   });
 
-  it('what is done asks for nothing either', () => {
-    const w = mountCard({ status: status([item('team', { state: 'done' })]), expandedByDefault: true });
+  it('what is done asks for nothing either', async () => {
+    const w = await mountExpanded({ status: status([item('team', { state: 'done' })]) });
 
     expect(w.find('[data-testid="setup-action-team"]').exists()).toBe(false);
   });
@@ -359,10 +371,9 @@ describe('decision 1 and the titles', () => {
     expect(w.find('[data-testid="setup-item-business_identity"]').exists()).toBe(true);
   });
 
-  it('a core item is translated by its key; a module one uses the title that came', () => {
-    const w = mountCard({
+  it('a core item is translated by its key; a module one uses the title that came', async () => {
+    const w = await mountExpanded({
       status: status([item('team', { level: 'recommended' }), item('taxes.setup', { title: 'Your taxes' })]),
-      expandedByDefault: true,
     });
 
     // A core item's key IS its i18n key (the English title travels as the fallback).

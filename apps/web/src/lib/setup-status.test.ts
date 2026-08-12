@@ -373,6 +373,21 @@ describe('decision 1: the panel does not repeat what the apps card already offer
     expect(view.rows.map((r) => r.key)).toEqual(['apps', 'business_identity']);
   });
 
+  // hub#487 — the justification of this deduplication was «the item still counts and `/setup`
+  // still shows it». `/setup` never existed, so the second half was false and the `apps` item had
+  // no row ANYWHERE on the panel. It is not `/setup` that owes that row: it is the expanded view,
+  // which is the «show me everything» this card already has. Deduplicating there was hiding the
+  // item from the one place whose whole purpose is to hide nothing.
+  it('EXPANDED it shows everything, including what the other card offers (hub#487)', () => {
+    const items = [item('apps'), item('business_identity', { level: 'legal' })];
+    const view = checklistView(parseSetupStatus([doc(items)]), {
+      alreadyOnScreen: ['apps'],
+      expanded: true,
+    });
+
+    expect(view.rows.map((r) => r.key)).toEqual(['apps', 'business_identity']);
+  });
+
   it('the counter does NOT change when deduplicating: the item is still the hub\'s', () => {
     const items = [item('apps'), item('business_identity', { level: 'legal' })];
     const view = checklistView(parseSetupStatus([doc(items)]), { alreadyOnScreen: ['apps'] });

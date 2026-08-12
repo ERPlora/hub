@@ -331,6 +331,36 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
             }),
             "flow.unknown_operator",
         ),
+        (
+            // hub#828: this exact body used to answer **201**. `command`, `notify` and `ai` all
+            // refused the same string; only `condition` swallowed it, because the scan read the
+            // paths a condition READS and never the values it compares against. Saved, it meant
+            // the literal text `{{secret.QA_API_KEY}}`: a guard that never matched, a run that
+            // ended `done` like any guard that stops, and not one word anywhere saying so.
+            json!({
+                "name": "Guard against my key",
+                "definition": {
+                    "schema_version": 1,
+                    "steps": [{ "id": "c", "kind": "condition",
+                                "when": { "input.x": { "eq": "{{secret.QA_API_KEY}}" } } }]
+                }
+            }),
+            "flow.secret_not_available",
+        ),
+        (
+            // The dangerous half, which was ALWAYS refused and has to stay refused: the secret as
+            // the PATH, which `lt`/`contains` would turn into a byte-by-byte oracle. It is here so
+            // that widening the scan above can never be what opens it.
+            json!({
+                "name": "Oracle",
+                "definition": {
+                    "schema_version": 1,
+                    "steps": [{ "id": "c", "kind": "condition",
+                                "when": { "secret.QA_API_KEY": { "lt": "m" } } }]
+                }
+            }),
+            "flow.secret_not_available",
+        ),
     ];
 
     for (body, code) in cases {
