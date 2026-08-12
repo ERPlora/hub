@@ -83,9 +83,10 @@
                El estado `moduleNav` sigue vivo (lo usa la rejilla de la topbar). -->
         </ion-content>
 
-        <!-- Footer: brand (logo + wordmark, click → home) + versión de la app. El usuario se
-             movió a la cabecera del menú. Aquí NO hay nada de instalar: el hub es una PWA y quien
-             la quiera instalada la instala desde su navegador — el shell no lo pide (hub#685). -->
+        <!-- Footer: brand (logo + wordmark, click → home) + the app version. The user moved to the
+             header of the menu. There is NOTHING about installing here: the hub is a PWA, and
+             whoever wants it installed installs it from their own browser — the shell does not ask
+             for it (hub#685). -->
         <ion-footer class="ion-no-border sidebar-foot">
           <!-- The app on this counter is older than the one we publish (hub#400). In the FOOTER on
                purpose: it is the one part of the sidebar that never scrolls away, and the issue
