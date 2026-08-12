@@ -37,7 +37,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { alertController } from '@ionic/vue';
+import { alertController, IonItem, IonLabel } from '@ionic/vue';
 import { useI18n } from 'vue-i18n';
 
 import HubIcon from './HubIcon.vue';
