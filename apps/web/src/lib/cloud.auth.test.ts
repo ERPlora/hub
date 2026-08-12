@@ -25,6 +25,7 @@ import {
   setTokens,
 } from './cloud';
 import { config, DEV_HUB_ID } from './config';
+import { setHubSession } from './session';
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -54,6 +55,7 @@ describe('refresh-on-401 según el plano de sesión', () => {
     endRequest.mockClear();
     setOnSessionExpired(sessionExpired);
     clearTokens();
+    setHubSession(null);
   });
 
   afterEach(() => {
@@ -85,6 +87,31 @@ describe('refresh-on-401 según el plano de sesión', () => {
 
   it('expira una sesión Hub Cloud que ya no conserva ningún token', async () => {
     config.hubId = '11111111-1111-4111-8111-111111111111';
+
+    await expect(cloudInvoices()).rejects.toThrow('cloud /api/v1/billing/invoices/ → 401');
+
+    expect(sessionExpired).toHaveBeenCalledOnce();
+  });
+
+  // hub#764 — «Mi plan» expulsaba al login en un hub Cloud REAL. El día a día del TPV es sesión
+  // local/PIN (ADR-0003): el runtime emite su propia sesión y NUNCA hay JWT Cloud. Al abrir
+  // /billing, el 401 del Cloud no encontraba refresh que rotar y se trataba como «sesión
+  // caducada», tirando abajo la sesión del runtime que estaba perfectamente viva. Un 401 solo
+  // puede expirar el plano que lo emitió.
+  it('hub#764: una sesión de RUNTIME (PIN) sobrevive al 401 de billing en un hub Cloud real', async () => {
+    config.hubId = '11111111-1111-4111-8111-111111111111';
+    setHubSession('runtime-session-token');
+
+    await expect(cloudInvoices()).rejects.toThrow('cloud /api/v1/billing/invoices/ → 401');
+
+    // El cajero sigue dentro: billing degrada a su estado «hace falta cuenta Cloud», no expulsa.
+    expect(sessionExpired).not.toHaveBeenCalled();
+  });
+
+  it('hub#764: y sigue expulsando cuando tampoco queda sesión de runtime', async () => {
+    // Sin ningún plano vivo no hay nada que conservar — el contrato de arriba se mantiene.
+    config.hubId = '11111111-1111-4111-8111-111111111111';
+    setTokens('access-caducado', '');
 
     await expect(cloudInvoices()).rejects.toThrow('cloud /api/v1/billing/invoices/ → 401');
 

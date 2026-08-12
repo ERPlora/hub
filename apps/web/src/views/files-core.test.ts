@@ -26,4 +26,15 @@ describe('Files core interactions', () => {
     expect(source).not.toContain('URL.createObjectURL');
     expect(source).not.toContain('window.open(');
   });
+
+  it('turns a drag & drop into a move, and unsubscribes from it like every other event', () => {
+    // The drag lives in the Web Component (`ok-file-manager`, OutfitKit ≥ 0.1.36); the page only
+    // hears `ok-move` and calls the endpoint (hub#710/#741). Three separate lines have to survive
+    // for a drop to do anything, and nothing was watching them: a release batch squashed from a
+    // stale branch already reverted this file's download path once without a check going red.
+    // A listener added and never removed also leaks across route changes, so both halves count.
+    expect(source).toContain("addEventListener('ok-move'");
+    expect(source).toContain("removeEventListener('ok-move'");
+    expect(source).toContain('moveMedia(from, to)');
+  });
 });

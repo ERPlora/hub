@@ -8,19 +8,32 @@ import { createI18n } from 'vue-i18n';
 
 const fetchBlueprintCatalog = vi.fn();
 const downloadBlueprint = vi.fn();
+const fetchImportReport = vi.fn();
 
 vi.mock('../lib/runtime', async () => {
   const actual = await vi.importActual<typeof import('../lib/runtime')>('../lib/runtime');
   return {
     fetchBlueprintCatalog: (...a: unknown[]) => fetchBlueprintCatalog(...a),
     downloadBlueprint: (...a: unknown[]) => downloadBlueprint(...a),
+    fetchImportReport: (...a: unknown[]) => fetchImportReport(...a),
     inspectBlueprint: vi.fn(),
     importBlueprint: vi.fn(),
-    sectionStatusInfo: vi.fn(() => ({ color: '', label: '' })),
+    // hub#763: estas NO se stubean — `reportWarrantsAttention` (decide si el informe recuperado se
+    // muestra al montar) y `reportReason` (pinta el motivo de cada fila) dependen de su lógica real.
+    sectionStatusInfo: actual.sectionStatusInfo,
+    sectionDiscardCode: actual.sectionDiscardCode,
     // hub#409: esta NO se stubea — es la que decide si la fila de un módulo se pinta bloqueada o
     // roja, justo el contrato bajo prueba.
     moduleInstallStatusInfo: actual.moduleInstallStatusInfo,
   };
+});
+// hub#488 — los nombres humanos de las apps. Mutable por test: la mayoría no pone ninguno, que es
+// el caso «no hay nombre» y debe seguir pintando el id.
+const appNames = vi.hoisted(() => new Map<string, string>());
+vi.mock('../lib/app-names', async () => {
+  const actual = await vi.importActual<typeof import('../lib/app-names')>('../lib/app-names');
+  // `appLabel` NO se stubea: la regla de «nombre o id, nunca un invento» es el contrato bajo prueba.
+  return { appLabel: actual.appLabel, loadAppNames: async () => appNames };
 });
 // Ref mutable: varios tests necesitan alternar owner/admin ↔ sin permiso.
 const isAdminRef = vi.hoisted(() => ({ value: true }));
@@ -50,6 +63,8 @@ function mountPanel() {
 beforeEach(() => {
   fetchBlueprintCatalog.mockReset();
   downloadBlueprint.mockReset();
+  fetchImportReport.mockReset();
+  appNames.clear();
   isAdminRef.value = true;
 });
 
@@ -255,6 +270,29 @@ describe('ImportPanel · report: a module blocked by entitlement (ADR-0060)', ()
     expect(text).not.toContain('Subscribe to them');
   });
 
+  // hub#488 — the row and the sentence both named the app by our manifest key. The owner is being
+  // asked to go and subscribe to it; `invoice` is not what the marketplace calls it.
+  it('names the blocked app the way the marketplace does, not by its manifest id', async () => {
+    appNames.set('verifactu', 'VeriFactu · AEAT');
+    appNames.set('invoice', 'Facturación');
+    const report = await reportWithBlockedModule();
+    const text = report.text();
+
+    expect(text).toContain('VeriFactu · AEAT');
+    expect(text).toContain('Facturación');
+    // The price still comes from the engine, next to the name the owner will recognise.
+    expect(text).toMatch(/9[.,]00/);
+    // And the raw key is gone from the row: leaving both would just be noise.
+    expect(text).not.toMatch(/\binvoice\b/);
+  });
+
+  it('an app the shell has no name for keeps its id, and the report still paints', async () => {
+    const report = await reportWithBlockedModule();
+
+    expect(report.text()).toContain('invoice');
+    expect(report.text()).toContain(en.importPage.statusBlocked);
+  });
+
   it('the other three states keep their visual', async () => {
     fetchBlueprintCatalog.mockResolvedValue([]);
     const w = mount(ImportPanel, {
@@ -280,3 +318,89 @@ describe('ImportPanel · report: a module blocked by entitlement (ADR-0060)', ()
     expect(text).toContain('unsigned module');
   });
 });
+
+describe('ImportPanel · hub#763 — el informe no se pierde al navegar', () => {
+  // 🔴 Defecto (hub#763): el Dashboard anunciaba «ver el detalle en Ajustes › Datos» tras un
+  // import parcial, pero al montarse la pestaña Datos empezaba SIEMPRE en el catálogo. El informe
+  // vivía solo en un `ref` del componente que el admin acaba de dejar atrás. Ahora se recupera del
+  // runtime al montar, y si quedó algo sin aplicar, se muestra en el paso `report`.
+  function partialReport() {
+    return {
+      sections: [{ section: 'modules/inventory', status: { Failed: 'módulo no instalado' }, discarded_rows: 0 }],
+      installed_modules: [],
+    };
+  }
+
+  it('recupera el último informe parcial al montar y lo muestra en el paso report', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    fetchImportReport.mockResolvedValue({
+      batch_id: 'b1',
+      name: 'pizzeria',
+      created_at: '2026-08-10T19:09:00Z',
+      report: partialReport(),
+    });
+    const w = mountPanel();
+    await flushPromises();
+
+    // El informe recuperado reemplaza al catálogo: es lo que el Dashboard prometió mostrar.
+    expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(false);
+    const report = w.get('[data-testid="import-report"]');
+    expect(report.text()).toContain(en.importPage.statusFailed);
+    expect(report.text()).toContain('módulo no instalado');
+    // El banner dice de QUÉ import es el informe (no aparece de la nada).
+    expect(w.find('[data-testid="import-report-recovered"]').exists()).toBe(true);
+  });
+
+  it('un informe totalmente aplicado NO se muestra: el catálogo es lo siguiente', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([
+      { slug: 'rest', name: 'Restaurante', locale: 'es', latest_version: '1.0.0' },
+    ]);
+    fetchImportReport.mockResolvedValue({
+      batch_id: 'b2',
+      name: 'pizzeria',
+      created_at: '2026-08-10T19:09:00Z',
+      report: {
+        sections: [{ section: 'modules/inventory', status: 'Applied', discarded_rows: 0 }],
+        installed_modules: [],
+      },
+    });
+    const w = mountPanel();
+    await flushPromises();
+
+    // Todo aplicado = nada que decir: el catálogo manda.
+    expect(w.find('[data-testid="import-report"]').exists()).toBe(false);
+    expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(true);
+  });
+
+  it('«ver las plantillas» descarta el informe recuperado y vuelve al catálogo', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([
+      { slug: 'rest', name: 'Restaurante', locale: 'es', latest_version: '1.0.0' },
+    ]);
+    fetchImportReport.mockResolvedValue({
+      batch_id: 'b1',
+      name: 'pizzeria',
+      created_at: '2026-08-10T19:09:00Z',
+      report: partialReport(),
+    });
+    const w = mountPanel();
+    await flushPromises();
+    expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(false);
+
+    await w.get('[data-testid="import-report-dismiss"]').trigger('click');
+    await flushPromises();
+    expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(true);
+    expect(w.find('[data-testid="import-report"]').exists()).toBe(false);
+  });
+
+  it('sin informe persistido (hub nuevo) muestra el catálogo, como antes', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([
+      { slug: 'rest', name: 'Restaurante', locale: 'es', latest_version: '1.0.0' },
+    ]);
+    fetchImportReport.mockResolvedValue(null);
+    const w = mountPanel();
+    await flushPromises();
+    expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(true);
+    expect(w.find('[data-testid="import-report"]').exists()).toBe(false);
+  });
+});
+

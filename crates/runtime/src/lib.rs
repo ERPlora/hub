@@ -1361,10 +1361,29 @@ impl Runtime {
 
     /// Marca un dispositivo como de confianza (tras el primer login online). Idempotente (§2.9).
     /// La confianza es **de este hub** (hub#489): la misma tablet puede serlo en dos negocios.
+    ///
+    /// El dispositivo queda **sin nombre** (hub#494): quien sepa con qué nombre debería nacer usa
+    /// [`Self::trust_device_with_default_name`].
     pub async fn trust_device(&self, device_id: &str, label: &str) -> Result<()> {
+        self.trust_device_with_default_name(device_id, label, "").await
+    }
+
+    /// Igual que [`Self::trust_device`], más el nombre con el que nace el dispositivo la **primera**
+    /// vez que este hub lo ve (hub#494).
+    ///
+    /// `default_name` se escribe **solo en el INSERT**: en un dispositivo ya conocido no toca nada,
+    /// porque para entonces el nombre o lo eligió el dueño o es el que se le puso al nacer, y las
+    /// dos cosas valen más que lo que traiga el login de turno. Lo que sí sigue reescribiéndose en
+    /// cada entrada es `label`, que es otra cosa: quién entró la última vez.
+    pub async fn trust_device_with_default_name(
+        &self,
+        device_id: &str,
+        label: &str,
+        default_name: &str,
+    ) -> Result<()> {
         match self.device_of_this_hub(device_id) {
             Some((hub_id, id)) => {
-                identity::trust_device(self.db.as_ref(), hub_id, id, label).await
+                identity::trust_device(self.db.as_ref(), hub_id, id, label, default_name).await
             }
             None => Ok(()), // nothing to trust: naming the hub names no device.
         }
@@ -1404,6 +1423,14 @@ impl Runtime {
     /// del propio hub (hub#454).
     pub async fn revoke_device(&self, device_id: &str) -> Result<devices::Revocation> {
         devices::revoke(self.db.as_ref(), &self.hub_id, device_id).await
+    }
+
+    /// **Nombra** un dispositivo que este hub ya conoce (hub#494): «Barra», «Cocina», «Portátil
+    /// despacho». Es lo único de la fila que decide el negocio, y por eso es lo único de fiar al
+    /// señalar cuál cortar. No crea filas: un dispositivo se lista porque se confió en él, nunca
+    /// porque alguien escribió su id.
+    pub async fn rename_device(&self, device_id: &str, name: &str) -> Result<devices::Renamed> {
+        devices::rename(self.db.as_ref(), &self.hub_id, device_id, name).await
     }
 
     /// The hub's **fiscal profile** (ADR-0273, hub#549): what this hub owes, who it owes it as, and

@@ -403,6 +403,106 @@ async fn renaming_requires_an_admin_session() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
+// ─────────────── Mover (el drag & drop de /files) ───────────────
+//
+// `POST /api/media/move` is what the drag & drop of the file manager calls (hub#710/#741): the
+// page turns an `ok-move` event into this request. It shipped with no test of its own, and a
+// release batch squashed from a stale branch reverted its sibling (`saveDownload`, hub#480)
+// without a single check going red. These are the guards that were missing.
+//
+// The rule the endpoint encodes: a move needs BOTH ends to allow it — taking the item out of the
+// source is a delete, putting it into the destination is an upload. So a module folder that opts
+// into neither (ADR-0172) can be neither dragged out of nor dropped into.
+
+fn move_request(from: &str, to: &str, session: &str) -> Request {
+    Request::builder()
+        .method("POST")
+        .uri("/api/media/move")
+        .header("x-hub-session", session)
+        .header("content-type", "application/json")
+        .body(Body::from(json!({ "from": from, "to": to }).to_string()))
+        .unwrap()
+}
+
+#[tokio::test]
+async fn moves_a_file_of_the_user_to_another_folder() {
+    let (router, admin, captured) = fixture_with_module("").await;
+    let response = send(&router, move_request("facturas/a.pdf", "archivo", &admin)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(
+        captured
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(_, p)| p.contains("move")),
+        "the move never reached the Cloud"
+    );
+}
+
+#[tokio::test]
+async fn dragging_a_file_out_of_a_read_only_module_folder_is_rejected() {
+    // Taking it out is a delete, and VeriFactu declares no `user_actions`: its XML is fiscal
+    // evidence. Dragging it elsewhere would be deleting it from the folder that guards it.
+    let (router, admin, _captured) = fixture_with_module("").await;
+    let response = send(
+        &router,
+        move_request("modules/verifactu/xml/rec-1.xml", "facturas", &admin),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn dropping_a_file_into_a_read_only_module_folder_is_rejected() {
+    // The other end of the same rule: putting something in is an upload.
+    let (router, admin, _captured) = fixture_with_module("").await;
+    let response = send(
+        &router,
+        move_request("facturas/a.pdf", "modules/verifactu/xml", &admin),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn a_folder_cannot_be_dropped_inside_itself() {
+    // Dropping a folder onto its own subtree would relocate a tree under a path that is about to
+    // stop existing. Every one of these has to be refused BEFORE the Cloud is asked.
+    let (router, admin, captured) = fixture_with_module("").await;
+    for (from, to) in [
+        ("facturas", "facturas"),
+        ("facturas", "facturas/2026"),
+        ("facturas", "facturas/2026/enero"),
+    ] {
+        let response = send(&router, move_request(from, to, &admin)).await;
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "move accepted: {from:?} → {to:?}"
+        );
+    }
+    assert!(
+        captured.lock().unwrap().is_empty(),
+        "a refused move still hit the Cloud"
+    );
+}
+
+#[tokio::test]
+async fn moving_requires_an_admin_session() {
+    let (router, _admin, _captured) = fixture_with_module("").await;
+    let response = send(
+        &router,
+        Request::builder()
+            .method("POST")
+            .uri("/api/media/move")
+            .header("content-type", "application/json")
+            .body(Body::from(json!({ "from": "a", "to": "b" }).to_string()))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
 // ─────────────── El listado entrega URLs del propio runtime ───────────────
 
 /// Mini-Cloud que responde un listado con una URL FIRMADA de Object Storage, como hace el SaaS.

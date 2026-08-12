@@ -819,6 +819,126 @@ pub async fn list_import_batches(rt: &Runtime, hub_id: &str) -> crate::Result<Ve
         .collect())
 }
 
+/// The actionable report of an import — the thing `ImportPanel.vue` paints and the Dashboard
+/// promises (hub#763). One row per `batch_id`: re-importing the same blueprint opens a NEW batch
+/// (so a new row), and the server UPSERTs the extended report (runtime sections + installed
+/// modules + media + fiscal) over it once the orchestration finishes. Without it, the report lived
+/// only in a Vue `ref` that navigation threw away — the admin arrived at Settings › Data and found
+/// the catalogue, with no report, no reason and no way forward.
+const ENSURE_REPORT_TABLE: &str = "CREATE TABLE IF NOT EXISTS _hub_import_report (\
+ id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL, report TEXT NOT NULL, \
+ created_at TEXT NOT NULL);";
+
+/// Creates the import-report table if it is missing (idempotent, like the batch tables — it is NOT
+/// a module migration, so it sidesteps the hub system-migration «max applied» trap).
+async fn ensure_report_table(db: &dyn erplora_db::DatabaseAdapter) -> crate::Result<()> {
+    db.execute_batch(ENSURE_REPORT_TABLE)
+        .await
+        .map_err(|e| crate::RuntimeError::Other(format!("reset: tabla de informe de import: {e}")))
+}
+
+/// Stores (or, on re-import over the same `batch_id`, replaces) the actionable report of one
+/// import run (hub#763).
+///
+/// `report_json` is opaque to this layer: the runtime writes its [`crate::import::ImportReport`]
+/// here, and the server later UPSERTs the EXTENDED report (modules/media/fiscal) it builds on top,
+/// so the row a reload reads is the same the UI would have painted in-memory.
+///
+/// A failure here MUST NOT abort the import — the engine already ran. Like the batch it lives
+/// under, losing it costs the traceability this PR adds, not the data the import applied.
+pub async fn store_import_report(
+    rt: &Runtime,
+    hub_id: &str,
+    batch_id: &str,
+    name: &str,
+    report_json: &str,
+) -> crate::Result<()> {
+    let db = rt.db();
+    ensure_report_table(db).await?;
+    let mut p = erplora_db::Params::new();
+    p.insert("id".into(), serde_json::json!(batch_id));
+    p.insert("hub_id".into(), serde_json::json!(hub_id));
+    p.insert("name".into(), serde_json::json!(name));
+    p.insert("report".into(), serde_json::json!(report_json));
+    p.insert("now".into(), serde_json::json!(crate::registry::now_rfc3339()));
+    // UPSERT: a `batch_id` is unique per import, so this only replaces on a replay over the exact
+    // same batch (the server's «extend the runtime report with modules/media/fiscal» step).
+    db.execute(
+        "INSERT INTO _hub_import_report (id, hub_id, name, report, created_at) \
+         VALUES (:id, :hub_id, :name, :report, :now) \
+         ON CONFLICT(id) DO UPDATE SET report = :report, created_at = :now",
+        &p,
+    )
+    .await
+    .map_err(|e| crate::RuntimeError::Other(format!("reset: persistir el informe de import: {e}")))?;
+    Ok(())
+}
+
+/// One persisted import report (the actionable document `ImportPanel.vue` paints), with its
+/// `batch_id` and when it ran — enough for the UI to say «the import of <name> from <time>».
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StoredImportReport {
+    pub batch_id: String,
+    pub name: String,
+    /// The JSON the writer stored (runtime report, or the server's extended one). Opaque here.
+    pub report: String,
+    pub created_at: String,
+}
+
+/// The last actionable report for `hub_id`, most recent first (hub#763).
+///
+/// This is what the Data tab reads on mount to recover what the Dashboard pointed at: the most
+/// recent import run, whatever it was. `None` when no import has run (or its batch was undone and
+/// the report with it — see [`undo_import`]).
+pub async fn last_import_report_for_hub(rt: &Runtime, hub_id: &str) -> crate::Result<Option<StoredImportReport>> {
+    let db = rt.db();
+    ensure_report_table(db).await?;
+    let res = db
+        .query(
+            "SELECT id AS batch_id, name AS name, report AS report, created_at AS created_at \
+             FROM _hub_import_report WHERE hub_id = :hub_id ORDER BY created_at DESC LIMIT 1",
+            &hub_params(hub_id),
+        )
+        .await
+        .map_err(|e| crate::RuntimeError::Other(format!("reset: leer el último informe: {e}")))?;
+    Ok(res.rows.first().map(|r| StoredImportReport {
+        batch_id: r["batch_id"].as_str().unwrap_or_default().to_string(),
+        name: r["name"].as_str().unwrap_or_default().to_string(),
+        report: r["report"].as_str().unwrap_or_default().to_string(),
+        created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
+    }))
+}
+
+/// The actionable report of ONE import run, by its `batch_id`, scoped to `hub_id` (hub#763).
+///
+/// `None` when the batch does not exist, belongs to another hub, or was undone (its report row is
+/// deleted together with the batch in [`undo_import`]). This is the same hub-scoping the undo path
+/// relies on, so an admin cannot read another tenant's report by guessing a `batch_id`.
+pub async fn last_import_report(
+    rt: &Runtime,
+    hub_id: &str,
+    batch_id: &str,
+) -> crate::Result<Option<StoredImportReport>> {
+    let db = rt.db();
+    ensure_report_table(db).await?;
+    let mut p = hub_params(hub_id);
+    p.insert("batch".into(), serde_json::json!(batch_id));
+    let res = db
+        .query(
+            "SELECT id AS batch_id, name AS name, report AS report, created_at AS created_at \
+             FROM _hub_import_report WHERE id = :batch AND hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .map_err(|e| crate::RuntimeError::Other(format!("reset: leer el informe: {e}")))?;
+    Ok(res.rows.first().map(|r| StoredImportReport {
+        batch_id: r["batch_id"].as_str().unwrap_or_default().to_string(),
+        name: r["name"].as_str().unwrap_or_default().to_string(),
+        report: r["report"].as_str().unwrap_or_default().to_string(),
+        created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
+    }))
+}
+
 /// Deshace una importación: borra EXACTAMENTE las filas que ese lote insertó, nada más.
 ///
 /// Acotado por `hub_id` (el lote pertenece a un hub) e **idempotente**: deshacer dos veces no
@@ -826,6 +946,9 @@ pub async fn list_import_batches(rt: &Runtime, hub_id: &str) -> crate::Result<Ve
 pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::Result<ResetReport> {
     let db = rt.db();
     ensure_batch_tables(db).await?;
+    // The report table is deleted in the same tx (hub#763): ensure it exists so the DELETE is
+    // valid even on a hub whose imports never persisted a report (fresh DB, batch never stored one).
+    ensure_report_table(db).await?;
 
     // El lote debe ser DE ESTE HUB: sin esta comprobación, un batch_id de otro tenant borraría
     // sus filas (misma BD compartida por organización).
@@ -889,6 +1012,13 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
     ));
     ops.push((
         "DELETE FROM _hub_import_batch WHERE id = :batch AND hub_id = :hub_id".into(),
+        p.clone(),
+    ));
+    // The actionable report travels with its batch (hub#763): undoing an import that «did not go
+    // in» removes its report too, so the Data tab no longer offers the detail of something the hub
+    // just rolled back. In the SAME transaction as the deletes, so a failed undo keeps both.
+    ops.push((
+        "DELETE FROM _hub_import_report WHERE id = :batch AND hub_id = :hub_id".into(),
         p.clone(),
     ));
 

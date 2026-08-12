@@ -700,3 +700,74 @@ async fn editing_your_own_profile_never_writes_the_access_email() {
         "the key her membership hangs from is hers, and she cannot retype it into somebody else's"
     );
 }
+
+// ── hub#463 — the row the backfill left alone must be TELLABLE APART on the Personal screen ──────
+//
+// The backfill reports these rows on the boot log and through `unresolved_access_emails()`, which
+// no HTTP route exposes. Meanwhile the Personal list resolves the address with
+// `COALESCE(NULLIF(u.email,''), p.email, '')`, so the administrator sees a perfectly normal email —
+// and everything that screen implies about it is false: their baja revokes no membership in the
+// SaaS, and their first login lands on a different row. A screen that promises something that will
+// not happen is worse than one that says nothing.
+//
+// The flag rides on the ROW, not on a second endpoint: one round trip, and a badge that cannot end
+// up next to the wrong person.
+
+/// 🔴 A row whose access email could not be filled in is flagged, WITH the reason the migration
+/// already computed — the administrator needs to know which of the two decisions is theirs to make.
+#[tokio::test]
+async fn the_staff_list_flags_the_row_whose_email_revokes_nothing() {
+    let tdb = TestDb::new().await;
+    let (_, raw) = hub_deployed_before_the_fix(&tdb).await;
+    row_written_before_the_fix(&raw, "u-ana-1", "Ana Soto", "admin", "ana@example.com").await;
+    row_written_before_the_fix(&raw, "u-ana-2", "Ana S.", "employee", "ana@example.com").await;
+
+    let rt = reboot(&tdb).await;
+    let rows = rt.list_hub_users().await.unwrap();
+
+    let ana = rows.iter().find(|u| u.id == "u-ana-1").expect("Ana está en la lista");
+    assert_eq!(
+        ana.access_email_conflict,
+        Some(erplora_runtime::access_email::AccessEmailConflict::TwoProfilesClaimIt),
+        "the screen has to say WHY, or the administrator cannot act on it"
+    );
+    // The address still shows: hiding it would help nobody decide which row is the person.
+    assert_eq!(ana.email, "ana@example.com");
+}
+
+/// The other reason travels too, and it is a DIFFERENT decision: here somebody else already answers
+/// for the address, so the way out is editing one of the two, not merging them.
+#[tokio::test]
+async fn a_row_whose_address_belongs_to_somebody_else_says_so() {
+    let tdb = TestDb::new().await;
+    let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
+    rt.create_login_user("ana@example.com", "admin").await.unwrap();
+    row_written_before_the_fix(&raw, "u-bob", "Bob Ruiz", "employee", "ana@example.com").await;
+
+    let rt = reboot(&tdb).await;
+    let rows = rt.list_hub_users().await.unwrap();
+
+    let bob = rows.iter().find(|u| u.id == "u-bob").expect("Bob está en la lista");
+    assert_eq!(
+        bob.access_email_conflict,
+        Some(erplora_runtime::access_email::AccessEmailConflict::AnotherRowAnswersForIt),
+    );
+}
+
+/// A healthy hub carries no flag at all. Without this the badge could be painted on everybody and
+/// the test above would still pass — a warning that is always on is not a warning.
+#[tokio::test]
+async fn nobody_is_flagged_in_a_hub_with_nothing_to_resolve() {
+    let tdb = TestDb::new().await;
+    let rt = reboot(&tdb).await;
+    rt.create_login_user("ana@example.com", "admin").await.unwrap();
+    rt.create_login_user("bob@example.com", "employee").await.unwrap();
+
+    let rows = rt.list_hub_users().await.unwrap();
+
+    assert!(!rows.is_empty(), "hay filas que mirar");
+    assert!(
+        rows.iter().all(|u| u.access_email_conflict.is_none()),
+        "un aviso que sale siempre no avisa de nada: {rows:?}"
+    );
+}

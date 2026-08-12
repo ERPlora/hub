@@ -11,6 +11,7 @@ vi.mock('./runtime', () => ({
 }));
 
 import {
+  accessEmailWarningOf,
   accessOf,
   canDeactivate,
   createHubUser,
@@ -135,5 +136,50 @@ describe('hub-users: el personal sale del core', () => {
     const roles = await listHubRoles();
     expect(roles[0]).toEqual({ name: 'owner', permissions: 12, members: 1 });
     expect(fetch).toHaveBeenCalledWith('/api/hub/roles', expect.anything());
+  });
+});
+
+// ── hub#463 — the row whose email revokes nothing has to be tellable apart ───────────────────────
+//
+// The Personal list resolves the address with `COALESCE(hub_user.email, profile.email)`, so a row
+// the v19 backfill refused to fill in shows a perfectly ordinary email. Everything that screen
+// implies about it is false: its baja revokes no membership in the SaaS, and its first login lands
+// on a different row. Until hub#463 the only place that said so was the boot log.
+describe('accessEmailWarningOf (hub#463)', () => {
+  const healthy: HubUser = {
+    id: 'u1',
+    name: 'Ana Soto',
+    email: 'ana@example.com',
+    role: 'admin',
+    cloud_user_id: 'c1',
+    is_active: true,
+    has_pin: false,
+    created_at: '2026-01-01T00:00:00Z',
+  };
+
+  it('says nothing about a row with nothing to resolve', () => {
+    // A warning that is always on is not a warning.
+    expect(accessEmailWarningOf(healthy)).toBeNull();
+  });
+
+  it('carries the reason through, because the two are DIFFERENT decisions', () => {
+    // «another row answers for it» → edit one of the two addresses.
+    // «two profiles claim it»     → decide which row is the person; merging is irreversible.
+    expect(accessEmailWarningOf({ ...healthy, access_email_conflict: 'another_row_answers_for_it' }))
+      .toBe('another_row_answers_for_it');
+    expect(accessEmailWarningOf({ ...healthy, access_email_conflict: 'two_profiles_claim_it' }))
+      .toBe('two_profiles_claim_it');
+  });
+
+  it('ignores a reason the shell does not know, instead of painting an empty badge', () => {
+    // An older/newer runtime may report a third reason. Showing a badge with no sentence behind it
+    // would be worse than the silence this issue is closing.
+    const unknown = { ...healthy, access_email_conflict: 'something_new' } as unknown as HubUser;
+    expect(accessEmailWarningOf(unknown)).toBeNull();
+  });
+
+  it('is absent on a runtime too old to report it at all', () => {
+    // The field is `skip_serializing_if = "Option::is_none"`, so an old runtime simply omits it.
+    expect(accessEmailWarningOf({ ...healthy, access_email_conflict: undefined })).toBeNull();
   });
 });

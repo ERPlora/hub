@@ -52,9 +52,12 @@ const agenda = { path: '/m/appointments', label: 'Appointments', icon: 'calendar
 function mountCard(
   apps: { path: string; label: string; icon: string }[] = [],
   messages: typeof i18n | typeof i18nEs = i18n,
+  // What the card is told about the list it was handed. `ready` by default: a caller that passes a
+  // list and says nothing else IS saying «this is the list».
+  state: 'loading' | 'ready' | 'error' = 'ready',
 ) {
   return mount(MyAppsCard, {
-    props: { apps },
+    props: { apps, state },
     global: { plugins: [messages], renderStubDefaultSlot: true },
     shallow: true,
   });
@@ -184,5 +187,41 @@ describe('the strings ship in both languages', () => {
     expect(w.find('[data-testid="apps-empty"]').text()).toBe(
       (esCatalogue as unknown as { dashboard: Record<string, string> }).dashboard.appsEmpty,
     );
+  });
+});
+
+// hub#770 — «Your apps will show up here» is a statement about the HUB, and the card was making it
+// while it simply did not know yet.
+//
+// On a cold load the panel painted the empty line for the ~3 seconds before `/api/navigation`
+// answered: a restaurant with twelve apps installed told its owner it had none, on the screen whose
+// only offer is «add your first ones». And a failed request came out identical, because `catch`
+// left the list empty — a session displaced by a second device (Free plan) read as «somebody
+// uninstalled everything» while the till in the next tab was still selling.
+describe('loading and failing are not «you have no apps»', () => {
+  it('says nothing about an empty hub while it is still asking', () => {
+    const w = mountCard([], i18n, 'loading');
+
+    expect(w.find('[data-testid="apps-empty"]').exists()).toBe(false);
+    // And the ＋ tile stays: it is the one thing that is true in every state.
+    expect(w.find('[data-testid="apps-add"]').exists()).toBe(true);
+  });
+
+  it('says nothing about an empty hub when the request FAILED', () => {
+    const w = mountCard([], i18n, 'error');
+
+    expect(w.find('[data-testid="apps-empty"]').exists()).toBe(false);
+  });
+
+  it('keeps painting the apps it already had when a reload fails', () => {
+    // The last known-good list beats every message we could put in its place.
+    const w = mountCard([pos, stock], i18n, 'error');
+
+    expect(tilePaths(w)).toEqual(['/m/pos', '/m/inventory']);
+    expect(w.find('[data-testid="apps-empty"]').exists()).toBe(false);
+  });
+
+  it('says it, and only then, when an answer came back empty', () => {
+    expect(mountCard([], i18n, 'ready').find('[data-testid="apps-empty"]').exists()).toBe(true);
   });
 });

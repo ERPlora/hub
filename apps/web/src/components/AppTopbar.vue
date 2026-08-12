@@ -47,7 +47,18 @@
         </ion-button>
       </ion-buttons>
 
-      <ion-title>{{ title }}</ion-title>
+      <!-- The name of the screen, and its HEADING (hub#794). `ion-title` paints plain text, so
+           eight of the shell's ten screens exposed no heading at all: somebody navigating by
+           headings —the first thing one does with a screen reader on an unfamiliar page— had
+           nowhere to jump. `role`/`aria-level` on the host rather than a separate `<h1>`: the
+           accessible name comes from the contents, so the ear reads EXACTLY what the eye reads
+           and the visual composition is untouched.
+           Dropped on the two screens that already paint their own `<h1>` — the VIEW says so, via
+           `AppPage`, never this toolbar (see the note on the prop). -->
+      <ion-title
+        :role="titleIsHeading ? 'heading' : undefined"
+        :aria-level="titleIsHeading ? '1' : undefined"
+      >{{ title }}</ion-title>
 
       <ion-buttons slot="end">
         <!-- Acciones propias de la vista (a la izquierda de los controles globales). -->
@@ -240,12 +251,30 @@ interface LauncherApp {
   color?: string;
 }
 
-const props = defineProps<{
-  /** Título de la vista. */
-  title: string;
-  /** Href de fallback del botón Back. Si se pasa, la vista es de detalle y muestra el Back. */
-  backHref?: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** Title of the view. */
+    title: string;
+    /** Fallback href of the Back button. When passed, the view is a detail one and shows Back. */
+    backHref?: string;
+    /**
+     * Is this title the main HEADING of the screen? (hub#794).
+     *
+     * `true` by default, and the direction of that default is the point: a screen has to opt OUT,
+     * never opt in. Opting in is exactly what left eight of the ten screens with no heading, each
+     * one waiting for somebody to remember it.
+     *
+     * Set to `false` on the two that already paint their own `<h1>` in the content —the panel
+     * greets with the business name, the profile with the person's— because two level-1 headings
+     * on one screen is the other defect the issue forbids in the same breath. Who knows that is
+     * the VIEW (via `AppPage`), not this toolbar: were it guessed from the route there would be
+     * two truths about one screen and they would drift apart — the same reason as
+     * `setupChecklistOnScreen`.
+     */
+    titleIsHeading?: boolean;
+  }>(),
+  { titleIsHeading: true },
+);
 
 const { t } = useI18n();
 const router = useRouter();

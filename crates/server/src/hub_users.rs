@@ -410,6 +410,9 @@ mod tests {
             is_active,
             has_pin: false,
             created_at: "2026-08-02T10:00:00Z".into(),
+            // Estas pruebas son del guardarraíl «no te quedes sin administrador»: el conflicto de
+            // email de acceso (hub#463) no entra en esa decisión.
+            access_email_conflict: None,
         }
     }
 

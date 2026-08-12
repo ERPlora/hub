@@ -235,23 +235,41 @@ export class InstallBlockedError extends Error {
   readonly code = 'install_blocked';
   readonly blockedOn: string[];
   readonly purchase: InstallPurchaseOption[];
+  /** What the RUNTIME said, or `null` if its body could not be read. See `InstallFailedError`. */
+  readonly detail: string | null;
 
-  constructor(message: string, blockedOn: string[], purchase: InstallPurchaseOption[]) {
+  constructor(
+    message: string,
+    blockedOn: string[],
+    purchase: InstallPurchaseOption[],
+    detail: string | null = null,
+  ) {
     super(message);
     this.name = 'InstallBlockedError';
     this.blockedOn = blockedOn;
     this.purchase = purchase;
+    this.detail = detail;
   }
 }
 
 /** Fallo de instalación con el CÓDIGO estable del runtime (hub#139) para que la UI lo traduzca. */
 export class InstallFailedError extends Error {
   readonly code: string;
+  /**
+   * The sentence the RUNTIME sent, or `null` when its body could not be read (hub#673).
+   *
+   * `message` is no good for this: it falls back to a TECHNICAL string on purpose
+   * (`request-install sales → 502`), which is what the logs want and the last thing to show
+   * somebody running a shop. `detail` separates «the runtime said something» from «it said
+   * nothing», which is the only way to know whether there is a sentence worth replacing ours with.
+   */
+  readonly detail: string | null;
 
-  constructor(message: string, code: string) {
+  constructor(message: string, code: string, detail: string | null = null) {
     super(message);
     this.name = 'InstallFailedError';
     this.code = code;
+    this.detail = detail;
   }
 }
 
@@ -282,7 +300,10 @@ export async function requestInstall(moduleId: string, version: string): Promise
       } catch {
         body = null;
       }
-      const message = (body?.error as string) || `request-install ${moduleId} → ${res.status}`;
+      // What the runtime said (hub#673), kept apart from the technical message the logs want:
+      // `null` when the body could not be read, so there is no sentence of its own to show.
+      const detail = typeof body?.error === 'string' ? (body.error as string) : null;
+      const message = detail || `request-install ${moduleId} → ${res.status}`;
       const code = (body?.code as string) || 'install_failed';
       if (code === 'install_blocked') {
         const purchase = Array.isArray(body?.purchase)
@@ -294,9 +315,9 @@ export async function requestInstall(moduleId: string, version: string): Promise
               purchaseUrl: p.purchase_url,
             }))
           : [];
-        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase);
+        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase, detail);
       }
-      throw new InstallFailedError(message, code);
+      throw new InstallFailedError(message, code, detail);
     }
     return (await res.json()) as InstallRequestResult;
   } finally {
@@ -396,7 +417,8 @@ export async function updateModule(moduleId: string, version = ''): Promise<Modu
       } catch {
         body = null;
       }
-      const message = (body?.error as string) || `update ${moduleId} → ${res.status}`;
+      const detail = typeof body?.error === 'string' ? (body.error as string) : null;
+      const message = detail || `update ${moduleId} → ${res.status}`;
       const code = (body?.code as string) || 'update_failed';
       if (code === 'install_blocked') {
         const purchase = Array.isArray(body?.purchase)
@@ -408,9 +430,9 @@ export async function updateModule(moduleId: string, version = ''): Promise<Modu
               purchaseUrl: p.purchase_url,
             }))
           : [];
-        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase);
+        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase, detail);
       }
-      throw new InstallFailedError(message, code);
+      throw new InstallFailedError(message, code, detail);
     }
     return (await res.json()) as ModuleUpdateResult;
   } finally {
@@ -488,15 +510,13 @@ export interface ModuleCapabilities {
 }
 
 /**
- * Catálogo de respaldo de labels de capability (por si el runtime no las devuelve traducidas).
- * Espejo del catálogo del backend; solo se usa como fallback de presentación.
+ * El catálogo de respaldo de labels vive en `./module-capabilities` (`CAPABILITY_CATALOG`).
+ *
+ * Estaba aquí con CUATRO entradas y `manage_flows` (hub#714) nunca se añadió: un espejo
+ * desincronizado de `crates/server/src/settings.rs::capability_meta` que nadie leía (el servidor
+ * manda `label`) hasta que hizo falta ponerle nombre a un id suelto del catálogo Cloud (pm#132).
+ * Ahora vive junto a la lógica que lo usa, con descripción además de etiqueta.
  */
-export const CAPABILITY_LABELS: Record<string, string> = {
-  network: 'Acceso a internet',
-  certificate: 'Certificado del negocio (firma fiscal)',
-  printer: 'Impresora',
-  notify: 'Notificaciones',
-};
 
 /**
  * Lee las capabilities (permisos) que declara un módulo instalado y su estado de concesión.
@@ -588,6 +608,80 @@ export async function publishFiscalIdentity(): Promise<void> {
     headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
   });
   if (!res.ok) throw new Error(`publish-fiscal-identity → ${res.status}`);
+}
+
+// ── Otorgamiento de representación (hub#817 / saas#1438) ──────────────────────────────────────
+// ERPlora remite los registros VERI*FACTU EN NOMBRE del obligado, y eso exige su consentimiento
+// firmado (Anexo I, Resolución DG AEAT 18/12/2024). Se firma aquí y lo CUSTODIA el SaaS.
+//
+// 🔴 Las dos llamadas van al RUNTIME, nunca al SaaS: el token de máquina del hub es secreto suyo y
+// no cruza a este navegador (ADR-0003). El runtime pone la cabecera, compone el documento y lo
+// manda; este lado no guarda ni el trazo ni el DNI.
+
+/** Lo que las dos rutas contestan siempre. `status: ''` = el runtime no contestó. */
+export interface RepresentationGrantStatus {
+  status: '' | 'absent' | 'vigente' | 'revocado';
+  /** Fecha DEL ESTADO: cuándo se firmó si está vigente, cuándo se revocó si está revocado. */
+  at: string;
+}
+
+/**
+ * Lo que contesta el **GET**: el estado más el texto que hay que enseñar.
+ *
+ * `anexo_text` viaja solo aquí, y por eso es un tipo aparte: el POST no lo devuelve, y declararlo
+ * en el tipo común diría que sí — que es justo la clase de mentira que un tipo existe para evitar.
+ */
+export interface RepresentationGrantState extends RepresentationGrantStatus {
+  /** El texto del Anexo I con sus placeholders, servido por el runtime (fuente única). */
+  anexo_text: string;
+}
+
+/** Lo que la pantalla manda a firmar. `signature` es el trazo; el documento lo monta el runtime. */
+export interface RepresentationGrantCapture {
+  obligado_nif: string;
+  obligado_name: string;
+  signer_nif: string;
+  signer_name: string;
+  signature: Blob;
+  dni_copy: File;
+}
+
+/**
+ * Lee el estado del otorgamiento (`GET /api/fiscal/representation-grant`). Cualquier sesión.
+ *
+ * **Lanza** si el runtime no contesta, en vez de degradar a «ausente»: «no lo sé» y «no has
+ * firmado» no son lo mismo, y enseñar el segundo cuando pasa el primero manda a alguien a firmar
+ * un otorgamiento que ya tiene.
+ */
+export async function getRepresentationGrant(): Promise<RepresentationGrantState> {
+  const res = await fetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) throw new Error(`get-representation-grant → ${res.status}`);
+  return (await res.json()) as RepresentationGrantState;
+}
+
+/**
+ * Sube el otorgamiento firmado (`POST /api/fiscal/representation-grant`, multipart). Solo admin
+ * (el runtime revalida). Lanza si el runtime o el SaaS lo rechazan.
+ */
+export async function postRepresentationGrant(
+  capture: RepresentationGrantCapture,
+): Promise<RepresentationGrantStatus> {
+  const form = new FormData();
+  form.append('obligado_nif', capture.obligado_nif);
+  form.append('obligado_name', capture.obligado_name);
+  form.append('signer_nif', capture.signer_nif);
+  form.append('signer_name', capture.signer_name);
+  form.append('signature', capture.signature, 'signature.png');
+  form.append('dni_copy', capture.dni_copy, capture.dni_copy.name);
+  const res = await fetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
+    method: 'POST',
+    headers: runtimeHeaders(),
+    body: form,
+  });
+  if (!res.ok) throw new Error(`post-representation-grant → ${res.status}`);
+  return (await res.json()) as RepresentationGrantStatus;
 }
 
 /**
@@ -1274,6 +1368,30 @@ export async function fetchImportBatches(): Promise<ImportBatch[]> {
   if (!res.ok) throw new Error(await readErrorMessage(res, `import/batches → ${res.status}`));
   const body = (await res.json()) as { ok: boolean; batches?: ImportBatch[] };
   return body.batches ?? [];
+}
+
+/**
+ * El último informe de importación persistido del hub (hub#763): lo que el Dashboard anuncia y la
+ * pestaña Datos recupera al montarse, para que navegar fuera del hero (o recargar) no pierda el
+ * informe accionable. `null` = sin import reciente, o el último lote ya se deshizo.
+ */
+export interface StoredImportReport {
+  /** `batch_id` del lote — para deshacerlo o reintentarlo. */
+  batch_id: string;
+  /** Nombre del blueprint, como lo reconoce el usuario. */
+  name: string;
+  /** Cuándo se corrió el import (RFC3339). */
+  created_at: string;
+  /** El informe extendido: `sections` + `installed_modules` + `media` + `fiscal`. */
+  report: ImportReport;
+}
+
+/** Recupera el último informe de importación del hub (`GET /api/hub/import/report`, hub#763). */
+export async function fetchImportReport(): Promise<StoredImportReport | null> {
+  const res = await fetch(`${RUNTIME_URL}/api/hub/import/report`, { headers: runtimeHeaders() });
+  if (!res.ok) throw new Error(await readErrorMessage(res, `import/report → ${res.status}`));
+  const body = (await res.json()) as { ok: boolean; report?: StoredImportReport | null };
+  return body.report ?? null;
 }
 
 /**
