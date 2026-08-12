@@ -79,6 +79,37 @@ fi
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
+# ── hub#746: the copy that RUNS is whatever core.hooksPath points at ─────────
+# (on the fleet machine: ~/.erplora/hooks/hub) and nothing syncs it with the
+# versioned .githooks/pre-push. Drift is silent in BOTH directions: a stale
+# copy re-reds already-fixed tests (false red), or skips checks the repo added
+# while still publishing the attestation (false green — indistinguishable on
+# the PR). So: check ourselves on every push and shout, and stamp the
+# attestation with the hash of the copy that actually ran (see publish_status).
+# A WARNING, not a refusal: a branch that edits this very hook is a legitimate
+# state where the two copies must differ.
+SELF="${BASH_SOURCE[0]:-$0}"
+HOOK_ID="$(git hash-object "$SELF" 2>/dev/null || true)"
+HOOK_ID="${HOOK_ID:0:12}"
+hook_drift_check() {
+    local versioned=".githooks/pre-push" self_abs versioned_abs versioned_id
+    [ -f "$versioned" ] || return 0
+    self_abs="$(cd "$(dirname "$SELF")" 2>/dev/null && pwd -P)/$(basename "$SELF")"
+    versioned_abs="$(cd "$(dirname "$versioned")" && pwd -P)/pre-push"
+    [ "$self_abs" = "$versioned_abs" ] && return 0
+    if ! cmp -s "$SELF" "$versioned" 2>/dev/null; then
+        versioned_id="$(git hash-object "$versioned" 2>/dev/null || true)"
+        {
+            echo "⚠️  pre-push: the INSTALLED hook is OUT OF SYNC with the versioned .githooks/pre-push."
+            echo "    running   : $self_abs (hook ${HOOK_ID:-?})"
+            echo "    versioned : $versioned_abs (hook ${versioned_id:0:12})"
+            echo "    The gate that decides this push is the INSTALLED copy. Unless this branch"
+            echo "    deliberately edits the hook itself, resync with:  bash scripts/install-hooks.sh"
+        } >&2
+    fi
+}
+hook_drift_check
+
 STATE_DIR="${HUB_GATE_STATE_DIR:-$(git rev-parse --git-common-dir)/hub-gate}"
 mkdir -p "$STATE_DIR"
 
@@ -179,7 +210,7 @@ publish_status() {
         if ! perr="$(gh api -X POST "repos/$repo/statuses/$sha" \
                 -f state=success \
                 -f context="$CONTEXT" \
-                -f description="cargo test --workspace green on the pusher's machine" \
+                -f description="cargo test --workspace green on the pusher's machine (hook ${HOOK_ID:-unknown})" \
                 2>&1 >/dev/null)"; then
             report_async "gh refused to post the status to $repo" "$perr" "$sha"
             exit 0

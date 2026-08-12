@@ -406,6 +406,86 @@ grep -qi 'could not be published' <<<"$out" && errs="$errs false-alarm"
     && ok "green + a working gh: the status is posted and nothing cries wolf" \
     || bad "green + a working gh: the status is posted and nothing cries wolf" "$errs"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 20–22 — the INSTALLED copy must not drift silently from the versioned hook
+# (hub#746)
+#
+# On the real machine `core.hooksPath` points OUTSIDE the repo
+# (~/.erplora/hooks/hub), so the copy that decides a push is not the file the
+# repo versions — and nothing syncs them. The hook therefore checks itself on
+# every run against the checkout's `.githooks/pre-push`, and the attestation
+# carries the hash of the copy that actually ran.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 20. Running copy differs from the versioned hook → loud drift warning ─────
+#    The fixture commits a MODIFIED `.githooks/pre-push`, while the copy that
+#    runs is the real one — exactly the installed-copy-is-stale shape.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+cp "$HOOK" "$repo/.githooks/pre-push"
+echo "# drifted by one line" >> "$repo/.githooks/pre-push"
+git -C "$repo" add .githooks/pre-push
+git -C "$repo" commit -qm hook
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                || errs="$errs exit=$code(want 0: drift warns, it does not block)"
+grep -qi 'out of sync' <<<"$out"               || errs="$errs no-drift-warning"
+grep -q 'install-hooks.sh' <<<"$out"           || errs="$errs no-resync-command"
+[ -z "$errs" ] \
+    && ok "drifted installed copy: the hook says so and names the resync command" \
+    || bad "drifted installed copy: the hook says so and names the resync command" "$errs"
+
+# ── 21. Running copy identical to the versioned hook → silence ────────────────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add .githooks/pre-push
+git -C "$repo" commit -qm hook
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                       || errs="$errs exit=$code(want 0)"
+grep -qi 'out of sync' <<<"$out"      && errs="$errs false-drift-alarm"
+[ -z "$errs" ] \
+    && ok "in-sync copies: no drift warning" \
+    || bad "in-sync copies: no drift warning" "$errs"
+
+# ── 22. The attestation names the hook that ran (hash in the description) ─────
+#    Option 4 of hub#746: a stale gate's green becomes DISTINGUISHABLE on the
+#    PR, because the status says which hook produced it.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+errs=""
+[ "$code" = 0 ]                                              || errs="$errs exit=$code(want 0)"
+grep -qE 'hook [0-9a-f]{12}' "$repo/POSTARGS" 2>/dev/null    || errs="$errs no-hook-hash-in-description args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)"
+[ -z "$errs" ] \
+    && ok "the posted status says which hook attested (12-hex hash)" \
+    || bad "the posted status says which hook attested (12-hex hash)" "$errs"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
