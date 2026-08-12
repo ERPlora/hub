@@ -486,6 +486,100 @@ grep -qE 'hook [0-9a-f]{12}' "$repo/POSTARGS" 2>/dev/null    || errs="$errs no-h
     && ok "the posted status says which hook attested (12-hex hash)" \
     || bad "the posted status says which hook attested (12-hex hash)" "$errs"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 23–26 — the lock must know its OWNER, and detect that the owner died
+# (hub#575)
+#
+# A push killed mid-suite (turn timeout, Ctrl-C, SIGKILL on the process tree)
+# used to leave the bare `mkdir` lock behind: every later push then waited up
+# to an hour for a dead owner, with a message claiming a suite was running.
+# And breaking it by hand is dangerous in the other direction — the day it was
+# tried, a LIVE suite was running and the manual removal started a second one
+# in parallel (the exact condition the lock exists to prevent, hub#526).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 23. Holding the lock writes an owner file; releasing cleans it all up ─────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="cat $repo/.state/lock/owner > $repo/OWNER 2>/dev/null; true")
+errs=""
+[ "$code" = 0 ]                                  || errs="$errs exit=$code(want 0)"
+grep -q '^pid=[0-9]' "$repo/OWNER" 2>/dev/null   || errs="$errs no-pid owner='$(cat "$repo/OWNER" 2>/dev/null)'"
+grep -q '^since=[0-9]' "$repo/OWNER" 2>/dev/null || errs="$errs no-since"
+[ ! -d "$repo/.state/lock" ]                     || errs="$errs lock-left-behind"
+[ -z "$errs" ] \
+    && ok "the lock carries pid + since while held, and is removed on exit" \
+    || bad "the lock carries pid + since while held, and is removed on exit" "$errs"
+
+# ── 24. Orphan lock (owner is dead): break it, say whose it was, run the suite ─
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+( exit 0 ) & dead_pid=$!
+wait "$dead_pid" 2>/dev/null
+mkdir -p "$repo/.state/lock"
+printf 'pid=%s\nsince=%s\n' "$dead_pid" "$(date +%s)" > "$repo/.state/lock/owner"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=20 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                        || errs="$errs exit=$code(want 0)"
+[ -f "$repo/RAN" ]                     || errs="$errs suite-never-ran"
+grep -qi 'orphan' <<<"$out"            || errs="$errs no-orphan-message"
+grep -q "$dead_pid" <<<"$out"          || errs="$errs dead-pid-not-named"
+[ ! -d "$repo/.state/lock" ]           || errs="$errs lock-left-behind"
+[ -z "$errs" ] \
+    && ok "orphan lock: broken automatically, naming the dead owner's PID" \
+    || bad "orphan lock: broken automatically, naming the dead owner's PID" "$errs out='$out'"
+
+# ── 25. LIVE owner: wait (never break), name who is holding, time out clearly ──
+#    Conservative by contract: breaking a live lock starts two suites in
+#    parallel, which is the hub#526 failure the lock exists to prevent.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+mkdir -p "$repo/.state/lock"
+printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=4 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                        || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]                   || errs="$errs suite-ran-past-a-live-lock"
+[ -d "$repo/.state/lock" ]             || errs="$errs live-lock-was-broken"
+grep -q "$$" <<<"$out"                 || errs="$errs owner-pid-not-named"
+grep -q "rm -rf" <<<"$out"             || errs="$errs no-manual-removal-command"
+[ -z "$errs" ] \
+    && ok "live owner: waits without breaking, names the PID, and times out with the exact command" \
+    || bad "live owner: waits without breaking, names the PID, and times out with the exact command" "$errs out='$out'"
+
+# ── 26. Lock WITHOUT an owner file: when in doubt, wait — never break ─────────
+#    A pre-hub#575 lock, or an owner file whose write is still in flight,
+#    is indistinguishable from a live suite. The conservative direction is
+#    to wait for the timeout, exactly as before.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+mkdir -p "$repo/.state/lock"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=4 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]           || errs="$errs suite-ran"
+[ -d "$repo/.state/lock" ]     || errs="$errs ownerless-lock-was-broken"
+[ -z "$errs" ] \
+    && ok "ownerless lock: waits conservatively instead of breaking it" \
+    || bad "ownerless lock: waits conservatively instead of breaking it" "$errs"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

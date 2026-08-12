@@ -227,20 +227,72 @@ if [ -f "$green" ]; then
 fi
 
 # mkdir is atomic on every filesystem we care about; flock is not on macOS.
+#
+# hub#575: the lock knows its OWNER. A push killed mid-suite used to leave the
+# bare directory behind, and every later push waited up to an hour for a dead
+# owner — while the message claimed a suite was running. Worse, the manual
+# remedy invited breaking a LIVE lock (two parallel suites = the hub#526
+# failure this lock exists to prevent). So:
+#   · the holder writes $LOCK/owner (pid + pushed sha + epoch);
+#   · a waiter that finds the owner DEAD breaks the lock out loud;
+#   · a lock with NO owner file is indistinguishable from a write in flight
+#     (or a pre-hub#575 holder), so when in doubt we WAIT — conservative by
+#     contract.
+# `kill -0` also fails with EPERM on another user's PID; the installed hook is
+# per-user (~/.erplora), so every legitimate holder is our own user.
 LOCK="$STATE_DIR/lock"
+lock_owner_field() { sed -n "s/^$1=//p" "$LOCK/owner" 2>/dev/null; }
+write_lock_owner() {
+    {
+        echo "pid=$$"
+        echo "sha=$pushed_sha"
+        echo "since=$(date +%s 2>/dev/null || echo '')"
+    } > "$LOCK/owner" 2>/dev/null || true
+}
 lock_wait="${HUB_GATE_LOCK_WAIT:-3600}"
 waited=0
+announced=0
 while ! mkdir "$LOCK" 2>/dev/null; do
+    owner_pid="$(lock_owner_field pid)"
+    if [ -n "$owner_pid" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
+        # Re-read right before breaking: the lock may have just changed hands.
+        # The window between this check and the mv is small and the direction
+        # of the remaining race is a broken FRESH lock, which the new holder's
+        # own mkdir loop recovers from — never two suites at once.
+        [ "$(lock_owner_field pid)" = "$owner_pid" ] || continue
+        echo "🧹 pre-push: the gate lock is ORPHANED — its owner (PID $owner_pid) is dead. Breaking it." >&2
+        stale="$LOCK.stale.$$"
+        if mv "$LOCK" "$stale" 2>/dev/null; then
+            rm -rf "$stale" 2>/dev/null || true
+        fi
+        continue
+    fi
     if [ "$waited" -ge "$lock_wait" ]; then
-        echo "❌ pre-push: another suite has held the gate lock for ${lock_wait}s." >&2
-        echo "   If it died, remove $LOCK by hand." >&2
+        echo "❌ pre-push: the gate lock has been held for ${lock_wait}s by PID ${owner_pid:-unknown}," >&2
+        if [ -n "$owner_pid" ]; then
+            echo "   which is still ALIVE — most likely a real suite. Retry later, or if you are" >&2
+            echo "   CERTAIN it is stuck, remove the lock by hand:  rm -rf '$LOCK'" >&2
+        else
+            echo "   whose owner file is missing (pre-hub#575 lock?). Check for a running suite" >&2
+            echo "   first; only then remove it by hand:  rm -rf '$LOCK'" >&2
+        fi
         exit 1
     fi
-    [ "$waited" = 0 ] && echo "⏳ pre-push: another push is running the suite — waiting for the lock…" >&2
+    if [ "$announced" = 0 ]; then
+        since="$(lock_owner_field since)"
+        held=""
+        now="$(date +%s 2>/dev/null || echo '')"
+        case "$since$now" in *[!0-9]*|'') ;; *) [ -n "$since" ] && [ -n "$now" ] && held=$((now - since)) ;; esac
+        echo "⏳ pre-push: another push is running the suite (PID ${owner_pid:-unknown}${held:+, holding for ${held}s}) — waiting up to ${lock_wait}s…" >&2
+        announced=1
+    fi
     sleep 2
     waited=$((waited + 2))
 done
-trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+write_lock_owner
+# Release only OUR lock: if someone wrongly broke ours and a new holder took
+# over, their owner pid differs and we must not delete their lock.
+trap 'p="$(lock_owner_field pid)"; if [ -z "$p" ] || [ "$p" = "$$" ]; then rm -rf "$LOCK" 2>/dev/null || true; fi' EXIT
 
 # Whoever held the lock may have just turned this very tree green.
 if [ -f "$green" ]; then
