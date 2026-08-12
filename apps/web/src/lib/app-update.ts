@@ -196,10 +196,23 @@ export async function checkAppUpdate(): Promise<AppUpdate> {
   };
 }
 
-/** Where THIS device would get the newer build, or `null` when there is nowhere to send it. */
+/**
+ * Where THIS device would get the newer build, or `null` when there is nowhere to send it.
+ *
+ * **A store install has nowhere to go, and saying otherwise is a policy breach** (hub#757). Google
+ * Play forbids an app it distributed from fetching an APK elsewhere, and Microsoft updates its own
+ * installs too: for those two the store IS the channel, so the honest answer is silence. It is not
+ * a cosmetic choice — a reviewer opening the app and finding a link to `/app/download/android/` is
+ * what fails the submission, and that is the only place this notice ever renders.
+ *
+ * Everything else keeps its download, and that is the half worth protecting: a Linux till or a
+ * Windows one that took the installer from the Cloud has no store watching over it, so taking the
+ * notice away from them is exactly the orphaned fleet this module was written to prevent.
+ */
 export async function updateDestination(): Promise<string | null> {
   if (!isTauri()) return null;
   const context = await getDeviceContext();
+  if (context?.distribution === 'play' || context?.distribution === 'msstore') return null;
   const platform = downloadPlatform(context?.platform);
   return platform ? appDownloadUrl(platform) : null;
 }

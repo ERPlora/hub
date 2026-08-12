@@ -29,6 +29,17 @@ export interface DeviceContext {
   id: string;
   clientType: 'hub-desktop' | 'hub-local' | 'hub-cloud';
   platform?: 'android' | 'windows' | 'macos' | 'linux' | 'cloud' | 'desktop';
+  /**
+   * How this binary reached the device — the shell stamps it at compile time (hub#757).
+   *
+   * It cannot be derived here: the web app is served by the hub, so one bundle answers every
+   * install at once (ADR-0154/0159) and a build flag of THIS bundle could never tell a Play
+   * install from a sideloaded one. Only the shell knows, and only when it was built.
+   *
+   * `undefined` means a shell older than hub#757, and is read as `direct` on purpose: those
+   * builds are the ones nobody else updates, so taking their notice away would strand them.
+   */
+  distribution?: 'play' | 'msstore' | 'direct';
 }
 
 /**
@@ -164,10 +175,13 @@ export async function getDeviceContext(): Promise<DeviceContext | null> {
       id?: string;
       client_type?: string;
       platform?: DeviceContext['platform'];
+      distribution?: DeviceContext['distribution'];
     };
     if (ctx && typeof ctx.id === 'string' && ctx.id) {
       const clientType = ctx.client_type === 'hub-local' ? 'hub-local' : 'hub-desktop';
-      return { id: ctx.id, clientType, platform: ctx.platform };
+      // `distribution` is read from a shell older than hub#757 as `undefined`, never as a guess:
+      // callers treat the silence as `direct`, which is what those builds actually are.
+      return { id: ctx.id, clientType, platform: ctx.platform, distribution: ctx.distribution };
     }
   } catch {
     /* ignore — degrade to the browser identity */

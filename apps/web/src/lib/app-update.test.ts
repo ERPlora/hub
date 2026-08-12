@@ -442,3 +442,54 @@ describe('refreshAppUpdate', () => {
     expect(announced).toEqual([]);
   });
 });
+
+// ── hub#757: a build that came from a STORE must not point at a download ───────────────────────
+//
+// Google Play forbids an app it distributed from fetching an APK anywhere else, and Microsoft
+// updates its own installs too. The notice itself is not the problem — pointing a Play install at
+// `/app/download/android/` is, and a reviewer opening the app is exactly who finds it.
+//
+// The signal has to come from the SHELL and not from a build flag of this bundle: the web app is
+// served by the hub, so one bundle answers every install at once (ADR-0154/0159) and could never
+// tell a Play install from a sideloaded one. `distribution` travels in the device context, which
+// the shell fills at compile time — the only place that knows where the binary came from.
+describe('updateDestination and the distribution channel (hub#757)', () => {
+  /** A shell that reports itself as `platform`, installed through `distribution`. */
+  function shellFrom(platform: string, distribution: string) {
+    vi.stubGlobal('window', {
+      __TAURI__: {
+        core: {
+          invoke: vi.fn(async (command: string) =>
+            command === 'device_context'
+              ? { id: 'device-1', clientType: 'hub-desktop', platform, distribution }
+              : null,
+          ),
+        },
+      },
+    });
+  }
+
+  it('sends a DIRECT install to its download, because nobody else will update it', async () => {
+    shellFrom('linux', 'direct');
+    const { updateDestination } = await import('./app-update');
+    expect(await updateDestination()).toContain('/app/download/linux/');
+  });
+
+  it('sends NOWHERE an install that came from Google Play', async () => {
+    shellFrom('android', 'play');
+    const { updateDestination } = await import('./app-update');
+    expect(await updateDestination()).toBeNull();
+  });
+
+  it('sends NOWHERE an install that came from the Microsoft Store', async () => {
+    shellFrom('windows', 'msstore');
+    const { updateDestination } = await import('./app-update');
+    expect(await updateDestination()).toBeNull();
+  });
+
+  it('treats a shell that says nothing as a direct install, so an old build keeps its notice', async () => {
+    shellFrom('windows', undefined as unknown as string);
+    const { updateDestination } = await import('./app-update');
+    expect(await updateDestination()).toContain('/app/download/windows/');
+  });
+});
