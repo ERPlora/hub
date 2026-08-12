@@ -1,5 +1,5 @@
 <template>
-  <AppPage :title="t('profile.title')" back-href="/dashboard" content-layout="detail">
+  <AppPage :title="t('profile.title')" back-href="/dashboard" content-layout="detail" heading-on-screen>
     <main class="profile-page">
       <section class="profile-hero" aria-labelledby="profile-name">
         <ok-avatar

@@ -11,7 +11,8 @@
     #footer    → tabbar secundario u otro footer (ion-footer > ion-toolbar > ion-segment).
 
   Props:
-    title      → título de la vista (a AppTopbar).
+    title      → título de la vista (a AppTopbar), y su ENCABEZADO de nivel 1 salvo que la vista
+                 declare `heading-on-screen` porque ya pinta el suyo (hub#794).
     backHref   → si se pasa, AppTopbar muestra el botón Back (vista de detalle).
     contentLayout → `detail` centra contenido legible; `detail-fill` conserva además el alto útil.
 
@@ -20,7 +21,7 @@
 -->
 <template>
   <ion-page ref="page">
-    <AppTopbar :title="title" :back-href="backHref">
+    <AppTopbar :title="title" :back-href="backHref" :title-is-heading="!headingOnScreen">
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />
       </template>
@@ -75,10 +76,20 @@ withDefaults(
      * ruta, serían dos verdades sobre una misma pantalla y acabarían discrepando.
      */
     setupChecklistOnScreen?: boolean;
+    /**
+     * This screen already paints its own main heading (`<h1>`) in the content (hub#794).
+     *
+     * Only the panel and the profile: they greet with the business name and with the person's.
+     * There the toolbar title does NOT take heading semantics, because two level-1 headings on one
+     * screen is the twin defect of having none. The view says so, exactly like
+     * `setupChecklistOnScreen` — and for the same reason.
+     */
+    headingOnScreen?: boolean;
   }>(),
   {
     contentLayout: 'fluid',
     setupChecklistOnScreen: false,
+    headingOnScreen: false,
   },
 );
 

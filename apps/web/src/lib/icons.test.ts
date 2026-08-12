@@ -80,6 +80,17 @@ function iconNamesIn(source: string): string[] {
       for (const quoted of m[0].match(/'[a-z][a-z0-9-]*'/g) ?? []) names.push(quoted.slice(1, -1));
     }
   }
+  // An icon declared in TypeScript, not in the markup — `{ id: 'delete', icon: 'person-remove' }`
+  // (hub#793). Row actions of `ok-data-table` are built that way: the name never appears inside a
+  // tag, so the markup scan above did not see it, and `person-remove` had been coming out EMPTY in
+  // Employees for months — the «Dar de baja» action was an invisible button.
+  //
+  // Required against THIS registry even though many of those actions are painted by an ok-*:
+  // OutfitKit bakes a handful of names of its own, but which ones is its business and it changes
+  // between versions. Being in the host registry works in both cases; relying on OutfitKit to
+  // bring it works right up until it stops bringing it.
+  for (const m of source.matchAll(/\bicon:\s*'([a-z][a-z0-9-]*)'/g)) names.push(m[1]);
+
   return names.filter((name) => ICON_NAME.test(name));
 }
 

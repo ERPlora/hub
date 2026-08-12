@@ -405,7 +405,10 @@ const userRowActions = computed<DataTableAction[]>(() =>
   isAdmin.value
     ? [
         { id: 'edit', label: t('employees.actionEdit'), icon: 'pencil' },
-        { id: 'delete', label: t('employees.actionDeactivate'), icon: 'person-remove', color: 'danger' },
+        // `person-remove-outline`, not `person-remove` (hub#793): the latter is not in the
+        // registry, so ionicons tried to FETCH it over the network and in the Hub —offline, under
+        // CSP— the button came out empty. `-outline` is also the family the rest of the app uses.
+        { id: 'delete', label: t('employees.actionDeactivate'), icon: 'person-remove-outline', color: 'danger' },
       ]
     : [],
 );
