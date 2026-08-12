@@ -69,16 +69,6 @@ export default {
     cancel: 'Not now',
     failed: 'We could not open your browser. Go to erplora.com to get the new version.',
   },
-  // PWA install modal (PwaInstallModal.vue) — replaces the old sidebar "Install app" button.
-  pwa: {
-    title: 'Get the full experience',
-    hook: 'Use ERPlora as a native app: full screen, its own icon and instant access — no browser bars in the way.',
-    nativeView: 'Native view',
-    cancel: 'Not now',
-    dontShowAgain: "Don't show this again",
-    iosHint: 'On iPhone/iPad: tap Share (the square with an arrow) and choose “Add to Home Screen”.',
-    browserHint: 'In your browser menu, choose “Install app” (or “Add to Home Screen”).',
-  },
   assistant: {
     confirmTitle: 'The assistant wants to run an action',
     confirmCancel: 'Cancel',
@@ -346,6 +336,11 @@ export default {
       'The devices somebody has signed in on. If you lose one, remove it here: its session closes right away and it can no longer sign in with a PIN.',
     thisDevice: 'The one you are using',
     unnamed: 'Unnamed device',
+    rename: 'Name this device',
+    nameLabel: 'Name it after where it is: Counter, Kitchen, Office laptop',
+    save: 'Save',
+    lastSignedInBy: 'Last signed in by {who}',
+    renameError: 'This device could not be renamed. Check the connection and try again.',
     empty: 'Nobody has signed in on a device yet.',
     inUse: 'In use right now',
     lastUsed: 'Last used {when}',

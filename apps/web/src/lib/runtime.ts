@@ -235,23 +235,41 @@ export class InstallBlockedError extends Error {
   readonly code = 'install_blocked';
   readonly blockedOn: string[];
   readonly purchase: InstallPurchaseOption[];
+  /** What the RUNTIME said, or `null` if its body could not be read. See `InstallFailedError`. */
+  readonly detail: string | null;
 
-  constructor(message: string, blockedOn: string[], purchase: InstallPurchaseOption[]) {
+  constructor(
+    message: string,
+    blockedOn: string[],
+    purchase: InstallPurchaseOption[],
+    detail: string | null = null,
+  ) {
     super(message);
     this.name = 'InstallBlockedError';
     this.blockedOn = blockedOn;
     this.purchase = purchase;
+    this.detail = detail;
   }
 }
 
 /** Fallo de instalación con el CÓDIGO estable del runtime (hub#139) para que la UI lo traduzca. */
 export class InstallFailedError extends Error {
   readonly code: string;
+  /**
+   * The sentence the RUNTIME sent, or `null` when its body could not be read (hub#673).
+   *
+   * `message` is no good for this: it falls back to a TECHNICAL string on purpose
+   * (`request-install sales → 502`), which is what the logs want and the last thing to show
+   * somebody running a shop. `detail` separates «the runtime said something» from «it said
+   * nothing», which is the only way to know whether there is a sentence worth replacing ours with.
+   */
+  readonly detail: string | null;
 
-  constructor(message: string, code: string) {
+  constructor(message: string, code: string, detail: string | null = null) {
     super(message);
     this.name = 'InstallFailedError';
     this.code = code;
+    this.detail = detail;
   }
 }
 
@@ -282,7 +300,10 @@ export async function requestInstall(moduleId: string, version: string): Promise
       } catch {
         body = null;
       }
-      const message = (body?.error as string) || `request-install ${moduleId} → ${res.status}`;
+      // What the runtime said (hub#673), kept apart from the technical message the logs want:
+      // `null` when the body could not be read, so there is no sentence of its own to show.
+      const detail = typeof body?.error === 'string' ? (body.error as string) : null;
+      const message = detail || `request-install ${moduleId} → ${res.status}`;
       const code = (body?.code as string) || 'install_failed';
       if (code === 'install_blocked') {
         const purchase = Array.isArray(body?.purchase)
@@ -294,9 +315,9 @@ export async function requestInstall(moduleId: string, version: string): Promise
               purchaseUrl: p.purchase_url,
             }))
           : [];
-        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase);
+        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase, detail);
       }
-      throw new InstallFailedError(message, code);
+      throw new InstallFailedError(message, code, detail);
     }
     return (await res.json()) as InstallRequestResult;
   } finally {
@@ -396,7 +417,8 @@ export async function updateModule(moduleId: string, version = ''): Promise<Modu
       } catch {
         body = null;
       }
-      const message = (body?.error as string) || `update ${moduleId} → ${res.status}`;
+      const detail = typeof body?.error === 'string' ? (body.error as string) : null;
+      const message = detail || `update ${moduleId} → ${res.status}`;
       const code = (body?.code as string) || 'update_failed';
       if (code === 'install_blocked') {
         const purchase = Array.isArray(body?.purchase)
@@ -408,9 +430,9 @@ export async function updateModule(moduleId: string, version = ''): Promise<Modu
               purchaseUrl: p.purchase_url,
             }))
           : [];
-        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase);
+        throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase, detail);
       }
-      throw new InstallFailedError(message, code);
+      throw new InstallFailedError(message, code, detail);
     }
     return (await res.json()) as ModuleUpdateResult;
   } finally {

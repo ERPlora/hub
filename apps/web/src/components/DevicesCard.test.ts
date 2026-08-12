@@ -34,6 +34,7 @@ const { DevicesError } = vi.hoisted(() => ({
 vi.mock('../lib/devices', () => ({
   DevicesError,
   listDevices: vi.fn(),
+  renameDevice: vi.fn(),
   revokeDevice: vi.fn(),
 }));
 vi.mock('../lib/session', async () => {
@@ -47,7 +48,7 @@ const replace = vi.fn(async () => undefined);
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace }) }));
 
 import DevicesCard from './DevicesCard.vue';
-import { listDevices, revokeDevice } from '../lib/devices';
+import { listDevices, renameDevice, revokeDevice } from '../lib/devices';
 import { isAdmin, logout } from '../lib/session';
 
 // Read from the vitest root (`apps/web`): under happy-dom `import.meta.url` is not a `file:` URL.
@@ -77,6 +78,9 @@ const i18n = createI18n({
 function device(overrides: Record<string, unknown> = {}) {
   return {
     deviceId: 'dev_abc',
+    // Two different facts (hub#494): what the BUSINESS calls it, and who signed in last. The second
+    // one is chosen by the client and changes shift to shift, so it may only ever be a hint.
+    name: 'Barra',
     label: 'Office laptop',
     trustedAt: '2026-08-01T08:00:00+00:00',
     mode: 'personal' as const,
@@ -86,6 +90,17 @@ function device(overrides: Record<string, unknown> = {}) {
     current: false,
     ...overrides,
   };
+}
+
+/**
+ * Type into the name field the way `ion-input` reports it: a `ionInput` `CustomEvent` carrying
+ * `detail.value` (same shape the other cards are driven with). `setValue` would be testing an
+ * `<input>` this card does not use.
+ */
+function type(wrapper: ReturnType<typeof mount>, value: string): void {
+  wrapper
+    .get('[data-test="name-dev_abc"]')
+    .element.dispatchEvent(new CustomEvent('ionInput', { detail: { value } }));
 }
 
 async function mountCard() {
@@ -107,6 +122,7 @@ beforeEach(() => {
     sessionsClosed: 1,
     wasCurrent: false,
   });
+  vi.mocked(renameDevice).mockReset().mockResolvedValue('Cocina');
   vi.mocked(logout).mockReset();
   replace.mockClear();
   (isAdmin as unknown as { value: boolean }).value = true;
@@ -133,12 +149,36 @@ describe('the list', () => {
   });
 
   it('names a device that never told the hub what it is called', async () => {
-    vi.mocked(listDevices).mockResolvedValue([device({ label: '  ' })]);
+    vi.mocked(listDevices).mockResolvedValue([device({ name: '', label: '  ' })]);
 
     const wrapper = await mountCard();
 
     // A blank row would look like a rendering fault, and the owner needs SOMETHING to tap.
     expect(wrapper.html()).toContain(i18n.global.t('devices.unnamed'));
+  });
+
+  it('leads with the name the business chose, and demotes who signed in last to a hint', async () => {
+    const wrapper = await mountCard();
+
+    const html = wrapper.html();
+    // The heading is the one field an administrator wrote. Before hub#494 the row was titled with
+    // `label` — the name of the PERSON who last signed in online, rewritten on every login and
+    // chosen by the client: three tablets, three rows saying "Marta", next to the button that
+    // disconnects one of them.
+    expect(wrapper.get('.name').text()).toContain('Barra');
+    expect(wrapper.get('.name').text()).not.toContain('Office laptop');
+    // The person is still worth showing — it is a real memory aid — but said as what it is.
+    expect(html).toContain('Office laptop');
+    expect(html).toContain(i18n.global.t('devices.lastSignedInBy', { who: 'Office laptop' }));
+  });
+
+  it('a device nobody has named yet says so instead of borrowing the person name', async () => {
+    vi.mocked(listDevices).mockResolvedValue([device({ name: '' })]);
+
+    const wrapper = await mountCard();
+
+    expect(wrapper.get('.name').text()).toContain(i18n.global.t('devices.unnamed'));
+    expect(wrapper.get('.name').text()).not.toContain('Office laptop');
   });
 
   it('says when it was last used instead of claiming somebody is on it', async () => {
@@ -321,6 +361,12 @@ describe('the words', () => {
       'revoke',
       'cancel',
       'loadError',
+      // hub#494 — the words of naming a device.
+      'rename',
+      'nameLabel',
+      'save',
+      'lastSignedInBy',
+      'renameError',
     ];
     for (const key of keys) {
       const spanish = i18n.global.t(`devices.${key}`, 1, { locale: 'es' });
@@ -330,5 +376,55 @@ describe('the words', () => {
       // for our thing, and this screen is read by somebody running a bar.
       expect(spanish.toLowerCase(), key).not.toMatch(/\bhubs?\b/);
     }
+  });
+});
+
+describe('naming a device (hub#494)', () => {
+  it('an administrator names it from the row, and the list comes back from the hub', async () => {
+    const wrapper = await mountCard();
+
+    await wrapper.get('[data-test="rename-dev_abc"]').trigger('click');
+    type(wrapper, 'Cocina');
+    await wrapper.get('[data-test="save-name-dev_abc"]').trigger('click');
+    await flushPromises();
+
+    expect(renameDevice).toHaveBeenCalledWith('dev_abc', 'Cocina');
+    // Reloaded, not patched in place: what the row says is the hub's to decide, exactly as in the
+    // revocation. A name that only changed on screen is the failure mode this whole card avoids.
+    expect(listDevices).toHaveBeenCalledTimes(2);
+  });
+
+  it('only an administrator is offered the pencil', async () => {
+    (isAdmin as unknown as { value: boolean }).value = false;
+
+    const wrapper = await mountCard();
+
+    // Mirror of the runtime gate (ADR-0248), which revalidates anyway: a name that whoever holds a
+    // device could write would be worth exactly what `label` is worth — nothing.
+    expect(wrapper.find('[data-test="rename-dev_abc"]').exists()).toBe(false);
+  });
+
+  it('a refused rename says why instead of looking like a name that stuck', async () => {
+    vi.mocked(renameDevice).mockRejectedValue(new DevicesError('sesión inválida o caducada'));
+    const wrapper = await mountCard();
+
+    await wrapper.get('[data-test="rename-dev_abc"]').trigger('click');
+    type(wrapper, 'Cocina');
+    await wrapper.get('[data-test="save-name-dev_abc"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.html()).toContain('sesión inválida o caducada');
+  });
+
+  it('naming is never one tap away from disconnecting', async () => {
+    const wrapper = await mountCard();
+
+    await wrapper.get('[data-test="rename-dev_abc"]').trigger('click');
+    await wrapper.get('[data-test="save-name-dev_abc"]').trigger('click');
+    await flushPromises();
+
+    // The two gestures share a row and nothing else: housekeeping must not be able to take a till
+    // down because a control was where the other one used to be.
+    expect(revokeDevice).not.toHaveBeenCalled();
   });
 });

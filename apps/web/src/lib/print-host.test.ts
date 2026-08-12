@@ -28,12 +28,14 @@ function job(overrides: Partial<DrainJob> = {}): DrainJob {
 
 /** A device with the printers the test names, and a record of everything printed. */
 function client(
-  devices: { role: string | null; ip: string | null; port?: number }[],
+  devices: { key?: string; mac?: string; role: string | null; ip: string | null; port?: number }[],
   onPrint?: (...args: unknown[]) => Promise<void>,
-): PrintHostClient & { printed: unknown[][] } {
+): PrintHostClient & { printed: unknown[][]; rolesSet: [string, string][] } {
   const printed: unknown[][] = [];
+  const rolesSet: [string, string][] = [];
   return {
     printed,
+    rolesSet,
     peripherals: {
       detect: () => Promise.resolve({ online: true }),
       getDevices: () => Promise.resolve(devices),
@@ -41,8 +43,15 @@ function client(
         printed.push(args);
         if (onPrint) await onPrint(...args);
       },
+      // The real registry answers with the updated registry; here the same list is mutated so that
+      // what gets read afterwards (the roles of the alta) is what ended up assigned.
+      setDeviceRole: async (keyOrMac: string, role: string) => {
+        rolesSet.push([keyOrMac, role]);
+        for (const d of devices) if (d.key === keyOrMac || d.mac === keyOrMac) d.role = role;
+        return devices;
+      },
     },
-  } as PrintHostClient & { printed: unknown[][] };
+  } as unknown as PrintHostClient & { printed: unknown[][]; rolesSet: [string, string][] };
 }
 
 describe('print host — a queued job becomes paper', () => {
@@ -285,5 +294,91 @@ describe('print host — booting it in the shell', () => {
     });
 
     expect(opened).toEqual([]);
+  });
+});
+
+// ── hub#862: a discovered printer is BORN WITH NO ROLE and nothing says so ─────────────────────
+// Discovery registers the printer, but somebody has to give it a role by hand in the `printing`
+// module. Until they do: the `receipt` role resolves to no printer (no ticket comes out) AND this
+// device registers as a host for ZERO roles (nobody drains the queue), so what got queued does not
+// come out either. Two silences adding up to one symptom: "it does not print and it says nothing".
+// The safety net covers the till's majority case: a single printer is the receipt printer.
+describe('safety net: the first printer with no role is the RECEIPT one (hub#862)', () => {
+  afterEach(() => {
+    bootPrintHost.reset();
+  });
+
+  it('the only discovered printer keeps the receipt role and this device registers for it', async () => {
+    const registered: string[] = [];
+    const c = client([{ key: '192.168.100.196:9100', mac: 'aa:bb', role: null, ip: '192.168.100.196', port: 9100 }]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async (role: string) => { registered.push(role); return { heartbeatSeconds: 30 }; },
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(c.rolesSet).toEqual([['192.168.100.196:9100', 'receipt']]);
+    expect(registered).toEqual(['receipt']);
+  });
+
+  it('does NOT touch an install that is already configured (some role set by hand)', async () => {
+    // Whoever already handed out the roles knows what they are doing: a second printer with no role
+    // may be the label one waiting for its turn, and giving it the receipts would print the
+    // customer's ticket on label stock.
+    const c = client([
+      { key: 'k1', role: 'kitchen', ip: '10.0.0.6' },
+      { key: 'k2', role: null, ip: '10.0.0.7' },
+    ]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async () => ({ heartbeatSeconds: 30 }),
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(c.rolesSet).toEqual([]);
+  });
+
+  it('with TWO role-less printers it does not guess: it touches neither', async () => {
+    // A single printer in a shop is the receipt one with near certainty. Two are already a routing
+    // decision (receipts + labels, receipts + kitchen) and picking by discovery order would print
+    // the customer's ticket on label stock. There the warning belongs to the printing screen.
+    const c = client([
+      { key: 'k1', role: null, ip: '10.0.0.6' },
+      { key: 'k2', role: null, ip: '10.0.0.7' },
+    ]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async () => ({ heartbeatSeconds: 30 }),
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(c.rolesSet).toEqual([]);
+  });
+
+  it('an entry with no address is not a printer: nothing is assigned to it', async () => {
+    const c = client([{ key: 'k3', role: null, ip: null }]);
+
+    await bootPrintHost(c, {
+      url: 'ws://h/ws/print',
+      session: () => 's',
+      deviceId: async () => 'till-1',
+      openSocket: () => socket(),
+      registerHost: async () => ({ heartbeatSeconds: 30 }),
+      heartbeatHost: async () => ({ refreshed: 1, heartbeatSeconds: 30 }),
+    });
+
+    expect(c.rolesSet).toEqual([]);
   });
 });

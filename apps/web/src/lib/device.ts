@@ -130,7 +130,12 @@ interface TauriCore {
 }
 
 function tauriCore(): TauriCore | null {
-  const g = (window as unknown as { __TAURI__?: { core?: TauriCore } }).__TAURI__;
+  // Se llega a `window` a través de `globalThis` a propósito: la referencia pelada LANZA un
+  // `ReferenceError` donde no hay DOM (un test en node, un worker), y este es el predicado con el
+  // que otros deciden si hay hardware — que reviente en vez de contestar «no» convierte una
+  // pregunta en una excepción para todos sus llamadores.
+  const w = (globalThis as { window?: { __TAURI__?: { core?: TauriCore } } }).window;
+  const g = w?.__TAURI__;
   return g?.core?.invoke ? g.core : null;
 }
 

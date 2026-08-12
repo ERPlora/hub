@@ -1102,16 +1102,23 @@ pub async fn trust_device(
     hub_id: &str,
     device_id: &str,
     label: &str,
+    default_name: &str,
 ) -> Result<()> {
     // INSERT … ON CONFLICT: re-marcar un dispositivo ya de confianza no falla ni duplica.
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     p.insert("label".into(), json!(label));
+    p.insert("default_name".into(), json!(default_name));
     p.insert("now".into(), json!(now_rfc3339()));
+    // `name` va SOLO en el INSERT (hub#494, migración de sistema v44). El `DO UPDATE` sigue
+    // tocando **solo `label`** —«quién entró la última vez», que sí cambia en cada entrada— y por
+    // eso el nombre que puso el dueño («Barra», «Cocina») sobrevive al siguiente login. Meterlo en
+    // el `SET` sería reintroducir el bug entero: una etiqueta que nadie eligió a propósito,
+    // reescrita por el cliente en cada turno, delante del botón que corta la tablet equivocada.
     db.execute(
-        "INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at) \
-          VALUES (:hub_id, :device_id, :label, :now) \
+        "INSERT INTO hub_trusted_device (hub_id, device_id, label, name, trusted_at) \
+          VALUES (:hub_id, :device_id, :label, :default_name, :now) \
           ON CONFLICT (hub_id, device_id) DO UPDATE SET label = excluded.label",
         &p,
     )
@@ -2112,11 +2119,12 @@ mod tests {
         let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
         // La tabla la crean las migraciones de sistema v2 + v23 (que le añade el `hub_id` y
-        // recompone la PK, hub#489); en el test la creamos a mano ya en su forma final.
+        // recompone la PK, hub#489) + v44 (`name`, hub#494); en el test la creamos a mano ya en su
+        // forma final.
         db.execute_batch(
             "CREATE TABLE hub_trusted_device (hub_id TEXT NOT NULL, device_id TEXT NOT NULL, \
-              label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL, \
-              PRIMARY KEY (hub_id, device_id));",
+              label TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '', \
+              trusted_at TEXT NOT NULL, PRIMARY KEY (hub_id, device_id));",
         )
         .await
         .unwrap();
@@ -2125,16 +2133,29 @@ mod tests {
             !is_device_trusted(&db, "hub-1", "dev-1").await.unwrap(),
             "desconocido = no confianza"
         );
-        trust_device(&db, "hub-1", "dev-1", "Caja 1").await.unwrap();
+        trust_device(&db, "hub-1", "dev-1", "Caja 1", "Chrome · Android")
+            .await
+            .unwrap();
         assert!(
             is_device_trusted(&db, "hub-1", "dev-1").await.unwrap(),
             "marcado = de confianza"
         );
         // Idempotente (re-marcar no falla).
-        trust_device(&db, "hub-1", "dev-1", "Caja 1 (renombrada)")
+        trust_device(&db, "hub-1", "dev-1", "Caja 1 (renombrada)", "Safari · iPad")
             .await
             .unwrap();
         assert!(is_device_trusted(&db, "hub-1", "dev-1").await.unwrap());
+        // Y el nombre con el que NACIÓ sigue ahí: el `DO UPDATE` toca `label` y nada más (hub#494).
+        // Un segundo login que lo reescribiera devolvería la fila a una etiqueta que nadie eligió.
+        let row = db
+            .query(
+                "SELECT name, label FROM hub_trusted_device WHERE hub_id = 'hub-1' AND device_id = 'dev-1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.rows[0]["name"], json!("Chrome · Android"));
+        assert_eq!(row.rows[0]["label"], json!("Caja 1 (renombrada)"));
         // Y es confianza de ESTE hub: el de al lado, sobre la misma BD, no la hereda (hub#489).
         assert!(
             !is_device_trusted(&db, "hub-2", "dev-1").await.unwrap(),

@@ -19,9 +19,16 @@
 //
 // Cuarto escalón previsto (aún no): si el DOM se resiste, renderizar a PDF y mandarlo a la
 // impresora desde Rust. La forma de esta API no cambia — solo se añade una vía más aquí dentro.
+//
+// ⚠️ El escalón 3 NO existe dentro de la app instalada (hub#862): en su WebView `window.print()` no
+// imprime nada. Allí acabar en el navegador es un FALLO (`via:'none'`) y se devuelve como tal — dar
+// por bueno un `via:'browser'` es lo que dejó a la QA creyendo que el papel había salido.
+import { isTauri } from './device';
 
 /** Dispositivo tal y como lo registra el Bridge. */
 export interface PrintDevice {
+  /** Clave del registro de dispositivos (`erplora_get_devices`). Es la que acepta `setDeviceRole`. */
+  key?: string;
   mac?: string;
   /** El Bridge devuelve `null` cuando el dispositivo aún no tiene rol asignado. */
   role?: string | null;
@@ -105,9 +112,32 @@ export type EnqueuePrintJob = (job: {
  * CUENTA previa (`prebill`, hub#748) no es ninguna de las dos: el papel que más veces sale en un
  * servicio de restaurante se trataba como una factura A4 y acababa en el diálogo del navegador,
  * que en la app instalada no imprime nada. Añadir un tipo térmico nuevo es añadirlo aquí.
+ *
+ * La lista es la mitad térmica del vocabulario de la cola del hub
+ * (`erplora_runtime::print_queue::DOCUMENT_TYPES`): si el hub sabe encolarlo y el renderizador
+ * ESC/POS sabe pintarlo, mandarlo al navegador es tirarlo (hub#862 — la ETIQUETA de código de
+ * barras y el arqueo de caja se perdían así). `invoice`/`delivery_note` quedan fuera a propósito:
+ * son A4 y no hay rollo de 80mm que los aguante.
  */
+const THERMAL_DOCUMENT_TYPES = new Set(['receipt', 'prebill', 'barcode_label', 'cash_session_report', 'generic']);
+
 export function isThermalDocument(documentType: string): boolean {
-  return documentType === 'receipt' || documentType === 'prebill' || documentType.endsWith('_order');
+  return THERMAL_DOCUMENT_TYPES.has(documentType) || documentType.endsWith('_order');
+}
+
+/**
+ * Clave de idempotencia para un documento cuyo caller no trajo ninguna.
+ *
+ * Exigir `jobId` para encolar convertía «el caller no puso la clave» en «este documento no se
+ * imprime en ningún sitio», y sin dejar rastro: la puerta caía al navegador, que en la app
+ * instalada no imprime nada, y el hub no veía ni un `POST /api/print/jobs` (hub#862). Un tique
+ * duplicado se tira a la basura; uno que no sale no existe — así que se encola con una clave
+ * propia. Lo que se pierde es la deduplicación entre reintentos DEL CALLER, que es lo único que
+ * puede aportar quien conoce el documento (`sale-42`, `prebill-o1-3`).
+ */
+function mintJobId(documentType: string): string {
+  const rnd = globalThis.crypto?.randomUUID?.() ?? `${Math.random().toString(36).slice(2)}${Date.now()}`;
+  return `${documentType}-${rnd}`;
 }
 
 /** Impresora del Bridge con ese ROL, en el formato que espera `peripherals.print`. */
@@ -173,12 +203,21 @@ export function createPrintService(
     /** Encola en la cola del hub cuando no hay Bridge (hub#344). Si no se pasa, se salta la vía
      *  COLA y se cae al navegador (comportamiento anterior, para quien aún no cablea el enqueue). */
     enqueue?: EnqueuePrintJob;
+    /**
+     * ¿Corremos DENTRO de la app instalada? Por defecto {@link isTauri}.
+     *
+     * Decide si el respaldo del navegador es un respaldo o una mentira. En el WKWebView de la app
+     * `window.print()` no imprime nada, así que devolver `via:'browser'` allí es dar por impreso un
+     * papel que no existe — es lo que hizo invisible el fallo durante toda la QA de hub#862.
+     */
+    installedApp?: () => boolean;
   } = {},
 ): (req: PrintRequest) => Promise<PrintResult> {
   const browserPrint = opts.browserPrint ?? (() => globalThis.print?.());
   const iframePrint =
     opts.iframePrint ?? ((html: string, format?: PrintFormat) => printHtmlInIframe(html, document, format));
   const enqueue = opts.enqueue;
+  const installedApp = opts.installedApp ?? isTauri;
 
   return async function print(req: PrintRequest): Promise<PrintResult> {
     const role = req.role || 'receipt';
@@ -190,11 +229,18 @@ export function createPrintService(
     // A4 (facturas/albaranes) no tiene cola, va al navegador. Si el runtime rechaza el encolado,
     // cae al navegador como antes — una venta no se cae por un problema de impresión.
     const toQueue = async (): Promise<PrintResult> => {
-      // Sin jobId no hay idempotencia: cada reintento duplicaría el tique. Se exige (el caller de
-      // ventas ya lo trae: `sale-${saleId}`). Si falta, no se encola — se cae al navegador.
-      if (!enqueue || !req.jobId) return toBrowser('sin cola: falta jobId o enqueue');
+      if (!enqueue) return toBrowser('sin cola: el shell no cableó el enqueue');
+      // La cola lleva el documento **estructurado** (hub#501) y el renderizador ESC/POS lee POR
+      // CLAVE: un `{}` no da error, saca **papel en blanco** — que es peor que no imprimir, porque
+      // parece que funcionó. Quien solo trae `html` tiene su destino en el navegador.
+      if (Object.keys(data).length === 0) {
+        return toBrowser('sin documento estructurado: la cola no puede renderizar HTML');
+      }
+      // El `jobId` del caller es la clave de idempotencia BUENA (`sale-42`), pero su ausencia no
+      // puede costar el documento: se encola con una propia (hub#862, ver `mintJobId`).
+      const jobId = req.jobId || mintJobId(documentType);
       try {
-        const ok = await enqueue({ jobId: req.jobId, role, documentType, document: data, format: req.format });
+        const ok = await enqueue({ jobId, role, documentType, document: data, format: req.format });
         return ok ? { via: 'queue', role } : toBrowser('el runtime rechazó el encolado');
       } catch (e) {
         return toBrowser(e instanceof Error ? e.message : String(e));
@@ -203,6 +249,18 @@ export function createPrintService(
 
     const toBrowser = (error?: string): PrintResult => {
       if (!allowBrowser) return { via: 'none', role, error };
+      // DENTRO de la app instalada NO hay respaldo de navegador: el WKWebView no imprime, así que
+      // esto es un FALLO y se devuelve como tal para que el caller avise. Abrir el diálogo aquí
+      // solo añadiría una ventana muerta encima del TPV (hub#862).
+      if (installedApp()) {
+        return {
+          via: 'none',
+          role,
+          error: [error, 'la app instalada no imprime por el navegador: asigna un rol a la impresora']
+            .filter(Boolean)
+            .join(' · '),
+        };
+      }
       // Con HTML del documento se imprime AISLADO (lo correcto). Sin él queda el print del
       // navegador, que saca lo que haya en pantalla — solo como último recurso.
       if (req.html) iframePrint(req.html, req.format); else browserPrint();

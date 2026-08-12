@@ -5,9 +5,64 @@ import { setHubSession, setUser } from './session';
 const COURIER_KEY = 'courier';
 
 /**
+ * How long the auth gate is willing to wait for the exchange (hub#858).
+ *
+ * A gate with no deadline turns a hung runtime into a hung app: the router would never resolve and
+ * the user would stare at an empty shell with no way to log in by hand. Ten seconds is far more
+ * than the two same-origin round trips need, and expiring the wait only costs the auto-login —
+ * the ordinary login page is exactly what a shell that could not redeem its courier should show.
+ */
+const COURIER_BOOT_WATCHDOG_MS = 10_000;
+
+let bootGate: Promise<void> | null = null;
+let releaseBootGate: (() => void) | null = null;
+let bootWatchdog: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Announce that a courier exchange is inbound, so the auth gate holds its decision (hub#858).
+ *
+ * This has to happen SYNCHRONOUSLY and early: `main.ts` installs the router at module evaluation
+ * and Vue Router starts its initial navigation there and then, long before two network round trips
+ * can finish. Before this gate existed the guard answered "no session → /login" and nothing ever
+ * re-navigated, so the courier landed into a shell that was already showing a login form.
+ */
+export function armCourierBoot(watchdogMs: number = COURIER_BOOT_WATCHDOG_MS): void {
+  if (bootGate) return;
+  bootGate = new Promise<void>((resolve) => {
+    releaseBootGate = resolve;
+  });
+  bootWatchdog = setTimeout(settleCourierBoot, watchdogMs);
+}
+
+/** Let navigation proceed: the exchange finished, failed, or ran out of patience. Idempotent. */
+export function settleCourierBoot(): void {
+  if (bootWatchdog !== null) {
+    clearTimeout(bootWatchdog);
+    bootWatchdog = null;
+  }
+  const release = releaseBootGate;
+  bootGate = null;
+  releaseBootGate = null;
+  release?.();
+}
+
+/**
+ * The in-flight courier exchange the auth gate must await, or `null` when there is none.
+ *
+ * `null` is the ordinary case (a plain browser boot, every navigation after the first): nothing
+ * waits for anything, so this cannot slow the app down.
+ */
+export function courierBootPending(): Promise<void> | null {
+  return bootGate;
+}
+
+/**
  * Take the opaque courier credential out of the URL fragment and scrub it synchronously.
  * Fragments are not sent to HTTP servers or in Referer headers; replacing history here also keeps
  * the one-time code out of screenshots, copy/paste and later browser history entries.
+ *
+ * Finding a code also ARMS the boot gate: this runs before the router is installed, which is the
+ * only moment early enough to stop the auth gate from deciding without the session (hub#858).
  */
 export function takeCourierCode(
   locationLike: Pick<Location, 'hash' | 'pathname' | 'search'> = window.location,
@@ -18,14 +73,29 @@ export function takeCourierCode(
   const code = params.get(COURIER_KEY)?.trim() ?? '';
   if (!code) return null;
   replace(`${locationLike.pathname}${locationLike.search}`);
-  return code.length <= 128 ? code : null;
+  if (code.length > 128) return null;
+  armCourierBoot();
+  return code;
 }
 
 /** Complete shell auto-login before Vue/router mount.  Only the local opaque session and the same
- * Cloud tokens used by the ordinary login flow are persisted; no credential is logged. */
+ * Cloud tokens used by the ordinary login flow are persisted; no credential is logged.
+ *
+ * Always settles the boot gate, whatever happens: a rejected exchange must release navigation to
+ * the login page instead of leaving the shell waiting forever. */
 export async function bootCourier(code: string | null = takeCourierCode()): Promise<boolean> {
-  if (!code) return false;
+  if (!code) {
+    settleCourierBoot();
+    return false;
+  }
+  try {
+    return await exchangeCourier(code);
+  } finally {
+    settleCourierBoot();
+  }
+}
 
+async function exchangeCourier(code: string): Promise<boolean> {
   const device = await getDeviceContext();
   const result = await runtimeCourierSession(code, device?.id);
   setTokens(result.access, result.refresh);

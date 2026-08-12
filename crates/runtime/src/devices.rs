@@ -67,6 +67,11 @@ use crate::registry::now_rfc3339;
 pub struct TrustedDevice {
     /// The `X-Device-Id` it presents. **Chosen by the device**: an identifier, never a credential.
     pub device_id: String,
+    /// What the **business** calls it — "Barra", "Cocina", "Portátil despacho" (hub#494). Written
+    /// only by an administrator through `PUT /api/devices/:id`, never by a login, which is what
+    /// makes it the one field here worth deciding from. `""` = nobody has named it yet, which the
+    /// screen shows as unnamed; it is deliberately different from a name of blanks.
+    pub name: String,
     /// The name of the last account that signed in online on it. **Chosen by the device** too (it
     /// travels in the login body), so it is a memory aid and nothing else.
     pub label: String,
@@ -96,6 +101,17 @@ pub struct Revocation {
     pub was_known: bool,
     /// Sessions that stopped resolving because of this call.
     pub sessions_closed: usize,
+}
+
+/// What naming a device actually did (hub#494).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Renamed {
+    /// `false` when this business has no such device. Unlike a revocation — where "I did not know
+    /// it" is still the outcome the owner wanted — this one is a caller naming something that does
+    /// not exist, and the door answers `404` rather than inventing a row.
+    pub was_known: bool,
+    /// The name as stored: trimmed, and `""` when the owner took it back.
+    pub name: String,
 }
 
 /// `name` of the `InvalidPayload` rejection of this door.
@@ -193,7 +209,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<TrustedD
     scope.insert("hub_id".into(), json!(hub_id));
     let devices = db
         .query(
-            "SELECT device_id, label, trusted_at, mode, mode_set_at, mode_set_by \
+            "SELECT device_id, name, label, trusted_at, mode, mode_set_at, mode_set_by \
                FROM hub_trusted_device WHERE hub_id = :hub_id",
             &scope,
         )
@@ -205,6 +221,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<TrustedD
             let device_id = r["device_id"].as_str().unwrap_or_default().to_string();
             let sessions = open.get(&device_id).cloned().unwrap_or_default();
             TrustedDevice {
+                name: r["name"].as_str().unwrap_or_default().to_string(),
                 label: r["label"].as_str().unwrap_or_default().to_string(),
                 trusted_at: r["trusted_at"].as_str().unwrap_or_default().to_string(),
                 mode: listed_mode(r["mode"].as_str()).to_string(),
@@ -268,6 +285,43 @@ pub async fn revoke(
     Ok(Revocation {
         was_known: forgotten.affected > 0,
         sessions_closed: closed.affected as usize,
+    })
+}
+
+/// Give `device_id` the name the **business** chose (hub#494). `""` takes the name back.
+///
+/// An `UPDATE`, never an upsert: a device is in this list because an online login trusted it, so
+/// creating a row from a typed id would put an entry in the owner's list that no device ever
+/// produced — and one that the pinpad gate would then treat as trusted.
+///
+/// **Scoped to `hub_id`**, like both statements of [`revoke`]: `hub_trusted_device` is keyed
+/// `(hub_id, device_id)` precisely because one tablet legitimately works in two businesses, and
+/// renaming mine must not retitle the neighbour's row.
+///
+/// The name arrives already trimmed and length-checked from the door; what is refused **here** is
+/// the same thing `revoke` refuses — a blank *id*, which names no device at all.
+pub async fn rename(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    device_id: &str,
+    name: &str,
+) -> Result<Renamed> {
+    let device_id = named(device_id)?;
+    let name = name.trim();
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("device_id".into(), json!(device_id));
+    p.insert("name".into(), json!(name));
+    let renamed = db
+        .execute(
+            "UPDATE hub_trusted_device SET name = :name \
+              WHERE hub_id = :hub_id AND device_id = :device_id",
+            &p,
+        )
+        .await?;
+    Ok(Renamed {
+        was_known: renamed.affected > 0,
+        name: name.to_string(),
     })
 }
 

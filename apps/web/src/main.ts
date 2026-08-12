@@ -17,6 +17,7 @@ import { createPrintService } from './lib/print';
 import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
+import { bootModuleNavLocale } from './lib/nav';
 import { bootActionFeedback, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 import { bootCourier, takeCourierCode } from './lib/courier';
@@ -99,6 +100,12 @@ import './theme/global.css';
 // Aplica el modo de tema guardado (claro/oscuro/system) antes del primer render.
 bootTheme();
 
+// Module names are localized BY THE RUNTIME and travel baked into the navigation (ADR-0055), so it
+// has to be ASKED FOR AGAIN when the language changes: the personal preference arrives after the
+// first render, and without this the list stayed in the language it booted with (hub#781).
+// See lib/nav.ts.
+bootModuleNavLocale();
+
 // Registra el service worker y engancha el botón «Instalar app» (PWA, ver lib/pwa.ts).
 bootPwa();
 
@@ -166,7 +173,15 @@ const erploraClient = getClient();
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
 
 // Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
-bootPrintOnSale(getClient());
+// Sale por la MISMA puerta que todo lo demás (hub#862): resolvía él mismo rol→impresora y llamaba al
+// hardware directo, así que con la impresora sin rol —o sin hardware en este equipo— el tique
+// desaparecía sin cola, sin navegador y sin aviso.
+bootPrintOnSale(getClient(), {
+  print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  onFailure: (f) => {
+    void toastError(`El tique de la venta ${f.saleId} NO se imprimió: ${f.error}`);
+  },
+});
 
 // HOST DE IMPRESIÓN (ADR-0196 §6, hub#343 + hub#501 + hub#749): este equipo se DA DE ALTA como host
 // de los roles que puede imprimir de verdad y drena la cola del hub. Se arranca SIEMPRE y en todos
