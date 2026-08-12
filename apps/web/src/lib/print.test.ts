@@ -226,6 +226,11 @@ function fakeIframeDoc() {
 // La PWA en un móvil sin app instalada no tiene impresora. Antes caía al diálogo del navegador
 // (que en un móvil no sirve para un tique térmico). Ahora encola en el hub: un print host del rol
 // conectado al hub lo drene por el WS del runtime. Una venta desde el móvil sale tarde, no se pierde.
+// ⚠️ Los payloads de aquí llevan una clave DE VERDAD (`{ total: 1 }`) y no `{}`: desde hub#862 la
+// puerta no encola un documento vacío —la cola lleva el documento ESTRUCTURADO y el renderizador lee
+// POR CLAVE, así que un `{}` sacaría papel en blanco dando el trabajo por bueno—. El contrato que
+// fijan estos tests (idempotencia, rechazo del runtime, fallo del Bridge) es el mismo; lo que cambia
+// es que el documento tiene que existir para que haya algo que encolar.
 describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
   const noBridge = { getDevices: vi.fn(async () => { throw new Error('hardware_unavailable'); }) };
 
@@ -248,7 +253,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     const enqueue = vi.fn(async () => true); // el runtime responde ok:true a un duplicado
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
 
-    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: {} });
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
 
     expect(r.via).toBe('queue');
   });
@@ -259,7 +264,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     const iframePrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
 
-    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', html: '<i>x</i>' });
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 }, html: '<i>x</i>' });
 
     expect(r.via).toBe('browser');
     expect(enqueue).toHaveBeenCalled();
@@ -271,7 +276,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     const iframePrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
 
-    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', html: '<i>x</i>' });
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 }, html: '<i>x</i>' });
 
     expect(r.via).toBe('browser');
   });
@@ -287,7 +292,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     const enqueue: EnqueuePrintJob = async (job) => { encolados.push(job.jobId); return true; };
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint: vi.fn() });
 
-    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: {} });
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
 
     expect(r.via).toBe('queue');
     expect(encolados).toEqual(['sale-42']);
@@ -335,7 +340,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     const browserPrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: failingPrint }), { enqueue, browserPrint });
 
-    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: {} });
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
 
     expect(r.via).toBe('queue');
     expect(failingPrint.print).toHaveBeenCalled();
@@ -348,7 +353,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     const iframePrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { browserPrint, iframePrint });
 
-    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', html: '<i>x</i>' });
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 }, html: '<i>x</i>' });
 
     expect(r.via).toBe('browser');
   });
@@ -381,7 +386,7 @@ describe('la puerta ENTREGA (hub#862)', () => {
     const enqueue = vi.fn(async () => true);
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, iframePrint: vi.fn() });
 
-    const r = await print({ documentType: 'cash_session_report', jobId: 'z-1', data: {} });
+    const r = await print({ documentType: 'cash_session_report', jobId: 'z-1', data: { total_counted: 120 } });
 
     expect(r.via).toBe('queue');
   });
@@ -412,6 +417,25 @@ describe('la puerta ENTREGA (hub#862)', () => {
     const r = await print({ role: 'receipt', documentType: 'prebill', data: { total: 9 } });
 
     expect(r.via).toBe('queue');
+  });
+
+  it('un documento SIN datos estructurados no se encola: la cola no sabe renderizar HTML', async () => {
+    // La cola lleva el documento ESTRUCTURADO (hub#501) y el renderizador ESC/POS lee POR CLAVE: un
+    // `{}` no falla, saca **papel en blanco** — peor que no imprimir, porque parece que funcionó. Un
+    // caller que solo trae `html` (el respaldo del navegador es su destino) va al navegador.
+    const enqueue = vi.fn(async () => true);
+    const iframePrint = vi.fn();
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), {
+      enqueue,
+      iframePrint,
+      installedApp: () => false,
+    });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', html: '<i>x</i>' });
+
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(r.via).toBe('browser');
+    expect(iframePrint).toHaveBeenCalledTimes(1);
   });
 
   it('DENTRO de la app instalada el respaldo del navegador NO es éxito', async () => {

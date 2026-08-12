@@ -230,6 +230,12 @@ export function createPrintService(
     // cae al navegador como antes — una venta no se cae por un problema de impresión.
     const toQueue = async (): Promise<PrintResult> => {
       if (!enqueue) return toBrowser('sin cola: el shell no cableó el enqueue');
+      // La cola lleva el documento **estructurado** (hub#501) y el renderizador ESC/POS lee POR
+      // CLAVE: un `{}` no da error, saca **papel en blanco** — que es peor que no imprimir, porque
+      // parece que funcionó. Quien solo trae `html` tiene su destino en el navegador.
+      if (Object.keys(data).length === 0) {
+        return toBrowser('sin documento estructurado: la cola no puede renderizar HTML');
+      }
       // El `jobId` del caller es la clave de idempotencia BUENA (`sale-42`), pero su ausencia no
       // puede costar el documento: se encola con una propia (hub#862, ver `mintJobId`).
       const jobId = req.jobId || mintJobId(documentType);
