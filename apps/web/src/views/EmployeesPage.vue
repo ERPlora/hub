@@ -133,6 +133,13 @@
         <RolesPanel v-show="tab === 'roles'" />
 
         <ApiKeysPanel v-if="isAdmin" v-show="tab === 'apikeys'" />
+
+        <!-- The PIN approval record (hub#512, ADR-0265): who asked for the elevation and who
+             authorised it. It belongs here because the row IS two people, and it carries the same
+             admin gate as the API keys. `v-if` and not `v-show` on purpose: the query has no
+             ceiling on the server (`list_approvals` returns the whole trail, with no LIMIT), so it
+             is read when somebody opens the tab and not on every visit to People. -->
+        <ApprovalsPanel v-if="isAdmin && tab === 'approvals'" />
       </template>
     </div>
 
@@ -156,6 +163,10 @@
             <ion-segment-button v-if="isAdmin" value="apikeys">
               <HubIcon name="keypad-outline" />
               <ion-label>{{ t('employees.tabApiKeys') }}</ion-label>
+            </ion-segment-button>
+            <ion-segment-button v-if="isAdmin" value="approvals">
+              <HubIcon name="finger-print-outline" />
+              <ion-label>{{ t('employees.tabApprovals') }}</ion-label>
             </ion-segment-button>
           </ion-segment>
         </ion-toolbar>
@@ -185,6 +196,7 @@ import {
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import ApiKeysPanel from './ApiKeysPanel.vue';
+import ApprovalsPanel from './ApprovalsPanel.vue';
 import RolesPanel from './RolesPanel.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
 import {
@@ -225,8 +237,14 @@ type DataTableElement = HTMLElement & {
 
 // La pestaña «Usuarios» separada desapareció: el personal del Hub SON sus usuarios. Se mantiene el
 // valor 'staff' del hash para no romper los deep-links (/employees#staff) ya publicados.
-type EmployeeTab = 'staff' | 'roles' | 'apikeys';
-const TABS: readonly EmployeeTab[] = ['staff', 'roles', 'apikeys'];
+type EmployeeTab = 'staff' | 'roles' | 'apikeys' | 'approvals';
+const TABS: readonly EmployeeTab[] = ['staff', 'roles', 'apikeys', 'approvals'];
+/**
+ * The tabs that need an administrator session. The runtime is the authority on both (it revalidates
+ * every write on API keys, and gates `hub.approvals.list` on `hub.administer`); here they are only
+ * offered or not, and a session that stops being one is taken off them.
+ */
+const ADMIN_ONLY_TABS: readonly EmployeeTab[] = ['apikeys', 'approvals'];
 const route = useRoute();
 const router = useRouter();
 const tab = ref<EmployeeTab>(TABS.find((value) => value === route.hash.slice(1)) ?? 'staff');
@@ -239,7 +257,7 @@ watch(() => route.hash, (hash) => {
   if (next !== tab.value) tab.value = next;
 });
 watch(isAdmin, (admin) => {
-  if (!admin && tab.value === 'apikeys') tab.value = 'staff';
+  if (!admin && ADMIN_ONLY_TABS.includes(tab.value)) tab.value = 'staff';
 });
 
 const loading = ref(true);

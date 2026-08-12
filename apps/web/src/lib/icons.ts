@@ -29,6 +29,7 @@ import downloadOutline from "~icons/ion/download-outline?raw";
 import ellipse from "~icons/ion/ellipse?raw";
 import removeOutline from "~icons/ion/remove-outline?raw";
 import extensionPuzzleOutline from "~icons/ion/extension-puzzle-outline?raw";
+import fingerPrintOutline from "~icons/ion/finger-print-outline?raw";
 import globeOutline from "~icons/ion/globe-outline?raw";
 import gridOutline from "~icons/ion/grid-outline?raw";
 import hardwareChipOutline from "~icons/ion/hardware-chip-outline?raw";
@@ -193,6 +194,7 @@ const SVGS: Record<string, string> = {
   "ellipse": ellipse,
   "remove-outline": removeOutline,
   "extension-puzzle-outline": extensionPuzzleOutline,
+  "finger-print-outline": fingerPrintOutline,
   "globe-outline": globeOutline,
   "grid-outline": gridOutline,
   "hardware-chip-outline": hardwareChipOutline,

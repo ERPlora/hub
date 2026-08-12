@@ -610,6 +610,7 @@ export default {
     tabStaff: 'Personal',
     tabRoles: 'Roles',
     tabApiKeys: 'API keys',
+    tabApprovals: 'Aprobaciones',
     colEmployee: 'Usuario',
     colEmail: 'Email',
     colRole: 'Rol',
@@ -746,6 +747,25 @@ export default {
     revokeBody: 'Vas a revocar «{name}». Cualquier sistema que use este token dejará de tener acceso de inmediato. Esta acción no se puede deshacer.',
     revoked: '«{name}» revocada.',
     revokeError: 'No se pudo revocar la API key.',
+  },
+  // Aprobaciones por PIN (hub#512, ADR-0265): el registro de cada aprobación que gastó un
+  // encargado, y el único sitio donde el dueño del negocio puede leerlo sin entrar por SQL a su
+  // propia base de datos. Se habla de PERSONAS y de ACCIONES, nunca de la maquinaria.
+  approvals: {
+    intro:
+      'Cada acción que necesitó el PIN de un encargado: quién la pidió, quién la autorizó y para qué se usó. Este registro se conserva mientras tu negocio esté en ERPlora, y nadie —tampoco un administrador— puede editarlo ni borrarlo.',
+    search: 'Buscar por persona o acción…',
+    colWhen: 'Cuándo',
+    colApprovedBy: 'Autorizado por',
+    colRequestedBy: 'Lo pidió',
+    colAction: 'Acción',
+    colLevel: 'Nivel',
+    colFingerprint: 'Referencia',
+    colRequestedById: 'Lo pidió (id)',
+    colApprovedById: 'Autorizado por (id)',
+    userGone: 'Usuario dado de baja',
+    empty: 'Todavía nadie ha tenido que autorizar nada en este Hub.',
+    loadError: 'No se pudo cargar el registro de aprobaciones.',
   },
   employeeForm: {
     titleEdit: 'Editar usuario',
