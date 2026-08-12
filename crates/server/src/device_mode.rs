@@ -46,6 +46,33 @@ pub(crate) fn device_id_of(headers: &HeaderMap) -> &str {
         .trim()
 }
 
+/// The demo adoption rule (hub#630), in ONE place for the two doors that must agree on it.
+///
+/// On an ephemeral demo (`HUB_DEMO`, ADR-0197) the FIRST device to present itself is adopted —
+/// a visitor has no account, and an online login is the only other thing that earns a device its
+/// trust. Two doors apply this rule and they must never drift: `auth_pin` (crate root), which
+/// performs the adoption when a PIN is submitted, and [`get_device_mode`], which tells the login
+/// screen whether the pinpad it would paint is usable (hub#514).
+///
+/// The second caller exists because the two rules DID drift (2026-08-12): hub#514 made the pinpad
+/// hang from this door's `trusted` bit, which answered from the raw trust rows — so on a virgin
+/// demo the pinpad was never offered, and the adoption that fires on submit became unreachable.
+/// Every `/demo` visitor saw the account door instead of the keypad.
+///
+/// `false` for a client that names no device (adoption adopts a device, it does not invent one)
+/// and on any hub that is not a demo — leaking this answer to a normal hub would paint a pinpad
+/// for whoever knocks first on a public URL.
+pub(crate) async fn demo_would_adopt(
+    demo: bool,
+    rt: &erplora_runtime::Runtime,
+    device_id: &str,
+) -> erplora_runtime::Result<bool> {
+    if !demo || device_id.is_empty() {
+        return Ok(false);
+    }
+    Ok(rt.list_devices().await?.is_empty())
+}
+
 /// The answer of the read door: what this device asks of the person in front of it.
 ///
 /// It carries **all three** controls (hub#358 + hub#359 + hub#514) because all three are needed to
@@ -102,10 +129,19 @@ pub async fn get_device_mode(State(st): State<AppState>, headers: HeaderMap) -> 
     // `personal` mode already implies trust (the mode lives in the trust row), so this only
     // disambiguates `shared`; but asking unconditionally is cheaper than special-casing and the
     // answer is the same single bit the login screen needs.
+    //
+    // The question is "would a PIN from this device get in?", NOT "is there a trust row?" — on a
+    // virgin demo the two differ: no row exists, yet the PIN door will adopt the first device
+    // that submits (hub#630, [`demo_would_adopt`]). Answering from the raw row painted no pinpad
+    // and made that adoption unreachable — the regression every `/demo` visitor hit (2026-08-12).
     let trusted = match rt.is_device_trusted(device_id).await {
-        Ok(t) => t,
-        // Fail-closed: a device we cannot look up is not trusted. The login screen falls back to
-        // the account door, which is stronger — never the other way.
+        Ok(true) => true,
+        Ok(false) => demo_would_adopt(st.config.demo, &rt, device_id)
+            .await
+            // Fail-closed: if the adoption question cannot be answered, the screen falls back to
+            // the account door, which is stronger — never the other way.
+            .unwrap_or(false),
+        // Fail-closed: a device we cannot look up is not trusted.
         Err(_) => false,
     };
     // The dial the business chose (hub#359). It travels on THIS door, and not on `/api/settings`,

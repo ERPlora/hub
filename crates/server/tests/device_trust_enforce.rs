@@ -189,6 +189,20 @@ async fn post_pin(app_: &axum::Router, body: Value) -> (StatusCode, Value) {
     (status, json)
 }
 
+/// `GET /api/device/mode` as the login screen asks it: no session, naming the device (or not).
+/// Returns the `data` object — the three bits the pinpad decision hangs from (hub#514).
+async fn get_device_mode(app_: &axum::Router, device_id: Option<&str>) -> Value {
+    let mut req = Request::builder().method("GET").uri("/api/device/mode");
+    if let Some(id) = device_id {
+        req = req.header("x-device-id", id);
+    }
+    let res = app_.clone().oneshot(req.body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK, "the read door answers without session");
+    let bytes = res.into_body().collect().await.unwrap().to_bytes();
+    let json: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    json["data"].clone()
+}
+
 /// Like [`fixture`], but the deployment declares this hub an **ephemeral demo** (`HUB_DEMO`).
 /// Device-trust stays ENFORCED: the point of the demo path is not that the gate is off.
 async fn demo_fixture() -> axum::Router {
@@ -331,6 +345,76 @@ async fn a_demo_does_not_hand_the_door_to_a_WRONG_pin() {
     .await;
 
     assert_ne!(status, StatusCode::OK, "a wrong PIN must not open a demo: {body}");
+}
+
+// ── Demo: the login screen must be TOLD the PIN is usable (regression of hub#514 × hub#630) ──
+//
+// hub#514 made the pinpad hang from the SERVER's trust (`GET /api/device/mode` → `trusted`), and
+// that was right — except on a demo. The adoption of hub#630 fires inside `POST /api/auth/pin`,
+// i.e. when a PIN is SUBMITTED; but with #514 an untrusted device is never OFFERED the pinpad, so
+// on a demo nobody could ever reach the submit that would have adopted them. The hub came up, the
+// seeded `Demo` user was there, `auth_pin` would have said yes — and every visitor saw the
+// account door (2026-08-12, live on `/demo`).
+//
+// The contract fixed here: the read door answers with the SAME rule as the door it paints —
+// "would a PIN from this device get in?" — not with the raw trust row. On a virgin demo the
+// answer is yes (the first device will be adopted); once one is adopted, strangers are refused
+// exactly as always, and a normal hub never vouches for anybody it has not met.
+
+#[tokio::test]
+async fn the_login_screen_of_a_virgin_demo_is_told_the_pin_is_usable() {
+    // 🔴 The regression: this used to answer `trusted:false`, so the pinpad was never painted and
+    // the adoption of hub#630 became unreachable — a writer whose only reader could not arrive.
+    let app_ = demo_fixture().await;
+
+    let data = get_device_mode(&app_, Some("dev_visitor")).await;
+
+    assert_eq!(
+        data["trusted"],
+        json!(true),
+        "a virgin demo will adopt the first device, so the screen must offer the pinpad: {data}"
+    );
+}
+
+#[tokio::test]
+async fn once_adopted_the_demo_login_screen_stops_vouching_for_strangers() {
+    // First use, not "off": the moment a device is adopted, the read door goes back to telling
+    // strangers the truth — otherwise whoever guesses the URL later is offered a pinpad the PIN
+    // door will refuse, which is the exact desync hub#514 existed to close.
+    let app_ = demo_fixture().await;
+    let (status, body) =
+        post_pin(&app_, json!({ "name": "Demo", "pin": "0000", "device_id": "dev_visitor" })).await;
+    assert_eq!(status, StatusCode::OK, "the adoption must happen for this test to mean anything: {body}");
+
+    let stranger = get_device_mode(&app_, Some("dev_stranger")).await;
+    let adopted = get_device_mode(&app_, Some("dev_visitor")).await;
+
+    assert_eq!(stranger["trusted"], json!(false), "adopted once, refuse the rest: {stranger}");
+    assert_eq!(adopted["trusted"], json!(true), "the visitor keeps their own demo: {adopted}");
+}
+
+#[tokio::test]
+async fn a_demo_does_not_vouch_for_a_client_that_names_no_device() {
+    // Mirror of `a_demo_still_refuses_a_client_that_does_not_identify_its_device`: first-use
+    // adopts a device, it does not invent one — and the read door must not promise a pinpad to a
+    // client whose PIN the write door would refuse as `device_unidentified`.
+    let app_ = demo_fixture().await;
+
+    let data = get_device_mode(&app_, None).await;
+
+    assert_eq!(data["trusted"], json!(false), "no name, no vouching: {data}");
+}
+
+#[tokio::test]
+async fn a_NORMAL_hub_login_screen_never_vouches_for_a_stranger() {
+    // 🔴 The expensive direction, same as `a_NORMAL_hub_never_adopts_anybody`: if the read door
+    // leaked the demo answer to a normal hub, every login screen on the public internet would
+    // paint a pinpad for whoever knocked first.
+    let app_ = fixture(true, None).await;
+
+    let data = get_device_mode(&app_, Some("dev_stranger")).await;
+
+    assert_eq!(data["trusted"], json!(false), "a normal hub only trusts an online login: {data}");
 }
 
 #[tokio::test]
