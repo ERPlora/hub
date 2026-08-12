@@ -236,6 +236,10 @@ export default {
     activityMethod: 'Método',
     activityAmount: 'Importe',
     activityStatus: 'Estado',
+    activitySearchPlaceholder: 'Buscar actividad…',
+    // Status badge of an activity row; it agrees with «venta» — the row is a sale (hub#863).
+    activityStatusCompleted: 'Completada',
+    activityStatusPending: 'Pendiente',
     widgets: 'Widgets',
     loadingWidgets: 'Cargando widgets…',
     customizePanel: 'Personalizar panel',

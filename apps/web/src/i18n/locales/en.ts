@@ -245,6 +245,10 @@ export default {
     activityMethod: 'Method',
     activityAmount: 'Amount',
     activityStatus: 'Status',
+    activitySearchPlaceholder: 'Search activity…',
+    // Status badge of an activity row; it agrees with «sale» — the row is a sale (hub#863).
+    activityStatusCompleted: 'Completed',
+    activityStatusPending: 'Pending',
     widgets: 'Widgets',
     loadingWidgets: 'Loading widgets…',
     customizePanel: 'Customize panel',
