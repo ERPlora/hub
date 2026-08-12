@@ -22,6 +22,10 @@ ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; pass=$((pass + 1)); }
 bad()  { printf '  \033[31m✗\033[0m %s\n     %s\n' "$1" "$2"; fail=$((fail + 1)); }
 
 # A throwaway git repo with one commit, so the hook has a real tree to hash.
+# The .gitignore is COMMITTED and covers every artifact the tests drop inside
+# the repo: since hub#855 the hook refuses to run when the working tree does
+# not match the pushed tree, and untracked non-ignored files count as a
+# mismatch (cargo compiles what is on disk, not what is committed).
 make_repo() {
     local dir
     dir=$(mktemp -d)
@@ -29,7 +33,8 @@ make_repo() {
     git -C "$dir" config user.email gate@test
     git -C "$dir" config user.name gate
     echo one > "$dir/file"
-    git -C "$dir" add file
+    printf '%s\n' .out .state RAN RUNS STATUS STATUSES TRACE ENV POSTED POSTARGS OWNER ghbin nogh nowhere > "$dir/.gitignore"
+    git -C "$dir" add file .gitignore
     git -C "$dir" commit -qm one
     echo "$dir"
 }
@@ -166,7 +171,8 @@ make_monorepo() {
     git -C "$base/hub" config user.name gate
     git -C "$base/hub" config --bool hooks.hubPrepushGate true
     echo one > "$base/hub/file"
-    git -C "$base/hub" add file
+    printf '%s\n' .out .state RAN RUNS STATUS TRACE ENV > "$base/hub/.gitignore"
+    git -C "$base/hub" add file .gitignore
     git -C "$base/hub" commit -qm one
     echo "$base"
 }
@@ -657,6 +663,105 @@ grep -qi 'clamp' <<<"$out"            || errs="$errs no-clamp-message"
 [ -z "$errs" ] \
     && ok "wait ≥ keepalive margin: clamped below it, with a message naming both" \
     || bad "wait ≥ keepalive margin: clamped below it, with a message naming both" "$errs out='$out'"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 30–33 — the gate must TEST the tree it ATTESTS (hub#855, P0)
+#
+# The suite runs on the WORKING TREE; the cache key and the attestation name
+# the PUSHED sha. When they differ — pushing another branch from the same
+# worktree, pushing a tag from an unrelated checkout, or a dirty tree — the
+# gate used to sign green a tree it never executed, and (worse) record that
+# lie as a `.green` cache entry for everyone else. Since hub#854 removed Rust
+# from CI, this gate is the ONLY Rust verification there is.
+#
+# The comparison is TREES, not shas: a reworded/rebased commit with identical
+# content is still fine. A tree already proven green needs no working tree at
+# all (test 33): the attestation is about content, and that content ran.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 30. Pushing a sha whose tree is NOT the working tree → refuse ─────────────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+old_sha=$(git -C "$repo" rev-parse HEAD)
+echo two > "$repo/file"
+git -C "$repo" commit -qam two   # HEAD moves on; we push the OLD sha
+code=$(run_hook "$repo" "refs/heads/old $old_sha refs/heads/old $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 >> $repo/STATUS" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                                   || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]                              || errs="$errs suite-ran-on-wrong-tree"
+[ ! -f "$repo/STATUS" ]                           || errs="$errs status-published"
+ls "$repo/.state"/*.green >/dev/null 2>&1         && errs="$errs green-recorded"
+grep -qi 'working tree' <<<"$out"                 || errs="$errs no-explanation"
+[ -z "$errs" ] \
+    && ok "pushed sha != working tree: refused, nothing tested, nothing attested" \
+    || bad "pushed sha != working tree: refused, nothing tested, nothing attested" "$errs out='$out'"
+
+# ── 31. Dirty working tree → refuse (the suite would test the dirt) ───────────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+echo dirty >> "$repo/file"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 >> $repo/STATUS" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]                       || errs="$errs suite-ran"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs status-published"
+ls "$repo/.state"/*.green >/dev/null 2>&1  && errs="$errs green-recorded"
+[ -z "$errs" ] \
+    && ok "dirty working tree: refused — a green here would sign untested content" \
+    || bad "dirty working tree: refused — a green here would sign untested content" "$errs out='$out'"
+
+# ── 32. Pushing a TAG from a checkout that moved on → refuse ──────────────────
+#    The worst of the three shapes (hub#855's third door): a tag is pushed
+#    from WHATEVER checkout is current, and nobody switches branches to tag.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+old_sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" tag v9.9.9 "$old_sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/tags/v9.9.9 $old_sha refs/tags/v9.9.9 $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 >> $repo/STATUS" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]                       || errs="$errs suite-ran"
+ls "$repo/.state"/*.green >/dev/null 2>&1  && errs="$errs green-recorded"
+[ -z "$errs" ] \
+    && ok "tag pushed from a moved-on checkout: refused instead of caching a lie" \
+    || bad "tag pushed from a moved-on checkout: refused instead of caching a lie" "$errs"
+
+# ── 33. A tree ALREADY proven green needs no working tree: cache-hit passes ───
+#    Deliberate: the attestation is about content. Once the pushed tree really
+#    ran (recorded by a matching run), pushing that same sha again — or a tag
+#    on it — from any checkout state is truthful and instant.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="echo run >> $repo/RUNS; true")
+echo two > "$repo/file"
+git -C "$repo" commit -qam two   # the checkout moves on; the green stays valid
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="echo run >> $repo/RUNS; true")
+runs=$(wc -l < "$repo/RUNS" 2>/dev/null | tr -d ' ')
+errs=""
+[ "$code" = 0 ]      || errs="$errs exit=$code(want 0)"
+[ "$runs" = 1 ]      || errs="$errs runs=$runs(want 1)"
+[ -z "$errs" ] \
+    && ok "already-green tree: passes from any checkout without rerunning" \
+    || bad "already-green tree: passes from any checkout without rerunning" "$errs"
 
 echo
 echo "  $pass passed, $fail failed"

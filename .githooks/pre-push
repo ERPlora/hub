@@ -273,6 +273,36 @@ if [ -f "$green" ]; then
     exit 0
 fi
 
+# ── hub#855 (P0): test the tree you attest ───────────────────────────────────
+# The suite below runs on the WORKING TREE, while the cache key and the
+# attestation name the PUSHED sha. If they are not the same content, a green
+# here signs code that never ran — and records the lie as a `.green` everyone
+# else will trust. It happens without malice: pushing another branch from a
+# stacked worktree, pushing a tag from whatever checkout is current, or just
+# a dirty tree. Since hub#854 removed Rust from CI, this gate is the ONLY
+# Rust verification, so: refuse unless working tree == pushed tree.
+# Trees, not shas — a reworded/rebased commit with identical content is fine.
+# Untracked non-ignored files count: cargo compiles what is on disk.
+# (A tree already recorded green is handled above: that content really ran.)
+head_tree="$(git rev-parse 'HEAD^{tree}' 2>/dev/null)"
+wt_status="$(git status --porcelain 2>/dev/null)"
+if [ "$head_tree" != "$tree" ] || [ -n "$wt_status" ]; then
+    {
+        echo "❌ pre-push: REFUSING — this working tree is not the tree being pushed, so the"
+        echo "   suite would test one thing and attest another (hub#855)."
+        echo "     pushed sha   : $pushed_sha (tree ${tree:0:12})"
+        echo "     HEAD tree    : ${head_tree:0:12}"
+        if [ -n "$wt_status" ]; then
+            echo "     dirty files  :"
+            printf '%s\n' "$wt_status" | sed 's/^/       /' | head -10
+        fi
+        echo "   Push from a checkout sitting at that sha with a clean tree (commit or drop"
+        echo "   local changes), or run the gate there first so the tree is proven green."
+        echo "   Bypass (NOT attested): SKIP_HUB_TESTS=1 git push"
+    } >&2
+    exit 1
+fi
+
 # mkdir is atomic on every filesystem we care about; flock is not on macOS.
 #
 # hub#575: the lock knows its OWNER. A push killed mid-suite used to leave the
