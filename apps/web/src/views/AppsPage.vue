@@ -109,6 +109,7 @@
       :message="toastMsg"
       :color="toastColor"
       :duration="toastDuration"
+      :buttons="toastButtons"
       @did-dismiss="toastOpen = false"
     />
     <!-- Tabs en footer -->
@@ -165,6 +166,7 @@ import { moduleNav, refreshModuleNav } from '../lib/nav';
 import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import { catalogActionFor, catalogRowState, isModuleInstalled, type CatalogRowState } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
+import { capabilitiesToConsent } from '../lib/module-capabilities';
 import {
   defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
   type ModuleUpdateInfo,
@@ -184,6 +186,8 @@ interface Mod {
   cat: string;
   /** Versión a instalar; si el Cloud no la expone usamos 'latest' en el request-install. */
   version?: string;
+  /** Ids de los permisos que declara el manifest, según el catálogo Cloud (pm#132). */
+  capabilities: string[];
 }
 
 type AppsTab = 'mine' | 'all' | 'paid';
@@ -243,6 +247,9 @@ const toastColor = ref<'primary' | 'success' | 'danger'>('primary');
 // Duración del toast (ms). 0 = persistente (lo usamos para "Instalando…" mientras corre la
 // instalación en background; el resultado lo cierra y muestra el suyo). Por defecto 2.5s.
 const toastDuration = ref<number>(2500);
+// Acciones del toast. Vacío = toast informativo. Se usa para llevar a Ajustes → Permisos cuando un
+// módulo entra sin sus permisos (pm#132): la ruta escrita en palabras no bastaba.
+const toastButtons = ref<Array<{ text: string; handler: () => void }>>([]);
 
 // --- Progreso de instalación por módulo (feedback visual en la card) ---
 // Clave = módulo pedido (root); valor = módulo en curso (puede ser una dep anidada) + fase.
@@ -511,6 +518,28 @@ function notify(msg: string, color: 'primary' | 'success' | 'danger', duration =
     toastMsg.value = msg;
     toastColor.value = color;
     toastDuration.value = duration;
+    toastButtons.value = [];
+    toastOpen.value = true;
+  });
+}
+
+/**
+ * El módulo entró pero sus permisos NO se concedieron (pm#132).
+ *
+ * Es la red de seguridad: sin ella el siguiente paso del usuario es abrir el módulo y leer «no
+ * tengo permiso» sin saber que la solución está a dos pantallas. Sticky (0) para que se pueda
+ * LEER, y con el botón que lleva allí — describir la ruta con palabras ya lo hacía el cartel del
+ * módulo y no bastaba.
+ */
+function notifyGrantFailed(name: string): void {
+  toastOpen.value = false;
+  void nextTick(() => {
+    toastMsg.value = t('apps.installedButNoPermissions', { name });
+    toastColor.value = 'danger';
+    toastDuration.value = 0;
+    toastButtons.value = [
+      { text: t('apps.goToPermissions'), handler: () => { void router.push('/settings#permissions'); } },
+    ];
     toastOpen.value = true;
   });
 }
@@ -671,16 +700,20 @@ async function installModule(mod: Mod): Promise<void> {
   // conceder otros.
   const version = await chooseVersion(mod.id, mod.name);
   if (version === null) return;
-  // Best-effort: intentamos conocer los permisos que declara el módulo ANTES de instalar. El catálogo
-  // Cloud no los expone, así que esto solo encuentra algo si el módulo ya estuvo instalado (runtime lo
-  // recuerda); si no, instalamos directo y los permisos se gestionan luego en Ajustes → Permisos.
-  let declared: ModuleCapability[] = [];
+  // Los permisos que declara el módulo, ANTES de instalar (pm#132). Dos fuentes, por orden:
+  //   1. el RUNTIME, que es la autoridad — pero solo conoce un módulo que YA estuvo instalado;
+  //   2. el CATÁLOGO Cloud, que expone los ids del manifest (`capabilities`) y es lo único que hay
+  //      en una PRIMERA instalación, que es justo cuando esto hace falta.
+  // Antes solo existía (1): en un alta nueva la lista salía vacía, no había modal, y el módulo
+  // entraba con todo DENEGADO — el dueño aterrizaba en un «no tengo permiso» de algo que acababa
+  // de instalar él. `null` = ni siquiera se pudo preguntar (módulo desconocido → error).
+  let fromRuntime: ModuleCapability[] | null = null;
   try {
-    const caps = await getModuleCapabilities(mod.id);
-    declared = caps.capabilities.filter((c) => c.requested);
+    fromRuntime = (await getModuleCapabilities(mod.id)).capabilities;
   } catch {
-    declared = [];
+    fromRuntime = null;
   }
+  const declared = capabilitiesToConsent(fromRuntime, mod.capabilities);
   if (declared.length) {
     consentMod.value = mod;
     consentVersion.value = version;
@@ -716,17 +749,24 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
     // (el runtime la resuelve). Ya NO se usa la del catálogo Cloud: el catálogo dice qué versión
     // publica el marketplace, no cuál puede instalar ESTE hub.
     await requestInstall(mod.id, version);
-    // Concede los permisos consentidos (PUT solo admin → el runtime revalida). Best-effort: si falla
-    // no rompe la instalación; el usuario puede ajustarlos en Ajustes → Permisos.
+    // Concede los permisos consentidos (PUT solo admin → el runtime revalida). Best-effort: si
+    // falla no rompe la instalación — pero YA NO SE CALLA. Un fallo aquí deja el módulo instalado
+    // y sin permisos, que es exactamente el aterrizaje en «no tengo permiso» de pm#132; el toast
+    // dice dónde se arregla y lleva un botón que va allí de un clic, en vez de describir la ruta.
+    let grantFailed = false;
     if (grantCaps.length) {
       const grants = Object.fromEntries(grantCaps.map((c) => [c.id, true]));
-      await putModuleCapabilities(mod.id, grants).catch(() => null);
+      grantFailed = await putModuleCapabilities(mod.id, grants).then(() => false, () => true);
     }
     // Optimista: badge "Instalado" ya, sin esperar al refresco del catálogo (loadCatalog llega
     // detrás vía `module.installed` y confirma el estado real del Cloud).
     const row = modules.value.find((m) => m.id === mod.id);
     if (row) row.installed = true;
-    notify(t('apps.installSuccess', { name: mod.name }), 'success');
+    if (grantFailed) {
+      notifyGrantFailed(mod.name);
+    } else {
+      notify(t('apps.installSuccess', { name: mod.name }), 'success');
+    }
   } catch (e) {
     // ADR-0060: «bloqueado» NO es una avería — al plan le faltan módulos de pago sin contratar y
     // no se ha instalado nada. Decirlo y nombrarlos es la diferencia entre que el usuario sepa qué
@@ -939,6 +979,7 @@ function toViewModule(m: CloudMarketplaceModule): Mod {
     available: m.available,
     cat: m.category,
     version: m.version,
+    capabilities: m.capabilities,
   };
 }
 

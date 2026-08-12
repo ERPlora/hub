@@ -530,7 +530,7 @@ export default {
     reset_fiscal: 'Tax configuration',
     reset_roles: 'Active roles',
     permissionsTitle: 'App permissions',
-    permissionsDesc: 'Grant or revoke the permissions each app asks for (internet access, certificate, printer, notifications). For safety, everything is denied until you grant it.',
+    permissionsDesc: 'Grant or revoke the permissions each app asks for (internet access, certificate, printer, notifications, manage automations). For safety, everything is denied until you grant it.',
     permissionsAdminOnly: 'Only an administrator can change permissions.',
     permissionsNoModules: 'No installed app asks for permissions.',
     permissionsModuleNone: 'This app asks for no permissions.',
@@ -645,6 +645,8 @@ export default {
     consentIntro: 'This app requests these permissions. You can review them later in Settings → Permissions.',
     consentInstallGrant: 'Install and grant',
     consentCancel: 'Cancel',
+    installedButNoPermissions: '"{name}" was installed, but its permissions could not be granted. It will not work without them: turn them on in Settings → Permissions.',
+    goToPermissions: 'Go to Permissions',
   },
   employees: {
     searchEmployee: 'Search user…',

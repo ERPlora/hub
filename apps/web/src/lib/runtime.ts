@@ -488,15 +488,13 @@ export interface ModuleCapabilities {
 }
 
 /**
- * Catálogo de respaldo de labels de capability (por si el runtime no las devuelve traducidas).
- * Espejo del catálogo del backend; solo se usa como fallback de presentación.
+ * El catálogo de respaldo de labels vive en `./module-capabilities` (`CAPABILITY_CATALOG`).
+ *
+ * Estaba aquí con CUATRO entradas y `manage_flows` (hub#714) nunca se añadió: un espejo
+ * desincronizado de `crates/server/src/settings.rs::capability_meta` que nadie leía (el servidor
+ * manda `label`) hasta que hizo falta ponerle nombre a un id suelto del catálogo Cloud (pm#132).
+ * Ahora vive junto a la lógica que lo usa, con descripción además de etiqueta.
  */
-export const CAPABILITY_LABELS: Record<string, string> = {
-  network: 'Acceso a internet',
-  certificate: 'Certificado del negocio (firma fiscal)',
-  printer: 'Impresora',
-  notify: 'Notificaciones',
-};
 
 /**
  * Lee las capabilities (permisos) que declara un módulo instalado y su estado de concesión.

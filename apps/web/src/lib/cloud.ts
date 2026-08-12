@@ -74,6 +74,13 @@ export interface CloudMarketplaceModule {
   installed: boolean;
   available: boolean;
   version?: string;
+  /**
+   * Ids de los permisos que declara el manifest del módulo (`capabilities`, ADR-0079). Vacío = no
+   * pide ninguno. Es lo ÚNICO que se puede leer ANTES de instalar: el runtime local solo conoce
+   * los de un módulo que ya estuvo instalado, así que sin esto la primera instalación no puede
+   * preguntar nada (pm#132). Declaración, nunca concesión.
+   */
+  capabilities: string[];
 }
 
 // --- Token store (JWT del usuario activo) -----------------------------------
@@ -701,7 +708,20 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
     installed: Boolean(raw.installed ?? raw.is_installed ?? raw.active),
     available: Boolean(raw.can_install ?? raw.is_active ?? true) && raw.is_coming_soon !== true,
     version: raw.version ? String(raw.version) : undefined,
+    capabilities: capabilityIds(raw.capabilities),
   };
+}
+
+/**
+ * Ids del bloque `capabilities` del manifest, tal cual lo sirve el catálogo (`{"manage_flows": {}}`).
+ *
+ * Aditivo a propósito: un SaaS anterior a pm#132 no manda el campo y el hub tiene que seguir
+ * instalando igual. Y de una forma inesperada NO se inventa un permiso: enseñar en el modal algo
+ * que el módulo no pide es tan malo como no enseñar lo que sí pide.
+ */
+function capabilityIds(raw: unknown): string[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  return Object.keys(raw as Record<string, unknown>);
 }
 
 /** Catálogo real del Marketplace vía el runtime local. Un Hub real firma con su token de máquina;
