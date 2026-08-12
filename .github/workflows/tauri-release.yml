@@ -67,6 +67,19 @@ concurrency:
 permissions:
   contents: read
 
+# 🔴 `dl.google.com` responde **404 a `ci-runner-1` por IPv6** — a TODA ruta de ese host, no solo
+# a un fichero (comprobado en la máquina: `curl -6` → 404, `curl -4` → 206, para el mismo URL).
+# Node resuelve AAAA primero (`verbatim` desde v17), así que toda acción JS que descargue de
+# Google coge la carretera rota: `Setup Android SDK` murió con `HTTPError: Unexpected HTTP
+# response: 404` bajando unas command line tools QUE EXISTEN (hub#878). Los runners de GitHub no
+# tienen IPv6, por eso allí nunca pudo pasar — el clásico «el runner propio no trae lo mismo»,
+# solo que esta vez traía de MÁS.
+#
+# Esto le da la vuelta al orden de resolución para los procesos Node que NO lanzamos nosotros (las
+# propias acciones). En Windows y macOS es un no-op: sin IPv6 no hay nada que reordenar.
+env:
+  NODE_OPTIONS: --dns-result-order=ipv4first
+
 jobs:
 
   build:
@@ -114,21 +127,12 @@ jobs:
             libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev
 
-      # No pnpm/Node setup here on purpose (hub#465): nothing in this job builds a frontend, so
-      # there is nothing for a JS toolchain to do. `tauri.conf.json` has no `beforeBuildCommand`
-      # — the only thing that would make tauri-action build one — because `frontendDist` points
-      # at the committed static `shell-dist/` (ADR-0154).
-      #
-      # Nor does anything else here need the workspace's node_modules, checked against the
-      # action's own source: `getRunner()` only uses a package manager when
-      # `hasDependency('@tauri-apps/cli', projectPath)` holds — there is no apps/tauri/package.json,
-      # so it takes the other branch, `npm install -g @tauri-apps/cli`, on the runner's
-      # preinstalled Node. The root pnpm-lock.yaml never enters the picture. tauri-action itself
-      # is a `using: node24` action, which GitHub runs on its own bundled runtime.
-      # The `node -e` below is likewise the runner's preinstalled node — same as job `upload-s3`.
-      #
-      # Guarded by scripts/pack-msix.test.sh: bring a `beforeBuildCommand` back and that test
-      # fails until the setup steps come back with it.
+      # Aquí NO se construye ningún frontend, y eso no ha cambiado (hub#465): `tauri.conf.json`
+      # no tiene `beforeBuildCommand` —lo único que haría a tauri-action construir uno— porque
+      # `frontendDist` apunta al `shell-dist/` estático y commiteado (ADR-0154). Lo que sí hay
+      # ahora es el CLI de Tauri como dependencia del workspace; el porqué, en `Tauri CLI`.
+      # Guardado por scripts/pack-msix.test.sh: el día que vuelva un `beforeBuildCommand`, ese
+      # test exige que vuelva con él lo que haga falta para construir el front.
       # `dtolnay/rust-toolchain` NO instala rustup: lo USA. En los runners de GitHub siempre está;
       # en `ci-runner-1` es un fichero que el `Post` de `rust-cache` llegó a borrar (ver abajo).
       - name: Bootstrap rustup (runner propio)
@@ -163,16 +167,40 @@ jobs:
           V="${GITHUB_REF_NAME#v}"
           node -e "const f='apps/tauri/src-tauri/tauri.conf.json';const c=require('./'+f);c.version='${V}';require('fs').writeFileSync(f, JSON.stringify(c,null,2)+'\n');console.log('version →','${V}')"
 
-      # tauri-action instala el CLI de Tauri y genera los bundles. NO hay `beforeBuildCommand`: el
-      # front empaquetado es `shell-dist/`, estático y commiteado (ADR-0154), así que no se
-      # construye nada de JS para bundlear. Sin `tagName` solo compila (no crea release de
-      # GitHub); subimos a S3.
+      # 🔴 El CLI de Tauri sale del WORKSPACE, no de un `npm install -g` (hub#878).
+      #
+      # `tauri-action` solo usa un gestor de paquetes si el proyecto DEPENDE del CLI
+      # (`getRunner()` → `hasDependency('@tauri-apps/cli', projectPath)`); si no, cae en
+      # `npm install -g @tauri-apps/cli@v2`. Eso escribe en `/usr/lib/node_modules`, que en un
+      # runner de GitHub es del usuario y en `ci-runner-1` es de root: el job de Linux de `v1.1.0`
+      # murió con `EACCES` antes de compilar una sola línea. El build dependía de un permiso de la
+      # máquina sin que nada lo dijera.
+      #
+      # `apps/tauri/package.json` existe SOLO para esto: fija el CLI en el lockfile (versión
+      # exacta, misma en las tres plataformas — `npm i -g …@v2` compilaba cada release con lo que
+      # hubiera ese día) y lo instala dentro del workspace, donde siempre se puede escribir.
+      # `--filter @erplora/app` deja fuera las deps del web app: aquí no se construye front.
+      - name: Node 22 + pnpm (pinned by package.json `packageManager`)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Tauri CLI (dependencia del workspace, NO global)
+        run: pnpm install --frozen-lockfile --filter @erplora/app
+
+      # `tauriScript` es lo que le dice a la acción que el CLI ya está: sin él vuelve al
+      # `npm install -g` de arriba. Sin `tagName` solo compila (no crea release de GitHub);
+      # subimos a S3.
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: apps/tauri
+          tauriScript: pnpm exec tauri
 
       # Recoge los bundles (sus nombres llevan la versión; los renombramos a nombres estables que
       # el Cloud sirve desde `latest/`). El target es el del workspace Cargo (raíz del repo).
@@ -300,6 +328,13 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Este paso baja las command line tools de `dl.google.com` y es EL que se cayó en `v1.1.0`
+      # con un 404 — no porque la versión estuviera retirada (el zip sigue ahí; `curl -4` lo trae),
+      # sino porque desde `ci-runner-1` ese host contesta 404 por IPv6 y Node lo prefiere. La
+      # vuelta a IPv4 está en el `env` del workflow, arriba, porque no es cosa de este paso: es de
+      # la máquina, y le pasa a cualquier acción JS que descargue de Google (hub#878).
+      # Sin `cmdline-tools-version`: el default de la acción es correcto y clavarlo aquí habría
+      # sido tratar el síntoma.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
