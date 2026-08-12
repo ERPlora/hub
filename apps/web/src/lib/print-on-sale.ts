@@ -94,6 +94,10 @@ async function onSaleCompleted(client: ErploraClient, deps: Deps, payload: unkno
         // Mismo tique reimpreso = mismo trabajo: la cola (y el equipo que la drena) deduplica.
         jobId: `sale-${saleId}`,
         data: buildReceiptDocument(settings, sale, lines),
+        // DESATENDIDA, igual que la comanda: nadie ha pedido imprimir, se ha cobrado. Un diálogo del
+        // navegador aquí sacaría la app en un folio (este camino no manda `html`) y dejaría la caja
+        // esperando un clic. Sin sitio donde imprimir se AVISA, que es lo que sirve al cajero.
+        fallbackToBrowser: false,
       });
     } catch (e) {
       result = { via: 'none', role: 'receipt', error: e instanceof Error ? e.message : String(e) };

@@ -78,6 +78,21 @@ describe('tique al cobrar (hub#862)', () => {
     expect(gate.calls[0]!.data).toMatchObject({ items: expect.anything() });
   });
 
+  it('es impresión DESATENDIDA: no abre el diálogo del navegador', async () => {
+    // Nadie ha pedido imprimir: se cobra y el papel debe salir solo. Un diálogo del navegador aquí
+    // sacaría la APP en un folio (este camino no lleva `html` del documento) y dejaría el TPV
+    // bloqueado esperando un clic. Si no hay dónde imprimir, se avisa — mismo criterio que la
+    // comanda de cocina (`print-comanda`).
+    const gate = fakeGate();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: gate.print });
+
+    await emit({ sale_id: '42' });
+
+    expect(gate.calls[0]!.fallbackToBrowser).toBe(false);
+    expect(gate.calls[0]!.html).toBeUndefined();
+  });
+
   it('sin hardware en este equipo (PWA) el tique TAMBIÉN sale por la puerta', async () => {
     const gate = fakeGate();
     const { client, emit } = fakeClient({
