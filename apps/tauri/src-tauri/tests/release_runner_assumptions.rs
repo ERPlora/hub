@@ -158,6 +158,43 @@ fn the_linux_job_installs_what_the_appimage_takes_from_the_machine() {
     }
 }
 
+/// What stops `Swatinem/rust-cache` from deleting `~/.cargo/registry/src` out from under the job
+/// running on the OTHER slot of the same machine.
+const CACHE_SAVE_GUARD: &str = "save-if: ${{ runner.environment != 'self-hosted' }}";
+
+#[test]
+fn the_cargo_cache_does_not_prune_the_registry_a_concurrent_job_is_reading() {
+    let code = workflow_code();
+
+    // Both Linux jobs of a release run AT THE SAME TIME on `ci-runner-1`: two runner slots, two
+    // `_work` trees — and ONE `$HOME`, so one `~/.cargo`. The `Post` of rust-cache `rmRF`s every
+    // non-`-sys` directory under `registry/src` before saving (`cleanRegistry`), and the Android
+    // build resolves `:tauri-android`, `:tauri-plugin-deep-link`, `:tauri-plugin-notification` and
+    // `:tauri-plugin-opener` as Gradle projects living in exactly those directories.
+    //
+    // Measured, not deduced: `Post Cache cargo` of the desktop job logged
+    // "... Cleaning cargo registry ..." at 13:29:24, and 41 s later the Android build died in
+    // Gradle's configuration phase with "No matching variant ... No variants exist" for those four
+    // projects — a red that names Gradle variants and says nothing about a cache on another job.
+    //
+    // `save-if: false` returns before any cleaning (rust-cache `save.ts`), so the restore still
+    // works and the hosted runners still save: it is only the destructive half that goes away, and
+    // only where the machine outlives the job.
+    let cache_steps = code.matches("uses: Swatinem/rust-cache").count();
+    assert!(
+        cache_steps >= 2,
+        "expected the desktop and Android jobs to both cache cargo; found {cache_steps}"
+    );
+    assert_eq!(
+        code.matches(CACHE_SAVE_GUARD).count(),
+        cache_steps,
+        "every `Swatinem/rust-cache` step must carry `{CACHE_SAVE_GUARD}`. Without it the `Post` \
+         of whichever job finishes first deletes the registry sources the other one is building \
+         from, and a release loses a platform to a failure that looks like a Gradle problem \
+         (hub#878)"
+    );
+}
+
 #[test]
 fn google_downloads_do_not_take_the_ipv6_road_that_answers_404() {
     let code = workflow_code();
