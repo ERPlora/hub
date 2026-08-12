@@ -358,8 +358,15 @@ jobs:
             echo "password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
           } > keystore.properties
 
+      # `ERPLORA_DISTRIBUTION=play` marca el binario como «me distribuye Play» (hub#757): con eso
+      # el shell deja de ofrecer la descarga del APK, que es lo que Google prohíbe a una app que
+      # ella misma reparte. Se hornea aquí porque el AAB es su propio build y solo va a Play; el
+      # `.exe`, el `.msi` y Linux no llevan la marca y conservan su aviso, que es lo correcto:
+      # a esos nadie los actualiza por ellos.
       - name: Build APK + AAB
         working-directory: apps/tauri
+        env:
+          ERPLORA_DISTRIBUTION: play
         run: cargo tauri android build --apk --aab
 
       # DESPUÉS del build a propósito: `tauri.settings.gradle` —que es quien incluye el módulo del
