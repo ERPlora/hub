@@ -22,7 +22,7 @@ vi.mock('./runtime', () => ({
 }));
 vi.mock('./device', () => ({ resolveDeviceId: vi.fn(async () => 'dev_self') }));
 
-import { DevicesError, listDevices, revokeDevice } from './devices';
+import { DevicesError, listDevices, renameDevice, revokeDevice } from './devices';
 
 const fetchMock = vi.fn();
 
@@ -43,6 +43,7 @@ beforeEach(() => {
 function device(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     device_id: 'dev_abc',
+    name: 'Barra',
     label: 'Office laptop',
     trusted_at: '2026-08-01T08:00:00+00:00',
     mode: 'personal',
@@ -78,6 +79,10 @@ describe('listDevices', () => {
 
     expect(only).toEqual({
       deviceId: 'dev_abc',
+      // Two different facts, kept apart on purpose (hub#494): `name` is what the BUSINESS decided
+      // and `label` is who signed in last — the second one changes shift to shift and is chosen by
+      // the client, so the screen may show it as a hint and must never lead with it.
+      name: 'Barra',
       label: 'Office laptop',
       trustedAt: '2026-08-01T08:00:00+00:00',
       mode: 'personal',
@@ -202,5 +207,51 @@ describe('revokeDevice', () => {
 
     // The screen needs this to send them to the login rather than leave them tapping a dead session.
     expect(outcome.wasCurrent).toBe(true);
+  });
+});
+
+describe('renameDevice', () => {
+  it('names the device through its own door, which is not the one that disconnects', async () => {
+    answering(200, { ok: true, data: { device_id: 'dev_abc', name: 'Barra' } });
+
+    const named = await renameDevice('dev_abc', '  Barra  ');
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://runtime.test/api/devices/dev_abc');
+    // PUT, never DELETE with a payload: renaming is housekeeping, revoking takes a till down.
+    expect(init.method).toBe('PUT');
+    expect(init.headers['X-Hub-Session']).toBe('admin-token');
+    expect(JSON.parse(init.body)).toEqual({ name: 'Barra' });
+    expect(named).toBe('Barra');
+  });
+
+  it('escapes the id, like every other call keyed on a string the device chose', async () => {
+    answering(200, { ok: true, data: { device_id: 'a/b', name: 'Barra' } });
+
+    await renameDevice('a/b', 'Barra');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://runtime.test/api/devices/a%2Fb');
+  });
+
+  it('refuses to call at all without a device to name', async () => {
+    await expect(renameDevice('   ', 'Barra')).rejects.toBeInstanceOf(DevicesError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a rejection reaches the screen instead of looking like a name that stuck', async () => {
+    answering(422, { ok: false, error: 'the device name is at most 60 characters' });
+
+    // Same rule as the revocation: a refusal that looks like success would have the owner believe
+    // the tablet they are about to cut off is the one the label says.
+    await expect(renameDevice('dev_abc', 'B'.repeat(200))).rejects.toThrow(/at most 60/);
+  });
+
+  it('taking the name back is a rename, not a special case', async () => {
+    answering(200, { ok: true, data: { device_id: 'dev_abc', name: '' } });
+
+    const named = await renameDevice('dev_abc', '   ');
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ name: '' });
+    expect(named).toBe('');
   });
 });

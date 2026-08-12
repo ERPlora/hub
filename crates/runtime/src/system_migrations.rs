@@ -1283,6 +1283,33 @@ CREATE INDEX IF NOT EXISTS ix_hub_session_hub ON hub_session (hub_id);",
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_status TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_at TEXT NOT NULL DEFAULT '';",
     },
+    // ── v44 — hub#494: el dispositivo tiene un NOMBRE que pone el negocio ─────────────────────
+    // La única etiqueta legible de un dispositivo era `label`, y la escribe el login online con el
+    // nombre de la **persona** que entró (viaja en el body, o sea que la elige el cliente) y la
+    // pisa en cada entrada. Con ADR-0257 el `device_id` es opaco a propósito, así que en un negocio
+    // con tres tablets la lista eran tres filas con el mismo nombre de persona y tres ids que no
+    // dicen nada — justo delante del botón que corta una. `name` es el hueco de lo que decide el
+    // dueño: lo escribe una puerta admin (`PUT /api/devices/:id`) y el login NO lo toca nunca.
+    //
+    // Columna nueva, **no** se reutiliza `label`: «quién entró la última vez» sigue siendo un dato
+    // útil (una pista) y merece su hueco. `''` = «nadie lo ha nombrado todavía», que la pantalla
+    // convierte en «sin nombre»; distinto de un nombre en blanco. Contrato de fila: TEXT, `''`
+    // para desconocido, nunca NULL.
+    //
+    // ⚠️ El número es DECLARADO, no la posición en este slice (faltan la 15, la 20 y la 24), así
+    // que contar entradas no vale: recompruébalo contra `origin/develop` justo antes de empujar
+    // (hub#573 hizo que una versión en o por debajo del máximo aplicado ABORTE el arranque
+    // nombrándola, en vez de saltarse en silencio). Comprobado contra `origin/develop` 430285b5.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`, como las otras dos de esta
+    // misma tabla (v17 `hub_trusted_device_mode`, v23 `hub_trusted_device_hub_scoped`). Aditiva y
+    // sin backfill: no hereda nada de hub#489, que ya dio `hub_id` a la tabla.
+    SystemMigration {
+        version: 44,
+        name: "hub_trusted_device_name",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3000,6 +3027,10 @@ mod kind_contract_tests {
         // número, como pasó en esta ola: hub#731 y hub#665 pidieron las dos el v37; hub#670,
         // hub#564 y hub#571 pidieron las tres el v39. Y `hub_identity_hub_scoped` (v42, hub#497)
         // se llevó el 42 que había pedido el otorgamiento de representación, que pasó al v43.
-        assert_eq!(MIGRATIONS.len(), 40, "el catálogo cambió de tamaño");
+        // + `hub_trusted_device_name` (v44, hub#494): el nombre que le pone el NEGOCIO al
+        // dispositivo. Ojo a la distancia entre 41 entradas y la v44 — **el número es declarado, no
+        // la posición**: faltan la 15, la 20 y la 24, así que contar entradas para elegir el
+        // siguiente número da un choque, no un hueco.
+        assert_eq!(MIGRATIONS.len(), 41, "el catálogo cambió de tamaño");
     }
 }

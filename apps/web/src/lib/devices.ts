@@ -25,6 +25,12 @@ export type DeviceMode = 'shared' | 'personal';
 export interface HubDevice {
   /** The `X-Device-Id` it presents. **Chosen by the device**: it names, it never grants. */
   deviceId: string;
+  /**
+   * What the **business** calls it — "Barra", "Cocina" (hub#494). Written only by an administrator
+   * and never by a login, so it is the one field on this row worth deciding from. `''` = nobody has
+   * named it yet, which the screen says out loud instead of filling in.
+   */
+  name: string;
   /** Name of the last account that signed in online on it. Chosen by the device too. */
   label: string;
   /** When this hub first trusted it. Written by the hub. */
@@ -119,6 +125,7 @@ export async function listDevices(): Promise<HubDevice[]> {
     .filter((row) => text(row?.device_id).trim() !== '')
     .map((row) => ({
       deviceId: text(row.device_id).trim(),
+      name: text(row.name),
       label: text(row.label),
       trustedAt: text(row.trusted_at),
       mode: readMode(row.mode),
@@ -139,6 +146,33 @@ export async function listDevices(): Promise<HubDevice[]> {
  * slash addressing another route would tell the owner a device was disconnected while it kept
  * working. A blank id never leaves the browser.
  */
+/**
+ * Give a device the name the business chose (`PUT /api/devices/:id`, **admin session**, hub#494),
+ * and answer with the name as the hub stored it.
+ *
+ * A **different door** from the revocation on purpose: one is undone by typing again, the other
+ * signs a shift out. Blank is not an error, it takes the name back — the row returns to unnamed.
+ * Nothing is optimistic here either: a refusal throws, because a name that did not stick is a name
+ * the owner will later trust when pointing at the tablet to cut off.
+ */
+export async function renameDevice(deviceId: string, name: string): Promise<string> {
+  const target = deviceId.trim();
+  if (!target) throw new DevicesError('devices → no device named');
+  let res: Response;
+  try {
+    res = await fetch(`${RUNTIME_URL}/api/devices/${encodeURIComponent(target)}`, {
+      method: 'PUT',
+      headers: { ...(await headers()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+  } catch (error) {
+    throw new DevicesError(error instanceof Error ? error.message : 'devices → offline');
+  }
+  const body = (await res.json().catch(() => null)) as { data?: Record<string, unknown> } | null;
+  if (!res.ok) throw rejection(body, res.status);
+  return text(body?.data?.name);
+}
+
 export async function revokeDevice(deviceId: string): Promise<Revocation> {
   const target = deviceId.trim();
   if (!target) throw new DevicesError('devices → no device named');

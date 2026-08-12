@@ -10,9 +10,11 @@
     - **Reconocer el dispositivo ES la tarea.** Un id opaco no decide nada, así que cada fila lleva
       el nombre con el que entró, si hay alguien dentro AHORA y cuánto le queda a esa sesión. Y el
       id también: dos cajas pueden llamarse igual.
-    - **De qué NO fiarse.** El id y el nombre los elige el propio dispositivo (ADR-0257: el
-      navegador se acuña su id; el nombre es el que viajó en el login). Sirven para reconocerlo a
-      ojo y para nada más — aquí no se decide nada a partir de ellos.
+    - **De qué NO fiarse, y de qué sí.** El id y la etiqueta los elige el propio dispositivo
+      (ADR-0257: el navegador se acuña su id; la etiqueta es el nombre de la persona que viajó en el
+      login, reescrito en cada entrada). Sirven para reconocerlo a ojo y para nada más. Lo único de
+      la fila que decide el NEGOCIO es el `name` (hub#494) — lo escribe un administrador, el login
+      no lo toca jamás — y por eso es lo que titula la fila y lo que hay que mirar al cortar.
     - **Nada destructivo con un solo toque.** La confirmación es en la propia fila (no un overlay:
       Ionic los reparenta a `body` y esto se lee mejor donde está la fila) y dice la consecuencia.
     - **La consecuencia REAL, sin prometer de más.** La sesión muere al momento; quitar un
@@ -57,8 +59,25 @@
               <p v-if="device.signedInUntil" class="activity">
                 {{ t('devices.openUntil', { when: when(device.signedInUntil) }) }}
               </p>
+              <!-- Quién entró la última vez: una PISTA, y dicha como tal. Lo elige el cliente (viaja
+                   en el cuerpo del login) y cambia de turno en turno, así que no puede titular la
+                   fila — que es justo lo que hacía antes de hub#494. -->
+              <p v-if="device.label.trim()" class="activity">
+                {{ t('devices.lastSignedInBy', { who: device.label.trim() }) }}
+              </p>
               <p class="id">{{ device.deviceId }}</p>
             </ion-label>
+            <ion-button
+              v-if="isAdmin"
+              slot="end"
+              fill="clear"
+              :disabled="busy"
+              :aria-label="t('devices.rename')"
+              :data-test="`rename-${device.deviceId}`"
+              @click="startNaming(device)"
+            >
+              <HubIcon slot="icon-only" name="create-outline" />
+            </ion-button>
             <ion-button
               v-if="isAdmin"
               slot="end"
@@ -71,6 +90,43 @@
             >
               <HubIcon slot="icon-only" name="trash-outline" />
             </ion-button>
+          </ion-item>
+
+          <!-- Ponerle nombre, en la propia fila: es el gesto que hace que señalar el dispositivo
+               correcto sea fácil, así que vive donde está el dispositivo. Deliberadamente lejos, en
+               gesto y en color, del botón que lo corta. -->
+          <ion-item v-if="naming === device.deviceId" lines="none" class="confirm">
+            <ion-label>
+              <p>{{ t('devices.nameLabel') }}</p>
+              <ion-input
+                mode="md"
+                fill="outline"
+                :maxlength="MAX_DEVICE_NAME"
+                :aria-label="t('devices.rename')"
+                :value="draftName"
+                :data-test="`name-${device.deviceId}`"
+                @ionInput="onType"
+              />
+              <div class="actions">
+                <ion-button
+                  size="small"
+                  :disabled="busy"
+                  :data-test="`save-name-${device.deviceId}`"
+                  @click="rename(device)"
+                >
+                  {{ t('devices.save') }}
+                </ion-button>
+                <ion-button
+                  size="small"
+                  fill="clear"
+                  :disabled="busy"
+                  :data-test="`cancel-name-${device.deviceId}`"
+                  @click="naming = ''"
+                >
+                  {{ t('devices.cancel') }}
+                </ion-button>
+              </div>
+            </ion-label>
           </ion-item>
 
           <!-- La confirmación, en la fila: qué se va a hacer, qué pasa después y —si es este mismo
@@ -128,13 +184,20 @@ import {
   IonButton,
   IonCard,
   IonCardContent,
+  IonInput,
   IonItem,
   IonLabel,
   IonList,
   IonNote,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
-import { DevicesError, listDevices, revokeDevice, type HubDevice } from '../lib/devices';
+import {
+  DevicesError,
+  listDevices,
+  renameDevice,
+  revokeDevice,
+  type HubDevice,
+} from '../lib/devices';
 import { isAdmin, logout } from '../lib/session';
 
 const { t, locale } = useI18n();
@@ -146,7 +209,17 @@ const loading = ref(true);
 const loadError = ref('');
 /** Id del dispositivo cuya confirmación está abierta. Vacío = ninguna. */
 const asking = ref('');
+/** Id del dispositivo al que se le está poniendo nombre (hub#494). Vacío = ninguno. */
+const naming = ref('');
+/** Lo tecleado en ese momento. */
+const draftName = ref('');
 const busy = ref(false);
+
+/**
+ * El mismo tope que impone la puerta (`crates/server/src/devices.rs`). Aquí no es la regla —el
+ * runtime revalida— sino evitar que alguien escriba un párrafo y se lo rechacen al guardar.
+ */
+const MAX_DEVICE_NAME = 60;
 
 /** Motivo REAL del fallo, o `fallback` si no hubo ninguno (red/500) — igual que `DeviceModeCard`. */
 function reasonOf(error: unknown, fallback: string): string {
@@ -154,11 +227,13 @@ function reasonOf(error: unknown, fallback: string): string {
 }
 
 /**
- * Un dispositivo que nunca dijo cómo se llama sigue teniendo que ser tocable: una fila en blanco se
- * lee como un fallo de pintado, y es la que hay que quitar.
+ * El título de la fila es el nombre que puso el NEGOCIO (hub#494) — lo único de la fila que no
+ * eligió el propio dispositivo. Si nadie lo ha nombrado todavía se dice así: una fila en blanco se
+ * lee como un fallo de pintado, y ponerle el nombre de la persona que entró es justo la mentira que
+ * hacía imposible señalar la tablet correcta.
  */
 function nameOf(device: HubDevice): string {
-  return device.label.trim() || t('devices.unnamed');
+  return device.name.trim() || t('devices.unnamed');
 }
 
 function modeOf(device: HubDevice): string {
@@ -198,7 +273,43 @@ async function load(): Promise<void> {
 function ask(deviceId: string): void {
   if (!isAdmin.value) return;
   loadError.value = '';
+  // Nunca las dos cosas abiertas a la vez: la confirmación de quitar y el campo del nombre en la
+  // misma fila serían dos botones primarios con consecuencias muy distintas.
+  naming.value = '';
   asking.value = deviceId;
+}
+
+/** Abre el campo con el nombre que ya tiene, para corregir en vez de reescribir. */
+function startNaming(device: HubDevice): void {
+  if (!isAdmin.value) return;
+  loadError.value = '';
+  asking.value = '';
+  draftName.value = device.name;
+  naming.value = device.deviceId;
+}
+
+function onType(event: Event): void {
+  const typed = (event as CustomEvent<{ value?: string | null }>).detail?.value;
+  draftName.value = typeof typed === 'string' ? typed : '';
+}
+
+/**
+ * Guarda el nombre. Se recarga desde el hub en vez de parchear la fila: manda lo que el hub guardó
+ * (recortado por él), igual que en la revocación. Y un fallo se DICE — un nombre que solo cambió en
+ * la pantalla es exactamente la clase de mentira que esta tarjeta existe para no contar.
+ */
+async function rename(device: HubDevice): Promise<void> {
+  if (!isAdmin.value || busy.value) return;
+  busy.value = true;
+  try {
+    await renameDevice(device.deviceId, draftName.value);
+    naming.value = '';
+    await load();
+  } catch (error) {
+    loadError.value = reasonOf(error, t('devices.renameError'));
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function revoke(device: HubDevice): Promise<void> {
@@ -228,7 +339,7 @@ onMounted(() => {
   void load();
 });
 
-defineExpose({ load, ask, revoke, devices });
+defineExpose({ load, ask, revoke, startNaming, rename, devices });
 </script>
 
 <style scoped>
