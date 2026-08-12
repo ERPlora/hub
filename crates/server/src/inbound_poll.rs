@@ -41,8 +41,21 @@
 //! noise). That is why the gate below matters more than it looks: the poll only runs for a hub
 //! that has `whatsapp_inbox` installed, active AND entitled, so the fleet-wide cost tracks the
 //! number of hubs that bought the module, not the number of hubs.
+//!
+//! ## When the SaaS says no: auth backoff (hub#733)
+//!
+//! The gate above is **local** — module installed, some token present. The SaaS's answer is the
+//! other half: a `401`/`403` means "this credential does not work", and that is not transient the
+//! way a network error is. A hub with a rotated/revoked token used to retry every 5 s for ever,
+//! one WARN per attempt (354 identical lines in 35 minutes, burying every real error). So a
+//! refused credential opens an exponential backoff — [`BACKOFF_INITIAL_SECS`] doubling up to
+//! [`BACKOFF_MAX_SECS`] — with exactly **one** WARN when it opens, silence while it lasts, and an
+//! INFO when the first accepted probe closes it. Recovery needs no restart: the probe that
+//! succeeds resumes the normal tick at once. Any other failure (timeouts, 5xx) keeps the plain
+//! retry-next-tick behaviour — transient trouble is exactly what a fixed tick handles well.
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use cloud_client::{Auth, CloudClient};
 use erplora_runtime::outbox;
@@ -75,6 +88,91 @@ pub const INTERVAL_ENV: &str = "HUB_WHATSAPP_POLL_SECS";
 
 /// How much of a rejection is worth carrying into the log line. Enough for `{"error": "..."}`.
 const MAX_DETAIL: usize = 300;
+
+/// First wait after the SaaS refuses the hub's credential: two ticks. A 401/403 is not "the
+/// network hiccuped", it is "do not come back until something changes" (hub#733).
+pub const BACKOFF_INITIAL_SECS: u64 = 2 * DEFAULT_INTERVAL_SECS;
+
+/// Ceiling of the auth backoff. Five minutes keeps a mis-enrolled hub down to 12 requests/hour
+/// (from 720) while still converging within minutes of a token rotation landing.
+pub const BACKOFF_MAX_SECS: u64 = 300;
+
+/// What recording an auth rejection decided (see [`AuthBackoff::on_rejection`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuthRejection {
+    /// `true` only for the rejection that OPENED the backoff — the one worth a WARN. Every
+    /// consecutive rejection after it is the same incident and must not add a log line.
+    pub entered_backoff: bool,
+    /// How long no request will leave the hub before the next probe.
+    pub retry_in: Duration,
+}
+
+/// Backoff state for a credential the SaaS refuses (401/403), hub#733.
+///
+/// Same shape as [`erplora_sync::Backoff`] (initial → ×2 → cap, reset on success) — carried here
+/// because this crate does not depend on `erplora-sync`, and because this one also has to remember
+/// *until when* the poller must stay quiet and whether the incident is new (one WARN) or ongoing
+/// (silence).
+#[derive(Debug)]
+pub struct AuthBackoff {
+    initial: Duration,
+    max: Duration,
+    /// The delay the NEXT rejection will apply. Doubles per consecutive rejection, capped.
+    next_delay: Duration,
+    /// While `now` is before this instant, no request leaves the hub.
+    suppressed_until: Option<Instant>,
+    /// Between the first rejection and the first success.
+    in_backoff: bool,
+}
+
+impl AuthBackoff {
+    pub fn new(initial: Duration, max: Duration) -> Self {
+        Self {
+            initial,
+            max,
+            next_delay: initial,
+            suppressed_until: None,
+            in_backoff: false,
+        }
+    }
+
+    /// Whether a tick at `now` must be skipped without opening a socket.
+    pub fn is_suppressed(&self, now: Instant) -> bool {
+        self.suppressed_until.is_some_and(|until| now < until)
+    }
+
+    /// Record a 401/403 at `now`: suppress the next window and grow the one after it.
+    pub fn on_rejection(&mut self, now: Instant) -> AuthRejection {
+        let entered_backoff = !self.in_backoff;
+        self.in_backoff = true;
+        let retry_in = self.next_delay;
+        self.suppressed_until = Some(now + retry_in);
+        self.next_delay = retry_in.saturating_mul(2).min(self.max);
+        AuthRejection {
+            entered_backoff,
+            retry_in,
+        }
+    }
+
+    /// Record a successful round trip. Returns `true` when it ends a backoff (worth an INFO);
+    /// a success while healthy is just Tuesday and returns `false`.
+    pub fn on_success(&mut self) -> bool {
+        let recovered = self.in_backoff;
+        self.in_backoff = false;
+        self.suppressed_until = None;
+        self.next_delay = self.initial;
+        recovered
+    }
+}
+
+impl Default for AuthBackoff {
+    fn default() -> Self {
+        Self::new(
+            Duration::from_secs(BACKOFF_INITIAL_SECS),
+            Duration::from_secs(BACKOFF_MAX_SECS),
+        )
+    }
+}
 
 /// Tick interval in seconds: [`INTERVAL_ENV`] if it parses to a positive integer, else the
 /// default. A `0` would turn the tick into a busy loop against the SaaS, so it is rejected like
@@ -165,6 +263,11 @@ pub enum PollError {
     Unreachable(String),
     #[error("whatsapp inbox answered {0}")]
     Rejected(String),
+    /// The SaaS refused the hub's credential (401/403). Unlike every other variant this one never
+    /// leaves [`InboundPoller::poll_once`]: it is what feeds [`AuthBackoff`], because a refused
+    /// credential is not transient and retrying it every tick is the bug (hub#733).
+    #[error("whatsapp inbox refused the hub's credential: {0}")]
+    AuthRejected(String),
     #[error("whatsapp inbox answer does not match the contract: {0}")]
     Malformed(String),
     #[error("the inbound event could not be written to the outbox: {0}")]
@@ -181,6 +284,9 @@ pub struct InboundPoller {
     cloud: CloudClient,
     hub_id: HubId,
     machine_token: MachineToken,
+    /// Quiet-down state for a refused credential (hub#733). `std::sync::Mutex` on purpose: it is
+    /// only ever held for a few field reads/writes, never across an `.await`.
+    auth_backoff: std::sync::Mutex<AuthBackoff>,
 }
 
 /// Hand-written so the machine token can never reach a log line: a failing tick prints the poller.
@@ -204,6 +310,16 @@ impl InboundPoller {
             cloud: CloudClient::new(cloud_base_url),
             hub_id,
             machine_token,
+            auth_backoff: std::sync::Mutex::new(AuthBackoff::default()),
+        }
+    }
+
+    /// Test hook: shrink the backoff windows so a test does not wait real minutes.
+    #[cfg(test)]
+    fn with_auth_backoff(self, backoff: AuthBackoff) -> Self {
+        Self {
+            auth_backoff: std::sync::Mutex::new(backoff),
+            ..self
         }
     }
 
@@ -251,9 +367,60 @@ impl InboundPoller {
         let Some(auth) = self.machine_auth() else {
             return Ok(PollReport::default());
         };
+        // A credential the SaaS refused (hub#733): stay quiet until the backoff window elapses.
+        // Checked BEFORE opening a socket, like the gates above — while suppressed, a tick costs
+        // the SaaS nothing and the log nothing.
+        if self
+            .auth_backoff
+            .lock()
+            .expect("auth backoff lock poisoned")
+            .is_suppressed(Instant::now())
+        {
+            return Ok(PollReport::default());
+        }
 
         // ── Fetch, with no lock held ────────────────────────────────────────────────────────
-        let messages = self.fetch(&auth).await?;
+        let messages = match self.fetch(&auth).await {
+            Ok(messages) => {
+                // First success after a refusal: the incident is over, resume the normal tick.
+                let recovered = self
+                    .auth_backoff
+                    .lock()
+                    .expect("auth backoff lock poisoned")
+                    .on_success();
+                if recovered {
+                    tracing::info!(
+                        "inbound whatsapp: the SaaS accepts the credential again, resuming the normal tick"
+                    );
+                }
+                messages
+            }
+            // A 401/403 is not "the network hiccuped", it is "do not come back until something
+            // changes" (a token rotation landing, an entitlement renewed). Absorbed here — an
+            // `Err` would make the caller's loop WARN once per tick, which is the bug — with
+            // exactly ONE warn when the backoff opens; the consecutive refusals only escalate
+            // the window in silence.
+            Err(PollError::AuthRejected(detail)) => {
+                let rejection = self
+                    .auth_backoff
+                    .lock()
+                    .expect("auth backoff lock poisoned")
+                    .on_rejection(Instant::now());
+                if rejection.entered_backoff {
+                    tracing::warn!(
+                        retry_in_secs = rejection.retry_in.as_secs(),
+                        "inbound whatsapp: the SaaS refused this hub's credential, backing off: {detail}"
+                    );
+                } else {
+                    tracing::debug!(
+                        retry_in_secs = rejection.retry_in.as_secs(),
+                        "inbound whatsapp: credential still refused: {detail}"
+                    );
+                }
+                return Ok(PollReport::default());
+            }
+            Err(e) => return Err(e),
+        };
         if messages.is_empty() {
             return Ok(PollReport::default());
         }
@@ -332,7 +499,7 @@ impl InboundPoller {
             .await
             .map_err(|e| PollError::Unreachable(e.to_string()))?;
         if !status.is_success() {
-            return Err(PollError::Rejected(format!("{status}: {}", detail(&body))));
+            return Err(rejection(status, &body));
         }
         let page: InboxPage =
             serde_json::from_str(&body).map_err(|e| PollError::Malformed(e.to_string()))?;
@@ -364,7 +531,7 @@ impl InboundPoller {
             .await
             .map_err(|e| PollError::Unreachable(e.to_string()))?;
         if !status.is_success() {
-            return Err(PollError::Rejected(format!("{status}: {}", detail(&body))));
+            return Err(rejection(status, &body));
         }
         Ok(serde_json::from_str::<Value>(&body)
             .ok()
@@ -376,6 +543,16 @@ impl InboundPoller {
 /// A rejection body, trimmed to what is worth logging.
 fn detail(body: &str) -> String {
     body.trim().chars().take(MAX_DETAIL).collect()
+}
+
+/// Classify a non-2xx answer: a refused credential (401/403) is its own kind of failure, because
+/// it is the one the poller must stop retrying every tick (hub#733).
+fn rejection(status: reqwest::StatusCode, body: &str) -> PollError {
+    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+        PollError::AuthRejected(format!("{status}: {}", detail(body)))
+    } else {
+        PollError::Rejected(format!("{status}: {}", detail(body)))
+    }
 }
 
 #[cfg(test)]
@@ -404,6 +581,7 @@ mod tests {
     #[derive(Clone)]
     struct FakeInbox {
         pending: Arc<Mutex<Vec<Value>>>,
+        inbox_status: Arc<Mutex<StatusCode>>,
         ack_status: Arc<Mutex<StatusCode>>,
         calls: Arc<Mutex<Vec<(String, HeaderMap, Option<Value>)>>>,
     }
@@ -449,6 +627,10 @@ mod tests {
         fn fail_the_ack_with(&self, status: StatusCode) {
             *self.inbox.ack_status.lock().unwrap() = status;
         }
+
+        fn answer_the_inbox_with(&self, status: StatusCode) {
+            *self.inbox.inbox_status.lock().unwrap() = status;
+        }
     }
 
     /// One message as `apps/whatsapp_inbox/api/inbox.py::_serialize` writes it.
@@ -478,6 +660,14 @@ mod tests {
                 None => "GET inbox".to_string(),
             };
             st.calls.lock().unwrap().push((path, headers, None));
+            let status = *st.inbox_status.lock().unwrap();
+            if !status.is_success() {
+                // The shape DRF answers a bad credential with.
+                return (
+                    status,
+                    Json(json!({"detail": "Authentication credentials were not provided."})),
+                );
+            }
             let pending = st.pending.lock().unwrap().clone();
             let cursor = pending
                 .last()
@@ -522,6 +712,7 @@ mod tests {
 
         let inbox_state = FakeInbox {
             pending: Arc::new(Mutex::new(messages)),
+            inbox_status: Arc::new(Mutex::new(StatusCode::OK)),
             ack_status: Arc::new(Mutex::new(StatusCode::OK)),
             calls: Arc::new(Mutex::new(Vec::new())),
         };
@@ -878,5 +1069,165 @@ mod tests {
     fn debug_never_prints_the_machine_token() {
         let printed = format!("{:?}", poller("https://erplora.com", Some("s3cr3t")));
         assert!(!printed.contains("s3cr3t"), "{printed}");
+    }
+
+    // ── Auth backoff (hub#733): a 401 is "do not come back", not "the network hiccuped" ──────
+
+    /// The sequence the issue asks for: exponential from two ticks up to a five-minute ceiling.
+    /// 10 s → 20 s → 40 s → 80 s → 160 s → 300 s, and it stays at 300 s for ever after.
+    #[test]
+    fn auth_backoff_delays_double_from_two_ticks_and_cap_at_five_minutes() {
+        let mut backoff = AuthBackoff::default();
+        let mut now = std::time::Instant::now();
+        let mut delays = Vec::new();
+        for _ in 0..7 {
+            let rejection = backoff.on_rejection(now);
+            delays.push(rejection.retry_in.as_secs());
+            now += rejection.retry_in;
+        }
+        assert_eq!(delays, vec![10, 20, 40, 80, 160, 300, 300]);
+    }
+
+    /// The whole state machine in one walk: only the FIRST rejection opens the backoff (that is
+    /// the one WARN the issue allows), the window suppresses ticks until it elapses, and one
+    /// success both ends the incident and resets the sequence to the initial delay.
+    #[test]
+    fn auth_backoff_enters_once_suppresses_the_window_and_recovers_on_success() {
+        let mut backoff = AuthBackoff::new(Duration::from_secs(10), Duration::from_secs(300));
+        let t0 = std::time::Instant::now();
+        assert!(!backoff.is_suppressed(t0), "healthy: every tick may poll");
+
+        let first = backoff.on_rejection(t0);
+        assert!(
+            first.entered_backoff,
+            "the first refusal is the one worth a WARN"
+        );
+        assert!(backoff.is_suppressed(t0 + Duration::from_secs(9)));
+        assert!(
+            !backoff.is_suppressed(t0 + Duration::from_secs(10)),
+            "window over: one probe may go out"
+        );
+
+        let second = backoff.on_rejection(t0 + Duration::from_secs(10));
+        assert!(
+            !second.entered_backoff,
+            "still the same incident — a second WARN would be the bug again"
+        );
+
+        assert!(backoff.on_success(), "coming back IS worth one INFO");
+        assert!(
+            !backoff.is_suppressed(t0 + Duration::from_secs(11)),
+            "recovery is immediate: no leftover window"
+        );
+        assert!(!backoff.on_success(), "a healthy success is not a recovery");
+
+        let again = backoff.on_rejection(t0 + Duration::from_secs(60));
+        assert!(again.entered_backoff, "a NEW incident gets its own WARN");
+        assert_eq!(
+            again.retry_in,
+            Duration::from_secs(10),
+            "the success reset the sequence to the initial delay"
+        );
+    }
+
+    /// The bug itself (hub#733): a refused credential must not be retried every tick. The tick
+    /// that meets the 401 completes as an empty report (an `Err` would make the caller's loop
+    /// WARN once per tick — 354 lines in 35 minutes), and every tick inside the window is
+    /// suppressed BEFORE opening a socket. After the window exactly one probe goes out; still
+    /// refused, the poller goes quiet again.
+    #[tokio::test]
+    async fn a_refused_credential_backs_off_instead_of_hammering_the_saas() {
+        let cloud = fake_cloud(vec![message("wamid.1", "hola")]).await;
+        cloud.answer_the_inbox_with(StatusCode::UNAUTHORIZED);
+        let runtime = hub_with_module(true).await;
+        let poller = poller(&cloud.base_url, Some("machine-tok")).with_auth_backoff(
+            AuthBackoff::new(Duration::from_millis(300), Duration::from_secs(300)),
+        );
+
+        let report = poller
+            .poll_once(&runtime, &entitled())
+            .await
+            .expect("an auth refusal is absorbed by the backoff, not surfaced per tick");
+        assert_eq!(report, PollReport::default());
+        assert_eq!(cloud.paths().len(), 1);
+
+        for _ in 0..5 {
+            let report = poller.poll_once(&runtime, &entitled()).await.unwrap();
+            assert_eq!(report, PollReport::default());
+        }
+        assert_eq!(
+            cloud.paths().len(),
+            1,
+            "inside the window not a single request leaves the hub"
+        );
+
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        poller.poll_once(&runtime, &entitled()).await.unwrap();
+        assert_eq!(cloud.paths().len(), 2, "exactly one probe after the window");
+
+        poller.poll_once(&runtime, &entitled()).await.unwrap();
+        assert_eq!(
+            cloud.paths().len(),
+            2,
+            "refused again: quiet again, now behind a longer window"
+        );
+        assert!(outbox_rows(&runtime).await.is_empty());
+    }
+
+    /// «Reanudación inmediata cuando el token vuelva a valer»: the first successful probe both
+    /// ingests whatever was pending AND ends the suppression, so the very next tick polls again.
+    #[tokio::test]
+    async fn the_first_success_after_backoff_resumes_normal_polling_at_once() {
+        let cloud = fake_cloud(vec![message("wamid.1", "hola")]).await;
+        cloud.answer_the_inbox_with(StatusCode::FORBIDDEN);
+        let runtime = hub_with_module(true).await;
+        let poller = poller(&cloud.base_url, Some("machine-tok")).with_auth_backoff(
+            AuthBackoff::new(Duration::from_millis(200), Duration::from_secs(300)),
+        );
+
+        poller.poll_once(&runtime, &entitled()).await.unwrap();
+        assert_eq!(cloud.paths().len(), 1);
+
+        // The token starts being accepted again (rotation converged on the SaaS side).
+        cloud.answer_the_inbox_with(StatusCode::OK);
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        let probe = poller.poll_once(&runtime, &entitled()).await.unwrap();
+        assert_eq!(probe.ingested, 1, "the probe itself ingests the backlog");
+        assert_eq!(probe.acked, 1);
+
+        let after = poller.poll_once(&runtime, &entitled()).await.unwrap();
+        assert_eq!(after, PollReport::default(), "inbox drained");
+        assert_eq!(
+            cloud.paths(),
+            vec![
+                "GET inbox".to_string(), // refused
+                "GET inbox".to_string(), // the probe…
+                "POST ack".to_string(),  // …which acked what it wrote
+                "GET inbox".to_string(), // and the next tick polls again, unsuppressed
+            ]
+        );
+        assert_eq!(outbox_rows(&runtime).await.len(), 1);
+    }
+
+    /// Only a refused credential means "stop asking". Any other rejection (a 500, a bad gateway)
+    /// keeps today's contract: the error surfaces to the caller and the next tick retries —
+    /// transient trouble is exactly what a fixed tick handles well.
+    #[tokio::test]
+    async fn a_non_auth_rejection_still_surfaces_and_does_not_back_off() {
+        let cloud = fake_cloud(vec![message("wamid.1", "hola")]).await;
+        cloud.answer_the_inbox_with(StatusCode::INTERNAL_SERVER_ERROR);
+        let runtime = hub_with_module(true).await;
+        let poller = poller(&cloud.base_url, Some("machine-tok"));
+
+        let err = poller.poll_once(&runtime, &entitled()).await.unwrap_err();
+        assert!(matches!(err, PollError::Rejected(_)), "{err}");
+
+        let err = poller.poll_once(&runtime, &entitled()).await.unwrap_err();
+        assert!(matches!(err, PollError::Rejected(_)), "{err}");
+        assert_eq!(
+            cloud.paths().len(),
+            2,
+            "a 500 is transient: the next tick still asks"
+        );
     }
 }
