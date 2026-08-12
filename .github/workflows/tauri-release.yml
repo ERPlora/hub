@@ -58,6 +58,16 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      # Un dispatch servía para DOS cosas incompatibles: refrescar `latest/` a mano y probar que el
+      # empaquetado sigue en pie. Lo segundo no debería publicar nada — `latest/latest.json` es la
+      # fuente de verdad de «la última versión publicada» que lee el Cloud (hub#400), y un run de
+      # prueba dejaba ahí los binarios de la rama que fuera. El default mantiene el comportamiento
+      # documentado; para probar, desmárcalo (`-f publish=false`).
+      publish:
+        description: "Subir los bundles a Object Storage (refresca `latest/`)"
+        type: boolean
+        default: true
 
 # Un push/tag nuevo cancela el build en curso del mismo ref: no apilar builds completos.
 concurrency:
@@ -111,6 +121,19 @@ jobs:
       # (#848) `matrix.os` vale `self-hosted`, así que `== 'ubuntu-latest'` era falso y este paso
       # se saltaba entero: el bundle de Linux se quedaba sin `librsvg2-dev`, `libappindicator3-dev`
       # ni `patchelf`, y fallaba al empaquetar. `matrix.label` no depende de dónde corra.
+      #
+      # Las dos últimas NO son para compilar: son para EMPAQUETAR el AppImage, y son cosas que el
+      # bundler coge DE LA MÁQUINA (por eso no hay dependencia de proyecto que las sustituya):
+      #   · `xdg-utils` → `/usr/bin/xdg-mime` y `/usr/bin/xdg-open`, que tauri-bundler COPIA dentro
+      #     del AppDir (xdg-mime porque la app declara el esquema `erplora://`; xdg-open porque
+      #     `bundleXdgOpen` va por defecto). Sin ellos: «xdg-mime binary not found» — después de
+      #     compilar la release entera.
+      #   · `libgtk-3-bin` → `gtk-query-immodules-3.0`, con el que el plugin GTK de linuxdeploy
+      #     escribe `immodules.cache`… y justo después hace `sed -i` sobre ese fichero. El plugin
+      #     corre con `set -e`, así que si la herramienta falta, el `sed` se encuentra un fichero
+      #     que nadie escribió y se lleva por delante el paso entero.
+      # La imagen de GitHub trae las dos; un Ubuntu de Hetzner no. Guardado por
+      # `release_runner_assumptions.rs`, que además explica cuál rompe qué (hub#878).
       - name: Install Linux build deps
         if: matrix.label == 'linux'
         run: |
@@ -125,7 +148,9 @@ jobs:
             file \
             libgtk-3-dev \
             libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev
+            libjavascriptcoregtk-4.1-dev \
+            xdg-utils \
+            libgtk-3-bin
 
       # Aquí NO se construye ningún frontend, y eso no ha cambiado (hub#465): `tauri.conf.json`
       # no tiene `beforeBuildCommand` —lo único que haría a tauri-action construir uno— porque
@@ -527,8 +552,10 @@ jobs:
     # También el AAB/APK: si no, la app de Android se construye y se queda en los artifacts del
     # run, sin llegar nunca a la página de descargas.
     needs: [build, build-android]
-    # tag v* → sube a v{version}/ + latest/ ; dispatch manual → refresca latest/.
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    # tag v* → sube a v{version}/ + latest/ ; dispatch manual → refresca latest/ salvo que se pida
+    # lo contrario con `publish: false` (probar el empaquetado sin tocar el canal de descargas).
+    # En un tag el input no existe, así que la release publica siempre.
+    if: (github.event_name == 'workflow_dispatch' && inputs.publish) || startsWith(github.ref, 'refs/tags/v')
     # De la imagen usa `aws` (CLI v2) y el `node -p` que lee la versión de `tauri.conf.json`;
     # ninguno de los dos lo instala este job. `ci-runner-1` trae ambos a nivel de sistema.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}

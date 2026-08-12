@@ -120,6 +120,44 @@ fn the_release_never_installs_the_tauri_cli_globally() {
     );
 }
 
+/// System binaries the Linux bundle needs that a bare Ubuntu does NOT bring, each with the
+/// package that provides it and what dies without it. All of them are *copied from the machine*
+/// into the AppImage or run against it, so no project dependency can replace them — the apt step
+/// is the only place they can live, and that is why they are asserted there.
+const APPIMAGE_SYSTEM_PACKAGES: [(&str, &str); 2] = [
+    // `/usr/bin/xdg-mime` + `/usr/bin/xdg-open`: tauri-bundler copies both INTO the AppDir —
+    // xdg-mime because the app declares deep link schemes (`erplora://`), xdg-open because
+    // `bundleXdgOpen` defaults on. Missing → "xdg-mime binary not found", after a full compile.
+    ("xdg-utils", "xdg-mime / xdg-open, copied into the AppDir"),
+    // `gtk-query-immodules-3.0`: linuxdeploy-plugin-gtk writes `immodules.cache` with it and then
+    // `sed -i`s that file. The script runs under `set -e`, so when the tool is missing the sed
+    // hits a file that was never written and the whole AppImage step dies there.
+    ("libgtk-3-bin", "gtk-query-immodules-3.0 for the GTK plugin"),
+];
+
+#[test]
+fn the_linux_job_installs_what_the_appimage_takes_from_the_machine() {
+    let code = workflow_code();
+    let deps_step = code
+        .split("Install Linux build deps")
+        .nth(1)
+        .expect("the Linux job installs its system dependencies in a step of that name")
+        .split("- name:")
+        .next()
+        .expect("the step ends where the next one starts")
+        .to_string();
+
+    for (package, why) in APPIMAGE_SYSTEM_PACKAGES {
+        assert!(
+            deps_step.contains(package),
+            "`{package}` is no longer installed by the Linux job. It provides {why}: a hosted \
+             runner image happens to carry it, a Hetzner Ubuntu does not, and the bundle only \
+             fails AFTER a full release compile — on a tag, where re-running is expensive and the \
+             release is already public (hub#878)"
+        );
+    }
+}
+
 #[test]
 fn google_downloads_do_not_take_the_ipv6_road_that_answers_404() {
     let code = workflow_code();
