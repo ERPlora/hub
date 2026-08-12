@@ -555,7 +555,14 @@ jobs:
     # tag v* → sube a v{version}/ + latest/ ; dispatch manual → refresca latest/ salvo que se pida
     # lo contrario con `publish: false` (probar el empaquetado sin tocar el canal de descargas).
     # En un tag el input no existe, así que la release publica siempre.
-    if: (github.event_name == 'workflow_dispatch' && inputs.publish) || startsWith(github.ref, 'refs/tags/v')
+    #
+    # ⚠️ Se compara contra el booleano Y contra la cadena a propósito. `gh workflow run -f
+    # publish=false` manda `"false"`, y una cadena no vacía es CIERTA en una expresión de Actions:
+    # un `&& inputs.publish` a secas publicaría precisamente en el run con el que uno intenta NO
+    # publicar. Aquí el fallo silencioso sería sobrescribir `latest/` con una build de prueba.
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish != false && inputs.publish != 'false')
     # De la imagen usa `aws` (CLI v2) y el `node -p` que lee la versión de `tauri.conf.json`;
     # ninguno de los dos lo instala este job. `ci-runner-1` trae ambos a nivel de sistema.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
