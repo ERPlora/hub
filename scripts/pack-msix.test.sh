@@ -143,37 +143,57 @@ diff_out="$(diff <(replaced_tokens) <(manifest_tokens "$manifest_path") 2>&1)"
     || bad "the packer replaces exactly the tokens the manifest declares" \
            "$(echo "$diff_out" | tr '\n' ' ')"
 
-# ── 8. hub#465: no JS toolchain while there is no frontend to build ──────────
-# `tauri-action` only builds a frontend when tauri.conf.json has a
-# `beforeBuildCommand`. Since ADR-0154 it has none — `frontendDist` points at
-# the committed static `shell-dist/` — so setting up pnpm/Node and resolving the
-# lockfile in every build job buys nothing, in the most expensive workflow we
-# have. The two halves are asserted together on purpose: if a
-# `beforeBuildCommand` ever comes back, this test demands the setup come back
-# with it instead of leaving a build that fails on the first tag.
+# ── 8. hub#465 + hub#878: the release installs the CLI, never a frontend ─────
+# hub#465 removed every JS step from this workflow on the grounds that nothing
+# needed one: `tauri-action` only builds a frontend when tauri.conf.json has a
+# `beforeBuildCommand`, and since ADR-0154 it has none. hub#878 falsified the
+# other half of that reasoning — with no `@tauri-apps/cli` dependency the action
+# falls back to `npm install -g`, which needs a writable /usr/lib/node_modules
+# and so only ever worked on GitHub-hosted runners. The Linux job of v1.1.0 died
+# there with EACCES.
+#
+# So a JS install is now expected, and what this asserts is that it stays the
+# CHEAP one: the CLI only (`--filter @erplora/app`), never the web app's
+# dependency tree, in the most expensive workflow we have. The `beforeBuildCommand`
+# half stands: bring one back and the front has to be built somewhere.
 has_before_build="$(python3 -c "import json;print('yes' if 'beforeBuildCommand' in json.load(open('$TAURI_CONF')).get('build',{}) else 'no')")"
-js_steps="$(grep -n 'pnpm/action-setup\|actions/setup-node\|pnpm install --frozen-lockfile' "$WORKFLOW" || true)"
+install_steps="$(grep -c 'pnpm install --frozen-lockfile' "$WORKFLOW" || true)"
+unfiltered="$(grep 'pnpm install --frozen-lockfile' "$WORKFLOW" | grep -vc -- '--filter @erplora/app' || true)"
+
+[ "$install_steps" -ge 1 ] \
+    && ok "the release installs the Tauri CLI from the workspace" \
+    || bad "the release installs the Tauri CLI from the workspace" \
+           "no \`pnpm install --frozen-lockfile\` left: tauri-action would go back to \`npm install -g\` (hub#878)"
 
 if [ "$has_before_build" = no ]; then
-    [ -z "$js_steps" ] \
-        && ok "no beforeBuildCommand ⇒ the release workflow sets up no JS toolchain" \
-        || bad "no beforeBuildCommand ⇒ the release workflow sets up no JS toolchain" \
-               "nothing builds a frontend, yet these steps remain: $(echo "$js_steps" | tr '\n' ' ')"
+    [ "$unfiltered" -eq 0 ] \
+        && ok "no beforeBuildCommand ⇒ the release resolves the CLI only, not the web app" \
+        || bad "no beforeBuildCommand ⇒ the release resolves the CLI only, not the web app" \
+               "an unfiltered \`pnpm install\` resolves the whole workspace for a build that packs \`shell-dist/\`"
 else
-    [ -n "$js_steps" ] \
-        && ok "beforeBuildCommand present ⇒ the release workflow sets up the JS toolchain" \
-        || bad "beforeBuildCommand present ⇒ the release workflow sets up the JS toolchain" \
-               "tauri.conf.json builds a frontend but no pnpm/Node setup remains in the workflow"
+    [ "$unfiltered" -ge 1 ] \
+        && ok "beforeBuildCommand present ⇒ the release installs what builds the frontend" \
+        || bad "beforeBuildCommand present ⇒ the release installs what builds the frontend" \
+               "tauri.conf.json builds a frontend, but only the CLI is installed — the build fails on the first tag"
 fi
 
-# ── 9. hub#465: the Tauri CLI does not come from the JS toolchain either ─────
-# Removing pnpm/Node is only safe because nothing resolves the CLI through
-# npm: the matrix job gets it from `tauri-action`, and build-android from
-# `cargo install tauri-cli`.
-! grep -q '@tauri-apps/cli' "$ROOT/package.json" && [ ! -f "$ROOT/apps/tauri/package.json" ] \
-    && ok "the Tauri CLI is not a JS dependency (no apps/tauri/package.json, no root dep)" \
-    || bad "the Tauri CLI is not a JS dependency" \
-           "a package.json now provides @tauri-apps/cli — the JS setup steps would be needed again"
+# ── 9. hub#878: the CLI is pinned, and the same one on the three platforms ───
+# `npm install -g @tauri-apps/cli@v2` also meant every release was built with
+# whatever the CLI was that morning, and possibly a different one per platform.
+# A lockfile entry is what makes two builds of the same commit comparable.
+cli_pin="$(python3 -c "import json;print(json.load(open('$ROOT/apps/tauri/package.json'))['devDependencies']['@tauri-apps/cli'])" 2>/dev/null || true)"
+case "$cli_pin" in
+    [0-9]*) ok "the Tauri CLI is pinned to an exact version ($cli_pin)" ;;
+    '')     bad "the Tauri CLI is pinned to an exact version" \
+                "apps/tauri/package.json does not declare @tauri-apps/cli — the global install comes back (hub#878)" ;;
+    *)      bad "the Tauri CLI is pinned to an exact version" \
+                "'$cli_pin' is a range: two builds of the same commit can use different CLIs" ;;
+esac
+
+grep -q 'tauriScript: pnpm exec tauri' "$WORKFLOW" \
+    && ok "tauri-action runs the workspace CLI (\`tauriScript\`)" \
+    || bad "tauri-action runs the workspace CLI (\`tauriScript\`)" \
+           "without \`tauriScript\` the action ignores what we installed and calls \`npm install -g\` (hub#878)"
 
 echo
 printf 'passed %d, failed %d\n' "$pass" "$fail"
