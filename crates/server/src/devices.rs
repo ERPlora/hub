@@ -50,6 +50,81 @@ struct ListedDevice {
     current: bool,
 }
 
+/// The longest name the list column is meant to carry. Not a database limit — the column is TEXT —
+/// but the one this door enforces: the name exists to be recognised **at a glance** among three
+/// rows, and a paragraph pushed into it would shove the row the owner came for off the screen.
+const MAX_DEVICE_NAME: usize = 60;
+
+/// The name as it will be stored, or `None` when it is too long to be one.
+///
+/// Trimmed in **one** place, so what is stored, what is echoed back and what the list shows are the
+/// same string. Blank is allowed and means "take the name back": unlike a blank *id* — which names
+/// no device and is a malformed request — it is a real gesture, and it returns the row to unnamed.
+///
+/// Counted in **characters, not bytes**: "Recepción" is shorter than its UTF-8 length, and a limit
+/// that shrank for accented names would be a limit that punishes writing Spanish properly.
+fn clean_name(name: &str) -> Option<&str> {
+    let name = name.trim();
+    (name.chars().count() <= MAX_DEVICE_NAME).then_some(name)
+}
+
+/// The name a device is born with the first time this hub sees it (hub#494): the **platform** it
+/// announced, never the person who happened to sign in.
+///
+/// Why the User-Agent and not the id: ADR-0257 made `device_id` 128 opaque bits on purpose, so it
+/// says nothing an owner could recognise. Why not the person's name: that is `label`, it changes
+/// shift to shift, and a list of three tablets all called "Marta" is the bug this issue exists for.
+///
+/// What comes out are **proper nouns** ("Chrome · Android", "Safari · iPad") — nothing to translate,
+/// which is what keeps a stored default from freezing one language into the database. The date is
+/// deliberately NOT part of it: the row already carries `trusted_at`, and the screen can render it
+/// in the reader's locale instead of in whichever one the server happened to have.
+///
+/// An unreadable agent yields `""` — the absence of a name, which the screen turns into "unnamed"
+/// and invites the owner to fix. Inventing "Device 1" would be the same lie in a new costume.
+pub(crate) fn default_device_name(user_agent: &str) -> String {
+    // Order matters: Edge and Opera announce Chrome, and Chrome announces Safari. Most specific
+    // first, so the browser reported is the one the owner would name.
+    let browser = [
+        ("Edg/", "Edge"),
+        ("OPR/", "Opera"),
+        ("Chrome/", "Chrome"),
+        ("Firefox/", "Firefox"),
+        ("Safari/", "Safari"),
+    ]
+    .into_iter()
+    .find(|(token, _)| user_agent.contains(token))
+    .map(|(_, name)| name);
+    // `iPad`/`iPhone` before `Mac OS X`, which they also carry; `Android` before `Linux`, same.
+    let platform = [
+        ("iPad", "iPad"),
+        ("iPhone", "iPhone"),
+        ("Android", "Android"),
+        ("Windows", "Windows"),
+        ("CrOS", "ChromeOS"),
+        ("Macintosh", "Mac"),
+        ("Mac OS X", "Mac"),
+        ("Linux", "Linux"),
+    ]
+    .into_iter()
+    .find(|(token, _)| user_agent.contains(token))
+    .map(|(_, name)| name);
+    // Half an answer still tells the owner which of the three tablets they are looking at.
+    match (browser, platform) {
+        (Some(browser), Some(platform)) => format!("{browser} · {platform}"),
+        (Some(only), None) | (None, Some(only)) => only.to_string(),
+        (None, None) => String::new(),
+    }
+}
+
+/// The `User-Agent` of a request, or `""` when it declared none.
+pub(crate) fn user_agent_of(headers: &HeaderMap) -> &str {
+    headers
+        .get(axum::http::header::USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+}
+
 fn unauthorized(e: auth::AuthError) -> Response {
     (
         StatusCode::UNAUTHORIZED,
@@ -139,10 +214,145 @@ pub async fn revoke_device(
     }
 }
 
+/// Body of `PUT /api/devices/:device_id`.
+#[derive(serde::Deserialize)]
+pub struct RenameDeviceReq {
+    /// What the business calls this device. Blank takes the name back.
+    #[serde(default)]
+    pub name: String,
+}
+
+/// PUT /api/devices/:device_id — give the device the name the **business** chose (hub#494).
+///
+/// Auth = **admin session**, the same gate as the read and the revocation (ADR-0248). It has to be:
+/// the name is what an owner will decide from when they point at the tablet to cut off, so if
+/// whoever holds a device could write it, it would be worth exactly as much as `label` — nothing.
+///
+/// **A door of its own, not a flag on the revocation.** Renaming is housekeeping and revoking takes
+/// a till down; one is undone by typing again and the other signs a shift out. Sharing an endpoint
+/// would mean one mis-sent field turns "fix a typo" into "disconnect the counter".
+///
+/// A device this business does not know is a `404`: rows exist because a login trusted a device,
+/// never because somebody typed an id — and a row invented here would be a *trusted* one.
+pub async fn rename_device(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(device_id): Path<String>,
+    Json(req): Json<RenameDeviceReq>,
+) -> Response {
+    let arc = match runtime(&st).await {
+        Ok(arc) => arc,
+        Err(response) => return response,
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let Some(name) = clean_name(&req.name) else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "error": format!("the device name is at most {MAX_DEVICE_NAME} characters"),
+                "code": "device_name_too_long",
+            })),
+        )
+            .into_response();
+    };
+    match rt.rename_device(device_id.trim(), name).await {
+        Ok(renamed) if renamed.was_known => Json(json!({
+            "ok": true,
+            "data": { "device_id": device_id.trim(), "name": renamed.name },
+        }))
+        .into_response(),
+        Ok(_) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({
+                "ok": false,
+                "error": "this business has no such device",
+                "code": "device_not_found",
+            })),
+        )
+            .into_response(),
+        // A blank segment (`/api/devices/%20`) names no device: the runtime refuses it (422).
+        Err(e) => crate::err_response(e),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use axum::http::HeaderValue;
+
+    #[test]
+    fn a_device_is_born_named_after_what_it_announced_never_after_the_person() {
+        // The name a device is born with (hub#494). `label` — the person — changes shift to shift
+        // and is chosen by the client; the platform is the one thing in the request that says
+        // something stable about the *device*. ADR-0257 rules out the id: 128 opaque bits.
+        assert_eq!(
+            default_device_name(
+                "Mozilla/5.0 (Linux; Android 14; SM-X200) AppleWebKit/537.36 (KHTML, like Gecko) \
+                 Chrome/126.0.0.0 Safari/537.36"
+            ),
+            "Chrome · Android"
+        );
+        assert_eq!(
+            default_device_name(
+                "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like \
+                 Gecko) Version/17.5 Safari/605.1.15"
+            ),
+            "Safari · iPad"
+        );
+        assert_eq!(
+            default_device_name(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) \
+                 Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0"
+            ),
+            "Edge · Windows",
+            "Edge announces Chrome AND Safari: the most specific token wins"
+        );
+        assert_eq!(
+            default_device_name(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like \
+                 Gecko) Version/17.5 Safari/605.1.15"
+            ),
+            "Safari · Mac"
+        );
+    }
+
+    #[test]
+    fn a_device_that_announced_nothing_readable_is_left_unnamed() {
+        // Empty is not a poor name, it is the absence of one — which is what the screen turns into
+        // "unnamed" and what an owner is invited to fix. Making something up ("Device 1") would be
+        // the same lie as the person's name it replaces.
+        for silent in ["", "   ", "curl/8.6.0", "PostmanRuntime/7.39.0"] {
+            assert_eq!(default_device_name(silent), "", "{silent:?} says nothing about the device");
+        }
+    }
+
+    #[test]
+    fn half_an_answer_is_still_worth_more_than_none() {
+        // A platform with no recognisable browser (or the other way round) still tells the owner
+        // which of the three tablets they are looking at, so it is not thrown away.
+        assert_eq!(default_device_name("Mozilla/5.0 (Linux; Android 14)"), "Android");
+        assert_eq!(default_device_name("Firefox/128.0"), "Firefox");
+    }
+
+    #[test]
+    fn a_name_is_trimmed_and_a_wall_of_text_is_refused() {
+        // Same rule as every other door: trimmed in ONE place, so what is stored, what is echoed
+        // back and what the list shows are the same string.
+        assert_eq!(clean_name("  Barra  "), Some("Barra"));
+        // Blank means "take the name back" — the row returns to unnamed, which is a real gesture
+        // and not a malformed request (a blank *id*, by contrast, names no device at all).
+        assert_eq!(clean_name("   "), Some(""));
+        // A paragraph in the column that exists to be read at a glance would push the row the
+        // owner is looking for off the screen.
+        assert_eq!(clean_name(&"B".repeat(MAX_DEVICE_NAME + 1)), None);
+        assert!(clean_name(&"B".repeat(MAX_DEVICE_NAME)).is_some(), "the limit itself is allowed");
+        // Counted in characters: an accented name must not be refused sooner than a plain one.
+        assert!(clean_name(&"á".repeat(MAX_DEVICE_NAME)).is_some(), "60 accented characters fit");
+    }
 
     #[test]
     fn the_current_flag_needs_the_caller_to_have_named_a_device() {

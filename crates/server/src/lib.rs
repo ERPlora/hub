@@ -1254,9 +1254,11 @@ pub fn app(state: AppState) -> Router {
         // entero (cuándo se usó cada dispositivo, cuánto le queda a su sesión), que es una lista de
         // la compra para quien tenga uno robado. Ver `crate::devices`.
         .route("/api/devices", get(devices::list_devices))
+        // El `PUT` **nombra** el dispositivo (hub#494) y el `DELETE` lo corta: dos gestos con
+        // consecuencias distintas, por eso son dos métodos y no un campo del mismo cuerpo.
         .route(
             "/api/devices/:device_id",
-            axum::routing::delete(devices::revoke_device),
+            axum::routing::delete(devices::revoke_device).put(devices::rename_device),
         )
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
@@ -3644,7 +3646,8 @@ async fn auth_cloud(
         )
             .into_response();
     };
-    open_cloud_session(&st, &token, body.map(|value| value.0), None).await
+    let user_agent = devices::user_agent_of(&headers).to_string();
+    open_cloud_session(&st, &token, body.map(|value| value.0), None, &user_agent).await
 }
 
 /// Shared implementation for ordinary Cloud login and the shell courier.  Keeping the JWT gate,
@@ -3655,6 +3658,11 @@ async fn open_cloud_session(
     token: &str,
     body: Option<CloudLoginReq>,
     cloud_tokens: Option<Value>,
+    // The `User-Agent` of the login request: the name a device this hub has never seen is born with
+    // (hub#494). It has to travel from the handler because this function sees no headers, and there
+    // is nothing else in the request that says anything about the **device** — ADR-0257 made the id
+    // opaque, and `name` in the body is the person.
+    user_agent: &str,
 ) -> Response {
     let Some(pem) = st.config.jwt_public_key.as_deref() else {
         return (
@@ -3780,8 +3788,15 @@ async fn open_cloud_session(
             // Device-trust (§2.9): este es un login ONLINE correcto → marca el dispositivo de
             // confianza para habilitar luego el login local por PIN. Best-effort (no bloquea el
             // login si falla el marcado).
+            // El nombre por defecto (hub#494) sale del **User-Agent**, y solo cuenta si el hub no
+            // conocía ya el dispositivo: `trust_device_with_default_name` lo escribe únicamente en
+            // el INSERT. `name` —la persona— sigue yendo a `label`, que es lo que es: una pista de
+            // quién entró la última vez, no el nombre de la tablet.
             if let Some(device_id) = device_id.as_deref() {
-                let _ = rt.trust_device(device_id, &name).await;
+                let default_name = devices::default_device_name(user_agent);
+                let _ = rt
+                    .trust_device_with_default_name(device_id, &name, &default_name)
+                    .await;
             }
             // Límite de dispositivos del plan (ADR-0154), como en el login por PIN.
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
@@ -3835,7 +3850,15 @@ struct CourierGrant {
 /// Boot courier for the native shell.  The browser submits only the opaque code to its same-origin
 /// runtime.  The runtime redeems it server-to-server with its machine credential, then feeds the
 /// access JWT through the exact same `/api/auth/cloud` implementation.  JWTs never appear in a URL.
-async fn auth_courier(State(st): State<AppState>, Json(req): Json<CourierReq>) -> Response {
+// `HeaderMap` va antes del `Json` a propósito: el extractor del cuerpo consume la petición y tiene
+// que ser el último. Lo necesita el nombre por defecto del dispositivo (hub#494): esta puerta abre
+// sesión igual que `/api/auth/cloud`, así que un login por el shell nativo no puede dejar la tablet
+// sin nombre solo por haber entrado por aquí.
+async fn auth_courier(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<CourierReq>,
+) -> Response {
     let code = req.code.trim();
     if code.is_empty() || code.len() > 128 {
         return (
@@ -3904,7 +3927,14 @@ async fn auth_courier(State(st): State<AppState>, Json(req): Json<CourierReq>) -
         email: cloud_tokens["cloud_user"]["email"].as_str().map(str::to_string),
         device_id: req.device_id,
     };
-    open_cloud_session(&st, &access, Some(login), Some(cloud_tokens)).await
+    open_cloud_session(
+        &st,
+        &access,
+        Some(login),
+        Some(cloud_tokens),
+        devices::user_agent_of(&headers),
+    )
+    .await
 }
 
 #[derive(serde::Deserialize)]

@@ -23,7 +23,7 @@ use erplora_runtime::device_mode::DeviceMode;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tower::ServiceExt; // oneshot
 
 type Response = axum::response::Response;
@@ -452,4 +452,279 @@ async fn disconnecting_the_same_device_twice_is_not_an_error() {
     let body = body_json(second).await;
     assert_eq!(body["data"]["was_known"], Value::Bool(false));
     assert_eq!(body["data"]["sessions_closed"], 0);
+}
+
+// ── Naming a device: `PUT /api/devices/:device_id` (hub#494) ─────────────────────────────────
+//
+// The revocation above is only as good as the owner's ability to point at the right row. Until
+// this door, the one readable field was `label` — the name of the *person* who last signed in
+// online, overwritten on every login and chosen by the client. Three tablets, three rows saying
+// "Marta", and the gesture that cuts one off is a coin toss.
+
+/// A request that carries a JSON body. `call` sends none, and the two shapes are worth keeping
+/// apart: everything above is about doors that take no payload.
+async fn call_with_body(
+    router: &axum::Router,
+    method: &str,
+    uri: &str,
+    session: Option<&str>,
+    body: Value,
+) -> Response {
+    let mut builder = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-type", "application/json");
+    if let Some(token) = session {
+        builder = builder.header("x-hub-session", token);
+    }
+    router
+        .clone()
+        .oneshot(builder.body(Body::from(body.to_string())).unwrap())
+        .await
+        .unwrap()
+}
+
+/// What the list says one device is called (`name`), asserting the read succeeded.
+async fn listed_name(router: &axum::Router, session: &str, device_id: &str) -> String {
+    let response = call(router, "GET", "/api/devices", Some(session), &[]).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_json(response).await["data"]["devices"]
+        .as_array()
+        .expect("a list of devices")
+        .iter()
+        .find(|d| d["device_id"] == device_id)
+        .unwrap_or_else(|| panic!("{device_id} is listed"))["name"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string()
+}
+
+#[tokio::test]
+async fn an_administrator_can_name_a_device_and_the_list_says_so() {
+    let (router, sessions) = fixture("hub-494").await;
+    // Nobody has named it yet, and that is a different fact from "its name is blank": the empty
+    // string is what the screen turns into "unnamed", never into a row with no title.
+    assert_eq!(listed_name(&router, &sessions.admin, "till-1").await, "");
+
+    let response = call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&sessions.admin),
+        json!({ "name": "  Barra  " }),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    // Trimmed in one place and used everywhere, like the id on the revocation door.
+    assert_eq!(body["data"]["name"], "Barra");
+    assert_eq!(body["data"]["device_id"], "till-1");
+    assert_eq!(listed_name(&router, &sessions.admin, "till-1").await, "Barra");
+}
+
+#[tokio::test]
+async fn the_next_online_login_does_not_touch_the_name_the_business_chose() {
+    let (router, sessions, state) = fixture_with_state("hub-494").await;
+    call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&sessions.admin),
+        json!({ "name": "Barra" }),
+    )
+    .await;
+
+    // Somebody else signs in online on that till: `trust_device` upserts, and its `DO UPDATE` is
+    // the statement this whole issue turns on. It may keep rewriting `label` — that field IS "who
+    // signed in last" — and it must never reach `name`, or the owner's choice lasts one shift.
+    state
+        .runtime
+        .lock()
+        .await
+        .trust_device("till-1", "Luis Prats")
+        .await
+        .unwrap();
+
+    let response = call(&router, "GET", "/api/devices", Some(&sessions.admin), &[]).await;
+    let body = body_json(response).await;
+    let till = body["data"]["devices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["device_id"] == "till-1")
+        .expect("the till is listed");
+    assert_eq!(till["name"], "Barra", "the name the business chose stayed");
+    assert_eq!(till["label"], "Luis Prats", "and the hint about who signed in moved on");
+}
+
+#[tokio::test]
+async fn a_name_can_be_taken_back_and_the_device_returns_to_unnamed() {
+    let (router, sessions) = fixture("hub-494").await;
+    call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&sessions.admin),
+        json!({ "name": "Barra" }),
+    )
+    .await;
+
+    let response = call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&sessions.admin),
+        json!({ "name": "   " }),
+    )
+    .await;
+
+    // Blank is not a malformed request here (unlike a blank *id*, which names no device at all):
+    // it is "I no longer want to call it that", and it puts the row back to unnamed.
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(listed_name(&router, &sessions.admin, "till-1").await, "");
+}
+
+#[tokio::test]
+async fn a_name_longer_than_any_screen_could_show_is_refused() {
+    let (router, sessions) = fixture("hub-494").await;
+
+    let response = call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&sessions.admin),
+        json!({ "name": "B".repeat(200) }),
+    )
+    .await;
+
+    // The name exists to be recognised at a glance in a list; a paragraph pushed into the column
+    // would push the row that matters off the screen — the opposite of what this door is for.
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(listed_name(&router, &sessions.admin, "till-1").await, "");
+}
+
+#[tokio::test]
+async fn naming_a_device_this_business_does_not_know_creates_nothing() {
+    let (router, sessions) = fixture("hub-494").await;
+
+    let response = call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/never-seen",
+        Some(&sessions.admin),
+        json!({ "name": "Cocina" }),
+    )
+    .await;
+
+    // A device is listed because it was TRUSTED, never because somebody typed its id. Inventing a
+    // row here would put an entry in the owner's list that no login ever produced.
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(listed_ids(&router, &sessions.admin).await.len(), 2);
+}
+
+#[tokio::test]
+async fn only_an_administrator_can_name_a_device() {
+    let (router, sessions) = fixture("hub-494").await;
+
+    let no_session = call_with_body(&router, "PUT", "/api/devices/till-1", None, json!({ "name": "Barra" })).await;
+    let as_employee = call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&sessions.employee),
+        json!({ "name": "Barra" }),
+    )
+    .await;
+
+    // Same gate as the read and the revocation (ADR-0248): the name is what an owner will trust
+    // when deciding which till to cut off, so whoever holds a device cannot write it.
+    assert_eq!(no_session.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(as_employee.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(listed_name(&router, &sessions.admin, "till-1").await, "");
+}
+
+#[tokio::test]
+async fn naming_a_device_is_not_disconnecting_it() {
+    let (router, sessions) = fixture("hub-494").await;
+
+    let response = call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/laptop-1",
+        Some(&sessions.admin),
+        json!({ "name": "Portátil despacho" }),
+    )
+    .await;
+
+    // Two gestures, two doors, on purpose: renaming is housekeeping and revoking takes a till down.
+    // A rename that closed sessions would sign the office out for a typo.
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        call(&router, "GET", "/api/devices", Some(&sessions.admin_on_laptop), &[])
+            .await
+            .status(),
+        StatusCode::OK,
+        "the session open on the renamed laptop is exactly as it was"
+    );
+    assert_eq!(listed_ids(&router, &sessions.admin).await.len(), 2);
+}
+
+#[tokio::test]
+async fn a_device_of_another_business_cannot_be_renamed_from_here() {
+    let (mine, my_sessions) = fixture("hub-494").await;
+    // The neighbour is alive and holds a device with the SAME id — the real case of one tablet
+    // working in two shops. Without a `hub_id` in the statement, this write crosses.
+    let (neighbours, their_sessions) = fixture("hub-494-neighbour").await;
+    call_with_body(
+        &neighbours,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&their_sessions.admin),
+        json!({ "name": "Su barra" }),
+    )
+    .await;
+
+    call_with_body(
+        &mine,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&my_sessions.admin),
+        json!({ "name": "Mi barra" }),
+    )
+    .await;
+
+    assert_eq!(listed_name(&mine, &my_sessions.admin, "till-1").await, "Mi barra");
+    assert_eq!(
+        listed_name(&neighbours, &their_sessions.admin, "till-1").await,
+        "Su barra",
+        "the shop next door kept the name it chose"
+    );
+}
+
+#[tokio::test]
+async fn the_first_login_names_a_device_after_the_platform_it_announced() {
+    let (router, sessions, state) = fixture_with_state("hub-494").await;
+
+    // What the login does when a device this hub has never seen signs in online: the name it is
+    // born with is the platform, NOT the person (the person is `label`, and it changes shift to
+    // shift). ADR-0257 forbids reading it off the id, which is 128 opaque bits.
+    state
+        .runtime
+        .lock()
+        .await
+        .trust_device_with_default_name("tablet-9", "Marta Ruiz", "Chrome · Android")
+        .await
+        .unwrap();
+    // …and a SECOND online login on the same device leaves that name alone: the default is what a
+    // device is called until somebody decides otherwise, not something rewritten on every entry.
+    state
+        .runtime
+        .lock()
+        .await
+        .trust_device_with_default_name("tablet-9", "Luis Prats", "Safari · iPad")
+        .await
+        .unwrap();
+
+    assert_eq!(listed_name(&router, &sessions.admin, "tablet-9").await, "Chrome · Android");
 }
