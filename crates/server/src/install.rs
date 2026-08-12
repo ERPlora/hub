@@ -401,7 +401,7 @@ async fn acquire_and_install(
     .await
     {
         Ok(plan) => {
-            return execute_plan(
+            match execute_plan(
                 http,
                 cloud_base_url,
                 cache_root,
@@ -413,7 +413,25 @@ async fn acquire_and_install(
                 signature_policy,
                 updating,
             )
-            .await;
+            .await?
+            {
+                PlanOutcome::Installed(installed) => return Ok(installed),
+                // hub#672: the plan arrived 200 but omits dependencies the downloaded manifest
+                // declares (the saas#1352 empty-graph outage shape). Executing it as-is would die
+                // in the runtime's `MissingDependency` net; degrade to the manifest fallback below
+                // instead — the safety net must RECOVER, not just kill.
+                PlanOutcome::Incomplete {
+                    module_id: drifted_node,
+                    missing,
+                } => {
+                    tracing::warn!(
+                        module_id = %module_id,
+                        drifted_node = %drifted_node,
+                        missing = ?missing,
+                        "install-plan omits dependencies the manifest declares (hub#672): resolving by manifest"
+                    );
+                }
+            }
         }
         Err(PlanUnavailable::Blocked(e)) => return Err(e),
         Err(PlanUnavailable::Degraded(reason)) => {
@@ -906,12 +924,29 @@ async fn fetch_install_plan(
     Ok(plan)
 }
 
-/// Ejecuta el plan **en orden** (dependencias primero). Por nodo: `download/?version=` → verificar
-/// el `sha256` DEL PLAN → `install_from_dir` → `mark_installed`. Sin round-trip a `versions/`.
+/// How executing a Cloud plan ended, when it did not fail outright.
+enum PlanOutcome {
+    /// The plan closure was executed; carries the requested module ("headline").
+    Installed(Installed),
+    /// hub#672: the downloaded manifest of `module_id` declares dependencies that are neither
+    /// installed nor anywhere in the plan's closure — the plan is incomplete (Cloud graph drift,
+    /// e.g. saas#1352 shipped every plan as a single node). Nothing broken was installed: the
+    /// caller must fall back to the manifest-nested resolution, which recovers.
+    Incomplete {
+        module_id: String,
+        missing: Vec<String>,
+    },
+}
+
+/// Executes the plan **in order** (dependencies first). Per node: `download/?version=` → verify
+/// the sha256 FROM THE PLAN → `install_from_dir` → `mark_installed`. No `versions/` round-trip.
 ///
-/// El `MissingDependency` del runtime (paso 6) e `install_order` siguen ahí como red de seguridad
-/// ante drift entre el set que reportamos y el real: si el plan viniera incompleto, el runtime lo
-/// rechaza en vez de instalar algo roto.
+/// The plan is the Cloud's claim; the downloaded manifest is the authoritative truth. Before
+/// registering each node, its `depends_on` is checked against what is installed plus the plan's
+/// own closure: a plan that omits declared dependencies (hub#672) returns
+/// [`PlanOutcome::Incomplete`] so the caller degrades to the manifest fallback instead of dying
+/// in the runtime's `MissingDependency` net. That net (installer step 6) stays as the last line
+/// for drift the manifest check cannot see (e.g. a plan ordered wrong).
 #[allow(clippy::too_many_arguments)]
 async fn execute_plan(
     http: &reqwest::Client,
@@ -924,9 +959,14 @@ async fn execute_plan(
     on_progress: OnProgress<'_>,
     signature_policy: &cloud_client::SignaturePolicy,
     updating: Option<&str>,
-) -> Result<Installed, InstallError> {
+) -> Result<PlanOutcome, InstallError> {
     let cloud = CloudClient::new(cloud_base_url);
     let mut headline: Option<Installed> = None;
+
+    // The plan's own closure: a dependency listed anywhere in the plan will be installed by it
+    // (dependencies-first order), so only deps outside this set make the plan incomplete.
+    let planned: std::collections::HashSet<&str> =
+        plan.plan.iter().map(|n| n.module_id.as_str()).collect();
 
     for node in &plan.plan {
         // Idempotencia / drift: el plan excluye lo ya instalado, pero si el registry lo tiene
@@ -987,6 +1027,23 @@ async fn execute_plan(
             signature_policy,
         )?;
 
+        // hub#672: check the REAL manifest's `depends_on` against the plan's closure BEFORE
+        // registering. A dependency that is neither installed nor planned means the Cloud's graph
+        // drifted (e.g. saas#1352: every plan came back single-node): bail out so the caller
+        // falls back to manifest resolution. Registering would only die in `MissingDependency`.
+        let missing: Vec<String> = runtime
+            .missing_dependencies(&dir)
+            .map_err(|e| InstallError::Runtime(e.to_string()))?
+            .into_iter()
+            .filter(|dep| !planned.contains(dep.as_str()))
+            .collect();
+        if !missing.is_empty() {
+            return Ok(PlanOutcome::Incomplete {
+                module_id: node.module_id.clone(),
+                missing,
+            });
+        }
+
         on_progress(&node.module_id, "installing");
         let installed_id = register(runtime, &dir, &node.module_id, updating).await?;
 
@@ -1013,16 +1070,18 @@ async fn execute_plan(
         }
     }
 
-    // El módulo pedido puede no estar en el plan porque YA estaba instalado (`already_satisfied`):
-    // reinstalarlo no aporta nada, así que se reporta lo que hay.
+    // The requested module may be absent from the plan because it was ALREADY installed
+    // (`already_satisfied`): reinstalling adds nothing, so report what is there.
     match headline {
-        Some(i) => Ok(i),
-        None if runtime.registry().is_installed(module_id) => Ok(Installed {
-            module_id: module_id.to_string(),
-            version: runtime.registry().module_version(module_id),
-            dir: cache_root.to_path_buf(),
-        }),
-        // Plan vacío y el módulo no está: el Cloud no lo considera instalable aquí.
+        Some(i) => Ok(PlanOutcome::Installed(i)),
+        None if runtime.registry().is_installed(module_id) => {
+            Ok(PlanOutcome::Installed(Installed {
+                module_id: module_id.to_string(),
+                version: runtime.registry().module_version(module_id),
+                dir: cache_root.to_path_buf(),
+            }))
+        }
+        // Empty plan and the module is not installed: the Cloud does not consider it installable here.
         None => Err(InstallError::VersionNotFound(module_id.to_string())),
     }
 }
