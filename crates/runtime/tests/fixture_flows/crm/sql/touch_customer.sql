@@ -1,0 +1,1 @@
+UPDATE crm_customer SET email = email WHERE hub_id = :hub_id;

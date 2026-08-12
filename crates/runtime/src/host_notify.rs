@@ -31,6 +31,15 @@
 //! 2. **Canal declarado** — [`assert_channel_declared`]: declarar `email` no habilita WhatsApp.
 //! 3. **Destinatario resuelto desde datos del HUB** — [`assert_recipient_allowed`]: allowlist de
 //!    `hub_settings` o email de un usuario del hub. Nunca una dirección libre del payload.
+//!
+//! ## Y la cuarta, para lo que encola un FLUJO (hub#821)
+//!
+//! Un flujo no es un módulo: las puertas 1 y 2 no tienen a quién preguntar. Lo que ocupa su sitio
+//! son sus **dos grants** —el canal (`notify`) y el par query#campo (`recipient_query`)—, y el
+//! destinatario no sale de la allowlist sino de esa query. Con eso, y solo con eso, un flujo puede
+//! escribir a un CLIENTE, que es lo que la allowlist nunca podía cubrir: los clientes viven en la
+//! tabla de un módulo. El detalle está en [`crate::flows::notify`]; lo que aquí importa es que la
+//! comprobación de FORMA ([`check_recipient_syntax`]) se aplica igual por los dos caminos.
 use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
@@ -59,6 +68,39 @@ impl Channel {
             _ => None,
         }
     }
+
+    /// Nombre canónico del canal — el mismo que se parsea y el mismo que guarda un grant `notify`.
+    pub fn as_str(self) -> &'static str {
+        channel_name(self)
+    }
+
+    /// Los canales por los que este hub **puede** enviar de verdad (hub#821). `sms` está en el
+    /// vocabulario de ADR-0012 y no tiene transporte —el proxy del SaaS solo hace email y WhatsApp,
+    /// y el hub no guarda credencial propia—, así que un grant o un step que lo nombre se rechaza
+    /// al guardar en vez de morir ocho reintentos después contra un 404.
+    pub const DELIVERABLE: &'static [Channel] = &[Channel::Email, Channel::Whatsapp];
+
+    /// ¿Hay transporte real para este canal? Ver [`Channel::DELIVERABLE`].
+    pub fn is_deliverable(self) -> bool {
+        Self::DELIVERABLE.contains(&self)
+    }
+}
+
+/// Clave del payload de un evento host-notify que dice que el destinatario **lo resolvió un
+/// flujo** por un grant `recipient_query` (hub#821), y no la allowlist del hub.
+///
+/// Es una PISTA, nunca una autorización: quien la honra ([`crate::outbox`]) exige además que la
+/// fila del outbox venga de un run (`run_id`) y sin módulo emisor —lo único que el kernel de
+/// flujos produce y un módulo no puede fabricar— y vuelve a leer el grant vivo. Copiarla en el
+/// payload de un módulo no abre nada.
+pub const RESOLVED_VIA_KEY: &str = "resolved_via";
+
+/// Prefijo del valor de [`RESOLVED_VIA_KEY`]: `flow_grant:<id del grant recipient_query>`.
+pub const FLOW_GRANT_PREFIX: &str = "flow_grant:";
+
+/// Cómo se escribe la pista de arriba para un grant concreto.
+pub fn flow_grant_release(grant_id: &str) -> String {
+    format!("{FLOW_GRANT_PREFIX}{grant_id}")
 }
 
 /// La intención de notificación que un command emite en el payload del evento `*.reminder.due`.
@@ -99,8 +141,10 @@ const MAX_RECIPIENT_LEN: usize = 254;
 ///
 /// No autoriza nada por sí sola — solo corta lo que nunca puede ser un destinatario legítimo:
 /// vacío, saltos de línea (inyección de cabeceras SMTP), varios destinatarios en un mismo `to`,
-/// o un teléfono que no es E.164. La autorización real la da [`assert_recipient_allowed`].
-fn check_recipient_syntax(channel: Channel, to: &str) -> Result<()> {
+/// o un teléfono que no es E.164. La autorización real la da [`assert_recipient_allowed`] — o, para
+/// un flujo, su grant `recipient_query` (hub#821), que reutiliza ESTA misma comprobación de forma:
+/// que la dirección salga de una query concedida no la convierte en un destinatario válido.
+pub(crate) fn check_recipient_syntax(channel: Channel, to: &str) -> Result<()> {
     let bad = |why: &str| {
         Err(RuntimeError::Notify(format!(
             "destinatario inválido para el canal {channel:?}: {why}"
@@ -209,10 +253,15 @@ fn channel_name(channel: Channel) -> &'static str {
 ///  1. estar en la **allowlist del dueño del hub** ([`ALLOWED_RECIPIENTS_SETTING`]), o
 ///  2. (canal email) ser el email de un **usuario del hub activo** (`hub_user`).
 ///
-/// Cualquier otra cosa se rechaza. **Pendiente de decisión de producto**: cómo se autoriza el
-/// contacto de un CLIENTE (los clientes viven en la tabla de un módulo, no en el core), que es lo
-/// que hace falta para los recordatorios de cita reales. Hasta entonces, el operador los autoriza
-/// explícitamente en la allowlist.
+/// Cualquier otra cosa se rechaza. Esta es la puerta de lo que emite un **módulo**, y sigue
+/// alcanzando solo al personal — a propósito.
+///
+/// El contacto de un **CLIENTE** (que vive en la tabla de un módulo, no en el core) ya tiene
+/// respuesta, y no pasa por aquí: la da el grant `recipient_query` de un flujo (hub#821,
+/// [`crate::flows::notify`]), que autoriza **un campo de una query declarada** y se vuelve a leer
+/// en la entrega, así que revocarlo corta el envío. Era la decisión de producto que este comentario
+/// dejó pendiente desde hub#240, y la razón por la que no se resolvió metiendo clientes en la
+/// allowlist: una allowlist con la agenda entera del negocio no contiene nada.
 pub async fn assert_recipient_allowed(
     db: &dyn erplora_db::DatabaseAdapter,
     hub_id: &str,
@@ -236,10 +285,12 @@ pub async fn assert_recipient_allowed(
     // 2) Email de un usuario del hub activo.
     if intent.channel == Channel::Email {
         let mut p = erplora_db::Params::new();
+        p.insert("hub_id".into(), serde_json::json!(hub_id));
         p.insert("email".into(), serde_json::json!(to.to_ascii_lowercase()));
         let res = db
             .query(
-                "SELECT id FROM hub_user WHERE LOWER(email) = :email AND is_active = 1",
+                "SELECT id FROM hub_user \
+                  WHERE hub_id = :hub_id AND LOWER(email) = :email AND is_active = 1",
                 &p,
             )
             .await?;
@@ -335,14 +386,15 @@ impl NotifyTransport for MockTransport {
     }
 }
 
-// ── TODO (decisión de dependencia del humano) ────────────────────────────────────────────────
-// El transporte REAL requiere dependencias nuevas que son columna del humano:
-//   - email  → `lettre` (SMTP) con el secreto SMTP local cifrado del hub.
-//   - sms    → cliente HTTP (`reqwest`, ya en el workspace de server) al proveedor del tenant.
-//   - whatsapp tenant   → Graph API de Meta (HTTP) con el token local cifrado del hub.
-//   - whatsapp premium  → `erplora-cloud-client::notify_whatsapp` (proxy Cloud, check_quota).
-// El cifrado del secreto local del hub debe seguir el patrón de ADR-0016 (Fernet/master key en
-// env), igual que el PKCS#12 de verifactu. NO se inventa aquí: se deja el trait y el mock.
+// ── El transporte real (hub#663) ─────────────────────────────────────────────────────────────
+// Ya existe: `crates/server/src/notify_transport.rs` (`CloudNotifyTransport`). **Todo sale por el
+// proxy del SaaS** —email por SES/SMTP y WhatsApp por Meta Graph con el token Fernet del hub— y el
+// hub NUNCA guarda una credencial de Meta/SES, igual que con los LLM. Por eso [`Routing`] no se
+// honra: ADR-0012 mandaba los canales «del tenant» a un secreto local cifrado que no existe, y
+// honrarlo hoy solo significaría negarse a enviar (flows.md §5). `sms` no tiene transporte por
+// ningún lado y se rechaza con motivo claro en vez de reintentar contra un 404.
+// El mock de aquí abajo se pide POR SU NOMBRE (`HUB_NOTIFY_TRANSPORT=mock`): caer en él por
+// accidente sería un recordatorio que nunca salió y del que nadie se entera.
 
 #[cfg(test)]
 mod tests {
@@ -479,7 +531,7 @@ mod tests {
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "h1").await.unwrap();
 
-        crate::identity::create_login_user(&db, "empleado@hub.com", "employee")
+        crate::identity::create_login_user(&db, "h1", "empleado@hub.com", "employee")
             .await
             .unwrap();
         assert_recipient_allowed(&db, "h1", &intent(Channel::Email, "Empleado@Hub.com"))
@@ -500,7 +552,7 @@ mod tests {
         );
 
         // Baja del usuario → la puerta se cierra.
-        crate::identity::deactivate_login_user(&db, "empleado@hub.com")
+        crate::identity::deactivate_login_user(&db, "h1", "empleado@hub.com")
             .await
             .unwrap();
         assert!(

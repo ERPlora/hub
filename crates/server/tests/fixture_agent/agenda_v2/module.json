@@ -1,0 +1,37 @@
+{
+  "id": "agenda",
+  "name": "Agenda",
+  "version": "1.1.0",
+  "agent": { "description": "Appointments: free slots and bookings" },
+  "permissions": ["agenda.view", "agenda.book", "agenda.cancel"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "agenda.slots.list": {
+      "permission": "agenda.view",
+      "sql": "queries/slots_list.sql",
+      "ai": {
+        "description": "Free appointment slots of this business, with their start time and the minutes they last."
+      }
+    },
+    "agenda.bookings.list": {
+      "permission": "agenda.view",
+      "sql": "queries/bookings_list.sql",
+      "ai": { "description": "Appointments already booked." }
+    }
+  },
+  "commands": {
+    "agenda.booking.create": {
+      "permission": "agenda.book",
+      "transaction": true,
+      "sql": ["commands/booking_create.sql"],
+      "schema": "commands/booking_create.schema.json",
+      "ai": { "description": "Book an appointment for a customer at a given slot." }
+    },
+    "agenda.booking.cancel": {
+      "permission": "agenda.cancel",
+      "transaction": true,
+      "sql": ["commands/booking_cancel.sql"],
+      "ai": { "description": "Cancel a booked appointment." }
+    }
+  }
+}

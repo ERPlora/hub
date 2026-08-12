@@ -132,10 +132,42 @@ pub struct NavEntry {
     pub nav: Nav,
 }
 
+/// **Who emitted an event** (hub#529).
+///
+/// The event stream filters what it fans out by the module a frame came from, and the only place
+/// that knows is the emitter: the dispatcher holds `cmd.module_id`. It is passed down here rather
+/// than inferred from the event's *name* because the `module.event` shape is a convention **nobody
+/// verifies** — a module may declare `emit: ["invoice.paid"]` and nothing stops it, so a filter
+/// reading the prefix would let any module hand itself another module's audience.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventSource<'a> {
+    /// An installed module's event, by module id.
+    Module(&'a str),
+    /// The hub itself: nobody's module. Flow approvals, an inbound WhatsApp message, the frames
+    /// the installer and the print queue publish. See `erplora_server::event_stream`.
+    Core,
+}
+
+impl EventSource<'_> {
+    /// The emitting module id, or `None` for the hub's own events. An **empty** module id is also
+    /// `None`: the outbox already writes `""` for a core event ([`crate::outbox::insert_core_event_once`]),
+    /// and two spellings of "nobody" would eventually disagree.
+    pub fn module_id(&self) -> Option<&str> {
+        match self {
+            EventSource::Module(id) if !id.is_empty() => Some(id),
+            _ => None,
+        }
+    }
+}
+
 /// Observador de eventos del runtime. El server lo implementa con un canal
 /// broadcast para reenviar los eventos por WebSocket (ARQUITECTURA.md §7.7).
+///
+/// `source` is **not optional and has no default** on purpose (hub#529): a sink that could forget
+/// who emitted would publish a frame the stream cannot attribute, and an unattributable frame is
+/// one the scope filter can only refuse — a silent loss of events with nothing to point at.
 pub trait EventSink: Send + Sync + std::fmt::Debug {
-    fn emit(&self, event: &str, payload: &serde_json::Value);
+    fn emit(&self, source: EventSource<'_>, event: &str, payload: &serde_json::Value);
 }
 
 #[derive(Debug, Default)]

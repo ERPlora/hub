@@ -77,8 +77,9 @@ pub struct UnresolvedAccessEmail {
 
 /// The rows the backfill left alone, for this hub. Empty is the normal answer.
 ///
-/// Scoped by `hub_id` through the profile table (`hub_user` has no `hub_id` column: since ADR-0201
-/// each hub owns its database), exactly like the Personal listing.
+/// Scoped by `hub_id` on `hub_user` itself since hub#497 gave it the column — subqueries included:
+/// «another row already answers for this email» has to mean another row **of this hub**, or the
+/// backfill would call an address resolved because the business next door happens to use it.
 pub async fn unresolved(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -89,17 +90,18 @@ pub async fn unresolved(
         .query(
             "SELECT u.id AS id, u.name AS name, TRIM(pr.email) AS profile_email, \
                     EXISTS (SELECT 1 FROM hub_user o \
-                             WHERE o.id <> u.id \
+                             WHERE o.hub_id = :hub_id AND o.id <> u.id \
                                AND LOWER(TRIM(COALESCE(o.email, ''))) = LOWER(TRIM(pr.email))) \
                       AS answered_elsewhere, \
                     EXISTS (SELECT 1 FROM hub_user_profile r \
-                              JOIN hub_user ru ON ru.id = r.user_id \
+                              JOIN hub_user ru ON ru.id = r.user_id AND ru.hub_id = r.hub_id \
                              WHERE r.hub_id = pr.hub_id AND r.user_id <> pr.user_id \
                                AND LOWER(TRIM(r.email)) = LOWER(TRIM(pr.email)) \
                                AND COALESCE(TRIM(ru.email), '') = '') AS claimed_twice \
                FROM hub_user u \
                JOIN hub_user_profile pr ON pr.user_id = u.id AND pr.hub_id = :hub_id \
-              WHERE COALESCE(TRIM(u.email), '') = '' AND TRIM(pr.email) <> '' \
+              WHERE u.hub_id = :hub_id \
+                AND COALESCE(TRIM(u.email), '') = '' AND TRIM(pr.email) <> '' \
               ORDER BY u.name, u.id",
             &p,
         )
@@ -203,10 +205,11 @@ mod tests {
     /// A `hub_user` with the access email given (`""` = the shape this whole module is about).
     async fn user(db: &PgAdapter, id: &str, name: &str, access_email: &str) {
         db.execute(
-            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-               VALUES (:id, :name, '', 'employee', NULL, 1, :now, :email)",
+            "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+               VALUES (:id, :hub_id, :name, '', 'employee', NULL, 1, :now, :email)",
             &p(&[
                 ("id", json!(id)),
+                ("hub_id", json!(HUB)),
                 ("name", json!(name)),
                 ("email", json!(access_email)),
                 ("now", json!("2026-08-01T10:00:00Z")),

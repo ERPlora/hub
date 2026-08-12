@@ -34,7 +34,7 @@
              needs a history nobody has on day one — so the launcher goes FIRST and cannot be
              removed. It is the only widget that works with zero data. Same source as the topbar
              launcher (`moduleNav` ← `/api/navigation`): one list of installed apps, not two. -->
-        <MyAppsCard :apps="moduleNav" />
+        <MyAppsCard :apps="moduleNav" :state="moduleNavState" />
 
         <!-- Zone 3 — The configuration checklist: ONE read of `hub.setup.status` (hub#372,
              `architecture/hub/setup-status.md`). It used to be a banner fed by a loop in the
@@ -187,7 +187,7 @@ import { dataTableLabels } from '../lib/data-table-labels';
 import { getClient, getHubSector, listInstalledModules, type InstalledModule } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
-import { moduleNav } from '../lib/nav';
+import { moduleNav, moduleNavState } from '../lib/nav';
 import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
 import { openAssistantForSetup } from '../lib/shell';
 import { detectPeripherals, type BridgeStatus } from '../lib/bridge-transport';

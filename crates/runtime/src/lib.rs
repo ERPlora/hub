@@ -72,8 +72,8 @@ pub use errors::{DemoLock, Result, RuntimeError};
 pub use manifest::{Manifest, ManifestWarning, CORE_VERSION};
 pub use module_update::ModuleUpdate;
 pub use registry::{
-    AutomationCtx, EventSink, ModuleSnapshot, ModuleStatus, NavEntry, Principal, Registry,
-    RequestContext,
+    AutomationCtx, EventSink, EventSource, ModuleSnapshot, ModuleStatus, NavEntry, Principal,
+    Registry, RequestContext,
 };
 // Re-export del guard de e2e para los tests de integración (ERPlora/hub#253): raíz corta
 // `erplora_runtime::require_modules_workspace()` en vez del path completo del módulo.
@@ -1020,22 +1020,22 @@ impl Runtime {
         role: &str,
         cloud_user_id: Option<&str>,
     ) -> Result<String> {
-        identity::create_user(self.db.as_ref(), name, pin, role, cloud_user_id).await
+        identity::create_user(self.db.as_ref(), &self.hub_id, name, pin, role, cloud_user_id).await
     }
 
     #[doc(hidden)]
     pub async fn ensure_dev_user(&self, id: &str, name: &str, role: &str) -> Result<()> {
-        identity::ensure_dev_user(self.db.as_ref(), id, name, role).await
+        identity::ensure_dev_user(self.db.as_ref(), &self.hub_id, id, name, role).await
     }
 
     /// Verifica el PIN de un usuario por nombre. `Some(user)` si encaja.
     pub async fn verify_pin(&self, name: &str, pin: &str) -> Result<Option<identity::HubUser>> {
-        identity::verify_pin(self.db.as_ref(), name, pin).await
+        identity::verify_pin(self.db.as_ref(), &self.hub_id, name, pin).await
     }
 
     /// Usuarios activos del hub con PIN (para mostrar el grid de login local). `(id, name, role)`.
     pub async fn list_pin_users(&self) -> Result<Vec<(String, String, String)>> {
-        identity::list_pin_users(self.db.as_ref()).await
+        identity::list_pin_users(self.db.as_ref(), &self.hub_id).await
     }
 
     /// **The manager approves one action** (hub#361, PLAN paso 2b rules 2 and 4).
@@ -1109,7 +1109,7 @@ impl Runtime {
             ));
         }
 
-        let approver = identity::verify_pin(self.db.as_ref(), req.approver_name, req.pin)
+        let approver = identity::verify_pin(self.db.as_ref(), &self.hub_id, req.approver_name, req.pin)
             .await?
             // One answer for an unknown name, a wrong PIN and a deactivated user: a dialog at the
             // counter must not become a way to find out who works here.
@@ -1201,7 +1201,7 @@ impl Runtime {
     /// **Siembra el owner del hub** desde el env del provisioning (`HUB_OWNER_EMAIL`, ADR-0157): el
     /// owner es el CREADOR del hub. Idempotente (no duplica ni cambia si ya existe). `true` si sembró.
     pub async fn seed_owner(&self, email: &str) -> Result<bool> {
-        identity::seed_owner(self.db.as_ref(), email).await
+        identity::seed_owner(self.db.as_ref(), &self.hub_id, email).await
     }
 
     /// Resuelve (o enlaza/provisiona) el `hub_user` de una identidad cloud (mapeo del JWT). Enlaza
@@ -1220,6 +1220,7 @@ impl Runtime {
     ) -> Result<identity::HubUser> {
         identity::get_or_link_cloud_user(
             self.db.as_ref(),
+            &self.hub_id,
             cloud_user_id,
             default_name,
             default_role,
@@ -1237,22 +1238,22 @@ impl Runtime {
         cloud_user_id: &str,
         email: Option<&str>,
     ) -> Result<usize> {
-        identity::revoke_cloud_access(self.db.as_ref(), cloud_user_id, email).await
+        identity::revoke_cloud_access(self.db.as_ref(), &self.hub_id, cloud_user_id, email).await
     }
 
     /// **Alta** de un usuario-login por email + rol (flujo admin, ADR-0157 §7). Upsert por email.
     pub async fn create_login_user(&self, email: &str, role: &str) -> Result<identity::HubUser> {
-        identity::create_login_user(self.db.as_ref(), email, role).await
+        identity::create_login_user(self.db.as_ref(), &self.hub_id, email, role).await
     }
 
     /// **Baja** de un usuario-login por email (flujo admin, ADR-0157 §7). Desactiva; `true` si afectó.
     pub async fn deactivate_login_user(&self, email: &str) -> Result<bool> {
-        identity::deactivate_login_user(self.db.as_ref(), email).await
+        identity::deactivate_login_user(self.db.as_ref(), &self.hub_id, email).await
     }
 
     /// Lista los usuarios-login del hub (los `hub_user` con email) para el panel admin.
     pub async fn list_login_users(&self) -> Result<Vec<identity::LoginUser>> {
-        identity::list_login_users(self.db.as_ref()).await
+        identity::list_login_users(self.db.as_ref(), &self.hub_id).await
     }
 
     /// Personas cuyo email **solo** está en su perfil y no se pudo llevar a donde se administra el
@@ -1266,7 +1267,7 @@ impl Runtime {
 
     /// Fija (o cambia) el PIN de un usuario existente por id (alta de PIN tras login cloud).
     pub async fn set_pin(&self, user_id: &str, pin: &str) -> Result<()> {
-        identity::set_pin(self.db.as_ref(), user_id, pin).await
+        identity::set_pin(self.db.as_ref(), &self.hub_id, user_id, pin).await
     }
 
     /// Abre una sesión server-side para `user_id`; devuelve el token opaco. `device_id` = identidad
@@ -1277,7 +1278,7 @@ impl Runtime {
         ttl_secs: i64,
         device_id: Option<&str>,
     ) -> Result<String> {
-        identity::create_session(self.db.as_ref(), user_id, ttl_secs, device_id).await
+        identity::create_session(self.db.as_ref(), &self.hub_id, user_id, ttl_secs, device_id).await
     }
 
     /// Aplica el límite de dispositivos del plan ANTES de abrir sesión (ADR-0154): con
@@ -1288,17 +1289,17 @@ impl Runtime {
         max_devices: u32,
         device_id: Option<&str>,
     ) -> Result<()> {
-        identity::enforce_device_limit(self.db.as_ref(), max_devices, device_id).await
+        identity::enforce_device_limit(self.db.as_ref(), &self.hub_id, max_devices, device_id).await
     }
 
     /// Resuelve una sesión válida a su `hub_user` activo (o `None`).
     pub async fn resolve_session(&self, token: &str) -> Result<Option<identity::HubUser>> {
-        identity::resolve_session(self.db.as_ref(), token).await
+        identity::resolve_session(self.db.as_ref(), &self.hub_id, token).await
     }
 
     /// Cierra una sesión (logout).
     pub async fn delete_session(&self, token: &str) -> Result<()> {
-        identity::delete_session(self.db.as_ref(), token).await
+        identity::delete_session(self.db.as_ref(), &self.hub_id, token).await
     }
 
     /// Perfil y preferencias del usuario actual, aislados por `(hub_id, user_id)`.
@@ -1765,9 +1766,10 @@ impl Runtime {
         outbox::list_dead(self.db.as_ref(), &self.hub_id, limit).await
     }
 
-    /// Puts a dead-letter back in front of the relay (`pending`, attempts reset). `false` if there
-    /// is no dead-letter with that id **in this hub**.
-    pub async fn retry_dead_event(&self, id: &str) -> Result<bool> {
+    /// Puts a dead-letter back in front of the relay (`pending`, attempts reset). Three answers,
+    /// because a row that CANNOT be replayed is neither a success nor a missing id
+    /// ([`outbox::RetryOutcome`], hub#827).
+    pub async fn retry_dead_event(&self, id: &str) -> Result<outbox::RetryOutcome> {
         outbox::retry(self.db.as_ref(), &self.hub_id, id).await
     }
 
@@ -1823,7 +1825,9 @@ impl Runtime {
             declared_by,
             samples: samples.len(),
             last_seen_at: samples.first().map(|s| s.created_at.clone()),
-            fields: event_shape::infer(&payloads),
+            // The NAME travels into the inference: for a flat payload it is the only thing that
+            // says whose data this is (hub#826).
+            fields: event_shape::infer(event_name, &payloads),
         }))
     }
 
@@ -1883,8 +1887,11 @@ impl Runtime {
         flows::store::get(self.db.as_ref(), &self.hub_id, id).await
     }
 
+    /// Saves a flow. The registry travels with it because the document names COMMANDS, and a
+    /// document naming one the kernel can never invoke is refused at save (hub#824) — same reason
+    /// `replace_flow_grants` carries it.
     pub async fn create_flow(&self, new: &flows::NewFlow, by: &str) -> Result<flows::Flow> {
-        flows::store::create(self.db.as_ref(), &self.hub_id, new, by).await
+        flows::store::create(self.db.as_ref(), &self.hub_id, &self.registry, new, by).await
     }
 
     pub async fn update_flow(
@@ -1893,7 +1900,7 @@ impl Runtime {
         new: &flows::NewFlow,
         by: &str,
     ) -> Result<flows::Flow> {
-        flows::store::update(self.db.as_ref(), &self.hub_id, id, new, by).await
+        flows::store::update(self.db.as_ref(), &self.hub_id, id, &self.registry, new, by).await
     }
 
     pub async fn delete_flow(&self, id: &str, by: &str) -> Result<()> {
@@ -2058,6 +2065,17 @@ impl Runtime {
         r
     }
 
+    /// **Would this payload be accepted by `name`, if it were run right now?** — asked without
+    /// running anything, and answered by the same code that will judge it at execution
+    /// ([`commands::validate_payload`]).
+    ///
+    /// hub#825: the agent runner asks this BEFORE parking a proposal in the approval tray. A
+    /// proposal the hub can already refute must never become a question for a person — approving it
+    /// would spend her decision on something that cannot happen.
+    pub fn validate_command_payload(&self, name: &str, payload: &Params) -> Result<()> {
+        commands::validate_payload(&self.registry, name, payload)
+    }
+
     /// The context a flow acts under: attributed to the flow, machine-principal (never offered a
     /// manager's PIN), and carrying only the permissions of what it was granted.
     async fn automation_ctx(&self, flow_id: &str, run_id: &str) -> Result<RequestContext> {
@@ -2101,6 +2119,7 @@ impl Runtime {
         payload.insert("command".into(), Json::from(approval.command.clone()));
         events::notify_sink(
             &self.registry,
+            registry::EventSource::Core,
             flows::approvals::EVENT_APPROVAL_CREATED,
             &payload,
         );
@@ -2198,6 +2217,34 @@ impl Runtime {
             .as_object()
             .cloned()
             .unwrap_or_default();
+
+        // Step 3a (hub#825) — **the net, not the first line.** The runner refuses to park a payload
+        // the schema already rejects, so nothing reaches this tray that could not run when it was
+        // written. What this covers is the one thing that check cannot: the contract MOVING between
+        // 3 AM and 9 AM, because a module updated in between.
+        //
+        // It refuses like the revoked grant of §7.2 and NOT like §14.8: the row stays **pending**
+        // and nobody is recorded as having decided it. `approved` with an error is the honest record
+        // of «the person approved and the COMMAND broke» — something ran, or could have. Here
+        // nothing could: this is refused before the door, so burning the approval would leave the
+        // worst possible row, one that says a person authorised something that never happened, and
+        // would take away her only remaining exit (rejecting, which ends the run cleanly).
+        if let Err(e) = commands::validate_payload(&self.registry, &approval.command, &payload) {
+            return Err(match e {
+                RuntimeError::InvalidPayload { name, detail } => RuntimeError::InvalidPayload {
+                    name,
+                    detail: format!(
+                        "{detail}. This proposal was written when `{}` accepted it; the command's \
+                         contract changed in between, so approving cannot run it. Nothing was \
+                         executed and the proposal is still PENDING: reject it to close the flow, \
+                         or decide again once the command accepts this payload.",
+                        approval.command
+                    ),
+                },
+                other => other,
+            });
+        }
+
         let (run, _) = flows::store::get_run(self.db.as_ref(), &self.hub_id, &approval.run_id)
             .await?;
         let outcome = self

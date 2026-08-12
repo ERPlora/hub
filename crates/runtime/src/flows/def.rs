@@ -24,6 +24,7 @@ use std::collections::BTreeMap;
 use serde_json::{Map, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
+use crate::host_notify::Channel;
 
 /// The only document version this kernel understands. An unknown version is REFUSED, never
 /// guessed: a v2 document (branching/DAG, if it ever exists) describes an execution this binary
@@ -80,9 +81,9 @@ fn invalid(code: &str, message: impl Into<String>) -> RuntimeError {
 
 // ── Steps ─────────────────────────────────────────────────────────────────────────────────────
 
-/// The six step kinds of `schema_version: 1` (ADR-0283 §5). The VOCABULARY is frozen here even
-/// though only three of them execute today, so that a document written for the finished kernel
-/// parses in this one and is refused by name — not as "unknown value", which reads like a typo.
+/// The six step kinds of `schema_version: 1` (ADR-0283 §5). The VOCABULARY is frozen here, and
+/// since hub#821 every one of them EXECUTES: the list of what a document may say and the list of
+/// what this kernel performs are finally the same list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepKind {
     Command,
@@ -90,9 +91,10 @@ pub enum StepKind {
     Delay,
     /// The first way out to the internet (hub#662): allow-listed URL + `_flow_secrets`.
     Http,
-    /// Reserved — hub#665 (server-side agent runner).
+    /// The server-side agent runner (hub#665).
     Ai,
-    /// Reserved — hub#663 part 2 (`notify` with `recipient_query`).
+    /// hub#821 — a message to a person, addressed through a `recipient_query` grant. It is the
+    /// only step that can reach somebody who is not in the hub's allow-list: a CUSTOMER.
     Notify,
 }
 
@@ -120,27 +122,24 @@ impl StepKind {
         })
     }
 
-    /// Does this kind reach outside the runtime? Those follow the **claim → I/O → complete**
-    /// contract: the tick prepares them, the server performs the I/O outside the global lock, and a
-    /// second locked pass persists the result.
+    /// Does this kind reach outside the runtime **from inside the tick**? Those follow the
+    /// **claim → I/O → complete** contract: the tick prepares them, the server performs the I/O
+    /// outside the global lock, and a second locked pass persists the result.
+    ///
+    /// `notify` is deliberately NOT one of them (hub#821). It does no I/O of its own: it resolves
+    /// the recipient with a local read and QUEUES a host-notify event, and the outbox relay — which
+    /// already has the retries, the backoff and the dead-letter — is what talks to the network.
+    /// Crossing the seam instead would have meant reimplementing all of that beside it.
     pub fn needs_io(self) -> bool {
-        matches!(self, StepKind::Http | StepKind::Ai | StepKind::Notify)
+        matches!(self, StepKind::Http | StepKind::Ai)
     }
 
-    /// Can this hub EXECUTE this kind today? The vocabulary is frozen at six; what grows is this
-    /// list — `http` joined it with hub#662 and `ai` with hub#665, leaving only `notify`
-    /// (hub#663 part 2). A document using what is left is refused **at save time** naming its
-    /// issue: a flow stored with a step nothing performs would park a run forever at 3 AM.
+    /// Can this hub EXECUTE this kind? The vocabulary is frozen at six and, since hub#821, all six
+    /// run: `http` joined with hub#662, `ai` with hub#665 and `notify` with hub#821. The guard that
+    /// used this stays where it is, because the rule it enforced is what got them here one at a
+    /// time — a flow is never stored with a step nothing performs.
     pub fn is_available(self) -> bool {
-        !matches!(self, StepKind::Notify)
-    }
-
-    /// The issue that brings the kinds that are not here yet, so the refusal is actionable.
-    fn pending_issue(self) -> &'static str {
-        match self {
-            StepKind::Notify => "hub#663",
-            _ => "",
-        }
+        true
     }
 
     /// Every kind, in document order. Mirrored by `schemas/flow.schema.json`.
@@ -187,8 +186,35 @@ pub enum StepSpec {
     /// document: what it decides comes from a model. That is exactly why [`AiStep::policy`]
     /// exists, and why its default is `manual`.
     Ai(AiStep),
-    /// `notify`: accepted by the grammar, refused by [`FlowDefinition::validate`].
-    Reserved,
+    /// `{"kind":"notify","channel":"whatsapp","to":{…},"template":…,"vars":{…}}` — a message to a
+    /// person (hub#821). See [`NotifyStep`].
+    Notify(NotifyStep),
+}
+
+/// **A message, and the only way a flow may address one** (hub#821, ADR-0283 §5).
+///
+/// The recipient is not a value: it is a QUERY and a FIELD, both named in a live
+/// `recipient_query` grant. There is deliberately no literal form — not even a template — because
+/// the whole hole this closes is a flow (or a template installed from the marketplace) putting an
+/// address from the event payload into `to` and mailing it. What an author writes is «the phone
+/// column of the customer this run is about»; the hub reads it, and the owner can revoke that
+/// sentence.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NotifyStep {
+    /// `email` or `whatsapp`. Needs its own live `notify` grant — see [`crate::flows::grants`].
+    pub channel: Channel,
+    /// The read the recipient comes out of. Executed read-only with the flow's own context.
+    pub query: String,
+    /// Its params, mapped against the run like any other value.
+    pub params: Map<String, Json>,
+    /// The column of the returned row that IS the recipient.
+    pub field: String,
+    /// The template NAME. There is no catalogue in the hub (flows.md §5): for WhatsApp it is
+    /// Meta's approved template, for email it doubles as the subject when `vars` gives none.
+    pub template: String,
+    /// The copy, mapped against the run. `vars.text` is what an email or a free WhatsApp message
+    /// says; the transport refuses an intent with nothing to say rather than inventing it.
+    pub vars: Map<String, Json>,
 }
 
 /// What an `ai` step may do, and how far it is trusted (ADR-0283 §7 / D3).
@@ -250,9 +276,10 @@ impl StepDef {
     fn expressions(&self) -> Vec<Json> {
         match &self.spec {
             StepSpec::Command { params, .. } => vec![Json::Object(params.clone())],
-            StepSpec::Condition { when } => {
-                vec![Json::Array(when.paths().map(|p| json_str(p)).collect())]
-            }
+            // Both sides of every clause (hub#828): the paths it reads and the values it compares
+            // against. Scanning only the paths left `{"input.x": {"eq": "{{secret.K}}"}}` saving
+            // as literal text — a guard that never matches and never says so.
+            StepSpec::Condition { when } => when.expressions(),
             StepSpec::Delay { until, .. } => {
                 until.iter().map(|u| json_str(u)).collect::<Vec<_>>()
             }
@@ -268,7 +295,15 @@ impl StepDef {
             // `secret.…` refusal of hub#662 has to reach it — a prompt is precisely where a
             // credential must never be interpolated, because it would be sent to the model.
             StepSpec::Ai(ai) => vec![json_str(&ai.prompt)],
-            StepSpec::Reserved => Vec::new(),
+            // Everything a `notify` step maps: the params of the recipient read and the copy. The
+            // `secret.…` refusal of hub#662 has to reach both — a credential interpolated into a
+            // message would be sent to a customer, and one interpolated into the params of the read
+            // would be handed to a module's table.
+            StepSpec::Notify(n) => vec![
+                Json::Object(n.params.clone()),
+                Json::Object(n.vars.clone()),
+                json_str(&n.template),
+            ],
         }
     }
 
@@ -481,9 +516,26 @@ impl Condition {
         })
     }
 
-    /// Every path this condition reads — used to refuse `secret.…` at save time.
-    fn paths(&self) -> impl Iterator<Item = &String> {
-        self.0.keys()
+    /// **Everything this condition names**, as expressions for the save-time scan: the paths it
+    /// READS (the left of each clause) *and* the values it compares against (the right of every
+    /// operator, including each item of an `in` array).
+    ///
+    /// The two halves are here for two different reasons, and only the first one was ever scanned:
+    ///
+    /// - the **left** is resolved against the run, so `secret.API_KEY` there is a real read — and
+    ///   with `lt`/`contains` a machine that guesses the credential byte by byte. That is the
+    ///   dangerous shape, and it has been refused since hub#662.
+    /// - the **right** is never resolved: it is literal text. `{"input.x": {"eq":
+    ///   "{{secret.K}}"}}` compared the answer against the eighteen characters `{{secret.K}}`, so
+    ///   the guard its author wrote never matched and no error, run status or log said why
+    ///   (hub#828). It is not a leak; it is a flow that does something other than what its
+    ///   document says, which §13.2 refuses at save time rather than storing.
+    fn expressions(&self) -> Vec<Json> {
+        let mut out: Vec<Json> = self.0.keys().map(|p| json_str(p)).collect();
+        for ops in self.0.values() {
+            out.extend(ops.iter().map(|(_, expected)| expected.clone()));
+        }
+        out
     }
 }
 
@@ -795,11 +847,10 @@ impl FlowDefinition {
                 return Err(invalid(
                     ERR_STEP_KIND_NOT_AVAILABLE,
                     format!(
-                        "step `{}` is of kind `{}`, which this hub cannot execute yet ({}). \
-                         Refused at save time so a flow never stalls forever at 3 AM.",
+                        "step `{}` is of kind `{}`, which this hub cannot execute. Refused at save \
+                         time so a flow never stalls forever at 3 AM.",
                         step.id,
                         step.kind.as_str(),
-                        step.kind.pending_issue()
                     ),
                 ));
             }
@@ -830,7 +881,12 @@ impl FlowDefinition {
         let mut paths: Vec<String> = Vec::new();
         for trigger in &self.triggers {
             template_paths(&Json::Object(trigger.input.clone()), &mut paths);
-            paths.extend(trigger.filter.paths().cloned());
+            // Both sides of the filter, for the same reason a `condition` step gets both (hub#828):
+            // a filter is that same language, and a secret on either side of it is either a read
+            // nothing may do or a comparison that silently means its own source text.
+            for expr in trigger.filter.expressions() {
+                template_paths(&expr, &mut paths);
+            }
         }
         if let Some(path) = paths.iter().find(|p| p.starts_with("secret.")) {
             return Err(invalid(
@@ -959,23 +1015,13 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         )
     })?;
 
-    // The kinds that do not run yet are parsed no further ON PURPOSE: their keys are the contract
-    // of hub#663, and inventing it here would freeze a shape nobody has run.
-    if !kind.is_available() {
-        return Ok(StepDef {
-            id,
-            kind,
-            spec: StepSpec::Reserved,
-        });
-    }
-
     let allowed: &[&str] = match kind {
         StepKind::Command => &["id", "kind", "command", "params"],
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &["id", "kind", "seconds", "until"],
         StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
         StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters"],
-        _ => &["id", "kind"],
+        StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars"],
     };
     for key in map.keys() {
         if !allowed.contains(&key.as_str()) {
@@ -1122,10 +1168,106 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             }
         }
         StepKind::Ai => StepSpec::Ai(parse_ai(&id, map)?),
-        _ => StepSpec::Reserved,
+        StepKind::Notify => StepSpec::Notify(parse_notify(&id, map)?),
     };
 
     Ok(StepDef { id, kind, spec })
+}
+
+/// The keys of a `notify` step (hub#821).
+///
+/// The one that matters is `to`: it is an OBJECT of `{query, params, field}` and nothing else. A
+/// string there — a literal address, or `"{{input.email}}"` — is refused, and that refusal is the
+/// feature. It is what makes «a flow never messages an address out of the event payload» a
+/// property of the grammar instead of a rule somebody has to remember.
+fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
+    let channel_text = map
+        .get("channel")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .trim();
+    let channel = Channel::parse(channel_text).filter(|c| c.is_deliverable()).ok_or_else(|| {
+        invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "step `{id}`: `channel` is one of {} (`sms` is in ADR-0012's vocabulary and this \
+                 hub has no transport for it, so a step naming it would only ever dead-letter)",
+                Channel::DELIVERABLE
+                    .iter()
+                    .map(|c| c.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        )
+    })?;
+
+    let Some(Json::Object(to)) = map.get("to") else {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "step `{id}`: `to` is `{{query, params, field}}` — a recipient is one field of one \
+                 granted read, never an address. A flow that could write one down could mail \
+                 whatever the event carried."
+            ),
+        ));
+    };
+    for key in to.keys() {
+        if !matches!(key.as_str(), "query" | "params" | "field") {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: unknown key `{key}` in `to`"),
+            ));
+        }
+    }
+    let text = |key: &str| {
+        to.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    };
+    let query = text("query");
+    let field = text("field");
+    if query.is_empty() || field.is_empty() {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!("step `{id}`: `to` needs the `query` to read and the `field` to take from it"),
+        ));
+    }
+
+    let object = |key: &str, what: &str| match map.get(key) {
+        Some(Json::Object(m)) => Ok(m.clone()),
+        None | Some(Json::Null) => Ok(Map::new()),
+        Some(_) => Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!("step `{id}`: `{what}` is an object of mappings"),
+        )),
+    };
+    let params = match to.get("params") {
+        Some(Json::Object(m)) => m.clone(),
+        None | Some(Json::Null) => Map::new(),
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `to.params` is an object of mappings"),
+            ))
+        }
+    };
+    let vars = object("vars", "vars")?;
+
+    Ok(NotifyStep {
+        channel,
+        query,
+        params,
+        field,
+        template: map
+            .get("template")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .trim()
+            .to_string(),
+        vars,
+    })
 }
 
 /// The keys of an `ai` step (hub#665). Parsed as strictly as every other kind: a `tools` block
@@ -1281,33 +1423,118 @@ mod tests {
         assert!(format!("{err}").contains("unless"), "{err}");
     }
 
-    /// The list shrinks one issue at a time, and what is LEFT must keep naming the issue that
-    /// brings it. `http` left with hub#662 and `ai` with hub#665; `notify` is the last one, and a
-    /// document using it must still be refused at save time rather than parked forever at 3 AM.
+    /// The list emptied one issue at a time — `http` with hub#662, `ai` with hub#665, `notify` with
+    /// hub#821 — and now there is nothing left in it. Every kind is parsed STRICTLY, so an empty
+    /// step of any of them is refused for its OWN missing key and never as "not implemented".
     #[test]
-    fn the_io_steps_this_hub_still_cannot_run_are_refused_by_name() {
-        for (kind, issue) in [("notify", "hub#663")] {
+    fn every_step_kind_runs_now_and_an_empty_one_is_refused_for_its_own_reason() {
+        for (kind, complaint) in [("http", "url"), ("ai", "prompt"), ("notify", "channel")] {
             let err = FlowDefinition::parse(&json!({
                 "schema_version": 1,
                 "steps": [{ "id": "call", "kind": kind }]
             }))
-            .expect_err("this kernel cannot perform this I/O step yet");
-            let text = format!("{err}");
-            assert!(text.contains(kind) && text.contains(issue), "{text}");
-        }
-        // …and the two that DID land are no longer refused for being unavailable: they are parsed
-        // strictly, so what they now complain about is their own missing keys.
-        for (kind, complaint) in [("http", "url"), ("ai", "prompt")] {
-            let err = FlowDefinition::parse(&json!({
-                "schema_version": 1,
-                "steps": [{ "id": "call", "kind": kind }]
-            }))
-            .expect_err("an empty step of either kind is still invalid, but for its OWN reason");
+            .expect_err("an empty step of any kind is invalid, but for its OWN reason");
             let text = format!("{err}");
             assert!(
-                text.contains(complaint) && !text.contains("cannot execute yet"),
+                text.contains(complaint) && !text.contains("cannot execute"),
                 "`{kind}` must be refused for its own missing key, not as unavailable: {text}"
             );
+        }
+        assert!(StepKind::ALL.iter().all(|k| k.is_available()));
+    }
+
+    // ── the `notify` step (hub#821) ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn a_notify_step_carries_its_channel_its_recipient_read_and_its_copy() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "remind", "kind": "notify", "channel": "whatsapp",
+                "to": {
+                    "query": "crm.customer.get",
+                    "params": { "id": "input.customer_id" },
+                    "field": "phone"
+                },
+                "template": "appointment_reminder",
+                "vars": { "text": "Te esperamos el {{input.when}}" }
+            }]
+        }))
+        .expect("the shape the appointment reminder is written in");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        assert_eq!(step.channel, Channel::Whatsapp);
+        assert_eq!(step.query, "crm.customer.get");
+        assert_eq!(step.field, "phone");
+        assert_eq!(step.template, "appointment_reminder");
+        assert_eq!(step.params.len(), 1);
+        assert_eq!(step.vars.len(), 1);
+    }
+
+    /// **The refusal that IS the feature.** There is no shape in which an author — or a template
+    /// installed from the marketplace — can write an address down, so there is no path by which one
+    /// out of the event payload becomes a recipient. `to` is a read and a column, or it does not
+    /// save.
+    #[test]
+    fn a_notify_step_cannot_name_a_recipient_by_hand() {
+        for to in [
+            json!("cliente@ejemplo.com"),
+            json!("{{input.email}}"),
+            json!("input.email"),
+            json!(["cliente@ejemplo.com"]),
+            json!({ "address": "cliente@ejemplo.com" }),
+            json!({ "query": "crm.customer.get", "field": "phone", "address": "x@y.z" }),
+            json!({ "query": "crm.customer.get" }),
+            json!({ "field": "phone" }),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "r", "kind": "notify", "channel": "email", "to": to }]
+            }))
+            .expect_err("a recipient is one field of one granted read, never an address");
+            assert!(
+                format!("{err}").contains("to") || format!("{err}").contains("query"),
+                "{err}"
+            );
+        }
+    }
+
+    /// A channel with no transport is refused where it was typed. `sms` is in ADR-0012's
+    /// vocabulary and nothing can send it, so a step naming it would only ever dead-letter.
+    #[test]
+    fn a_notify_step_on_a_channel_with_no_transport_is_refused_at_save_time() {
+        for channel in ["sms", "pigeon", ""] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "r", "kind": "notify", "channel": channel,
+                    "to": { "query": "q.x", "field": "phone" }
+                }]
+            }))
+            .expect_err("this hub cannot send on that channel");
+            assert!(format!("{err}").contains("channel"), "{err}");
+        }
+    }
+
+    /// A `secret.…` in a message or in the params of the recipient read is refused like anywhere
+    /// else outside an `http` step: interpolated into the copy it would be SENT to a customer.
+    #[test]
+    fn a_notify_step_cannot_read_a_flow_secret() {
+        for step in [
+            json!({
+                "id": "r", "kind": "notify", "channel": "email",
+                "to": { "query": "q.x", "field": "email" },
+                "vars": { "text": "clave {{secret.API_KEY}}" }
+            }),
+            json!({
+                "id": "r", "kind": "notify", "channel": "email",
+                "to": { "query": "q.x", "params": { "k": "secret.API_KEY" }, "field": "email" }
+            }),
+        ] {
+            let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .expect_err("a credential must never be interpolated into a message");
+            assert!(format!("{err}").contains("API_KEY"), "{err}");
         }
     }
 
@@ -1422,6 +1649,81 @@ mod tests {
                 .expect_err("a secret only leaves the hub through an http step");
             assert!(format!("{err}").contains("secret"), "{err}");
         }
+    }
+
+    /// **Both sides of a condition** (hub#828). The scan read the paths a condition READS — the
+    /// left of each clause — and never the values it compares AGAINST, so
+    /// `{"input.x": {"eq": "{{secret.K}}"}}` saved with a `201` and then meant the literal text
+    /// `{{secret.K}}`: the guard its author wrote («only continue if the answer carries my key»)
+    /// never matched, the run ended `done` like any guard that stops, and nothing anywhere said
+    /// so. `command`, `notify` and `ai` all refused the same string. §13.2 is the rule that was
+    /// missing here: what this hub cannot execute is refused at save time instead of stored and
+    /// stalled forever.
+    #[test]
+    fn a_condition_cannot_name_a_secret_on_either_side_of_a_clause() {
+        for when in [
+            json!({ "input.x": { "eq": "{{secret.API_KEY}}" } }),
+            json!({ "input.x": { "contains": "{{secret.API_KEY}}" } }),
+            json!({ "input.x": { "in": ["ok", "{{secret.API_KEY}}"] } }),
+            json!({ "input.x": { "neq": "secret.API_KEY" } }),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "c", "kind": "condition", "when": when }]
+            }))
+            .expect_err("a flow that does not do what its author wrote must not save");
+            assert!(format!("{err}").contains("API_KEY"), "{err}");
+        }
+
+        // A trigger's filter is the same document in the same language, and its scope is the EVENT:
+        // there is nothing a secret could mean there either, on either side.
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "triggers": [{ "kind": "event", "event": "sale.completed",
+                           "filter": { "event.ref": { "eq": "{{secret.API_KEY}}" } } }],
+            "steps": [{ "id": "c", "kind": "condition", "when": { "input.x": { "eq": "1" } } }]
+        }))
+        .expect_err("a trigger cannot read a flow secret either");
+        assert!(format!("{err}").contains("API_KEY"), "{err}");
+    }
+
+    /// **The oracle stays closed.** This is the regression guard for the fix above, not a new
+    /// rule: the DANGEROUS shape is the secret as the PATH — the left of the clause — because
+    /// `lt`/`contains` over a value the hub resolves is a byte-by-byte guessing machine. It was
+    /// already refused (that is why hub#828 is a P2 and not a leak), and widening the scan to the
+    /// right-hand values must not cost it.
+    #[test]
+    fn a_secret_as_the_path_of_a_condition_is_still_refused() {
+        for when in [
+            json!({ "secret.API_KEY": { "exists": true } }),
+            json!({ "secret.API_KEY": { "lt": "m" } }),
+            json!({ "secret.API_KEY": { "contains": "sk-" } }),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "c", "kind": "condition", "when": when }]
+            }))
+            .expect_err("the oracle: a condition must never resolve a secret");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_SECRET_NOT_AVAILABLE),
+                "{err:?}"
+            );
+        }
+    }
+
+    /// The other half of the rule: a condition that names no secret still saves. A scan that
+    /// refuses every string with a dot in it would close the oracle by making conditions useless.
+    #[test]
+    fn a_condition_that_names_no_secret_still_saves() {
+        FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "c", "kind": "condition", "when": {
+                "input.total": { "gte": "100" },
+                "event.status": { "in": ["paid", "sent"] },
+                "steps.a.ok": { "eq": true }
+            } }]
+        }))
+        .expect("an ordinary guard must keep saving");
     }
 
     #[test]

@@ -99,6 +99,19 @@ export interface DeadEvent {
   attempts: number;
   depth: number;
   created_at: string;
+  /**
+   * Why the row is terminal, when the answer is not "it burnt its eight attempts" (hub#827).
+   * Empty for an ordinary dead-letter; `flow.release_revoked` when the owner withdrew a flow's
+   * authorisation while the message was still queued.
+   */
+  failure_kind: string;
+  /**
+   * Whether `POST …/retry` can do anything with this row. **The screen must not offer a button
+   * that cannot work**: retrying a revoked release answered `200`, reset the attempts and died
+   * again for the same reason — a loop with no exit, drawn as the remedy. When this is `false`
+   * the row is shown with what WOULD help instead (grant the permission again and run the flow).
+   */
+  retryable: boolean;
 }
 
 /** Generic envelope unwrap for the dead-letter endpoints (all return `{ ok, data }` on success). */

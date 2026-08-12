@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use erplora_runtime::{EventSink, Runtime};
+use erplora_runtime::{EventSink, EventSource, Runtime};
 use erplora_vector::VectorStore;
 use serde_json::{json, Value as Json};
 use tokio::sync::{broadcast, Mutex};
@@ -20,6 +20,26 @@ pub type SharedVectorStore = Arc<dyn VectorStore + Send + Sync>;
 /// frontend: `{"type":"module.installed","module_id":"…"}`.
 pub type WsEvent = Json;
 
+/// The field a frame carries its **emitting module** in (hub#529).
+///
+/// Written here, next to `name` and `payload`, by the sink — never by the module. It is what
+/// `event_stream::may_receive` filters on, so it has to be something the emitter cannot choose:
+/// a payload key or an event-name prefix would both be under the module's own control.
+///
+/// A frame **without** this field is the hub's own (see [`EventSource::Core`] and the raw frames
+/// [`AppState::broadcast`] publishes).
+pub const FRAME_MODULE: &str = "module";
+
+/// Turns an emitted event into the frame this channel carries. **One builder**, used by the sink
+/// and by anything that needs the same shape, so the wire format is defined in exactly one place.
+pub fn event_frame(source: EventSource<'_>, event: &str, payload: &Json) -> WsEvent {
+    let mut frame = json!({ "name": event, "payload": payload });
+    if let Some(module_id) = source.module_id() {
+        frame[FRAME_MODULE] = json!(module_id);
+    }
+    frame
+}
+
 /// Implementa `EventSink` del runtime publicando en un canal broadcast (→ WebSocket).
 #[derive(Debug)]
 pub struct BroadcastSink {
@@ -27,9 +47,9 @@ pub struct BroadcastSink {
 }
 
 impl EventSink for BroadcastSink {
-    fn emit(&self, event: &str, payload: &Json) {
+    fn emit(&self, source: EventSource<'_>, event: &str, payload: &Json) {
         // Si no hay suscriptores, `send` falla; lo ignoramos a propósito.
-        let _ = self.tx.send(json!({ "name": event, "payload": payload }));
+        let _ = self.tx.send(event_frame(source, event, payload));
     }
 }
 
@@ -516,6 +536,14 @@ pub struct AppState {
     /// Per-key cap on simultaneous stream connections (hub#531). One API key should not be able to
     /// exhaust the hub by opening N sockets — a reconnection bug reaches the ceiling, not just malice.
     pub stream_limiter: Arc<crate::event_stream::StreamLimiter>,
+    /// **One rolling budget for every delegated-certificate refetch this process makes**
+    /// (ADR-0202 §2 point 4). It used to be a local of `serve()`, which was enough while the only
+    /// callers were the loops `serve()` itself spawns; capturing the Anexo I adds a **fourth
+    /// trigger** on a request path (hub#817), and a trigger that made its own budget would defeat
+    /// the property the other three exist to hold — the control plane allows 20/h per hub, and a
+    /// hub that spends its allowance locks itself out of the call that installs a working
+    /// certificate. Living here means the four share one count, which is what the SaaS counts.
+    pub certificate_budget: Arc<crate::fiscal_certificate::RefetchBudget>,
 }
 
 impl AppState {
@@ -574,6 +602,7 @@ impl AppState {
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
             stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
             stream_limiter: Arc::new(crate::event_stream::StreamLimiter::default()),
+            certificate_budget: Arc::new(crate::fiscal_certificate::RefetchBudget::hourly()),
         }
     }
 

@@ -96,7 +96,8 @@ pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, user_id: &str) -> Resul
     p.insert("user_id".into(), json!(user_id));
     let users = db
         .query(
-            "SELECT id, name, role, cloud_user_id FROM hub_user WHERE id = :user_id AND is_active = 1",
+            "SELECT id, name, role, cloud_user_id FROM hub_user \
+              WHERE hub_id = :hub_id AND id = :user_id AND is_active = 1",
             &p,
         )
         .await?;
@@ -225,7 +226,8 @@ pub async fn update(
     ];
     if !name.is_empty() {
         ops.push((
-            "UPDATE hub_user SET name = :name WHERE id = :user_id".to_string(),
+            "UPDATE hub_user SET name = :name WHERE hub_id = :hub_id AND id = :user_id"
+                .to_string(),
             p,
         ));
     }

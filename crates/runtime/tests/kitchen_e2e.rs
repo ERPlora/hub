@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use erplora_db::{Params, testutil::fresh_db};
-use erplora_runtime::{EventSink, RequestContext, Runtime};
+use erplora_runtime::{EventSink, EventSource, RequestContext, Runtime};
 use serde_json::json;
 
 fn params(v: serde_json::Value) -> Params {
@@ -35,7 +35,7 @@ struct Sink {
     events: Mutex<Vec<(String, serde_json::Value)>>,
 }
 impl EventSink for Sink {
-    fn emit(&self, name: &str, payload: &serde_json::Value) {
+    fn emit(&self, _source: EventSource<'_>, name: &str, payload: &serde_json::Value) {
         self.events.lock().unwrap().push((name.to_string(), payload.clone()));
     }
 }

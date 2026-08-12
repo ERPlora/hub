@@ -217,8 +217,8 @@ async fn un_insert_que_lee_de_otra_tabla_no_exfiltra() {
     // Un usuario real en el hub destino, con su secreto.
     rt.db()
         .execute_batch(
-            "INSERT INTO hub_user (id, name, role, pin_hash, is_active, created_at) \
-             VALUES ('u1', 'Ioan', 'owner', 'hash-secreto', 1, '2026-07-31T00:00:00Z');",
+            "INSERT INTO hub_user (id, hub_id, name, role, pin_hash, is_active, created_at) \
+             VALUES ('u1', 'h2', 'Ioan', 'owner', 'hash-secreto', 1, '2026-07-31T00:00:00Z');",
         )
         .await
         .expect("usuario de partida");
@@ -246,8 +246,8 @@ async fn un_cte_que_borra_no_se_ejecuta() {
     let mut rt = fresh().await;
     rt.db()
         .execute_batch(
-            "INSERT INTO hub_user (id, name, role, pin_hash, is_active, created_at) \
-             VALUES ('u1', 'Ioan', 'owner', 'hash', 1, '2026-07-31T00:00:00Z');",
+            "INSERT INTO hub_user (id, hub_id, name, role, pin_hash, is_active, created_at) \
+             VALUES ('u1', 'h2', 'Ioan', 'owner', 'hash', 1, '2026-07-31T00:00:00Z');",
         )
         .await
         .expect("usuario de partida");

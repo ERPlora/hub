@@ -3,6 +3,7 @@
   "name": "CRM",
   "version": "1.0.0",
   "permissions": ["crm.change_customer"],
+  "capabilities": { "notify": { "channels": ["email"] } },
   "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
   "queries": {
     "crm.note.list": {
@@ -14,6 +15,14 @@
       "permission": "crm.change_customer",
       "sql": "sql/list_notes.sql",
       "ai": { "description": "The most recent notes" }
+    },
+    "crm.customer.get": {
+      "permission": "crm.change_customer",
+      "sql": "sql/get_customer.sql"
+    },
+    "crm.customer.list": {
+      "permission": "crm.change_customer",
+      "sql": "sql/list_customers.sql"
     }
   },
   "commands": {
@@ -39,6 +48,11 @@
       "permission": "crm.change_customer",
       "sql": ["sql/add_note.sql"],
       "emit": ["sale.completed"]
+    },
+    "crm.reminder.send": {
+      "permission": "crm.change_customer",
+      "sql": ["sql/touch_customer.sql"],
+      "emit": ["crm.reminder.due"]
     }
   },
   "events": { "listen": { "crm.note.added": { "command": "crm.note.count" } } }

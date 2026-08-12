@@ -1194,6 +1194,95 @@ CREATE TABLE IF NOT EXISTS hub_module_package (\
   stored_at TEXT NOT NULL, \
   PRIMARY KEY (hub_id, module_id));",
     },
+    // ── v42 — hub#497: la IDENTIDAD también es de un hub, no de una base de datos ───────────────
+    // `hub_user` y `hub_session` eran las dos últimas tablas de sistema sin `hub_id`, cuando todas
+    // las demás —`hub_settings`, `hub_api_key`, `hub_module`, `hub_user_profile` y, desde hub#489,
+    // `hub_trusted_device`— van por `(hub_id, …)`. El **perfil** de una persona era por hub; la
+    // persona no, y la sesión tampoco.
+    //
+    // En una BD compartida eso no era «ver de más», era **entrar**: `resolve_session` casaba por
+    // `token` a secas, así que un token del hub B autenticaba contra el A con el rol que su titular
+    // tiene *allí*; `verify_pin` buscaba por nombre en toda la tabla, así que un PIN de 4 dígitos
+    // del negocio de al lado era un login aquí; el desalojo de ADR-0154 y el corte de un
+    // dispositivo (hub#489) borraban sesiones de los vecinos.
+    //
+    // ⚠️ **El backfill NO adivina.** Se sella `:hub_id` —el del despliegue— en las filas que no
+    // dicen de quién son, y eso es correcto **porque desde ADR-0201 cada hub es dueño de su propia
+    // base de datos** (`Hub.database_name` + rol propio). Comprobado antes de escribir esto contra
+    // la producción real: 5 hubs, 5 bases distintas, 5 roles distintos, ninguna compartida, y el
+    // más antiguo creado DESPUÉS de que ADR-0201 se cerrara — no queda ni un hub heredado que
+    // migrar. Y el camino que las compartía se borró, no se capó (`sibling_url` no existe en el
+    // SaaS; `_provision_hub_prerequisites` crea siempre `hub_{uuid12}`), así que tampoco puede
+    // volver a aparecer una. En una BD de un solo hub, «toda fila es de este hub» es un hecho, no
+    // una conjetura.
+    //
+    // **Y no se borra nada.** v23 sí borró las filas sin `hub_id` de `hub_trusted_device`: allí lo
+    // perdido era una confianza que se recupera con un login. Aquí las filas son **personas** —su
+    // historial, sus ventas, su auditoría cuelgan de ese id— y el criterio de hub#436 (señalar, no
+    // adivinar) no puede aplicarse borrándolas.
+    //
+    // **La PK no se recompone** a `(hub_id, id)`: `hub_user.id` es un UUID y `hub_session.token`
+    // son 32 bytes aleatorios, así que no pueden chocar entre hubs. Una clave compuesta no
+    // aportaría unicidad y rompería todo lo que ya viaja solo por id — `hub_user_profile(hub_id,
+    // user_id)`, los `hub_user:<id>` de cada columna de auditoría, los bundles exportados y las
+    // sesiones ya emitidas. Lo que faltaba nunca fue una clave: era un `WHERE`.
+    //
+    // ⚠️ **Re-ejecutable** (regla hub#342/#483): `ADD COLUMN IF NOT EXISTS`, un `UPDATE` acotado a
+    // `hub_id IS NULL` y `SET NOT NULL` (idempotente). El segundo pase es un no-op — importa porque
+    // los fixtures rebobinan el control por versión.
+    //
+    // ⚠️ **v42 porque 41 es el máximo del catálogo hoy.** `apply` aborta si una entrada cae en o por
+    // debajo del máximo ya aplicado. Recomprobado contra `origin/develop` en el push (hub#573); los
+    // huecos v15/v20/v24 siguen libres e **inalcanzables** — cogerlos ES el fallo mudo.
+    SystemMigration {
+        version: 42,
+        name: "hub_identity_hub_scoped",
+        kind: Kind::Contract,
+        postgres: "\
+ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS hub_id TEXT;\
+UPDATE hub_user SET hub_id = :hub_id WHERE hub_id IS NULL;\
+ALTER TABLE hub_user ALTER COLUMN hub_id SET NOT NULL;\
+ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS hub_id TEXT;\
+UPDATE hub_session SET hub_id = :hub_id WHERE hub_id IS NULL;\
+ALTER TABLE hub_session ALTER COLUMN hub_id SET NOT NULL;\
+CREATE INDEX IF NOT EXISTS ix_hub_user_hub ON hub_user (hub_id, name);\
+CREATE INDEX IF NOT EXISTS ix_hub_session_hub ON hub_session (hub_id);",
+    },
+    // ── v43 — hub#817 / saas#1438: el OTORGAMIENTO firmado, recordado en el perfil ─────────────
+    // ERPlora remite los registros **en nombre del** obligado, y eso exige su consentimiento
+    // firmado (Anexo I de la Resolución DG AEAT de 18/12/2024, bajo el Convenio 17). El documento
+    // lo **custodia el SaaS** —es a ERPlora a quien se otorga—, así que este hub no puede ser la
+    // autoridad sobre un papel que no guarda: estas dos columnas son una COPIA de lo que el plano
+    // de control contestó.
+    //
+    // Por qué se copia en vez de preguntar: `fiscal_profile::go_live` es una transición de base de
+    // datos, y meterle una llamada de red la haría fallar cuando el SaaS no responde —justo el
+    // momento en que un negocio menos quiere que le bloqueen el paso a producción— o la obligaría
+    // a adivinar. Guardada, la respuesta **sobrevive al reinicio**: en memoria, un redespliegue la
+    // convertiría en «no sé», que es o una puerta abierta o una atascada.
+    //
+    // `''` = «nunca se preguntó», distinto de `absent` = «se preguntó y no hay ninguno». Son dos
+    // estados distintos para la pantalla: uno dice «cargando», el otro «tienes que firmar». Las dos
+    // columnas siguen el contrato de fila: TEXT, `''` para «desconocido», nunca NULL.
+    //
+    // ⚠️ v43, y nació como v42: `hub_identity_hub_scoped` (hub#497) se llevó el 42 mientras esta
+    // rama estaba en vuelo, y el rebase lo destapó como conflicto — que es exactamente para lo
+    // que sirve tener el número a mano. `apply` aborta ruidosamente si una entrada del catálogo
+    // cae en o por debajo del máximo aplicado, pero solo cuando un hub ya lleva el número más
+    // alto: tardísimo para enterarse. Recompruébalo contra `origin/develop` en el push
+    // (hub#573); no lo recuerdes.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`. `tests/access_email_backfill.rs`
+    // rebobina la tabla de control y reaplica todo lo posterior sobre una BD que ya tiene los
+    // objetos; un `ADD COLUMN` pelado falla 42701 y se lleva esa suite por delante.
+    SystemMigration {
+        version: 43,
+        name: "hub_fiscal_representation",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_status TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_at TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -1619,8 +1708,8 @@ mod tests {
         );
         // Una fila escrita por el alta anterior a hub#356: el email solo en el perfil.
         db.execute_batch(
-            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-               VALUES ('u1', 'Ana Soto', '', 'admin', NULL, 1, '2026-08-01T10:00:00Z', '');\
+            "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+               VALUES ('u1', 'hub-test', 'Ana Soto', '', 'admin', NULL, 1, '2026-08-01T10:00:00Z', '');\
              INSERT INTO hub_user_profile \
                (hub_id, user_id, first_name, last_name, email, avatar_path, updated_at) \
                VALUES ('hub-test', 'u1', 'Ana', 'Soto', 'ana@example.com', '', '2026-08-01T10:00:00Z');",
@@ -2187,8 +2276,8 @@ mod tests {
         crate::identity::ensure_tables(&db).await.unwrap();
         // Sesión legacy YA existente (BD que sobrevive a un update): sin la columna device_id.
         db.execute_batch(
-            "INSERT INTO hub_session (token, user_id, created_at, expires_at) \
-             VALUES ('legacy', 'u1', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z');",
+            "INSERT INTO hub_session (token, hub_id, user_id, created_at, expires_at) \
+             VALUES ('legacy', 'hub-test', 'u1', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z');",
         )
         .await
         .unwrap();
@@ -2216,8 +2305,8 @@ mod tests {
 
         // Y una sesión nueva puede persistir device_id.
         db.execute_batch(
-            "INSERT INTO hub_session (token, user_id, created_at, expires_at, device_id) \
-             VALUES ('t2', 'u1', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z', 'dev-A');",
+            "INSERT INTO hub_session (token, hub_id, user_id, created_at, expires_at, device_id) \
+             VALUES ('t2', 'hub-test', 'u1', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z', 'dev-A');",
         )
         .await
         .unwrap();
@@ -2245,8 +2334,8 @@ mod tests {
         crate::identity::ensure_tables(&db).await.unwrap();
         // Usuario legacy YA existente (BD que sobrevive a un update): sin la columna email.
         db.execute_batch(
-            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-             VALUES ('u-legacy', 'Ada', '', 'owner', 'cloud-1', 1, '2026-01-01T00:00:00Z');",
+            "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-legacy', 'hub-test', 'Ada', '', 'owner', 'cloud-1', 1, '2026-01-01T00:00:00Z');",
         )
         .await
         .unwrap();
@@ -2270,8 +2359,8 @@ mod tests {
 
         // Y una fila nueva puede persistir + buscarse por email (lookup del enlace JWT→hub_user).
         db.execute_batch(
-            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-             VALUES ('u2', 'Beto', '', 'employee', NULL, 1, '2026-01-01T00:00:00Z', 'beto@bar.com');",
+            "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
+             VALUES ('u2', 'hub-test', 'Beto', '', 'employee', NULL, 1, '2026-01-01T00:00:00Z', 'beto@bar.com');",
         )
         .await
         .unwrap();
@@ -2311,14 +2400,14 @@ mod tests {
         // treated it as an administrator because `is_admin_role` said so. The rename must reach
         // those rows, whatever the casing, and must not touch anybody else.
         db.execute_batch(
-            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-             VALUES ('u-owner', 'Boss', '', 'owner', 'cloud-1', 1, '2026-01-01T00:00:00Z');\
-             INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-             VALUES ('u-shout', 'Shout', '', 'OWNER', NULL, 1, '2026-01-01T00:00:00Z');\
-             INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-             VALUES ('u-cash', 'Marta', '', 'cashier', NULL, 1, '2026-01-01T00:00:00Z');\
-             INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-             VALUES ('u-gone', 'Baja', '', 'owner', NULL, 0, '2026-01-01T00:00:00Z');",
+            "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-owner', 'hub-test', 'Boss', '', 'owner', 'cloud-1', 1, '2026-01-01T00:00:00Z');\
+             INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-shout', 'hub-test', 'Shout', '', 'OWNER', NULL, 1, '2026-01-01T00:00:00Z');\
+             INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-cash', 'hub-test', 'Marta', '', 'cashier', NULL, 1, '2026-01-01T00:00:00Z');\
+             INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+             VALUES ('u-gone', 'hub-test', 'Baja', '', 'owner', NULL, 0, '2026-01-01T00:00:00Z');",
         )
         .await
         .unwrap();
@@ -2734,6 +2823,103 @@ mod tests {
             "tras re-aplicar, el control vuelve a registrar las versiones"
         );
     }
+    /// **v42 sella el hub en la identidad ya desplegada, y no pierde a nadie** (hub#497).
+    ///
+    /// Las filas que existían no dicen de qué hub son. v23 resolvió eso en `hub_trusted_device`
+    /// **borrándolas** —lo perdido era una confianza que se recupera con un login—; aquí no se
+    /// puede: son personas, y su historial cuelga de su id. Se sellan con el `hub_id` del
+    /// despliegue, que desde ADR-0201 es un hecho (cada hub es dueño de su base) y no una
+    /// conjetura.
+    ///
+    /// El baseline v0 ya crea la columna, así que un hub **ya desplegado** se simula quitándola:
+    /// es exactamente la forma que tienen esos hubs.
+    #[tokio::test]
+    async fn la_v42_sella_el_hub_en_la_identidad_ya_desplegada_sin_perder_a_nadie() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let v42 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_identity_hub_scoped")
+            .expect("la identidad por hub sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(v42.version)).await;
+        db.execute_batch(
+            "ALTER TABLE hub_user DROP COLUMN hub_id;\
+             ALTER TABLE hub_session DROP COLUMN hub_id;",
+        )
+        .await
+        .unwrap();
+
+        // Una persona y su sesión abierta, de antes de que la columna existiera.
+        db.execute_batch(
+            "INSERT INTO hub_user (id, name, pin_hash, role, is_active, created_at) \
+               VALUES ('u-1', 'Ana', '', 'admin', 1, '2026-01-01T00:00:00Z');\
+             INSERT INTO hub_session (token, user_id, created_at, expires_at) \
+               VALUES ('t-1', 'u-1', '2026-01-01T00:00:00Z', '2099-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-a").await.unwrap();
+
+        // Nadie se borró, y ahora cada fila dice de quién es.
+        let stamped = db
+            .query(
+                "SELECT (SELECT count(*) FROM hub_user WHERE hub_id = 'hub-a') AS users, \
+                        (SELECT count(*) FROM hub_session WHERE hub_id = 'hub-a') AS sessions",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(stamped.rows[0]["users"].as_i64(), Some(1), "Ana sigue ahí");
+        assert_eq!(
+            stamped.rows[0]["sessions"].as_i64(),
+            Some(1),
+            "y sigue con la sesión que tenía abierta: migrar no echa a nadie del hub"
+        );
+
+        // Y la sesión ya solo vale en su hub — que es lo que la columna existe para poder decir.
+        assert!(crate::identity::resolve_session(&db, "hub-a", "t-1")
+            .await
+            .unwrap()
+            .is_some());
+        assert!(
+            crate::identity::resolve_session(&db, "hub-b", "t-1")
+                .await
+                .unwrap()
+                .is_none(),
+            "el token sellado para hub-a no abre otro hub"
+        );
+    }
+
+    /// Re-ejecutable (regla hub#342/#483): el segundo pase es un no-op, no un error. Los fixtures
+    /// que rebobinan el control por versión vuelven a pasar por aquí, y una migración que reventase
+    /// al repetirse se llevaría por delante la suite de otro.
+    #[tokio::test]
+    async fn la_v42_se_puede_aplicar_dos_veces() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let v42 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_identity_hub_scoped")
+            .expect("la identidad por hub sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(v42.version)).await;
+        db.execute_batch(
+            "ALTER TABLE hub_user DROP COLUMN hub_id;\
+             ALTER TABLE hub_session DROP COLUMN hub_id;",
+        )
+        .await
+        .unwrap();
+
+        apply_one(&db, "hub_identity_hub_scoped").await;
+        // El mismo SQL otra vez, tal cual lo ejecutaría `apply`.
+        for statement in split_statements(v42.postgres) {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!("hub-a"));
+            db.execute(&statement, &p)
+                .await
+                .unwrap_or_else(|e| panic!("`{statement}` no es re-ejecutable: {e}"));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2780,7 +2966,7 @@ mod kind_contract_tests {
 
         assert_eq!(
             no_vuelta,
-            vec![1, 14, 23, 25],
+            vec![1, 14, 23, 25, 42],
             "cambió el inventario de migraciones sin vuelta atrás. Si es una nueva: revisa que \
              de verdad haga falta, porque cada una es una versión por debajo de la cual el \
              rollback deja de ser seguro."
@@ -2806,11 +2992,14 @@ mod kind_contract_tests {
         // 38 = 27 + las cinco del kernel de automatización (v31–v35, hub#661) + `_flow_secrets`
         // (v36, hub#662) + `_flow_triggers.tz` (v37, hub#731) + `_flow_approvals` (v38, hub#665) +
         // `_hub_activity` (v39, hub#670) + `_update_history` (v40, hub#564) + `hub_module_package`
-        // (v41, hub#571). El número está a mano a propósito: añadir una migración de sistema tiene
+        // (v41, hub#571) + `hub_identity_hub_scoped` (v42, hub#497) + el otorgamiento de
+        // representación en el perfil fiscal (v43, hub#817).
+        // El número está a mano a propósito: añadir una migración de sistema tiene
         // que ser un gesto CONSCIENTE, y este assert es lo que obliga a mirar el catálogo entero
         // antes de tocarlo — que es justo lo que evita que dos ramas en vuelo pidan el mismo
         // número, como pasó en esta ola: hub#731 y hub#665 pidieron las dos el v37; hub#670,
-        // hub#564 y hub#571 pidieron las tres el v39.
-        assert_eq!(MIGRATIONS.len(), 38, "el catálogo cambió de tamaño");
+        // hub#564 y hub#571 pidieron las tres el v39. Y `hub_identity_hub_scoped` (v42, hub#497)
+        // se llevó el 42 que había pedido el otorgamiento de representación, que pasó al v43.
+        assert_eq!(MIGRATIONS.len(), 40, "el catálogo cambió de tamaño");
     }
 }

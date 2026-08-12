@@ -46,6 +46,43 @@ pub(crate) enum Origin {
     Automation,
 }
 
+/// **Does this payload satisfy the contract `name` declares?** — asked WITHOUT running anything.
+///
+/// It is the same question [`execute_at`] asks just before it touches the database, and it is the
+/// same code answering it ([`validate_against`]): two implementations of "is this payload valid"
+/// would eventually disagree, and the whole point of asking early is that the answer matches what
+/// will happen later.
+///
+/// It exists because of hub#825. A write an `ai` step proposes under `policy: "manual"` becomes a row
+/// a person reads hours later, and until now nothing checked the payload before writing that row: the
+/// owner pressed «approve», the schema refused it, her decision was spent and the run died on a
+/// proposal the hub could have refuted the moment the model made it. Under `policy: "auto"` the same
+/// refusal already came back to the model as a tool result and the run survived (flows.md §14.9) —
+/// this is what lets `manual` take that same path.
+///
+/// A command that is not in the registry is [`RuntimeError::CommandNotFound`], because "I cannot
+/// judge this" and "this is fine" must not be the same answer. A command with no `schema` declares no
+/// contract, so anything satisfies it — same as at execution.
+pub fn validate_payload(registry: &Registry, name: &str, payload: &Params) -> Result<()> {
+    let cmd = registry
+        .get_command(name)
+        .ok_or_else(|| RuntimeError::CommandNotFound(name.to_string()))?;
+    validate_against(cmd, name, payload)
+}
+
+/// The one place the compiled schema of a command judges a payload.
+fn validate_against(cmd: &RegisteredCommand, name: &str, payload: &Params) -> Result<()> {
+    let Some(schema) = &cmd.schema else {
+        return Ok(());
+    };
+    schema
+        .validate(&Json::Object(payload.clone()))
+        .map_err(|detail| RuntimeError::InvalidPayload {
+            name: name.to_string(),
+            detail,
+        })
+}
+
 /// Ejecuta `name(payload)` con el contexto dado. Aplica permiso, ejecuta el SQL **y persiste
 /// los eventos emitidos en el outbox dentro de la MISMA transacción** (entrega at-least-once
 /// asíncrona; los listeners los corre el relay, ver `outbox.rs`). ARQUITECTURA.md §4/§5.4.
@@ -305,12 +342,7 @@ pub(crate) async fn execute_at(
     // para TODOS los tiers de abajo (SQL declarativo, WASM, nativo), que bindean por nombre.
     let defaulted;
     let payload = if let Some(schema) = &cmd.schema {
-        schema
-            .validate(&Json::Object(payload.clone()))
-            .map_err(|detail| RuntimeError::InvalidPayload {
-                name: name.to_string(),
-                detail,
-            })?;
+        validate_against(cmd, name, payload)?;
         let mut p = payload.clone();
         schema.apply_defaults(&mut p);
         defaulted = p;
@@ -426,9 +458,15 @@ pub(crate) async fn execute_at(
     seal_first_record_if_fiscal(db, ctx, &cmd.def.emit).await;
 
     // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
-    // durable a listeners la hace el relay desde el outbox.
+    // durable a listeners la hace el relay desde el outbox. El emisor viaja con el evento
+    // (hub#529): es lo único que el canal puede creerse para filtrar por módulo.
     for event in &cmd.def.emit {
-        events::notify_sink(registry, event, &bound);
+        events::notify_sink(
+            registry,
+            crate::registry::EventSource::Module(&cmd.module_id),
+            event,
+            &bound,
+        );
     }
 
     // El id que este command acaba de crear, igual que en el camino WASM (§5.3): `system_params`
@@ -939,12 +977,15 @@ async fn persist_handler_output(
     tx_ops.extend_from_slice(extra_ops);
     db.execute_tx(&tx_ops).await?;
 
-    // Notificación al WS (UI en vivo) tras commit; entrega durable a listeners = relay.
+    // Notificación al WS (UI en vivo) tras commit; entrega durable a listeners = relay. Los
+    // eventos del handler salen con el módulo del command (hub#529) — que es también el único
+    // namespace en el que hub#240 les deja llamarse.
+    let source = crate::registry::EventSource::Module(&cmd.module_id);
     for event in &cmd.def.emit {
-        events::notify_sink(registry, event, &declared_payload);
+        events::notify_sink(registry, source, event, &declared_payload);
     }
     for (name, payload) in &handler_events {
-        events::notify_sink(registry, name, payload);
+        events::notify_sink(registry, source, name, payload);
     }
 
     Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))

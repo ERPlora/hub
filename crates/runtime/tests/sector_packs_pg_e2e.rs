@@ -82,15 +82,22 @@ async fn exercise_list_queries(rt: &Runtime, ctx: &RequestContext, failures: &mu
     }
 }
 
-/// Aplica el blueprint del sector (INSERTs directos en las tablas de módulo) sobre Postgres.
+/// Aplica el seed del sector (INSERTs directos en las tablas de módulo) sobre Postgres.
 /// Un red aquí = el seed no casa con el esquema Postgres (columna/tipo/sintaxis).
+///
+/// **Por `Runtime::apply_seed`, no por `execute_batch` (hub#840).** Antes ejecutaba el fichero a
+/// pelo, y `execute_batch` no es una puerta que exista en producción: nadie aplica un seed así. El
+/// host lo pasa por `HUB_SEED_SQL` y el runtime lo aplica con `seed::apply`, que liga `:hub_id` y
+/// acota al hub las filas de identidad que el fichero no acotó. Con la puerta falsa, el test se
+/// ponía rojo por un `NOT NULL` que la puerta REAL no produce — y, peor, no probaba nada de lo que
+/// el arranque hace de verdad.
 async fn apply_blueprint(rt: &Runtime, sector: &str, failures: &mut Vec<String>) {
     let path = blueprint_seed(sector);
     let Ok(sql) = std::fs::read_to_string(&path) else {
         failures.push(format!("SEED {sector}: no se pudo leer {}", path.display()));
         return;
     };
-    if let Err(e) = rt.db_for_test().execute_batch(&sql).await {
+    if let Err(e) = rt.apply_seed(&sql).await {
         failures.push(format!("SEED {sector}: {e}"));
     }
 }

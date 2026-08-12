@@ -125,7 +125,7 @@
             "ai",
             "notify"
           ],
-          "description": "Vocabulario CONGELADO. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http` (hub#662) y `ai` (hub#665) siguen el contrato claim → I/O → complete: el tick los prepara y el server los ejecuta FUERA del lock. `notify` todavía NO está implementado: un documento que lo use se RECHAZA al guardar nombrando su issue (hub#663), en vez de guardarse y quedarse colgado a las 3 de la mañana."
+          "description": "Vocabulario CONGELADO, y desde hub#821 los SEIS se ejecutan. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http` (hub#662) y `ai` (hub#665) siguen el contrato claim → I/O → complete: el tick los prepara y el server los ejecuta FUERA del lock. `notify` (hub#821) no cruza esa costura: resuelve el destinatario con una lectura local y ENCOLA un evento host-notify, y quien habla con la red es el relay del outbox, que ya tiene reintentos, backoff y dead-letter."
         },
         "command": {
           "type": "string",
@@ -214,6 +214,48 @@
           "maximum": 10,
           "default": 6,
           "description": "Solo `kind: ai` — vueltas del bucle de tools. Se RECHAZA por encima del tope en vez de recortarse: cada turno es una llamada real por el proxy del SaaS, que la mide (`AssistantUsage`), y un documento que dice 50 y ejecuta 10 le miente a quien lo escribió."
+        },
+        "channel": {
+          "enum": [
+            "email",
+            "whatsapp"
+          ],
+          "description": "Solo `kind: notify` — por dónde sale el mensaje. OBLIGATORIO. Necesita su propio grant `notify` VIVO para ese canal: son dos permisos distintos porque no cuestan lo mismo (Meta cobra cada WhatsApp; un email no), y quien permitió el recordatorio por email no ha aceptado pagarlo por WhatsApp. `sms` está en el vocabulario de ADR-0012 y NO se admite: ni el proxy del SaaS ni el hub tienen transporte, así que se rechaza al guardar en vez de morir en el dead-letter."
+        },
+        "to": {
+          "$ref": "#/$defs/recipient",
+          "description": "Solo `kind: notify` — a quién. OBLIGATORIO. Es una query y un campo, NUNCA una dirección: no hay forma de escribir una a mano, y esa ausencia es la garantía de que un flujo (o una plantilla del marketplace) no puede mandar el mensaje a lo que traiga el payload del evento."
+        },
+        "template": {
+          "type": "string",
+          "description": "Solo `kind: notify` — NOMBRE de plantilla; no hay catálogo en el hub (flows.md §5). En WhatsApp es la plantilla aprobada en Meta; en email hace de asunto si `vars` no trae uno. Se mapea contra el run como cualquier otro valor."
+        },
+        "vars": {
+          "$ref": "#/$defs/mapping",
+          "description": "Solo `kind: notify` — el texto y sus variables, mapeados contra el run (`vars.text` es lo que dice un email o un WhatsApp libre). Un `{{secret.X}}` aquí se RECHAZA al guardar: sería una credencial enviada a un cliente."
+        }
+      }
+    },
+    "recipient": {
+      "type": "object",
+      "required": [
+        "query",
+        "field"
+      ],
+      "additionalProperties": false,
+      "description": "El destinatario de un step `notify` (hub#821): UN CAMPO de UNA query declarada. El par `<query>#<campo>` tiene que coincidir con un grant `recipient_query` VIVO del flujo — pedir otro campo, u otra query, es un permiso distinto con la misma respuesta por defecto. La query se ejecuta en modo lectura con el contexto del flujo; si devuelve 0 filas o más de 1, el step FALLA (elegir «la primera» dependería de un orden que ningún documento declara, y mandárselo a todas es una campaña que nadie concedió). Y el valor pasa la misma comprobación de forma de siempre: salir de una query concedida no convierte a un email en un número de WhatsApp. Revocar el grant corta el envío AUNQUE el mensaje ya estuviera encolado.",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "La query de la que sale el contacto."
+        },
+        "params": {
+          "$ref": "#/$defs/mapping",
+          "description": "Sus parámetros, mapeados contra el run (`{\"id\": \"input.customer_id\"}`). Es donde se acota la lectura para que devuelva UNA fila."
+        },
+        "field": {
+          "type": "string",
+          "description": "La COLUMNA de esa fila que es el destinatario (`phone`, `email`). Un nombre de columna, no una ruta."
         }
       }
     }

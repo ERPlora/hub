@@ -1,0 +1,1 @@
+SELECT id, email, phone FROM crm_customer WHERE hub_id = :hub_id AND id = :id;
