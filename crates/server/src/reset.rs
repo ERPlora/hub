@@ -20,7 +20,8 @@ use serde::Deserialize;
 use serde_json::json;
 
 use erplora_runtime::reset::{
-    execute_reset, list_import_batches, plan_reset, undo_import, ResetSelection,
+    execute_reset, last_import_report_for_hub, list_import_batches, plan_reset, undo_import,
+    ResetSelection,
 };
 
 use crate::auth;
@@ -184,6 +185,59 @@ pub async fn import_batches(State(st): State<AppState>, headers: HeaderMap) -> R
         Err(e) => err(
             StatusCode::INTERNAL_SERVER_ERROR,
             &format!("no se pudieron listar las importaciones: {e}"),
+        ),
+    }
+}
+
+/// GET /api/hub/import/report — recovers the LAST actionable import report for the hub (hub#763).
+///
+/// The Dashboard hero points an admin at «Settings › Data» after a partial import, and that screen
+/// used to start at the catalogue no matter what — the report was gone the moment navigation
+/// dropped the in-memory `ref`. This endpoint hands the Data tab the persisted report (most recent
+/// first): the extended document the server stored (sections + installed_modules + media + fiscal),
+/// its `batch_id` (to undo or retry), its blueprint name and when it ran. Behind the same admin
+/// gate as the rest of the import surface.
+///
+/// `None` (a `{ ok: true, report: null }` body) is the honest answer for a hub that never ran an
+/// import, or whose last batch was undone (its report row is deleted with the batch): the Data tab
+/// shows the catalogue, exactly as before.
+pub async fn import_report(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let data_hub_id = match auth::authenticate(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx.hub_id,
+        Err(e) => return unauthorized(e),
+    };
+    match last_import_report_for_hub(&rt, &data_hub_id).await {
+        Ok(None) => (StatusCode::OK, Json(json!({ "ok": true, "report": null }))).into_response(),
+        Ok(Some(stored)) => {
+            // `stored.report` is opaque JSON the writer put there (runtime report, or the server's
+            // extended one). Parse it back so the body is a structured object, not a nested string.
+            let parsed = serde_json::from_str::<serde_json::Value>(&stored.report)
+                .unwrap_or_else(|_| json!({ "sections": [] }));
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "report": {
+                        "batch_id": stored.batch_id,
+                        "name": stored.name,
+                        "created_at": stored.created_at,
+                        "report": parsed,
+                    }
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("no se pudo leer el último informe de importación: {e}"),
         ),
     }
 }

@@ -31,6 +31,7 @@ use sha2::{Digest, Sha256};
 
 use erplora_runtime::export::{self, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{self, ImportSelection};
+use erplora_runtime::reset;
 use erplora_runtime::Runtime;
 
 use crate::state::AppState;
@@ -747,20 +748,25 @@ pub(crate) async fn run_import(
 
     // (4) Motor del runtime (Fase 2): aplica las secciones de datos con el hub_id DEL DESPLIEGUE.
     //     Un Err del motor = rechazo duro (integridad/versión) → 422 sin efectos.
-    let report = {
+    let (report, batch_id) = {
         let arc = st
             .runtime_for(&st.hub_id())
             .await
             .map_err(crate::tenant_rejected)?;
         let mut rt = arc.lock().await;
-        import::import_sections(&mut rt, &manifest, &files, &selection, data_hub_id)
+        let r = import::import_sections(&mut rt, &manifest, &files, &selection, data_hub_id)
             .await
             .map_err(|e| {
                 err(
                     StatusCode::UNPROCESSABLE_ENTITY,
                     &format!("import rechazado: {e}"),
                 )
-            })?
+            })?;
+        // The runtime persisted its OWN report under `batch_id` (hub#763). The server UPSERTs the
+        // EXTENDED one (below) over the same id, so a reload reads the full picture. Captured here
+        // so the extend step can reuse the same `batch_id` the engine opened.
+        let batch_id = r.batch_id.clone();
+        (r, batch_id)
     };
 
     // (5) Media: copia `media/*` del bundle al gestor media (ADR-0047). Best-effort por fichero
@@ -822,6 +828,22 @@ pub(crate) async fn run_import(
             "el certificado no se aplica automáticamente (la contraseña no viaja en el bundle): súbelo en Ajustes → Negocio (PUT /api/business/certificate)"
         },
     });
+
+    // (8) Persist the EXTENDED report under its batch (hub#763). The runtime stored its sections
+    //     already; this UPSERTs the full document (sections + installed_modules + media + fiscal)
+    //     so navigating to Settings › Data (or reloading, or a new session) recovers EXACTLY what
+    //     the hero card was pointing at. A failure here MUST NOT fail the import (best-effort, like
+    //     every step that is not integrity): the data is in; what would be lost is this view of it.
+    if let Some(ref batch) = batch_id {
+        if let Ok(report_json) = serde_json::to_string(&report_v) {
+            let arc = st
+                .runtime_for(&st.hub_id())
+                .await
+                .map_err(crate::tenant_rejected)?;
+            let rt = arc.lock().await;
+            let _ = reset::store_import_report(&rt, data_hub_id, batch, &manifest.name, &report_json).await;
+        }
+    }
     Ok(report_v)
 }
 

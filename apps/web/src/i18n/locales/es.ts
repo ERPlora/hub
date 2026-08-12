@@ -202,6 +202,9 @@ export default {
       interruptedBody: 'Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.',
       continue: 'Continuar',
       retry: 'Intentar otra vez',
+      // hub#763 — la puerta al informe que nombran las frases de arriba. Ahora el informe sobrevive
+      // a la navegación, así que este botón lleva a algo y no al catálogo de plantillas vacío.
+      seeReport: 'Ver el informe',
     },
     // La franja bloqueante (hub#374): la superficie de las pantallas donde no está la checklist.
     // Dice la CONSECUENCIA, no la gravedad — ⛔ significa que el runtime rechaza el documento, así
@@ -1133,6 +1136,12 @@ export default {
     back: 'Elegir otro fichero',
     reportTitle: 'Informe de la importación',
     reportModules: 'Apps',
+    // hub#763 — este informe se ha RECUPERADO, no es el de una importación que acabas de correr.
+    // El Dashboard manda a Datos tras un import parcial; este aviso dice de QUÉ import es el
+    // informe (su nombre y cuándo fue) para que no aparezca de la nada.
+    reportRecovered: 'Este es el informe de tu última importación de {name} ({when}). No todo entró.',
+    // La vuelta al catálogo tras leer el informe recuperado, para que el admin pueda reintentar.
+    reportDismiss: 'Ver las plantillas',
     statusApplied: 'Aplicado',
     statusSkipped: 'Saltado',
     statusIgnored: 'Descartado',

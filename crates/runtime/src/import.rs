@@ -76,6 +76,12 @@ pub struct SectionResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ImportReport {
     pub sections: Vec<SectionResult>,
+    /// The batch this import ran under, so its report can be recovered after navigation/reload
+    /// (hub#763). Skipped on the wire: the shell's contract is `sections` (+ the server's
+    /// `installed_modules`/`media`/`fiscal`), and a server that does not know the field must still
+    /// round-trip. The client reads it through the persisted report, not this field.
+    #[serde(default, skip_serializing, skip_deserializing)]
+    pub batch_id: Option<String>,
 }
 
 /// Aplica en el hub las secciones seleccionadas del bundle, bajo el tenant `target_hub_id`
@@ -177,6 +183,20 @@ pub async fn import_sections(
             discarded_rows,
         });
     }
+    // ── Persist the actionable report under its batch (hub#763) ──────────────
+    // The engine's report used to live ONLY in the return value — so once the caller navigated
+    // away (the Dashboard hero → Settings › Data path), the report was gone and the Data tab could
+    // only show the catalogue again. Storing it under the same `batch_id` the batch opened lets
+    // the Data tab recover it on mount, after a reload or a new session. A failure here MUST NOT
+    // abort the import (the engine already ran): losing it costs this traceability, not the data.
+    // The server UPSERTs the EXTENDED report (sections + installed_modules/media/fiscal) over the
+    // same `batch_id` once its orchestration finishes, so what a reload reads is the full picture.
+    if let Some(ref batch) = batch_id {
+        if let Ok(json) = serde_json::to_string(&report) {
+            let _ = crate::reset::store_import_report(rt, target_hub_id, batch, &manifest.name, &json).await;
+        }
+    }
+    report.batch_id = batch_id;
     Ok(report)
 }
 
@@ -1229,10 +1249,28 @@ mod tests {
                     discarded_rows: 0,
                 },
             ],
+            batch_id: None,
         };
         let json = serde_json::to_string(&r).unwrap();
         let back: ImportReport = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
+
+        // `batch_id` NO viaja por el cable (hub#763): el contrato del shell son las `sections` (más
+        // lo que el servidor añade encima), y un servidor que no conozca el campo tiene que poder
+        // hacer round-trip igual. El cliente lo lee del informe PERSISTIDO, no de aquí.
+        assert!(!json.contains("batch_id"), "el batch_id no se serializa: {json}");
+    }
+
+    /// Y el lote sí acompaña al informe DENTRO del proceso, que es como el motor se lo pasa al
+    /// servidor para que haga el UPSERT del informe extendido sobre el mismo `batch_id`.
+    #[test]
+    fn the_batch_travels_in_memory_but_not_on_the_wire() {
+        let r = ImportReport { sections: Vec::new(), batch_id: Some("b-1".into()) };
+
+        let back: ImportReport = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+
+        assert_eq!(r.batch_id.as_deref(), Some("b-1"));
+        assert_eq!(back.batch_id, None, "al deserializar no se inventa un lote que no vino");
     }
 
     /// A manifest whose only interesting part is where it comes from (hub#331 gate).
