@@ -666,3 +666,260 @@ async fn raw_downloads_the_file_server_side_and_never_leaks_the_hub_token_to_sto
         "el token de máquina del hub no puede llegar al almacenamiento"
     );
 }
+
+// ─────────────── OOM guard on the raw proxy (hub#759) ───────────────
+//
+// A catalog page mounts hundreds of `/api/media/raw` URLs at once. The proxy used to materialize
+// every object fully in memory with no concurrency cap — enough to kill a 96 MiB container
+// (exit 137). These tests pin the three mechanisms that bound memory:
+//
+//   1. a semaphore on simultaneous object downloads (the burst queues instead of stacking up),
+//   2. streaming the body instead of buffering it whole,
+//   3. a hard per-object size cap — refused upfront when the size is declared, and cut off
+//      mid-stream when it is not.
+//
+// The numbers 8 (concurrent downloads) and 25 MiB (object cap) mirror the constants in
+// `crates/server/src/media.rs`; they are spelled out here so a silent change to either
+// turns a test red.
+
+/// Spawns `router` on an ephemeral port and returns its address.
+async fn spawn_backend(router: Router) -> std::net::SocketAddr {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    addr
+}
+
+/// Fixture for the raw proxy: a mini-Cloud that signs every path to `storage_addr`, plus an app
+/// with one admin session. Returns (app, session).
+async fn raw_proxy_fixture_at(storage_addr: std::net::SocketAddr) -> (axum::Router, String) {
+    let signed = format!("http://{storage_addr}/object?X-Amz-Signature=abc");
+    let cloud = Router::new().fallback(move || {
+        let signed = signed.clone();
+        async move { Json(json!({ "url": signed })) }
+    });
+    let cloud_addr = spawn_backend(cloud).await;
+
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-media");
+    rt.ensure_system_tables().await.unwrap();
+    let user_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
+    let session = rt.create_session(&user_id, 3600, None).await.unwrap();
+    let cfg = HubConfig {
+        demo: false,
+        hub_id: "hub-media".into(),
+        cloud_base_url: format!("http://{cloud_addr}"),
+        module_cache: std::env::temp_dir().join("erplora-media-oom-cache"),
+        auth_mode: AuthMode::Session,
+        jwt_public_key: None,
+        cloud_api_token: Some("test-machine-token".into()),
+        device_trust_enforce: false,
+        media_dir: std::env::temp_dir().join("erplora-media-oom-scratch"),
+        sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
+    };
+    (app(AppState::with_config(rt, cfg)), session)
+}
+
+/// Same fixture, with the storage given as an axum router.
+async fn raw_proxy_fixture(storage: Router) -> (axum::Router, String) {
+    let storage_addr = spawn_backend(storage).await;
+    raw_proxy_fixture_at(storage_addr).await
+}
+
+fn raw_request(session: &str) -> Request {
+    Request::builder()
+        .uri("/api/media/raw?path=catalog/img.webp")
+        .header("x-hub-session", session)
+        .body(Body::empty())
+        .unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_raw_downloads_are_bounded() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    // Gauge of simultaneous downloads AS SEEN BY THE STORAGE. The guard travels inside the
+    // response body stream, so a download counts as active until the proxy has drained it —
+    // which is exactly the window in which the proxy holds its memory.
+    #[derive(Default)]
+    struct Gauge {
+        active: AtomicUsize,
+        max: AtomicUsize,
+    }
+    struct ActiveDownload(Arc<Gauge>);
+    impl Drop for ActiveDownload {
+        fn drop(&mut self) {
+            self.0.active.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+
+    let gauge = Arc::new(Gauge::default());
+    let storage = Router::new().fallback({
+        let gauge = gauge.clone();
+        move || {
+            let gauge = gauge.clone();
+            async move {
+                let now = gauge.active.fetch_add(1, Ordering::SeqCst) + 1;
+                gauge.max.fetch_max(now, Ordering::SeqCst);
+                let guard = ActiveDownload(gauge);
+                // Several delayed chunks: the download stays "active" while the proxy drains
+                // it, so overlapping downloads overlap on the gauge.
+                Body::from_stream(futures_util::stream::unfold(
+                    (0u32, guard),
+                    |(i, guard)| async move {
+                        if i >= 4 {
+                            return None;
+                        }
+                        tokio::time::sleep(Duration::from_millis(40)).await;
+                        Some((
+                            Ok::<_, std::io::Error>(axum::body::Bytes::from(vec![0u8; 1024])),
+                            (i + 1, guard),
+                        ))
+                    },
+                ))
+            }
+        }
+    });
+    let (router, session) = raw_proxy_fixture(storage).await;
+
+    let mut tasks = Vec::new();
+    for _ in 0..16 {
+        let router = router.clone();
+        let session = session.clone();
+        tasks.push(tokio::spawn(async move {
+            let response = router.oneshot(raw_request(&session)).await.unwrap();
+            let status = response.status();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            (status, body.len())
+        }));
+    }
+    for task in tasks {
+        let (status, len) = task.await.unwrap();
+        // Bounding must queue the burst, not shed it: every request still succeeds, whole.
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(len, 4 * 1024);
+    }
+
+    let max = gauge.max.load(Ordering::SeqCst);
+    // Positive control: if the test never overlapped downloads it cannot detect the bound.
+    assert!(max >= 2, "the test never overlapped downloads (max {max})");
+    assert!(
+        max <= 8,
+        "simultaneous object downloads must be bounded (semaphore missing?): saw {max} at once"
+    );
+}
+
+#[tokio::test]
+async fn raw_streams_the_body_instead_of_buffering_it_whole() {
+    use std::time::Duration;
+
+    // Storage sends the first chunk immediately and holds the tail for a long time. A proxy that
+    // buffers the whole object cannot answer until the slow tail arrives; a streaming proxy must
+    // deliver headers + first chunk right away.
+    let storage = Router::new().fallback(|| async {
+        Body::from_stream(futures_util::stream::unfold(0u32, |i| async move {
+            match i {
+                0 => Some((
+                    Ok::<_, std::io::Error>(axum::body::Bytes::from(vec![1u8; 1024])),
+                    1,
+                )),
+                1 => {
+                    tokio::time::sleep(Duration::from_secs(8)).await;
+                    Some((Ok(axum::body::Bytes::from(vec![2u8; 1024])), 2))
+                }
+                _ => None,
+            }
+        }))
+    });
+    let (router, session) = raw_proxy_fixture(storage).await;
+
+    let first_chunk = tokio::time::timeout(Duration::from_secs(3), async {
+        let response = router.oneshot(raw_request(&session)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        use http_body_util::BodyExt;
+        response.into_body().frame().await.unwrap().unwrap()
+    })
+    .await;
+    assert!(
+        first_chunk.is_ok(),
+        "the first chunk must arrive before the upstream finishes: the proxy is buffering the whole object"
+    );
+}
+
+#[tokio::test]
+async fn raw_refuses_an_object_bigger_than_the_size_cap() {
+    use std::time::Duration;
+
+    // Storage that announces a 200 MiB object and then stalls. On a 96 MiB container that must be
+    // refused upfront from the declared size — never downloaded. Raw TCP because axum would
+    // overwrite a hand-set Content-Length.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let storage_addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        loop {
+            let Ok((mut socket, _)) = listener.accept().await else {
+                break;
+            };
+            tokio::spawn(async move {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 4096];
+                let _ = socket.read(&mut buf).await;
+                let _ = socket
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\ncontent-type: image/webp\r\ncontent-length: 209715200\r\n\r\n",
+                    )
+                    .await;
+                // Trickle a little data, then hang: a proxy that tries to download gets stuck.
+                let _ = socket.write_all(&[0u8; 1024]).await;
+                tokio::time::sleep(Duration::from_secs(8)).await;
+            });
+        }
+    });
+    let (router, session) = raw_proxy_fixture_at(storage_addr).await;
+
+    let response = tokio::time::timeout(
+        Duration::from_secs(3),
+        router.oneshot(raw_request(&session)),
+    )
+    .await
+    .expect("an oversized object must be refused from its declared size, not downloaded")
+    .unwrap();
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+#[tokio::test]
+async fn raw_cuts_off_a_stream_that_exceeds_the_size_cap() {
+    // No Content-Length (chunked): the cap must also hold mid-stream. 26 chunks of 1 MiB exceed
+    // the 25 MiB cap.
+    let storage = Router::new().fallback(|| async {
+        Body::from_stream(futures_util::stream::unfold(0u32, |i| async move {
+            (i < 26).then(|| {
+                (
+                    Ok::<_, std::io::Error>(axum::body::Bytes::from(vec![0u8; 1024 * 1024])),
+                    i + 1,
+                )
+            })
+        }))
+    });
+    let (router, session) = raw_proxy_fixture(storage).await;
+
+    let response = router.oneshot(raw_request(&session)).await.unwrap();
+    // Headers may already be out (200): the enforcement is aborting the body.
+    match axum::body::to_bytes(response.into_body(), usize::MAX).await {
+        Err(_) => {} // stream aborted: the cap held
+        Ok(bytes) => assert!(
+            (bytes.len() as u64) <= 25 * 1024 * 1024,
+            "the proxy relayed {} bytes — nothing bounds memory on an unsized stream",
+            bytes.len()
+        ),
+    }
+}

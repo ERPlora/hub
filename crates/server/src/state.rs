@@ -536,6 +536,12 @@ pub struct AppState {
     /// Per-key cap on simultaneous stream connections (hub#531). One API key should not be able to
     /// exhaust the hub by opening N sockets — a reconnection bug reaches the ceiling, not just malice.
     pub stream_limiter: Arc<crate::event_stream::StreamLimiter>,
+    /// Cap on simultaneous media object downloads (hub#759). A catalog page mounts hundreds of
+    /// `/api/media/raw` URLs at once; without this bound, N concurrent proxied downloads stack
+    /// their buffers simultaneously — enough to OOM a 96 MiB container (exit 137). Requests
+    /// beyond the cap queue on the semaphore instead of failing. Each permit is held for the
+    /// whole life of the streamed response body, not just the handler call.
+    pub media_fetch_limiter: Arc<tokio::sync::Semaphore>,
     /// **One rolling budget for every delegated-certificate refetch this process makes**
     /// (ADR-0202 §2 point 4). It used to be a local of `serve()`, which was enough while the only
     /// callers were the loops `serve()` itself spawns; capturing the Anexo I adds a **fourth
@@ -602,6 +608,9 @@ impl AppState {
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
             stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
             stream_limiter: Arc::new(crate::event_stream::StreamLimiter::default()),
+            media_fetch_limiter: Arc::new(tokio::sync::Semaphore::new(
+                crate::media::MAX_CONCURRENT_MEDIA_FETCHES,
+            )),
             certificate_budget: Arc::new(crate::fiscal_certificate::RefetchBudget::hourly()),
         }
     }
