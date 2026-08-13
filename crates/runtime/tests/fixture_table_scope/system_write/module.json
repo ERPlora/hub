@@ -1,0 +1,13 @@
+{
+  "id": "system_write",
+  "name": "System write fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "system_write.claim": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/claim.sql"]
+    }
+  }
+}

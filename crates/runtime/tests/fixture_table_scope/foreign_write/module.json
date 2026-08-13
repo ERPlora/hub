@@ -1,0 +1,13 @@
+{
+  "id": "foreign_write",
+  "name": "Foreign write fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "foreign_write.raid": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/raid.sql"]
+    }
+  }
+}

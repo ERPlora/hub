@@ -1,0 +1,22 @@
+{
+  "id": "nid",
+  "name": "NewIds fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "nid.create": {
+      "permission": "",
+      "transaction": true,
+      "handler": {
+        "type": "native",
+        "function": "create"
+      }
+    },
+    "nid._insert": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/insert.sql"]
+    }
+  }
+}

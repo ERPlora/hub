@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "required": ["order_id"],
+  "additionalProperties": false,
+  "properties": {
+    "order_id": { "type": "string" }
+  }
+}
