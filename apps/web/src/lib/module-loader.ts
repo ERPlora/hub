@@ -46,6 +46,20 @@ interface RuntimeNavItem {
   component: string;
 }
 
+/**
+ * Lo que contesta `/api/navigation`: el menú + cuántos módulos se espera que aporten uno (hub#894).
+ *
+ * `activeModules` es el número contra el que se comprueba una lista vacía. Cuenta los módulos
+ * instalados **y activos**: uno que el admin apagó no se espera que aporte menú, así que contarlo
+ * convertiría un hub apagado a propósito en un falso «no he podido cargar tus apps».
+ * `undefined` = un runtime anterior que no lo dice, y «no lo ha dicho» nunca puede ser el motivo de
+ * gritar.
+ */
+interface Navigation {
+  items: RuntimeNavItem[];
+  activeModules?: number;
+}
+
 const loadedEntries = new Set<string>();
 /** Base bajo la que el runtime sirve los assets de los módulos (`/modules/<id>/...`). */
 const MODULES_BASE = '/modules';
@@ -55,14 +69,18 @@ const MODULES_BASE = '/modules';
  * `GET /api/navigation` → `{ ok, data: [{ module_id, id, label, icon, component }] }`.
  * El runtime ya filtra por módulos activos; aquí no se vuelve a filtrar por estado.
  */
-async function fetchNavigation(): Promise<RuntimeNavItem[]> {
+async function fetchNavigation(): Promise<Navigation> {
   // `?locale=` (ADR-0055): el runtime devuelve los labels ya traducidos (fallback locale→en→manifest).
   const res = await fetch(`${RUNTIME_URL}/api/navigation?locale=${encodeURIComponent(getLocale())}`, {
     headers: runtimeHeaders(),
   });
   if (!res.ok) throw new Error(`navigation → ${res.status}`);
-  const env = (await res.json()) as { ok: boolean; data?: RuntimeNavItem[] };
-  return env.ok && env.data ? env.data : [];
+  const env = (await res.json()) as {
+    ok: boolean;
+    data?: RuntimeNavItem[];
+    active_modules?: number;
+  };
+  return { items: env.ok && env.data ? env.data : [], activeModules: env.active_modules };
 }
 
 /**
@@ -104,16 +122,29 @@ export async function loadManifest(moduleId: string): Promise<ModuleManifest | n
  * Construye las entradas de menú del shell a partir de lo que el runtime reporta como instalado
  * y activo (`/api/navigation`), resolviendo por módulo su `ui.entry` (del manifest) y los iconos.
  *
- * Si el runtime no responde aún (boot temprano, sin runtime en dev), devuelve `[]` sin romper:
- * el shell deja la nav vacía y `refreshModuleNav` reintentará tras instalar/activar.
+ * **LANZA si no ha podido construir la lista** (hub#894). Antes devolvía `[]` en ese caso, y ahí
+ * estaba el defecto: `refreshModuleNav` recibía una lista vacía correcta, marcaba `moduleNavState`
+ * como `ready`, y `ready` + cero filas se pinta «aún no tienes apps». Un 401 —la forma cotidiana de
+ * una sesión desplazada por un segundo dispositivo en plan Free— le decía así a un hub con 12
+ * módulos registrados que no tenía ninguno, en las DOS pantallas que listan apps, y le ofrecía
+ * instalar lo que ya tenía. hub#770 escribió la regla (cargando / falló / vacío son tres frases
+ * distintas) y su máquina de estados; esta función la saltaba porque nunca rechazaba.
+ *
+ * Lanza en dos casos, y son el mismo error visto por sus dos lados:
+ *   1. la petición falló (401, 5xx, sin runtime) — no hay respuesta que creer;
+ *   2. la respuesta llegó, el runtime esperaba menú (`active_modules > 0`) y no queda ninguna app que
+ *      montar. Eso es una contradicción, no un hub vacío: alguno de los descartes silenciosos de
+ *      abajo (entitlement, manifest ilegible) se los llevó todos.
+ *
+ * Lo que NO lanza: un hub sin módulos activos (`active_modules: 0` → `[]` es la respuesta verdadera,
+ * incluido el hub que el admin apagó a propósito), un runtime que no reporta la cuenta (se toma al
+ * pie de la letra, como antes), ni un módulo roto
+ * entre varios buenos (los demás siguen en pantalla — «los datos ganan», hub#770).
  */
 export async function loadMenu(): Promise<MenuEntry[]> {
-  let navItems: RuntimeNavItem[];
-  try {
-    navItems = await fetchNavigation();
-  } catch {
-    return [];
-  }
+  // Un fallo aquí sale hacia arriba a propósito: quien pinta la lista tiene que poder distinguir
+  // «no pude preguntar» de «este hub no tiene apps».
+  const { items: navItems, activeModules } = await fetchNavigation();
 
   // Agrupa las entradas de navegación por módulo (un manifest/icon-map por módulo, no por item).
   const byModule = new Map<string, RuntimeNavItem[]>();
@@ -148,6 +179,15 @@ export async function loadMenu(): Promise<MenuEntry[]> {
         iconSvg: item.icon ? icons[item.icon] : undefined,
       });
     }
+  }
+  // Cero apps que montar cuando el runtime esperaba menú = contradicción (hub#894). Lo afirmó él
+  // (`active_modules`), así que la lista vacía no puede ser la respuesta: se sube como fallo para que
+  // se pinte un error y no la frase «aún no tienes apps», que manda al dueño a instalar lo que ya
+  // tiene. `activeModules == null` = un runtime que no lo dice; ahí no hay contradicción que detectar.
+  if (entries.length === 0 && (activeModules ?? 0) > 0) {
+    throw new Error(
+      `navigation → 0 apps to mount with ${activeModules} active module(s) on this hub`,
+    );
   }
   return entries;
 }
@@ -222,7 +262,7 @@ export async function loadModuleLocale(
 export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
   let navItems: RuntimeNavItem[];
   try {
-    navItems = await fetchNavigation();
+    navItems = (await fetchNavigation()).items;
   } catch {
     return [];
   }

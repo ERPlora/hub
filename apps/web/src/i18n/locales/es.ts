@@ -251,6 +251,10 @@ export default {
     // mismo nombre para lo mismo en las dos superficies.
     appsAdd: 'Añadir apps',
     appsEmpty: 'Aquí aparecerán tus apps. Añade las que necesite tu negocio.',
+    // hub#894 — se dice EN LUGAR de `appsEmpty` cuando la lista no se pudo cargar. Nunca afirma que
+    // el hub esté vacío, y propone recargar: las apps siguen instaladas.
+    appsLoadError:
+      'No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.',
     blueprintTitle: 'Configura tu negocio',
     blueprintBody: 'Carga una plantilla para tu negocio o restaura una copia para empezar.',
     blueprintCta: 'Configurar',
