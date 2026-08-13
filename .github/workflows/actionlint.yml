@@ -1,0 +1,71 @@
+# ==============================================================================
+# actionlint — PR gate for the workflow files themselves (hub#652)
+#
+# Why this exists: three times a broken `build-hub.yml` froze the fleet image
+# (`ghcr.io/erplora/hub:latest`) in TOTAL silence — ~2 days in July (duplicate
+# `build-args` key, #238), 4 days in August (vue-tsc, now covered by test-web),
+# ~13.5 h on 08-09 (duplicate `id: tags`, hub#515). When GitHub cannot parse a
+# workflow the run "fails" with 0 jobs, 0 s, no logs — and no PR check watched
+# these files, so the breakage merged unnoticed every time.
+#
+# actionlint catches BOTH historical parse-killers before merge (verified with
+# this exact invocation, 2026-08-13):
+#   - duplicate map key   → `key "build-args" is duplicated ... [syntax-check]`
+#   - duplicate step id   → `step ID "tags" duplicates ... [id]`
+#
+# It lints ALL workflows, not only the changed ones: a develop→main batch can
+# resurrect an old broken step in a file the PR does not list as changed.
+#
+# External-tool integrations (`shellcheck`, `pyflakes`) are DISABLED on purpose:
+#   - they depend on what happens to be installed on the runner (a clean
+#     self-hosted Ubuntu has no shellcheck; GitHub's ubuntu-latest does), which
+#     would make the gate's verdict depend on where it ran;
+#   - this gate exists to catch what makes GitHub refuse to RUN a workflow, not
+#     to lint shell style — and the existing workflows carry two pre-existing
+#     shellcheck warnings (tauri-release.yml, test-hub.yml) that would turn the
+#     gate red on files out of its scope.
+#
+# Where it runs: same `CI_RUNNER_LABEL` switch as the other workflows — the
+# dedicated `ci-runner-1` when the org Variable is set, GitHub's cheap default
+# `ubuntu-latest` otherwise. The job is seconds long either way.
+# ==============================================================================
+
+name: Lint Workflows (actionlint)
+
+on:
+  pull_request:
+    paths: ['.github/workflows/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: actionlint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: actionlint (all workflows)
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Pinned version + official downloader (a ~3 MB static Go binary; no
+      # package manager involved, so it works the same on ci-runner-1 and on
+      # ubuntu-latest). Bump the version deliberately, not via a moving tag.
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+        run: |
+          set -euo pipefail
+          bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") \
+            "${ACTIONLINT_VERSION}" "${RUNNER_TEMP}"
+
+      - name: Lint all workflows
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/actionlint" -color -shellcheck= -pyflakes=
