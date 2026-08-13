@@ -177,11 +177,24 @@ jobs:
 
       # 🔴 `cache-bin: false`: el paso `Post` de esta acción limpia `$CARGO_HOME/bin` y borra el
       # `rustup` del runner propio, rompiendo el job SIGUIENTE. Explicación en `test-shell.yml`.
+      #
+      # 🔴 `save-if` apagado en el runner propio, y NO es una optimización tampoco. El mismo `Post`
+      # llama a `cleanRegistry`, que hace `rmRF` de TODO directorio de `~/.cargo/registry/src` que
+      # no sea del workspace. Este job y `build-android` corren A LA VEZ en `ci-runner-1` —dos
+      # ranuras, dos `_work`, UN `$HOME`— y el build de Android incluye como proyectos Gradle
+      # `:tauri-android`, `:tauri-plugin-deep-link`, `:tauri-plugin-notification` y
+      # `:tauri-plugin-opener`, que viven EXACTAMENTE ahí. Medido: este `Post` escribió
+      # «... Cleaning cargo registry ...» a las 13:29:24 y 41 s después Android moría en la fase de
+      # configuración con «No variants exist» para esos cuatro (hub#878) — un rojo que habla de
+      # variantes de Gradle y no menciona ni la caché ni el otro job.
+      # `save-if: false` corta ANTES de limpiar (`save.ts`), así que el restore sigue y en Windows
+      # y macOS —máquinas que mueren con el job— la caché se guarda igual que siempre.
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
           cache-bin: false
+          save-if: ${{ runner.environment != 'self-hosted' }}
 
       # En tag push, fija la versión del bundle a partir del tag (`v1.2.3` → `1.2.3`) para que la
       # app reporte su versión. En main se queda con la de `tauri.conf.json` (build "latest").
@@ -388,11 +401,15 @@ jobs:
 
       # 🔴 `cache-bin: false`: ver `test-shell.yml`. Aquí además el job hace
       # `cargo install tauri-cli`, que escribe justo en `$CARGO_HOME/bin`.
+      # 🔴 `save-if` apagado en el runner propio: este job es la VÍCTIMA del `cleanRegistry` del
+      # job de escritorio (explicación completa allí), pero el suyo hace lo mismo al terminar —y
+      # el de escritorio dura menos, así que sería su verdugo en el orden contrario.
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
           cache-bin: false
+          save-if: ${{ runner.environment != 'self-hosted' }}
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
