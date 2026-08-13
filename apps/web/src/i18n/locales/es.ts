@@ -56,6 +56,16 @@ export default {
     profile: 'Perfil',
     signOut: 'Cerrar sesión',
   },
+  // Textos del shell de la app instalada. «Cambiar de negocio» (hub#447): la app recuerda UN
+  // negocio y esta es la puerta del usuario hacia otro. Se habla de NEGOCIO, nunca de «hub».
+  shell: {
+    changeHub: 'Cambiar de negocio',
+    changeHubTitle: '¿Cambiar de negocio?',
+    changeHubBody:
+      'Este dispositivo cerrará la sesión de este negocio y mostrará tu lista de negocios.',
+    changeHubCancel: 'Cancelar',
+    changeHubConfirm: 'Cambiar',
+  },
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
   // para dos cosas es como un cajero acaba desinstalando el TPV.

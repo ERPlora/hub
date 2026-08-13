@@ -692,11 +692,29 @@ fn initial_url_for(
     onboarding_url(saas_base)
 }
 
-/// Olvida el hub capturado y devuelve la ventana al onboarding del SaaS. Lo invoca el frontend
-/// cuando el Cloud responde 410 `hub_not_found` (hub borrado/revocado). CONSERVA `device.id`
-/// (ancla estable de la instalación). Best-effort en la navegación (sin ventana no falla).
+/// Where the window goes after forgetting the hub (hub#447).
+///
+/// Two callers, two intents. The 410 path (`choose = false`) keeps the plain onboarding: the hub
+/// is gone, the SaaS routes as it sees fit — and with a single hub that means straight back in,
+/// which is right there. The USER path («switch business», `choose = true`) needs the opposite:
+/// `?choose=1` is the SaaS's own affordance for forcing the hub list even when a lone hub would
+/// auto-redirect — without it, the owner with two businesses and one tablet bounces right back
+/// into the hub they were trying to leave.
+fn forget_destination(base: &str, choose: bool) -> String {
+    if choose {
+        format!("{}?choose=1", onboarding_url(base))
+    } else {
+        onboarding_url(base)
+    }
+}
+
+/// Olvida el hub capturado y devuelve la ventana al onboarding del SaaS. Dos llamadores (hub#447):
+/// el frontend ante un 410 `hub_not_found` (sin `choose` → onboarding a secas) y el control
+/// «cambiar de negocio» de la topbar (`choose: true` → `?choose=1`, el selector de hubs del SaaS).
+/// CONSERVA `device.id` (ancla estable de la instalación, ADR-0154 — lo exige la issue).
+/// Best-effort en la navegación (sin ventana no falla).
 #[tauri::command]
-fn forget_hub(app: tauri::AppHandle) -> Result<(), ShellError> {
+fn forget_hub(app: tauri::AppHandle, choose: Option<bool>) -> Result<(), ShellError> {
     use tauri::Manager;
     let cache_dir: PathBuf = app
         .path()
@@ -704,7 +722,9 @@ fn forget_hub(app: tauri::AppHandle) -> Result<(), ShellError> {
         .map_err(|e| ShellError::Io(e.to_string()))?;
     clear_hub_url(&cache_dir);
     if let Some(window) = app.get_webview_window("main") {
-        if let Ok(url) = onboarding_url(&saas_base_url()).parse::<tauri::Url>() {
+        if let Ok(url) =
+            forget_destination(&saas_base_url(), choose.unwrap_or(false)).parse::<tauri::Url>()
+        {
             let _ = window.navigate(url);
         }
     }
@@ -1723,6 +1743,32 @@ mod tests {
             twice.scanned_printers().expect("scanned").len(),
             1,
             "the same bonded printer merged twice must stay one device"
+        );
+    }
+
+    // ── hub#447: forgetting BY CHOICE lands on the chooser, forgetting on a 410 does not ─────
+    //
+    // `/shell/` redirects a single-hub user straight back into their hub — correct after a 410
+    // (the hub is gone, the SaaS will route somewhere sane), useless for «I want to pick»: the
+    // owner with two businesses and one tablet would bounce right back into the one they were
+    // trying to leave. `?choose=1` is the SaaS's own affordance for forcing the list; this is
+    // the caller the SaaS was waiting for.
+
+    #[test]
+    fn forgetting_by_choice_lands_on_the_chooser() {
+        assert_eq!(
+            forget_destination("https://erplora.com", true),
+            "https://erplora.com/shell/?choose=1"
+        );
+    }
+
+    #[test]
+    fn forgetting_on_a_410_keeps_the_plain_onboarding() {
+        // The 410 path sends no `choose`: with the hub gone there is nothing to pick between,
+        // and the plain onboarding lets the SaaS route (or re-onboard) as it sees fit.
+        assert_eq!(
+            forget_destination("https://erplora.com", false),
+            "https://erplora.com/shell/"
         );
     }
 

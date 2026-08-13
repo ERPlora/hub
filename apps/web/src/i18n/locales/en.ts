@@ -57,6 +57,17 @@ export default {
     profile: 'Profile',
     signOut: 'Sign out',
   },
+  // Shell-of-the-installed-app copy. «Switch business» (hub#447): the app remembers ONE business
+  // and this is the user's own door to another — an owner with two venues and one tablet, a till
+  // being reassigned. Spoken as BUSINESS, never "hub": the reader owns a bar.
+  shell: {
+    changeHub: 'Switch business',
+    changeHubTitle: 'Switch business?',
+    changeHubBody:
+      'This device will sign out of this business and show your list of businesses.',
+    changeHubCancel: 'Cancel',
+    changeHubConfirm: 'Switch',
+  },
   // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
   // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and
   // one noun for two things is how a cashier ends up uninstalling the till.

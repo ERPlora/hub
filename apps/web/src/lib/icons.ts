@@ -165,6 +165,7 @@ import remove from "~icons/ion/remove?raw";
 import ribbonOutline from "~icons/ion/ribbon-outline?raw";
 import searchOutline from "~icons/ion/search-outline?raw";
 import star from "~icons/ion/star?raw";
+import swapHorizontalOutline from "~icons/ion/swap-horizontal-outline?raw";
 import swapVerticalOutline from "~icons/ion/swap-vertical-outline?raw";
 import terminalOutline from "~icons/ion/terminal-outline?raw";
 import trash from "~icons/ion/trash?raw";
@@ -332,6 +333,7 @@ const SVGS: Record<string, string> = {
   "ribbon-outline": ribbonOutline,
   "search-outline": searchOutline,
   star,
+  "swap-horizontal-outline": swapHorizontalOutline,
   "swap-vertical-outline": swapVerticalOutline,
   "terminal-outline": terminalOutline,
   trash,
