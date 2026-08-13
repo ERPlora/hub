@@ -433,6 +433,11 @@ export default {
     hardwareDesc: 'Impresoras, escáneres y otros dispositivos de este equipo o de su red',
     hardwareReady: 'Disponible aquí',
     hardwareAppOnly: 'Solo desde la app instalada',
+    // «Arrancar al iniciar sesión» (ADR-0204 §7, hub#389). Solo app de escritorio.
+    startOnLogin: 'Arrancar al iniciar sesión',
+    startOnLoginDesc:
+      'Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre tengan dónde imprimirse',
+    startOnLoginError: 'No se pudo cambiar el ajuste de arranque al iniciar sesión',
     disabled: 'Desactivado',
     fiscalIdentity: 'Datos del negocio',
     fiscalIdentityDesc: 'Identidad del obligado tributario (la usan las facturas y las apps fiscales).',

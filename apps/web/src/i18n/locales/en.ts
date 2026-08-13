@@ -461,6 +461,11 @@ export default {
     hardwareDesc: 'Printers, scanners and other devices on this computer or its network',
     hardwareReady: 'Available here',
     hardwareAppOnly: 'Only from the installed app',
+    // «Start on login» (ADR-0204 §7, hub#389). Desktop app only; the OS keeps the state.
+    startOnLogin: 'Start on login',
+    startOnLoginDesc:
+      'Open ERPlora when you sign in to this computer, so tickets always have somewhere to print',
+    startOnLoginError: 'Could not change the start on login setting',
     disabled: 'Disabled',
     fiscalIdentity: 'Business details',
     fiscalIdentityDesc: 'Taxpayer identity (used by invoices and the fiscal apps).',
