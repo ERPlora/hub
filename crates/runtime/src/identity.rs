@@ -46,6 +46,24 @@ pub const DEACTIVATED_ERROR_CODE: &str = "user_deactivated";
 /// that already travels by id alone (`hub_user_profile(hub_id, user_id)`, the `hub_user:<id>` of
 /// every audit column, exported bundles, sessions already issued). What was missing was never a
 /// key; it was a `WHERE`.
+///
+/// ⚠️ **`hub_id` only ever reaches a table through this batch on a database that is BORN here**
+/// (hub#885). A `CREATE TABLE IF NOT EXISTS` is a **no-op** on a table that already exists — it
+/// does not add the columns the new definition lists — and this batch runs on every boot, before
+/// the migration engine, so it meets databases it did not create. On a hub deployed before hub#497
+/// `hub_user` still has no `hub_id` here, and the column only arrives with the system migration
+/// v42 (`hub_identity_hub_scoped`), which runs **afterwards**. That is why the two indexes over
+/// `hub_id` are **not** in this batch: they lived here for one release and the boot died 42703
+/// (`indexcmds.c` / `ComputeIndexAttrs`) on every existing hub in the fleet — a `CREATE INDEX` on a
+/// column the no-op above did not create — while Swarm rolled the update back and the deploy CLI
+/// printed `Service converged`. They belong to v42, which creates them right after the `ALTER` that
+/// guarantees the column and the `UPDATE` that fills the rows already there. Same rule as
+/// `installer::ENSURE_HUB_MODULE`, and for the same reason: a change in the SHAPE of a system table
+/// goes through a numbered migration, always, because that is the only step that reaches a database
+/// that already exists.
+///
+/// `ix_hub_user_cloud` stays because `cloud_user_id` is part of the v0 baseline itself: every
+/// `hub_user` that has ever existed has that column.
 const ENSURE_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS hub_user (\
   id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL, pin_hash TEXT NOT NULL DEFAULT '', \
@@ -54,9 +72,7 @@ CREATE TABLE IF NOT EXISTS hub_user (\
 CREATE TABLE IF NOT EXISTS hub_session (\
   token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, user_id TEXT NOT NULL, created_at TEXT NOT NULL, \
   expires_at TEXT NOT NULL);\
-CREATE INDEX IF NOT EXISTS ix_hub_user_cloud ON hub_user (cloud_user_id);\
-CREATE INDEX IF NOT EXISTS ix_hub_user_hub ON hub_user (hub_id, name);\
-CREATE INDEX IF NOT EXISTS ix_hub_session_hub ON hub_session (hub_id);";
+CREATE INDEX IF NOT EXISTS ix_hub_user_cloud ON hub_user (cloud_user_id);";
 
 /// Crea las tablas de identidad (idempotente).
 pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
@@ -2087,6 +2103,41 @@ mod tests {
         assert_eq!(u3.id, u.id);
         assert!(u3.is_active, "el alta reactiva");
         assert_eq!(u3.role, "employee");
+    }
+
+    /// **The baseline never indexes a column its `CREATE TABLE` may not have created** (hub#885).
+    ///
+    /// [`ensure_tables`] runs on every boot, *before* the migration engine, so it meets databases it
+    /// did not create. A `CREATE TABLE IF NOT EXISTS` is a **no-op** on a table that is already
+    /// there — it does not add the columns the new definition lists — so on a hub deployed before
+    /// hub#497 `hub_user` still has no `hub_id`, and an index over it dies 42703 (`indexcmds.c` /
+    /// `ComputeIndexAttrs`). The migration that adds the column (v42) runs afterwards and never gets
+    /// its turn: the process exits 1 and Swarm rolls the whole update back.
+    ///
+    /// The column and the two indexes that need it belong to v42, which creates them right after the
+    /// `ALTER`. Here we only assert the baseline **survives** the old shape, which is the invariant
+    /// the boot path depends on. The end-to-end proof that the upgrade lands is
+    /// `tests/boot_over_pre_hub_scoped_identity.rs`.
+    #[tokio::test]
+    async fn the_baseline_survives_a_table_that_predates_hub_id() {
+        let db = fresh_db().await;
+        // A `hub_user`/`hub_session` exactly as a hub deployed before hub#497 carries them.
+        db.execute_batch(
+            "CREATE TABLE hub_user (\
+               id TEXT PRIMARY KEY, name TEXT NOT NULL, pin_hash TEXT NOT NULL DEFAULT '', \
+               role TEXT NOT NULL DEFAULT '', cloud_user_id TEXT, \
+               is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL);\
+             CREATE TABLE hub_session (\
+               token TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL, \
+               expires_at TEXT NOT NULL);",
+        )
+        .await
+        .unwrap();
+
+        ensure_tables(&db).await.expect(
+            "el baseline no puede indexar `hub_id` en una tabla que ya existía sin esa columna: \
+             su `CREATE TABLE IF NOT EXISTS` no la añade (hub#885)",
+        );
     }
 
     #[tokio::test]
