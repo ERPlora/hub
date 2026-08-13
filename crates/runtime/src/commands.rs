@@ -332,6 +332,24 @@ pub(crate) async fn execute_at(
         }
     };
 
+    // hub#632 — PATCH semantics. If this command is the `update` door of a record whose module
+    // declares `patch: { read, key }`, a PARTIAL payload is completed BEFORE validation: the
+    // dispatcher runs the declared read, keeps of the row only the keys the update's schema
+    // accepts (the `get` returns columns the update refuses — `additionalProperties: false`), and
+    // overlays the caller's keys on top. Explicit `null` overwrites; omitted preserves. The
+    // merged object then goes through the SAME validation and SQL as always — a full payload
+    // merges into itself, so nothing changes for today's callers. Without this, 46 updates in 20
+    // modules require the whole object and a caller that fills one from memory corrupts a record
+    // that carries a tax id.
+    let patched;
+    let payload = match patch_read_spec(registry, &cmd.module_id, name) {
+        Some(patch) if cmd.schema.is_some() => {
+            patched = merge_patch_read(db, registry, cmd, patch, payload, ctx).await;
+            &patched
+        }
+        _ => payload,
+    };
+
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y
     // cacheado en el Registry): rechaza ANTES de tocar la BD o invocar handlers (hub#27).
     // Tras validar, inyectamos los `default` del schema en las claves AUSENTES (causa raíz,
@@ -682,6 +700,85 @@ pub(crate) async fn enforce_protects(
         }
     }
     Ok(())
+}
+
+/// The `patch` contract of `command`, if the module that owns it declares one (hub#632): the
+/// record entry whose `update` names this command, carrying `patch: { read, key }`.
+fn patch_read_spec<'r>(
+    registry: &'r Registry,
+    module_id: &str,
+    command: &str,
+) -> Option<&'r crate::manifest::PatchDef> {
+    registry
+        .installed
+        .iter()
+        .find(|m| m.id == module_id)?
+        .records
+        .values()
+        .find(|record| record.update.as_deref() == Some(command))?
+        .patch
+        .as_ref()
+}
+
+/// Completes a (possibly partial) update payload from the record's declared read (hub#632).
+///
+/// Merge rules — the contract of the issue, verbatim:
+///  - the read's row is kept ONLY for the keys the update's schema declares (`get` returns
+///    columns like `id`/`sku`/`stock` the update refuses under `additionalProperties: false`);
+///  - the caller's keys always win, **including an explicit `null`** (null overwrites/clears;
+///    omitting preserves — the two are different things again);
+///  - the read runs in a system context (same `hub_id`, wildcard permissions), the same rule as
+///    `reads` (ADR-0069) and `protects`: it is a module-authored contract, not a user action, and
+///    the update's own permission was already checked at the gate.
+///
+/// Degrades OPEN on a broken read or a missing row: the caller's payload goes to validation as
+/// sent, and the schema gives its usual answer (a partial payload of a missing record is refused
+/// as incomplete — nothing is invented, nothing is written). Same direction as `preload_reads`.
+async fn merge_patch_read(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    cmd: &RegisteredCommand,
+    patch: &crate::manifest::PatchDef,
+    payload: &Params,
+    ctx: &RequestContext,
+) -> Params {
+    let Some(key_value) = payload.get(&patch.key) else {
+        return payload.clone(); // No key, nothing to read: validation will say what is missing.
+    };
+    let mut read_params = Params::new();
+    read_params.insert(patch.key.clone(), key_value.clone());
+    let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
+    let row = match crate::queries::execute(db, registry, &patch.read, &read_params, &sys).await {
+        Ok(rows) => rows.into_iter().next(),
+        Err(e) => {
+            eprintln!(
+                "⚠ patch: `{}` read `{}` failed ({e}) → payload validated as sent",
+                cmd.module_id, patch.read
+            );
+            None
+        }
+    };
+    let Some(Json::Object(row)) = row else {
+        return payload.clone();
+    };
+    let Some(props) = cmd
+        .schema
+        .as_ref()
+        .and_then(|schema| schema.raw.get("properties"))
+        .and_then(|p| p.as_object())
+    else {
+        return payload.clone();
+    };
+    let mut merged = Params::new();
+    for key in props.keys() {
+        if let Some(value) = row.get(key) {
+            merged.insert(key.clone(), value.clone());
+        }
+    }
+    for (key, value) in payload {
+        merged.insert(key.clone(), value.clone());
+    }
+    merged
 }
 
 async fn execute_wasm(
