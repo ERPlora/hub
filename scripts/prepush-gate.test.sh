@@ -365,13 +365,14 @@ case "$1 $2" in
         echo '  ✓ Logged in to github.com account other-company (keyring)' >&2
         exit 0 ;;
 esac
-# `gh api …` — reading the commit works, writing the status does not.
+# `gh api …` — the push landed (the ref reads back), writing the status does not.
 for a in "$@"; do [ "$a" = "-X" ] && { echo 'gh: HTTP 403: Resource not accessible by integration' >&2; exit 1; }; done
+for a in "$@"; do case "$a" in repos/*/git/ref/*) echo "$FAKE_REF_SHA"; exit 0 ;; esac; done
 exit 0
 GH
 )
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" FAKE_REF_SHA="$sha" \
     HUB_GATE_TEST_CMD="true")
 sleep 2
 log="$repo/.state/publish-status.log"
@@ -396,6 +397,7 @@ case "\$1 \$2" in
     "auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -762,6 +764,113 @@ errs=""
 [ -z "$errs" ] \
     && ok "already-green tree: passes from any checkout without rerunning" \
     || bad "already-green tree: passes from any checkout without rerunning" "$errs"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 34–36 — the attestation is the CONSEQUENCE of the push landing (hub#574)
+#
+# A pre-push hook cannot know whether the transfer will succeed — it runs
+# before it. The publish step therefore verifies, from the background, that
+# the REMOTE REF really advanced to (or past) the pushed sha before posting
+# the status. "The commit exists on origin" is NOT enough: the same sha can be
+# there from an earlier push to a throwaway ref while THIS push died (SIGPIPE,
+# exit 141, closed SSH). And the terminal message must attest the TEST, not
+# claim the push — workers read "→ pushing" while the branch never arrived.
+#
+# Poll injection (so these tests take milliseconds, not 120s):
+#   HUB_GATE_PUSH_POLL_TRIES · HUB_GATE_PUSH_POLL_DELAY
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 34. The push DIES: ref never advances → NO status, and the log says so ────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<'GH'
+case "$1 $2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "$@"; do [ "$a" = "-X" ] && { echo posted > "$REPO_DIR/POSTED"; exit 0; }; done
+for a in "$@"; do case "$a" in repos/*/git/ref/*) echo 'gh: HTTP 404: Not Found' >&2; exit 1 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" REPO_DIR="$repo" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+out=$(cat "$repo/.out" 2>/dev/null)
+log="$repo/.state/publish-status.log"
+errs=""
+[ "$code" = 0 ]                                  || errs="$errs exit=$code(want 0: the gate cannot know yet)"
+[ ! -f "$repo/POSTED" ]                          || errs="$errs status-posted-for-a-dead-push"
+grep -qi 'did not land' "$log" 2>/dev/null       || errs="$errs log-does-not-say-it log=$(head -8 "$log" 2>/dev/null | tr '\n' ' ')"
+grep -qi 'retry' "$log" 2>/dev/null              || errs="$errs no-retry-instruction"
+[ -z "$errs" ] \
+    && ok "dead push: no orphan status, and the log says the push did not land + retry" \
+    || bad "dead push: no orphan status, and the log says the push did not land + retry" "$errs"
+
+# ── 35. The ref advanced to the sha → the status posts, and the terminal is honest ─
+#    The green message must attest the TEST and defer the push/attestation
+#    claim to the verification — not announce "pushing" as a fact.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                || errs="$errs exit=$code(want 0)"
+[ -f "$repo/POSTED" ]                          || errs="$errs not-posted"
+grep -qi 'verified on origin' <<<"$out"        || errs="$errs message-does-not-defer-to-verification"
+grep -qiE 'green → pushing|green -> pushing' <<<"$out" && errs="$errs still-claims-pushing"
+[ -z "$errs" ] \
+    && ok "landed push: status posted, and the terminal attests the test, not the push" \
+    || bad "landed push: status posted, and the terminal attests the test, not the push" "$errs out='$out'"
+
+# ── 36. The ref already moved PAST the sha (another worker pushed on top) ─────
+#    Landing is "the ref contains the pushed sha", not "the ref equals it":
+#    a fleet mate merging on top seconds later must not turn a real landing
+#    into a false 'did not land'.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+other=1111111111111111111111111111111111111111
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$other"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in repos/*/compare/*) echo "ahead"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+errs=""
+[ "$code" = 0 ]           || errs="$errs exit=$code(want 0)"
+[ -f "$repo/POSTED" ]     || errs="$errs not-posted log=$(head -8 "$repo/.state/publish-status.log" 2>/dev/null | tr '\n' ' ')"
+[ -z "$errs" ] \
+    && ok "ref moved past the sha: still counts as landed (ancestor check), status posts" \
+    || bad "ref moved past the sha: still counts as landed (ancestor check), status posts" "$errs"
 
 echo
 echo "  $pass passed, $fail failed"

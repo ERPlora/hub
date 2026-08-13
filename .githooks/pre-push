@@ -22,7 +22,10 @@
 # On green it publishes a `local-gate/hub-tests` commit status on the pushed
 # sha, so `merge-pr.sh` still sees a check and keeps refusing to merge on
 # silence (pm#58/#60). The status is an ATTESTATION that the suite ran here —
-# it is not an independent verification.
+# it is not an independent verification. It posts only AFTER a background step
+# verifies the remote ref really advanced to (or past) the pushed sha
+# (hub#574): a pre-push runs before the transfer and cannot know whether the
+# push will land.
 #
 # ── ARMING ───────────────────────────────────────────────────────────────────
 #     git config --bool hooks.hubPrepushGate true      # arm
@@ -37,6 +40,8 @@
 #   HUB_GATE_TEST_CMD · HUB_GATE_STATUS_CMD · HUB_GATE_STATE_DIR · HUB_GATE_LOCK_WAIT
 #   HUB_GATE_UNPROTECTED_LOCK_WAIT (hub#788: lock-wait cap while the SSH
 #   connection has no keepalive; the rule is keepalive margin > max lock wait)
+#   HUB_GATE_PUSH_POLL_TRIES · HUB_GATE_PUSH_POLL_DELAY (hub#574: how long the
+#   background publish step polls origin for the ref before giving up)
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
@@ -76,12 +81,16 @@ if [ "${SKIP_HUB_TESTS:-0}" = "1" ]; then
 fi
 
 # git feeds us "<local ref> <local sha> <remote ref> <remote sha>" per ref.
-# A pure branch deletion carries no tree to test.
+# A pure branch deletion carries no tree to test. The remote ref is kept for
+# hub#574: the publish step verifies that THIS ref really advanced before
+# attesting anything.
 pushed_sha=""
-while read -r _local_ref local_sha _remote_ref _remote_sha; do
+pushed_ref=""
+while read -r _local_ref local_sha remote_ref _remote_sha; do
     [ -n "${local_sha:-}" ] || continue
     [ "$local_sha" = "$ZERO" ] && continue
     pushed_sha="$local_sha"
+    pushed_ref="$remote_ref"
 done
 if [ -z "$pushed_sha" ]; then
     exit 0
@@ -244,14 +253,37 @@ publish_status() {
     fi
 
     (
-        local tries=0 seen=0 perr
-        while [ "$tries" -lt 24 ]; do
-            gh api "repos/$repo/commits/$sha" >/dev/null 2>&1 && { seen=1; break; }
-            sleep 5
+        # hub#574: the attestation is the CONSEQUENCE of the push landing. A
+        # pre-push hook runs BEFORE the transfer, so it cannot know — instead,
+        # this background step verifies the REMOTE REF really advanced to (or
+        # past) the pushed sha before posting. "The commit exists on origin"
+        # is not enough: the same sha may already be there from an earlier
+        # push to another ref while THIS push died (SIGPIPE / exit 141 /
+        # closed SSH — three sightings in one day, 2026-08-08).
+        local tries=0 seen=0 perr poll_tries poll_delay
+        poll_tries="${HUB_GATE_PUSH_POLL_TRIES:-24}"
+        poll_delay="${HUB_GATE_PUSH_POLL_DELAY:-5}"
+        landed() {
+            local got cmpstat
+            if [ -n "$pushed_ref" ]; then
+                got="$(gh api "repos/$repo/git/ref/${pushed_ref#refs/}" -q .object.sha 2>/dev/null)" || return 1
+                [ "$got" = "$sha" ] && return 0
+                [ -n "$got" ] || return 1
+                # The ref may have moved PAST our sha already (a fleet mate
+                # pushed on top): landed means "the ref contains the sha".
+                cmpstat="$(gh api "repos/$repo/compare/$sha...$got" -q .status 2>/dev/null)" || return 1
+                [ "$cmpstat" = "ahead" ] || [ "$cmpstat" = "identical" ]
+            else
+                gh api "repos/$repo/commits/$sha" >/dev/null 2>&1
+            fi
+        }
+        while [ "$tries" -lt "$poll_tries" ]; do
+            landed && { seen=1; break; }
+            sleep "$poll_delay"
             tries=$((tries + 1))
         done
         if [ "$seen" != 1 ]; then
-            report_async "commit $sha never appeared on $repo after 120s — did the push land?" "" "$sha"
+            report_async "the remote ref ${pushed_ref:-?} never advanced to $sha — the push DID NOT LAND (SIGPIPE / closed SSH / killed process). Retry the push: the tree is cached green, so the retry is instant" "" "$sha" "$repo"
             exit 0
         fi
         if ! perr="$(gh api -X POST "repos/$repo/statuses/$sha" \
@@ -556,6 +588,9 @@ if ! eval "$test_cmd"; then
 fi
 
 : > "$green"
-echo "✅ pre-push: suite green → pushing, and attesting it as $CONTEXT." >&2
+# hub#574: attest the TEST, never claim the push — this line used to say
+# "→ pushing, and attesting it", and workers read it while the transfer died
+# behind it (SIGPIPE/closed SSH) with the branch never reaching origin.
+echo "✅ pre-push: suite green → letting the push proceed. The $CONTEXT status posts only after the ref is verified on origin." >&2
 publish_status "$pushed_sha"
 exit 0
