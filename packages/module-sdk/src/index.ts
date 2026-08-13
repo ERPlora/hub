@@ -404,6 +404,49 @@ export type ElevationApprover = (ask: ElevationAsk) => Promise<string | null>;
  */
 export const SERVER_UNAVAILABLE = 'server_unavailable';
 
+// ── hub#906: the honest verdict of a command the hub never answered ──────────────────────────
+//
+// A QUERY that failed did nothing. A COMMAND that failed may have COMMITTED: in the incident that
+// motivates this (saas#1460), the runtime accepted `complete_sale` (200 in its own log) and was
+// OOM-killed before the client could read the response — the cashier saw a raw WebKit exception,
+// concluded «it did not charge», and charged again: double charge, duplicated fiscal document.
+// The client cannot know which side of the commit the failure fell on, and pretending either way
+// is the bug. So the command path presents the only honest verdict: «we can't tell — check before
+// trying again». No automatic retry is ever added here: retrying a charge is how a fiscal
+// document gets duplicated.
+
+/**
+ * The honest sentence, per locale (en is the source, es the translation — ADR-0055). Localized
+ * HERE, like `dataTableLabels`, because this error's `message` is what modules and the shell's
+ * toast show verbatim; a technical English line in front of a cashier is the failure being fixed.
+ */
+const COMMAND_VERDICT_EN =
+  "We can't tell whether the operation completed. Check the result before trying again — for a charge, check Sales before charging again.";
+const COMMAND_VERDICT_ES =
+  'No sabemos si la operación se completó. Comprueba el resultado antes de reintentar — si era un cobro, comprueba en Ventas antes de volver a cobrar.';
+
+/** The unknown-outcome sentence for `locale` (same resolution rule as {@link dataTableLabels}). */
+export function commandVerdictMessage(locale = 'es'): string {
+  return locale.toLowerCase().startsWith('en') ? COMMAND_VERDICT_EN : COMMAND_VERDICT_ES;
+}
+
+/**
+ * A command the hub never answered (hub#906). `code` stays {@link SERVER_UNAVAILABLE} — the
+ * contract modules already key on since hub#782 — and the verdict travels as the **data field**
+ * `outcomeUnknown`, never as an `instanceof`: module bundles may carry their own copy of this
+ * class, and a plain field survives that where the prototype chain does not. The technical
+ * transport line is kept on `cause` for logs; `message` is the sentence a person may read.
+ */
+export class UnknownOutcomeError extends ErploraError {
+  readonly outcomeUnknown = true;
+
+  constructor(message: string, cause: unknown) {
+    super(SERVER_UNAVAILABLE, message);
+    this.name = 'UnknownOutcomeError';
+    this.cause = cause;
+  }
+}
+
 /** Sobre de respuesta estándar del server Axum (`crates/server`). */
 interface Envelope {
   ok: boolean;
@@ -1444,8 +1487,27 @@ export class ErploraClient {
     const full = await this.queryPage<T>(name, { ...params, limit: total, offset: 0 });
     return Array.isArray(full?.rows) ? full.rows : rows;
   }
+  /**
+   * Command dispatch, with the honest verdict of hub#906 on top of the transport:
+   *
+   * When the transport itself failed ({@link SERVER_UNAVAILABLE} — the hub died mid-request, the
+   * proxy answered its 502 page, the network dropped), the action **may have committed** before
+   * the answer was lost, so the caller gets an {@link UnknownOutcomeError} whose `message` is the
+   * localized «we can't tell — check before trying again» sentence, and the shell's notifier
+   * (wired to the global toast in `apps/web/src/lib/runtime.ts`) is told once as the default net —
+   * a module that renders nothing still leaves the cashier with a verdict instead of a raw
+   * exception. Domain refusals (`permission_denied`, `requires_elevation`, …) pass untouched: the
+   * hub answered, the outcome is known, and the module orients by the code as always. Queries are
+   * NOT captured (see {@link query}): a read that failed did nothing, and toasting every failed
+   * dashboard poll would bury the one toast that matters.
+   */
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
-    return this.transport.command(name, payload) as Promise<T>;
+    return (this.transport.command(name, payload) as Promise<T>).catch((e: unknown) => {
+      if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) throw e;
+      const verdict = new UnknownOutcomeError(commandVerdictMessage(this.locale), e);
+      this.opts.notifier?.({ type: 'error', message: verdict.message });
+      throw verdict;
+    });
   }
   /** Suscribe a un evento de dominio; devuelve una función para cancelar. */
   on(event: string, cb: (payload: unknown) => void): () => void {
