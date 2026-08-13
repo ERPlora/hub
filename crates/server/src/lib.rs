@@ -1417,6 +1417,11 @@ pub fn app(state: AppState) -> Router {
         // capability `manage_flows` si quien llama es un módulo — lo que traen los eventos de un
         // negocio es la forma de ese negocio, y no la lee cualquier módulo instalado.
         .route("/api/hub/events/shape", get(outbox_admin::event_shape))
+        // Catálogo de NOMBRES de evento (hub#823): la unión de lo que los módulos instalados
+        // declaran y lo que el outbox vio de verdad — el desplegable «Cuando pase…» del editor de
+        // flujos deja de sembrarse a mano. Solo nombres, nunca payloads; misma doble puerta que
+        // `…/shape` (ADR-0312): sesión admin + `manage_flows` si quien llama nombra un módulo.
+        .route("/api/hub/events", get(outbox_admin::list_events))
         // ── Kernel de automatización (ADR-0283 K7, hub#661) ────────────────────────────────
         // REST del core, NO commands `hub.*`: el core se congela y el dispatcher no es donde se
         // añade superficie nueva (§9). Misma puerta que las keys y la dead-letter: sesión local de

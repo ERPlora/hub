@@ -1860,6 +1860,49 @@ impl Runtime {
         }))
     }
 
+    /// **Every event this hub can speak of**, by name (hub#823) — the read the flow editor's
+    /// «Cuando pase…» dropdown is built from, so it stops being seeded from a hand-written file
+    /// that can never offer an event this hub emits and the file does not know.
+    ///
+    /// The union of two honest sources, sorted by name:
+    ///
+    /// - what installed modules DECLARE ([`Registry::declared_events`]: `events.emits` plus each
+    ///   command's `emit`) — a declared event that never fired is still offered, with no
+    ///   `last_seen_at`;
+    /// - what was really SEEN in the outbox ([`outbox::seen_event_names`]) — an event that
+    ///   happened and that nobody declares any more (a core event, an uninstalled module) is
+    ///   still offered, with `declared_by` empty.
+    ///
+    /// Names only: what an event carries is [`Self::event_shape`]'s answer, with its redaction.
+    pub async fn event_catalog(&self) -> Result<Vec<event_shape::EventCatalogEntry>> {
+        let mut entries: std::collections::BTreeMap<String, event_shape::EventCatalogEntry> = self
+            .registry
+            .declared_events()
+            .into_iter()
+            .map(|(name, declared_by)| {
+                (
+                    name.clone(),
+                    event_shape::EventCatalogEntry {
+                        name,
+                        declared_by,
+                        last_seen_at: None,
+                    },
+                )
+            })
+            .collect();
+        for seen in outbox::seen_event_names(self.db.as_ref(), &self.hub_id).await? {
+            entries
+                .entry(seen.name.clone())
+                .or_insert_with(|| event_shape::EventCatalogEntry {
+                    name: seen.name,
+                    declared_by: Vec::new(),
+                    last_seen_at: None,
+                })
+                .last_seen_at = Some(seen.last_seen_at);
+        }
+        Ok(entries.into_values().collect())
+    }
+
     /// Un ciclo del barrido del **scheduler** (ADR-0011): ejecuta las scheduled tasks vencidas de
     /// los módulos activos. Lo llama el bucle de background del server (junto al relay del outbox).
     /// Devuelve cuántas tareas corrió. `hub_id` es el del despliegue (contexto de sistema).

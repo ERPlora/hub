@@ -893,6 +893,42 @@ pub async fn sample_payloads(
         .collect())
 }
 
+/// One event name this hub has really written to the outbox, with its newest sighting (hub#823).
+#[derive(Debug, Clone)]
+pub struct SeenEvent {
+    pub name: String,
+    pub last_seen_at: String,
+}
+
+/// Every DISTINCT event name in this hub's outbox with `MAX(created_at)`, the SEEN half of the
+/// event catalogue (hub#823) — the declared half comes from the registry.
+///
+/// Every status counts, like [`sample_payloads`]: the question is «did this event ever happen
+/// here», and a delivery failure does not change the answer. Names only — the payload never
+/// leaves this table through this read.
+///
+/// Backed by `ix_outbox_name` (`hub_id, event_name, created_at`), which serves this group-by the
+/// same way it serves the shape's per-name read.
+pub async fn seen_event_names(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<SeenEvent>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT event_name, MAX(created_at) AS last_seen_at FROM _event_outbox \
+             WHERE hub_id = :hub_id GROUP BY event_name",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .map(|row| SeenEvent {
+            name: row["event_name"].as_str().unwrap_or_default().to_string(),
+            last_seen_at: row["last_seen_at"].as_str().unwrap_or_default().to_string(),
+        })
+        .collect())
+}
+
 /// What [`retry`] did — three answers, because the caller has to tell them apart (hub#827).
 ///
 /// It used to be a `bool`, and `false` meant «there is no such dead-letter»: a `404`. That left

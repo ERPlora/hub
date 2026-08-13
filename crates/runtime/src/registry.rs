@@ -432,6 +432,33 @@ impl Registry {
         ids.into_iter().collect()
     }
 
+    /// Every event some installed module declares it emits, as `event name → declaring module
+    /// ids` (both sorted). The whole-catalogue reading of [`Self::modules_emitting`], and it looks
+    /// in the same two places for the same reason: `events.emits` and each command's `emit`,
+    /// because hub#722 left a manifest that only carries the second as a warning, not a refusal.
+    ///
+    /// It is one half of the hub's event catalogue (hub#823) — what is DECLARED; the outbox
+    /// contributes what was SEEN. Without this, the flow editor's «Cuando pase…» dropdown had to
+    /// be seeded from a hand-written file that could never offer an event this hub emits and the
+    /// file does not know.
+    pub fn declared_events(&self) -> std::collections::BTreeMap<String, Vec<String>> {
+        let mut events: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+            std::collections::BTreeMap::new();
+        for module in &self.installed {
+            let command_emits = module.commands.values().flat_map(|c| c.emit.iter());
+            for event in module.events.emits.iter().chain(command_emits) {
+                events
+                    .entry(event.clone())
+                    .or_default()
+                    .insert(module.id.clone());
+            }
+        }
+        events
+            .into_iter()
+            .map(|(name, ids)| (name, ids.into_iter().collect()))
+            .collect()
+    }
+
     /// Ids de los módulos **activos** que exponen al menos una query/command `expose_api`
     /// (orden estable por id). Lo usan el generador OpenAPI y la matriz de scope de la UI.
     pub fn modules_with_public_api(&self) -> Vec<String> {

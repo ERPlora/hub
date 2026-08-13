@@ -239,6 +239,40 @@ pub async fn trace_event(
     }
 }
 
+/// `GET /api/hub/events` — **every event this hub can speak of, by name** (hub#823).
+///
+/// `…/events/shape` answers what an event carries, but the caller has to know its name to ask.
+/// Nothing listed the names, so the flow editor's «Cuando pase…» dropdown was seeded from a
+/// hand-written file — honest, but it goes stale on its own and can never offer an event this hub
+/// emits and the file does not know. The data was already in the runtime; this is the surface.
+///
+/// The catalogue is the union of what installed modules DECLARE (`events.emits` + each command's
+/// `emit`) and what was really SEEN in the outbox: a declared event that never fired comes with no
+/// `last_seen_at`, and an event that happened but that nobody declares any more (a core event, an
+/// uninstalled module) comes with `declared_by` empty. **Names only** — what an event carries
+/// stays behind `…/shape`, with its redaction, so this listing never touches a payload.
+///
+/// **Same two gates as `…/shape`** (ADR-0312), for the same reason: the admin session of this
+/// file, and `manage_flows` when the caller names a module. What a business emits is the shape of
+/// that business, and it is not readable by every installed module because an admin is logged in.
+pub async fn list_events(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return rejected(e);
+    }
+    if let Err(response) = crate::flows_api::require_flows_capability(&headers, &rt).await {
+        return response;
+    }
+    match rt.event_catalog().await {
+        Ok(catalog) => Json(json!({ "ok": true, "data": catalog })).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 /// Query of `GET /api/hub/events/shape`. The event name travels as a parameter and not as a path
 /// segment because event names contain dots (`sale.completed`), and a dot in a path segment is a
 /// thing `fetch` normalises.
