@@ -24,6 +24,7 @@ object PermissionPolicy {
 
     const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
     const val ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
+    const val BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT"
 
     /** Android 13 — antes, las notificaciones van concedidas de fábrica. */
     const val SDK_NOTIFICATIONS = 33
@@ -32,13 +33,22 @@ object PermissionPolicy {
     const val SDK_LOCAL_NETWORK = 37
 
     /**
+     * Android 12 — before, talking to bonded devices rides the install-time `BLUETOOTH`
+     * permission. From API 31 on, listing or connecting to a bonded RFCOMM printer without
+     * `BLUETOOTH_CONNECT` fails the same silent way as the other two: an empty bonded list and a
+     * till that reports no bluetooth printers (ADR-0204, hub#388).
+     */
+    const val SDK_BLUETOOTH_CONNECT = 31
+
+    /**
      * Permisos a solicitar en un dispositivo con nivel de API [sdkInt].
      *
-     * El orden es estable —notificaciones antes que red local— porque es el orden en que el
+     * El orden es estable —notificaciones, red local, bluetooth— porque es el orden en que el
      * usuario ve los diálogos, y que cambie entre versiones desconcierta.
      *
      * @param notifications si la app va a mostrar notificaciones del sistema.
      * @param localNetwork si la app va a hablar con dispositivos de la red local (impresoras).
+     * @param bluetooth si la app va a hablar con impresoras Bluetooth SPP emparejadas (ADR-0204).
      */
     @JvmStatic
     @JvmOverloads
@@ -46,10 +56,12 @@ object PermissionPolicy {
         sdkInt: Int = Build.VERSION.SDK_INT,
         notifications: Boolean = true,
         localNetwork: Boolean = true,
+        bluetooth: Boolean = true,
     ): List<String> {
         val permisos = mutableListOf<String>()
         if (notifications && sdkInt >= SDK_NOTIFICATIONS) permisos += POST_NOTIFICATIONS
         if (localNetwork && sdkInt >= SDK_LOCAL_NETWORK) permisos += ACCESS_LOCAL_NETWORK
+        if (bluetooth && sdkInt >= SDK_BLUETOOTH_CONNECT) permisos += BLUETOOTH_CONNECT
         return permisos
     }
 }

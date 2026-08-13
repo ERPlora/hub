@@ -1909,6 +1909,24 @@ export const ANDROID_LOCAL_NETWORK_PERMISSION = 'android.permission.ACCESS_LOCAL
  */
 export const ANDROID_NOTIFICATIONS_PERMISSION = 'android.permission.POST_NOTIFICATIONS';
 
+/**
+ * Android runtime permission to talk to bonded Bluetooth devices (API 31+) — what a
+ * `bluetooth:{mac}` print job and the bonded-printer half of discovery need (ADR-0204, hub#388).
+ * Mirror of `PermissionPolicy.BLUETOOTH_CONNECT`.
+ */
+export const ANDROID_BLUETOOTH_CONNECT_PERMISSION = 'android.permission.BLUETOOTH_CONNECT';
+
+/**
+ * The permissions a job to THIS printer is about to use (hub#758/hub#388): RFCOMM for a
+ * `bluetooth:{mac}` id, the LAN for everything else. Naming the wrong one would be the same
+ * out-of-context dialog hub#758 removed, pointing the other way.
+ */
+function printerPermissions(printerId: string): string[] {
+  return printerId.startsWith('bluetooth:')
+    ? [ANDROID_BLUETOOTH_CONNECT_PERMISSION]
+    : [ANDROID_LOCAL_NETWORK_PERMISSION];
+}
+
 export class IpcBridgeTransport implements BridgeTransport {
   constructor(private readonly tauri: TauriBridge) {}
 
@@ -1955,7 +1973,12 @@ export class IpcBridgeTransport implements BridgeTransport {
    * usuario a buscar una impresora que lleva encendida todo el rato (hub#338).
    */
   async discoverPrinters(): Promise<BridgePrinter[]> {
-    await this.ensurePermissions([ANDROID_LOCAL_NETWORK_PERMISSION]);
+    // Both printer permissions: on Android the shell sweeps the LAN AND lists bonded Bluetooth
+    // printers (ADR-0204). Still not the notifications one — that dialog has its own context.
+    await this.ensurePermissions([
+      ANDROID_LOCAL_NETWORK_PERMISSION,
+      ANDROID_BLUETOOTH_CONNECT_PERMISSION,
+    ]);
     const outcome = (await this.tauri.invoke('erplora_discover_printers', {})) as
       | PrinterDiscoveryResult
       | BridgePrinter[];
@@ -1981,18 +2004,18 @@ export class IpcBridgeTransport implements BridgeTransport {
     data: Record<string, unknown>,
     jobId?: string,
   ): Promise<void> {
-    await this.ensurePermissions([ANDROID_LOCAL_NETWORK_PERMISSION]);
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_print', { printerId, documentType, data, jobId: jobId ?? null });
   }
 
   async testPrint(printerId: string): Promise<void> {
-    await this.ensurePermissions([ANDROID_LOCAL_NETWORK_PERMISSION]);
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_test_print', { printerId });
   }
 
   /** The drawer opens through the printer's ESC/POS kick — so it goes over the local network too. */
   async openDrawer(printerId: string, pin = 2): Promise<void> {
-    await this.ensurePermissions([ANDROID_LOCAL_NETWORK_PERMISSION]);
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_open_drawer', { printerId, pin });
   }
 

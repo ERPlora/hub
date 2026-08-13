@@ -43,6 +43,7 @@ import java.io.File
     permissions = [
         Permission(strings = [PermissionPolicy.POST_NOTIFICATIONS], alias = PermissionPolicy.POST_NOTIFICATIONS),
         Permission(strings = [PermissionPolicy.ACCESS_LOCAL_NETWORK], alias = PermissionPolicy.ACCESS_LOCAL_NETWORK),
+        Permission(strings = [PermissionPolicy.BLUETOOTH_CONNECT], alias = PermissionPolicy.BLUETOOTH_CONNECT),
     ]
 )
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
@@ -151,6 +152,95 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    /**
+     * `bluetooth_bonded_printers` — the bonded devices that look like printers (ADR-0204).
+     *
+     * The BONDED list, never a scan: pairing belongs to Android's own settings (its UI, its PIN
+     * handling), and reading the list needs only `BLUETOOTH_CONNECT` — no `BLUETOOTH_SCAN`
+     * dialog. Adapter absent or off answers an EMPTY list, not an error: a venue with no
+     * bluetooth is a normal venue. A SecurityException (permission denied) rejects with
+     * [BLUETOOTH_PERMISSION_DENIED], because "no permission" and "no printers" send the user in
+     * opposite directions (the hub#338 lesson).
+     */
+    @Command
+    fun bluetoothBondedPrinters(invoke: Invoke) {
+        val printers = org.json.JSONArray()
+        try {
+            val manager =
+                activity.getSystemService(android.content.Context.BLUETOOTH_SERVICE)
+                    as? android.bluetooth.BluetoothManager
+            val adapter = manager?.adapter
+            @Suppress("MissingPermission")
+            if (adapter != null && adapter.isEnabled) {
+                @Suppress("MissingPermission")
+                for (device in adapter.bondedDevices ?: emptySet()) {
+                    @Suppress("MissingPermission")
+                    val name = device.name
+                    val majorClass = device.bluetoothClass?.majorDeviceClass ?: 0
+                    if (!BluetoothSpp.looksLikePrinter(name, majorClass)) continue
+                    val mac = device.address.uppercase()
+                    printers.put(
+                        JSObject()
+                            .put("id", BluetoothSpp.printerId(mac))
+                            .put("name", BluetoothSpp.displayName(name, mac))
+                            .put("mac", mac),
+                    )
+                }
+            }
+        } catch (e: SecurityException) {
+            invoke.reject("bluetooth permission denied: ${e.message}", BLUETOOTH_PERMISSION_DENIED)
+            return
+        }
+        invoke.resolve(JSObject().put("printers", printers))
+    }
+
+    /**
+     * `bluetooth_print` — sends already-rendered ESC/POS bytes to a bonded printer over RFCOMM
+     * (ADR-0204). Transport only: the rendering happened in Rust, the payload arrives base64.
+     *
+     * The socket work runs off the main thread — RFCOMM connect blocks for seconds — and the
+     * outcome is reported honestly: a ticket that did not come out REJECTS (hub#475), so the
+     * print host reports `failed` instead of swallowing the job.
+     */
+    @Command
+    fun bluetoothPrint(invoke: Invoke) {
+        val args = invoke.getArgs()
+        val mac = args.getString("mac", null)
+        val payloadBase64 = args.getString("payloadBase64", null)
+        if (mac.isNullOrBlank() || payloadBase64.isNullOrBlank()) {
+            invoke.reject("bluetooth_print needs both mac and payloadBase64")
+            return
+        }
+        val payload =
+            try {
+                android.util.Base64.decode(payloadBase64, android.util.Base64.DEFAULT)
+            } catch (e: IllegalArgumentException) {
+                invoke.reject("payloadBase64 is not base64: ${e.message}")
+                return
+            }
+
+        val manager =
+            activity.getSystemService(android.content.Context.BLUETOOTH_SERVICE)
+                as? android.bluetooth.BluetoothManager
+        val adapter = manager?.adapter
+        @Suppress("MissingPermission")
+        if (adapter == null || !adapter.isEnabled) {
+            invoke.reject("bluetooth is off or unavailable on this device")
+            return
+        }
+
+        Thread {
+            try {
+                BluetoothSpp.send(adapter, mac, payload)
+                invoke.resolve()
+            } catch (e: SecurityException) {
+                invoke.reject("bluetooth permission denied: ${e.message}", BLUETOOTH_PERMISSION_DENIED)
+            } catch (e: Exception) {
+                invoke.reject(e.message ?: e.toString(), e)
+            }
+        }.start()
+    }
+
     private fun concedidos(): Set<String> =
         PermissionPolicy.required()
             .filter { ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED }
@@ -165,6 +255,14 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     companion object {
+        /**
+         * The code a bluetooth operation is refused under when `BLUETOOTH_CONNECT` is denied
+         * (ADR-0204). Mirror of `BLUETOOTH_PERMISSION_DENIED` on the Rust side — same trip as
+         * `downloads_unreachable`: Kotlin rejects with a code, Tauri renders `[code] - message`,
+         * Rust recognises it out of the text.
+         */
+        const val BLUETOOTH_PERMISSION_DENIED = "bluetooth_permission_denied"
+
         /** Los que hay que pedir: los requeridos que aún no están concedidos. */
         @JvmStatic
         fun pendingOf(required: List<String>, granted: Set<String>): List<String> =

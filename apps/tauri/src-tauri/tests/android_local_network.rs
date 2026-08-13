@@ -52,6 +52,10 @@ const REQUIRED: &[&str] = &[
     "android.permission.CHANGE_WIFI_MULTICAST_STATE",
     "android.permission.ACCESS_LOCAL_NETWORK",
     "android.permission.POST_NOTIFICATIONS",
+    // Bluetooth Classic SPP printing (ADR-0204, hub#388). Runtime permission since API 31, and
+    // the same silent failure as the LAN one: without it the bonded list is empty and the till
+    // reports no bluetooth printers.
+    "android.permission.BLUETOOTH_CONNECT",
 ];
 
 /// The manifest of the generated Android project — the one a lost file makes `android init` rewrite.

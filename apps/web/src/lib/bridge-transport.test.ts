@@ -156,11 +156,17 @@ describe('permisos de runtime antes de tocar el hardware', () => {
     );
     // hub#758: only what THIS operation needs. Asking for the whole batch made Android pop the
     // notifications dialog right after a printer re-scan — an out-of-context request the user
-    // rightly denies.
+    // rightly denies. Discovery names the two PRINTER permissions (the LAN sweep and the bonded
+    // Bluetooth list, ADR-0204/hub#388) and never the notifications one.
     const peticion = invokeSpy.mock.calls.find(
       (c) => c[0] === 'plugin:erplora-android|request_permissions',
     );
-    expect(peticion?.[1]).toEqual({ permissions: ['android.permission.ACCESS_LOCAL_NETWORK'] });
+    expect(peticion?.[1]).toEqual({
+      permissions: [
+        'android.permission.ACCESS_LOCAL_NETWORK',
+        'android.permission.BLUETOOTH_CONNECT',
+      ],
+    });
   });
 
   it('pide permisos antes de notificar', async () => {

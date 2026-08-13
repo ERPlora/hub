@@ -1148,8 +1148,55 @@ fn shell_local_network_access<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> L
     }
 }
 
-/// `erplora_discover_printers` — re-escanea la red (mDNS + subred), registra y devuelve las
-/// impresoras. Espejo de `Command::DiscoverPrinters` del bridge.
+/// Converts a bonded printer (as Kotlin announces it) into the shared `PrinterInfo` shape.
+///
+/// `category` stays `unknown` on purpose — same honesty rule as the port-9100 sweep: SPP says
+/// "accepts bytes", not "speaks ESC/POS", and guessing "thermal" is how wrong paper gets printed.
+fn bluetooth_printer_info(
+    p: &tauri_plugin_erplora_android::BluetoothPrinter,
+) -> erplora_peripherals::protocol::PrinterInfo {
+    erplora_peripherals::protocol::PrinterInfo {
+        id: p.id.clone(),
+        name: p.name.clone(),
+        kind: "bluetooth".into(),
+        category: erplora_peripherals::protocol::default_printer_category(),
+        status: "ready".into(),
+        paper_width: 80,
+        mac: Some(p.mac.clone()),
+    }
+}
+
+/// Folds the bonded Bluetooth printers into the network discovery outcome (ADR-0204, hub#388).
+///
+/// One list on purpose: "which printers can this device print on?" is ONE question to the person
+/// setting up a till, whatever transport each answer arrives by. Deduplicated by id, so a
+/// re-merge cannot turn one printer into two devices.
+///
+/// A `PermissionDenied` outcome stays a refusal WITHOUT printers: an answer that both names a
+/// missing permission and lists printers would give the screen two contradictory instructions at
+/// once. Discovery asks for both printer permissions up front (hub#758), so that state is one
+/// "allow" away from resolving itself.
+fn merge_bluetooth_printers(
+    outcome: PrinterDiscovery,
+    bonded: Vec<tauri_plugin_erplora_android::BluetoothPrinter>,
+) -> PrinterDiscovery {
+    match outcome {
+        PrinterDiscovery::Scanned { mut printers } => {
+            for p in &bonded {
+                if printers.iter().any(|known| known.id == p.id) {
+                    continue;
+                }
+                printers.push(bluetooth_printer_info(p));
+            }
+            PrinterDiscovery::Scanned { printers }
+        }
+        blocked @ PrinterDiscovery::PermissionDenied { .. } => blocked,
+    }
+}
+
+/// `erplora_discover_printers` — re-escanea la red (mDNS + subred), lista las impresoras
+/// Bluetooth EMPAREJADAS (solo Android, ADR-0204), registra y devuelve las impresoras. Espejo de
+/// `Command::DiscoverPrinters` del bridge.
 ///
 /// Devuelve el OUTCOME (`{status, …}`), no el array pelado: sin permiso de red local no hay lista
 /// vacía que devolver, hay una razón — y «conecta una impresora» y «da permiso a la app» son
@@ -1159,8 +1206,27 @@ async fn erplora_discover_printers(
     app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
 ) -> Result<PrinterDiscovery, HardwareError> {
+    use tauri_plugin_erplora_android::ErploraAndroidExt;
+
     let access = shell_local_network_access(&app);
-    Ok(discovery::discover_printers(&state.registry, access).await?)
+    let outcome = discovery::discover_printers(&state.registry, access).await?;
+
+    // Bonded SPP printers (Android; empty everywhere else). A bluetooth failure must not poison
+    // the network half — a venue with a broken adapter still has its LAN printers.
+    let bonded = app
+        .erplora_android()
+        .bluetooth_bonded_printers()
+        .unwrap_or_else(|e| {
+            log::warn!("shell: could not list bonded bluetooth printers ({e})");
+            Vec::new()
+        });
+    // Registered like their network siblings, so roles (kitchen/bar/receipt) can be assigned to
+    // them; the MAC is the key, ip/port stay empty — the watchdog knows to leave them alone.
+    for p in &bonded {
+        let _ = state.registry.register(Some(&p.mac), "", 0, &p.name, "bluetooth");
+    }
+
+    Ok(merge_bluetooth_printers(outcome, bonded))
 }
 
 /// `erplora_get_devices` — contenido del registro persistente de dispositivos (con sus roles).
@@ -1178,52 +1244,101 @@ fn erplora_get_devices(state: tauri::State<'_, PeripheralsState>) -> Vec<Device>
 /// a job written by hand, a producer talking straight to this command — would otherwise reach the
 /// paper as a nameless key/value dump, and a kitchen order that comes out wrong is only discovered
 /// when the plate is missing. Failing here turns that into a `failed` the print host reports.
-#[tauri::command]
+/// Sends already-rendered bytes to a bonded SPP printer through the Android plugin (ADR-0204).
+///
+/// Direct, not queued: the `PrintQueue` is the NETWORK path (its jobs carry a socket target).
+/// Phase 1 gives bluetooth the simple failure mode — the error comes straight back to the caller
+/// (the print host reports `failed`), instead of retrying against a printer whose only health
+/// signal IS the connect.
+fn bluetooth_send(
+    app: &tauri::AppHandle,
+    mac: &str,
+    payload: &[u8],
+) -> Result<(), HardwareError> {
+    use tauri_plugin_erplora_android::ErploraAndroidExt;
+    app.erplora_android()
+        .bluetooth_print(mac, payload)
+        .map_err(|e| {
+            HardwareError::from(erplora_peripherals::PeripheralError::Unreachable(
+                e.to_string(),
+            ))
+        })
+}
+
+/// ⚠️ `(async)` is load-bearing (ADR-0204): the bluetooth arm crosses into Kotlin through
+/// `run_mobile_plugin`, which dispatches onto Android's main looper and BLOCKS for the answer — a
+/// plain command runs on that very thread and the till would hang on the press that prints.
+#[tauri::command(async)]
 fn erplora_print(
+    app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
     printer_id: String,
     document_type: String,
     data: serde_json::Value,
     job_id: Option<String>,
 ) -> Result<(), HardwareError> {
-    let target = parse_printer_id(&printer_id)?;
+    let target = discovery::parse_print_target(&printer_id)?;
     let doc = DocumentType::parse(&document_type).ok_or_else(|| {
         HardwareError::from(erplora_peripherals::PeripheralError::UnknownDocumentType(
             document_type.clone(),
         ))
     })?;
     let payload = escpos::render_document(doc, &data)?;
-    state.queue.enqueue(PrintJob {
-        job_id,
-        target,
-        payload,
-        attempts: 0,
-    })?;
+    match target {
+        discovery::PrintTarget::Network(target) => {
+            state.queue.enqueue(PrintJob {
+                job_id,
+                target,
+                payload,
+                attempts: 0,
+            })?;
+        }
+        discovery::PrintTarget::Bluetooth(bt) => bluetooth_send(&app, &bt.mac, &payload)?,
+    }
     Ok(())
 }
 
-/// `erplora_test_print` — encola una página de prueba en la impresora dada.
-#[tauri::command]
+/// `erplora_test_print` — encola una página de prueba en la impresora dada (o la envía por SPP si
+/// la impresora es Bluetooth, ADR-0204). `(async)` por la misma razón que `erplora_print`.
+#[tauri::command(async)]
 fn erplora_test_print(
+    app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
     printer_id: String,
 ) -> Result<(), HardwareError> {
-    let target = parse_printer_id(&printer_id)?;
+    let target = discovery::parse_print_target(&printer_id)?;
     let payload = escpos::render_test_page(&printer_id);
-    state.queue.enqueue(PrintJob {
-        job_id: None,
-        target,
-        payload,
-        attempts: 0,
-    })?;
+    match target {
+        discovery::PrintTarget::Network(target) => {
+            state.queue.enqueue(PrintJob {
+                job_id: None,
+                target,
+                payload,
+                attempts: 0,
+            })?;
+        }
+        discovery::PrintTarget::Bluetooth(bt) => bluetooth_send(&app, &bt.mac, &payload)?,
+    }
     Ok(())
 }
 
-/// `erplora_open_drawer` — abre el cajón vía kick ESC/POS por el socket de la impresora.
+/// `erplora_open_drawer` — abre el cajón vía kick ESC/POS por el socket de la impresora (o por el
+/// transporte SPP si la impresora es Bluetooth, ADR-0204 — el kick son bytes ESC/POS como
+/// cualquier otro documento).
 #[tauri::command]
-async fn erplora_open_drawer(printer_id: String, pin: Option<u8>) -> Result<(), HardwareError> {
-    let target = parse_printer_id(&printer_id)?;
-    drawer::open_drawer(&target, pin.unwrap_or(2)).await?;
+async fn erplora_open_drawer(
+    app: tauri::AppHandle,
+    printer_id: String,
+    pin: Option<u8>,
+) -> Result<(), HardwareError> {
+    match discovery::parse_print_target(&printer_id)? {
+        discovery::PrintTarget::Network(target) => {
+            drawer::open_drawer(&target, pin.unwrap_or(2)).await?;
+        }
+        discovery::PrintTarget::Bluetooth(bt) => {
+            bluetooth_send(&app, &bt.mac, drawer::kick_command(pin.unwrap_or(2)))?;
+        }
+    }
     Ok(())
 }
 
@@ -1400,6 +1515,65 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("erplora-shell-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).expect("tempdir");
         dir
+    }
+
+    // ── ADR-0204 / hub#388: bonded Bluetooth printers join discovery ─────────────────────────
+    //
+    // The LAN sweep and the bonded list are two halves of ONE question — "which printers can
+    // this device print on?" — so they come back as one list. The merge is pure so the emulator
+    // (which has no Bluetooth at all) is not the only place it can be exercised.
+
+    fn a_bonded_printer() -> tauri_plugin_erplora_android::BluetoothPrinter {
+        serde_json::from_value(serde_json::json!({
+            "id": "bluetooth:AA:BB:CC:DD:EE:FF",
+            "name": "Kitchen BT",
+            "mac": "AA:BB:CC:DD:EE:FF"
+        }))
+        .expect("the wire shape Kotlin builds")
+    }
+
+    #[test]
+    fn a_bonded_bluetooth_printer_joins_the_scanned_list() {
+        let merged = merge_bluetooth_printers(
+            PrinterDiscovery::Scanned { printers: vec![] },
+            vec![a_bonded_printer()],
+        );
+        let printers = merged.scanned_printers().expect("still a scanned outcome");
+        assert_eq!(printers.len(), 1);
+        assert_eq!(printers[0].id, "bluetooth:AA:BB:CC:DD:EE:FF");
+        assert_eq!(printers[0].kind, "bluetooth");
+        assert_eq!(printers[0].name, "Kitchen BT");
+        assert_eq!(printers[0].mac.as_deref(), Some("AA:BB:CC:DD:EE:FF"));
+    }
+
+    #[test]
+    fn a_blocked_lan_scan_stays_blocked_and_carries_no_printers() {
+        // Phase-1 limit, stated on purpose: with the LAN permission denied the outcome is the
+        // permission refusal, and the bonded list does NOT ride along — an outcome that both
+        // names a missing permission and lists printers would give the screen two contradictory
+        // instructions at once. The permission prompt for discovery asks for both (hub#758), so
+        // this state is one "allow" away from resolving itself.
+        let merged = merge_bluetooth_printers(
+            PrinterDiscovery::PermissionDenied {
+                permission: "android.permission.ACCESS_LOCAL_NETWORK".into(),
+            },
+            vec![a_bonded_printer()],
+        );
+        assert_eq!(merged.scanned_printers(), None);
+    }
+
+    #[test]
+    fn a_bonded_printer_already_listed_is_not_duplicated() {
+        let once = merge_bluetooth_printers(
+            PrinterDiscovery::Scanned { printers: vec![] },
+            vec![a_bonded_printer()],
+        );
+        let twice = merge_bluetooth_printers(once, vec![a_bonded_printer()]);
+        assert_eq!(
+            twice.scanned_printers().expect("scanned").len(),
+            1,
+            "the same bonded printer merged twice must stay one device"
+        );
     }
 
     // ── shell_capture_origin: el contrato del marcador ?shell=1 ──────────────────────────────
