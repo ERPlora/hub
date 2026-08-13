@@ -36,6 +36,25 @@ fn key(k: &str) -> serde_json::Value {
     json!(format!("e2e-{k}"))
 }
 
+/// Id of the CASH payment method from the hub's seeded catalog.
+///
+/// "The client proposes, the server disposes" (sales#20): when the hub has a payment-method
+/// catalog, `complete_sale` demands a `payment_method_id` that is IN it — a sale without one is
+/// rejected with `sales.payment_method_required`. Resolved through the public query instead of
+/// hand-composing the seed id, so the test does not couple to how `sales` builds its ids.
+async fn cash_method_id(rt: &Runtime, ctx: &RequestContext) -> String {
+    let rows = rt
+        .execute_query("sales.payment_methods", &Params::new(), ctx)
+        .await
+        .expect("sales.payment_methods");
+    rows.iter()
+        .find(|r| r["type"] == json!("cash"))
+        .unwrap_or_else(|| panic!("the hub's catalog must carry the `cash` method: {rows:?}"))["id"]
+        .as_str()
+        .expect("payment method id")
+        .to_string()
+}
+
 #[derive(Default, Debug)]
 struct Sink {
     events: Mutex<Vec<(String, serde_json::Value)>>,
@@ -46,10 +65,15 @@ impl EventSink for Sink {
     }
 }
 
-/// Runtime con inventory + customers + sales (orden topológico de deps).
+/// Runtime with inventory + customers + sales (topological dependency order).
+///
+/// The runtime's hub_id matches the RequestContext's ("h1"): module seeds are applied under the
+/// RUNTIME's hub_id, so with `Runtime::new` (DEV_HUB_ID) the seeded payment-method catalog was
+/// invisible to the tests and `complete_sale` silently degraded instead of enforcing
+/// `payment_method_id` against the hub's trusted catalog (hub#594).
 async fn fresh() -> (Runtime, Arc<Sink>) {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes"); // inventory depende de taxes (ADR-0066)
@@ -75,9 +99,9 @@ async fn install_with_deps() {
 #[tokio::test]
 async fn missing_dep_fails() {
     if !erplora_runtime::require_modules_workspace() { return; }
-    // sales sin sus deps (inventory/taxes) debe fallar: el orden topológico es del instalador.
+    // sales without its deps (inventory/taxes) must fail: topological order is the installer's job.
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     let err = rt.install_from_dir(&mdir("sales")).await;
     assert!(err.is_err(), "sales sin deps debe fallar");
 }
@@ -88,9 +112,10 @@ async fn complete_sale_creates_header_and_lines() {
     if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
     let (rt, sink) = fresh().await;
     let ctx = admin();
-    // Dinero en CÉNTIMOS (ADR-0007): price 121=1.21€, 110=1.10€; tendered 2000=20€.
+    // Money in CENTS (ADR-0007): price 121=1.21€, 110=1.10€; tendered 2000=20€.
     let res = rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("header-lines"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "tax_included": true, "amount_tendered": 2000, "customer_name": "Bar Manolo",
         "items": [
             { "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 },
@@ -122,10 +147,11 @@ async fn second_sale_increments_number() {
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
-    // DOS cobros distintos → DOS claves distintas (sales#20): la clave identifica el intento de
-    // cobro, así que repetirla sería pedir la MISMA venta, no una segunda.
+    // TWO distinct charges → TWO distinct keys (sales#20): the key identifies the charge attempt,
+    // so repeating it would ask for the SAME sale, not a second one.
+    let pm = cash_method_id(&rt, &ctx).await;
     let venta = |k: &str| params(json!({
-        "idempotency_key": key(k),
+        "idempotency_key": key(k), "payment_method_id": pm,
         "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     }));
     rt.execute_command("sales.complete_sale", &venta("num-1"), &ctx).await.unwrap();
@@ -151,6 +177,7 @@ async fn el_mismo_intento_de_cobro_reintentado_no_cobra_dos_veces() {
     let ctx = admin();
     let intento = params(json!({
         "idempotency_key": key("reintento-del-mismo-cobro"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "amount_tendered": 1000,
         "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     }));
@@ -178,9 +205,10 @@ async fn sale_decrements_stock_via_event() {
     let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
-    // venta de 3 unidades de ese producto → evento descuenta stock a 7.
+    // selling 3 units of that product → the event decrements stock to 7.
     rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("stock-decrement"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "items": [{ "product_id": pid, "product_name": "Café", "price": 121, "quantity": 3_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → inventory.stock.decrease.
@@ -198,9 +226,11 @@ async fn sale_persists_staff_id_and_breaks_down_by_staff() {
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
-    // dos ventas atribuidas a staff-A, una a staff-B.
+    // two sales attributed to staff-A, one to staff-B.
+    let pm = cash_method_id(&rt, &ctx).await;
     let mk = |staff: &str, price: i64| params(json!({
         "idempotency_key": key(&format!("by-staff-{staff}-{price}")),
+        "payment_method_id": pm,
         "tax_included": true, "amount_tendered": 0, "staff_id": staff,
         "items": [{ "product_name": "Corte", "price": price, "quantity": 1_000_000, "tax_rate": 21.0, "is_service": true }]
     }));
@@ -232,13 +262,14 @@ async fn by_staff_respects_date_range_and_excludes_unattributed() {
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
-    // venta SIN staff (TPV normal) + venta CON staff.
+    // one sale WITHOUT staff (regular POS) + one WITH staff.
+    let pm = cash_method_id(&rt, &ctx).await;
     rt.execute_command("sales.complete_sale", &params(json!({
-        "idempotency_key": key("sin-staff"),
+        "idempotency_key": key("sin-staff"), "payment_method_id": pm,
         "items": [{ "product_name": "Café", "price": 121, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     rt.execute_command("sales.complete_sale", &params(json!({
-        "idempotency_key": key("con-staff"),
+        "idempotency_key": key("con-staff"), "payment_method_id": pm,
         "staff_id": "staff-X",
         "items": [{ "product_name": "Corte", "price": 2000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
@@ -266,9 +297,10 @@ async fn create_from_appointment_tags_sale_and_emits_conversion() {
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, sink) = fresh().await;
     let ctx = admin();
-    // El POS arma los items desde la cita (servicio, precio) y pasa staff_id + appointment_id.
+    // The POS builds the items from the appointment (service, price) and passes staff_id + appointment_id.
     rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("desde-la-cita"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "tax_included": true, "amount_tendered": 0,
         "staff_id": "stylist-1", "appointment_id": "appt-42",
         "customer_id": "cust-9", "customer_name": "Ana",
@@ -304,9 +336,10 @@ async fn sale_records_customer_purchase_via_event() {
     let cid = rt.execute_query("customers.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
-    // venta a ese cliente → record_purchase: lead → first_purchase, total_spent sube.
+    // sale to that customer → record_purchase: lead → first_purchase, total_spent goes up.
     rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("compra-del-cliente"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "customer_id": cid, "customer_name": "Cliente",
         "items": [{ "product_name": "X", "price": 5000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
@@ -439,6 +472,7 @@ async fn checkout_order_marks_it_completed_and_links_sale() {
 
     rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("checkout-del-pedido"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "order_id": oid, "amount_tendered": 300,
         "items": [{ "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("checkout");
@@ -471,18 +505,19 @@ async fn split_bill_one_order_produces_two_sales() {
     let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
-    // split 1: cobra el Plato A, deja el pedido ABIERTO.
+    // split 1: charges Plato A, leaves the order OPEN.
+    let pm = cash_method_id(&rt, &ctx).await;
     rt.execute_command("sales.complete_sale", &params(json!({
-        "idempotency_key": key("split-plato-a"),
+        "idempotency_key": key("split-plato-a"), "payment_method_id": pm,
         "order_id": oid, "keep_order_open": true, "amount_tendered": 1000,
         "items": [{ "product_name": "Plato A", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("split 1");
     let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(ord[0]["status"], json!("open"), "un split parcial deja el pedido abierto");
 
-    // split 2 (final): cobra el Plato B → completa el pedido.
+    // split 2 (final): charges Plato B → completes the order.
     rt.execute_command("sales.complete_sale", &params(json!({
-        "idempotency_key": key("split-plato-b"),
+        "idempotency_key": key("split-plato-b"), "payment_method_id": pm,
         "order_id": oid, "amount_tendered": 500,
         "items": [{ "product_name": "Plato B", "price": 500, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("split 2");
@@ -608,9 +643,10 @@ async fn split_bill_cada_uno_paga_lo_suyo() {
     let linea_a = lineas.iter().find(|l| l["product_name"] == json!("Menú A")).unwrap()["id"]
         .as_str().unwrap().to_string();
 
-    // El primero paga lo suyo: cobro PARCIAL con su línea.
+    // The first diner pays their share: PARTIAL charge with their line.
+    let pm = cash_method_id(&rt, &ctx).await;
     rt.execute_command("sales.complete_sale", &params(json!({
-        "idempotency_key": key("cada-uno-lo-suyo-primero"),
+        "idempotency_key": key("cada-uno-lo-suyo-primero"), "payment_method_id": pm,
         "order_id": oid, "keep_order_open": true, "line_ids": [linea_a],
         "amount_tendered": 1200, "tax_included": true,
         "items": [{ "product_name": "Menú A", "price": 1200, "quantity": 1_000_000, "tax_rate": 21.0 }]
@@ -623,9 +659,9 @@ async fn split_bill_cada_uno_paga_lo_suyo() {
     let pedido = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(pedido[0]["status"], json!("open"), "aún queda quien pague");
 
-    // El segundo paga: cobro final, el pedido se cierra.
+    // The second diner pays: final charge, the order closes.
     rt.execute_command("sales.complete_sale", &params(json!({
-        "idempotency_key": key("cada-uno-lo-suyo-segundo"),
+        "idempotency_key": key("cada-uno-lo-suyo-segundo"), "payment_method_id": pm,
         "order_id": oid, "amount_tendered": 1500, "tax_included": true,
         "items": [{ "product_name": "Menú B", "price": 1500, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("cobro del segundo");
@@ -656,9 +692,10 @@ async fn media_racion_de_gambas_descuenta_medio_kilo_y_cobra_la_mitad() {
     let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
-    // Media ración: 0,5 kg con su contexto de unidades CONGELADO (§2.4).
+    // Half portion: 0.5 kg with its unit context FROZEN (§2.4).
     rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("media-racion-de-gambas"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "tax_included": true, "amount_tendered": 600,
         "items": [{
             "product_id": pid, "product_name": "Gambas", "price": 1200, "quantity": 500_000,
@@ -704,6 +741,7 @@ async fn una_cantidad_fuera_de_la_rejilla_no_crea_venta_ni_toca_stock() {
 
     let r = rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("azafran-fuera-de-rejilla"),
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "items": [{
             "product_id": pid, "product_name": "Azafrán", "price": 900_000, "quantity": 500,
             "unit_code": "kg", "increment_value": 1_000, "tax_rate": 21.0

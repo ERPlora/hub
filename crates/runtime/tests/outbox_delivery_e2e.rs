@@ -82,7 +82,7 @@ impl NativeHandler for EmittingHandler {
 /// cash_register vs inventory sobre `sale.voided`).
 async fn runtime() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&fixture("ob")).await.expect("instalar ob");
     rt.install_from_dir(&fixture("ob2")).await.expect("instalar ob2");
     rt.register_native("ob", Arc::new(EmittingHandler));

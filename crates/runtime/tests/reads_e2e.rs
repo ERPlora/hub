@@ -54,10 +54,25 @@ impl EventSink for Sink {
     }
 }
 
+/// Id of the CASH payment method from the hub's seeded catalog (hub#594): with runtime and ctx
+/// sharing "h1" the `sales` seed is visible and `complete_sale` enforces `payment_method_id`.
+async fn cash_method_id(rt: &Runtime, ctx: &RequestContext) -> String {
+    let rows = rt
+        .execute_query("sales.payment_methods", &Params::new(), ctx)
+        .await
+        .expect("sales.payment_methods");
+    rows.iter()
+        .find(|r| r["type"] == json!("cash"))
+        .unwrap_or_else(|| panic!("the hub's catalog must carry the `cash` method: {rows:?}"))["id"]
+        .as_str()
+        .expect("payment method id")
+        .to_string()
+}
+
 /// Runtime con `taxes` + `inventory` + `customers` + `sales` (el conjunto que hace falta para cobrar).
 async fn rt_pos() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.set_event_sink(Arc::new(Sink::default()));
     for m in ["taxes", "inventory", "customers", "sales"] {
         rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));
@@ -77,10 +92,13 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
     let rt = rt_pos().await;
     let ctx = admin();
 
-    // El hub declara su catálogo fiscal: la comida de restaurante va al 10 %.
+    // The hub declares its fiscal catalog: this menu category is taxed at 10 %. A test-owned key
+    // is used instead of the seeded `restaurant.food` (hub#594: with runtime and ctx sharing
+    // "h1" the taxes seed IS visible, and re-creating a seeded category collides on
+    // `(hub_id, key)`) — it also proves the resolution reads the catalog, not a seed default.
     rt.execute_command(
         "taxes.categories.create",
-        &params(json!({ "key": "restaurant.food", "name": "Comida" })),
+        &params(json!({ "key": "test.menu", "name": "Comida" })),
         &ctx,
     )
     .await
@@ -90,13 +108,13 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
         "taxes.rules.create",
         &params(json!({
             "country_code": "ES", "region_code": null,
-            "tax_category_key": "restaurant.food", "rate_pct": 10.0,
+            "tax_category_key": "test.menu", "rate_pct": 10.0,
             "tax_type": "vat", "valid_from": null, "valid_to": null
         })),
         &ctx,
     )
     .await
-    .expect("crear la regla fiscal (ES · restaurant.food · 10 %)");
+    .expect("crear la regla fiscal (ES · test.menu · 10 %)");
 
     // Guardarraíl del propio test: si la regla no llegó al catálogo, no estaría probando nada.
     let reglas = rt.execute_query("taxes.rules.list", &Params::new(), &ctx).await.unwrap();
@@ -106,14 +124,15 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
-            // `idempotency_key` del intento de cobro (sales#20, obligatorio desde v2.13.x).
+            // `idempotency_key` of the charge attempt (sales#20, mandatory since v2.13.x).
             "idempotency_key": "reads-e2e-menu-del-dia",
+            "payment_method_id": cash_method_id(&rt, &ctx).await,
             "items": [{
                 "product_name": "Menú del día",
                 "price": 1100,
                 "quantity": 1_000_000,
-                "tax_category_key": "restaurant.food",
-                "tax_rate": 0.0            // ← LA MENTIRA DEL CLIENTE
+                "tax_category_key": "test.menu",
+                "tax_rate": 0.0            // ← THE CLIENT'S LIE
             }],
             "tax_included": true,
             "amount_tendered": 1100,
@@ -158,17 +177,20 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
 #[tokio::test]
 async fn una_read_que_falla_no_impide_cobrar() {
     if !erplora_runtime::require_modules_workspace() { return; }
-    // Se instala el conjunto completo, pero SIN sembrar ninguna regla fiscal: el catálogo de
-    // confianza llega VACÍO. Lo que se prueba es que la venta NO se cae por eso — cobrar es lo
-    // último que puede fallar en un TPV.
+    // The full stack is installed. Since hub#594 the seeded fiscal catalog IS visible (runtime
+    // and ctx share "h1"), so the empty-catalog scenario is built per-line: the item carries NO
+    // `tax_category_key`, so the trusted catalog cannot resolve it and the handler must degrade
+    // to the client hint — and the sale must still complete, because charging is the last thing
+    // allowed to fail in a POS.
     let rt = rt_pos().await;
     let ctx = admin();
 
-    // Sin NINGUNA regla fiscal en el hub: el catálogo llega vacío.
+    // Line without a fiscal category: the catalog has nothing to match it against.
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
             "idempotency_key": "reads-e2e-sin-catalogo-fiscal",
+            "payment_method_id": cash_method_id(&rt, &ctx).await,
             "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }],
             "tax_included": true,
             "amount_tendered": 1000,

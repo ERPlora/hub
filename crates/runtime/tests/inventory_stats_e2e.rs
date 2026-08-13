@@ -38,7 +38,7 @@ fn admin() -> RequestContext {
 
 async fn stack() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt
