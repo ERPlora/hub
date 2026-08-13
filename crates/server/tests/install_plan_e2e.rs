@@ -14,7 +14,10 @@
 //!   3. the hub's real installed set travels in the request, so an already-satisfied dependency
 //!      is not re-downloaded (idempotence);
 //!   4. a Cloud without the endpoint (older deployment) still installs via the manifest-nested
-//!      fallback — the safety net stays.
+//!      fallback — the safety net stays;
+//!   5. a plan that arrives 200 but INCOMPLETE (it omits deps the downloaded manifest declares —
+//!      hub#672, the saas#1352 empty-graph outage) degrades to the manifest fallback and
+//!      RECOVERS instead of dying in `MissingDependency`.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -410,5 +413,67 @@ async fn falls_back_to_nested_resolution_when_the_cloud_has_no_plan_endpoint() {
     assert!(
         calls.iter().any(|c| c.starts_with("versions:")),
         "the fallback path does use versions/: {calls:?}"
+    );
+}
+
+/// (5) hub#672: a plan that arrives 200 but is INCOMPLETE — it omits a dependency that the
+/// downloaded module's manifest DOES declare (the saas#1352 empty-`Module.dependencies` outage:
+/// every plan came back as a single node) — must NOT be executed as-is and die in the runtime's
+/// `MissingDependency` net. The hub detects the drift against the real manifest and degrades to
+/// the manifest-nested fallback, which installs the whole closure. The net RECOVERS, not just kills.
+#[tokio::test]
+async fn an_incomplete_plan_degrades_to_the_manifest_fallback_and_recovers() {
+    let leaf = module_zip("leaf", &[]);
+    let dependent = module_zip("dependent", &["leaf"]);
+    let (leaf_sha, dependent_sha) = (sha256_hex(&leaf), sha256_hex(&dependent));
+    let mut catalog = HashMap::new();
+    catalog.insert("leaf".to_string(), (leaf, leaf_sha));
+    catalog.insert("dependent".to_string(), (dependent, dependent_sha.clone()));
+
+    // The Cloud's graph is broken: the plan holds ONLY the requested module, even though the
+    // published zip's manifest declares `depends_on: ["leaf"]` and nothing is installed yet.
+    let mock = Arc::new(MockCloud {
+        catalog,
+        plan: Some(json!({
+            "requested": "dependent",
+            "plan": [node("dependent", &dependent_sha, "requested")],
+            "already_satisfied": [],
+            "blocked": false,
+            "blocked_on": [],
+        })),
+        calls: Mutex::new(Vec::new()),
+        plan_bodies: Mutex::new(Vec::new()),
+    });
+    let base_url = spawn_mock_cloud(mock.clone()).await;
+
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
+    install_from_cloud(
+        &reqwest::Client::new(),
+        &base_url,
+        &cache_dir("incomplete"),
+        &Auth::HubToken {
+            hub_id: "hub-test".into(),
+            token: "tok".into(),
+        },
+        &mut rt,
+        "dependent",
+        "latest",
+        &|_, _| {},
+        &dev_policy(),
+    )
+    .await
+    .expect(
+        "an incomplete plan must degrade to the manifest fallback, not die in MissingDependency",
+    );
+
+    assert!(
+        rt.registry().is_installed("leaf"),
+        "the dependency the plan omitted must be installed via the manifest fallback"
+    );
+    assert!(rt.registry().is_installed("dependent"));
+    let calls = mock.calls.lock().unwrap().clone();
+    assert!(
+        calls.iter().any(|c| c.starts_with("versions:")),
+        "recovery goes through the manifest fallback (versions/ round-trip): {calls:?}"
     );
 }
