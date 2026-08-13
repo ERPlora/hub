@@ -6,9 +6,9 @@
 //   - the tab exists and is reachable by deep link (`/employees#approvals`), so «send me the link»
 //     is an answer somebody can act on;
 //   - it is offered only to an administrator, matching the runtime gate on `hub.administer`;
-//   - the panel is mounted when the tab is OPENED, not with the page. The query has no ceiling
-//     server-side (`list_approvals` has no LIMIT: it returns the whole trail, ordered by date), so
-//     mounting it with People would make every visit to the staff list drag down years of receipts;
+//   - the panel is mounted when the tab is OPENED, not with the page. The read is paged
+//     server-side since hub#884, but the audit is still not the staff list's business: a visit to
+//     People must not query it at all;
 //   - a session that stops being an administrator is taken off it, exactly like API keys.
 //
 // Source-level assertions, like the rest of this page's contract (`employees-core.test.ts`): the
@@ -29,7 +29,7 @@ describe('People › Approvals · the way in', () => {
     expect(source).toMatch(/const TABS: readonly EmployeeTab\[\] = \[[^\]]*'approvals'/);
   });
 
-  it('mounts the panel only when the tab is open: the read has no ceiling', () => {
+  it('mounts the panel only when the tab is open: People never queries the audit', () => {
     // `v-show` would mount it with the page and fire the query on every visit to People.
     expect(source).toMatch(/<ApprovalsPanel\s+v-if="isAdmin && tab === 'approvals'"\s*\/>/);
   });

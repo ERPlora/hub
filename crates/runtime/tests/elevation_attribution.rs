@@ -522,12 +522,155 @@ async fn the_audit_filters_by_command() {
     .await
     .unwrap();
 
+    // `f_command`: the same filter convention every list query of the runtime speaks (hub#884
+    // moved the audit onto the generic list engine; the ad-hoc `command` param went with it).
     let mut filter = Params::new();
-    filter.insert("command".into(), json!("till.sale.take_payment"));
+    filter.insert("f_command".into(), json!("till.sale.take_payment"));
     let rows = rt
         .execute_query("hub.approvals.list", &filter, &admin())
         .await
         .unwrap();
     assert_eq!(rows.len(), 1, "only the payment, not the drawer");
     assert_eq!(rows[0]["command"], json!("till.sale.take_payment"));
+
+    // The LEVEL filters the same way — the screen offers it since hub#512, so the server has to
+    // answer it now that the client no longer holds the whole trail to filter in memory.
+    let mut by_level = Params::new();
+    by_level.insert("f_permission".into(), json!("till.void_sale"));
+    let rows = rt
+        .execute_query("hub.approvals.list", &by_level, &admin())
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 1, "only the drawer, not the payment");
+    assert_eq!(rows[0]["command"], json!("till.drawer.open"));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hub#884 — the record is read in PAGES: the whole trail never crosses the wire
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The write path and the gate are covered above, through the real door. What these tests pin down
+// is the READ contract: the audit grows forever by design (nothing deletes it), so the query must
+// serve pages with a real total — and the date filter must live in the query, because filtering in
+// the client only works while the whole trail is in memory, which is exactly the bug.
+//
+// The rows are seeded straight into `_elevation_audit` ON PURPOSE: pagination and date filtering
+// need controlled, distinct instants, and spending real approvals stamps them all with «now».
+
+/// Seed `n` audit rows, one per minute of 2026-07-01T00:xx, oldest = r0. Same shape the runtime
+/// writes (`elevation.rs`), timestamps in the same RFC 3339 form `now_rfc3339` produces.
+async fn seed_audit(db: &TestDb, n: usize) {
+    let conn = db.adapter().await;
+    for i in 0..n {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(format!("r{i}")));
+        p.insert("hub_id".into(), json!("h1"));
+        p.insert("command".into(), json!("till.sale.take_payment"));
+        p.insert("permission".into(), json!("till.take_payment"));
+        p.insert("created_by".into(), json!("u-cashier"));
+        p.insert("approved_by".into(), json!("u-manager"));
+        p.insert("payload_fingerprint".into(), json!(format!("fp-{i}")));
+        p.insert(
+            "created_at".into(),
+            json!(format!("2026-07-01T00:{i:02}:00+00:00")),
+        );
+        conn.execute(
+            "INSERT INTO _elevation_audit \
+             (id, hub_id, command, permission, created_by, approved_by, payload_fingerprint, created_at) \
+             VALUES (:id, :hub_id, :command, :permission, :created_by, :approved_by, \
+             :payload_fingerprint, :created_at)",
+            &p,
+        )
+        .await
+        .expect("the audit table is a core table, always there");
+    }
+}
+
+/// An admin asks for a page and gets a PAGE: the requested slice, newest first, plus the real
+/// total so the pager can say «page 1 of 3» without downloading pages 2 and 3.
+#[tokio::test]
+async fn the_audit_is_read_in_pages_with_a_real_total() {
+    let (db, rt) = fresh_hub().await;
+    seed_audit(&db, 5).await;
+
+    let page = rt
+        .execute_query_page("hub.approvals.list", &params(json!({ "limit": 2 })), &admin())
+        .await
+        .expect("an admin may read the audit");
+    assert_eq!(page.rows.len(), 2, "the page is the slice asked for");
+    assert_eq!(page.total, 5, "the total is the whole trail, not the slice");
+    assert_eq!(page.limit, 2);
+    assert_eq!(page.offset, 0);
+    // Newest first is the default order — the question this screen answers is about «that Tuesday»,
+    // and the reader starts from today.
+    assert_eq!(page.rows[0]["created_at"], json!("2026-07-01T00:04:00+00:00"));
+
+    let last = rt
+        .execute_query_page(
+            "hub.approvals.list",
+            &params(json!({ "limit": 2, "offset": 4 })),
+            &admin(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(last.rows.len(), 1, "the last page holds the remainder");
+    assert_eq!(last.rows[0]["created_at"], json!("2026-07-01T00:00:00+00:00"));
+    assert_eq!(last.total, 5);
+}
+
+/// Without an explicit `limit` the response is still BOUNDED: the engine's default page size
+/// applies. This is the ceiling hub#884 is about — before it, «no limit sent» meant «the whole
+/// trail crosses the wire», and at five approvals a day that is megabytes per screen-open.
+#[tokio::test]
+async fn the_audit_never_ships_whole_by_default() {
+    let (db, rt) = fresh_hub().await;
+    seed_audit(&db, 60).await;
+
+    let page = rt
+        .execute_query_page("hub.approvals.list", &Params::new(), &admin())
+        .await
+        .unwrap();
+    assert_eq!(page.rows.len(), 50, "the default page size caps the response");
+    assert_eq!(page.total, 60, "…and the total still names the full trail");
+}
+
+/// The date range is answered BY THE QUERY (`f_created_at_from`/`_to`, the engine's range filter),
+/// with the total reflecting the filtered set — so «show me that Tuesday» works without the client
+/// ever holding the rest of the years.
+#[tokio::test]
+async fn the_audit_filters_by_date_range_on_the_server() {
+    let (db, rt) = fresh_hub().await;
+    seed_audit(&db, 5).await;
+
+    let page = rt
+        .execute_query_page(
+            "hub.approvals.list",
+            &params(json!({
+                "f_created_at_from": "2026-07-01T00:01:00+00:00",
+                "f_created_at_to": "2026-07-01T00:03:59",
+            })),
+            &admin(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(page.rows.len(), 3, "r1..r3: the range is inclusive on both ends");
+    assert_eq!(page.total, 3, "the total is the FILTERED total: it feeds the pager");
+    assert_eq!(page.rows[0]["created_at"], json!("2026-07-01T00:03:00+00:00"));
+    assert_eq!(page.rows[2]["created_at"], json!("2026-07-01T00:01:00+00:00"));
+}
+
+/// The wire knows it is a list: the server keys the `{rows,total,limit,offset}` envelope off
+/// `is_list_query`, which must say yes for the audit — and keep saying no for the core queries
+/// that still answer with a plain array (`users.list` feeds dropdowns, not pagers).
+#[tokio::test]
+async fn the_audit_is_a_list_query_on_the_wire() {
+    let (_db, rt) = fresh_hub().await;
+    assert!(
+        rt.is_list_query("hub.approvals.list"),
+        "the server must envelope the audit as a page"
+    );
+    assert!(
+        !rt.is_list_query("hub.users.list"),
+        "the other core queries keep their plain-array shape"
+    );
 }
