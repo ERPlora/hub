@@ -55,7 +55,7 @@ fn admin() -> RequestContext {
 
 async fn rt() -> Runtime {
     let db = fresh_db().await;
-    Runtime::new(Box::new(db))
+    Runtime::with_hub_id(Box::new(db), "h1")
 }
 
 /// Ejecuta la query de un widget y devuelve la ÚNICA fila (las queries de KPI son singleton).
@@ -85,12 +85,23 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
     assert_eq!(empty["total"].as_i64().unwrap_or(0), 0, "sin ventas el total es 0");
     assert_eq!(empty["tickets"].as_i64().unwrap_or(0), 0, "sin ventas los tickets son 0");
 
-    // Una venta REAL: Café 1.21€×2 + Agua 1.10€×1, IVA incluido → total 352 céntimos (proven en sales_e2e).
+    // A REAL sale: Café 1.21€×2 + Agua 1.10€×1, tax included → total 352 cents (proven in sales_e2e).
+    // With runtime and ctx sharing "h1" (hub#594) the seeded catalog is visible, so complete_sale
+    // enforces a real `payment_method_id`.
+    let pm = rt
+        .execute_query("sales.payment_methods", &Params::new(), &ctx)
+        .await
+        .expect("sales.payment_methods")
+        .iter()
+        .find(|r| r["type"] == json!("cash"))
+        .expect("the hub's catalog must carry the `cash` method")["id"]
+        .clone();
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
-            // `idempotency_key` del intento de cobro (sales#20, obligatorio desde v2.13.x).
+            // `idempotency_key` of the charge attempt (sales#20, mandatory since v2.13.x).
             "idempotency_key": "dashboard-e2e-venta-del-kpi",
+            "payment_method_id": pm,
             "tax_included": true, "amount_tendered": 2000, "customer_name": "Bar Manolo",
             "items": [
                 { "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 },

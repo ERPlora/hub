@@ -20,7 +20,7 @@ fn ctx() -> RequestContext {
 
 async fn fresh_with_products(names_prices: &[(&str, f64)]) -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes"); // inventory depends_on taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.expect("instalar inventory");
     for (i, (name, price)) in names_prices.iter().enumerate() {

@@ -44,7 +44,7 @@ impl EventSink for Sink {
 /// alguno de los dos para instalarse, seguiría sabiendo de ellos y este setup fallaría.
 async fn fresh() -> (Runtime, Arc<Sink>) {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");

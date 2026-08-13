@@ -36,7 +36,7 @@ fn wasm_present() -> bool {
 
 async fn stack() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap();
@@ -203,9 +203,12 @@ async fn rejected_or_untracked_decreases_leave_no_movement() {
     // Rechazo atómico (sobreventa no permitida): sin movimiento. Desde `inventory` v1.2.18
     // (inventory#6/ADR-0205) el rechazo llega como error de dominio con código estable, no como el
     // no-op mudo de antes — lo que el ledger promete no cambia: un rechazo no deja rastro.
-    let pid = create_product(&rt, &ctx, "REJ", 3).await;
+    // Quantities in 10^6 fixed point (ADR-0147): with the units catalog visible (hub#594) the
+    // grid validation is live and a raw `9` would be rejected as `off_grid` before the
+    // insufficient-stock check this test is about.
+    let pid = create_product(&rt, &ctx, "REJ", 3_000_000).await;
     let err = rt.execute_command("inventory.stock.decrease",
-        &params(json!({ "product_id": pid, "qty": 9 })), &ctx).await
+        &params(json!({ "product_id": pid, "qty": 9_000_000 })), &ctx).await
         .expect_err("descontar 9 de 3 debe rechazarse");
     // Contra el CÓDIGO, no contra la frase: el código es lo estable (ADR-0205), el `message` es
     // solo el fallback humano.
@@ -214,7 +217,7 @@ async fn rejected_or_untracked_decreases_leave_no_movement() {
                        if code == "inventory.insufficient_stock"),
         "el rechazo debe llegar con su código de dominio (ADR-0205): {err:?}"
     );
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 3.0);
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 3_000_000.0);
     assert!(movements(&rt, &ctx, &pid).await.is_empty(), "un rechazo no deja rastro en el ledger");
 
     // track_stock = 0: sin movimiento.
@@ -222,7 +225,7 @@ async fn rejected_or_untracked_decreases_leave_no_movement() {
         "track_stock": 0, "allow_sell_without_stock": 0, "low_stock_threshold": 10
     })), &ctx).await.unwrap();
     rt.execute_command("inventory.stock.decrease",
-        &params(json!({ "product_id": pid, "qty": 1 })), &ctx).await.unwrap();
+        &params(json!({ "product_id": pid, "qty": 1_000_000 })), &ctx).await.unwrap();
     assert!(movements(&rt, &ctx, &pid).await.is_empty(), "tracking off: sin movimientos");
 }
 

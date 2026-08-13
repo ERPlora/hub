@@ -25,7 +25,7 @@ fn mdir(name: &str) -> PathBuf {
 /// Runtime con `tables` instalado (no depende de nadie).
 async fn fresh() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("tables")).await.expect("instalar tables");
     // Las mesas del ejemplo: `tables_session` tiene FK interna a `tables_table`.
     for (id, numero) in [("m12", "12"), ("m8", "8")] {
@@ -351,9 +351,24 @@ async fn transferir_cierra_un_tramo_y_abre_el_siguiente() {
 // Ojo al split-bill: `sale.completed` se emite TAMBIÉN en un cobro parcial, donde el pedido sigue
 // abierto y la mesa NO debe liberarse. Por eso `tables` escucha el fin del PEDIDO, no el de la venta.
 
+/// Id of the CASH payment method from the hub's seeded catalog (hub#594): with runtime and ctx
+/// sharing "h1" the `sales` seed is visible and `complete_sale` enforces `payment_method_id`.
+async fn cash_method_id(rt: &Runtime, ctx: &erplora_runtime::RequestContext) -> String {
+    let rows = rt
+        .execute_query("sales.payment_methods", &Params::new(), ctx)
+        .await
+        .expect("sales.payment_methods");
+    rows.iter()
+        .find(|r| r["type"] == json!("cash"))
+        .unwrap_or_else(|| panic!("the hub's catalog must carry the `cash` method: {rows:?}"))["id"]
+        .as_str()
+        .expect("payment method id")
+        .to_string()
+}
+
 async fn con_pos() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     for m in ["taxes", "inventory", "sales", "tables"] {
         rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));
     }
@@ -406,8 +421,9 @@ async fn cobrar_el_pedido_libera_la_mesa_y_cierra_su_tramo() {
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
-            // `idempotency_key` del intento de cobro (sales#20, obligatorio desde v2.13.x).
+            // `idempotency_key` of the charge attempt (sales#20, mandatory since v2.13.x).
             "idempotency_key": "tables-e2e-cobro-que-libera",
+            "payment_method_id": cash_method_id(&rt, &ctx).await,
             "order_id": oid, "amount_tendered": 250, "tax_included": true,
             "items": [{ "product_name": "Caña", "price": 250, "quantity": 1, "tax_rate": 21.0 }]
         })),
@@ -453,6 +469,7 @@ async fn un_cobro_PARCIAL_no_libera_la_mesa() {
         "sales.complete_sale",
         &params(json!({
             "idempotency_key": "tables-e2e-cobro-parcial",
+            "payment_method_id": cash_method_id(&rt, &ctx).await,
             "order_id": oid, "keep_order_open": true, "amount_tendered": 250, "tax_included": true,
             "items": [{ "product_name": "Caña", "price": 250, "quantity": 1, "tax_rate": 21.0 }]
         })),

@@ -112,7 +112,7 @@ async fn run_sector(sector: &str) {
     // Esquema efímero por test (ADR-0154): parte de un "hub nuevo" aislado, sin reset manual.
     let db = fresh_db().await;
 
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     // El server llama esto al arrancar: crea las tablas de sistema (incl. identidad `hub_user`)
     // que el blueprint necesita para sembrar los cajeros. Sin esto el seed fallaría por hub_user.
     rt.ensure_system_tables().await.expect("ensure_system_tables");

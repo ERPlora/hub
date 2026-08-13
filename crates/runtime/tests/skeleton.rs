@@ -15,8 +15,12 @@ fn module_dir() -> PathBuf {
 
 async fn fresh_runtime() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&module_dir()).await.expect("instalar inventory");
+    // The runtime's hub_id MUST match the RequestContext's ("h1"). The installer applies module
+    // seeds under the RUNTIME's hub_id (`Runtime::new` defaults to DEV_HUB_ID), so a mismatch
+    // installs the catalog in one hub and queries it from another: seeded reference data becomes
+    // invisible and handlers silently fall back to their degraded paths (hub#594).
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
+    rt.install_from_dir(&module_dir()).await.expect("install inventory");
     rt
 }
 

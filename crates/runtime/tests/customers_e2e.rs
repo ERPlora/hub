@@ -22,7 +22,7 @@ fn wasm_present() -> bool {
 }
 async fn fresh() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&dir()).await.expect("instalar customers");
     rt
 }

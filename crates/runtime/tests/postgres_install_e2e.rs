@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use erplora_db::testutil::fresh_db;
 use erplora_db::Params;
-use erplora_runtime::{RequestContext, Runtime, DEV_HUB_ID};
+use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
 fn module_dir(id: &str) -> PathBuf {
@@ -38,12 +38,13 @@ async fn install_on_postgres_applies_migrations_and_queries_work() {
     // Esquema efímero por test (ADR-0154): "hub nuevo" aislado, sin cleanup manual.
     let db = fresh_db().await;
 
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&module_dir("customers")).await.expect("instalar customers");
 
     // Síntoma del bug: el módulo queda `active` en `hub_module`…
+    // The runtime is built with `with_hub_id("h1")` (hub#594), so module state lives under "h1".
     let mut p = Params::new();
-    p.insert("hub_id".into(), json!(DEV_HUB_ID));
+    p.insert("hub_id".into(), json!("h1"));
     let status = rt
         .db_for_test()
         .query(
@@ -97,7 +98,7 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
     // Esquema efímero por test (ADR-0154): "hub nuevo" aislado, sin cleanup manual.
     let db = fresh_db().await;
 
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     // `invoice` declara `depends_on: [taxes, sales]` y `sales` a su vez `[inventory, taxes]`: el
     // instalador exige la cadena completa antes que el dependiente. Lo que este test mide sigue
     // siendo SOLO lo de `invoice` (sus `_hub_migrations`), que no cambian por instalar sus deps.

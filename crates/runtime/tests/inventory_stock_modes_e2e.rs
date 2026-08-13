@@ -40,7 +40,7 @@ fn wasm_present() -> bool {
 
 async fn stack() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap(); // sales depende de customers
@@ -188,9 +188,12 @@ async fn insufficient_decrease_is_rejected_atomically() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
-    let pid = create_product(&rt, &ctx, "Café", "CAF", 5, Some(5)).await;
+    // Quantities in 10^6 fixed point (ADR-0147): with the units catalog visible (hub#594) the
+    // grid validation is live, and a raw `10` would be rejected as `off_grid` before ever
+    // reaching the insufficient-stock check this test is about.
+    let pid = create_product(&rt, &ctx, "Café", "CAF", 5_000_000, Some(5_000_000)).await;
 
-    let err = try_decrease(&rt, &ctx, &pid, 10).await.expect_err("sobreventa no permitida: rechazo");
+    let err = try_decrease(&rt, &ctx, &pid, 10_000_000).await.expect_err("sobreventa no permitida: rechazo");
     // Contra el CÓDIGO, no contra la frase: el código es lo estable y lo que la UI programa
     // (ADR-0205); el `message` es solo el fallback humano y puede reescribirse sin avisar.
     assert!(
@@ -199,7 +202,7 @@ async fn insufficient_decrease_is_rejected_atomically() {
         "el rechazo debe llegar con su código de dominio (ADR-0205): {err:?}"
     );
 
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 5.0, "stock intacto: ni negativo ni truncado a 0");
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 5_000_000.0, "stock intacto: ni negativo ni truncado a 0");
 }
 
 /// Con stock suficiente el descuento sigue funcionando (regresión).
@@ -208,11 +211,11 @@ async fn sufficient_decrease_still_decreases() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let rt = stack().await;
     let ctx = admin();
-    let pid = create_product(&rt, &ctx, "Té", "TE", 5, Some(5)).await;
+    let pid = create_product(&rt, &ctx, "Té", "TE", 5_000_000, Some(5_000_000)).await;
 
-    decrease(&rt, &ctx, &pid, 3).await;
+    decrease(&rt, &ctx, &pid, 3_000_000).await;
 
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 2.0);
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 2_000_000.0);
 }
 
 // ── Modo 3b: tracking activo, sobreventa PERMITIDA ──────────────────────────────────────
@@ -225,11 +228,11 @@ async fn oversell_allowed_represents_negative_stock() {
     let rt = stack().await;
     let ctx = admin();
     set_settings(&rt, &ctx, 1, 1, 10).await;
-    let pid = create_product(&rt, &ctx, "Leche", "LEC", 5, Some(5)).await;
+    let pid = create_product(&rt, &ctx, "Leche", "LEC", 5_000_000, Some(5_000_000)).await;
 
-    decrease(&rt, &ctx, &pid, 10).await;
+    decrease(&rt, &ctx, &pid, 10_000_000).await;
 
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, -5.0, "sobreventa representada como saldo negativo");
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, -5_000_000.0, "sobreventa representada como saldo negativo");
 }
 
 // ── Modo 2: `track_stock = 0` — catálogo sin control de stock ───────────────────────────
@@ -241,11 +244,11 @@ async fn track_off_direct_decrease_is_noop() {
     let rt = stack().await;
     let ctx = admin();
     set_settings(&rt, &ctx, 0, 0, 10).await;
-    let pid = create_product(&rt, &ctx, "Pan", "PAN", 5, Some(5)).await;
+    let pid = create_product(&rt, &ctx, "Pan", "PAN", 5_000_000, Some(5_000_000)).await;
 
-    decrease(&rt, &ctx, &pid, 3).await;
+    decrease(&rt, &ctx, &pid, 3_000_000).await;
 
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 5.0, "track_stock=0: sin movimientos automáticos");
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 5_000_000.0, "track_stock=0: sin movimientos automáticos");
 }
 
 /// La cadena completa con tracking DESACTIVADO: la venta no genera movimientos y la
