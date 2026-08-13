@@ -1020,6 +1020,13 @@ export default {
     statusVoid: 'Void',
     statusUncollectible: 'Uncollectible',
   },
+  // hub#846 — the shell's ONE reaction when the RUNTIME says this session is no longer valid
+  // (expired, or displaced by a sign-in on another device): explain it, instead of screens
+  // quietly emptying into «no data» or a «Retry» that can never help.
+  auth: {
+    sessionEnded:
+      'Your session has ended: it expired or was opened on another device. Please sign in again.',
+  },
   login: {
     logoAlt: 'Business logo',
     toggleTheme: 'Toggle theme',

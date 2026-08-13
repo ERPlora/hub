@@ -968,6 +968,13 @@ export default {
     statusVoid: 'Anulada',
     statusUncollectible: 'Incobrable',
   },
+  // hub#846 — the shell's ONE reaction when the RUNTIME says this session is no longer valid
+  // (expired, or displaced by a sign-in on another device): explain it, instead of screens
+  // quietly emptying into «no data» or a «Retry» that can never help.
+  auth: {
+    sessionEnded:
+      'Tu sesión ha terminado: caducó o se abrió en otro dispositivo. Vuelve a entrar.',
+  },
   login: {
     logoAlt: 'Logotipo del negocio',
     toggleTheme: 'Cambiar tema',
