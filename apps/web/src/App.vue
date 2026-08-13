@@ -1,152 +1,155 @@
 <template>
   <ion-app>
     <ion-split-pane content-id="main" when="lg" :class="{ rail: railCollapsed }">
-      <!-- Menú lateral (drawer en móvil, fijo en desktop ≥lg). Solo con sesión. -->
-      <ion-menu
-        v-if="isAuthed"
-        :menu-id="SHELL_MENU_ID"
-        content-id="main"
-        type="overlay"
-        class="dash-menu"
-      >
-        <!-- Tarjeta de usuario ARRIBA (decisión 2026-07-16: el avatar de la topbar se retiró por
-             duplicado; el usuario vive aquí). La tarjeta ENTERA es el trigger de un menú
-             desplegable (ion-popover) con Perfil / Cerrar sesión — patrón "user menu" del
-             dashboard de Cloud/Untitled UI, en vez de iconos sueltos. -->
-        <ion-header class="ion-no-border">
-          <ion-toolbar class="brand-toolbar">
-            <button
-              id="sidebar-user-menu"
-              class="sidebar-user"
-              type="button"
-              aria-haspopup="menu"
-              @keydown.enter.prevent="openUserMenuFromKeyboard"
-              @keydown.space.prevent="openUserMenuFromKeyboard"
-            >
-              <div class="sidebar-user-avatar">
-                <img v-if="user?.avatarUrl" :src="user.avatarUrl" alt="" />
-                <span v-else>{{ initials }}</span>
-              </div>
-              <div class="sidebar-user-meta nav-label">
-                <div class="sidebar-user-name">{{ user?.name }}</div>
-                <div class="sidebar-user-email">{{ user?.email }}</div>
-              </div>
-              <HubIcon class="sidebar-user-chevron nav-label" name="chevron-expand-outline" />
-            </button>
-            <ion-popover
-              trigger="sidebar-user-menu"
-              trigger-action="click"
-              :dismiss-on-select="true"
-              side="bottom"
-              alignment="start"
-              class="sidebar-user-popover"
-            >
-              <ion-content>
-                <ion-list lines="none">
-                  <ion-item button :detail="false" @click="goProfile">
-                    <HubIcon slot="start" name="person-outline" />
-                    <ion-label>{{ t('sidebar.profile') }}</ion-label>
-                  </ion-item>
-                  <ion-item button :detail="false" @click="onLogout">
-                    <HubIcon slot="start" name="log-out-outline" />
-                    <ion-label>{{ t('sidebar.signOut') }}</ion-label>
-                  </ion-item>
-                </ion-list>
-              </ion-content>
-            </ion-popover>
-            <!-- El rail-toggle se movió a la topbar compartida (AppTopbar), a la derecha del back,
-                 para dar paridad con el shell de Cloud. El estado sigue en lib/shell (railCollapsed). -->
-          </ion-toolbar>
-        </ion-header>
-
-        <ion-content class="sidebar-content">
-          <ion-list v-for="section in nav" :key="section.titleKey" lines="none" class="nav-list">
-            <ion-list-header class="nav-section-label">{{ t(section.titleKey) }}</ion-list-header>
-            <ion-menu-toggle v-for="it in section.items" :key="it.path" :auto-hide="false">
-              <ion-item
-                button
-                class="nav-item"
-                :class="{ selected: isActive(it.path) }"
-                :router-link="it.path"
-                router-direction="root"
-                :detail="false"
-                :aria-current="isActive(it.path) ? 'page' : undefined"
+      <!-- Menú lateral (drawer en móvil, fijo en desktop ≥lg). Como TODO el chrome autenticado,
+           va dentro de <AuthenticatedChrome>: quién lo ve se decide ahí, en un solo sitio
+           (hub#925). -->
+      <AuthenticatedChrome>
+        <ion-menu
+          :menu-id="SHELL_MENU_ID"
+          content-id="main"
+          type="overlay"
+          class="dash-menu"
+        >
+          <!-- Tarjeta de usuario ARRIBA (decisión 2026-07-16: el avatar de la topbar se retiró por
+               duplicado; el usuario vive aquí). La tarjeta ENTERA es el trigger de un menú
+               desplegable (ion-popover) con Perfil / Cerrar sesión — patrón "user menu" del
+               dashboard de Cloud/Untitled UI, en vez de iconos sueltos. -->
+          <ion-header class="ion-no-border">
+            <ion-toolbar class="brand-toolbar">
+              <button
+                id="sidebar-user-menu"
+                class="sidebar-user"
+                type="button"
+                aria-haspopup="menu"
+                @keydown.enter.prevent="openUserMenuFromKeyboard"
+                @keydown.space.prevent="openUserMenuFromKeyboard"
               >
-                <HubIcon slot="start" class="nav-icon" :name="it.icon" />
-                <ion-label class="nav-label">{{ t(it.labelKey) }}</ion-label>
-              </ion-item>
-            </ion-menu-toggle>
-          </ion-list>
+                <div class="sidebar-user-avatar">
+                  <img v-if="user?.avatarUrl" :src="user.avatarUrl" alt="" />
+                  <span v-else>{{ initials }}</span>
+                </div>
+                <div class="sidebar-user-meta nav-label">
+                  <div class="sidebar-user-name">{{ user?.name }}</div>
+                  <div class="sidebar-user-email">{{ user?.email }}</div>
+                </div>
+                <HubIcon class="sidebar-user-chevron nav-label" name="chevron-expand-outline" />
+              </button>
+              <ion-popover
+                trigger="sidebar-user-menu"
+                trigger-action="click"
+                :dismiss-on-select="true"
+                side="bottom"
+                alignment="start"
+                class="sidebar-user-popover"
+              >
+                <ion-content>
+                  <ion-list lines="none">
+                    <ion-item button :detail="false" @click="goProfile">
+                      <HubIcon slot="start" name="person-outline" />
+                      <ion-label>{{ t('sidebar.profile') }}</ion-label>
+                    </ion-item>
+                    <ion-item button :detail="false" @click="onLogout">
+                      <HubIcon slot="start" name="log-out-outline" />
+                      <ion-label>{{ t('sidebar.signOut') }}</ion-label>
+                    </ion-item>
+                  </ion-list>
+                </ion-content>
+              </ion-popover>
+              <!-- El rail-toggle se movió a la topbar compartida (AppTopbar), a la derecha del back,
+                   para dar paridad con el shell de Cloud. El estado sigue en lib/shell (railCollapsed). -->
+            </ion-toolbar>
+          </ion-header>
 
-          <!-- Los módulos instalados NO van en el sidebar: se acceden desde el botón «apps»
-               de la topbar (rejilla, estilo Google) y desde el Home del Hub (pestaña Aplicaciones).
-               El estado `moduleNav` sigue vivo (lo usa la rejilla de la topbar). -->
-        </ion-content>
+          <ion-content class="sidebar-content">
+            <ion-list v-for="section in nav" :key="section.titleKey" lines="none" class="nav-list">
+              <ion-list-header class="nav-section-label">{{ t(section.titleKey) }}</ion-list-header>
+              <ion-menu-toggle v-for="it in section.items" :key="it.path" :auto-hide="false">
+                <ion-item
+                  button
+                  class="nav-item"
+                  :class="{ selected: isActive(it.path) }"
+                  :router-link="it.path"
+                  router-direction="root"
+                  :detail="false"
+                  :aria-current="isActive(it.path) ? 'page' : undefined"
+                >
+                  <HubIcon slot="start" class="nav-icon" :name="it.icon" />
+                  <ion-label class="nav-label">{{ t(it.labelKey) }}</ion-label>
+                </ion-item>
+              </ion-menu-toggle>
+            </ion-list>
 
-        <!-- Footer: brand (logo + wordmark, click → home) + the app version. The user moved to the
-             header of the menu. There is NOTHING about installing here: the hub is a PWA, and
-             whoever wants it installed installs it from their own browser — the shell does not ask
-             for it (hub#685). -->
-        <ion-footer class="ion-no-border sidebar-foot">
-          <!-- The app on this counter is older than the one we publish (hub#400). In the FOOTER on
-               purpose: it is the one part of the sidebar that never scrolls away, and the issue
-               asks for visible, not buried in settings. It paints itself only when there is
-               something to do AND this session is the one it belongs to; the rest of the time it is
-               not there at all. -->
-          <ion-menu-toggle :auto-hide="false">
-            <SidebarAppUpdate />
-          </ion-menu-toggle>
+            <!-- Los módulos instalados NO van en el sidebar: se acceden desde el botón «apps»
+                 de la topbar (rejilla, estilo Google) y desde el Home del Hub (pestaña Aplicaciones).
+                 El estado `moduleNav` sigue vivo (lo usa la rejilla de la topbar). -->
+          </ion-content>
 
-          <!-- «Actualizar plan» — la gestión del plan de este hub, que vive en el SaaS.
-               SIN gate de permiso, a propósito (decisión de Ioan 2026-08-09): la salida a gestión
-               del topbar sí filtra por `hub.administer`, pero el dueño entra muchas veces con la
-               sesión de caja y esconderle su propio plan es peor que enseñárselo a un cajero — al
-               llegar al SaaS manda `IsHubAdmin`, que es la autoridad de verdad.
-               Sale por `openExternal`: dentro de la app instalada `window.open` no abre NADA
-               (hub#475), y un botón muerto justo donde el dueño va a pagar es el peor sitio. -->
-          <ion-menu-toggle v-if="canOfferPlanUpgrade" :auto-hide="false">
-            <ion-button
-              class="sidebar-upgrade"
-              fill="clear"
-              size="small"
-              expand="block"
-              @click="onUpgradePlan"
-            >
-              <HubIcon slot="start" name="rocket-outline" />
-              {{ t('nav.upgradePlan') }}
-            </ion-button>
-          </ion-menu-toggle>
-
-          <div class="sidebar-foot-brand">
+          <!-- Footer: brand (logo + wordmark, click → home) + the app version. The user moved to the
+               header of the menu. There is NOTHING about installing here: the hub is a PWA, and
+               whoever wants it installed installs it from their own browser — the shell does not ask
+               for it (hub#685). -->
+          <ion-footer class="ion-no-border sidebar-foot">
+            <!-- The app on this counter is older than the one we publish (hub#400). In the FOOTER on
+                 purpose: it is the one part of the sidebar that never scrolls away, and the issue
+                 asks for visible, not buried in settings. It paints itself only when there is
+                 something to do AND this session is the one it belongs to; the rest of the time it is
+                 not there at all. -->
             <ion-menu-toggle :auto-hide="false">
-              <a class="erp-lockup sm brand-link" role="button" tabindex="0" @click="goHome">
-                <span class="erp-logo sm">
-                  <i class="erp-nw" /><i class="erp-n" /><i class="erp-ne" />
-                  <i class="erp-w" /><i class="erp-hub" /><i class="erp-e" />
-                  <i class="erp-sw" /><i class="erp-s" /><i class="erp-se" />
-                </span>
-                <span class="erp-wordmark nav-label">erplora</span>
-              </a>
+              <SidebarAppUpdate />
             </ion-menu-toggle>
-            <span class="sidebar-foot-text ml-auto nav-label">v{{ appVersion }}</span>
-          </div>
-        </ion-footer>
-      </ion-menu>
+
+            <!-- «Actualizar plan» — la gestión del plan de este hub, que vive en el SaaS.
+                 SIN gate de permiso, a propósito (decisión de Ioan 2026-08-09): la salida a gestión
+                 del topbar sí filtra por `hub.administer`, pero el dueño entra muchas veces con la
+                 sesión de caja y esconderle su propio plan es peor que enseñárselo a un cajero — al
+                 llegar al SaaS manda `IsHubAdmin`, que es la autoridad de verdad.
+                 Sale por `openExternal`: dentro de la app instalada `window.open` no abre NADA
+                 (hub#475), y un botón muerto justo donde el dueño va a pagar es el peor sitio. -->
+            <ion-menu-toggle v-if="canOfferPlanUpgrade" :auto-hide="false">
+              <ion-button
+                class="sidebar-upgrade"
+                fill="clear"
+                size="small"
+                expand="block"
+                @click="onUpgradePlan"
+              >
+                <HubIcon slot="start" name="rocket-outline" />
+                {{ t('nav.upgradePlan') }}
+              </ion-button>
+            </ion-menu-toggle>
+
+            <div class="sidebar-foot-brand">
+              <ion-menu-toggle :auto-hide="false">
+                <a class="erp-lockup sm brand-link" role="button" tabindex="0" @click="goHome">
+                  <span class="erp-logo sm">
+                    <i class="erp-nw" /><i class="erp-n" /><i class="erp-ne" />
+                    <i class="erp-w" /><i class="erp-hub" /><i class="erp-e" />
+                    <i class="erp-sw" /><i class="erp-s" /><i class="erp-se" />
+                  </span>
+                  <span class="erp-wordmark nav-label">erplora</span>
+                </a>
+              </ion-menu-toggle>
+              <span class="sidebar-foot-text ml-auto nav-label">v{{ appVersion }}</span>
+            </div>
+          </ion-footer>
+        </ion-menu>
+      </AuthenticatedChrome>
 
       <ion-router-outlet id="main" />
     </ion-split-pane>
 
     <!-- Drawer del asistente (lo abre el sparkles de la topbar). Hermano del split-pane:
-         va por encima del shell. Solo con sesión. Los errores del frontend se reportan
-         AUTOMÁTICAMENTE al runtime (lib/error-report), sin modal ni acción del usuario. -->
-    <template v-if="isAuthed">
+         va por encima del shell. Los errores del frontend se reportan AUTOMÁTICAMENTE al runtime
+         (lib/error-report), sin modal ni acción del usuario. -->
+    <AuthenticatedChrome>
       <AssistantDrawer />
       <!-- El diálogo de aprobación por PIN (hub#363). Se monta UNA vez, aquí, y lo abre el
            TRANSPORTE ante un `requires_elevation` — nunca un módulo ni una pantalla: así el
            encargado aprueba igual venga la acción de la app que venga, y ninguna se lo deja sin
-           poner. Solo con sesión: quien no ha entrado no tiene acción que elevar. -->
+           poner. Dentro del gate: quien no ha entrado no tiene acción que elevar. -->
       <ElevationDialog />
-    </template>
+    </AuthenticatedChrome>
   </ion-app>
 </template>
 
@@ -160,6 +163,10 @@ import {
   IonPopover, IonRouterOutlet, IonButton,
 } from '@ionic/vue';
 import HubIcon from './components/HubIcon.vue';
+// El ÚNICO gate del chrome autenticado (hub#925). Ver su doc: no basta con que exista `user` —
+// eso es «hubo una sesión y quedó su rastro», y por eso el login se pintaba con el menú entero
+// alrededor. Todo trozo de chrome nuevo va DENTRO de él; nadie vuelve a escribir la condición.
+import AuthenticatedChrome from './components/AuthenticatedChrome.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
 import ElevationDialog from './components/ElevationDialog.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
