@@ -73,8 +73,14 @@ jobs:
         # whenever two test-hub jobs overlapped the second one could not bind 5433 and died in
         # ~9 s with "Docker start fail with exit code 1" — a message that only shows up in the
         # check-run ANNOTATIONS, not in the log. Publishing only the container port lets Docker
-        # pick a free host port per job; steps read it via
-        # `${{ job.services.postgres.ports['5432'] }}`.
+        # pick a free host port per job.
+        #
+        # ⚠️ The job context (`job.services.postgres.ports['5432']`) reports the port assigned
+        # at container START and is FROZEN afterwards — and the lock-limits step below does a
+        # `docker restart`, which REBINDS the ephemeral port to a new value (proven in run
+        # 31660118661: context said 32768, tests got Connection refused there). The one source
+        # of truth for later steps is `docker port` AFTER that restart; the lock-limits step
+        # resolves it and exports DATABASE_URL to $GITHUB_ENV.
         #
         # ⚠️ Two Postgres for the same suite (hub#647): this CI service AND the local pre-push
         # gate (`.githooks/pre-push`), which keeps its own pinned localhost:5433 in a separate
@@ -90,8 +96,9 @@ jobs:
 
     env:
       # DATABASE_URL is NOT set here on purpose: the Postgres host port is dynamic (hub#898)
-      # and the `job.services` context is not available in job-level `env` — a step below
-      # exports it to $GITHUB_ENV instead.
+      # and only known for sure AFTER the lock-limits step restarts the container (the restart
+      # rebinds the ephemeral port). That step resolves the real port with `docker port` and
+      # exports DATABASE_URL to $GITHUB_ENV for the test steps.
       # Sin debuginfo: el `target/` del workspace (wasmtime/extism/sqlx + decenas de binarios de
       # test) desbordaba los ~14 GB del runner y el LINK moría con SIGBUS/ENOSPC. El debuginfo es
       # el grueso del target; quitarlo hace que `cargo test --workspace` quepa de sobra.
@@ -101,13 +108,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # The service publishes Postgres on a dynamic host port (see `ports` above, hub#898).
-      # Export the DSN the test helper reads (`erplora_db::testutil` → env `DATABASE_URL`;
-      # same shape as its default, only the port varies) so every later step sees it.
-      - name: Export dynamic Postgres port (hub#898)
-        run: |
-          echo "DATABASE_URL=postgres://postgres:test@localhost:${{ job.services.postgres.ports['5432'] }}/hub_test" >> "$GITHUB_ENV"
 
       # Libera ~25-30 GB de imágenes/toolchains preinstalados que no usamos, para que el link del
       # workspace no se quede sin disco (SIGBUS/ENOSPC en `ld` durante los binarios de test).
@@ -130,10 +130,11 @@ jobs:
       #
       # Se cambia EN SITIO en vez de recrear el contenedor: los servicios de Actions no admiten
       # pasarle argumentos al comando del contenedor, y estos tres ajustes necesitan reinicio.
-      - name: Raise Postgres lock limits (hub#526)
+      - name: Raise Postgres lock limits (hub#526) + export dynamic port (hub#898)
         run: |
           # Find the container by the HOST PORT this same workflow published — dynamic since
-          # hub#898, read from the job context (never hardcode it here again). It used to be
+          # hub#898, read from the job context, which is accurate HERE (before the restart
+          # below) and never hardcoded again. It used to be
           # `--filter ancestor=postgres:18`, and when the service above moved to
           # `pgvector/pgvector:pg18` the filter stopped matching: `docker ps` came back empty,
           # `docker exec ""` failed with "invalid container name or ID" and the job died with
@@ -165,6 +166,34 @@ jobs:
           echo "lock ceiling now:"
           docker exec "$PG" psql -U postgres -tAc \
             "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);"
+
+          # ⚠️ The restart above REBINDS the ephemeral host port: the value the job context
+          # reported at container start is stale from here on (run 31660118661: context said
+          # 32768, Postgres came back on a different port, 16 tests died with Connection
+          # refused in 0.03 s — while every in-container check above kept passing, because
+          # `docker exec` never crosses the host port). Ask Docker for the CURRENT binding and
+          # only export the DSN once a real TCP connect from the host proves it.
+          HOST_PORT=$(docker port "$PG" 5432/tcp | head -1 | sed 's/.*://')
+          if [ -z "$HOST_PORT" ]; then
+            echo "::error::docker port returned no host binding for 5432/tcp on ${PG}."
+            docker port "$PG" || true
+            exit 1
+          fi
+          echo "Postgres host port after restart: ${HOST_PORT} (was ${PG_PORT} at container start)"
+          ok=""
+          for i in $(seq 1 15); do
+            if timeout 2 bash -c "exec 3<>/dev/tcp/localhost/${HOST_PORT}" 2>/dev/null; then
+              ok=1; break
+            fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::Postgres is not reachable from the host on localhost:${HOST_PORT} after restart."
+            docker ps --format '  {{.ID}}  {{.Image}}  {{.Ports}}'
+            exit 1
+          fi
+          # Same DSN shape as the `erplora_db::testutil` default — only the port varies.
+          echo "DATABASE_URL=postgres://postgres:test@localhost:${HOST_PORT}/hub_test" >> "$GITHUB_ENV"
 
       # `rustup` viene de serie en la imagen de GitHub, pero en `ci-runner-1` es un fichero más
       # que algo puede borrar — y algo lo borró (ver el `cache-bin: false` de abajo).
