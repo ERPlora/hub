@@ -260,6 +260,9 @@ export default {
     // name for the same thing on both surfaces.
     appsAdd: 'Add apps',
     appsEmpty: 'Your apps will show up here. Add the ones your business needs.',
+    // hub#894 — said INSTEAD of `appsEmpty` when the list could not be loaded. It never claims the
+    // hub is empty, and it names reloading as the move, because the apps are still installed.
+    appsLoadError: 'Could not load your apps. Reload the page; if it keeps failing, sign in again.',
     blueprintTitle: 'Set up your business',
     blueprintBody: 'Load a template for your business or restore a backup to get started.',
     blueprintCta: 'Set up',

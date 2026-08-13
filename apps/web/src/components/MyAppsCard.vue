@@ -17,6 +17,19 @@
       {{ t('dashboard.appsEmpty') }}
     </p>
 
+    <!-- …and when there is nothing to show because the ASKING failed, that has to be said OUT LOUD
+         (hub#894). hub#770 stopped the card from lying here; what it left was silence, and next to a
+         grid whose only tile is «＋ Add apps», silence still reads as «this hub is empty». A real hub
+         with twelve modules registered went two surfaces deep like that and its owner's only
+         available move was to go install what they already had. A failure nobody can see is also a
+         failure nobody reports: that hub's 401 sat in the runtime log the whole time.
+
+         Only when there is nothing on screen — rows beat this message like they beat every other
+         one (hub#770, «data wins»). -->
+    <p v-else-if="display === 'error'" class="apps-card-error" data-testid="apps-error" role="alert">
+      {{ t('dashboard.appsLoadError') }}
+    </p>
+
     <ul class="apps-grid">
       <li v-for="app in ordered" :key="app.path" class="apps-grid-cell">
         <ion-button
@@ -131,6 +144,12 @@ function remember(path: string): void {
   margin: 0.4rem 0 0;
   font-size: 0.875rem;
   color: var(--ion-color-medium);
+}
+/* Same line, said in the danger tone: this one is about US failing, not about the hub being new. */
+.apps-card-error {
+  margin: 0.4rem 0 0;
+  font-size: 0.875rem;
+  color: var(--ion-color-danger);
 }
 
 /* Auto-fill grid: 4-5 tiles per row on a desktop, 3 on a phone, without a media query per breakpoint
