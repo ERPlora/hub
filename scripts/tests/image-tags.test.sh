@@ -152,6 +152,30 @@ PUBLISHED="1.2.3" run "refs/heads/main"
 [ "$status" -eq 0 ] || fail "a push to main must not be blocked by an already-published version"
 passed=$((passed + 1))
 
+# ── A branch other than main NEVER moves :latest (hub#872) ───────────────────────────
+# `workflow_dispatch` runs the workflow from ANY ref, and `:latest` is the tag every real
+# hub's service is registered with (Cloud/Dokploy provisioning). A manual build from
+# `develop` — or any work branch — must publish ONLY the immutable `:<sha>`, so a single
+# hub can be pointed at it without changing the code of the whole fleet.
+make_manifest "2.5.0"
+PUBLISHED="" run "refs/heads/develop"
+[ "$status" -eq 0 ] || fail "a dispatch from develop should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" \
+    && fail "a build from develop must NOT publish :latest — that moves the whole fleet (hub#872)"
+grep -qxF "ghcr.io/erplora/hub:abc1234def" "$tmp_dir/out" || fail "a build from develop must still publish the immutable sha tag"
+grep -qxF "ghcr.io/erplora/hub:2.5.0" "$tmp_dir/out" \
+    && fail "a build from develop must NOT publish the immutable :X.Y.Z — only a release tag does"
+passed=$((passed + 1))
+
+# ── …and neither does an arbitrary work branch ───────────────────────────────────────
+make_manifest "2.5.0"
+PUBLISHED="" run "refs/heads/fix/some-work-branch"
+[ "$status" -eq 0 ] || fail "a dispatch from a work branch should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" \
+    && fail "a build from a work branch must NOT publish :latest (hub#872)"
+grep -qxF "ghcr.io/erplora/hub:abc1234def" "$tmp_dir/out" || fail "a build from a work branch must still publish the sha tag"
+passed=$((passed + 1))
+
 # ── 0.0.0 is refused everywhere: it is the placeholder, not a version ────────────────
 make_manifest "0.0.0"
 PUBLISHED="" run "refs/heads/main"
