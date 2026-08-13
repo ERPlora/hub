@@ -30,6 +30,14 @@ fn main() {
             "erplora_remove_device",
             // Notificación del SO: el aviso cuando NADIE mira la pantalla (comanda a cocina).
             "erplora_notify",
+            // «Start on login» (ADR-0204 §7, hub#389). App commands and not the autostart
+            // plugin's own (`autostart:allow-*`): the plugin is a DESKTOP-ONLY dependency, so on
+            // an Android build its permissions do not exist and a capability naming them would
+            // fail the build. These three exist on every platform — on mobile they answer an
+            // error, and the settings toggle never renders there.
+            "autostart_is_enabled",
+            "autostart_enable",
+            "autostart_disable",
         ])),
     )
     .expect("error en tauri-build (app manifest / capabilities)");

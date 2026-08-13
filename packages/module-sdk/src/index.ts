@@ -1897,29 +1897,64 @@ export class UnavailableBridgeTransport implements BridgeTransport {
  * Android, iOS). Delega en el crate `erplora-peripherals` en proceso (ARQUITECTURA.md §2.7); no hay
  * servidor local ni WebSocket. Desde ADR-0196 §3 es el **único** transporte que llega al hardware.
  */
+/**
+ * Android runtime permission that gates ALL traffic to the LAN (API 37+) — what discovery and
+ * printing need. Mirror of `PermissionPolicy.ACCESS_LOCAL_NETWORK` on the Kotlin side.
+ */
+export const ANDROID_LOCAL_NETWORK_PERMISSION = 'android.permission.ACCESS_LOCAL_NETWORK';
+
+/**
+ * Android runtime permission for system notifications (API 33+) — what `notify` needs, and
+ * nothing else does (hub#758). Mirror of `PermissionPolicy.POST_NOTIFICATIONS`.
+ */
+export const ANDROID_NOTIFICATIONS_PERMISSION = 'android.permission.POST_NOTIFICATIONS';
+
+/**
+ * Android runtime permission to talk to bonded Bluetooth devices (API 31+) — what a
+ * `bluetooth:{mac}` print job and the bonded-printer half of discovery need (ADR-0204, hub#388).
+ * Mirror of `PermissionPolicy.BLUETOOTH_CONNECT`.
+ */
+export const ANDROID_BLUETOOTH_CONNECT_PERMISSION = 'android.permission.BLUETOOTH_CONNECT';
+
+/**
+ * The permissions a job to THIS printer is about to use (hub#758/hub#388): RFCOMM for a
+ * `bluetooth:{mac}` id, the LAN for everything else. Naming the wrong one would be the same
+ * out-of-context dialog hub#758 removed, pointing the other way.
+ */
+function printerPermissions(printerId: string): string[] {
+  return printerId.startsWith('bluetooth:')
+    ? [ANDROID_BLUETOOTH_CONNECT_PERMISSION]
+    : [ANDROID_LOCAL_NETWORK_PERMISSION];
+}
+
 export class IpcBridgeTransport implements BridgeTransport {
   constructor(private readonly tauri: TauriBridge) {}
 
   /**
-   * Asegura los permisos de RUNTIME antes de tocar el hardware.
+   * Ensures the runtime permissions an operation is ABOUT to use — and only those (hub#758).
    *
-   * Declararlos en el manifest **no basta**: `ACCESS_LOCAL_NETWORK` (Android 17+) y
-   * `POST_NOTIFICATIONS` (Android 13+) se conceden en runtime, y su ausencia **falla en
-   * silencio** — el descubrimiento devuelve `[]` y las notificaciones no salen, sin un solo
-   * error. Verificado en el emulador API 37.
+   * Declaring them in the manifest is **not enough**: `ACCESS_LOCAL_NETWORK` (Android 17+) and
+   * `POST_NOTIFICATIONS` (Android 13+) are granted at runtime, and their absence fails
+   * **silently** — discovery returns `[]` and notifications never show, with no error anywhere.
+   * Verified on the API 37 emulator.
    *
-   * Es idempotente en el lado nativo: si ya están concedidos no sale ningún diálogo, así que
-   * llamarlo antes de cada escaneo no molesta al usuario.
+   * The request carries a SCOPE on purpose. Asked without one, the plugin used to request its
+   * whole batch: tapping «Re-scan» popped the local-network dialog and then, with no visible
+   * relation to anything, the notifications one — an opportunistic-looking ask the user rightly
+   * denies. Each operation now names what it needs; the notifications dialog belongs to the
+   * first flow that actually notifies.
    *
-   * Nunca propaga: un «no» del usuario es una respuesta, no un fallo. Sin impresora el TPV
-   * tiene que seguir cobrando, y sin avisos la comanda tiene que seguir imprimiéndose.
+   * Idempotent on the native side: already granted means no dialog, so asking before every scan
+   * costs the user nothing.
+   *
+   * Never propagates: a «no» from the user is an answer, not a failure. Without a printer the
+   * till has to keep selling, and without notices the kitchen order still has to print.
    */
-  private async ensurePermissions(): Promise<void> {
+  private async ensurePermissions(permissions: string[]): Promise<void> {
     try {
-      await this.tauri.invoke('plugin:erplora-android|request_permissions', {});
+      await this.tauri.invoke('plugin:erplora-android|request_permissions', { permissions });
     } catch {
-      // En escritorio el comando no existe o no hay nada que pedir; en Android, el usuario dijo
-      // que no. En ambos casos se sigue.
+      // On desktop the command has nothing to ask; on Android, the user said no. Carry on.
     }
   }
 
@@ -1938,7 +1973,12 @@ export class IpcBridgeTransport implements BridgeTransport {
    * usuario a buscar una impresora que lleva encendida todo el rato (hub#338).
    */
   async discoverPrinters(): Promise<BridgePrinter[]> {
-    await this.ensurePermissions();
+    // Both printer permissions: on Android the shell sweeps the LAN AND lists bonded Bluetooth
+    // printers (ADR-0204). Still not the notifications one — that dialog has its own context.
+    await this.ensurePermissions([
+      ANDROID_LOCAL_NETWORK_PERMISSION,
+      ANDROID_BLUETOOTH_CONNECT_PERMISSION,
+    ]);
     const outcome = (await this.tauri.invoke('erplora_discover_printers', {})) as
       | PrinterDiscoveryResult
       | BridgePrinter[];
@@ -1964,18 +2004,18 @@ export class IpcBridgeTransport implements BridgeTransport {
     data: Record<string, unknown>,
     jobId?: string,
   ): Promise<void> {
-    await this.ensurePermissions();
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_print', { printerId, documentType, data, jobId: jobId ?? null });
   }
 
   async testPrint(printerId: string): Promise<void> {
-    await this.ensurePermissions();
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_test_print', { printerId });
   }
 
   /** The drawer opens through the printer's ESC/POS kick — so it goes over the local network too. */
   async openDrawer(printerId: string, pin = 2): Promise<void> {
-    await this.ensurePermissions();
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_open_drawer', { printerId, pin });
   }
 
@@ -1987,7 +2027,7 @@ export class IpcBridgeTransport implements BridgeTransport {
 
   /** Notificación del SO por el shell (que ES el bridge en Tauri). Best-effort: no propaga fallos. */
   async notify(title: string, body: string): Promise<void> {
-    await this.ensurePermissions();
+    await this.ensurePermissions([ANDROID_NOTIFICATIONS_PERMISSION]);
     try {
       await this.tauri.invoke('erplora_notify', { title, body });
     } catch {

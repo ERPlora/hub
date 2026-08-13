@@ -20,3 +20,6 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
+# The bluetooth print payload crosses the JNI boundary as base64 (ADR-0204, hub#388), same
+# reasoning as the shell's `save_download`: ~1.3x the bytes instead of ~4x as a JSON number array.
+base64 = "0.22"

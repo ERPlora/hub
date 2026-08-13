@@ -480,7 +480,8 @@ jobs:
                    android.permission.ACCESS_NETWORK_STATE \
                    android.permission.CHANGE_WIFI_MULTICAST_STATE \
                    android.permission.ACCESS_LOCAL_NETWORK \
-                   android.permission.POST_NOTIFICATIONS; do
+                   android.permission.POST_NOTIFICATIONS \
+                   android.permission.BLUETOOTH_CONNECT; do
             echo "$PERMISOS" | grep -q "name='$P'" \
               || { echo "::error::el APK NO declara $P — el hardware moriría EN SILENCIO (hub#337)"; exit 1; }
           done

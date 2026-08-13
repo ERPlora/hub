@@ -79,6 +79,13 @@ fn find_mac(text: &str) -> Option<String> {
 
 /// `true` si `token` tiene forma de MAC: 6 grupos de 1-2 dígitos hex separados consistentemente
 /// por `:` o `-`.
+/// `true` if `token` is a well-formed MAC address. Public face of [`is_mac_token`] for the
+/// `bluetooth:{mac}` printer_id variant (ADR-0204): the contract validates the MAC at the parsing
+/// edge, with the same rule the registry itself uses to recognise one.
+pub fn is_mac(token: &str) -> bool {
+    is_mac_token(token)
+}
+
 fn is_mac_token(token: &str) -> bool {
     let sep = if token.contains(':') {
         ':'
@@ -470,9 +477,23 @@ impl Watchdog {
         }
     }
 
+    /// Does the watchdog watch over this device at all? (ADR-0204, hub#388)
+    ///
+    /// Only NETWORK devices: the whole toolbox here is IP-shaped — a TCP probe for health, an ARP
+    /// sweep for recovery. A Bluetooth SPP printer has neither an IP to probe nor a subnet to be
+    /// found on, so "monitoring" it could only mark it offline forever, and the recovery sweep —
+    /// which hunts by MAC, the one thing a BT printer always has — would happily "recover" it
+    /// onto some LAN device's IP. Phase 1 gives BT devices no health path on purpose.
+    pub fn monitors(device: &Device) -> bool {
+        device.kind == "network"
+    }
+
     /// Comprueba la alcanzabilidad de todos los dispositivos conocidos. Porta `_check_devices`.
     async fn check_devices(&self, registry: &DeviceRegistry) {
         for device in registry.get_all() {
+            if !Self::monitors(&device) {
+                continue;
+            }
             // El chequeo de salud solo necesita IP: se hace por `key`, así que las impresoras sin
             // MAC (todas en Android) también se vigilan. La MAC solo hace falta para el recovery
             // scan, más abajo.
@@ -523,6 +544,9 @@ impl Watchdog {
         let mut mac_lookup: HashMap<String, Device> = registry
             .get_all()
             .into_iter()
+            // A Bluetooth printer always has a MAC and never has an IP — the perfect FALSE
+            // candidate for an ARP-based recovery. It is not lost on the LAN; it was never there.
+            .filter(Self::monitors)
             .filter(|d| d.status == "offline")
             .filter_map(|d| d.mac.clone().map(|mac| (mac, d)))
             .collect();
@@ -642,6 +666,52 @@ mod tests {
             "la sonda debe rendirse con su timeout, no con el del SO (tardó {:?})",
             started.elapsed()
         );
+    }
+
+    // ── ADR-0204 / hub#388: the watchdog is a NETWORK mechanism, and says so ───────────────────
+    //
+    // Its whole toolbox is IP-shaped: a TCP probe to decide alive/dead and an ARP sweep to find a
+    // printer that DHCP moved. A Bluetooth SPP printer has neither an IP to probe nor a subnet to
+    // be found on — running either against it can only produce noise (a permanent "offline") or a
+    // false recovery onto some LAN device that happens to share the MAC. Phase 1 of ADR-0204 gives
+    // BT devices NO health path on purpose; this predicate is where that decision lives.
+
+    fn device_of_kind(kind: &str, ip: &str) -> Device {
+        Device {
+            key: "AA:BB:CC:DD:EE:FF".into(),
+            mac: Some("AA:BB:CC:DD:EE:FF".into()),
+            ip: ip.into(),
+            port: 0,
+            name: "Printer".into(),
+            role: None,
+            kind: kind.into(),
+            first_seen: "2026-08-13T00:00:00".into(),
+            last_seen: "2026-08-13T00:00:00".into(),
+            status: "online".into(),
+        }
+    }
+
+    #[test]
+    fn the_watchdog_monitors_network_devices_and_leaves_bluetooth_alone() {
+        assert!(Watchdog::monitors(&device_of_kind("network", "10.0.0.5")));
+        assert!(
+            !Watchdog::monitors(&device_of_kind("bluetooth", "")),
+            "a BT printer has no IP to probe: 'monitoring' it can only mark it offline forever"
+        );
+    }
+
+    #[test]
+    fn a_bluetooth_device_never_enters_the_recovery_sweep() {
+        // The recovery sweep hunts offline devices BY MAC across the local subnet — and a BT
+        // printer always HAS a MAC, so without this gate it is the perfect false candidate: any
+        // LAN device answering 9100 with a matching-looking MAC would "recover" it onto an IP it
+        // never had.
+        let bt = {
+            let mut d = device_of_kind("bluetooth", "");
+            d.status = "offline".into();
+            d
+        };
+        assert!(!Watchdog::monitors(&bt));
     }
 
     // ── device_key: la identidad estable ────────────────────────────────────────────────────────

@@ -763,6 +763,83 @@ for (const [command, run] of REACHES_THE_PRINTER) {
   });
 }
 
+// ── hub#758: an operation asks ONLY for the permission it is about to use ───────────────
+//
+// The request used to carry no scope, and the plugin answered it by asking for its WHOLE batch:
+// tapping «Re-scan» on a fresh Android popped the local-network dialog and then, out of nowhere,
+// the notifications one. A permission that appears with no visible relation to what the user just
+// did reads as opportunistic and gets denied — and a denied POST_NOTIFICATIONS is a kitchen that
+// stops hearing orders. So the scope travels with every request: discovery and printing name the
+// local network, and the notifications dialog belongs to the first flow that actually notifies.
+
+function fakeShellRecordingPermissionArgs() {
+  const requests: unknown[] = [];
+  const tauri = {
+    invoke: async (cmd: string, args?: unknown) => {
+      if (cmd === 'plugin:erplora-android|request_permissions') requests.push(args);
+      if (cmd === 'erplora_discover_printers') return { status: 'scanned', printers: [] };
+      return {};
+    },
+    listen: async () => () => {},
+  };
+  return { transport: new IpcBridgeTransport(tauri), requests };
+}
+
+// Discovery is the one operation that looks at BOTH transports on Android — the LAN sweep and the
+// bonded Bluetooth list (ADR-0204) — so it names both printer permissions. Still zero
+// notifications: that dialog belongs to the flow that notifies.
+test('discovery asks for the two printer permissions and nothing else (hub#758/hub#388)', async () => {
+  const { transport, requests } = fakeShellRecordingPermissionArgs();
+
+  await transport.discoverPrinters();
+
+  assert.deepEqual(requests, [
+    {
+      permissions: [
+        'android.permission.ACCESS_LOCAL_NETWORK',
+        'android.permission.BLUETOOTH_CONNECT',
+      ],
+    },
+  ]);
+});
+
+for (const [command, run] of REACHES_THE_PRINTER) {
+  if (command === 'erplora_discover_printers') continue; // asserted above: discovery scans both transports
+  test(`${command} to a network printer asks only for the local-network permission (hub#758)`, async () => {
+    const { transport, requests } = fakeShellRecordingPermissionArgs();
+
+    await run(transport);
+
+    assert.deepEqual(requests, [{ permissions: ['android.permission.ACCESS_LOCAL_NETWORK'] }]);
+  });
+}
+
+// A `bluetooth:{mac}` job leaves through RFCOMM, not the LAN (ADR-0204): asking for the network
+// permission there would be the same out-of-context dialog hub#758 removed, pointing the other way.
+const REACHES_A_BLUETOOTH_PRINTER: Array<[string, (t: IpcBridgeTransport) => Promise<unknown>]> = [
+  ['erplora_print', (t) => t.print('bluetooth:AA:BB:CC:DD:EE:FF', 'receipt', { total: 100 })],
+  ['erplora_test_print', (t) => t.testPrint('bluetooth:AA:BB:CC:DD:EE:FF')],
+  ['erplora_open_drawer', (t) => t.openDrawer('bluetooth:AA:BB:CC:DD:EE:FF')],
+];
+
+for (const [command, run] of REACHES_A_BLUETOOTH_PRINTER) {
+  test(`${command} to a bluetooth printer asks only for BLUETOOTH_CONNECT (hub#388)`, async () => {
+    const { transport, requests } = fakeShellRecordingPermissionArgs();
+
+    await run(transport);
+
+    assert.deepEqual(requests, [{ permissions: ['android.permission.BLUETOOTH_CONNECT'] }]);
+  });
+}
+
+test('notify asks only for the notifications permission — its own context, nothing else (hub#758)', async () => {
+  const { transport, requests } = fakeShellRecordingPermissionArgs();
+
+  await transport.notify('New order', 'Table 4');
+
+  assert.deepEqual(requests, [{ permissions: ['android.permission.POST_NOTIFICATIONS'] }]);
+});
+
 test('a refused permission does not stop the till from trying to print', async () => {
   // A "no" is an answer, not a crash — and the user may have granted it in the system settings
   // since. Failing here would turn a permission the till does not strictly need on this Android

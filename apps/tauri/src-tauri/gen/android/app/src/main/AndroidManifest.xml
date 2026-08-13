@@ -28,6 +28,13 @@
          Runtime permission since Android 13. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Bluetooth Classic SPP printing (ADR-0204, hub#388): bonded list + RFCOMM socket.
+         Runtime permission since Android 12; the pre-12 spelling is install-time and capped
+         with maxSdkVersion. No BLUETOOTH_SCAN on purpose: pairing happens in Android's own
+         settings, the till only reads the bonded list. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 

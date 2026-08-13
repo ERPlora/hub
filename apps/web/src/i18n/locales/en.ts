@@ -57,6 +57,17 @@ export default {
     profile: 'Profile',
     signOut: 'Sign out',
   },
+  // Shell-of-the-installed-app copy. «Switch business» (hub#447): the app remembers ONE business
+  // and this is the user's own door to another — an owner with two venues and one tablet, a till
+  // being reassigned. Spoken as BUSINESS, never "hub": the reader owns a bar.
+  shell: {
+    changeHub: 'Switch business',
+    changeHubTitle: 'Switch business?',
+    changeHubBody:
+      'This device will sign out of this business and show your list of businesses.',
+    changeHubCancel: 'Cancel',
+    changeHubConfirm: 'Switch',
+  },
   // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
   // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and
   // one noun for two things is how a cashier ends up uninstalling the till.
@@ -461,6 +472,11 @@ export default {
     hardwareDesc: 'Printers, scanners and other devices on this computer or its network',
     hardwareReady: 'Available here',
     hardwareAppOnly: 'Only from the installed app',
+    // «Start on login» (ADR-0204 §7, hub#389). Desktop app only; the OS keeps the state.
+    startOnLogin: 'Start on login',
+    startOnLoginDesc:
+      'Open ERPlora when you sign in to this computer, so tickets always have somewhere to print',
+    startOnLoginError: 'Could not change the start on login setting',
     disabled: 'Disabled',
     fiscalIdentity: 'Business details',
     fiscalIdentityDesc: 'Taxpayer identity (used by invoices and the fiscal apps).',

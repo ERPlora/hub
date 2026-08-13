@@ -34,6 +34,8 @@ export interface PrintDevice {
   role?: string | null;
   ip?: string | null;
   port?: number | null;
+  /** Transport of the device (`network` | `bluetooth`, ADR-0204). The registry serializes `type`. */
+  type?: string;
 }
 
 /** Mínimo que necesitamos del cliente (inyectable para tests). */
@@ -140,10 +142,20 @@ function mintJobId(documentType: string): string {
   return `${documentType}-${rnd}`;
 }
 
-/** Impresora del Bridge con ese ROL, en el formato que espera `peripherals.print`. */
+/**
+ * Impresora del Bridge con ese ROL, en el formato que espera `peripherals.print`.
+ *
+ * A bonded Bluetooth printer (ADR-0204, Android only) registers with NO ip — its identity is the
+ * MAC — so it resolves to `bluetooth:{mac}`. Built with the network template it would come out
+ * `network::0`: a job sent to nowhere, failing at some socket far from here.
+ */
 export function printerIdForRole(devices: PrintDevice[], role: string): string | undefined {
-  const d = (devices || []).find((x) => x?.role === role && x?.ip);
-  return d ? `network:${d.ip}:${d.port ?? 9100}` : undefined;
+  const d = (devices || []).find(
+    (x) => x?.role === role && (x?.ip || (x?.type === 'bluetooth' && x?.mac)),
+  );
+  if (!d) return undefined;
+  if (d.type === 'bluetooth') return `bluetooth:${d.mac}`;
+  return `network:${d.ip}:${d.port ?? 9100}`;
 }
 
 /**
