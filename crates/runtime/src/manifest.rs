@@ -10,8 +10,16 @@ pub struct Manifest {
     pub id: String,
     pub name: String,
     pub version: String,
+    /// Modules this one needs installed, optionally with a MINIMUM version (hub#681).
+    ///
+    /// Two authoring shapes, mixable in one list: a plain string (`"taxes"`, the shape of every
+    /// published manifest — any installed version satisfies it) and
+    /// `{ "id": "inventory", "min_version": "1.2.20" }` for a contract that was born in a
+    /// concrete version (sales#68: `sales` reads `inventory.products.for_sale`, which exists
+    /// since inventory 1.2.20). The installer enforces the floor
+    /// (`installer::register_module`); the topo-sort and the cascades read only the id.
     #[serde(default)]
-    pub depends_on: Vec<String>,
+    pub depends_on: Vec<DependencyRef>,
     #[serde(default)]
     pub permissions: Vec<String>,
     #[serde(default)]
@@ -184,6 +192,78 @@ pub struct Manifest {
     /// line in a log nobody reads, which is the failure mode this issue is about.
     #[serde(skip)]
     pub warnings: Vec<ManifestWarning>,
+}
+
+/// One entry of `depends_on` (hub#681): the module this one needs, and — optionally — the oldest
+/// version of it that honours the contract.
+///
+/// `min_version` is a FLOOR, never a pin: at or above it the dependency satisfies, and absence
+/// means "any installed version", which is what every plain-string entry (the shape of the whole
+/// published catalogue) keeps meaning. Enforced at install time by `installer::register_module`;
+/// blueprints and the install plan are not relaxed by it (they resolve versions upstream).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DependencyRef {
+    /// Id of the required module (`inventory`).
+    pub id: String,
+    /// Oldest acceptable version of it (`1.2.20`), compared as a semver floor
+    /// ([`version_triple`]). `None` = any version.
+    pub min_version: Option<String>,
+}
+
+impl<'de> serde::Deserialize<'de> for DependencyRef {
+    /// Accepts the two authoring shapes — `"id"` and `{ "id": ..., "min_version": ... }` — with
+    /// errors that name the offending field. An unknown key inside the object form is refused:
+    /// a dependency entry changes what the installer enforces, which is the refuse tier of
+    /// ADR-0286 (silently dropping a constraint would install a module its author knows to be
+    /// broken in this combination).
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = DependencyRef;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a module id string or { \"id\": ..., \"min_version\": ... }")
+            }
+
+            fn visit_str<E: serde::de::Error>(
+                self,
+                id: &str,
+            ) -> std::result::Result<Self::Value, E> {
+                Ok(DependencyRef {
+                    id: id.to_string(),
+                    min_version: None,
+                })
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> std::result::Result<Self::Value, A::Error> {
+                let mut id: Option<String> = None;
+                let mut min_version: Option<String> = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "id" => id = Some(map.next_value()?),
+                        "min_version" => min_version = map.next_value()?,
+                        other => {
+                            return Err(serde::de::Error::unknown_field(
+                                other,
+                                &["id", "min_version"],
+                            ))
+                        }
+                    }
+                }
+                Ok(DependencyRef {
+                    id: id.ok_or_else(|| serde::de::Error::missing_field("id"))?,
+                    min_version,
+                })
+            }
+        }
+        deserializer.deserialize_any(V)
+    }
 }
 
 /// Which cores can run a module (`compatibility`, hub#521).
@@ -1456,7 +1536,7 @@ fn refuses_unknown_fields(path: &str) -> bool {
 /// floors at `1.2.3`) and missing components read as zero (`2` = `2.0.0`): this compares a FLOOR,
 /// so being generous about the shape is right, while a fourth component or a non-numeric one is
 /// not a version anybody released and returns `None`.
-fn version_triple(value: &str) -> Option<(u64, u64, u64)> {
+pub(crate) fn version_triple(value: &str) -> Option<(u64, u64, u64)> {
     let core = value.trim().split(['-', '+']).next()?;
     let mut parts = core.split('.');
     let major = parts.next()?.parse().ok()?;

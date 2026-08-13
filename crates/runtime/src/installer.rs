@@ -159,13 +159,46 @@ async fn register_module(
     dir: &Path,
     manifest: Manifest,
 ) -> Result<String> {
-    // Dependencias declaradas deben estar ya instaladas (orden topológico = del llamador).
+    // Dependencias declaradas deben estar ya instaladas (orden topológico = del llamador), y —
+    // hub#681 — cuando la entrada declara un suelo de versión, la instalada debe alcanzarlo:
+    // dos módulos correctos por separado pueden no vender juntos (sales#68), y el runtime que
+    // omite la read en silencio es exactamente lo que hace el hueco indiagnosticable.
     for dep in &manifest.depends_on {
-        if !registry.is_installed(dep) {
+        if !registry.is_installed(&dep.id) {
             return Err(RuntimeError::MissingDependency {
                 module: manifest.id.clone(),
-                dep: dep.clone(),
+                dep: dep.id.clone(),
             });
+        }
+        if let Some(required) = &dep.min_version {
+            // An unreadable floor is refused, never read as "any version works" — the same
+            // direction as an unreadable `compatibility.min_erplora_version` (hub#521).
+            let Some(floor) = crate::manifest::version_triple(required) else {
+                return Err(RuntimeError::DependencyFloorUnreadable {
+                    module: manifest.id.clone(),
+                    dep: dep.id.clone(),
+                    declared: required.clone(),
+                });
+            };
+            let installed = registry
+                .installed
+                .iter()
+                .find(|m| m.id == dep.id)
+                .map(|m| m.version.clone())
+                .unwrap_or_default();
+            // An installed version the runtime cannot parse is tolerated (the schema requires
+            // semver, so it is a build lying about itself, and refusing every dependent then
+            // would be worse than trusting it) — mirror of how `CORE_VERSION` is trusted.
+            if let Some(version) = crate::manifest::version_triple(&installed) {
+                if version < floor {
+                    return Err(RuntimeError::DependencyTooOld {
+                        module: manifest.id.clone(),
+                        dep: dep.id.clone(),
+                        required: required.clone(),
+                        installed,
+                    });
+                }
+            }
         }
     }
 

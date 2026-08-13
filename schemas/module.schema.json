@@ -60,8 +60,31 @@
     },
     "depends_on": {
       "type": "array",
+      "description": "Módulos que este necesita instalados, opcionalmente con versión MÍNIMA (hub#681). Dos formas mezclables: el string plano (`\"taxes\"` — cualquier versión instalada satisface, la forma de todo el catálogo publicado) y `{ \"id\": \"inventory\", \"min_version\": \"1.2.20\" }` para un contrato que nació en una versión concreta (sales#68). El instalador valida el suelo; el topo-orden y las cascadas leen solo el id.",
       "items": {
-        "type": "string"
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "min_version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+\\.\\d+",
+                "description": "Versión mínima de la dependencia que cumple el contrato (suelo, nunca pin)."
+              }
+            }
+          }
+        ]
       },
       "default": []
     },

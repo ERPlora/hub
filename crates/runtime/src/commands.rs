@@ -522,7 +522,7 @@ async fn preload_reads(
         .installed
         .iter()
         .find(|m| m.id == cmd.module_id)
-        .map(|m| m.depends_on.clone())
+        .map(|m| m.depends_on.iter().map(|d| d.id.clone()).collect())
         .unwrap_or_default();
     let allowed: Vec<&str> = std::iter::once(cmd.module_id.as_str())
         .chain(deps.iter().map(|s| s.as_str()))
