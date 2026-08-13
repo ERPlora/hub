@@ -137,27 +137,32 @@ runs=$(wc -l < "$repo/RUNS" 2>/dev/null | tr -d ' ')
     || bad "changed tree: the green does not carry over" "exit=$code runs=$runs want=2"
 
 # ── 8. The lock serialises concurrent pushes (19 worktrees share this hook) ────
-repo=$(make_repo)
-git -C "$repo" config --bool hooks.hubPrepushGate true
-sha=$(git -C "$repo" rev-parse HEAD)
+#    Modeled as the real fleet works: two SEPARATE worktrees (each clean at its
+#    own HEAD — since hub#855 the gate refuses a tree that mutates under it),
+#    sharing ONE state dir the way the worktrees share .git/hub-gate.
+repoA=$(make_repo)
+repoB=$(make_repo)
+git -C "$repoA" config --bool hooks.hubPrepushGate true
+git -C "$repoB" config --bool hooks.hubPrepushGate true
+echo other > "$repoB/file"; git -C "$repoB" commit -qam other   # distinct trees, no cache short-circuit
+shaA=$(git -C "$repoA" rev-parse HEAD)
+shaB=$(git -C "$repoB" rev-parse HEAD)
+state=$(mktemp -d)
 # Each run appends on entry and on exit; interleaved marks mean they overlapped.
-slow="echo enter >> $repo/TRACE; sleep 2; echo leave >> $repo/TRACE; true"
-run_hook "$repo" "refs/heads/a $sha refs/heads/a $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="$slow" >/dev/null &
+slow_a="echo enter >> $state/TRACE; sleep 2; echo leave >> $state/TRACE; true"
+run_hook "$repoA" "refs/heads/a $shaA refs/heads/a $ZERO" \
+    HUB_GATE_STATE_DIR="$state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="$slow_a" >/dev/null &
 first=$!
 sleep 0.3
-# A different tree, so the second push cannot short-circuit on the cache.
-echo other > "$repo/file2"; git -C "$repo" add file2; git -C "$repo" commit -qm two
-sha2=$(git -C "$repo" rev-parse HEAD)
-run_hook "$repo" "refs/heads/b $sha2 refs/heads/b $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="$slow" >/dev/null &
+run_hook "$repoB" "refs/heads/b $shaB refs/heads/b $ZERO" \
+    HUB_GATE_STATE_DIR="$state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="$slow_a" >/dev/null &
 second=$!
 wait $first $second
-[ "$(tr '\n' ' ' < "$repo/TRACE")" = "enter leave enter leave " ] \
+[ "$(tr '\n' ' ' < "$state/TRACE")" = "enter leave enter leave " ] \
     && ok "lock: two concurrent pushes run their suites one at a time" \
-    || bad "lock: two concurrent pushes run their suites one at a time" "trace=$(tr '\n' ' ' < "$repo/TRACE")"
+    || bad "lock: two concurrent pushes run their suites one at a time" "trace=$(tr '\n' ' ' < "$state/TRACE")"
 
 # A monorepo layout: hub/ with modules-workspace/ as its sibling.
 # `cd && pwd -P` so the expected path is symlink-resolved too: on macOS mktemp hands
