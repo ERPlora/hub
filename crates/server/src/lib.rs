@@ -3218,7 +3218,25 @@ async fn navigation(
             })
         })
         .collect();
-    Json(json!({ "ok": true, "data": items })).into_response()
+    // `active_modules` = módulos instalados **y activos** (hub#894). **Aditivo**: `ok`/`data` intactos.
+    //
+    // `data` es el menú, y por sí solo no distingue las dos cosas que producen el mismo array vacío:
+    // un hub recién nacido y un hub con 12 módulos cuyo menú salió vacío de todas formas. La primera
+    // es un hecho que merece pintarse («añade tu primera app»); la segunda no, y se pintaba igual —
+    // un hub real de producción (12/12 según `/readyz`) le dijo a su dueña que no tenía apps y le
+    // ofreció instalar las que ya tenía. Este número le da al shell contra qué comprobar la lista
+    // vacía en vez de creérsela.
+    //
+    // Cuenta los **activos**, no los instalados, y la diferencia importa: un módulo que el admin
+    // apagó a propósito NO se espera que aporte menú, así que contarlo convertiría un hub apagado a
+    // conciencia en un falso «no he podido cargar tus apps». El denominador es lo que el hub espera
+    // que aporte, no lo que tiene guardado.
+    let active_modules = reg
+        .installed
+        .iter()
+        .filter(|m| reg.is_active(&m.id))
+        .count();
+    Json(json!({ "ok": true, "data": items, "active_modules": active_modules })).into_response()
 }
 
 async fn list_modules(

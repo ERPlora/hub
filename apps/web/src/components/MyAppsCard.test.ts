@@ -225,3 +225,58 @@ describe('loading and failing are not «you have no apps»', () => {
     expect(mountCard([], i18n, 'ready').find('[data-testid="apps-empty"]').exists()).toBe(true);
   });
 });
+
+// hub#894 — silence was not enough.
+//
+// hub#770 stopped the card from LYING: on a failure it no longer says «you have no apps». What it
+// says instead is nothing at all, and next to a grid whose only tile is «＋ Add apps», nothing still
+// reads as «this hub is empty». A real hub with twelve modules registered went two surfaces deep
+// like that, and its owner's only available move was to go install what they already had.
+//
+// A failure the user cannot see is a failure nobody reports either — the runtime log for that hub
+// held the 401 the whole time and it took a code read to find it. So an empty launcher that FAILED
+// has to say so, out loud, in the card.
+describe('a launcher that failed says so', () => {
+  it('paints a visible failure when it has nothing to show and the request failed', () => {
+    const w = mountCard([], i18n, 'error');
+
+    const error = w.find('[data-testid="apps-error"]');
+    expect(error.exists()).toBe(true);
+    expect(error.text().length).toBeGreaterThan(0);
+    // And it is NOT the «you have no apps» sentence wearing another hat.
+    expect(w.find('[data-testid="apps-empty"]').exists()).toBe(false);
+  });
+
+  it('stays quiet about failing while it still has apps on screen', () => {
+    // Data wins (hub#770): rows beat every message, including this one.
+    const w = mountCard([pos, stock], i18n, 'error');
+
+    expect(tilePaths(w)).toEqual(['/m/pos', '/m/inventory']);
+    expect(w.find('[data-testid="apps-error"]').exists()).toBe(false);
+  });
+
+  it('does not cry failure while it is merely still asking', () => {
+    const w = mountCard([], i18n, 'loading');
+
+    expect(w.find('[data-testid="apps-error"]').exists()).toBe(false);
+  });
+
+  it('does not cry failure on a hub that genuinely has nothing', () => {
+    const w = mountCard([], i18n, 'ready');
+
+    expect(w.find('[data-testid="apps-error"]').exists()).toBe(false);
+    expect(w.find('[data-testid="apps-empty"]').exists()).toBe(true);
+  });
+
+  it('ships the failure line in both languages', () => {
+    const en = enCatalogue as unknown as { dashboard: Record<string, string> };
+    const es = esCatalogue as unknown as { dashboard: Record<string, string> };
+
+    expect(en.dashboard.appsLoadError, 'en.dashboard.appsLoadError').toBeTruthy();
+    expect(es.dashboard.appsLoadError, 'es.dashboard.appsLoadError').toBeTruthy();
+    expect(es.dashboard.appsLoadError).not.toBe(en.dashboard.appsLoadError);
+    expect(mountCard([], i18nEs, 'error').find('[data-testid="apps-error"]').text()).toBe(
+      es.dashboard.appsLoadError,
+    );
+  });
+});
