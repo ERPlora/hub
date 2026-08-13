@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-import { upgradePlanUrl } from './upgrade-plan-link';
+import { planUpgradeIsOfferable, upgradePlanUrl } from './upgrade-plan-link';
 
 const appSource = readFileSync(new URL('../App.vue', import.meta.url), 'utf8');
 
@@ -49,5 +49,44 @@ describe('el enlace de actualizar plan', () => {
     // `window.open` no abre NADA en la webview de la app instalada (hub#475): sin `openExternal`
     // esto sería un botón muerto justo en la pantalla donde el dueño va a pagar.
     expect(appSource).toContain('openExternal');
+  });
+});
+
+// ── hub#756: la copia que reparte Google Play no ofrece este control ────────────────────────────
+//
+// El razonamiento de arriba sigue siendo bueno, y para la web y para Windows se mantiene: gestionar
+// la cuenta no es un escaparate, y Microsoft lo permite por escrito (política 10.8.2 — un producto
+// que no es juego puede usar su propia caja y mandar al navegador a completarla).
+//
+// Pero la QA sobre un Pixel real (hub#756) demostró lo que un argumento no puede: el revisor de
+// Play pulsa el botón, ve abrirse Chrome en `…/change-plan/`, y eso es steering para él. Cuando lo
+// que está en juego es que te tumben el envío, la lectura que importa no es la nuestra.
+//
+// Por eso el corte NO es «Android» sino la DISTRIBUCIÓN: el que pone la regla es quien reparte el
+// binario. Un APK instalado de lado no lo gobierna Google, y a ese usuario esconderle su propio
+// plan sería quitarle algo por un motivo que no le aplica.
+describe('en la copia que reparte una tienda', () => {
+  it('Google Play NO recibe el control: es quien lo trata como steering', () => {
+    expect(planUpgradeIsOfferable('play')).toBe(false);
+  });
+
+  it('Microsoft SÍ lo recibe: su política 10.8.2 lo permite por escrito', () => {
+    expect(planUpgradeIsOfferable('msstore')).toBe(true);
+  });
+
+  it('una instalación directa lo conserva: ninguna tienda la gobierna', () => {
+    expect(planUpgradeIsOfferable('direct')).toBe(true);
+  });
+
+  it('sin señal se OFRECE, que es el lado seguro para el cliente', () => {
+    // Un shell anterior a hub#757 no manda `distribution`, y el navegador tampoco. Quitar el
+    // control ahí dejaría sin acceso a su plan a todo el que abre el hub en Chrome, que es la
+    // mayoría — y por un riesgo que en el navegador no existe.
+    expect(planUpgradeIsOfferable(undefined)).toBe(true);
+  });
+
+  it('App.vue esconde el botón con esa regla, no lo pinta siempre', () => {
+    // El fallo de hub#756 era exactamente esto: el botón se pintaba sin mirar de dónde venía la app.
+    expect(appSource).toContain('planUpgradeIsOfferable');
   });
 });
