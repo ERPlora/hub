@@ -22,6 +22,10 @@ ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; pass=$((pass + 1)); }
 bad()  { printf '  \033[31m✗\033[0m %s\n     %s\n' "$1" "$2"; fail=$((fail + 1)); }
 
 # A throwaway git repo with one commit, so the hook has a real tree to hash.
+# The .gitignore is COMMITTED and covers every artifact the tests drop inside
+# the repo: since hub#855 the hook refuses to run when the working tree does
+# not match the pushed tree, and untracked non-ignored files count as a
+# mismatch (cargo compiles what is on disk, not what is committed).
 make_repo() {
     local dir
     dir=$(mktemp -d)
@@ -29,7 +33,8 @@ make_repo() {
     git -C "$dir" config user.email gate@test
     git -C "$dir" config user.name gate
     echo one > "$dir/file"
-    git -C "$dir" add file
+    printf '%s\n' .out .state RAN RUNS STATUS STATUSES TRACE ENV POSTED POSTARGS OWNER ghbin nogh nowhere > "$dir/.gitignore"
+    git -C "$dir" add file .gitignore
     git -C "$dir" commit -qm one
     echo "$dir"
 }
@@ -132,27 +137,32 @@ runs=$(wc -l < "$repo/RUNS" 2>/dev/null | tr -d ' ')
     || bad "changed tree: the green does not carry over" "exit=$code runs=$runs want=2"
 
 # ── 8. The lock serialises concurrent pushes (19 worktrees share this hook) ────
-repo=$(make_repo)
-git -C "$repo" config --bool hooks.hubPrepushGate true
-sha=$(git -C "$repo" rev-parse HEAD)
+#    Modeled as the real fleet works: two SEPARATE worktrees (each clean at its
+#    own HEAD — since hub#855 the gate refuses a tree that mutates under it),
+#    sharing ONE state dir the way the worktrees share .git/hub-gate.
+repoA=$(make_repo)
+repoB=$(make_repo)
+git -C "$repoA" config --bool hooks.hubPrepushGate true
+git -C "$repoB" config --bool hooks.hubPrepushGate true
+echo other > "$repoB/file"; git -C "$repoB" commit -qam other   # distinct trees, no cache short-circuit
+shaA=$(git -C "$repoA" rev-parse HEAD)
+shaB=$(git -C "$repoB" rev-parse HEAD)
+state=$(mktemp -d)
 # Each run appends on entry and on exit; interleaved marks mean they overlapped.
-slow="echo enter >> $repo/TRACE; sleep 2; echo leave >> $repo/TRACE; true"
-run_hook "$repo" "refs/heads/a $sha refs/heads/a $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="$slow" >/dev/null &
+slow_a="echo enter >> $state/TRACE; sleep 2; echo leave >> $state/TRACE; true"
+run_hook "$repoA" "refs/heads/a $shaA refs/heads/a $ZERO" \
+    HUB_GATE_STATE_DIR="$state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="$slow_a" >/dev/null &
 first=$!
 sleep 0.3
-# A different tree, so the second push cannot short-circuit on the cache.
-echo other > "$repo/file2"; git -C "$repo" add file2; git -C "$repo" commit -qm two
-sha2=$(git -C "$repo" rev-parse HEAD)
-run_hook "$repo" "refs/heads/b $sha2 refs/heads/b $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="$slow" >/dev/null &
+run_hook "$repoB" "refs/heads/b $shaB refs/heads/b $ZERO" \
+    HUB_GATE_STATE_DIR="$state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="$slow_a" >/dev/null &
 second=$!
 wait $first $second
-[ "$(tr '\n' ' ' < "$repo/TRACE")" = "enter leave enter leave " ] \
+[ "$(tr '\n' ' ' < "$state/TRACE")" = "enter leave enter leave " ] \
     && ok "lock: two concurrent pushes run their suites one at a time" \
-    || bad "lock: two concurrent pushes run their suites one at a time" "trace=$(tr '\n' ' ' < "$repo/TRACE")"
+    || bad "lock: two concurrent pushes run their suites one at a time" "trace=$(tr '\n' ' ' < "$state/TRACE")"
 
 # A monorepo layout: hub/ with modules-workspace/ as its sibling.
 # `cd && pwd -P` so the expected path is symlink-resolved too: on macOS mktemp hands
@@ -166,7 +176,8 @@ make_monorepo() {
     git -C "$base/hub" config user.name gate
     git -C "$base/hub" config --bool hooks.hubPrepushGate true
     echo one > "$base/hub/file"
-    git -C "$base/hub" add file
+    printf '%s\n' .out .state RAN RUNS STATUS TRACE ENV > "$base/hub/.gitignore"
+    git -C "$base/hub" add file .gitignore
     git -C "$base/hub" commit -qm one
     echo "$base"
 }
@@ -359,13 +370,14 @@ case "$1 $2" in
         echo '  ✓ Logged in to github.com account other-company (keyring)' >&2
         exit 0 ;;
 esac
-# `gh api …` — reading the commit works, writing the status does not.
+# `gh api …` — the push landed (the ref reads back), writing the status does not.
 for a in "$@"; do [ "$a" = "-X" ] && { echo 'gh: HTTP 403: Resource not accessible by integration' >&2; exit 1; }; done
+for a in "$@"; do case "$a" in repos/*/git/ref/*) echo "$FAKE_REF_SHA"; exit 0 ;; esac; done
 exit 0
 GH
 )
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" FAKE_REF_SHA="$sha" \
     HUB_GATE_TEST_CMD="true")
 sleep 2
 log="$repo/.state/publish-status.log"
@@ -390,6 +402,7 @@ case "\$1 \$2" in
     "auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -405,6 +418,464 @@ grep -qi 'could not be published' <<<"$out" && errs="$errs false-alarm"
 [ -z "$errs" ] \
     && ok "green + a working gh: the status is posted and nothing cries wolf" \
     || bad "green + a working gh: the status is posted and nothing cries wolf" "$errs"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 20–22 — the INSTALLED copy must not drift silently from the versioned hook
+# (hub#746)
+#
+# On the real machine `core.hooksPath` points OUTSIDE the repo
+# (~/.erplora/hooks/hub), so the copy that decides a push is not the file the
+# repo versions — and nothing syncs them. The hook therefore checks itself on
+# every run against the checkout's `.githooks/pre-push`, and the attestation
+# carries the hash of the copy that actually ran.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 20. Running copy differs from the versioned hook → loud drift warning ─────
+#    The fixture commits a MODIFIED `.githooks/pre-push`, while the copy that
+#    runs is the real one — exactly the installed-copy-is-stale shape.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+cp "$HOOK" "$repo/.githooks/pre-push"
+echo "# drifted by one line" >> "$repo/.githooks/pre-push"
+git -C "$repo" add .githooks/pre-push
+git -C "$repo" commit -qm hook
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                || errs="$errs exit=$code(want 0: drift warns, it does not block)"
+grep -qi 'out of sync' <<<"$out"               || errs="$errs no-drift-warning"
+grep -q 'install-hooks.sh' <<<"$out"           || errs="$errs no-resync-command"
+[ -z "$errs" ] \
+    && ok "drifted installed copy: the hook says so and names the resync command" \
+    || bad "drifted installed copy: the hook says so and names the resync command" "$errs"
+
+# ── 21. Running copy identical to the versioned hook → silence ────────────────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add .githooks/pre-push
+git -C "$repo" commit -qm hook
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                       || errs="$errs exit=$code(want 0)"
+grep -qi 'out of sync' <<<"$out"      && errs="$errs false-drift-alarm"
+[ -z "$errs" ] \
+    && ok "in-sync copies: no drift warning" \
+    || bad "in-sync copies: no drift warning" "$errs"
+
+# ── 22. The attestation names the hook that ran (hash in the description) ─────
+#    Option 4 of hub#746: a stale gate's green becomes DISTINGUISHABLE on the
+#    PR, because the status says which hook produced it.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+errs=""
+[ "$code" = 0 ]                                              || errs="$errs exit=$code(want 0)"
+grep -qE 'hook [0-9a-f]{12}' "$repo/POSTARGS" 2>/dev/null    || errs="$errs no-hook-hash-in-description args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)"
+[ -z "$errs" ] \
+    && ok "the posted status says which hook attested (12-hex hash)" \
+    || bad "the posted status says which hook attested (12-hex hash)" "$errs"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 23–26 — the lock must know its OWNER, and detect that the owner died
+# (hub#575)
+#
+# A push killed mid-suite (turn timeout, Ctrl-C, SIGKILL on the process tree)
+# used to leave the bare `mkdir` lock behind: every later push then waited up
+# to an hour for a dead owner, with a message claiming a suite was running.
+# And breaking it by hand is dangerous in the other direction — the day it was
+# tried, a LIVE suite was running and the manual removal started a second one
+# in parallel (the exact condition the lock exists to prevent, hub#526).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 23. Holding the lock writes an owner file; releasing cleans it all up ─────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="cat $repo/.state/lock/owner > $repo/OWNER 2>/dev/null; true")
+errs=""
+[ "$code" = 0 ]                                  || errs="$errs exit=$code(want 0)"
+grep -q '^pid=[0-9]' "$repo/OWNER" 2>/dev/null   || errs="$errs no-pid owner='$(cat "$repo/OWNER" 2>/dev/null)'"
+grep -q '^since=[0-9]' "$repo/OWNER" 2>/dev/null || errs="$errs no-since"
+[ ! -d "$repo/.state/lock" ]                     || errs="$errs lock-left-behind"
+[ -z "$errs" ] \
+    && ok "the lock carries pid + since while held, and is removed on exit" \
+    || bad "the lock carries pid + since while held, and is removed on exit" "$errs"
+
+# ── 24. Orphan lock (owner is dead): break it, say whose it was, run the suite ─
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+( exit 0 ) & dead_pid=$!
+wait "$dead_pid" 2>/dev/null
+mkdir -p "$repo/.state/lock"
+printf 'pid=%s\nsince=%s\n' "$dead_pid" "$(date +%s)" > "$repo/.state/lock/owner"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=20 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                        || errs="$errs exit=$code(want 0)"
+[ -f "$repo/RAN" ]                     || errs="$errs suite-never-ran"
+grep -qi 'orphan' <<<"$out"            || errs="$errs no-orphan-message"
+grep -q "$dead_pid" <<<"$out"          || errs="$errs dead-pid-not-named"
+[ ! -d "$repo/.state/lock" ]           || errs="$errs lock-left-behind"
+[ -z "$errs" ] \
+    && ok "orphan lock: broken automatically, naming the dead owner's PID" \
+    || bad "orphan lock: broken automatically, naming the dead owner's PID" "$errs out='$out'"
+
+# ── 25. LIVE owner: wait (never break), name who is holding, time out clearly ──
+#    Conservative by contract: breaking a live lock starts two suites in
+#    parallel, which is the hub#526 failure the lock exists to prevent.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+mkdir -p "$repo/.state/lock"
+printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=4 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                        || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]                   || errs="$errs suite-ran-past-a-live-lock"
+[ -d "$repo/.state/lock" ]             || errs="$errs live-lock-was-broken"
+grep -q "$$" <<<"$out"                 || errs="$errs owner-pid-not-named"
+grep -q "rm -rf" <<<"$out"             || errs="$errs no-manual-removal-command"
+[ -z "$errs" ] \
+    && ok "live owner: waits without breaking, names the PID, and times out with the exact command" \
+    || bad "live owner: waits without breaking, names the PID, and times out with the exact command" "$errs out='$out'"
+
+# ── 26. Lock WITHOUT an owner file: when in doubt, wait — never break ─────────
+#    A pre-hub#575 lock, or an owner file whose write is still in flight,
+#    is indistinguishable from a live suite. The conservative direction is
+#    to wait for the timeout, exactly as before.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+mkdir -p "$repo/.state/lock"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=4 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]           || errs="$errs suite-ran"
+[ -d "$repo/.state/lock" ]     || errs="$errs ownerless-lock-was-broken"
+[ -z "$errs" ] \
+    && ok "ownerless lock: waits conservatively instead of breaking it" \
+    || bad "ownerless lock: waits conservatively instead of breaking it" "$errs"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 27–29 — the SSH keepalive lives in the REPO, and the lock wait must never
+# outlast what the connection tolerates (hub#788)
+#
+# `git push` opens the SSH transport BEFORE this hook runs. A lock wait of
+# 3600s against an idle connection gets closed by GitHub, and the push dies in
+# silence having run zero tests. The keepalive used to live only in one
+# machine's .git/config; the hook now guarantees it, and keeps the inequality
+# keepalive margin (Interval × CountMax) > max lock wait — by capping the
+# wait, never by trusting the connection.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 27. A repo without keepalive: the hook installs it for the NEXT pushes ────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true")
+sshcmd=$(git -C "$repo" config core.sshCommand 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                 || errs="$errs exit=$code(want 0)"
+grep -q 'ServerAliveInterval' <<<"$sshcmd"      || errs="$errs keepalive-not-installed sshCommand='$sshcmd'"
+[ -z "$errs" ] \
+    && ok "no keepalive configured: the hook arms core.sshCommand itself" \
+    || bad "no keepalive configured: the hook arms core.sshCommand itself" "$errs"
+
+# ── 28. UNPROTECTED connection: fail fast on lock contention, never wait 1h ───
+#    The keepalive the hook just installed does not protect THIS push — its
+#    connection was opened before. Waiting the full HUB_GATE_LOCK_WAIT on it
+#    reproduces the silent death; the hook must cap the wait and say why.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+mkdir -p "$repo/.state/lock"
+printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
+start=$SECONDS
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=3600 HUB_GATE_UNPROTECTED_LOCK_WAIT=2 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+took=$((SECONDS - start))
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                       || errs="$errs exit=$code(want 1)"
+[ "$took" -lt 60 ]                    || errs="$errs took=${took}s(want fast fail)"
+[ ! -f "$repo/RAN" ]                  || errs="$errs suite-ran"
+grep -qi 'keepalive' <<<"$out"        || errs="$errs no-keepalive-explanation"
+[ -z "$errs" ] \
+    && ok "unprotected connection + lock contention: capped wait, fast clear failure" \
+    || bad "unprotected connection + lock contention: capped wait, fast clear failure" "$errs out='$out'"
+
+# ── 29. PROTECTED connection: the wait is clamped BELOW the keepalive margin ──
+#    The inequality margin > wait must hold even if someone raises
+#    HUB_GATE_LOCK_WAIT: the hook clamps the wait to the margin, it never
+#    trusts the connection past what the keepalive guarantees.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+git -C "$repo" config core.sshCommand "ssh -o ServerAliveInterval=1 -o ServerAliveCountMax=4"
+sha=$(git -C "$repo" rev-parse HEAD)
+mkdir -p "$repo/.state/lock"
+printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
+start=$SECONDS
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_LOCK_WAIT=3600 \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+took=$((SECONDS - start))
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                       || errs="$errs exit=$code(want 1)"
+[ "$took" -lt 60 ]                    || errs="$errs took=${took}s(want clamped to ~2s margin/2)"
+[ ! -f "$repo/RAN" ]                  || errs="$errs suite-ran"
+grep -qi 'clamp' <<<"$out"            || errs="$errs no-clamp-message"
+[ -z "$errs" ] \
+    && ok "wait ≥ keepalive margin: clamped below it, with a message naming both" \
+    || bad "wait ≥ keepalive margin: clamped below it, with a message naming both" "$errs out='$out'"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 30–33 — the gate must TEST the tree it ATTESTS (hub#855, P0)
+#
+# The suite runs on the WORKING TREE; the cache key and the attestation name
+# the PUSHED sha. When they differ — pushing another branch from the same
+# worktree, pushing a tag from an unrelated checkout, or a dirty tree — the
+# gate used to sign green a tree it never executed, and (worse) record that
+# lie as a `.green` cache entry for everyone else. Since hub#854 removed Rust
+# from CI, this gate is the ONLY Rust verification there is.
+#
+# The comparison is TREES, not shas: a reworded/rebased commit with identical
+# content is still fine. A tree already proven green needs no working tree at
+# all (test 33): the attestation is about content, and that content ran.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 30. Pushing a sha whose tree is NOT the working tree → refuse ─────────────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+old_sha=$(git -C "$repo" rev-parse HEAD)
+echo two > "$repo/file"
+git -C "$repo" commit -qam two   # HEAD moves on; we push the OLD sha
+code=$(run_hook "$repo" "refs/heads/old $old_sha refs/heads/old $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 >> $repo/STATUS" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                                   || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]                              || errs="$errs suite-ran-on-wrong-tree"
+[ ! -f "$repo/STATUS" ]                           || errs="$errs status-published"
+ls "$repo/.state"/*.green >/dev/null 2>&1         && errs="$errs green-recorded"
+grep -qi 'working tree' <<<"$out"                 || errs="$errs no-explanation"
+[ -z "$errs" ] \
+    && ok "pushed sha != working tree: refused, nothing tested, nothing attested" \
+    || bad "pushed sha != working tree: refused, nothing tested, nothing attested" "$errs out='$out'"
+
+# ── 31. Dirty working tree → refuse (the suite would test the dirt) ───────────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+echo dirty >> "$repo/file"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 >> $repo/STATUS" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]                       || errs="$errs suite-ran"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs status-published"
+ls "$repo/.state"/*.green >/dev/null 2>&1  && errs="$errs green-recorded"
+[ -z "$errs" ] \
+    && ok "dirty working tree: refused — a green here would sign untested content" \
+    || bad "dirty working tree: refused — a green here would sign untested content" "$errs out='$out'"
+
+# ── 32. Pushing a TAG from a checkout that moved on → refuse ──────────────────
+#    The worst of the three shapes (hub#855's third door): a tag is pushed
+#    from WHATEVER checkout is current, and nobody switches branches to tag.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+old_sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" tag v9.9.9 "$old_sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/tags/v9.9.9 $old_sha refs/tags/v9.9.9 $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 >> $repo/STATUS" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/RAN" ]                       || errs="$errs suite-ran"
+ls "$repo/.state"/*.green >/dev/null 2>&1  && errs="$errs green-recorded"
+[ -z "$errs" ] \
+    && ok "tag pushed from a moved-on checkout: refused instead of caching a lie" \
+    || bad "tag pushed from a moved-on checkout: refused instead of caching a lie" "$errs"
+
+# ── 33. A tree ALREADY proven green needs no working tree: cache-hit passes ───
+#    Deliberate: the attestation is about content. Once the pushed tree really
+#    ran (recorded by a matching run), pushing that same sha again — or a tag
+#    on it — from any checkout state is truthful and instant.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="echo run >> $repo/RUNS; true")
+echo two > "$repo/file"
+git -C "$repo" commit -qam two   # the checkout moves on; the green stays valid
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="echo run >> $repo/RUNS; true")
+runs=$(wc -l < "$repo/RUNS" 2>/dev/null | tr -d ' ')
+errs=""
+[ "$code" = 0 ]      || errs="$errs exit=$code(want 0)"
+[ "$runs" = 1 ]      || errs="$errs runs=$runs(want 1)"
+[ -z "$errs" ] \
+    && ok "already-green tree: passes from any checkout without rerunning" \
+    || bad "already-green tree: passes from any checkout without rerunning" "$errs"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 34–36 — the attestation is the CONSEQUENCE of the push landing (hub#574)
+#
+# A pre-push hook cannot know whether the transfer will succeed — it runs
+# before it. The publish step therefore verifies, from the background, that
+# the REMOTE REF really advanced to (or past) the pushed sha before posting
+# the status. "The commit exists on origin" is NOT enough: the same sha can be
+# there from an earlier push to a throwaway ref while THIS push died (SIGPIPE,
+# exit 141, closed SSH). And the terminal message must attest the TEST, not
+# claim the push — workers read "→ pushing" while the branch never arrived.
+#
+# Poll injection (so these tests take milliseconds, not 120s):
+#   HUB_GATE_PUSH_POLL_TRIES · HUB_GATE_PUSH_POLL_DELAY
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 34. The push DIES: ref never advances → NO status, and the log says so ────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<'GH'
+case "$1 $2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "$@"; do [ "$a" = "-X" ] && { echo posted > "$REPO_DIR/POSTED"; exit 0; }; done
+for a in "$@"; do case "$a" in repos/*/git/ref/*) echo 'gh: HTTP 404: Not Found' >&2; exit 1 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" REPO_DIR="$repo" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+out=$(cat "$repo/.out" 2>/dev/null)
+log="$repo/.state/publish-status.log"
+errs=""
+[ "$code" = 0 ]                                  || errs="$errs exit=$code(want 0: the gate cannot know yet)"
+[ ! -f "$repo/POSTED" ]                          || errs="$errs status-posted-for-a-dead-push"
+grep -qi 'did not land' "$log" 2>/dev/null       || errs="$errs log-does-not-say-it log=$(head -8 "$log" 2>/dev/null | tr '\n' ' ')"
+grep -qi 'retry' "$log" 2>/dev/null              || errs="$errs no-retry-instruction"
+[ -z "$errs" ] \
+    && ok "dead push: no orphan status, and the log says the push did not land + retry" \
+    || bad "dead push: no orphan status, and the log says the push did not land + retry" "$errs"
+
+# ── 35. The ref advanced to the sha → the status posts, and the terminal is honest ─
+#    The green message must attest the TEST and defer the push/attestation
+#    claim to the verification — not announce "pushing" as a fact.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                || errs="$errs exit=$code(want 0)"
+[ -f "$repo/POSTED" ]                          || errs="$errs not-posted"
+grep -qi 'verified on origin' <<<"$out"        || errs="$errs message-does-not-defer-to-verification"
+grep -qiE 'green → pushing|green -> pushing' <<<"$out" && errs="$errs still-claims-pushing"
+[ -z "$errs" ] \
+    && ok "landed push: status posted, and the terminal attests the test, not the push" \
+    || bad "landed push: status posted, and the terminal attests the test, not the push" "$errs out='$out'"
+
+# ── 36. The ref already moved PAST the sha (another worker pushed on top) ─────
+#    Landing is "the ref contains the pushed sha", not "the ref equals it":
+#    a fleet mate merging on top seconds later must not turn a real landing
+#    into a false 'did not land'.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+other=1111111111111111111111111111111111111111
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$other"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in repos/*/compare/*) echo "ahead"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+errs=""
+[ "$code" = 0 ]           || errs="$errs exit=$code(want 0)"
+[ -f "$repo/POSTED" ]     || errs="$errs not-posted log=$(head -8 "$repo/.state/publish-status.log" 2>/dev/null | tr '\n' ' ')"
+[ -z "$errs" ] \
+    && ok "ref moved past the sha: still counts as landed (ancestor check), status posts" \
+    || bad "ref moved past the sha: still counts as landed (ancestor check), status posts" "$errs"
 
 echo
 echo "  $pass passed, $fail failed"

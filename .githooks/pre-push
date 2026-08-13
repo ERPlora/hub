@@ -22,7 +22,10 @@
 # On green it publishes a `local-gate/hub-tests` commit status on the pushed
 # sha, so `merge-pr.sh` still sees a check and keeps refusing to merge on
 # silence (pm#58/#60). The status is an ATTESTATION that the suite ran here —
-# it is not an independent verification.
+# it is not an independent verification. It posts only AFTER a background step
+# verifies the remote ref really advanced to (or past) the pushed sha
+# (hub#574): a pre-push runs before the transfer and cannot know whether the
+# push will land.
 #
 # ── ARMING ───────────────────────────────────────────────────────────────────
 #     git config --bool hooks.hubPrepushGate true      # arm
@@ -35,6 +38,10 @@
 #
 # Injection points, used by scripts/prepush-gate.test.sh:
 #   HUB_GATE_TEST_CMD · HUB_GATE_STATUS_CMD · HUB_GATE_STATE_DIR · HUB_GATE_LOCK_WAIT
+#   HUB_GATE_UNPROTECTED_LOCK_WAIT (hub#788: lock-wait cap while the SSH
+#   connection has no keepalive; the rule is keepalive margin > max lock wait)
+#   HUB_GATE_PUSH_POLL_TRIES · HUB_GATE_PUSH_POLL_DELAY (hub#574: how long the
+#   background publish step polls origin for the ref before giving up)
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
@@ -52,6 +59,14 @@ PG_DSN=postgres://postgres:test@localhost:5433/hub_test
 # default (64) runs out mid-run.
 PG_IMAGE=pgvector/pgvector:pg18
 PG_ARGS="-c max_locks_per_transaction=1024 -c max_connections=300 -c shared_buffers=512MB"
+# hub#788: `git push` opens the SSH transport BEFORE this hook runs, so every
+# second spent waiting on the gate lock is spent on an IDLE connection that
+# GitHub eventually closes — the push then dies in silence with zero tests run.
+# The keepalive below gives a margin of Interval × CountMax = 7200s, and the
+# INEQUALITY that must hold is: keepalive margin > maximum lock wait
+# (HUB_GATE_LOCK_WAIT, default 3600s). The hook enforces it by clamping the
+# wait, never by trusting the connection; see ensure_ssh_keepalive.
+KEEPALIVE_SSH="ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=240 -o TCPKeepAlive=yes"
 
 armed="$(git config --bool hooks.hubPrepushGate 2>/dev/null || echo false)"
 if [ "$armed" != "true" ]; then
@@ -66,18 +81,90 @@ if [ "${SKIP_HUB_TESTS:-0}" = "1" ]; then
 fi
 
 # git feeds us "<local ref> <local sha> <remote ref> <remote sha>" per ref.
-# A pure branch deletion carries no tree to test.
+# A pure branch deletion carries no tree to test. The remote ref is kept for
+# hub#574: the publish step verifies that THIS ref really advanced before
+# attesting anything.
 pushed_sha=""
-while read -r _local_ref local_sha _remote_ref _remote_sha; do
+pushed_ref=""
+while read -r _local_ref local_sha remote_ref _remote_sha; do
     [ -n "${local_sha:-}" ] || continue
     [ "$local_sha" = "$ZERO" ] && continue
     pushed_sha="$local_sha"
+    pushed_ref="$remote_ref"
 done
 if [ -z "$pushed_sha" ]; then
     exit 0
 fi
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# ── hub#746: the copy that RUNS is whatever core.hooksPath points at ─────────
+# (on the fleet machine: ~/.erplora/hooks/hub) and nothing syncs it with the
+# versioned .githooks/pre-push. Drift is silent in BOTH directions: a stale
+# copy re-reds already-fixed tests (false red), or skips checks the repo added
+# while still publishing the attestation (false green — indistinguishable on
+# the PR). So: check ourselves on every push and shout, and stamp the
+# attestation with the hash of the copy that actually ran (see publish_status).
+# A WARNING, not a refusal: a branch that edits this very hook is a legitimate
+# state where the two copies must differ.
+SELF="${BASH_SOURCE[0]:-$0}"
+HOOK_ID="$(git hash-object "$SELF" 2>/dev/null || true)"
+HOOK_ID="${HOOK_ID:0:12}"
+hook_drift_check() {
+    local versioned=".githooks/pre-push" self_abs versioned_abs versioned_id
+    [ -f "$versioned" ] || return 0
+    self_abs="$(cd "$(dirname "$SELF")" 2>/dev/null && pwd -P)/$(basename "$SELF")"
+    versioned_abs="$(cd "$(dirname "$versioned")" && pwd -P)/pre-push"
+    [ "$self_abs" = "$versioned_abs" ] && return 0
+    if ! cmp -s "$SELF" "$versioned" 2>/dev/null; then
+        versioned_id="$(git hash-object "$versioned" 2>/dev/null || true)"
+        {
+            echo "⚠️  pre-push: the INSTALLED hook is OUT OF SYNC with the versioned .githooks/pre-push."
+            echo "    running   : $self_abs (hook ${HOOK_ID:-?})"
+            echo "    versioned : $versioned_abs (hook ${versioned_id:0:12})"
+            echo "    The gate that decides this push is the INSTALLED copy. Unless this branch"
+            echo "    deliberately edits the hook itself, resync with:  bash scripts/install-hooks.sh"
+        } >&2
+    fi
+}
+hook_drift_check
+
+# ── hub#788: keepalive in the repo, and never wait longer than it protects ───
+# The keepalive can only be effective if it was configured BEFORE git opened
+# this push's SSH connection. So: if it is already there, this run is
+# protected; if not, the hook installs it for every FUTURE push (self-healing
+# — the fix used to live in one machine's .git/config only) and treats the
+# CURRENT run as unprotected, capping its lock wait so the connection dies
+# after the hook has already failed fast with a clear retry message, not
+# mid-transfer in silence.
+SSH_PROTECTED=0
+ssh_keepalive_margin() {   # echoes Interval × CountMax in seconds; empty if no keepalive
+    local cmd interval countmax
+    cmd="${GIT_SSH_COMMAND:-}"
+    [ -n "$cmd" ] || cmd="$(git config core.sshCommand 2>/dev/null || true)"
+    interval="$(printf '%s' "$cmd" | sed -n 's/.*ServerAliveInterval[= ]\([0-9][0-9]*\).*/\1/p')"
+    countmax="$(printf '%s' "$cmd" | sed -n 's/.*ServerAliveCountMax[= ]\([0-9][0-9]*\).*/\1/p')"
+    [ -n "$interval" ] || return 0
+    [ -n "$countmax" ] || countmax=3   # OpenSSH default
+    echo $((interval * countmax))
+}
+ensure_ssh_keepalive() {
+    if [ -n "$(ssh_keepalive_margin)" ]; then
+        SSH_PROTECTED=1
+        return 0
+    fi
+    # GIT_SSH_COMMAND overrides the config, so writing the config would not
+    # help; and an existing core.sshCommand without keepalive is someone's
+    # deliberate setup — warn rather than rewrite.
+    if [ -z "${GIT_SSH_COMMAND:-}" ] && [ -z "$(git config core.sshCommand 2>/dev/null || true)" ]; then
+        if git config --local core.sshCommand "$KEEPALIVE_SSH" 2>/dev/null; then
+            echo "ℹ️  pre-push: no SSH keepalive was configured — armed core.sshCommand for future pushes (hub#788)." >&2
+        fi
+    else
+        echo "⚠️  pre-push: the effective SSH command has no keepalive (ServerAliveInterval) — add one, or lock waits will outlive the connection (hub#788)." >&2
+    fi
+}
+ensure_ssh_keepalive
 
 STATE_DIR="${HUB_GATE_STATE_DIR:-$(git rev-parse --git-common-dir)/hub-gate}"
 mkdir -p "$STATE_DIR"
@@ -166,20 +253,43 @@ publish_status() {
     fi
 
     (
-        local tries=0 seen=0 perr
-        while [ "$tries" -lt 24 ]; do
-            gh api "repos/$repo/commits/$sha" >/dev/null 2>&1 && { seen=1; break; }
-            sleep 5
+        # hub#574: the attestation is the CONSEQUENCE of the push landing. A
+        # pre-push hook runs BEFORE the transfer, so it cannot know — instead,
+        # this background step verifies the REMOTE REF really advanced to (or
+        # past) the pushed sha before posting. "The commit exists on origin"
+        # is not enough: the same sha may already be there from an earlier
+        # push to another ref while THIS push died (SIGPIPE / exit 141 /
+        # closed SSH — three sightings in one day, 2026-08-08).
+        local tries=0 seen=0 perr poll_tries poll_delay
+        poll_tries="${HUB_GATE_PUSH_POLL_TRIES:-24}"
+        poll_delay="${HUB_GATE_PUSH_POLL_DELAY:-5}"
+        landed() {
+            local got cmpstat
+            if [ -n "$pushed_ref" ]; then
+                got="$(gh api "repos/$repo/git/ref/${pushed_ref#refs/}" -q .object.sha 2>/dev/null)" || return 1
+                [ "$got" = "$sha" ] && return 0
+                [ -n "$got" ] || return 1
+                # The ref may have moved PAST our sha already (a fleet mate
+                # pushed on top): landed means "the ref contains the sha".
+                cmpstat="$(gh api "repos/$repo/compare/$sha...$got" -q .status 2>/dev/null)" || return 1
+                [ "$cmpstat" = "ahead" ] || [ "$cmpstat" = "identical" ]
+            else
+                gh api "repos/$repo/commits/$sha" >/dev/null 2>&1
+            fi
+        }
+        while [ "$tries" -lt "$poll_tries" ]; do
+            landed && { seen=1; break; }
+            sleep "$poll_delay"
             tries=$((tries + 1))
         done
         if [ "$seen" != 1 ]; then
-            report_async "commit $sha never appeared on $repo after 120s — did the push land?" "" "$sha"
+            report_async "the remote ref ${pushed_ref:-?} never advanced to $sha — the push DID NOT LAND (SIGPIPE / closed SSH / killed process). Retry the push: the tree is cached green, so the retry is instant" "" "$sha" "$repo"
             exit 0
         fi
         if ! perr="$(gh api -X POST "repos/$repo/statuses/$sha" \
                 -f state=success \
                 -f context="$CONTEXT" \
-                -f description="cargo test --workspace green on the pusher's machine" \
+                -f description="cargo test --workspace green on the pusher's machine (hook ${HOOK_ID:-unknown})" \
                 2>&1 >/dev/null)"; then
             report_async "gh refused to post the status to $repo" "$perr" "$sha"
             exit 0
@@ -195,21 +305,124 @@ if [ -f "$green" ]; then
     exit 0
 fi
 
+# ── hub#855 (P0): test the tree you attest ───────────────────────────────────
+# The suite below runs on the WORKING TREE, while the cache key and the
+# attestation name the PUSHED sha. If they are not the same content, a green
+# here signs code that never ran — and records the lie as a `.green` everyone
+# else will trust. It happens without malice: pushing another branch from a
+# stacked worktree, pushing a tag from whatever checkout is current, or just
+# a dirty tree. Since hub#854 removed Rust from CI, this gate is the ONLY
+# Rust verification, so: refuse unless working tree == pushed tree.
+# Trees, not shas — a reworded/rebased commit with identical content is fine.
+# Untracked non-ignored files count: cargo compiles what is on disk.
+# (A tree already recorded green is handled above: that content really ran.)
+head_tree="$(git rev-parse 'HEAD^{tree}' 2>/dev/null)"
+wt_status="$(git status --porcelain 2>/dev/null)"
+if [ "$head_tree" != "$tree" ] || [ -n "$wt_status" ]; then
+    {
+        echo "❌ pre-push: REFUSING — this working tree is not the tree being pushed, so the"
+        echo "   suite would test one thing and attest another (hub#855)."
+        echo "     pushed sha   : $pushed_sha (tree ${tree:0:12})"
+        echo "     HEAD tree    : ${head_tree:0:12}"
+        if [ -n "$wt_status" ]; then
+            echo "     dirty files  :"
+            printf '%s\n' "$wt_status" | sed 's/^/       /' | head -10
+        fi
+        echo "   Push from a checkout sitting at that sha with a clean tree (commit or drop"
+        echo "   local changes), or run the gate there first so the tree is proven green."
+        echo "   Bypass (NOT attested): SKIP_HUB_TESTS=1 git push"
+    } >&2
+    exit 1
+fi
+
 # mkdir is atomic on every filesystem we care about; flock is not on macOS.
+#
+# hub#575: the lock knows its OWNER. A push killed mid-suite used to leave the
+# bare directory behind, and every later push waited up to an hour for a dead
+# owner — while the message claimed a suite was running. Worse, the manual
+# remedy invited breaking a LIVE lock (two parallel suites = the hub#526
+# failure this lock exists to prevent). So:
+#   · the holder writes $LOCK/owner (pid + pushed sha + epoch);
+#   · a waiter that finds the owner DEAD breaks the lock out loud;
+#   · a lock with NO owner file is indistinguishable from a write in flight
+#     (or a pre-hub#575 holder), so when in doubt we WAIT — conservative by
+#     contract.
+# `kill -0` also fails with EPERM on another user's PID; the installed hook is
+# per-user (~/.erplora), so every legitimate holder is our own user.
 LOCK="$STATE_DIR/lock"
+lock_owner_field() { sed -n "s/^$1=//p" "$LOCK/owner" 2>/dev/null; }
+write_lock_owner() {
+    {
+        echo "pid=$$"
+        echo "sha=$pushed_sha"
+        echo "since=$(date +%s 2>/dev/null || echo '')"
+    } > "$LOCK/owner" 2>/dev/null || true
+}
 lock_wait="${HUB_GATE_LOCK_WAIT:-3600}"
+# hub#788: the connection must outlive the wait — cap the wait, never trust
+# the connection. Two cases:
+#   · protected (keepalive was active when git opened the connection): keep
+#     lock_wait strictly BELOW the keepalive margin;
+#   · unprotected (keepalive just installed, or absent): GitHub will close the
+#     idle connection long before an hour — fail fast with a retry message
+#     instead of dying mid-transfer in silence.
+if [ "$SSH_PROTECTED" = 1 ]; then
+    margin="$(ssh_keepalive_margin)"
+    if [ -n "$margin" ] && [ "$lock_wait" -ge "$margin" ] 2>/dev/null; then
+        clamped=$((margin / 2))
+        echo "⚠️  pre-push: HUB_GATE_LOCK_WAIT (${lock_wait}s) ≥ SSH keepalive margin (${margin}s) — clamped the wait to ${clamped}s so the connection outlives it (hub#788)." >&2
+        lock_wait=$clamped
+    fi
+else
+    unprotected_wait="${HUB_GATE_UNPROTECTED_LOCK_WAIT:-240}"
+    if [ "$lock_wait" -gt "$unprotected_wait" ] 2>/dev/null; then
+        echo "⚠️  pre-push: this push's SSH connection has NO keepalive — capping the lock wait at ${unprotected_wait}s. If it times out, just retry: the next connection is protected (hub#788)." >&2
+        lock_wait=$unprotected_wait
+    fi
+fi
 waited=0
+announced=0
 while ! mkdir "$LOCK" 2>/dev/null; do
+    owner_pid="$(lock_owner_field pid)"
+    if [ -n "$owner_pid" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
+        # Re-read right before breaking: the lock may have just changed hands.
+        # The window between this check and the mv is small and the direction
+        # of the remaining race is a broken FRESH lock, which the new holder's
+        # own mkdir loop recovers from — never two suites at once.
+        [ "$(lock_owner_field pid)" = "$owner_pid" ] || continue
+        echo "🧹 pre-push: the gate lock is ORPHANED — its owner (PID $owner_pid) is dead. Breaking it." >&2
+        stale="$LOCK.stale.$$"
+        if mv "$LOCK" "$stale" 2>/dev/null; then
+            rm -rf "$stale" 2>/dev/null || true
+        fi
+        continue
+    fi
     if [ "$waited" -ge "$lock_wait" ]; then
-        echo "❌ pre-push: another suite has held the gate lock for ${lock_wait}s." >&2
-        echo "   If it died, remove $LOCK by hand." >&2
+        echo "❌ pre-push: the gate lock has been held for ${lock_wait}s by PID ${owner_pid:-unknown}," >&2
+        if [ -n "$owner_pid" ]; then
+            echo "   which is still ALIVE — most likely a real suite. Retry later, or if you are" >&2
+            echo "   CERTAIN it is stuck, remove the lock by hand:  rm -rf '$LOCK'" >&2
+        else
+            echo "   whose owner file is missing (pre-hub#575 lock?). Check for a running suite" >&2
+            echo "   first; only then remove it by hand:  rm -rf '$LOCK'" >&2
+        fi
         exit 1
     fi
-    [ "$waited" = 0 ] && echo "⏳ pre-push: another push is running the suite — waiting for the lock…" >&2
+    if [ "$announced" = 0 ]; then
+        since="$(lock_owner_field since)"
+        held=""
+        now="$(date +%s 2>/dev/null || echo '')"
+        case "$since$now" in *[!0-9]*|'') ;; *) [ -n "$since" ] && [ -n "$now" ] && held=$((now - since)) ;; esac
+        echo "⏳ pre-push: another push is running the suite (PID ${owner_pid:-unknown}${held:+, holding for ${held}s}) — waiting up to ${lock_wait}s…" >&2
+        announced=1
+    fi
     sleep 2
     waited=$((waited + 2))
 done
-trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+write_lock_owner
+# Release only OUR lock: if someone wrongly broke ours and a new holder took
+# over, their owner pid differs and we must not delete their lock.
+trap 'p="$(lock_owner_field pid)"; if [ -z "$p" ] || [ "$p" = "$$" ]; then rm -rf "$LOCK" 2>/dev/null || true; fi' EXIT
 
 # Whoever held the lock may have just turned this very tree green.
 if [ -f "$green" ]; then
@@ -375,6 +588,9 @@ if ! eval "$test_cmd"; then
 fi
 
 : > "$green"
-echo "✅ pre-push: suite green → pushing, and attesting it as $CONTEXT." >&2
+# hub#574: attest the TEST, never claim the push — this line used to say
+# "→ pushing, and attesting it", and workers read it while the transfer died
+# behind it (SIGPIPE/closed SSH) with the branch never reaching origin.
+echo "✅ pre-push: suite green → letting the push proceed. The $CONTEXT status posts only after the ref is verified on origin." >&2
 publish_status "$pushed_sha"
 exit 0

@@ -711,13 +711,15 @@ impl Runtime {
         r
     }
 
-    /// ¿La query (de un módulo activo) declara bloque `list` (es paginada)? Lo usa el server
-    /// para decidir la forma del `data` que devuelve por el wire.
+    /// ¿La query (de un módulo activo — o del core, hub#884) declara bloque `list` (es paginada)?
+    /// Lo usa el server para decidir la forma del `data` que devuelve por el wire.
     pub fn is_list_query(&self, name: &str) -> bool {
-        self.registry
-            .get_query(name)
-            .map(|q| q.def.list.is_some())
-            .unwrap_or(false)
+        hub_users::is_core_list_query(name)
+            || self
+                .registry
+                .get_query(name)
+                .map(|q| q.def.list.is_some())
+                .unwrap_or(false)
     }
 
     /// Ejecuta un command declarativo (solo si su módulo está activo). Los eventos emitidos se

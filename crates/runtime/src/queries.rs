@@ -104,9 +104,10 @@ pub async fn execute_page(
     // WC → SDK → dispatcher), así que la identidad del hub se ofrece como una query más, con el
     // mismo gate de permisos. Va ANTES del registry: ningún módulo puede suplantarla.
     if let Some(rest) = name.strip_prefix(crate::hub_users::CORE_NAMESPACE) {
-        let rows = crate::hub_users::core_query(db, registry, &ctx.hub_id, name, rest, ctx, params).await?;
-        let total = rows.len() as u64;
-        return Ok(QueryPage { rows, total, limit: total, offset: 0 });
+        // The core decides the page shape itself: whole-set for the small catalogues, a real page
+        // for `approvals.list` (hub#884), which runs through `run_list` like any module list.
+        return crate::hub_users::core_query(db, registry, &ctx.hub_id, name, rest, ctx, params)
+            .await;
     }
     let q = registry.get_query(name).ok_or_else(|| {
         // Tres ausencias distintas, tres errores (ADR-0127/0128): módulo NO instalado y módulo
@@ -175,7 +176,9 @@ pub async fn execute_page(
 }
 
 /// Compone y ejecuta el SQL paginado a partir del SELECT base y el `ListSpec`.
-async fn run_list(
+/// `pub(crate)`: el core lo reutiliza para `hub.approvals.list` (hub#884) — mismo motor, mismo
+/// contrato, sin un segundo paginador.
+pub(crate) async fn run_list(
     db: &dyn DatabaseAdapter,
     base_sql: &str,
     spec: &ListSpec,
