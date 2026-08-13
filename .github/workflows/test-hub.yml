@@ -212,10 +212,17 @@ jobs:
       # 🔴 `cache-bin: false`: el paso `Post` de esta acción limpia `$CARGO_HOME/bin` y se lleva
       # por delante el binario `rustup` del runner propio, rompiendo el job SIGUIENTE con
       # `rustup: command not found`. Explicación larga en `test-shell.yml`.
+      #
+      # 🔴 `save-if` off on our own runner: the same `Post` also `rmRF`s `~/.cargo/registry/src`
+      # (`cleanRegistry`), and the two slots of `ci-runner-1` share ONE `$HOME` — so it deletes
+      # the sources the job on the other slot is compiling from. That is what killed the Android
+      # release build of v1.1.1 (hub#886); this workflow reaches the same registry, so it carries
+      # the same guard. Long version in `test-shell.yml`.
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-bin: false
+          save-if: ${{ runner.environment != 'self-hosted' }}
 
       # `--exclude erplora-tauri`: el shell de escritorio (ADR-0159) arrastra tauri/wry → GTK/
       # webkit2gtk, system-libs que este runner no tiene y que inflarían el target (el disco ya

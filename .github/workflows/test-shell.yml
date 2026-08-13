@@ -87,10 +87,21 @@ jobs:
       # persiste, así que el job SIGUIENTE —cualquiera, de cualquier repo— muere con
       # `rustup: command not found` en 12 s, un rojo que no se parece en nada a su causa.
       # Vivido el 2026-08-11 a las 20:48 UTC: dejó sin CI de Rust a toda la máquina.
+      #
+      # 🔴 `save-if` off on our own runner, and it is not an optimisation either. The same `Post`
+      # also runs `cleanRegistry`, which `rmRF`s every non-`-sys` directory under
+      # `~/.cargo/registry/src`. The two slots of `ci-runner-1` share ONE `$HOME`, so that delete
+      # lands on whatever the OTHER slot is compiling right now: on v1.1.1 a `Cleaning cargo
+      # registry` at 00:54:22 killed the concurrent Android release build 8 s later with `could
+      # not parse/generate dep info ... No such file or directory` (hub#886). `tauri-release.yml`
+      # was guarded first; this workflow prunes the very same registry, so it needs the same
+      # guard. `save-if: false` returns BEFORE cleaning anything (rust-cache `save.ts`), so the
+      # restore still works and hosted runners — which die with the job — still save.
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-bin: false
+          save-if: ${{ runner.environment != 'self-hosted' }}
 
       - name: cargo test -p erplora-tauri
         run: cargo test -p erplora-tauri -p tauri-plugin-erplora-android
