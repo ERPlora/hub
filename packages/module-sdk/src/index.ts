@@ -404,6 +404,49 @@ export type ElevationApprover = (ask: ElevationAsk) => Promise<string | null>;
  */
 export const SERVER_UNAVAILABLE = 'server_unavailable';
 
+// ── hub#906: the honest verdict of a command the hub never answered ──────────────────────────
+//
+// A QUERY that failed did nothing. A COMMAND that failed may have COMMITTED: in the incident that
+// motivates this (saas#1460), the runtime accepted `complete_sale` (200 in its own log) and was
+// OOM-killed before the client could read the response — the cashier saw a raw WebKit exception,
+// concluded «it did not charge», and charged again: double charge, duplicated fiscal document.
+// The client cannot know which side of the commit the failure fell on, and pretending either way
+// is the bug. So the command path presents the only honest verdict: «we can't tell — check before
+// trying again». No automatic retry is ever added here: retrying a charge is how a fiscal
+// document gets duplicated.
+
+/**
+ * The honest sentence, per locale (en is the source, es the translation — ADR-0055). Localized
+ * HERE, like `dataTableLabels`, because this error's `message` is what modules and the shell's
+ * toast show verbatim; a technical English line in front of a cashier is the failure being fixed.
+ */
+const COMMAND_VERDICT_EN =
+  "We can't tell whether the operation completed. Check the result before trying again — for a charge, check Sales before charging again.";
+const COMMAND_VERDICT_ES =
+  'No sabemos si la operación se completó. Comprueba el resultado antes de reintentar — si era un cobro, comprueba en Ventas antes de volver a cobrar.';
+
+/** The unknown-outcome sentence for `locale` (same resolution rule as {@link dataTableLabels}). */
+export function commandVerdictMessage(locale = 'es'): string {
+  return locale.toLowerCase().startsWith('en') ? COMMAND_VERDICT_EN : COMMAND_VERDICT_ES;
+}
+
+/**
+ * A command the hub never answered (hub#906). `code` stays {@link SERVER_UNAVAILABLE} — the
+ * contract modules already key on since hub#782 — and the verdict travels as the **data field**
+ * `outcomeUnknown`, never as an `instanceof`: module bundles may carry their own copy of this
+ * class, and a plain field survives that where the prototype chain does not. The technical
+ * transport line is kept on `cause` for logs; `message` is the sentence a person may read.
+ */
+export class UnknownOutcomeError extends ErploraError {
+  readonly outcomeUnknown = true;
+
+  constructor(message: string, cause: unknown) {
+    super(SERVER_UNAVAILABLE, message);
+    this.name = 'UnknownOutcomeError';
+    this.cause = cause;
+  }
+}
+
 /** Sobre de respuesta estándar del server Axum (`crates/server`). */
 interface Envelope {
   ok: boolean;
@@ -1444,8 +1487,27 @@ export class ErploraClient {
     const full = await this.queryPage<T>(name, { ...params, limit: total, offset: 0 });
     return Array.isArray(full?.rows) ? full.rows : rows;
   }
+  /**
+   * Command dispatch, with the honest verdict of hub#906 on top of the transport:
+   *
+   * When the transport itself failed ({@link SERVER_UNAVAILABLE} — the hub died mid-request, the
+   * proxy answered its 502 page, the network dropped), the action **may have committed** before
+   * the answer was lost, so the caller gets an {@link UnknownOutcomeError} whose `message` is the
+   * localized «we can't tell — check before trying again» sentence, and the shell's notifier
+   * (wired to the global toast in `apps/web/src/lib/runtime.ts`) is told once as the default net —
+   * a module that renders nothing still leaves the cashier with a verdict instead of a raw
+   * exception. Domain refusals (`permission_denied`, `requires_elevation`, …) pass untouched: the
+   * hub answered, the outcome is known, and the module orients by the code as always. Queries are
+   * NOT captured (see {@link query}): a read that failed did nothing, and toasting every failed
+   * dashboard poll would bury the one toast that matters.
+   */
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
-    return this.transport.command(name, payload) as Promise<T>;
+    return (this.transport.command(name, payload) as Promise<T>).catch((e: unknown) => {
+      if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) throw e;
+      const verdict = new UnknownOutcomeError(commandVerdictMessage(this.locale), e);
+      this.opts.notifier?.({ type: 'error', message: verdict.message });
+      throw verdict;
+    });
   }
   /** Suscribe a un evento de dominio; devuelve una función para cancelar. */
   on(event: string, cb: (payload: unknown) => void): () => void {
@@ -1835,29 +1897,64 @@ export class UnavailableBridgeTransport implements BridgeTransport {
  * Android, iOS). Delega en el crate `erplora-peripherals` en proceso (ARQUITECTURA.md §2.7); no hay
  * servidor local ni WebSocket. Desde ADR-0196 §3 es el **único** transporte que llega al hardware.
  */
+/**
+ * Android runtime permission that gates ALL traffic to the LAN (API 37+) — what discovery and
+ * printing need. Mirror of `PermissionPolicy.ACCESS_LOCAL_NETWORK` on the Kotlin side.
+ */
+export const ANDROID_LOCAL_NETWORK_PERMISSION = 'android.permission.ACCESS_LOCAL_NETWORK';
+
+/**
+ * Android runtime permission for system notifications (API 33+) — what `notify` needs, and
+ * nothing else does (hub#758). Mirror of `PermissionPolicy.POST_NOTIFICATIONS`.
+ */
+export const ANDROID_NOTIFICATIONS_PERMISSION = 'android.permission.POST_NOTIFICATIONS';
+
+/**
+ * Android runtime permission to talk to bonded Bluetooth devices (API 31+) — what a
+ * `bluetooth:{mac}` print job and the bonded-printer half of discovery need (ADR-0204, hub#388).
+ * Mirror of `PermissionPolicy.BLUETOOTH_CONNECT`.
+ */
+export const ANDROID_BLUETOOTH_CONNECT_PERMISSION = 'android.permission.BLUETOOTH_CONNECT';
+
+/**
+ * The permissions a job to THIS printer is about to use (hub#758/hub#388): RFCOMM for a
+ * `bluetooth:{mac}` id, the LAN for everything else. Naming the wrong one would be the same
+ * out-of-context dialog hub#758 removed, pointing the other way.
+ */
+function printerPermissions(printerId: string): string[] {
+  return printerId.startsWith('bluetooth:')
+    ? [ANDROID_BLUETOOTH_CONNECT_PERMISSION]
+    : [ANDROID_LOCAL_NETWORK_PERMISSION];
+}
+
 export class IpcBridgeTransport implements BridgeTransport {
   constructor(private readonly tauri: TauriBridge) {}
 
   /**
-   * Asegura los permisos de RUNTIME antes de tocar el hardware.
+   * Ensures the runtime permissions an operation is ABOUT to use — and only those (hub#758).
    *
-   * Declararlos en el manifest **no basta**: `ACCESS_LOCAL_NETWORK` (Android 17+) y
-   * `POST_NOTIFICATIONS` (Android 13+) se conceden en runtime, y su ausencia **falla en
-   * silencio** — el descubrimiento devuelve `[]` y las notificaciones no salen, sin un solo
-   * error. Verificado en el emulador API 37.
+   * Declaring them in the manifest is **not enough**: `ACCESS_LOCAL_NETWORK` (Android 17+) and
+   * `POST_NOTIFICATIONS` (Android 13+) are granted at runtime, and their absence fails
+   * **silently** — discovery returns `[]` and notifications never show, with no error anywhere.
+   * Verified on the API 37 emulator.
    *
-   * Es idempotente en el lado nativo: si ya están concedidos no sale ningún diálogo, así que
-   * llamarlo antes de cada escaneo no molesta al usuario.
+   * The request carries a SCOPE on purpose. Asked without one, the plugin used to request its
+   * whole batch: tapping «Re-scan» popped the local-network dialog and then, with no visible
+   * relation to anything, the notifications one — an opportunistic-looking ask the user rightly
+   * denies. Each operation now names what it needs; the notifications dialog belongs to the
+   * first flow that actually notifies.
    *
-   * Nunca propaga: un «no» del usuario es una respuesta, no un fallo. Sin impresora el TPV
-   * tiene que seguir cobrando, y sin avisos la comanda tiene que seguir imprimiéndose.
+   * Idempotent on the native side: already granted means no dialog, so asking before every scan
+   * costs the user nothing.
+   *
+   * Never propagates: a «no» from the user is an answer, not a failure. Without a printer the
+   * till has to keep selling, and without notices the kitchen order still has to print.
    */
-  private async ensurePermissions(): Promise<void> {
+  private async ensurePermissions(permissions: string[]): Promise<void> {
     try {
-      await this.tauri.invoke('plugin:erplora-android|request_permissions', {});
+      await this.tauri.invoke('plugin:erplora-android|request_permissions', { permissions });
     } catch {
-      // En escritorio el comando no existe o no hay nada que pedir; en Android, el usuario dijo
-      // que no. En ambos casos se sigue.
+      // On desktop the command has nothing to ask; on Android, the user said no. Carry on.
     }
   }
 
@@ -1876,7 +1973,12 @@ export class IpcBridgeTransport implements BridgeTransport {
    * usuario a buscar una impresora que lleva encendida todo el rato (hub#338).
    */
   async discoverPrinters(): Promise<BridgePrinter[]> {
-    await this.ensurePermissions();
+    // Both printer permissions: on Android the shell sweeps the LAN AND lists bonded Bluetooth
+    // printers (ADR-0204). Still not the notifications one — that dialog has its own context.
+    await this.ensurePermissions([
+      ANDROID_LOCAL_NETWORK_PERMISSION,
+      ANDROID_BLUETOOTH_CONNECT_PERMISSION,
+    ]);
     const outcome = (await this.tauri.invoke('erplora_discover_printers', {})) as
       | PrinterDiscoveryResult
       | BridgePrinter[];
@@ -1902,18 +2004,18 @@ export class IpcBridgeTransport implements BridgeTransport {
     data: Record<string, unknown>,
     jobId?: string,
   ): Promise<void> {
-    await this.ensurePermissions();
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_print', { printerId, documentType, data, jobId: jobId ?? null });
   }
 
   async testPrint(printerId: string): Promise<void> {
-    await this.ensurePermissions();
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_test_print', { printerId });
   }
 
   /** The drawer opens through the printer's ESC/POS kick — so it goes over the local network too. */
   async openDrawer(printerId: string, pin = 2): Promise<void> {
-    await this.ensurePermissions();
+    await this.ensurePermissions(printerPermissions(printerId));
     await this.tauri.invoke('erplora_open_drawer', { printerId, pin });
   }
 
@@ -1925,7 +2027,7 @@ export class IpcBridgeTransport implements BridgeTransport {
 
   /** Notificación del SO por el shell (que ES el bridge en Tauri). Best-effort: no propaga fallos. */
   async notify(title: string, body: string): Promise<void> {
-    await this.ensurePermissions();
+    await this.ensurePermissions([ANDROID_NOTIFICATIONS_PERMISSION]);
     try {
       await this.tauri.invoke('erplora_notify', { title, body });
     } catch {

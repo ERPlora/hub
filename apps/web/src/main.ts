@@ -6,7 +6,14 @@ import { iconRegistry } from './lib/icons';
 import App from './App.vue';
 import { router } from './router';
 import { i18n } from './i18n';
-import { getClient, clientInjectionKey, bootHubContext, RUNTIME_URL, runtimeHeaders } from './lib/runtime';
+import {
+  getClient,
+  clientInjectionKey,
+  bootHubContext,
+  RUNTIME_URL,
+  runtimeHeaders,
+  setOnRuntimeSessionExpired,
+} from './lib/runtime';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
@@ -18,7 +25,7 @@ import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { bootModuleNavLocale } from './lib/nav';
-import { bootActionFeedback, toastError } from './lib/toast';
+import { bootActionFeedback, toast, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 import { bootCourier, takeShellCourierCode } from './lib/courier';
 
@@ -217,6 +224,19 @@ bootPrintComanda(getClient(), {
 setOnSessionExpired(() => {
   logout();
   void router.replace('/login');
+});
+
+// The LOCAL plane (hub#846), twin of the Cloud hook above: a RUNTIME 401 whose session was
+// CONFIRMED dead (expired, or displaced by another device on the single-device plan) already
+// closed the local session inside lib/runtime.ts — the invalidation is ONE and lives there. Here
+// the shell EXPLAINS it (i18n toast, not a failure with a «Retry» that could never help) and
+// leads to the login. `reason` travels in the query so LoginPage can adopt it later (the key
+// `login.sessionTakenOver` already sits waiting for that wire). The login screen keeps deciding
+// on its own what to offer — pinpad in the demo or on a trusted device (ADR-0329: the runtime's
+// `demo_would_adopt` rule stays untouched and keeps answering that question).
+setOnRuntimeSessionExpired(() => {
+  void toast(i18n.global.t('auth.sessionEnded'), 'warning', 6000);
+  void router.replace({ name: 'login', query: { reason: 'session-expired' } });
 });
 
 // El Cloud reportó que el hub fue borrado/revocado (410 hub_not_found, vía el gate de

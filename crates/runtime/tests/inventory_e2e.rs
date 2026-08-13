@@ -36,7 +36,7 @@ fn wasm_present() -> bool {
 
 async fn fresh() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     // inventory depende de taxes (ADR-0066): instalar taxes primero.
     rt.install_from_dir(&inventory_dir().parent().unwrap().join("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&inventory_dir()).await.expect("instalar inventory");

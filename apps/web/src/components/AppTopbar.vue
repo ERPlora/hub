@@ -99,6 +99,25 @@
             <HubIcon slot="icon-only" name="cloud-outline" />
           </ion-button>
 
+          <!-- «Switch business» (hub#447): the installed app remembers ONE business (`hub.url`,
+               ADR-0159) and until this button the only thing that forgot it was a Cloud 410 — an
+               owner with two venues and one tablet had no door, and a reassigned till could only
+               be uninstalled. Rendered ONLY inside the installed app (`canChangeHub` = isTauri):
+               a browser holds no capture to forget, its way across is the address bar. The click
+               confirms first (the local session is lost) and then the shell forgets the capture
+               and navigates to the SaaS's own hub chooser (`/shell/?choose=1`) — `device.id`
+               survives on purpose (ADR-0154). -->
+          <ion-button
+            v-if="changeHubAvailable"
+            data-testid="topbar-change-hub"
+            fill="clear"
+            :aria-label="t('shell.changeHub')"
+            :title="t('shell.changeHub')"
+            @click="openChangeHub"
+          >
+            <HubIcon slot="icon-only" name="swap-horizontal-outline" />
+          </ion-button>
+
           <!-- Asistente (sparkles): visible cuando la capacidad está disponible. Abre el drawer. -->
           <ion-button
             v-if="assistantAvailable"
@@ -171,6 +190,18 @@
                   <HubIcon slot="start" name="cloud-outline" />
                   <ion-label class="ion-text-wrap">{{ t('topbar.manage') }}</ion-label>
                 </ion-item>
+                <!-- Same door on a phone (hub#447): folded into the menu, never lost — the rule
+                     this overflow exists for. -->
+                <ion-item
+                  v-if="changeHubAvailable"
+                  button
+                  :detail="false"
+                  data-testid="topbar-more-change-hub"
+                  @click="pick(openChangeHub)"
+                >
+                  <HubIcon slot="start" name="swap-horizontal-outline" />
+                  <ion-label class="ion-text-wrap">{{ t('shell.changeHub') }}</ion-label>
+                </ion-item>
                 <ion-item
                   v-if="assistantAvailable"
                   button
@@ -239,6 +270,7 @@ import {
 import HubIcon from './HubIcon.vue';
 import { assistantAvailable, toggleAssistant, notificationCount, isLoading, railCollapsed } from '../lib/shell';
 import { canOpenManagement, openManagement } from '../lib/management-link';
+import { canChangeHub, requestChangeHub } from '../lib/change-hub';
 import { isCompactViewport } from '../lib/viewport';
 import { moduleNav } from '../lib/nav';
 import { resolveIcon } from '../lib/icons';
@@ -337,6 +369,22 @@ function openNotifications(event?: Event): void {
 function pick(action: (event?: Event) => void): void {
   moreOpen.value = false;
   action();
+}
+
+// ── «Switch business» (hub#447) ─────────────────────────────────────────────
+// Read once, like `inInstalledApp` elsewhere: whether this window is the installed app cannot
+// change while the toolbar is mounted.
+const changeHubAvailable = canChangeHub();
+
+/** Opens the confirmation; on «Switch» the shell forgets the capture and navigates the whole
+ *  window to the SaaS hub chooser — nothing further to do here. */
+function openChangeHub(): void {
+  void requestChangeHub({
+    header: t('shell.changeHubTitle'),
+    message: t('shell.changeHubBody'),
+    cancel: t('shell.changeHubCancel'),
+    confirm: t('shell.changeHubConfirm'),
+  });
 }
 
 function goBack(): void {

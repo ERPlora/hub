@@ -821,123 +821,132 @@ pub async fn core_query(
     rest: &str,
     ctx: &crate::registry::RequestContext,
     params: &erplora_db::Params,
-) -> Result<Vec<serde_json::Value>> {
+) -> Result<crate::queries::QueryPage> {
     if !CORE_QUERIES.contains(&rest) {
-        // NO es `ModuleNotInstalled`: `hub` no es un módulo ausente, es el core. Un nombre que no
-        // existe aquí es un contrato roto y debe explotar (no lo perdona `queryOptional`).
+        // NOT `ModuleNotInstalled`: `hub` is not an absent module, it is the core. A name that does
+        // not exist here is a broken contract and must blow up (`queryOptional` does not forgive it).
         return Err(RuntimeError::QueryNotFound(name.to_string()));
     }
-    // Gate por-query: `approvals.list` requiere admin (quién aprobó qué es información sobre el
-    // personal, no del encargado). Las demás queries del core abren con sesión local.
+    // Per-query gate: `approvals.list` requires admin (who approved what is information about the
+    // staff, not the cashier's). The other core queries open with a local session.
     if rest == "approvals.list" {
         crate::permissions::check(ctx, ADMINISTER_PERMISSION)?;
     } else {
         crate::permissions::check(ctx, VIEW_USERS_PERMISSION)?;
     }
+    // Non-paginated core queries answer with the whole (small) set: `total` = row count, no offset.
+    // `approvals.list` is the exception — the audit grows forever, so it pages (hub#884).
+    let whole = |rows: Vec<serde_json::Value>| {
+        let total = rows.len() as u64;
+        crate::queries::QueryPage { rows, total, limit: total, offset: 0 }
+    };
     match rest {
-        // Estado de configuración del hub (hub#369): UN documento con los ítems del core unidos a
-        // los que declaran los módulos instalados. El gate es el mismo del namespace — tener sesión
-        // local —; qué ítems ve cada sesión lo filtra el `permission` de cada uno.
-        "setup.status" => Ok(vec![
+        // Setup status of the hub (hub#369): ONE document joining the core's items with the ones
+        // installed modules declare. The gate is the namespace's — having a local session —; which
+        // items each session sees is filtered by each item's `permission`.
+        "setup.status" => Ok(whole(vec![
             crate::setup_status::status(db, registry, hub_id, ctx).await?,
-        ]),
-        // Registro de aprobaciones por PIN (hub#362 escribe, hub#512 lee). Doble atribución:
-        // quién pidió la elevación y quién la aprobó. Los ids se resuelven a nombres contra
-        // `hub_user`, o la pantalla enseña UUIDs y no la usa nadie.
+        ])),
+        // The PIN approval record (hub#362 writes, hub#512 reads, hub#884 pages). Double
+        // attribution: who asked for the elevation and who approved it. The ids resolve to names
+        // against `hub_user`, or the screen shows UUIDs and nobody uses it.
         "approvals.list" => list_approvals(db, hub_id, params).await,
-        "users.list" => Ok(list(db, hub_id)
-            .await?
-            .into_iter()
-            .map(|u| {
-                json!({
-                    "id": u.id,
-                    "name": u.name,
-                    "role": u.role,
-                    "is_active": u.is_active,
+        "users.list" => Ok(whole(
+            list(db, hub_id)
+                .await?
+                .into_iter()
+                .map(|u| {
+                    json!({
+                        "id": u.id,
+                        "name": u.name,
+                        "role": u.role,
+                        "is_active": u.is_active,
+                    })
                 })
-            })
-            .collect()),
-        // Los roles no son PII: se devuelven enteros (nombre, permisos, miembros).
-        _ => Ok(list_roles(db, registry, hub_id)
-            .await?
-            .into_iter()
-            .map(|r| json!({ "name": r.name, "permissions": r.permissions, "members": r.members }))
-            .collect()),
+                .collect(),
+        )),
+        // Roles are not PII: they are returned whole (name, permissions, members).
+        _ => Ok(whole(
+            list_roles(db, registry, hub_id)
+                .await?
+                .into_iter()
+                .map(|r| json!({ "name": r.name, "permissions": r.permissions, "members": r.members }))
+                .collect(),
+        )),
     }
 }
 
-/// Lee el registro de aprobaciones por PIN (`_elevation_audit`, hub#362 escribe / hub#512 lee).
+/// Core queries whose wire shape is the list envelope `{rows,total,limit,offset}` (they paginate),
+/// mirroring what `list` in a module manifest declares. The server keys the response shape off
+/// this — every other core query stays a plain array (dropdowns, not pagers).
+pub fn is_core_list_query(name: &str) -> bool {
+    name == "hub.approvals.list"
+}
+
+/// Reads the PIN approval record (`_elevation_audit`; hub#362 writes, hub#512 reads, hub#884
+/// pages), through the runtime's OWN list engine — the same one every module list query goes
+/// through, contract included.
 ///
-/// Doble atribución: `created_by` (el cajero que pidió la elevación) y `approved_by` (el encargado
-/// que la aprobó). Los ids son `hub_user.id` y se resuelven a nombres con un JOIN, o la pantalla
-/// enseña UUIDs y no la usa nadie.
+/// Double attribution: `created_by` (the cashier who asked for the elevation) and `approved_by`
+/// (the manager who approved it). The ids are `hub_user.id` and resolve to names via a JOIN, or
+/// the screen shows UUIDs and nobody uses it.
 ///
-/// Filtros opcionales vía params: `command`, `created_by`, `approved_by`. Sin soft-delete, sin
-/// paginación interna (la lista es por negocio y crece despacio; el paginador genérico del runtime
-/// la recorta si hace falta).
+/// The audit grows forever by design (nothing deletes it), so this never ships whole: the engine
+/// serves `{rows,total,limit,offset}` and understands the standard list params — `limit`/`offset`,
+/// `sort`/`dir` (whitelist: `created_at`), `search` over person names and command, `f_command`/
+/// `f_permission`/`f_created_by`/`f_approved_by` (exact) and `f_created_at_from`/`_to` (range: the
+/// date filter lives HERE, not in the client — filtering client-side only worked while the whole
+/// trail was in memory, which was the bug).
 async fn list_approvals(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     params: &erplora_db::Params,
-) -> Result<Vec<serde_json::Value>> {
-    let mut p = erplora_db::Params::new();
-    p.insert("hub_id".into(), json!(hub_id));
+) -> Result<crate::queries::QueryPage> {
+    use crate::manifest::{FilterOp, FilterSpec, ListSpec};
 
-    // Filtros dinámicos: solo se añaden los que el caller mandó, para no pegar siempre a un plan
-    // con tres OR. Cada uno es una igualdad exacta — no hay búsqueda libre sobre un registro de
-    // auditoría.
-    let mut conditions = Vec::new();
-    for (field) in ["command", "created_by", "approved_by"] {
-        if let Some(val) = params.get(field) {
-            let bind = format!("filter_{field}");
-            conditions.push(format!("a.{field} = :{bind}"));
-            p.insert(bind, val.clone());
-        }
-    }
-    let where_clause = if conditions.is_empty() {
-        String::new()
-    } else {
-        format!("AND {}", conditions.join(" AND "))
+    // The same spec a module would write in its manifest's `list` block; static because the audit
+    // is a core table, not a manifest. No free-text search beyond names/command, on purpose.
+    let filters = [
+        ("command", FilterOp::Eq),
+        ("permission", FilterOp::Eq),
+        ("created_by", FilterOp::Eq),
+        ("approved_by", FilterOp::Eq),
+        ("created_at", FilterOp::Range),
+    ]
+    .into_iter()
+    .map(|(col, op)| (col.to_string(), FilterSpec { op }))
+    .collect();
+    let spec = ListSpec {
+        search: vec![
+            "command".into(),
+            "created_by_name".into(),
+            "approved_by_name".into(),
+        ],
+        sort: vec!["created_at".into()],
+        default_sort: Some("created_at".into()),
+        default_dir: Some("desc".into()),
+        filters,
+        page_size: 50,
     };
 
-    // LEFT JOIN para resolver ambos ids a nombres en una sola pasada. COALESCE: si el usuario fue
-    // borrado (identidad por despliegue, sin soft-delete), el nombre queda vacío en vez de excluir
-    // la fila — un registro de auditoría no puede perderse porque un empleado ya no esté.
-    let sql = format!(
-        "SELECT a.id AS id, a.command AS command, a.permission AS permission, \
-                a.created_by AS created_by, creator.name AS created_by_name, \
-                a.approved_by AS approved_by, approver.name AS approved_by_name, \
+    // LEFT JOIN resolves both ids to names in one pass. COALESCE: if the user was deleted
+    // (identity is per deployment, no soft-delete) the name comes back empty instead of excluding
+    // the row — an audit record must not be lost because an employee is gone. The ORDER BY is the
+    // engine's, from the spec's whitelist.
+    const BASE_SQL: &str = "SELECT a.id AS id, a.command AS command, a.permission AS permission, \
+                a.created_by AS created_by, COALESCE(creator.name, '') AS created_by_name, \
+                a.approved_by AS approved_by, COALESCE(approver.name, '') AS approved_by_name, \
                 a.payload_fingerprint AS payload_fingerprint, a.created_at AS created_at \
            FROM _elevation_audit a \
            LEFT JOIN hub_user creator  ON creator.id  = a.created_by \
            LEFT JOIN hub_user approver ON approver.id = a.approved_by \
-          WHERE a.hub_id = :hub_id {where_clause} \
-          ORDER BY a.created_at DESC"
-    );
+          WHERE a.hub_id = :hub_id";
 
-    let rows = db.query(&sql, &p).await?;
-    Ok(rows
-        .rows
-        .iter()
-        .map(|r| {
-            // Los nombres pueden ser NULL (usuario borrado: identidad por despliegue, sin
-            // soft-delete) → string vacío, para que la fila no se pierda del registro de auditoría.
-            let name = |key: &str| -> String {
-                r[key].as_str().unwrap_or_default().to_string()
-            };
-            json!({
-                "id": r["id"].clone(),
-                "command": r["command"].clone(),
-                "permission": r["permission"].clone(),
-                "created_by": r["created_by"].clone(),
-                "created_by_name": name("created_by_name"),
-                "approved_by": r["approved_by"].clone(),
-                "approved_by_name": name("approved_by_name"),
-                "payload_fingerprint": r["payload_fingerprint"].clone(),
-                "created_at": r["created_at"].clone(),
-            })
-        })
-        .collect())
+    // The caller's list params travel as-is; `hub_id` is inserted LAST so nothing in the payload
+    // can override the tenant.
+    let mut bound = params.clone();
+    bound.insert("hub_id".into(), json!(hub_id));
+    crate::queries::run_list(db, BASE_SQL, &spec, &bound).await
 }
 
 #[cfg(test)]

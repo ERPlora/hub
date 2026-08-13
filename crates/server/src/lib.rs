@@ -1417,6 +1417,11 @@ pub fn app(state: AppState) -> Router {
         // capability `manage_flows` si quien llama es un módulo — lo que traen los eventos de un
         // negocio es la forma de ese negocio, y no la lee cualquier módulo instalado.
         .route("/api/hub/events/shape", get(outbox_admin::event_shape))
+        // Catálogo de NOMBRES de evento (hub#823): la unión de lo que los módulos instalados
+        // declaran y lo que el outbox vio de verdad — el desplegable «Cuando pase…» del editor de
+        // flujos deja de sembrarse a mano. Solo nombres, nunca payloads; misma doble puerta que
+        // `…/shape` (ADR-0312): sesión admin + `manage_flows` si quien llama nombra un módulo.
+        .route("/api/hub/events", get(outbox_admin::list_events))
         // ── Kernel de automatización (ADR-0283 K7, hub#661) ────────────────────────────────
         // REST del core, NO commands `hub.*`: el core se congela y el dispatcher no es donde se
         // añade superficie nueva (§9). Misma puerta que las keys y la dead-letter: sesión local de
@@ -3218,7 +3223,25 @@ async fn navigation(
             })
         })
         .collect();
-    Json(json!({ "ok": true, "data": items })).into_response()
+    // `active_modules` = módulos instalados **y activos** (hub#894). **Aditivo**: `ok`/`data` intactos.
+    //
+    // `data` es el menú, y por sí solo no distingue las dos cosas que producen el mismo array vacío:
+    // un hub recién nacido y un hub con 12 módulos cuyo menú salió vacío de todas formas. La primera
+    // es un hecho que merece pintarse («añade tu primera app»); la segunda no, y se pintaba igual —
+    // un hub real de producción (12/12 según `/readyz`) le dijo a su dueña que no tenía apps y le
+    // ofreció instalar las que ya tenía. Este número le da al shell contra qué comprobar la lista
+    // vacía en vez de creérsela.
+    //
+    // Cuenta los **activos**, no los instalados, y la diferencia importa: un módulo que el admin
+    // apagó a propósito NO se espera que aporte menú, así que contarlo convertiría un hub apagado a
+    // conciencia en un falso «no he podido cargar tus apps». El denominador es lo que el hub espera
+    // que aporte, no lo que tiene guardado.
+    let active_modules = reg
+        .installed
+        .iter()
+        .filter(|m| reg.is_active(&m.id))
+        .count();
+    Json(json!({ "ok": true, "data": items, "active_modules": active_modules })).into_response()
 }
 
 async fn list_modules(

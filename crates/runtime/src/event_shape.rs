@@ -255,6 +255,21 @@ pub struct EventField {
     pub seen_in: usize,
 }
 
+/// One row of the hub's event catalogue (hub#823): a name the flow editor can offer in «Cuando
+/// pase…», with who declares it and when it last happened. **Names only** — what the event
+/// carries stays behind [`EventShape`], with its redaction.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EventCatalogEntry {
+    pub name: String,
+    /// Installed modules that declare they emit it, sorted. Empty means it really happened and
+    /// nobody declares it any more — a core event, or the module was uninstalled.
+    pub declared_by: Vec<String>,
+    /// When it last happened here. `None` for a declared event that never fired (or whose last
+    /// occurrence aged out of the ninety-day retention window, hub#699).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen_at: Option<String>,
+}
+
 /// Everything this hub knows about one event name.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EventShape {

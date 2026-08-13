@@ -1,22 +1,19 @@
-// Copia los artefactos de los módulos instalados (module.json + dist/<id>.esm.js) a
-// public/modules/** para que el shell pueda cargarlos en runtime con import() dinámico
-// (Vite sirve public/ en la raíz, en dev y en build).
+// Copies the installed modules' artifacts (module.json + dist/<id>.esm.js) into
+// public/modules/** so the shell can load them at runtime with dynamic import()
+// (Vite serves public/ at the root, in dev and in build).
 //
-// En producción esto NO existe: el runtime (crates/server) sirve los módulos descargados
-// del marketplace. Aquí es solo el puente para el shell web de desarrollo. ARQUITECTURA.md §4.
+// In production this does NOT exist: the runtime (crates/server) serves the modules downloaded
+// from the marketplace. This is only the bridge for the dev web shell. ARQUITECTURA.md §4.
 import { mkdirSync, copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// Source-of-truth de los módulos: el workspace de dev del toolkit en el ROOT del monorepo
-// (ERPlora/modules-workspace/modules/<id>/, cada uno su propio repo git, creado/gestionado por
-// @erplora/module-toolkit). hub/modules/ se reserva para los módulos INSTALADOS en runtime.
-const MODULES_SRC = join(HERE, '../../../modules-workspace/modules');
 const PUBLIC_DST = join(HERE, 'public/modules');
 
-// Lote POS (Stencil→Lit, 2026-06-07): los módulos que el shell de desarrollo carga en runtime.
-// En prod esto no existe (el runtime sirve los módulos del marketplace) — aquí es el puente del dev.
+// POS batch (Stencil→Lit, 2026-06-07): the modules the dev shell loads at runtime.
+// In prod this does not exist (the runtime serves the marketplace modules) — this is the dev bridge.
 const MODULES = [
   'appointments', 'cart_checkout', 'cash_register', 'customers', 'inventory',
   'invoice', 'invoice_series', 'kitchen', 'online_booking',
@@ -25,66 +22,145 @@ const MODULES = [
   'tasks', 'taxes', 'tickets', 'verifactu', 'whatsapp_inbox',
 ];
 
-for (const id of MODULES) {
-  const src = join(MODULES_SRC, id);
-  const manifestPath = join(src, 'module.json');
-  if (!existsSync(manifestPath)) {
-    console.warn(`! módulo ${id}: falta module.json (¿lo compilaste con module-cli build?)`);
-    continue;
+// Main checkout of THIS repo, via the git common dir (absolute even from a worktree).
+// Returns null outside a git checkout (e.g. the Docker image build) — callers fall through.
+function defaultGitCommonDir(startDir) {
+  try {
+    const out = execFileSync(
+      'git',
+      ['-C', startDir, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+    return out || null;
+  } catch {
+    return null;
   }
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  const entry = manifest.ui?.entry; // p. ej. dist/inventory.esm.js
-  const bundlePath = join(src, entry ?? '');
-  if (!entry || !existsSync(bundlePath)) {
-    console.warn(`! módulo ${id}: falta el bundle ${entry}. Ejecuta: pnpm -F @erplora/module-cli build:inventory`);
-    continue;
-  }
-
-  const dstDir = join(PUBLIC_DST, id);
-  mkdirSync(join(dstDir, dirname(entry)), { recursive: true });
-  copyFileSync(manifestPath, join(dstDir, 'module.json'));
-  copyFileSync(bundlePath, join(dstDir, entry));
-
-  // Sidecar de iconos (ADR-0036): SVG horneados del módulo, junto al bundle en dist/. El shell
-  // (module-loader.loadMenu) lo lee para pintar los iconos de nav del módulo. Opcional.
-  let iconsNote = '';
-  const iconsPath = join(src, dirname(entry), 'icons.json');
-  if (existsSync(iconsPath)) {
-    copyFileSync(iconsPath, join(dstDir, dirname(entry), 'icons.json'));
-    iconsNote = ' + icons.json';
-  }
-
-  // Schema del bloque `settings` (settings declarativos estilo widgets): el shell lo fetchea en
-  // runtime (`/modules/<id>/<settings.schema>`) para renderizar el form genérico de ajustes. En prod
-  // el runtime sirve el paquete completo del módulo; aquí, el puente del dev solo copia ese fichero.
-  let settingsNote = '';
-  const schemaRel = manifest.settings?.schema;
-  if (schemaRel) {
-    const schemaSrc = join(src, schemaRel);
-    if (existsSync(schemaSrc)) {
-      mkdirSync(join(dstDir, dirname(schemaRel)), { recursive: true });
-      copyFileSync(schemaSrc, join(dstDir, schemaRel));
-      settingsNote = ` + ${schemaRel}`;
-    } else {
-      console.warn(`! módulo ${id}: settings.schema declara ${schemaRel} pero no existe`);
-    }
-  }
-
-  // Catálogos del módulo (ADR-0055). El runtime traduce la navegación, pero el shell también
-  // consulta `/modules/<id>/locales/<lang>.json` para títulos de widgets y otros metadatos.
-  // Sin esta copia, el desarrollo local degradaba silenciosamente al inglés aunque el paquete
-  // instalado sí incluyera sus locales.
-  let localesNote = '';
-  const localesSrc = join(src, 'locales');
-  if (existsSync(localesSrc)) {
-    const localeFiles = readdirSync(localesSrc).filter((name) => name.endsWith('.json'));
-    if (localeFiles.length) {
-      mkdirSync(join(dstDir, 'locales'), { recursive: true });
-      for (const name of localeFiles) {
-        copyFileSync(join(localesSrc, name), join(dstDir, 'locales', name));
-      }
-      localesNote = ` + ${localeFiles.length} locale(s)`;
-    }
-  }
-  console.log(`✓ sync ${id}: module.json + ${entry}${iconsNote}${settingsNote}${localesNote} → public/modules/${id}/`);
 }
+
+// Source of truth for dev modules: the toolkit's dev workspace at the MONOREPO root
+// (ERPlora/modules-workspace/modules/<id>/, each its own git repo, managed by
+// @erplora/module-toolkit). hub/modules/ is reserved for runtime-INSTALLED modules.
+//
+// hub#787: the path used to be hardcoded relative to this file, so `pnpm dev` from a git
+// worktree booted a hub with zero modules. Resolution order (same shape as the pre-push hook's
+// `resolve_modules_dir`, and the hub#643 precedent for `blueprints/`):
+//   1. ERPLORA_MODULES_DIR (the escape hatch the cargo e2e already document)
+//   2. HUB_MODULES_DIR (the var scripts/dev.mjs exports for the runtime)
+//   3. walk up from this file until `modules-workspace/modules` appears (main checkout)
+//   4. derive the main checkout from the git common dir (worktrees live elsewhere)
+// Returns { dir, tried }: `dir` is null when nothing was found; `tried` feeds a truthful warning.
+export function resolveModulesWorkspace({
+  env = process.env,
+  startDir = HERE,
+  gitCommonDir = defaultGitCommonDir,
+} = {}) {
+  if (env.ERPLORA_MODULES_DIR) return { dir: env.ERPLORA_MODULES_DIR, tried: [env.ERPLORA_MODULES_DIR] };
+  if (env.HUB_MODULES_DIR) return { dir: env.HUB_MODULES_DIR, tried: [env.HUB_MODULES_DIR] };
+
+  const tried = [];
+  let dir = resolve(startDir);
+  for (;;) {
+    const candidate = join(dir, 'modules-workspace', 'modules');
+    tried.push(candidate);
+    if (existsSync(candidate)) return { dir: candidate, tried };
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  const common = gitCommonDir(startDir);
+  if (common) {
+    // <main checkout>/../modules-workspace/modules — the monorepo layout, seen from the hub repo.
+    const candidate = resolve(dirname(common), '..', 'modules-workspace', 'modules');
+    tried.push(candidate);
+    if (existsSync(candidate)) return { dir: candidate, tried };
+  }
+
+  return { dir: null, tried };
+}
+
+export function syncModules({ modulesSrc, dst = PUBLIC_DST, modules = MODULES } = {}) {
+  for (const id of modules) {
+    const src = join(modulesSrc, id);
+    const manifestPath = join(src, 'module.json');
+    if (!existsSync(manifestPath)) {
+      console.warn(`! module ${id}: missing module.json in ${src} (did you build it?)`);
+      continue;
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const entry = manifest.ui?.entry; // e.g. dist/inventory.esm.js
+    const bundlePath = join(src, entry ?? '');
+    if (!entry || !existsSync(bundlePath)) {
+      console.warn(`! module ${id}: missing bundle ${entry}. Run: pnpm -F @erplora/module-cli build:inventory`);
+      continue;
+    }
+
+    const dstDir = join(dst, id);
+    mkdirSync(join(dstDir, dirname(entry)), { recursive: true });
+    copyFileSync(manifestPath, join(dstDir, 'module.json'));
+    copyFileSync(bundlePath, join(dstDir, entry));
+
+    // Icons sidecar (ADR-0036): the module's baked SVGs, next to the bundle in dist/. The shell
+    // (module-loader.loadMenu) reads it to paint the module's nav icons. Optional.
+    let iconsNote = '';
+    const iconsPath = join(src, dirname(entry), 'icons.json');
+    if (existsSync(iconsPath)) {
+      copyFileSync(iconsPath, join(dstDir, dirname(entry), 'icons.json'));
+      iconsNote = ' + icons.json';
+    }
+
+    // Schema of the `settings` block (declarative settings, widget-style): the shell fetches it at
+    // runtime (`/modules/<id>/<settings.schema>`) to render the generic settings form. In prod the
+    // runtime serves the full module package; here the dev bridge only copies that file.
+    let settingsNote = '';
+    const schemaRel = manifest.settings?.schema;
+    if (schemaRel) {
+      const schemaSrc = join(src, schemaRel);
+      if (existsSync(schemaSrc)) {
+        mkdirSync(join(dstDir, dirname(schemaRel)), { recursive: true });
+        copyFileSync(schemaSrc, join(dstDir, schemaRel));
+        settingsNote = ` + ${schemaRel}`;
+      } else {
+        console.warn(`! module ${id}: settings.schema declares ${schemaRel} but it does not exist`);
+      }
+    }
+
+    // Module catalogs (ADR-0055). The runtime translates the navigation, but the shell also
+    // queries `/modules/<id>/locales/<lang>.json` for widget titles and other metadata.
+    // Without this copy, local development silently degraded to English even though the
+    // installed package did include its locales.
+    let localesNote = '';
+    const localesSrc = join(src, 'locales');
+    if (existsSync(localesSrc)) {
+      const localeFiles = readdirSync(localesSrc).filter((name) => name.endsWith('.json'));
+      if (localeFiles.length) {
+        mkdirSync(join(dstDir, 'locales'), { recursive: true });
+        for (const name of localeFiles) {
+          copyFileSync(join(localesSrc, name), join(dstDir, 'locales', name));
+        }
+        localesNote = ` + ${localeFiles.length} locale(s)`;
+      }
+    }
+    console.log(`✓ sync ${id}: module.json + ${entry}${iconsNote}${settingsNote}${localesNote} → public/modules/${id}/`);
+  }
+}
+
+function main() {
+  const { dir, tried } = resolveModulesWorkspace();
+  if (!dir || !existsSync(dir)) {
+    // Tell the truth: the workspace is missing, the module builds are not the problem (hub#787).
+    console.warn('! cannot find the dev modules workspace (modules-workspace/modules). Tried:');
+    for (const t of tried) console.warn(`    ${t}`);
+    console.warn('  The shell will boot WITHOUT modules. Point ERPLORA_MODULES_DIR (or HUB_MODULES_DIR)');
+    console.warn('  at <monorepo>/modules-workspace/modules — from a worktree, the sibling of the MAIN checkout.');
+    // warn + skip on purpose: predev and the Docker image build must not fail on this
+    // (in the image the workspace is legitimately absent — see docker/Dockerfile).
+    return;
+  }
+  syncModules({ modulesSrc: dir });
+}
+
+// Run only when invoked as a script (`node sync-modules.mjs`), not when imported by tests
+// or by scripts/dev.mjs (which reuses resolveModulesWorkspace for HUB_MODULES_DIR).
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (isMain) main();

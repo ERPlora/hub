@@ -10,8 +10,16 @@ pub struct Manifest {
     pub id: String,
     pub name: String,
     pub version: String,
+    /// Modules this one needs installed, optionally with a MINIMUM version (hub#681).
+    ///
+    /// Two authoring shapes, mixable in one list: a plain string (`"taxes"`, the shape of every
+    /// published manifest — any installed version satisfies it) and
+    /// `{ "id": "inventory", "min_version": "1.2.20" }` for a contract that was born in a
+    /// concrete version (sales#68: `sales` reads `inventory.products.for_sale`, which exists
+    /// since inventory 1.2.20). The installer enforces the floor
+    /// (`installer::register_module`); the topo-sort and the cascades read only the id.
     #[serde(default)]
-    pub depends_on: Vec<String>,
+    pub depends_on: Vec<DependencyRef>,
     #[serde(default)]
     pub permissions: Vec<String>,
     #[serde(default)]
@@ -175,6 +183,23 @@ pub struct Manifest {
     /// `cash_register`, which is the canonical shape.
     #[serde(default)]
     pub protects: Vec<ProtectsDef>,
+    /// **Declared mutability per record** (hub#632, decisión de Ioan 2026-08-09): what of this
+    /// module's data can be edited after the fact, and through which door.
+    ///
+    /// `mutable: false` says the record is corrected, never edited (`reason` names why with a
+    /// CLOSED vocabulary — fiscal · ledger · identity · audit — so the assistant can explain
+    /// "an issued invoice is not edited: it is rectified with `invoice.rectify`", and
+    /// `correct_with` points at the correction commands). `mutable: true` names the `update`
+    /// command and, optionally, `patch: { read, key }` — which is what turns that update into a
+    /// PARTIAL door: the dispatcher reads the current record, merges the sent keys on top
+    /// (limited to the update schema's keys), validates the complete object and runs the SQL
+    /// untouched (`commands::execute_at`). The conditional validation (mutable:false forbids
+    /// update/patch) lives ONLY in `schemas/module.schema.json`, on purpose: no Rust duplicate.
+    ///
+    /// Absent in every published manifest, and that stays valid: no declaration = no patch door
+    /// and nothing said about mutability.
+    #[serde(default)]
+    pub records: HashMap<String, RecordDef>,
     /// What this core did **not** understand of the manifest, and chose to install anyway
     /// (hub#521). Filled by [`Manifest::load`], never by serde — it describes what serde DROPPED,
     /// so it cannot come from serde.
@@ -184,6 +209,113 @@ pub struct Manifest {
     /// line in a log nobody reads, which is the failure mode this issue is about.
     #[serde(skip)]
     pub warnings: Vec<ManifestWarning>,
+}
+
+/// One entry of the `records` block (hub#632): the declared mutability of one record kind.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RecordDef {
+    /// Can this record be edited after creation? `false` = corrected, never edited.
+    pub mutable: bool,
+    /// Why it is immutable, in a CLOSED vocabulary (`fiscal` · `ledger` · `identity` · `audit`)
+    /// enforced by the authoring schema — closed so it is translatable and explainable.
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// Commands that CORRECT an immutable record (`sales.void`, `invoice.rectify`): the road the
+    /// assistant points at instead of an edit that does not exist.
+    #[serde(default)]
+    pub correct_with: Vec<String>,
+    /// The full-object update command of a mutable record (`sales.order.update_line`).
+    #[serde(default)]
+    pub update: Option<String>,
+    /// What turns [`update`](Self::update) into a PARTIAL door — see [`PatchDef`].
+    #[serde(default)]
+    pub patch: Option<PatchDef>,
+}
+
+/// The read-merge contract of a partial update (hub#632): before validating, the dispatcher runs
+/// [`read`](Self::read) with the caller's [`key`](Self::key) param, merges the sent keys on top of
+/// the row (limited to the update schema's keys — the `get` returns columns the update does not
+/// accept), and only then validates the COMPLETE object. Explicit `null` overwrites; omitted
+/// preserves.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PatchDef {
+    /// Query of the SAME module that returns the current record (`sales.order.get`).
+    pub read: String,
+    /// Name of the payload key that identifies the record (`order_id`) — it is both the read's
+    /// parameter and the update's own key field.
+    pub key: String,
+}
+
+/// One entry of `depends_on` (hub#681): the module this one needs, and — optionally — the oldest
+/// version of it that honours the contract.
+///
+/// `min_version` is a FLOOR, never a pin: at or above it the dependency satisfies, and absence
+/// means "any installed version", which is what every plain-string entry (the shape of the whole
+/// published catalogue) keeps meaning. Enforced at install time by `installer::register_module`;
+/// blueprints and the install plan are not relaxed by it (they resolve versions upstream).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DependencyRef {
+    /// Id of the required module (`inventory`).
+    pub id: String,
+    /// Oldest acceptable version of it (`1.2.20`), compared as a semver floor
+    /// ([`version_triple`]). `None` = any version.
+    pub min_version: Option<String>,
+}
+
+impl<'de> serde::Deserialize<'de> for DependencyRef {
+    /// Accepts the two authoring shapes — `"id"` and `{ "id": ..., "min_version": ... }` — with
+    /// errors that name the offending field. An unknown key inside the object form is refused:
+    /// a dependency entry changes what the installer enforces, which is the refuse tier of
+    /// ADR-0286 (silently dropping a constraint would install a module its author knows to be
+    /// broken in this combination).
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = DependencyRef;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a module id string or { \"id\": ..., \"min_version\": ... }")
+            }
+
+            fn visit_str<E: serde::de::Error>(
+                self,
+                id: &str,
+            ) -> std::result::Result<Self::Value, E> {
+                Ok(DependencyRef {
+                    id: id.to_string(),
+                    min_version: None,
+                })
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> std::result::Result<Self::Value, A::Error> {
+                let mut id: Option<String> = None;
+                let mut min_version: Option<String> = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "id" => id = Some(map.next_value()?),
+                        "min_version" => min_version = map.next_value()?,
+                        other => {
+                            return Err(serde::de::Error::unknown_field(
+                                other,
+                                &["id", "min_version"],
+                            ))
+                        }
+                    }
+                }
+                Ok(DependencyRef {
+                    id: id.ok_or_else(|| serde::de::Error::missing_field("id"))?,
+                    min_version,
+                })
+            }
+        }
+        deserializer.deserialize_any(V)
+    }
 }
 
 /// Which cores can run a module (`compatibility`, hub#521).
@@ -1312,6 +1444,7 @@ const ROOT_FIELDS: &[&str] = &[
     "seed",
     "compatibility",
     "protects",
+    "records",
 ];
 
 const COMMAND_FIELDS: &[&str] = &[
@@ -1385,6 +1518,7 @@ const SETTINGS_FIELDS: &[&str] = &["title", "icon", "schema", "get", "set", "com
 const AGENT_FIELDS: &[&str] = &["description", "keywords"];
 const STATIC_FILES_FIELDS: &[&str] = &["folder", "user_actions"];
 const COMPATIBILITY_FIELDS: &[&str] = &["min_erplora_version", "max_erplora_version"];
+const RECORD_FIELDS: &[&str] = &["mutable", "reason", "correct_with", "update", "patch"];
 
 /// The fields this core knows at `path`, or `None` if it judges nothing there.
 ///
@@ -1411,6 +1545,7 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
         "agent" => AGENT_FIELDS,
         "static_files" => STATIC_FILES_FIELDS,
         "compatibility" => COMPATIBILITY_FIELDS,
+        "records.*" => RECORD_FIELDS,
         _ => return None,
     })
 }
@@ -1449,6 +1584,9 @@ fn refuses_unknown_fields(path: &str) -> bool {
             | "seed"
             | "roles[]"
             | "scheduled_tasks[]"
+            // hub#632: a record entry decides whether the dispatcher runs a read-merge before an
+            // update — ignoring a field here would change what executes, the refuse tier.
+            | "records.*"
     )
 }
 
@@ -1456,7 +1594,7 @@ fn refuses_unknown_fields(path: &str) -> bool {
 /// floors at `1.2.3`) and missing components read as zero (`2` = `2.0.0`): this compares a FLOOR,
 /// so being generous about the shape is right, while a fourth component or a non-numeric one is
 /// not a version anybody released and returns `None`.
-fn version_triple(value: &str) -> Option<(u64, u64, u64)> {
+pub(crate) fn version_triple(value: &str) -> Option<(u64, u64, u64)> {
     let core = value.trim().split(['-', '+']).next()?;
     let mut parts = core.split('.');
     let major = parts.next()?.parse().ok()?;
@@ -1551,6 +1689,7 @@ impl Manifest {
             ("commands", "commands.*"),
             ("queries", "queries.*"),
             ("widgets", "widgets.*"),
+            ("records", "records.*"),
         ] {
             if let Some(entries) = root.get(block).and_then(|v| v.as_object()) {
                 for (name, entry) in entries {

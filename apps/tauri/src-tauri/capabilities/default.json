@@ -27,6 +27,9 @@
     "allow-erplora-set-device-name",
     "allow-erplora-remove-device",
     "allow-erplora-notify",
+    "allow-autostart-is-enabled",
+    "allow-autostart-enable",
+    "allow-autostart-disable",
     "erplora-android:default"
   ]
 }

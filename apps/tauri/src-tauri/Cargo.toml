@@ -79,3 +79,7 @@ tauri-utils = "2"
 # the crate and the `#[cfg(desktop)]` code would stop compiling.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+# «Start on login» (ADR-0204 §7, hub#389): opt-in autostart for the dedicated desktop till, so
+# there is always a print host draining the hub's queue. The OS keeps the state (LaunchAgent /
+# registry / autostart dir); the shell only exposes enable/disable/is_enabled over `invoke`.
+tauri-plugin-autostart = "2"

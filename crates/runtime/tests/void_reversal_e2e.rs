@@ -26,7 +26,7 @@ fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]
 
 async fn full_stack() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap(); // sales depende de customers
@@ -156,22 +156,25 @@ async fn cash_sale_void_reverts_cash_and_stock() {
     // Fondo de apertura 100,00 € y un producto con stock 10.
     let opening = 10_000;
     let sid = open_cash_session(&rt, &ctx, opening).await;
-    let pid = create_product(&rt, &ctx, "Café", "CAF", 10).await;
+    // Quantities in 10^6 fixed point (ADR-0147): with the units catalog visible (hub#594) the
+    // grid validation on `inventory.stock.decrease` is live and raw units are rejected as
+    // `off_grid`.
+    let pid = create_product(&rt, &ctx, "Café", "CAF", 10_000_000).await;
 
     // Precondición: venta cash de 30,00 € de 2 uds → caja +3000, stock 10→8.
-    seed_sale(&rt, "sale-1", "S-1", 3000, "cash", &[(&pid, 0, 2.0)]).await;
+    seed_sale(&rt, "sale-1", "S-1", 3000, "cash", &[(&pid, 0, 2_000_000.0)]).await;
     seed_cash_sale_movement(&rt, &ctx, &sid, "sale-1", 3000).await;
-    seed_stock_decrease(&rt, &ctx, &pid, 2).await;
+    seed_stock_decrease(&rt, &ctx, &pid, 2_000_000).await;
     assert_eq!(expected_cash(&rt, &ctx).await, opening + 3000, "la venta cash subió la caja");
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 8.0, "la venta bajó el stock");
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 8_000_000.0, "la venta bajó el stock");
 
     // ── ANULAR la venta (sales.void: UPDATE de estado + emit sale.voided) ───────────────
     rt.execute_command("sales.void", &params(json!({ "sale_id": "sale-1", "reason": "test" })), &ctx)
         .await.unwrap();
     rt.drain_outbox().await.unwrap(); // sale.voided → _reverse_sale + _restock_on_void
 
-    // Stock restituido a 10 tras la anulación.
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10.0, "la anulación restituye el stock");
+    // Stock restored to 10 after the void.
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10_000_000.0, "la anulación restituye el stock");
 
     // El movimiento `sale` original SIGUE existiendo (no se muta): hay sale + refund.
     let movs = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx)
@@ -183,7 +186,7 @@ async fn cash_sale_void_reverts_cash_and_stock() {
 
     // ── REENTREGA del evento: idempotencia (no duplica refund ni stock) ─────────────────
     rt.drain_outbox().await.unwrap();
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10.0, "re-drenar no duplica la restitución");
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10_000_000.0, "re-drenar no duplica la restitución");
     let movs2 = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx)
         .await.unwrap();
     assert_eq!(movs2.len(), movs.len(), "no se añaden movimientos al reentregar el evento");
@@ -202,13 +205,13 @@ async fn card_sale_void_restocks_but_no_cash_refund() {
     let ctx = admin();
     let opening = 5_000;
     let sid = open_cash_session(&rt, &ctx, opening).await;
-    let pid = create_product(&rt, &ctx, "Té", "TE", 7).await;
+    let pid = create_product(&rt, &ctx, "Té", "TE", 7_000_000).await;
 
-    // Venta tarjeta: NO crea movimiento de caja; solo baja stock 7→4.
-    seed_sale(&rt, "sale-2", "S-2", 3000, "card", &[(&pid, 0, 3.0)]).await;
-    seed_stock_decrease(&rt, &ctx, &pid, 3).await;
+    // Card sale: does NOT create a cash movement; only lowers stock 7→4 (10^6 fixed point).
+    seed_sale(&rt, "sale-2", "S-2", 3000, "card", &[(&pid, 0, 3_000_000.0)]).await;
+    seed_stock_decrease(&rt, &ctx, &pid, 3_000_000).await;
     assert_eq!(expected_cash(&rt, &ctx).await, opening, "tarjeta no toca la caja");
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 4.0);
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 4_000_000.0);
 
     rt.execute_command("sales.void", &params(json!({ "sale_id": "sale-2", "reason": "x" })), &ctx)
         .await.unwrap();
@@ -216,7 +219,7 @@ async fn card_sale_void_restocks_but_no_cash_refund() {
 
     // Caja intacta (no había movimiento cash que revertir); stock restituido.
     assert_eq!(expected_cash(&rt, &ctx).await, opening, "sin refund: la venta no fue en efectivo");
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 7.0, "el stock se restituye igual en tarjeta");
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 7_000_000.0, "el stock se restituye igual en tarjeta");
     let movs = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx)
         .await.unwrap();
     assert!(movs.iter().all(|m| m["movement_type"] != json!("refund")), "no debe haber refund de caja");

@@ -35,14 +35,20 @@ fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
 }
 
-/// Devuelve cuántas veces corrió el listener `name` (tabla `ob_log` del fixture). Lectura directa
-/// por `db_for_test` (la aserción es de test, no de negocio: no hace falta una query declarada).
+/// Devuelve cuántas veces corrió el listener `name`. Lectura directa por `db_for_test` (la
+/// aserción es de test, no de negocio: no hace falta una query declarada). Cada módulo cuenta en
+/// SU tabla (`ob_log`/`ob2_log`): desde hub#633 el SQL de un command solo escribe tablas de su
+/// propio prefijo, así que el hermano ya no puede loguear en la tabla del otro.
 async fn runs(rt: &Runtime, name: &str) -> i64 {
+    let table = if name == "good" { "ob2_log" } else { "ob_log" };
     let mut p = Params::new();
     p.insert("name".into(), json!(name));
     let rows = rt
         .db_for_test()
-        .query("SELECT runs FROM ob_log WHERE listener = :name", &p)
+        .query(
+            &format!("SELECT runs FROM {table} WHERE listener = :name"),
+            &p,
+        )
         .await
         .unwrap();
     rows.rows
@@ -82,7 +88,7 @@ impl NativeHandler for EmittingHandler {
 /// cash_register vs inventory sobre `sale.voided`).
 async fn runtime() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&fixture("ob")).await.expect("instalar ob");
     rt.install_from_dir(&fixture("ob2")).await.expect("instalar ob2");
     rt.register_native("ob", Arc::new(EmittingHandler));

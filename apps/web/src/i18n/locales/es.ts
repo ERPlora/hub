@@ -56,6 +56,16 @@ export default {
     profile: 'Perfil',
     signOut: 'Cerrar sesión',
   },
+  // Textos del shell de la app instalada. «Cambiar de negocio» (hub#447): la app recuerda UN
+  // negocio y esta es la puerta del usuario hacia otro. Se habla de NEGOCIO, nunca de «hub».
+  shell: {
+    changeHub: 'Cambiar de negocio',
+    changeHubTitle: '¿Cambiar de negocio?',
+    changeHubBody:
+      'Este dispositivo cerrará la sesión de este negocio y mostrará tu lista de negocios.',
+    changeHubCancel: 'Cancelar',
+    changeHubConfirm: 'Cambiar',
+  },
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
   // para dos cosas es como un cajero acaba desinstalando el TPV.
@@ -236,6 +246,10 @@ export default {
     activityMethod: 'Método',
     activityAmount: 'Importe',
     activityStatus: 'Estado',
+    activitySearchPlaceholder: 'Buscar actividad…',
+    // Status badge of an activity row; it agrees with «venta» — the row is a sale (hub#863).
+    activityStatusCompleted: 'Completada',
+    activityStatusPending: 'Pendiente',
     widgets: 'Widgets',
     loadingWidgets: 'Cargando widgets…',
     customizePanel: 'Personalizar panel',
@@ -251,6 +265,10 @@ export default {
     // mismo nombre para lo mismo en las dos superficies.
     appsAdd: 'Añadir apps',
     appsEmpty: 'Aquí aparecerán tus apps. Añade las que necesite tu negocio.',
+    // hub#894 — se dice EN LUGAR de `appsEmpty` cuando la lista no se pudo cargar. Nunca afirma que
+    // el hub esté vacío, y propone recargar: las apps siguen instaladas.
+    appsLoadError:
+      'No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.',
     blueprintTitle: 'Configura tu negocio',
     blueprintBody: 'Carga una plantilla para tu negocio o restaura una copia para empezar.',
     blueprintCta: 'Configurar',
@@ -425,6 +443,11 @@ export default {
     hardwareDesc: 'Impresoras, escáneres y otros dispositivos de este equipo o de su red',
     hardwareReady: 'Disponible aquí',
     hardwareAppOnly: 'Solo desde la app instalada',
+    // «Arrancar al iniciar sesión» (ADR-0204 §7, hub#389). Solo app de escritorio.
+    startOnLogin: 'Arrancar al iniciar sesión',
+    startOnLoginDesc:
+      'Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre tengan dónde imprimirse',
+    startOnLoginError: 'No se pudo cambiar el ajuste de arranque al iniciar sesión',
     disabled: 'Desactivado',
     fiscalIdentity: 'Datos del negocio',
     fiscalIdentityDesc: 'Identidad del obligado tributario (la usan las facturas y las apps fiscales).',
@@ -967,6 +990,13 @@ export default {
     statusPaid: 'Pagada',
     statusVoid: 'Anulada',
     statusUncollectible: 'Incobrable',
+  },
+  // hub#846 — the shell's ONE reaction when the RUNTIME says this session is no longer valid
+  // (expired, or displaced by a sign-in on another device): explain it, instead of screens
+  // quietly emptying into «no data» or a «Retry» that can never help.
+  auth: {
+    sessionEnded:
+      'Tu sesión ha terminado: caducó o se abrió en otro dispositivo. Vuelve a entrar.',
   },
   login: {
     logoAlt: 'Logotipo del negocio',

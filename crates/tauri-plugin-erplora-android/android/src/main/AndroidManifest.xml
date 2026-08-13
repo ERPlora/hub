@@ -47,4 +47,17 @@
          permission since Android 13 (API 33). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Bluetooth Classic SPP printing (ADR-0204, hub#388): listing the BONDED printers and
+         opening the RFCOMM socket. A RUNTIME permission since Android 12 (API 31); without the
+         declaration the request is answered DENIED with no dialog, forever — same trap as
+         ACCESS_LOCAL_NETWORK above. No BLUETOOTH_SCAN on purpose: pairing happens in Android's
+         own settings, the till only reads the bonded list. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- The pre-12 spelling, install-time. `maxSdkVersion` keeps it out of the merged manifest
+         where BLUETOOTH_CONNECT took over. -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+
 </manifest>

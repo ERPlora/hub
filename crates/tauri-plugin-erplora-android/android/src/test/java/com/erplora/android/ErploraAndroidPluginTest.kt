@@ -96,6 +96,47 @@ class ErploraAndroidPluginTest {
         }
     }
 
+    // ── hub#758: a request carries the SCOPE of the operation that makes it ──────────────────
+    //
+    // Asked without one, the plugin requested its whole batch: tapping «Re-scan» popped the
+    // local-network dialog and then, with no visible relation to anything the user just did, the
+    // notifications one. An out-of-context permission reads as opportunistic and gets denied —
+    // and a denied POST_NOTIFICATIONS is a kitchen that stops hearing orders.
+
+    @Test
+    fun `a scoped request asks only for what the operation needs`() {
+        assertEquals(
+            listOf(RED),
+            ErploraAndroidPlugin.requestScope(
+                required = listOf(NOTIF, RED),
+                requested = listOf(RED),
+            ),
+        )
+    }
+
+    @Test
+    fun `a request without a scope keeps asking for everything — an older web must not break`() {
+        // The web app is served by the hub and the plugin ships inside the installed binary: they
+        // CAN be out of step. A web that predates the scope sends none, and gets the old batch.
+        assertEquals(
+            listOf(NOTIF, RED),
+            ErploraAndroidPlugin.requestScope(required = listOf(NOTIF, RED), requested = null),
+        )
+    }
+
+    @Test
+    fun `the scope cannot smuggle in a permission this Android does not require`() {
+        // On API 36 the local network permission does not exist; requesting it can hang the
+        // dialog on some vendors. The policy stays the single authority on what CAN be asked.
+        assertEquals(
+            emptyList(),
+            ErploraAndroidPlugin.requestScope(
+                required = PermissionPolicy.required(sdkInt = 36, notifications = false),
+                requested = listOf(RED),
+            ),
+        )
+    }
+
     // Hubo aquí un test del `REQUEST_CODE` propio del plugin. Se retiró con el mecanismo que
     // fijaba: pedir por `activity.requestPermissions` deja la respuesta en la Activity de Tauri,
     // que no sabe devolvérsela al plugin — el sistema concedía los permisos y el `invoke` no

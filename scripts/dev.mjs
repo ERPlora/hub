@@ -20,6 +20,7 @@
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveModulesWorkspace } from '../apps/web/sync-modules.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HUB_ROOT = join(HERE, '..');
@@ -30,9 +31,14 @@ const DEFAULTS = {
   // Postgres-only (ADR-0154): el runtime falla duro sin DSN. Default local para `pnpm dev`
   // (crea la BD con `createdb erplora_hub_dev`); sobreescribible exportando HUB_DATABASE_URL.
   HUB_DATABASE_URL: 'postgres://localhost/erplora_hub_dev',
-  // Fuente de módulos de dev = el workspace del toolkit en el root del monorepo. El runtime los
-  // instala al arrancar (los mismos que apps/web carga como WebComponents vía sync-modules.mjs).
-  HUB_MODULES_DIR: join(MONOREPO_ROOT, 'modules-workspace', 'modules'),
+  // Dev module source = the toolkit workspace at the monorepo root. The runtime installs them at
+  // boot (the same ones apps/web loads as WebComponents via sync-modules.mjs). Resolved with the
+  // shared resolver (hub#787) so it also works from a git worktree, where `HUB_ROOT/..` is NOT
+  // the monorepo — it derives the main checkout from the git common dir. The old relative path
+  // stays as last resort so a checkout without the sibling repo behaves exactly as before.
+  HUB_MODULES_DIR:
+    resolveModulesWorkspace({ startDir: HUB_ROOT }).dir ??
+    join(MONOREPO_ROOT, 'modules-workspace', 'modules'),
   // Modo desarrollo EXPLÍCITO (hub#239): habilita las vías de carga de código local — el escaneo
   // de HUB_MODULES_DIR al arrancar y `POST /api/modules/install {dir}` (confinado al staging).
   // El provisioning del SaaS NUNCA inyecta esta variable: en producción esas vías están apagadas
@@ -121,7 +127,10 @@ function shutdown(reason) {
 log('dev', '\x1b[32m', `HUB_DATABASE_URL=${env.HUB_DATABASE_URL}`);
 log('dev', '\x1b[32m', `HUB_MODULES_DIR=${env.HUB_MODULES_DIR}  HUB_DEV_MODE=${env.HUB_DEV_MODE}`);
 log('dev', '\x1b[32m', `HUB_BIND=${env.HUB_BIND}  VITE_RUNTIME_URL='${env.VITE_RUNTIME_URL}'`);
-log('dev', '\x1b[32m', 'runtime → http://127.0.0.1:8787   web → http://localhost:5173');
+// Two benches can coexist (hub#787): the web port comes from VITE_PORT (default 5173) and the
+// runtime from HUB_BIND; apps/web/vite.config.ts reads both from this same env.
+const WEB_PORT = Number(env.VITE_PORT) || 5173;
+log('dev', '\x1b[32m', `runtime → http://${env.HUB_BIND}   web → http://localhost:${WEB_PORT}`);
 
 for (const p of procs) {
   const child = spawn(p.cmd, p.args, {

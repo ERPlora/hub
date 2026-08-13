@@ -138,7 +138,7 @@
             :rows="activity"
             :views="['table', 'cards']"
             :searchKeys="['sale', 'customer', 'method']"
-            search-placeholder="Buscar actividad…"
+            :search-placeholder="t('dashboard.activitySearchPlaceholder')"
             page-size="15"
             column-picker
           ></ok-data-table>
@@ -415,9 +415,25 @@ function badgeCell(text: string, tone: Tone): Node {
 }
 
 interface ActivityRow {
-  date: string; sale: string; customer: string; method: string; amount: number; status: string; tone: Tone;
+  date: string; sale: string; customer: string; method: string; amount: number;
+  /** Stable machine value; translated only for display (hub#863). */
+  status: 'completed' | 'pending';
+  tone: Tone;
 }
-const activity = ref<ActivityRow[]>([]);
+const activityRaw = ref<ActivityRow[]>([]);
+// Display rows: `status` is translated here and ONLY here, so the badge, the select filter and its
+// options all see the same localized word — and a locale switch repaints them (the fetched value
+// underneath stays stable, so nothing ever compares against a translation).
+const activity = computed(() =>
+  activityRaw.value.map((r) => ({
+    ...r,
+    status: t(
+      r.status === 'completed'
+        ? 'dashboard.activityStatusCompleted'
+        : 'dashboard.activityStatusPending',
+    ),
+  })),
+);
 const loadingFeed = ref<boolean>(true);
 const activityTable = ref<HTMLElement | null>(null);
 
@@ -452,17 +468,17 @@ async function loadActivity(): Promise<void> {
       sort: 'created_at',
       dir: 'desc',
     });
-    activity.value = page.rows.map((r) => ({
+    activityRaw.value = page.rows.map((r) => ({
       date: String(r.created_at ?? ''),
       sale: String(r.sale_number ?? `#${r.id}`),
       customer: String(r.customer_name ?? '—'),
       method: String(r.payment_method_name ?? '—'),
       amount: Number(r.total) || 0,
-      status: r.status === 'completed' ? 'Completada' : 'Pendiente',
+      status: r.status === 'completed' ? 'completed' : 'pending',
       tone: r.status === 'completed' ? 'success' : 'medium',
     }));
   } catch {
-    activity.value = [];
+    activityRaw.value = [];
   } finally {
     loadingFeed.value = false;
   }

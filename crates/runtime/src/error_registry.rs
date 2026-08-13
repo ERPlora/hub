@@ -301,6 +301,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::RequiresElevation { .. } => "requires_elevation",
         E::CapabilityDenied { .. } => "capability_denied",
         E::MissingDependency { .. } => "missing_dependency",
+        // hub#681: the dependency exists but is older than the declared floor — its own code so
+        // the shell/marketplace can say "update `inventory` first" instead of a generic failure.
+        E::DependencyTooOld { .. } => "dependency_too_old",
+        E::DependencyFloorUnreadable { .. } => "dependency_floor_unreadable",
         E::DependencyCycle { .. } => "dependency_cycle",
         E::EventLoop => "event_loop",
         E::EventNotDeclared { .. } => "event_not_declared",

@@ -1,0 +1,183 @@
+# ==============================================================================
+# Image freshness — detects a silently frozen ghcr.io/erplora/hub:latest (hub#652)
+#
+# Why this is a SEPARATE file and not a step in build-hub.yml: when GitHub cannot
+# parse a workflow (duplicate map key, duplicate step id) the run "fails" with
+# 0 jobs and no logs, so any alert living INSIDE build-hub.yml (`if: failure()`,
+# a `notify` job with `needs`) NEVER executes. That exact failure mode froze the
+# fleet image three times, each discovered by accident. The only reliable
+# detection is an outside check asking the positive question:
+#
+#   "does the registry hold an image for what is on main?"
+#
+# `build-hub` publishes an immutable `ghcr.io/erplora/hub:<full git sha>` tag on
+# every push to main, so the check is: does the tag for HEAD of main exist?
+# This catches strictly more than "last run != success": workflow not parsing,
+# run never created (bad path filter), run green but nothing pushed, image
+# pruned by retention.
+#
+# Registry access reuses the hub#841/#844 pattern: talk to the REGISTRY
+# (ghcr.io token exchange with the workflow's own GITHUB_TOKEN, then /v2/...) —
+# NOT `gh api` against the org packages API, which the repo-scoped token cannot
+# see (that combination blocked a release on ci-runner-1). One deviation from
+# image-tags.sh, on purpose: a single manifest request for ONE tag instead of
+# paging /v2/<repo>/tags/list — existence of one tag is the whole question, and
+# a missed page must not fake a "missing image" alert.
+#
+# Alert channel: the job FAILS and opens (or refreshes, idempotently — one open
+# issue, never one per run) an issue. Native Actions notifications demonstrably
+# did not work here (three incidents, zero notices); an issue notifies watchers
+# and lands on the board.
+#
+# Cadence & cost: 1×/day (hub#652 discusses hourly, but CI is serialized on the
+# single ci-runner-1 and Actions overage bills 1 min minimum per job — daily
+# already turns a 2-day silent freeze into a ≤24 h one for ~1 billable min/day).
+# Runs on the `CI_RUNNER_LABEL` switch like build-hub; `ubuntu-latest` is the
+# cheap fallback when the Variable is unset.
+#
+# NOTE: `schedule` triggers only fire from the workflow file on the DEFAULT
+# branch (main). Until this file reaches main via a release batch, only
+# `workflow_dispatch` runs it.
+# ==============================================================================
+
+name: Image Freshness (ghcr.io/erplora/hub)
+
+on:
+  schedule:
+    - cron: '41 5 * * *'   # daily, off the top of the hour (GitHub load spike)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: main HEAD has a published image
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read   # GHCR token exchange for the private erplora/hub package
+      issues: write    # open/refresh the alert issue
+
+    env:
+      # build-hub takes 16-19 min; the single runner can also queue it behind
+      # another job. Younger commits are given the benefit of the doubt.
+      GRACE_MINUTES: '60'
+
+    steps:
+      # Explicit `ref: main`: schedule runs on the default branch anyway, but a
+      # manual dispatch from another branch must still check MAIN's image.
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Check GHCR for the image of main HEAD
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          sha=$(git rev-parse HEAD)
+          commit_ts=$(git show -s --format=%ct HEAD)
+          age_minutes=$(( ($(date +%s) - commit_ts) / 60 ))
+          echo "main HEAD: $sha (${age_minutes} min old)"
+          {
+            echo "sha=$sha"
+            echo "age_minutes=$age_minutes"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$age_minutes" -lt "$GRACE_MINUTES" ]; then
+            echo "result=fresh-commit" >> "$GITHUB_OUTPUT"
+            echo "Commit is younger than ${GRACE_MINUTES} min — build may still be running. OK."
+            exit 0
+          fi
+
+          # GHCR is lowercase-only; github.repository_owner keeps its case.
+          repo=$(printf '%s/hub' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+
+          # Same auth the version guard uses (scripts/image-tags.sh, hub#841):
+          # GITHUB_TOKEN → ghcr.io token exchange, pull scope.
+          token=$(curl -fsS --max-time 30 \
+            -u "${GITHUB_ACTOR}:${GH_TOKEN}" \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:${repo}:pull" \
+            | jq -r '.token // empty')
+          if [ -z "$token" ]; then
+            echo "result=unverifiable" >> "$GITHUB_OUTPUT"
+            echo "::error::Could not obtain a GHCR pull token with GITHUB_TOKEN — the check could not run (this is NOT a stale-image verdict)."
+            exit 1
+          fi
+
+          # 200 = the image for HEAD exists; 404 = it does not (frozen image).
+          # Anything else = the registry could not be read — fail, but do NOT
+          # claim the image is stale (refuse to guess, like image-tags.sh).
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 60 \
+            -H "Authorization: Bearer $token" \
+            -H 'Accept: application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json' \
+            "https://ghcr.io/v2/${repo}/manifests/${sha}")
+          echo "GHCR manifest ${repo}:${sha} -> HTTP ${status}"
+
+          case "$status" in
+            200)
+              echo "result=fresh" >> "$GITHUB_OUTPUT"
+              echo "Image for main HEAD is published. build-hub is alive."
+              ;;
+            404)
+              echo "result=stale" >> "$GITHUB_OUTPUT"
+              echo "::error::No image for main HEAD (${sha}, ${age_minutes} min old). build-hub is NOT publishing — likely an unparseable workflow (0 jobs, no logs; see hub#652)."
+              ;;
+            *)
+              echo "result=unverifiable" >> "$GITHUB_OUTPUT"
+              echo "::error::GHCR answered HTTP ${status} — the check could not run (this is NOT a stale-image verdict)."
+              exit 1
+              ;;
+          esac
+
+      # Idempotent: reuse the one open alert issue, comment on it; only create
+      # when none is open. `gh` is preinstalled on ubuntu-latest and installed
+      # on ci-runner-1.
+      - name: Open or refresh the alert issue
+        if: steps.check.outputs.result == 'stale'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.check.outputs.sha }}
+          AGE_MINUTES: ${{ steps.check.outputs.age_minutes }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="build-hub is not publishing: main HEAD has no image in GHCR"
+          body="Detected by the daily image-freshness check (hub#652).
+
+          - main HEAD: \`${SHA}\` (${AGE_MINUTES} min old, grace ${GRACE_MINUTES} min)
+          - missing tag: \`ghcr.io/erplora/hub:${SHA}\` — so \`:latest\` is frozen at an older commit
+          - run: ${RUN_URL}
+
+          Historical cause (3×): GitHub refuses to PARSE \`build-hub.yml\` (duplicate map key or step id) → the run shows failure with **0 jobs, 0 s, no logs**. Do not look for logs — there are none. Reproduce the parse error with:
+
+          \`\`\`sh
+          gh workflow run .github/workflows/build-hub.yml -R ${{ github.repository }} --ref main
+          # → HTTP 422 'failed to parse workflow' with line/col, if that is the cause
+          \`\`\`
+
+          This issue is reused (one comment per detection) while the condition persists; close it once the image is published again."
+
+          # Search phrase deliberately colon-free (colons are GitHub search
+          # syntax) and stable — it is what makes the alert idempotent.
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search '"main HEAD has no image in GHCR" in:title' \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Refreshing open alert issue #$existing"
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+
+      - name: Fail loudly
+        if: steps.check.outputs.result == 'stale'
+        run: |
+          echo "::error::ghcr.io/erplora/hub:latest is frozen — no image for main HEAD. See the alert issue."
+          exit 1

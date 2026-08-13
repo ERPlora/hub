@@ -32,9 +32,25 @@ fn mdir(n: &str) -> PathBuf { erplora_runtime::e2e_support::modules_root().join(
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 fn wasm() -> bool { mdir("cash_register").join("dist/handler.wasm").exists() }
 
+/// Id of the CASH payment method from the hub's seeded catalog (hub#594): with the runtime and
+/// the ctx sharing "h1", the `sales` seed is visible and `complete_sale` enforces
+/// `payment_method_id` against it instead of silently degrading.
+async fn cash_method_id(rt: &Runtime, ctx: &RequestContext) -> String {
+    let rows = rt
+        .execute_query("sales.payment_methods", &Params::new(), ctx)
+        .await
+        .expect("sales.payment_methods");
+    rows.iter()
+        .find(|r| r["type"] == json!("cash"))
+        .unwrap_or_else(|| panic!("the hub's catalog must carry the `cash` method: {rows:?}"))["id"]
+        .as_str()
+        .expect("payment method id")
+        .to_string()
+}
+
 async fn rt_cr() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("cash_register")).await.expect("instalar cash_register");
     rt
 }
@@ -132,7 +148,7 @@ async fn sale_completed_records_cash_movement() {
     // Cadena cross-módulo completa: inventory+customers+invoice+sales+cash_register.
     if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&mdir("taxes")).await.unwrap(); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap();
@@ -148,8 +164,9 @@ async fn sale_completed_records_cash_movement() {
 
     // venta de 30 → cash_register.record_sale añade un movimiento 'sale' de 30 a la sesión.
     rt.execute_command("sales.complete_sale", &params(json!({
-        // `idempotency_key` del intento de cobro (sales#20, obligatorio desde v2.13.x).
+        // `idempotency_key` of the charge attempt (sales#20, mandatory since v2.13.x).
         "idempotency_key": "cash-e2e-movimiento-de-caja",
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "tax_included": false,
         "items": [{ "product_name": "X", "price": 3000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
@@ -174,7 +191,7 @@ async fn movement_add_emits_movement_added() {
     if !erplora_runtime::require_modules_workspace() { return; }
     // Path directo determinista: `movement.add` escribe un movimiento → debe emitir el evento.
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
     rt.install_from_dir(&mdir("cash_register")).await.expect("instalar cash_register");
@@ -200,7 +217,7 @@ async fn record_sale_emits_movement_added_after_relay() {
     // mismo tx del outbox → cuando el widget lo recibe, el dato YA está en la BD.
     if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
     rt.install_from_dir(&mdir("taxes")).await.unwrap();
@@ -216,6 +233,7 @@ async fn record_sale_emits_movement_added_after_relay() {
 
     rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": "cash-e2e-movement-added-por-el-relay",
+        "payment_method_id": cash_method_id(&rt, &ctx).await,
         "tax_included": false,
         "items": [{ "product_name": "X", "price": 3000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();

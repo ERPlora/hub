@@ -34,6 +34,7 @@ use axum::extract::{Multipart, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::future::Future;
@@ -302,10 +303,33 @@ async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Respons
     }
 }
 
-/// `GET …/media/raw?path=` en el Cloud → reenvía los bytes del fichero (inline) al cliente. Lee a
-/// memoria (los ficheros de media son modestos: logs, PDFs, imágenes) y fija `Content-Type` por
-/// extensión, igual que hacía la rama local.
+/// Cap on simultaneous media object downloads (hub#759). A catalog page mounts ~300 image URLs
+/// at once; each in-flight download holds network buffers in a 96 MiB container, so the burst
+/// queues here in groups instead of stacking up. The value is deliberately small: media files are
+/// modest (logs, PDFs, images) and each download completes fast, so queued requests drain quickly.
+pub const MAX_CONCURRENT_MEDIA_FETCHES: usize = 8;
+
+/// Hard cap on the size of a single media object served through the raw proxy (hub#759). Media
+/// files are modest (logs, PDFs, catalog images); anything bigger than this cannot be safely
+/// relayed by a 96 MiB container and is refused (413) — upfront when the size is declared, or by
+/// aborting the stream when it is not.
+pub const MAX_MEDIA_OBJECT_BYTES: u64 = 25 * 1024 * 1024;
+
+/// `GET …/media/raw?path=` en el Cloud → **streams** the file bytes (inline) to the client and
+/// sets `Content-Type` by extension.
+///
+/// Memory discipline (hub#759): this proxy used to buffer each object fully in RAM with no
+/// concurrency bound — a catalog burst of ~300 images was enough to OOM the 96 MiB container
+/// (exit 137). Three mechanisms bound it now: a semaphore on simultaneous downloads (acquired
+/// before any network I/O and held until the response body is fully drained), chunked streaming
+/// instead of `bytes()`, and a per-object size cap ([`MAX_MEDIA_OBJECT_BYTES`]).
 async fn cloud_raw(st: &AppState, path: &str) -> Response {
+    // The permit gates the WHOLE pipeline (Cloud signing call + object download + body relay).
+    // `acquire_owned` queues excess requests instead of shedding them; the semaphore is never
+    // closed, so an `Err` can only mean shutdown.
+    let Ok(permit) = st.media_fetch_limiter.clone().acquire_owned().await else {
+        return err(StatusCode::SERVICE_UNAVAILABLE, "media limiter closed");
+    };
     let Some(headers) = cloud_headers(st) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
@@ -341,18 +365,41 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
         Ok(_) => return err(StatusCode::NOT_FOUND, "fichero no encontrado"),
         Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
     };
-    let bytes = match object.bytes().await {
-        Ok(b) => b,
-        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
-    };
+    // When the size is declared, refuse an oversized object BEFORE downloading a single byte.
+    if object
+        .content_length()
+        .is_some_and(|len| len > MAX_MEDIA_OBJECT_BYTES)
+    {
+        return err(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "media object exceeds the size cap",
+        );
+    }
     let name = file_name_str(Path::new(path));
+    // Relay the object chunk by chunk instead of materializing it: memory per request is one
+    // chunk, not one file. The closure owns `permit` so it is released only when the response
+    // body is dropped (fully drained or the client went away), keeping the concurrency bound
+    // true for the whole download, not just this function call. `total` re-enforces the size
+    // cap mid-stream for objects that did not declare a length: exceeding it aborts the body.
+    let mut total: u64 = 0;
+    let stream = object.bytes_stream().map(move |chunk| {
+        let _held_until_drained = &permit;
+        let chunk = chunk.map_err(axum::BoxError::from)?;
+        total += chunk.len() as u64;
+        if total > MAX_MEDIA_OBJECT_BYTES {
+            return Err(axum::BoxError::from(std::io::Error::other(
+                "media object exceeds the size cap",
+            )));
+        }
+        Ok::<_, axum::BoxError>(chunk)
+    });
     Response::builder()
         .header(header::CONTENT_TYPE, content_type(&name))
         .header(
             header::CONTENT_DISPOSITION,
             format!("inline; filename=\"{}\"", name.replace('"', "")),
         )
-        .body(Body::from(bytes.to_vec()))
+        .body(Body::from_stream(stream))
         .unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "respuesta inválida"))
 }
 

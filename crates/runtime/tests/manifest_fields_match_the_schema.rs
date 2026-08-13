@@ -71,6 +71,7 @@ fn every_block_the_runtime_judges_has_the_same_fields_as_the_schema() {
         ("/properties/agent", "agent"),
         ("/properties/static_files", "static_files"),
         ("/properties/compatibility", "compatibility"),
+        ("/properties/records/additionalProperties", "records.*"),
     ];
 
     for (pointer, path) in pairs {

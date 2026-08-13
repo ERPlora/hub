@@ -249,7 +249,8 @@ impl Runtime {
         Ok(manifest
             .depends_on
             .into_iter()
-            .filter(|dep| !self.registry.is_installed(dep))
+            .filter(|dep| !self.registry.is_installed(&dep.id))
+            .map(|dep| dep.id)
             .collect())
     }
 
@@ -296,7 +297,12 @@ impl Runtime {
         // 3) Orden topológico por depends_on (un ciclo sí aborta: error de diseño del conjunto).
         let pairs: Vec<(String, Vec<String>)> = found
             .iter()
-            .map(|(_, m)| (m.id.clone(), m.depends_on.clone()))
+            .map(|(_, m)| {
+                (
+                    m.id.clone(),
+                    m.depends_on.iter().map(|d| d.id.clone()).collect(),
+                )
+            })
             .collect();
         let order = installer::install_order(&pairs)?;
         // 4) Instala en orden; un módulo que falle se omite (log) sin tumbar a los demás.
@@ -402,7 +408,7 @@ impl Runtime {
             }
             to_enable.push(id.clone());
             if let Some(m) = self.registry.installed.iter().find(|m| m.id == id) {
-                pending.extend(m.depends_on.iter().cloned());
+                pending.extend(m.depends_on.iter().map(|d| d.id.clone()));
             }
         }
         for id in &to_enable {
@@ -425,7 +431,7 @@ impl Runtime {
                     matches!(
                         self.registry.status.get(&m.id),
                         Some(ModuleStatus::InactiveAuto)
-                    ) && m.depends_on.iter().all(|d| self.registry.is_active(d))
+                    ) && m.depends_on.iter().all(|d| self.registry.is_active(&d.id))
                 })
                 .map(|m| m.id.clone())
                 .collect();
@@ -459,7 +465,7 @@ impl Runtime {
                 .filter(|m| {
                     self.registry.is_active(&m.id)
                         && !fallen.contains(&m.id)
-                        && m.depends_on.iter().any(|d| fallen.contains(d))
+                        && m.depends_on.iter().any(|d| fallen.contains(&d.id))
                 })
                 .map(|m| m.id.clone())
                 .collect();
@@ -545,7 +551,7 @@ impl Runtime {
                 .iter()
                 .filter(|m| {
                     self.registry.is_active(&m.id)
-                        && m.depends_on.iter().any(|d| fallen.contains(d))
+                        && m.depends_on.iter().any(|d| fallen.contains(&d.id))
                 })
                 .map(|m| m.id.clone())
                 .collect();
@@ -600,7 +606,7 @@ impl Runtime {
                     .status
                     .get(&m.id)
                     .unwrap_or(&ModuleStatus::Inactive),
-                depends_on: m.depends_on.clone(),
+                depends_on: m.depends_on.iter().map(|d| d.id.clone()).collect(),
                 manifest_warnings: m.warnings.clone(),
             })
             .collect()
@@ -711,13 +717,15 @@ impl Runtime {
         r
     }
 
-    /// ¿La query (de un módulo activo) declara bloque `list` (es paginada)? Lo usa el server
-    /// para decidir la forma del `data` que devuelve por el wire.
+    /// ¿La query (de un módulo activo — o del core, hub#884) declara bloque `list` (es paginada)?
+    /// Lo usa el server para decidir la forma del `data` que devuelve por el wire.
     pub fn is_list_query(&self, name: &str) -> bool {
-        self.registry
-            .get_query(name)
-            .map(|q| q.def.list.is_some())
-            .unwrap_or(false)
+        hub_users::is_core_list_query(name)
+            || self
+                .registry
+                .get_query(name)
+                .map(|q| q.def.list.is_some())
+                .unwrap_or(false)
     }
 
     /// Ejecuta un command declarativo (solo si su módulo está activo). Los eventos emitidos se
@@ -1856,6 +1864,49 @@ impl Runtime {
             // says whose data this is (hub#826).
             fields: event_shape::infer(event_name, &payloads),
         }))
+    }
+
+    /// **Every event this hub can speak of**, by name (hub#823) — the read the flow editor's
+    /// «Cuando pase…» dropdown is built from, so it stops being seeded from a hand-written file
+    /// that can never offer an event this hub emits and the file does not know.
+    ///
+    /// The union of two honest sources, sorted by name:
+    ///
+    /// - what installed modules DECLARE ([`Registry::declared_events`]: `events.emits` plus each
+    ///   command's `emit`) — a declared event that never fired is still offered, with no
+    ///   `last_seen_at`;
+    /// - what was really SEEN in the outbox ([`outbox::seen_event_names`]) — an event that
+    ///   happened and that nobody declares any more (a core event, an uninstalled module) is
+    ///   still offered, with `declared_by` empty.
+    ///
+    /// Names only: what an event carries is [`Self::event_shape`]'s answer, with its redaction.
+    pub async fn event_catalog(&self) -> Result<Vec<event_shape::EventCatalogEntry>> {
+        let mut entries: std::collections::BTreeMap<String, event_shape::EventCatalogEntry> = self
+            .registry
+            .declared_events()
+            .into_iter()
+            .map(|(name, declared_by)| {
+                (
+                    name.clone(),
+                    event_shape::EventCatalogEntry {
+                        name,
+                        declared_by,
+                        last_seen_at: None,
+                    },
+                )
+            })
+            .collect();
+        for seen in outbox::seen_event_names(self.db.as_ref(), &self.hub_id).await? {
+            entries
+                .entry(seen.name.clone())
+                .or_insert_with(|| event_shape::EventCatalogEntry {
+                    name: seen.name,
+                    declared_by: Vec::new(),
+                    last_seen_at: None,
+                })
+                .last_seen_at = Some(seen.last_seen_at);
+        }
+        Ok(entries.into_values().collect())
     }
 
     /// Un ciclo del barrido del **scheduler** (ADR-0011): ejecuta las scheduled tasks vencidas de

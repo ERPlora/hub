@@ -1,20 +1,26 @@
 // hub#512 — the READ of the PIN approval record (`_elevation_audit`, ADR-0265).
+// hub#884 — the read is PAGED: the runtime serves `{rows,total,limit,offset}` and the shell asks
+// for one page at a time through the SDK's list controller — the same engine, the same contract,
+// every other list of the product uses.
 //
 // The runtime has written a receipt per spent approval since system migration v26, and until this
 // screen the only way to read it was a SQL session against the customer's own database. The query
-// (`hub.approvals.list`, `crates/runtime/src/hub_users.rs`) already exists and already resolves both
-// ids to names with a LEFT JOIN; what is fixed here is how the shell reads it:
+// (`hub.approvals.list`, `crates/runtime/src/hub_users.rs`) resolves both ids to names with a LEFT
+// JOIN and now paginates through the runtime's list engine; what is fixed here is how the shell
+// reads it:
 //
-//   - the order is the QUERY's (`created_at DESC`). An audit trail that a screen re-sorts on a
-//     whim is one where two people looking at the same hub see a different "last approval";
+//   - one PAGE crosses the wire, never the trail. The audit grows forever by design, so «download
+//     it all and filter in memory» stops being a screen and starts being megabytes per open;
+//   - the order is the QUERY's (`created_at DESC` by default). An audit trail that a screen
+//     re-sorts on a whim is one where two people see a different "last approval";
 //   - a receipt whose person was deleted STILL has a row. The JOIN leaves the name empty on
 //     purpose — losing the row would lose the audit, which is the one thing it may not do;
 //   - a broken answer is NOT an empty record. `parseApprovals` returns nothing for a shape it does
-//     not know, and the read itself throws, so the panel can say «could not load» instead of
-//     «nobody has ever approved anything» — the false negative this issue exists to end.
+//     not know, and a failed page lands in the controller's `error`, so the panel can say «could
+//     not load» instead of «nobody has ever approved anything».
 import { describe, expect, it, vi } from 'vitest';
 
-import { APPROVALS_QUERY, listApprovals, parseApprovals, type Approval } from './approvals';
+import { APPROVALS_QUERY, createApprovalsController, parseApprovals } from './approvals';
 
 /** Two receipts as the runtime emits them: newest first, snake_case, both names resolved. */
 const ROWS = [
@@ -42,52 +48,66 @@ const ROWS = [
   },
 ];
 
-function clientAnswering(rows: unknown): { query: ReturnType<typeof vi.fn> } {
-  return { query: vi.fn().mockResolvedValue(rows) };
+/** A client whose `queryPage` answers one page of the trail, the way the runtime does. */
+function clientAnswering(rows: unknown[], total = rows.length) {
+  return {
+    queryPage: vi.fn().mockResolvedValue({ rows, total, limit: 10, offset: 0 }),
+  };
 }
 
-describe('approvals · reading the record', () => {
-  it('asks the core query that owns the record', async () => {
-    const client = clientAnswering(ROWS);
+describe('approvals · reading the record one page at a time', () => {
+  it('asks the core query that owns the record, for a PAGE and newest first', async () => {
+    const client = clientAnswering(ROWS, 41);
+    const ctl = createApprovalsController(client as never, () => {});
 
-    await listApprovals(client as never);
+    await ctl.load();
 
-    expect(client.query).toHaveBeenCalledWith(APPROVALS_QUERY, {});
     expect(APPROVALS_QUERY).toBe('hub.approvals.list');
+    expect(client.queryPage).toHaveBeenCalledWith(
+      APPROVALS_QUERY,
+      expect.objectContaining({ limit: 10, offset: 0, sort: 'created_at', dir: 'desc' }),
+    );
   });
 
-  it('carries the double attribution: who asked AND who approved', async () => {
-    const [first] = await listApprovals(clientAnswering(ROWS) as never);
+  it('hands back the page AND the real total: the pager must know 2 of 41', async () => {
+    const ctl = createApprovalsController(clientAnswering(ROWS, 41) as never, () => {});
+
+    await ctl.load();
+
+    expect(ctl.rows.map((r) => r.id)).toEqual(['a2', 'a1']);
+    expect(ctl.total).toBe(41);
+  });
+
+  it('carries the double attribution: who asked AND who approved, ids included', async () => {
+    const ctl = createApprovalsController(clientAnswering(ROWS) as never, () => {});
+
+    await ctl.load();
+    const first = ctl.rows[0];
 
     expect(first.createdByName).toBe('Marta');
     expect(first.approvedByName).toBe('Sofía');
     // The ids travel too: two people can share a name, and the CSV of an audit needs the id.
     expect(first.createdBy).toBe('u-cashier');
     expect(first.approvedBy).toBe('u-manager');
-  });
-
-  it('says WHAT was approved and at what level, and WHICH one it was', async () => {
-    const [first] = await listApprovals(clientAnswering(ROWS) as never);
-
     expect(first.command).toBe('sales.void_line');
     expect(first.permission).toBe('sales.void');
-    // The fingerprint is what tells the €4 ticket from the other €4 ticket (ADR-0265).
     expect(first.payloadFingerprint).toBe('ff01');
     expect(first.createdAt).toBe('2026-08-11T20:15:00Z');
   });
 
-  it('keeps the order the query gave: newest first, never re-sorted here', async () => {
-    const rows = await listApprovals(clientAnswering(ROWS) as never);
-
-    expect(rows.map((r: Approval) => r.id)).toEqual(['a2', 'a1']);
-  });
-
-  it('passes the filters through, so the same query can answer «what did Sofía approve»', async () => {
+  it('a date range travels as the query’s range filter on `created_at`', async () => {
     const client = clientAnswering(ROWS);
+    const ctl = createApprovalsController(client as never, () => {});
 
-    await listApprovals(client as never, { approved_by: 'u-manager' });
+    ctl.setFilter('created_at', { from: '2026-08-01', to: '2026-08-11T23:59:59' });
+    await vi.waitFor(() => expect(client.queryPage).toHaveBeenCalled());
 
-    expect(client.query).toHaveBeenCalledWith(APPROVALS_QUERY, { approved_by: 'u-manager' });
+    expect(client.queryPage).toHaveBeenCalledWith(
+      APPROVALS_QUERY,
+      expect.objectContaining({
+        filters: { created_at: { from: '2026-08-01', to: '2026-08-11T23:59:59' } },
+      }),
+    );
   });
 });
 
@@ -116,10 +136,14 @@ describe('approvals · what must never be lost', () => {
     expect(rows.map((r) => r.id)).toEqual(['a2', 'a1']);
   });
 
-  it('a failed read THROWS: the caller has to tell «could not load» from «nothing to show»', async () => {
-    const client = { query: vi.fn().mockRejectedValue(new Error('Failed to fetch')) };
+  it('a failed page lands in `error`: «could not load» is not «nothing to show»', async () => {
+    const client = { queryPage: vi.fn().mockRejectedValue(new Error('Failed to fetch')) };
+    const ctl = createApprovalsController(client as never, () => {});
 
-    await expect(listApprovals(client as never)).rejects.toThrow('Failed to fetch');
+    await ctl.load();
+
+    expect(ctl.error).toBe('Failed to fetch');
+    expect(ctl.rows).toEqual([]);
   });
 
   it('a field the runtime did not send reads as empty, never as «undefined» on screen', () => {

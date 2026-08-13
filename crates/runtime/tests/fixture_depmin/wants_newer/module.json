@@ -1,0 +1,6 @@
+{
+  "id": "wants_newer",
+  "name": "Wants base >= 1.3.0",
+  "version": "1.0.0",
+  "depends_on": [{ "id": "base", "min_version": "1.3.0" }]
+}

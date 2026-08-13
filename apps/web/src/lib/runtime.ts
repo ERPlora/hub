@@ -18,7 +18,7 @@ import { toast, type ToastColor } from './toast';
 import { config } from './config';
 import { getAccessToken } from './cloud';
 import { makeBridgeTransport } from './bridge-transport';
-import { getHubSession, user } from './session';
+import { getHubSession, logout, user } from './session';
 import { beginRequest, endRequest } from './shell';
 import { getLocale, bootHubLanguage } from '../i18n';
 import { hubSettings } from './hub-settings';
@@ -128,6 +128,104 @@ export function runtimeHeaders(): Record<string, string> {
   return h;
 }
 
+// ── Central reaction to a DEAD runtime session (hub#846) ──────────────────────────────────────
+// Before this existed, every fetch in this file decided on its own what `!res.ok` meant, and most
+// flattened a 401 to "no data": the user kept their name, email and navigation while the screens
+// emptied one by one (hub#902's 401-every-10s loop is this file's event-ticket retry; hub#894's
+// "you have no apps" is the same flattening). The shell has to REACT — close the local session
+// once and lead to the login — not merely show the failure.
+
+/**
+ * The runtime said this shell's session is no longer valid (expired, or displaced by a sign-in on
+ * another device). By the time a caller sees this error the local session has already been closed
+ * and the redirect hook fired — so no screen may present it as a retryable failure or as an empty
+ * list: retrying cannot help, and "no data" would be a lie.
+ */
+export class RuntimeSessionExpiredError extends Error {
+  readonly code = 'session_expired';
+
+  constructor() {
+    super('the runtime session is no longer valid');
+    this.name = 'RuntimeSessionExpiredError';
+  }
+}
+
+/**
+ * End-of-session hook, mirror of `cloud.setOnSessionExpired` (the Cloud plane's twin in
+ * `lib/cloud.ts`). `main.ts` registers the shell's reaction — explain (toast, i18n `auth.*`) and
+ * redirect to the login via the router. It CANNOT live here: `router/index.ts` imports this
+ * module, so importing the router back would be a cycle. Closing the session itself is not
+ * delegated to the hook — `handleRuntime401` calls `logout()` directly, so the invalidation
+ * happens even before `main.ts` has registered anything.
+ */
+let onRuntimeSessionExpired: (() => void) | null = null;
+export function setOnRuntimeSessionExpired(fn: (() => void) | null): void {
+  onRuntimeSessionExpired = fn;
+}
+
+/** Single-flight death confirmation: one probe per burst, not one per call in flight. */
+let sessionProbe: Promise<boolean> | null = null;
+
+/**
+ * Is the local session actually DEAD? A raw `401` is not enough to know: several admin-gated
+ * handlers map a role refusal to 401 too (`crates/server/src/settings.rs` documents «401 para
+ * fallo de auth (sin sesión / sesión inválida / **rol insuficiente**)»), and signing a live
+ * cashier out for touching an admin door would be a regression, not a fix. `GET /api/settings`
+ * accepts ANY valid user session (`require_user_session`), so a 401 THERE can only mean the
+ * session itself is gone. A probe that cannot be read (network failure) answers "not dead":
+ * death is proven, never presumed — connectivity must stay a retryable error (hub#770).
+ */
+function probeSessionDead(): Promise<boolean> {
+  if (!sessionProbe) {
+    sessionProbe = (async () => {
+      try {
+        const res = await fetch(`${RUNTIME_URL}/api/settings`, { headers: runtimeHeaders() });
+        return res.status === 401;
+      } catch {
+        return false;
+      }
+    })();
+    void sessionProbe.finally(() => {
+      sessionProbe = null;
+    });
+  }
+  return sessionProbe;
+}
+
+/**
+ * The one place every runtime 401 goes through. Returns `true` when the 401 meant "this session
+ * is dead" — and by then the shell session has been invalidated (once) and the hook fired.
+ */
+async function handleRuntime401(): Promise<boolean> {
+  // Only a shell that believes it is signed in can be signed out. The login screen probes the
+  // runtime without a session and collects 401s legitimately — nothing to react to.
+  if (!getHubSession() && !user.value) return false;
+  const dead = await probeSessionDead();
+  if (!dead) return false;
+  // Invalidate ONCE: a screen load has dozens of calls in flight and they all hit this on the
+  // same dead session. `logout()` clears the local session synchronously, so the first arrival
+  // closes it and every other in-flight 401 falls out at this guard.
+  if (getHubSession() || user.value) {
+    logout();
+    onRuntimeSessionExpired?.();
+  }
+  return true;
+}
+
+/**
+ * `fetch` against the runtime with the central 401 handling of hub#846. Behaves exactly like
+ * `fetch` — network errors and non-401 statuses pass through untouched, so every caller keeps its
+ * own degradation contract — except that a 401 from a confirmed-dead session throws
+ * [`RuntimeSessionExpiredError`] instead of returning, so no caller can flatten it to "no data".
+ */
+async function runtimeFetch(input: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401 && (await handleRuntime401())) {
+    throw new RuntimeSessionExpiredError();
+  }
+  return res;
+}
+
 /**
  * **The shell's credential for the event channel** (hub#504). The hub pushes nothing to a
  * connection that has not presented an API key of that hub with read access — including to us.
@@ -138,11 +236,14 @@ export function runtimeHeaders(): Record<string, string> {
  * XSS and would open the whole read API, not just this channel.
  *
  * Returns `null` — never throws — when there is no session yet or the runtime is unreachable: this
- * is called on every reconnect attempt, and a throw would kill the channel for good.
+ * is called on every reconnect attempt, and a throw would kill the channel for good. A 401 from a
+ * session confirmed dead still triggers the CENTRAL reaction (hub#846) on its way to `null`: this
+ * retry loop was the «WS 101 + 401 every ~10 s» symptom of hub#902, hammering forever a door that
+ * retrying could never open.
  */
 export async function fetchStreamTicket(): Promise<string | null> {
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/events/ticket`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/events/ticket`, {
       method: 'POST',
       headers: runtimeHeaders(),
     });
@@ -286,7 +387,7 @@ export async function requestInstall(moduleId: string, version: string): Promise
   // tardar (trabajo en background). beginRequest/endRequest alimenta el `inFlight` de la topbar.
   beginRequest();
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/modules/request-install`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/request-install`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ module_id: moduleId, version }),
@@ -346,12 +447,24 @@ export interface InstalledModule {
 /** Lista los módulos instalados en el runtime (fuente de verdad local, no el catálogo Cloud). */
 export async function listInstalledModules(): Promise<InstalledModule[]> {
   // `?locale=` (ADR-0055): el runtime devuelve el `name` de cada módulo ya traducido.
-  const res = await fetch(`${RUNTIME_URL}/api/modules?locale=${encodeURIComponent(getLocale())}`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/modules?locale=${encodeURIComponent(getLocale())}`, {
     headers: runtimeHeaders(),
   });
   if (!res.ok) throw new Error(`modules → ${res.status}`);
-  const env = (await res.json()) as { ok: boolean; data?: InstalledModule[] };
-  return env.ok && env.data ? env.data : [];
+  const env = (await res.json()) as {
+    ok: boolean;
+    data?: InstalledModule[];
+    error?: { message?: string } | string;
+  };
+  // A 200 whose envelope says `ok:false` is a DOMAIN error, not "this hub has no modules": it was
+  // flattened to `[]` here and a hub with 12 registered modules showed «you have no apps yet»,
+  // inviting its owner to reinstall what they already had (hub#894 / hub#846). It surfaces — and
+  // it is NOT a session death either, so the central 401 reaction plays no part in it.
+  if (!env.ok) {
+    const msg = typeof env.error === 'string' ? env.error : env.error?.message;
+    throw new Error(msg?.trim() ? msg : 'modules → the runtime reported a failure');
+  }
+  return env.data ?? [];
 }
 
 /**
@@ -374,7 +487,7 @@ export class ModuleActionError extends Error {
 
 /** Activa / desactiva / desinstala un módulo en el runtime (hot-plug). Lanza si el runtime falla. */
 async function moduleAction(id: string, action: 'activate' | 'deactivate' | 'uninstall'): Promise<void> {
-  const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(id)}/${action}`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(id)}/${action}`, {
     method: 'POST',
     headers: runtimeHeaders(),
   });
@@ -405,7 +518,7 @@ async function moduleAction(id: string, action: 'activate' | 'deactivate' | 'uni
 export async function updateModule(moduleId: string, version = ''): Promise<ModuleUpdateResult> {
   beginRequest();
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/update`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/update`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ version }),
@@ -458,7 +571,7 @@ export interface ModuleUpdateResult {
  * devuelve lista vacía: sin respuesta no se ofrece nada.
  */
 export async function listModuleUpdates(): Promise<ModuleUpdateInfo[]> {
-  const res = await fetch(`${RUNTIME_URL}/api/modules/updates`, { headers: runtimeHeaders() });
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/updates`, { headers: runtimeHeaders() });
   if (!res.ok) return [];
   const env = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: ModuleUpdateInfo[] };
   return env.ok && env.data ? env.data : [];
@@ -478,7 +591,7 @@ export async function listModuleUpdates(): Promise<ModuleUpdateInfo[]> {
  */
 export async function listModuleVersions(moduleId: string): Promise<ModuleVersions> {
   const empty: ModuleVersions = { module_id: moduleId, installed: null, latest: null, versions: [] };
-  const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/versions`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/versions`, {
     headers: runtimeHeaders(),
   });
   if (!res.ok) return empty;
@@ -523,7 +636,7 @@ export interface ModuleCapabilities {
  * Cualquier sesión puede leerlas; conceder/revocar es solo admin (`putModuleCapabilities`).
  */
 export async function getModuleCapabilities(moduleId: string): Promise<ModuleCapabilities> {
-  const res = await fetch(
+  const res = await runtimeFetch(
     `${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/capabilities`,
     { headers: runtimeHeaders() },
   );
@@ -541,7 +654,7 @@ export async function putModuleCapabilities(
   moduleId: string,
   grants: Record<string, boolean>,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await runtimeFetch(
     `${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/capabilities`,
     {
       method: 'PUT',
@@ -570,7 +683,7 @@ export interface BusinessCertificate {
  */
 export async function getBusinessCertificate(): Promise<BusinessCertificate> {
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/business/certificate`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/business/certificate`, {
       headers: runtimeHeaders(),
     });
     if (!res.ok) return { present: false };
@@ -586,7 +699,7 @@ export async function getBusinessCertificate(): Promise<BusinessCertificate> {
  * UI es solo cosmético; aquí revalida Rust). Lanza si el runtime rechaza.
  */
 export async function putBusinessCertificate(pkcs12_b64: string, password: string): Promise<void> {
-  const res = await fetch(`${RUNTIME_URL}/api/business/certificate`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/business/certificate`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
     body: JSON.stringify({ pkcs12_b64, password }),
@@ -603,7 +716,7 @@ export async function putBusinessCertificate(pkcs12_b64: string, password: strin
  * del hub nunca cruza a este navegador (ADR-0003). Solo admin (Rust revalida). Lanza si falla.
  */
 export async function publishFiscalIdentity(): Promise<void> {
-  const res = await fetch(`${RUNTIME_URL}/api/business/fiscal-identity`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/business/fiscal-identity`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
   });
@@ -654,7 +767,7 @@ export interface RepresentationGrantCapture {
  * un otorgamiento que ya tiene.
  */
 export async function getRepresentationGrant(): Promise<RepresentationGrantState> {
-  const res = await fetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
     headers: runtimeHeaders(),
   });
   if (!res.ok) throw new Error(`get-representation-grant → ${res.status}`);
@@ -675,7 +788,7 @@ export async function postRepresentationGrant(
   form.append('signer_name', capture.signer_name);
   form.append('signature', capture.signature, 'signature.png');
   form.append('dni_copy', capture.dni_copy, capture.dni_copy.name);
-  const res = await fetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
     method: 'POST',
     headers: runtimeHeaders(),
     body: form,
@@ -689,7 +802,7 @@ export async function postRepresentationGrant(
  * si no). Lanza si el runtime rechaza.
  */
 export async function deleteBusinessCertificate(): Promise<void> {
-  const res = await fetch(`${RUNTIME_URL}/api/business/certificate`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/business/certificate`, {
     method: 'DELETE',
     headers: runtimeHeaders(),
   });
@@ -1028,7 +1141,7 @@ function filenameFromDisposition(header: string | null): string | null {
  */
 export async function fetchExportTables(): Promise<ExportModuleTables[]> {
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/hub/export/tables`, { headers: runtimeHeaders() });
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/export/tables`, { headers: runtimeHeaders() });
     if (!res.ok) return [];
     const body = (await res.json()) as { modules?: ExportModuleTables[] };
     return Array.isArray(body.modules) ? body.modules : [];
@@ -1059,7 +1172,7 @@ export async function exportHub(
   try {
     let res: Response;
     try {
-      res = await fetch(`${RUNTIME_URL}/api/hub/export`, {
+      res = await runtimeFetch(`${RUNTIME_URL}/api/hub/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
         body: JSON.stringify({ name, locale, selection }),
@@ -1111,7 +1224,7 @@ export interface CatalogBlueprint {
 export async function fetchBlueprintCatalog(): Promise<CatalogBlueprint[]> {
   beginRequest();
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/blueprints/catalog`, { headers: runtimeHeaders() });
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/blueprints/catalog`, { headers: runtimeHeaders() });
     if (!res.ok) throw new Error(await readErrorMessage(res, `blueprints/catalog → ${res.status}`));
     const body = (await res.json()) as { blueprints?: CatalogBlueprint[] };
     return body.blueprints ?? [];
@@ -1130,7 +1243,7 @@ export async function fetchBlueprintCatalog(): Promise<CatalogBlueprint[]> {
 export async function downloadBlueprint(slug: string): Promise<Blob> {
   beginRequest();
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/blueprints/${encodeURIComponent(slug)}/download`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/blueprints/${encodeURIComponent(slug)}/download`, {
       headers: runtimeHeaders(),
     });
     if (!res.ok) throw new Error(await readErrorMessage(res, `blueprints/download → ${res.status}`));
@@ -1143,7 +1256,7 @@ export async function downloadBlueprint(slug: string): Promise<Blob> {
 export async function inspectBlueprint(file: Blob): Promise<BlueprintInspection> {
   beginRequest();
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/hub/import/inspect`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/import/inspect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream', ...runtimeHeaders() },
       body: file,
@@ -1170,7 +1283,7 @@ export async function importBlueprint(
 ): Promise<ImportReport> {
   beginRequest(); // instalar módulos + aplicar SQL puede tardar → barra de progreso del shell
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/hub/import`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/import`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ upload_id: uploadId, selection }),
@@ -1322,7 +1435,7 @@ export interface ResetReport {
  * pintar las secciones con sus cifras y sus bloqueos.
  */
 export async function fetchResetPlan(): Promise<ResetPlan> {
-  const res = await fetch(`${RUNTIME_URL}/api/hub/reset/plan`, {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/reset/plan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
     body: '{}',
@@ -1339,7 +1452,7 @@ export async function fetchResetPlan(): Promise<ResetPlan> {
 export async function resetHub(selection: ResetSelection): Promise<ResetReport> {
   beginRequest(); // barrer varias tablas puede tardar → barra de progreso del shell
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/hub/reset`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ selection }),
@@ -1364,7 +1477,7 @@ export interface ImportBatch {
 
 /** Importaciones del hub, de la más reciente a la más antigua (`GET /api/hub/import/batches`). */
 export async function fetchImportBatches(): Promise<ImportBatch[]> {
-  const res = await fetch(`${RUNTIME_URL}/api/hub/import/batches`, { headers: runtimeHeaders() });
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/import/batches`, { headers: runtimeHeaders() });
   if (!res.ok) throw new Error(await readErrorMessage(res, `import/batches → ${res.status}`));
   const body = (await res.json()) as { ok: boolean; batches?: ImportBatch[] };
   return body.batches ?? [];
@@ -1388,7 +1501,7 @@ export interface StoredImportReport {
 
 /** Recupera el último informe de importación del hub (`GET /api/hub/import/report`, hub#763). */
 export async function fetchImportReport(): Promise<StoredImportReport | null> {
-  const res = await fetch(`${RUNTIME_URL}/api/hub/import/report`, { headers: runtimeHeaders() });
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/import/report`, { headers: runtimeHeaders() });
   if (!res.ok) throw new Error(await readErrorMessage(res, `import/report → ${res.status}`));
   const body = (await res.json()) as { ok: boolean; report?: StoredImportReport | null };
   return body.report ?? null;
@@ -1401,7 +1514,7 @@ export async function fetchImportReport(): Promise<StoredImportReport | null> {
 export async function undoImport(batchId: string): Promise<ResetReport> {
   beginRequest();
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/hub/import/undo`, {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/import/undo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ batch_id: batchId }),

@@ -35,6 +35,22 @@ describe('impresora por rol', () => {
     expect(printerIdForRole(devices, 'etiquetas')).toBeUndefined();
     expect(printerIdForRole([], 'receipt')).toBeUndefined();
   });
+
+  // ADR-0204 / hub#388: a bonded SPP printer registers with NO ip (its identity is the MAC).
+  // Built as `network:{ip}:{port}` it would come out `network::0` — a job sent to nowhere.
+  it('resolves a bluetooth device to bluetooth:{mac} (ADR-0204)', () => {
+    const bt = [
+      { key: 'AA:BB:CC:DD:EE:FF', mac: 'AA:BB:CC:DD:EE:FF', role: 'receipt', ip: '', port: 0, type: 'bluetooth' },
+    ];
+    expect(printerIdForRole(bt, 'receipt')).toBe('bluetooth:AA:BB:CC:DD:EE:FF');
+  });
+
+  it('a bluetooth device that lost its mac cannot be a destination', () => {
+    // Without the MAC there is nothing to connect RFCOMM to; answering `bluetooth:undefined`
+    // would send the job to a string, and the failure would surface at the socket, not here.
+    const broken = [{ key: 'x', role: 'receipt', ip: '', port: 0, type: 'bluetooth' }];
+    expect(printerIdForRole(broken, 'receipt')).toBeUndefined();
+  });
 });
 
 describe('servicio global de impresión', () => {

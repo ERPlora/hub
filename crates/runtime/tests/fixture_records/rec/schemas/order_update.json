@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["order_id", "customer", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "order_id": { "type": "string" },
+    "customer": { "type": "string" },
+    "notes": { "type": ["string", "null"] },
+    "status": { "type": "string" }
+  }
+}

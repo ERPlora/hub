@@ -174,6 +174,33 @@
             </ion-item>
           </ion-card-content>
         </ion-card>
+
+        <!-- «Start on login» (ADR-0204 §7, hub#389). Only rendered where it can WORK: the desktop
+             app (the availability probe is the shell command itself — a browser has no shell and
+             Android answers an error on purpose, so neither ever shows the toggle). A setting of
+             THIS device, not of the hub: the OS keeps the state (LaunchAgent / registry /
+             autostart dir), nothing is persisted here — the checked state is always what
+             `autostart_is_enabled` just answered. OFF by default: it is an opt-in for the
+             dedicated till, where the app must be open for the print queue to drain
+             (ADR-0196 §6). -->
+        <ion-card v-if="autostart.available" class="mt-3">
+          <ion-card-content class="p-0">
+            <ion-item lines="none">
+              <HubIcon slot="start" name="power-outline" />
+              <ion-label>
+                <h2>{{ t('settings.startOnLogin') }}</h2>
+                <p>{{ t('settings.startOnLoginDesc') }}</p>
+              </ion-label>
+              <ion-toggle
+                data-testid="settings-autostart"
+                :checked="autostart.enabled"
+                :aria-label="t('settings.startOnLogin')"
+                @ion-change="onAutostartToggle($event)"
+                slot="end"
+              />
+            </ion-item>
+          </ion-card-content>
+        </ion-card>
       </template>
 
       <!-- ── Tab: Negocio (identidad fiscal genérica) ── -->
@@ -491,6 +518,7 @@ import { bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';
 import { resolveSettingsTab, type SettingsTab } from '../lib/settings-tabs';
+import { autostartState, setAutostart, type AutostartState } from '../lib/autostart';
 import { hubSettings, getHubSettings, updateHubSettings, type HubSettings } from '../lib/hub-settings';
 import { publishHubCurrency } from '../lib/money';
 import { toastSuccess, toastError } from '../lib/toast';
@@ -591,6 +619,30 @@ watch(hubSettings, (s) => {
 onMounted(() => {
   void getHubSettings().catch(() => null);
 });
+
+// ── «Start on login» (ADR-0204 §7, hub#389) — a setting of THIS device, kept by the OS ──────────
+// No persistence of our own: what is shown is always what the shell just read back from the OS,
+// and the availability probe IS the command (browser → no shell; Android → error on purpose).
+const autostart = ref<AutostartState>({ available: false, enabled: false });
+
+onMounted(() => {
+  void autostartState().then((state) => {
+    autostart.value = state;
+  });
+});
+
+async function onAutostartToggle(e: Event): Promise<void> {
+  const checked = (e as CustomEvent<{ checked: boolean }>).detail.checked;
+  if (checked === autostart.value.enabled) return; // re-sync of :checked, not a user action
+  try {
+    // The answer is the state the OS read BACK, not the one asked for: a shell whose enable()
+    // silently no-ops must leave the toggle where the OS is, or the till "starts" only on screen.
+    autostart.value = { available: true, enabled: await setAutostart(checked) };
+  } catch {
+    autostart.value = { ...autostart.value }; // re-render pulls :checked back to the real state
+    await toastError(t('settings.startOnLoginError'));
+  }
+}
 
 // ── Estado: Negocio (identidad fiscal genérica, server-side /api/settings — ADR-0061) ──
 // FUENTE ÚNICA país-agnóstica que usan invoice (emisor) y los módulos fiscales por país. Se siembra

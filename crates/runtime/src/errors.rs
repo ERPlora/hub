@@ -116,6 +116,31 @@ pub enum RuntimeError {
     CapabilityDenied { module: String, capability: String },
     #[error("dependencia no satisfecha: el módulo `{module}` requiere `{dep}`")]
     MissingDependency { module: String, dep: String },
+    /// The dependency is installed but OLDER than the declared floor (hub#681): each module is
+    /// correct in isolation and the combination does not work, so the refusal names all four
+    /// facts the operator needs.
+    #[error(
+        "module `{module}` requires `{dep}` >= {required}, but version {installed} is installed: \
+         update `{dep}` first"
+    )]
+    DependencyTooOld {
+        module: String,
+        dep: String,
+        required: String,
+        installed: String,
+    },
+    /// A `min_version` floor the runtime cannot parse (hub#681). Refused, not read as "any
+    /// version works": a claim the runtime cannot check is not read as fine — same direction as
+    /// an unreadable `compatibility.min_erplora_version` (hub#521).
+    #[error(
+        "module `{module}` declares an unreadable version floor for `{dep}`: `{declared}` is not \
+         a version this runtime can compare (expected `MAJOR.MINOR.PATCH`)"
+    )]
+    DependencyFloorUnreadable {
+        module: String,
+        dep: String,
+        declared: String,
+    },
     #[error("ciclo de dependencias entre módulos en `{module}` (depends_on cíclico)")]
     DependencyCycle { module: String },
     #[error("ciclo de eventos demasiado profundo (posible bucle de listeners)")]

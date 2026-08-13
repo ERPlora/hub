@@ -46,7 +46,7 @@ fn admin() -> RequestContext {
 
 async fn rt_appts() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     // appointments `depends_on` customers + services + staff (FK lógicas cross-módulo; staff por
     // ADR-0074, selector de profesional) y services `depends_on` taxes (ADR-0066); el installer
     // valida la cadena, así que las instalamos en orden topológico primero (staff no depende de nada).

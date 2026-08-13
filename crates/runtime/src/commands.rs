@@ -332,6 +332,24 @@ pub(crate) async fn execute_at(
         }
     };
 
+    // hub#632 — PATCH semantics. If this command is the `update` door of a record whose module
+    // declares `patch: { read, key }`, a PARTIAL payload is completed BEFORE validation: the
+    // dispatcher runs the declared read, keeps of the row only the keys the update's schema
+    // accepts (the `get` returns columns the update refuses — `additionalProperties: false`), and
+    // overlays the caller's keys on top. Explicit `null` overwrites; omitted preserves. The
+    // merged object then goes through the SAME validation and SQL as always — a full payload
+    // merges into itself, so nothing changes for today's callers. Without this, 46 updates in 20
+    // modules require the whole object and a caller that fills one from memory corrupts a record
+    // that carries a tax id.
+    let patched;
+    let payload = match patch_read_spec(registry, &cmd.module_id, name) {
+        Some(patch) if cmd.schema.is_some() => {
+            patched = merge_patch_read(db, registry, cmd, patch, payload, ctx).await;
+            &patched
+        }
+        _ => payload,
+    };
+
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y
     // cacheado en el Registry): rechaza ANTES de tocar la BD o invocar handlers (hub#27).
     // Tras validar, inyectamos los `default` del schema en las claves AUSENTES (causa raíz,
@@ -522,7 +540,7 @@ async fn preload_reads(
         .installed
         .iter()
         .find(|m| m.id == cmd.module_id)
-        .map(|m| m.depends_on.clone())
+        .map(|m| m.depends_on.iter().map(|d| d.id.clone()).collect())
         .unwrap_or_default();
     let allowed: Vec<&str> = std::iter::once(cmd.module_id.as_str())
         .chain(deps.iter().map(|s| s.as_str()))
@@ -682,6 +700,85 @@ pub(crate) async fn enforce_protects(
         }
     }
     Ok(())
+}
+
+/// The `patch` contract of `command`, if the module that owns it declares one (hub#632): the
+/// record entry whose `update` names this command, carrying `patch: { read, key }`.
+fn patch_read_spec<'r>(
+    registry: &'r Registry,
+    module_id: &str,
+    command: &str,
+) -> Option<&'r crate::manifest::PatchDef> {
+    registry
+        .installed
+        .iter()
+        .find(|m| m.id == module_id)?
+        .records
+        .values()
+        .find(|record| record.update.as_deref() == Some(command))?
+        .patch
+        .as_ref()
+}
+
+/// Completes a (possibly partial) update payload from the record's declared read (hub#632).
+///
+/// Merge rules — the contract of the issue, verbatim:
+///  - the read's row is kept ONLY for the keys the update's schema declares (`get` returns
+///    columns like `id`/`sku`/`stock` the update refuses under `additionalProperties: false`);
+///  - the caller's keys always win, **including an explicit `null`** (null overwrites/clears;
+///    omitting preserves — the two are different things again);
+///  - the read runs in a system context (same `hub_id`, wildcard permissions), the same rule as
+///    `reads` (ADR-0069) and `protects`: it is a module-authored contract, not a user action, and
+///    the update's own permission was already checked at the gate.
+///
+/// Degrades OPEN on a broken read or a missing row: the caller's payload goes to validation as
+/// sent, and the schema gives its usual answer (a partial payload of a missing record is refused
+/// as incomplete — nothing is invented, nothing is written). Same direction as `preload_reads`.
+async fn merge_patch_read(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    cmd: &RegisteredCommand,
+    patch: &crate::manifest::PatchDef,
+    payload: &Params,
+    ctx: &RequestContext,
+) -> Params {
+    let Some(key_value) = payload.get(&patch.key) else {
+        return payload.clone(); // No key, nothing to read: validation will say what is missing.
+    };
+    let mut read_params = Params::new();
+    read_params.insert(patch.key.clone(), key_value.clone());
+    let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
+    let row = match crate::queries::execute(db, registry, &patch.read, &read_params, &sys).await {
+        Ok(rows) => rows.into_iter().next(),
+        Err(e) => {
+            eprintln!(
+                "⚠ patch: `{}` read `{}` failed ({e}) → payload validated as sent",
+                cmd.module_id, patch.read
+            );
+            None
+        }
+    };
+    let Some(Json::Object(row)) = row else {
+        return payload.clone();
+    };
+    let Some(props) = cmd
+        .schema
+        .as_ref()
+        .and_then(|schema| schema.raw.get("properties"))
+        .and_then(|p| p.as_object())
+    else {
+        return payload.clone();
+    };
+    let mut merged = Params::new();
+    for key in props.keys() {
+        if let Some(value) = row.get(key) {
+            merged.insert(key.clone(), value.clone());
+        }
+    }
+    for (key, value) in payload {
+        merged.insert(key.clone(), value.clone());
+    }
+    merged
 }
 
 async fn execute_wasm(
@@ -876,9 +973,11 @@ async fn persist_handler_output(
     depth: u32,
     extra_ops: &[(String, Params)],
     output: &Output,
-    // Lote de ids que el host generó y entregó al handler. Se devuelven al llamante para que la
-    // UI pueda correlacionar lo que acaba de crear (el POS abre un pedido y necesita su `order_id`
-    // para añadirle líneas). Por convención `new_ids[0]` es la entidad principal (§5.3).
+    // Lote de ids que el host generó y entregó al handler. Al llamante solo se le devuelven los
+    // que las operaciones del handler CONSUMIERON (hub#776): un id del lote que ninguna operación
+    // referencia no nombra ninguna fila, y devolver los 256 convertía cada toque del TPV en una
+    // respuesta de varios KB de UUIDs fantasma. Por convención `new_ids[0]` es la entidad
+    // principal (§5.3) — se preserva porque el orden del lote se mantiene al filtrar.
     new_ids: &[Json],
 ) -> Result<Json> {
     // hub#139: a business rejection is a normal guest output, not a WASM trap. It is checked
@@ -988,7 +1087,62 @@ async fn persist_handler_output(
         events::notify_sink(registry, source, name, payload);
     }
 
-    Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))
+    Ok(json!({
+        "ok": true,
+        "operations": output.operations.len(),
+        "new_ids": consumed_new_ids(output, new_ids),
+    }))
+}
+
+/// The batch ids the handler's operations actually CONSUMED, in batch order (hub#776).
+///
+/// The host is the only id authority (§5.3): the guest cannot mint UUIDs, it can only take them
+/// from `context.new_ids`. So an id of the batch names a materialised row **iff** some operation's
+/// params reference it — anywhere, including nested structures (order lines carry theirs inside
+/// arrays of objects). Scanning the params is therefore a complete and safe derivation: it needs
+/// no guest-sdk change and no republish of the 21 modules with handlers.
+///
+/// Properties the callers rely on:
+///  - **batch order is preserved**, so `new_ids[0]` keeps being the main entity for every caller
+///    that already reads it (handlers take ids from the front of the batch by convention);
+///  - an id referenced by two operations is reported **once** (it names one row);
+///  - a handler that consumed nothing answers with an empty list — no phantom ids.
+fn consumed_new_ids(output: &Output, new_ids: &[Json]) -> Vec<Json> {
+    use std::collections::HashSet;
+
+    fn scan<'v>(value: &'v Json, batch: &HashSet<&'v str>, used: &mut HashSet<&'v str>) {
+        match value {
+            Json::String(s) => {
+                if let Some(&id) = batch.get(s.as_str()) {
+                    used.insert(id);
+                }
+            }
+            Json::Array(items) => {
+                for item in items {
+                    scan(item, batch, used);
+                }
+            }
+            Json::Object(map) => {
+                for item in map.values() {
+                    scan(item, batch, used);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let batch: HashSet<&str> = new_ids.iter().filter_map(Json::as_str).collect();
+    let mut used: HashSet<&str> = HashSet::new();
+    for op in &output.operations {
+        for value in op.params.values() {
+            scan(value, &batch, &mut used);
+        }
+    }
+    new_ids
+        .iter()
+        .filter(|id| id.as_str().is_some_and(|s| used.contains(s)))
+        .cloned()
+        .collect()
 }
 
 /// Valida el **nombre de un evento devuelto por un handler** contra lo declarado en el

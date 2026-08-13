@@ -39,7 +39,7 @@ const MDNS_BROWSE_WINDOW: Duration = Duration::from_millis(1500);
 const MDNS_SERVICE_TYPES: [&str; 2] = ["_pdl-datastream._tcp.local.", "_ipp._tcp.local."];
 
 /// Destino de impresión por red. Sustituye al tuple `('network', {host, port})` de Python.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NetworkTarget {
     pub host: String,
     pub port: u16,
@@ -52,8 +52,54 @@ impl NetworkTarget {
     }
 }
 
+/// Bluetooth Classic SPP print destination — Android only (ADR-0204, hub#388).
+///
+/// The MAC is the whole identity: RFCOMM connects to a bonded device by address, there is no
+/// host/port. Desktop and iOS never produce nor accept this variant (iOS because of Apple's MFi
+/// restriction on Bluetooth Classic, desktop by the standing red-only decision of §2.7).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BluetoothTarget {
+    /// Normalized (`AA:BB:CC:DD:EE:FF`): the same spelling the device registry keys on and the
+    /// Kotlin transport connects with — two spellings of one printer would be two devices.
+    pub mac: String,
+}
+
+/// Where a print job goes, parsed from a `printer_id` (ADR-0204).
+///
+/// `network:{ip}:{port}` feeds the TCP path everywhere; `bluetooth:{mac}` exists ONLY on Android,
+/// where the shell hands the rendered ESC/POS bytes to the Kotlin SPP transport. The rendering
+/// stays in Rust either way — the transport is the only thing that changes.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PrintTarget {
+    Network(NetworkTarget),
+    Bluetooth(BluetoothTarget),
+}
+
+/// Parses a `printer_id` into the transport it names: `network:{ip}:{port}` or `bluetooth:{mac}`
+/// (ADR-0204). Anything else — `usb:`, a malformed MAC — is refused HERE, at the contract's edge,
+/// instead of travelling on to blow up inside a socket connect with a message nobody can map back
+/// to the id.
+pub fn parse_print_target(printer_id: &str) -> Result<PrintTarget> {
+    match printer_id.split_once(':') {
+        Some(("bluetooth", mac)) => {
+            if !crate::registry::is_mac(mac) {
+                return Err(crate::PeripheralError::InvalidPrinterId(format!(
+                    "malformed bluetooth MAC in: {printer_id}"
+                )));
+            }
+            Ok(PrintTarget::Bluetooth(BluetoothTarget {
+                mac: crate::registry::normalize_mac(mac),
+            }))
+        }
+        _ => parse_printer_id(printer_id).map(PrintTarget::Network),
+    }
+}
+
 /// Parsea un `printer_id` `network:{ip}:{port}` → `NetworkTarget`.
-/// Porta `parse_printer_id`, restringido a la rama `network` (rechaza `usb:`/`bluetooth:`).
+/// Porta `parse_printer_id`, restringido a la rama `network`: es el parser del camino TCP (cola
+/// de impresión, cajón, enriquecido del registro), así que rechaza `usb:` y también `bluetooth:` —
+/// esa variante solo llega al hardware por [`parse_print_target`] (transporte SPP de Android,
+/// ADR-0204).
 pub fn parse_printer_id(printer_id: &str) -> Result<NetworkTarget> {
     // `split(':', 1)` de Python: separa el esquema del resto por el PRIMER ':'.
     let (scheme, rest) = match printer_id.split_once(':') {
@@ -540,10 +586,54 @@ mod tests {
         assert_eq!(crate::protocol::default_printer_category(), PRINTER_CATEGORY_UNKNOWN);
     }
 
+    // ── ADR-0204 / hub#388: `bluetooth:{mac}` joins the printer_id contract ───────────────────
+    //
+    // This INVERTS the old test that asserted `bluetooth:` was an error. The retirement of SPP
+    // rested on a wrong premise ("Tauri-Android loses Bluetooth") — a Kotlin plugin runs
+    // in-process with the full Android APIs, so the €30 thermal printer at the table is back:
+    // only Android produces and accepts the variant, desktop and iOS stay network-only.
+
     #[test]
-    fn parse_printer_id_sigue_rechazando_transportes_no_de_red() {
+    fn a_bluetooth_printer_id_is_a_valid_print_target_now() {
+        match parse_print_target("bluetooth:aa:bb:cc:dd:ee:ff") {
+            Ok(PrintTarget::Bluetooth(t)) => {
+                // Normalized on the way in: the MAC is the device's identity in the registry and
+                // in the Kotlin transport, and two spellings of one printer would be two devices.
+                assert_eq!(t.mac, "AA:BB:CC:DD:EE:FF");
+            }
+            other => panic!("bluetooth:{{mac}} must parse as a Bluetooth target, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_network_print_target_parses_exactly_as_before() {
+        match parse_print_target("network:10.0.0.5:9100") {
+            Ok(PrintTarget::Network(t)) => {
+                assert_eq!(t.host, "10.0.0.5");
+                assert_eq!(t.port, 9100);
+            }
+            other => panic!("network ids must keep parsing unchanged, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn usb_stays_rejected_and_so_does_a_malformed_bluetooth_mac() {
+        // USB remains out (ADR-0204: drivers per OS do not scale). And a `bluetooth:` id whose
+        // rest is not a MAC must fail HERE, not travel to Kotlin to blow up inside the socket
+        // connect with a message nobody maps back to the id.
+        assert!(parse_print_target("usb:001:002").is_err());
+        assert!(parse_print_target("bluetooth:not-a-mac").is_err());
+        assert!(parse_print_target("bluetooth:").is_err());
+        assert!(parse_print_target("bluetooth:AA:BB:CC:DD:EE").is_err(), "5 groups is not a MAC");
+    }
+
+    #[test]
+    fn the_network_only_parser_still_refuses_bluetooth() {
+        // `parse_printer_id` is the NETWORK parser: the print queue (`PrintJob.target`), the
+        // drawer and the registry enrichment feed TCP sockets and cannot take a MAC. Bluetooth
+        // ids reach hardware exclusively through `parse_print_target`'s Bluetooth arm (the
+        // Android SPP transport), so this door stays closed.
         assert!(parse_printer_id("bluetooth:AA:BB:CC:DD:EE:FF").is_err());
-        assert!(parse_printer_id("usb:001:002").is_err());
         assert!(parse_printer_id("network:10.0.0.5:9100").is_ok());
     }
 

@@ -27,7 +27,7 @@ fn admin() -> RequestContext {
 /// taxes ← inventory ← sales → customers (sales depende de los tres; inventory de taxes).
 async fn hub_pos() -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::new(Box::new(db));
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     for m in ["taxes", "customers", "inventory", "sales"] {
         rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));
     }
