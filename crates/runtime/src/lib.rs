@@ -249,7 +249,8 @@ impl Runtime {
         Ok(manifest
             .depends_on
             .into_iter()
-            .filter(|dep| !self.registry.is_installed(dep))
+            .filter(|dep| !self.registry.is_installed(&dep.id))
+            .map(|dep| dep.id)
             .collect())
     }
 
@@ -296,7 +297,12 @@ impl Runtime {
         // 3) Orden topológico por depends_on (un ciclo sí aborta: error de diseño del conjunto).
         let pairs: Vec<(String, Vec<String>)> = found
             .iter()
-            .map(|(_, m)| (m.id.clone(), m.depends_on.clone()))
+            .map(|(_, m)| {
+                (
+                    m.id.clone(),
+                    m.depends_on.iter().map(|d| d.id.clone()).collect(),
+                )
+            })
             .collect();
         let order = installer::install_order(&pairs)?;
         // 4) Instala en orden; un módulo que falle se omite (log) sin tumbar a los demás.
@@ -402,7 +408,7 @@ impl Runtime {
             }
             to_enable.push(id.clone());
             if let Some(m) = self.registry.installed.iter().find(|m| m.id == id) {
-                pending.extend(m.depends_on.iter().cloned());
+                pending.extend(m.depends_on.iter().map(|d| d.id.clone()));
             }
         }
         for id in &to_enable {
@@ -425,7 +431,7 @@ impl Runtime {
                     matches!(
                         self.registry.status.get(&m.id),
                         Some(ModuleStatus::InactiveAuto)
-                    ) && m.depends_on.iter().all(|d| self.registry.is_active(d))
+                    ) && m.depends_on.iter().all(|d| self.registry.is_active(&d.id))
                 })
                 .map(|m| m.id.clone())
                 .collect();
@@ -459,7 +465,7 @@ impl Runtime {
                 .filter(|m| {
                     self.registry.is_active(&m.id)
                         && !fallen.contains(&m.id)
-                        && m.depends_on.iter().any(|d| fallen.contains(d))
+                        && m.depends_on.iter().any(|d| fallen.contains(&d.id))
                 })
                 .map(|m| m.id.clone())
                 .collect();
@@ -545,7 +551,7 @@ impl Runtime {
                 .iter()
                 .filter(|m| {
                     self.registry.is_active(&m.id)
-                        && m.depends_on.iter().any(|d| fallen.contains(d))
+                        && m.depends_on.iter().any(|d| fallen.contains(&d.id))
                 })
                 .map(|m| m.id.clone())
                 .collect();
@@ -600,7 +606,7 @@ impl Runtime {
                     .status
                     .get(&m.id)
                     .unwrap_or(&ModuleStatus::Inactive),
-                depends_on: m.depends_on.clone(),
+                depends_on: m.depends_on.iter().map(|d| d.id.clone()).collect(),
                 manifest_warnings: m.warnings.clone(),
             })
             .collect()

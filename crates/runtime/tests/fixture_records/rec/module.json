@@ -1,0 +1,40 @@
+{
+  "id": "rec",
+  "name": "Records fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "records": {
+    "order": {
+      "mutable": true,
+      "update": "rec.order.update",
+      "patch": { "read": "rec.order.get", "key": "order_id" }
+    },
+    "receipt": {
+      "mutable": false,
+      "reason": "fiscal",
+      "correct_with": ["rec.receipt.void"]
+    }
+  },
+  "queries": {
+    "rec.order.get": {
+      "permission": "",
+      "sql": "sql/order_get.sql",
+      "schema": "schemas/order_get.json"
+    }
+  },
+  "commands": {
+    "rec.order.create": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/order_create.sql"],
+      "schema": "schemas/order_create.json"
+    },
+    "rec.order.update": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/order_update.sql"],
+      "schema": "schemas/order_update.json"
+    }
+  }
+}

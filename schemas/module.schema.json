@@ -60,8 +60,31 @@
     },
     "depends_on": {
       "type": "array",
+      "description": "Módulos que este necesita instalados, opcionalmente con versión MÍNIMA (hub#681). Dos formas mezclables: el string plano (`\"taxes\"` — cualquier versión instalada satisface, la forma de todo el catálogo publicado) y `{ \"id\": \"inventory\", \"min_version\": \"1.2.20\" }` para un contrato que nació en una versión concreta (sales#68). El instalador valida el suelo; el topo-orden y las cascadas leen solo el id.",
       "items": {
-        "type": "string"
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "min_version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+\\.\\d+",
+                "description": "Versión mínima de la dependencia que cumple el contrato (suelo, nunca pin)."
+              }
+            }
+          }
+        ]
       },
       "default": []
     },
@@ -71,6 +94,94 @@
         "type": "string"
       },
       "default": []
+    },
+    "records": {
+      "type": "object",
+      "description": "Mutabilidad DECLARADA por registro (hub#632): qué datos del módulo se pueden editar a posteriori y por qué puerta. `mutable: false` = se corrige, nunca se edita (`reason` con vocabulario CERRADO y `correct_with` apuntando a los commands de corrección); `mutable: true` nombra su command `update` y, opcionalmente, `patch: { read, key }` — que convierte ese update en puerta PARCIAL: el runtime lee el registro, fusiona encima lo enviado (limitado a las claves del schema del update), valida el objeto COMPLETO y ejecuta el SQL sin tocarlo. La validación condicional vive SOLO aquí, a propósito (sin duplicado Rust).",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "mutable"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "mutable": {
+            "type": "boolean",
+            "description": "¿Se puede editar este registro tras crearse? `false` = se corrige, nunca se edita."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "fiscal",
+              "ledger",
+              "identity",
+              "audit"
+            ],
+            "description": "Por qué es inmutable — vocabulario CERRADO para que sea traducible y explicable por el asistente («una factura emitida no se edita: se rectifica»)."
+          },
+          "correct_with": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "description": "Commands que CORRIGEN un registro inmutable (`sales.void`, `invoice.rectify`)."
+          },
+          "update": {
+            "type": "string",
+            "description": "Command de update (objeto completo) del registro mutable."
+          },
+          "patch": {
+            "type": "object",
+            "required": [
+              "read",
+              "key"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "read": {
+                "type": "string",
+                "description": "Query del PROPIO módulo que devuelve el registro actual (`sales.order.get`)."
+              },
+              "key": {
+                "type": "string",
+                "description": "Clave del payload que identifica el registro (`order_id`)."
+              }
+            },
+            "description": "Contrato de update PARCIAL: el runtime ejecuta `read` con `key`, fusiona lo enviado encima y valida el objeto completo. `null` explícito pisa; omitir conserva."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mutable": {
+                  "const": false
+                }
+              },
+              "required": [
+                "mutable"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "update"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "patch"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
     },
     "roles": {
       "type": "array",

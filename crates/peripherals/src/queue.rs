@@ -30,16 +30,27 @@ pub enum JobOutcome {
     Failed { job_id: Option<String>, error: String },
 }
 
-/// Política de reintentos.
+/// Retry policy plus the per-attempt deadlines that keep the worker from ever blocking on the
+/// OS network timeouts (hub#596).
 #[derive(Debug, Clone, Copy)]
 pub struct RetryPolicy {
     pub max_attempts: u32,
     pub backoff_ms: u64,
+    /// Deadline for the TCP `connect` of a single attempt. Without it, a printer that absorbs
+    /// the SYN — loose cable, IP that is no longer hers, filtered port — parks the worker for
+    /// the OS connect timeout (tens of seconds) and stalls every other printer's jobs. 3 s is
+    /// the value the retired `NetworkPrinter` used per attempt (hub#379 / ADR-0276); a LAN
+    /// printer that is up answers in milliseconds.
+    pub connect_timeout_ms: u64,
+    /// Deadline for writing the payload once connected. A printer that accepts the connection
+    /// and then wedges (never reads) would otherwise hold the worker until TCP retransmission
+    /// gives up, which takes minutes.
+    pub write_timeout_ms: u64,
 }
 
 impl Default for RetryPolicy {
     fn default() -> Self {
-        Self { max_attempts: 3, backoff_ms: 2000 }
+        Self { max_attempts: 3, backoff_ms: 2000, connect_timeout_ms: 3000, write_timeout_ms: 10_000 }
     }
 }
 
@@ -65,11 +76,42 @@ impl PrintQueue {
         })
     }
 
-    /// Envía un trabajo: abre socket al destino y escribe el payload. Un intento.
+    /// Sends one job: opens the socket to the target and writes the payload. One attempt, with
+    /// its own deadlines (hub#596) — this call must never hang on the OS network timeouts,
+    /// because the worker processes jobs serially and every other printer waits behind it. A
+    /// timed-out attempt returns `Err`, so `process` retries it under the same `job_id`
+    /// (idempotency, ADR-0196) instead of duplicating the print.
     pub async fn send_once(&self, job: &PrintJob) -> Result<()> {
-        let mut stream = TcpStream::connect(job.target.socket_addr()).await?;
-        stream.write_all(&job.payload).await?;
-        Ok(())
+        let addr = job.target.socket_addr();
+        let mut stream = match tokio::time::timeout(
+            Duration::from_millis(self.policy.connect_timeout_ms),
+            TcpStream::connect(&addr),
+        )
+        .await
+        {
+            Ok(Ok(stream)) => stream,
+            Ok(Err(e)) => return Err(e.into()),
+            // The connect was absorbed (loose cable, stale IP, filtered port): unreachable.
+            Err(_elapsed) => {
+                return Err(PeripheralError::Unreachable(format!(
+                    "{addr}: connect timed out after {} ms",
+                    self.policy.connect_timeout_ms
+                )))
+            }
+        };
+        match tokio::time::timeout(
+            Duration::from_millis(self.policy.write_timeout_ms),
+            stream.write_all(&job.payload),
+        )
+        .await
+        {
+            Ok(result) => result.map_err(Into::into),
+            // Accepted the connection and then wedged without reading: unreachable too.
+            Err(_elapsed) => Err(PeripheralError::Unreachable(format!(
+                "{addr}: write timed out after {} ms",
+                self.policy.write_timeout_ms
+            ))),
+        }
     }
 
     /// Bucle worker: drena la cola y reintenta según la política; emite cada `JobOutcome` por
@@ -128,11 +170,51 @@ mod tests {
     use tokio::io::AsyncReadExt;
     use tokio::net::TcpListener;
 
-    /// Reintentos rápidos: los tests no deben pagar los 2 s de backoff de producción.
+    /// Fast retries: tests must not pay the 2 s production backoff. Deadlines stay generous so
+    /// only the black-hole tests, which set their own tight values, exercise them.
     fn fast_policy(max_attempts: u32) -> RetryPolicy {
         RetryPolicy {
             max_attempts,
             backoff_ms: 10,
+            connect_timeout_ms: 1000,
+            write_timeout_ms: 1000,
+        }
+    }
+
+    /// A "black hole" printer: a listener whose tiny backlog is saturated and never accepts.
+    /// Further SYNs are absorbed — neither accepted nor refused — so a bare `connect` against it
+    /// hangs until some deadline fires. Models the hub#596 failure mode (loose cable, stale IP,
+    /// filtered port) without hardware. Keep the value alive: dropping it frees the port again.
+    struct BlackHolePrinter {
+        target: NetworkTarget,
+        _listener: TcpListener,
+        _backlog_guards: Vec<TcpStream>,
+    }
+
+    impl BlackHolePrinter {
+        async fn start() -> Self {
+            let socket = tokio::net::TcpSocket::new_v4().unwrap();
+            socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+            let listener = socket.listen(1).unwrap();
+            let addr = listener.local_addr().unwrap();
+            let mut guards = Vec::new();
+            for _ in 0..4 {
+                match tokio::time::timeout(Duration::from_millis(200), TcpStream::connect(addr))
+                    .await
+                {
+                    Ok(Ok(stream)) => guards.push(stream),
+                    // The backlog is full: this connect already hangs, the hole is ready.
+                    _ => break,
+                }
+            }
+            Self {
+                target: NetworkTarget {
+                    host: addr.ip().to_string(),
+                    port: addr.port(),
+                },
+                _listener: listener,
+                _backlog_guards: guards,
+            }
         }
     }
 
@@ -234,6 +316,8 @@ mod tests {
         let queue = Arc::new(PrintQueue::new(RetryPolicy {
             max_attempts: 8,
             backoff_ms: 20,
+            connect_timeout_ms: 1000,
+            write_timeout_ms: 1000,
         }));
         let mut outcomes = spawn_worker(queue.clone());
         let target = NetworkTarget {
@@ -304,5 +388,134 @@ mod tests {
             .enqueue(job(unreachable_target(), b"nowhere"))
             .expect_err("la cola cerrada no acepta trabajos");
         assert!(matches!(err, PeripheralError::InvalidPayload(_)));
+    }
+
+    /// **The connect deadline is the queue's own, not the OS one** (hub#596). Against a printer
+    /// that absorbs the connection without accepting or refusing it, `send_once` must give up
+    /// within its configured deadline; inheriting the OS timeout means tens of seconds with the
+    /// worker parked and every other printer's jobs behind it.
+    #[tokio::test]
+    async fn send_once_gives_up_within_its_own_connect_deadline() {
+        let hole = BlackHolePrinter::start().await;
+        let queue = PrintQueue::new(RetryPolicy {
+            max_attempts: 1,
+            backoff_ms: 10,
+            connect_timeout_ms: 100,
+            write_timeout_ms: 1000,
+        });
+
+        let started = std::time::Instant::now();
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            queue.send_once(&job(hole.target.clone(), b"stuck")),
+        )
+        .await
+        .expect("send_once must give up within its own connect deadline, not the OS one");
+
+        assert!(
+            matches!(result, Err(PeripheralError::Unreachable(_))),
+            "an absorbed connect is the printer being unreachable, got {result:?}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "the 100 ms deadline must bound the attempt (took {:?})",
+            started.elapsed()
+        );
+    }
+
+    /// **A printer that accepts and then wedges cannot hold the worker either.** The write gets
+    /// its own deadline: a payload bigger than the socket buffers against a peer that never
+    /// reads would otherwise block `write_all` until TCP retransmission gives up (minutes).
+    #[tokio::test]
+    async fn send_once_gives_up_on_a_printer_that_accepts_but_never_reads() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let wedged = tokio::spawn(async move {
+            let (_sock, _) = listener.accept().await.unwrap();
+            // Hold the socket open without reading a byte: the sender's buffers fill and stay full.
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        });
+
+        let queue = PrintQueue::new(RetryPolicy {
+            max_attempts: 1,
+            backoff_ms: 10,
+            connect_timeout_ms: 1000,
+            write_timeout_ms: 100,
+        });
+        // Well past what loopback socket buffers absorb, so the write really stalls.
+        let payload = vec![0x20u8; 16 * 1024 * 1024];
+
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            queue.send_once(&job(
+                NetworkTarget {
+                    host: addr.ip().to_string(),
+                    port: addr.port(),
+                },
+                &payload,
+            )),
+        )
+        .await
+        .expect("the write must give up within its own deadline, not the OS retransmission one");
+
+        assert!(
+            matches!(result, Err(PeripheralError::Unreachable(_))),
+            "a wedged printer is unreachable for the queue, got {result:?}"
+        );
+        wedged.abort();
+    }
+
+    /// **One dead printer does not stop the drain for the healthy ones** (hub#596: bar, kitchen
+    /// and till share the one serial worker). The job against the black hole fails within its
+    /// bounded retries and the next job — a different, healthy printer — still prints.
+    #[tokio::test]
+    async fn one_dead_printer_does_not_stall_the_healthy_ones_jobs() {
+        let hole = BlackHolePrinter::start().await;
+        let mock = MockPrinter::start().await;
+        let queue = Arc::new(PrintQueue::new(RetryPolicy {
+            max_attempts: 3,
+            backoff_ms: 10,
+            connect_timeout_ms: 100,
+            write_timeout_ms: 1000,
+        }));
+        let mut outcomes = spawn_worker(queue.clone());
+
+        queue
+            .enqueue(PrintJob {
+                job_id: Some("dead".into()),
+                target: hole.target.clone(),
+                payload: b"never lands".to_vec(),
+                attempts: 0,
+            })
+            .unwrap();
+        queue
+            .enqueue(PrintJob {
+                job_id: Some("alive".into()),
+                target: mock.target.clone(),
+                payload: b"bar ticket".to_vec(),
+                attempts: 0,
+            })
+            .unwrap();
+
+        let first = tokio::time::timeout(Duration::from_secs(2), outcomes.recv())
+            .await
+            .expect("the dead printer's job must fail within its bounded retries, not the OS timeout")
+            .unwrap();
+        match first {
+            JobOutcome::Failed { job_id, .. } => {
+                assert_eq!(job_id.as_deref(), Some("dead"), "the failed job keeps its id for retry")
+            }
+            other => panic!("a black-holed printer cannot complete: {other:?}"),
+        }
+
+        let second = tokio::time::timeout(Duration::from_secs(2), outcomes.recv())
+            .await
+            .expect("the healthy printer's job must follow right behind the bounded failure")
+            .unwrap();
+        match second {
+            JobOutcome::Completed { job_id } => assert_eq!(job_id.as_deref(), Some("alive")),
+            other => panic!("the healthy printer must still get its job: {other:?}"),
+        }
+        assert_eq!(mock.captured_bytes().await, b"bar ticket");
     }
 }
