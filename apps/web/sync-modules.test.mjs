@@ -1,0 +1,134 @@
+// hub#787: `pnpm dev` from a git worktree booted a hub with ZERO modules — the path to the
+// sibling `modules-workspace/` repo was hardcoded relative to the checkout, and a worktree is
+// not where the main checkout is. These tests pin the resolution contract:
+//   1. `ERPLORA_MODULES_DIR` / `HUB_MODULES_DIR` win (same escape hatch as the pre-push hook
+//      and the cargo e2e — hub#643 precedent for `blueprints/`).
+//   2. Otherwise walk up from the script until a `modules-workspace/modules` dir appears
+//      (covers the main checkout, unchanged behavior).
+//   3. Otherwise derive the main checkout from the git common dir (covers worktrees).
+//   4. When nothing is found the warning must tell the truth ("cannot find modules-workspace"),
+//      not blame the module build ("¿lo compilaste?").
+import { describe, it, expect } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { resolveModulesWorkspace, syncModules } from './sync-modules.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const SCRIPT = join(HERE, 'sync-modules.mjs');
+
+/** Creates <root>/modules-workspace/modules and returns both paths. */
+function fakeWorkspace() {
+  const root = mkdtempSync(join(tmpdir(), 'erplora-787-'));
+  const modules = join(root, 'modules-workspace', 'modules');
+  mkdirSync(modules, { recursive: true });
+  return { root, modules };
+}
+
+describe('resolveModulesWorkspace', () => {
+  it('honors ERPLORA_MODULES_DIR first, even if the dir does not exist (explicit override)', () => {
+    const { dir } = resolveModulesWorkspace({
+      env: { ERPLORA_MODULES_DIR: '/explicit/override', HUB_MODULES_DIR: '/other' },
+      startDir: tmpdir(),
+      gitCommonDir: () => null,
+    });
+    expect(dir).toBe('/explicit/override');
+  });
+
+  it('honors HUB_MODULES_DIR second (the var scripts/dev.mjs already documents)', () => {
+    const { dir } = resolveModulesWorkspace({
+      env: { HUB_MODULES_DIR: '/from/dev/mjs' },
+      startDir: tmpdir(),
+      gitCommonDir: () => null,
+    });
+    expect(dir).toBe('/from/dev/mjs');
+  });
+
+  it('walks up from startDir until it finds modules-workspace/modules (main checkout case)', () => {
+    const { root, modules } = fakeWorkspace();
+    try {
+      const nested = join(root, 'hub', 'apps', 'web');
+      mkdirSync(nested, { recursive: true });
+      const { dir } = resolveModulesWorkspace({ env: {}, startDir: nested, gitCommonDir: () => null });
+      expect(dir).toBe(modules);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('derives the main checkout from the git common dir (worktree case)', () => {
+    const { root, modules } = fakeWorkspace();
+    try {
+      // Simulate: main checkout at <root>/hub (git common dir <root>/hub/.git),
+      // while startDir is a worktree far away from the monorepo.
+      const commonDir = join(root, 'hub', '.git');
+      mkdirSync(commonDir, { recursive: true });
+      const worktree = mkdtempSync(join(tmpdir(), 'erplora-787-wt-'));
+      try {
+        const { dir } = resolveModulesWorkspace({
+          env: {},
+          startDir: worktree,
+          gitCommonDir: () => commonDir,
+        });
+        expect(dir).toBe(modules);
+      } finally {
+        rmSync(worktree, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns null plus the tried candidates when nothing is found', () => {
+    const worktree = mkdtempSync(join(tmpdir(), 'erplora-787-none-'));
+    try {
+      const { dir, tried } = resolveModulesWorkspace({
+        env: {},
+        startDir: worktree,
+        gitCommonDir: () => null,
+      });
+      expect(dir).toBeNull();
+      expect(tried.length).toBeGreaterThan(0);
+    } finally {
+      rmSync(worktree, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('syncModules', () => {
+  it('copies module.json + bundle from an explicit workspace into the destination', () => {
+    const src = mkdtempSync(join(tmpdir(), 'erplora-787-src-'));
+    const dst = mkdtempSync(join(tmpdir(), 'erplora-787-dst-'));
+    try {
+      const mod = join(src, 'inventory');
+      mkdirSync(join(mod, 'dist'), { recursive: true });
+      writeFileSync(join(mod, 'module.json'), JSON.stringify({ ui: { entry: 'dist/inventory.esm.js' } }));
+      writeFileSync(join(mod, 'dist', 'inventory.esm.js'), 'export default 1;');
+
+      syncModules({ modulesSrc: src, dst });
+
+      expect(existsSync(join(dst, 'inventory', 'module.json'))).toBe(true);
+      expect(existsSync(join(dst, 'inventory', 'dist', 'inventory.esm.js'))).toBe(true);
+    } finally {
+      rmSync(src, { recursive: true, force: true });
+      rmSync(dst, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('sync-modules.mjs as a script', () => {
+  it('warns truthfully (missing workspace, not "did you build it?") and exits 0 when the workspace is nowhere', () => {
+    const missing = join(tmpdir(), 'erplora-787-definitely-missing');
+    const res = spawnSync(process.execPath, [SCRIPT], {
+      env: { ...process.env, ERPLORA_MODULES_DIR: missing, HUB_MODULES_DIR: '' },
+      encoding: 'utf8',
+    });
+    const out = `${res.stdout}\n${res.stderr}`;
+    expect(res.status).toBe(0); // predev/Docker rely on warn+skip, never a hard fail
+    expect(out).toContain('modules-workspace');
+    expect(out).toContain(missing);
+    expect(out).not.toContain('¿lo compilaste');
+  });
+});

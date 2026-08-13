@@ -29,6 +29,25 @@ const APP_VERSION = (() => {
   }
 })();
 
+// hub#787: two dev benches must be able to coexist (e.g. two worktrees comparing branches), so
+// the dev server port and the runtime proxy target come from the environment, with today's
+// values as defaults. Precedence for the target: VITE_RUNTIME_TARGET > derived from HUB_BIND
+// (the runtime's own bind var, exported by scripts/dev.mjs) > http://127.0.0.1:8787.
+const DEV_PORT = Number(process.env.VITE_PORT) || 5173;
+const RUNTIME_TARGET = (() => {
+  if (process.env.VITE_RUNTIME_TARGET) return process.env.VITE_RUNTIME_TARGET;
+  const bind = process.env.HUB_BIND;
+  if (bind) {
+    const sep = bind.lastIndexOf(':');
+    const rawHost = sep === -1 ? bind : bind.slice(0, sep);
+    const port = sep === -1 ? '8787' : bind.slice(sep + 1);
+    // A wildcard bind is not a dialable host — proxy to loopback instead.
+    const host = !rawHost || rawHost === '0.0.0.0' || rawHost === '::' || rawHost === '[::]' ? '127.0.0.1' : rawHost;
+    return `http://${host}:${port}`;
+  }
+  return 'http://127.0.0.1:8787';
+})();
+
 // En dev, Vite se niega a servir JS de /public importado dinámicamente desde el código
 // ("can only be referenced via HTML tags"). Los módulos (WC Lit) se cargan en runtime con
 // import() dinámico desde /modules/**; este middleware los sirve CRUDOS (sin transform de Vite),
@@ -80,10 +99,11 @@ export default defineConfig({
   build: {
     target: 'es2022',
   },
-  // Tests unitarios (vitest), colocados junto al código: src/**/*.test.ts. Los e2e de Playwright
-  // viven en tests/e2e y NO los corre vitest (requieren la app levantada).
+  // Unit tests (vitest), colocated with the code: src/**/*.test.ts. The Playwright e2e live in
+  // tests/e2e and vitest does NOT run them (they need the app up). The two root-level test files
+  // cover the dev-bench plumbing (hub#787): module sync from a worktree + env-driven port/proxy.
   test: {
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'sync-modules.test.mjs', 'vite.config.test.ts'],
     environment: 'node',
   },
   // Dev proxy (mismo origen → sin CORS). El runtime local (Axum :8787) no expone CORS y el Cloud
@@ -95,7 +115,7 @@ export default defineConfig({
     // Vite quedaba escuchando SOLO en IPv6 `[::1]:5173`. El webview de Tauri pega a `127.0.0.1`
     // → conexión rechazada → ventana en blanco. Forzar 127.0.0.1 + strictPort lo evita.
     host: '127.0.0.1',
-    port: 5173,
+    port: DEV_PORT,
     strictPort: true,
     proxy: {
       '/cloud': {
@@ -107,8 +127,8 @@ export default defineConfig({
         secure: false,
         rewrite: (p) => p.replace(/^\/cloud/, ''),
       },
-      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/ws': { target: 'http://127.0.0.1:8787', changeOrigin: true, ws: true },
+      '/api': { target: RUNTIME_TARGET, changeOrigin: true },
+      '/ws': { target: RUNTIME_TARGET, changeOrigin: true, ws: true },
     },
   },
 });
