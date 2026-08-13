@@ -59,6 +59,15 @@ impl Serialize for Error {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Empty {}
 
+/// The scope of a `request_permissions` call (hub#758): the permissions the OPERATION that asks
+/// is about to use, or `None` when the caller sent none (a web older than the scope), which keeps
+/// the old ask-for-everything behavior so the two separately-shipped halves cannot break each
+/// other.
+#[derive(Debug, Serialize)]
+struct RequestPermissionsArgs {
+    permissions: Option<Vec<String>>,
+}
+
 /// What the shell asks the native side to publish, and where it staged the bytes (hub#499).
 ///
 /// A **path** and not the bytes: the shell has already written the file into its own cache, so an
@@ -118,17 +127,25 @@ impl<R: Runtime> ErploraAndroid<R> {
         Ok(PermissionStatus::new())
     }
 
-    /// Pide lo que falte. Idempotente: si ya está todo, no sale ningún diálogo.
-    pub fn request_permissions(&self) -> Result<PermissionStatus, Error> {
+    /// Asks for what is missing, scoped to what the calling operation is about to use (hub#758).
+    /// `None` = no scope sent (an older web): the whole batch, as before. Idempotent: if
+    /// everything in scope is granted, no dialog.
+    pub fn request_permissions(
+        &self,
+        permissions: Option<Vec<String>>,
+    ) -> Result<PermissionStatus, Error> {
         #[cfg(target_os = "android")]
         {
             return self
                 .0
-                .run_mobile_plugin("requestPermissions", Empty {})
+                .run_mobile_plugin("requestPermissions", RequestPermissionsArgs { permissions })
                 .map_err(|e| Error::PluginInvoke(e.to_string()));
         }
         #[cfg(not(target_os = "android"))]
-        Ok(PermissionStatus::new())
+        {
+            let _ = permissions;
+            Ok(PermissionStatus::new())
+        }
     }
 
     /// Publishes the file at `source_path` into Android's **public** Downloads collection under
@@ -191,8 +208,9 @@ async fn check_permissions<R: Runtime>(app: tauri::AppHandle<R>) -> Result<Permi
 #[tauri::command]
 async fn request_permissions<R: Runtime>(
     app: tauri::AppHandle<R>,
+    permissions: Option<Vec<String>>,
 ) -> Result<PermissionStatus, Error> {
-    app.erplora_android().request_permissions()
+    app.erplora_android().request_permissions(permissions)
 }
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -332,6 +350,37 @@ mod tests {
                  Declared right now: {declared:?}"
             );
         }
+    }
+
+    /// The scope of a permission request has to reach Kotlin under the key Kotlin reads
+    /// (hub#758). If either side renamed it, the argument would silently vanish and the plugin
+    /// would fall back to requesting its whole batch — the exact out-of-context notifications
+    /// dialog this contract exists to end, with no error anywhere.
+    #[test]
+    fn the_permission_scope_travels_under_the_key_kotlin_reads() {
+        let args = RequestPermissionsArgs {
+            permissions: Some(vec![ACCESS_LOCAL_NETWORK.to_string()]),
+        };
+        let json = serde_json::to_value(&args).expect("serializable");
+        assert_eq!(json["permissions"][0], ACCESS_LOCAL_NETWORK);
+
+        const PLUGIN_KT: &str =
+            include_str!("../android/src/main/java/com/erplora/android/ErploraAndroidPlugin.kt");
+        assert!(
+            PLUGIN_KT.contains("optJSONArray(\"permissions\")"),
+            "ErploraAndroidPlugin.kt no longer reads the \"permissions\" scope: every request \
+             would go back to asking for the whole batch (hub#758)"
+        );
+    }
+
+    /// An absent scope must serialize as an ABSENT key, not as `null`: Kotlin's `optJSONArray`
+    /// treats both as "no scope", but the wire contract is "an old web sends nothing", and
+    /// pinning it keeps the fallback path honest.
+    #[test]
+    fn no_scope_still_serializes_and_means_the_whole_batch() {
+        let args = RequestPermissionsArgs { permissions: None };
+        let json = serde_json::to_value(&args).expect("serializable");
+        assert!(json["permissions"].is_null());
     }
 
     #[test]

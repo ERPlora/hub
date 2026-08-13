@@ -154,6 +154,13 @@ describe('permisos de runtime antes de tocar el hardware', () => {
     expect(llamadas.indexOf('plugin:erplora-android|request_permissions')).toBeLessThan(
       llamadas.indexOf('erplora_discover_printers'),
     );
+    // hub#758: only what THIS operation needs. Asking for the whole batch made Android pop the
+    // notifications dialog right after a printer re-scan — an out-of-context request the user
+    // rightly denies.
+    const peticion = invokeSpy.mock.calls.find(
+      (c) => c[0] === 'plugin:erplora-android|request_permissions',
+    );
+    expect(peticion?.[1]).toEqual({ permissions: ['android.permission.ACCESS_LOCAL_NETWORK'] });
   });
 
   it('pide permisos antes de notificar', async () => {
@@ -168,6 +175,12 @@ describe('permisos de runtime antes de tocar el hardware', () => {
     expect(llamadas.indexOf('plugin:erplora-android|request_permissions')).toBeLessThan(
       llamadas.indexOf('erplora_notify'),
     );
+    // hub#758: notifying is the ONE context where the notifications permission belongs — and the
+    // local network has nothing to do with it, so it must not tag along here either.
+    const peticion = invokeSpy.mock.calls.find(
+      (c) => c[0] === 'plugin:erplora-android|request_permissions',
+    );
+    expect(peticion?.[1]).toEqual({ permissions: ['android.permission.POST_NOTIFICATIONS'] });
   });
 
   it('si el usuario DENIEGA, la operación sigue — no revienta', async () => {
