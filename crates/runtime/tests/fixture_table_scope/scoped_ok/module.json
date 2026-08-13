@@ -1,19 +1,14 @@
 {
-  "id": "ob2",
-  "name": "Outbox142Sibling",
+  "id": "scoped_ok",
+  "name": "Scoped OK fixture",
   "version": "1.0.0",
   "permissions": [],
   "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
   "commands": {
-    "ob2.good": {
+    "scoped_ok.touch": {
       "permission": "",
       "transaction": true,
-      "sql": ["sql/good_listener.sql"]
-    }
-  },
-  "events": {
-    "listen": {
-      "ob.e": { "command": "ob2.good" }
+      "sql": ["sql/touch.sql"]
     }
   }
 }

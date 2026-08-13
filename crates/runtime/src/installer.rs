@@ -61,6 +61,9 @@ pub async fn install(
     // hub#139: id-dependent contract checks (domain error namespaces, exclusive row gates)
     // run BEFORE any side effect — a broken contract never reaches migrations or the registry.
     validate_command_contracts(&manifest)?;
+    // hub#633 (ADR-0283 D4 fase B): the SQL a module ships may only WRITE its own tables.
+    // Same door as the other contract checks: before any side effect, on the hostile border.
+    validate_table_scope(dir, &manifest)?;
     // hub#351 (paso 2b): same door for the roles the module declares. A manifest may add roles to
     // the hub's catalogue, but it can neither redefine a base role nor hand out administration.
     validate_role_declarations(&manifest)?;
@@ -319,6 +322,241 @@ async fn register_module(
 
     persist_status(db, hub_id, &id, &version, ModuleStatus::Active).await?;
     Ok(id)
+}
+
+/// **The SQL a module's COMMANDS and SEED ship may only WRITE its own tables** (hub#633,
+/// ADR-0283 D4 fase B).
+///
+/// "A module only touches its own tables" was a documented principle with exactly ONE runtime
+/// door: migrations, guarded by [`crate::migration_guard`] (hub#542 — kinds, system namespaces,
+/// an enumerated grandfather list). The other half had NOTHING: the installer ran its
+/// validations without ever looking at the tables the SQL of `commands` (and `seed`) writes, so
+/// a third-party `module.json` could ship `UPDATE inventory_product …` and only the human review
+/// and the marketplace signature stood in the way. This gate closes that half; migrations stay
+/// with their own guard (duplicating them here would let two doors disagree about the same file —
+/// the grandfather list is the proof they already would).
+///
+/// **Hardness chosen by measurement, not by taste** (2026-08-13, the 25 published manifests):
+/// zero command/seed files write another module's tables, zero write `_hub_*` or any `_*` name.
+/// 25/25 real manifests pass, so the gate is born a **hard error** — fail closed on the hostile
+/// border, like the sibling validations above it.
+///
+/// What it scans: the write targets (`INSERT INTO` / `UPDATE` / `DELETE FROM` / `CREATE|ALTER|
+/// DROP TABLE` / `CREATE INDEX … ON` / `TRUNCATE`) of every SQL file the manifest declares under
+/// `commands` and `seed.postgres`, lexically (literals and comments stripped — the same class of
+/// validation as `import_sql`, on the same hostile border).
+///
+/// Two deliberate exclusions:
+///
+///  - **reads**: reading another module's tables by direct SQL is also against the composition
+///    contract (ADR-0127 — cross-module goes through public namespaced queries), but a lexical
+///    scanner cannot tell a foreign table in `FROM`/`JOIN` from a CTE name (`WITH cand AS (…) …
+///    FROM cand`), and a false refusal bricks a legitimate module at the boot re-registration.
+///    The read half waits for an AST-based validator (module-system §4bis leaves that door open).
+///  - **migrations**: already governed by `migration_guard` at apply time (see above).
+fn validate_table_scope(dir: &Path, manifest: &Manifest) -> Result<()> {
+    let scope = crate::import_sql::TableScope::Module(manifest.id.clone());
+    let mut files: Vec<&str> = Vec::new();
+    for def in manifest.commands.values() {
+        files.extend(def.sql.iter().map(String::as_str));
+    }
+    files.extend(manifest.seed.postgres.iter().map(|f| f.file()));
+
+    for rel in files {
+        let sql = loader::read_text(dir, rel)?;
+        for table in &write_targets(&sql).tables {
+            if scope.allows(table) {
+                continue;
+            }
+            let why = if crate::export::is_system_table(table) {
+                format!(
+                    "`{table}` is a system table of the hub: the fiscal profile, the certificate \
+                     and the runtime's own bookkeeping are the identity of this installation, out \
+                     of reach of every module (ADR-0273 D8)"
+                )
+            } else {
+                format!(
+                    "`{table}` is outside the module's own prefix (`{id}`/`{id}_*`): a module \
+                     only writes its own tables; another module's data is composed through its \
+                     public queries/commands (ADR-0127), never by direct SQL",
+                    id = manifest.id
+                )
+            };
+            return Err(RuntimeError::Other(format!(
+                "manifest `{}`: `{rel}` writes {why}",
+                manifest.id
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// The tables a batch of SQL WRITES, found lexically (hub#633).
+struct WriteTargets {
+    /// Every write target, lowercased (Postgres folds unquoted identifiers).
+    tables: Vec<String>,
+}
+
+/// Lexical write-target extraction. Works over the word stream with literals and comments
+/// stripped, so `'a; DROP TABLE x'` is data and `-- UPDATE t` is a comment. The `UPDATE` arm
+/// skips the non-statement uses: `ON CONFLICT … DO UPDATE SET`, the `FOR [NO KEY] UPDATE` lock
+/// clause and trigger timing (`BEFORE|AFTER UPDATE`).
+fn write_targets(sql: &str) -> WriteTargets {
+    let words = sql_words(sql);
+    let w = |i: usize| words.get(i).map(String::as_str);
+    let mut out = WriteTargets { tables: Vec::new() };
+    let skip_modifiers = |mut i: usize, mods: &[&str]| {
+        while w(i).is_some_and(|word| mods.contains(&word)) {
+            i += 1;
+        }
+        i
+    };
+    let mut i = 0usize;
+    while i < words.len() {
+        match w(i) {
+            Some("insert") if w(i + 1) == Some("into") => {
+                if let Some(t) = w(i + 2) {
+                    out.tables.push(t.to_string());
+                }
+                i += 3;
+            }
+            Some("update") => {
+                let prev = i.checked_sub(1).and_then(w);
+                let statement = !matches!(
+                    prev,
+                    Some("do") | Some("for") | Some("key") | Some("before") | Some("after")
+                        | Some("or") | Some("of")
+                );
+                if statement {
+                    let at = skip_modifiers(i + 1, &["only"]);
+                    if let Some(t) = w(at) {
+                        out.tables.push(t.to_string());
+                    }
+                }
+                i += 1;
+            }
+            Some("delete") if w(i + 1) == Some("from") => {
+                let at = skip_modifiers(i + 2, &["only"]);
+                if let Some(t) = w(at) {
+                    out.tables.push(t.to_string());
+                }
+                i += 3;
+            }
+            Some("create") => {
+                let j = skip_modifiers(i + 1, &["temp", "temporary", "unlogged", "unique"]);
+                match w(j) {
+                    Some("table") => {
+                        let at = skip_modifiers(j + 1, &["if", "not", "exists"]);
+                        if let Some(t) = w(at) {
+                            out.tables.push(t.to_string());
+                        }
+                    }
+                    Some("index") => {
+                        // CREATE [UNIQUE] INDEX [CONCURRENTLY] [IF NOT EXISTS] name ON table
+                        let mut k = skip_modifiers(j + 1, &["concurrently", "if", "not", "exists"]);
+                        k += 1; // the index name
+                        if w(k) == Some("on") {
+                            let at = skip_modifiers(k + 1, &["only"]);
+                            if let Some(t) = w(at) {
+                                out.tables.push(t.to_string());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+            Some("alter") | Some("drop") if w(i + 1) == Some("table") => {
+                let at = skip_modifiers(i + 2, &["if", "exists", "only"]);
+                if let Some(t) = w(at) {
+                    out.tables.push(t.to_string());
+                }
+                i += 3;
+            }
+            Some("truncate") => {
+                let at = skip_modifiers(i + 1, &["table", "only"]);
+                if let Some(t) = w(at) {
+                    out.tables.push(t.to_string());
+                }
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    out
+}
+
+/// Splits SQL into lowercased words (identifiers and keywords), with `'…'` literals, `"…"`
+/// quoted identifiers folded to their content, and `--`/`/* … */` comments stripped. Punctuation
+/// separates words and is dropped — enough structure for [`write_targets`], which only reads
+/// keyword→identifier sequences.
+fn sql_words(sql: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut chars = sql.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\'' => {
+                // String literal: skip through, honouring the `''` escape.
+                while let Some(q) = chars.next() {
+                    if q == '\'' {
+                        if chars.peek() == Some(&'\'') {
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            '"' => {
+                // Quoted identifier: its content is one word (folded — TableScope folds too).
+                let mut ident = String::new();
+                while let Some(q) = chars.next() {
+                    if q == '"' {
+                        if chars.peek() == Some(&'"') {
+                            ident.push('"');
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    } else {
+                        ident.push(q);
+                    }
+                }
+                out.push(ident.to_ascii_lowercase());
+            }
+            '-' if chars.peek() == Some(&'-') => {
+                for q in chars.by_ref() {
+                    if q == '\n' {
+                        break;
+                    }
+                }
+            }
+            '/' if chars.peek() == Some(&'*') => {
+                chars.next();
+                let mut prev = ' ';
+                for q in chars.by_ref() {
+                    if prev == '*' && q == '/' {
+                        break;
+                    }
+                    prev = q;
+                }
+            }
+            c if c.is_ascii_alphabetic() || c == '_' => {
+                let mut word = String::from(c);
+                while let Some(&n) = chars.peek() {
+                    if n.is_ascii_alphanumeric() || n == '_' {
+                        word.push(n);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                out.push(word.to_ascii_lowercase());
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 /// Validations that depend on the module id and therefore cannot be expressed by the JSON
@@ -1449,6 +1687,87 @@ mod tests {
         assert!(
             error.contains("waiter") && error.contains("twice"),
             "a duplicated key must be called out: {error}"
+        );
+    }
+
+    // ── hub#633: the SQL a module ships may only WRITE its own tables ──────────────────────────
+
+    /// The word-level extraction behind the gate: statements, clauses that look like statements,
+    /// and the shapes the published catalogue actually contains.
+    #[test]
+    fn write_targets_reads_statements_not_clauses() {
+        let targets = |sql: &str| super::write_targets(sql).tables;
+
+        assert_eq!(targets("INSERT INTO inventory_product (id) VALUES (:id);"), ["inventory_product"]);
+        assert_eq!(targets("UPDATE taxes_rule SET rate = 21;"), ["taxes_rule"]);
+        assert_eq!(targets("DELETE FROM sales_line WHERE id = :id;"), ["sales_line"]);
+        assert_eq!(targets("CREATE TABLE IF NOT EXISTS kitchen_log (id TEXT);"), ["kitchen_log"]);
+        assert_eq!(targets("ALTER TABLE staff_member ADD COLUMN x TEXT;"), ["staff_member"]);
+        assert_eq!(targets("DROP TABLE IF EXISTS tasks_done;"), ["tasks_done"]);
+        assert_eq!(
+            targets("CREATE UNIQUE INDEX IF NOT EXISTS idx_x ON printing_job (status);"),
+            ["printing_job"]
+        );
+        assert_eq!(targets("TRUNCATE TABLE payments_intent;"), ["payments_intent"]);
+
+        // `ON CONFLICT … DO UPDATE SET` is a clause of the INSERT, not an UPDATE of `set` — the
+        // false positive that would have flagged 19 of the 25 published modules.
+        assert_eq!(
+            targets(
+                "INSERT INTO sales_counter (k, n) VALUES (:k, 1) \
+                 ON CONFLICT (k) DO UPDATE SET n = sales_counter.n + 1;"
+            ),
+            ["sales_counter"]
+        );
+        // The lock clause and quoted/cased identifiers.
+        assert!(targets("SELECT * FROM sales_order FOR UPDATE;").is_empty());
+        assert_eq!(targets("UPDATE \"Sales_Order\" SET x = 1;"), ["sales_order"]);
+        // Literals and comments are data, not statements.
+        assert!(targets("-- UPDATE hub_user\nSELECT 'DELETE FROM hub_user';").is_empty());
+    }
+
+    /// A TEMP scratch is still a write target: a COMMAND creating `_*` scratch is refused (fail
+    /// closed — zero published commands do it; the migration that legitimately does, `taxes/003`,
+    /// is governed by `migration_guard`'s grandfather list, not by this gate).
+    #[test]
+    fn a_temp_table_is_still_a_write_target() {
+        let writes = super::write_targets(
+            "CREATE TEMP TABLE _scratch AS SELECT 1; INSERT INTO _scratch (one) SELECT 2;",
+        );
+        assert_eq!(writes.tables, ["_scratch", "_scratch"]);
+        assert!(
+            !crate::import_sql::TableScope::Module("taxes".into()).allows("_scratch"),
+            "`_*` is the system namespace, out of every module's scope"
+        );
+    }
+
+    /// **Measured, not asserted**: every published module passes the write-scope gate — which is
+    /// the fact that let hub#633 be born a hard error instead of a warning. Skips (loudly) where
+    /// `modules-workspace` is not checked out, like every other catalogue sweep.
+    #[test]
+    fn every_published_manifest_passes_the_table_scope_gate() {
+        if !crate::require_modules_workspace() {
+            return;
+        }
+        let root = crate::e2e_support::modules_root();
+        let mut checked = 0;
+        for entry in std::fs::read_dir(&root).expect("modules root is readable").flatten() {
+            let dir = entry.path();
+            if !dir.join("module.json").is_file() {
+                continue;
+            }
+            let module = dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let Ok(manifest) = crate::manifest::Manifest::load(&dir) else {
+                continue; // A manifest that does not parse is another test's business.
+            };
+            super::validate_table_scope(&dir, &manifest)
+                .unwrap_or_else(|e| panic!("`{module}` must pass the write-scope gate: {e}"));
+            checked += 1;
+        }
+        assert!(
+            checked >= 20,
+            "expected the published catalogue (~25 modules), only {checked} checked in {}",
+            root.display()
         );
     }
 
