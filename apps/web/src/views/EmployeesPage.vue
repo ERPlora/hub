@@ -136,9 +136,9 @@
 
         <!-- The PIN approval record (hub#512, ADR-0265): who asked for the elevation and who
              authorised it. It belongs here because the row IS two people, and it carries the same
-             admin gate as the API keys. `v-if` and not `v-show` on purpose: the query has no
-             ceiling on the server (`list_approvals` returns the whole trail, with no LIMIT), so it
-             is read when somebody opens the tab and not on every visit to People. -->
+             admin gate as the API keys. `v-if` and not `v-show` on purpose: the read is paged
+             server-side since hub#884, but it still belongs to the moment somebody OPENS the tab —
+             a visit to People has no business querying an audit trail at all. -->
         <ApprovalsPanel v-if="isAdmin && tab === 'approvals'" />
       </template>
     </div>

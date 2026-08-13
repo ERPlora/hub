@@ -1,4 +1,5 @@
-// The PIN approval record, read from the ONE query that owns it (hub#512).
+// The PIN approval record, read from the ONE query that owns it (hub#512), one PAGE at a time
+// (hub#884).
 //
 // The runtime writes a receipt for every **spent** step-up approval into the system table
 // `_elevation_audit` (system migration **v26**, [ADR-0265]): who asked (`created_by`, the cashier),
@@ -11,17 +12,31 @@
 //
 // The reading is deliberately thin, because the query is the authority:
 //
-//   - **the order is the query's** (`created_at DESC`). Re-sorting here would mean two people
-//     looking at the same hub disagree about which approval was the last one;
+//   - **one page crosses the wire, never the trail.** The audit grows forever by design (nothing
+//     deletes it), so the query runs through the runtime's list engine and this file reads it with
+//     the SDK's `ListController` — the same `{rows,total,limit,offset}` contract every list of the
+//     product speaks. Filters (`command`, `permission`, `created_by`, `approved_by` exact;
+//     `created_at` range) and the search over names/command are answered BY THE QUERY: filtering
+//     in the client only worked while the whole record was in memory, which was the bug (hub#884);
+//   - **the order is the query's** (`created_at DESC` by default). Re-sorting here would mean two
+//     people looking at the same hub disagree about which approval was the last one;
 //   - **the names come resolved.** The query LEFT JOINs `hub_user` twice; a row whose person was
 //     deleted arrives with an empty name and it still is a row. Dropping it here would undo, on
 //     the only screen that reads the record, the care the SQL took not to lose it;
 //   - **a broken answer is not an empty record.** A shape we do not know parses to nothing and a
-//     failed read throws, so the caller can say «could not load» instead of «nobody ever approved
-//     anything» — a silent false negative on an audit trail is worse than no screen at all.
+//     failed page lands in the controller's `error`, so the caller can say «could not load»
+//     instead of «nobody ever approved anything» — a silent false negative on an audit trail is
+//     worse than no screen at all.
 //
 // [ADR-0265]: architecture/00-overview/decision-log.md#adr-0265
-import type { ErploraClient } from '@erplora/module-sdk';
+import {
+  createListController,
+  type ErploraClient,
+  type ListClient,
+  type ListController,
+  type ListParams,
+  type Page,
+} from '@erplora/module-sdk';
 
 /** The one query. A core query of the reserved `hub.` namespace (`crates/runtime/src/hub_users.rs`). */
 export const APPROVALS_QUERY = 'hub.approvals.list';
@@ -50,25 +65,33 @@ export interface Approval {
   createdAt: string;
 }
 
-/**
- * Equality filters the query understands. Each one is an exact match — there is no free-text search
- * over an audit trail, and the query offers none.
- */
-export interface ApprovalFilters {
-  command?: string;
-  created_by?: string;
-  approved_by?: string;
-}
+/** The controller a screen holds: one page of parsed receipts + the real total, SDK contract. */
+export type ApprovalsController = ListController<Approval>;
 
 /**
- * Reads the record. Throws what the transport threw: the caller has to be able to tell a hub with
- * no approvals from a hub that could not be asked.
+ * The list controller over the record: page, sort, search and filters all re-ask the RUNTIME
+ * (`hub.approvals.list` runs through the runtime's list engine since hub#884). Ten per page —
+ * the table's own default — newest first; the rows come parsed, so a shape the runtime never
+ * promised parses to nothing instead of reaching the screen.
+ *
+ * A failed page lands in the controller's `error` (never thrown): the caller has to be able to
+ * tell a hub with no approvals from a hub that could not be asked.
  */
-export async function listApprovals(
+export function createApprovalsController(
   client: ErploraClient,
-  filters: ApprovalFilters = {},
-): Promise<Approval[]> {
-  return parseApprovals(await client.query<unknown>(APPROVALS_QUERY, { ...filters }));
+  onChange: () => void,
+): ApprovalsController {
+  const parsing: ListClient = {
+    async queryPage<R>(name: string, params: ListParams): Promise<Page<R>> {
+      const page = await client.queryPage<unknown>(name, params);
+      return { ...page, rows: parseApprovals(page.rows) as R[] };
+    },
+  };
+  return createListController<Approval>(parsing, APPROVALS_QUERY, onChange, {
+    pageSize: 10,
+    sort: 'created_at',
+    dir: 'desc',
+  });
 }
 
 /** Reads the runtime's payload. Anything that is not a list of rows parses to nothing. */
