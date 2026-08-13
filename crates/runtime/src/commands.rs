@@ -876,9 +876,11 @@ async fn persist_handler_output(
     depth: u32,
     extra_ops: &[(String, Params)],
     output: &Output,
-    // Lote de ids que el host generó y entregó al handler. Se devuelven al llamante para que la
-    // UI pueda correlacionar lo que acaba de crear (el POS abre un pedido y necesita su `order_id`
-    // para añadirle líneas). Por convención `new_ids[0]` es la entidad principal (§5.3).
+    // Lote de ids que el host generó y entregó al handler. Al llamante solo se le devuelven los
+    // que las operaciones del handler CONSUMIERON (hub#776): un id del lote que ninguna operación
+    // referencia no nombra ninguna fila, y devolver los 256 convertía cada toque del TPV en una
+    // respuesta de varios KB de UUIDs fantasma. Por convención `new_ids[0]` es la entidad
+    // principal (§5.3) — se preserva porque el orden del lote se mantiene al filtrar.
     new_ids: &[Json],
 ) -> Result<Json> {
     // hub#139: a business rejection is a normal guest output, not a WASM trap. It is checked
@@ -988,7 +990,62 @@ async fn persist_handler_output(
         events::notify_sink(registry, source, name, payload);
     }
 
-    Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))
+    Ok(json!({
+        "ok": true,
+        "operations": output.operations.len(),
+        "new_ids": consumed_new_ids(output, new_ids),
+    }))
+}
+
+/// The batch ids the handler's operations actually CONSUMED, in batch order (hub#776).
+///
+/// The host is the only id authority (§5.3): the guest cannot mint UUIDs, it can only take them
+/// from `context.new_ids`. So an id of the batch names a materialised row **iff** some operation's
+/// params reference it — anywhere, including nested structures (order lines carry theirs inside
+/// arrays of objects). Scanning the params is therefore a complete and safe derivation: it needs
+/// no guest-sdk change and no republish of the 21 modules with handlers.
+///
+/// Properties the callers rely on:
+///  - **batch order is preserved**, so `new_ids[0]` keeps being the main entity for every caller
+///    that already reads it (handlers take ids from the front of the batch by convention);
+///  - an id referenced by two operations is reported **once** (it names one row);
+///  - a handler that consumed nothing answers with an empty list — no phantom ids.
+fn consumed_new_ids(output: &Output, new_ids: &[Json]) -> Vec<Json> {
+    use std::collections::HashSet;
+
+    fn scan<'v>(value: &'v Json, batch: &HashSet<&'v str>, used: &mut HashSet<&'v str>) {
+        match value {
+            Json::String(s) => {
+                if let Some(&id) = batch.get(s.as_str()) {
+                    used.insert(id);
+                }
+            }
+            Json::Array(items) => {
+                for item in items {
+                    scan(item, batch, used);
+                }
+            }
+            Json::Object(map) => {
+                for item in map.values() {
+                    scan(item, batch, used);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let batch: HashSet<&str> = new_ids.iter().filter_map(Json::as_str).collect();
+    let mut used: HashSet<&str> = HashSet::new();
+    for op in &output.operations {
+        for value in op.params.values() {
+            scan(value, &batch, &mut used);
+        }
+    }
+    new_ids
+        .iter()
+        .filter(|id| id.as_str().is_some_and(|s| used.contains(s)))
+        .cloned()
+        .collect()
 }
 
 /// Valida el **nombre de un evento devuelto por un handler** contra lo declarado en el
