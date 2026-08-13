@@ -47,14 +47,17 @@ interface RuntimeNavItem {
 }
 
 /**
- * Lo que contesta `/api/navigation`: el menú + cuántos módulos TIENE el hub (hub#894).
+ * Lo que contesta `/api/navigation`: el menú + cuántos módulos se espera que aporten uno (hub#894).
  *
- * `installed` es el número contra el que se comprueba una lista vacía. `undefined` = un runtime
- * anterior que no lo dice, y «no lo ha dicho» nunca puede ser el motivo de gritar.
+ * `activeModules` es el número contra el que se comprueba una lista vacía. Cuenta los módulos
+ * instalados **y activos**: uno que el admin apagó no se espera que aporte menú, así que contarlo
+ * convertiría un hub apagado a propósito en un falso «no he podido cargar tus apps».
+ * `undefined` = un runtime anterior que no lo dice, y «no lo ha dicho» nunca puede ser el motivo de
+ * gritar.
  */
 interface Navigation {
   items: RuntimeNavItem[];
-  installed?: number;
+  activeModules?: number;
 }
 
 const loadedEntries = new Set<string>();
@@ -72,8 +75,12 @@ async function fetchNavigation(): Promise<Navigation> {
     headers: runtimeHeaders(),
   });
   if (!res.ok) throw new Error(`navigation → ${res.status}`);
-  const env = (await res.json()) as { ok: boolean; data?: RuntimeNavItem[]; installed?: number };
-  return { items: env.ok && env.data ? env.data : [], installed: env.installed };
+  const env = (await res.json()) as {
+    ok: boolean;
+    data?: RuntimeNavItem[];
+    active_modules?: number;
+  };
+  return { items: env.ok && env.data ? env.data : [], activeModules: env.active_modules };
 }
 
 /**
@@ -125,18 +132,19 @@ export async function loadManifest(moduleId: string): Promise<ModuleManifest | n
  *
  * Lanza en dos casos, y son el mismo error visto por sus dos lados:
  *   1. la petición falló (401, 5xx, sin runtime) — no hay respuesta que creer;
- *   2. la respuesta llegó, el hub TIENE módulos (`installed > 0`) y aun así no queda ninguna app que
+ *   2. la respuesta llegó, el runtime esperaba menú (`active_modules > 0`) y no queda ninguna app que
  *      montar. Eso es una contradicción, no un hub vacío: alguno de los descartes silenciosos de
  *      abajo (entitlement, manifest ilegible) se los llevó todos.
  *
- * Lo que NO lanza: un hub genuinamente vacío (`installed: 0` → `[]` es la respuesta verdadera), un
- * runtime que no reporta `installed` (se toma al pie de la letra, como antes), ni un módulo roto
+ * Lo que NO lanza: un hub sin módulos activos (`active_modules: 0` → `[]` es la respuesta verdadera,
+ * incluido el hub que el admin apagó a propósito), un runtime que no reporta la cuenta (se toma al
+ * pie de la letra, como antes), ni un módulo roto
  * entre varios buenos (los demás siguen en pantalla — «los datos ganan», hub#770).
  */
 export async function loadMenu(): Promise<MenuEntry[]> {
   // Un fallo aquí sale hacia arriba a propósito: quien pinta la lista tiene que poder distinguir
   // «no pude preguntar» de «este hub no tiene apps».
-  const { items: navItems, installed } = await fetchNavigation();
+  const { items: navItems, activeModules } = await fetchNavigation();
 
   // Agrupa las entradas de navegación por módulo (un manifest/icon-map por módulo, no por item).
   const byModule = new Map<string, RuntimeNavItem[]>();
@@ -172,13 +180,13 @@ export async function loadMenu(): Promise<MenuEntry[]> {
       });
     }
   }
-  // Cero apps que montar en un hub que SÍ tiene módulos = contradicción (hub#894). El runtime lo
-  // afirmó (`installed`), así que la lista vacía no puede ser la respuesta: se sube como fallo para
-  // que se pinte un error y no la frase «aún no tienes apps», que manda al dueño a instalar lo que ya
-  // tiene. `installed == null` = un runtime que no lo dice; ahí no hay contradicción que detectar.
-  if (entries.length === 0 && (installed ?? 0) > 0) {
+  // Cero apps que montar cuando el runtime esperaba menú = contradicción (hub#894). Lo afirmó él
+  // (`active_modules`), así que la lista vacía no puede ser la respuesta: se sube como fallo para que
+  // se pinte un error y no la frase «aún no tienes apps», que manda al dueño a instalar lo que ya
+  // tiene. `activeModules == null` = un runtime que no lo dice; ahí no hay contradicción que detectar.
+  if (entries.length === 0 && (activeModules ?? 0) > 0) {
     throw new Error(
-      `navigation → 0 apps to mount with ${installed} module(s) installed on this hub`,
+      `navigation → 0 apps to mount with ${activeModules} active module(s) on this hub`,
     );
   }
   return entries;

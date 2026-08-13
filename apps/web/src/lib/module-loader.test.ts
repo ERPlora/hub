@@ -48,7 +48,7 @@ function navItem(moduleId: string) {
  * `nav` is either a body to answer 200 with, or an HTTP status to fail with.
  */
 function stubFetch(
-  nav: { ok: boolean; data?: unknown[]; installed?: number } | number,
+  nav: { ok: boolean; data?: unknown[]; active_modules?: number } | number,
   manifests: Record<string, unknown | null> = {},
 ) {
   const fetchMock = vi.fn(async (url: string) => {
@@ -81,7 +81,7 @@ beforeEach(() => {
 
 describe('loadMenu builds the launcher', () => {
   it('returns one entry per navigation item of every installed module', async () => {
-    stubFetch({ ok: true, data: [navItem('inventory')], installed: 1 }, { inventory: inventoryManifest });
+    stubFetch({ ok: true, data: [navItem('inventory')], active_modules: 1 }, { inventory: inventoryManifest });
 
     const entries = await loadMenu();
 
@@ -90,7 +90,7 @@ describe('loadMenu builds the launcher', () => {
   });
 
   it('a hub where nothing is installed answers an empty list — that is a real answer', async () => {
-    stubFetch({ ok: true, data: [], installed: 0 });
+    stubFetch({ ok: true, data: [], active_modules: 0 });
 
     await expect(loadMenu()).resolves.toEqual([]);
   });
@@ -132,17 +132,19 @@ describe('a failed navigation is a FAILURE, not an empty hub', () => {
 // out empty anyway, because something inside `loadMenu` dropped every module on the floor. Each drop
 // was a silent `continue`, and the result was the same false sentence.
 //
-// The runtime now reports `installed` (hub#894), so the contradiction «zero apps to show, N modules
-// installed» is detectable in the one place that knows both numbers.
+// The runtime now reports `active_modules` (hub#894), so the contradiction «zero apps to show, N
+// modules expected to publish a menu» is detectable in the one place that knows both numbers. It
+// counts ACTIVE modules on purpose: a hub whose modules the admin switched off expects no menu, and
+// shouting «I could not load your apps» there would be a new false alarm in place of the old one.
 
-describe('an empty launcher on a hub with modules installed is an error', () => {
+describe('an empty launcher on a hub that expected a menu is an error', () => {
   it('rejects when the entitlement filter drops every module', async () => {
     // `isModuleEntitled` is strict as soon as `/api/entitlement` resolves, and it resolves to an
     // empty Set whenever the SaaS answers 200 with no modules. Twelve installed modules then
     // vanished from the launcher with no error anywhere — the most plausible silent total wipe.
     entitled.mockReturnValue(false);
     stubFetch(
-      { ok: true, data: [navItem('inventory'), navItem('sales')], installed: 2 },
+      { ok: true, data: [navItem('inventory'), navItem('sales')], active_modules: 2 },
       { inventory: inventoryManifest },
     );
 
@@ -152,7 +154,7 @@ describe('an empty launcher on a hub with modules installed is an error', () => 
   it('rejects when no module manifest can be read', async () => {
     // `/modules/<id>/module.json` is served by the runtime itself. When it stops answering, every
     // module is skipped for want of a bundle to import, and the launcher empties out.
-    stubFetch({ ok: true, data: [navItem('inventory')], installed: 1 }, {});
+    stubFetch({ ok: true, data: [navItem('inventory')], active_modules: 1 }, {});
 
     await expect(loadMenu()).rejects.toThrow();
   });
@@ -160,7 +162,7 @@ describe('an empty launcher on a hub with modules installed is an error', () => 
   it('still returns the modules it COULD resolve when only some fail', async () => {
     // Data wins (hub#770): one broken module must not take the other eleven off the screen.
     stubFetch(
-      { ok: true, data: [navItem('inventory'), navItem('broken')], installed: 2 },
+      { ok: true, data: [navItem('inventory'), navItem('broken')], active_modules: 2 },
       { inventory: inventoryManifest },
     );
 
@@ -169,8 +171,18 @@ describe('an empty launcher on a hub with modules installed is an error', () => 
     expect(entries.map((e) => e.moduleId)).toEqual(['inventory']);
   });
 
+  it('stays silent for a hub whose modules are all switched off', async () => {
+    // The correction to the first cut of this fix, which counted INSTALLED modules: a hub the admin
+    // deliberately quieted down (every module off) would have been told «I could not load your apps».
+    // Trading the old false claim for a new one is not a fix. Nothing was expected to publish a menu,
+    // so an empty menu here is a fact.
+    stubFetch({ ok: true, data: [], active_modules: 0 });
+
+    await expect(loadMenu()).resolves.toEqual([]);
+  });
+
   it('does not invent a contradiction on a runtime that does not report the count', async () => {
-    // An older runtime omits `installed`. Absent is «I did not say», and «I did not say» can never
+    // An older runtime omits the count. Absent is «I did not say», and «I did not say» can never
     // be the reason to shout: the answer is taken at face value, exactly as before.
     stubFetch({ ok: true, data: [] });
 

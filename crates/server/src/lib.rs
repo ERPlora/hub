@@ -3218,16 +3218,25 @@ async fn navigation(
             })
         })
         .collect();
-    // `installed` = cuántos módulos TIENE este hub (hub#894). **Aditivo**: `ok`/`data` no cambian.
+    // `active_modules` = módulos instalados **y activos** (hub#894). **Aditivo**: `ok`/`data` intactos.
     //
-    // `data` es el menú —instalado **y** activo, y solo las entradas que declara el manifest—, y por
-    // sí solo no distingue las dos cosas que producen el mismo array vacío: un hub recién nacido y
-    // un hub con 12 módulos registrados cuyo menú salió vacío de todas formas. La primera es un
-    // hecho que merece pintarse («añade tu primera app»); la segunda es una CONTRADICCIÓN, y se
-    // pintaba como la primera — un hub real de producción (12/12 según `/readyz`) le dijo a su dueña
-    // que no tenía apps y le ofreció instalar las que ya tenía. Con este número el shell tiene
-    // contra qué comprobar la lista vacía en vez de creérsela.
-    Json(json!({ "ok": true, "data": items, "installed": reg.installed.len() })).into_response()
+    // `data` es el menú, y por sí solo no distingue las dos cosas que producen el mismo array vacío:
+    // un hub recién nacido y un hub con 12 módulos cuyo menú salió vacío de todas formas. La primera
+    // es un hecho que merece pintarse («añade tu primera app»); la segunda no, y se pintaba igual —
+    // un hub real de producción (12/12 según `/readyz`) le dijo a su dueña que no tenía apps y le
+    // ofreció instalar las que ya tenía. Este número le da al shell contra qué comprobar la lista
+    // vacía en vez de creérsela.
+    //
+    // Cuenta los **activos**, no los instalados, y la diferencia importa: un módulo que el admin
+    // apagó a propósito NO se espera que aporte menú, así que contarlo convertiría un hub apagado a
+    // conciencia en un falso «no he podido cargar tus apps». El denominador es lo que el hub espera
+    // que aporte, no lo que tiene guardado.
+    let active_modules = reg
+        .installed
+        .iter()
+        .filter(|m| reg.is_active(&m.id))
+        .count();
+    Json(json!({ "ok": true, "data": items, "active_modules": active_modules })).into_response()
 }
 
 async fn list_modules(
