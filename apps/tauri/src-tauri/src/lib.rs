@@ -69,6 +69,53 @@ pub struct DeviceContext {
     pub id: String,
     pub client_type: String,
     pub platform: String,
+    /// De dónde salió ESTE binario: `play`, `msstore` o `direct` (hub#757).
+    ///
+    /// Solo el shell puede decirlo. El web va servido por el hub (ADR-0154/0159), así que un flag
+    /// suyo sería el mismo para todas las instalaciones y no distinguiría una copia de Play de una
+    /// instalada a mano. Aquí se hornea al compilar: los jobs de tienda del workflow exportan
+    /// `ERPLORA_DISTRIBUTION`, y todo lo demás —instalador de Windows, `.deb`, AppImage— se queda
+    /// en `direct`, que es justo quien necesita seguir avisando de que hay versión nueva.
+    pub distribution: String,
+}
+
+/// Canal por el que llegó este binario. Se resuelve distinto en cada plataforma **porque el CI las
+/// construye distinto**, no por capricho:
+///
+/// - **Android**: el AAB es su propio build y solo va a Play, así que la marca se hornea al
+///   compilar (`ERPLORA_DISTRIBUTION=play` en ese job). `option_env!` y no `env!`: sin la variable
+///   el build no falla, se declara `direct`.
+/// - **Windows**: el MSIX se empaqueta **del mismo `.exe`** que el instalador normal (el workflow
+///   lo hace a propósito para no facturar el build dos veces), así que un flag de compilación
+///   valdría lo mismo para los dos canales y no distinguiría nada. Hay que mirarlo en ejecución:
+///   una app empaquetada corre desde `WindowsApps`, y una instalada por el `.exe`/`.msi` no.
+///
+/// El sesgo de los errores es deliberado. Equivocarse hacia `direct` deja a una copia de tienda con
+/// un aviso de más —feo, y lo caza la revisión—; equivocarse hacia `msstore` dejaría a un TPV de
+/// mostrador sin enterarse nunca de que hay versión nueva, que es el problema que este módulo
+/// existe para evitar. Ante la duda, `direct`.
+fn distribution_channel() -> &'static str {
+    if let Some(forced) = option_env!("ERPLORA_DISTRIBUTION") {
+        return match forced {
+            "play" => "play",
+            "msstore" => "msstore",
+            _ => "direct",
+        };
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // `GetCurrentPackageFullName` sería lo canónico, pero exige traer la crate `windows` para
+        // una sola llamada. La ruta es el mismo hecho observable: el runtime de MSIX monta la app
+        // bajo `%ProgramFiles%\WindowsApps\<identity>`, y ahí no aterriza ningún instalador.
+        if std::env::current_exe()
+            .ok()
+            .map(|p| p.to_string_lossy().to_lowercase().contains("windowsapps"))
+            .unwrap_or(false)
+        {
+            return "msstore";
+        }
+    }
+    "direct"
 }
 
 /// Lee (o crea y persiste) un id de dispositivo estable por instalación en `app_data_dir`.
@@ -122,6 +169,7 @@ fn device_context(app: tauri::AppHandle) -> Result<DeviceContext, ShellError> {
         // Taxonomía del Cloud; la plataforma concreta viaja aparte en X-Device-Platform.
         client_type: client_type.to_string(),
         platform: platform.to_string(),
+        distribution: distribution_channel().to_string(),
     })
 }
 

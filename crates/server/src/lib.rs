@@ -3571,13 +3571,14 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
                 // whoever opened the demo keeps it and somebody who later guesses the URL does not
                 // walk into their session. `Registry::demo_hub` is sealed at boot from `HUB_DEMO`
                 // and has no writer (ADR-0197 §4), so this cannot be turned on from outside.
-                let adopt = if st.config.demo {
-                    match rt.list_devices().await {
-                        Ok(devices) => devices.is_empty(),
-                        Err(e) => return err_response(e),
-                    }
-                } else {
-                    false
+                //
+                // The rule itself lives in `device_mode::demo_would_adopt`, SHARED with the read
+                // door that decides whether the pinpad is painted (hub#514): when the two drifted,
+                // this branch became unreachable — no pinpad, no PIN submit, no adoption.
+                let adopt = match device_mode::demo_would_adopt(st.config.demo, &rt, device_id).await
+                {
+                    Ok(adopt) => adopt,
+                    Err(e) => return err_response(e),
                 };
                 if !adopt {
                     return (

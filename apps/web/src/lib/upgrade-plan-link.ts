@@ -27,6 +27,7 @@
 // en un comentario; por eso aquí se nombra en prosa. Es lo que se quiere: mejor un falso positivo
 // que reformulas en diez segundos que un enlace real que se cuela.)
 import { config } from './config';
+import type { DeviceContext } from './device';
 
 /**
  * La página de plan de ESTE hub en el SaaS.
@@ -37,4 +38,28 @@ import { config } from './config';
 export function upgradePlanUrl(): string {
   const base = config.cloudApiUrl.replace(/\/+$/, '');
   return `${base}/dashboard/hubs/${encodeURIComponent(config.hubId)}/change-plan/?utm_source=hub`;
+}
+
+/**
+ * ¿Se le ofrece este control a la copia que tiene delante el usuario? (hub#756)
+ *
+ * El razonamiento de arriba —gestión de cuenta, no escaparate— sigue siendo el bueno, y para el
+ * navegador y para Windows se mantiene entero: Microsoft lo permite **por escrito** (política
+ * 10.8.2, un producto que no es juego puede usar su propia caja y mandar al navegador a
+ * completarla).
+ *
+ * Lo que cambió no es el argumento sino un hecho: la QA sobre un Pixel real vio al revisor de Play
+ * pulsar el botón, abrirse Chrome en la página de plan, y tratarlo como steering. Ante un envío que
+ * te tumban, la lectura que cuenta es la de quien revisa.
+ *
+ * **El corte es la DISTRIBUCIÓN, no el sistema operativo**, y esa es toda la idea: la regla la pone
+ * quien reparte el binario. Un APK instalado de lado corre en el mismo Android y Google no lo
+ * gobierna; esconderle ahí su plan al dueño sería quitarle algo por una regla que no le aplica.
+ *
+ * Sin señal se OFRECE. Un shell anterior a hub#757 no manda `distribution`, y el navegador tampoco:
+ * negar por defecto dejaría sin acceso a su plan a casi todo el mundo para protegerse de un riesgo
+ * que fuera de Play no existe.
+ */
+export function planUpgradeIsOfferable(distribution: DeviceContext['distribution']): boolean {
+  return distribution !== 'play';
 }

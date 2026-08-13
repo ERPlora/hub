@@ -20,11 +20,15 @@ import { bootPwa } from './lib/pwa';
 import { bootModuleNavLocale } from './lib/nav';
 import { bootActionFeedback, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
-import { bootCourier, takeCourierCode } from './lib/courier';
+import { bootCourier, takeShellCourierCode } from './lib/courier';
 
-// Scrub the bearer-like one-time code before registering workers, reporting errors or making any
+// Pick up the bearer-like one-time code before registering workers, reporting errors or making any
 // boot request.  It remains only in memory until the Hub context is ready for the exchange.
-const shellCourierCode = takeCourierCode();
+//
+// The URL was already scrubbed by `./router` on the import above — it has to be, because that
+// module builds the history that snapshots the location (hub#755).  This call is idempotent and
+// just hands over what was taken there.
+const shellCourierCode = takeShellCourierCode();
 
 // Los ok-* de OutfitKit y los Web Components de los módulos pintan sus iconos POR NOMBRE
 // (`<ion-icon name="trash-outline">`): son WC ajenos, no pueden llamar a `resolveIcon()`. ion-icon

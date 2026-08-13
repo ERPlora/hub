@@ -14,16 +14,24 @@
 
 name: Hub tests (Rust · Postgres)
 
-# ── Sin `pull_request` a propósito ────────────────────────────────────────────
-# Este gate corría en CADA PR y se llevaba el 96% de los minutos de Actions del repo
-# (127 runs / 1.647 min en 3 días, con la organización en overage). La MISMA suite corre
-# ahora en local, en `.githooks/pre-push`, que aborta el push si está roja y publica un
-# commit status `local-gate/hub-tests` para que `merge-pr.sh` siga viendo un check y
-# siga negándose a mergear con el CI mudo (pm#58/#60).
+# ── Con `pull_request`, otra vez ──────────────────────────────────────────────
+# Este gate se quitó de las PR porque se llevaba el 96% de los minutos de Actions del
+# repo (127 runs / 1.647 min en 3 días, con la organización en overage). Ese motivo
+# CADUCÓ: desde el 2026-08-11 los jobs salen por runners propios de la org
+# (`CI_RUNNER_LABEL`, hub#837), cuyos minutos no se facturan. Lo que quedaba era el
+# coste sin la razón.
 #
-# Sigue corriendo en `main` — ahí es donde se integra por lotes y donde el fallo debe ser
-# ruidoso — y a mano con `workflow_dispatch`.
+# Y el hueco era real: sin `pull_request`, un lote develop→main de 23 commits se
+# integraba SIN que la suite hubiera visto nunca esos commits JUNTOS — corría después,
+# ya en `main`, donde el rojo lo paga el siguiente que mergee y no quien lo introdujo.
+# Es el mismo agujero que el SaaS cerró en saas#1020.
+#
+# El gate LOCAL de `.githooks/pre-push` no se retira: sigue abortando el push en rojo y
+# publicando el commit status `local-gate/hub-tests` para que `merge-pr.sh` vea un check
+# aunque Actions esté mudo (pm#58/#60). Cubren cosas distintas — el local, cada rama
+# antes de salir; éste, el árbol mergeado.
 on:
+  pull_request:
   push:
     branches: [main]
   workflow_dispatch:

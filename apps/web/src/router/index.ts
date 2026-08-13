@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
 import type { RouteLocationNormalized, RouteLocationRaw, RouteRecordRaw } from 'vue-router';
-import { courierBootPending } from '../lib/courier';
+import { courierBootPending, takeShellCourierCode } from '../lib/courier';
 import { isAuthed, logout } from '../lib/session';
 import { isModuleEntitled, needsActivation } from '../lib/entitlement';
 import { apiDocsEnabled } from '../lib/api-docs';
@@ -50,6 +50,20 @@ const routes: RouteRecordRaw[] = [
   // outlet en blanco.
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ];
+
+// DO NOT MOVE THIS BELOW `createWebHistory()` — it is the whole fix for hub#755.
+//
+// The SaaS hands the shell its one-time courier in the fragment (`/?shell=1#courier=…`). The
+// history built on the next line snapshots `window.location` as it is RIGHT NOW and replays that
+// snapshot as the initial navigation, so a fragment still present here is a credential the router
+// will faithfully write back into the address bar — which is exactly what QA read back on Android
+// seconds after `forget_hub`. Worse, an unauthenticated boot then carries it into
+// `/login?redirect=…%23courier%3D…`, and a query string, unlike a fragment, is sent to the server.
+//
+// Scrubbing here is the earliest moment that exists: `main.ts` imports this module, and ES imports
+// are evaluated before the importing module's body, so nothing written in `main.ts` can run sooner.
+// Idempotent, so `main.ts` still gets the code it needs for the exchange.
+takeShellCourierCode();
 
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

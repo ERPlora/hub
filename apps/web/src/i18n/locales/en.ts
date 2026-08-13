@@ -652,6 +652,7 @@ export default {
     tabStaff: 'People',
     tabRoles: 'Roles',
     tabApiKeys: 'API keys',
+    tabApprovals: 'Approvals',
     colEmployee: 'User',
     colEmail: 'Email',
     colRole: 'Role',
@@ -788,6 +789,29 @@ export default {
     revokeBody: 'You are about to revoke “{name}”. Any system using this token will lose access immediately. This cannot be undone.',
     revoked: '“{name}” revoked.',
     revokeError: 'Could not revoke the API key.',
+  },
+  // PIN approvals (hub#512, ADR-0265): the record of every approval a manager spent, and the only
+  // place a business owner can read it without a SQL session against their own database. The words
+  // name PEOPLE and ACTIONS, never the machinery: nobody behind a counter knows what an "elevation"
+  // or a "permission scope" is, and this is the screen somebody opens on a bad day.
+  approvals: {
+    intro:
+      'Every action that needed a manager’s PIN: who asked for it, who approved it, and what it was used for. This record is kept for as long as your business is with ERPlora, and nobody — not even an administrator — can edit or delete it.',
+    search: 'Search by person or action…',
+    colWhen: 'When',
+    colApprovedBy: 'Approved by',
+    colRequestedBy: 'Asked by',
+    colAction: 'Action',
+    colLevel: 'Level',
+    // The fingerprint of the exact payload: it is what tells one €4 refund from another. Named for
+    // what it is FOR, because "fingerprint" reads as a threat and "hash" as nothing at all.
+    colFingerprint: 'Reference',
+    colRequestedById: 'Asked by (id)',
+    colApprovedById: 'Approved by (id)',
+    // Their receipt outlives them: the row stays, and it says why the name is missing.
+    userGone: 'Deleted user',
+    empty: 'Nobody has had to approve anything on this Hub yet.',
+    loadError: 'The approval record could not be loaded.',
   },
   employeeForm: {
     titleEdit: 'Edit user',
