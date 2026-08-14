@@ -19,6 +19,7 @@ import {
   HttpWsTransport,
   MODULE_HEADER,
   MODULE_SCOPE_REQUIRED,
+  RELEASE_REVOKED,
 } from './index.ts';
 
 const SESSION = 's3ss10n-of-a-human-admin';
@@ -321,7 +322,8 @@ test('hub#715: the surface is one route, and every id it can paste in one is che
     .sort();
   assert.deepEqual(
     methods,
-    ['list', 'shape'],
+    // The dead-letter half arrived with hub#953; its own routes are pinned further down.
+    ['dead', 'deadCount', 'discard', 'list', 'retry', 'retryAll', 'shape', 'trace'],
     'adding an escape hatch here turns this red on purpose',
   );
 
@@ -394,4 +396,175 @@ test('hub#715: «no examples yet» reaches the editor as data, not as an error',
   assert.equal(shape.samples, 0);
   assert.deepEqual(shape.fields, []);
   assert.deepEqual(shape.declared_by, ['shop']);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hub#953 — the dead-letter queue, typed, so `ERPlora/flows#20` can draw the tray.
+//
+// The engine has been finished and operable over HTTP since hub#660: what died, with its payload,
+// its error and its attempts; retry one, retry the lot, discard, trace. None of it was reachable
+// through this surface, so the only person who could see a business event that never happened was
+// one who knew how to `curl`. These six methods are the whole gap.
+//
+// Same discipline as the two surfaces above, and the same reason: one method per route, no method
+// that takes a path, module-scoped so the `manage_flows` gate has something to read — and here the
+// gate matters MORE than it does for the catalogue, because a dead-letter carries the whole payload
+// and `retry` re-runs somebody else's command with that module's authority (hub#686).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A dead-letter as the tray meets it: an invoice that never reached VeriFactu. */
+const A_DEAD_LETTER = {
+  id: 'e1a2b3c4',
+  event_name: 'sale.closed',
+  module_id: 'sales',
+  user_id: 'cashier-1',
+  payload: { invoice_id: 'F2-1', total: '12.10' },
+  last_error: 'verifactu.records.ingest_invoice: permission_denied',
+  attempts: 8,
+  depth: 1,
+  created_at: '2026-08-09T10:00:00+00:00',
+  failure_kind: '',
+  retryable: true,
+};
+
+test('hub#953: the six dead-letter gestures are six routes, and the surface is still not a proxy', async () => {
+  const { client, calls } = scoped({ ok: true, data: [] });
+  const events = client.events;
+
+  // The method LIST is pinned, exactly as it is for the flows surface: an escape hatch added here
+  // would hand a generic core proxy to every module the owner grants `manage_flows`.
+  const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(events))
+    .filter((n) => n !== 'constructor')
+    .sort();
+  assert.deepEqual(methods, [
+    'dead',
+    'deadCount',
+    'discard',
+    'list',
+    'retry',
+    'retryAll',
+    'shape',
+    'trace',
+  ]);
+
+  await events.dead();
+  await events.deadCount();
+  await events.trace(A_DEAD_LETTER.id);
+  await events.retry(A_DEAD_LETTER.id);
+  await events.discard(A_DEAD_LETTER.id);
+  await events.retryAll();
+
+  assert.deepEqual(
+    calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
+    [
+      'GET /api/hub/events/dead',
+      'GET /api/hub/events/dead/count',
+      `GET /api/hub/events/${A_DEAD_LETTER.id}/trace`,
+      `POST /api/hub/events/${A_DEAD_LETTER.id}/retry`,
+      `POST /api/hub/events/${A_DEAD_LETTER.id}/discard`,
+      // «Retry all» is THIS hub's queue and takes no argument, exactly like the endpoint: there is
+      // no id, no filter and no way to name another tenant's rows.
+      'POST /api/hub/events/retry-all',
+    ],
+  );
+  for (const call of calls) {
+    assert.ok(call.url.startsWith(`http://hub${EVENTS_BASE_PATH}`), `${call.url} escaped the prefix`);
+    assert.equal(call.headers[MODULE_HEADER], EDITOR, 'the call names the module the gate reads');
+    assert.equal(call.headers['X-Hub-Session'], SESSION, 'the SHELL owns the session, as always');
+  }
+});
+
+test('hub#953: an id that would climb out of the prefix never becomes a request', async () => {
+  const { client, calls } = scoped({ ok: true, data: null });
+  const events = client.events;
+
+  for (const bad of ['', '   ', '../../settings', 'a/b', 'a.b', '%2e%2e', 'a?x=1', 'a#f', 'a'.repeat(80)]) {
+    for (const gesture of [
+      () => events.retry(bad),
+      () => events.discard(bad),
+      () => events.trace(bad),
+    ]) {
+      await assert.rejects(
+        gesture,
+        (e: unknown) => e instanceof ErploraError && e.code === 'invalid_argument',
+        `\`${bad}\` must be refused as an event id`,
+      );
+    }
+  }
+  assert.equal(calls.length, 0, 'not one of those left the process');
+});
+
+test('hub#953: the tray can tell a row it must NOT offer «Retry» for, before pressing anything', async () => {
+  // The screen must not draw a button that cannot work (hub#827): a dead-letter whose flow release
+  // was withdrawn comes back with `retryable: false` and the reason, so flows#20 can offer what
+  // WOULD help — grant the permission again and run the flow — instead of a loop with no exit.
+  const revoked = {
+    ...A_DEAD_LETTER,
+    id: 'e9f8d7c6',
+    failure_kind: RELEASE_REVOKED,
+    retryable: false,
+  };
+  const { client } = scoped({ ok: true, data: [A_DEAD_LETTER, revoked] });
+
+  const queue = await client.events.dead();
+
+  assert.equal(queue.length, 2);
+  assert.equal(queue[0].retryable, true);
+  assert.equal(queue[1].retryable, false);
+  assert.equal(queue[1].failure_kind, RELEASE_REVOKED);
+  // The payload arrives verbatim: it is what lets an operator tell a lost invoice from noise, and
+  // it is exactly why this queue sits behind the capability and not behind «an admin is logged in».
+  assert.deepEqual(queue[0].payload, { invoice_id: 'F2-1', total: '12.10' });
+});
+
+test('hub#953: a retry the runtime REFUSES arrives as a refusal, never as a promise it kept', async () => {
+  // `outbox.rs` covers this at the engine
+  // (`a_revoked_dead_letter_refuses_the_retry_instead_of_promising_one`): the row answers `409`
+  // with its `failure_kind` rather than going back to `pending` to die again for the same reason.
+  // What this pins is that the refusal survives the SDK — a resolved promise here would have
+  // flows#20 telling an owner their invoice was re-sent when nothing moved.
+  const { client } = scoped({
+    ok: false,
+    error: {
+      code: RELEASE_REVOKED,
+      message: 'this dead-letter cannot be replayed: the authorisation that produced it was withdrawn',
+    },
+  });
+
+  await assert.rejects(
+    () => client.events.retry(A_DEAD_LETTER.id),
+    (e: unknown) => e instanceof ErploraError && e.code === RELEASE_REVOKED,
+    'the tray has to be able to say WHY, which means reading the code',
+  );
+});
+
+test('hub#953: the count is a number the badge can render, and retryAll says how many moved', async () => {
+  const { client: counter } = scoped({ ok: true, data: { count: 3 } });
+  assert.equal((await counter.events.deadCount()).count, 3);
+
+  const { client: sweeper } = scoped({ ok: true, data: { retried: 2 } });
+  assert.equal((await sweeper.events.retryAll()).retried, 2);
+});
+
+test('hub#953: a hub older than these routes leaves the methods ABSENT, so the screen can say so', () => {
+  // The SDK travels WITH the hub (the shell hands the module its client), so «this hub is older
+  // than the surface» reads as «the method is not there» — the same probe flows#8 already does for
+  // `events.list` (`ui/lib/event-catalog.ts`). Pinning that the methods are ordinary, enumerable
+  // prototype members is what keeps that probe honest: a getter that throws, or a Proxy that
+  // answers everything, would make `typeof …dead === 'function'` a lie on an old hub.
+  const { client } = scoped();
+  const proto = Object.getPrototypeOf(client.events);
+  for (const name of ['dead', 'deadCount', 'retry', 'discard', 'retryAll', 'trace']) {
+    const descriptor = Object.getOwnPropertyDescriptor(proto, name) ?? { value: undefined };
+    assert.equal(
+      typeof descriptor.value,
+      'function',
+      `${name} must be a plain prototype method a module can probe for, not a getter`,
+    );
+    assert.equal(
+      typeof (client.events as unknown as Record<string, unknown>)[name],
+      'function',
+      `\`typeof client.events.${name} === 'function'\` is the probe a module writes`,
+    );
+  }
 });

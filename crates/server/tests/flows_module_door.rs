@@ -381,21 +381,24 @@ async fn the_granted_module_does_not_let_a_cashier_or_an_api_key_in() {
 }
 
 /// **Not a generic "act as module" switch.** The header is read only where the editor's own
-/// surface lives — `/api/hub/flows*` and, since hub#715, `GET /api/hub/events/shape`, both gated
-/// by `manage_flows`. Anywhere else in the core it is inert: naming a module (granted or not) must
-/// not change a single answer, including on the OTHER `/api/hub/events/*` routes, which are the
-/// dead-letter queue and belong to an operator, not to the editor. The day somebody wires this
-/// header into a shared middleware, this test is what says no.
+/// surface lives — `/api/hub/flows*`, and `/api/hub/events/*` since hub#715 (`shape`), hub#823
+/// (`list`) and hub#953 (the dead-letter queue), all gated by `manage_flows`. Anywhere else in the
+/// core it is inert: naming a module (granted or not) must not change a single answer. The day
+/// somebody wires this header into a shared middleware, this test is what says no.
+///
+/// ⚠️ **`/api/hub/events/dead` used to be in the list below, and moving it out was a decision, not
+/// an erosion** (ADR-0338, hub#953). It sat here because the dead-letter queue was «an operator's
+/// screen, not the editor's» — true while the SHELL was the only caller. Once `@erplora/module-sdk`
+/// exposes those six gestures to modules, «an admin is logged in» would mean every installed module
+/// can read the full payloads of everybody else's events and replay them with the emitter's
+/// authority (hub#686). What guards it now is `dead_letter_module_door.rs`, which pins BOTH halves:
+/// an ungranted module refused, and the caller that names no module untouched. If that file ever
+/// goes, this comment is the record of what it was protecting.
 #[tokio::test]
 async fn the_module_header_means_nothing_outside_the_editors_doors() {
     let f = fixture(true).await;
 
-    for uri in [
-        "/api/settings",
-        "/api/hub/context",
-        "/api/hub/events/dead",
-        "/api/modules",
-    ] {
+    for uri in ["/api/settings", "/api/hub/context", "/api/modules"] {
         let bare = send(&f.router, request("GET", uri, Some(&f.admin), None, None)).await;
         for module in [EDITOR, INVENTORY, "not_even_installed"] {
             let named = send(
