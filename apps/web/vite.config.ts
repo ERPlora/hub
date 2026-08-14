@@ -8,6 +8,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 
+import { stripModuleVersion } from './src/lib/module-url';
+
 // Versión de la app, horneada en build → la lee el footer del sidebar vía `__APP_VERSION__`.
 // Orden de prioridad: env APP_VERSION (CI) > git tag más reciente > package.json.
 // package.json es "0.0.0" a propósito (monorepo); la versión real viene de los tags git.
@@ -52,14 +54,27 @@ const RUNTIME_TARGET = (() => {
 // ("can only be referenced via HTML tags"). Los módulos (WC Lit) se cargan en runtime con
 // import() dinámico desde /modules/**; este middleware los sirve CRUDOS (sin transform de Vite),
 // antes que el pipeline de transform. En prod los sirve el runtime (crates/server), no Vite.
+//
+// hub#935 — en producción el shell pide los assets del módulo por su ruta VERSIONADA
+// (`/modules/<id>/v/<version>/…`), que es lo que impide que una caché conteste con el bundle de la
+// versión anterior. Aquí no hay runtime ni caché: los módulos están copiados en `public/modules/<id>/`
+// sin carpeta de versión, así que el segmento se quita antes de tocar disco — para el `.js` que sirve
+// este middleware y, en el `rewrite` de abajo, para TODO lo demás (module.json, icons.json, locales),
+// que lo sirve el estático de Vite. Sin eso, el shell de dev pediría rutas que no existen.
 function serveModulesRaw(): Plugin {
   return {
     name: 'erplora-serve-modules-raw',
     configureServer(server) {
+      // Reescribe la url ANTES de cualquier otro middleware: así el estático de Vite ve la ruta que
+      // existe en `public/` y no hace falta duplicar aquí el servido de cada tipo de asset.
+      server.middlewares.use((req: { url?: string }, _res, next: () => void) => {
+        if (req.url?.startsWith('/modules/')) req.url = stripModuleVersion(req.url);
+        next();
+      });
       server.middlewares.stack.unshift({
         route: '',
         handle: async (req: { url?: string }, res: import('node:http').ServerResponse, next: () => void) => {
-          const url = (req.url ?? '').split('?')[0];
+          const url = stripModuleVersion((req.url ?? '').split('?')[0]);
           if (!url.startsWith('/modules/') || !url.endsWith('.js')) return next();
           const filePath = join(__dirname, 'public', url);
           if (!existsSync(filePath)) return next();

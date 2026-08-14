@@ -19,6 +19,7 @@ class ErploraAndroidPluginTest {
 
     private val NOTIF = PermissionPolicy.POST_NOTIFICATIONS
     private val RED = PermissionPolicy.ACCESS_LOCAL_NETWORK
+    private val BT = PermissionPolicy.BLUETOOTH_CONNECT
 
     @Test
     fun `solo se pide lo que falta`() {
@@ -54,12 +55,17 @@ class ErploraAndroidPluginTest {
     @Test
     fun `un permiso que la version de Android no conoce no aparece en el resultado`() {
         // No se puede conceder ni denegar: informar de él sería mentir.
+        //
+        // Lo que se fija es el FILTRADO por nivel de API, no cuántos permisos hay: en la 36 la
+        // política conoce las notificaciones (33) y el Bluetooth (31), pero NO la red local, que
+        // llega en la 37. El esperado se escribe entero a propósito — así, añadir un permiso a la
+        // política obliga a decir en qué versión existe en vez de colarse aquí sin mirar.
         val estado = ErploraAndroidPlugin.statusOf(
             required = PermissionPolicy.required(sdkInt = 36),
             granted = setOf(NOTIF),
         )
-        assertEquals(mapOf(NOTIF to true), estado)
-        assertTrue(RED !in estado)
+        assertEquals(mapOf(NOTIF to true, BT to false), estado)
+        assertTrue(RED !in estado, "ACCESS_LOCAL_NETWORK llega en la API 37: en la 36 no se puede afirmar nada de él")
     }
 
     @Test
@@ -78,7 +84,14 @@ class ErploraAndroidPluginTest {
             .toSet()
 
         // Todos los niveles de API que la política distingue, no solo el del emulador de turno.
-        val posibles = listOf(1, PermissionPolicy.SDK_NOTIFICATIONS, PermissionPolicy.SDK_LOCAL_NETWORK)
+        // La lista se amplía con cada umbral nuevo: si falta uno, el permiso que solo aparece por
+        // debajo del siguiente umbral se quedaría sin comprobar y la trampa volvería (hub#933).
+        val posibles = listOf(
+            1,
+            PermissionPolicy.SDK_BLUETOOTH_CONNECT,
+            PermissionPolicy.SDK_NOTIFICATIONS,
+            PermissionPolicy.SDK_LOCAL_NETWORK,
+        )
             .flatMap { PermissionPolicy.required(sdkInt = it) }
             .toSet()
 

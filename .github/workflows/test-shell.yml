@@ -7,6 +7,13 @@
 # su target desbordaría el disco del runner). Este workflow las instala y corre
 # `cargo test -p erplora-tauri`, pero SOLO cuando cambia el shell — así los PRs
 # que no lo tocan no pagan los ~minutos de compilar el stack Tauri.
+#
+# Corre además los tests unitarios KOTLIN del plugin de Android (hub#933). No es
+# lo mismo que el `cargo test`: la política de permisos y el transporte SPP son
+# Kotlin, y hasta hub#933 sus 34 tests solo se ejecutaban al publicar un tag —
+# `develop` aguantó un día en rojo sin que nada avisara. Se corren contra la raíz
+# mínima `crates/tauri-plugin-erplora-android/android-tests/`, sin `:app` y por
+# tanto sin NDK ni tauri-cli: segundos, no el job de release.
 # ==============================================================================
 
 name: Shell tests (Tauri thin client)
@@ -40,9 +47,15 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # `setup-android` baja las command line tools de `dl.google.com`, y desde `ci-runner-1` ese host
+  # contesta **404 por IPv6**, que Node prefiere. Es de la máquina, no del paso: le pasa a
+  # cualquier acción JS que descargue de Google (hub#878, vivido en `v1.1.0`).
+  NODE_OPTIONS: --dns-result-order=ipv4first
+
 jobs:
   test:
-    name: cargo test -p erplora-tauri
+    name: cargo test -p erplora-tauri + Kotlin del plugin
     # El único workflow del repo que la PR del interruptor (#837) dejó fuera. No tiene nada de
     # especial: instala él mismo sus deps GTK con `sudo apt-get`, cosa que el usuario `runner`
     # puede hacer en `ci-runner-1`.
@@ -87,10 +100,57 @@ jobs:
       # persiste, así que el job SIGUIENTE —cualquiera, de cualquier repo— muere con
       # `rustup: command not found` en 12 s, un rojo que no se parece en nada a su causa.
       # Vivido el 2026-08-11 a las 20:48 UTC: dejó sin CI de Rust a toda la máquina.
+      #
+      # 🔴 `save-if` off on our own runner, and it is not an optimisation either. The same `Post`
+      # also runs `cleanRegistry`, which `rmRF`s every non-`-sys` directory under
+      # `~/.cargo/registry/src`. The two slots of `ci-runner-1` share ONE `$HOME`, so that delete
+      # lands on whatever the OTHER slot is compiling right now: on v1.1.1 a `Cleaning cargo
+      # registry` at 00:54:22 killed the concurrent Android release build 8 s later with `could
+      # not parse/generate dep info ... No such file or directory` (hub#886). `tauri-release.yml`
+      # was guarded first; this workflow prunes the very same registry, so it needs the same
+      # guard. `save-if: false` returns BEFORE cleaning anything (rust-cache `save.ts`), so the
+      # restore still works and hosted runners — which die with the job — still save.
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-bin: false
+          save-if: ${{ runner.environment != 'self-hosted' }}
 
       - name: cargo test -p erplora-tauri
         run: cargo test -p erplora-tauri -p tauri-plugin-erplora-android
+
+      # ── Tests Kotlin del plugin de Android (hub#933) ────────────────────────────────────────
+      #
+      # `cargo test` de arriba es RUST. La lógica de qué permiso se pide en cada nivel de API y de
+      # cómo se habla con una impresora SPP vive en KOTLIN, con sus 34 tests — y hasta hub#933 el
+      # ÚNICO sitio donde se ejecutaban era el job `build-android` de `tauri-release.yml`, que
+      # dispara con tag o a mano. Un test que solo corre al publicar no protege nada: el SPP
+      # (`48f2b0e1`) dejó una expectativa caducada y `develop` estuvo un día entero en rojo sin que
+      # un solo check se pusiera en ámbar. El siguiente tag se lo habría comido en plena release.
+      #
+      # Van como PASOS de este job, no como job aparte, a propósito: desde el 2026-08-12 el CI
+      # serializa en una sola máquina y un job nuevo es una ranura más de cola. Aquí no cuestan
+      # ranura, y el disparador ya es el correcto — este workflow filtra por
+      # `crates/tauri-plugin-erplora-android/**`, que es justo el árbol que cubren.
+      #
+      # No se paga el build de Android: `android-tests/` es una raíz Gradle mínima sin `:app`, así
+      # que NO hace falta NDK, ni tauri-cli, ni compilar Rust para cuatro triples. Medido en este
+      # árbol: 22 s en frío, 1 s en caliente.
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Solo la plataforma y las build-tools: el NDK es para compilar Rust a Android y aquí no se
+      # compila Rust. Es la diferencia entre un paso de segundos y el job de release.
+      - name: Android platform 36 (sin NDK)
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+
+      # Después del `cargo test`: el script saca el SDK Kotlin de `tauri` del crate ya
+      # DESEMPAQUETADO en el registry, y quien lo desempaqueta es el build de arriba.
+      - name: Kotlin unit tests (plugin de permisos + SPP)
+        run: ./scripts/kotlin-plugin-tests.sh

@@ -15,6 +15,7 @@ import { addIcons } from 'ionicons';
 
 import { isModuleEntitled } from './entitlement';
 import { moduleIconRegistry } from './icons';
+import { moduleBase } from './module-url';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 import { orderSlotFillers } from './slot-fillers';
 import type { SlotDef } from './slot-fillers';
@@ -40,6 +41,13 @@ interface RuntimeNavItem {
   module_id: string;
   /** Nombre del módulo ya traducido al idioma activo (ADR-0055; fallback locale→en→manifest). */
   module_name: string;
+  /**
+   * Versión INSTALADA del módulo (hub#935). Con ella se direcciona el bundle por versión. Viene del
+   * runtime a propósito y no del `module.json`: esta respuesta va autenticada y ninguna caché la
+   * toca, mientras que el manifest es un asset y sí puede llegar atrasado. `undefined` = runtime
+   * anterior a hub#935 → se cae al `version` del manifest y, si tampoco está, a la url sin versión.
+   */
+  module_version?: string | null;
   id: string;
   label: string;
   icon?: string | null;
@@ -161,7 +169,10 @@ export async function loadMenu(): Promise<MenuEntry[]> {
   for (const [moduleId, items] of byModule) {
     const manifest = await loadManifest(moduleId);
     if (!manifest) continue; // sin manifest no sabemos qué bundle importar → se omite el módulo.
-    const base = `${MODULES_BASE}/${moduleId}`;
+    // La versión la manda el RUNTIME (hub#935); el manifest es solo el respaldo para un runtime
+    // anterior. Creerle al manifest cuando el runtime ha hablado reconstruiría el bug: un
+    // `module.json` servido de una caché apuntaría a la url —también cacheada— de la versión vieja.
+    const base = moduleBase(moduleId, items[0].module_version ?? manifest.version);
     const entry = manifest.ui.entry;
     const icons = await loadIconMap(base, entry);
     for (const item of items) {
@@ -218,6 +229,27 @@ async function loadEntryUrl(entryUrl: string): Promise<string> {
   return entryUrl;
 }
 
+/**
+ * Recarga la página después de actualizar un módulo (hub#935).
+ *
+ * **Un custom element solo se puede registrar UNA vez por documento.** Cuando el dueño actualiza un
+ * módulo, esta página ya importó el bundle anterior y ya definió su tag: el bundle nuevo no puede
+ * sustituirlo por mucho que ahora viva en otra url y el servidor mande el código nuevo (el segundo
+ * `customElements.define` del mismo tag ni siquiera se aplica). Direccionar por versión arregla la
+ * ENTREGA; esto arregla la otra mitad, que es que lo entregado llegue a ejecutarse.
+ *
+ * Sin esto la pantalla mentiría igual que antes —lista y manifest en la versión nueva, componente en
+ * la vieja—, que es justo el fallo mudo del que va la issue.
+ *
+ * El retardo es para que dé tiempo a leer el aviso de que se va a recargar: recargar de golpe deja
+ * al dueño sin saber por qué se le ha movido la pantalla.
+ */
+export const MODULE_UPDATE_RELOAD_DELAY_MS = 1200;
+
+export function reloadForModuleUpdate(delayMs = MODULE_UPDATE_RELOAD_DELAY_MS): void {
+  setTimeout(() => window.location.reload(), delayMs);
+}
+
 /** Un módulo instalado + su manifest crudo (incluye `widgets`, `provides_slots`, etc.). */
 /**
  * Traducciones del módulo para el idioma activo (`locales/<lang>.json`, ADR-0055). El runtime ya
@@ -238,13 +270,17 @@ export interface InstalledManifest {
   locale?: ModuleLocaleFile;
 }
 
-/** Lee `/modules/<id>/locales/<lang>.json` (asset estático). `undefined` si no existe o falla. */
+/**
+ * Lee `locales/<lang>.json` del módulo (asset estático) desde su `base` — versionada cuando se sabe
+ * la versión (hub#935), que es lo que evita leer las traducciones de la versión anterior.
+ * `undefined` si no existe o falla.
+ */
 export async function loadModuleLocale(
-  moduleId: string,
+  base: string,
   lang: string,
 ): Promise<ModuleLocaleFile | undefined> {
   try {
-    const res = await fetch(`${MODULES_BASE}/${moduleId}/locales/${lang}.json`);
+    const res = await fetch(`${base}/locales/${lang}.json`);
     if (!res.ok) return undefined;
     return (await res.json()) as ModuleLocaleFile;
   } catch {
@@ -268,11 +304,12 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
   }
 
   const moduleIds: string[] = [];
-  const seen = new Set<string>();
+  // Versión instalada que reporta el runtime, por módulo (hub#935) — la que direcciona el bundle.
+  const versions = new Map<string, string | undefined>();
   for (const item of navItems) {
     if (!isModuleEntitled(item.module_id)) continue;
-    if (seen.has(item.module_id)) continue;
-    seen.add(item.module_id);
+    if (versions.has(item.module_id)) continue;
+    versions.set(item.module_id, item.module_version ?? undefined);
     moduleIds.push(item.module_id);
   }
 
@@ -283,15 +320,19 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
   for (const moduleId of moduleIds) {
     const manifest = await loadManifest(moduleId);
     if (!manifest) continue;
+    // Misma url versionada que el menú (hub#935): esta es la SEGUNDA puerta al mismo `import()`
+    // (widgets del dashboard ADR-0054, slots cross-módulo ADR-0043). Arreglar solo el menú dejaría
+    // el dashboard montando el bundle viejo del módulo recién actualizado.
+    const base = moduleBase(moduleId, versions.get(moduleId) ?? manifest.version);
     // Registra los iconos HORNEADOS del módulo (dist/icons.json) también por esta vía: el dashboard
     // usa `loadInstalledManifests` (no la navegación), así que sin esto los iconos de cabecera de
     // widget que SÍ están horneados salían vacíos si su módulo no tenía entrada de navegación (P2).
-    await loadIconMap(`${MODULES_BASE}/${moduleId}`, manifest.ui.entry);
-    const locale = lang === 'en' ? undefined : await loadModuleLocale(moduleId, lang);
+    await loadIconMap(base, manifest.ui.entry);
+    const locale = lang === 'en' ? undefined : await loadModuleLocale(base, lang);
     out.push({
       moduleId,
       manifest,
-      entryUrl: `${MODULES_BASE}/${moduleId}/${manifest.ui.entry}`,
+      entryUrl: `${base}/${manifest.ui.entry}`,
       locale,
     });
   }

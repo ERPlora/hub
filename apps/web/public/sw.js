@@ -44,6 +44,11 @@ function isApiRequest(url) {
 // reescriben in-place al reconstruir un módulo. Con SWR el SW serviría uno VIEJO en la primera
 // carga aunque el servidor tuviera uno nuevo (y si el viejo tenía un bug, se reproducía). Van
 // SIEMPRE a la red, como /api.
+//
+// hub#935 añadió la ruta versionada (`/modules/<id>/v/<version>/...`), que sí es inmutable y la
+// cachea el navegador por `Cache-Control` un año. Aun así el SW se sigue apartando de TODO
+// `/modules/`: la caché HTTP ya hace ese trabajo con la política que declara el runtime, y meter al
+// SW en medio solo devolvería la clase de fallo mudo que la issue vino a cerrar.
 function isUnversionedAsset(url) {
   return url.pathname.startsWith('/modules/');
 }

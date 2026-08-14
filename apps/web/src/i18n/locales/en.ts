@@ -625,6 +625,10 @@ export default {
     // NOT end up half-updated; it keeps running the version it had.
     updating: 'Updating {name}…',
     updateSuccess: '{name} updated: {from} → {to}.',
+    // hub#935 — a custom element can only be registered once per document, so this page cannot show
+    // the new build of the app it just updated. Saying that the screen is about to reload beats
+    // reloading it out of the blue, and beats leaving it showing the previous version in silence.
+    updateSuccessReloading: '{name} updated: {from} → {to}. Reloading to use the new version…',
     updateUpToDate: '{name} is already on the latest version.',
     updateError: 'Could not update {name}. It keeps running the version it had.',
     updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
