@@ -1188,6 +1188,15 @@ export default {
     reportRecovered: 'Este es el informe de tu última importación de {name} ({when}). No todo entró.',
     // La vuelta al catálogo tras leer el informe recuperado, para que el admin pueda reintentar.
     reportDismiss: 'Ver las plantillas',
+    // hub#845 — reintento SOLO de lo que no entró: el servidor vuelve a bajar la MISMA versión del
+    // catálogo y re-ejecuta solo lo fallido; lo ya aplicado no se duplica jamás.
+    retry: 'Reintentar lo que falta',
+    retryNotRetryable:
+      'Esta importación vino de un archivo subido a mano, así que no se puede reintentar automáticamente. Vuelve a subir el archivo y selecciona solo lo que falló.',
+    retryVersionUnavailable:
+      'La versión de la plantilla que usó esta importación ya no está en el catálogo, así que el reintento no se ejecutó — reintentar con otra versión podría cargar datos distintos.',
+    retryBatchNotFound:
+      'El informe de esta importación ya no está registrado (puede que se deshiciera), así que no hay nada que reintentar.',
     statusApplied: 'Aplicado',
     statusSkipped: 'Saltado',
     statusIgnored: 'Descartado',

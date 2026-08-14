@@ -9,6 +9,7 @@ import { createI18n } from 'vue-i18n';
 const fetchBlueprintCatalog = vi.fn();
 const downloadBlueprint = vi.fn();
 const fetchImportReport = vi.fn();
+const retryImport = vi.fn();
 
 vi.mock('../lib/runtime', async () => {
   const actual = await vi.importActual<typeof import('../lib/runtime')>('../lib/runtime');
@@ -16,6 +17,10 @@ vi.mock('../lib/runtime', async () => {
     fetchBlueprintCatalog: (...a: unknown[]) => fetchBlueprintCatalog(...a),
     downloadBlueprint: (...a: unknown[]) => downloadBlueprint(...a),
     fetchImportReport: (...a: unknown[]) => fetchImportReport(...a),
+    // hub#845: the retry transport is stubbed; whether the button CAN act is real logic
+    // (`retryAvailability` reads the report through the real status normalisers below).
+    retryImport: (...a: unknown[]) => retryImport(...a),
+    RetryRefusedError: actual.RetryRefusedError,
     inspectBlueprint: vi.fn(),
     importBlueprint: vi.fn(),
     // hub#763: estas NO se stubean — `reportWarrantsAttention` (decide si el informe recuperado se
@@ -64,6 +69,7 @@ beforeEach(() => {
   fetchBlueprintCatalog.mockReset();
   downloadBlueprint.mockReset();
   fetchImportReport.mockReset();
+  retryImport.mockReset();
   appNames.clear();
   isAdminRef.value = true;
 });
@@ -401,6 +407,121 @@ describe('ImportPanel · hub#763 — el informe no se pierde al navegar', () => 
     await flushPromises();
     expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(true);
     expect(w.find('[data-testid="import-report"]').exists()).toBe(false);
+  });
+});
+
+describe('ImportPanel · hub#845 — «Reintentar lo que falta» en el informe recuperado', () => {
+  // Real English catalogue (like the ADR-0060 block): the reason for a disabled retry and the
+  // translated refusal are tested through the sentence the user actually reads.
+  const i18nReal = createI18n({
+    legacy: false,
+    locale: 'en',
+    missingWarn: false,
+    fallbackWarn: false,
+    messages: { en },
+  });
+
+  function mountPanelReal() {
+    return mount(ImportPanel, {
+      shallow: true,
+      global: { plugins: [i18nReal], renderStubDefaultSlot: true },
+    });
+  }
+
+  function partialCatalogReport() {
+    return {
+      sections: [
+        { section: 'hub_settings', status: 'Applied', discarded_rows: 0 },
+        { section: 'modules/inventory', status: { Failed: 'módulo no instalado' }, discarded_rows: 0 },
+      ],
+      installed_modules: [],
+      origin: { source: 'catalog', slug: 'pizzeria', version: '1.0.2', locale: 'es' },
+    };
+  }
+
+  function storedReport(report: unknown, batchId = 'b1') {
+    return { batch_id: batchId, name: 'pizzeria', created_at: '2026-08-10T19:09:00Z', report };
+  }
+
+  it('un informe parcial venido del catálogo ofrece el reintento HABILITADO', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    fetchImportReport.mockResolvedValue(storedReport(partialCatalogReport()));
+    const w = mountPanelReal();
+    await flushPromises();
+
+    const retry = w.get('[data-testid="import-report-retry"]');
+    expect(retry.attributes('disabled')).toBe('false');
+    // Enabled ⇒ no reason to show: the reason exists only to explain a disabled button.
+    expect(w.find('[data-testid="import-retry-reason"]').exists()).toBe(false);
+  });
+
+  it('pulsarlo reintenta ESE lote y pinta el informe fresco del reintento', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    // On mount: the partial report. After the retry: the fresh persisted one (new batch).
+    const freshReport = {
+      sections: [{ section: 'modules/inventory', status: 'Applied', discarded_rows: 0 }],
+      installed_modules: [{ id: 'inventory', version: '1.0.0', status: 'installed' }],
+      origin: { source: 'catalog', slug: 'pizzeria', version: '1.0.2', locale: 'es' },
+    };
+    fetchImportReport
+      .mockResolvedValueOnce(storedReport(partialCatalogReport()))
+      .mockResolvedValueOnce(storedReport(freshReport, 'b2'));
+    retryImport.mockResolvedValue({ retried: true, code: undefined, report: freshReport });
+
+    const w = mountPanelReal();
+    await flushPromises();
+    await w.get('[data-testid="import-report-retry"]').trigger('click');
+    await flushPromises();
+
+    expect(retryImport).toHaveBeenCalledWith('b1');
+    const report = w.get('[data-testid="import-report"]');
+    expect(report.text()).toContain(en.importPage.statusApplied);
+    expect(report.text()).not.toContain('módulo no instalado');
+  });
+
+  it('un import de FICHERO LOCAL no se puede reintentar: botón deshabilitado y el MOTIVO legible', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const report = partialCatalogReport();
+    (report as { origin: unknown }).origin = { source: 'local' };
+    fetchImportReport.mockResolvedValue(storedReport(report));
+    const w = mountPanelReal();
+    await flushPromises();
+
+    const retry = w.get('[data-testid="import-report-retry"]');
+    expect(retry.attributes('disabled')).toBe('true');
+    expect(w.get('[data-testid="import-retry-reason"]').text()).toContain(
+      en.importPage.retryNotRetryable,
+    );
+  });
+
+  it('un informe ANTERIOR al campo origin tampoco es reintentable (sin origen no hay garantía)', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const report = partialCatalogReport();
+    delete (report as { origin?: unknown }).origin;
+    fetchImportReport.mockResolvedValue(storedReport(report));
+    const w = mountPanelReal();
+    await flushPromises();
+
+    expect(w.get('[data-testid="import-report-retry"]').attributes('disabled')).toBe('true');
+    expect(w.find('[data-testid="import-retry-reason"]').exists()).toBe(true);
+  });
+
+  it('un rechazo del server con código estable se enseña TRADUCIDO, no como prosa técnica', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    fetchImportReport.mockResolvedValue(storedReport(partialCatalogReport()));
+    const { RetryRefusedError } = await vi.importActual<typeof import('../lib/runtime')>('../lib/runtime');
+    retryImport.mockRejectedValue(
+      new RetryRefusedError('the catalogue now serves 1.0.5', 'import_retry_version_unavailable'),
+    );
+
+    const w = mountPanelReal();
+    await flushPromises();
+    await w.get('[data-testid="import-report-retry"]').trigger('click');
+    await flushPromises();
+
+    expect(w.get('[data-testid="import-retry-error"]').text()).toContain(
+      en.importPage.retryVersionUnavailable,
+    );
   });
 });
 

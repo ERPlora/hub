@@ -1305,6 +1305,10 @@ pub fn app(state: AppState) -> Router {
             )),
         )
         .route("/api/hub/import", post(export_import::import_blueprint))
+        // Reintento SOLO de lo que no entró (hub#845): deriva la selección del informe persistido,
+        // vuelve a bajar la MISMA versión del catálogo y re-ejecuta. Lo ya aplicado no se duplica
+        // (propiedad del motor: guardas por clave técnica hub#260 + clave natural ADR-0304).
+        .route("/api/hub/import/retry", post(export_import::retry_import))
         // Reset del hub — volver a cero (ADR-0170): el espejo destructivo del export. Mismo gate
         // admin. El `plan` es dry-run (lo que la UI pinta antes de confirmar); el límite fiscal
         // (facturas remitidas a la AEAT) lo aplica el MOTOR, no esta capa.
