@@ -1258,18 +1258,54 @@ export interface EventShape {
 }
 
 /**
- * **The hub's event catalogue** (hub#715) — what an event carries, learned from events that
- * really happened in THIS hub.
+ * One line of `GET /api/hub/events` (hub#823): an event this hub can produce, and **only its
+ * name** — what it carries stays behind {@link EventsApi.shape} with the redaction of ADR-0312.
  *
- * Not the live event bus: to react to events, use `subscribe`. This is the read the flow editor's
- * data picker is built from, so the owner chooses «Total de la venta — 42,50 €» and not
- * `sale.total`.
+ * The union of two sources, and the difference between them is information the picker needs:
+ * `declared_by` empty means the name was seen in the outbox but no installed module claims it any
+ * more (the module was uninstalled), and a missing `last_seen_at` means it is declared but has
+ * never happened here yet. Neither disqualifies it as a trigger — a shop that has not sold
+ * anything still gets to automate its first sale.
+ */
+export interface EventCatalogEntry {
+  /** The event name exactly as it is emitted: `sale.completed`. */
+  name: string;
+  /** Installed modules declaring they emit it. Empty = only the outbox remembers it. */
+  declared_by: string[];
+  /** When this hub last emitted it. Absent = never (within the retention window). */
+  last_seen_at?: string;
+}
+
+/**
+ * **The hub's event catalogue** (hub#715, hub#823) — which events this hub can produce, and what
+ * each of them carries, learned from events that really happened in THIS hub.
  *
- * One method, one route, no method that takes a path — the same discipline as {@link FlowsApi},
+ * Not the live event bus: to react to events, use `subscribe`. This is the read the flow editor is
+ * built from — {@link list} fills its «when this happens» dropdown, {@link shape} its data picker,
+ * so the owner chooses «Total de la venta — 42,50 €» and not `sale.total`.
+ *
+ * Two methods, two routes, no method that takes a path — the same discipline as {@link FlowsApi},
  * pinned by the same test file.
  */
 export class EventsApi {
   constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+
+  /**
+   * `GET /api/hub/events` — **the events this hub can produce**, names only.
+   *
+   * The union of what the installed modules declare and what the outbox has really seen, so the
+   * trigger picker offers this business's own events instead of a list typed into a module that
+   * ages on its own and can never name an event nobody thought to add (flows#8).
+   *
+   * Names only, deliberately: what an event CARRIES is a separate read behind {@link shape}, with
+   * the redaction ADR-0312 put there. Listing the names of a hub's events is not the same
+   * disclosure as listing its customers' email addresses, and only the second needs the sampling
+   * machinery — but both sit behind the same `manage_flows` gate, because the set of events a
+   * business emits is still the shape of that business.
+   */
+  async list(): Promise<EventCatalogEntry[]> {
+    return this.send({ method: 'GET', path: EVENTS_BASE_PATH }) as Promise<EventCatalogEntry[]>;
+  }
 
   /**
    * `GET /api/hub/events/shape?name=…` — the fields of an event, with an example each.

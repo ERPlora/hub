@@ -319,7 +319,11 @@ test('hub#715: the surface is one route, and every id it can paste in one is che
   const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(events))
     .filter((n) => n !== 'constructor')
     .sort();
-  assert.deepEqual(methods, ['shape'], 'adding an escape hatch here turns this red on purpose');
+  assert.deepEqual(
+    methods,
+    ['list', 'shape'],
+    'adding an escape hatch here turns this red on purpose',
+  );
 
   await events.shape('sale.completed');
   await events.shape('hub.whatsapp.message_received', { limit: 3 });
@@ -348,6 +352,32 @@ test('hub#715: the surface is one route, and every id it can paste in one is che
     );
   }
   assert.equal(calls.length, before, 'not one of those became an HTTP request');
+});
+
+test('hub#823: the catalogue LISTS what this hub emits, so the picker stops being hand-written', async () => {
+  // Until now `shape(name)` was the only way in and it needs the name first, so the flow editor
+  // seeded its «when this happens» dropdown from a list typed into the module (`trigger-catalog.ts`,
+  // flows#8). A hand-written list ages on its own and — the part that cannot be fixed by editing it
+  // — can never offer an event this hub really emits that nobody thought to add.
+  const catalogue = [
+    { name: 'sale.completed', declared_by: ['sales'], last_seen_at: '2026-08-13T10:00:00Z' },
+    // No `last_seen_at`: declared by an installed module, never yet emitted here. It is still a
+    // legitimate trigger — a shop that has not sold anything yet may still automate the first sale.
+    { name: 'appointments.appointment.created', declared_by: ['appointments'] },
+    // No `declared_by`: seen in the outbox but its module is gone. The name is real, so it is
+    // offered — the picker is what decides how to word it.
+    { name: 'legacy.thing_happened', declared_by: [] },
+  ];
+  const { client, calls } = scoped({ ok: true, data: catalogue });
+
+  const served = await client.events.list();
+
+  assert.deepEqual(served, catalogue);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, `http://hub${EVENTS_BASE_PATH}`, 'no query, no path segment');
+  assert.equal(calls[0].method, 'GET');
+  assert.equal(calls[0].headers[MODULE_HEADER], EDITOR, 'same `manage_flows` gate as `shape`');
+  assert.equal(calls[0].headers['X-Hub-Session'], SESSION, 'the SHELL owns the session, as always');
 });
 
 test('hub#715: «no examples yet» reaches the editor as data, not as an error', async () => {
