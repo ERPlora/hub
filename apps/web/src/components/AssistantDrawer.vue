@@ -89,7 +89,7 @@
 
       <footer class="assistant-foot">
         <!-- Bandeja de adjuntos pendientes (antes de enviar). -->
-        <div v-if="pendingAttachments.length || attachError" class="attach-tray">
+        <div v-if="pendingAttachments.length || attachError || voiceError" class="attach-tray">
           <span v-for="(p, pi) in pendingAttachments" :key="pi" class="attach-chip">
             <HubIcon :name="partIcon(p)" />
             <span class="attach-name">{{ attachName(p) }}</span>
@@ -103,6 +103,7 @@
             </button>
           </span>
           <span v-if="attachError" class="attach-error">{{ attachError }}</span>
+          <span v-if="voiceError" class="attach-error">{{ voiceError }}</span>
         </div>
 
         <div class="assistant-foot-row">
@@ -122,6 +123,20 @@
             @click="openAttach"
           >
             <HubIcon slot="icon-only" name="attach-outline" />
+          </ion-button>
+          <!-- Micrófono (hub#629): voz → texto → el INPUT del chat. Grabando se pone en danger y
+               el mismo botón para; transcribiendo muestra spinner. Enviar sigue siendo del humano:
+               la transcripción cae en el draft, nunca se auto-envía. -->
+          <ion-button
+            fill="clear"
+            size="small"
+            :disabled="streaming || transcribing"
+            :color="recording ? 'danger' : undefined"
+            :aria-label="recording ? t('assistant.micStop') : t('assistant.mic')"
+            @click="toggleMic"
+          >
+            <ion-spinner v-if="transcribing" slot="icon-only" name="crescent" class="mic-busy" />
+            <HubIcon v-else slot="icon-only" :name="micIcon" />
           </ion-button>
           <ion-textarea
             v-model="draft"
@@ -162,9 +177,12 @@ import {
   fileToContentPart,
   messageText,
   messageAttachments,
+  startVoiceRecording,
+  transcribeAudio,
   type ChatMessage,
   type ChatContent,
   type ChatContentPart,
+  type VoiceRecording,
 } from '../lib/assistant';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
 import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
@@ -280,6 +298,55 @@ function partIcon(p: ChatContentPart): string {
 }
 function chipIcon(kind: 'image' | 'file'): string {
   return kind === 'file' ? 'document-text-outline' : 'image-outline';
+}
+
+// ── Voice input (hub#629): mic → MediaRecorder → SaaS speech proxy (Whisper) → the draft ────────
+// The backend already exists whole (`saas/apps/speech`); this is only the microphone half. The
+// transcript joins the INPUT: reading and SENDING stay the user's — voice never fires a turn.
+const recording = ref<VoiceRecording | null>(null);
+const transcribing = ref(false);
+const voiceError = ref('');
+
+// Icon resolved in script, not a `:name` ternary in the template (the icon guard scans `:name`
+// literally — same reason as `partIcon` above).
+const micIcon = computed(() => (recording.value ? 'stop-circle-outline' : 'mic-outline'));
+
+function showVoiceError(message: string): void {
+  voiceError.value = message;
+  window.setTimeout(() => (voiceError.value = ''), 4000);
+}
+
+async function toggleMic(): Promise<void> {
+  if (transcribing.value) return;
+
+  if (recording.value) {
+    // Second press: stop, transcribe, drop the text into the input.
+    const rec = recording.value;
+    recording.value = null;
+    transcribing.value = true;
+    try {
+      const clip = await rec.stop();
+      const text = await transcribeAudio(clip, locale.value);
+      if (text) draft.value = draft.value.trim() ? `${draft.value.trimEnd()} ${text}` : text;
+    } catch {
+      showVoiceError(t('assistant.micFailed'));
+    } finally {
+      transcribing.value = false;
+    }
+    return;
+  }
+
+  try {
+    recording.value = await startVoiceRecording();
+  } catch (err) {
+    // The browser's own failure shapes, each with ITS message: a denied permission
+    // (NotAllowedError) is the user's decision, not a malfunction.
+    const name = (err as { name?: string })?.name;
+    const message = (err as Error)?.message ?? '';
+    if (name === 'NotAllowedError') showVoiceError(t('assistant.micDenied'));
+    else if (/not supported/i.test(message)) showVoiceError(t('assistant.micUnsupported'));
+    else showVoiceError(t('assistant.micFailed'));
+  }
 }
 
 async function scrollToBottom(): Promise<void> {
@@ -414,6 +481,9 @@ watch(
 
 onBeforeUnmount(() => {
   abort?.();
+  // Never leave the mic light on: an unmount mid-recording releases the stream.
+  recording.value?.cancel();
+  recording.value = null;
   // No dejar la clase pegada en <html> si el panel se desmonta (p. ej. al cerrar sesión).
   document.documentElement.classList.remove('assistant-open');
 });
@@ -580,6 +650,11 @@ onBeforeUnmount(() => {
 .chat-typing {
   --color: var(--ion-color-medium);
   height: 18px;
+}
+/* Spinner del micrófono mientras transcribe: tamaño de icono, no el default del spinner. */
+.mic-busy {
+  width: 1.15em;
+  height: 1.15em;
 }
 
 .assistant-foot {

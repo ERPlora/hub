@@ -311,6 +311,13 @@ async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireM
       if (fc.name === 'hub.modules.install') {
         return toolMessage(fc.call_id, await hostInstall(params));
       }
+      // Host tool mutante (hub#631, pasos 2-3): aplicar un blueprint va por el MISMO pipeline que
+      // la hero card del dashboard. Semántica verificada ANTES de exponerla: el import es ADITIVO
+      // (import_sql.rs solo admite INSERT con guardas NOT EXISTS; ADR-0304 añade las claves
+      // naturales del destino — una fila existente se SALTA, nunca se funde ni se pisa).
+      if (fc.name === 'hub.blueprints.apply') {
+        return toolMessage(fc.call_id, await hostBlueprintApply(params));
+      }
       const data = await getClient().command(fc.name, params);
       return toolMessage(fc.call_id, data ?? null);
     } catch (err) {
@@ -324,6 +331,10 @@ async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireM
     // descripción, versión, precio, instalado) para no quemar contexto.
     if (fc.name === 'hub.marketplace.search') {
       return toolMessage(fc.call_id, await hostMarketplaceSearch(params));
+    }
+    // Host tool de lectura (hub#631): el catálogo de blueprints del SaaS, recortado a la ficha.
+    if (fc.name === 'hub.blueprints.list') {
+      return toolMessage(fc.call_id, await hostBlueprintsList());
     }
     const data = await getClient().query(fc.name, params);
     return toolMessage(fc.call_id, data ?? null);
@@ -367,6 +378,130 @@ async function hostInstall(params: Record<string, unknown>): Promise<unknown> {
   }
   const { requestInstall } = await import('./runtime');
   return await requestInstall(moduleId, version);
+}
+
+/** `hub.blueprints.list`: catálogo de plantillas del SaaS, recortado a lo que el modelo necesita
+ *  (slug, nombre, descripción, idioma, país, versión) — sin plomería de checksums/tamaños. */
+async function hostBlueprintsList(): Promise<unknown> {
+  const { fetchBlueprintCatalog } = await import('./runtime');
+  const catalog = await fetchBlueprintCatalog();
+  return {
+    blueprints: catalog.map((b) => ({
+      slug: b.slug,
+      name: b.name,
+      description: b.description,
+      locale: b.locale,
+      country: b.country,
+      version: b.latest_version,
+    })),
+  };
+}
+
+/** `hub.blueprints.apply`: el pipeline de la hero card (hub#368), reutilizado tal cual —
+ *  descarga (el runtime verifica SHA256), inspecciona (staging + manifest) e importa con la
+ *  selección one-click (`heroSelection`: nunca personas ni identidad fiscal, ADR-0195 §4/§5).
+ *  El motor es best-effort y ADITIVO (ADR-0304): lo existente se conserva; se devuelve el
+ *  `importOutcome` compacto para que el modelo cuente lo que pasó de verdad. */
+async function hostBlueprintApply(params: Record<string, unknown>): Promise<unknown> {
+  const slug = String(params.slug ?? '').trim();
+  if (!slug) return { error: 'slug is required' };
+  const { downloadBlueprint, inspectBlueprint, importBlueprint } = await import('./runtime');
+  const { heroSelection, importOutcome } = await import('./blueprint-hero');
+  const blob = await downloadBlueprint(slug);
+  const inspection = await inspectBlueprint(blob);
+  const report = await importBlueprint(inspection.upload_id, heroSelection(inspection.manifest));
+  return {
+    outcome: importOutcome(report),
+    installed_modules: (report.installed_modules ?? []).map((m) => ({ id: m.id, status: m.status })),
+  };
+}
+
+// ── Voice input (hub#629): microphone → MediaRecorder → SaaS speech proxy → text ────────────────
+
+/** The SaaS transcribe cap (`saas/apps/speech`, MAX_AUDIO_SIZE = 2 MB). Checked BEFORE the wire:
+ *  a clip the proxy would reject with a 400 should never leave the device. */
+export const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
+
+/** Containers the SaaS accepts, in preference order; the first the browser supports wins
+ *  (Chromium records webm, Safari mp4). */
+const RECORDER_MIME_TYPES = ['audio/webm', 'audio/ogg', 'audio/mp4'];
+
+/** A live microphone capture. `stop()` hands back the clip; both paths release the microphone —
+ *  a mic light that stays on after the drawer is done with it is a bug, not a detail. */
+export interface VoiceRecording {
+  /** Stops recording, releases the microphone and resolves the captured audio. */
+  stop(): Promise<Blob>;
+  /** Abandons the capture: releases the microphone, discards the audio. */
+  cancel(): void;
+}
+
+/**
+ * Opens the microphone and starts recording.
+ *
+ * Failure surface is the browser's own, on purpose: no `MediaRecorder` → throws `not supported`;
+ * a denied permission REJECTS with the browser's `NotAllowedError` untouched, so the caller can
+ * tell "the user said no" (its own message) from "something broke" (a generic one).
+ */
+export async function startVoiceRecording(): Promise<VoiceRecording> {
+  const Recorder = (globalThis as { MediaRecorder?: typeof MediaRecorder }).MediaRecorder;
+  const media = (globalThis as { navigator?: Navigator }).navigator?.mediaDevices;
+  if (!Recorder || !media?.getUserMedia) {
+    throw new Error('voice recording is not supported in this browser');
+  }
+  const stream = await media.getUserMedia({ audio: true });
+  const mimeType = RECORDER_MIME_TYPES.find((t) => Recorder.isTypeSupported?.(t));
+  const recorder = new Recorder(stream, mimeType ? { mimeType } : undefined);
+  const chunks: BlobPart[] = [];
+  recorder.addEventListener('dataavailable', (ev) => {
+    const data = (ev as BlobEvent).data;
+    if (data && data.size > 0) chunks.push(data);
+  });
+  const release = (): void => stream.getTracks().forEach((t) => t.stop());
+  recorder.start();
+
+  return {
+    stop: () =>
+      new Promise<Blob>((resolve, reject) => {
+        recorder.addEventListener(
+          'stop',
+          () => {
+            release();
+            resolve(new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' }));
+          },
+          { once: true },
+        );
+        recorder.addEventListener(
+          'error',
+          (ev) => {
+            release();
+            reject((ev as { error?: Error }).error ?? new Error('recording failed'));
+          },
+          { once: true },
+        );
+        recorder.stop();
+      }),
+    cancel: () => {
+      try {
+        if (recorder.state !== 'inactive') recorder.stop();
+      } catch {
+        /* already inert */
+      }
+      release();
+    },
+  };
+}
+
+/**
+ * Sends a recorded clip to the SaaS speech proxy (Whisper) and returns the transcription. The hub
+ * NEVER talks to an LLM/API directly (§9.3): the SaaS is the proxy and meters the cost. Refuses
+ * oversize clips before touching the network (the proxy's own cap is 2 MB).
+ */
+export async function transcribeAudio(audio: Blob, language?: string): Promise<string> {
+  if (audio.size > MAX_AUDIO_BYTES) {
+    throw new Error('audio clip too large');
+  }
+  const { cloudTranscribeSpeech } = await import('./cloud');
+  return await cloudTranscribeSpeech(audio, language);
 }
 
 function safeParseArgs(s: string): Record<string, unknown> {

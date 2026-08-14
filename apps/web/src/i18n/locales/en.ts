@@ -100,6 +100,11 @@ export default {
     attachRemove: 'Remove attachment',
     attachImage: 'image',
     attachTooLarge: 'The file is too large.',
+    mic: 'Dictate by voice',
+    micStop: 'Stop recording',
+    micDenied: 'Microphone access was denied. Allow it in your browser to dictate.',
+    micUnsupported: 'This browser cannot record audio.',
+    micFailed: 'The audio could not be transcribed.',
   },
   // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
   // installed app there is no download shelf and no notification, so if we say nothing, nothing is
