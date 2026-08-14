@@ -145,3 +145,139 @@ fn compilar_no_sostiene_el_candado() {
     assert!(resultado.is_ok());
     assert_eq!(cache.len(), 1);
 }
+
+// ─── Precalentado al arrancar (hub#926, segunda mitad) ────────────────────────────────────────
+//
+// Medido en HARDWARE DE PRODUCCIÓN (amd64, imagen que corre la flota, 512 MiB / 0,25 vCPU): tras
+// un DEPLOY —que estrena contenedor y por tanto vacía la caché en disco de wasmtime— las dos
+// primeras ventas costaron **8,2 s y 5,7 s**, y de la tercera en adelante 75-91 ms. Ese es el
+// «tarda una eternidad» del incidente saas#1460 visto de cerca: no es cada venta, es la PRIMERA
+// después de cada despliegue, y la paga el cajero que tenga un cliente delante.
+//
+// La compilación hay que hacerla igual; lo que se puede elegir es CUÁNDO. Precalentar al arrancar
+// la mueve al hueco en que nadie está esperando.
+
+use erplora_runtime::wasm_cache::warm_up;
+
+/// Un `Registry` de mentira: lo que el precalentado necesita saber es qué módulos tienen handler.
+fn modulo(id: &str, version: &str, con_handler: bool) -> (String, String, Option<Vec<u8>>) {
+    (
+        id.to_string(),
+        version.to_string(),
+        con_handler.then(wasm_vacio),
+    )
+}
+
+#[test]
+fn precalentar_compila_los_handlers_instalados() {
+    let cache = WasmCache::default();
+    let modulos = vec![
+        modulo("sales", "2.14.1", true),
+        modulo("invoice", "1.2.0", true),
+    ];
+
+    let calentados = warm_up(&cache, &modulos, WasmLimits::default());
+
+    assert_eq!(calentados, 2, "los dos handlers quedan compilados");
+    assert_eq!(cache.len(), 2);
+}
+
+#[test]
+fn precalentar_ignora_los_modulos_sin_handler() {
+    // Un módulo declarativo (Tier 0) no tiene nada que compilar: ni entra en la caché ni cuenta.
+    let cache = WasmCache::default();
+    let modulos = vec![
+        modulo("sales", "2.14.1", true),
+        modulo("printing", "1.0.0", false),
+    ];
+
+    assert_eq!(warm_up(&cache, &modulos, WasmLimits::default()), 1);
+    assert_eq!(cache.len(), 1);
+}
+
+#[test]
+fn un_handler_roto_no_impide_calentar_los_demas() {
+    // Arrancar es lo único que no puede fallar: si un módulo trae bytes corruptos, se salta y el
+    // hub sigue en pie — ese comando fallará cuando alguien lo llame, con su error, no antes.
+    let cache = WasmCache::default();
+    let modulos = vec![
+        ("roto".to_string(), "1.0.0".to_string(), Some(vec![0u8, 1, 2, 3])),
+        modulo("sales", "2.14.1", true),
+    ];
+
+    assert_eq!(warm_up(&cache, &modulos, WasmLimits::default()), 1, "solo cuenta el que compiló");
+    assert_eq!(cache.len(), 1);
+}
+
+#[test]
+fn precalentar_dos_veces_no_recompila() {
+    let cache = WasmCache::default();
+    let modulos = vec![modulo("sales", "2.14.1", true)];
+
+    warm_up(&cache, &modulos, WasmLimits::default());
+    warm_up(&cache, &modulos, WasmLimits::default());
+
+    assert_eq!(cache.len(), 1, "la segunda pasada encuentra la caché caliente");
+}
+
+/// Qué handlers hay que precalentar: uno por MÓDULO, no uno por comando.
+///
+/// El registro guarda los bytes del `.wasm` en cada comando, y un módulo declara varios comandos
+/// contra el mismo handler. Sin deduplicar, `sales` (21 comandos) se compilaría 21 veces al
+/// arrancar — el precalentado costaría más que el problema que quita.
+#[test]
+fn los_handlers_a_precalentar_van_uno_por_modulo() {
+    use erplora_runtime::manifest::{CommandDef, Manifest};
+    use erplora_runtime::registry::{RegisteredCommand, Registry};
+    use serde_json::json;
+
+    let cmd_def = |permission: &str| -> CommandDef {
+        serde_json::from_value(json!({ "permission": permission })).expect("CommandDef de prueba")
+    };
+    let manifest = |id: &str, version: &str| -> Manifest {
+        serde_json::from_value(json!({ "id": id, "name": id, "version": version }))
+            .expect("Manifest de prueba")
+    };
+
+    let mut registry = Registry::default();
+    let bytes = wasm_vacio();
+    for (name, module) in [
+        ("sales.complete_sale", "sales"),
+        ("sales.void", "sales"),
+        ("invoice.create", "invoice"),
+    ] {
+        registry.commands.insert(
+            name.to_string(),
+            RegisteredCommand {
+                module_id: module.to_string(),
+                def: cmd_def("sales.take_payment"),
+                sql: vec![],
+                wasm: Some(bytes.clone()),
+                schema: None,
+            },
+        );
+    }
+    // Un comando declarativo (Tier 0) no aporta nada que compilar.
+    registry.commands.insert(
+        "printing.job.enqueue".to_string(),
+        RegisteredCommand {
+            module_id: "printing".to_string(),
+            def: cmd_def("printing.enqueue"),
+            sql: vec!["INSERT INTO printing_job DEFAULT VALUES".to_string()],
+            wasm: None,
+            schema: None,
+        },
+    );
+    for (id, version) in [("sales", "2.14.1"), ("invoice", "1.2.0"), ("printing", "1.0.0")] {
+        registry.installed.push(manifest(id, version));
+    }
+
+    let mut a_calentar = registry.handlers_to_warm_up();
+    a_calentar.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let ids: Vec<&str> = a_calentar.iter().map(|(id, _, _)| id.as_str()).collect();
+    assert_eq!(ids, vec!["invoice", "sales"], "un módulo, una compilación");
+    let versiones: Vec<&str> = a_calentar.iter().map(|(_, v, _)| v.as_str()).collect();
+    assert_eq!(versiones, vec!["1.2.0", "2.14.1"], "cada uno con SU versión instalada");
+    assert!(a_calentar.iter().all(|(_, _, w)| w.is_some()));
+}

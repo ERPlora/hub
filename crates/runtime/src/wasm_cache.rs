@@ -1,10 +1,20 @@
 //! Código máquina de los handlers, compilado UNA vez por versión de módulo (hub#926).
 //!
 //! El `.wasm` de un módulo no lo ejecuta la CPU: wasmtime lo traduce con Cranelift primero, y esa
-//! traducción es la parte cara — en tiempo y en memoria. El runtime la hacía dentro de CADA
-//! comando y tiraba el resultado, así que una venta arrastraba la compilación de `sales` más las
-//! de los listeners que despierta su evento. Medido en saas#1460: ~7 MiB retenidos por venta hasta
-//! una meseta de ~240 MiB, y 11 s para cerrar una venta en un contenedor de 0,1 vCPU.
+//! traducción es la parte cara. El runtime la pedía dentro de CADA comando y tiraba el resultado.
+//!
+//! Medido en **hardware de producción** (amd64, la imagen que corre la flota, 512 MiB / 0,25 vCPU),
+//! que es lo que de verdad describe el problema:
+//!
+//!  * Extism ya trae una caché **en disco** de wasmtime (`$HOME/.cache/wasmtime`), así que la
+//!    segunda llamada a un handler no vuelve a pasar por Cranelift: por eso una venta cuesta
+//!    ~50 ms y no lo que cuesta compilar. Esta caché en memoria se ahorra además la
+//!    deserialización y el montaje del plugin: **−23 % de CPU por venta** (44 → 34 ms, medido A/B
+//!    con dos imágenes compiladas igual).
+//!  * Pero la caché en disco vive en el contenedor, y **un deploy estrena contenedor**: tras cada
+//!    despliegue las dos primeras ventas costaron **8,2 s y 5,7 s** (de la tercera en adelante,
+//!    75-91 ms). Ese es el coste que paga el cajero con un cliente delante, y para eso está
+//!    [`warm_up`].
 //!
 //! Aquí se guarda el resultado de esa traducción. Lo que se comparte es **código inmutable**; el
 //! estado nunca: cada llamada sigue instanciando su propio sandbox (memoria lineal, fuel y epoch
@@ -20,6 +30,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use erplora_wasm_host::{CompiledModule, WasmLimits};
+
+/// Reexportado para que el host (server/Tauri) pueda armar los topes sin depender del crate del
+/// sandbox: el precalentado del arranque es su único usuario.
+pub use erplora_wasm_host::WasmLimits as Limits;
 
 use crate::errors::{Result, RuntimeError};
 
@@ -125,4 +139,32 @@ impl WasmCache {
     fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<CacheKey, Arc<CompiledModule>>> {
         self.entries.lock().unwrap_or_else(|e| e.into_inner())
     }
+}
+
+/// Compila por adelantado los handlers de los módulos instalados (hub#926).
+///
+/// Medido en hardware de producción (amd64, imagen de la flota, 512 MiB / 0,25 vCPU): tras un
+/// **deploy** —que estrena contenedor, y con él la caché en disco de wasmtime— las dos primeras
+/// ventas costaron **8,2 s y 5,7 s**, y de la tercera en adelante 75-91 ms. La compilación hay que
+/// pagarla igual; lo que se elige aquí es **cuándo**: al arrancar, cuando no hay nadie esperando
+/// en el mostrador, en vez de en el primer cobro del día.
+///
+/// Devuelve cuántos handlers quedaron compilados. **No falla nunca**: un módulo con bytes rotos se
+/// salta —su comando dará error cuando alguien lo llame, con su mensaje, no antes— porque arrancar
+/// es justo lo que no se puede permitir que se caiga.
+pub fn warm_up(
+    cache: &WasmCache,
+    modules: &[(String, String, Option<Vec<u8>>)],
+    limits: WasmLimits,
+) -> usize {
+    let mut warmed = 0;
+    for (module_id, version, wasm) in modules {
+        let Some(bytes) = wasm else { continue };
+        let key = CacheKey::new(module_id.clone(), version.clone(), limits);
+        match cache.get_or_compile(key, bytes, limits) {
+            Ok(_) => warmed += 1,
+            Err(e) => eprintln!("wasm: no se pudo precalentar `{module_id}`: {e}"),
+        }
+    }
+    warmed
 }
