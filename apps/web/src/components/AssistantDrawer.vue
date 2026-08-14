@@ -82,6 +82,20 @@
                 <HubIcon slot="start" name="arrow-forward-circle-outline" />
                 {{ t('assistant.goTo') }} {{ r.label }}
               </ion-button>
+              <!-- Report an issue (hub#946, Microsoft Store policy 11.16): every FINISHED
+                   assistant answer can be flagged as inappropriate. Never on the live
+                   (streaming) bubble — reporting a half-written answer sends a truncation. -->
+              <ion-button
+                v-if="canReport(i)"
+                size="small"
+                fill="clear"
+                class="chat-report-btn"
+                data-testid="assistant-report"
+                @click="openReportDialog(i)"
+              >
+                <HubIcon slot="start" name="flag-outline" />
+                {{ t('assistant.report') }}
+              </ion-button>
             </div>
           </div>
         </div>
@@ -89,7 +103,7 @@
 
       <footer class="assistant-foot">
         <!-- Bandeja de adjuntos pendientes (antes de enviar). -->
-        <div v-if="pendingAttachments.length || attachError" class="attach-tray">
+        <div v-if="pendingAttachments.length || attachError || voiceError" class="attach-tray">
           <span v-for="(p, pi) in pendingAttachments" :key="pi" class="attach-chip">
             <HubIcon :name="partIcon(p)" />
             <span class="attach-name">{{ attachName(p) }}</span>
@@ -103,6 +117,7 @@
             </button>
           </span>
           <span v-if="attachError" class="attach-error">{{ attachError }}</span>
+          <span v-if="voiceError" class="attach-error">{{ voiceError }}</span>
         </div>
 
         <div class="assistant-foot-row">
@@ -122,6 +137,20 @@
             @click="openAttach"
           >
             <HubIcon slot="icon-only" name="attach-outline" />
+          </ion-button>
+          <!-- Micrófono (hub#629): voz → texto → el INPUT del chat. Grabando se pone en danger y
+               el mismo botón para; transcribiendo muestra spinner. Enviar sigue siendo del humano:
+               la transcripción cae en el draft, nunca se auto-envía. -->
+          <ion-button
+            fill="clear"
+            size="small"
+            :disabled="streaming || transcribing"
+            :color="recording ? 'danger' : undefined"
+            :aria-label="recording ? t('assistant.micStop') : t('assistant.mic')"
+            @click="toggleMic"
+          >
+            <ion-spinner v-if="transcribing" slot="icon-only" name="crescent" class="mic-busy" />
+            <HubIcon v-else slot="icon-only" :name="micIcon" />
           </ion-button>
           <ion-textarea
             v-model="draft"
@@ -162,10 +191,15 @@ import {
   fileToContentPart,
   messageText,
   messageAttachments,
+  startVoiceRecording,
+  transcribeAudio,
   type ChatMessage,
   type ChatContent,
   type ChatContentPart,
+  type VoiceRecording,
 } from '../lib/assistant';
+import { reportAssistantMessage } from '../lib/assistant-report';
+import { toastSuccess, toastError } from '../lib/toast';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
 import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
@@ -282,6 +316,55 @@ function chipIcon(kind: 'image' | 'file'): string {
   return kind === 'file' ? 'document-text-outline' : 'image-outline';
 }
 
+// ── Voice input (hub#629): mic → MediaRecorder → SaaS speech proxy (Whisper) → the draft ────────
+// The backend already exists whole (`saas/apps/speech`); this is only the microphone half. The
+// transcript joins the INPUT: reading and SENDING stay the user's — voice never fires a turn.
+const recording = ref<VoiceRecording | null>(null);
+const transcribing = ref(false);
+const voiceError = ref('');
+
+// Icon resolved in script, not a `:name` ternary in the template (the icon guard scans `:name`
+// literally — same reason as `partIcon` above).
+const micIcon = computed(() => (recording.value ? 'stop-circle-outline' : 'mic-outline'));
+
+function showVoiceError(message: string): void {
+  voiceError.value = message;
+  window.setTimeout(() => (voiceError.value = ''), 4000);
+}
+
+async function toggleMic(): Promise<void> {
+  if (transcribing.value) return;
+
+  if (recording.value) {
+    // Second press: stop, transcribe, drop the text into the input.
+    const rec = recording.value;
+    recording.value = null;
+    transcribing.value = true;
+    try {
+      const clip = await rec.stop();
+      const text = await transcribeAudio(clip, locale.value);
+      if (text) draft.value = draft.value.trim() ? `${draft.value.trimEnd()} ${text}` : text;
+    } catch {
+      showVoiceError(t('assistant.micFailed'));
+    } finally {
+      transcribing.value = false;
+    }
+    return;
+  }
+
+  try {
+    recording.value = await startVoiceRecording();
+  } catch (err) {
+    // The browser's own failure shapes, each with ITS message: a denied permission
+    // (NotAllowedError) is the user's decision, not a malfunction.
+    const name = (err as { name?: string })?.name;
+    const message = (err as Error)?.message ?? '';
+    if (name === 'NotAllowedError') showVoiceError(t('assistant.micDenied'));
+    else if (/not supported/i.test(message)) showVoiceError(t('assistant.micUnsupported'));
+    else showVoiceError(t('assistant.micFailed'));
+  }
+}
+
 async function scrollToBottom(): Promise<void> {
   await nextTick();
   const el = threadEl.value;
@@ -308,7 +391,9 @@ async function send(): Promise<void> {
   pendingAttachments.value = [];
 
   messages.value.push({ role: 'user', content });
-  const assistantMsg = ref<ChatMessage>({ role: 'assistant', content: '' });
+  // Every assistant answer is born with a stable id (hub#946): the report call references
+  // the exact message it flags. Messages persisted before ids existed simply have none.
+  const assistantMsg = ref<ChatMessage>({ role: 'assistant', content: '', id: crypto.randomUUID() });
   messages.value.push(assistantMsg.value);
   streaming.value = true;
   saveAssistantHistory();
@@ -395,6 +480,59 @@ function stop(): void {
   saveAssistantHistory();
 }
 
+// ── Report an issue (hub#946) ───────────────────────────────────────────────────────────────────
+// Microsoft Store policy 11.16: the user must be able to report inappropriate AI-generated
+// content. Only FINISHED answers are reportable — the live bubble is still being written.
+
+/** Whether the message at `index` can be reported: never the bubble being streamed. */
+function canReport(index: number): boolean {
+  return !(streaming.value && index === messages.value.length - 1);
+}
+
+/** The closest user message BEFORE `index` — the question the reported answer replied to. */
+function precedingUserMessage(index: number): string {
+  for (let i = index - 1; i >= 0; i--) {
+    const m = messages.value[i];
+    if (m.role === 'user') return messageText(m.content);
+  }
+  return '';
+}
+
+/** Opens the report dialog (same alert pattern as the write-confirm card) and, on confirm,
+ *  posts the report to the runtime. Success and failure each get their toast. */
+async function openReportDialog(index: number): Promise<void> {
+  const msg = messages.value[index];
+  if (!msg) return;
+  const alert = await alertController.create({
+    header: t('assistant.reportTitle'),
+    message: t('assistant.reportHint'),
+    inputs: [{ name: 'comment', type: 'textarea', placeholder: t('assistant.reportPlaceholder') }],
+    buttons: [
+      { text: t('assistant.confirmCancel'), role: 'cancel' },
+      { text: t('assistant.reportConfirm'), role: 'confirm' },
+    ],
+  });
+  await alert.present();
+  const { role, data } = await alert.onDidDismiss<{ values?: { comment?: string } }>();
+  if (role !== 'confirm') return;
+  // A message that predates ids (restored history) gets one on the fly, and it sticks.
+  if (!msg.id) {
+    msg.id = crypto.randomUUID();
+    saveAssistantHistory();
+  }
+  try {
+    await reportAssistantMessage({
+      messageId: msg.id,
+      assistantMessage: messageText(msg.content),
+      userMessage: precedingUserMessage(index),
+      comment: (data?.values?.comment ?? '').trim(),
+    });
+    void toastSuccess(t('assistant.reportSent'));
+  } catch {
+    void toastError(t('assistant.reportError'));
+  }
+}
+
 // Al abrir el panel, lleva el foco al fondo del hilo + togglea la clase global `assistant-open`
 // en <html>. Esa clase la consume el CSS global de App.vue para EMPUJAR el contenido (push) desde
 // tablet (≥768px), reservando a la derecha el ancho adaptable del panel. Solo en móvil el panel
@@ -414,6 +552,9 @@ watch(
 
 onBeforeUnmount(() => {
   abort?.();
+  // Never leave the mic light on: an unmount mid-recording releases the stream.
+  recording.value?.cancel();
+  recording.value = null;
   // No dejar la clase pegada en <html> si el panel se desmonta (p. ej. al cerrar sesión).
   document.documentElement.classList.remove('assistant-open');
 });
@@ -560,6 +701,17 @@ onBeforeUnmount(() => {
   text-transform: none;
   font-weight: 500;
 }
+/* "Report an issue" (hub#946): present on every finished answer, but quiet — muted text
+   that only asks for attention on hover. */
+.chat-report-btn {
+  text-transform: none;
+  font-weight: 400;
+  --color: var(--ion-color-medium);
+  font-size: 0.75rem;
+}
+.chat-report-btn:hover {
+  --color: var(--ion-color-danger, #c00);
+}
 .chat-bubble {
   padding: 0.6rem 0.85rem;
   border-radius: 14px;
@@ -580,6 +732,11 @@ onBeforeUnmount(() => {
 .chat-typing {
   --color: var(--ion-color-medium);
   height: 18px;
+}
+/* Spinner del micrófono mientras transcribe: tamaño de icono, no el default del spinner. */
+.mic-busy {
+  width: 1.15em;
+  height: 1.15em;
 }
 
 .assistant-foot {

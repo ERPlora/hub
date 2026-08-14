@@ -30,12 +30,28 @@ name: Hub tests (Rust · Postgres)
 # publicando el commit status `local-gate/hub-tests` para que `merge-pr.sh` vea un check
 # aunque Actions esté mudo (pm#58/#60). Cubren cosas distintas — el local, cada rama
 # antes de salir; éste, el árbol mergeado.
+# ── Push to develop: the POST-MERGE check (hub#572) ──────────────────────────
+# Two individually-green PRs can break develop when combined: the clash is
+# semantic, not textual (one PR widens a struct the other constructs literally
+# — no shared line, git merges clean, each gate ran the suite against the
+# develop of ITS moment). Nothing ran the suite on the RESULTING develop, so
+# the breakage surfaced on the next victim's pre-push, pointing at their diff.
+# This trigger closes that hole: the suite runs on develop exactly as each
+# merge left it. Prevention at merge time (option 1) lives in pm's merge-pr.sh
+# (pm#74) — but that is `cargo check`, it does not EXECUTE; this run does.
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
+# Per-ref group + cancel-in-progress. What that means per event:
+# - push to develop: the group is the develop ref, so two merges in a row
+#   cancel the first run and test the FINAL develop — the tree that matters —
+#   instead of queueing ~20 min runs on the single serialized runner (hub#572).
+# - pull_request: the group is the PR's own merge ref (refs/pull/N/merge), so
+#   a run is only ever cancelled by a newer push to the SAME PR. Unchanged.
+# - push to main: unchanged (per-ref, latest state wins).
 concurrency:
   group: test-hub-${{ github.ref }}
   cancel-in-progress: true
@@ -50,6 +66,9 @@ jobs:
     # runner es UNA máquina, así que esta suite (la más larga) serializa con el build de la imagen.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 40
+    permissions:
+      contents: read
+      issues: write   # open/refresh the develop-broken alert issue (hub#572)
 
     services:
       postgres:
@@ -233,4 +252,49 @@ jobs:
       # también arrastra GTK en Linux. Su valor real son los tests KOTLIN (`testDebugUnitTest`),
       # que es donde vive la lógica; la parte Rust es el registro del plugin.
       - name: cargo test --workspace
+        id: tests
         run: cargo test --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+
+      # When the POST-MERGE run on develop goes red (hub#572), make it loud:
+      # open (or refresh, idempotently — one open issue, never one per run) an
+      # alert issue, same pattern as image-freshness.yml (hub#652) — native
+      # Actions notifications demonstrably reached nobody there; an issue
+      # notifies watchers and lands on the board. Gated on the TEST step's own
+      # outcome so an environmental failure (disk, service container) does not
+      # fake a "develop is broken" verdict; a run cancelled by a newer merge
+      # never triggers it (`failure()` excludes cancellation).
+      - name: Open or refresh the develop-broken alert issue (hub#572)
+        if: >-
+          failure() && steps.tests.outcome == 'failure' &&
+          github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          subject=$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)
+          title="develop is broken after a merge: ${subject}"
+          body="Detected by the post-merge suite on develop (hub#572).
+
+          - develop HEAD: \`${SHA}\` — '${subject}'
+          - failed run: ${RUN_URL}
+
+          Two individually-green PRs can break develop when combined: the clash is semantic, not textual, so neither PR's gate could see it — each ran the suite against the develop of ITS moment. This run is the first that saw them together, so the culprit is the INTERACTION of this merge with what develop already had, not necessarily this merge's own diff.
+
+          Until develop is green again, every local pre-push gate fails with an error unrelated to the pusher's diff, and a develop→main batch would promote the breakage. Fix forward on develop (hub#572 is the class; the original case was fixed in hub#547).
+
+          This issue is reused (one comment per detection) while develop stays red; close it once develop is green again."
+
+          # Search phrase deliberately colon-free (colons are GitHub search
+          # syntax) and stable — it is what makes the alert idempotent.
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search '"develop is broken after a merge" in:title' \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Refreshing open alert issue #$existing"
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi

@@ -98,6 +98,19 @@ export default {
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
     attachTooLarge: 'El archivo es demasiado grande.',
+    mic: 'Dictar por voz',
+    micStop: 'Detener la grabación',
+    micDenied: 'El acceso al micrófono está denegado. Permítelo en tu navegador para dictar.',
+    micUnsupported: 'Este navegador no puede grabar audio.',
+    micFailed: 'No se ha podido transcribir el audio.',
+    report: 'Denunciar un problema',
+    reportTitle: 'Denunciar esta respuesta',
+    reportHint:
+      'Si esta respuesta del asistente te parece inapropiada o dañina, envíanosla y la revisaremos.',
+    reportPlaceholder: 'Comentario (opcional)',
+    reportConfirm: 'Denunciar',
+    reportSent: 'Gracias, hemos recibido tu denuncia.',
+    reportError: 'No se pudo enviar la denuncia. Inténtalo de nuevo.',
   },
   // Lo que se le dice al usuario tras pulsar «descargar», lo pulse donde lo pulse (hub#480). Dentro
   // de la app instalada no hay barra de descargas ni aviso del sistema: si no lo decimos nosotros,
@@ -530,6 +543,20 @@ export default {
     permissionGranted: '{cap} concedido a {app}.',
     permissionRevoked: '{cap} revocado a {app}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
+  },
+  // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT.
+  print: {
+    coverageTitle: 'Estado de impresión',
+    coverageDesc: 'Qué dispositivos están sacando cada tipo de tique ahora mismo.',
+    roleReceipt: 'Tiques de venta',
+    roleKitchen: 'Comandas de cocina',
+    roleBar: 'Comandas de barra',
+    roleLabel: 'Etiquetas',
+    stalled: 'Nadie está imprimiendo esto — {n} tique en espera | Nadie está imprimiendo esto — {n} tiques en espera',
+    unattended: 'El dispositivo que imprimía esto no responde',
+    ready: 'Imprimiendo en {hosts}',
+    hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
+    coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
@@ -1188,6 +1215,15 @@ export default {
     reportRecovered: 'Este es el informe de tu última importación de {name} ({when}). No todo entró.',
     // La vuelta al catálogo tras leer el informe recuperado, para que el admin pueda reintentar.
     reportDismiss: 'Ver las plantillas',
+    // hub#845 — reintento SOLO de lo que no entró: el servidor vuelve a bajar la MISMA versión del
+    // catálogo y re-ejecuta solo lo fallido; lo ya aplicado no se duplica jamás.
+    retry: 'Reintentar lo que falta',
+    retryNotRetryable:
+      'Esta importación vino de un archivo subido a mano, así que no se puede reintentar automáticamente. Vuelve a subir el archivo y selecciona solo lo que falló.',
+    retryVersionUnavailable:
+      'La versión de la plantilla que usó esta importación ya no está en el catálogo, así que el reintento no se ejecutó — reintentar con otra versión podría cargar datos distintos.',
+    retryBatchNotFound:
+      'El informe de esta importación ya no está registrado (puede que se deshiciera), así que no hay nada que reintentar.',
     statusApplied: 'Aplicado',
     statusSkipped: 'Saltado',
     statusIgnored: 'Descartado',

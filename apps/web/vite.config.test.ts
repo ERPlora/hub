@@ -71,3 +71,72 @@ describe('vite.config server env overrides (hub#787)', () => {
     expect(cfg.server.proxy['/api'].target).toBe('http://127.0.0.1:9911');
   });
 });
+
+// hub#798: the initial bundle carried ~1 MB of @ionic/core because Stencil's component modules
+// have unannotated top-level calls (`proxyCustomElement(...)`), so Rollup treats every one of the
+// 140+ components @ionic/vue re-exports as side-effectful and keeps them all — ion-datetime,
+// ion-input-otp, ion-refresher… none of which the shell ever imports. Declaring @ionic/core's JS
+// side-effect-free lets Rollup drop the unused ones. This is safe for custom-element registration:
+// nothing registers at import time — @ionic/vue calls `defineCustomElement()` when a wrapper
+// mounts or a controller is used, and `lib/ionic-wc.ts` registers OutfitKit's deps explicitly —
+// so the set of REGISTERED elements is unchanged; only never-referenced dead bytes go away.
+describe('vite.config tree-shakes @ionic/core (hub#798)', () => {
+  it('marks @ionic/core JS modules as side-effect-free', async () => {
+    const cfg = await loadConfig();
+    const moduleSideEffects = cfg.build?.rollupOptions?.treeshake?.moduleSideEffects;
+    expect(typeof moduleSideEffects).toBe('function');
+    // pnpm-style resolved id of a core component nobody imports in the shell.
+    const ionicCoreId =
+      '/repo/node_modules/.pnpm/@ionic+core@8.8.9/node_modules/@ionic/core/components/ion-input-otp.js';
+    expect(moduleSideEffects(ionicCoreId, false)).toBe(false);
+  });
+
+  it('splits stable vendors into their own cache groups (manualChunks)', async () => {
+    const cfg = await loadConfig();
+    const manualChunks = cfg.build?.rollupOptions?.output?.manualChunks;
+    expect(typeof manualChunks).toBe('function');
+    const pnpm = (pkg: string, rest: string) =>
+      `/repo/node_modules/.pnpm/${pkg.replace('/', '+')}@1.0.0/node_modules/${pkg}/${rest}`;
+    // Ionic is deliberately NOT grouped. Assigning a module through manualChunks makes it a chunk
+    // entry whose exports are all preserved; for the @ionic/vue barrel (and @ionic/core through
+    // it) that resurrects every tree-shaken component — measured +~300 kB of dead code (146 core
+    // files back instead of 103). Ionic therefore stays in the entry chunk, tree-shaken.
+    expect(manualChunks(pnpm('@ionic/core', 'components/ion-datetime.js'))).toBeUndefined();
+    expect(manualChunks(pnpm('@ionic/vue', 'dist/index.js'))).toBeUndefined();
+    expect(manualChunks(pnpm('@ionic/vue-router', 'dist/index.js'))).toBeUndefined();
+    expect(manualChunks(pnpm('ionicons', 'components/icon.js'))).toBeUndefined();
+    // Vue runtime + router + i18n.
+    expect(manualChunks(pnpm('vue', 'dist/vue.runtime.esm-bundler.js'))).toBe('vendor-vue');
+    expect(manualChunks(pnpm('@vue/runtime-core', 'dist/x.js'))).toBe('vendor-vue');
+    expect(manualChunks(pnpm('vue-router', 'dist/x.js'))).toBe('vendor-vue');
+    expect(manualChunks(pnpm('vue-i18n', 'dist/x.js'))).toBe('vendor-vue');
+    expect(manualChunks(pnpm('@intlify/core-base', 'dist/x.js'))).toBe('vendor-vue');
+    // OutfitKit + Lit (the ok-* registry main.ts loads at boot).
+    expect(manualChunks(pnpm('@erplora/outfitkit', 'dist/ok-data-table.js'))).toBe('vendor-outfitkit');
+    expect(manualChunks(pnpm('lit-html', 'lit-html.js'))).toBe('vendor-outfitkit');
+    expect(manualChunks(pnpm('@lit/reactive-element', 'x.js'))).toBe('vendor-outfitkit');
+    // App code and every other package keep Rollup's default assignment.
+    expect(manualChunks('/repo/apps/web/src/main.ts')).toBeUndefined();
+    expect(manualChunks(pnpm('mammoth', 'lib/index.js'))).toBeUndefined();
+    expect(manualChunks(pnpm('swagger-ui-dist', 'swagger-ui-es-bundle.js'))).toBeUndefined();
+    // vue-demi and friends must NOT be caught by a loose 'vue' match.
+    expect(manualChunks(pnpm('vue-demi', 'lib/index.mjs'))).toBeUndefined();
+  });
+
+  it('leaves every other module side-effectful (default Rollup analysis)', async () => {
+    const cfg = await loadConfig();
+    const moduleSideEffects = cfg.build.rollupOptions.treeshake.moduleSideEffects;
+    // Our own code, other packages, and any CSS keep the default (true = analyze/keep effects).
+    expect(moduleSideEffects('/repo/apps/web/src/main.ts', false)).toBe(true);
+    expect(
+      moduleSideEffects('/repo/node_modules/@ionic/vue/dist/index.js', false),
+    ).toBe(true);
+    expect(
+      moduleSideEffects('/repo/node_modules/@ionic/vue/css/core.css', false),
+    ).toBe(true);
+    // Defensive: if @ionic/core ever ships CSS through the graph, it must stay side-effectful.
+    expect(
+      moduleSideEffects('/repo/node_modules/@ionic/core/css/ionic.bundle.css', false),
+    ).toBe(true);
+  });
+});

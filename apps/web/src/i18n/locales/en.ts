@@ -100,6 +100,19 @@ export default {
     attachRemove: 'Remove attachment',
     attachImage: 'image',
     attachTooLarge: 'The file is too large.',
+    mic: 'Dictate by voice',
+    micStop: 'Stop recording',
+    micDenied: 'Microphone access was denied. Allow it in your browser to dictate.',
+    micUnsupported: 'This browser cannot record audio.',
+    micFailed: 'The audio could not be transcribed.',
+    report: 'Report an issue',
+    reportTitle: 'Report this response',
+    reportHint:
+      'If this assistant response seems inappropriate or harmful, send it to us and we will review it.',
+    reportPlaceholder: 'Comment (optional)',
+    reportConfirm: 'Report',
+    reportSent: 'Thank you, we received your report.',
+    reportError: 'The report could not be sent. Please try again.',
   },
   // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
   // installed app there is no download shelf and no notification, so if we say nothing, nothing is
@@ -559,6 +572,28 @@ export default {
     permissionGranted: '{cap} granted to {app}.',
     permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
+  },
+  // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT. The runtime
+  // sends facts (`role`, `waiting`, `liveHosts`); the sentence the owner reads lives here — the
+  // API comment in `crates/server/src/print.rs` says so explicitly.
+  print: {
+    coverageTitle: 'Printing status',
+    coverageDesc: 'Which devices are taking each kind of ticket out right now.',
+    // The four conventional roles get a human name; an unknown role shows its raw name.
+    roleReceipt: 'Sale receipts',
+    roleKitchen: 'Kitchen orders',
+    roleBar: 'Bar orders',
+    roleLabel: 'Labels',
+    // THE alarm (the issue's headline, per role): work is piling up and no device takes it out.
+    stalled: 'Nobody is printing these — {n} ticket waiting | Nobody is printing these — {n} tickets waiting',
+    // Lost coverage: a device WAS registered for this role and stopped reporting.
+    unattended: 'The device that printed these is not responding',
+    // Reassurance: who is on it. Without it the screen could only ever show problems.
+    ready: 'Printing on {hosts}',
+    // What to DO about it — a warning with no action next to it is a reproach (hub#800 §3).
+    hostHint: 'Open the ERPlora app on the device connected to this printer.',
+    // Never green, no call to action: our failed probe is not the owner's homework (hub#375).
+    coverageError: 'Could not check who is printing right now.',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
@@ -1246,6 +1281,15 @@ export default {
     reportRecovered: 'This is the report of your last import of {name} ({when}). It did not all go in.',
     // The way back to the catalogue after reading a recovered report, so the admin can retry.
     reportDismiss: 'See the templates',
+    // hub#845 — retry ONLY what did not make it in: the server re-downloads the SAME catalogue
+    // version and re-runs just the failed parts; what already applied is never duplicated.
+    retry: "Retry what's missing",
+    retryNotRetryable:
+      'This import came from an uploaded file, so it cannot be retried automatically. Upload the file again and select only what failed.',
+    retryVersionUnavailable:
+      'The template version this import used is no longer in the catalogue, so the retry did not run — retrying with a different version could load different data.',
+    retryBatchNotFound:
+      'The report of this import is no longer on record (it may have been undone), so there is nothing to retry.',
     statusApplied: 'Applied',
     statusSkipped: 'Skipped',
     statusIgnored: 'Discarded',

@@ -531,6 +531,12 @@ pub struct ImportReq {
     upload_id: String,
     #[serde(default)]
     selection: ImportSelectionReq,
+    /// Where the bundle came from, when the client downloaded it from the catalogue (hub#845):
+    /// the card's `slug` + the `version` it announced. Persisted with the report so a partial
+    /// import can be retried against the SAME bundle. Absent for a hand-uploaded file — which is
+    /// exactly what makes that import non-retryable, and the report says so.
+    #[serde(default)]
+    origin: Option<ImportOriginReq>,
 }
 
 /// Espejo serde de `erplora_runtime::import::ImportSelection`.
@@ -627,6 +633,7 @@ pub async fn import_blueprint(
         &bytes,
         req.selection.into_selection(),
         &data_hub_id,
+        req.origin.as_ref(),
     )
     .await;
     let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
@@ -649,6 +656,7 @@ pub(crate) async fn run_import(
     zip_bytes: &[u8],
     selection: ImportSelection,
     data_hub_id: &str,
+    origin: Option<&ImportOriginReq>,
 ) -> Result<Value, Response> {
     // (1) Re-extraer TODO en memoria (re-valida zip + rutas: el temporal pudo manipularse).
     let (manifest, files) =
@@ -828,6 +836,11 @@ pub(crate) async fn run_import(
             "el certificado no se aplica automáticamente (la contraseña no viaja en el bundle): súbelo en Ajustes → Negocio (PUT /api/business/certificate)"
         },
     });
+    // The EXACT origin travels with the report (hub#845): catalogue slug + version when the bundle
+    // came from the cloud, or an explicit «local» — which is what tells the retry endpoint (and the
+    // shell's retry button) whether re-downloading the SAME bundle is even possible. Inside the
+    // report JSON on purpose: the `_hub_import_report.report` column is opaque, so no migration.
+    report_v["origin"] = origin_json(origin, &manifest.locale);
 
     // (8) Persist the EXTENDED report under its batch (hub#763). The runtime stored its sections
     //     already; this UPSERTs the full document (sections + installed_modules + media + fiscal)
@@ -845,6 +858,261 @@ pub(crate) async fn run_import(
         }
     }
     Ok(report_v)
+}
+
+// ─────────────────── POST /api/hub/import/retry (hub#845) ────────────────────
+
+/// Exact origin of an import as the CLIENT knows it: the catalogue card it clicked (`slug`) and
+/// the version that card announced. Both are required — without the version a retry cannot
+/// guarantee it re-runs the SAME bundle, and retrying with another one is another bug waiting.
+#[derive(Deserialize, Clone)]
+pub struct ImportOriginReq {
+    #[serde(default)]
+    slug: String,
+    #[serde(default)]
+    version: String,
+}
+
+/// What [`origin_json`] wrote, read back from a persisted report. `locale` narrows the catalogue
+/// download when the same slug is published in more than one language.
+struct StoredOrigin {
+    slug: String,
+    version: String,
+    locale: Option<String>,
+}
+
+/// The `origin` entry persisted INSIDE the extended report (no schema change: the
+/// `_hub_import_report.report` column is opaque JSON). `source: "catalog"` carries
+/// slug + version + locale; anything else — a hand-uploaded file, or a half-empty origin that
+/// cannot guarantee a version — is `source: "local"`: an import the hub cannot re-download, and
+/// the report SAYS so instead of hiding it (hub#845).
+fn origin_json(origin: Option<&ImportOriginReq>, manifest_locale: &str) -> Value {
+    match origin {
+        Some(o) if !o.slug.trim().is_empty() && !o.version.trim().is_empty() => json!({
+            "source": "catalog",
+            "slug": o.slug.trim(),
+            "version": o.version.trim(),
+            "locale": manifest_locale,
+        }),
+        _ => json!({ "source": "local" }),
+    }
+}
+
+/// Reads the origin back. `None` = not retryable: local upload, a report older than the field, or
+/// an origin that cannot pin a version.
+fn stored_origin(report: &Value) -> Option<StoredOrigin> {
+    let origin = report.get("origin")?;
+    if origin["source"].as_str()? != "catalog" {
+        return None;
+    }
+    let slug = origin["slug"].as_str().unwrap_or_default().trim().to_string();
+    let version = origin["version"].as_str().unwrap_or_default().trim().to_string();
+    if slug.is_empty() || version.is_empty() {
+        return None;
+    }
+    let locale = origin["locale"]
+        .as_str()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(str::to_string);
+    Some(StoredOrigin { slug, version, locale })
+}
+
+/// `true` if a section's status is `Failed` (serde wire shape: `{"Failed": "reason"}`).
+fn section_failed(status: &Value) -> bool {
+    status.get("Failed").is_some()
+}
+
+/// Derives «retry ONLY what did not make it in» from a persisted report (hub#845).
+///
+/// - `Failed` sections come back, mapped to their selection flag / module id.
+/// - `Applied` is never re-applied blindly; `Skipped` was never asked for; `Ignored` and
+///   `PartiallyApplied` are the engine's own discards — retrying them repeats the same decision.
+/// - `installed_modules[]` entries in `failed` or `blocked` join the module list: `blocked` is a
+///   purchase decision (ADR-0060) and after subscribing the SAME button re-runs it.
+/// - Media uses the server's extended entry (`media.failed`): files that could not be copied are
+///   retried too.
+fn retry_selection_from_report(report: &Value) -> ImportSelection {
+    let mut sel = ImportSelection::default();
+    let empty = Vec::new();
+    for s in report["sections"].as_array().unwrap_or(&empty) {
+        if !section_failed(&s["status"]) {
+            continue;
+        }
+        match s["section"].as_str().unwrap_or_default() {
+            "hub_users" | "users" => sel.users = true,
+            "hub_settings" | "settings" => sel.settings = true,
+            "fiscal" => sel.fiscal = true,
+            "media" => sel.media = true,
+            other => {
+                if let Some(id) = other.strip_prefix("modules/") {
+                    if !id.is_empty() && !sel.modules.iter().any(|m| m == id) {
+                        sel.modules.push(id.to_string());
+                    }
+                }
+            }
+        }
+    }
+    for m in report["installed_modules"].as_array().unwrap_or(&empty) {
+        let status = m["status"].as_str().unwrap_or_default();
+        if status != "failed" && status != "blocked" {
+            continue;
+        }
+        if let Some(id) = m["id"].as_str() {
+            if !id.is_empty() && !sel.modules.iter().any(|x| x == id) {
+                sel.modules.push(id.to_string());
+            }
+        }
+    }
+    if report["media"]["selected"].as_bool().unwrap_or(false)
+        && report["media"]["failed"].as_u64().unwrap_or(0) > 0
+    {
+        sel.media = true;
+    }
+    sel
+}
+
+/// `true` when the derived selection asks for nothing — a fully applied import: the retry is an
+/// explicit «nothing to retry», never a blind full re-run.
+fn selection_is_empty(sel: &ImportSelection) -> bool {
+    !sel.users && !sel.settings && !sel.fiscal && !sel.media && sel.modules.is_empty()
+}
+
+/// Error with a STABLE code next to the honest message (same lesson as the domain-error channel,
+/// ADR-0205): the shell translates the code; the message is the fallback.
+fn coded_err(status: StatusCode, code: &str, msg: &str) -> Response {
+    (
+        status,
+        Json(json!({ "ok": false, "code": code, "error": { "message": msg } })),
+    )
+        .into_response()
+}
+
+/// Body of `POST /api/hub/import/retry`.
+#[derive(Deserialize)]
+pub struct RetryReq {
+    batch_id: String,
+}
+
+/// POST /api/hub/import/retry — re-runs a partially applied import, retrying ONLY what its
+/// persisted report says failed (or stayed blocked), against the SAME catalogue bundle (hub#845).
+///
+/// Not duplicating what is already present is the ENGINE's property, not this endpoint's promise:
+/// the technical-key guard (hub#260) skips the bundle's own rows and the natural-key guards
+/// (ADR-0304) skip rows the hub created by itself — `import_retry_test.rs` pins both. This layer
+/// derives the narrowed selection from the report and refuses to run when it cannot guarantee the
+/// same bundle: a local upload has no origin to re-download, and a catalogue that no longer serves
+/// the imported version would silently retry with a DIFFERENT bundle.
+pub async fn retry_import(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<RetryReq>>,
+) -> Response {
+    let data_hub_id;
+    {
+        let arc = match st.runtime_for(&st.hub_id()).await {
+            Ok(rt) => rt,
+            Err(e) => return crate::tenant_rejected(e),
+        };
+        let rt = arc.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+        data_hub_id = match auth::authenticate(&headers, &st.config, &rt).await {
+            Ok(ctx) => ctx.hub_id,
+            Err(e) => return unauthorized(e),
+        };
+    }
+    let Some(Json(req)) = body else {
+        return err(StatusCode::UNPROCESSABLE_ENTITY, "missing JSON body { batch_id }");
+    };
+    let batch_id = req.batch_id.trim().to_string();
+    if batch_id.is_empty() {
+        return err(StatusCode::UNPROCESSABLE_ENTITY, "empty batch_id");
+    }
+
+    // The persisted report of THAT import, scoped to this hub (a guessed batch_id is a 404).
+    let stored = {
+        let arc = match st.runtime_for(&st.hub_id()).await {
+            Ok(rt) => rt,
+            Err(e) => return crate::tenant_rejected(e),
+        };
+        let rt = arc.lock().await;
+        match reset::last_import_report(&rt, &data_hub_id, &batch_id).await {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                return coded_err(
+                    StatusCode::NOT_FOUND,
+                    "import_retry_batch_not_found",
+                    "no import report for that batch (it may have been undone)",
+                )
+            }
+            Err(e) => {
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("could not read the import report: {e}"),
+                )
+            }
+        }
+    };
+    let report: Value = serde_json::from_str(&stored.report).unwrap_or_else(|_| json!({}));
+
+    // A retry needs an origin it can re-download. A local upload is refused WITH its reason — the
+    // shell disables the button for the same case, but the server is the authority.
+    let Some(origin) = stored_origin(&report) else {
+        return coded_err(
+            StatusCode::CONFLICT,
+            "import_origin_not_retryable",
+            "this import did not come from the catalogue (uploaded file): upload the file again and select only what failed",
+        );
+    };
+
+    let selection = retry_selection_from_report(&report);
+    if selection_is_empty(&selection) {
+        // Explicit no-op: everything already applied. 200 on purpose (like a double undo) — the
+        // user pressing again after a slow network must not see an error.
+        return (
+            StatusCode::OK,
+            Json(json!({ "ok": true, "retried": false, "code": "import_nothing_to_retry" })),
+        )
+            .into_response();
+    }
+
+    // Same-version guarantee: the catalogue download has no version pin, so this fetches what the
+    // SaaS serves TODAY and refuses if it is not the version the report imported.
+    let Some(cred) = auth::hub_scoped_auth(&headers, &st) else {
+        return err(
+            StatusCode::BAD_GATEWAY,
+            "hub has no cloud credential (neither machine token nor Bearer)",
+        );
+    };
+    let fetched =
+        match crate::fetch_blueprint(&st, &cred, &origin.slug, origin.locale.as_deref()).await {
+            Ok(f) => f,
+            Err(crate::BlueprintFetchError::Cloud { status, body }) => {
+                return (status, [(header::CONTENT_TYPE, "application/json")], body).into_response()
+            }
+            Err(e) => return err(StatusCode::BAD_GATEWAY, &e.message()),
+        };
+    if fetched.version != origin.version {
+        return coded_err(
+            StatusCode::CONFLICT,
+            "import_retry_version_unavailable",
+            &format!(
+                "the import used version {} of \u{ab}{}\u{bb}, but the catalogue now serves {} — retrying with a different bundle is refused",
+                origin.version, origin.slug, fetched.version
+            ),
+        );
+    }
+
+    let origin_req = ImportOriginReq { slug: origin.slug, version: origin.version };
+    match run_import(&st, Some(cred), &fetched.zip, selection, &data_hub_id, Some(&origin_req)).await
+    {
+        Ok(report) => {
+            Json(json!({ "ok": true, "retried": true, "report": report })).into_response()
+        }
+        Err(resp) => resp,
+    }
 }
 
 /// Entrada de `report.installed_modules[]` para UN módulo del blueprint.
@@ -1148,5 +1416,135 @@ mod tests {
         assert_eq!(prepare_media_target(&root, "/etc/passwd"), None);
         assert_eq!(prepare_media_target(&root, "a/../../evil.png"), None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // ── hub#845 — retry ONLY what did not make it in ───────────────────────────
+
+    /// The retry selection is DERIVED from the persisted report: only `Failed` sections come back.
+    /// `Applied` must not be re-applied blindly, and `Ignored`/`PartiallyApplied` are the engine's
+    /// own decisions — retrying them would just repeat the same discard.
+    #[test]
+    fn retry_selection_takes_only_failed_sections() {
+        let report = json!({
+            "sections": [
+                { "section": "hub_users", "status": { "Failed": "db down" } },
+                { "section": "hub_settings", "status": "Applied" },
+                { "section": "fiscal", "status": "Skipped" },
+                { "section": "media", "status": { "Ignored": "identity_not_portable" } },
+                { "section": "modules/inventory", "status": { "Failed": "module not installed" } },
+                { "section": "modules/taxes", "status": "Applied" },
+                { "section": "modules/sales", "status": { "PartiallyApplied": "numbering_not_portable" } },
+            ]
+        });
+        let sel = retry_selection_from_report(&report);
+        assert!(sel.users, "a failed section is retried");
+        assert!(!sel.settings, "an applied section is NOT re-applied blindly");
+        assert!(!sel.fiscal, "a skipped section stays out");
+        assert!(!sel.media, "an ignored section was a decision, not a breakage");
+        assert_eq!(sel.modules, vec!["inventory".to_string()], "only the failed module's data comes back");
+    }
+
+    /// A module the import could not install (`failed`) or left as a purchase decision (`blocked`,
+    /// ADR-0060) is part of the retry: after fixing the cause (or subscribing) the same button
+    /// re-runs it. Modules that installed are not listed twice.
+    #[test]
+    fn retry_selection_includes_failed_and_blocked_modules_deduplicated() {
+        let report = json!({
+            "sections": [
+                { "section": "modules/inventory", "status": { "Failed": "module not installed" } },
+            ],
+            "installed_modules": [
+                { "id": "inventory", "version": "1.0.0", "status": "failed", "code": "install_cloud_unavailable" },
+                { "id": "verifactu", "version": "1.4.1", "status": "blocked", "code": "install_blocked" },
+                { "id": "taxes", "version": "2.0.0", "status": "installed" },
+                { "id": "sales", "version": "2.13.0", "status": "already_installed" },
+            ]
+        });
+        let sel = retry_selection_from_report(&report);
+        assert_eq!(
+            sel.modules,
+            vec!["inventory".to_string(), "verifactu".to_string()],
+            "failed + blocked, without duplicating the id the section already brought back"
+        );
+    }
+
+    /// The media outcome lives in the server's extended entry (`media.failed`), not only in the
+    /// engine's section row: files that could not be copied are retried too.
+    #[test]
+    fn retry_selection_reads_the_extended_media_entry() {
+        let report = json!({
+            "sections": [ { "section": "media", "status": "Skipped" } ],
+            "media": { "selected": true, "copied": 3, "failed": 2 }
+        });
+        let sel = retry_selection_from_report(&report);
+        assert!(sel.media, "media with failed copies is retried");
+
+        let clean = json!({
+            "sections": [],
+            "media": { "selected": true, "copied": 5, "failed": 0 }
+        });
+        assert!(!retry_selection_from_report(&clean).media);
+    }
+
+    /// A fully applied import derives an EMPTY selection: the retry endpoint answers «nothing to
+    /// retry» instead of re-running the whole bundle (the no-op is explicit, not accidental).
+    #[test]
+    fn a_fully_applied_report_derives_an_empty_selection() {
+        let report = json!({
+            "sections": [
+                { "section": "hub_settings", "status": "Applied" },
+                { "section": "modules/inventory", "status": "Applied" },
+            ],
+            "installed_modules": [
+                { "id": "inventory", "version": "1.0.0", "status": "installed" },
+            ],
+            "media": { "selected": true, "copied": 4, "failed": 0 }
+        });
+        let sel = retry_selection_from_report(&report);
+        assert!(selection_is_empty(&sel), "nothing failed ⇒ nothing to retry");
+    }
+
+    /// The report persists the EXACT origin of the import (hub#845): catalogue slug + version (the
+    /// only thing that lets a retry guarantee the same bundle) — or it says it has none.
+    #[test]
+    fn the_report_origin_says_catalog_or_local_explicitly() {
+        let catalog = origin_json(
+            Some(&ImportOriginReq { slug: "peluqueria".into(), version: "1.0.4".into() }),
+            "es",
+        );
+        assert_eq!(catalog["source"], "catalog");
+        assert_eq!(catalog["slug"], "peluqueria");
+        assert_eq!(catalog["version"], "1.0.4");
+        assert_eq!(catalog["locale"], "es");
+
+        let local = origin_json(None, "es");
+        assert_eq!(local["source"], "local", "a hand-uploaded file SAYS it has no origin");
+
+        // A half-empty origin cannot guarantee the same version ⇒ it is NOT a catalogue origin.
+        let empty_version =
+            origin_json(Some(&ImportOriginReq { slug: "peluqueria".into(), version: "".into() }), "es");
+        assert_eq!(empty_version["source"], "local");
+    }
+
+    /// Reading the origin back: only a complete catalogue origin is retryable.
+    #[test]
+    fn stored_origin_is_only_returned_for_a_complete_catalog_origin() {
+        let report = json!({
+            "origin": { "source": "catalog", "slug": "peluqueria", "version": "1.0.4", "locale": "es" }
+        });
+        let origin = stored_origin(&report).expect("catalog origin is retryable");
+        assert_eq!(origin.slug, "peluqueria");
+        assert_eq!(origin.version, "1.0.4");
+        assert_eq!(origin.locale.as_deref(), Some("es"));
+
+        assert!(stored_origin(&json!({ "origin": { "source": "local" } })).is_none());
+        assert!(
+            stored_origin(&json!({ "sections": [] })).is_none(),
+            "a report older than the field has no origin — and says so by not being retryable"
+        );
+        assert!(
+            stored_origin(&json!({ "origin": { "source": "catalog", "slug": "x" } })).is_none(),
+            "an origin without a version cannot guarantee the same bundle"
+        );
     }
 }

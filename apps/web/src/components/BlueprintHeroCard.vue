@@ -310,7 +310,11 @@ async function use(blueprint: CatalogBlueprint): Promise<void> {
   }
 
   try {
-    run.value = { phase: 'finished', outcome: importOutcome(await importBlueprint(uploadId, selection)) };
+    // hub#845 — the catalogue origin (slug + announced version) travels with the import: the
+    // one-click path is the main producer of partial imports, and the persisted report needs the
+    // exact origin for «Retry what's missing» in Settings › Data to be able to act.
+    const origin = { slug: blueprint.slug, version: blueprint.latest_version };
+    run.value = { phase: 'finished', outcome: importOutcome(await importBlueprint(uploadId, selection, origin)) };
   } catch (err) {
     run.value = { phase: 'finished', outcome: { kind: 'interrupted', reason: messageOf(err) } };
   }

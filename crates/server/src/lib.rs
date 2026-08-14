@@ -37,6 +37,7 @@ use serde_json::{json, Map, Value};
 pub mod activity;
 pub mod api_keys;
 pub mod assistant;
+pub mod assistant_report;
 pub mod auth;
 pub mod boot_announce;
 pub mod daily_usage;
@@ -1076,6 +1077,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // apagado el suyo (hub#670: el último flush de la marca de actividad).
     let announce_state = state.clone();
     let shutdown_state = state.clone();
+    // hub#926: el precalentado de handlers también necesita el suyo (el router consume `state`).
+    let warm_state = state.clone();
     // CSP (ADR-0050, hub#708): con el doc servido por Axum —que es SIEMPRE, también en la app
     // instalada, cuya ventana navega aquí— la de `tauri.conf` no alcanza al documento. Sin rama:
     // la política se emite siempre, y `cfg.csp` es `String` para que "sin CSP" ni se pueda escribir.
@@ -1093,6 +1096,44 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // eso es peor que tardar. En su propia task y best-effort, como el import de blueprint y el
     // refetch del certificado: un plano de control inalcanzable deja un hub que FUNCIONA.
     boot_announce::spawn(&announce_state);
+    // Precalentar los handlers WASM (hub#926). La caché en disco de wasmtime vive DENTRO del
+    // contenedor, así que un deploy la estrena vacía: medido en producción, las dos primeras ventas
+    // tras desplegar costaron 8,2 s y 5,7 s, y las siguientes 75-91 ms. Compilar hay que compilar;
+    // lo que se elige aquí es hacerlo mientras nadie espera, no en el primer cobro del día.
+    //
+    // En su propia task y DESPUÉS de bindear, como el resto del arranque: el hub ya atiende, y si
+    // el precalentado tarda —o un módulo trae bytes rotos— no retrasa ni tumba nada.
+    {
+        tokio::spawn(async move {
+            // Se toma la caché (un `Arc` compartido con el registro) y se SUELTA el candado del
+            // runtime antes de compilar: calentar no puede bloquear a quien esté cobrando.
+            let (cache, modules) = {
+                let rt = warm_state.runtime.lock().await;
+                (
+                    std::sync::Arc::clone(&rt.registry().wasm_cache),
+                    rt.registry().handlers_to_warm_up(),
+                )
+            };
+            if modules.is_empty() {
+                return;
+            }
+            let total = modules.len();
+            // `spawn_blocking`: compilar es trabajo de CPU y no debe ocupar un worker async.
+            match tokio::task::spawn_blocking(move || {
+                erplora_runtime::wasm_cache::warm_up(
+                    &cache,
+                    &modules,
+                    erplora_runtime::wasm_cache::Limits::from_env(),
+                )
+            })
+            .await
+            {
+                Ok(warmed) => eprintln!("wasm: {warmed}/{total} handler(s) precalentados"),
+                Err(e) => eprintln!("wasm: precalentado abortado: {e}"),
+            }
+        });
+    }
+
     // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
     // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).
     axum::serve(listener, router)
@@ -1305,6 +1346,10 @@ pub fn app(state: AppState) -> Router {
             )),
         )
         .route("/api/hub/import", post(export_import::import_blueprint))
+        // Reintento SOLO de lo que no entró (hub#845): deriva la selección del informe persistido,
+        // vuelve a bajar la MISMA versión del catálogo y re-ejecuta. Lo ya aplicado no se duplica
+        // (propiedad del motor: guardas por clave técnica hub#260 + clave natural ADR-0304).
+        .route("/api/hub/import/retry", post(export_import::retry_import))
         // Reset del hub — volver a cero (ADR-0170): el espejo destructivo del export. Mismo gate
         // admin. El `plan` es dry-run (lo que la UI pinta antes de confirmar); el límite fiscal
         // (facturas remitidas a la AEAT) lo aplica el MOTOR, no esta capa.
@@ -1513,6 +1558,9 @@ pub fn app(state: AppState) -> Router {
             axum::routing::delete(members::remove_member),
         )
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
+        // Report of inappropriate AI-generated content (Microsoft Store policy 11.16, hub#946):
+        // any signed-in hub user; funneled into the global error registry (ADR-0052) → Cloud.
+        .route("/api/assistant/report", post(assistant_report::report))
         // The EVENT channel (hub#504): needs an API key of this hub that may read. See
         // `event_stream` — the credential travels in the header, in the first frame (`/ws`) or as
         // a single-use ticket (`/api/events`), never as a long-lived secret in the URL.

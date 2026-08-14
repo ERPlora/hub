@@ -99,6 +99,31 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
             Some(r#"{"type":"object","properties":{"search":{"type":"string","description":"Free-text filter over name/description/tags. Omit to list everything."}}}"#),
         ),
         (
+            "hub.blueprints.list",
+            "List the sector templates (blueprints) published for this hub — slug, name, \
+             description, locale, country, version. A template brings a vertical's modules, seed \
+             catalogue and role set in one step. Call it when the user describes their business \
+             (\"I have a restaurant\") and the hub is empty or half set up, BEFORE walking them \
+             through installing modules one by one.",
+            "query",
+            erplora_runtime::hub_users::VIEW_USERS_PERMISSION,
+            None,
+        ),
+        (
+            "hub.blueprints.apply",
+            "Apply a sector template (blueprint) to THIS hub: installs its modules, seeds their \
+             catalogue and applies the portable settings of the vertical. It is ADDITIVE and \
+             verified so: it only inserts rows that do not exist yet — it never overwrites or \
+             deletes what the hub already has (existing records are kept and the template's \
+             duplicates are skipped), and it never imports people, fiscal identity or another \
+             business's invoice numbering. Mutating: the user confirms a card before it runs — \
+             never claim it is applied until the result comes back. Use the slug exactly as \
+             hub.blueprints.list returned it.",
+            "command",
+            erplora_runtime::hub_users::ADMINISTER_PERMISSION,
+            Some(r#"{"type":"object","properties":{"slug":{"type":"string","description":"Blueprint slug, exactly as hub.blueprints.list returned it."}},"required":["slug"]}"#),
+        ),
+        (
             "hub.modules.install",
             "Install a marketplace module into THIS hub (downloads, verifies, migrates and \
              activates it; its tools and screens appear immediately). Mutating: the user confirms \
@@ -609,6 +634,64 @@ mod tests {
         assert!(names.contains(&"hub.setup.status"));
         assert!(names.contains(&"hub.marketplace.search"));
         assert!(!names.contains(&"hub.modules.install"), "a non-admin must not see install: {names:?}");
+    }
+
+    /// hub#631 steps 2-3: the guided flow «I have a restaurant in Madrid, set it up for me» needs
+    /// the sector templates. `hub.blueprints.list` is a read (the SaaS catalogue); apply is the
+    /// strong mutation and lives in its own test below.
+    #[test]
+    fn assemble_tools_offers_blueprints_list_and_apply_to_an_admin() {
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+
+        let list = tools
+            .iter()
+            .find(|t| t["name"] == "hub.blueprints.list")
+            .expect("blueprints.list must be offered on an empty hub — templates are its way out");
+        assert_eq!(list["kind"], "query", "a read: auto-run, no confirm-card");
+
+        let apply = tools
+            .iter()
+            .find(|t| t["name"] == "hub.blueprints.apply")
+            .expect("blueprints.apply must be offered to an admin");
+        assert_eq!(apply["kind"], "command", "a mutation: the confirm-card gates it");
+        assert_eq!(apply["parameters"]["required"][0], "slug");
+    }
+
+    /// The precondition hub#631 fixed before exposing apply: is `/api/hub/import` on a hub WITH
+    /// data destructive or additive? Verified additive — the import SQL subset is INSERT-only
+    /// (`import_sql.rs`: no UPDATE/DELETE/DDL, no `ON CONFLICT DO UPDATE`, no DML CTEs) and every
+    /// row is guarded by `NOT EXISTS` on the technical id AND the destination's natural keys
+    /// (ADR-0304): an existing row is SKIPPED, never merged or overwritten. The confirm-card can
+    /// only tell the owner that if the tool's description says it, so the description is contract.
+    #[test]
+    fn blueprints_apply_describes_the_verified_additive_semantics() {
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+        let apply = tools
+            .iter()
+            .find(|t| t["name"] == "hub.blueprints.apply")
+            .expect("apply must be offered to an admin");
+        let desc = apply["description"].as_str().unwrap_or("").to_lowercase();
+        assert!(desc.contains("additive"), "must state the verified semantics: {desc}");
+        assert!(
+            desc.contains("never") && (desc.contains("overwrit") || desc.contains("delet")),
+            "must promise existing data is kept: {desc}"
+        );
+    }
+
+    /// Same permission line as install: applying a template is administration. A cashier keeps
+    /// the read (list mutates nothing) and never sees apply.
+    #[test]
+    fn blueprints_apply_is_not_offered_without_the_admin_permission() {
+        let ctx = RequestContext::new("h1", "u1", ["hub.users.view".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+        let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+        assert!(names.contains(&"hub.blueprints.list"));
+        assert!(
+            !names.contains(&"hub.blueprints.apply"),
+            "a non-admin must not see apply: {names:?}"
+        );
     }
 
     /// The line the user drew (2026-08-09): DESTRUCTIVE actions are the user's alone. The core

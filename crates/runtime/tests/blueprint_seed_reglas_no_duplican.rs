@@ -1,18 +1,20 @@
-//! Contrato: los datos de REFERENCIA que un módulo re-siembra en cada hub NO deben viajar en el
-//! blueprint y duplicarse al restaurar. Complementa `import_test.rs`, que solo cubre
-//! `taxes_category`/`taxes_category_alias` (marcadas `is_system`/`source='shipped'`), ya excluidas
-//! por [`export::is_module_seeded`] (PR #191).
+//! Contract (hub#576): a blueprint is a COMPLETE hub, so the business's `tax_rules` TRAVEL in the
+//! bundle next to its products — and importing over a hub that already has equivalent rules must
+//! NOT duplicate them.
 //!
-//! Hueco que fija ESTE test: `taxes_rule` no lleva `is_system` NI `source` — el heurístico no la
-//! reconocía y sus 6 reglas de IVA sembradas SÍ viajaban. Al importar sobre un hub que ya re-sembró
-//! las suyas, el guard-por-`id` no las ve (el `id` embebe el hub ORIGEN: `h1|taxrule|…` vs el
-//! destino `h2|taxrule|…`) → el destino acaba con 12 reglas y el lookup de IVA es AMBIGUO. No
-//! revienta (`taxes_rule` no tiene índice único por clave natural), así que es un fallo SILENCIOSO
-//! en un módulo fiscal — peor que un crash.
+//! History, because this file used to pin the OPPOSITE: `taxes_rule` had no unique index on its
+//! natural key, so an equivalent rule arriving from another hub (its `id` embeds the ORIGIN hub:
+//! `h1|taxrule|…` vs the destination's `h2|taxrule|…`) sailed past the id-based guard and the VAT
+//! lookup silently became ambiguous — 12 rules where 10 belong. The only safe answer then was to
+//! exclude seeded rules from the export ([`export::is_module_seeded`], `created_by='system'`).
+//! That exclusion is now lifted for `taxes_rule` because BOTH halves of the fix exist:
+//!   * the `taxes` module declares the natural key of a root rule as a real UNIQUE index
+//!     (migration 004: partial over `parent_id IS NULL AND is_deleted = 0`, `NULLS NOT DISTINCT`);
+//!   * the import guard asks the destination's catalog by NATURAL KEY (ADR-0304), so an
+//!     equivalent row is SKIPPED instead of landing twice — or dying against the index.
 //!
-//! Marcador uniforme de lo sembrado por el módulo: `created_by = 'system'` (lo pone
-//! `apply_module_seed`). `hub_settings`/`hub_user` no tienen esa columna, así que excluir por ella
-//! no les afecta.
+//! Reference data proper (`taxes_category` `is_system=1`, aliases `source='shipped'`) keeps NOT
+//! traveling: the module re-seeds it on install (`import_test.rs` covers those).
 
 use std::path::PathBuf;
 
@@ -50,7 +52,8 @@ async fn count(rt: &Runtime, sql: &str) -> i64 {
         .unwrap_or(-1)
 }
 
-/// Restaurar un blueprint sobre un hub que ya tiene su semilla NO duplica las reglas de IVA.
+/// The bundle CARRIES the VAT rules (hub#576) — and restoring it over a hub that already has
+/// equivalent rules does NOT duplicate them: the natural-key guard skips them one by one.
 #[tokio::test]
 async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
     if !erplora_runtime::require_modules_workspace() { return; }
@@ -79,6 +82,13 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
     )
     .await
     .expect("export h1");
+    // The rules are IN the bundle: a blueprint is a complete hub (hub#576). Before this, the
+    // seeded rules were excluded and a per-country blueprint could never carry its VAT.
+    let sql = String::from_utf8(bundle.files["data/taxes.sql"].clone()).unwrap();
+    assert!(
+        sql.contains("INSERT INTO taxes_rule"),
+        "the blueprint must carry the hub's tax_rules next to its products:\n{sql}"
+    );
 
     // DESTINO h2, sembrado bajo SU PROPIO hub_id: ya tiene sus reglas ES.
     //
@@ -133,31 +143,23 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
     );
 }
 
-/// 🔴 [hub#532] Un hub VACÍO que importa una plantilla acaba **con los impuestos puestos**.
+/// [hub#532 → hub#576] Un hub VACÍO que importa una plantilla acaba **con los impuestos puestos**.
 ///
-/// Es la afirmación que faltaba, y su ausencia costó un diagnóstico equivocado: al auditar las
-/// cuatro plantillas del catálogo (2026-08-08) las cuatro traían `data/taxes.sql` **vacío** —el
-/// restaurante, 280 productos y cero tipos de IVA— y eso se leyó como un agujero: *«las plantillas
-/// no traen los impuestos»*. No lo es. El fichero está vacío **a propósito**, por dos reglas que ya
-/// existían y que nadie había juntado en una sola frase:
+/// The contract FLIPPED with hub#576 (decision: a blueprint is a complete hub, its `tax_rules`
+/// travel by default and per country, next to its products). Before, `data/taxes.sql` shipped
+/// EMPTY on purpose and the taxes arrived only through the module seed on install — which is
+/// exactly the coupling hub#576 dismantles: the module seed planting the ES baseline in every
+/// hub regardless of country was the only thing holding the "ready to use" blueprint together.
 ///
-/// 1. el export **omite** las filas que un módulo re-siembra ([`export::is_module_seeded`],
-///    `created_by = 'system'`) — el resto de este fichero prueba por qué: si viajaran, el destino
-///    acabaría con las reglas por duplicado y el lookup de IVA ambiguo;
-/// 2. el import **instala** los módulos del manifest, y el instalador aplica su bloque `seed`
-///    (ADR-0147) — más el suplemento de IVA ES si el hub es de España.
-///
-/// O sea: los impuestos llegan, pero **por el seed del módulo, no por el bundle**. Y así es como
-/// tiene que ser, porque el seed siembra **según el país del hub**: unas filas dentro del bundle
-/// plantarían el IVA español en un hub francés.
-///
-/// Los otros tests de esta familia prueban las dos mitades por separado —que no se duplican
-/// (arriba) y que un hub ES recibe 21/10/4 al instalar (`es_iva_seed_e2e`)—. Ninguno afirmaba el
-/// resultado que le importa a quien mira una plantilla: **después de importar, ¿puede facturar?**
+/// Now the template carries its rules (they are the other half of its catalog: 280 products
+/// pointing at `restaurant.food` price NOTHING without the rule that resolves it), and the
+/// natural-key guard (ADR-0304 + taxes migration 004) is what keeps the double-seeded case
+/// duplicate-free — proven above. What this test keeps asserting is the outcome that matters to
+/// whoever imports a template: **after importing, can the hub charge VAT?**
 #[tokio::test]
 async fn importar_una_plantilla_deja_el_hub_con_los_impuestos_puestos() {
     if !erplora_runtime::require_modules_workspace() { return; }
-    // ORIGEN: un hub con `taxes`, exportado como PLANTILLA. Su `data/taxes.sql` sale vacío.
+    // ORIGEN: un hub con `taxes`, exportado como PLANTILLA.
     let origen = hub_con_taxes("h1").await;
     let selection = ExportSelection {
         users: false,
@@ -173,8 +175,13 @@ async fn importar_una_plantilla_deja_el_hub_con_los_impuestos_puestos() {
         .expect("export plantilla");
     let sql = String::from_utf8(bundle.files["data/taxes.sql"].clone()).unwrap();
     assert!(
-        !sql.contains("INSERT INTO taxes_rule"),
-        "premisa: las reglas sembradas NO viajan en el bundle (las re-siembra el módulo):\n{sql}"
+        sql.contains("INSERT INTO taxes_rule"),
+        "premise (hub#576): a template carries its tax_rules next to its products:\n{sql}"
+    );
+    // Reference data proper keeps NOT traveling: the module re-seeds it on install (ADR-0147).
+    assert!(
+        !sql.contains("INSERT INTO taxes_category "),
+        "system categories are reference data and must keep out of the bundle:\n{sql}"
     );
 
     // DESTINO: hub NUEVO. Instalar el módulo del manifest es el paso 2 del import, y es el que
