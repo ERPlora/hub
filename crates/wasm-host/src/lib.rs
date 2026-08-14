@@ -272,6 +272,22 @@ impl WasmHost {
     /// determinista, sin leer el entorno. Lo usan los tests (y cualquier host que quiera
     /// fijar sus propios límites) para no depender de una variable de proceso compartida.
     pub fn from_bytes_with_limits(wasm: &[u8], limits: WasmLimits) -> Result<Self, WasmError> {
+        CompiledModule::compile(wasm, limits)?.instantiate()
+    }
+
+    /// Igual, partiendo de un módulo YA compilado (hub#926).
+    fn from_compiled(compiled: &CompiledModule) -> Result<Self, WasmError> {
+        let plugin = extism::Plugin::new_from_compiled(&compiled.compiled)
+            .map_err(|e| WasmError::Load(e.to_string()))?;
+        Ok(WasmHost {
+            plugin,
+            limits: compiled.limits,
+        })
+    }
+
+    /// El manifest de Extism con los tres topes puestos. Vive aparte porque lo necesitan las dos
+    /// fases: compilar (una vez por versión de módulo) e instanciar (una vez por llamada).
+    fn manifest_with_limits(wasm: &[u8], limits: WasmLimits) -> extism::Manifest {
         let wasm_owned = extism::Wasm::data(wasm.to_vec());
         // `with_memory_max` fija `memory.max_pages`; el `ResourceLimiter` de Extism
         // atrapa (OOM) cualquier `memory.grow` que supere el tope. `with_timeout` arma la
@@ -281,12 +297,7 @@ impl WasmHost {
             .with_timeout(std::time::Duration::from_millis(limits.timeout_ms));
         // `with_wasi(false)` + sin host functions: se mantiene el sandbox cerrado (el guest no
         // tiene reloj, ni ficheros, ni red). `with_fuel_limit` activa `consume_fuel` en wasmtime.
-        let plugin = extism::PluginBuilder::new(&manifest)
-            .with_wasi(false)
-            .with_fuel_limit(limits.fuel)
-            .build()
-            .map_err(|e| WasmError::Load(e.to_string()))?;
-        Ok(WasmHost { plugin, limits })
+        manifest
     }
 
     /// Igual que [`from_bytes`](Self::from_bytes) pero con el tope de memoria explícito
@@ -393,6 +404,58 @@ impl WasmHost {
     /// Topes del sandbox (los del entorno; sin runtime WASM no se aplican a nada).
     pub fn limits(&self) -> WasmLimits {
         WasmLimits::from_env()
+    }
+}
+
+/// Un módulo WASM **ya traducido a código máquina** (hub#926).
+///
+/// El `.wasm` que trae un módulo no lo ejecuta la CPU: wasmtime tiene que compilarlo con Cranelift
+/// primero, y ESO es lo caro — en tiempo (segundos en un contenedor de 0,25 vCPU) y en memoria (los
+/// artefactos de la compilación, que el asignador no devuelve al kernel). El runtime lo hacía en
+/// CADA comando y tiraba el resultado: una venta arrastraba la compilación de `sales` más las de
+/// los listeners de la cascada, y el confeti acumulado fijaba el suelo del plan free en 512 MB
+/// (saas#1460).
+///
+/// Separando las fases, el código máquina se compila una vez por versión de módulo y cada llamada
+/// solo **instancia**: un `Store` nuevo con su memoria lineal, su fuel y su epoch. Se comparte el
+/// código (inmutable); nunca el estado.
+#[cfg(feature = "extism")]
+pub struct CompiledModule {
+    compiled: extism::CompiledPlugin,
+    limits: WasmLimits,
+}
+
+#[cfg(feature = "extism")]
+impl std::fmt::Debug for CompiledModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CompiledModule")
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "extism")]
+impl CompiledModule {
+    /// Compila los bytes a código máquina. Es la fase cara: hazla una vez y guarda el resultado.
+    pub fn compile(wasm: &[u8], limits: WasmLimits) -> Result<Self, WasmError> {
+        let manifest = WasmHost::manifest_with_limits(wasm, limits);
+        let builder = extism::PluginBuilder::new(&manifest)
+            .with_wasi(false)
+            .with_fuel_limit(limits.fuel);
+        let compiled =
+            extism::CompiledPlugin::new(builder).map_err(|e| WasmError::Load(e.to_string()))?;
+        Ok(CompiledModule { compiled, limits })
+    }
+
+    /// Estrena una instancia aislada de este módulo. Es la fase barata: memoria lineal nueva, fuel
+    /// nuevo y reloj nuevo, sin volver a compilar.
+    pub fn instantiate(&self) -> Result<WasmHost, WasmError> {
+        WasmHost::from_compiled(self)
+    }
+
+    /// Los topes con los que se compiló (la caché no puede servir un módulo compilado con otros).
+    pub fn limits(&self) -> WasmLimits {
+        self.limits
     }
 }
 
@@ -530,6 +593,77 @@ mod tests {
     #[cfg(feature = "extism")]
     fn compile_wat(src: &str) -> Vec<u8> {
         wat::parse_str(src).expect("compilar WAT de prueba a wasm")
+    }
+
+    /// Guest que crece 24 MB (384 páginas) en CADA llamada. Con el tope en 32 MB, dos llamadas
+    /// sobre la MISMA instancia se pasan (48 MB) y la segunda falla; dos instancias distintas
+    /// nacidas de la misma compilación pasan las dos, porque cada una estrena memoria lineal.
+    /// Es el guest que distingue «compartir código» de «compartir estado» (hub#926).
+    #[cfg(feature = "extism")]
+    const GROWING_GUEST_WAT: &str = r#"
+        (module
+          (import "extism:host/env" "alloc"      (func $alloc      (param i64) (result i64)))
+          (import "extism:host/env" "store_u8"   (func $store_u8   (param i64 i32)))
+          (import "extism:host/env" "output_set" (func $output_set (param i64 i64)))
+          (memory 1)
+          (func (export "handle") (result i32)
+            (local $p i64)
+            (if (i32.eq (memory.grow (i32.const 384)) (i32.const -1))
+              (then (unreachable)))
+            (local.set $p (call $alloc (i64.const 2)))
+            (call $store_u8 (local.get $p) (i32.const 123))
+            (call $store_u8 (i64.add (local.get $p) (i64.const 1)) (i32.const 125))
+            (call $output_set (local.get $p) (i64.const 2))
+            (i32.const 0)))
+    "#;
+
+    /// hub#926 — compilar es lo caro (Cranelift), instanciar es lo barato. El runtime recompilaba
+    /// el handler en CADA comando: una venta arrastraba 3-4 compilaciones completas (la del módulo
+    /// más las de sus listeners), y eso fijaba el suelo de memoria del plan free en 512 MB
+    /// (saas#1460). Separar las dos fases es lo que permite compilar una vez por versión de módulo
+    /// y quedarse solo con la instanciación por llamada.
+    #[cfg(feature = "extism")]
+    #[test]
+    fn compiled_module_instantiates_more_than_once() {
+        let wasm = compile_wat(NORMAL_GUEST_WAT);
+        let compiled = CompiledModule::compile(&wasm, WasmLimits::default()).expect("compilar");
+
+        for intento in 1..=3 {
+            let mut host = compiled.instantiate().expect("instanciar");
+            host.call("handle", &json!({}))
+                .unwrap_or_else(|e| panic!("la instancia {intento} debe ejecutar: {e:?}"));
+        }
+    }
+
+    /// Compartir el CÓDIGO no puede compartir el ESTADO: cada instancia estrena su memoria lineal,
+    /// su fuel y su reloj. Sin esto, cachear la compilación filtraría datos de una venta a la
+    /// siguiente — un fallo mucho peor que el que se venía a arreglar.
+    #[cfg(feature = "extism")]
+    #[test]
+    fn each_instance_gets_fresh_linear_memory() {
+        let wasm = compile_wat(GROWING_GUEST_WAT);
+        let limits = WasmLimits {
+            memory_max_mb: 32,
+            ..WasmLimits::default()
+        };
+        let compiled = CompiledModule::compile(&wasm, limits).expect("compilar");
+
+        // CONTROL: la memoria NO se resetea dentro de una misma instancia — dos crecidas de 24 MB
+        // superan el tope. Si este control pasara, el test de abajo no probaría nada.
+        let mut misma = compiled.instantiate().expect("instanciar");
+        misma.call("handle", &json!({})).expect("primera crecida");
+        assert!(
+            misma.call("handle", &json!({})).is_err(),
+            "control roto: la misma instancia debería quedarse sin memoria a la segunda llamada"
+        );
+
+        // Y la prueba: dos instancias distintas de la MISMA compilación no se estorban.
+        for intento in 1..=2 {
+            let mut fresca = compiled.instantiate().expect("instanciar");
+            fresca
+                .call("handle", &json!({}))
+                .unwrap_or_else(|e| panic!("la instancia fresca {intento} estrena memoria: {e:?}"));
+        }
     }
 
     /// Un guest que intenta reservar > 32 MB recibe un error de asignación

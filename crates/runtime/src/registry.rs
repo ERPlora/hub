@@ -173,6 +173,11 @@ pub trait EventSink: Send + Sync + std::fmt::Debug {
 #[derive(Debug, Default)]
 pub struct Registry {
     pub installed: Vec<Manifest>,
+    /// Código máquina de los handlers WASM, compilado una vez por versión de módulo (hub#926).
+    /// Vive aquí porque su vida ES la del módulo instalado: `remove_module` —el paso previo de
+    /// toda actualización— tira lo suyo, así que un hub nunca ejecuta el código de la versión
+    /// anterior.
+    pub wasm_cache: std::sync::Arc<crate::wasm_cache::WasmCache>,
     /// Estado por módulo (id → activo/inactivo).
     pub status: HashMap<String, ModuleStatus>,
     pub queries: HashMap<String, RegisteredQuery>,
@@ -398,6 +403,30 @@ impl Registry {
     }
 
     /// Versión instalada de un módulo (del manifest), o `"0.0.0"` si no está instalado.
+    /// Los handlers WASM que conviene tener compilados antes del primer cobro (hub#926):
+    /// **uno por módulo**, con la versión instalada y sus bytes.
+    ///
+    /// Deduplica a propósito: los bytes del `.wasm` viven en cada `RegisteredCommand`, y un módulo
+    /// declara muchos comandos contra el mismo handler (`sales` tiene 21). Precalentar por comando
+    /// compilaría 21 veces lo mismo — costaría más que el problema que quita.
+    pub fn handlers_to_warm_up(&self) -> Vec<(String, String, Option<Vec<u8>>)> {
+        let mut seen: HashMap<&str, &Vec<u8>> = HashMap::new();
+        for cmd in self.commands.values() {
+            if let Some(bytes) = &cmd.wasm {
+                seen.entry(cmd.module_id.as_str()).or_insert(bytes);
+            }
+        }
+        seen.into_iter()
+            .map(|(id, bytes)| {
+                (
+                    id.to_string(),
+                    self.module_version(id),
+                    Some(bytes.clone()),
+                )
+            })
+            .collect()
+    }
+
     pub fn module_version(&self, module_id: &str) -> String {
         self.installed
             .iter()
@@ -509,6 +538,9 @@ impl Registry {
             return false;
         }
         self.installed.retain(|m| m.id != module_id);
+        // hub#926: el código compilado del módulo se va con él. Toda actualización pasa por aquí,
+        // así que esto es lo que garantiza que la versión nueva no ejecute el binario de la vieja.
+        self.wasm_cache.forget_module(module_id);
         self.status.remove(module_id);
         self.queries.retain(|_, q| q.module_id != module_id);
         self.commands.retain(|_, c| c.module_id != module_id);

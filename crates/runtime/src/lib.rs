@@ -66,6 +66,7 @@ pub mod ui;
 pub mod update_history;
 pub mod user_profile;
 pub mod wasm;
+pub mod wasm_cache;
 
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{DemoLock, Result, RuntimeError};

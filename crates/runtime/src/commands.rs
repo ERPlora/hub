@@ -2,7 +2,7 @@
 //! Tier 0/1 (SQL declarativo), Tier 2 (handler WASM vía `erplora-wasm-host`, §5.3 / §9.2)
 //! y plugins **nativos first-party** (ADR-0009, `native.rs`).
 use erplora_db::{DatabaseAdapter, Params, TxGatedOutcome};
-use erplora_wasm_host::{Operation, Output, WasmHost};
+use erplora_wasm_host::{Operation, Output};
 use serde_json::{json, Value as Json};
 
 use crate::elevation::Grants;
@@ -825,7 +825,16 @@ async fn execute_wasm(
         },
     });
 
-    let output = call_wasm_off_thread(bytes, &handler.function, input).await?;
+    // hub#926: el código compilado se pide a la caché del registro, que lo compila la PRIMERA vez
+    // y lo reutiliza. La clave lleva la versión instalada: una actualización estrena binario.
+    let limits = erplora_wasm_host::WasmLimits::from_env();
+    let key = crate::wasm_cache::CacheKey::new(
+        cmd.module_id.clone(),
+        registry.module_version(&cmd.module_id),
+        limits,
+    );
+    let compiled = registry.wasm_cache.get_or_compile(key, bytes, limits)?;
+    let output = call_wasm_off_thread(compiled, &handler.function, input).await?;
 
     persist_handler_output(
         db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
@@ -849,7 +858,7 @@ const WASM_CALL_GRACE_MS: u64 = 2_000;
 /// simplemente lento) se quedaba con ese worker y el runtime del TPV dejaba de responder hasta
 /// reiniciar el proceso. Ahora:
 ///
-///  1. compilación y llamada van en `spawn_blocking` (pool de hilos bloqueantes: no tocan los
+///  1. instanciación y llamada van en `spawn_blocking` (pool de hilos bloqueantes: no tocan los
 ///     workers async);
 ///  2. el guest lleva sus propios topes de fuel/memoria/reloj (ver `erplora_wasm_host`);
 ///  3. y el host además espera la LLAMADA con `timeout` (tope del guest + [`WASM_CALL_GRACE_MS`]),
@@ -857,21 +866,30 @@ const WASM_CALL_GRACE_MS: u64 = 2_000;
 ///
 /// # El reloj del host solo corre durante la llamada
 ///
-/// La **compilación** del plugin (fase 1) queda FUERA del `timeout`: es código del host
-/// (wasmtime/cranelift), termina por construcción y su duración depende de la carga de la
-/// máquina, no del guest. Cuando compartía presupuesto con la llamada, bajo carga (varios
-/// commands WASM concurrentes, cada uno recompilando su módulo) la compilación se comía el
-/// margen entero y handlers legítimos fallaban con "no respondió" sin haber ejecutado ni una
-/// instrucción del guest. El anti-cuelgue de hub#241 no lo necesita: el guest no ejecuta nada
-/// durante la compilación (fuel + epoch acotan la fase 2, que es la única que un módulo
-/// malicioso puede alargar a voluntad).
-async fn call_wasm_off_thread(bytes: &[u8], function: &str, input: Json) -> Result<Output> {
-    let limits = erplora_wasm_host::WasmLimits::from_env();
-    let wasm = bytes.to_vec();
+/// La **instanciación** (fase 1) queda FUERA del `timeout`: es código del host, termina por
+/// construcción y su duración depende de la carga de la máquina, no del guest. Cuando compartía
+/// presupuesto con la llamada, bajo carga la preparación se comía el margen entero y handlers
+/// legítimos fallaban con "no respondió" sin haber ejecutado ni una instrucción del guest. El
+/// anti-cuelgue de hub#241 no lo necesita: el guest no ejecuta nada durante la fase 1 (fuel +
+/// epoch acotan la fase 2, la única que un módulo malicioso puede alargar a voluntad).
+///
+/// **Y desde hub#926 la fase 1 ya no compila.** El código máquina se traduce una sola vez por
+/// versión de módulo y vive en `Registry::wasm_cache`; aquí solo se estrena un `Store` (memoria
+/// lineal, fuel y epoch nuevos). Antes se recompilaba en CADA comando: una venta arrastraba la
+/// compilación de su módulo más las de los listeners de su cascada, lo que fijaba el suelo de
+/// memoria del plan free en 512 MB y ponía la primera venta en 11 s a 0,1 vCPU (saas#1460).
+async fn call_wasm_off_thread(
+    compiled: std::sync::Arc<erplora_wasm_host::CompiledModule>,
+    function: &str,
+    input: Json,
+) -> Result<Output> {
+    let limits = compiled.limits();
 
-    // Fase 1 — compilar (sin reloj del guest). `extism::Plugin` es Send: puede cruzar de un
-    // hilo bloqueante a otro.
-    let mut host = tokio::task::spawn_blocking(move || WasmHost::from_bytes_with_limits(&wasm, limits))
+    // Fase 1 — INSTANCIAR (ya no compilar, hub#926). Estrena `Store`: memoria lineal, fuel y epoch
+    // nuevos, así que el aislamiento por llamada es el mismo de antes; lo único que se comparte es
+    // el código máquina, que es inmutable. Sigue en `spawn_blocking` porque instanciar también es
+    // una llamada bloqueante a wasmtime, y sigue FUERA del reloj del guest (es trabajo del host).
+    let mut host = tokio::task::spawn_blocking(move || compiled.instantiate())
         .await
         .map_err(|join_err| {
             RuntimeError::Wasm(format!("el handler `{function}` abortó al cargar: {join_err}"))
