@@ -42,8 +42,18 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 async fn fresh() -> Runtime {
+    fresh_as("h1").await
+}
+
+/// A hub with the modules installed (and therefore seeded) UNDER ITS OWN hub_id — like in
+/// production, where the server installs the manifest modules for the DESTINATION hub before
+/// calling the motor (this file's header says so). A destination seeded under a DIFFERENT hub
+/// is a state production cannot produce, and it hid the `taxes_rule` FK to its categories until
+/// the rules started traveling (hub#576) — same correction `blueprint_seed_reglas_no_duplican`
+/// already made for its fixtures.
+async fn fresh_as(hub: &str) -> Runtime {
     let db = fresh_db().await;
-    let mut rt = Runtime::with_hub_id(Box::new(db), "h1"); // ctx y runtime comparten hub (como en prod)
+    let mut rt = Runtime::with_hub_id(Box::new(db), hub); // ctx y runtime comparten hub (como en prod)
     rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
     rt
@@ -109,7 +119,7 @@ async fn round_trip_restores_equivalent_state_under_target_hub_id() {
     let bundle = exported_bundle().await;
 
     // Hub destino B, tenant DISTINTO (h2), con los módulos ya instalados (paso del server).
-    let mut b = fresh().await;
+    let mut b = fresh_as("h2").await;
     let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
         .await
         .expect("import en B");
@@ -512,7 +522,7 @@ async fn module_data_for_uninstalled_module_fails_its_section_only() {
     // Destino SIN inventory (solo taxes): la sección de inventory falla con motivo claro,
     // la de taxes se aplica. (Instalar módulos que faltan es del server, no de este motor.)
     let db = fresh_db().await;
-    let mut b = Runtime::with_hub_id(Box::new(db), "h1");
+    let mut b = Runtime::with_hub_id(Box::new(db), "h2");
     b.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
 
     let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
@@ -545,7 +555,7 @@ async fn una_fila_cuyo_id_ya_existe_no_rompe_la_seccion() {
     let bundle = exported_bundle().await;
 
     // Destino con los módulos instalados — y por tanto con su semilla ya aplicada.
-    let mut b = fresh().await;
+    let mut b = fresh_as("h2").await;
 
     // Se importa DOS veces: la segunda tiene garantizado que cada id ya está.
     import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")

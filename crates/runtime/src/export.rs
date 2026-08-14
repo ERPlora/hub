@@ -748,10 +748,17 @@ pub(crate) async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str
 pub(crate) struct NaturalKey {
     /// Columnas del índice único.
     pub(crate) cols: Vec<String>,
-    /// Condiciones `columna = literal` del predicado, cuando el índice es PARCIAL
-    /// (`… WHERE is_deleted = 0`). Sin ellas la guarda miraría filas que el índice no cubre y
-    /// saltaría una fila que sí cabía (una serie borrada no impide volver a crear su código).
-    pub(crate) predicate: Vec<(String, String)>,
+    /// Condiciones del predicado, cuando el índice es PARCIAL: `columna = literal`
+    /// (`Some(lit)`) o `columna IS NULL` (`None`, hub#576 — la forma del índice de raíces de
+    /// `taxes_rule`: `WHERE parent_id IS NULL AND is_deleted = 0`). Sin ellas la guarda miraría
+    /// filas que el índice no cubre y saltaría una fila que sí cabía (una serie borrada no
+    /// impide volver a crear su código).
+    pub(crate) predicate: Vec<(String, Option<String>)>,
+    /// `NULLS NOT DISTINCT` (PG15+): el índice trata NULL = NULL, así que un valor NULL de la
+    /// fila SÍ puede chocar y su guarda se emite como `columna IS NULL` (hub#576). Con el
+    /// default (`false`, NULLS DISTINCT) un NULL no choca nunca y la clave se descarta para esa
+    /// fila, como siempre.
+    pub(crate) nulls_not_distinct: bool,
 }
 
 /// Claves naturales DECLARADAS por `table` en la BD (índices únicos no primarios), leídas del
@@ -768,6 +775,7 @@ pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
     }
     let sql = format!(
         "SELECT i.indnatts::int AS natts, i.indnkeyatts::int AS nkeyatts, \
+                i.indnullsnotdistinct AS nnd, \
                 pg_get_expr(i.indpred, i.indrelid) AS predicate, \
                 (SELECT string_agg(a.attname, ',' ORDER BY a.attnum) FROM pg_attribute a \
                   WHERE a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)) AS cols \
@@ -803,7 +811,8 @@ pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
                 None | Some("") => Vec::new(),
                 Some(expr) => parse_index_predicate(expr)?,
             };
-            Some(NaturalKey { cols, predicate })
+            let nulls_not_distinct = truthy(r.get("nnd"));
+            Some(NaturalKey { cols, predicate, nulls_not_distinct })
         })
         .collect()
 }
@@ -814,10 +823,21 @@ pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
 /// forma que usan los módulos—; cualquier otra cosa (`source_id IS NOT NULL`, un `OR`, una llamada
 /// a función) devuelve `None` y su índice se descarta entero. Fail-open deliberado: ver
 /// [`natural_keys`].
-fn parse_index_predicate(expr: &str) -> Option<Vec<(String, String)>> {
+fn parse_index_predicate(expr: &str) -> Option<Vec<(String, Option<String>)>> {
     let mut out = Vec::new();
     for part in expr.split(" AND ") {
         let part = part.trim().trim_start_matches('(').trim_end_matches(')').trim();
+        // `columna IS NULL` (hub#576): identidad «regla raíz» del índice parcial de `taxes_rule`.
+        // `IS NOT NULL` no acaba en ` IS NULL`, así que cae al `split_once('=')` y descarta el
+        // índice entero — el fail-open de siempre.
+        if let Some(col) = part.strip_suffix(" IS NULL") {
+            let col = col.trim();
+            if !safe_ident(col) {
+                return None;
+            }
+            out.push((col.to_string(), None));
+            continue;
+        }
         let (col, lit) = part.split_once('=')?;
         let (col, lit) = (col.trim(), lit.trim());
         if !safe_ident(col) {
@@ -829,7 +849,7 @@ fn parse_index_predicate(expr: &str) -> Option<Vec<(String, String)>> {
         if !numeric && !quoted {
             return None;
         }
-        out.push((col.to_string(), lit.to_string()));
+        out.push((col.to_string(), Some(lit.to_string())));
     }
     (!out.is_empty()).then_some(out)
 }
@@ -918,24 +938,46 @@ async fn fetch_rows(
     };
     let res = db.query(&sql, &params).await?;
     // Filtros en Rust (no todas las tablas tienen estas columnas): fuera las soft-deleted y fuera
-    // los datos PROPIEDAD DEL MÓDULO (los re-siembra al instalarse) — ver `is_module_seeded`.
-    Ok(res.rows.into_iter().filter(|r| !truthy(r.get("is_deleted")) && !is_module_seeded(r)).collect())
+    // los datos PROPIEDAD DEL MÓDULO (los re-siembra al instalarse) — ver `is_module_seeded`,
+    // salvo las tablas que son DATOS DEL NEGOCIO aunque las sembrara el módulo (hub#576).
+    let seeded_travels = SEEDED_ROWS_TRAVEL_TABLES.contains(&table);
+    Ok(res
+        .rows
+        .into_iter()
+        .filter(|r| !truthy(r.get("is_deleted")) && (seeded_travels || !is_module_seeded(r)))
+        .collect())
 }
 
+/// Tablas cuyas filas viajan en el bundle AUNQUE las sembrara el módulo (hub#576).
+///
+/// Un blueprint es un hub COMPLETO: sus `tax_rules` son la otra mitad de su catálogo — 280
+/// productos apuntando a `restaurant.food` no valen nada sin la regla que lo resuelve, y el IVA
+/// que le corresponde a un catálogo es POR PAÍS (el blueprint ES lleva reglas ES; uno FR llevará
+/// FR). Excluirlas era la única opción mientras `taxes_rule` no tenía índice único por clave
+/// natural: el guard por `id` no reconoce la misma regla venida de otro hub y el lookup de IVA
+/// duplicaba EN SILENCIO. Las dos mitades del arreglo existen ya: el índice (módulo `taxes`,
+/// migración 004 — parcial sobre raíces, `NULLS NOT DISTINCT`) y la guarda por clave natural del
+/// import (ADR-0304), que SALTA la fila equivalente en el destino.
+///
+/// Lista corta y del CORE, como [`TEMPLATE_EXCLUDED_TABLES`]: los datos de REFERENCIA de un módulo
+/// (categorías `is_system`, alias `source='shipped'`) siguen SIN viajar — los re-siembra el módulo
+/// al instalarse (ADR-0147/0267 §3).
+pub(crate) const SEEDED_ROWS_TRAVEL_TABLES: [&str; 1] = ["taxes_rule"];
+
 /// Fila de referencia PROPIEDAD DEL MÓDULO: la crea el propio módulo al instalarse (migración/
-/// bloque `seed`) y la RE-SIEMBRA en cada hub — categorías fiscales canónicas (`is_system=1`),
-/// alias de fábrica (`source='shipped'`) y reglas de IVA (`taxes_rule`), ADR-0085. NO debe viajar
-/// en el bundle: al restaurar sobre un hub que ya re-sembró las suyas, chocaría contra las claves
-/// únicas (`(hub_id,key)`/`(hub_id,alias)`) —el `duplicate key ix_tax_cat_hub_key` que tumbaba la
-/// demo del SaaS— o, en tablas SIN índice único de clave natural (`taxes_rule`), DUPLICARÍA en
-/// silencio (guard-por-`id` no la ve: el `id` embebe el hub ORIGEN) dejando el lookup de IVA
-/// ambiguo. Los datos de USUARIO sí viajan.
+/// bloque `seed`) y la RE-SIEMBRA en cada hub — categorías fiscales canónicas (`is_system=1`) y
+/// alias de fábrica (`source='shipped'`). NO debe viajar en el bundle: al restaurar sobre un hub
+/// que ya re-sembró las suyas, chocaría contra las claves únicas (`(hub_id,key)`/`(hub_id,alias)`)
+/// —el `duplicate key ix_tax_cat_hub_key` que tumbaba la demo del SaaS—. Los datos de USUARIO sí
+/// viajan; y las tablas de [`SEEDED_ROWS_TRAVEL_TABLES`] (`taxes_rule`, hub#576) viajan ENTERAS
+/// aunque las sembrara el módulo, porque son datos del negocio con clave natural declarada y la
+/// guarda del import (ADR-0304) salta la fila equivalente.
 ///
 /// Marcadores: `is_system=1` y `source='shipped'` son específicos de `taxes_category`/alias;
 /// `created_by='system'` es UNIFORME —lo pone `apply_module_seed` en TODA fila que siembra un
-/// módulo, incluida `taxes_rule`— y distingue lo sembrado (system) de lo que crea un usuario (su
-/// id). Excluir por él es seguro para las secciones a nivel hub: `hub_settings`/`hub_user` no
-/// tienen columna `created_by`, así que nunca casan.
+/// módulo— y distingue lo sembrado (system) de lo que crea un usuario (su id). Excluir por él es
+/// seguro para las secciones a nivel hub: `hub_settings`/`hub_user` no tienen columna
+/// `created_by`, así que nunca casan.
 pub(crate) fn is_module_seeded(row: &serde_json::Value) -> bool {
     truthy(row.get("is_system"))
         || row.get("source").and_then(|v| v.as_str()) == Some("shipped")
@@ -1061,6 +1103,26 @@ async fn setting(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str, key: &str) 
 mod tests {
     use super::*;
     use erplora_db::{DatabaseAdapter, testutil::fresh_db};
+
+    /// The predicate of `taxes_rule`'s roots-only unique index (hub#576):
+    /// `WHERE parent_id IS NULL AND is_deleted = 0`, as `pg_get_expr` renders it. An `IS NULL`
+    /// conjunct is identity ("root rule"), not noise — dropping the whole index for it would
+    /// leave the imported baseline unguarded and the section dying against the index.
+    #[test]
+    fn parse_index_predicate_understands_is_null_conjuncts() {
+        assert_eq!(
+            parse_index_predicate("((parent_id IS NULL) AND (is_deleted = 0))"),
+            Some(vec![("parent_id".to_string(), None), ("is_deleted".to_string(), Some("0".to_string()))]),
+        );
+    }
+
+    /// `IS NOT NULL` (or anything else the parser cannot read with certainty) still discards
+    /// the whole index — fail-open, hub#753 behavior.
+    #[test]
+    fn parse_index_predicate_still_discards_what_it_cannot_read() {
+        assert_eq!(parse_index_predicate("(source_id IS NOT NULL)"), None);
+        assert_eq!(parse_index_predicate("(lower(code) = 'x')"), None);
+    }
 
     /// El manifest hace round-trip serde sin perder campos: es el contrato del fichero
     /// `manifest.json` (la fuente de verdad del bundle, a prueba de renombres del zip).

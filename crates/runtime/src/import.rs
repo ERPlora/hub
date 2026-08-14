@@ -993,28 +993,43 @@ fn natural_key_guards(
     let value_of = |col: &str| -> Option<&String> { cols.iter().position(|c| c == col).map(|i| &vals[i]) };
     let mut out = String::new();
     for key in keys {
-        let mut conds: Vec<(String, String)> = Vec::new();
+        // `None` en el valor de una condición = `columna IS NULL` (hub#576).
+        let mut conds: Vec<(String, Option<String>)> = Vec::new();
         let mut usable = true;
         for col in &key.cols {
             match value_of(col) {
-                // `NULL` no choca contra un índice único en Postgres (NULLS DISTINCT por defecto).
-                Some(v) if v.eq_ignore_ascii_case("NULL") => usable = false,
-                Some(v) => conds.push((col.clone(), v.clone())),
+                // `NULL` no choca contra un índice único en Postgres (NULLS DISTINCT por
+                // defecto)… salvo que el índice declare `NULLS NOT DISTINCT` (hub#576): ahí
+                // NULL = NULL ES identidad y la guarda pregunta `columna IS NULL`.
+                Some(v) if v.eq_ignore_ascii_case("NULL") => {
+                    if key.nulls_not_distinct {
+                        conds.push((col.clone(), None));
+                    } else {
+                        usable = false;
+                    }
+                }
+                Some(v) => conds.push((col.clone(), Some(v.clone()))),
                 None => usable = false,
             }
             if !usable {
                 break;
             }
         }
-        // Índice PARCIAL: la fila solo puede chocar si ella misma cumple el predicado.
+        // Índice PARCIAL: la fila solo puede chocar si ella misma cumple el predicado — también
+        // cuando la condición es `columna IS NULL` (la fila debe traer NULL ahí, hub#576).
         for (col, lit) in &key.predicate {
             if !usable {
                 break;
             }
-            match value_of(col) {
-                Some(v) if v == lit => {
+            match (value_of(col), lit) {
+                (Some(v), Some(lit)) if v == lit => {
                     if !conds.iter().any(|(c, _)| c == col) {
-                        conds.push((col.clone(), lit.clone()));
+                        conds.push((col.clone(), Some(lit.clone())));
+                    }
+                }
+                (Some(v), None) if v.eq_ignore_ascii_case("NULL") => {
+                    if !conds.iter().any(|(c, _)| c == col) {
+                        conds.push((col.clone(), None));
                     }
                 }
                 _ => usable = false,
@@ -1025,7 +1040,10 @@ fn natural_key_guards(
         }
         let where_clause = conds
             .iter()
-            .map(|(c, v)| format!("{} = {v}", quote_ident(c)))
+            .map(|(c, v)| match v {
+                Some(v) => format!("{} = {v}", quote_ident(c)),
+                None => format!("{} IS NULL", quote_ident(c)),
+            })
             .collect::<Vec<_>>()
             .join(" AND ");
         out.push_str(&format!(" AND NOT EXISTS (SELECT 1 FROM {table} WHERE {where_clause})"));
@@ -1610,7 +1628,8 @@ mod tests {
             "invoice_series_series",
             vec![crate::export::NaturalKey {
                 cols: vec!["hub_id".into(), "code".into()],
-                predicate: vec![("is_deleted".into(), "0".into())],
+                predicate: vec![("is_deleted".into(), Some("0".into()))],
+                nulls_not_distinct: false,
             }],
         );
         let out = remap_section_ids(sql, "h2", &keys);
@@ -1636,7 +1655,8 @@ mod tests {
         let vals = vec!["'x'".to_string(), "'h2'".to_string(), "NULL".to_string(), "1".to_string()];
         let nk = |c: Vec<&str>, p: Vec<(&str, &str)>| crate::export::NaturalKey {
             cols: c.into_iter().map(str::to_string).collect(),
-            predicate: p.into_iter().map(|(a, b)| (a.to_string(), b.to_string())).collect(),
+            predicate: p.into_iter().map(|(a, b)| (a.to_string(), Some(b.to_string()))).collect(),
+            nulls_not_distinct: false,
         };
 
         for (caso, key) in [
@@ -1647,5 +1667,68 @@ mod tests {
             let out = natural_key_guards("t", &cols, &vals, &[key]);
             assert!(out.is_empty(), "{caso}: no debía generar guarda, salió `{out}`");
         }
+    }
+
+    // ── NULLS NOT DISTINCT + `IS NULL` predicate (hub#576) ──────────────────────────────────
+
+    /// The shape `taxes_rule` declares: a partial unique index over root rules
+    /// (`WHERE parent_id IS NULL AND is_deleted = 0`) with `NULLS NOT DISTINCT`, because
+    /// `region_code NULL` (whole country) and `valid_from NULL` (since forever) ARE identity.
+    /// A NULL row value must guard with `col IS NULL` instead of silencing the key — otherwise
+    /// the INSERT sails past the guard and dies against the index, taking the section with it.
+    #[test]
+    fn a_nulls_not_distinct_key_guards_null_values_with_is_null() {
+        let cols: Vec<String> = ["id", "hub_id", "country_code", "tax_category_key", "region_code", "valid_from", "parent_id", "is_deleted"]
+            .into_iter().map(str::to_string).collect();
+        let vals: Vec<String> = ["'r1'", "'h2'", "'ES'", "'product.generic'", "NULL", "'2012-09-01'", "NULL", "0"]
+            .into_iter().map(str::to_string).collect();
+        let key = crate::export::NaturalKey {
+            cols: ["hub_id", "country_code", "tax_category_key", "region_code", "valid_from"]
+                .into_iter().map(str::to_string).collect(),
+            predicate: vec![("parent_id".into(), None), ("is_deleted".into(), Some("0".into()))],
+            nulls_not_distinct: true,
+        };
+        let out = natural_key_guards("taxes_rule", &cols, &vals, &[key]);
+        assert_eq!(
+            out,
+            " AND NOT EXISTS (SELECT 1 FROM taxes_rule WHERE \"hub_id\" = 'h2' AND \"country_code\" = 'ES' \
+             AND \"tax_category_key\" = 'product.generic' AND \"region_code\" IS NULL \
+             AND \"valid_from\" = '2012-09-01' AND \"parent_id\" IS NULL AND \"is_deleted\" = 0)",
+            "a NULL key value under NULLS NOT DISTINCT must guard with IS NULL"
+        );
+    }
+
+    /// A COMPONENT row (`parent_id` set) falls OUTSIDE the `parent_id IS NULL` predicate: the
+    /// index cannot reject it, so no guard is emitted — inventing one would silently skip
+    /// legitimate components.
+    #[test]
+    fn a_row_outside_an_is_null_predicate_gets_no_guard() {
+        let cols: Vec<String> = ["id", "hub_id", "country_code", "tax_category_key", "region_code", "valid_from", "parent_id", "is_deleted"]
+            .into_iter().map(str::to_string).collect();
+        let vals: Vec<String> = ["'c1'", "'h2'", "'ES'", "'product.generic'", "'ES-CN'", "NULL", "'root-igic'", "0"]
+            .into_iter().map(str::to_string).collect();
+        let key = crate::export::NaturalKey {
+            cols: ["hub_id", "country_code", "tax_category_key", "region_code", "valid_from"]
+                .into_iter().map(str::to_string).collect(),
+            predicate: vec![("parent_id".into(), None), ("is_deleted".into(), Some("0".into()))],
+            nulls_not_distinct: true,
+        };
+        let out = natural_key_guards("taxes_rule", &cols, &vals, &[key]);
+        assert!(out.is_empty(), "a component row cannot collide on the roots-only index: `{out}`");
+    }
+
+    /// Under the DEFAULT (`NULLS DISTINCT`) nothing changes: a NULL key value still cannot
+    /// collide, so the key is discarded for that row — hub#753 behavior, verbatim.
+    #[test]
+    fn a_nulls_distinct_key_still_discards_null_values() {
+        let cols: Vec<String> = ["id", "hub_id", "code"].into_iter().map(str::to_string).collect();
+        let vals: Vec<String> = ["'x'", "'h2'", "NULL"].into_iter().map(str::to_string).collect();
+        let key = crate::export::NaturalKey {
+            cols: vec!["hub_id".into(), "code".into()],
+            predicate: vec![],
+            nulls_not_distinct: false,
+        };
+        let out = natural_key_guards("t", &cols, &vals, &[key]);
+        assert!(out.is_empty(), "NULLS DISTINCT: a NULL value must keep discarding the key, got `{out}`");
     }
 }
