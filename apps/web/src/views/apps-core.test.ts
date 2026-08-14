@@ -173,6 +173,28 @@ describe('Apps · what an installed app card offers', () => {
     expect(body).toContain('loadInstalled()');
   });
 
+  // hub#935 — un custom element solo se puede registrar UNA vez por documento. Cuando esta pantalla
+  // actualiza un módulo, el bundle VIEJO ya está importado y su tag ya está definido: el bundle nuevo
+  // no puede sustituirlo por mucho que la url cambie y el servidor mande el código nuevo. Sin
+  // recargar, la pantalla del módulo sigue ejecutando la versión anterior mientras la ficha, el
+  // manifest y esta misma lista dicen la nueva — que es el fallo MUDO del que va la issue.
+  //
+  // La comprobación es sobre la FORMA a propósito: lo que no puede volver a pasar es que el camino
+  // de éxito de la actualización termine sin recargar.
+  it('reloads the page after a successful update — the old bundle is already registered', () => {
+    const fn = source.slice(
+      source.indexOf('async function updateInstalledModule'),
+      source.indexOf('/** Punto de entrada de instalación'),
+    );
+    expect(fn.length, 'updateInstalledModule must exist').toBeGreaterThan(0);
+    expect(fn).toContain('reloadForModuleUpdate(');
+    // Y se le dice al dueño lo que va a pasar, en vez de recargarle la pantalla sin más.
+    expect(source).toContain('apps.updateSuccessReloading');
+    // El «ya estabas en la última» NO recarga: no ha cambiado nada que mostrar.
+    const upToDate = fn.slice(fn.indexOf('if (!result.updated)'));
+    expect(upToDate.slice(0, upToDate.indexOf('}'))).not.toContain('reloadForModuleUpdate(');
+  });
+
   it('names the apps that uninstalling would break, before uninstalling', () => {
     const fn = source.slice(
       source.indexOf('async function removeModule'),

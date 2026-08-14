@@ -1339,6 +1339,12 @@ pub fn app(state: AppState) -> Router {
         // se descargan en runtime al `module_cache` (NO se hornean en el `web_dir`), así que sin esta
         // ruta `/modules/**` caía al fallback SPA (`index.html`) y NINGÚN Web Component cargaba: toda
         // la UI de módulos quedaba muerta ("No se pudo cargar el módulo").
+        // hub#935 — la MISMA ruta para todas las versiones era el defecto: el bundle de un módulo
+        // actualizado llegaba a una url que las cachés (borde y navegador) ya tenían resuelta con
+        // los bytes de la versión anterior, así que la pantalla seguía ejecutando el código viejo
+        // sin ningún aviso. Con la versión en la RUTA (la query no vale: el borde la ignora para la
+        // clave de caché) cada versión tiene una dirección que ninguna caché ha visto antes.
+        .route("/modules/:id/v/:version/*path", get(serve_module_asset_at))
         .route("/modules/:id/*path", get(serve_module_asset))
         // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
         .route("/api/entitlement", get(proxy_entitlement))
@@ -2388,20 +2394,92 @@ fn install_error_response(e: &install::InstallError) -> Response {
     (install_error_status(e), Json(body)).into_response()
 }
 
+/// Lo que se le dice a las cachés sobre un asset servido por la ruta **con** versión: el contenido
+/// de una versión publicada no cambia jamás (republicar exige subir la versión), así que se puede
+/// guardar para siempre. Es lo que hace que la url versionada además sea *más rápida* que la de
+/// antes, no solo más correcta.
+const MODULE_ASSET_IMMUTABLE: &str = "public, max-age=31536000, immutable";
+
+/// Y lo que se le dice sobre la ruta **sin** versión: ahí el contenido SÍ cambia bajo los pies (es
+/// «la versión instalada», sea cual sea hoy), así que guardarla sin preguntar es exactamente el
+/// defecto de hub#935. `no-cache` no prohíbe almacenarla: obliga a revalidarla antes de usarla.
+const MODULE_ASSET_REVALIDATE: &str = "no-cache, must-revalidate";
+
+/// Un segmento de ruta que no puede salir del `module_cache` (ni `..` ni vacío ni separadores).
+fn is_safe_path_segment(seg: &str) -> bool {
+    !seg.is_empty() && seg != ".." && seg != "." && !seg.contains('/') && !seg.contains('\\')
+}
+
+/// Lee `module_cache/<id>/<version>/<rel>` y lo devuelve con su content-type y su política de caché.
+async fn read_module_asset(
+    st: &AppState,
+    id: &str,
+    version: &str,
+    rel: &str,
+    cache_control: &'static str,
+) -> Response {
+    // Anti path-traversal: ningún segmento `..` (incluido tras decodificar %2e%2e) ni vacío.
+    if rel.split('/').any(|seg| !is_safe_path_segment(seg)) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let full = st.config.module_cache.join(id).join(version).join(rel);
+    match tokio::fs::read(&full).await {
+        Ok(bytes) => (
+            [
+                (header::CONTENT_TYPE, module_asset_content_type(rel)),
+                (header::CACHE_CONTROL, cache_control),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// GET /modules/:id/v/:version/*path — el MISMO asset, direccionado por versión (hub#935).
+///
+/// Existe porque un módulo actualizado no llegaba al navegador: todas las versiones se servían desde
+/// la misma url y sin una sola cabecera de caché, así que el borde cacheaba el `.js` por extensión
+/// (`cf-cache-status: HIT`) y el `import()` del shell seguía recibiendo el bundle anterior mientras
+/// el `module.json` ya decía la versión nueva. El fallo era MUDO: manifest nuevo, servidor nuevo,
+/// pantalla vieja. Un `?v=` no lo arregla —el borde ignora la query para la clave de caché—; una
+/// ruta distinta sí, porque ninguna caché la ha visto antes.
+///
+/// Sirve **cualquier versión presente en la caché de descargas**, no solo la instalada: es lo que la
+/// hace inmutable de verdad (una pestaña abierta desde antes de actualizar sigue resolviendo su
+/// bundle) y lo que permite declararla cacheable un año. El módulo sí tiene que estar instalado.
+async fn serve_module_asset_at(
+    State(st): State<AppState>,
+    Path((id, version, rel)): Path<(String, String, String)>,
+) -> Response {
+    // La versión es un segmento de ruta más y llega del cliente: hostil hasta que se demuestre.
+    if !is_safe_path_segment(&version) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let installed = {
+        let rt = st.runtime.lock().await;
+        rt.modules().into_iter().any(|m| m.id == id)
+    };
+    if !installed {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    read_module_asset(&st, &id, &version, &rel, MODULE_ASSET_IMMUTABLE).await
+}
+
 /// GET /modules/:id/*path — sirve los assets web (`module.json`, `dist/*.esm.js`, wasm, icons) de un
 /// módulo instalado desde la CACHÉ de descargas, resueltos por la VERSIÓN instalada
 /// (`module_cache/<id>/<version>/<path>`). La versión sale del registro (el módulo debe estar
 /// instalado). Guard anti path-traversal. Un asset ausente o un módulo no instalado → **404** (lo
 /// maneja el cargador del Web Component); al ser ruta explícita NO cae al fallback SPA, así que nunca
 /// se sirve `index.html` haciéndose pasar por JS/JSON (que es exactamente lo que rompía la UI).
+///
+/// Sigue siendo la ruta del `module.json` —quien DICE en qué versión está el módulo— y el respaldo
+/// para clientes anteriores a hub#935. Por eso va marcada «revalida siempre»: su contenido cambia
+/// cada vez que se actualiza el módulo, y servirla de una caché es servir la versión de ayer.
 async fn serve_module_asset(
     State(st): State<AppState>,
     Path((id, rel)): Path<(String, String)>,
 ) -> Response {
-    // Anti path-traversal: ningún segmento `..` (incluido tras decodificar %2e%2e) ni vacío.
-    if rel.split('/').any(|seg| seg == ".." || seg.is_empty()) {
-        return StatusCode::NOT_FOUND.into_response();
-    }
     // Versión instalada del módulo (del registro). Módulo no instalado → 404.
     let version = {
         let rt = st.runtime.lock().await;
@@ -2413,15 +2491,7 @@ async fn serve_module_asset(
     let Some(version) = version else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    let full = st.config.module_cache.join(&id).join(&version).join(&rel);
-    match tokio::fs::read(&full).await {
-        Ok(bytes) => (
-            [(header::CONTENT_TYPE, module_asset_content_type(&rel))],
-            bytes,
-        )
-            .into_response(),
-        Err(_) => StatusCode::NOT_FOUND.into_response(),
-    }
+    read_module_asset(&st, &id, &version, &rel, MODULE_ASSET_REVALIDATE).await
 }
 
 /// Content-Type de un asset de módulo por extensión (los que sirve [`serve_module_asset`]).
@@ -3205,10 +3275,8 @@ async fn navigation(
         .navigation()
         .iter()
         .map(|n| {
-            let mod_fallback = reg
-                .installed
-                .iter()
-                .find(|m| m.id == n.module_id)
+            let entry = reg.installed.iter().find(|m| m.id == n.module_id);
+            let mod_fallback = entry
                 .map(|m| m.name.as_str())
                 .unwrap_or(n.module_id.as_str());
             json!({
@@ -3216,6 +3284,12 @@ async fn navigation(
                 // Nombre del módulo traducido (ADR-0055): lo usa el shell para el sidebar y las
                 // tarjetas del dashboard (un ítem por módulo).
                 "module_name": reg.module_name_localized(&n.module_id, mod_fallback, locale),
+                // Versión INSTALADA (hub#935). Con ella el shell construye la url versionada del
+                // bundle (`/modules/<id>/v/<version>/…`) sin depender del `module.json`, que es un
+                // asset y sí puede llegar de una caché: si llegara atrasado, el shell pediría la url
+                // de la versión vieja —cacheada— y volveríamos al fallo mudo que motivó la issue.
+                // Esta respuesta va autenticada y ninguna caché la toca.
+                "module_version": entry.map(|m| m.version.clone()),
                 "id": n.nav.id,
                 // Label de la pestaña traducido (ADR-0055): locale → en → label del manifest.
                 "label": reg.nav_label_localized(&n.module_id, &n.nav.id, &n.nav.label, locale),

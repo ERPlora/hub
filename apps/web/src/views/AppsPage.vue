@@ -163,6 +163,7 @@ import {
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { moduleNav, refreshModuleNav } from '../lib/nav';
+import { reloadForModuleUpdate } from '../lib/module-loader';
 import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import { catalogActionFor, catalogRowState, isModuleInstalled, type CatalogRowState } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
@@ -647,9 +648,13 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
       notify(t('apps.updateUpToDate', { name }), 'primary');
       return;
     }
-    notify(t('apps.updateSuccess', { name, from: result.from, to: result.to }), 'success');
-    await loadInstalled();
-    await refreshModuleNav();
+    // hub#935 — el módulo ya está actualizado en el hub, pero ESTA página no puede mostrarlo: el
+    // custom element del bundle anterior ya está registrado y un tag solo se define una vez por
+    // documento. Sin recargar, la lista y el manifest dirían la versión nueva y la pantalla del
+    // módulo seguiría ejecutando la vieja — el fallo mudo que motivó la issue. Se avisa (toast
+    // sticky) y se recarga; refrescar el menú aquí no serviría de nada.
+    notify(t('apps.updateSuccessReloading', { name, from: result.from, to: result.to }), 'success', 0);
+    reloadForModuleUpdate();
   } catch (e) {
     if (e instanceof InstallBlockedError) {
       // ADR-0060: a la versión nueva le faltan módulos de pago sin contratar. No se ha tocado nada

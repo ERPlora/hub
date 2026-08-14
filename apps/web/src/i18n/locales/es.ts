@@ -592,6 +592,7 @@ export default {
     // ha quedado a medias, sigue corriendo la versión que tenía.
     updating: 'Actualizando {name}…',
     updateSuccess: '{name} actualizado: {from} → {to}.',
+    updateSuccessReloading: '{name} actualizado: {from} → {to}. Recargando para usar la versión nueva…',
     updateUpToDate: '{name} ya está en la última versión.',
     updateError: 'No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.',
     updateBlocked: 'La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.',
