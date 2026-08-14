@@ -14,7 +14,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveModulesWorkspace, syncModules } from './sync-modules.mjs';
+import { MODULES, resolveModulesWorkspace, syncModules } from './sync-modules.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, 'sync-modules.mjs');
@@ -130,5 +130,20 @@ describe('sync-modules.mjs as a script', () => {
     expect(out).toContain('modules-workspace');
     expect(out).toContain(missing);
     expect(out).not.toContain('¿lo compilaste');
+  });
+});
+
+describe('the dev list of modules', () => {
+  it('carries `flows`, or the automation editor cannot be opened locally AT ALL', () => {
+    // The list was written for the POS batch of 24 and never grew. `flows` is the 25th module
+    // (pm#110) and it is pure UI: with nothing in `public/modules/flows/` the shell's dynamic
+    // `import()` fails and the screen says «no se pudo cargar el módulo» — while the RUNTIME
+    // reports it installed, so the two halves of the bench disagree and the module looks broken.
+    // It is not even warned about: a module missing from this list is skipped in silence.
+    expect(MODULES).toContain('flows');
+  });
+
+  it('names every module exactly once', () => {
+    expect(new Set(MODULES).size).toBe(MODULES.length);
   });
 });

@@ -14,8 +14,13 @@ const PUBLIC_DST = join(HERE, 'public/modules');
 
 // POS batch (Stencil→Lit, 2026-06-07): the modules the dev shell loads at runtime.
 // In prod this does not exist (the runtime serves the marketplace modules) — this is the dev bridge.
-const MODULES = [
-  'appointments', 'cart_checkout', 'cash_register', 'customers', 'inventory',
+//
+// ⚠️ A module MISSING from this list is skipped in SILENCE (the `did you build it?` warning only
+// fires for one that is listed and has no `module.json`), and then the bench contradicts itself:
+// the runtime reports the module installed while the shell answers «no se pudo cargar el módulo».
+// That is what happened to `flows`, the 25th (pm#110) — added below, and pinned by a test.
+export const MODULES = [
+  'appointments', 'cart_checkout', 'cash_register', 'customers', 'flows', 'inventory',
   'invoice', 'invoice_series', 'kitchen', 'online_booking',
   'payment_gateways', 'payments', 'pricing', 'reservations',
   'printing', 'sales', 'schedules', 'services', 'staff', 'tables',
