@@ -13,11 +13,24 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { queryMock, commandMock, requestInstallMock, catalogMock } = vi.hoisted(() => ({
+const {
+  queryMock,
+  commandMock,
+  requestInstallMock,
+  catalogMock,
+  blueprintCatalogMock,
+  downloadBlueprintMock,
+  inspectBlueprintMock,
+  importBlueprintMock,
+} = vi.hoisted(() => ({
   queryMock: vi.fn(),
   commandMock: vi.fn(),
   requestInstallMock: vi.fn(),
   catalogMock: vi.fn(),
+  blueprintCatalogMock: vi.fn(),
+  downloadBlueprintMock: vi.fn(),
+  inspectBlueprintMock: vi.fn(),
+  importBlueprintMock: vi.fn(),
 }));
 
 vi.mock('./runtime', () => ({
@@ -25,6 +38,29 @@ vi.mock('./runtime', () => ({
   getClient: () => ({ query: queryMock, command: commandMock }),
   runtimeHeaders: () => ({ 'X-Hub-Id': 'h1', 'X-Hub-Session': 'sesion' }),
   requestInstall: requestInstallMock,
+  fetchBlueprintCatalog: blueprintCatalogMock,
+  downloadBlueprint: downloadBlueprintMock,
+  inspectBlueprint: inspectBlueprintMock,
+  importBlueprint: importBlueprintMock,
+  // `blueprint-hero` (real, imported by the apply flow) normalises the report through these two
+  // helpers. Functional stand-ins mirroring runtime.ts — the real classification is pinned by
+  // blueprint-hero's own tests; here what is under test is the dispatch pipeline.
+  moduleInstallStatusInfo: (m: { status: string; blocked_on?: string[]; error?: string }) =>
+    m.status === 'installed' || m.status === 'already_installed'
+      ? { kind: m.status, blockedOn: [], purchase: [] }
+      : m.status === 'blocked'
+        ? { kind: 'blocked', blockedOn: m.blocked_on ?? [], purchase: [] }
+        : { kind: 'failed', blockedOn: [], purchase: [], error: m.error },
+  sectionStatusInfo: (s: string | Record<string, unknown>) =>
+    typeof s === 'string'
+      ? { kind: s.toLowerCase() }
+      : 'Failed' in s
+        ? { kind: 'failed', reason: String(s.Failed) }
+        : 'Ignored' in s
+          ? { kind: 'ignored', reason: String(s.Ignored) }
+          : 'PartiallyApplied' in s
+            ? { kind: 'partial', reason: String(s.PartiallyApplied) }
+            : { kind: 'applied' },
 }));
 vi.mock('./config', () => ({ config: { hubId: 'h1' } }));
 vi.mock('./cloud', () => ({ getAccessToken: () => 'tok', cloudMarketplaceModules: catalogMock }));
@@ -72,14 +108,46 @@ const CATALOG = [
   { id: 'sales', name: 'Sales', description: 'POS sales', version: '3.0.1', priceLabel: 'Gratis', installed: true, available: true },
 ];
 
+/** What the SaaS blueprint catalogue answers (shape of `CatalogBlueprint`). */
+const BLUEPRINTS = [
+  {
+    slug: 'restaurante-es',
+    name: 'Restaurante',
+    description: 'Restaurante y bar en España',
+    locale: 'es',
+    country: 'ES',
+    latest_version: '1.0.4',
+    latest_sha256: 'abc',
+    size_bytes: 1024,
+    downloads: 7,
+  },
+];
+
+const BLUEPRINT_MANIFEST = {
+  name: 'Restaurante',
+  sections: ['hub_settings', 'media', 'hub_users', 'fiscal'],
+  modules: [{ id: 'inventory' }, { id: 'sales' }],
+};
+
 beforeEach(() => {
   vi.restoreAllMocks();
   queryMock.mockReset();
   commandMock.mockReset();
   requestInstallMock.mockReset();
   catalogMock.mockReset();
+  blueprintCatalogMock.mockReset();
+  downloadBlueprintMock.mockReset();
+  inspectBlueprintMock.mockReset();
+  importBlueprintMock.mockReset();
   catalogMock.mockResolvedValue(CATALOG);
   requestInstallMock.mockResolvedValue({ ok: true, module_id: 'inventory', version: '1.2.19' });
+  blueprintCatalogMock.mockResolvedValue(BLUEPRINTS);
+  downloadBlueprintMock.mockResolvedValue(new Blob(['zip'], { type: 'application/zip' }));
+  inspectBlueprintMock.mockResolvedValue({ ok: true, upload_id: 'up-1', manifest: BLUEPRINT_MANIFEST });
+  importBlueprintMock.mockResolvedValue({
+    sections: [{ section: 'hub_settings', status: 'Applied' }],
+    installed_modules: [{ id: 'inventory', status: 'installed' }, { id: 'sales', status: 'installed' }],
+  });
 });
 
 describe('hub.marketplace.search', () => {
@@ -125,5 +193,87 @@ describe('hub.modules.install', () => {
     const r = await run(async () => false);
     expect(r.done).toBe(true);
     expect(requestInstallMock).not.toHaveBeenCalled();
+  });
+});
+
+// hub#631 steps 2-3: the sector templates. `list` reads the SaaS catalogue; `apply` drives the
+// SAME pipeline as the dashboard hero card (download → inspect → import with the one-click
+// selection), whose semantics were verified additive before exposing the tool (import_sql.rs is
+// INSERT-only + ADR-0304 natural-key guards: existing rows are skipped, never overwritten).
+describe('hub.blueprints.list', () => {
+  it('lee el catálogo de blueprints, NUNCA el dispatcher de queries, y recorta la ficha', async () => {
+    const { bodies } = mockFetchRounds([
+      [sseLine({ type: 'function_call', name: 'hub.blueprints.list', call_id: 'b1', arguments: '{}' })],
+      [sseLine({ type: 'done' })],
+    ]);
+    const r = await run();
+    expect(r.done).toBe(true);
+    expect(blueprintCatalogMock).toHaveBeenCalled();
+    expect(queryMock).not.toHaveBeenCalled();
+    const toolMsg = bodies[1].messages.find(
+      (m) => (m as { role: string }).role === 'tool',
+    ) as { content: string };
+    expect(toolMsg.content).toContain('restaurante-es');
+    expect(toolMsg.content).toContain('1.0.4');
+    // Trimmed: the model needs the card, not the checksum plumbing.
+    expect(toolMsg.content).not.toContain('latest_sha256');
+  });
+});
+
+describe('hub.blueprints.apply', () => {
+  it('tras CONFIRMAR, aplica por el pipeline del hero: download → inspect → import con la selección one-click', async () => {
+    const { bodies } = mockFetchRounds([
+      [sseLine({ type: 'function_call', name: 'hub.blueprints.apply', call_id: 'b2', kind: 'command', arguments: '{"slug":"restaurante-es"}' })],
+      [sseLine({ type: 'done' })],
+    ]);
+    const confirm = vi.fn(async () => true);
+    const r = await run(confirm);
+    expect(r.done).toBe(true);
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(downloadBlueprintMock).toHaveBeenCalledWith('restaurante-es');
+    expect(inspectBlueprintMock).toHaveBeenCalled();
+    // The one-click selection (heroSelection, REAL): a template never carries another business's
+    // people or fiscal identity, even though the bundle lists those sections.
+    expect(importBlueprintMock).toHaveBeenCalledWith(
+      'up-1',
+      expect.objectContaining({
+        users: false,
+        fiscal: false,
+        settings: true,
+        media: true,
+        modules: ['inventory', 'sales'],
+      }),
+    );
+    // The model is told the outcome, not handed the raw report.
+    const toolMsg = bodies[1].messages.find(
+      (m) => (m as { role: string }).role === 'tool',
+    ) as { content: string };
+    expect(toolMsg.content).toContain('ready');
+  });
+
+  it('sin confirmación NO aplica nada — default-deny (ni descarga ni importa)', async () => {
+    mockFetchRounds([
+      [sseLine({ type: 'function_call', name: 'hub.blueprints.apply', call_id: 'b3', kind: 'command', arguments: '{"slug":"restaurante-es"}' })],
+      [sseLine({ type: 'done' })],
+    ]);
+    const r = await run(async () => false);
+    expect(r.done).toBe(true);
+    expect(downloadBlueprintMock).not.toHaveBeenCalled();
+    expect(importBlueprintMock).not.toHaveBeenCalled();
+  });
+
+  it('sin slug → nota de error para el modelo, sin tocar nada', async () => {
+    const { bodies } = mockFetchRounds([
+      [sseLine({ type: 'function_call', name: 'hub.blueprints.apply', call_id: 'b4', kind: 'command', arguments: '{}' })],
+      [sseLine({ type: 'done' })],
+    ]);
+    const r = await run(async () => true);
+    expect(r.done).toBe(true);
+    expect(downloadBlueprintMock).not.toHaveBeenCalled();
+    expect(importBlueprintMock).not.toHaveBeenCalled();
+    const toolMsg = bodies[1].messages.find(
+      (m) => (m as { role: string }).role === 'tool',
+    ) as { content: string };
+    expect(toolMsg.content).toContain('slug');
   });
 });
