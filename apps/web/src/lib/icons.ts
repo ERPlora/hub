@@ -78,6 +78,7 @@ import chatbubblesOutline from "~icons/ion/chatbubbles-outline?raw";
 import checkboxOutline from "~icons/ion/checkbox-outline?raw";
 import clipboardOutline from "~icons/ion/clipboard-outline?raw";
 import cube from "~icons/ion/cube?raw";
+import flagOutline from "~icons/ion/flag-outline?raw";
 import flameOutline from "~icons/ion/flame-outline?raw";
 import folderOutline from "~icons/ion/folder-outline?raw";
 import funnel from "~icons/ion/funnel?raw";
@@ -247,6 +248,7 @@ const SVGS: Record<string, string> = {
   "checkbox-outline": checkboxOutline,
   "clipboard-outline": clipboardOutline,
   "cube": cube,
+  "flag-outline": flagOutline,
   "flame-outline": flameOutline,
   "folder-outline": folderOutline,
   "funnel": funnel,
