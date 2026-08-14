@@ -8,6 +8,9 @@ license.workspace = true
 [dependencies]
 erplora-db = { path = "../db" }
 erplora-guest-sdk = { path = "../guest-sdk" }
+# hub#926: los tests de la caché compilan un `.wasm` mínimo de WAT en el propio test, sin
+# ficheros externos ni target wasm32 (mismo recurso que usa `wasm-host`).
+wat = "1"
 erplora-wasm-host = { path = "../wasm-host" }
 # Traits async del contrato de plugins nativos first-party (ADR-0009, native.rs).
 async-trait = "0.1"

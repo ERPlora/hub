@@ -173,6 +173,11 @@ pub trait EventSink: Send + Sync + std::fmt::Debug {
 #[derive(Debug, Default)]
 pub struct Registry {
     pub installed: Vec<Manifest>,
+    /// Código máquina de los handlers WASM, compilado una vez por versión de módulo (hub#926).
+    /// Vive aquí porque su vida ES la del módulo instalado: `remove_module` —el paso previo de
+    /// toda actualización— tira lo suyo, así que un hub nunca ejecuta el código de la versión
+    /// anterior.
+    pub wasm_cache: crate::wasm_cache::WasmCache,
     /// Estado por módulo (id → activo/inactivo).
     pub status: HashMap<String, ModuleStatus>,
     pub queries: HashMap<String, RegisteredQuery>,
@@ -509,6 +514,9 @@ impl Registry {
             return false;
         }
         self.installed.retain(|m| m.id != module_id);
+        // hub#926: el código compilado del módulo se va con él. Toda actualización pasa por aquí,
+        // así que esto es lo que garantiza que la versión nueva no ejecute el binario de la vieja.
+        self.wasm_cache.forget_module(module_id);
         self.status.remove(module_id);
         self.queries.retain(|_, q| q.module_id != module_id);
         self.commands.retain(|_, c| c.module_id != module_id);
