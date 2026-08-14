@@ -961,6 +961,17 @@ export const FLOWS_BASE_PATH = '/api/hub/flows';
 /** Where the hub's event catalogue lives. Every path {@link EventsApi} can build starts here. */
 export const EVENTS_BASE_PATH = '/api/hub/events';
 
+/**
+ * `_event_outbox.failure_kind` for the one dead-letter a retry can never fix (hub#827): the owner
+ * withdrew the flow's authorisation while the message was still queued, so the recipient is no
+ * longer in the row. It arrives as `failure_kind` on a {@link DeadEvent} and as the `code` of the
+ * `409` {@link EventsApi.retry} refuses with — the same word in both places, so a screen can say
+ * what WOULD help (grant the permission again and run the flow) instead of drawing a dead end.
+ *
+ * Exported so a module matches the runtime's constant instead of retyping the string.
+ */
+export const RELEASE_REVOKED = 'flow.release_revoked';
+
 /** How a call names the module it acts for. Read by `crates/server/src/flows_api.rs`, nowhere else. */
 export const MODULE_HEADER = 'X-Erplora-Module';
 
@@ -1277,15 +1288,97 @@ export interface EventCatalogEntry {
 }
 
 /**
- * **The hub's event catalogue** (hub#715, hub#823) — which events this hub can produce, and what
- * each of them carries, learned from events that really happened in THIS hub.
+ * **One dead-letter**: a business event that never happened — the note that was not written, the
+ * warning that never went out — left in `_event_outbox` after the relay gave up (hub#660).
+ *
+ * The whole payload travels, deliberately: an operator deciding between «replay this» and «close it
+ * for good» is deciding ABOUT the payload. It is also why this read sits behind `manage_flows` and
+ * not behind «an admin is logged in» — it is the widest of the three outbox reads.
+ */
+export interface DeadEvent {
+  id: string;
+  event_name: string;
+  /** The **emitting** module (attribution): who produced the event, not who refused it. */
+  module_id: string;
+  /** The user whose context the emitter ran with — the cashier behind a structural dead-letter. */
+  user_id: string;
+  payload: unknown;
+  last_error: string;
+  attempts: number;
+  depth: number;
+  created_at: string;
+  /**
+   * Why the row is terminal, when the answer is not «it burnt its eight attempts» (hub#827). `''`
+   * for an ordinary dead-letter; {@link RELEASE_REVOKED} when the owner withdrew a flow's
+   * authorisation while the message was still queued.
+   */
+  failure_kind: string;
+  /**
+   * Whether {@link EventsApi.retry} can do anything with this row. **A screen must not offer a
+   * button that cannot work**: retrying a revoked release used to answer `200`, reset the attempts
+   * and die again for the same reason — a loop with no exit, drawn as the remedy. When this is
+   * `false`, show what WOULD help instead.
+   */
+  retryable: boolean;
+}
+
+/** What `GET /api/hub/events/dead/count` answers — the number a badge renders. */
+export interface DeadCount {
+  count: number;
+}
+
+/** What `POST /api/hub/events/retry-all` answers: how many rows of THIS hub went back to the relay. */
+export interface RetryAllResult {
+  retried: number;
+}
+
+/** One link of a correlation chain (hub#666). No payload: the chain is for walking, not inspecting. */
+export interface CorrelatedEvent {
+  id: string;
+  event_name: string;
+  module_id: string;
+  status: string;
+  /** The flow run that emitted it (`''` when a person's command did). */
+  run_id: string;
+  /** The event whose delivery caused it (`''` when it is the root of its chain). */
+  parent_event_id: string;
+  depth: number;
+  created_at: string;
+}
+
+/**
+ * What `GET /api/hub/events/{id}/trace` answers (hub#666): **what this event set off** — the flow
+ * runs it started and the events its delivery caused. One level only; the caller follows the link
+ * it cares about, one hop at a time.
+ */
+export interface EventTrace {
+  event: CorrelatedEvent;
+  /**
+   * The runs this event started. Left `unknown` for the same reason {@link FlowsApi.getRun} is:
+   * the run shape belongs to the kernel and a second copy here is one that can drift.
+   */
+  runs: unknown[];
+  caused: CorrelatedEvent[];
+}
+
+/**
+ * **The hub's event catalogue and its dead-letter queue** (hub#715, hub#823, hub#953) — which
+ * events this hub can produce, what each of them carries, and which of them never made it.
  *
  * Not the live event bus: to react to events, use `subscribe`. This is the read the flow editor is
  * built from — {@link list} fills its «when this happens» dropdown, {@link shape} its data picker,
- * so the owner chooses «Total de la venta — 42,50 €» and not `sale.total`.
+ * so the owner chooses «Total de la venta — 42,50 €» and not `sale.total` — plus the six gestures
+ * that make a failure recoverable ({@link dead}, {@link deadCount}, {@link retry}, {@link discard},
+ * {@link retryAll}, {@link trace}), which is the tray `ERPlora/flows#20` draws.
  *
- * Two methods, two routes, no method that takes a path — the same discipline as {@link FlowsApi},
- * pinned by the same test file.
+ * **All eight sit behind the same two gates** (ADR-0312, hub#953): a human owner/admin session the
+ * runtime checks, plus `manage_flows` declared in the calling module's `module.json` and granted by
+ * the owner. The gate matters MORE for the dead-letter half than for the catalogue: a dead-letter
+ * carries the whole payload, and {@link retry} re-runs another module's command with THAT module's
+ * authority (hub#686). Without it, one installed module could drive another's automations.
+ *
+ * Eight methods, eight routes, no method that takes a path — the same discipline as
+ * {@link FlowsApi}, pinned by the same test file.
  */
 export class EventsApi {
   constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
@@ -1321,6 +1414,105 @@ export class EventsApi {
       method: 'GET',
       path: `${EVENTS_BASE_PATH}/shape${queryString({ name: event, limit: opts.limit })}`,
     }) as Promise<EventShape>;
+  }
+
+  // ── The dead-letter queue (hub#660, exposed by hub#953) ─────────────────────────────────────
+  //
+  // Four gestures and two reads, and between them they are the difference between «the engine is
+  // built» and «somebody can use it». A dead event is business that did not happen, and until this
+  // surface existed it was visible only to whoever knew how to `curl` — never to the owner of the
+  // salon whose reminder never went out.
+
+  /**
+   * `GET /api/hub/events/dead` — **what died**, newest first, with the payload it was carrying.
+   *
+   * The payload is the point: it is what lets an operator tell a lost invoice from noise. Rows come
+   * with {@link DeadEvent.retryable} already decided by the runtime, so a screen knows which ones
+   * it may offer «Retry» for **before** anyone presses anything.
+   */
+  async dead(): Promise<DeadEvent[]> {
+    return this.send({
+      method: 'GET',
+      path: `${EVENTS_BASE_PATH}/dead`,
+    }) as Promise<DeadEvent[]>;
+  }
+
+  /**
+   * `GET /api/hub/events/dead/count` — the cheap number (no payloads), for a badge.
+   *
+   * Counts only `dead`: `delivered`/`pending` are not failures, and `discarded` are failures a
+   * person already decided to keep closed. Neither is «something that needs you».
+   */
+  async deadCount(): Promise<DeadCount> {
+    return this.send({
+      method: 'GET',
+      path: `${EVENTS_BASE_PATH}/dead/count`,
+    }) as Promise<DeadCount>;
+  }
+
+  /**
+   * `POST /api/hub/events/{id}/retry` — put one dead-letter back in front of the relay.
+   *
+   * The delivery happens on the relay's next cycle, not here: at-least-once plus the idempotency of
+   * `_event_delivery` still hold, so listeners that already succeeded on an earlier attempt are not
+   * re-run.
+   *
+   * **Rejects when the retry can never work.** A row whose flow authorisation was withdrawn answers
+   * `409` with {@link RELEASE_REVOKED}, and it arrives here as a thrown {@link ErploraError}
+   * carrying that code — never as a resolved promise. Reporting «re-sent» for a message that did
+   * not move is the one outcome a recovery tray must not produce.
+   */
+  async retry(id: string): Promise<{ id: string; status: string }> {
+    const event = checkedSegment('event id', id, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${EVENTS_BASE_PATH}/${event}/retry`,
+    }) as Promise<{ id: string; status: string }>;
+  }
+
+  /**
+   * `POST /api/hub/events/{id}/discard` — close a dead-letter for good.
+   *
+   * **Never a delete**: the row survives as the only proof the event existed, stamped with
+   * `discarded_at` and a `discarded_by` the runtime takes from the resolved session — never from
+   * anything a caller sends. The relay does not pick it up again.
+   */
+  async discard(id: string): Promise<{ id: string; status: string; discarded_by: string }> {
+    const event = checkedSegment('event id', id, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${EVENTS_BASE_PATH}/${event}/discard`,
+    }) as Promise<{ id: string; status: string; discarded_by: string }>;
+  }
+
+  /**
+   * `POST /api/hub/events/retry-all` — every dead-letter of **THIS hub**, back to the relay at once.
+   *
+   * For the real case the one-by-one gesture does not cover: a transient outage (the database went
+   * down, a module was deactivated mid-flight) killed several events at the same time and the cause
+   * is now fixed. There is no id and no filter, exactly like the endpoint — no argument exists that
+   * could name another tenant's rows. Rows that can never be replayed are skipped, not swept along.
+   */
+  async retryAll(): Promise<RetryAllResult> {
+    return this.send({
+      method: 'POST',
+      path: `${EVENTS_BASE_PATH}/retry-all`,
+    }) as Promise<RetryAllResult>;
+  }
+
+  /**
+   * `GET /api/hub/events/{id}/trace` — **what this event set off** (hub#666): the flow runs it
+   * started and the events its delivery caused, one level deep.
+   *
+   * The forward reading of the correlation columns — the door that answers «this sale fired these
+   * five steps» from the sale end, which is the end a person actually has.
+   */
+  async trace(id: string): Promise<EventTrace> {
+    const event = checkedSegment('event id', id, ID_PATTERN);
+    return this.send({
+      method: 'GET',
+      path: `${EVENTS_BASE_PATH}/${event}/trace`,
+    }) as Promise<EventTrace>;
   }
 }
 
