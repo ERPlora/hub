@@ -807,3 +807,116 @@ async fn assistant_stream_without_bearer_is_401() {
     let resp = make_app().await.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
+
+/// App in `AuthMode::Session` (the production door) plus a signed-in employee's session token —
+/// `AuthMode::Dev` trusts headers, so only this app can show the anonymous 401 (hub#946).
+async fn make_session_app() -> (axum::Router, String) {
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-946");
+    rt.ensure_system_tables().await.unwrap();
+    let user_id = rt
+        .create_user("Employee", "2222", "employee", None)
+        .await
+        .unwrap();
+    let session = rt.create_session(&user_id, 3600, None).await.unwrap();
+    let temp = std::env::temp_dir().join(format!("erplora-http-946-{}", std::process::id()));
+    let cfg = HubConfig {
+        demo: false,
+        hub_id: "hub-946".into(),
+        cloud_base_url: "https://example.invalid".into(),
+        module_cache: temp.join("modules-cache"),
+        auth_mode: AuthMode::Session,
+        jwt_public_key: None,
+        cloud_api_token: Some("machine-secret".into()),
+        device_trust_enforce: false,
+        media_dir: temp,
+        sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
+    };
+    (app(AppState::with_config(rt, cfg)), session)
+}
+
+fn report_request(session: Option<&str>, body: Value) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/api/assistant/report")
+        .header("content-type", "application/json");
+    if let Some(token) = session {
+        builder = builder.header("x-hub-session", token);
+    }
+    builder.body(Body::from(body.to_string())).unwrap()
+}
+
+/// hub#946: reporting AI content requires a signed-in hub user — an anonymous request is refused
+/// at the door.
+#[tokio::test]
+async fn assistant_report_without_session_is_401() {
+    let (router, _session) = make_session_app().await;
+    let resp = router
+        .oneshot(report_request(
+            None,
+            json!({ "message_id": "m-1", "assistant_message": "bad answer" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+/// hub#946: ANY signed-in hub user may report — no admin gate. The person offended by the content
+/// is whoever is in front of the screen, so an employee's session opens the door.
+#[tokio::test]
+async fn assistant_report_any_signed_in_user_may_report() {
+    let (router, session) = make_session_app().await;
+    let resp = router
+        .oneshot(report_request(
+            Some(&session),
+            json!({ "message_id": "m-946", "assistant_message": "an inappropriate answer" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(true));
+}
+
+/// hub#946: a signed-in user's report is accepted and acknowledged with `{ok: true}` (the event
+/// itself travels through the global error registry, not through a table of its own — ADR-0052).
+#[tokio::test]
+async fn assistant_report_with_session_is_accepted() {
+    let resp = make_app()
+        .await
+        .oneshot(post(
+            "/api/assistant/report",
+            json!({
+                "message_id": "m-e2e-1",
+                "assistant_message": "an inappropriate answer",
+                "user_message": "what happened?",
+                "comment": "this is offensive",
+                "reason": "offensive"
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(true));
+}
+
+/// hub#946: an empty `assistant_message` is a malformed report, never a silent 200.
+#[tokio::test]
+async fn assistant_report_empty_assistant_message_is_rejected() {
+    let resp = make_app()
+        .await
+        .oneshot(post(
+            "/api/assistant/report",
+            json!({ "message_id": "m-1", "assistant_message": "" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(false));
+    assert_eq!(body["error"]["code"], "invalid_payload");
+}

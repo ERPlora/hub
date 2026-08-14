@@ -34,6 +34,9 @@ export type ChatContent = string | ChatContentPart[];
 export interface ChatMessage {
   role: ChatRole;
   content: ChatContent;
+  /** Stable client-generated id (crypto.randomUUID), used to reference the message when
+   *  reporting it (hub#946). Optional: history persisted before ids existed has none. */
+  id?: string;
 }
 
 /** Keep well under the Cloud's per-attachment cap (base64 grows ~1.33×). */

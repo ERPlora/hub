@@ -103,6 +103,14 @@ export default {
     micDenied: 'El acceso al micrófono está denegado. Permítelo en tu navegador para dictar.',
     micUnsupported: 'Este navegador no puede grabar audio.',
     micFailed: 'No se ha podido transcribir el audio.',
+    report: 'Denunciar un problema',
+    reportTitle: 'Denunciar esta respuesta',
+    reportHint:
+      'Si esta respuesta del asistente te parece inapropiada o dañina, envíanosla y la revisaremos.',
+    reportPlaceholder: 'Comentario (opcional)',
+    reportConfirm: 'Denunciar',
+    reportSent: 'Gracias, hemos recibido tu denuncia.',
+    reportError: 'No se pudo enviar la denuncia. Inténtalo de nuevo.',
   },
   // Lo que se le dice al usuario tras pulsar «descargar», lo pulse donde lo pulse (hub#480). Dentro
   // de la app instalada no hay barra de descargas ni aviso del sistema: si no lo decimos nosotros,

@@ -105,6 +105,14 @@ export default {
     micDenied: 'Microphone access was denied. Allow it in your browser to dictate.',
     micUnsupported: 'This browser cannot record audio.',
     micFailed: 'The audio could not be transcribed.',
+    report: 'Report an issue',
+    reportTitle: 'Report this response',
+    reportHint:
+      'If this assistant response seems inappropriate or harmful, send it to us and we will review it.',
+    reportPlaceholder: 'Comment (optional)',
+    reportConfirm: 'Report',
+    reportSent: 'Thank you, we received your report.',
+    reportError: 'The report could not be sent. Please try again.',
   },
   // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
   // installed app there is no download shelf and no notification, so if we say nothing, nothing is

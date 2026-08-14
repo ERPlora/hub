@@ -82,6 +82,20 @@
                 <HubIcon slot="start" name="arrow-forward-circle-outline" />
                 {{ t('assistant.goTo') }} {{ r.label }}
               </ion-button>
+              <!-- Report an issue (hub#946, Microsoft Store policy 11.16): every FINISHED
+                   assistant answer can be flagged as inappropriate. Never on the live
+                   (streaming) bubble — reporting a half-written answer sends a truncation. -->
+              <ion-button
+                v-if="canReport(i)"
+                size="small"
+                fill="clear"
+                class="chat-report-btn"
+                data-testid="assistant-report"
+                @click="openReportDialog(i)"
+              >
+                <HubIcon slot="start" name="flag-outline" />
+                {{ t('assistant.report') }}
+              </ion-button>
             </div>
           </div>
         </div>
@@ -184,6 +198,8 @@ import {
   type ChatContentPart,
   type VoiceRecording,
 } from '../lib/assistant';
+import { reportAssistantMessage } from '../lib/assistant-report';
+import { toastSuccess, toastError } from '../lib/toast';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
 import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
@@ -375,7 +391,9 @@ async function send(): Promise<void> {
   pendingAttachments.value = [];
 
   messages.value.push({ role: 'user', content });
-  const assistantMsg = ref<ChatMessage>({ role: 'assistant', content: '' });
+  // Every assistant answer is born with a stable id (hub#946): the report call references
+  // the exact message it flags. Messages persisted before ids existed simply have none.
+  const assistantMsg = ref<ChatMessage>({ role: 'assistant', content: '', id: crypto.randomUUID() });
   messages.value.push(assistantMsg.value);
   streaming.value = true;
   saveAssistantHistory();
@@ -460,6 +478,59 @@ function stop(): void {
   abort = null;
   streaming.value = false;
   saveAssistantHistory();
+}
+
+// ── Report an issue (hub#946) ───────────────────────────────────────────────────────────────────
+// Microsoft Store policy 11.16: the user must be able to report inappropriate AI-generated
+// content. Only FINISHED answers are reportable — the live bubble is still being written.
+
+/** Whether the message at `index` can be reported: never the bubble being streamed. */
+function canReport(index: number): boolean {
+  return !(streaming.value && index === messages.value.length - 1);
+}
+
+/** The closest user message BEFORE `index` — the question the reported answer replied to. */
+function precedingUserMessage(index: number): string {
+  for (let i = index - 1; i >= 0; i--) {
+    const m = messages.value[i];
+    if (m.role === 'user') return messageText(m.content);
+  }
+  return '';
+}
+
+/** Opens the report dialog (same alert pattern as the write-confirm card) and, on confirm,
+ *  posts the report to the runtime. Success and failure each get their toast. */
+async function openReportDialog(index: number): Promise<void> {
+  const msg = messages.value[index];
+  if (!msg) return;
+  const alert = await alertController.create({
+    header: t('assistant.reportTitle'),
+    message: t('assistant.reportHint'),
+    inputs: [{ name: 'comment', type: 'textarea', placeholder: t('assistant.reportPlaceholder') }],
+    buttons: [
+      { text: t('assistant.confirmCancel'), role: 'cancel' },
+      { text: t('assistant.reportConfirm'), role: 'confirm' },
+    ],
+  });
+  await alert.present();
+  const { role, data } = await alert.onDidDismiss<{ values?: { comment?: string } }>();
+  if (role !== 'confirm') return;
+  // A message that predates ids (restored history) gets one on the fly, and it sticks.
+  if (!msg.id) {
+    msg.id = crypto.randomUUID();
+    saveAssistantHistory();
+  }
+  try {
+    await reportAssistantMessage({
+      messageId: msg.id,
+      assistantMessage: messageText(msg.content),
+      userMessage: precedingUserMessage(index),
+      comment: (data?.values?.comment ?? '').trim(),
+    });
+    void toastSuccess(t('assistant.reportSent'));
+  } catch {
+    void toastError(t('assistant.reportError'));
+  }
 }
 
 // Al abrir el panel, lleva el foco al fondo del hilo + togglea la clase global `assistant-open`
@@ -629,6 +700,17 @@ onBeforeUnmount(() => {
 .chat-nav-btn {
   text-transform: none;
   font-weight: 500;
+}
+/* "Report an issue" (hub#946): present on every finished answer, but quiet — muted text
+   that only asks for attention on hover. */
+.chat-report-btn {
+  text-transform: none;
+  font-weight: 400;
+  --color: var(--ion-color-medium);
+  font-size: 0.75rem;
+}
+.chat-report-btn:hover {
+  --color: var(--ion-color-danger, #c00);
 }
 .chat-bubble {
   padding: 0.6rem 0.85rem;

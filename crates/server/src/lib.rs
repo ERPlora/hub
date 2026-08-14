@@ -37,6 +37,7 @@ use serde_json::{json, Map, Value};
 pub mod activity;
 pub mod api_keys;
 pub mod assistant;
+pub mod assistant_report;
 pub mod auth;
 pub mod boot_announce;
 pub mod daily_usage;
@@ -1517,6 +1518,9 @@ pub fn app(state: AppState) -> Router {
             axum::routing::delete(members::remove_member),
         )
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
+        // Report of inappropriate AI-generated content (Microsoft Store policy 11.16, hub#946):
+        // any signed-in hub user; funneled into the global error registry (ADR-0052) → Cloud.
+        .route("/api/assistant/report", post(assistant_report::report))
         // The EVENT channel (hub#504): needs an API key of this hub that may read. See
         // `event_stream` — the credential travels in the header, in the first frame (`/ws`) or as
         // a single-use ticket (`/api/events`), never as a long-lived secret in the URL.
