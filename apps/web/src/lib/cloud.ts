@@ -252,6 +252,30 @@ async function get<T>(path: string, timeoutMs = 8000): Promise<T> {
   return (await res.json()) as T;
 }
 
+/**
+ * Voice→text for the assistant drawer (hub#629): POSTs the recorded clip to the SaaS speech proxy
+ * (`saas/apps/speech`, Whisper) and returns the transcription. Same auth plane as
+ * billing/marketplace — user JWT + `X-Hub-Id` (`IsHubMember`) — and the SaaS is the ONLY party
+ * talking to the model (it meters the cost, `@quota`): the hub never calls an external LLM/API.
+ *
+ * Multipart: the body is a `FormData` and fetch sets the `Content-Type` (with its boundary)
+ * itself — never set it by hand or the SaaS reads an empty form. `language` is the ISO 639-1 code
+ * (the SaaS also accepts `es-ES` and trims it to `es`).
+ */
+export async function cloudTranscribeSpeech(audio: Blob, language?: string): Promise<string> {
+  const form = new FormData();
+  const kind = audio.type || 'audio/webm';
+  const ext = kind.includes('ogg') ? 'ogg' : kind.includes('mp4') ? 'm4a' : kind.includes('wav') ? 'wav' : 'webm';
+  form.append('audio', audio, `voice-note.${ext}`);
+  if (language) form.append('language', language);
+  // 30 s: a transcription is slower than a JSON GET, and aborting a working Whisper call just
+  // to meet the default 8 s would charge the quota and hand the user nothing.
+  const res = await authedFetch('/api/v1/hub/device/speech/transcribe/', { method: 'POST', body: form }, 30000);
+  if (!res.ok) throw new Error(`cloud speech/transcribe → ${res.status}`);
+  const body = (await res.json()) as { text?: string };
+  return (body.text ?? '').trim();
+}
+
 // --- Llamadas hub-scoped vía el RUNTIME local (no directas al Cloud) ---------
 // marketplace + entitlement los firma el RUNTIME con el token de MÁQUINA del hub (X-Hub-Token),
 // que es un secreto y NO debe vivir en el navegador. El web pega al runtime local; el runtime
