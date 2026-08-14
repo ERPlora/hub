@@ -195,6 +195,71 @@ fn the_cargo_cache_does_not_prune_the_registry_a_concurrent_job_is_reading() {
     );
 }
 
+/// Marker that a job is scheduled on `ci-runner-1` instead of a GitHub-hosted image.
+const SELF_HOSTED_MARKER: &str = "CI_RUNNER_LABEL";
+
+/// Every workflow file in the repository, as `(file name, contents with comments stripped)`.
+fn all_workflows_code() -> Vec<(String, String)> {
+    let dir = repo_root().join(".github/workflows");
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).expect("cannot list .github/workflows") {
+        let path = entry.expect("cannot read a workflow entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("yml") {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .expect("workflow file name is not valid UTF-8")
+            .to_string();
+        let code = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()))
+            .lines()
+            .filter(|line| !line.trim_start().starts_with('#'))
+            .collect::<Vec<_>>()
+            .join("\n");
+        out.push((name, code));
+    }
+    out.sort();
+    out
+}
+
+/// The release workflow was fixed on its own (hub#886), which left the hole only half shut: the
+/// registry it stopped pruning is the SAME `~/.cargo` that every other Rust workflow of this repo
+/// prunes from the other runner slot. `test-hub.yml` and `test-shell.yml` both run on
+/// `ci-runner-1` and both save a cargo cache, so either of them finishing while a release builds
+/// Android reproduces hub#886 exactly — and the red still lands on the release, still shaped like
+/// a Gradle problem, still on a tag that cannot be re-run.
+///
+/// This is the whole-machine version of the assertion above: the guard is a property of *sharing
+/// one `$HOME` between two runner slots*, not a property of the release workflow, so it is checked
+/// everywhere the machine is shared rather than in the one file where it happened to hurt first.
+#[test]
+fn no_workflow_on_the_shared_runner_prunes_the_cargo_registry() {
+    let mut unguarded = Vec::new();
+
+    for (name, code) in all_workflows_code() {
+        let cache_steps = code.matches("uses: Swatinem/rust-cache").count();
+        if cache_steps == 0 || !code.contains(SELF_HOSTED_MARKER) {
+            continue;
+        }
+        let guards = code.matches(CACHE_SAVE_GUARD).count();
+        if guards != cache_steps {
+            unguarded.push(format!("{name}: {guards} guard(s) for {cache_steps} cache step(s)"));
+        }
+    }
+
+    assert!(
+        unguarded.is_empty(),
+        "these workflows run on `ci-runner-1` and save a cargo cache without \
+         `{CACHE_SAVE_GUARD}`: {unguarded:?}. The two runner slots share one `$HOME`, so the \
+         `Post` of rust-cache `rmRF`s `~/.cargo/registry/src` while the job on the other slot is \
+         still compiling from it — measured on v1.1.1: `Cleaning cargo registry` at 00:54:22 and \
+         the Android build dead at 00:54:30 with `could not parse/generate dep info ... No such \
+         file or directory` (hub#886)"
+    );
+}
+
 #[test]
 fn google_downloads_do_not_take_the_ipv6_road_that_answers_404() {
     let code = workflow_code();
