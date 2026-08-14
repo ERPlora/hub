@@ -384,6 +384,47 @@
             </ion-item>
           </ion-card-content>
         </ion-card>
+
+        <!-- Print coverage (hub#800): who is printing each kind of ticket — and who is NOT. The
+             runtime has answered this (`GET /api/print/hosts`, per-role `coverage`) since
+             hub#748/#749 and no screen ever read it, so "nobody is printing the kitchen's tickets"
+             stayed invisible while the POS kept charging. The card only exists when there is
+             something to say: a business that never printed sees nothing (a role the API never
+             returns is a role this business does not use — the issue's "when does it shout"
+             decision), and a failed probe reads "could not check", never an empty green screen. -->
+        <ion-card v-if="printCoverageError || printCoverage.length" class="mt-3">
+          <ion-card-content>
+            <ion-label>
+              <h2>{{ t('print.coverageTitle') }}</h2>
+              <p>{{ t('print.coverageDesc') }}</p>
+            </ion-label>
+            <p v-if="printCoverageError" class="print-coverage-error mt-2">
+              {{ t('print.coverageError') }}
+            </p>
+            <ion-list v-else lines="none">
+              <ion-item
+                v-for="row in printCoverage"
+                :key="row.role"
+                class="print-coverage-row"
+                :data-status="row.status"
+              >
+                <HubIcon
+                  slot="start"
+                  :name="PRINT_STATUS_ICON[row.status].icon"
+                  :color="PRINT_STATUS_COLOR[row.status]"
+                />
+                <ion-label>
+                  <h2>{{ printRoleName(row.role) }}</h2>
+                  <p v-if="row.status === 'stalled'">{{ t('print.stalled', { n: row.waiting }) }}</p>
+                  <p v-else-if="row.status === 'unattended'">{{ t('print.unattended') }}</p>
+                  <p v-else>{{ t('print.ready', { hosts: row.hosts.join(', ') }) }}</p>
+                  <!-- A warning with no action next to it is a reproach (hub#800 §3). -->
+                  <p v-if="row.status !== 'ready'">{{ t('print.hostHint') }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
       </template>
 
       <!-- ── Tab: Permisos (capabilities de módulo, default-deny) ── -->
@@ -522,6 +563,7 @@ import { autostartState, setAutostart, type AutostartState } from '../lib/autost
 import { hubSettings, getHubSettings, updateHubSettings, type HubSettings } from '../lib/hub-settings';
 import { publishHubCurrency } from '../lib/money';
 import { toastSuccess, toastError } from '../lib/toast';
+import { coverageRows, fetchPrintHosts, type PrintRoleRow } from '../lib/print-coverage';
 import {
   listInstalledModules,
   getModuleCapabilities,
@@ -894,6 +936,48 @@ async function removeCert(): Promise<void> {
   } finally {
     certBusy.value = false;
   }
+}
+
+// ── Print coverage (hub#800): the read model of `GET /api/print/hosts` for the Receipts tab ──
+// Reloaded EVERY time the tab is entered, not latched like the permissions below: whether the
+// kitchen's host is alive is exactly the kind of fact that changes while the app stays open, and a
+// stale "ready" here would be the same lie this card exists to end.
+const printCoverage = ref<PrintRoleRow[]>([]);
+const printCoverageError = ref<boolean>(false);
+
+async function loadPrintCoverage(): Promise<void> {
+  try {
+    const { hosts, coverage } = await fetchPrintHosts();
+    printCoverage.value = coverageRows(coverage, hosts);
+    printCoverageError.value = false;
+  } catch {
+    // "Could not check" is its own state — never green, and no per-role row is invented (hub#375).
+    printCoverage.value = [];
+    printCoverageError.value = true;
+  }
+}
+
+watch(
+  tab,
+  (current) => {
+    if (current === 'tickets') void loadPrintCoverage();
+  },
+  { immediate: true },
+);
+
+// Icon per status, shaped as `{ icon: '…' }` so the shell's icon-registry audit
+// (`lib/icons.test.ts`, hub#793) keeps seeing these names even though they live in script.
+const PRINT_STATUS_ICON = {
+  ready: { icon: 'checkmark-circle-outline' },
+  stalled: { icon: 'alert-circle-outline' },
+  unattended: { icon: 'alert-circle-outline' },
+} as const;
+const PRINT_STATUS_COLOR = { ready: 'success', stalled: 'danger', unattended: 'warning' } as const;
+
+/** Human name of a printer role; an unknown role shows its raw name rather than a broken key. */
+function printRoleName(role: string): string {
+  const key = `print.role${role.charAt(0).toUpperCase()}${role.slice(1)}`;
+  return te(key) ? t(key) : role;
 }
 
 // ── Estado: Permisos (capabilities de módulo, default-deny) ──

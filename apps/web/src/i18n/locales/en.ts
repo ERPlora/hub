@@ -560,6 +560,28 @@ export default {
     permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
   },
+  // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT. The runtime
+  // sends facts (`role`, `waiting`, `liveHosts`); the sentence the owner reads lives here — the
+  // API comment in `crates/server/src/print.rs` says so explicitly.
+  print: {
+    coverageTitle: 'Printing status',
+    coverageDesc: 'Which devices are taking each kind of ticket out right now.',
+    // The four conventional roles get a human name; an unknown role shows its raw name.
+    roleReceipt: 'Sale receipts',
+    roleKitchen: 'Kitchen orders',
+    roleBar: 'Bar orders',
+    roleLabel: 'Labels',
+    // THE alarm (the issue's headline, per role): work is piling up and no device takes it out.
+    stalled: 'Nobody is printing these — {n} ticket waiting | Nobody is printing these — {n} tickets waiting',
+    // Lost coverage: a device WAS registered for this role and stopped reporting.
+    unattended: 'The device that printed these is not responding',
+    // Reassurance: who is on it. Without it the screen could only ever show problems.
+    ready: 'Printing on {hosts}',
+    // What to DO about it — a warning with no action next to it is a reproach (hub#800 §3).
+    hostHint: 'Open the ERPlora app on the device connected to this printer.',
+    // Never green, no call to action: our failed probe is not the owner's homework (hub#375).
+    coverageError: 'Could not check who is printing right now.',
+  },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.
