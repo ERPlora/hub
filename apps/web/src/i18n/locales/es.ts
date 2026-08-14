@@ -531,6 +531,20 @@ export default {
     permissionRevoked: '{cap} revocado a {app}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
   },
+  // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT.
+  print: {
+    coverageTitle: 'Estado de impresión',
+    coverageDesc: 'Qué dispositivos están sacando cada tipo de tique ahora mismo.',
+    roleReceipt: 'Tiques de venta',
+    roleKitchen: 'Comandas de cocina',
+    roleBar: 'Comandas de barra',
+    roleLabel: 'Etiquetas',
+    stalled: 'Nadie está imprimiendo esto — {n} tique en espera | Nadie está imprimiendo esto — {n} tiques en espera',
+    unattended: 'El dispositivo que imprimía esto no responde',
+    ready: 'Imprimiendo en {hosts}',
+    hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
+    coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
+  },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.
