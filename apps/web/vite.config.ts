@@ -113,6 +113,48 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+    rollupOptions: {
+      treeshake: {
+        preset: 'recommended',
+        // hub#798 — Stencil's @ionic/core component modules open with unannotated top-level calls
+        // (`proxyCustomElement(...)`), so Rollup keeps every one of the 140+ components that
+        // @ionic/vue re-exports (~1 MB in the entry chunk, ion-datetime/ion-input-otp/… included,
+        // none of them used). Their only real side effect is `defineCustomElement()`, which is an
+        // EXPORTED function invoked explicitly (by @ionic/vue on wrapper mount / controller use,
+        // and by lib/ionic-wc.ts for OutfitKit's deps) — nothing registers at import time, so the
+        // set of registered custom elements does not change; only never-referenced code is
+        // dropped. JS only: any CSS stays side-effectful. Contract: vite.config.test.ts (hub#798).
+        moduleSideEffects: (id: string) =>
+          !(/node_modules\/(\.pnpm\/[^/]+\/node_modules\/)?@ionic\/core\//.test(id) && id.endsWith('.js')),
+      },
+      output: {
+        // hub#798 — cache-stability split. These vendors only change on dependency bumps; without
+        // this, EVERY app-code change invalidated one ~1.7 MB entry chunk and a PWA update
+        // re-downloaded it whole. The entry still imports them statically (Vite emits
+        // modulepreload for all of them → parallel fetch, no waterfall), so boot COST is
+        // unchanged — a shell edit just stops invalidating them. Everything else (mammoth, pdfjs,
+        // swagger-ui, app code) keeps Rollup's default assignment — those are already lazy chunks
+        // and must stay that way.
+        //
+        // ⚠️ Ionic (@ionic/core, @ionic/vue, ionicons) is NOT grouped, on purpose: a module
+        // assigned through manualChunks becomes a chunk entry whose exports are all preserved,
+        // and for the @ionic/vue barrel that resurrects every tree-shaken component (measured:
+        // 146 @ionic/core files instead of 103, +~300 kB of dead code). Ionic therefore stays in
+        // the entry chunk, tree-shaken by the moduleSideEffects override above. Only packages the
+        // shell uses (near-)fully are grouped, where full-export preservation costs nothing.
+        manualChunks: (id: string): string | undefined => {
+          const pkg = id.match(/node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?((?:@[^/]+\/)?[^/]+)\//)?.[1];
+          if (!pkg) return undefined;
+          if (pkg === 'vue' || pkg.startsWith('@vue/') || pkg === 'vue-router' || pkg === 'vue-i18n' || pkg.startsWith('@intlify/')) {
+            return 'vendor-vue';
+          }
+          if (pkg === '@erplora/outfitkit' || pkg === 'lit' || pkg === 'lit-html' || pkg === 'lit-element' || pkg.startsWith('@lit/') || pkg.startsWith('@lit-labs/')) {
+            return 'vendor-outfitkit';
+          }
+          return undefined;
+        },
+      },
+    },
   },
   // Unit tests (vitest), colocated with the code: src/**/*.test.ts. The Playwright e2e live in
   // tests/e2e and vitest does NOT run them (they need the app up). The two root-level test files
