@@ -974,6 +974,21 @@ export interface ImportReport {
    * fallaban, el informe salía «bien» y el panel quedaba vacío sin ninguna señal (2026-08-03).
    */
   installed_modules?: ModuleInstallResult[];
+  /**
+   * Where the bundle came from (hub#845): the catalogue card (`source: "catalog"`, with the exact
+   * `slug` + `version` a retry needs to re-download the SAME bundle) or an explicit
+   * `source: "local"` for a hand-uploaded file — which is what makes that import non-retryable.
+   * Absent on reports older than the field: same meaning as `local`, no origin to go back to.
+   */
+  origin?: ImportReportOrigin;
+}
+
+/** The persisted origin of an import (hub#845) — what decides whether a retry can act. */
+export interface ImportReportOrigin {
+  source: 'catalog' | 'local';
+  slug?: string;
+  version?: string;
+  locale?: string;
 }
 
 /**
@@ -1280,13 +1295,17 @@ export async function inspectBlueprint(file: Blob): Promise<BlueprintInspection>
 export async function importBlueprint(
   uploadId: string,
   selection: ImportSelection,
+  // hub#845 — the catalogue card the bundle came from, so the persisted report keeps the exact
+  // origin (slug + version) a retry needs. Omitted for a local file: the report then says
+  // `origin.source: "local"` and the retry button explains itself instead of guessing.
+  origin?: { slug: string; version: string },
 ): Promise<ImportReport> {
   beginRequest(); // instalar módulos + aplicar SQL puede tardar → barra de progreso del shell
   try {
     const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/import`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
-      body: JSON.stringify({ upload_id: uploadId, selection }),
+      body: JSON.stringify({ upload_id: uploadId, selection, ...(origin ? { origin } : {}) }),
     });
     if (!res.ok) throw new Error(await readErrorMessage(res, `import → ${res.status}`));
     const body = (await res.json()) as { ok: boolean; report?: ImportReport };
@@ -1505,6 +1524,70 @@ export async function fetchImportReport(): Promise<StoredImportReport | null> {
   if (!res.ok) throw new Error(await readErrorMessage(res, `import/report → ${res.status}`));
   const body = (await res.json()) as { ok: boolean; report?: StoredImportReport | null };
   return body.report ?? null;
+}
+
+/** Outcome of `POST /api/hub/import/retry` (hub#845). */
+export interface RetryOutcome {
+  /** `false` = explicit no-op: everything in that import already applied (`code` says so). */
+  retried: boolean;
+  /** Stable server code (`import_nothing_to_retry`, …) when the run did not happen. */
+  code?: string;
+  /** The fresh extended report when the retry ran; `null` on a no-op. */
+  report: ImportReport | null;
+}
+
+/** A retry the server REFUSED, keeping its stable code so the shell can translate it (hub#845). */
+export class RetryRefusedError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'RetryRefusedError';
+    this.code = code;
+  }
+}
+
+/**
+ * Retries ONLY what a partial import left out (`POST /api/hub/import/retry`, hub#845): the server
+ * derives the selection from the persisted report of that `batch_id`, re-downloads the SAME
+ * catalogue bundle (slug + version travel with the report) and re-runs it. What already applied is
+ * never duplicated — that is the engine's natural-key guarantee (ADR-0304), not a UI promise.
+ *
+ * Throws {@link RetryRefusedError} with the server's stable `code` when the retry cannot run: a
+ * local upload has no origin to re-download (`import_origin_not_retryable`), or the catalogue no
+ * longer serves the imported version (`import_retry_version_unavailable`).
+ */
+export async function retryImport(batchId: string): Promise<RetryOutcome> {
+  beginRequest(); // installing modules + applying SQL can take a while → shell progress bar
+  try {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/import/retry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ batch_id: batchId }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      let code: string | undefined;
+      let message = text.trim() || `import/retry → ${res.status}`;
+      try {
+        const parsed = JSON.parse(text) as { code?: string; error?: { message?: string } | string };
+        code = parsed.code;
+        const m = typeof parsed.error === 'string' ? parsed.error : parsed.error?.message;
+        if (m) message = m;
+      } catch {
+        // Not JSON: the raw text is the honest message.
+      }
+      throw new RetryRefusedError(message, code);
+    }
+    const body = (await res.json()) as {
+      ok: boolean;
+      retried?: boolean;
+      code?: string;
+      report?: ImportReport | null;
+    };
+    return { retried: Boolean(body.retried), code: body.code, report: body.report ?? null };
+  } finally {
+    endRequest();
+  }
 }
 
 /**

@@ -258,6 +258,33 @@
         </ion-card-content>
       </ion-card>
 
+      <!-- hub#845 — retry ONLY what did not make it in. The server derives the selection from this
+           same persisted report and re-downloads the SAME catalogue version; what already applied
+           is never touched again (engine guarantee: natural keys, ADR-0304). Disabled WITH its
+           reason when the import has no catalogue origin to re-download (a hand-uploaded file).
+           Hidden when nothing failed: a retry that would be a no-op is not an action. -->
+      <ion-button
+        v-if="recoveredReport && retryInfo && retryInfo.reason !== 'nothing_to_retry'"
+        class="mt-3"
+        expand="block"
+        data-testid="import-report-retry"
+        :disabled="!isAdmin || !retryInfo.canRetry"
+        @click="doRetry"
+      >
+        <HubIcon slot="start" name="refresh-outline" />
+        {{ t('importPage.retry') }}
+      </ion-button>
+      <p
+        v-if="recoveredReport && retryInfo?.reason === 'not_retryable_origin'"
+        class="page-lead"
+        data-testid="import-retry-reason"
+      >
+        {{ t('importPage.retryNotRetryable') }}
+      </p>
+      <ion-note v-if="error" data-testid="import-retry-error" color="danger" class="error-note">
+        {{ error }}
+      </ion-note>
+
       <ion-button data-testid="import-done" class="mt-3" expand="block" @click="finish">
         <HubIcon slot="start" name="home-outline" />
         {{ t('importPage.done') }}
@@ -308,6 +335,8 @@ import { refreshModuleNav } from '../lib/nav';
 import {
   inspectBlueprint,
   importBlueprint,
+  retryImport,
+  RetryRefusedError,
   sectionStatusInfo,
   sectionDiscardCode,
   moduleInstallStatusInfo,
@@ -321,6 +350,7 @@ import {
   type SectionDiscardCode,
   type StoredImportReport,
 } from '../lib/runtime';
+import { retryAvailability, retryErrorKey } from '../lib/import-retry';
 import { formatAmount } from '../lib/money';
 import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
 
@@ -337,6 +367,9 @@ const inspecting = ref<boolean>(false);
 const activeSource = ref<string>('');
 const uploadId = ref<string>('');
 const manifest = ref<BlueprintManifest | null>(null);
+// hub#845 — the catalogue card the staged bundle came from (slug + announced version), or null for
+// a local file. Travels with the import so the persisted report keeps a retryable origin.
+const pendingOrigin = ref<{ slug: string; version: string } | null>(null);
 
 type BlueprintRow = CatalogBlueprint & Record<string, unknown>;
 type TableRow = Record<string, unknown>;
@@ -375,6 +408,8 @@ async function onFileChange(e: Event): Promise<void> {
   const file = input.files?.[0];
   if (!file) return;
   activeSource.value = 'local';
+  // A local file has no catalogue origin: the report will honestly say so (hub#845).
+  pendingOrigin.value = null;
   try {
     await inspectAndReview(file);
   } finally {
@@ -653,6 +688,42 @@ function dismissRecovered(): void {
   resetToPick();
 }
 
+// ── hub#845 — «retry what's missing» on the recovered report ──────────────────
+// Whether the button can act is a property of the report itself (something failed/blocked AND the
+// import has a catalogue origin to re-download) — derived by `retryAvailability`, the same logic
+// the server enforces. Null while there is no recovered report.
+const retryInfo = computed(() => (recoveredReport.value ? retryAvailability(recoveredReport.value.report) : null));
+
+async function doRetry(): Promise<void> {
+  if (!isAdmin.value || !recoveredReport.value) return;
+  error.value = '';
+  step.value = 'importing';
+  try {
+    const outcome = await retryImport(recoveredReport.value.batch_id);
+    if (outcome.retried && outcome.report) {
+      report.value = outcome.report;
+      // The retry may have installed modules: same refresh as a normal import.
+      await refreshModuleNav();
+      window.dispatchEvent(new CustomEvent('erp:modules-changed'));
+      // The retry persisted a FRESH report under a new batch: re-read it so a further retry (or an
+      // undo) acts on that batch, not on the stale one. Best-effort — the fresh report is already
+      // on screen if this read fails.
+      try {
+        const stored = await fetchImportReport();
+        if (stored) recoveredReport.value = stored;
+      } catch {
+        // keep painting the report the retry just returned
+      }
+    }
+    step.value = 'report';
+  } catch (e) {
+    // A refusal carries a stable code (translated); anything else shows the server's honest text.
+    const key = e instanceof RetryRefusedError ? retryErrorKey(e.code) : null;
+    error.value = key ? t(key) : e instanceof Error ? e.message : String(e);
+    step.value = 'report';
+  }
+}
+
 onBeforeUnmount(() => {
   blueprintTable.value?.removeEventListener('rowAction', handleBlueprintAction);
 });
@@ -666,6 +737,9 @@ async function pickFromCloud(bp: CatalogBlueprint): Promise<void> {
   error.value = '';
   inspecting.value = true;
   activeSource.value = bp.slug;
+  // hub#845 — remember WHICH card this bundle is: its slug + the version the card announced. It
+  // travels with the import so the persisted report keeps the exact origin a retry needs.
+  pendingOrigin.value = { slug: bp.slug, version: bp.latest_version };
   try {
     const zip = await downloadBlueprint(bp.slug);
     await inspectAndReview(zip);
@@ -733,6 +807,7 @@ function resetToPick(): void {
   manifest.value = null;
   uploadId.value = '';
   moduleRows.value = [];
+  pendingOrigin.value = null;
 }
 
 // ── Paso 3: importar → informe ──
@@ -743,13 +818,17 @@ async function doImport(): Promise<void> {
   error.value = '';
   step.value = 'importing';
   try {
-    report.value = await importBlueprint(uploadId.value, {
-      users: hasUsers.value && selUsers.value,
-      settings: hasSettings.value && selSettings.value,
-      fiscal: hasFiscal.value && selFiscal.value,
-      media: hasMedia.value && selMedia.value,
-      modules: moduleRows.value.filter((m) => m.include).map((m) => m.id),
-    });
+    report.value = await importBlueprint(
+      uploadId.value,
+      {
+        users: hasUsers.value && selUsers.value,
+        settings: hasSettings.value && selSettings.value,
+        fiscal: hasFiscal.value && selFiscal.value,
+        media: hasMedia.value && selMedia.value,
+        modules: moduleRows.value.filter((m) => m.include).map((m) => m.id),
+      },
+      pendingOrigin.value ?? undefined,
+    );
     step.value = 'report';
     // El import pudo instalar módulos: refresca el menú del shell.
     await refreshModuleNav();

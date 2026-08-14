@@ -1273,6 +1273,15 @@ export default {
     reportRecovered: 'This is the report of your last import of {name} ({when}). It did not all go in.',
     // The way back to the catalogue after reading a recovered report, so the admin can retry.
     reportDismiss: 'See the templates',
+    // hub#845 — retry ONLY what did not make it in: the server re-downloads the SAME catalogue
+    // version and re-runs just the failed parts; what already applied is never duplicated.
+    retry: "Retry what's missing",
+    retryNotRetryable:
+      'This import came from an uploaded file, so it cannot be retried automatically. Upload the file again and select only what failed.',
+    retryVersionUnavailable:
+      'The template version this import used is no longer in the catalogue, so the retry did not run — retrying with a different version could load different data.',
+    retryBatchNotFound:
+      'The report of this import is no longer on record (it may have been undone), so there is nothing to retry.',
     statusApplied: 'Applied',
     statusSkipped: 'Skipped',
     statusIgnored: 'Discarded',
