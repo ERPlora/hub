@@ -1253,6 +1253,7 @@ export default {
     sectionMedia: 'Imágenes y media',
     sectionRoles: 'Roles',
     sectionCapabilities: 'Permisos de las apps',
+    sectionFlows: 'Automatizaciones',
     sectionModule: 'App {id}',
     modulesTitle: 'Apps',
     withData: 'incluye datos',
@@ -1306,6 +1307,12 @@ export default {
       'Permisos de apps descartados: {n}. El acceso a tu impresora, a tu certificado de firma y a internet se concede solo en este terminal. No se ha permitido nada \u2014 concede lo que necesites en Ajustes \u203a Permisos.',
     reasonCapabilitiesNotGrantable:
       'Permisos sin restaurar: {n}. Esas apps ya no los piden, o no est\u00e1n instaladas aqu\u00ed. Todo lo dem\u00e1s se ha devuelto.',
+    reasonFlowGrantsNotPortable:
+      'Automatizaciones restauradas, pero apagadas. Lo que cada una tiene permitido hacer se concede solo en este terminal \u2014 rev\u00edsalas en Automatizaciones y enciende las que quieras.',
+    reasonFlowsPausedWithoutGrants:
+      'Algunas automatizaciones han vuelto apagadas: un permiso que ten\u00edan ya no est\u00e1 disponible aqu\u00ed. Abre Automatizaciones para ver qu\u00e9 le falta a cada una.',
+    reasonFlowsNotRestorable:
+      'Automatizaciones descartadas: {n}. Sus instrucciones nombran algo que aqu\u00ed no existe, as\u00ed que no se han podido guardar. El resto ha vuelto.',
     done: 'Ir al inicio',
   },
   moduleView: {

@@ -105,6 +105,7 @@ fn blueprint(name: &str, active_roles: &[&str]) -> BlueprintManifest {
         sections: vec!["roles".into()],
         active_roles: active_roles.iter().map(|r| (*r).to_string()).collect(),
         capability_grants: Default::default(),
+        flows: Vec::new(),
         sha256: BTreeMap::new(),
     }
 }
