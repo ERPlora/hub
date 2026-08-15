@@ -29,6 +29,12 @@ pub const HUB_ID_PLACEHOLDER: &str = "__HUB_ID__";
 /// before importing shows that the bundle brings a role set.
 pub const ROLES_SECTION: &str = "roles";
 
+/// Section that carries the **capability grants** of each module (hub#473). Like [`ROLES_SECTION`]
+/// it has **no `data/*.sql`**: the keys travel in [`BlueprintManifest::capability_grants`] and the
+/// import re-grants them through `capabilities::set_grant`, never as SQL. Listed in `sections` so
+/// the inventory the user confirms before importing shows that the bundle brings permissions.
+pub const CAPABILITY_GRANTS_SECTION: &str = "capabilities";
+
 /// Metadatos del hub de origen (informativos; el import NO los aplica como datos).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HubMeta {
@@ -221,6 +227,25 @@ pub struct BlueprintManifest {
     /// the four published blueprints do today.
     #[serde(default)]
     pub active_roles: Vec<String>,
+    /// Capabilities the hub had **granted** to each module (`module_id` → capability keys), so
+    /// that restoring a backup does not come back with every module denied (hub#473).
+    ///
+    /// Declarative, exactly like [`active_roles`](Self::active_roles) and for the same reason,
+    /// only sharper: `_module_capability_grants` is the table that decides whether a module may
+    /// read the signing certificate or reach the network (ADR-0079). A `data/capabilities.sql`
+    /// would have handed any bundle raw INSERTs into it. As keys, the import walks them through
+    /// `capabilities::set_grant` — the same door the administrator's switch uses — so a capability
+    /// the module INSTALLED HERE does not declare is refused.
+    ///
+    /// Only a **backup** carries them, and only the hub restoring its own copy applies them
+    /// (`is_same_hub`): a grant is an approval of THIS deployment's owner over the host's own
+    /// primitives, not vocabulary of a business — which is why the role set travels in both
+    /// purposes (ADR-0242 §8) and this does not.
+    ///
+    /// `#[serde(default)]` ⇒ a bundle older than this field restores no grants, which is what
+    /// every bundle produced so far does.
+    #[serde(default)]
+    pub capability_grants: BTreeMap<String, Vec<String>>,
     /// SHA256 hex por fichero del bundle (ruta relativa → hash). Verificado al importar.
     pub sha256: BTreeMap<String, String>,
 }
@@ -480,6 +505,28 @@ pub async fn export_hub(
         sections.push(ROLES_SECTION.to_string());
     }
 
+    // ── Los PERMISOS que cada módulo tenía concedidos (hub#473) ──────────────
+    // Mismo patrón que los roles —CLAVES declarativas en el manifest, nunca filas de
+    // `_module_capability_grants`— y por una razón más fuerte: esa tabla es la que decide si un
+    // módulo puede leer el certificado de firma o salir a la red (ADR-0079). Al importar, cada
+    // par pasa por `capabilities::set_grant`, la misma puerta que el interruptor del administrador.
+    //
+    // Sin casilla (una casilla no es un control, ADR-0195) pero SÍ con `purpose`, al revés que los
+    // roles: un rol es vocabulario del negocio; un grant es la aprobación del dueño de ESTE
+    // despliegue sobre los primitivos del host. Una plantilla pública que llegara con `certificate`
+    // concedida sería el marketplace decidiendo que un módulo puede usar tu clave de firma.
+    //
+    // Hoy restaurar un backup dejaba TODOS los módulos denegados (default-deny) y nadie lo decía:
+    // el restore parecía completo y el hub no podía firmar.
+    let capability_grants = if carries_identity {
+        crate::capabilities::granted_by_module(db, hub_id).await.unwrap_or_default()
+    } else {
+        BTreeMap::new()
+    };
+    if !capability_grants.is_empty() {
+        sections.push(CAPABILITY_GRANTS_SECTION.to_string());
+    }
+
     // ── Manifest (fuente de verdad) + integridad ─────────────────────────────
     let mut sha256 = BTreeMap::new();
     for (path, bytes) in &files {
@@ -500,6 +547,7 @@ pub async fn export_hub(
         modules: manifest_modules,
         sections,
         active_roles,
+        capability_grants,
         sha256,
     };
     Ok(ExportBundle { manifest, files })
@@ -1143,6 +1191,10 @@ mod tests {
             modules: vec![ManifestModule { id: "taxes".into(), version: "2.1.1".into(), with_data: true }],
             sections: vec!["hub_settings".into(), "modules/taxes".into()],
             active_roles: Vec::new(),
+            capability_grants: BTreeMap::from([(
+                "verifactu".to_string(),
+                vec!["certificate".to_string(), "network".to_string()],
+            )]),
             sha256: BTreeMap::from([("data/taxes.sql".into(), "ab".repeat(32))]),
         };
         let json = serde_json::to_string(&m).unwrap();

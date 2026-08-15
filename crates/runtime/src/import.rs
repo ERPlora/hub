@@ -150,7 +150,11 @@ pub async fn import_sections(
         // The role set of the vertical is NOT a section of data (hub#354): it travels as keys in
         // `manifest.active_roles` and is applied once, after this loop, through the role catalogue's
         // own write door. Skipped here so it does not also report a hollow `Skipped` row.
-        if section == crate::export::ROLES_SECTION {
+        // Same for the capability grants (hub#473): keys in `manifest.capability_grants`, applied
+        // after this loop through the granting door, never as rows.
+        if section == crate::export::ROLES_SECTION
+            || section == crate::export::CAPABILITY_GRANTS_SECTION
+        {
             continue;
         }
         // Asked BEFORE the match, not inside it: the answer comes from `rt.registry()` and the
@@ -184,6 +188,21 @@ pub async fn import_sections(
         let (status, discarded_rows) = apply_role_activation(rt, manifest, target_hub_id).await;
         report.sections.push(SectionResult {
             section: crate::export::ROLES_SECTION.to_string(),
+            status,
+            discarded_rows,
+        });
+    }
+    // ── The capabilities each module had granted (hub#473) ───────────────────
+    // AFTER the sections, for the same reason as the roles: the modules whose `module.json`
+    // DECLARES these capabilities are installed by the server before the engine runs, and a
+    // capability nobody declares is refused. Driven by the DATA (`capability_grants`) and not by
+    // the presence of the section label, so a hand-made bundle that omits the label gets the very
+    // same guards.
+    if !manifest.capability_grants.is_empty() {
+        let (status, discarded_rows) =
+            apply_capability_grants(rt, manifest, target_hub_id, same_hub).await;
+        report.sections.push(SectionResult {
+            section: crate::export::CAPABILITY_GRANTS_SECTION.to_string(),
             status,
             discarded_rows,
         });
@@ -243,6 +262,56 @@ async fn apply_role_activation(
     }
 }
 
+/// Re-grants the capabilities the backup carried and turns the outcome into a row of the report.
+///
+/// **Whose hub this is decides first** — the same question, and the same `is_same_hub`, that the
+/// identities of ADR-0195 §3 are gated on. A capability grant is not vocabulary of a business (which
+/// is why the role set travels in both purposes, ADR-0242 §8): it is the approval THIS deployment's
+/// owner gave a module over the host's own primitives. A downloaded blueprint arriving with
+/// `certificate` pre-granted would be a file deciding that a module may use your signing key, and it
+/// would be the only grant in the system nobody ever clicked. So a bundle that is not this hub's own
+/// copy is discarded whole, counted, and reported with its stable code.
+///
+/// For the hub's own restore the policy lives in [`crate::capabilities::pre_grant`] — this only
+/// decides how to SAY it, with the three states the report already has, and counts the pairs left
+/// out. A database failure is `Failed`, never a discard.
+async fn apply_capability_grants(
+    rt: &Runtime,
+    manifest: &BlueprintManifest,
+    target_hub_id: &str,
+    same_hub: bool,
+) -> (SectionStatus, u32) {
+    let asked: u32 = manifest.capability_grants.values().map(|c| c.len() as u32).sum();
+    if !same_hub {
+        return (
+            SectionStatus::Ignored(ignore_reason::CAPABILITY_GRANTS_NOT_PORTABLE.into()),
+            asked,
+        );
+    }
+    match crate::capabilities::pre_grant(
+        rt.db(),
+        rt.registry(),
+        target_hub_id,
+        &manifest.capability_grants,
+        crate::roles::BLUEPRINT_ACTOR,
+    )
+    .await
+    {
+        Ok(outcome) => {
+            let discarded = outcome.refused.len() as u32;
+            let status = if outcome.refused.is_empty() {
+                SectionStatus::Applied
+            } else if outcome.granted.is_empty() {
+                SectionStatus::Ignored(ignore_reason::CAPABILITIES_NOT_GRANTABLE.into())
+            } else {
+                SectionStatus::PartiallyApplied(ignore_reason::CAPABILITIES_NOT_GRANTABLE.into())
+            };
+            (status, discarded)
+        }
+        Err(e) => (SectionStatus::Failed(e.to_string()), 0),
+    }
+}
+
 /// Stable reason codes carried by [`SectionStatus::Ignored`] — a CONTRACT with the shell, which
 /// turns each one into a translated sentence (same lesson as the domain-error channel, hub#139:
 /// a code that never changes, plus a message that can live in i18n, instead of prose that the UI
@@ -263,6 +332,15 @@ pub mod ignore_reason {
     /// One code for both, because the answer to the user is the same one: those roles are not part
     /// of this hub's catalogue, so nothing was switched on for them.
     pub const ROLES_NOT_ACTIVATABLE: &str = "roles_not_activatable";
+    /// The bundle carried the capability grants of ANOTHER hub (hub#473). `network`, `certificate`,
+    /// `printer` and `notify` are primitives of THIS deployment's host, and the grant over them is
+    /// the approval its owner gave (ADR-0079, default-deny). A downloaded file may not make one, so
+    /// the whole set is discarded — only the hub restoring its own copy gets its permissions back.
+    pub const CAPABILITY_GRANTS_NOT_PORTABLE: &str = "capability_grants_not_portable";
+    /// This hub's own backup asked to re-grant capabilities it cannot grant (hub#473): unknown
+    /// keys, and keys the module INSTALLED HERE does not declare — a module updated to stop asking
+    /// for the network, or one that failed to install. The rest were re-granted.
+    pub const CAPABILITIES_NOT_GRANTABLE: &str = "capabilities_not_grantable";
     /// The bundle brought a section over one of the hub's OWN system tables — its fiscal profile,
     /// its certificate store, its import batches (ADR-0273 D8 — hub#560). Those are the identity of
     /// THIS installation, not vocabulary of anybody's business, so no bundle writes them: not a
@@ -1341,6 +1419,7 @@ mod tests {
             modules: Vec::new(),
             sections: vec!["hub_users".into()],
             active_roles: Vec::new(),
+            capability_grants: Default::default(),
             sha256: BTreeMap::new(),
         }
     }

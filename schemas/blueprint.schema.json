@@ -40,7 +40,7 @@
     "sections": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Secciones presentes en el bundle: `hub_users`, `hub_settings`, `fiscal`, `media`, `modules/<id>` por cada módulo con datos y `roles` si el bundle trae juego de roles."
+      "description": "Secciones presentes en el bundle: `hub_users`, `hub_settings`, `fiscal`, `media`, `modules/<id>` por cada módulo con datos `roles` si el bundle trae juego de roles y `capabilities` si trae los permisos concedidos a los módulos."
     },
     "active_roles": {
       "type": "array",
@@ -51,6 +51,19 @@
       },
       "default": [],
       "description": "Juego de roles del vertical que el hub ENCIENDE al importar (hub#354): `waiter`, `kitchen`, `stylist`… Son CLAVES, nunca filas de `hub_role_activation`: el import las pasa por la misma puerta que el administrador (`roles::set_active`), así que un blueprint no puede acuñar un rol que ningún módulo instalado declare ni tocar los base/administrativos (`admin`/`owner`/`manager`/`employee`), que se rechazan. Aditivo: nunca apaga un rol que el hub ya tuviera encendido. Ausente ⇒ no preactiva nada."
+    },
+    "capability_grants": {
+      "type": "object",
+      "default": {},
+      "description": "Permisos módulo→host (ADR-0079) que el hub tenía CONCEDIDOS, por módulo (hub#473): `network`, `certificate`, `printer`, `notify`, `manage_flows`. Son CLAVES, nunca filas de `_module_capability_grants`: al importar, cada par pasa por `capabilities::set_grant` — la misma puerta que el interruptor del administrador —, así que una capability que el módulo instalado NO declare se rechaza y se cuenta. Solo lo lleva un `backup` y solo lo aplica el hub que restaura su propia copia (`hub.hub_id` == destino): un grant es la aprobación del dueño de ESE despliegue sobre los primitivos del host, no vocabulario del negocio (por eso los roles sí viajan en los dos propósitos y esto no). Aditivo: nunca revoca lo que el hub ya tuviera concedido. Ausente ⇒ no concede nada.",
+      "patternProperties": {
+        "^[a-z][a-z0-9-]*$": {
+          "type": "array",
+          "items": { "enum": ["network", "certificate", "printer", "notify", "manage_flows"] },
+          "description": "Capabilities concedidas a ese módulo. Solo las concedidas (`granted = 1`): un `no` es el estado por defecto (default-deny) y no necesita fila."
+        }
+      },
+      "additionalProperties": false
     },
     "sha256": {
       "type": "object",

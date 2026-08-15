@@ -11,7 +11,7 @@
 //! capabilities no concedidas → [`RuntimeError::CapabilityDenied`] y el handler nunca corre (el
 //! certificado no se lee y la red no se toca). Es ortogonal al RBAC de usuario
 //! (`permissions`/`role_permissions`), que se chequea aparte en `permissions::check`.
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
@@ -41,6 +41,104 @@ pub async fn granted_set(
         .iter()
         .filter_map(|r| r["capability"].as_str().map(|s| s.to_string()))
         .collect())
+}
+
+/// Everything this hub has **granted** (`granted = 1`), module by module — what a backup has to
+/// carry so that restoring it does not come back with every module denied (hub#473).
+///
+/// Scoped by `hub_id` like every read of this table: the database is SHARED (`tenancy.md`), so a
+/// query without it would put the neighbour's approvals inside this hub's backup.
+///
+/// A **revoked** grant (`granted = 0`) is deliberately not reported: it is indistinguishable from
+/// the default state of a hub that was never asked (default-deny), so carrying it would add a row
+/// that says nothing. `BTreeMap`/sorted values because this feeds a manifest — two exports of the
+/// same hub must produce byte-identical JSON.
+pub async fn granted_by_module(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<BTreeMap<String, Vec<String>>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT module_id, capability FROM _module_capability_grants \
+             WHERE hub_id = :hub_id AND granted = 1 ORDER BY module_id, capability",
+            &p,
+        )
+        .await?;
+    let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for r in &res.rows {
+        let (Some(module), Some(cap)) = (r["module_id"].as_str(), r["capability"].as_str()) else {
+            continue;
+        };
+        out.entry(module.to_string()).or_default().push(cap.to_string());
+    }
+    Ok(out)
+}
+
+/// What the hub did with the capability grants a bundle asked to restore (hub#473).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PreGrant {
+    /// `(module_id, capability)` pairs that are granted now.
+    pub granted: Vec<(String, String)>,
+    /// Pairs the hub **refused**: an unknown capability, or one the module INSTALLED HERE does not
+    /// declare (including «the module is not installed at all», which declares nothing). Kept by
+    /// name and not merely counted, so a caller that wants to say *which* ones has them.
+    pub refused: Vec<(String, String)>,
+}
+
+/// Re-grant the capabilities a **backup** carried, through the same door the administrator's
+/// switch uses (hub#473). The mirror of [`granted_by_module`].
+///
+/// Three properties, each one deliberate and each one the reason this is not a `data/*.sql`:
+///
+/// - **It is not a second door.** Every pair goes through [`set_grant`], so a file gets exactly
+///   the guards a click gets: an unknown capability and one the installed module does not DECLARE
+///   are refused. The authority is the `module.json` that is installed HERE — a module updated to
+///   drop `network` does not get it back because an old backup remembers it.
+/// - **It never revokes.** The set is additive: a capability this hub granted after the backup was
+///   taken stays granted. Mirroring the bundle exactly would let restoring an old copy switch off a
+///   permission the owner granted later, and the module would stop working with nobody deciding it.
+/// - **It is not all-or-nothing.** A refused pair is skipped and reported; the rest still land. A
+///   restore whose kitchen module failed to install must still let the till sign its invoices.
+///
+/// Who may CALL this is a separate question, and the import answers it: only the hub restoring its
+/// own copy (`is_same_hub`). A grant is an approval of THIS deployment's owner over the host's own
+/// primitives — the certificate, the network — so a downloaded template must not be able to make
+/// one, however well-formed it is.
+///
+/// A policy refusal lands in [`PreGrant::refused`]; a database failure propagates, because «the row
+/// could not be written» must never read as «this hub said no».
+pub async fn pre_grant(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    grants: &BTreeMap<String, Vec<String>>,
+    by: &str,
+) -> Result<PreGrant> {
+    let mut out = PreGrant::default();
+    for (module_id, capabilities) in grants {
+        let declared = requested(registry, module_id);
+        let mut seen: HashSet<&str> = HashSet::new();
+        for capability in capabilities {
+            let capability = capability.trim();
+            if !seen.insert(capability) {
+                continue; // a bundle naming the same capability twice grants it once
+            }
+            // Asked BEFORE writing, with the same two questions `set_grant` asks — so a refusal is
+            // policy and never gets confused with the database failing underneath.
+            let known = crate::manifest::CapabilityKind::parse(capability);
+            let pair = (module_id.clone(), capability.to_string());
+            match known {
+                Some(kind) if declared.contains(&kind) => {
+                    set_grant(db, registry, hub_id, module_id, capability, true, by).await?;
+                    out.granted.push(pair);
+                }
+                _ => out.refused.push(pair),
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Capabilities que el módulo **declara** necesitar (del manifest en el `Registry`).

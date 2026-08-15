@@ -940,6 +940,11 @@ export const SECTION_DISCARD_CODES = [
   // sus registros son de la instalación que los emitió. Antes el motivo era prosa que nombraba
   // VeriFactu; el código sirve igual para TicketBai o NF525, y aquí se traduce.
   'installation_bound_data',
+  // hub#473 — los permisos módulo→host (`certificate`, `network`, `printer`, `notify`) que el dueño
+  // había concedido. De OTRO hub se descartan enteros; del backup PROPIO se reconceden los que el
+  // módulo instalado siga declarando, y los demás se cuentan.
+  'capability_grants_not_portable',
+  'capabilities_not_grantable',
 ] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */

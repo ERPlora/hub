@@ -1235,6 +1235,7 @@ export default {
     sectionFiscalDesc: 'Configuración VeriFactu y el certificado de empresa (.p12)',
     sectionMedia: 'Imágenes y media',
     sectionRoles: 'Roles',
+    sectionCapabilities: 'Permisos de las apps',
     sectionModule: 'App {id}',
     modulesTitle: 'Apps',
     withData: 'incluye datos',
@@ -1284,6 +1285,10 @@ export default {
       'Numeración descartada: {n}. Las series de facturación y los números ya emitidos son del negocio que creó el fichero. Tu numeración se queda como está — si aún no tienes series, configúralas en Ajustes.',
     reasonInstallationBoundData:
       'Registros descartados: {n}. Esta app lleva un registro oficial encadenado a la caja que lo emitió, así que solo vuelve a esa misma caja. La tuya empieza el suyo — aquí no se ha cambiado nada.',
+    reasonCapabilityGrantsNotPortable:
+      'Permisos de apps descartados: {n}. El acceso a tu impresora, a tu certificado de firma y a internet se concede solo en este terminal. No se ha permitido nada \u2014 concede lo que necesites en Ajustes \u203a Permisos.',
+    reasonCapabilitiesNotGrantable:
+      'Permisos sin restaurar: {n}. Esas apps ya no los piden, o no est\u00e1n instaladas aqu\u00ed. Todo lo dem\u00e1s se ha devuelto.',
     done: 'Ir al inicio',
   },
   moduleView: {
