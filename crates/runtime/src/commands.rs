@@ -21,6 +21,20 @@ pub(crate) const MAX_EVENT_DEPTH: u32 = 16;
 /// dividir la operación. ARQUITECTURA.md §5.3.
 pub(crate) const NEW_IDS_BATCH: usize = 256;
 
+/// Upper bound for the value a handler RETURNS to the caller (hub#70), measured on its serialised
+/// JSON — the same way [`crate::print_queue::MAX_DOCUMENT_BYTES`] bounds a print job.
+///
+/// The result channel exists so an answer comes from the sandboxed handler instead of from
+/// whoever called (`schedules.is_open`). It is an **answer**, not a transport: without a cap, a
+/// handler could hand the caller megabytes on every keystroke of the till, and the channel would
+/// quietly become the file-transfer path it was never meant to be. 64 KiB fits a bulk report of
+/// thousands of lines (`schedules.bulk_create_special_days`) with room to spare.
+///
+/// Over the cap the command **fails** — nothing is written and nothing is truncated. Handing back
+/// a shortened authoritative value would be the worst outcome: the caller cannot tell it apart
+/// from the complete one, which is exactly the forgery this channel was built to prevent.
+pub const MAX_RESULT_BYTES: usize = 64 * 1024;
+
 /// Origen de una invocación de [`execute_at`] (hub#131, hub#145).
 ///
 /// Distingue el camino EXTERNO — todo lo que entra por `Runtime::execute_command` (HTTP
@@ -1018,6 +1032,24 @@ async fn persist_handler_output(
         });
     }
 
+    // hub#70: the value the handler RETURNS travels in its own channel — it is neither an
+    // operation nor an event, and it never contributes an id to `new_ids`. Its size is checked
+    // HERE, before the transaction, so an oversized answer costs nothing and leaves nothing
+    // behind. It is refused, never truncated: a shortened authoritative value is
+    // indistinguishable from the complete one, which is exactly the forgery this channel exists
+    // to prevent. An oversized result is a broken guest contract (`Wasm`), not a business
+    // rejection the UI would translate.
+    if let Some(result) = &output.result {
+        let size = result.to_string().len();
+        if size > MAX_RESULT_BYTES {
+            return Err(RuntimeError::Wasm(format!(
+                "handler of module `{}` returned a result of {size} bytes, over the \
+                 {MAX_RESULT_BYTES} byte cap for a command result",
+                cmd.module_id
+            )));
+        }
+    }
+
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
     for op in &output.operations {
@@ -1105,11 +1137,18 @@ async fn persist_handler_output(
         events::notify_sink(registry, source, name, payload);
     }
 
-    Ok(json!({
+    let mut response = json!({
         "ok": true,
         "operations": output.operations.len(),
         "new_ids": consumed_new_ids(output, new_ids),
-    }))
+    });
+    // The key appears only when the handler answered (hub#70). A guest built before the channel
+    // existed keeps producing exactly the response it always did — and `Some(Json::Null)` ("nothing
+    // matched") stays distinguishable from "this handler returns nothing".
+    if let Some(result) = &output.result {
+        response["result"] = result.clone();
+    }
+    Ok(response)
 }
 
 /// The batch ids the handler's operations actually CONSUMED, in batch order (hub#776).
@@ -2144,6 +2183,245 @@ mod tests {
             0,
             "a rejecting handler must not persist any of its effects"
         );
+    }
+
+    // ── hub#70: the result channel of a handler ──────────────────────────────────────────────
+    //
+    // A handler could only describe WRITES. Anything the caller needed to *know*
+    // (`schedules.is_open`) had to be recomputed client-side over rows the caller itself
+    // supplied — so the caller could forge the answer. Same harness as hub#139/hub#240: a native
+    // handler shares `persist_handler_output` with WASM and needs no compiled `.wasm`.
+
+    /// Test handler that returns a value to the caller, optionally alongside a declared event.
+    #[derive(Debug)]
+    struct AnsweringHandler {
+        result: Option<Json>,
+        /// Answer with the first id of the host's batch instead of `result` (see the test on
+        /// `new_ids`): the guest can only take ids from `context.new_ids`.
+        echo_first_new_id: bool,
+        event: bool,
+    }
+
+    impl AnsweringHandler {
+        fn answering(result: Json) -> Self {
+            Self {
+                result: Some(result),
+                echo_first_new_id: false,
+                event: false,
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl crate::native::NativeHandler for AnsweringHandler {
+        async fn call(
+            &self,
+            _function: &str,
+            input: &Json,
+            _host: &dyn crate::native::NativeHost,
+        ) -> Result<Output> {
+            let mut out = Output::new();
+            if self.echo_first_new_id {
+                out = out.with_result(json!({"id": input["context"]["new_ids"][0]}));
+            } else if let Some(result) = &self.result {
+                out = out.with_result(result.clone());
+            }
+            if self.event {
+                out = out.with_event(erplora_wasm_host::Event {
+                    name: "sale.completed".to_string(),
+                    payload: json!({}),
+                });
+            }
+            Ok(out)
+        }
+    }
+
+    fn registry_with_answering_handler(handler: AnsweringHandler) -> Registry {
+        let mut reg = registry_with_native_handler("sale.completed");
+        reg.native
+            .insert("sales".into(), std::sync::Arc::new(handler));
+        reg
+    }
+
+    async fn execute_sales_command(db: &dyn DatabaseAdapter, reg: &Registry) -> Result<Json> {
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        execute(
+            db,
+            reg,
+            "sales.complete_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+    }
+
+    /// **The point of hub#70.** A read-only handler (no operations at all) computes an answer and
+    /// the caller receives it — `schedules.is_open` decided inside the sandbox, over data the host
+    /// provided, instead of by whoever called.
+    #[tokio::test]
+    async fn a_read_only_handler_returns_its_computed_value_to_the_caller() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_answering_handler(AnsweringHandler::answering(
+            json!({"open": true, "closes_at": "20:00"}),
+        ));
+
+        let out = execute_sales_command(&db, &reg).await.unwrap();
+        assert_eq!(out["ok"], json!(true));
+        assert_eq!(out["result"], json!({"open": true, "closes_at": "20:00"}));
+        // A handler that only answers is a legitimate command, not a suspicious no-op: it wrote
+        // nothing and minted nothing, and says so.
+        assert_eq!(out["operations"], json!(0));
+        assert_eq!(out["new_ids"], json!([]));
+    }
+
+    /// `Some(null)` is an answer ("nothing matched"), not the absence of one: the key travels.
+    #[tokio::test]
+    async fn a_null_answer_reaches_the_caller_as_an_answer() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_answering_handler(AnsweringHandler::answering(Json::Null));
+
+        let out = execute_sales_command(&db, &reg).await.unwrap();
+        assert!(out.get("result").is_some(), "an explicit null must travel");
+        assert!(out["result"].is_null());
+    }
+
+    /// Backwards compatibility with every guest built before this field existed (the versioning
+    /// pattern of hub#139): no `result` in the output ⇒ the response is byte-for-byte the old one.
+    #[tokio::test]
+    async fn a_handler_that_answers_nothing_keeps_the_previous_response_shape() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_native_handler("sale.completed"); // old-style handler
+
+        let out = execute_sales_command(&db, &reg).await.unwrap();
+        assert_eq!(out, json!({"ok": true, "operations": 0, "new_ids": []}));
+    }
+
+    /// The result is a THIRD channel: it is not an operation, it is not an event, and — above all
+    /// — an id echoed inside it is not a materialised row. `new_ids` keeps meaning "ids some
+    /// operation consumed" (hub#776); otherwise a handler could name rows it never wrote.
+    #[tokio::test]
+    async fn an_id_echoed_in_the_result_is_not_reported_as_a_new_id() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_answering_handler(AnsweringHandler {
+            result: None,
+            echo_first_new_id: true,
+            event: true,
+        });
+
+        let out = execute_sales_command(&db, &reg).await.unwrap();
+        assert!(
+            out["result"]["id"].is_string(),
+            "the handler did answer: {out}"
+        );
+        assert_eq!(
+            out["new_ids"],
+            json!([]),
+            "an id that no operation consumed names no row, even if the result mentions it"
+        );
+        // The event channel is untouched by the result: it still reaches the outbox.
+        let rows = db
+            .query("SELECT COUNT(*) AS c FROM _event_outbox", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(rows.rows[0]["c"].as_i64().unwrap_or(-1), 1);
+    }
+
+    /// An oversized answer is REFUSED, never silently shortened: a truncated authoritative value
+    /// is worse than no value (the caller cannot tell it apart from the real one). Nothing the
+    /// handler returned is persisted either — the cap is checked before the transaction.
+    #[tokio::test]
+    async fn an_oversized_result_is_rejected_and_nothing_is_persisted() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let reg = registry_with_answering_handler(AnsweringHandler {
+            result: Some(json!("x".repeat(MAX_RESULT_BYTES + 1))),
+            echo_first_new_id: false,
+            event: true,
+        });
+
+        let err = execute_sales_command(&db, &reg).await.unwrap_err();
+        assert!(matches!(err, RuntimeError::Wasm(_)), "got {err:?}");
+        assert!(
+            err.to_string().contains(&MAX_RESULT_BYTES.to_string()),
+            "the error must state the cap it hit: {err}"
+        );
+        let rows = db
+            .query("SELECT COUNT(*) AS c FROM _event_outbox", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.rows[0]["c"].as_i64().unwrap_or(-1),
+            0,
+            "a refused result must not leave its side effects behind"
+        );
+    }
+
+    /// A result exactly at the cap is accepted: the boundary is inclusive and measured on the
+    /// serialised JSON, like `print_queue::MAX_DOCUMENT_BYTES`.
+    #[tokio::test]
+    async fn a_result_exactly_at_the_cap_is_accepted() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let skeleton = json!("").to_string().len(); // the two quotes
+        let result = json!("y".repeat(MAX_RESULT_BYTES - skeleton));
+        assert_eq!(result.to_string().len(), MAX_RESULT_BYTES);
+        let reg = registry_with_answering_handler(AnsweringHandler::answering(result));
+
+        let out = execute_sales_command(&db, &reg).await.unwrap();
+        assert_eq!(out["result"].as_str().unwrap().len(), MAX_RESULT_BYTES - 2);
+    }
+
+    /// The cap is a bound on an ANSWER, not on a file: big enough for a bulk report
+    /// (`schedules.bulk_create_special_days`), small enough that it can never be a blob channel.
+    #[test]
+    fn the_result_cap_stays_in_a_sane_range() {
+        assert!(MAX_RESULT_BYTES >= 16 * 1024);
+        assert!(MAX_RESULT_BYTES <= 512 * 1024);
+    }
+
+    /// A rejection wins over an answer: a guest that sets both must not leak a computed value
+    /// alongside an aborted transaction (hub#139 checks `error` before anything else).
+    #[tokio::test]
+    async fn a_rejecting_handler_does_not_also_return_a_result() {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        let mut reg = registry_with_native_handler("sale.completed");
+        reg.native.insert(
+            "sales".into(),
+            std::sync::Arc::new(RejectingHandlerWithResult),
+        );
+
+        let err = execute_sales_command(&db, &reg).await.unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::Domain { ref code, .. } if code == "sales.rejected"),
+            "got {err:?}"
+        );
+    }
+
+    /// Handler that rejects AND fills the result channel — a buggy or malicious guest.
+    #[derive(Debug)]
+    struct RejectingHandlerWithResult;
+
+    #[async_trait::async_trait]
+    impl crate::native::NativeHandler for RejectingHandlerWithResult {
+        async fn call(
+            &self,
+            _function: &str,
+            _input: &Json,
+            _host: &dyn crate::native::NativeHost,
+        ) -> Result<Output> {
+            Ok(Output::new()
+                .with_result(json!({"open": true}))
+                .with_error(erplora_wasm_host::guest_sdk::DomainError::new(
+                    "sales.rejected",
+                    "Rejected by a business rule",
+                )))
+        }
     }
 
     /// hub#139: a handler cannot mint codes in a namespace it does not own. An invalid code is
