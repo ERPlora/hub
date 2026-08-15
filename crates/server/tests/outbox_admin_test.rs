@@ -14,7 +14,7 @@
 //! neither is something an integration token gets to do.
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::testutil::fresh_db;
+use erplora_db::testutil::TestDb;
 use erplora_db::{DatabaseAdapter, Params};
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
@@ -28,6 +28,9 @@ const DELIVERED_ID: &str = "evt-delivered";
 
 struct Fixture {
     router: axum::Router,
+    /// The hub's own schema, kept so a test can read a row back **through a second connection** —
+    /// what the HTTP surface answered is not evidence that anything was written.
+    db: TestDb,
     /// Session of an owner/admin — the only one who may operate the queue.
     admin: String,
     admin_id: String,
@@ -36,6 +39,24 @@ struct Fixture {
     /// A real, active API key of this hub. Valid everywhere it is meant to be — not here.
     api_key: String,
     temp: std::path::PathBuf,
+}
+
+impl Fixture {
+    /// One row of `_event_outbox`, read straight from the database the router just wrote to.
+    async fn outbox_row(&self, id: &str) -> Value {
+        let db = self.db.adapter().await;
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        let rows = db
+            .query(
+                "SELECT status, discarded_by, discard_reason FROM _event_outbox WHERE id = :id",
+                &p,
+            )
+            .await
+            .unwrap()
+            .rows;
+        rows.into_iter().next().expect("the row is never deleted")
+    }
 }
 
 async fn body_json(response: axum::response::Response) -> Value {
@@ -66,7 +87,8 @@ async fn seed_event(db: &dyn DatabaseAdapter, id: &str, status: &str, attempts: 
 }
 
 async fn fixture() -> Fixture {
-    let db = fresh_db().await;
+    let test_db = TestDb::new().await;
+    let db = test_db.adapter().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
 
@@ -104,6 +126,7 @@ async fn fixture() -> Fixture {
     };
     Fixture {
         router: app(AppState::with_config(rt, cfg)),
+        db: test_db,
         admin,
         admin_id,
         employee,
@@ -118,6 +141,18 @@ fn request(method: &str, uri: &str, session: Option<&str>) -> Request<Body> {
         builder = builder.header("x-hub-session", token);
     }
     builder.body(Body::empty()).unwrap()
+}
+
+/// The same request, carrying a JSON body — the shape the tray sends when the operator typed why.
+fn json_request(method: &str, uri: &str, session: Option<&str>, body: Value) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-type", "application/json");
+    if let Some(token) = session {
+        builder = builder.header("x-hub-session", token);
+    }
+    builder.body(Body::from(body.to_string())).unwrap()
 }
 
 async fn send(router: &axum::Router, request: Request<Body>) -> axum::response::Response {
@@ -200,6 +235,77 @@ async fn retry_requeues_and_discard_stamps_the_session_user() {
 
     std::fs::remove_dir_all(f.temp).ok();
     std::fs::remove_dir_all(f2.temp).ok();
+}
+
+/// **Closing a dead-letter can say WHY, and the why is written down** (hub#955).
+///
+/// `discarded_at` + `discarded_by` answered when and who; nothing answered why, so six months later
+/// the only available reading of a closed row was «somebody discarded this» — the half that needed
+/// no storing. The tray of `ERPlora/flows#20` can ask, and the reason travels in the body.
+///
+/// The body carries **exactly one field**. `discarded_by` is still the resolved session and a body
+/// that names somebody else changes nothing: authorship of an audit record is not an input.
+#[tokio::test]
+async fn discard_writes_down_the_reason_from_the_body_and_the_author_from_the_session() {
+    let f = fixture().await;
+    let uri = format!("/api/hub/events/{DEAD_ID}/discard");
+
+    let response = send(
+        &f.router,
+        json_request(
+            "POST",
+            &uri,
+            Some(&f.admin),
+            json!({
+                // Whitespace as a text area hands it back: « duplicada » and «duplicada» are not
+                // two different decisions.
+                "reason": "  duplicada: la factura se registró a mano  ",
+                // And an attempt to sign somebody else's name to the decision, which is ignored.
+                "discarded_by": "hub_user:somebody-else",
+            }),
+        ),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], true);
+    assert_eq!(
+        body["data"]["discard_reason"], "duplicada: la factura se registró a mano",
+        "the response carries the reason, which is what the tray renders back"
+    );
+
+    // What the API answered is not evidence of anything: the row itself has to carry it.
+    let row = f.outbox_row(DEAD_ID).await;
+    assert_eq!(row["status"], "discarded");
+    assert_eq!(
+        row["discard_reason"], "duplicada: la factura se registró a mano",
+        "the reason is STORED, trimmed — this is the record that outlives the click"
+    );
+    assert_eq!(
+        row["discarded_by"], format!("hub_user:{}", f.admin_id),
+        "the author is the session's, never the one the body tried to write"
+    );
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// The reason is **optional**: a discard with no body at all is the gesture that existed before
+/// hub#955 and it keeps working, with an empty reason rather than a `400`. Requiring an
+/// explanation to close a row is how a recovery queue stops being drained.
+#[tokio::test]
+async fn a_discard_without_a_body_still_closes_the_row() {
+    let f = fixture().await;
+    let uri = format!("/api/hub/events/{DEAD_ID}/discard");
+
+    let response = send(&f.router, request("POST", &uri, Some(&f.admin))).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(body_json(response).await["data"]["discard_reason"], "");
+    let row = f.outbox_row(DEAD_ID).await;
+    assert_eq!(row["status"], "discarded");
+    assert_eq!(row["discard_reason"], "", "no reason is the empty string, never NULL");
+
+    std::fs::remove_dir_all(f.temp).ok();
 }
 
 /// The door: anonymous is 401, a logged-in NON-admin is 403 (authenticated, just not allowed), and

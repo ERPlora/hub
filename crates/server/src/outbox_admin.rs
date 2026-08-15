@@ -24,7 +24,9 @@
 //! API key ni el token de máquina. Reintentar re-ejecuta el command de otro con los permisos del
 //! emisor, y descartar cierra un registro fiscal para siempre; ninguna de las dos es una gestión
 //! que le toque a un token de integración — la key solo habla `/api/v1` (`auth::authenticate`).
-//! `discarded_by` sale SIEMPRE de la sesión resuelta, jamás del cuerpo de la petición.
+//! `discarded_by` sale SIEMPRE de la sesión resuelta, jamás del cuerpo de la petición. Lo único
+//! que sí viaja en el cuerpo es el **motivo** del descarte (hub#955): es lo único que no está ya
+//! dentro del hub, porque solo lo sabe quien decide cerrar la fila.
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -195,13 +197,30 @@ pub async fn retry_all_dead(State(st): State<AppState>, headers: HeaderMap) -> R
     }
 }
 
-/// POST /api/hub/events/{id}/discard — cierra la dead-letter: estado `discarded` + `discarded_at`
-/// y `discarded_by`. **La fila se conserva** (auditable, nunca `DELETE`) y el relay no vuelve a
-/// cogerla (`claim_next_due` solo reclama `pending`). Auth = sesión admin.
+/// Cuerpo de `POST …/discard`: **un solo campo**, el motivo (hub#955).
+///
+/// Todo lo demás del sello sale de dentro —`discarded_at` del reloj, `discarded_by` de la sesión—,
+/// así que este cuerpo no tiene más superficie que la que el motivo necesita. Es opcional: el
+/// gesto existía antes que él y exigir una redacción para cerrar una fila es como una cola de
+/// recuperación deja de vaciarse.
+#[derive(serde::Deserialize, Default)]
+pub struct DiscardReq {
+    reason: Option<String>,
+}
+
+/// POST /api/hub/events/{id}/discard — cierra la dead-letter: estado `discarded` + `discarded_at`,
+/// `discarded_by` y **`discard_reason`** (hub#955). **La fila se conserva** (auditable, nunca
+/// `DELETE`) y el relay no vuelve a cogerla (`claim_next_due` solo reclama `pending`). Auth =
+/// sesión admin.
+///
+/// El motivo es lo único que sale del cuerpo, y lo único que solo sabe quien cierra la fila: sin
+/// él, seis meses después la única lectura posible de un descarte es «alguien lo descartó», que es
+/// justo la mitad que no hacía falta guardar. Lo consume la bandeja de `ERPlora/flows#20`.
 pub async fn discard_dead(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    body: Option<Json<DiscardReq>>,
 ) -> Response {
     let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(arc) => arc,
@@ -213,12 +232,23 @@ pub async fn discard_dead(
         Err(response) => return response,
     };
     // Auditoría: quién lo descartó sale de la SESIÓN resuelta, nunca del cuerpo (mismo criterio
-    // que el `created_by` de las API keys).
+    // que el `created_by` de las API keys). Un cuerpo que traiga `discarded_by` no cambia nada:
+    // `DiscardReq` no tiene ese campo y serde lo ignora.
     let discarded_by = format!("hub_user:{}", admin.id);
-    match rt.discard_dead_event(&id, &discarded_by).await {
+    // Se recorta AQUÍ con la misma función que aplica el runtime al escribir, para devolver
+    // exactamente lo que queda en la fila y no lo que llegó (una implementación, sin deriva).
+    let reason = erplora_runtime::outbox::clamp_discard_reason(
+        &body.map(|b| b.0).unwrap_or_default().reason.unwrap_or_default(),
+    );
+    match rt.discard_dead_event(&id, &discarded_by, &reason).await {
         Ok(true) => Json(json!({
             "ok": true,
-            "data": { "id": id, "status": erplora_runtime::outbox::STATUS_DISCARDED, "discarded_by": discarded_by }
+            "data": {
+                "id": id,
+                "status": erplora_runtime::outbox::STATUS_DISCARDED,
+                "discarded_by": discarded_by,
+                "discard_reason": reason
+            }
         }))
         .into_response(),
         Ok(false) => not_a_dead_letter(),
