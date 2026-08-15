@@ -217,6 +217,26 @@ export default {
       // a hairdresser to hunt for a needle. The generic line above is left for the case where the
       // failure is not an app and no name would mean anything to her.
       failedApps: 'These did not go in: {apps}. You can see the detail and try again in Settings › Data.',
+      // hub#899 — the other half of the same complaint. When what broke was a SECTION of the
+      // template there was no app to name, so the card fell back to «something else did not go in»:
+      // two «somethings» in one card, at the minute she is checking whether her business is inside.
+      // She could not tell a missing service from a missing till, so she could not decide whether to
+      // start working or import again. Each part is named below, in her words and never by our key.
+      failedParts: 'This did not go in: {parts}. You can see the detail and try again in Settings › Data.',
+      failedAppsAndParts:
+        'These did not go in: {apps}. Nor did {parts}. You can see the detail and try again in Settings › Data.',
+      // The parts of the hub a template carries, as the owner would name them. They read inside a
+      // sentence («This did not go in: the images»), which is why they are lower case and not the
+      // table headings the full report uses.
+      partSettings: 'the settings of the business',
+      partTeam: 'the people',
+      partRoles: 'the roles and what each one may do',
+      partFiscal: 'the tax details',
+      partMedia: 'the images',
+      // `modules/<id>` is the app's DATA — its catalogue, its services, its prices — and the app
+      // itself may be installed and running. Saying the app did not go in would send her to
+      // reinstall something that is already there.
+      partAppData: 'the data of {app}',
       notStartedTitle: 'That template could not be opened',
       notStartedBody: 'Nothing changed in your business. Try again, or load it from Settings › Data.',
       interruptedTitle: 'The set-up did not finish',

@@ -145,6 +145,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 
 import {
   heroOffers,
+  heroPart,
   heroSelection,
   heroVisible,
   hubIsEmpty,
@@ -260,23 +261,51 @@ const blockedApps = computed<string[]>(() =>
 const somethingBroke = computed<boolean>(
   () =>
     outcome.value?.kind === 'partial' &&
-    (outcome.value.failedApps.length > 0 || outcome.value.failedParts > 0),
+    (outcome.value.failedApps.length > 0 || outcome.value.failedSections.length > 0),
+);
+
+/** The apps that did not go in, named the way the owner knows them (hub#488). */
+const failedApps = computed<string[]>(() =>
+  outcome.value?.kind === 'partial'
+    ? outcome.value.failedApps.map((id) => appLabel(id, appNames.value))
+    : [],
 );
 
 /**
- * What broke, NAMED when we know the names (hub#751).
+ * The other parts of the template that did not go in, in the owner's words (hub#899).
+ *
+ * `blueprint-hero.ts` says what each section IS; the words are here, because this is where the
+ * catalogue and the app names live. Nothing is dropped for being unpronounceable: a section this
+ * shell does not know is painted by its key, exactly like the full report at Settings › Data does,
+ * and that is still better than the «something else» it replaces.
+ */
+const failedParts = computed<string[]>(() =>
+  (outcome.value?.kind === 'partial' ? outcome.value.failedSections : []).map((section) => {
+    const part = heroPart(section);
+    if (part.kind === 'app_data') {
+      return t('setup.hero.partAppData', { app: appLabel(part.moduleId, appNames.value) });
+    }
+    return part.kind === 'named' ? t(part.i18nKey) : part.section;
+  }),
+);
+
+/**
+ * What broke, NAMED (hub#751 for the apps, hub#899 for everything else).
  *
  * «Something else did not go in» sent a hairdresser to hunt for a needle: the card already knew it
- * was `verifactu`, and said nothing. When the failure is an app, it is named — that is what she can
- * act on, and what she can repeat to support. Only a section-level failure keeps the generic
- * sentence, because there no name would mean anything to her.
+ * was `verifactu`, and said nothing. hub#751 named the apps; the parts of the template kept the
+ * generic sentence on the grounds that no name would mean anything to her — which was right about
+ * OUR keys (`hub_settings`, `modules/hairdressing`) and wrong about her: «the settings of the
+ * business» and «the data of Peluquería» are things she can act on. So both are named, and the
+ * generic line is left as the last resort of a report that names nothing at all.
  */
 const failedMessage = computed<string>(() => {
-  const apps = outcome.value?.kind === 'partial' ? outcome.value.failedApps : [];
-  // hub#488: named the way the owner knows them, so «these did not go in» is a sentence he can act
-  // on and repeat to support — not a list of our manifest keys.
-  const named = apps.map((id) => appLabel(id, appNames.value));
-  return named.length ? t('setup.hero.failedApps', { apps: named.join(', ') }) : t('setup.hero.failed');
+  const apps = failedApps.value.join(', ');
+  const parts = failedParts.value.join(', ');
+  if (apps && parts) return t('setup.hero.failedAppsAndParts', { apps, parts });
+  if (apps) return t('setup.hero.failedApps', { apps });
+  if (parts) return t('setup.hero.failedParts', { parts });
+  return t('setup.hero.failed');
 });
 
 const reason = computed<string>(() =>

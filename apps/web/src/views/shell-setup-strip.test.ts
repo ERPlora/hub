@@ -68,6 +68,27 @@ describe('the document belongs to the shell, and it stays fresh', () => {
     );
   });
 
+  it('a write to the settings re-reads it, instead of waiting for a navigation (hub#900)', () => {
+    // Settings › Business is the screen that CLEARS the ⛔: the tax id and the legal name it saves
+    // are the item behind it. Nothing re-read the document after a write, so the owner saved her
+    // business and «You cannot issue invoices yet» stayed put until she happened to open the till.
+    //
+    // The refresh lives in `persistHubSettings` — the one door every setting on that screen goes
+    // through (the currency, the language, the country, the palette, the business details). This
+    // asserts there is no second writer, because a direct `updateHubSettings` call somewhere else
+    // is the same defect one field further along. What it DOES with the answer is pinned by
+    // `settings-setup-refresh.test.ts`, which presses the button for real.
+    const settings = source('./SettingsPage.vue');
+    expect(settings).toContain("from '../lib/setup-status'");
+
+    const calls = settings.match(/\bupdateHubSettings\(/g) ?? [];
+    expect(calls, 'a writer appeared outside persistHubSettings').toHaveLength(1);
+    const door = settings.slice(settings.indexOf('async function persistHubSettings'));
+    const body = door.slice(0, door.indexOf('\n}'));
+    expect(body).toContain('updateHubSettings(');
+    expect(body, 'the one door saves without re-reading the document').toContain('refreshSetupStatus');
+  });
+
   it('re-reads as the user moves, so the strip clears itself once the hub is fixed', () => {
     // The strip cannot be dismissed, so the ONLY way it goes away is the hub being fixed. Reading it
     // again on navigation is also what catches a gate that appears mid-session (installing the

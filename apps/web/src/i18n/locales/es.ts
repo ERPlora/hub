@@ -207,6 +207,18 @@ export default {
       blocked: 'Estas hay que añadirlas antes a tu plan: {apps}',
       failed: 'Hay algo más que no ha entrado. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
       failedApps: 'Estas no han entrado: {apps}. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      // hub#899 — la otra mitad de la misma queja: cuando lo que falla es una SECCIÓN no hay app que
+      // nombrar y la tarjeta caía en «Hay algo más que no ha entrado». Dos «algos» en una tarjeta,
+      // justo en el minuto en que ella comprueba si su negocio está dentro.
+      failedParts: 'Esto no ha entrado: {parts}. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      failedAppsAndParts:
+        'Estas no han entrado: {apps}. Tampoco {parts}. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      partSettings: 'los ajustes del negocio',
+      partTeam: 'las personas',
+      partRoles: 'los roles y lo que puede hacer cada uno',
+      partFiscal: 'los datos fiscales',
+      partMedia: 'las imágenes',
+      partAppData: 'los datos de {app}',
       notStartedTitle: 'No se ha podido abrir esa plantilla',
       notStartedBody: 'No ha cambiado nada en tu negocio. Inténtalo otra vez o cárgala desde Ajustes › Datos.',
       interruptedTitle: 'La configuración no ha terminado',
