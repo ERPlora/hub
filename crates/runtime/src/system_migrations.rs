@@ -1336,6 +1336,69 @@ ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_at TEXT 
         kind: Kind::Expand,
         postgres: "ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS on_expire TEXT NOT NULL DEFAULT 'reject';",
     },
+    // ── v46 — hub#735: `_event_delivery` también es de un hub ────────────────────────────────
+    // Era la última tabla del radio del kernel de flujos **sin `hub_id` a nivel de esquema**, y no
+    // es una tabla cualquiera: es donde se escribe el marcador de idempotencia de cada entrega —
+    // el de los listeners de un módulo (`_event_delivery(event_id, listener_command)`) y el del
+    // disparador de un flujo, bajo el listener sintético `_flow:<trigger_id>`. Es la pieza que
+    // garantiza «un evento produce UN run», y estaba fuera del contrato de fila de `tenancy.md`.
+    //
+    // ⚠️ **El backfill NO adivina.** Sella `:hub_id` —el del despliegue— en los marcadores que no
+    // dicen de quién son, y eso es correcto **porque desde ADR-0201 cada hub es dueño de su propia
+    // base de datos** (`Hub.database_name` + rol propio): en una BD de un solo hub, «todo marcador
+    // es de este hub» es un hecho, no una conjetura. Es el mismo criterio y el mismo párrafo que
+    // la v42 escribió para `hub_user`/`hub_session`.
+    //
+    // **Y no se borra nada**: un marcador perdido no es espacio recuperado, es un listener que
+    // vuelve a correr y un evento que produce un segundo run.
+    //
+    // **La PK NO se recompone** a `(hub_id, event_id, listener_command)`, por la misma razón que
+    // v42 no la recompuso en `hub_user`: `event_id` es un UUID v4 y no puede chocar entre hubs, así
+    // que una clave más ancha no añadiría unicidad — y la ESTRECHA es más fuerte. Ampliarla sería
+    // permitir dos marcadores para el mismo evento con `hub_id` distinto, que es exactamente el
+    // «entregado dos veces» que esta tabla existe para impedir. Lo que faltaba era un `WHERE`.
+    //
+    // El índice `(hub_id, event_id)` es lo que hace respondible «los marcadores de este hub» sin
+    // recorrer la tabla entera; las lecturas calientes siguen entrando por la PK.
+    //
+    // ⚠️ **`NOT NULL` y no `DEFAULT ''`, a sabiendas de la ventana del start-first** (ADR-0269).
+    // Mientras el contenedor viejo sigue vivo, sus `INSERT` de marcador (sin `hub_id`) fallan: la
+    // transacción del listener hace **rollback entera**, así que no hay entrega a medias ni
+    // marcador huérfano, y la fila del outbox se reintenta con backoff hasta que el contenedor
+    // nuevo la coge. Un `DEFAULT ''` evitaría ese fallo y a cambio dejaría marcadores sin dueño que
+    // el lector scopeado **no vería nunca** y que chocarían con la PK para siempre: el evento
+    // reentregado, el listener corriendo dos veces y la fila muerta en dead-letter. El fallo
+    // transitorio es el que se puede desandar solo.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`, `UPDATE` acotados a
+    // `hub_id IS NULL`, `SET NOT NULL` idempotente y `CREATE INDEX IF NOT EXISTS`. Importa porque
+    // los fixtures rebobinan la tabla de control por versión y reaplican todo lo posterior sobre
+    // una BD que ya tiene los objetos.
+    //
+    // ⚠️ **v46, y nació como v45**: `flow_approval_on_expire` (hub#972) se llevó el 45 mientras
+    // esta rama estaba en vuelo, y el rebase lo destapó como conflicto — que es exactamente para
+    // lo que sirve tener el número a mano. `apply` aborta si una entrada cae en o por debajo del
+    // máximo ya aplicado, pero solo cuando un hub ya lleva el número más alto: tardísimo para
+    // enterarse. Recomprobado contra `origin/develop` en el push (hub#573); los huecos v15/v20/v24
+    // siguen libres e **inalcanzables**: cogerlos ES el fallo mudo.
+    SystemMigration {
+        version: 46,
+        name: "event_delivery_hub_scoped",
+        kind: Kind::Contract,
+        // El `CREATE … IF NOT EXISTS` de cabeza no es redundante: la tabla la pone
+        // `outbox::ensure_tables` (v0, el suelo) y en un hub real ya existe cuando esto corre —
+        // pero una migración que se cae si la tabla no está solo se puede aplicar en un orden, y
+        // este catálogo se reaplica entero sobre bases en cualquier estado.
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _event_delivery (\
+  event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
+  hub_id TEXT NOT NULL, \
+  PRIMARY KEY (event_id, listener_command));\
+ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS hub_id TEXT;\
+UPDATE _event_delivery SET hub_id = :hub_id WHERE hub_id IS NULL;\
+ALTER TABLE _event_delivery ALTER COLUMN hub_id SET NOT NULL;\
+CREATE INDEX IF NOT EXISTS ix_event_delivery_hub ON _event_delivery (hub_id, event_id);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2973,6 +3036,76 @@ mod tests {
                 .unwrap_or_else(|e| panic!("`{statement}` no es re-ejecutable: {e}"));
         }
     }
+
+    /// **v46 sella el hub en los marcadores de idempotencia que ya existían** (hub#735).
+    ///
+    /// `_event_delivery` la crea el baseline v0 (`outbox::ensure_tables`), así que un hub **ya
+    /// desplegado** se simula quitándole la columna: es exactamente la forma que tiene hoy. Lo que
+    /// se comprueba es lo que importa de un marcador — que **sigue ahí**: perder uno no libera
+    /// espacio, hace que un listener vuelva a correr y que un evento produzca un segundo run.
+    #[tokio::test]
+    async fn la_v46_sella_el_hub_en_los_marcadores_ya_escritos_sin_perder_ninguno() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let v46 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "event_delivery_hub_scoped")
+            .expect("el marcador por hub sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(v46.version)).await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        db.execute_batch("ALTER TABLE _event_delivery DROP COLUMN hub_id;")
+            .await
+            .unwrap();
+        // Dos marcadores de antes de que la columna existiera: el de un listener de módulo y el
+        // sintético de un disparador de flujo.
+        db.execute_batch(
+            "INSERT INTO _event_delivery (event_id, listener_command, delivered_at) VALUES \
+               ('evt-1', 'inventory._restock_on_void', '2026-01-01T00:00:00Z'), \
+               ('evt-1', '_flow:trigger-9', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-a").await.unwrap();
+
+        let rows = db
+            .query(
+                "SELECT count(*) AS c FROM _event_delivery WHERE hub_id = 'hub-a'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.rows[0]["c"].as_i64(),
+            Some(2),
+            "los dos marcadores siguen ahí, y ahora dicen de qué hub son"
+        );
+    }
+
+    /// Re-ejecutable (regla hub#342/#483): el segundo pase es un no-op, no un error.
+    #[tokio::test]
+    async fn la_v46_se_puede_aplicar_dos_veces() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let v46 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "event_delivery_hub_scoped")
+            .expect("el marcador por hub sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(v46.version)).await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        db.execute_batch("ALTER TABLE _event_delivery DROP COLUMN hub_id;")
+            .await
+            .unwrap();
+
+        apply_one(&db, "event_delivery_hub_scoped").await;
+        for statement in split_statements(v46.postgres) {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!("hub-a"));
+            db.execute(&statement, &p)
+                .await
+                .unwrap_or_else(|e| panic!("`{statement}` no es re-ejecutable: {e}"));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -3001,11 +3134,19 @@ mod kind_contract_tests {
 
     /// **El inventario: qué versiones NO admiten vuelta atrás.**
     ///
-    /// Cuatro de veintiséis. La issue decía «al menos dos» (las PK de `hub_module` y de
-    /// `_hub_certificate`) y se dejaba las dos peores:
+    /// Seis. La issue decía «al menos dos» (las PK de `hub_module` y de `_hub_certificate`) y se
+    /// dejaba las dos peores:
     ///
     /// - **v23** hace `DELETE FROM` — **borra datos**, no solo esquema;
     /// - **v25** hace `DROP COLUMN` — el binario anterior usaba esa columna.
+    ///
+    /// Las dos `SET NOT NULL` (v42, v46) están aquí por el mismo motivo por los dos lados: revertir
+    /// el binario deja una columna obligatoria que el código anterior no escribe, así que sus
+    /// `INSERT` fallan. Y en el despliegue start-first (ADR-0269) eso también dura lo que tarda el
+    /// contenedor viejo en morir: sus escrituras fallan y **hacen rollback** —ni entrega a medias
+    /// ni marcador huérfano—, y la fila del outbox se reintenta con backoff. Es la alternativa
+    /// segura frente a un `DEFAULT ''`, que dejaría marcadores sin dueño que el lector scopeado no
+    /// vería nunca y que chocarían con la PK para siempre.
     ///
     /// Sirve para dos cosas: un rollback **por debajo** de estas versiones no es seguro, y este
     /// test se rompe si alguien añade una quinta sin mirarlo.
@@ -3019,7 +3160,7 @@ mod kind_contract_tests {
 
         assert_eq!(
             no_vuelta,
-            vec![1, 14, 23, 25, 42],
+            vec![1, 14, 23, 25, 42, 46],
             "cambió el inventario de migraciones sin vuelta atrás. Si es una nueva: revisa que \
              de verdad haga falta, porque cada una es una versión por debajo de la cual el \
              rollback deja de ser seguro."
@@ -3055,9 +3196,12 @@ mod kind_contract_tests {
         // se llevó el 42 que había pedido el otorgamiento de representación, que pasó al v43.
         // + `hub_trusted_device_name` (v44, hub#494): el nombre que le pone el NEGOCIO al
         // dispositivo. + `flow_approval_on_expire` (v45, hub#972): qué le pasa al run cuando su
-        // aprobación caduca, escrito en la fila. Ojo a la distancia entre 42 entradas y la v45 —
-        // **el número es declarado, no la posición**: faltan la 15, la 20 y la 24, así que contar
-        // entradas para elegir el siguiente número da un choque, no un hueco.
-        assert_eq!(MIGRATIONS.len(), 42, "el catálogo cambió de tamaño");
+        // aprobación caduca, escrito en la fila. + `event_delivery_hub_scoped` (v46, hub#735): el
+        // marcador de idempotencia también dice de qué hub es — nació como v45 y el rebase lo
+        // destapó como conflicto contra hub#972, que es exactamente para lo que sirve tener el
+        // número a mano. Ojo a la distancia entre 43 entradas y la v46 — **el número es declarado,
+        // no la posición**: faltan la 15, la 20 y la 24, así que contar entradas para elegir el
+        // siguiente número da un choque, no un hueco.
+        assert_eq!(MIGRATIONS.len(), 43, "el catálogo cambió de tamaño");
     }
 }

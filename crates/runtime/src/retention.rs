@@ -266,13 +266,14 @@ mod tests {
     }
 
     /// The idempotency marker the relay writes inside the listener's transaction.
-    async fn marker(db: &PgAdapter, event_id: &str) {
+    async fn marker(db: &PgAdapter, hub: &str, event_id: &str) {
         let mut p = Params::new();
         p.insert("event_id".into(), json!(event_id));
+        p.insert("hub_id".into(), json!(hub));
         p.insert("at".into(), json!(days_ago(0)));
         db.execute(
-            "INSERT INTO _event_delivery (event_id, listener_command, delivered_at) \
-             VALUES (:event_id, 'm.listener', :at)",
+            "INSERT INTO _event_delivery (event_id, listener_command, delivered_at, hub_id) \
+             VALUES (:event_id, 'm.listener', :at, :hub_id)",
             &p,
         )
         .await
@@ -326,9 +327,9 @@ mod tests {
         let db = fresh_db().await;
         system_schema(&db).await;
         event(&db, HUB, "old-delivered", "delivered", 120).await;
-        marker(&db, "old-delivered").await;
+        marker(&db, HUB, "old-delivered").await;
         event(&db, HUB, "old-discarded", "discarded", 120).await;
-        marker(&db, "old-discarded").await;
+        marker(&db, HUB, "old-discarded").await;
 
         let rep = prune_once(&db, HUB, &cutoff()).await.unwrap();
 
@@ -384,7 +385,7 @@ mod tests {
         let db = fresh_db().await;
         system_schema(&db).await;
         event(&db, HUB, "recent", "delivered", 89).await;
-        marker(&db, "recent").await;
+        marker(&db, HUB, "recent").await;
 
         let rep = prune_once(&db, HUB, &cutoff()).await.unwrap();
 
@@ -502,10 +503,10 @@ mod tests {
         let db = fresh_db().await;
         system_schema(&db).await;
         event(&db, HUB, "mine", "delivered", 120).await;
-        marker(&db, "mine").await;
+        marker(&db, HUB, "mine").await;
         run_with_step(&db, HUB, "mine-run", "done", 120).await;
         event(&db, "neighbour", "theirs", "delivered", 120).await;
-        marker(&db, "theirs").await;
+        marker(&db, "neighbour", "theirs").await;
         run_with_step(&db, "neighbour", "their-run", "done", 120).await;
 
         let rep = prune_once(&db, HUB, &cutoff()).await.unwrap();
@@ -520,7 +521,7 @@ mod tests {
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE event_id='theirs'").await,
             1,
-            "and so is its marker — _event_delivery has no hub_id of its own"
+            "and so is its marker: the doomed set is the hub's own events, and nothing else"
         );
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _flow_runs WHERE hub_id='neighbour'").await,

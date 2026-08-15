@@ -92,7 +92,7 @@ pub async fn on_event(
         let listener = synthetic_listener(&trigger_id);
 
         // Already handled in a previous attempt of this same event (the relay is at-least-once).
-        if delivery_exists(db, event_id, &listener).await? {
+        if delivery_exists(db, hub_id, event_id, &listener).await? {
             continue;
         }
 
@@ -102,7 +102,7 @@ pub async fn on_event(
         if !filter.matches(&scope) {
             // Not a match is a decision, not a pending job: book it so the next attempt of the
             // same event does not re-evaluate a filter that already said no.
-            mark_delivered(db, event_id, &listener).await?;
+            mark_delivered(db, hub_id, event_id, &listener).await?;
             continue;
         }
 
@@ -112,7 +112,7 @@ pub async fn on_event(
                 "flows: flow {flow_id} exceeded {MAX_RUNS_PER_MINUTE} runs/min (event \
                  {event_name}); the event is dropped to keep the hub up"
             );
-            mark_delivered(db, event_id, &listener).await?;
+            mark_delivered(db, hub_id, event_id, &listener).await?;
             continue;
         }
 
@@ -128,7 +128,7 @@ pub async fn on_event(
             &format!("flow:{flow_id}"),
         );
         // The run and its idempotence marker commit together, or neither does.
-        db.execute_tx(&[(sql, params), delivery_op(event_id, &listener)])
+        db.execute_tx(&[(sql, params), delivery_op(hub_id, event_id, &listener)])
             .await?;
         started += 1;
     }
@@ -158,7 +158,7 @@ pub async fn sweep_schedules(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u
 
         if runs_in_last_minute(db, hub_id, &flow_id).await? >= MAX_RUNS_PER_MINUTE {
             eprintln!("flows: flow {flow_id} exceeded {MAX_RUNS_PER_MINUTE} runs/min (schedule)");
-            advance_schedule(db, &trigger_id, &kind, &expr, &now, tz).await?;
+            advance_schedule(db, hub_id, &trigger_id, &kind, &expr, &now, tz).await?;
             continue;
         }
 
@@ -179,7 +179,7 @@ pub async fn sweep_schedules(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u
         );
         // Firing and moving the clock commit together: if the insert fails the trigger stays due,
         // and if it succeeds the trigger cannot fire twice for the same instant.
-        let advance = advance_schedule_op(&trigger_id, &kind, &expr, &now, tz);
+        let advance = advance_schedule_op(hub_id, &trigger_id, &kind, &expr, &now, tz);
         db.execute_tx(&[(sql, params), advance]).await?;
         started += 1;
     }
@@ -219,12 +219,13 @@ async fn retime_to_current_zone(
         let expr = row["cron"].as_str().unwrap_or_default();
         let mut p = Params::new();
         p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub_id));
         p.insert("tz".into(), json!(tz.name()));
         p.insert("now".into(), json!(now));
         p.insert("next_run".into(), json!(cron::next_after_in_tz(expr, now, tz)));
         db.execute(
             "UPDATE _flow_triggers SET next_run = :next_run, tz = :tz, updated_at = :now \
-             WHERE id = :id",
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
             &p,
         )
         .await?;
@@ -262,6 +263,7 @@ async fn claim_due_schedule(
 /// business clock** (collapsing a backlog, like the scheduler), an `at` to never (`enabled = 0` —
 /// it was one-shot).
 fn advance_schedule_op(
+    hub_id: &str,
     trigger_id: &str,
     kind: &str,
     expr: &str,
@@ -270,6 +272,7 @@ fn advance_schedule_op(
 ) -> (String, Params) {
     let mut p = Params::new();
     p.insert("id".into(), json!(trigger_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("now".into(), json!(now));
     let sql = if kind == "cron" {
         // hub#730: the fallback used to be `now`, which means "due again on the very next tick" —
@@ -287,23 +290,26 @@ fn advance_schedule_op(
         p.insert("next_run".into(), json!(next));
         p.insert("tz".into(), json!(tz.name()));
         "UPDATE _flow_triggers SET next_run = :next_run, tz = :tz, last_run = :now, \
-         claim_expires_at = NULL, updated_at = :now WHERE id = :id"
+         claim_expires_at = NULL, updated_at = :now \
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
     } else {
         "UPDATE _flow_triggers SET enabled = 0, next_run = NULL, last_run = :now, \
-         claim_expires_at = NULL, updated_at = :now WHERE id = :id"
+         claim_expires_at = NULL, updated_at = :now \
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
     };
     (sql.to_string(), p)
 }
 
 async fn advance_schedule(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     trigger_id: &str,
     kind: &str,
     expr: &str,
     now: &str,
     tz: cron::Tz,
 ) -> Result<()> {
-    let (sql, p) = advance_schedule_op(trigger_id, kind, expr, now, tz);
+    let (sql, p) = advance_schedule_op(hub_id, trigger_id, kind, expr, now, tz);
     db.execute(&sql, &p).await?;
     Ok(())
 }
@@ -322,7 +328,8 @@ async fn runs_in_last_minute(
     let res = db
         .query(
             "SELECT COUNT(*) AS c FROM _flow_runs \
-             WHERE hub_id = :hub_id AND flow_id = :flow_id AND created_at >= :since",
+             WHERE hub_id = :hub_id AND flow_id = :flow_id AND created_at >= :since \
+               AND deleted_at IS NULL",
             &p,
         )
         .await?;
@@ -350,33 +357,40 @@ fn parse_condition(raw: &str) -> Condition {
         .unwrap_or_default()
 }
 
-fn delivery_op(event_id: &str, listener: &str) -> (String, Params) {
-    let mut p = Params::new();
-    p.insert("event_id".into(), json!(event_id));
-    p.insert("listener_command".into(), json!(listener));
-    p.insert("delivered_at".into(), json!(now_rfc3339()));
-    (
-        "INSERT INTO _event_delivery (event_id, listener_command, delivered_at) \
-         VALUES (:event_id, :listener_command, :delivered_at)"
-            .to_string(),
-        p,
-    )
+/// The marker a trigger books its idempotence under, built by the outbox — the SAME statement the
+/// relay uses for a module's listener, and deliberately not a second copy of it (hub#735): the
+/// column list of `_event_delivery` now includes `hub_id`, and two hand-written inserts are two
+/// places for the next column to be forgotten in one of them.
+fn delivery_op(hub_id: &str, event_id: &str, listener: &str) -> (String, Params) {
+    crate::outbox::delivery_op(hub_id, event_id, listener)
 }
 
-async fn mark_delivered(db: &dyn DatabaseAdapter, event_id: &str, listener: &str) -> Result<()> {
-    let (sql, p) = delivery_op(event_id, listener);
+async fn mark_delivered(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+    listener: &str,
+) -> Result<()> {
+    let (sql, p) = delivery_op(hub_id, event_id, listener);
     db.execute(&sql, &p).await?;
     Ok(())
 }
 
-async fn delivery_exists(db: &dyn DatabaseAdapter, event_id: &str, listener: &str) -> Result<bool> {
+async fn delivery_exists(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+    listener: &str,
+) -> Result<bool> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("event_id".into(), json!(event_id));
     p.insert("listener_command".into(), json!(listener));
     let res = db
         .query(
             "SELECT 1 AS ok FROM _event_delivery \
-             WHERE event_id = :event_id AND listener_command = :listener_command",
+             WHERE event_id = :event_id AND listener_command = :listener_command \
+               AND hub_id = :hub_id",
             &p,
         )
         .await?;
@@ -745,5 +759,126 @@ mod tests {
         assert_eq!(sweep_schedules(&db, HUB).await.unwrap(), 1);
         let next = trigger_row(&db, &flow, "next_run").await;
         assert!(next.ends_with("T03:30:00+00:00"), "advancing keeps the zone: {next}");
+    }
+
+    // ── hub#735: the writes of this file name the hub, and the guards only count what exists ──
+
+    /// The neighbour hub, sharing this database with [`HUB`].
+    const OTHER: &str = "hub-triggers-neighbour";
+
+    async fn flow_for(db: &dyn DatabaseAdapter, hub: &str, definition: Json) -> String {
+        store::create(
+            db,
+            hub,
+            &crate::registry::Registry::new(),
+            &NewFlow {
+                name: "T".into(),
+                enabled: true,
+                definition,
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap()
+        .id
+    }
+
+    /// The rate guard is a ceiling on what a flow is DOING, not on what it once did and had
+    /// removed. Counting soft-deleted runs strangles a flow with executions that no longer exist —
+    /// and nothing ever lets go of the throttle, because a deleted row does not age out of the
+    /// window by being deleted again.
+    #[tokio::test]
+    async fn the_rate_guard_does_not_count_runs_that_no_longer_exist() {
+        let db = db().await;
+        let flow = flow_with(&db, on_sale(json!({}))).await;
+        for _ in 0..MAX_RUNS_PER_MINUTE {
+            store::start_run(&db, HUB, &flow, "", "manual", "", &json!({}), 0, "t")
+                .await
+                .unwrap();
+        }
+        // They are all gone — soft-deleted, which is how every read in the kernel says «gone».
+        let mut p = Params::new();
+        p.insert("f".into(), json!(flow));
+        p.insert("now".into(), json!(now_rfc3339()));
+        db.execute(
+            "UPDATE _flow_runs SET deleted_at = :now WHERE flow_id = :f",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            on_event(&db, HUB, "evt-after", "sale.completed", &payload(&[]), 0)
+                .await
+                .unwrap(),
+            1,
+            "the ceiling counts live runs, not tombstones"
+        );
+    }
+
+    /// Two hubs, one database, a due clock trigger in each. Advancing one hub's schedule must not
+    /// reach into the other's — and the neighbour here is alive, with its own armed trigger.
+    #[tokio::test]
+    async fn a_clock_trigger_is_only_advanced_by_the_hub_that_owns_it() {
+        let db = db().await;
+        let cron_flow = json!({
+            "schema_version": 1,
+            "triggers": [{ "kind": "cron", "cron": "*/5 * * * *" }],
+            "steps": [{ "id": "wait", "kind": "delay", "seconds": 1 }]
+        });
+        let mine = flow_with(&db, cron_flow.clone()).await;
+        let theirs = flow_for(&db, OTHER, cron_flow).await;
+
+        let before_mine = trigger_row(&db, &mine, "next_run").await;
+        let before_theirs = trigger_row(&db, &theirs, "next_run").await;
+        let (id, _) = (trigger_row(&db, &mine, "id").await, ());
+
+        // The neighbour asks for OUR trigger to be moved on.
+        advance_schedule(&db, OTHER, &id, "cron", "*/5 * * * *", &now_rfc3339(), cron::Tz::UTC)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            trigger_row(&db, &mine, "next_run").await,
+            before_mine,
+            "our clock did not move"
+        );
+        assert_eq!(trigger_row(&db, &mine, "last_run").await, "", "nor did it fire");
+        assert_eq!(
+            trigger_row(&db, &theirs, "next_run").await,
+            before_theirs,
+            "and the neighbour's own clock is where it was"
+        );
+    }
+
+    /// The idempotency marker says WHOSE delivery it was. Without that, «has this event already
+    /// started a run?» is a question asked of every hub's markers at once.
+    #[tokio::test]
+    async fn an_idempotence_marker_belongs_to_the_hub_that_booked_it() {
+        let db = db().await;
+        let flow = flow_with(&db, on_sale(json!({}))).await;
+        on_event(&db, HUB, "evt-1", "sale.completed", &payload(&[]), 0).await.unwrap();
+        assert_eq!(run_count(&db, &flow).await, 1);
+
+        let listener = db
+            .query(
+                "SELECT listener_command, hub_id FROM _event_delivery WHERE event_id = 'evt-1'",
+                &Params::new(),
+            )
+            .await
+            .unwrap()
+            .rows
+            .remove(0);
+        assert_eq!(listener["hub_id"], json!(HUB), "the marker carries its hub");
+
+        let name = listener["listener_command"].as_str().unwrap().to_string();
+        assert!(
+            delivery_exists(&db, HUB, "evt-1", &name).await.unwrap(),
+            "its own hub sees it"
+        );
+        assert!(
+            !delivery_exists(&db, OTHER, "evt-1", &name).await.unwrap(),
+            "and the neighbour does not: this marker is not an answer to its question"
+        );
     }
 }

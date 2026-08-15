@@ -869,6 +869,11 @@ impl Runtime {
         // propósito: un índice no cambia la forma del dato y `IF NOT EXISTS` no cuesta nada en el
         // segundo arranque — mismo criterio que las columnas del outbox por su `ENSURE_TABLES`.
         flows::store::ensure_indexes(self.db.as_ref()).await?;
+        // 2a-bis) The `wake_at` of the runs parked before hub#970, re-written in UTC. Same
+        // criterion as 2b below: an invariant over data, not a schema change — the write side is
+        // already fixed, but a run that is ALREADY asleep is only ever read by the very comparison
+        // the offset breaks, so nothing else would reach it. Re-running it is a no-op.
+        flows::store::normalize_wake_at(self.db.as_ref(), &self.hub_id).await?;
         // 2b) The device row an id that names the HUB left behind (hub#454). Not a versioned
         // migration on purpose: it is an invariant, not a schema change — it must also clean a
         // database restored from a backup taken before the fix, and re-running it is a no-op.

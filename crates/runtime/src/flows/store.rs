@@ -426,10 +426,11 @@ pub async fn seed_triggers(
         }
         let mut p = Params::new();
         p.insert("id".into(), json!(row["id"].as_str().unwrap_or_default()));
+        p.insert("hub_id".into(), json!(hub_id));
         p.insert("now".into(), json!(now));
         db.execute(
             "UPDATE _flow_triggers SET deleted_at = :now, enabled = 0, updated_at = :now \
-             WHERE id = :id",
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
             &p,
         )
         .await?;
@@ -605,6 +606,66 @@ pub async fn ensure_indexes(db: &dyn DatabaseAdapter) -> Result<()> {
     )
     .await?;
     Ok(())
+}
+
+/// **Re-writes the `wake_at` of runs parked with a non-UTC offset** (hub#970).
+///
+/// `wake_sleeping` asks the database `wake_at <= :now`, and the column is TEXT: the comparison is
+/// lexicographic, so it only answers «has this instant arrived?» while every string in it is UTC.
+/// `delay.until` used to store the instant with the offset it was written in — `trigger.at`
+/// documents that the offset IS part of the instant — so `…T09:00:00+02:00` sorted two hours late
+/// and a `-05:00` sorted five hours early. The write side is fixed at the source
+/// (`executor::run_step`), but the runs already asleep would never be touched again: the only
+/// thing that reads a sleeping run is the comparison the offset breaks.
+///
+/// Not a numbered migration, on purpose — same criterion as [`ensure_indexes`] and
+/// `identity::forget_hub_id_as_device`: it repairs an INVARIANT over data, not the shape of the
+/// schema, so it must also reach a database restored from a backup taken before the fix, and
+/// running it twice is a no-op (a `wake_at` already in UTC re-writes to itself).
+///
+/// Bounded by construction: only `sleeping` runs of this hub have a `wake_at` at all, and a hub
+/// has as many of those as it has delays in flight.
+pub async fn normalize_wake_at(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let parked = db
+        .query(
+            "SELECT id, wake_at FROM _flow_runs \
+             WHERE hub_id = :hub_id AND status = :status AND wake_at IS NOT NULL \
+               AND deleted_at IS NULL AND wake_at NOT LIKE '%+00:00'",
+            &{
+                let mut q = p.clone();
+                q.insert("status".into(), json!(STATUS_SLEEPING));
+                q
+            },
+        )
+        .await?;
+    for row in &parked.rows {
+        let raw = row["wake_at"].as_str().unwrap_or_default();
+        // Anything that is not an instant is left exactly as it is: this repairs a zone, it does
+        // not invent a wake-up time for a row nobody can read.
+        let Ok(instant) = chrono::DateTime::parse_from_rfc3339(raw) else {
+            continue;
+        };
+        let mut q = Params::new();
+        q.insert("id".into(), json!(row["id"].as_str().unwrap_or_default()));
+        q.insert("hub_id".into(), json!(hub_id));
+        q.insert("wake_at".into(), json!(to_utc_rfc3339(&instant)));
+        db.execute(
+            "UPDATE _flow_runs SET wake_at = :wake_at \
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
+            &q,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// **An instant, as this kernel writes instants: UTC** (flows.md §3.2 — "UTC inside, the business
+/// clock on screen"). The one place that turns a `DateTime<FixedOffset>` into a `wake_at`, so the
+/// write path and the boot repair cannot disagree about what the column holds.
+pub(crate) fn to_utc_rfc3339(instant: &chrono::DateTime<chrono::FixedOffset>) -> String {
+    instant.with_timezone(&chrono::Utc).to_rfc3339()
 }
 
 /// The runs one event started — the forward half of «this sale set off these steps».

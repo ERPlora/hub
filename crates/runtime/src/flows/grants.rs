@@ -706,15 +706,8 @@ pub async fn replace(
             .iter()
             .any(|(k, v)| k.as_str() == grant.kind && v == &grant.value);
         if !still_wanted {
-            let mut p = Params::new();
-            p.insert("id".into(), json!(grant.id));
-            p.insert("now".into(), json!(now));
-            p.insert("by".into(), json!(granted_by));
-            db.execute(
-                "UPDATE _flow_grants SET deleted_at = :now, revoked_by = :by WHERE id = :id",
-                &p,
-            )
-            .await?;
+            let (sql, p) = revoke_op(hub_id, &grant.id, &now, granted_by);
+            db.execute(&sql, &p).await?;
         }
     }
 
@@ -741,6 +734,34 @@ pub async fn replace(
         .await?;
     }
     Ok(())
+}
+
+/// The `UPDATE` that revokes ONE grant, as a statement a caller can execute or put in its own
+/// transaction — the shape the rest of the kernel uses for a write it wants to be able to reason
+/// about (`write_step_op`, `advance_index_op`, `delivery_op`).
+///
+/// Two clauses beyond the id, and neither is decoration (hub#735):
+///
+/// - **`hub_id`** — the id came from a hub-scoped read, but the read and the write are two
+///   statements. The twelfth caller is the one that forgets, and this is the file where a
+///   forgotten scope revokes somebody else's authorisation.
+/// - **`deleted_at IS NULL`** — revocation is a FACT WITH A TIMESTAMP, and re-revoking must not
+///   move it. `replace` reads the live grants and then writes; between those two, `revoke_all`
+///   (which `delete` calls) can land. Without this clause the later write overwrites `deleted_at`
+///   and `revoked_by`, and what the header of this file promises — «who could do what, and until
+///   when» — becomes «until whenever somebody last pressed save».
+fn revoke_op(hub_id: &str, grant_id: &str, now: &str, revoked_by: &str) -> (String, Params) {
+    let mut p = Params::new();
+    p.insert("id".into(), json!(grant_id));
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("now".into(), json!(now));
+    p.insert("by".into(), json!(revoked_by));
+    (
+        "UPDATE _flow_grants SET deleted_at = :now, revoked_by = :by \
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
+            .to_string(),
+        p,
+    )
 }
 
 /// Live grants of a flow, oldest first.
@@ -1666,5 +1687,77 @@ mod tests {
         let err = parse_pairs(&json!([{ "kind": "commnd", "value": "sales.sale.create" }]))
             .expect_err("a typo must not become a silent denial noticed at 3 AM");
         assert!(format!("{err}").contains("command"), "{err}");
+    }
+
+    // ── hub#735: a revocation is a fact with a timestamp, and it belongs to one hub ────────────
+
+    /// The neighbour hub, sharing this database with [`HUB`].
+    const OTHER: &str = "hub-grants-neighbour";
+
+    async fn live_grant(db: &dyn DatabaseAdapter, hub: &str, flow: &str) -> String {
+        replace(
+            db,
+            hub,
+            flow,
+            &registry(),
+            &[(GrantKind::Command, "sales.sale.create".to_string())],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        list(db, hub, flow).await.unwrap().remove(0).id
+    }
+
+    /// The whole row, unfiltered — a scoped read cannot tell «the write was refused» from «the
+    /// write happened and the row is now invisible».
+    async fn raw_grant(db: &dyn DatabaseAdapter, id: &str) -> Json {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        db.query("SELECT * FROM _flow_grants WHERE id = :id", &p)
+            .await
+            .unwrap()
+            .rows
+            .remove(0)
+    }
+
+    #[tokio::test]
+    async fn a_revocation_names_its_hub_and_is_never_rewritten() {
+        let db = db_with_schema().await;
+        crate::flows::test_support::ensure_schema(&db, OTHER).await;
+        let mine = live_grant(&db, HUB, FLOW).await;
+        let theirs = live_grant(&db, OTHER, FLOW).await;
+        let theirs_before = raw_grant(&db, &theirs).await;
+
+        // The neighbour cannot revoke what is not its own, even naming the row by id.
+        let (sql, p) = revoke_op(OTHER, &mine, "2020-01-01T00:00:00+00:00", "hub_user:9");
+        db.execute(&sql, &p).await.unwrap();
+        assert_eq!(
+            raw_grant(&db, &mine).await["deleted_at"],
+            Json::Null,
+            "our grant is still live"
+        );
+
+        // Its owner can, once. The timestamp of that «once» is the audit trail.
+        let (sql, p) = revoke_op(HUB, &mine, "2026-01-01T00:00:00+00:00", "hub_user:1");
+        db.execute(&sql, &p).await.unwrap();
+        let revoked = raw_grant(&db, &mine).await;
+        assert_eq!(revoked["deleted_at"], json!("2026-01-01T00:00:00+00:00"));
+        assert_eq!(revoked["revoked_by"], json!("hub_user:1"));
+
+        // A second revocation — the shape of `replace` racing the `revoke_all` of a delete — is a
+        // no-op. It must not move «until when» forward, nor rename who did it.
+        let (sql, p) = revoke_op(HUB, &mine, "2026-06-06T00:00:00+00:00", "hub_user:2");
+        db.execute(&sql, &p).await.unwrap();
+        assert_eq!(
+            raw_grant(&db, &mine).await,
+            revoked,
+            "the first revocation is the one that happened"
+        );
+
+        assert_eq!(
+            raw_grant(&db, &theirs).await,
+            theirs_before,
+            "and the neighbour's grant was never in this story"
+        );
     }
 }
