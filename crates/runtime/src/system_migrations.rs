@@ -1650,6 +1650,29 @@ ALTER TABLE _hub_fiscal_regime_registry \
 UPDATE _hub_fiscal_regime_registry SET simplified_invoice_max_cents = 300000 \
   WHERE country_code = 'ES' AND regime_key = 'verifactu' AND simplified_invoice_max_cents = 0;",
     },
+    // hub#963 — the public claim: the one row a stranger with no session can act on.
+    //
+    // `token_hash` and not the locator: a dump of this table must not hand over every open ticket
+    // in the hub. `UNIQUE (hub_id, kind, subject_id)` is what makes minting idempotent, so the POS
+    // can call it on every reprint and the customer's copy keeps working.
+    SystemMigration {
+        version: 52,
+        name: "public_claim",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _public_claim_key (\
+  hub_id TEXT NOT NULL, key_hex TEXT NOT NULL, created_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id));\
+CREATE TABLE IF NOT EXISTS _public_claim (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, token_hash TEXT NOT NULL, kind TEXT NOT NULL, \
+  subject_id TEXT NOT NULL, command TEXT NOT NULL, \
+  sealed_payload TEXT NOT NULL DEFAULT '{}', public_fields TEXT NOT NULL DEFAULT '[]', \
+  expires_at TEXT NOT NULL, redeemed_at TEXT, result_ref TEXT NOT NULL DEFAULT '', \
+  created_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, \
+  PRIMARY KEY (id));\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_public_claim_token ON _public_claim (hub_id, token_hash);\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_public_claim_subject ON _public_claim (hub_id, kind, subject_id);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3496,6 +3519,11 @@ mod kind_contract_tests {
         // un rearranque no le pise al comerciante un valor que él hubiera movido. Al escribirla el
         // máximo era la v50 en `origin/develop` y en TODAS las ramas remotas, y también en los 10
         // worktrees locales de la flota — que es donde vive el número que el remoto aún no ha visto.
-        assert_eq!(MIGRATIONS.len(), 48, "el catálogo cambió de tamaño");
+        // + `public_claim` (v52, hub#963; nació v51 y se movió en el rebase: hub#297 se llevó la 51): las dos tablas de la ÚNICA puerta del hub que contesta a
+        // alguien sin sesión — el cliente que se lleva el tique y quiere su factura. Se guarda el
+        // HASH del localizador, nunca el localizador: un volcado de la tabla no puede entregar
+        // todos los tiques abiertos del negocio. Al escribirla el máximo era la v50 en
+        // `origin/develop` y en TODAS las ramas remotas, recomprobado contra el conjunto.
+        assert_eq!(MIGRATIONS.len(), 49, "el catálogo cambió de tamaño");
     }
 }

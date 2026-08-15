@@ -439,6 +439,25 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
         b.qr(str_field(data, "qr_data", ""));
     }
 
+    // **El SEGUNDO QR: «pide tu factura»** (hub#963). No sustituye al de arriba y por eso son dos
+    // campos: el de VeriFactu apunta a la Sede de la AEAT (`ValidarQR`) y sirve para COTEJAR; este
+    // apunta a este hub y sirve para PEDIR. Ágora imprime «CREAR FACTURA», Cuiner imprime
+    // localizador + QR — y los dos lo ponen al pie, junto al fiscal, sobre el mismo papel.
+    //
+    // El **localizador en texto** va debajo y no es decorativo: es la única vía cuando la cámara no
+    // enfoca, el móvil no tiene batería o el tique se fotocopia. Por eso el alfabeto Crockford del
+    // core evita `I`, `L`, `O` y `U` — se teclea de un papel térmico, no se lee de una pantalla.
+    if is_truthy(data, "claim_qr_data") {
+        b.set(Align::Center, false, false, false);
+        if is_truthy(data, "claim_note") {
+            b.text(&format!("{}\n", str_field(data, "claim_note", "")));
+        }
+        b.qr(str_field(data, "claim_qr_data", ""));
+        if is_truthy(data, "claim_locator") {
+            b.text(&format!("{}\n", str_field(data, "claim_locator", "")));
+        }
+    }
+
     b.text("\n");
     if is_truthy(data, "receipt_header") {
         b.set(Align::Center, false, false, false);
@@ -849,6 +868,93 @@ mod tests {
             DocumentType::parse("prebill").is_some(),
             "`prebill` is the bill taken to the table before charging; refusing it leaves the \
              waiter with nothing to carry"
+        );
+    }
+
+    /// How many QR symbols reached the paper. One symbol is FIVE `GS ( k` commands (set model,
+    /// module size, error correction, store data, print), so counting the raw prefix would answer
+    /// five when the honest answer is one.
+    fn qr_symbols(bytes: &[u8]) -> usize {
+        bytes
+            .windows(3)
+            .filter(|w| *w == [0x1d, 0x28, 0x6b])
+            .count()
+            / 5
+    }
+
+    /// **Two QRs, not one** (hub#963). The VeriFactu one points at the AEAT's `ValidarQR` and is
+    /// for CHECKING; the second points at this hub and is for ASKING — «pide tu factura». They are
+    /// two fields on purpose: printing one over the other would either strip the fiscal proof from
+    /// the ticket or leave the customer with nothing to scan.
+    #[test]
+    fn a_ticket_can_carry_both_the_fiscal_qr_and_the_invoice_request_qr() {
+        let doc = json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-42",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1&numserie=T-42",
+            "claim_note": "Pide tu factura",
+            "claim_qr_data": "https://bar.erplora.com/p/ABCD1234ABCD1234",
+            "claim_locator": "ABCD1234ABCD1234",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &doc)
+            .expect("a well-formed ticket renders");
+        let text = String::from_utf8_lossy(&bytes);
+
+        assert_eq!(qr_symbols(&bytes), 2, "both QRs must reach the paper");
+        assert!(
+            text.contains("ValidarQR"),
+            "the fiscal QR still points at the AEAT"
+        );
+        assert!(
+            text.contains("/p/ABCD1234ABCD1234"),
+            "and the second one at this hub"
+        );
+        assert!(
+            text.contains("Pide tu factura"),
+            "with a caption, or nobody knows what the second code is for"
+        );
+        assert!(
+            text.contains("ABCD1234ABCD1234\n"),
+            "and the locator in PLAIN TEXT below it: the camera is not always an option"
+        );
+    }
+
+    /// A ticket with no claim prints exactly what it printed before. The second QR is opt-in, so
+    /// no hub that has not adopted this grows a blank line or a stray caption.
+    #[test]
+    fn a_ticket_without_a_claim_is_unchanged() {
+        let doc = json!({
+            "receipt_id": "T-43",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &doc).unwrap();
+        assert_eq!(qr_symbols(&bytes), 1, "only the fiscal QR");
+    }
+
+    /// **The bill still carries no QR of either kind.** The pre-bill drops the fiscal one because
+    /// there is no billing record yet — and for exactly the same reason there is no invoice to
+    /// request: a claim on a sale that has not been charged would point at nothing.
+    #[test]
+    fn the_bill_carries_neither_qr() {
+        let doc = json!({
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "claim_qr_data": "https://bar.erplora.com/p/ABCD1234ABCD1234",
+            "claim_locator": "ABCD1234ABCD1234",
+        });
+        let bytes = render_document(DocumentType::parse("prebill").unwrap(), &doc).unwrap();
+        assert!(
+            !bytes.windows(3).any(|w| w == [0x1d, 0x28, 0x6b]),
+            "a bill carries no QR at all"
+        );
+        assert!(
+            !String::from_utf8_lossy(&bytes).contains("ABCD1234ABCD1234"),
+            "nor the locator in text"
         );
     }
 
