@@ -261,7 +261,8 @@ fn config_minima() -> serde_json::Value {
 fn xml_alta_importes_en_euros_y_estructura() {
     let hash = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
     let record = record_alta_centimos(&hash);
-    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
+        .expect("el registro se puede declarar");
 
     // Importes formateados en EUROS (la conversión céntimos→euros la hace build_soap /100).
     assert!(xml.contains("<sum1:CuotaTotal>231.00</sum1:CuotaTotal>"), "{xml}");
@@ -304,7 +305,8 @@ fn xml_alta_encadenamiento_referencia_registro_anterior() {
         "invoice_date": FECHA_ISO,
         "record_hash": h1,
     });
-    let xml = aeat::build_soap(&record, &config_minima(), Some(&prev), "hub-test");
+    let xml = aeat::build_soap(&record, &config_minima(), Some(&prev), "hub-test")
+        .expect("el registro se puede declarar");
 
     assert!(xml.contains("<sum1:RegistroAnterior>"), "{xml}");
     assert!(
@@ -319,7 +321,8 @@ fn xml_anulacion_estructura() {
     let hash = chain::anulacion_hash(NIF, NUM1, FECHA_ISO, "", TS1);
     let mut record = record_alta_centimos(&hash);
     record["record_type"] = json!("anulacion");
-    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
+        .expect("el registro se puede declarar");
 
     assert!(xml.contains("<sum1:RegistroAnulacion>"));
     assert!(xml.contains(&format!(
@@ -340,7 +343,8 @@ fn xml_alta_con_destinatario_emite_bloque_destinatarios() {
     let mut record = record_alta_centimos(&hash);
     record["recipient_nif"] = json!("B87654321");
     record["recipient_name"] = json!("Cliente S.L.");
-    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
+        .expect("el registro se puede declarar");
 
     assert!(xml.contains("<sum1:Destinatarios><sum1:IDDestinatario>"), "{xml}");
     assert!(xml.contains("<sum1:NombreRazon>Cliente S.L.</sum1:NombreRazon>"), "{xml}");
@@ -368,7 +372,8 @@ fn xml_alta_f3_emite_bloque_facturas_sustituidas() {
     // Una F3 exige destinatario (como F1) — el cliente que pide la factura.
     record["recipient_nif"] = json!("B87654321");
     record["recipient_name"] = json!("Cliente S.L.");
-    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
+        .expect("el registro se puede declarar");
 
     assert!(xml.contains("<sum1:FacturasSustituidas><sum1:IDFacturaSustituida>"), "{xml}");
     assert!(
@@ -394,7 +399,8 @@ fn xml_alta_sin_sustitucion_no_emite_bloque() {
     // Guardarraíl: un alta normal (F1/F2, sin datos de sustitución) NO lleva FacturasSustituidas.
     let hash = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
     let record = record_alta_centimos(&hash);
-    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
+        .expect("el registro se puede declarar");
     assert!(!xml.contains("<sum1:FacturasSustituidas>"), "sin sustitución no debe emitir el bloque: {xml}");
 }
 
@@ -403,7 +409,8 @@ fn xml_alta_sin_destinatario_omite_bloque() {
     // Sin recipient_nif (p.ej. F2 simplificada / ticket de POS) NO se emite Destinatarios.
     let hash = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
     let record = record_alta_centimos(&hash); // sin recipient_*
-    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
+        .expect("el registro se puede declarar");
 
     assert!(!xml.contains("<sum1:Destinatarios>"), "no debe emitir Destinatarios vacío: {xml}");
 }

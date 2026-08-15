@@ -90,7 +90,7 @@ fn banner(title: &str) {
 
 /// Postea un alta y devuelve `(cuerpo_crudo, respuesta_parseada)`, imprimiendo ambos enteros.
 async fn send_alta(record: &Json, prev: Option<&Json>, label: &str) -> (String, aeat::AeatResponse) {
-    let xml = aeat::build_soap(record, &config(), prev, "hub-ensayo-2007");
+    let xml = aeat::build_soap(record, &config(), prev, "hub-ensayo-2007").expect("declarable");
     banner(&format!("{label} — XML ENVIADO"));
     println!("{xml}");
 

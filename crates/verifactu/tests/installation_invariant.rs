@@ -100,8 +100,8 @@ async fn two_hubs_with_the_same_nif_get_distinct_installation_numbers_and_fresh_
 
     // The XML declares each installation's own UUID, and both open with PrimerRegistro=S.
     let config = json!({});
-    let xml_a = aeat::build_soap(&rec_a, &config, None, HUB_A);
-    let xml_b = aeat::build_soap(&rec_b, &config, None, HUB_B);
+    let xml_a = aeat::build_soap(&rec_a, &config, None, HUB_A).expect("declarable");
+    let xml_b = aeat::build_soap(&rec_b, &config, None, HUB_B).expect("declarable");
     assert!(
         xml_a.contains(&format!("<sum1:NumeroInstalacion>{HUB_A}</sum1:NumeroInstalacion>")),
         "hub A must declare ITS hub_id as NumeroInstalacion: {xml_a}"

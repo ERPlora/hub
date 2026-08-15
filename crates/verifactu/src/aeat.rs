@@ -95,12 +95,44 @@ fn s(v: &Json, k: &str) -> String {
         .to_string()
 }
 
-fn f(v: &Json, k: &str) -> f64 {
+/// An amount the AEAT record **cannot go without**: absent, null or unreadable is a hard domain
+/// failure, never `0.00`.
+fn amount(v: &Json, k: &str) -> Result<f64, VerifactuError> {
     match v.get(k) {
-        Some(Json::Number(n)) => n.as_f64().unwrap_or(0.0),
-        Some(Json::String(t)) => t.trim().parse().unwrap_or(0.0),
-        _ => 0.0,
+        Some(Json::Number(n)) => n.as_f64().ok_or_else(|| unreadable_amount(k, &n.to_string())),
+        Some(Json::String(t)) => t
+            .trim()
+            .parse()
+            .map_err(|_| unreadable_amount(k, t.trim())),
+        // Absent, `null`, a bool, an object: all of them are «nobody wrote an amount here». The
+        // old reading answered `0.0` to every one of them and the answer went to Hacienda as a
+        // fiscal fact — with a fingerprint on it and a chain number spent.
+        Some(other) => Err(unreadable_amount(k, &other.to_string())),
+        None => Err(missing_amount(k)),
     }
+}
+
+/// An amount that may legitimately **not be there** (see the call sites): absent means the
+/// element is not emitted at all, so `0.0` is the right reading. Present-but-unreadable is still
+/// a hard failure — silence is a contract, garbage is a defect.
+fn optional_amount(v: &Json, k: &str) -> Result<f64, VerifactuError> {
+    match v.get(k) {
+        None | Some(Json::Null) => Ok(0.0),
+        _ => amount(v, k),
+    }
+}
+
+fn unreadable_amount(field: &str, raw: &str) -> VerifactuError {
+    VerifactuError::Payload(format!(
+        "importe `{field}` ilegible ({raw}): un registro fiscal no puede declarar un importe que \
+         nadie ha podido leer"
+    ))
+}
+
+fn missing_amount(field: &str) -> VerifactuError {
+    VerifactuError::Payload(format!(
+        "falta el importe `{field}`: un registro fiscal no puede declarar un importe que no existe"
+    ))
 }
 
 /// Bloque `Encadenamiento`: primer registro o referencia al registro anterior.
@@ -395,7 +427,7 @@ impl Detalle {
 const MAX_DETALLES: usize = 12;
 
 /// Traduce una entrada del array a códigos de la AEAT.
-fn detalle_de_entrada(e: &Json) -> Detalle {
+fn detalle_de_entrada(e: &Json) -> Result<Detalle, VerifactuError> {
     let impuesto = impuesto_code(&s(e, "tax"));
     // §15.6: `ClaveRegimen` es obligatoria con IVA e IGIC, y el régimen general es `01`.
     let regimen = {
@@ -438,21 +470,35 @@ fn detalle_de_entrada(e: &Json) -> Detalle {
     if calificacion != "" && (regimen == "08" || (impuesto == "03" && regimen == "20")) {
         calificacion = "N2";
     }
-    Detalle {
+    // Which amounts this line is allowed to omit is NOT a matter of taste: it is the same rule
+    // `Detalle::con_importes` renders by. A line that carries no `TipoImpositivo`/`CuotaRepercutida`
+    // (exempt, N1/N2) may arrive without `rate`/`quota` — they would not be emitted anyway. A line
+    // that DOES carry them must bring them; and `BaseImponibleOimporteNoSujeto` is the one element
+    // no detail can go without, whatever its calificación.
+    let carries_amounts = exenta.is_empty() && !matches!(calificacion, "N1" | "N2");
+    let (rate, quota) = if carries_amounts {
+        (amount(e, "rate")?, amount(e, "quota")?)
+    } else {
+        (optional_amount(e, "rate")?, optional_amount(e, "quota")?)
+    };
+    Ok(Detalle {
         impuesto,
         regimen,
         calificacion,
         exenta,
-        rate: f(e, "rate"),
-        base: f(e, "base"),
-        quota: f(e, "quota"),
-        surcharge_rate: f(e, "surcharge_rate"),
-        surcharge_quota: f(e, "surcharge_quota"),
+        rate,
+        base: amount(e, "base")?,
+        quota,
+        // The equivalence surcharge is the textbook LEGITIMATE absence: most lines have none, and
+        // `has_surcharge` below reads presence, not value. Absent = no surcharge; unreadable is
+        // still a failure.
+        surcharge_rate: optional_amount(e, "surcharge_rate")?,
+        surcharge_quota: optional_amount(e, "surcharge_quota")?,
         has_surcharge: e.get("surcharge_rate").is_some() || e.get("surcharge_quota").is_some(),
-    }
+    })
 }
 
-fn desglose(record: &Json) -> String {
+fn desglose(record: &Json) -> Result<String, VerifactuError> {
     let mut lines: Vec<Detalle> = Vec::new();
 
     match serde_json::from_str::<Json>(&s(record, "tax_breakdown")) {
@@ -460,7 +506,7 @@ fn desglose(record: &Json) -> String {
         Ok(Json::Array(entries)) => {
             for e in &entries {
                 if e.is_object() {
-                    lines.push(detalle_de_entrada(e));
+                    lines.push(detalle_de_entrada(e)?);
                 }
             }
         }
@@ -470,8 +516,8 @@ fn desglose(record: &Json) -> String {
                 if let Ok(rate) = rate.trim().parse::<f64>() {
                     lines.push(Detalle::nacional(
                         rate,
-                        f(&amounts, "base"),
-                        f(&amounts, "tax"),
+                        amount(&amounts, "base")?,
+                        amount(&amounts, "tax")?,
                     ));
                 }
             }
@@ -482,9 +528,9 @@ fn desglose(record: &Json) -> String {
         // Facturas anteriores al campo (`'{}'`), o un desglose ilegible: el tipo efectivo de una
         // factura de tipo único ES su tipo real, y `Desglose` no puede quedarse sin detalle.
         lines.push(Detalle::nacional(
-            f(record, "tax_rate"),
-            f(record, "base_amount"),
-            f(record, "tax_amount"),
+            amount(record, "tax_rate")?,
+            amount(record, "base_amount")?,
+            amount(record, "tax_amount")?,
         ));
     }
     // Orden estable: el XML no puede depender del orden de las claves de un objeto JSON ni de cómo
@@ -499,12 +545,22 @@ fn desglose(record: &Json) -> String {
     });
     lines.truncate(MAX_DETALLES);
 
-    lines.iter().map(Detalle::render).collect()
+    Ok(lines.iter().map(Detalle::render).collect())
 }
 
 /// Construye el sobre SOAP `RegFactuSistemaFacturacion` para un registro (alta/anulación).
 /// `prev` = registro anterior de la cadena (para `Encadenamiento`), si lo hay.
-pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &str) -> String {
+///
+/// **Devuelve `Result` porque un registro puede ser imposible de declarar** (hub#324): un importe
+/// que no está o que no se puede leer NO se convierte en `0,00` — eso viajaría a Hacienda como una
+/// factura de cero euros, con su huella, su número de cadena gastado y nada que lo delate. Se para
+/// aquí, antes de la red.
+pub fn build_soap(
+    record: &Json,
+    config: &Json,
+    prev: Option<&Json>,
+    hub_id: &str,
+) -> Result<String, VerifactuError> {
     let record_type = s(record, "record_type");
     let gen_ts = s(record, "generation_timestamp");
     let registro = if record_type == "anulacion" {
@@ -559,9 +615,11 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
             destinatarios = destinatarios(record),
             // Una línea de desglose por tipo REAL de la factura (ver `desglose`). Los importes están
             // en CÉNTIMOS (INTEGER, ADR-0007) y la AEAT exige euros con 2 decimales → /100.0 aquí.
-            desglose = desglose(record),
-            cuota = format_amount(f(record, "tax_amount") / 100.0),
-            total = format_amount(f(record, "total_amount") / 100.0),
+            desglose = desglose(record)?,
+            // `CuotaTotal` e `ImporteTotal` son obligatorios y son LO QUE SE COBRA: no admiten
+            // ausencia. Un `0,00` inventado aquí es una factura de cero euros ante la AEAT.
+            cuota = format_amount(amount(record, "tax_amount")? / 100.0),
+            total = format_amount(amount(record, "total_amount")? / 100.0),
             chain = encadenamiento(record, prev),
             sistema = sistema_informatico(config, hub_id),
             ts = esc(&gen_ts),
@@ -569,7 +627,7 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
         )
     };
 
-    format!(
+    Ok(format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
          <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \
          xmlns:sum=\"https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroLR.xsd\" \
@@ -586,7 +644,7 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
         obligado = esc(&s(record, "issuer_name")),
         nif = esc(&s(record, "issuer_nif")),
         registro = registro,
-    )
+    ))
 }
 
 // La identidad mTLS y la caducidad del certificado se obtienen ahora del **core** vía
@@ -1217,7 +1275,7 @@ mod desglose_tests {
     }
 
     fn xml_de(record: &Json) -> String {
-        build_soap(record, &json!({}), None, "hub-1")
+        build_soap(record, &json!({}), None, "hub-1").expect("el registro se puede declarar")
     }
 
     /// EL caso del negocio: una caña (21%) y una tapa (10%) en el mismo ticket. Antes se declaraba
@@ -1539,5 +1597,202 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","class":"exempt","rate":0.00,"base":1000,"quota":0}]"#;
         let xml = xml_de(&alta(tb, 1000.0, 0.0, 0.0));
         assert!(xml.contains("<sum1:OperacionExenta>E6</sum1:OperacionExenta>"), "{xml}");
+    }
+}
+
+#[cfg(test)]
+mod amount_tests {
+    //! **An amount that is not there never becomes `0.00`** (hub#324).
+    //!
+    //! `f()` used to answer `0.0` to three different questions — «the field is missing», «the
+    //! field holds something that is not a number» and «the amount really is zero» — and the
+    //! answer travelled to the AEAT as a fiscal fact. A record remitted with a zero total is not
+    //! a bug you fix later: it has a fingerprint, it burnt a chain number, and the AEAT accepted
+    //! it. So the reading fails HARD, before hashing anything and long before the network.
+    //!
+    //! The other half is knowing where absence is legitimate — otherwise the strictness gets
+    //! reverted the first time an ordinary invoice is refused. Those cases have their own tests
+    //! below and go through `optional_amount`.
+    use super::*;
+    use serde_json::json;
+
+    /// A record the AEAT would accept, so each test can remove exactly ONE thing from it.
+    fn declarable_record() -> Json {
+        json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F2",
+            "description": "Ticket",
+            "base_amount": 1000.0,
+            "tax_amount": 210.0,
+            "total_amount": 1210.0,
+            "tax_rate": 21.0,
+            "tax_breakdown": r#"{"21.00":{"base":1000,"tax":210}}"#,
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        })
+    }
+
+    fn build(record: &Json) -> Result<String, VerifactuError> {
+        build_soap(record, &json!({}), None, "hub-1")
+    }
+
+    /// The baseline: nothing removed, the envelope is built. Without this the tests below would
+    /// pass for any reason at all.
+    #[test]
+    fn the_untouched_record_still_builds() {
+        let xml = build(&declarable_record()).expect("nothing is missing");
+        assert!(xml.contains("<sum1:ImporteTotal>12.10</sum1:ImporteTotal>"));
+    }
+
+    /// `ImporteTotal` is what the customer paid. Missing, it used to be declared as `0,00`.
+    #[test]
+    fn a_missing_total_is_refused_instead_of_declared_as_zero() {
+        let mut record = declarable_record();
+        record.as_object_mut().unwrap().remove("total_amount");
+
+        let error = build(&record).expect_err("a total that is not there cannot be declared");
+        let message = error.to_string();
+        assert!(message.contains("total_amount"), "says WHICH amount: {message}");
+        assert!(
+            !message.contains("0.00"),
+            "the point is that no zero was produced: {message}"
+        );
+    }
+
+    /// `null` is not zero. It is the shape a read failure takes on the way here.
+    #[test]
+    fn a_null_amount_is_absence_not_zero() {
+        let mut record = declarable_record();
+        record["tax_amount"] = Json::Null;
+
+        let error = build(&record).expect_err("null is not an amount");
+        assert!(error.to_string().contains("tax_amount"), "{error}");
+    }
+
+    /// Unreadable is worse than missing: something WAS written there and nobody can say what.
+    #[test]
+    fn an_unreadable_amount_is_refused() {
+        let mut record = declarable_record();
+        record["total_amount"] = json!("1.210,00 €");
+
+        let error = build(&record).expect_err("that string is not an amount");
+        let message = error.to_string();
+        assert!(message.contains("total_amount"), "{message}");
+        assert!(message.contains("1.210,00"), "quotes what it could not read: {message}");
+    }
+
+    /// The breakdown line's only mandatory element (`BaseImponibleOimporteNoSujeto`). A line
+    /// without it used to declare an operation of zero euros with a real `CuotaRepercutida`.
+    #[test]
+    fn a_breakdown_line_without_a_base_is_refused() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] =
+            json!(r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,"quota":210}]"#);
+
+        let error = build(&record).expect_err("a detail line has to carry its base");
+        assert!(error.to_string().contains("base"), "{error}");
+    }
+
+    /// A line that DOES emit `TipoImpositivo`/`CuotaRepercutida` must bring them.
+    #[test]
+    fn a_subject_line_without_its_quota_is_refused() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] =
+            json!(r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,"base":1000}]"#);
+
+        let error = build(&record).expect_err("a subject line declares its quota");
+        assert!(error.to_string().contains("quota"), "{error}");
+    }
+
+    /// The fallback path (old `'{}'` invoices) reads the record's own totals, and they are not
+    /// optional either: this is the line that ends up carrying the WHOLE invoice.
+    #[test]
+    fn the_single_rate_fallback_will_not_invent_a_base() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] = json!("{}");
+        record.as_object_mut().unwrap().remove("base_amount");
+
+        let error = build(&record).expect_err("the fallback line has no base to declare");
+        assert!(error.to_string().contains("base_amount"), "{error}");
+    }
+
+    // ── Where absence is LEGITIMATE ────────────────────────────────────────────────────────
+    //
+    // Not exceptions granted to make the tests pass: in each of these the element is not emitted
+    // at all, so «not there» is the contract and not a lost number.
+
+    /// Most invoices carry no equivalence surcharge, and `has_surcharge` reads PRESENCE.
+    #[test]
+    fn an_absent_equivalence_surcharge_is_not_a_missing_amount() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] = json!(
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,"base":1000,"quota":210}]"#
+        );
+
+        let xml = build(&record).expect("no surcharge is the normal case");
+        assert!(!xml.contains("TipoRecargoEquivalencia"), "{xml}");
+    }
+
+    /// An exempt line emits neither `TipoImpositivo` nor `CuotaRepercutida` (§15.5), so demanding
+    /// them would refuse invoices the AEAT accepts.
+    #[test]
+    fn an_exempt_line_needs_no_rate_or_quota() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] =
+            json!(r#"[{"tax":"vat","regime":"01","class":"exempt","exempt_reason":"E1","base":5000}]"#);
+
+        let xml = build(&record).expect("an exempt line declares neither rate nor quota");
+        assert!(xml.contains("<sum1:OperacionExenta>E1</sum1:OperacionExenta>"), "{xml}");
+        assert!(!xml.contains("TipoImpositivo"), "{xml}");
+    }
+
+    /// Same for N1/N2 (error 1237): the elements are forbidden, so their absence is the contract.
+    #[test]
+    fn a_not_subject_line_needs_no_rate_or_quota() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] = json!(
+            r#"[{"tax":"vat","regime":"01","class":"not_subject_location","base":100000}]"#
+        );
+
+        let xml = build(&record).expect("N2 declares neither rate nor quota");
+        assert!(
+            xml.contains("<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>"),
+            "{xml}"
+        );
+    }
+
+    /// **Zero is still a number.** The refusal is about absence, not about the value — an invoice
+    /// legitimately worth nothing (a fully discounted line, an S2 reverse charge) must go through.
+    #[test]
+    fn an_explicit_zero_is_declared_as_zero() {
+        let mut record = declarable_record();
+        record["tax_amount"] = json!(0.0);
+        record["total_amount"] = json!(0.0);
+        record["tax_breakdown"] = json!(
+            r#"[{"tax":"vat","regime":"01","class":"subject_reverse","rate":0.00,"base":0,"quota":0}]"#
+        );
+
+        let xml = build(&record).expect("zero written down is a declarable amount");
+        assert!(xml.contains("<sum1:ImporteTotal>0.00</sum1:ImporteTotal>"), "{xml}");
+    }
+
+    /// A `RegistroAnulacion` carries no amounts at all: the strictness must not reach it.
+    #[test]
+    fn an_annulment_declares_no_amounts_and_is_unaffected() {
+        let record = json!({
+            "record_type": "anulacion",
+            "issuer_nif": "B12345678",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        });
+
+        let xml = build(&record).expect("an annulment has no amounts to miss");
+        assert!(xml.contains("<sum1:RegistroAnulacion>"), "{xml}");
     }
 }

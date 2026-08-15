@@ -110,14 +110,14 @@ fn validacion_xsd_sobre_el_xml_real() {
     let mut f1_sin_destinatario = f2.clone();
     f1_sin_destinatario["invoice_type"] = serde_json::json!("F1");
 
-    let xml_f2 = aeat::build_soap(&f2, &cfg, None, "hub-preproduccion");
+    let xml_f2 = aeat::build_soap(&f2, &cfg, None, "hub-preproduccion").expect("declarable");
     println!(
         "F2 sin destinatario → {:?}",
         xsd::validate_registro(&xml_f2)
     );
     xsd::validate_registro(&xml_f2).expect("una simplificada no lleva destinatario: es válida");
 
-    let xml_f1 = aeat::build_soap(&f1_sin_destinatario, &cfg, None, "hub-preproduccion");
+    let xml_f1 = aeat::build_soap(&f1_sin_destinatario, &cfg, None, "hub-preproduccion").expect("declarable");
     let err = xsd::validate_registro(&xml_f1).expect_err("una F1 sin Destinatarios es un 1189");
     println!("F1 SIN destinatario → BLOQUEADO: {err}");
 }
