@@ -29,6 +29,11 @@ on:
       # leyendo los permisos DEL APK construido (hub#337). Sin esta ruta, un PR que solo tocase
       # el release podría quitar ese paso sin que la guarda llegase a correr.
       - ".github/workflows/tauri-release.yml"
+      # Las reglas del `release-gate` (hub#895) y su test: viven en `scripts/`, así que un cambio
+      # que solo las tocase no dispararía nada sin esta ruta — y el gate es lo único que impide
+      # que un tag que no publica nada salga verde.
+      - "scripts/release-gate.sh"
+      - "scripts/release-gate.test.sh"
   pull_request:
     paths:
       - "apps/tauri/**"
@@ -38,6 +43,11 @@ on:
       # leyendo los permisos DEL APK construido (hub#337). Sin esta ruta, un PR que solo tocase
       # el release podría quitar ese paso sin que la guarda llegase a correr.
       - ".github/workflows/tauri-release.yml"
+      # Las reglas del `release-gate` (hub#895) y su test: viven en `scripts/`, así que un cambio
+      # que solo las tocase no dispararía nada sin esta ruta — y el gate es lo único que impide
+      # que un tag que no publica nada salga verde.
+      - "scripts/release-gate.sh"
+      - "scripts/release-gate.test.sh"
   workflow_dispatch:
 
 concurrency:
@@ -69,6 +79,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ANTES de las deps de sistema a propósito: dura menos de un segundo y no necesita nada de
+      # la máquina, así que un fallo suyo se ve enseguida en vez de después de compilar el stack
+      # Tauri entero. Son las reglas del `release-gate` de `tauri-release.yml` (hub#895) — el job
+      # que hace que «tag verde» signifique «publicado». Su único otro sitio de ejecución sería un
+      # tag, que no se puede re-lanzar.
+      - name: Release gate rules (scripts/release-gate.test.sh)
+        run: ./scripts/release-gate.test.sh
 
       # Deps de sistema de tauri v2 en Linux (webview + GTK). Sin appindicator/librsvg:
       # el shell no usa tray y aquí no se bundlea.

@@ -82,6 +82,10 @@ a verla live en `apps.microsoft.com`.
    `AZURE_AD_APPLICATION_SECRET` · `SELLER_ID` (Partner Center → Account settings → Identifiers).
 4. Poner la Variable `MICROSOFT_STORE_PRODUCT_ID`. Desde entonces, cada tag `v*` publica la
    actualización sola (build → MSIX → `msstore publish` → certificación → la Store la entrega).
+5. Quitar `store` de la Variable `RELEASE_CHANNELS_PENDING` (hub#895). Mientras esté ahí, el
+   job `release-gate` deja pasar el tag en verde avisando de que la Store no publicó; en cuanto
+   se quita, un tag que no publique en la Store sale **rojo**. Dejarla puesta con el canal ya
+   vivo solo produce un warning de «lista sin limpiar», nunca un rojo.
 
 ### Fase 4 — botón en erplora.com (repo `saas`)
 
