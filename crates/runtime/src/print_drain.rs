@@ -112,15 +112,18 @@ pub async fn claim(
     role: &str,
 ) -> Result<Option<PrintJob>> {
     let device_id = device_id.trim();
-    let role = role.trim();
     let roles = require_registered_host(db, hub_id, device_id).await?;
-    require_role(&roles, role)?;
+    // The station is resolved BEFORE the registry check so the two refusals stay distinct: a role
+    // that names no station of this hub is a bad payload (422, naming the real ones), while a real
+    // station this device does not host is [`ERR_ROLE_NOT_HOSTED`] (hub#457).
+    let station = crate::print_stations::resolve(db, hub_id, role).await?;
+    require_role(&roles, &station.key)?;
     print_queue::reclaim_expired(db, hub_id).await?;
     print_hosts::heartbeat(db, hub_id, device_id).await?;
     print_queue::claim_next(
         db,
         hub_id,
-        role,
+        &station.id,
         device_id,
         print_queue::DEFAULT_LEASE_SECONDS,
     )

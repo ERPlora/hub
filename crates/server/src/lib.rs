@@ -1480,6 +1480,20 @@ pub fn app(state: AppState) -> Router {
                 .delete(print::retire_host),
         )
         .route("/api/print/hosts/heartbeat", post(print::host_heartbeat))
+        // ── Estaciones de impresión, como FILAS (hub#457) ────────────────────────────────────
+        // «Qué impresora imprime esto» deja de ser una cadena comparada literalmente y pasa a ser
+        // una FILA con id: el mercado entero (Toast, Square, Lightspeed, Odoo, Simphony…) enlaza
+        // ítem→estación←impresora por referencia, nunca por un texto tecleado al imprimir. Leer
+        // basta sesión (el TPV ofrece los destinos); crear/renombrar/borrar es sesión **admin**,
+        // como `/api/keys`: define qué colas TIENE el negocio, no qué hace la caja de hoy.
+        .route(
+            "/api/print/stations",
+            get(print::list_stations).post(print::create_station),
+        )
+        .route(
+            "/api/print/stations/:id",
+            axum::routing::patch(print::rename_station).delete(print::delete_station),
+        )
         // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────
         // Gestión de keys (auth = sesión admin owner/admin; NO una api key).
         .route(
