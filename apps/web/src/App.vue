@@ -214,6 +214,7 @@ import { getClient } from './lib/runtime';
 import { refreshSetupStatus } from './lib/setup-status';
 import { bootAppUpdateWatch } from './lib/app-update';
 import { bootDeadLetterWatch } from './lib/dead-letter';
+import { bootUndrainedPrintingWatch } from './lib/print-alert';
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }
@@ -321,6 +322,10 @@ async function gateAndRefresh(): Promise<void> {
   // admin vea, sin ir a buscarlo, que hay eventos caídos. Solo arranca para admin (el propio
   // watcher se filtra por rol), igual que el de actualizaciones solo arranca en Tauri.
   bootDeadLetterWatch();
+  // Impresión sin drenar (hub#987): la otra fuente de la campana. A diferencia de la anterior NO se
+  // filtra por rol — quien está en el mostrador es quien puede encender la caja y quien se va a
+  // quedar sin darle el tique al cliente, así que el aviso tiene que llegarle a él.
+  bootUndrainedPrintingWatch();
 
   // La nav de módulos se refresca GLOBALMENTE al instalarse un módulo. El único oyente de
   // `module.installed` vivía en AppsPage (montada solo en /apps): instalar desde el DRAWER del

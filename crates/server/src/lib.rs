@@ -1523,6 +1523,17 @@ pub fn app(state: AppState) -> Router {
             "/api/print/stations/:id",
             axum::routing::patch(print::rename_station).delete(print::delete_station),
         )
+        // El mapa `documentType → estación` (hub#987): el módulo dice QUÉ imprime, el hub DÓNDE sale.
+        .route(
+            "/api/print/routes",
+            get(print::list_routes).put(print::set_route),
+        )
+        // Lo que NO se está drenando, para la campana. Sesión de usuario, no admin: quien está en
+        // el mostrador es quien puede encender la caja y quien se va a quedar sin darle el tique.
+        .route(
+            "/api/print/undrained",
+            get(print::undrained_stations),
+        )
         // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────
         // Gestión de keys (auth = sesión admin owner/admin; NO una api key).
         .route(

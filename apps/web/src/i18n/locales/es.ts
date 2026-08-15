@@ -44,6 +44,11 @@ export default {
     noNotifications: 'Todo al día. Sin notificaciones.',
     deadLettersTitle: 'Eventos caídos',
     deadLettersBody: 'Hay {count} evento(s) que el relay no pudo entregar. Revísalos y reenvíalos.',
+    // Impresión sin drenar (hub#987). Nombra la estación: «la impresión está parada» manda al dueño
+    // a mirar cuatro impresoras; «la cocina está parada» lo manda a una.
+    printingStalledTitle: 'Nadie está imprimiendo «{station}»',
+    printingStalledBody:
+      'Hay {count} documento(s) esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida.',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',

@@ -120,6 +120,44 @@ pub struct RoleCoverage {
     /// Registered hosts that reported within [`HOST_TTL_SECONDS`]. `0` with `waiting > 0` is the
     /// state worth warning about.
     pub live_hosts: i64,
+    /// How long the **oldest** waiting job has been waiting, in seconds. `0` when nothing waits.
+    ///
+    /// The half the alarm was missing (hub#987): `waiting` says how much is stuck, this says how
+    /// long — and without it there is no threshold, so the warning would either flap on every
+    /// reconnect or never fire at all. The oldest and not the newest, because the question the
+    /// merchant is really asking is "how long has somebody been waiting for their ticket".
+    pub waiting_seconds: i64,
+}
+
+/// How long work must have been waiting, with nobody draining it, before it becomes an alarm
+/// (hub#987).
+///
+/// **One definition**, the same reason [`LIVE_EXPR`] is one: the runtime, the API and the screen
+/// have to agree on when the hub is in trouble, and a threshold spelled out in three places is three
+/// thresholds. The API hands this number to the client (as `heartbeatSeconds` already travels) so no
+/// surface invents its own.
+///
+/// A minute, and the two ends of the choice:
+///
+///  - **not lower**, because `live_hosts` is already a lagging signal — a host counts as live for
+///    [`HOST_TTL_SECONDS`] after its last beat, so "no live host" means it has been quiet at least
+///    that long. Alarming instantly on top of that would put a red badge on every screen in the
+///    building every time a till restarts.
+///  - **not higher**, because the thing being measured is a customer standing at a counter waiting
+///    for a receipt, or a plate that has not been started. Square's own fix for this was to stop
+///    being quiet about it; a threshold long enough to be polite is long enough to be useless.
+pub const UNDRAINED_ALERT_SECONDS: i64 = 60;
+
+/// Whether this station is in the state worth shouting about: work waiting, nobody live to take it,
+/// and long enough that it is not a reconnect.
+///
+/// A function and not three comparisons at each call site, for the same reason the threshold is a
+/// constant: the runtime, the count endpoint and the screen must not be able to disagree about what
+/// "stuck" means.
+pub fn is_undrained(coverage: &RoleCoverage) -> bool {
+    coverage.live_hosts == 0
+        && coverage.waiting > 0
+        && coverage.waiting_seconds >= UNDRAINED_ALERT_SECONDS
 }
 
 /// Stored columns every read of the registry returns, in the order [`row_to_host`] expects.
@@ -308,16 +346,22 @@ pub async fn coverage(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Role
     // A `UNION ALL` of the two sides and one `GROUP BY` rather than a join: a role can exist on
     // either side alone — work with nobody to take it (the alarm) and a host with nothing to do
     // (the reassurance) — and any join would drop exactly one of those two.
+    // `MIN(NULLIF(oldest, ''))` is how the age survives the UNION: a host row contributes `''` →
+    // NULL and is skipped, a pending job contributes its `created_at`, and MIN picks the one that
+    // has been waiting longest. A host row must not be able to drag the age, which is why it is
+    // NULL and not the empty string (`MIN('')` would win every comparison and report no wait).
     let sql = format!(
-        "SELECT role, SUM(waiting) AS waiting, SUM(live) AS live_hosts FROM ( \
-           SELECT role, 0 AS waiting, {LIVE_EXPR} AS live \
+        "SELECT role, SUM(waiting) AS waiting, SUM(live) AS live_hosts, \
+                MIN(NULLIF(oldest, '')) AS oldest FROM ( \
+           SELECT role, 0 AS waiting, {LIVE_EXPR} AS live, '' AS oldest \
              FROM _print_host WHERE hub_id = :hub_id \
            UNION ALL \
-           SELECT role, 1 AS waiting, 0 AS live \
+           SELECT role, 1 AS waiting, 0 AS live, created_at AS oldest \
              FROM _print_queue WHERE hub_id = :hub_id AND status = :pending \
          ) t GROUP BY role ORDER BY role"
     );
     let res = db.query(&sql, &p).await?;
+    let now = chrono::Utc::now();
     Ok(res
         .rows
         .iter()
@@ -325,7 +369,37 @@ pub async fn coverage(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Role
             role: row["role"].as_str().unwrap_or_default().to_string(),
             waiting: row["waiting"].as_i64().unwrap_or(0),
             live_hosts: row["live_hosts"].as_i64().unwrap_or(0),
+            waiting_seconds: waited_seconds(row["oldest"].as_str(), now),
         })
+        .collect())
+}
+
+/// Seconds between `queued_at` (RFC-3339 as the queue stores it) and `now`, floored at `0`.
+///
+/// An unparseable or absent timestamp answers `0` — "nothing has been waiting" — and that is the
+/// safe direction on purpose: [`is_undrained`] needs the age to be *large* to raise an alarm, so a
+/// timestamp we cannot read can never invent one. The opposite default would turn a corrupt row into
+/// a permanent red badge nobody can clear.
+fn waited_seconds(queued_at: Option<&str>, now: chrono::DateTime<chrono::Utc>) -> i64 {
+    queued_at
+        .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+        .map(|at| (now - at.with_timezone(&chrono::Utc)).num_seconds().max(0))
+        .unwrap_or(0)
+}
+
+/// The stations that are **stuck**: work waiting, nobody draining, past [`UNDRAINED_ALERT_SECONDS`].
+///
+/// This is [`coverage`] filtered by [`is_undrained`], and it exists as its own name because it is
+/// what a surface asks for. `coverage` answers "how is printing doing" (including the reassurance
+/// that the kitchen is ready); this answers "is anything on fire", which is the question a badge and
+/// a banner are allowed to ask on every screen.
+///
+/// Still a **warning, never a gate** (see the module docs): nothing here refuses to queue anything.
+pub async fn undrained(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<RoleCoverage>> {
+    Ok(coverage(db, hub_id)
+        .await?
+        .into_iter()
+        .filter(is_undrained)
         .collect())
 }
 
@@ -395,6 +469,130 @@ mod tests {
 
     fn of_role<'a>(cov: &'a [RoleCoverage], role: &str) -> Option<&'a RoleCoverage> {
         cov.iter().find(|c| c.role == role)
+    }
+
+    /// Back-dates when a job was queued. Same idea as [`last_seen_seconds_ago`]: waiting is measured
+    /// in elapsed time, so the only way to test the threshold is to move the clock on the row.
+    async fn queued_seconds_ago(db: &PgAdapter, job_id: &str, seconds: i64) {
+        let at = (chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339();
+        let mut p = Params::new();
+        p.insert("at".into(), json!(at));
+        p.insert("job_id".into(), json!(job_id));
+        db.execute(
+            "UPDATE _print_queue SET created_at = :at WHERE job_id = :job_id",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// The missing half of the alarm (hub#987): coverage said *how much* was waiting, never *how
+    /// long*. Without the age there is no threshold, and without a threshold the warning either
+    /// flaps on every reconnect or never fires.
+    #[tokio::test]
+    async fn coverage_reports_how_long_the_oldest_job_has_been_waiting() {
+        let db = hosts_db().await;
+        queue(&db, "h1", "j-old", "kitchen").await;
+        queue(&db, "h1", "j-new", "kitchen").await;
+        queued_seconds_ago(&db, "j-old", 300).await;
+
+        let kitchen = of_role(&coverage(&db, "h1").await.unwrap(), "kitchen")
+            .cloned()
+            .expect("the kitchen has work waiting");
+
+        assert_eq!(kitchen.waiting, 2);
+        assert!(
+            kitchen.waiting_seconds >= 300 && kitchen.waiting_seconds < 400,
+            "the age is the OLDEST job's, not the newest: {}",
+            kitchen.waiting_seconds
+        );
+    }
+
+    /// Nothing waiting ⇒ no age to report. `0` and not "the age of the last thing we printed": the
+    /// number answers "how long has somebody been waiting", and nobody is.
+    #[tokio::test]
+    async fn a_station_with_nothing_waiting_reports_no_age() {
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "kitchen", "Cocina", "u1")
+            .await
+            .unwrap();
+
+        let kitchen = of_role(&coverage(&db, "h1").await.unwrap(), "kitchen")
+            .cloned()
+            .expect("a registered host shows up even with nothing to do");
+        assert_eq!(kitchen.waiting, 0);
+        assert_eq!(kitchen.waiting_seconds, 0);
+    }
+
+    /// **THE alarm, with its threshold** (hub#987). Work waiting, nobody draining it, and long
+    /// enough that it is not a reconnect. Below the threshold it stays quiet — a till that is
+    /// restarting must not put a red badge on every screen in the building.
+    #[tokio::test]
+    async fn a_station_is_undrained_only_once_the_wait_passes_the_threshold() {
+        let db = hosts_db().await;
+        queue(&db, "h1", "j1", "kitchen").await;
+
+        assert!(
+            undrained(&db, "h1").await.unwrap().is_empty(),
+            "a job queued a second ago is not an alarm, it is a job"
+        );
+
+        queued_seconds_ago(&db, "j1", UNDRAINED_ALERT_SECONDS + 5).await;
+
+        let stalled = undrained(&db, "h1").await.unwrap();
+        assert_eq!(
+            stalled.iter().map(|c| c.role.as_str()).collect::<Vec<_>>(),
+            ["kitchen"],
+            "a minute of tickets piling up with nobody listening HAS to reach a screen"
+        );
+    }
+
+    /// A live host is the whole answer: it is draining, so nothing is stuck however old the queue is.
+    /// This is what keeps a busy kitchen from alarming just because it is busy.
+    #[tokio::test]
+    async fn a_station_with_a_live_host_is_never_undrained() {
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "kitchen", "Cocina", "u1")
+            .await
+            .unwrap();
+        queue(&db, "h1", "j1", "kitchen").await;
+        queued_seconds_ago(&db, "j1", UNDRAINED_ALERT_SECONDS * 10).await;
+
+        assert!(
+            undrained(&db, "h1").await.unwrap().is_empty(),
+            "somebody is draining it: late is not lost"
+        );
+    }
+
+    /// The host that WAS there and went quiet is exactly the case this exists for (a till out of
+    /// battery, the app closed, the hub updated and nobody re-registered).
+    #[tokio::test]
+    async fn a_host_that_went_quiet_leaves_its_station_undrained() {
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "kitchen", "Cocina", "u1")
+            .await
+            .unwrap();
+        queue(&db, "h1", "j1", "kitchen").await;
+        queued_seconds_ago(&db, "j1", UNDRAINED_ALERT_SECONDS + 5).await;
+        last_seen_seconds_ago(&db, "till-1", HOST_TTL_SECONDS + 10).await;
+
+        assert_eq!(
+            undrained(&db, "h1").await.unwrap().len(),
+            1,
+            "a registration is not a printer: what counts is whether it is still answering"
+        );
+    }
+
+    /// The alarm never crosses hubs: a neighbour's stuck kitchen is not this hub's badge.
+    #[tokio::test]
+    async fn the_alarm_never_counts_another_hubs_work() {
+        let db = hosts_db().await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        queue(&db, "h2", "j1", "kitchen").await;
+        queued_seconds_ago(&db, "j1", UNDRAINED_ALERT_SECONDS + 5).await;
+
+        assert!(undrained(&db, "h1").await.unwrap().is_empty());
+        assert_eq!(undrained(&db, "h2").await.unwrap().len(), 1);
     }
 
     /// The basic gesture: a device says "I print the kitchen's tickets" and the hub knows it.

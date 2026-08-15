@@ -234,14 +234,45 @@
         <ion-popover :is-open="notifOpen" :event="notifEvent" @did-dismiss="notifOpen = false">
           <ion-content>
             <ion-list lines="full">
-              <ion-item v-if="notificationCount > 0" lines="none" button detail @click="goToDeadLetters">
+              <ion-item
+                v-if="deadLetterCount > 0"
+                lines="none"
+                button
+                detail
+                @click="goToDeadLetters"
+              >
                 <HubIcon slot="start" name="alert-circle-outline" color="danger" />
                 <ion-label class="ion-text-wrap">
                   <h3>{{ t('topbar.deadLettersTitle') }}</h3>
-                  <p>{{ t('topbar.deadLettersBody', { count: notificationCount }) }}</p>
+                  <p>{{ t('topbar.deadLettersBody', { count: deadLetterCount }) }}</p>
                 </ion-label>
               </ion-item>
-              <ion-item v-else lines="none">
+              <!-- Una estación con trabajo esperando y nadie drenándola (hub#987). Una fila POR
+                   estación: «la cocina» y «la barra» son dos cajas distintas y dos gestos distintos,
+                   y un total no dice a cuál hay que ir. -->
+              <ion-item
+                v-for="station in undrainedStations"
+                :key="station.role"
+                lines="none"
+                button
+                detail
+                data-testid="topbar-undrained-printing"
+                @click="goToPrinting"
+              >
+                <HubIcon slot="start" name="print-outline" color="danger" />
+                <ion-label class="ion-text-wrap">
+                  <h3>{{ t('topbar.printingStalledTitle', { station: station.role }) }}</h3>
+                  <p>
+                    {{
+                      t('topbar.printingStalledBody', {
+                        count: station.waiting,
+                        minutes: Math.max(1, Math.round(station.waitingSeconds / 60)),
+                      })
+                    }}
+                  </p>
+                </ion-label>
+              </ion-item>
+              <ion-item v-if="notificationCount === 0" lines="none">
                 <ion-label class="ion-text-wrap" style="opacity:.6">{{ t('topbar.noNotifications') }}</ion-label>
               </ion-item>
             </ion-list>
@@ -268,7 +299,15 @@ import {
   IonPopover, IonContent, IonList, IonItem, IonLabel,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
-import { assistantAvailable, toggleAssistant, notificationCount, isLoading, railCollapsed } from '../lib/shell';
+import {
+  assistantAvailable,
+  toggleAssistant,
+  notificationCount,
+  notificationCountOf,
+  isLoading,
+  railCollapsed,
+} from '../lib/shell';
+import { undrainedStations } from '../lib/print-alert';
 import { canOpenManagement, openManagement } from '../lib/management-link';
 import { canChangeHub, requestChangeHub } from '../lib/change-hub';
 import { isCompactViewport } from '../lib/viewport';
@@ -396,6 +435,15 @@ function goBack(): void {
 // La campana avisa de dead-letters: llevar directo a la pestaña donde se gestionan (hub#660).
 function goToDeadLetters(): void {
   void router.push({ path: '/system', hash: '#events' });
+}
+
+/** Lo que aporta cada fuente, para pintar SU fila y no el total (hub#987). */
+const deadLetterCount = computed(() => notificationCountOf('deadLetters'));
+
+// Y de impresión parada: a la pantalla donde se ve la cobertura por estación y se registra el host
+// (hub#987). Es la misma que ya pintaba el aviso donde nadie lo veía.
+function goToPrinting(): void {
+  void router.push({ path: '/settings', hash: '#receipts' });
 }
 </script>
 

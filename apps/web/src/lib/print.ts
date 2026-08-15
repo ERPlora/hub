@@ -252,7 +252,18 @@ export function createPrintService(
       // puede costar el documento: se encola con una propia (hub#862, ver `mintJobId`).
       const jobId = req.jobId || mintJobId(documentType);
       try {
-        const ok = await enqueue({ jobId, role, documentType, document: data, format: req.format });
+        // **El rol viaja como lo dijo el caller, NO con el defecto del shell** (hub#987). `role` de
+        // arriba lleva `|| 'receipt'` porque las otras dos vías lo necesitan —`printerIdForRole`
+        // busca un equipo por rol, y el `PrintResult` lo reporta—, pero mandárselo a la cola sería
+        // el shell nombrando el periférico del comerciante: TODO saldría por la caja, comandas
+        // incluidas, y el mapa del hub no llegaría a resolver nunca. Vacío = «decídelo tú».
+        const ok = await enqueue({
+          jobId,
+          role: req.role || '',
+          documentType,
+          document: data,
+          format: req.format,
+        });
         return ok ? { via: 'queue', role } : toBrowser('el runtime rechazó el encolado');
       } catch (e) {
         return toBrowser(e instanceof Error ? e.message : String(e));

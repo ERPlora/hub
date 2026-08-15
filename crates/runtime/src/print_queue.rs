@@ -143,7 +143,15 @@ pub enum EnqueueOutcome {
 pub struct NewPrintJob {
     /// Idempotency key chosen by the producer. Two enqueues with the same one are one job.
     pub job_id: String,
-    /// Printer role: `receipt` (default of the shell), `kitchen`, `bar`, …
+    /// **Override of the station, in deprecation** (hub#987). Empty — the normal shape now — means
+    /// "the hub decides", and [`crate::print_routes::route_for`] resolves it from
+    /// [`document_type`](Self::document_type). A producer that still names one gets exactly that
+    /// station, so nothing published broke the day the map landed.
+    ///
+    /// It is `#[serde(default)]` and not `Option` on purpose: absent and `""` mean the same thing
+    /// ("I am not naming a printer"), and two spellings of one meaning is how the sloppy-input bug
+    /// of hub#457 got in.
+    #[serde(default)]
     pub role: String,
     /// Which document this is, from [`DOCUMENT_TYPES`]. Not the same axis as `role`: the role says
     /// *which printer*, this says *what shape* — an `invoice` can come out of the receipt printer.
@@ -202,26 +210,38 @@ pub async fn enqueue(
     if job_id.is_empty() {
         return Err(invalid("job_id is required (it is the idempotency key)"));
     }
-    if job.role.trim().is_empty() {
-        return Err(invalid("role is required (which printer prints this)"));
-    }
-    // **The role is RESOLVED, not compared** (hub#457). Everything below stores the station's own
-    // `key` and `id`, so `Kitchen`, ` kitchen ` and `kitchen` are one queue and `kitchn` is not a
-    // queue at all — it is a 422 that names the stations this hub really has. That is the same
-    // shape as the `documentType` guard right below, applied to the field that was missing it.
-    let station = crate::print_stations::resolve(db, hub_id, &job.role).await?;
-    let role = station.key.as_str();
     let document_type = job.document_type.trim();
     // The vocabulary is CLOSED, and that is the point of this guard. An unknown document type
     // used to map to `Generic`, so a typo (`kitchn`) printed a nameless list of key/value pairs
     // where the kitchen expected an order — a failure nobody saw until the plate was missing.
     // Here it is a refusal, with the accepted names in the message.
+    //
+    // It runs BEFORE the station is resolved (hub#987) because since the map exists the document
+    // type is what *decides* the station: routing an unvalidated word would be looking up a key
+    // that cannot be in the map and falling open on a payload that should have been refused.
     if !DOCUMENT_TYPES.contains(&document_type) {
         return Err(invalid(format!(
             "unknown document type `{document_type}` (expected one of {})",
             DOCUMENT_TYPES.join(", ")
         )));
     }
+    // **Two doors, and they fail in opposite directions on purpose** (hub#987).
+    //
+    // `role` named  → [`crate::print_stations::resolve`], which REFUSES an unknown one with a 422
+    //   naming this hub's stations (hub#457). The producer is a human or a UI here, so the typo has
+    //   to be visible — the fail-open must not relax this.
+    // `role` empty  → [`crate::print_routes::route_for`], which NEVER refuses. The job said only
+    //   what it *is*; there is no typo to show anybody, and the only choice left is paper somewhere
+    //   or paper nowhere. It falls open to `receipt`, the station a hub cannot delete.
+    //
+    // Either way what gets stored is the station's own `key` and `id`, so `Kitchen`, ` kitchen ` and
+    // `kitchen` are one queue and `claim_next` — which filters by id — finds the job.
+    let station = if job.role.trim().is_empty() {
+        crate::print_routes::route_for(db, hub_id, document_type).await?
+    } else {
+        crate::print_stations::resolve(db, hub_id, &job.role).await?
+    };
+    let role = station.key.as_str();
     // The renderer reads the document BY KEY (`data.get("items")`, `data.get("total")`). Handed an
     // array, a string or a number it finds nothing, renders every default and prints a blank ticket
     // without erroring — the same silent failure one layer down.
@@ -509,6 +529,139 @@ mod tests {
 
     async fn all(db: &PgAdapter, hub_id: &str) -> Vec<PrintJob> {
         list(db, hub_id, None, None, 100).await.unwrap()
+    }
+
+    /// A job that says only WHAT it is — the shape hub#987 makes normal, with the hub deciding
+    /// where it comes out.
+    fn routed_job(job_id: &str, document_type: &str) -> NewPrintJob {
+        NewPrintJob {
+            job_id: job_id.into(),
+            role: String::new(),
+            document_type: document_type.into(),
+            document: json!({ "total": 12.5 }),
+            format: FORMAT_RECEIPT.into(),
+        }
+    }
+
+    /// The station a queued job really landed on.
+    async fn landed_on(db: &PgAdapter, hub_id: &str, job_id: &str) -> String {
+        all(db, hub_id)
+            .await
+            .into_iter()
+            .find(|j| j.job_id == job_id)
+            .expect("the job was queued")
+            .role
+    }
+
+    /// **The module says WHAT, the hub says WHERE** (hub#987). A producer that names no station gets
+    /// routed by its document type — so `sales` can stop shipping `role: 'receipt'` and a kitchen
+    /// order still reaches the kitchen.
+    #[tokio::test]
+    async fn a_job_that_names_no_station_is_routed_by_its_document_type() {
+        let db = queue_db().await;
+
+        enqueue(&db, "h1", &routed_job("j-kitchen", "kitchen_order"))
+            .await
+            .unwrap();
+        enqueue(&db, "h1", &routed_job("j-ticket", "receipt"))
+            .await
+            .unwrap();
+        enqueue(&db, "h1", &routed_job("j-label", "barcode_label"))
+            .await
+            .unwrap();
+
+        assert_eq!(landed_on(&db, "h1", "j-kitchen").await, "kitchen");
+        assert_eq!(landed_on(&db, "h1", "j-ticket").await, "receipt");
+        assert_eq!(landed_on(&db, "h1", "j-label").await, "label");
+    }
+
+    /// …and the hub's map is what decides it, not a constant: re-point the document type and the
+    /// next identical job comes out somewhere else, with no module touched.
+    #[tokio::test]
+    async fn re_pointing_the_map_moves_the_next_job_without_touching_a_module() {
+        let db = queue_db().await;
+        crate::print_routes::set(&db, "h1", "kitchen_order", "bar", "u1")
+            .await
+            .unwrap();
+
+        enqueue(&db, "h1", &routed_job("j1", "kitchen_order"))
+            .await
+            .unwrap();
+
+        assert_eq!(landed_on(&db, "h1", "j1").await, "bar");
+    }
+
+    /// `role` survives as a **full override** (in deprecation, hub#987): a producer that still sends
+    /// one gets exactly what it asked for, so nothing published breaks on the day this lands.
+    #[tokio::test]
+    async fn an_explicit_role_still_overrides_the_map() {
+        let db = queue_db().await;
+
+        // The map says `kitchen_order` → `kitchen`; this producer insists on the bar.
+        let mut job = routed_job("j1", "kitchen_order");
+        job.role = "bar".into();
+        enqueue(&db, "h1", &job).await.unwrap();
+
+        assert_eq!(landed_on(&db, "h1", "j1").await, "bar");
+    }
+
+    /// **The door does NOT relax.** The fail-open is for a job that lost its destination, never for
+    /// a producer that named one that does not exist: there the producer is a human or a UI, and the
+    /// typo has to be visible. Still a 422 naming this hub's real stations (hub#457).
+    #[tokio::test]
+    async fn an_explicit_unknown_station_is_still_refused_at_the_door() {
+        let db = queue_db().await;
+        let mut job = routed_job("j1", "kitchen_order");
+        job.role = "kitchn".into();
+
+        let err = enqueue(&db, "h1", &job).await.unwrap_err();
+
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "naming a station that does not exist is a bad payload, not a routing gap: {err}"
+        );
+        assert!(err.to_string().contains("kitchen"), "{err}");
+        assert!(all(&db, "h1").await.is_empty(), "and nothing was queued");
+    }
+
+    /// **Fail OPEN** (hub#987, the market decision of hub#457). The merchant deleted the station its
+    /// kitchen orders were routed to. The next order must come out at the counter — late, loud and
+    /// on paper — and never be dropped the way Clover and Loyverse drop it.
+    #[tokio::test]
+    async fn a_job_whose_route_broke_comes_out_at_the_counter_not_nowhere() {
+        let db = queue_db().await;
+        let bar = crate::print_stations::resolve(&db, "h1", "bar").await.unwrap();
+        crate::print_routes::set(&db, "h1", "kitchen_order", "bar", "u1")
+            .await
+            .unwrap();
+        crate::print_stations::delete(&db, "h1", &bar.id).await.unwrap();
+
+        let outcome = enqueue(&db, "h1", &routed_job("j1", "kitchen_order"))
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, EnqueueOutcome::Queued, "the job is NOT refused");
+        assert_eq!(
+            landed_on(&db, "h1", "j1").await,
+            crate::print_stations::PROTECTED_KEY,
+            "a job that already got in and lost its destination falls open to `receipt`"
+        );
+    }
+
+    /// A job carries the station it landed on as a resolved `station_id`, whichever door routed it.
+    /// Without that, `claim_next` — which filters by id — would never hand out a routed job.
+    #[tokio::test]
+    async fn a_routed_job_is_claimable_by_the_host_of_the_station_it_landed_on() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &routed_job("j1", "kitchen_order"))
+            .await
+            .unwrap();
+
+        let claimed = claim_next_role(&db, "h1", "kitchen", "till-1", DEFAULT_LEASE_SECONDS)
+            .await
+            .unwrap()
+            .expect("the kitchen's host finds the order the map sent there");
+        assert_eq!(claimed.job_id, "j1");
     }
 
     /// **The idempotency guard.** Enqueueing the same `jobId` twice is ONE job: the second call is
@@ -920,15 +1073,22 @@ mod tests {
         );
     }
 
-    /// A job without an id, without a role or without a document is rejected before it reaches the
-    /// database: an empty `jobId` would silently break the idempotency key for every other job.
+    /// A job without an id or without a document is rejected before it reaches the database: an
+    /// empty `jobId` would silently break the idempotency key for every other job.
+    ///
+    /// ⚠️ **An empty `role` used to be on this list and deliberately is not any more** (hub#987).
+    /// It was right while `role` was the only way to say where a job went; now it is the *normal*
+    /// way to say "the hub decides", and the map routes it by document type
+    /// ([`tests::a_job_that_names_no_station_is_routed_by_its_document_type`]). What is still
+    /// refused is naming a station that does not exist — see
+    /// [`tests::an_explicit_unknown_station_is_still_refused_at_the_door`], which is where that
+    /// half of the guard moved.
     #[tokio::test]
-    async fn a_job_without_id_role_or_document_is_rejected() {
+    async fn a_job_without_id_or_document_is_rejected() {
         let db = queue_db().await;
 
         for bad in [
             job("", "receipt", "T-1"),
-            job("j1", "", "T-1"),
             NewPrintJob {
                 job_id: "j1".into(),
                 role: "receipt".into(),

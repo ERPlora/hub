@@ -3,10 +3,12 @@
 //! Two endpoints, both mounted in [`crate::app`] and both behind a **user session** (the same gate
 //! as the rest of the core API — enqueueing is not anonymous):
 //!
-//!  - `POST /api/print/jobs` → body `{ jobId, role, documentType, document, format? }`. Enqueues
-//!    the document for the print host of that `role`. **Idempotent by `jobId`**: a retry answers
-//!    `200` with `status: "duplicate"` instead of queueing a second ticket. The document travels
-//!    **structured** — the shape `escpos::render_document` reads — never as HTML (hub#501).
+//!  - `POST /api/print/jobs` → body `{ jobId, role?, documentType, document, format? }`. Enqueues
+//!    the document. **`role` is optional since hub#987**: omitted — the normal shape — the hub
+//!    routes it by `documentType` through its own map; sent, it is a full override in deprecation.
+//!    **Idempotent by `jobId`**: a retry answers `200` with `status: "duplicate"` instead of
+//!    queueing a second ticket. The document travels **structured** — the shape
+//!    `escpos::render_document` reads — never as HTML (hub#501).
 //!  - `GET  /api/print/jobs?role=&status=&limit=` → the queue as a **status view**: what is waiting,
 //!    what is printing, what died and why. It deliberately omits the document, which travels to the
 //!    print host that claims the job (hub#343), not to whoever polls the queue.
@@ -32,6 +34,14 @@
 //!
 //! Reading is any session because it is what a screen reads to **offer** a destination; writing is
 //! admin because it defines what the queues of the business *are* — the same door as `/api/keys`.
+//!
+//! And three for the **routing** (hub#987) — the other arrow of that same diagram, plus the alarm:
+//!
+//! | Endpoint | Auth | Contract |
+//! |----------|------|----------|
+//! | `GET /api/print/routes` | user session | the `documentType → station` map, + the fallback. |
+//! | `PUT /api/print/routes` | **admin** | `{ documentType, stationKey }` — where this comes out. |
+//! | `GET /api/print/undrained` | user session | what is stuck, for the bell. **Not admin** — see there. |
 //!
 //! **A device only ever registers, beats for or retires ITSELF**: the subject of the write doors is
 //! the caller's `X-Device-Id` and there is no parameter to name another one — which is why an
@@ -231,7 +241,39 @@ fn host_json(host: &PrintHost) -> Value {
 /// Per-role coverage over the wire: facts, not a sentence. The phrasing the owner reads ("nothing
 /// is printing the kitchen's tickets") belongs to the UI, which is the layer that can translate it.
 fn coverage_json(c: &RoleCoverage) -> Value {
-    json!({ "role": c.role, "waiting": c.waiting, "liveHosts": c.live_hosts })
+    json!({
+        "role": c.role,
+        "waiting": c.waiting,
+        "liveHosts": c.live_hosts,
+        // How long the oldest job has been waiting (hub#987). The screen needs it to say "for four
+        // minutes" instead of just "waiting", and it is what the threshold below is compared against.
+        "waitingSeconds": c.waiting_seconds,
+        // Resolved by the runtime, never re-derived by the client: one definition of "stuck"
+        // (`print_hosts::is_undrained`), so the badge and the row cannot disagree.
+        "undrained": print_hosts::is_undrained(c),
+    })
+}
+
+/// A routed document type as the API reports it.
+fn route_json(r: &erplora_runtime::print_routes::PrintRoute) -> Value {
+    json!({
+        "documentType": r.document_type,
+        "stationId": r.station_id,
+        // Empty on both when the row dangles (the station was deleted). The screen paints THAT as
+        // broken and offers to repoint it — hiding it would make a broken map look complete.
+        "stationKey": r.station_key,
+        "stationLabel": r.station_label,
+    })
+}
+
+/// Body of `PUT /api/print/routes` — point one document type at one station.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetRoute {
+    /// One of `print_queue::DOCUMENT_TYPES`.
+    pub document_type: String,
+    /// The station's wire key, as `GET /api/print/stations` lists them.
+    pub station_key: String,
 }
 
 /// Body of `POST /api/print/hosts`. There is deliberately **no `deviceId`**: a device registers
@@ -586,6 +628,106 @@ pub async fn delete_station(
         Ok(DeleteOutcome::Protected) => station_conflict(
             "the `receipt` station is the default of every till and cannot be removed".to_string(),
         ),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// GET /api/print/routes — this hub's `documentType → station` map. Auth = any user session.
+///
+/// Any session and not admin, for the same reason as the station list: this is what a screen reads
+/// to **show** where a document comes out. Changing it is the admin door below.
+pub async fn list_routes(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let hub_id = st.hub_id();
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.print_routes().await {
+        Ok(routes) => Json(json!({
+            "ok": true,
+            "routes": routes.iter().map(route_json).collect::<Vec<_>>(),
+            // The station a job falls open onto when its route is missing or broken. It travels so
+            // the screen can say where an unrouted document ends up instead of guessing.
+            "fallbackStation": erplora_runtime::print_stations::PROTECTED_KEY,
+        }))
+        .into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// PUT /api/print/routes — point a document type at a station. Auth = **admin** session.
+///
+/// Admin for the same reason `POST /api/print/stations` is: this decides where the business's
+/// paper comes out, which is a decision about the business and not about the device in your hand.
+pub async fn set_route(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<SetRoute>>,
+) -> Response {
+    let Some(Json(input)) = body else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "error": {
+                    "code": "invalid_payload",
+                    "message": "expected { documentType, stationKey }"
+                }
+            })),
+        )
+            .into_response();
+    };
+    let hub_id = st.hub_id();
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
+        Ok(admin) => admin,
+        Err(e) => return unauthorized(e),
+    };
+    match rt
+        .set_print_route(&input.document_type, &input.station_key, &admin.id)
+        .await
+    {
+        Ok(route) => Json(json!({ "ok": true, "route": route_json(&route) })).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// GET /api/print/undrained — the cheap "is anything on fire" number for the topbar bell (hub#987).
+///
+/// Auth = **any user session**, and that is the substantive difference with the dead-letter count it
+/// is modelled on (`/api/hub/events/dead/count`, hub#660, admin-only). A dead-letter needs an admin;
+/// a queue nobody is draining needs whoever is at the counter — they are the one who can switch the
+/// till back on, and they are the one about to hand a customer no receipt. Restricting this to
+/// admins would hide the alarm from the only person standing next to the printer.
+///
+/// It carries the threshold it applied so no client re-invents one (same shape as
+/// `heartbeatSeconds` on the host heartbeat).
+pub async fn undrained_stations(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let hub_id = st.hub_id();
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.print_undrained().await {
+        Ok(stations) => Json(json!({
+            "ok": true,
+            "count": stations.len(),
+            "thresholdSeconds": print_hosts::UNDRAINED_ALERT_SECONDS,
+            "stations": stations.iter().map(coverage_json).collect::<Vec<_>>(),
+        }))
+        .into_response(),
         Err(e) => crate::err_response(e),
     }
 }
