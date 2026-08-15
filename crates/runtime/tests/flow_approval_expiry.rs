@@ -341,8 +341,7 @@ async fn once_swept_the_run_and_its_proposal_finally_enter_the_ninety_day_prune(
         )
         .await
         .unwrap();
-    let cutoff = (chrono::Utc::now() - chrono::Duration::days(retention::RETENTION_DAYS))
-        .to_rfc3339();
+    let cutoff = retention::Cutoffs::now();
     let before = retention::prune_once(rt.db_for_test(), HUB, &cutoff)
         .await
         .unwrap();
