@@ -1259,6 +1259,8 @@ export default {
       'Filas descartadas: {n}. El fichero intentaba escribir los registros propios de este negocio — su perfil fiscal y su certificado. Son de esta instalación y ningún fichero puede cambiarlos.',
     reasonNumberingNotPortable:
       'Numeración descartada: {n}. Las series de facturación y los números ya emitidos son del negocio que creó el fichero. Tu numeración se queda como está — si aún no tienes series, configúralas en Ajustes.',
+    reasonInstallationBoundData:
+      'Registros descartados: {n}. Esta app lleva un registro oficial encadenado a la caja que lo emitió, así que solo vuelve a esa misma caja. La tuya empieza el suyo — aquí no se ha cambiado nada.',
     done: 'Ir al inicio',
   },
   moduleView: {

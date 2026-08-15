@@ -140,6 +140,24 @@ pub struct Manifest {
     /// a fiscal provider", which is simply true of them.
     #[serde(default)]
     pub fiscal_regime: Option<FiscalRegimeDef>,
+    /// **This module's data belongs to the INSTALLATION that produced it** (hub#380, generalising
+    /// ADR-0202 §4.2). A bundle from another hub never applies it; the same hub restoring its own
+    /// backup gets it back.
+    ///
+    /// The import engine used to ask a different question — *«is this section
+    /// `modules/verifactu`?»* — which put one country's regime inside a generic engine and would
+    /// have needed one more name for TicketBai and another for NF525. Both chain their records
+    /// against the previous one under an installation identifier (`NumeroInstalacion` = `hub_id`
+    /// here), so applied under another hub the next record would chain on something the tax
+    /// authority never received for that installation, and a pending queue would be transmitted
+    /// under the wrong installation. That is a property of the DATA, and only the module that owns
+    /// it knows it — so the module declares it and [`crate::import`] reads it.
+    ///
+    /// It is about **portability, not secrecy**: the rows still export (a hub must be able to back
+    /// itself up), they simply do not land anywhere else. Absent = portable, which is the shape of
+    /// every published manifest and the truth about all but the fiscal ones.
+    #[serde(default)]
+    pub installation_bound_data: bool,
     /// **The commercial terms the module declares** (`billing`, ADR-0007) — captured VERBATIM, the
     /// way [`Manifest::ai_context`] is, and read for exactly one yes/no question.
     ///
@@ -1437,6 +1455,7 @@ const ROOT_FIELDS: &[&str] = &[
     "notify",
     "capabilities",
     "fiscal_regime",
+    "installation_bound_data",
     "scheduled_tasks",
     "ui",
     "marketplace",
@@ -1913,6 +1932,37 @@ pub struct NavLocale {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// hub#380 — «my data belongs to the installation that produced it» is something the MODULE
+    /// says, not something the core knows by name.
+    ///
+    /// The import engine used to compare the section against the literal `modules/verifactu`: a
+    /// Spanish regime hard-coded into a generic engine, which would have needed one more `||` for
+    /// TicketBai and another for NF525. The module declares it here instead.
+    #[test]
+    fn a_module_declares_that_its_data_is_bound_to_its_installation() {
+        let bound: Manifest = serde_json::from_str(
+            r#"{
+            "id": "verifactu",
+            "name": "VeriFactu",
+            "version": "1.2.3",
+            "installation_bound_data": true
+        }"#,
+        )
+        .expect("manifest parses");
+        assert!(bound.installation_bound_data);
+    }
+
+    /// Absent = portable, which is the shape of EVERY published manifest: adding the field must
+    /// not change what any of them means today.
+    #[test]
+    fn a_module_that_says_nothing_carries_portable_data() {
+        let plain: Manifest = serde_json::from_str(
+            r#"{ "id": "inventory", "name": "Inventory", "version": "1.0.0" }"#,
+        )
+        .expect("manifest parses");
+        assert!(!plain.installation_bound_data);
+    }
 
     #[test]
     fn parses_module_static_files_folder() {

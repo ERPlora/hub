@@ -936,6 +936,10 @@ export const SECTION_DISCARD_CODES = [
   'system_table_not_portable',
   // hub#753 — la serie de facturación y el libro de números ya entregados son de UNA instalación.
   'numbering_not_portable',
+  // hub#380 — la sección es de un módulo que declara `installation_bound_data` en su module.json:
+  // sus registros son de la instalación que los emitió. Antes el motivo era prosa que nombraba
+  // VeriFactu; el código sirve igual para TicketBai o NF525, y aquí se traduce.
+  'installation_bound_data',
 ] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */

@@ -968,6 +968,7 @@ const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
   roles_not_activatable: (n) => t('importPage.reasonRolesNotActivatable', { n }),
   system_table_not_portable: (n) => t('importPage.reasonSystemTableNotPortable', { n }),
   numbering_not_portable: (n) => t('importPage.reasonNumberingNotPortable', { n }),
+  installation_bound_data: (n) => t('importPage.reasonInstallationBoundData', { n }),
 };
 
 /** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */

@@ -77,6 +77,13 @@ describe('sectionDiscardCode · motivo traducible vs prosa heredada', () => {
     expect(sectionDiscardCode('system_table_not_portable')).toBe('system_table_not_portable');
   });
 
+  // hub#380 — el motivo dejó de ser prosa que nombraba VeriFactu: ahora es el código del flag
+  // `installation_bound_data` del module.json, así que sirve igual para TicketBai o NF525 y la
+  // frase la pone el shell traducida.
+  it('reconoce el código de unos datos ligados a otra instalación', () => {
+    expect(sectionDiscardCode('installation_bound_data')).toBe('installation_bound_data');
+  });
+
   it('un motivo en prosa NO es un código: se pinta tal cual', () => {
     const prosa = 'una plantilla no aplica identidades: la sección `hub_users` se ha descartado';
     expect(sectionDiscardCode(prosa)).toBeNull();
