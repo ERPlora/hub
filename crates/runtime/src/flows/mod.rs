@@ -52,7 +52,7 @@ pub mod store;
 pub mod triggers;
 
 pub use agent::AiRequest;
-pub use approvals::{Approval, NewApproval};
+pub use approvals::{Approval, ExpirySweepReport, NewApproval};
 pub use def::{AiPolicy, AiStep, Condition, FlowDefinition, StepKind, TriggerKind, SCHEMA_VERSION};
 pub use executor::{tick, IoResult, PendingIo, TickReport};
 pub use http::HttpRequest;

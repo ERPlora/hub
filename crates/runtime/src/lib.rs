@@ -2395,6 +2395,96 @@ impl Runtime {
         }
     }
 
+    /// **Closes the proposals nobody answered** (hub#972) — the active sweep the TTL never had.
+    ///
+    /// `expires_at` was read only by `claim_pending`, so a proposal past its 72 h could be neither
+    /// approved nor rejected (both go through that door) and its run sat in `waiting_approval` for
+    /// ever: exempt from the 90-day prune, holding a verbatim `payload` that can carry a customer's
+    /// personal details. There was no action a person could take, in a hub with no way to reach the
+    /// database.
+    ///
+    /// What it does per swept row is decided by the ROW (`on_expire`, [`flows::approvals::ExpiryPolicy`]),
+    /// never by this method: `reject`/`cancel` end the run, `continue` resumes it at the next step.
+    /// The default is the conservative one — the steps written after an `ai` step assumed it acted.
+    /// Whatever the policy, **nothing the model proposed is executed**: an expiry is the opposite of
+    /// an approval.
+    ///
+    /// A run that has moved on (or been deleted) since is skipped and counted as `stranded` rather
+    /// than aborting the pass: the proposal is already closed, and one broken run must not stop the
+    /// hub from closing the rest.
+    ///
+    /// **One bounded pass** (`SWEEP_BATCH` proposals), like [`retention::prune_once`] and for the
+    /// same reason: the caller holds the runtime lock the tills are queueing behind, and it re-takes
+    /// it per pass instead of keeping it for a whole catch-up. Driven by the hourly retention tick
+    /// in `crates/server`, **before** the prune, so a run that becomes terminal here can be pruned
+    /// in the same hour it stops being live.
+    pub async fn sweep_expired_flow_approvals(&self) -> Result<flows::ExpirySweepReport> {
+        let now = registry::now_rfc3339();
+        let mut report = flows::ExpirySweepReport::default();
+        let swept = flows::approvals::sweep_expired(
+            self.db.as_ref(),
+            &self.hub_id,
+            &now,
+            flows::approvals::SWEEP_BATCH,
+        )
+        .await?;
+        for approval in &swept {
+            report.expired += 1;
+            let resumed = matches!(approval.on_expire, flows::approvals::ExpiryPolicy::Continue);
+            let result = if resumed {
+                // The turn's own output is kept and closed with how it ended — the same shape
+                // an approved proposal leaves, so `steps.<id>.status` answers the question
+                // «what happened here?» whichever way it went.
+                let mut output = self.parked_step_output(&approval.run_id).await;
+                if let Some(map) = output.as_object_mut() {
+                    map.insert("status".into(), json!(flows::approvals::STATUS_EXPIRED));
+                    map.insert("approval_id".into(), json!(approval.id));
+                    map.insert("command".into(), json!(approval.command));
+                }
+                flows::IoResult::Done(output)
+            } else {
+                flows::IoResult::Cancelled(format!(
+                    "`{}` was never decided: the proposal expired at {} and `on_expire` is \
+                     `{}`",
+                    approval.command,
+                    approval.expires_at,
+                    approval.on_expire.as_str()
+                ))
+            };
+            match self
+                .complete_flow_io(&approval.run_id, &approval.step_id, result)
+                .await
+            {
+                Ok(()) if resumed => report.runs_resumed += 1,
+                Ok(()) => report.runs_stopped += 1,
+                Err(e) => {
+                    report.stranded += 1;
+                    eprintln!(
+                        "flows: approval {} expired but its run {} could not be closed: {e}",
+                        approval.id, approval.run_id
+                    );
+                }
+            }
+            // Ephemeral, WS-only, exactly like `flow.approval.created`: a tray left open all
+            // night has to stop showing a question that can no longer be answered, and the
+            // SCREEN is the module `flows`'s job.
+            let mut payload = Params::new();
+            payload.insert("approval_id".into(), Json::from(approval.id.clone()));
+            payload.insert("flow_id".into(), Json::from(approval.flow_id.clone()));
+            payload.insert("run_id".into(), Json::from(approval.run_id.clone()));
+            payload.insert("command".into(), Json::from(approval.command.clone()));
+            payload.insert("expires_at".into(), Json::from(approval.expires_at.clone()));
+            payload.insert("on_expire".into(), Json::from(approval.on_expire.as_str()));
+            events::notify_sink(
+                &self.registry,
+                registry::EventSource::Core,
+                flows::approvals::EVENT_APPROVAL_EXPIRED,
+                &payload,
+            );
+        }
+        Ok(report)
+    }
+
     /// Catch-up del scheduler al **arrancar** (Tauri/local): ejecuta una sola vez las tareas con
     /// backlog vencido (collapse) y reprograma las demás. Lo llama el host una vez al arrancar.
     pub async fn scheduler_catch_up(&self, hub_id: &str) -> Result<usize> {

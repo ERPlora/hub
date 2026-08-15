@@ -34,6 +34,14 @@ pub const ERR_APPROVAL_EXPIRED: &str = "flow.approval_expired";
 pub const STATUS_PENDING: &str = "pending";
 pub const STATUS_APPROVED: &str = "approved";
 pub const STATUS_REJECTED: &str = "rejected";
+/// Nobody answered in time (hub#972). A **decided** status, terminal like the other two: what it
+/// says is that the question is closed, not that it is still hanging.
+pub const STATUS_EXPIRED: &str = "expired";
+
+/// Who closes an expired proposal. Not a person, and it cannot be mistaken for one: every human
+/// principal in this hub is `hub_user:…`. The row still records WHEN it was closed, because
+/// «nobody answered» is a fact about a moment.
+pub const DECIDED_BY_EXPIRY: &str = "system:expiry";
 
 /// How long a proposal stays decidable. A booking proposed for «tomorrow at 10» stops being a
 /// question worth answering once tomorrow has passed, and an approval left lying around for a
@@ -43,6 +51,58 @@ pub const DEFAULT_TTL_HOURS: i64 = 72;
 /// The name of the ephemeral event the WS carries so the tray lights up without polling. The
 /// SCREEN is the module `flows`'s job (ADR-0283 §7); the core emits the fact.
 pub const EVENT_APPROVAL_CREATED: &str = "flow.approval.created";
+
+/// …and the one the sweep emits, so a tray that was open all night stops showing a question that
+/// can no longer be answered. Same shape and same reason as [`EVENT_APPROVAL_CREATED`].
+pub const EVENT_APPROVAL_EXPIRED: &str = "flow.approval.expired";
+
+/// **What happens to the RUN when its proposal expires** — the value of the `on_expire` column.
+///
+/// It is a column and not a constant because the answer belongs to whoever wrote the flow: the
+/// generic `approval` step (hub#950) sets it per document, and the sweep is the one place that
+/// reads it. Storing it next to the `payload` — rather than looking the flow up at sweep time —
+/// keeps the same property the payload has: editing (or deleting) the flow does not change what a
+/// proposal already in the tray means.
+pub const ON_EXPIRE_REJECT: &str = "reject";
+pub const ON_EXPIRE_CANCEL: &str = "cancel";
+pub const ON_EXPIRE_CONTINUE: &str = "continue";
+
+/// The parsed form of that column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpiryPolicy {
+    /// Treat the silence as a **refusal** — the DEFAULT, and the conservative reading. The steps
+    /// written after an `ai` step assumed it acted; carrying on as if it had would be the one
+    /// mistake an approval exists to prevent. Today a rejection ends the run (§14.7), so this and
+    /// [`ExpiryPolicy::Cancel`] land in the same place; they stop being synonyms the day `on_reject`
+    /// exists, and the row already says which one was meant.
+    Reject,
+    /// End the run, without calling it a refusal.
+    Cancel,
+    /// Carry on to the next step. Opt-in, for a document whose remaining steps do NOT depend on
+    /// the write — the `Limit Wait Time` of n8n, not a default anybody should inherit.
+    Continue,
+}
+
+impl ExpiryPolicy {
+    /// Anything unrecognised degrades to [`ExpiryPolicy::Reject`]. A row written by a newer version
+    /// (or by hand) must not be able to talk this hub into carrying on: the failure mode of
+    /// guessing here is a write nobody authorised.
+    pub fn parse(raw: &str) -> Self {
+        match raw {
+            ON_EXPIRE_CONTINUE => Self::Continue,
+            ON_EXPIRE_CANCEL => Self::Cancel,
+            _ => Self::Reject,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Reject => ON_EXPIRE_REJECT,
+            Self::Cancel => ON_EXPIRE_CANCEL,
+            Self::Continue => ON_EXPIRE_CONTINUE,
+        }
+    }
+}
 
 /// One proposal, as the tray shows it.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -61,6 +121,10 @@ pub struct Approval {
     pub decided_by: String,
     pub decided_at: Option<String>,
     pub expires_at: Option<String>,
+    /// What the sweep will do to the RUN if `expires_at` passes with nobody answering. Shown in
+    /// the tray for the same reason `expires_at` is: it is half of what «leave this for later»
+    /// costs.
+    pub on_expire: String,
     /// Why the approved command failed, if it did. Empty otherwise.
     pub error: String,
     pub created_at: String,
@@ -125,7 +189,7 @@ pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<App
     let res = db
         .query(
             "SELECT id, run_id, flow_id, step_id, command, payload, reason, status, decided_by, \
-                    decided_at, expires_at, error, created_at \
+                    decided_at, expires_at, on_expire, error, created_at \
              FROM _flow_approvals WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
             &p,
         )
@@ -147,13 +211,13 @@ pub async fn list(
     let sql = if status.is_some() {
         p.insert("status".into(), json!(status.unwrap_or_default()));
         "SELECT id, run_id, flow_id, step_id, command, payload, reason, status, decided_by, \
-                decided_at, expires_at, error, created_at \
+                decided_at, expires_at, on_expire, error, created_at \
          FROM _flow_approvals \
          WHERE hub_id = :hub_id AND status = :status AND deleted_at IS NULL \
          ORDER BY created_at DESC, id DESC LIMIT :limit"
     } else {
         "SELECT id, run_id, flow_id, step_id, command, payload, reason, status, decided_by, \
-                decided_at, expires_at, error, created_at \
+                decided_at, expires_at, on_expire, error, created_at \
          FROM _flow_approvals WHERE hub_id = :hub_id AND deleted_at IS NULL \
          ORDER BY created_at DESC, id DESC LIMIT :limit"
     };
@@ -172,6 +236,12 @@ pub async fn claim_pending(
     id: &str,
 ) -> Result<Approval> {
     let approval = get(db, hub_id, id).await?;
+    // A row the SWEEP closed (hub#972) is refused by the name it was closed under. Falling through
+    // to `already_decided` would name a decider that does not exist and send the tray to the wrong
+    // message: «somebody beat you to it» is a different fact from «this question is too old».
+    if approval.status == STATUS_EXPIRED {
+        return Err(expired(id, approval.expires_at.as_deref().unwrap_or("")));
+    }
     if approval.status != STATUS_PENDING {
         return Err(RuntimeError::Domain {
             code: ERR_APPROVAL_ALREADY_DECIDED.to_string(),
@@ -181,18 +251,145 @@ pub async fn claim_pending(
             ),
         });
     }
+    // Still `pending`, but past its deadline: the hourly sweep has simply not come round yet. The
+    // answer is the same one it will give afterwards — the person must not get a different verdict
+    // depending on what minute she pressed the button.
     if let Some(expires_at) = &approval.expires_at {
         if expires_at.as_str() < now_rfc3339().as_str() {
-            return Err(RuntimeError::Domain {
-                code: ERR_APPROVAL_EXPIRED.to_string(),
-                message: format!(
-                    "approval `{id}` expired at {expires_at}; what it proposed was about a moment \
-                     that has passed"
-                ),
-            });
+            return Err(expired(id, expires_at));
         }
     }
     Ok(approval)
+}
+
+fn expired(id: &str, expires_at: &str) -> RuntimeError {
+    RuntimeError::Domain {
+        code: ERR_APPROVAL_EXPIRED.to_string(),
+        message: format!(
+            "approval `{id}` expired at {expires_at}; what it proposed was about a moment that \
+             has passed"
+        ),
+    }
+}
+
+/// One proposal the sweep closed, and everything its caller needs to end (or resume) the run.
+///
+/// The sweep itself touches only `_flow_approvals`: this file has no executor and no event sink,
+/// and giving it one would put «what happens to a run» in two places.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpiredApproval {
+    pub id: String,
+    pub run_id: String,
+    pub flow_id: String,
+    pub step_id: String,
+    pub command: String,
+    pub expires_at: String,
+    /// Read from the ROW, not from the flow: see [`ExpiryPolicy`].
+    pub on_expire: ExpiryPolicy,
+}
+
+/// Proposals closed per pass of the sweep. Smaller than the prune's [`crate::retention::BATCH`] on
+/// purpose: closing one proposal is not one `DELETE` but a run being ended or resumed
+/// (`complete_io`, several statements), and the whole pass happens under the runtime lock the tills
+/// are queueing behind. The driver simply repeats the pass.
+pub const SWEEP_BATCH: i64 = 100;
+
+/// What one expiry sweep closed, so the caller can log it without a second query — same contract
+/// as [`crate::retention::PruneReport`]: a silent sweep is indistinguishable from data loss the day
+/// somebody looks for the proposal they were going to approve and does not find it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ExpirySweepReport {
+    /// Proposals moved to `expired`.
+    pub expired: u64,
+    /// Runs ended by it (`reject`/`cancel`).
+    pub runs_stopped: u64,
+    /// Runs sent on to their next step (`continue`).
+    pub runs_resumed: u64,
+    /// Proposals closed whose run could no longer be reached (deleted, or already moved on). The
+    /// tray is clean either way; this is the count that must never be silent.
+    pub stranded: u64,
+}
+
+impl ExpirySweepReport {
+    /// Nothing was overdue — the common case, and the one the caller must not log.
+    pub fn is_empty(&self) -> bool {
+        self.expired == 0
+    }
+
+    /// Fold one pass into the running total. Public for the same reason [`crate::retention::PruneReport::merge`]
+    /// is: the driver owns the passes, because it re-takes the runtime lock between them.
+    pub fn merge(&mut self, other: ExpirySweepReport) {
+        self.expired += other.expired;
+        self.runs_stopped += other.runs_stopped;
+        self.runs_resumed += other.runs_resumed;
+        self.stranded += other.stranded;
+    }
+}
+
+/// **The barrier that was missing** (hub#972): closes every proposal whose deadline has passed and
+/// says which runs are now waiting for nobody.
+///
+/// Before this, `expires_at` was consulted *only* on the way in ([`claim_pending`]). A row past its
+/// TTL could therefore be neither approved nor rejected — both go through that door — so there was
+/// no action left for a person to take, and its run stayed in `waiting_approval` for ever. That
+/// status is exempt from the 90-day prune on purpose (a real approval waits for days), which meant
+/// the `payload`, stored verbatim and quite capable of holding a customer's name and phone,
+/// outlived every retention rule the hub has.
+///
+/// Three properties, and each one is load-bearing:
+///
+/// - **`UPDATE … WHERE status = 'pending'`**, inside a single data-modifying statement. Two sweeps
+///   racing (or a sweep racing a person pressing *approve*) end with one winner, and the decision
+///   a HUMAN took is never overwritten by a clock.
+/// - **Bounded** by `limit`, like the prune: this runs against a live till.
+/// - **`expires_at IS NOT NULL`** — no deadline means no TTL, not «expired at the epoch».
+///
+/// `now` is passed in rather than read here so the caller owns the clock, the same contract as
+/// [`crate::retention::prune_once`]'s `cutoff`.
+pub async fn sweep_expired(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    now: &str,
+    limit: i64,
+) -> Result<Vec<ExpiredApproval>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("now".into(), json!(now));
+    p.insert("lim".into(), json!(limit.clamp(1, 1000)));
+    p.insert("status".into(), json!(STATUS_EXPIRED));
+    p.insert("by".into(), json!(DECIDED_BY_EXPIRY));
+    let res = db
+        .query(
+            "WITH overdue AS (\
+               SELECT id FROM _flow_approvals \
+                WHERE hub_id = :hub_id AND status = 'pending' AND deleted_at IS NULL \
+                  AND expires_at IS NOT NULL AND expires_at < :now \
+                ORDER BY expires_at LIMIT :lim\
+             ), swept AS (\
+               UPDATE _flow_approvals \
+                  SET status = :status, decided_by = :by, decided_at = :now, updated_at = :now \
+                WHERE id IN (SELECT id FROM overdue) AND status = 'pending' \
+                RETURNING id, run_id, flow_id, step_id, command, expires_at, on_expire\
+             ) SELECT id, run_id, flow_id, step_id, command, expires_at, on_expire FROM swept",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .map(|r| {
+            let text = |k: &str| r[k].as_str().unwrap_or_default().to_string();
+            ExpiredApproval {
+                id: text("id"),
+                run_id: text("run_id"),
+                flow_id: text("flow_id"),
+                step_id: text("step_id"),
+                command: text("command"),
+                expires_at: text("expires_at"),
+                on_expire: ExpiryPolicy::parse(&text("on_expire")),
+            }
+        })
+        .collect())
 }
 
 /// Records the decision. Called AFTER the command has run (or not), so the row never says
@@ -239,6 +436,9 @@ fn row(r: &Json) -> Approval {
         decided_by: text("decided_by"),
         decided_at: opt("decided_at"),
         expires_at: opt("expires_at"),
+        // Normalised through `ExpiryPolicy`, so what the tray reads is what the sweep will do —
+        // an unrecognised value shows as `reject` because that is how it will be obeyed.
+        on_expire: ExpiryPolicy::parse(&text("on_expire")).as_str().to_string(),
         error: text("error"),
         created_at: text("created_at"),
     }
@@ -349,6 +549,207 @@ mod tests {
             .expect_err("yesterday's booking is not a question worth answering today");
         // The stable CODE, not the prose: `RuntimeError::Domain` shows only its message, and the
         // code is the half the module `flows` programs against (flows.md §13.8).
+        assert_eq!(code_of(&err), ERR_APPROVAL_EXPIRED, "{err}");
+    }
+
+    /// Ages a proposal's deadline, the way three days of silence would.
+    async fn age(db: &impl DatabaseAdapter, id: &str, when: &str) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("when".into(), json!(when));
+        db.execute(
+            "UPDATE _flow_approvals SET expires_at = :when WHERE id = :id",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    const LONG_AGO: &str = "2020-01-01T00:00:00+00:00";
+
+    /// The sweep decides the row, and what it hands back is what the caller needs to end the run:
+    /// nothing about a run is decided in here, because this file has no executor.
+    #[tokio::test]
+    async fn the_sweep_expires_a_proposal_past_its_deadline_and_says_which_run_it_was() {
+        let db = db().await;
+        let created = create(&db, HUB, &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        age(&db, &created.id, LONG_AGO).await;
+
+        let swept = sweep_expired(&db, HUB, &now_rfc3339(), 100).await.unwrap();
+
+        assert_eq!(swept.len(), 1);
+        assert_eq!(swept[0].id, created.id);
+        assert_eq!(swept[0].run_id, "run-1");
+        assert_eq!(swept[0].step_id, "agent");
+        assert_eq!(
+            swept[0].on_expire,
+            ExpiryPolicy::Reject,
+            "no document said otherwise, and the conservative answer is the default"
+        );
+        let after = get(&db, HUB, &created.id).await.unwrap();
+        assert_eq!(after.status, STATUS_EXPIRED);
+        assert_eq!(after.decided_by, DECIDED_BY_EXPIRY);
+        assert!(after.decided_at.is_some());
+    }
+
+    /// Twice an hour for the life of the hub: the second pass has to find nothing.
+    #[tokio::test]
+    async fn the_sweep_is_idempotent_and_never_re_decides_a_decided_row() {
+        let db = db().await;
+        let expired = create(&db, HUB, &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        age(&db, &expired.id, LONG_AGO).await;
+        // A row a PERSON already answered, aged past its deadline as well: a sweep that looked at
+        // the clock alone would overwrite her decision with `expired`.
+        let decided = create(&db, HUB, &proposal("agenda.booking.cancel"))
+            .await
+            .unwrap();
+        mark_decided(&db, HUB, &decided.id, STATUS_APPROVED, "hub_user:1", "")
+            .await
+            .unwrap();
+        age(&db, &decided.id, LONG_AGO).await;
+
+        let first = sweep_expired(&db, HUB, &now_rfc3339(), 100).await.unwrap();
+        let second = sweep_expired(&db, HUB, &now_rfc3339(), 100).await.unwrap();
+
+        assert_eq!(first.len(), 1, "only the undecided one");
+        assert!(second.is_empty(), "nothing left: {second:?}");
+        let untouched = get(&db, HUB, &decided.id).await.unwrap();
+        assert_eq!(untouched.status, STATUS_APPROVED);
+        assert_eq!(untouched.decided_by, "hub_user:1");
+    }
+
+    /// One database can hold rows for more than one `hub_id` (the row contract, not the deploy).
+    /// The neighbour here is ALIVE and equally overdue — a scoping test whose other tenant has
+    /// nothing to lose proves nothing.
+    #[tokio::test]
+    async fn the_sweep_only_touches_the_hub_it_was_asked_for() {
+        let db = db().await;
+        test_support::ensure_schema(&db, "hub-next-door").await;
+        let mine = create(&db, HUB, &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        let theirs = create(&db, "hub-next-door", &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        age(&db, &mine.id, LONG_AGO).await;
+        age(&db, &theirs.id, LONG_AGO).await;
+
+        let swept = sweep_expired(&db, HUB, &now_rfc3339(), 100).await.unwrap();
+
+        assert_eq!(swept.len(), 1);
+        assert_eq!(swept[0].id, mine.id);
+        assert_eq!(
+            get(&db, "hub-next-door", &theirs.id).await.unwrap().status,
+            STATUS_PENDING,
+            "the tenant is never negotiable, not even for a cleanup"
+        );
+    }
+
+    /// A pass is BOUNDED, for the same reason the prune's is: this runs on a live till, and a hub
+    /// that has been ignoring its tray for a year must not take the table with it in one statement.
+    #[tokio::test]
+    async fn a_pass_is_bounded_and_the_rest_waits_for_the_next_one() {
+        let db = db().await;
+        for _ in 0..5 {
+            let a = create(&db, HUB, &proposal("agenda.booking.create"))
+                .await
+                .unwrap();
+            age(&db, &a.id, LONG_AGO).await;
+        }
+
+        let first = sweep_expired(&db, HUB, &now_rfc3339(), 2).await.unwrap();
+        let rest = sweep_expired(&db, HUB, &now_rfc3339(), 100).await.unwrap();
+
+        assert_eq!(first.len(), 2, "one pass never exceeds the limit");
+        assert_eq!(rest.len(), 3);
+        assert_eq!(
+            list(&db, HUB, Some(STATUS_PENDING), 50).await.unwrap().len(),
+            0
+        );
+    }
+
+    /// The policy travels in the ROW, so the generic `approval` step of hub#950 can set it per
+    /// document without this sweep growing a second branch. Anything unrecognised falls back to
+    /// the conservative answer rather than being obeyed literally.
+    #[tokio::test]
+    async fn the_expiry_policy_is_read_from_the_row_and_degrades_to_reject() {
+        let db = db().await;
+        for policy in [ON_EXPIRE_CONTINUE, ON_EXPIRE_CANCEL, "nonsense-from-v2"] {
+            let a = create(&db, HUB, &proposal("agenda.booking.create"))
+                .await
+                .unwrap();
+            let mut p = Params::new();
+            p.insert("id".into(), json!(a.id));
+            p.insert("policy".into(), json!(policy));
+            p.insert("when".into(), json!(LONG_AGO));
+            db.execute(
+                "UPDATE _flow_approvals SET on_expire = :policy, expires_at = :when \
+                 WHERE id = :id",
+                &p,
+            )
+            .await
+            .unwrap();
+
+            let swept = sweep_expired(&db, HUB, &now_rfc3339(), 100).await.unwrap();
+
+            assert_eq!(swept.len(), 1, "policy `{policy}`");
+            assert_eq!(
+                swept[0].on_expire,
+                match policy {
+                    ON_EXPIRE_CONTINUE => ExpiryPolicy::Continue,
+                    ON_EXPIRE_CANCEL => ExpiryPolicy::Cancel,
+                    _ => ExpiryPolicy::Reject,
+                },
+                "policy `{policy}`"
+            );
+        }
+    }
+
+    /// A row without a deadline is not overdue: `expires_at IS NULL` means «no TTL», and reading it
+    /// as «expired at the epoch» would sweep away every proposal written before the column existed.
+    #[tokio::test]
+    async fn a_proposal_without_a_deadline_is_never_swept() {
+        let db = db().await;
+        let created = create(&db, HUB, &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        let mut p = Params::new();
+        p.insert("id".into(), json!(created.id));
+        db.execute(
+            "UPDATE _flow_approvals SET expires_at = NULL WHERE id = :id",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        assert!(sweep_expired(&db, HUB, &now_rfc3339(), 100)
+            .await
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            get(&db, HUB, &created.id).await.unwrap().status,
+            STATUS_PENDING
+        );
+    }
+
+    /// The refusal keeps its NAME after the sweep. `already_decided` would name a decider that
+    /// does not exist, and the tray shows a different message for each code.
+    #[tokio::test]
+    async fn a_swept_proposal_is_refused_as_expired_not_as_already_decided() {
+        let db = db().await;
+        let created = create(&db, HUB, &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        age(&db, &created.id, LONG_AGO).await;
+        sweep_expired(&db, HUB, &now_rfc3339(), 100).await.unwrap();
+
+        let err = claim_pending(&db, HUB, &created.id)
+            .await
+            .expect_err("a swept proposal is not decidable either");
         assert_eq!(code_of(&err), ERR_APPROVAL_EXPIRED, "{err}");
     }
 

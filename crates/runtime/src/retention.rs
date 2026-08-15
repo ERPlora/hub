@@ -21,6 +21,14 @@
 //! `waiting_approval` are live work and are never touched at any age (`waiting_approval` can sit
 //! there for days by design — ADR-0283 §7).
 //!
+//! **That exemption used to be unbounded** (hub#972). The 72 h TTL of an approval was checked only
+//! when somebody tried to decide it, so a proposal nobody answered left its run in
+//! `waiting_approval` for ever — and the run kept the proposal, whose `payload` is stored verbatim
+//! and can hold a customer's name and phone. The hourly tick now sweeps overdue proposals first
+//! (`flows::approvals::sweep_expired`), which puts their runs in a terminal status, and this prune
+//! deletes `_flow_approvals` together with the runs it removes. "Live work is exempt" is only
+//! honest if work stops being live.
+//!
 //! What is actually lost after 90 days is **traceability**: `/api/hub/events/{id}/trace`, the run
 //! history behind a sale. No invoice is affected — `_event_outbox` stores the *event*, while the
 //! document lives in the `invoice`/`verifactu` module tables under its own fiscal retention. The
@@ -79,12 +87,14 @@ pub struct PruneReport {
     pub runs: u64,
     /// `_flow_run_steps` rows removed with those runs.
     pub run_steps: u64,
+    /// `_flow_approvals` rows removed with those runs (hub#972).
+    pub approvals: u64,
 }
 
 impl PruneReport {
     /// Every row this prune deleted, across the four tables.
     pub fn total(&self) -> u64 {
-        self.events + self.delivery_markers + self.runs + self.run_steps
+        self.events + self.delivery_markers + self.runs + self.run_steps + self.approvals
     }
 
     /// Nothing to do — the common case, and the one the caller must not log.
@@ -100,6 +110,7 @@ impl PruneReport {
         self.delivery_markers += other.delivery_markers;
         self.runs += other.runs;
         self.run_steps += other.run_steps;
+        self.approvals += other.approvals;
     }
 }
 
@@ -122,11 +133,17 @@ WITH doomed AS (\
   DELETE FROM _event_outbox WHERE id IN (SELECT id FROM doomed) RETURNING id\
 ) SELECT (SELECT COUNT(*) FROM markers) AS markers, (SELECT COUNT(*) FROM events) AS events";
 
-/// The terminal runs and their steps, in one atomic statement.
+/// The terminal runs and their children — steps AND approvals — in one atomic statement.
 ///
-/// The steps are deleted by `run_id` alone, deliberately: the doomed set is already scoped to the
-/// hub, and re-filtering the children by `hub_id` would let a step written with a wrong `hub_id`
-/// survive its run as an orphan — hiding the bug instead of removing the row.
+/// The children are deleted by `run_id` alone, deliberately: the doomed set is already scoped to
+/// the hub, and re-filtering them by `hub_id` would let a row written with a wrong `hub_id` survive
+/// its run as an orphan — hiding the bug instead of removing the row.
+///
+/// `_flow_approvals` joined this in hub#972, and it is not bookkeeping: the row keeps the proposed
+/// `payload` VERBATIM, which is exactly where a customer's name, phone or address ends up. Nothing
+/// in the hub ever deleted from that table, so a proposal used to outlive by years the run that
+/// explains it. It is a child of its run in the same sense a step is — and while its run is live
+/// (`waiting_approval` at any age), neither of them is touched.
 const PRUNE_RUNS: &str = "\
 WITH doomed AS (\
   SELECT id FROM _flow_runs \
@@ -137,9 +154,12 @@ WITH doomed AS (\
    LIMIT :lim\
 ), steps AS (\
   DELETE FROM _flow_run_steps WHERE run_id IN (SELECT id FROM doomed) RETURNING id\
+), approvals AS (\
+  DELETE FROM _flow_approvals WHERE run_id IN (SELECT id FROM doomed) RETURNING id\
 ), runs AS (\
   DELETE FROM _flow_runs WHERE id IN (SELECT id FROM doomed) RETURNING id\
-) SELECT (SELECT COUNT(*) FROM steps) AS steps, (SELECT COUNT(*) FROM runs) AS runs";
+) SELECT (SELECT COUNT(*) FROM steps) AS steps, (SELECT COUNT(*) FROM runs) AS runs, \
+         (SELECT COUNT(*) FROM approvals) AS approvals";
 
 /// One bounded pass: up to [`BATCH`] terminal events and [`BATCH`] terminal runs older than
 /// `cutoff`, each with its children.
@@ -160,6 +180,7 @@ pub async fn prune_once(db: &dyn DatabaseAdapter, hub_id: &str, cutoff: &str) ->
         delivery_markers: cell(&events, "markers"),
         runs: cell(&runs, "runs"),
         run_steps: cell(&runs, "steps"),
+        approvals: cell(&runs, "approvals"),
     })
 }
 
@@ -410,6 +431,66 @@ mod tests {
             .await,
             0,
             "not one orphan step"
+        );
+    }
+
+    /// One approval row, pointing at a run, holding a payload verbatim.
+    async fn approval(db: &PgAdapter, hub: &str, id: &str, run_id: &str, status: &str) {
+        let at = days_ago(0);
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub));
+        p.insert("run_id".into(), json!(run_id));
+        p.insert("status".into(), json!(status));
+        p.insert("at".into(), json!(at));
+        db.execute(
+            "INSERT INTO _flow_approvals \
+             (id, hub_id, run_id, flow_id, step_id, command, payload, reason, status, \
+              created_at, updated_at) \
+             VALUES (:id, :hub_id, :run_id, 'f1', 'agent', 'agenda.booking.create', \
+                     '{\"customer\":\"Marta\",\"phone\":\"600000000\"}', '', :status, :at, :at)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// hub#972 — the payload of a proposal is stored VERBATIM, and it can carry a customer's name,
+    /// phone or address. It is a child of its run exactly as a step is, so it goes when the run
+    /// goes: a proposal that outlived the history explaining it would keep personal data for ever
+    /// in the one table nothing ever deleted from.
+    #[tokio::test]
+    async fn a_pruned_run_takes_its_approvals_with_it() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        run_with_step(&db, HUB, "old-run", "cancelled", 120).await;
+        approval(&db, HUB, "old-approval", "old-run", "expired").await;
+        // Live work, and therefore untouchable — with its proposal still waiting for a person.
+        run_with_step(&db, HUB, "waiting-run", "waiting_approval", 120).await;
+        approval(&db, HUB, "live-approval", "waiting-run", "pending").await;
+
+        let rep = prune_once(&db, HUB, &cutoff()).await.unwrap();
+
+        assert_eq!(rep.runs, 1);
+        assert_eq!(rep.approvals, 1, "the terminal run took its proposal");
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _flow_approvals WHERE id='live-approval'"
+            )
+            .await,
+            1,
+            "the pending proposal of a live run is still a question somebody has to answer"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _flow_approvals a \
+                 WHERE NOT EXISTS (SELECT 1 FROM _flow_runs r WHERE r.id = a.run_id)"
+            )
+            .await,
+            0,
+            "not one orphan proposal"
         );
     }
 

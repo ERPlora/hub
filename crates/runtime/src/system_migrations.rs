@@ -1310,6 +1310,32 @@ ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_at TEXT 
         kind: Kind::Expand,
         postgres: "ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';",
     },
+    // ── v45 — hub#972: qué le pasa al RUN cuando su aprobación caduca, escrito en la FILA ──────
+    // El TTL de 72 h solo se miraba al leer (`claim_pending`): una fila vencida no se podía ni
+    // aprobar ni rechazar —las dos vías pasan por ahí— y su run se quedaba en `waiting_approval`
+    // para siempre, exento de la poda de 90 días con el `payload` verbatim dentro (RGPD). El
+    // barrido que lo saca de ahí necesita saber QUÉ hacer, y esa respuesta no puede ser una
+    // constante en el código: el step `approval` genérico (hub#950) la elige **por documento**
+    // (`on_expire: reject | cancel | continue`), así que el dato viaja donde viaja la decisión —
+    // en la fila, junto al `payload` que también se guarda en vez de re-derivarse.
+    //
+    // `'reject'` por defecto, y es la respuesta conservadora a propósito: los steps escritos
+    // después de un `ai` asumían que la escritura ocurrió, así que «nadie contestó» se parece
+    // mucho más a un «no» que a un «sí». `continue` es opt-in de quien escribió el documento.
+    //
+    // Aditiva y re-ejecutable (`ADD COLUMN IF NOT EXISTS`), sin backfill: el DEFAULT ya deja a las
+    // filas existentes con la política que tendrían igualmente.
+    //
+    // ⚠️ El número es DECLARADO, no la posición en el slice, y hay varias ramas de flujos a la vez
+    // queriendo número: recompruébalo contra `origin/develop` justo antes de empujar (hub#573 hace
+    // que una versión en o por debajo del máximo aplicado ABORTE el arranque en vez de saltarse en
+    // silencio). Comprobado contra `origin/develop` 6a0e8e27.
+    SystemMigration {
+        version: 45,
+        name: "flow_approval_on_expire",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS on_expire TEXT NOT NULL DEFAULT 'reject';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3028,9 +3054,10 @@ mod kind_contract_tests {
         // hub#564 y hub#571 pidieron las tres el v39. Y `hub_identity_hub_scoped` (v42, hub#497)
         // se llevó el 42 que había pedido el otorgamiento de representación, que pasó al v43.
         // + `hub_trusted_device_name` (v44, hub#494): el nombre que le pone el NEGOCIO al
-        // dispositivo. Ojo a la distancia entre 41 entradas y la v44 — **el número es declarado, no
-        // la posición**: faltan la 15, la 20 y la 24, así que contar entradas para elegir el
-        // siguiente número da un choque, no un hueco.
-        assert_eq!(MIGRATIONS.len(), 41, "el catálogo cambió de tamaño");
+        // dispositivo. + `flow_approval_on_expire` (v45, hub#972): qué le pasa al run cuando su
+        // aprobación caduca, escrito en la fila. Ojo a la distancia entre 42 entradas y la v45 —
+        // **el número es declarado, no la posición**: faltan la 15, la 20 y la 24, así que contar
+        // entradas para elegir el siguiente número da un choque, no un hueco.
+        assert_eq!(MIGRATIONS.len(), 42, "el catálogo cambió de tamaño");
     }
 }
