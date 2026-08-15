@@ -8,6 +8,8 @@
 //! modalidad "NO VERI*FACTU"). Por eso "firma PKCS#12" == identidad cliente TLS.
 use serde_json::Value as Json;
 
+use erplora_runtime::producer_facts::ProducerFacts;
+
 use crate::chain::{format_amount, format_date};
 use crate::VerifactuError;
 
@@ -95,12 +97,44 @@ fn s(v: &Json, k: &str) -> String {
         .to_string()
 }
 
-fn f(v: &Json, k: &str) -> f64 {
+/// An amount the AEAT record **cannot go without**: absent, null or unreadable is a hard domain
+/// failure, never `0.00`.
+fn amount(v: &Json, k: &str) -> Result<f64, VerifactuError> {
     match v.get(k) {
-        Some(Json::Number(n)) => n.as_f64().unwrap_or(0.0),
-        Some(Json::String(t)) => t.trim().parse().unwrap_or(0.0),
-        _ => 0.0,
+        Some(Json::Number(n)) => n.as_f64().ok_or_else(|| unreadable_amount(k, &n.to_string())),
+        Some(Json::String(t)) => t
+            .trim()
+            .parse()
+            .map_err(|_| unreadable_amount(k, t.trim())),
+        // Absent, `null`, a bool, an object: all of them are «nobody wrote an amount here». The
+        // old reading answered `0.0` to every one of them and the answer went to Hacienda as a
+        // fiscal fact — with a fingerprint on it and a chain number spent.
+        Some(other) => Err(unreadable_amount(k, &other.to_string())),
+        None => Err(missing_amount(k)),
     }
+}
+
+/// An amount that may legitimately **not be there** (see the call sites): absent means the
+/// element is not emitted at all, so `0.0` is the right reading. Present-but-unreadable is still
+/// a hard failure — silence is a contract, garbage is a defect.
+fn optional_amount(v: &Json, k: &str) -> Result<f64, VerifactuError> {
+    match v.get(k) {
+        None | Some(Json::Null) => Ok(0.0),
+        _ => amount(v, k),
+    }
+}
+
+fn unreadable_amount(field: &str, raw: &str) -> VerifactuError {
+    VerifactuError::Payload(format!(
+        "importe `{field}` ilegible ({raw}): un registro fiscal no puede declarar un importe que \
+         nadie ha podido leer"
+    ))
+}
+
+fn missing_amount(field: &str) -> VerifactuError {
+    VerifactuError::Payload(format!(
+        "falta el importe `{field}`: un registro fiscal no puede declarar un importe que no existe"
+    ))
 }
 
 /// Bloque `Encadenamiento`: primer registro o referencia al registro anterior.
@@ -181,53 +215,63 @@ fn facturas_sustituidas(record: &Json) -> String {
     )
 }
 
-/// Bloque `SistemaInformatico` (identificación del software, config del hub).
+/// Bloque `SistemaInformatico` — y **quién declara cada campo** (ADR-0202 §5.1, hub#323).
 ///
-/// La identidad del PRODUCTOR del software (ERPlora) es FIJA — la misma para todos los hubs, lo
-/// declara la AEAT. Si la config del módulo no la trae (fila vacía/stale), usamos el fallback
-/// hardcodeado en vez de emitir un NIF vacío (que la AEAT rechaza con error 1100).
-fn sistema_informatico(config: &Json, hub_id: &str) -> String {
-    // Fallback del productor: identidad legal de ERPlora como fabricante del software.
-    const PRODUCER_NAME: &str = "ERPLORA CLOUD SL";
-    const PRODUCER_NIF: &str = "B27593136";
-    const PRODUCER_ID: &str = "EC";
-    const PRODUCER_VERSION: &str = "1.0.0";
+/// Mezcla dos clases de hecho con dueños distintos, y confundirlos es lo que había:
+///
+/// - **el hub** declara `Version` (su propio binario: la flota está clavada a digests distintos,
+///   así que cada hub tiene que decir el SUYO) y `NumeroInstalacion` (su `hub_id`, §4.2);
+/// - **el plano de control** declara los otros siete: la identidad del fabricante, las capacidades
+///   del producto y `IndicadorMultiplesOT`, que la AEAT calcula **por cuenta** —sobre cuántas
+///   facturaciones ha creado su propietario— y que un hub no puede ver.
+///
+/// Lo que se retira con esto: la `Version` hardcodeada a `"1.0.0"` (la flota corre v1.1.2 y cada
+/// registro declaraba una versión que no existe), el `IndicadorMultiplesOT` clavado a `N`, el
+/// mismo nombre emitido como fabricante Y como producto, y el fallback a las columnas editables
+/// `verifactu_config.software_*` — que es por donde entró un `IdSistemaInformatico` de 11
+/// caracteres y el error 1100 en todos los registros.
+///
+/// **Sin los hechos no hay sobre.** No hay defaults para una declaración legal: un hub al que
+/// nadie se los ha dicho todavía deja el registro en la cola de contingencia hasta el siguiente
+/// latido (un minuto como mucho, y sin llegar al Cloud tampoco podría transmitir), en vez de
+/// inventarse el dato — que es exactamente el defecto que se está arreglando.
+fn sistema_informatico(config: &Json, hub_id: &str) -> Result<String, VerifactuError> {
+    let facts = config
+        .get("producer_facts")
+        .and_then(ProducerFacts::parse)
+        .ok_or_else(|| {
+            VerifactuError::Payload(
+                "faltan los hechos del productor (`SistemaInformatico`): este hub todavía no los \
+                 ha recibido del plano de control, o el bloque no es válido. Sin ellos no se \
+                 puede construir el registro"
+                    .into(),
+            )
+        })?;
 
-    let name = nonempty(s(config, "software_name"), PRODUCER_NAME);
-    let nif = nonempty(s(config, "software_nif"), PRODUCER_NIF);
-    // IdSistemaInformatico: la AEAT lo limita a 2 caracteres y es un valor FIJO asignado al
-    // software ERPlora. No se lee de la BD (que puede tener valores legacy inválidos como
-    // "ERPLORA-001" de 11 chars → la AEAT rechaza con error 1100).
-    let id = PRODUCER_ID.to_string();
-    let version = nonempty(s(config, "software_version"), PRODUCER_VERSION);
-
-    format!(
+    Ok(format!(
         "<sum1:SistemaInformatico>\
          <sum1:NombreRazon>{name}</sum1:NombreRazon>\
          <sum1:NIF>{nif}</sum1:NIF>\
-         <sum1:NombreSistemaInformatico>{name}</sum1:NombreSistemaInformatico>\
+         <sum1:NombreSistemaInformatico>{product}</sum1:NombreSistemaInformatico>\
          <sum1:IdSistemaInformatico>{id}</sum1:IdSistemaInformatico>\
          <sum1:Version>{version}</sum1:Version>\
          <sum1:NumeroInstalacion>{hub}</sum1:NumeroInstalacion>\
-         <sum1:TipoUsoPosibleSoloVerifactu>S</sum1:TipoUsoPosibleSoloVerifactu>\
-         <sum1:TipoUsoPosibleMultiOT>S</sum1:TipoUsoPosibleMultiOT>\
-         <sum1:IndicadorMultiplesOT>N</sum1:IndicadorMultiplesOT>\
+         <sum1:TipoUsoPosibleSoloVerifactu>{solo}</sum1:TipoUsoPosibleSoloVerifactu>\
+         <sum1:TipoUsoPosibleMultiOT>{multi}</sum1:TipoUsoPosibleMultiOT>\
+         <sum1:IndicadorMultiplesOT>{indicador}</sum1:IndicadorMultiplesOT>\
          </sum1:SistemaInformatico>",
-        name = esc(&name),
-        nif = esc(&nif),
-        id = esc(&id),
-        version = esc(&version),
+        name = esc(&facts.nombre_razon),
+        nif = esc(&facts.nif),
+        product = esc(&facts.nombre_sistema_informatico),
+        id = esc(&facts.id_sistema_informatico),
+        // La declara ESTE binario, y solo él puede: `CORE_VERSION` es el número del
+        // `[workspace.package]` con el que se construyó la imagen (hub#515/#521).
+        version = esc(erplora_runtime::CORE_VERSION),
         hub = esc(hub_id),
-    )
-}
-
-/// Devuelve `val` si no está vacío, si no `fallback`.
-fn nonempty(val: String, fallback: &str) -> String {
-    if val.is_empty() {
-        fallback.to_string()
-    } else {
-        val
-    }
+        solo = esc(&facts.tipo_uso_posible_solo_verifactu),
+        multi = esc(&facts.tipo_uso_posible_multi_ot),
+        indicador = esc(&facts.indicador_multiples_ot),
+    ))
 }
 // ── Desglose: el TIPO y la CALIFICACIÓN ───────────────────────────────────────────────────
 //
@@ -395,7 +439,7 @@ impl Detalle {
 const MAX_DETALLES: usize = 12;
 
 /// Traduce una entrada del array a códigos de la AEAT.
-fn detalle_de_entrada(e: &Json) -> Detalle {
+fn detalle_de_entrada(e: &Json) -> Result<Detalle, VerifactuError> {
     let impuesto = impuesto_code(&s(e, "tax"));
     // §15.6: `ClaveRegimen` es obligatoria con IVA e IGIC, y el régimen general es `01`.
     let regimen = {
@@ -438,21 +482,35 @@ fn detalle_de_entrada(e: &Json) -> Detalle {
     if calificacion != "" && (regimen == "08" || (impuesto == "03" && regimen == "20")) {
         calificacion = "N2";
     }
-    Detalle {
+    // Which amounts this line is allowed to omit is NOT a matter of taste: it is the same rule
+    // `Detalle::con_importes` renders by. A line that carries no `TipoImpositivo`/`CuotaRepercutida`
+    // (exempt, N1/N2) may arrive without `rate`/`quota` — they would not be emitted anyway. A line
+    // that DOES carry them must bring them; and `BaseImponibleOimporteNoSujeto` is the one element
+    // no detail can go without, whatever its calificación.
+    let carries_amounts = exenta.is_empty() && !matches!(calificacion, "N1" | "N2");
+    let (rate, quota) = if carries_amounts {
+        (amount(e, "rate")?, amount(e, "quota")?)
+    } else {
+        (optional_amount(e, "rate")?, optional_amount(e, "quota")?)
+    };
+    Ok(Detalle {
         impuesto,
         regimen,
         calificacion,
         exenta,
-        rate: f(e, "rate"),
-        base: f(e, "base"),
-        quota: f(e, "quota"),
-        surcharge_rate: f(e, "surcharge_rate"),
-        surcharge_quota: f(e, "surcharge_quota"),
+        rate,
+        base: amount(e, "base")?,
+        quota,
+        // The equivalence surcharge is the textbook LEGITIMATE absence: most lines have none, and
+        // `has_surcharge` below reads presence, not value. Absent = no surcharge; unreadable is
+        // still a failure.
+        surcharge_rate: optional_amount(e, "surcharge_rate")?,
+        surcharge_quota: optional_amount(e, "surcharge_quota")?,
         has_surcharge: e.get("surcharge_rate").is_some() || e.get("surcharge_quota").is_some(),
-    }
+    })
 }
 
-fn desglose(record: &Json) -> String {
+fn desglose(record: &Json) -> Result<String, VerifactuError> {
     let mut lines: Vec<Detalle> = Vec::new();
 
     match serde_json::from_str::<Json>(&s(record, "tax_breakdown")) {
@@ -460,7 +518,7 @@ fn desglose(record: &Json) -> String {
         Ok(Json::Array(entries)) => {
             for e in &entries {
                 if e.is_object() {
-                    lines.push(detalle_de_entrada(e));
+                    lines.push(detalle_de_entrada(e)?);
                 }
             }
         }
@@ -470,8 +528,8 @@ fn desglose(record: &Json) -> String {
                 if let Ok(rate) = rate.trim().parse::<f64>() {
                     lines.push(Detalle::nacional(
                         rate,
-                        f(&amounts, "base"),
-                        f(&amounts, "tax"),
+                        amount(&amounts, "base")?,
+                        amount(&amounts, "tax")?,
                     ));
                 }
             }
@@ -482,9 +540,9 @@ fn desglose(record: &Json) -> String {
         // Facturas anteriores al campo (`'{}'`), o un desglose ilegible: el tipo efectivo de una
         // factura de tipo único ES su tipo real, y `Desglose` no puede quedarse sin detalle.
         lines.push(Detalle::nacional(
-            f(record, "tax_rate"),
-            f(record, "base_amount"),
-            f(record, "tax_amount"),
+            amount(record, "tax_rate")?,
+            amount(record, "base_amount")?,
+            amount(record, "tax_amount")?,
         ));
     }
     // Orden estable: el XML no puede depender del orden de las claves de un objeto JSON ni de cómo
@@ -499,12 +557,22 @@ fn desglose(record: &Json) -> String {
     });
     lines.truncate(MAX_DETALLES);
 
-    lines.iter().map(Detalle::render).collect()
+    Ok(lines.iter().map(Detalle::render).collect())
 }
 
 /// Construye el sobre SOAP `RegFactuSistemaFacturacion` para un registro (alta/anulación).
 /// `prev` = registro anterior de la cadena (para `Encadenamiento`), si lo hay.
-pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &str) -> String {
+///
+/// **Devuelve `Result` porque un registro puede ser imposible de declarar** (hub#324): un importe
+/// que no está o que no se puede leer NO se convierte en `0,00` — eso viajaría a Hacienda como una
+/// factura de cero euros, con su huella, su número de cadena gastado y nada que lo delate. Se para
+/// aquí, antes de la red.
+pub fn build_soap(
+    record: &Json,
+    config: &Json,
+    prev: Option<&Json>,
+    hub_id: &str,
+) -> Result<String, VerifactuError> {
     let record_type = s(record, "record_type");
     let gen_ts = s(record, "generation_timestamp");
     let registro = if record_type == "anulacion" {
@@ -524,7 +592,7 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
             num = esc(&s(record, "invoice_number")),
             fecha = esc(&format_date(&s(record, "invoice_date"))),
             chain = encadenamiento(record, prev),
-            sistema = sistema_informatico(config, hub_id),
+            sistema = sistema_informatico(config, hub_id)?,
             ts = esc(&gen_ts),
             hash = esc(&s(record, "record_hash")),
         )
@@ -559,17 +627,19 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
             destinatarios = destinatarios(record),
             // Una línea de desglose por tipo REAL de la factura (ver `desglose`). Los importes están
             // en CÉNTIMOS (INTEGER, ADR-0007) y la AEAT exige euros con 2 decimales → /100.0 aquí.
-            desglose = desglose(record),
-            cuota = format_amount(f(record, "tax_amount") / 100.0),
-            total = format_amount(f(record, "total_amount") / 100.0),
+            desglose = desglose(record)?,
+            // `CuotaTotal` e `ImporteTotal` son obligatorios y son LO QUE SE COBRA: no admiten
+            // ausencia. Un `0,00` inventado aquí es una factura de cero euros ante la AEAT.
+            cuota = format_amount(amount(record, "tax_amount")? / 100.0),
+            total = format_amount(amount(record, "total_amount")? / 100.0),
             chain = encadenamiento(record, prev),
-            sistema = sistema_informatico(config, hub_id),
+            sistema = sistema_informatico(config, hub_id)?,
             ts = esc(&gen_ts),
             hash = esc(&s(record, "record_hash")),
         )
     };
 
-    format!(
+    Ok(format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
          <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \
          xmlns:sum=\"https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroLR.xsd\" \
@@ -586,7 +656,69 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
         obligado = esc(&s(record, "issuer_name")),
         nif = esc(&s(record, "issuer_nif")),
         registro = registro,
-    )
+    ))
+}
+
+/// La config mínima con la que un registro se puede declarar: los hechos del productor tal y como
+/// los sirve el plano de control (hub#323). Sin ellos no hay `SistemaInformatico` y por tanto no
+/// hay sobre, así que todo test que construya uno los necesita.
+#[cfg(test)]
+pub(crate) fn test_config_with_producer_facts() -> Json {
+    serde_json::json!({
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        }
+    })
+}
+
+/// El bloque de la `Cabecera` que declara que este envío sale de una **incidencia** (XSD:
+/// `CabeceraType` → `RemisionVoluntaria/Incidencia`).
+const INCIDENCIA_BLOCK: &str =
+    "<sum1:RemisionVoluntaria><sum1:Incidencia>S</sum1:Incidencia></sum1:RemisionVoluntaria>";
+
+/// Marca un sobre ya construido como **remisión salida de la cola de contingencia**
+/// (`Cabecera/RemisionVoluntaria/Incidencia = S`, hub#322).
+///
+/// `Incidencia` es lo que legaliza el diferido: un registro que no pudo remitirse cuando se generó
+/// —la AEAT caída, la red del local muerta— y que sale horas después tiene que decirlo. Ningún
+/// motor lo emitía: todos los sobres de este hub parecían remisiones puntuales.
+///
+/// **Es una marca del SOBRE, no del registro**, y por eso se estampa aquí y no se pasa al
+/// constructor:
+///
+/// - el registro **no cambia ni un byte**. Su huella se calculó sobre sus propios campos y la AEAT
+///   ya tiene registros encadenados desde él; la `Cabecera` no entra en la huella y no se persiste
+///   nada en la fila. Si algún día se agrupan registros (la AEAT admite 1000 por envío), un lote
+///   no mezclará con y sin incidencia porque la cabecera es **una** por sobre;
+/// - **un reintento reutiliza EXACTAMENTE el XML del intento anterior** (no se regenera con una
+///   configuración que pudo cambiar mientras la AEAT estaba caída), y ese XML se construyó cuando
+///   todavía nadie sabía que el registro acabaría en la cola. Un parámetro del constructor no
+///   llegaría a ese caso — que es justo el caso normal de la cola.
+///
+/// **Idempotente**: la cola reintenta con el XML que guardó, que ya viene marcado. Dos
+/// `Incidencia` en una cabecera es un rechazo por esquema. Un sobre que no se reconoce vuelve
+/// intacto: corromper un XML a punto de transmitirse sería peor que no marcarlo.
+pub fn stamp_contingency_incidence(xml: &str) -> String {
+    if xml.contains("<sum1:Incidencia>") {
+        return xml.to_string();
+    }
+    // El anclaje es el cierre de `ObligadoEmision`, que es el único elemento OBLIGATORIO de la
+    // cabecera: `RemisionVoluntaria` va justo detrás en el `xs:sequence` (solo `Representante`
+    // puede colarse en medio, y este motor todavía no lo emite — hub#321).
+    const ANCHOR: &str = "</sum1:ObligadoEmision>";
+    match xml.find(ANCHOR) {
+        Some(at) => {
+            let cut = at + ANCHOR.len();
+            format!("{}{INCIDENCIA_BLOCK}{}", &xml[..cut], &xml[cut..])
+        }
+        None => xml.to_string(),
+    }
 }
 
 // La identidad mTLS y la caducidad del certificado se obtienen ahora del **core** vía
@@ -1217,7 +1349,13 @@ mod desglose_tests {
     }
 
     fn xml_de(record: &Json) -> String {
-        build_soap(record, &json!({}), None, "hub-1")
+        build_soap(
+            record,
+            &test_config_with_producer_facts(),
+            None,
+            "hub-1",
+        )
+        .expect("el registro se puede declarar")
     }
 
     /// EL caso del negocio: una caña (21%) y una tapa (10%) en el mismo ticket. Antes se declaraba
@@ -1539,5 +1677,498 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","class":"exempt","rate":0.00,"base":1000,"quota":0}]"#;
         let xml = xml_de(&alta(tb, 1000.0, 0.0, 0.0));
         assert!(xml.contains("<sum1:OperacionExenta>E6</sum1:OperacionExenta>"), "{xml}");
+    }
+}
+
+#[cfg(test)]
+mod amount_tests {
+    //! **An amount that is not there never becomes `0.00`** (hub#324).
+    //!
+    //! `f()` used to answer `0.0` to three different questions — «the field is missing», «the
+    //! field holds something that is not a number» and «the amount really is zero» — and the
+    //! answer travelled to the AEAT as a fiscal fact. A record remitted with a zero total is not
+    //! a bug you fix later: it has a fingerprint, it burnt a chain number, and the AEAT accepted
+    //! it. So the reading fails HARD, before hashing anything and long before the network.
+    //!
+    //! The other half is knowing where absence is legitimate — otherwise the strictness gets
+    //! reverted the first time an ordinary invoice is refused. Those cases have their own tests
+    //! below and go through `optional_amount`.
+    use super::*;
+    use serde_json::json;
+
+    /// A record the AEAT would accept, so each test can remove exactly ONE thing from it.
+    fn declarable_record() -> Json {
+        json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F2",
+            "description": "Ticket",
+            "base_amount": 1000.0,
+            "tax_amount": 210.0,
+            "total_amount": 1210.0,
+            "tax_rate": 21.0,
+            "tax_breakdown": r#"{"21.00":{"base":1000,"tax":210}}"#,
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        })
+    }
+
+    fn build(record: &Json) -> Result<String, VerifactuError> {
+        build_soap(record, &test_config_with_producer_facts(), None, "hub-1")
+    }
+
+    /// The baseline: nothing removed, the envelope is built. Without this the tests below would
+    /// pass for any reason at all.
+    #[test]
+    fn the_untouched_record_still_builds() {
+        let xml = build(&declarable_record()).expect("nothing is missing");
+        assert!(xml.contains("<sum1:ImporteTotal>12.10</sum1:ImporteTotal>"));
+    }
+
+    /// `ImporteTotal` is what the customer paid. Missing, it used to be declared as `0,00`.
+    #[test]
+    fn a_missing_total_is_refused_instead_of_declared_as_zero() {
+        let mut record = declarable_record();
+        record.as_object_mut().unwrap().remove("total_amount");
+
+        let error = build(&record).expect_err("a total that is not there cannot be declared");
+        let message = error.to_string();
+        assert!(message.contains("total_amount"), "says WHICH amount: {message}");
+        assert!(
+            !message.contains("0.00"),
+            "the point is that no zero was produced: {message}"
+        );
+    }
+
+    /// `null` is not zero. It is the shape a read failure takes on the way here.
+    #[test]
+    fn a_null_amount_is_absence_not_zero() {
+        let mut record = declarable_record();
+        record["tax_amount"] = Json::Null;
+
+        let error = build(&record).expect_err("null is not an amount");
+        assert!(error.to_string().contains("tax_amount"), "{error}");
+    }
+
+    /// Unreadable is worse than missing: something WAS written there and nobody can say what.
+    #[test]
+    fn an_unreadable_amount_is_refused() {
+        let mut record = declarable_record();
+        record["total_amount"] = json!("1.210,00 €");
+
+        let error = build(&record).expect_err("that string is not an amount");
+        let message = error.to_string();
+        assert!(message.contains("total_amount"), "{message}");
+        assert!(message.contains("1.210,00"), "quotes what it could not read: {message}");
+    }
+
+    /// The breakdown line's only mandatory element (`BaseImponibleOimporteNoSujeto`). A line
+    /// without it used to declare an operation of zero euros with a real `CuotaRepercutida`.
+    #[test]
+    fn a_breakdown_line_without_a_base_is_refused() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] =
+            json!(r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,"quota":210}]"#);
+
+        let error = build(&record).expect_err("a detail line has to carry its base");
+        assert!(error.to_string().contains("base"), "{error}");
+    }
+
+    /// A line that DOES emit `TipoImpositivo`/`CuotaRepercutida` must bring them.
+    #[test]
+    fn a_subject_line_without_its_quota_is_refused() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] =
+            json!(r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,"base":1000}]"#);
+
+        let error = build(&record).expect_err("a subject line declares its quota");
+        assert!(error.to_string().contains("quota"), "{error}");
+    }
+
+    /// The fallback path (old `'{}'` invoices) reads the record's own totals, and they are not
+    /// optional either: this is the line that ends up carrying the WHOLE invoice.
+    #[test]
+    fn the_single_rate_fallback_will_not_invent_a_base() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] = json!("{}");
+        record.as_object_mut().unwrap().remove("base_amount");
+
+        let error = build(&record).expect_err("the fallback line has no base to declare");
+        assert!(error.to_string().contains("base_amount"), "{error}");
+    }
+
+    // ── Where absence is LEGITIMATE ────────────────────────────────────────────────────────
+    //
+    // Not exceptions granted to make the tests pass: in each of these the element is not emitted
+    // at all, so «not there» is the contract and not a lost number.
+
+    /// Most invoices carry no equivalence surcharge, and `has_surcharge` reads PRESENCE.
+    #[test]
+    fn an_absent_equivalence_surcharge_is_not_a_missing_amount() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] = json!(
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,"base":1000,"quota":210}]"#
+        );
+
+        let xml = build(&record).expect("no surcharge is the normal case");
+        assert!(!xml.contains("TipoRecargoEquivalencia"), "{xml}");
+    }
+
+    /// An exempt line emits neither `TipoImpositivo` nor `CuotaRepercutida` (§15.5), so demanding
+    /// them would refuse invoices the AEAT accepts.
+    #[test]
+    fn an_exempt_line_needs_no_rate_or_quota() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] =
+            json!(r#"[{"tax":"vat","regime":"01","class":"exempt","exempt_reason":"E1","base":5000}]"#);
+
+        let xml = build(&record).expect("an exempt line declares neither rate nor quota");
+        assert!(xml.contains("<sum1:OperacionExenta>E1</sum1:OperacionExenta>"), "{xml}");
+        assert!(!xml.contains("TipoImpositivo"), "{xml}");
+    }
+
+    /// Same for N1/N2 (error 1237): the elements are forbidden, so their absence is the contract.
+    #[test]
+    fn a_not_subject_line_needs_no_rate_or_quota() {
+        let mut record = declarable_record();
+        record["tax_breakdown"] = json!(
+            r#"[{"tax":"vat","regime":"01","class":"not_subject_location","base":100000}]"#
+        );
+
+        let xml = build(&record).expect("N2 declares neither rate nor quota");
+        assert!(
+            xml.contains("<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>"),
+            "{xml}"
+        );
+    }
+
+    /// **Zero is still a number.** The refusal is about absence, not about the value — an invoice
+    /// legitimately worth nothing (a fully discounted line, an S2 reverse charge) must go through.
+    #[test]
+    fn an_explicit_zero_is_declared_as_zero() {
+        let mut record = declarable_record();
+        record["tax_amount"] = json!(0.0);
+        record["total_amount"] = json!(0.0);
+        record["tax_breakdown"] = json!(
+            r#"[{"tax":"vat","regime":"01","class":"subject_reverse","rate":0.00,"base":0,"quota":0}]"#
+        );
+
+        let xml = build(&record).expect("zero written down is a declarable amount");
+        assert!(xml.contains("<sum1:ImporteTotal>0.00</sum1:ImporteTotal>"), "{xml}");
+    }
+
+    /// A `RegistroAnulacion` carries no amounts at all: the strictness must not reach it.
+    #[test]
+    fn an_annulment_declares_no_amounts_and_is_unaffected() {
+        let record = json!({
+            "record_type": "anulacion",
+            "issuer_nif": "B12345678",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        });
+
+        let xml = build(&record).expect("an annulment has no amounts to miss");
+        assert!(xml.contains("<sum1:RegistroAnulacion>"), "{xml}");
+    }
+}
+
+#[cfg(test)]
+mod contingency_incidence_tests {
+    //! **What legalises a deferred remission** (hub#322).
+    //!
+    //! `Incidencia` (`SuministroInformacion.xsd`, inside `Cabecera/RemisionVoluntaria`) is how a
+    //! record that could not be sent when it was generated is declared as such. No engine emitted
+    //! it: every envelope this hub built looked like a punctual remission, including the ones that
+    //! had spent hours in the contingency queue because the AEAT was down.
+    //!
+    //! Two properties decide the shape of the fix, and both have a test here:
+    //!
+    //! * **the flag belongs to the ENVELOPE, not to the record.** The AEAT admits up to 1000
+    //!   records per `RegFactuSistemaFacturacion` and the header is one per envelope, so a batch
+    //!   never mixes records with and without incidence. Nothing about it is persisted on the row
+    //!   and nothing about it enters the fingerprint;
+    //! * **a retry reuses the EXACT XML of the previous attempt** (it is not rebuilt with a
+    //!   configuration that may have changed meanwhile), and that stored XML was built before
+    //!   anybody knew the record would end up in the queue. So the flag is stamped on the
+    //!   envelope on the way out, which is the only place that works for both.
+    use super::*;
+    use serde_json::json;
+
+    fn envelope() -> String {
+        let record = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F2",
+            "description": "Ticket",
+            "base_amount": 1000.0,
+            "tax_amount": 210.0,
+            "total_amount": 1210.0,
+            "tax_rate": 21.0,
+            "tax_breakdown": r#"{"21.00":{"base":1000,"tax":210}}"#,
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        });
+        build_soap(&record, &test_config_with_producer_facts(), None, "hub-1")
+            .expect("declarable")
+    }
+
+    /// A punctual remission declares no incidence at all — the element is `minOccurs="0"` and
+    /// sending `N` on every ordinary invoice would say something nobody meant.
+    #[test]
+    fn a_punctual_remission_carries_no_incidence() {
+        let xml = envelope();
+        assert!(!xml.contains("RemisionVoluntaria"), "{xml}");
+        assert!(!xml.contains("Incidencia"), "{xml}");
+    }
+
+    /// 🔴 The defect: a record drained from the contingency queue used to look punctual.
+    #[test]
+    fn an_envelope_out_of_the_queue_declares_the_incidence() {
+        let xml = stamp_contingency_incidence(&envelope());
+
+        assert!(
+            xml.contains(
+                "<sum1:RemisionVoluntaria><sum1:Incidencia>S</sum1:Incidencia>\
+                 </sum1:RemisionVoluntaria>"
+            ),
+            "{xml}"
+        );
+    }
+
+    /// The XSD `xs:sequence` of `CabeceraType` is ObligadoEmision → Representante? →
+    /// RemisionVoluntaria? → RemisionRequerimiento?. Out of order it is a 4102, with the chain
+    /// number already spent.
+    #[test]
+    fn the_incidence_goes_after_obligado_emision_inside_the_header() {
+        let xml = stamp_contingency_incidence(&envelope());
+
+        let obligado = xml.find("</sum1:ObligadoEmision>").expect("ObligadoEmision");
+        let remision = xml.find("<sum1:RemisionVoluntaria>").expect("RemisionVoluntaria");
+        let cabecera_end = xml.find("</sum:Cabecera>").expect("Cabecera");
+        assert!(obligado < remision, "{xml}");
+        assert!(remision < cabecera_end, "inside the header, not after it: {xml}");
+    }
+
+    /// **The record is untouched, byte for byte.** The fingerprint was computed over the record's
+    /// own fields and the AEAT already holds records chained from it; an envelope flag that
+    /// changed one byte of `RegistroAlta` would be a different record.
+    #[test]
+    fn stamping_does_not_touch_the_record_or_its_fingerprint() {
+        let plain = envelope();
+        let stamped = stamp_contingency_incidence(&plain);
+
+        let registro = |xml: &str| {
+            let start = xml.find("<sum:RegistroFactura>").expect("RegistroFactura");
+            let end = xml.find("</sum:RegistroFactura>").expect("RegistroFactura end");
+            xml[start..end].to_string()
+        };
+        assert_eq!(registro(&plain), registro(&stamped));
+        assert!(
+            stamped.contains("<sum1:Huella>ABC123</sum1:Huella>"),
+            "the fingerprint travels exactly as it was computed: {stamped}"
+        );
+    }
+
+    /// Idempotent: the queue retries the same record with the XML it stored last time, which is
+    /// already stamped. Two headers, or two `Incidencia` inside one, is a schema rejection.
+    #[test]
+    fn stamping_twice_is_stamping_once() {
+        let once = stamp_contingency_incidence(&envelope());
+        let twice = stamp_contingency_incidence(&once);
+
+        assert_eq!(once, twice);
+        assert_eq!(twice.matches("<sum1:Incidencia>").count(), 1, "{twice}");
+    }
+
+    /// An envelope this function does not recognise comes back UNCHANGED rather than mangled: the
+    /// worst outcome here would be corrupting an XML that was about to be transmitted.
+    #[test]
+    fn an_unrecognised_envelope_is_returned_untouched() {
+        let foreign = "<soapenv:Envelope><soapenv:Body/></soapenv:Envelope>";
+        assert_eq!(stamp_contingency_incidence(foreign), foreign);
+    }
+}
+
+#[cfg(test)]
+mod producer_facts_tests {
+    //! **Who declares what in `SistemaInformatico`** (hub#323).
+    //!
+    //! Three things were wrong at once, and they were wrong in the same twelve lines:
+    //!
+    //! * `Version` was the string `"1.0.0"`, or whatever an editable config row happened to hold.
+    //!   The fleet runs pinned digests — v1.1.2 at the time of writing — so every record declared
+    //!   a version that does not exist;
+    //! * `IndicadorMultiplesOT` was nailed to `N`. It is computed by the SaaS **per account**,
+    //!   over how many facturaciones its owner created, and a hub cannot see that;
+    //! * the manufacturer's identity fell back to `verifactu_config.software_*` — an editable
+    //!   row, which is exactly the field that once held an 11-character `IdSistemaInformatico`
+    //!   and got error 1100 on every record.
+    use super::*;
+    use serde_json::json;
+
+    /// The block as the control plane serves it, keyed by the literal AEAT element names.
+    fn producer() -> Json {
+        json!({
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        })
+    }
+
+    fn config_with(producer_facts: Json) -> Json {
+        json!({ "producer_facts": producer_facts })
+    }
+
+    fn record() -> Json {
+        json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F2",
+            "description": "Ticket",
+            "base_amount": 1000.0,
+            "tax_amount": 210.0,
+            "total_amount": 1210.0,
+            "tax_rate": 21.0,
+            "tax_breakdown": r#"{"21.00":{"base":1000,"tax":210}}"#,
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        })
+    }
+
+    fn xml_with(config: &Json) -> String {
+        build_soap(&record(), config, None, "hub-1").expect("declarable")
+    }
+
+    /// 🔴 The one that is a lie on every hub in the fleet: `Version` is the running binary's, and
+    /// nothing else can know it — two hubs on two digests must declare two numbers.
+    #[test]
+    fn the_version_is_the_running_binary_s() {
+        let xml = xml_with(&config_with(producer()));
+
+        assert!(
+            xml.contains(&format!(
+                "<sum1:Version>{}</sum1:Version>",
+                erplora_runtime::CORE_VERSION
+            )),
+            "{xml}"
+        );
+        // ⚠️ In the source tree `CORE_VERSION` is the `[workspace.package]` value and the release
+        // CI rewrites it from the `v*` tag before building, so asserting it is NOT some particular
+        // number would prove nothing here. What has to hold is that the emitted number IS this
+        // binary's — hence the comparison above, and the config test right below, which is the one
+        // that would have caught the old hardcoded `"1.0.0"`.
+        assert_eq!(xml.matches("<sum1:Version>").count(), 1, "{xml}");
+    }
+
+    /// And it is NOT taken from the config: an editable row cannot tell this binary what binary
+    /// it is.
+    #[test]
+    fn a_config_row_cannot_rename_the_running_version() {
+        let mut config = config_with(producer());
+        config["software_version"] = json!("9.9.9");
+
+        let xml = xml_with(&config);
+
+        assert!(!xml.contains("<sum1:Version>9.9.9</sum1:Version>"), "{xml}");
+    }
+
+    /// 🔴 `IndicadorMultiplesOT` was hardcoded. It comes from the control plane, and a hub whose
+    /// owner runs a second business declares `S`.
+    #[test]
+    fn the_multiple_taxpayer_indicator_comes_from_the_control_plane() {
+        let mut facts = producer();
+        facts["IndicadorMultiplesOT"] = json!("S");
+
+        let xml = xml_with(&config_with(facts));
+
+        assert!(
+            xml.contains("<sum1:IndicadorMultiplesOT>S</sum1:IndicadorMultiplesOT>"),
+            "{xml}"
+        );
+    }
+
+    /// The manufacturer is not the product. The engine emitted `NombreRazon` in both slots, so
+    /// `NombreSistemaInformatico` declared a company where the AEAT expects a product name.
+    #[test]
+    fn the_manufacturer_and_the_product_are_declared_separately() {
+        let xml = xml_with(&config_with(producer()));
+
+        assert!(xml.contains("<sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:NombreSistemaInformatico>ERPlora Hub</sum1:NombreSistemaInformatico>"),
+            "{xml}"
+        );
+    }
+
+    /// The editable `verifactu_config.software_*` columns are NOT a source of the manufacturer's
+    /// identity any more. That fallback is how an 11-character `IdSistemaInformatico` reached the
+    /// AEAT, and these fields are identical across the fleet: one typo is every record of every
+    /// hub (error 1100).
+    #[test]
+    fn the_editable_software_columns_no_longer_decide_who_we_are() {
+        let mut config = config_with(producer());
+        config["software_name"] = json!("Whatever SL");
+        config["software_nif"] = json!("B99999999");
+        config["software_id"] = json!("ERPLORA-001");
+
+        let xml = xml_with(&config);
+
+        assert!(!xml.contains("Whatever SL"), "{xml}");
+        assert!(!xml.contains("B99999999"), "{xml}");
+        assert!(!xml.contains("ERPLORA-001"), "{xml}");
+    }
+
+    /// `NumeroInstalacion` stays the hub's own id (ADR-0202 §4.2): one hub, one chain.
+    #[test]
+    fn the_installation_number_is_still_this_hub() {
+        let xml = xml_with(&config_with(producer()));
+
+        assert!(
+            xml.contains("<sum1:NumeroInstalacion>hub-1</sum1:NumeroInstalacion>"),
+            "{xml}"
+        );
+    }
+
+    /// **Without the facts there is no envelope.** A hub that has never been told them cannot
+    /// declare `IndicadorMultiplesOT` — and inventing an `N` is the exact defect being fixed.
+    /// Refusing leaves the record in the contingency queue until the next beat (a minute at
+    /// most); declaring a guess to Hacienda cannot be undone.
+    #[test]
+    fn a_hub_that_has_not_been_told_the_facts_does_not_build_an_envelope() {
+        let error = build_soap(&record(), &json!({}), None, "hub-1")
+            .expect_err("nobody has declared the manufacturer to this hub yet");
+
+        assert!(
+            error.to_string().contains("productor"),
+            "the reason has to name what is missing: {error}"
+        );
+    }
+
+    /// And a block that would be rejected by the AEAT is treated as no block at all, rather than
+    /// emitted and refused with the chain number already spent.
+    #[test]
+    fn an_invalid_block_is_not_emitted() {
+        let mut facts = producer();
+        facts["IdSistemaInformatico"] = json!("ERPLORA-001");
+
+        let error = build_soap(&record(), &config_with(facts), None, "hub-1")
+            .expect_err("an 11-character product code is error 1100 on every record");
+
+        assert!(error.to_string().contains("productor"), "{error}");
     }
 }

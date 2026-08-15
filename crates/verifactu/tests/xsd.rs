@@ -19,9 +19,17 @@ use serde_json::{json, Value};
 
 fn config() -> Value {
     json!({
-        "software_name": "ERPLORA CLOUD SL",
-        "software_nif": "B27593136",
-        "software_version": "1.0.0",
+        // Hechos del productor tal y como los sirve el plano de control (hub#323): sin ellos
+        // no hay `SistemaInformatico`, y por tanto no hay sobre que validar.
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        },
     })
 }
 
@@ -49,7 +57,7 @@ fn alta(invoice_type: &str, recipient_nif: &str) -> Value {
 }
 
 fn xml_de(record: &Value) -> String {
-    aeat::build_soap(record, &config(), None, "hub-1")
+    aeat::build_soap(record, &config(), None, "hub-1").expect("el registro se puede declarar")
 }
 
 // ── El XML que el módulo genera es válido ─────────────────────────────────────────────────
@@ -87,7 +95,8 @@ fn el_alta_encadenada_pasa_la_validacion() {
     });
     let mut rec = alta("F2", "");
     rec["is_first_record"] = json!(0);
-    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1");
+    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1")
+        .expect("el registro se puede declarar");
     assert!(xml.contains("<sum1:RegistroAnterior>"), "{xml}");
 
     xsd::validate_registro(&xml)
@@ -107,7 +116,8 @@ fn la_anulacion_encadenada_pasa_la_validacion() {
     let mut rec = alta("F1", "B12345678");
     rec["record_type"] = json!("anulacion");
     rec["is_first_record"] = json!(0);
-    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1");
+    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1")
+        .expect("el registro se puede declarar");
     assert!(xml.contains("<sum1:RegistroAnterior>"), "{xml}");
 
     xsd::validate_registro(&xml).expect("una anulación encadenada también debe pasar el gate");

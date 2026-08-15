@@ -273,6 +273,21 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
             m.insert("certificate_type".into(), json!(certificate_type));
         }
     }
+
+    // Los hechos del productor (hub#323): identidad del fabricante + `IndicadorMultiplesOT`, que
+    // el hub NO puede saber y que el plano de control sirve en el latido. Viajan pegados a la
+    // config —igual que los marcadores del certificado— para que el constructor del XML lea UN
+    // objeto y no sepa que existe un Cloud. Ausentes = ausentes: no hay defaults para una
+    // declaración legal, y `sistema_informatico` se niega a construir el registro.
+    //
+    // Se ADJUNTAN a la config, nunca la CREAN: «este hub no tiene config de VeriFactu» tiene que
+    // seguir contestando `None` a quien pregunta. Los hechos del productor son de la flota, no de
+    // este hub, y no convierten un módulo sin configurar en uno configurado.
+    if let Some(obj) = config.as_mut().and_then(Json::as_object_mut) {
+        if let Some(facts) = host.producer_facts().await.unwrap_or_default() {
+            obj.insert("producer_facts".into(), facts);
+        }
+    }
     Ok(config)
 }
 
@@ -1050,7 +1065,18 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "substitutes_nif": r.substitutes_nif,
             });
             if let Ok((ops, _success)) =
-                transmit_one(host, ctx, &record_json, cfg, &ids[3], &ids[4], &ids[5]).await
+                transmit_one(
+                    host,
+                    ctx,
+                    &record_json,
+                    cfg,
+                    &ids[3],
+                    &ids[4],
+                    &ids[5],
+                    // Alta recién creada: se remite en el momento, no sale de ninguna cola.
+                    Remission::Punctual,
+                )
+                .await
             {
                 for o in ops {
                     output = output.with_operation(o);
@@ -1116,6 +1142,8 @@ async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> 
         &ctx.new_ids[1],
         // Id reservado para el ancla si la AEAT rechaza por encadenamiento y hay que re-anclar.
         &ctx.new_ids[2],
+        // Envío puntual: `verifactu.record.transmit` remite un registro, no drena la cola.
+        Remission::Punctual,
     )
     .await?;
     let mut out = Output::new();
@@ -1139,6 +1167,7 @@ async fn transmit_one(
     event_id: &str,
     queue_id: &str,
     recovery_id: &str,
+    remission: Remission,
 ) -> Result<(Vec<Operation>, bool)> {
     let record_id = str_field(record, "id");
     // WHERE this goes is settled BEFORE anything else happens — before the chain read, before
@@ -1147,8 +1176,16 @@ async fn transmit_one(
     let destination = match destination_of(record, config) {
         Ok(destination) => destination,
         Err(reason) => {
-            return refuse_transmission(host, ctx, &record_id, event_id, queue_id, config, &reason)
-                .await
+            return refuse_transmission(
+                host,
+                ctx,
+                &record_id,
+                event_id,
+                queue_id,
+                config,
+                &Refusal::environment_unknown(reason),
+            )
+            .await
         }
     };
     let is_first = int_field(record, "is_first_record", 0) != 0;
@@ -1177,12 +1214,45 @@ async fn transmit_one(
 
     // En un reintento se usa EXACTAMENTE el XML del intento anterior (si ya quedó en BD), no se
     // regenera con una configuración que podría haber cambiado mientras la AEAT estaba caída.
-    let xml = record
+    //
+    // **Si el sobre no se puede construir, no se transmite** (hub#324): un importe ausente o
+    // ilegible ya no se convierte en `0,00`. Se trata como la negativa de hub#471 —evento con
+    // motivo + entrada en la cola—, NO como un rechazo: el registro se queda donde está, con su
+    // XML anterior intacto, y vuelve a intentarse cuando el dato esté arreglado (FAQ §5: ningún
+    // RF generado puede quedarse sin remitir).
+    let xml = match record
         .get("xml_content")
         .and_then(Json::as_str)
         .filter(|value| !value.trim().is_empty())
         .map(ToString::to_string)
-        .unwrap_or_else(|| aeat::build_soap(record, config, prev.as_ref(), &ctx.hub_id));
+    {
+        Some(previous) => previous,
+        None => match aeat::build_soap(record, config, prev.as_ref(), &ctx.hub_id) {
+            Ok(xml) => xml,
+            Err(e) => {
+                return refuse_transmission(
+                    host,
+                    ctx,
+                    &record_id,
+                    event_id,
+                    queue_id,
+                    config,
+                    &Refusal::undeclarable(e.to_string()),
+                )
+                .await
+            }
+        },
+    };
+
+    // `Cabecera/Incidencia=S` cuando el envío sale de la cola de contingencia (hub#322). Se
+    // estampa AQUÍ, sobre el sobre ya resuelto, y no dentro del constructor: el XML reutilizado
+    // de un intento anterior se construyó cuando nadie sabía todavía que este registro acabaría
+    // en la cola, y ese es justamente el caso normal de la cola. Es marca del SOBRE: el bloque
+    // `RegistroAlta`/`RegistroAnulacion` —el que cubre la huella— no cambia ni un byte.
+    let xml = match remission {
+        Remission::Punctual => xml,
+        Remission::FromContingency => aeat::stamp_contingency_incidence(&xml),
+    };
 
     // Validación contra el esquema ANTES de tocar la red (`xsd::validate_registro`). Cuando la
     // AEAT contesta 4102 el número de cadena ya está gastado, así que un XML que no cumple no
@@ -1252,6 +1322,7 @@ async fn transmit_one(
                     &resp,
                     recovery_id,
                     event_id,
+                    remission,
                 )
                 .await
                 {
@@ -1394,6 +1465,54 @@ async fn enqueue_retry(
     })
 }
 
+/// **Where this send comes from**, which is what decides whether the envelope declares an
+/// incidence (`Cabecera/RemisionVoluntaria/Incidencia`, hub#322).
+///
+/// It is passed in and not derived from the record on purpose: the caller is the only one that
+/// knows. `process_contingency_queue` is draining the queue; `transmit_record` and the inline
+/// transmission of `create_record` are remitting an invoice as it happens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Remission {
+    /// The record is being remitted as it is generated — the ordinary sale.
+    Punctual,
+    /// The record waited in the contingency queue and is going out now. This is what `Incidencia`
+    /// exists for, and what makes the deferred remission legal instead of merely late.
+    FromContingency,
+}
+
+/// Why a record was NOT handed to the AEAT, in the two channels the operator reads: a stable code
+/// the UI can program against, and the sentence a human sees.
+///
+/// The code used to be the literal `record_environment_unknown`, written inside the event — which
+/// worked while there was exactly one way to refuse. There are two now (hub#324 added «the record
+/// cannot be declared»), and two refusals wearing the same code would have the panel telling
+/// somebody to fix an environment when what is broken is an amount.
+struct Refusal {
+    /// Stable domain key, `<what_is_wrong>` in the module's own namespace. Never translated.
+    code: &'static str,
+    /// The reason as a human reads it. Also what goes into `contingencyqueue.last_error`.
+    reason: String,
+}
+
+impl Refusal {
+    /// The record does not say which of the two tax agencies owns it (hub#471).
+    fn environment_unknown(reason: String) -> Self {
+        Self {
+            code: "record_environment_unknown",
+            reason,
+        }
+    }
+
+    /// The envelope could not be built at all: an amount is missing or unreadable (hub#324).
+    /// **Retryable on purpose** — the fix is upstream data, and the record must keep its place.
+    fn undeclarable(reason: String) -> Self {
+        Self {
+            code: "record_not_declarable",
+            reason,
+        }
+    }
+}
+
 /// **The record does not say which AEAT owns it, so nothing is transmitted** (hub#471).
 ///
 /// The row is deliberately left UNTOUCHED: `_apply_transmission` overwrites `xml_content` and
@@ -1411,8 +1530,9 @@ async fn refuse_transmission(
     event_id: &str,
     queue_id: &str,
     config: &Json,
-    reason: &str,
+    refusal: &Refusal,
 ) -> Result<(Vec<Operation>, bool)> {
+    let reason = refusal.reason.as_str();
     let retry = enqueue_retry(host, ctx, record_id, queue_id, config, reason).await?;
     Ok((
         vec![
@@ -1425,7 +1545,7 @@ async fn refuse_transmission(
                     "severity": "error",
                     "message": format!("No se ha transmitido a la AEAT: {reason}"),
                     "details": json!({
-                        "reason": "record_environment_unknown",
+                        "reason": refusal.code,
                         "error": reason,
                         "attempts": retry.attempts,
                     })
@@ -1552,6 +1672,9 @@ async fn auto_rechain_and_retry(
     rejection: &aeat::AeatResponse,
     recovery_id: &str,
     event_id: &str,
+    // El re-anclado hereda el origen del envío que lo disparó (hub#322): un registro que salió
+    // de la cola sigue saliendo de la cola cuando se reintenta sobre el ancla que dio la AEAT.
+    remission: Remission,
 ) -> Result<Option<(Vec<Operation>, bool)>> {
     let issuer_nif = str_field(record, "issuer_nif");
     // Both legs of the recovery go to the record's OWN destination (hub#471): asking the wrong
@@ -1603,7 +1726,11 @@ async fn auto_rechain_and_retry(
         config,
         Some(&anchor_as_prev(anchor)),
         &ctx.hub_id,
-    );
+    )?;
+    let xml = match remission {
+        Remission::Punctual => xml,
+        Remission::FromContingency => aeat::stamp_contingency_incidence(&xml),
+    };
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
     let identity = build_identity(host, &ctx.hub_id, config).await?;
     let body = aeat::post_soap(destination.endpoint, identity, &xml).await?;
@@ -1756,6 +1883,8 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
             &event_id,
             &queue_id,
             &recovery_id,
+            // ESTE es el envío que declara `Incidencia=S`: sale de la cola de contingencia.
+            Remission::FromContingency,
         )
         .await?;
         for o in ops {
@@ -1901,14 +2030,18 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
                     "is_first_record": 1,
                     "generation_timestamp": gen_ts,
                 });
-                let xml = aeat::build_soap(&sample, &config, None, &ctx.hub_id);
                 // Mismo gate que la transmisión real: la prueba tiene que fallar donde falla el
-                // envío de verdad, no ir a la AEAT a que lo diga con un 4102.
-                if let Err(e) = xsd::validate_registro(&xml) {
-                    aeat =
-                        json!({ "ok": false, "error": format!("XML no conforme al esquema: {e}") });
-                } else {
-                    match aeat::post_soap(transmission_endpoint(&config), identity, &xml).await {
+                // envío de verdad, no ir a la AEAT a que lo diga con un 4102. Y si el sobre ni
+                // siquiera se puede construir (hub#324), el diagnóstico lo dice aquí.
+                let built = aeat::build_soap(&sample, &config, None, &ctx.hub_id);
+                let checked = built.as_ref().map_err(ToString::to_string).and_then(|xml| {
+                    xsd::validate_registro(xml)
+                        .map(|()| xml.as_str())
+                        .map_err(|e| format!("XML no conforme al esquema: {e}"))
+                });
+                match checked {
+                    Err(error) => aeat = json!({ "ok": false, "error": error }),
+                    Ok(xml) => match aeat::post_soap(transmission_endpoint(&config), identity, xml).await {
                         Ok(body) => {
                             let r = aeat::parse_response(&body);
                             let accepted = r.estado_registro == "Correcto"
@@ -3057,6 +3190,13 @@ mod environment_chain_tests {
         queue: Vec<Json>,
         has_core_certificate: bool,
         reads: Mutex<Vec<(String, Params)>>,
+        /// Every XML this engine archived, in order.
+        ///
+        /// It is the honest observation point for «what was about to be transmitted»: the archive
+        /// happens **after** the envelope is final and **before** the network is touched, and a
+        /// transmission that cannot be archived is never sent. Asserting here needs neither a
+        /// fake AEAT nor a certificate.
+        archived: Mutex<Vec<String>>,
     }
 
     impl ChainHost {
@@ -3067,7 +3207,18 @@ mod environment_chain_tests {
                 queue: Vec::new(),
                 has_core_certificate: false,
                 reads: Mutex::new(Vec::new()),
+                archived: Mutex::new(Vec::new()),
             }
+        }
+
+        /// The XML of the FIRST transmission this host archived.
+        fn first_archived(&self) -> String {
+            self.archived
+                .lock()
+                .unwrap()
+                .first()
+                .cloned()
+                .expect("nothing was archived, so nothing was about to be transmitted")
         }
     }
 
@@ -3135,12 +3286,30 @@ mod environment_chain_tests {
             Ok(self.has_core_certificate.then(|| "own".to_string()))
         }
 
+        /// The manufacturer's facts as the control plane serves them (hub#323). Without them no
+        /// envelope can be built at all, so a fixture that transmits has to answer this.
+        async fn producer_facts(&self) -> Result<Option<Json>> {
+            Ok(Some(json!({
+                "NombreRazon": "ERPLORA CLOUD SL",
+                "NIF": "B27593136",
+                "NombreSistemaInformatico": "ERPlora Hub",
+                "IdSistemaInformatico": "EC",
+                "TipoUsoPosibleSoloVerifactu": "S",
+                "TipoUsoPosibleMultiOT": "S",
+                "IndicadorMultiplesOT": "N",
+            })))
+        }
+
         async fn write_static_file(
             &self,
             relative_path: &str,
-            _bytes: &[u8],
+            bytes: &[u8],
             _content_type: &str,
         ) -> Result<String> {
+            self.archived
+                .lock()
+                .unwrap()
+                .push(String::from_utf8_lossy(bytes).into_owned());
             Ok(format!("modules/verifactu/{relative_path}"))
         }
     }
@@ -3406,6 +3575,10 @@ mod environment_chain_tests {
     fn queued_testing_record() -> Json {
         let mut record = chain_row("rec-2", 2, "testing", HASH_TESTING_2, HASH_TESTING_1);
         record["status"] = json!("pending");
+        // `DescripcionOperacion` is required and must not be empty (`xsd::REQUIRED_ALTA`).
+        // Without it the XSD gate refuses the record BEFORE the envelope is archived, and a test
+        // asserting on what was about to be transmitted would find nothing at all.
+        record["description"] = json!("Ticket");
         record
     }
 
@@ -3538,6 +3711,145 @@ mod environment_chain_tests {
                 .iter()
                 .any(|o| o.command == "verifactu._apply_transmission"),
             "nothing was transmitted, so nothing may overwrite the record's archived XML"
+        );
+    }
+
+    // ── hub#322: the envelope says whether it comes out of the contingency queue ─────────────
+    //
+    // Both tests stop at the same place, on purpose: the envelope is archived BEFORE the network
+    // is opened, and this host has no certificate to sign with, so the run dies right after the
+    // archive. What was archived is exactly what was about to be handed to the AEAT — no fake
+    // tax agency and no `.p12` needed to assert on it.
+
+    fn contingency_input() -> Json {
+        json!({
+            "payload": {},
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor", "id-summary"] }
+        })
+    }
+
+    /// 🔴 The defect: a record that spent the outage in the queue was remitted looking punctual.
+    /// `Incidencia` is what legalises a deferred remission, and no envelope carried it.
+    #[tokio::test]
+    async fn a_record_drained_from_the_queue_declares_the_incidence() {
+        let mut host = ChainHost::new(config_row("testing"), vec![queued_testing_record()]);
+        host.has_core_certificate = true;
+        host.queue = vec![json!({ "record_id": "rec-2" })];
+
+        let _ = process_contingency_queue(&contingency_input(), &host).await;
+
+        let sent = host.first_archived();
+        assert!(
+            sent.contains(
+                "<sum1:RemisionVoluntaria><sum1:Incidencia>S</sum1:Incidencia>\
+                 </sum1:RemisionVoluntaria>"
+            ),
+            "an envelope out of the queue declares the incidence: {sent}"
+        );
+    }
+
+    /// The other half, and the one that keeps the flag meaningful: an ordinary sale is a punctual
+    /// remission and declares NO incidence. Stamping every envelope would say nothing at all.
+    #[tokio::test]
+    async fn an_ordinary_transmission_declares_no_incidence() {
+        let mut host = ChainHost::new(config_row("testing"), vec![queued_testing_record()]);
+        host.has_core_certificate = true;
+        let input = json!({
+            "payload": { "record_id": "rec-2" },
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor"] }
+        });
+
+        let _ = transmit_record(&input, &host).await;
+
+        let sent = host.first_archived();
+        assert!(!sent.contains("Incidencia"), "{sent}");
+        assert!(!sent.contains("RemisionVoluntaria"), "{sent}");
+    }
+
+    /// **The flag is the ENVELOPE's, and the record knows nothing about it** (the caveat of #322).
+    ///
+    /// The same invoice remitted punctually and remitted out of the queue is the SAME record —
+    /// same fields, same fingerprint, same chain link — and only its envelope differs. So the
+    /// incidence must live in the `Cabecera` and nowhere inside `RegistroFactura`, which is the
+    /// half the fingerprint covers.
+    ///
+    /// (What DOES carry it afterwards is `xml_content`, and that is the point: the column is the
+    /// evidence of what was actually transmitted, and the next retry reuses it verbatim.)
+    #[tokio::test]
+    async fn the_incidence_lives_in_the_header_and_not_in_the_record() {
+        let mut host = ChainHost::new(config_row("testing"), vec![queued_testing_record()]);
+        host.has_core_certificate = true;
+        host.queue = vec![json!({ "record_id": "rec-2" })];
+
+        let _ = process_contingency_queue(&contingency_input(), &host).await;
+
+        let sent = host.first_archived();
+        let registro_start = sent.find("<sum:RegistroFactura>").expect("RegistroFactura");
+        assert!(
+            sent[..registro_start].contains("<sum1:Incidencia>S</sum1:Incidencia>"),
+            "the header declares it: {sent}"
+        );
+        assert!(
+            !sent[registro_start..].contains("Incidencia"),
+            "and the record does not — the fingerprint covers that block: {sent}"
+        );
+    }
+
+    /// **A record whose amounts cannot be read is not transmitted either** (hub#324).
+    ///
+    /// It lands on the SAME refusal as hub#471 and for the same reason: nothing is sent, nothing
+    /// overwrites the row, and the record keeps its place in the queue. What it must NOT do is
+    /// what the old `unwrap_or(0.0)` did — build an envelope declaring `0,00`, hand it to the AEAT
+    /// and have it accepted. That is unrecoverable: the record is remitted, fingerprinted and
+    /// chained, and the AEAT neither replaces nor deletes it (ADR-0189).
+    #[tokio::test]
+    async fn a_record_with_an_unreadable_amount_is_refused_not_declared_as_zero() {
+        let mut record = queued_testing_record();
+        record.as_object_mut().unwrap().remove("total_amount");
+        let mut host = ChainHost::new(config_row("testing"), vec![record]);
+        host.has_core_certificate = true;
+        let input = json!({
+            "payload": { "record_id": "rec-2" },
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor"] }
+        });
+
+        let out = transmit_record(&input, &host)
+            .await
+            .expect("an undeclarable record is an outcome, not an aborted batch");
+
+        let event = find_op(&out, "verifactu._insert_event");
+        assert_eq!(event.params.get("severity"), Some(&json!("error")));
+        let details: Json =
+            serde_json::from_str(event.params.get("details").and_then(Json::as_str).unwrap())
+                .unwrap();
+        assert_eq!(
+            details["reason"],
+            json!("record_not_declarable"),
+            "its OWN key: telling this apart from an environment it cannot resolve is what \
+             decides whether somebody goes to look at the invoice or at the config"
+        );
+        assert!(
+            details["error"].as_str().unwrap_or_default().contains("total_amount"),
+            "the operator has to be told WHICH amount: {details}"
+        );
+        assert_eq!(
+            find_op(&out, "verifactu._enqueue_contingency")
+                .params
+                .get("record_id"),
+            Some(&json!("rec-2")),
+            "an RF may never be left generated and never remitted (FAQ §5)"
+        );
+        assert!(
+            !out.operations
+                .iter()
+                .any(|o| o.command == "verifactu._apply_transmission"),
+            "nothing was built and nothing was sent, so nothing may touch the record"
         );
     }
 

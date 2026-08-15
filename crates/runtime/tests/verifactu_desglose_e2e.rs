@@ -141,7 +141,21 @@ async fn aeat_xml(rt: &Runtime, invoice_id: &str) -> String {
         .expect("an issued invoice must produce a VeriFactu record");
     // The record row IS the params of that insert — the same shape the transmission reads back.
     let record = Value::Object(insert.params.clone());
-    let xml = aeat::build_soap(&record, &json!({}), None, erplora_runtime::DEV_HUB_ID);
+    // Producer facts as the control plane serves them (hub#323): without them there is no
+    // `SistemaInformatico`, so there is no envelope to validate.
+    let config = json!({
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        }
+    });
+    let xml = aeat::build_soap(&record, &config, None, erplora_runtime::DEV_HUB_ID)
+        .expect("el registro se puede declarar");
     if let Err(e) = xsd::validate_registro(&xml) {
         panic!("the pre-network validator rejected the record: {e}\n{xml}");
     }
