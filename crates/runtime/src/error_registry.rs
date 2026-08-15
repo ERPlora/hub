@@ -256,6 +256,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#554: a hub that already emitted refusing to change taxpayer is the freeze doing its
         // job — the state of the hub, not a bug of the Hub.
         | E::BusinessTaxIdFrozen { .. }
+        // hub#69: a hub that went live refusing to move country is the freeze of ADR-0273 doing
+        // its job — the state of the hub, not a bug of the Hub. Same reasoning as its sibling.
+        | E::HubCountryFrozen { .. }
         // hub#360: a cashier reaching for something a manager approves is the permission model
         // working, not a Hub bug. Same severity as the flat `PermissionDenied` it refines.
         | E::RequiresElevation { .. }
@@ -331,6 +334,9 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // same key that mean opposite things ("this hub is nobody's" vs "this hub already emitted
         // and cannot change taxpayer"), and only one of them has a way out.
         E::BusinessTaxIdFrozen { .. } => "business_tax_id_frozen",
+        // hub#69: its own code, not a flavour of the tax-id freeze. Two different keys frozen by
+        // two different facts, and the screen has to name the one that refused.
+        E::HubCountryFrozen { .. } => "hub_country_frozen",
         // hub#521: three distinct codes for three distinct refusals of a `module.json`. The screen
         // that offers an install has to say something different for "this app needs a newer
         // terminal" (act: update) than for "this app declares something we cannot run" (act:

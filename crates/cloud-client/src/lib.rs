@@ -69,6 +69,72 @@ pub struct PreparedRequest {
     pub headers: Vec<(&'static str, String)>,
 }
 
+/// **Where this hub is**, as the marketplace catalogue is asked about it (ADR-0062, hub#69).
+///
+/// Compliance is sold as atomic modules per regime (`verifactu`, `ticketbai`, `nf525`…) and each
+/// declares the countries it applies to. Without saying where the hub is, the catalogue answered
+/// with every country's regime at once: a hub in France was offered VeriFactu, which it cannot
+/// use, and the one module it does need was buried among the rest.
+///
+/// **The browser is not in this conversation.** The values come from `hub_settings.country_code` /
+/// `region_code` — read by the runtime, appended by the runtime — so the catalogue a till sees is
+/// not something a query param from the page can widen. That matters beyond tidiness: which fiscal
+/// regime a hub is offered is the first step of what it will end up filing.
+///
+/// Empty `country` = **no filter at all** (the whole catalogue), which is what a hub that has not
+/// answered where it is should see — not an empty shelf.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CountryFilter {
+    /// ISO-3166-1 alpha-2 (`ES`), upper-cased. `""` = the hub has not said.
+    pub country: String,
+    /// ISO-3166-2 subdivision WITHOUT the country prefix (`PV`), upper-cased. `""` = the whole
+    /// country, which is the normal case.
+    pub region: String,
+}
+
+impl CountryFilter {
+    /// No filter: the whole catalogue.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// Normalises on the way in (trim + upper-case), so a stored `" es "` and an `ES` are the same
+    /// filter and neither becomes a country the SaaS does not recognise.
+    ///
+    /// **And it translates the region between the two spellings.** The hub stores `region_code` as
+    /// full ISO-3166-2 (`ES-PV`, enforced by `settings::validate_region`); the marketplace filter
+    /// takes the subdivision alone (`PV`), the format the regional scope of a `ModuleCountry` link
+    /// holds. Sending the prefixed form errors nowhere and matches nothing — a hub in the Basque
+    /// Country would be shown VeriFactu instead of TicketBAI — so the prefix is dropped here, at
+    /// the one boundary that knows both spellings. Only when it IS this hub's country: a dash in
+    /// front of anything else is part of the code, not a prefix to guess at.
+    pub fn new(country: &str, region: &str) -> Self {
+        let country = country.trim().to_ascii_uppercase();
+        let region = region.trim().to_ascii_uppercase();
+        let region = region
+            .strip_prefix(&format!("{country}-"))
+            .filter(|_| !country.is_empty())
+            .unwrap_or(&region)
+            .to_string();
+        Self { country, region }
+    }
+
+    /// `""` · `"?countries=ES"` · `"?countries=ES&region=PV"`.
+    ///
+    /// A region with no country is dropped: the SaaS ignores it by contract (a region only means
+    /// something inside its country) and sending it would advertise a filter nobody applies.
+    fn query(&self) -> String {
+        if self.country.is_empty() {
+            return String::new();
+        }
+        if self.region.is_empty() {
+            format!("?countries={}", self.country)
+        } else {
+            format!("?countries={}&region={}", self.country, self.region)
+        }
+    }
+}
+
 /// Percent-encode de un valor que va en **un segmento de path** (RFC 3986). Deja intacto el
 /// conjunto *unreserved* (`A-Z a-z 0-9 - . _ ~`) y codifica el resto como `%XX`. Sin dependencias
 /// (el crate no arrastra `url`/`percent-encoding`). Lo usa `members_remove` para poner el email en
@@ -130,13 +196,24 @@ impl CloudClient {
     }
 
     /// Lista de módulos del marketplace para el hub (con JWT de usuario). §2.2.
-    pub fn marketplace_modules(&self, auth: &Auth) -> PreparedRequest {
-        self.get("/api/v1/marketplace/modules/", auth)
+    ///
+    /// Filtrada por el país del hub (ADR-0062, hub#69) — ver [`CountryFilter`].
+    pub fn marketplace_modules(&self, auth: &Auth, country: &CountryFilter) -> PreparedRequest {
+        self.get(
+            &format!("/api/v1/marketplace/modules/{}", country.query()),
+            auth,
+        )
     }
 
     /// Catálogo público de metadatos para Demo. No concede descarga, compra ni entitlement.
-    pub fn public_marketplace_modules(&self) -> PreparedRequest {
-        self.public_get("/api/v1/marketplace/catalog/")
+    ///
+    /// Lleva el MISMO filtro de país que su hermana de arriba: una demo también está en un país,
+    /// y ofrecerle el régimen fiscal de otro sería enseñar un módulo que no puede usar.
+    pub fn public_marketplace_modules(&self, country: &CountryFilter) -> PreparedRequest {
+        self.public_get(&format!(
+            "/api/v1/marketplace/catalog/{}",
+            country.query()
+        ))
     }
 
     /// Which build of the installable app the Cloud publishes right now (hub#400).
@@ -895,7 +972,7 @@ mod tests {
             hub_id: "h1".into(),
             access: "abc".into(),
         };
-        let r = c.marketplace_modules(&auth);
+        let r = c.marketplace_modules(&auth, &CountryFilter::none());
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/modules/");
         assert!(r
             .headers
@@ -965,9 +1042,94 @@ mod tests {
     #[test]
     fn public_marketplace_catalog_has_no_hub_credentials() {
         let c = CloudClient::new("https://erplora.com");
-        let r = c.public_marketplace_modules();
+        let r = c.public_marketplace_modules(&CountryFilter::none());
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/catalog/");
         assert!(r.headers.is_empty());
+    }
+
+    // ── The catalogue is asked FOR A COUNTRY (ADR-0062, hub#69) ────────────────────────────────
+    //
+    // A hub in France was offered VeriFactu — a Spanish regime it cannot use — because the request
+    // never said where the hub is. The country travels as a query param the RUNTIME appends from
+    // `hub_settings.country_code`; the browser is not in the conversation.
+
+    #[test]
+    fn the_marketplace_is_asked_about_the_hub_country() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "tok".into(),
+        };
+        let r = c.marketplace_modules(&auth, &CountryFilter::new("ES", ""));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/modules/?countries=ES"
+        );
+    }
+
+    /// 🔴 **The two sides spell a region differently and the mismatch is silent.** The hub stores
+    /// `region_code` as FULL ISO-3166-2 — `ES-PV`, enforced by `validate_region` — while the
+    /// marketplace filter takes the subdivision alone (`PV`), because that is what the regional
+    /// scope of a `ModuleCountry` link holds.
+    ///
+    /// Sending `ES-PV` would not error anywhere: it would simply match no link, so a hub in the
+    /// Basque Country would be offered **VeriFactu and not TicketBAI** — precisely backwards, and
+    /// on the one screen where getting the regime wrong is expensive. The prefix is stripped here,
+    /// at the boundary that knows both spellings.
+    #[test]
+    fn the_country_prefix_is_stripped_from_the_region_the_hub_stores() {
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.public_marketplace_modules(&CountryFilter::new("ES", "ES-PV"));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/catalog/?countries=ES&region=PV"
+        );
+    }
+
+    #[test]
+    fn the_region_refines_the_country_when_the_hub_declares_one() {
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.public_marketplace_modules(&CountryFilter::new("ES", "PV"));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/catalog/?countries=ES&region=PV",
+            "a bare subdivision is already in the wire format and passes through"
+        );
+    }
+
+    /// A prefix that is NOT this hub's country is left alone: it is not the `XX-` of ISO-3166-2
+    /// being spelled out, it is a subdivision code that happens to contain a dash, and guessing
+    /// would corrupt it.
+    #[test]
+    fn a_prefix_from_another_country_is_not_stripped() {
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.public_marketplace_modules(&CountryFilter::new("PT", "ES-PV"));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/catalog/?countries=PT&region=ES-PV"
+        );
+    }
+
+    /// A region with no country is NOT sent: the SaaS ignores it (a region only means something
+    /// inside its country) and sending it would suggest a filter that is not being applied.
+    #[test]
+    fn a_region_without_a_country_is_not_sent_at_all() {
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.public_marketplace_modules(&CountryFilter::new("", "PV"));
+        assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/catalog/");
+    }
+
+    /// **An unknown country must not silently become "the whole catalogue".** Whatever the hub has
+    /// stored is normalised (trimmed, upper-cased) and sent; a hub whose country the SaaS does not
+    /// know gets the universal modules back, which is the honest answer.
+    #[test]
+    fn the_country_is_normalised_before_it_travels() {
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.public_marketplace_modules(&CountryFilter::new(" fr ", " oc "));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/catalog/?countries=FR&region=OC"
+        );
     }
 
     /// hub#400: which build of the installable app the Cloud publishes. The version of a public
