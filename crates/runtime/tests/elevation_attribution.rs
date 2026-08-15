@@ -76,12 +76,7 @@ fn ticket() -> Params {
 async fn approve(rt: &Runtime, command: &str, payload: &Params) -> String {
     rt.approve_elevation(
         &cashier(),
-        ElevationRequest {
-            approver_name: "Sofía",
-            pin: MANAGER_PIN,
-            command,
-            payload,
-        },
+        ElevationRequest::with_pin("Sofía", MANAGER_PIN, command, payload),
     )
     .await
     .expect("the manager approves")
@@ -92,12 +87,7 @@ async fn approve(rt: &Runtime, command: &str, payload: &Params) -> String {
 async fn manager_id(rt: &Runtime) -> String {
     rt.approve_elevation(
         &cashier(),
-        ElevationRequest {
-            approver_name: "Sofía",
-            pin: MANAGER_PIN,
-            command: "till.sale.take_payment",
-            payload: &ticket(),
-        },
+        ElevationRequest::with_pin("Sofía", MANAGER_PIN, "till.sale.take_payment", &ticket()),
     )
     .await
     .expect("the manager approves")

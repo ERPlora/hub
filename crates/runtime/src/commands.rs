@@ -321,7 +321,7 @@ pub(crate) async fn execute_at(
             Ok(()) => ctx,
             Err(RuntimeError::RequiresElevation { permission }) => {
                 match spend_approval(grants, ctx, name, payload, &permission) {
-                    Some((approved_by, fingerprint)) => {
+                    Some((spent, fingerprint)) => {
                         // No receipt, no elevated action: swallowing this would make «break the
                         // audit» a way to run a manager-level command leaving no trace at all.
                         crate::elevation::record_spend(
@@ -330,11 +330,11 @@ pub(crate) async fn execute_at(
                             name,
                             &permission,
                             &ctx.user_id,
-                            &approved_by,
+                            &spent,
                             &fingerprint,
                         )
                         .await?;
-                        elevated_ctx = ctx.clone().spent_approval_of(approved_by);
+                        elevated_ctx = ctx.clone().spent_approval_of(spent.approved_by);
                         &elevated_ctx
                     }
                     // No approval, or one granted for another action, another cashier or another
@@ -1313,7 +1313,7 @@ fn spend_approval(
     command: &str,
     payload: &Params,
     permission: &str,
-) -> Option<(String, String)> {
+) -> Option<(crate::elevation::SpentApproval, String)> {
     // The token comes from the CONTEXT and from nowhere else — the HTTP layer put it there from
     // `X-Elevation-Token`. Reading it from `payload` instead would be the whole vulnerability:
     // the body of a command is caller-controlled data that already gets validated, defaulted and
@@ -1332,7 +1332,7 @@ fn spend_approval(
     // matched against. Recomputing it at the call site would let the two drift apart — the record
     // would then describe an action nobody actually approved.
     let fingerprint = crate::elevation::fingerprint(payload);
-    let approved_by = grants.spend(
+    let spent = grants.spend(
         token,
         &crate::elevation::Binding {
             hub_id: ctx.hub_id.clone(),
@@ -1342,7 +1342,7 @@ fn spend_approval(
             permission: permission.to_string(),
         },
     )?;
-    Some((approved_by, fingerprint))
+    Some((spent, fingerprint))
 }
 
 /// Valida una intención del handler y la resuelve a su(s) SQL.

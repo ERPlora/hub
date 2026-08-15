@@ -378,6 +378,27 @@ fn guard_decision(
         ));
     }
 
+    // **Cuatro ojos para la placa** (hub#658, el extra de Toast en la decisión de mercado): nadie
+    // se enrola su propia tarjeta. Es la única de las tres credenciales donde el alta y el uso son
+    // el mismo gesto —pasarla— así que un administrador podría enrolar una segunda tarjeta a su
+    // nombre, dejarla en un cajón y usarla después sin que la traza distinga quién la pasó. Con dos
+    // personas en el alta, la tarjeta tiene siempre un emisor distinto de su portador.
+    //
+    // ⚠️ Solo el ALTA. **Revocar la propia placa se puede siempre** (`badge: Some("")`): quien
+    // acaba de perder la tarjeta es la persona con más prisa por matarla, y hacerle buscar a otro
+    // administrador convierte una pérdida en una ventana abierta. Es la misma asimetría que el
+    // resto del subsistema — cerrar una puerta nunca necesita permiso, abrirla sí.
+    if target_id == actor_id
+        && input
+            .badge
+            .as_deref()
+            .is_some_and(|badge| !badge.trim().is_empty())
+    {
+        return Some(Guard::Rejected(
+            "nadie da de alta su propia placa: pídeselo a otro administrador",
+        ));
+    }
+
     // ¿El cambio le quita a este usuario la condición de administrador activo?
     let was_admin = target.is_active && is_admin_role(&target.role);
     let role_after = input.role.as_deref().unwrap_or(&target.role);
@@ -409,6 +430,7 @@ mod tests {
             cloud_user_id: None,
             is_active,
             has_pin: false,
+            has_badge: false,
             created_at: "2026-08-02T10:00:00Z".into(),
             // Estas pruebas son del guardarraíl «no te quedes sin administrador»: el conflicto de
             // email de acceso (hub#463) no entra en esa decisión.
@@ -450,6 +472,50 @@ mod tests {
         assert_eq!(
             guard_decision(&census, "owner", "admin", "admin", &deactivate()),
             None
+        );
+    }
+
+    fn set_badge(badge: &str) -> UpdateHubUser {
+        UpdateHubUser {
+            badge: Some(badge.into()),
+            ..UpdateHubUser::default()
+        }
+    }
+
+    /// hub#658 — **four eyes on a badge**, the extra Toast adds to the market decision.
+    ///
+    /// A badge is the only credential whose enrolment and whose use are the same gesture: swiping
+    /// it. An administrator could therefore enrol a second card in their own name, leave it in a
+    /// drawer and use it later — and the trace, which is the whole point of this credential, would
+    /// name them either way with nothing to distinguish who held the card.
+    #[test]
+    fn nobody_enrols_their_own_badge() {
+        let census = [user("owner", "owner", true), user("sofia", "manager", true)];
+        assert!(matches!(
+            guard_decision(&census, "owner", "admin", "owner", &set_badge("0009171456")),
+            Some(Guard::Rejected(msg)) if msg.contains("su propia placa")
+        ));
+        // …but enrolling somebody else's is exactly what an administrator is for.
+        assert_eq!(
+            guard_decision(&census, "owner", "admin", "sofia", &set_badge("0009171456")),
+            None
+        );
+    }
+
+    /// And the other half of the same rule: **revoking your own badge is always allowed.**
+    /// Whoever just lost the card is the person in the biggest hurry to kill it; sending them to
+    /// find a second administrator turns a loss into an open window.
+    #[test]
+    fn anybody_may_revoke_their_own_badge() {
+        let census = [user("owner", "owner", true), user("sofia", "manager", true)];
+        assert_eq!(
+            guard_decision(&census, "owner", "admin", "owner", &set_badge("")),
+            None
+        );
+        assert_eq!(
+            guard_decision(&census, "owner", "admin", "owner", &set_badge("   ")),
+            None,
+            "a field of spaces is a revocation, not an enrolment"
         );
     }
 

@@ -205,6 +205,7 @@ import { PROFILE_ROUTE } from './lib/routes';
 import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
 import { installIdleLogout } from './lib/idle-logout';
+import { installBadgeScanner } from './lib/badge-scanner';
 import { loadDeviceMode } from './lib/device-mode';
 import { openUserSwitch, userSwitchOffered } from './lib/user-switch';
 import { bootHubLanguage } from './i18n';
@@ -356,6 +357,15 @@ installIdleLogout(() => {
   logout();
   void router.replace('/login');
 });
+// **El lector de placas escucha AQUÍ, en el shell** (hub#658), y no en la pantalla que la espera.
+// Un lector RFID/NFC es un teclado: la ráfaga se reconoce por su VELOCIDAD, nunca porque un campo
+// tenga el foco. El foro de Odoo es el archivo de por qué — con captura por foco, el número cae en
+// el buscador y el Enter final «pulsa» el botón que haya bajo el ratón. En el mostrador nadie hace
+// clic antes de pasar la tarjeta.
+//
+// `App.vue` no se desmonta nunca, así que esta instalación es única y no se deshace. Quién atiende
+// cada tarjeta lo deciden las pantallas suscritas (`onBadgeScan`), y manda la última.
+installBadgeScanner();
 // La franja bloqueante NO se puede descartar (hub#374): la única forma de que desaparezca es que el
 // hub deje de estar bloqueado, así que el documento se relee al navegar. Es también lo que detecta
 // un gate que APARECE a mitad de sesión —instalar el módulo que pide certificado añade un ⛔ que en

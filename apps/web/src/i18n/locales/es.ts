@@ -696,6 +696,8 @@ export default {
     actionDeactivate: 'Dar de baja',
     access: {
       pin: 'PIN local',
+      pin_badge: 'PIN + placa',
+      badge: 'Placa',
       cloud: 'Cuenta online',
       // Existe como persona del negocio, pero no puede iniciar sesión en el Hub.
       none: 'Sin acceso',
@@ -840,6 +842,12 @@ export default {
     pinHelp: 'Entre 4 y 8 dígitos. En blanco, entra con su cuenta online.',
     pinSetHelp: 'Escribe un PIN nuevo para cambiarlo; déjalo en blanco y se queda como está.',
     clearPin: 'Retirar el PIN',
+    badge: 'Placa',
+    badgeHelp:
+      'Pasa la tarjeta y se rellena sola: no hace falta hacer clic aquí antes. También puedes teclear el número, para un llavero o una etiqueta grabada.',
+    badgeSetHelp:
+      'Ya lleva una placa. Pasa una tarjeta nueva para sustituirla, o déjalo en blanco y se queda como está.',
+    clearBadge: 'Retirar la placa',
     localUser: 'Usuario local',
     localUserHelp:
       'Trabaja en este hub solo con un PIN: sin email y sin cuenta de ERPlora. Desmárcalo para darle una cuenta más adelante, sin perder su historial.',
@@ -861,6 +869,9 @@ export default {
       local_cannot_administer: 'Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.',
       local_has_email: 'Un usuario local no lleva email. Desmarca «Usuario local» para invitarlo como usuario de cuenta.',
       name_taken: 'Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.',
+      badge_shape: 'Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_».',
+      badge_in_use: 'Esa placa ya la lleva otro usuario activo. La placa dice quién está en la caja, así que no la pueden compartir dos personas.',
+      badge_without_fallback: 'La placa no puede ser su única vía de entrada: si pierde la tarjeta se queda fuera. Consérvale el PIN, dale una cuenta, o retira también la placa.',
     },
     activeUser: 'Usuario activo',
     required: 'Campo obligatorio',
@@ -1064,6 +1075,9 @@ export default {
     signInWithEmail: 'Iniciar sesión con email',
     changeUser: 'Cambiar usuario',
     pinIncorrect: 'PIN incorrecto',
+    orSwipeBadge: '…o pasa tu placa: no hace falta elegir tu nombre antes.',
+    badgeRejected: 'Esa placa no abre nada aquí. Entra con tu PIN o pídeselo a un administrador.',
+    badgeTooManyAttempts: 'Demasiados intentos fallidos con esta placa. Espera unos minutos o entra con tu PIN.',
     // hub#330. Sustituye a «PIN incorrecto» cuando lo que se rechazó fue el dispositivo, no los
     // dígitos. Decirle «PIN incorrecto» a quien lo ha escrito bien es la peor respuesta posible: lo
     // vuelve a teclear, y nada en pantalla nombra el gesto que lo arregla.
@@ -1111,6 +1125,7 @@ export default {
   elevation: {
     title: 'Hace falta una aprobación',
     lead: 'Pide a un encargado que introduzca su PIN para aprobarlo.',
+    orSwipeBadge: '…o que pase su placa: no hace falta pulsar nada antes.',
     chooseApprover: '¿Quién lo aprueba?',
     approverName: 'Su nombre',
     approverNamePlaceholder: 'Escribe su nombre',

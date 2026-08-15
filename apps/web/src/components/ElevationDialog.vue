@@ -28,6 +28,14 @@
     <div class="elevation-body ion-padding">
       <h2>{{ t('elevation.title') }}</h2>
       <p data-testid="elevation-lead" class="elevation-lead">{{ t('elevation.lead') }}</p>
+      <!-- **Pasar la tarjeta ES la aprobación** (hub#658): es lo que hacen Toast, Aloha y Square, y
+           obligar al encargado a teclear cuatro dígitos delante del cliente cuando lleva la tarjeta
+           en la mano es fricción que el mercado quitó hace veinte años. Se dice en los dos pasos
+           del diálogo porque la placa no necesita que se elija a nadie antes: resuelve la persona
+           entera. No hay campo que enfocar — la ráfaga la caza el listener global del shell. -->
+      <p data-testid="elevation-badge-hint" class="elevation-badge-hint">
+        {{ t('elevation.orSwipeBadge') }}
+      </p>
 
       <!-- Step 1 — who is approving. A tap, not a spelling test: the queue is still there, and a
            mistyped name spends one of the five tries the brute-force guard allows. -->
@@ -111,11 +119,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IonModal, IonButton, IonCard, IonCardContent, IonInput, IonNote } from '@ionic/vue';
 
 import { pendingElevation, resolveElevation, elevationRefusalKey } from '../lib/elevation';
+import { onBadgeScan } from '../lib/badge-scanner';
 import { pinUsers } from '../lib/runtime';
 import { toast } from '../lib/toast';
 
@@ -135,15 +144,41 @@ const errorKey = ref<string>('');
 const sending = ref<boolean>(false);
 const pinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
 
-// A new ask is a new dialog: nothing of the previous one survives — not the person, not the
-// sentence a refusal left on screen.
+// La placa se atiende **solo mientras hay algo que aprobar**, y la suscripción se renueva en ese
+// momento a propósito: `onBadgeScan` entrega al ÚLTIMO suscrito, así que suscribirse al abrir es lo
+// que pone a este diálogo por encima de la pantalla que tenga debajo (la ficha de Personal también
+// escucha, para que el lector rellene su campo). Suscribirse al montar dejaría ganar a la pantalla,
+// que se monta después — y un swipe acabaría enrolando la tarjeta en un formulario en vez de
+// aprobando la acción que el cajero tiene en pantalla.
+//
+// Y desuscribirse al cerrar es la otra mitad: sin nada que aprobar, este componente no tiene por qué
+// tragarse las tarjetas de nadie.
+let stopBadgeScan: (() => void) | null = null;
+function stopListening(): void {
+  stopBadgeScan?.();
+  stopBadgeScan = null;
+}
+onUnmounted(stopListening);
+
 watch(pendingElevation, (ask) => {
-  if (!ask) return;
+  if (!ask) {
+    stopListening();
+    return;
+  }
+  stopListening();
+  stopBadgeScan = onBadgeScan((badge) => {
+    void submitBadge(badge);
+  });
+  // A new ask is a new dialog: nothing of the previous one survives — not the person, not the
+  // sentence a refusal left on screen.
   approver.value = '';
   typedName.value = '';
   errorKey.value = '';
   sending.value = false;
-});
+  // `immediate` porque este componente puede montarse con una petición ya en curso (así lo hace el
+  // arranque del shell, y así lo montan los tests). Sin él, la primera aprobación de la sesión sería
+  // la única a la que no se le puede pasar la tarjeta.
+}, { immediate: true });
 
 function onTypeName(ev: Event): void {
   typedName.value = (ev as CustomEvent<{ value?: string }>).detail?.value ?? '';
@@ -201,6 +236,32 @@ async function submit(pin: string): Promise<void> {
   }
 }
 
+/**
+ * Aprobar pasando la placa del encargado.
+ *
+ * Comparte con {@link submit} el guardarraíl y el manejo del rechazo, y **no** comparte la elección
+ * previa de persona: la tarjeta ya dice quién es. Solo se atiende con un diálogo abierto — un swipe
+ * cuando no hay nada que aprobar no puede acuñar una aprobación que nadie pidió.
+ */
+async function submitBadge(badge: string): Promise<void> {
+  const ask = pendingElevation.value;
+  if (!ask || sending.value) return;
+  sending.value = true;
+  errorKey.value = '';
+  try {
+    const approval = await ask.approveWithBadge(badge);
+    void toast(t('elevation.approvedBy', { name: approval.approverName }), 'success');
+    resolveElevation(approval.token);
+  } catch (e) {
+    // El diálogo SIGUE ABIERTO, igual que con un PIN rechazado: la tarjeta puede no ser de quien
+    // puede aprobar, y cerrar aquí mandaría al encargado de vuelta al mostrador por ello.
+    errorKey.value = elevationRefusalKey(e);
+    clearPinpad();
+  } finally {
+    sending.value = false;
+  }
+}
+
 function clearPinpad(): void {
   if (pinpadRef.value) pinpadRef.value.value = '';
 }
@@ -230,6 +291,11 @@ function onDismiss(): void {
 .elevation-lead {
   margin: 0 0 0.9rem;
   color: color-mix(in oklab, var(--ion-text-color) 75%, transparent);
+}
+.elevation-badge-hint {
+  margin: -0.55rem 0 0.9rem;
+  font-size: 0.8125rem;
+  color: color-mix(in oklab, var(--ion-text-color) 60%, transparent);
 }
 .elevation-choose {
   margin: 0 0 0.5rem;

@@ -757,6 +757,8 @@ export default {
     actionDeactivate: 'Deactivate',
     access: {
       pin: 'Local PIN',
+      pin_badge: 'PIN + badge',
+      badge: 'Badge',
       cloud: 'Online account',
       // Exists as a person in the business, but cannot sign in to the Hub.
       none: 'No sign-in',
@@ -905,6 +907,14 @@ export default {
     pinHelp: 'Between 4 and 8 digits. Leave blank to sign in with an online account.',
     pinSetHelp: 'Type a new PIN to change it; leave blank to keep the current one.',
     clearPin: 'Remove PIN',
+    // hub#658 — the badge, sibling of the PIN. Both words matter: «badge» is what the sector calls
+    // the card, and «remove» (not «reset») says what the button does — the PIN is untouched.
+    badge: 'Badge',
+    badgeHelp:
+      'Swipe the card and it fills in on its own — no need to click here first. You can also type the number, for a key fob or an engraved tag.',
+    badgeSetHelp:
+      'They already carry a badge. Swipe a new card to replace it, or leave this blank to keep the current one.',
+    clearBadge: 'Remove badge',
     localUser: 'Local user',
     localUserHelp:
       'Works this hub with a PIN only: no email and no ERPlora account. Turn it off to give them an account later, keeping their history.',
@@ -927,6 +937,11 @@ export default {
       local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
       local_has_email: 'A local user has no email. Turn off «Local user» to invite them as an account user.',
       name_taken: 'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',
+      badge_shape: 'A badge is between 4 and 64 characters: letters, digits, «-» and «_».',
+      badge_in_use: 'Another active user already carries this badge. A badge says who is at the till, so no two people can share one.',
+      // hub#658 — the badge may never be somebody's ONLY way in: a lost card would lock them out
+      // of their own till (Square does not allow it either, and Lightspeed L-Series is why).
+      badge_without_fallback: 'A badge cannot be their only way in: a lost card would lock them out. Keep their PIN, give them an account, or remove the badge as well.',
     },
     activeUser: 'Active user',
     required: 'Required field',
@@ -1135,6 +1150,11 @@ export default {
     signInWithEmail: 'Sign in with email',
     changeUser: 'Change user',
     pinIncorrect: 'Incorrect PIN',
+    // hub#658 — one sentence for every way a badge can be refused, on purpose: the login door must
+    // not become the way to find out which cards this business has issued.
+    orSwipeBadge: '…or swipe your badge — no need to tap your name first.',
+    badgeRejected: 'That badge does not open anything here. Use your PIN, or ask an administrator.',
+    badgeTooManyAttempts: 'Too many failed attempts with this badge. Wait a few minutes, or use your PIN.',
     // hub#330. Shown INSTEAD of «Incorrect PIN» when the refusal was about the device, not the
     // digits. Saying "incorrect PIN" to somebody whose PIN is correct is the worst answer available:
     // they retype it, and nothing on the screen names the one gesture that fixes it.
@@ -1181,6 +1201,9 @@ export default {
   elevation: {
     title: 'Approval needed',
     lead: 'Ask a manager to enter their PIN to approve this.',
+    // hub#658 — swiping the card IS the approval (Toast, Aloha, Square). Said up front, in both
+    // steps, because a badge needs nobody tapped on the grid first: it resolves the whole person.
+    orSwipeBadge: '…or swipe their badge — no need to tap anything first.',
     chooseApprover: 'Who is approving?',
     approverName: 'Their name',
     approverNamePlaceholder: 'Type their name',

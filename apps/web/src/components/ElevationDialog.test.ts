@@ -12,7 +12,7 @@
 //   - a refused PIN keeps the dialog open, because the alternative is fetching the manager twice;
 //   - closing it is a legitimate answer, and it hands the caller back the refusal it already had;
 //   - and, above all, the caller waits: the promise is resolved exactly once, by a person.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { ErploraError, type ElevationAsk } from '@erplora/module-sdk';
@@ -27,15 +27,28 @@ vi.mock('../lib/toast', () => ({ toast: (...args: unknown[]) => toast(...args) }
 import ElevationDialog from './ElevationDialog.vue';
 import { pinUsers } from '../lib/runtime';
 import { askForApproval, pendingElevation, resolveElevation } from '../lib/elevation';
+import { installBadgeScanner, onBadgeScan } from '../lib/badge-scanner';
 import en from '../i18n/locales/en';
 
 const i18n = createI18n({ legacy: false, locale: 'en', missingWarn: false, fallbackWarn: false, messages: { en } });
+
+/** Todo lo montado por el test en curso, para desmontarlo al terminar.
+ *
+ * No es higiene decorativa: este componente se **suscribe al lector de placas** mientras hay algo
+ * que aprobar (hub#658), y un diálogo que sobrevive a su test sigue vivo y sigue suscribiéndose en
+ * los siguientes. La ráfaga la recibe el ÚLTIMO suscrito, así que un montaje huérfano se queda con
+ * la tarjeta del test de al lado — y el fallo aparece a varios tests de distancia de su causa. */
+const mounted: Array<{ unmount: () => void }> = [];
+
+afterEach(() => {
+  while (mounted.length) mounted.pop()!.unmount();
+});
 
 function mountDialog() {
   // shallow: the `ion-*` are stubbed (this is the dialog's contract, not Ionic's), but the slot is
   // still rendered — a real `ion-modal` reparents its content to <body> and there would be nothing
   // to look at. The `ok-*` are custom ELEMENTS, so they survive shallow and can be fired at.
-  return mount(ElevationDialog, {
+  const wrapper = mount(ElevationDialog, {
     shallow: true,
     global: {
       plugins: [i18n],
@@ -43,6 +56,8 @@ function mountDialog() {
       config: { compilerOptions: { isCustomElement: (tag: string) => tag.startsWith('ok-') } },
     },
   });
+  mounted.push(wrapper);
+  return wrapper;
 }
 
 /** `is-open` of the modal, read as a prop: on a stub, a `false` boolean leaves no attribute. */
@@ -52,8 +67,19 @@ const isOpen = (w: ReturnType<typeof mountDialog>): unknown =>
   (modal(w).props() as Record<string, unknown>).isOpen;
 
 /** An ask whose `approve` is scripted, so the test can be the runtime's answer. */
-function ask(approve: ElevationAsk['approve']): ElevationAsk {
-  return { command: 'till.sale.void', payload: { sale_id: 's1' }, permission: 'till.void_sale', approve };
+function ask(
+  approve: ElevationAsk['approve'],
+  approveWithBadge: ElevationAsk['approveWithBadge'] = async () => {
+    throw new Error('this ask was not scripted for a badge');
+  },
+): ElevationAsk {
+  return {
+    command: 'till.sale.void',
+    payload: { sale_id: 's1' },
+    permission: 'till.void_sale',
+    approve,
+    approveWithBadge,
+  };
 }
 
 const approves = vi.fn(async () => ({
@@ -261,5 +287,111 @@ describe('giving up is an answer', () => {
 
     modal(w).vm.$emit('didDismiss');
     expect(await pending).toBeNull();
+  });
+});
+
+// ── hub#658 — the manager's CARD approves what the manager's PIN approves ────────────────────
+
+describe('the badge', () => {
+  /** A reader's burst: fast characters, a trailing Enter, and no field focused anywhere. */
+  function swipe(badge: string): void {
+    for (const ch of badge) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true, cancelable: true }));
+    }
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  }
+
+  const approvesBadge = vi.fn(async () => ({
+    token: 'tok-badge',
+    permission: 'till.void_sale',
+    approvedBy: 'u-sofia',
+    approverName: 'Sofía',
+    expiresInSeconds: 120,
+  }));
+
+  let uninstall: () => void;
+  beforeEach(() => {
+    approvesBadge.mockClear();
+    uninstall = installBadgeScanner();
+  });
+  // En `afterEach` y no al final de cada test: un test que falla a mitad dejaría el listener
+  // puesto, y el siguiente vería CADA tecla dos veces — un fallo que no se parece en nada a su
+  // causa (la ráfaga sale con los caracteres duplicados).
+  afterEach(() => uninstall());
+
+  it('approves without anybody being tapped on the grid first', async () => {
+    // The market decision in one assertion (Toast, Aloha, Square): swiping the card IS the
+    // approval. A badge resolves the whole person, so there is no name to choose and no pinpad to
+    // reach — which is exactly the friction the sector removed twenty years ago.
+    seedPeople();
+    const pending = askForApproval(ask(approves, approvesBadge));
+    mountDialog();
+    await flushPromises();
+
+    swipe('0009171456');
+    await flushPromises();
+
+    expect(approvesBadge).toHaveBeenCalledWith('0009171456');
+    expect(approves).not.toHaveBeenCalled();
+    expect(await pending).toBe('tok-badge');
+    expect(pendingElevation.value).toBeNull();
+  });
+
+  it('keeps the dialog open when the card is refused, exactly as a wrong PIN does', async () => {
+    seedPeople();
+    const refuses = vi.fn(async () => {
+      throw new ErploraError('hub.elevation.approver_cannot', 'that person cannot approve this');
+    });
+    void askForApproval(ask(approves, refuses));
+    const w = mountDialog();
+    await flushPromises();
+
+    swipe('0009171456');
+    await flushPromises();
+
+    expect(w.find('[data-testid="elevation-error"]').text()).toBe(en.elevation.approverCannot);
+    expect(pendingElevation.value, 'still asking').not.toBeNull();
+  });
+
+  it('wins over the screen underneath, and only while there is something to approve', async () => {
+    // The employee form also listens (the reader fills its badge field). `onBadgeScan` delivers to
+    // the LAST subscriber, so a dialog that subscribed on MOUNT would lose to a page mounted after
+    // it — and a swipe meant to approve a void would enrol a card in a form instead.
+    seedPeople();
+    mountDialog();
+    await flushPromises();
+
+    const page: string[] = [];
+    const offPage = onBadgeScan((badge) => page.push(badge));
+
+    // Nothing to approve yet: the dialog is not listening, so the screen behind gets the card.
+    swipe('0009171456');
+    await flushPromises();
+    expect(page).toEqual(['0009171456']);
+
+    // An ask arrives → the dialog takes over.
+    const pending = askForApproval(ask(approves, approvesBadge));
+    await flushPromises();
+    swipe('0009171456');
+    await flushPromises();
+    expect(page).toEqual(['0009171456']); // el diálogo se la quedó: la página no oyó nada
+    expect(await pending).toBe('tok-badge');
+
+    // …and hands the door back once it closes.
+    await flushPromises();
+    swipe('0009171456');
+    await flushPromises();
+    expect(page).toEqual(['0009171456', '0009171456']);
+
+    offPage();
+  });
+
+  it('is offered in words, so nobody has to know the card works here', async () => {
+    seedPeople();
+    void askForApproval(ask(approves, approvesBadge));
+    const w = mountDialog();
+    await flushPromises();
+
+    expect(w.find('[data-testid="elevation-badge-hint"]').text()).toBe(en.elevation.orSwipeBadge);
   });
 });

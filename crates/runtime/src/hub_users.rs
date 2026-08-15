@@ -169,6 +169,9 @@ pub struct HubUserRow {
     pub is_active: bool,
     /// `true` si puede entrar con PIN local. El owner suele entrar por Cloud, así que es `false`.
     pub has_pin: bool,
+    /// `true` si lleva una **placa** enrolada (hub#658). Hermana de `has_pin`: la pantalla enseña
+    /// las dos por separado porque revocar una no toca la otra, y ese es el contrato entero.
+    pub has_badge: bool,
     pub created_at: String,
     /// Por qué el backfill v19 NO pudo llevar el email de esta persona a donde se administra el
     /// acceso (hub#436/#463); `None` —lo normal— si no hay nada que resolver.
@@ -211,6 +214,11 @@ pub struct NewHubUser {
     pub role: String,
     #[serde(default)]
     pub pin: String,
+    /// La **placa** (RFID/NFC/banda/iButton) que el lector rellena — y que se puede teclear, porque
+    /// un iButton lleva el número grabado y un lector de banda no siempre está a mano (hub#658).
+    /// Vacío = sin placa. Nunca sustituye al PIN.
+    #[serde(default)]
+    pub badge: String,
     /// The **«Local user»** checkbox of the alta (plan step 2b, hub#355): this person exists only
     /// in this hub's database — name + PIN, no email, nothing created in the SaaS.
     ///
@@ -224,7 +232,7 @@ pub struct NewHubUser {
 }
 
 /// Edición parcial: solo se toca lo que viene. `pin: Some("")` **retira** el PIN;
-/// `is_active: Some(false)` es la baja.
+/// `badge: Some("")` **revoca la placa** sin tocar el PIN; `is_active: Some(false)` es la baja.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct UpdateHubUser {
     pub name: Option<String>,
@@ -232,6 +240,10 @@ pub struct UpdateHubUser {
     pub role: Option<String>,
     pub is_active: Option<bool>,
     pub pin: Option<String>,
+    /// La placa. **Revocación independiente** (hub#658): `Some("")` la retira y el PIN sigue
+    /// exactamente donde estaba — volver a solo-PIN es siempre posible. El caso Lightspeed
+    /// L-Series (tarjeta irrevocable, producto descatalogado) es por qué esto no es opcional.
+    pub badge: Option<String>,
 }
 
 fn invalid(detail: impl Into<String>) -> RuntimeError {
@@ -322,6 +334,37 @@ fn is_guessable_pin(pin: &str) -> bool {
     step_is(0) || step_is(1) || step_is(-1)
 }
 
+/// Longitud admisible de una placa. El suelo son 4 caracteres —por debajo se teclea a mano en
+/// menos de lo que se tarda en decirlo— y el techo, holgado, cubre desde un UID EM4100 de 10
+/// dígitos hasta la pista 2 de una banda magnética.
+const BADGE_LEN: std::ops::RangeInclusive<usize> = 4..=64;
+
+/// Placa: vacío (sin placa) o el volcado del lector — alfanumérico, con `-` y `_` tolerados.
+///
+/// Deliberadamente **no** se restringe a dígitos como el PIN: aquí caben un UID hex de MIFARE, el
+/// número grabado de un iButton y el código de barras de un badge de Odoo. Lo que sí se cierra es
+/// el conjunto de caracteres, porque lo que llega es una **ráfaga de teclado** de un dispositivo
+/// que nadie audita: un separador o un carácter de control colado ahí acabaría en la traza, y la
+/// traza es el motivo por el que existe esta credencial.
+fn clean_badge(value: &str) -> Result<String> {
+    let badge = value.trim();
+    if badge.is_empty() {
+        return Ok(String::new());
+    }
+    if !BADGE_LEN.contains(&badge.chars().count()) {
+        return Err(invalid("la placa debe tener entre 4 y 64 caracteres"));
+    }
+    if !badge
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(invalid(
+            "la placa solo admite letras, dígitos, `-` y `_`",
+        ));
+    }
+    Ok(badge.to_string())
+}
+
 /// Email: vacío u opcional con forma mínima válida (misma regla que el perfil propio).
 fn clean_email(value: &str) -> Result<String> {
     let email = value.trim();
@@ -391,6 +434,58 @@ async fn ensure_pin_is_free(
         ));
     }
     Ok(())
+}
+
+/// El gemelo de [`ensure_pin_is_free`] para la placa (hub#658), y por una razón más fuerte: un PIN
+/// se comparte contándolo, una tarjeta se comparte prestándola. Dos filas detrás de una placa
+/// harían que la traza —lo único que contesta «alguien usó mi tarjeta»— nombrase a quien la BD
+/// devolviese primero.
+async fn ensure_badge_is_free(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    badge: &str,
+    excluding_id: Option<&str>,
+) -> Result<()> {
+    if identity::badge_is_taken(db, hub_id, badge, excluding_id).await? {
+        return Err(reject(
+            "badge_in_use",
+            "another active user already carries this badge: a badge says who is at the till, so \
+             no two people can share one",
+        ));
+    }
+    Ok(())
+}
+
+/// Rechaza la edición que dejaría a alguien **con placa y sin ninguna otra puerta** (hub#658).
+///
+/// `pin`/`badge` son lo que trae la edición (`None` = no se toca); `current` es la fila tal y como
+/// está. El veredicto se emite sobre el estado RESULTANTE, que es lo que permite retirar la placa y
+/// el PIN en la misma edición —una persona que no inicia sesión es un registro legítimo— y lo que
+/// impide retirar solo el PIN.
+///
+/// El email cuenta como salida: quien entra con su cuenta de ERPlora conserva una puerta pase lo
+/// que pase con la tarjeta. La guarda es sobre el **respaldo**, no sobre el PIN.
+fn ensure_the_badge_is_not_the_only_way_in(
+    current: &HubUserRow,
+    pin: Option<&str>,
+    badge: Option<&str>,
+) -> Result<()> {
+    let will_have_badge = match badge {
+        Some(value) => !value.is_empty(),
+        None => current.has_badge,
+    };
+    let will_have_pin = match pin {
+        Some(value) => !value.is_empty(),
+        None => current.has_pin,
+    };
+    if !will_have_badge || will_have_pin || !current.email.trim().is_empty() {
+        return Ok(());
+    }
+    Err(reject(
+        "badge_without_fallback",
+        "a badge cannot be somebody's only way in: a lost card would lock them out of their own \
+         till. Keep their PIN, give them an account, or remove the badge as well.",
+    ))
 }
 
 /// Lo que hace admisible el alta de un **usuario LOCAL** (plan paso 2b, hub#355) — la casilla
@@ -556,6 +651,8 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
             "SELECT u.id AS id, u.name AS name, u.role AS role, u.cloud_user_id AS cloud_user_id, \
                     u.is_active AS is_active, u.created_at AS created_at, \
                     CASE WHEN u.pin_hash IS NULL OR u.pin_hash = '' THEN 0 ELSE 1 END AS has_pin, \
+                    CASE WHEN u.badge_hash IS NULL OR u.badge_hash = '' THEN 0 ELSE 1 END \
+                      AS has_badge, \
                     COALESCE(NULLIF(u.email, ''), p.email, '') AS email \
                FROM hub_user u \
                LEFT JOIN hub_user_profile p ON p.user_id = u.id AND p.hub_id = :hub_id \
@@ -585,6 +682,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
                 cloud_user_id: r["cloud_user_id"].as_str().map(ToString::to_string),
                 is_active: truthy(&r["is_active"]),
                 has_pin: truthy(&r["has_pin"]),
+                has_badge: truthy(&r["has_badge"]),
                 created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
             }
         })
@@ -630,6 +728,7 @@ pub async fn create(
     let name = clean_name(&input.name)?;
     let role = clean_role(&input.role)?;
     let pin = clean_pin(&input.pin)?;
+    let badge = clean_badge(&input.badge)?;
     let email = clean_email(&input.email)?;
     crate::roles::ensure_assignable(db, registry, hub_id, &role).await?;
     if input.local {
@@ -639,10 +738,14 @@ pub async fn create(
         ensure_name_is_free(db, hub_id, &name, None).await?;
     }
     ensure_pin_is_free(db, hub_id, &pin, None).await?;
+    ensure_badge_is_free(db, hub_id, &badge, None).await?;
 
     let id = identity::create_user(db, hub_id, &name, &pin, &role, None).await?;
     if !email.is_empty() {
         write_email(db, hub_id, &id, &name, &email).await?;
+    }
+    if !badge.is_empty() {
+        identity::set_badge(db, hub_id, &id, &badge).await?;
     }
     Ok(id)
 }
@@ -691,6 +794,10 @@ pub async fn update(
         Some(value) => Some(clean_pin(value)?),
         None => None,
     };
+    let badge = match &input.badge {
+        Some(value) => Some(clean_badge(value)?),
+        None => None,
+    };
     let is_active = input.is_active.unwrap_or(current.is_active);
     // El rol solo pasa por el catálogo cuando la edición lo CAMBIA (hub#352): revalidar el rol que
     // ya tenía la fila convertiría desinstalar un módulo en «este usuario ya no se puede editar»,
@@ -706,6 +813,16 @@ pub async fn update(
     if let Some(pin) = pin.as_deref() {
         ensure_pin_is_free(db, hub_id, pin, Some(user_id)).await?;
     }
+    // Y una placa nueva tiene que seguir siendo suya, por lo mismo (hub#658).
+    if let Some(badge) = badge.as_deref() {
+        ensure_badge_is_free(db, hub_id, badge, Some(user_id)).await?;
+    }
+    // **La placa nunca puede quedarse como la ÚNICA vía de entrada** (hub#658). Square directamente
+    // no lo permite, y el caso Lightspeed L-Series es por qué: una tarjeta que se pierde y ninguna
+    // otra puerta = una persona fuera de su propia caja, sin gesto en ninguna pantalla que la deje
+    // volver. El estado se juzga DESPUÉS de aplicar la edición —no campo a campo— para que quitar la
+    // placa y el PIN a la vez siga siendo legítimo: lo que se rechaza es el resultado.
+    ensure_the_badge_is_not_the_only_way_in(&current, pin.as_deref(), badge.as_deref())?;
     // Y un email nuevo tiene que seguir siendo suyo, por lo mismo (hub#356): mover el email de una
     // ficha al de otra dejaría dos filas peleándose por una sola membresía del SaaS, y el login por
     // email resolvería a la que devolviese primero la BD.
@@ -743,6 +860,12 @@ pub async fn update(
     }
     if let Some(pin) = pin {
         identity::set_pin(db, hub_id, user_id, &pin).await?;
+    }
+    // **Revocación independiente** (hub#658): esto escribe SOLO las columnas de la placa. Perder
+    // la tarjeta no puede dejar a nadie fuera, así que `badge: Some("")` la mata y el PIN de arriba
+    // sigue exactamente donde estaba.
+    if let Some(badge) = badge {
+        identity::set_badge(db, hub_id, user_id, &badge).await?;
     }
     // Desactivar cierra sus sesiones abiertas: la baja tiene que ser inmediata, no esperar al TTL.
     if !is_active {
