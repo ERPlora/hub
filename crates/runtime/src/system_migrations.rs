@@ -1609,6 +1609,47 @@ CREATE TABLE IF NOT EXISTS _print_route (\
   updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, document_type));",
     },
+    // ── v51 — hub#297: el techo de la factura SIMPLIFICADA, en la fila del régimen que lo impone ─
+    // La v27 dejó `_hub_fiscal_regime_registry` como **datos, no código**: qué régimen debe cada
+    // país. El techo de la simplificada es un dato del mismo tipo y de la misma fila —lo impone el
+    // régimen, no el runtime—, así que va aquí y no en un `match country_code` compilado. Francia
+    // el día que toque es una fila; una rebaja del importe es un `UPDATE`, no un despliegue.
+    //
+    // **`0` significa «este régimen NO pone techo», nunca «techo cero»** — y por eso la query lo
+    // devuelve como `null`. Un `0` que se leyera como importe pararía TODAS las ventas del hub, que
+    // es exactamente el fallo que un default numérico invita a cometer. Se elige `0` y no NULL en la
+    // columna por el contrato de fila (nada de NULLs: un tercer estado es una rama más por la que
+    // colarse); la traducción a `null` se hace una sola vez, en [`crate::fiscal_profile::limits`].
+    //
+    // **300000 = 3.000,00 € en céntimos, y NO son los 3.010,00 de `xsd.rs`.** El validador de red
+    // (§15.8, hub#964) valida contra el techo MÁS los 10,00 € de tolerancia, porque eso es lo que la
+    // AEAT rechaza de verdad. Lo que se publica aquí es el techo a secas: la tolerancia es holgura
+    // de redondeo de la agencia, no margen del comerciante, y un mostrador que se la gasta construye
+    // el producto sobre los decimales que la AEAT se guarda para sí. Dos capas, dos números, y
+    // ninguno enmascara al otro (el patrón de `print_queue.rs` con `DOCUMENT_TYPES`).
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS` + un `UPDATE` que solo escribe
+    // donde aún no hay valor. `tests/access_email_backfill.rs` rebobina la tabla de control y repite
+    // todas las migraciones posteriores sobre una BD que ya tiene los objetos; un `ADD COLUMN` pelado
+    // falla 42701. Y la guarda `= 0` del `UPDATE` es lo que impide que un rearranque le pise al
+    // comerciante un techo que él hubiera movido.
+    //
+    // ⚠️ **v51: el siguiente número POR ENCIMA DEL MÁXIMO, recomprobado en el rebase.** `apply`
+    // compara contra el MÁXIMO aplicado, así que un número repetido ABORTA el arranque (hub#573) de
+    // un hub ya desplegado y uno por debajo se salta EN SILENCIO. Comprobado contra TODAS las ramas
+    // remotas (solo `develop` llega a la v50) y contra los 10 worktrees locales de la flota. Los
+    // huecos v15/v20/v24 siguen libres e inalcanzables: cogerlos ES el fallo mudo que ya renumeró
+    // hub#341/#342/#470/#501.
+    SystemMigration {
+        version: 51,
+        name: "fiscal_regime_simplified_limit",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _hub_fiscal_regime_registry \
+  ADD COLUMN IF NOT EXISTS simplified_invoice_max_cents BIGINT NOT NULL DEFAULT 0;\
+UPDATE _hub_fiscal_regime_registry SET simplified_invoice_max_cents = 300000 \
+  WHERE country_code = 'ES' AND regime_key = 'verifactu' AND simplified_invoice_max_cents = 0;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
