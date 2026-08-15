@@ -13,7 +13,8 @@
 use std::collections::BTreeSet;
 
 use erplora_runtime::flows::def::{
-    AiPolicy, Op, StepKind, TriggerKind, DEFAULT_MAX_ITERS, MAX_ITERS_CAP, SCHEMA_VERSION,
+    AiPolicy, Op, QueryResult, StepKind, TriggerKind, DEFAULT_MAX_ITERS, MAX_ITERS_CAP,
+    MAX_QUERY_ROWS, SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::Channel;
 
@@ -50,7 +51,7 @@ fn keys_at(schema: &serde_json::Value, pointer: &str) -> BTreeSet<String> {
 }
 
 #[test]
-fn the_step_kinds_are_the_same_six_on_both_sides() {
+fn the_step_kinds_are_the_same_on_both_sides() {
     let declared = enum_at(&schema(), "/$defs/step/properties/kind");
     let known: BTreeSet<String> = StepKind::ALL
         .iter()
@@ -87,6 +88,69 @@ fn the_keys_of_an_http_step_are_declared_on_both_sides() {
         }]
     }));
     assert!(accepted.is_ok(), "{accepted:?}");
+}
+
+/// hub#954 — the `query` step. Three halves have to agree, and each for its own reason:
+///
+/// - the **keys**, because the runtime refuses one it does not know;
+/// - the **`result` vocabulary**, because `rows` is the value everybody will reach for and it is
+///   deliberately absent from v1 (the mapping language cannot index an array), so a schema that
+///   offered it would have an editor saving a mapping the kernel resolves to nothing;
+/// - the **ceiling**, because the runtime REFUSES above it instead of clamping, and a schema that
+///   allowed more would move that refusal from the editor to a background tick at 3 AM.
+#[test]
+fn the_query_step_is_declared_with_the_same_ceiling_and_the_same_result_shapes() {
+    let schema = schema();
+    let declared = keys_at(&schema, "/$defs/step/properties");
+    for key in ["query", "params", "result", "limit"] {
+        assert!(
+            declared.contains(key),
+            "the schema must declare `{key}` of a `query` step; it has {declared:?}"
+        );
+    }
+
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/result"),
+        QueryResult::ALL
+            .iter()
+            .map(|r| r.as_str().to_string())
+            .collect::<BTreeSet<String>>(),
+        "`rows` is not in v1 on either side: `resolve_path` cannot walk `steps.x.rows.0.total`, \
+         and a mapping the kernel resolves to nothing is a lie the editor would help write"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/result/default"),
+        Some(&serde_json::json!(QueryResult::First.as_str()))
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/limit/maximum"),
+        Some(&serde_json::json!(MAX_QUERY_ROWS)),
+        "the runtime refuses above the ceiling; a schema that allowed more would move that \
+         refusal off the screen where it was typed"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/limit/minimum"),
+        Some(&serde_json::json!(1))
+    );
+
+    // And the runtime really does accept exactly these keys, and really does refuse a bigger read.
+    let step = |extra: serde_json::Value| {
+        let mut base = serde_json::json!({
+            "id": "week", "kind": "query", "query": "sales.summary",
+            "params": { "from": "input.from" }
+        });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(step(serde_json::json!({ "result": "first", "limit": 50 })).is_ok());
+    assert!(step(serde_json::json!({ "result": "count" })).is_ok());
+    assert!(step(serde_json::json!({ "result": "rows" })).is_err());
+    assert!(step(serde_json::json!({ "limit": MAX_QUERY_ROWS + 1 })).is_err());
 }
 
 #[test]

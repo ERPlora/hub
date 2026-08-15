@@ -138,6 +138,25 @@ fn check_commands(registry: &Registry, def: &FlowDefinition) -> Result<()> {
     Ok(())
 }
 
+/// **The save-time half of hub#954.** A `query` step naming a read the registry does not have is
+/// a step this hub can never perform, so it is refused here rather than stored to fail at 3 AM.
+///
+/// It is deliberately STRICTER than [`check_commands`], and the asymmetry is the same one
+/// `grants::replace` already draws: an unknown command is forgiven there because a `command` step
+/// may name a module that is not installed yet and the grant is what actually opens the door,
+/// while an unknown QUERY is refused because a grant naming nothing reads like a permission and is
+/// not one. A step naming nothing reads like a read and is not one either.
+fn check_queries(registry: &Registry, def: &FlowDefinition) -> Result<()> {
+    for step in &def.steps {
+        if let StepSpec::Query(spec) = &step.spec {
+            if registry.get_query(&spec.query).is_none() {
+                return Err(RuntimeError::QueryNotFound(spec.query.clone()));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn create(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -149,6 +168,7 @@ pub async fn create(
     // instead of at the screen where it was written.
     let def = FlowDefinition::parse(&new.definition)?;
     check_commands(registry, &def)?;
+    check_queries(registry, &def)?;
     let id = new_id();
     let now = now_rfc3339();
     let mut p = Params::new();
@@ -182,6 +202,7 @@ pub async fn update(
 ) -> Result<Flow> {
     let def = FlowDefinition::parse(&new.definition)?;
     check_commands(registry, &def)?;
+    check_queries(registry, &def)?;
     get(db, hub_id, id).await?; // 404 before mutating, and scoped to this hub.
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
@@ -958,6 +979,44 @@ mod tests {
             .as_str()
             .unwrap()
             .to_string()
+    }
+
+    /// **hub#954** — a `query` step naming a read that does not exist is refused AT SAVE, the same
+    /// rule a `query` grant follows (`grants::replace`): a grant naming nothing reads like a
+    /// permission and is not one, and a step naming nothing reads like a read and is not one
+    /// either. Stored, it would be a flow that fails at 3 AM instead of on the screen.
+    #[tokio::test]
+    async fn a_query_step_naming_a_read_that_does_not_exist_is_refused_at_save() {
+        let db = db().await;
+        let mut reg = registry();
+        reg.queries.insert(
+            "sales.summary".into(),
+            test_support::query("sales", "sales.view_sale", "SELECT 1 AS n"),
+        );
+
+        let flow = |query: &str| NewFlow {
+            name: "Report".into(),
+            enabled: true,
+            definition: json!({
+                "schema_version": 1,
+                "steps": [{ "id": "week", "kind": "query", "query": query }]
+            }),
+        };
+
+        let err = create(&db, HUB, &reg, &flow("sales.nope"), "hub_user:1")
+            .await
+            .expect_err("a read nothing performs is refused where it was typed");
+        assert!(format!("{err}").contains("sales.nope"), "{err}");
+
+        // …and the one that does exist saves.
+        let ok = create(&db, HUB, &reg, &flow("sales.summary"), "hub_user:1")
+            .await
+            .unwrap();
+        // The same rule on the way back in.
+        let err = update(&db, HUB, &ok.id, &reg, &flow("sales.nope"), "hub_user:1")
+            .await
+            .expect_err("an update is a save too");
+        assert!(format!("{err}").contains("sales.nope"), "{err}");
     }
 
     #[tokio::test]

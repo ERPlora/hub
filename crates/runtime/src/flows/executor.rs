@@ -37,7 +37,7 @@ use crate::commands::{self, Origin};
 use crate::errors::{Result, RuntimeError};
 use crate::flows::def::{self, FlowDefinition, StepDef, StepSpec};
 use crate::flows::http::HttpRequest;
-use crate::flows::{grants, http, notify, store, triggers};
+use crate::flows::{grants, http, notify, query, store, triggers};
 use crate::registry::{new_id, now_rfc3339, AutomationCtx, Registry, RequestContext};
 
 /// How many runs one tick advances. The tick happens every second, so this is a throughput knob,
@@ -383,6 +383,41 @@ async fn run_step(
             } else {
                 Outcome::Stopped
             })
+        }
+
+        // **A read the flow performs itself** (hub#954). Like `condition`, it does no I/O and does
+        // not cross the `PendingIo` seam: it is a local `SELECT` with the flow's own context, and
+        // the ceiling on its rows is what keeps it a step the tick can afford under the global
+        // lock.
+        //
+        // It writes NOTHING, and that is why it needs no `committed` window the way a `command`
+        // does: a run reclaimed after an expired lease simply reads again, which is safe by
+        // construction (flows.md §13.4 is about writes).
+        StepSpec::Query(_) => {
+            match query::run(db, registry, hub_id, flow_id, run_id, step, scope).await {
+                Ok(query::Read {
+                    recorded_input,
+                    output,
+                }) => {
+                    write_step(
+                        db, hub_id, run_id, index, step, STEP_DONE, &recorded_input, &output, "",
+                        &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Continue { output })
+                }
+                Err(e) => {
+                    // Denied, or a read that failed. Nothing was written by it either way, and
+                    // the run says why at the step instead of carrying a null forward.
+                    let error = format!("step `{}`: {}", step.id, error_text(&e));
+                    write_step(
+                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
+                        &error, &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Failed { error })
+                }
+            }
         }
 
         StepSpec::Delay { seconds, until } => {
@@ -1074,6 +1109,16 @@ mod tests {
                 vec![],
             ),
         );
+        // The read a `query` step performs (hub#954). Same module, same permission: what opens it
+        // for a flow is the grant, not the role of whoever wrote the flow.
+        reg.queries.insert(
+            "notes.note.find".into(),
+            test_support::query(
+                "notes",
+                "notes.view_note",
+                "SELECT id, text FROM note WHERE text = :text ORDER BY id",
+            ),
+        );
         reg
     }
 
@@ -1255,6 +1300,156 @@ mod tests {
         assert_eq!(steps.len(), 3);
         assert_eq!(steps[0].status, "done");
         assert!(steps[0].output.get("ok").is_some(), "the output is kept: {:?}", steps[0].output);
+    }
+
+    // ── the `query` step, end to end (hub#954) ────────────────────────────────────────────────
+
+    /// The whole point of the step: a later step maps a value the flow READ, with no model in the
+    /// middle. The read is a field at the root of `steps.<id>` because that is the only shape the
+    /// mapping language can walk.
+    #[tokio::test]
+    async fn a_query_step_reads_and_the_next_step_maps_what_it_found() {
+        let db = db().await;
+        let flow_id = flow(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "write", "kind": "command", "command": "notes.note.add",
+                      "params": { "text": "one" } },
+                    { "id": "look", "kind": "query", "query": "notes.note.find",
+                      "params": { "text": "one" } },
+                    { "id": "guard", "kind": "condition",
+                      "when": { "steps.look.found": { "eq": true } } },
+                    { "id": "echo", "kind": "command", "command": "notes.note.add",
+                      "params": { "text": "seen {{steps.look.text}} x{{steps.look.count}}" } }
+                ]
+            }),
+        )
+        .await;
+        grants::replace(
+            &db,
+            HUB,
+            &flow_id,
+            &registry(),
+            &[
+                (GrantKind::Command, "notes.note.add".to_string()),
+                (GrantKind::Query, "notes.note.find".to_string()),
+            ],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        assert_eq!(notes(&db).await, vec!["one", "seen one x1"]);
+        let run = run_of(&db, &flow_id).await;
+        assert_eq!(run.status, store::STATUS_DONE, "{}", run.last_error);
+        let (_, steps) = store::get_run(&db, HUB, &run.id).await.unwrap();
+        assert_eq!(steps[1].kind, "query");
+        assert_eq!(steps[1].status, "done");
+        assert_eq!(steps[1].output["found"], json!(true));
+        assert_eq!(steps[1].output["count"], json!(1));
+        assert_eq!(
+            steps[1].input["query"],
+            json!("notes.note.find"),
+            "the history says which read was performed: {:?}",
+            steps[1].input
+        );
+    }
+
+    /// A read nobody granted does not happen, and the run stops there saying so — the same default
+    /// answer a `command` step gets. The grant is re-read at the instant of the read, so revoking
+    /// it mid-run is what stops the next step.
+    #[tokio::test]
+    async fn without_a_query_grant_nothing_is_read_and_the_run_fails_naming_it() {
+        let db = db().await;
+        let flow_id = flow(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "look", "kind": "query", "query": "notes.note.find",
+                      "params": { "text": "one" } },
+                    { "id": "echo", "kind": "command", "command": "notes.note.add",
+                      "params": { "text": "should not happen" } }
+                ]
+            }),
+        )
+        .await;
+        // The COMMAND is granted and the read is not: the refusal is about the read.
+        grant(&db, &flow_id, "notes.note.add").await;
+
+        store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        assert!(notes(&db).await.is_empty(), "the run stopped at the read");
+        let run = run_of(&db, &flow_id).await;
+        assert_eq!(run.status, store::STATUS_FAILED);
+        assert!(
+            run.last_error.contains(grants::ERR_GRANT_DENIED)
+                && run.last_error.contains("notes.note.find"),
+            "the failure names the missing grant: {}",
+            run.last_error
+        );
+    }
+
+    /// Zero rows is a fact, not a failure: the run carries on and a `condition` decides. That is
+    /// what makes «avísame SI hay stock bajo» writable — Zapier resolves the same case with a
+    /// Filter, and the step that failed on empty would make the sentence impossible.
+    #[tokio::test]
+    async fn a_read_that_finds_nothing_lets_a_condition_decide_instead_of_failing() {
+        let db = db().await;
+        let flow_id = flow(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "look", "kind": "query", "query": "notes.note.find",
+                      "params": { "text": "nobody" }, "result": "count" },
+                    { "id": "guard", "kind": "condition",
+                      "when": { "steps.look.found": { "eq": true } } },
+                    { "id": "echo", "kind": "command", "command": "notes.note.add",
+                      "params": { "text": "found something" } }
+                ]
+            }),
+        )
+        .await;
+        grants::replace(
+            &db,
+            HUB,
+            &flow_id,
+            &registry(),
+            &[
+                (GrantKind::Command, "notes.note.add".to_string()),
+                (GrantKind::Query, "notes.note.find".to_string()),
+            ],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        assert!(notes(&db).await.is_empty(), "the guard stopped it, the read did not");
+        let run = run_of(&db, &flow_id).await;
+        assert_eq!(
+            run.status,
+            store::STATUS_DONE,
+            "an empty read is the flow working: {}",
+            run.last_error
+        );
+        let (_, steps) = store::get_run(&db, HUB, &run.id).await.unwrap();
+        assert_eq!(steps[0].output, json!({ "count": 0, "found": false }));
     }
 
     #[tokio::test]
