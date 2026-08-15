@@ -243,7 +243,7 @@ async fn a_proposal_inside_its_window_is_left_alone_and_can_still_be_decided() {
         run_of(&rt, &flow_id).await.status,
         store::STATUS_WAITING_APPROVAL
     );
-    rt.decide_flow_approval(&approval.id, true, "hub_user:owner")
+    rt.decide_flow_approval(&approval.id, true, "hub_user:owner", "")
         .await
         .expect("the sweep did not burn a decidable proposal");
     assert_eq!(notes(&rt).await, vec!["the proposed note"]);
@@ -304,7 +304,7 @@ async fn a_swept_proposal_is_still_refused_as_expired_and_not_as_already_decided
 
     for approve in [true, false] {
         let err = rt
-            .decide_flow_approval(&approval.id, approve, "hub_user:owner")
+            .decide_flow_approval(&approval.id, approve, "hub_user:owner", "")
             .await
             .expect_err("an expired proposal is not decidable");
         match err {

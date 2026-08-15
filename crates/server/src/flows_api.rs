@@ -87,8 +87,9 @@ fn bad_request(code: &str, message: &str) -> Response {
 ///
 /// …and four exceptions ahead of the rule, each one a status the family default would get wrong:
 ///
-/// - **403** for the two refusals by authority (`grant_denied`, `internal_command` — the latter
-///   with the same status the dispatcher gives `RuntimeError::InternalCommand`);
+/// - **403** for the three refusals by authority (`grant_denied`, `internal_command` — the latter
+///   with the same status the dispatcher gives `RuntimeError::InternalCommand` — and
+///   `approval_not_yours`, hub#950: authenticated, just not who the question was addressed to);
 /// - **409** for the real conflicts, the ones `409` was always for: the request is well formed, the
 ///   caller is allowed, and the STATE says no;
 /// - **409** for `secrets_key_missing` — this hub is not set up to hold secrets, the same shape as
@@ -112,7 +113,12 @@ fn flow_status(code: &str) -> Option<StatusCode> {
         return None;
     }
     let status = match code {
-        grants::ERR_GRANT_DENIED | grants::ERR_INTERNAL_COMMAND => StatusCode::FORBIDDEN,
+        // …and the third refusal by authority (hub#950): the caller authenticated, and is simply
+        // not who the question was addressed to. `403` and not `409`: the state is fine, the
+        // person is not the one who may change it.
+        grants::ERR_GRANT_DENIED
+        | grants::ERR_INTERNAL_COMMAND
+        | approvals::ERR_APPROVAL_NOT_YOURS => StatusCode::FORBIDDEN,
         approvals::ERR_APPROVAL_ALREADY_DECIDED
         | approvals::ERR_APPROVAL_EXPIRED
         | store::ERR_FLOW_DELETED
@@ -597,8 +603,9 @@ pub async fn approve(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    body: Option<Json<Value>>,
 ) -> Response {
-    decide(st, headers, id, true).await
+    decide(st, headers, id, true, comment_of(body)).await
 }
 
 /// `POST /api/hub/flows/approvals/{id}/reject` — nothing runs, and the run stops: the steps written
@@ -607,14 +614,32 @@ pub async fn reject(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    body: Option<Json<Value>>,
 ) -> Response {
-    decide(st, headers, id, false).await
+    decide(st, headers, id, false, comment_of(body)).await
 }
 
-async fn decide(st: AppState, headers: HeaderMap, id: String, approve: bool) -> Response {
+/// The optional `{"comment": "…"}` (hub#950) — what the person typed while deciding, which ends up
+/// on the row and in `steps.<id>.comment`.
+///
+/// `Option<Json<Value>>` because these two routes have always been called with **no body at all**,
+/// and a required extractor would answer `400` to every existing caller. Anything that is not a
+/// string is the empty comment: a decision must never fail over the note attached to it.
+fn comment_of(body: Option<Json<Value>>) -> String {
+    body.and_then(|Json(v)| v.get("comment").and_then(|c| c.as_str()).map(str::to_string))
+        .unwrap_or_default()
+}
+
+async fn decide(
+    st: AppState,
+    headers: HeaderMap,
+    id: String,
+    approve: bool,
+    comment: String,
+) -> Response {
     let (arc, who) = admin_session!(st, headers);
     let rt = arc.lock().await;
-    match rt.decide_flow_approval(&id, approve, &who).await {
+    match rt.decide_flow_approval(&id, approve, &who, &comment).await {
         Ok(approval) => Json(json!({ "ok": true, "data": approval })).into_response(),
         Err(e) => flow_err(e),
     }

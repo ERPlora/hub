@@ -1510,6 +1510,56 @@ ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS credential_ref TEXT NOT NULL DE
 ALTER TABLE _elevation_audit ADD COLUMN IF NOT EXISTS credential_kind TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _elevation_audit ADD COLUMN IF NOT EXISTS credential_ref TEXT NOT NULL DEFAULT '';",
     },
+    // ── v49 — hub#950: `_flow_approvals` deja de ser «lo que propuso un modelo» ────────────────
+    // La tabla nació para UNA cosa: la escritura que propone un step `ai` y que espera a que
+    // alguien la apruebe (v38). El step `approval` genérico necesita exactamente la misma fila —
+    // la misma bandeja, la misma regla de idempotencia, el mismo barrido de caducidad, la misma
+    // auditoría de quién decidió— pero SIN command que ejecutar: lo que se aprueba es una
+    // pregunta, y el trabajo lo hace el step siguiente.
+    //
+    // Se GENERALIZA la fila, no se bifurca la tabla. Una segunda tabla habría duplicado las cinco
+    // cosas de arriba para que difiriera una: qué ejecuta «aprobar». Eso es un `kind` y una rama
+    // en un método, no un esquema paralelo que se desincroniza a la primera corrección.
+    //
+    // - **`kind`** (`'command' | 'decision'`) — con DEFAULT `'command'`, que es lo que TODAS las
+    //   filas ya escritas son. Un default `'decision'` convertiría un `payload` guardado en una
+    //   pregunta que no ejecuta nada, tirando en silencio la escritura que alguien aprobó.
+    // - **`title` / `summary`** — la pregunta, YA TEMPLADA al crearla. Es la propiedad que hace
+    //   que editar el flujo no mute una solicitud viva, igual que el `payload` se guarda en vez de
+    //   re-derivarse: lo que lee la persona a las 9 es lo que se escribió a las 3.
+    // - **`assignee_role`** — un ROL, nunca una persona (el `Allowed Group` de Odoo). Nombrar a
+    //   alguien en un documento se rompe el día que se va, que es el agujero que Business Central
+    //   tuvo que parchear inventando el «sustituto».
+    // - **`comment`** — lo que tecleó quien decidió. Es media auditoría y es uno de los cuatro
+    //   campos que el step deja en `steps.<id>` para los pasos siguientes.
+    // - **`on_reject`** — qué le cuesta al run un «no», por el MISMO motivo que `on_expire` (v45)
+    //   es columna: la respuesta es de quien escribió el flujo y tiene que ser la que estaba en
+    //   vigor cuando se hizo la pregunta. `'cancel'` por defecto = lo que un rechazo hace hoy.
+    // - **`command` pasa a tener DEFAULT `''`** — una `decision` no ejecuta nada, y «vacío» es
+    //   cómo se dice eso. Se deja `NOT NULL`: un `NULL` sería un tercer estado que nadie lee.
+    //
+    // Aditiva y re-ejecutable (`ADD COLUMN IF NOT EXISTS`), sin backfill: los DEFAULT dejan a las
+    // filas existentes exactamente como ya son — propuestas de un modelo, sin pregunta, sin rol y
+    // canceladas al rechazarlas.
+    //
+    // ⚠️ **El número es DECLARADO, no la posición en el slice**, y hay varias ramas de flujos a la
+    // vez queriendo número (la v45 nació v45, la v46 nació v45 y la v48 dejó un hueco a propósito
+    // por esto mismo). Recomprobado contra `origin/develop` justo antes de empujar: máximo v48
+    // (`hub_user_badge_credential`, hub#658). Una versión en o por debajo del máximo ya aplicado
+    // ABORTA el arranque (hub#573), y para cuando se nota el hub ya lleva el número más alto.
+    SystemMigration {
+        version: 49,
+        name: "flow_approval_generic_decision",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'command';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS assignee_role TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS comment TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS on_reject TEXT NOT NULL DEFAULT 'cancel';\
+ALTER TABLE _flow_approvals ALTER COLUMN command SET DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3331,6 +3381,10 @@ mod kind_contract_tests {
         // así que el hueco duró lo que duró el rebase. Es la lección de la v46 (que nació como v45 y
         // chocó) aplicada **por delante** en vez de por detrás: un hueco no se puede coger por
         // accidente, un número repetido sí, y ese aborta el arranque de un hub ya desplegado.
-        assert_eq!(MIGRATIONS.len(), 45, "el catálogo cambió de tamaño");
+        // + `flow_approval_generic_decision` (v49, hub#950): `_flow_approvals` deja de ser solo
+        // «lo que propuso un modelo» y gana `kind`, la pregunta ya templada (`title`/`summary`),
+        // el rol que puede contestarla, el comentario de quien decidió y `on_reject`. Se
+        // generaliza la fila; no se bifurca la tabla.
+        assert_eq!(MIGRATIONS.len(), 46, "el catálogo cambió de tamaño");
     }
 }

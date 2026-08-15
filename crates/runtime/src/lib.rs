@@ -2338,6 +2338,60 @@ impl Runtime {
         flows::approvals::get(self.db.as_ref(), &self.hub_id, id).await
     }
 
+    /// **Who may answer this question** (hub#950), resolved server-side at the moment of deciding
+    /// and never taken from the request.
+    ///
+    /// The document names a **role** — Odoo's `Allowed Group` — because naming a person is a flow
+    /// that stops working the day they leave, the hole Business Central had to invent a
+    /// "substitute" for. An empty role means what the tray has always meant: whoever administers
+    /// the hub.
+    ///
+    /// **An administrator always counts**, even when another role was named, and that is the
+    /// deliberate half. The alternative is a question that becomes undecidable the day its role has
+    /// nobody left in it — no approve, no reject, and a run parked until the sweep: the orphaned
+    /// approval every Power Automate forum is full of and that hub#979 exists to stop. It is also
+    /// what Business Central's *approval administrator* and Salesforce's delegated approver are
+    /// for. Delegation proper (BC's `Delegate After`) is out of v1.
+    ///
+    /// The role is read from `hub_user` by the id inside `decided_by`, so it is this hub's current
+    /// answer and not whatever a session claimed when it was opened.
+    async fn ensure_may_decide(&self, approval: &flows::Approval, decided_by: &str) -> Result<()> {
+        if approval.assignee_role.trim().is_empty() {
+            return Ok(());
+        }
+        let user_id = decided_by.strip_prefix("hub_user:").unwrap_or(decided_by);
+        let role = hub_users::get(self.db.as_ref(), &self.hub_id, user_id)
+            .await?
+            .map(|u| u.role)
+            .unwrap_or_default();
+        if role.eq_ignore_ascii_case(approval.assignee_role.trim())
+            || hub_users::is_admin_role(&role)
+        {
+            return Ok(());
+        }
+        Err(RuntimeError::Domain {
+            code: flows::approvals::ERR_APPROVAL_NOT_YOURS.to_string(),
+            message: format!(
+                "this approval is addressed to `{}` and `{decided_by}` is `{}`; nothing was \
+                 decided and the question is still waiting for somebody who may answer it",
+                approval.assignee_role,
+                if role.is_empty() { "unknown" } else { &role }
+            ),
+        })
+    }
+
+    /// What an `approval` step leaves in `steps.<id>` — the four fields the steps written after it
+    /// read, and the reason the three branches of the original contract compose out of a LINEAR
+    /// document: `condition` on `steps.approve.decision` IS the branch.
+    fn decision_output(&self, decided: &flows::Approval) -> Json {
+        json!({
+            "decision": decided.status,
+            "decided_by": decided.decided_by,
+            "decided_at": decided.decided_at.clone().unwrap_or_default(),
+            "comment": decided.comment,
+        })
+    }
+
     pub async fn list_flow_approvals(
         &self,
         status: Option<&str>,
@@ -2362,31 +2416,80 @@ impl Runtime {
     ///
     /// `decided_by` is the caller's job to resolve from the SESSION; this method never reads it
     /// from a body (same rule as `discarded_by` in `outbox_admin.rs`).
+    ///
+    /// **Two kinds go through here** since hub#950, and the branch is the row's (`kind`), never the
+    /// caller's: a `command` is a write a model proposed and approving RUNS it; a `decision` is a
+    /// question an `approval` step asked, and approving runs **nothing** — it records an answer and
+    /// lets the run carry on to the step that does the work. Everything around that one difference
+    /// is shared on purpose: one tray, one «decided once» rule, one expiry sweep, one audit.
     pub async fn decide_flow_approval(
         &self,
         id: &str,
         approve: bool,
         decided_by: &str,
+        comment: &str,
     ) -> Result<flows::Approval> {
+        // **Who, before what.** The role is checked against the row as it stands and BEFORE
+        // `claim_pending`, so somebody this question was not addressed to gets `not_yours` rather
+        // than «already decided by Marta at 04:12» — an authorisation failure must not be a way to
+        // read the row it refuses. Today the HTTP tray is admin-only and both callers would see
+        // that anyway; the day the module `flows` opens the tray to the role that was named, this
+        // order is what stops it being a disclosure.
+        let approval = self.get_flow_approval(id).await?;
+        self.ensure_may_decide(&approval, decided_by).await?;
         let approval = flows::approvals::claim_pending(self.db.as_ref(), &self.hub_id, id).await?;
 
         if !approve {
-            let decided = flows::approvals::mark_decided(
+            let decided = flows::approvals::mark_decided_with_comment(
                 self.db.as_ref(),
                 &self.hub_id,
                 id,
                 flows::approvals::STATUS_REJECTED,
                 decided_by,
                 "",
+                comment,
+            )
+            .await?;
+            // **What a refusal costs is the ROW's answer, not this method's** (hub#950). For a
+            // model's proposal it is always `cancel`, which is exactly what a rejection has always
+            // done; for an `approval` step the document chose, and `continue` is what makes the
+            // «rejected» branch composable out of a linear document.
+            let result = match flows::approvals::RejectPolicy::parse(&approval.on_reject) {
+                flows::approvals::RejectPolicy::Continue => {
+                    flows::IoResult::Done(self.decision_output(&decided))
+                }
+                flows::approvals::RejectPolicy::Cancel => flows::IoResult::Cancelled(
+                    if approval.kind == flows::approvals::KIND_DECISION {
+                        format!("`{}` was rejected by `{decided_by}`", approval.title)
+                    } else {
+                        format!("`{}` was rejected by `{decided_by}`", approval.command)
+                    },
+                ),
+            };
+            self.complete_flow_io(&approval.run_id, &approval.step_id, result)
+                .await?;
+            return Ok(decided);
+        }
+
+        // **A decision executes nothing.** No grant is re-checked because none was ever spent: the
+        // step asked a question, and the write — if there is one — is a later step with its own
+        // grant, re-read when the tick reaches it. Putting a grant check here would gate the
+        // ANSWER on a capability the answer does not use.
+        if approval.kind == flows::approvals::KIND_DECISION {
+            let decided = flows::approvals::mark_decided_with_comment(
+                self.db.as_ref(),
+                &self.hub_id,
+                id,
+                flows::approvals::STATUS_APPROVED,
+                decided_by,
+                "",
+                comment,
             )
             .await?;
             self.complete_flow_io(
                 &approval.run_id,
                 &approval.step_id,
-                flows::IoResult::Cancelled(format!(
-                    "`{}` was rejected by `{decided_by}`",
-                    approval.command
-                )),
+                flows::IoResult::Done(self.decision_output(&decided)),
             )
             .await?;
             return Ok(decided);
@@ -2450,13 +2553,14 @@ impl Runtime {
 
         match outcome {
             Ok(result) => {
-                let decided = flows::approvals::mark_decided(
+                let decided = flows::approvals::mark_decided_with_comment(
                     self.db.as_ref(),
                     &self.hub_id,
                     id,
                     flows::approvals::STATUS_APPROVED,
                     decided_by,
                     "",
+                    comment,
                 )
                 .await?;
                 // The step's output is the WHOLE turn: what the model produced before it
@@ -2480,13 +2584,14 @@ impl Runtime {
                 // The person DID approve; what broke is the command. Both facts are recorded, and
                 // the error is returned so the tray shows a failure instead of a green tick.
                 let message = format!("{e}");
-                flows::approvals::mark_decided(
+                flows::approvals::mark_decided_with_comment(
                     self.db.as_ref(),
                     &self.hub_id,
                     id,
                     flows::approvals::STATUS_APPROVED,
                     decided_by,
                     &message,
+                    comment,
                 )
                 .await?;
                 self.complete_flow_io(
@@ -2536,22 +2641,40 @@ impl Runtime {
         for approval in &swept {
             report.expired += 1;
             let resumed = matches!(approval.on_expire, flows::approvals::ExpiryPolicy::Continue);
+            let is_decision = approval.kind == flows::approvals::KIND_DECISION;
+            // A question has no command to name; what it had was a title, and the sweep brings it
+            // back with the row.
+            let subject = if is_decision {
+                approval.title.clone()
+            } else {
+                approval.command.clone()
+            };
             let result = if resumed {
-                // The turn's own output is kept and closed with how it ended — the same shape
-                // an approved proposal leaves, so `steps.<id>.status` answers the question
-                // «what happened here?» whichever way it went.
-                let mut output = self.parked_step_output(&approval.run_id).await;
-                if let Some(map) = output.as_object_mut() {
-                    map.insert("status".into(), json!(flows::approvals::STATUS_EXPIRED));
-                    map.insert("approval_id".into(), json!(approval.id));
-                    map.insert("command".into(), json!(approval.command));
-                }
+                // **The two kinds leave a different shape**, and each is the shape its step's
+                // readers already know. A `decision` leaves the same four fields it would have
+                // left had somebody answered — so `steps.<id>.decision` reads `expired` and the
+                // `condition` after it is n8n's «no answer» path. A model's turn keeps its own
+                // output, closed with how it ended.
+                let output = if is_decision {
+                    json!({
+                        "decision": flows::approvals::STATUS_EXPIRED,
+                        "decided_by": flows::approvals::DECIDED_BY_EXPIRY,
+                        "decided_at": approval.expires_at,
+                        "comment": "",
+                    })
+                } else {
+                    let mut output = self.parked_step_output(&approval.run_id).await;
+                    if let Some(map) = output.as_object_mut() {
+                        map.insert("status".into(), json!(flows::approvals::STATUS_EXPIRED));
+                        map.insert("approval_id".into(), json!(approval.id));
+                        map.insert("command".into(), json!(approval.command));
+                    }
+                    output
+                };
                 flows::IoResult::Done(output)
             } else {
                 flows::IoResult::Cancelled(format!(
-                    "`{}` was never decided: the proposal expired at {} and `on_expire` is \
-                     `{}`",
-                    approval.command,
+                    "`{subject}` was never decided: it expired at {} and `on_expire` is `{}`",
                     approval.expires_at,
                     approval.on_expire.as_str()
                 ))

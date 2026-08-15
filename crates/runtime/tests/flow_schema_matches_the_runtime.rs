@@ -12,9 +12,10 @@
 //! This file is the seam. Change one side without the other and it goes red, naming the value.
 use std::collections::BTreeSet;
 
+use erplora_runtime::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use erplora_runtime::flows::def::{
-    AiPolicy, Op, QueryResult, StepKind, TriggerKind, DEFAULT_MAX_ITERS, MAX_ITERS_CAP,
-    MAX_QUERY_ROWS, SCHEMA_VERSION,
+    AiPolicy, Op, QueryResult, StepKind, TriggerKind, DEFAULT_APPROVAL_TTL_SECONDS,
+    DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_ITERS_CAP, MAX_QUERY_ROWS, SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::Channel;
 
@@ -151,6 +152,97 @@ fn the_query_step_is_declared_with_the_same_ceiling_and_the_same_result_shapes()
     assert!(step(serde_json::json!({ "result": "count" })).is_ok());
     assert!(step(serde_json::json!({ "result": "rows" })).is_err());
     assert!(step(serde_json::json!({ "limit": MAX_QUERY_ROWS + 1 })).is_err());
+}
+
+/// hub#950 — the `approval` step, the eighth kind. Three halves have to agree:
+///
+/// - the **keys**, because the runtime refuses one it does not know;
+/// - the **two policy vocabularies**, because they are what a document says should happen when the
+///   answer is «no» or when there is no answer at all — a schema offering a value the hub degrades
+///   to something else would have an editor promising a branch the kernel will not take;
+/// - the **ceiling on `expires_in`**, because the runtime REFUSES above it instead of clamping, and
+///   a schema that allowed a year would move that refusal from the editor to a sweep at 3 AM.
+#[test]
+fn the_approval_step_is_declared_with_the_same_policies_and_the_same_ceiling() {
+    let schema = schema();
+    let declared = keys_at(&schema, "/$defs/step/properties");
+    for key in ["title", "summary", "assignee", "expires_in", "on_expire", "on_reject"] {
+        assert!(
+            declared.contains(key),
+            "the schema must declare `{key}` of an `approval` step; it has {declared:?}"
+        );
+    }
+
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/on_expire"),
+        ExpiryPolicy::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect::<BTreeSet<String>>()
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/on_expire/default"),
+        Some(&serde_json::json!(ExpiryPolicy::Reject.as_str())),
+        "silence is read as a refusal, because the steps after an approval assumed it was granted"
+    );
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/on_reject"),
+        RejectPolicy::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect::<BTreeSet<String>>()
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/on_reject/default"),
+        Some(&serde_json::json!(RejectPolicy::Cancel.as_str()))
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/expires_in/maximum"),
+        Some(&serde_json::json!(MAX_APPROVAL_TTL_SECONDS))
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/expires_in/default"),
+        Some(&serde_json::json!(DEFAULT_APPROVAL_TTL_SECONDS))
+    );
+
+    // The assignee is a ROLE and there is no shape in which a person can be named — the same
+    // closed-object property that makes a `notify` recipient impossible to write by hand.
+    assert_eq!(
+        keys_at(&schema, "/$defs/assignee/properties"),
+        BTreeSet::from(["role".to_string()])
+    );
+    assert_eq!(
+        schema
+            .pointer("/$defs/assignee/additionalProperties")
+            .and_then(|v| v.as_bool()),
+        Some(false),
+        "an extra key in `assignee` is refused on both sides: that object is the only way a \
+         question names who may answer it, and it must not grow one that reads like a user id"
+    );
+
+    // And the runtime really does accept exactly these, and really does refuse a longer wait.
+    let step = |extra: serde_json::Value| {
+        let mut base = serde_json::json!({
+            "id": "approve", "kind": "approval", "title": "¿Aprobamos {{input.what}}?"
+        });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(step(serde_json::json!({
+        "summary": "Importe {{input.total}} €",
+        "assignee": { "role": "manager" },
+        "expires_in": MAX_APPROVAL_TTL_SECONDS,
+        "on_expire": "continue",
+        "on_reject": "continue"
+    }))
+    .is_ok());
+    assert!(step(serde_json::json!({ "expires_in": MAX_APPROVAL_TTL_SECONDS + 1 })).is_err());
+    assert!(step(serde_json::json!({ "assignee": { "user": "hub_user:7" } })).is_err());
 }
 
 #[test]
