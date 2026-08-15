@@ -14,7 +14,7 @@
 > Fuentes: diseño AI/RAG [architecture/hub/crates/vector.md](../architecture/hub/crates/vector.md) (ADR-0033), mapa del monorepo
 > [CLAUDE.md](../CLAUDE.md), repo de arquitectura seccionado [architecture/](../architecture/).
 >
-> **Estado:** en producción — 24 módulos, runtime con suites e2e amplias, imagen Docker del
+> **Estado:** en producción — 25 módulos (`ls modules-workspace/modules`; entró `flows`, ADR-0283 — ⚠️ el worktree `.wt-*` no cuenta), runtime con suites e2e amplias, imagen Docker del
 > tenant, instalación E2E por marketplace con SHA256. Estado vivo: `/estado`.
 > Última actualización: 2026-08-06.
 >
