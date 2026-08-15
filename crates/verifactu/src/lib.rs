@@ -23,7 +23,7 @@ use erplora_db::Params;
 use erplora_runtime::certificate_refetch::RefetchSignal;
 use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
 use erplora_runtime::{Result, RuntimeError};
-use erplora_wasm_host::{Operation, Output};
+use erplora_wasm_host::{Event, Operation, Output};
 use serde_json::{json, Value as Json};
 
 pub mod aeat;
@@ -1103,7 +1103,7 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "substitutes_date": r.substitutes_date,
                 "substitutes_nif": r.substitutes_nif,
             });
-            if let Ok((ops, _success)) =
+            if let Ok((ops, events, _success)) =
                 transmit_one(
                     host,
                     ctx,
@@ -1120,6 +1120,11 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 for o in ops {
                     output = output.with_operation(o);
                 }
+                // A sale whose invoice the AEAT refused is the case verifactu#42 exists for: it
+                // happens on the till, in front of nobody, and the audit row is on a screen.
+                for e in events {
+                    output = output.with_event(e);
+                }
             }
         }
     }
@@ -1134,6 +1139,62 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
 /// endpoint del entorno configurado (`testing` = default). Respuesta → UPDATE del
 /// registro (accepted/rejected/error) + evento; fallo de red → cola de contingencia
 /// con backoff exponencial (5,10,20,40,60 min cap).
+/// **The public event a failed outcome emits** (verifactu#42).
+///
+/// One name for «this invoice did not get through and somebody has to look at it», whichever way
+/// it failed — the AEAT refusing it, the wire never carrying it, the record not knowing which tax
+/// agency owns it, the XML not passing the schema. `reason` tells them apart.
+///
+/// **One and not four**, because a trigger picks ONE event: an owner who builds «warn me when
+/// something fiscal fails» and gets only the AEAT half has built the silent version of the alarm
+/// they asked for. An operator who wants a single flavour filters on `reason`, which is a
+/// condition step; an owner who wants all of them does nothing, which is the right default for
+/// the person who loses money when it goes unnoticed.
+pub const EVENT_RECORD_REJECTED: &str = "verifactu.record.rejected";
+
+/// **Registered at the AEAT, with an error noted on it** (ADR-0189) — deliberately NOT a rejection.
+///
+/// Resending it is a duplicate and the AEAT refuses it (3000), so calling it a failure would send
+/// the owner chasing an invoice that is already filed. But nobody opens the VeriFactu screen, and
+/// an accepted-with-errors that nobody reads is a latent problem — so it gets its own word.
+pub const EVENT_RECORD_ACCEPTED_WITH_ERRORS: &str = "verifactu.record.accepted_with_errors";
+
+/// The AEAT answered, and its answer was no.
+pub const REASON_AEAT_REJECTED: &str = "aeat_rejected";
+/// The message never reached the AEAT (TLS, DNS, the agency down). It is queued for contingency.
+pub const REASON_TRANSMISSION_FAILED: &str = "transmission_failed";
+/// The record cannot say which tax agency owns it, so nothing was built and nothing was sent.
+/// Same key as `Refusal::environment_unknown`, and on purpose: the refusal's stable code IS the
+/// event's reason, so the panel and the automation never disagree about what went wrong.
+pub const REASON_ENVIRONMENT_UNKNOWN: &str = "record_environment_unknown";
+/// The envelope could not be built — an amount is missing or unreadable (hub#324). Retryable: the
+/// fix is upstream data, and the record keeps its place in the queue.
+pub const REASON_RECORD_NOT_DECLARABLE: &str = "record_not_declarable";
+/// The XML does not meet the AEAT schema; refused locally rather than burning a chain number.
+pub const REASON_XSD_INVALID: &str = "xsd_invalid";
+
+/// The public payload of a failed outcome. **Closed set, and nothing fiscal in it**: it ends up in
+/// somebody's task list and in a message, so it carries what is needed to say «check invoice X»
+/// and no more — never the signed XML, the chain hash, the NIF, the amounts or the CSV.
+fn failure_payload(
+    record: &Json,
+    reason: &str,
+    status: &str,
+    code: &str,
+    message: &str,
+    environment: &str,
+) -> Json {
+    json!({
+        "record_id": str_field(record, "id"),
+        "invoice_number": str_field(record, "invoice_number"),
+        "status": status,
+        "reason": reason,
+        "error_code": code,
+        "error_message": message,
+        "environment": environment,
+    })
+}
+
 async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let (payload, ctx) = split_input(input)?;
     let record_id = str_field(&payload, "record_id");
@@ -1172,7 +1233,7 @@ async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> 
         .into());
     }
 
-    let (ops, _success) = transmit_one(
+    let (ops, events, _success) = transmit_one(
         host,
         &ctx,
         &record,
@@ -1189,7 +1250,11 @@ async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> 
     for o in ops {
         out = out.with_operation(o);
     }
-    // El evento `verifactu.record.transmitted` lo emite el `emit` declarado del command.
+    // El evento `verifactu.record.transmitted` lo emite el `emit` declarado del command — sale
+    // pase lo que pase, porque describe el INTENTO. Lo que decide el desenlace es esto (verifactu#42).
+    for e in events {
+        out = out.with_event(e);
+    }
     Ok(out)
 }
 
@@ -1207,7 +1272,7 @@ async fn transmit_one(
     queue_id: &str,
     recovery_id: &str,
     remission: Remission,
-) -> Result<(Vec<Operation>, bool)> {
+) -> Result<(Vec<Operation>, Vec<Event>, bool)> {
     let record_id = str_field(record, "id");
     // WHERE this goes is settled BEFORE anything else happens — before the chain read, before
     // the XML, before the archive (hub#471). If the record cannot say which of the two tax
@@ -1218,7 +1283,7 @@ async fn transmit_one(
             return refuse_transmission(
                 host,
                 ctx,
-                &record_id,
+                record,
                 event_id,
                 queue_id,
                 config,
@@ -1272,7 +1337,7 @@ async fn transmit_one(
                 return refuse_transmission(
                     host,
                     ctx,
-                    &record_id,
+                    record,
                     event_id,
                     queue_id,
                     config,
@@ -1316,6 +1381,17 @@ async fn transmit_one(
                     }),
                 ),
             ],
+            vec![Event::new(
+                EVENT_RECORD_REJECTED,
+                failure_payload(
+                    record,
+                    REASON_XSD_INVALID,
+                    "rejected",
+                    "XSD",
+                    &reason,
+                    &destination.environment,
+                ),
+            )],
             false,
         ));
     }
@@ -1374,7 +1450,7 @@ async fn transmit_one(
                     // traga en silencio.
                     Err(e) => {
                         return Ok(response_ops(
-                            &record_id,
+                            record,
                             &resp,
                             &destination,
                             &xml,
@@ -1388,7 +1464,7 @@ async fn transmit_one(
             }
 
             Ok(response_ops(
-                &record_id,
+                record,
                 &resp,
                 &destination,
                 &xml,
@@ -1436,7 +1512,23 @@ async fn transmit_one(
                 ),
                 retry.operation,
             ];
-            Ok((ops, false))
+            Ok((
+                ops,
+                // For the owner this is the same problem as a refusal — the invoice is not at the
+                // AEAT. `reason` is what tells an operator that the wire failed, not the filing.
+                vec![Event::new(
+                    EVENT_RECORD_REJECTED,
+                    failure_payload(
+                        record,
+                        REASON_TRANSMISSION_FAILED,
+                        "error",
+                        "",
+                        &reason,
+                        environment,
+                    ),
+                )],
+                false,
+            ))
         }
     }
 }
@@ -1537,7 +1629,7 @@ impl Refusal {
     /// The record does not say which of the two tax agencies owns it (hub#471).
     fn environment_unknown(reason: String) -> Self {
         Self {
-            code: "record_environment_unknown",
+            code: REASON_ENVIRONMENT_UNKNOWN,
             reason,
         }
     }
@@ -1546,7 +1638,7 @@ impl Refusal {
     /// **Retryable on purpose** — the fix is upstream data, and the record must keep its place.
     fn undeclarable(reason: String) -> Self {
         Self {
-            code: "record_not_declarable",
+            code: REASON_RECORD_NOT_DECLARABLE,
             reason,
         }
     }
@@ -1565,13 +1657,14 @@ impl Refusal {
 async fn refuse_transmission(
     host: &dyn NativeHost,
     ctx: &Ctx,
-    record_id: &str,
+    record: &Json,
     event_id: &str,
     queue_id: &str,
     config: &Json,
     refusal: &Refusal,
-) -> Result<(Vec<Operation>, bool)> {
+) -> Result<(Vec<Operation>, Vec<Event>, bool)> {
     let reason = refusal.reason.as_str();
+    let record_id = &str_field(record, "id");
     let retry = enqueue_retry(host, ctx, record_id, queue_id, config, reason).await?;
     Ok((
         vec![
@@ -1594,6 +1687,15 @@ async fn refuse_transmission(
             ),
             retry.operation,
         ],
+        // Nothing was handed to the AEAT — the same problem for the owner as a refusal, under the
+        // reason that tells an operator the two apart. The key is `Refusal::code` and not a
+        // literal: hub#324 added a second way to refuse (an envelope that cannot be built), and
+        // two refusals wearing the same reason would have the alarm telling somebody to fix an
+        // environment when what is broken is an amount.
+        vec![Event::new(
+            EVENT_RECORD_REJECTED,
+            failure_payload(record, refusal.code, "error", "", reason, ""),
+        )],
         false,
     ))
 }
@@ -1603,7 +1705,7 @@ async fn refuse_transmission(
 /// reintento tras re-anclar.
 #[allow(clippy::too_many_arguments)]
 fn response_ops(
-    record_id: &str,
+    record: &Json,
     resp: &aeat::AeatResponse,
     destination: &Destination,
     xml: &str,
@@ -1611,7 +1713,8 @@ fn response_ops(
     event_id: &str,
     now: &str,
     note: Option<&str>,
-) -> (Vec<Operation>, bool) {
+) -> (Vec<Operation>, Vec<Event>, bool) {
+    let record_id = &str_field(record, "id");
     let verdict = aeat::classify(resp);
     let success = verdict.status == "accepted";
     // A record whose chain is not the hub's current environment went to the OTHER tax agency.
@@ -1676,7 +1779,46 @@ fn response_ops(
             json!({ "record_id": record_id }),
         ));
     }
-    (ops, success)
+    // ── What LEAVES the module (verifactu#42) ────────────────────────────────────────────────
+    //
+    // The `_insert_event` row above is the audit trail: it is on a screen somebody has to open,
+    // and the bar that closes at two in the morning does not open it. This is the outbox event an
+    // automation can hang off — and it is emitted only for the two outcomes a person has to act
+    // on. A clean acceptance says nothing: `verifactu.record.transmitted` already covers «it went
+    // out», and one more row per successful invoice would be the till's whole day in the outbox.
+    //
+    // The drift note is NOT one of them. A record remitted to the other tax agency is correct
+    // (the chain owns it) and it is already a `warning` in the audit trail; raising it here would
+    // make «something went wrong fiscally» fire on a go-live, which is the fastest way to teach
+    // an owner to ignore the alarm.
+    let events = if !success {
+        vec![Event::new(
+            EVENT_RECORD_REJECTED,
+            failure_payload(
+                record,
+                REASON_AEAT_REJECTED,
+                verdict.status,
+                &verdict.code,
+                &verdict.message,
+                environment,
+            ),
+        )]
+    } else if verdict.accepted_with_errors {
+        vec![Event::new(
+            EVENT_RECORD_ACCEPTED_WITH_ERRORS,
+            failure_payload(
+                record,
+                REASON_AEAT_REJECTED,
+                verdict.status,
+                &verdict.code,
+                &verdict.message,
+                environment,
+            ),
+        )]
+    } else {
+        Vec::new()
+    };
+    (ops, events, success)
 }
 
 /// El eslabón anterior en la forma que espera `aeat::build_soap`, a partir del ancla que devolvió
@@ -1714,7 +1856,7 @@ async fn auto_rechain_and_retry(
     // El re-anclado hereda el origen del envío que lo disparó (hub#322): un registro que salió
     // de la cola sigue saliendo de la cola cuando se reintenta sobre el ancla que dio la AEAT.
     remission: Remission,
-) -> Result<Option<(Vec<Operation>, bool)>> {
+) -> Result<Option<(Vec<Operation>, Vec<Event>, bool)>> {
     let issuer_nif = str_field(record, "issuer_nif");
     // Both legs of the recovery go to the record's OWN destination (hub#471): asking the wrong
     // tax agency for the anchor would re-chain this record onto a link from the other chain,
@@ -1785,8 +1927,8 @@ async fn auto_rechain_and_retry(
         rejection.descripcion_error.trim(),
         short(&chain::normalize_hash(&anchor.record_hash)),
     );
-    let (mut ops, success) = response_ops(
-        &record_id,
+    let (mut ops, events, success) = response_ops(
+        record,
         &resp,
         destination,
         &xml,
@@ -1798,7 +1940,7 @@ async fn auto_rechain_and_retry(
     // El ancla y el re-encadenado se aplican ANTES del resultado del reintento (orden del Output).
     ops.insert(0, rechain_op);
     ops.insert(0, anchor_op);
-    Ok(Some((ops, success)))
+    Ok(Some((ops, events, success)))
 }
 
 /// Guarda el XML con una clave estable por registro. Los reintentos sobrescriben atómicamente el
@@ -1914,7 +2056,7 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
         // sitio donde engancha el reintento tras restaurar un backup (hub#287).
         let recovery_id = ctx.new_ids[id_idx + 2].clone();
         id_idx += 3;
-        let (ops, success) = transmit_one(
+        let (ops, events, success) = transmit_one(
             host,
             &ctx,
             &rec,
@@ -1926,6 +2068,9 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
             Remission::FromContingency,
         )
         .await?;
+        for e in events {
+            out = out.with_event(e);
+        }
         for o in ops {
             out = out.with_operation(o);
         }
@@ -3936,8 +4081,8 @@ mod environment_chain_tests {
         let destination = destination_of(&queued_testing_record(), &config_row("production"))
             .expect("a record that carries its environment resolves");
 
-        let (ops, _) = response_ops(
-            "rec-2",
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
             &accepted_response(),
             &destination,
             "<xml/>",
@@ -3981,8 +4126,8 @@ mod environment_chain_tests {
         let destination = destination_of(&queued_testing_record(), &config_row("production"))
             .expect("a record that carries its environment resolves");
 
-        let (ops, _) = response_ops(
-            "rec-2",
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
             &accepted_response(),
             &destination,
             "<xml/>",
@@ -4016,8 +4161,8 @@ mod environment_chain_tests {
         let destination = destination_of(&queued_testing_record(), &config_row("production"))
             .expect("a record that carries its environment resolves");
 
-        let (ops, success) = response_ops(
-            "rec-2",
+        let (ops, _, success) = response_ops(
+            &queued_testing_record(),
             &accepted_response(),
             &destination,
             "<xml/>",
@@ -4090,8 +4235,8 @@ mod environment_chain_tests {
         let destination = destination_of(&queued_testing_record(), &config_row("testing"))
             .expect("a record that carries its environment resolves");
 
-        let (ops, _) = response_ops(
-            "rec-2",
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
             &accepted_response(),
             &destination,
             "<xml/>",
@@ -4111,6 +4256,242 @@ mod environment_chain_tests {
             Some(&json!("AEAT (testing): Correcto Correcto")),
             "no drift, no note: the message keeps its plain shape"
         );
+    }
+
+    // ── verifactu#42 — the outcome that has to leave the module ────────────────────────────────
+    //
+    // Everything above writes `verifactu_event`, the module's own audit table. Nothing there
+    // leaves: it is a row on a screen somebody has to open. This is the ONE part of the product
+    // where not finding out has consequences before the AEAT, and a bar that closes at two in the
+    // morning does not open that screen.
+    //
+    // So a failed outcome also emits a **public** event — the hub's outbox, the thing an
+    // automation can be built on (`ERPlora/flows#18` R0 #6, «fiscal failure → tell the owner»).
+
+    /// A real `Incorrecto` from the AEAT, as `parse_response` hands it over.
+    fn rejected_response() -> aeat::AeatResponse {
+        aeat::AeatResponse {
+            estado_envio: "Incorrecto".to_string(),
+            estado_registro: "Incorrecto".to_string(),
+            codigo_error: "1189".to_string(),
+            descripcion_error: "El NIF del destinatario no está identificado".to_string(),
+            ..Default::default()
+        }
+    }
+
+    /// `AceptadoConErrores` (ADR-0189): the AEAT REGISTERED it and noted an error on it.
+    fn accepted_with_errors_response() -> aeat::AeatResponse {
+        aeat::AeatResponse {
+            estado_envio: "Correcto".to_string(),
+            estado_registro: "AceptadoConErrores".to_string(),
+            codigo_error: "2007".to_string(),
+            descripcion_error: "Primer registro con obligado ya existente".to_string(),
+            ..Default::default()
+        }
+    }
+
+    fn emitted(events: &[Event], name: &str) -> Option<Json> {
+        events
+            .iter()
+            .find(|e| e.name == name)
+            .map(|e| e.payload.clone())
+    }
+
+    /// A rejection the AEAT really answered leaves the module, so something other than a screen
+    /// can notice it.
+    #[test]
+    fn a_rejection_by_the_aeat_emits_a_public_event_the_owner_can_be_told_about() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        let (_, events, success) = response_ops(
+            &queued_testing_record(),
+            &rejected_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            None,
+        );
+
+        assert!(!success);
+        let payload = emitted(&events, EVENT_RECORD_REJECTED)
+            .expect("a rejection has to leave the module, not just the audit table");
+        assert_eq!(payload["record_id"], json!("rec-2"));
+        // The human reference. `record_id` is a uuid nobody can act on; «revisa la factura INV-2»
+        // is the sentence an automation has to be able to write.
+        assert_eq!(payload["invoice_number"], json!("INV-2"));
+        assert_eq!(payload["reason"], json!(REASON_AEAT_REJECTED));
+        assert_eq!(payload["error_code"], json!("1189"));
+        assert_eq!(payload["environment"], json!("testing"));
+        assert!(
+            emitted(&events, EVENT_RECORD_ACCEPTED_WITH_ERRORS).is_none(),
+            "a rejection is not an acceptance with a note on it"
+        );
+    }
+
+    /// **Nothing fiscal travels.** The payload ends up in somebody's task list and in a message,
+    /// and `flows#18` asks for this by name: enough to say «check invoice X», and no more.
+    #[test]
+    fn the_public_payload_carries_no_fiscal_content_at_all() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing")).unwrap();
+        let mut response = rejected_response();
+        response.csv = "CSV-SHOULD-NOT-TRAVEL".to_string();
+
+        let (_, events, _) = response_ops(
+            &queued_testing_record(),
+            &response,
+            &destination,
+            "<xml>the signed record</xml>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            None,
+        );
+
+        let payload = emitted(&events, EVENT_RECORD_REJECTED).expect("it emits");
+        let text = payload.to_string();
+        for secret in [
+            "<xml>",              // the signed record itself
+            HASH_TESTING_2,       // the chain hash
+            NIF,                  // the issuer's tax id
+            "12100",              // any amount
+            "CSV-SHOULD-NOT-TRAVEL",
+        ] {
+            assert!(
+                !text.contains(secret),
+                "`{secret}` must never leave in a public event: {text}"
+            );
+        }
+        // And the keys are the closed set, so a field added later is a decision and not a slip.
+        let keys: Vec<&String> = payload.as_object().expect("an object").keys().collect();
+        assert_eq!(
+            keys,
+            vec![
+                "environment",
+                "error_code",
+                "error_message",
+                "invoice_number",
+                "reason",
+                "record_id",
+                "status",
+            ]
+        );
+    }
+
+    /// **An `AceptadoConErrores` is not a rejection** (ADR-0189): the record IS at the AEAT and
+    /// resending it is a duplicate. Filing it as a rejection would send the owner chasing an
+    /// invoice that is already registered — but staying silent leaves a latent problem nobody
+    /// sees, which is the other half of verifactu#42. So it gets its own word.
+    #[test]
+    fn an_acceptance_with_errors_is_told_apart_from_a_rejection() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing")).unwrap();
+
+        let (_, events, success) = response_ops(
+            &queued_testing_record(),
+            &accepted_with_errors_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            None,
+        );
+
+        assert!(success, "it is registered at the AEAT: it counts as accepted");
+        assert!(
+            emitted(&events, EVENT_RECORD_REJECTED).is_none(),
+            "never as a rejection: the invoice is filed"
+        );
+        let payload = emitted(&events, EVENT_RECORD_ACCEPTED_WITH_ERRORS)
+            .expect("but it cannot be silent either");
+        assert_eq!(payload["error_code"], json!("2007"));
+        assert_eq!(payload["record_id"], json!("rec-2"));
+    }
+
+    /// A clean acceptance says nothing. `verifactu.record.transmitted` already exists for «it
+    /// went out», and an outbox row per successful invoice would be the till's whole day.
+    #[test]
+    fn a_clean_acceptance_emits_no_failure_event() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing")).unwrap();
+
+        let (_, events, success) = response_ops(
+            &queued_testing_record(),
+            &accepted_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-08-06T10:00:00+02:00",
+            None,
+        );
+
+        assert!(success);
+        assert!(events.is_empty(), "nothing to tell anybody: {events:?}");
+    }
+
+    /// **The two refusals leave under their OWN reason** — the second one (hub#324, «the envelope
+    /// cannot be built») landed after this event was written, and it must not inherit the first
+    /// one's word.
+    ///
+    /// For the owner both are the same problem: the invoice is not at the AEAT. For whoever has to
+    /// fix it they are opposite errands — one sends somebody to the config, the other to the
+    /// invoice. So the event's `reason` is `Refusal::code`, the same key the audit row already
+    /// carries, and never a literal written a second time next to it.
+    #[tokio::test]
+    async fn a_record_that_cannot_be_declared_leaves_under_its_own_reason() {
+        let mut record = queued_testing_record();
+        record.as_object_mut().unwrap().remove("total_amount");
+        let mut host = ChainHost::new(config_row("testing"), vec![record]);
+        host.has_core_certificate = true;
+        let input = json!({
+            "payload": { "record_id": "rec-2" },
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor"] }
+        });
+
+        let out = transmit_record(&input, &host)
+            .await
+            .expect("an undeclarable record is an outcome, not an aborted batch");
+
+        let payload = emitted(&out.events, EVENT_RECORD_REJECTED)
+            .expect("nothing reached the AEAT: that has to leave the module");
+        assert_eq!(payload["reason"], json!(REASON_RECORD_NOT_DECLARABLE));
+        assert_eq!(payload["invoice_number"], json!("INV-2"));
+        assert!(
+            payload["error_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("total_amount"),
+            "and it says WHICH amount, or the alarm is not actionable: {payload}"
+        );
+    }
+
+    /// The other refusal — the record that cannot say which tax agency owns it (hub#471) — keeps
+    /// its own key. Written as a pair with the test above: one of them alone would pass with both
+    /// refusals collapsed onto a single literal.
+    #[tokio::test]
+    async fn a_record_with_no_environment_leaves_under_the_environment_reason() {
+        let mut record = queued_testing_record();
+        record.as_object_mut().unwrap().remove("environment");
+        let mut host = ChainHost::new(config_row("production"), vec![record]);
+        host.has_core_certificate = true;
+        let input = json!({
+            "payload": { "record_id": "rec-2" },
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor"] }
+        });
+
+        let out = transmit_record(&input, &host)
+            .await
+            .expect("an unplaceable record is an outcome, not an aborted batch");
+
+        let payload = emitted(&out.events, EVENT_RECORD_REJECTED)
+            .expect("nothing was built and nothing was sent: that has to leave the module");
+        assert_eq!(payload["reason"], json!(REASON_ENVIRONMENT_UNKNOWN));
     }
 }
 
