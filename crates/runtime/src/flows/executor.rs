@@ -231,9 +231,10 @@ async fn advance_run(
 
     // A step that committed but never recorded its output: the process died between the two
     // writes. Continuing would read `steps.<id>` as null in every later step.
-    if let Some(step_id) = interrupted_step(db, &run_id).await? {
+    if let Some(step_id) = interrupted_step(db, hub_id, &run_id).await? {
         return finish(
             db,
+            hub_id,
             &run_id,
             store::STATUS_FAILED,
             &format!(
@@ -253,6 +254,7 @@ async fn advance_run(
         Ok(_) => {
             return finish(
                 db,
+                hub_id,
                 &run_id,
                 store::STATUS_CANCELLED,
                 "the flow was disabled while this run was in flight",
@@ -263,6 +265,7 @@ async fn advance_run(
         Err(_) => {
             return finish(
                 db,
+                hub_id,
                 &run_id,
                 store::STATUS_CANCELLED,
                 &format!("{ERR_FLOW_GONE}: the flow was deleted while this run was in flight"),
@@ -278,7 +281,7 @@ async fn advance_run(
     let def = match FlowDefinition::parse(&flow.definition) {
         Ok(def) => def,
         Err(e) => {
-            return finish(db, &run_id, store::STATUS_FAILED, &format!("{e}"))
+            return finish(db, hub_id, &run_id, store::STATUS_FAILED, &format!("{e}"))
                 .await
                 .map(|()| None)
         }
@@ -286,7 +289,7 @@ async fn advance_run(
 
     for _ in 0..MAX_STEPS_PER_TICK {
         let Some(step) = def.steps.get(index as usize) else {
-            return finish(db, &run_id, store::STATUS_DONE, "").await.map(|()| None);
+            return finish(db, hub_id, &run_id, store::STATUS_DONE, "").await.map(|()| None);
         };
         let scope = json!({ "input": input, "steps": vars.get("steps").cloned().unwrap_or(json!({})) });
 
@@ -307,7 +310,7 @@ async fn advance_run(
             Outcome::Continue { output } => {
                 set_step_output(&mut vars, &step.id, output);
                 index += 1;
-                persist_vars(db, &run_id, index, &vars).await?;
+                persist_vars(db, hub_id, &run_id, index, &vars).await?;
             }
             Outcome::Io { pending } => {
                 // The run keeps its lease: it is invisible to the next tick until the server
@@ -315,15 +318,15 @@ async fn advance_run(
                 return Ok(Some(pending));
             }
             Outcome::Stopped => {
-                return finish(db, &run_id, store::STATUS_DONE, "").await.map(|()| None)
+                return finish(db, hub_id, &run_id, store::STATUS_DONE, "").await.map(|()| None)
             }
             Outcome::Sleep { wake_at } => {
-                return sleep_until(db, &run_id, &wake_at).await.map(|()| None)
+                return sleep_until(db, hub_id, &run_id, &wake_at).await.map(|()| None)
             }
             Outcome::Failed { error } => {
                 // v1 is `on_error: "stop"` (ADR-0283 §1): a linear flow has nowhere else to go,
                 // and retrying a business command by itself is how a sale gets charged twice.
-                return finish(db, &run_id, store::STATUS_FAILED, &error).await.map(|()| None);
+                return finish(db, hub_id, &run_id, store::STATUS_FAILED, &error).await.map(|()| None);
             }
         }
     }
@@ -331,10 +334,11 @@ async fn advance_run(
     // Budget spent with steps left: back in the queue, lease released, resumes next tick.
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "UPDATE _flow_runs SET status = 'pending', claim_expires_at = NULL, updated_at = :now \
-         WHERE id = :id",
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
         &p,
     )
     .await?;
@@ -387,7 +391,9 @@ async fn run_step(
                 (None, Some(path)) => {
                     let value = def::resolve(&json!(path), scope);
                     match value.as_str().and_then(|s| {
-                        chrono::DateTime::parse_from_rfc3339(s).ok().map(|d| d.to_rfc3339())
+                        chrono::DateTime::parse_from_rfc3339(s)
+                            .ok()
+                            .map(|d| d.to_rfc3339())
                     }) {
                         Some(instant) => instant,
                         None => {
@@ -411,7 +417,7 @@ async fn run_step(
             write_step(db, hub_id, run_id, index, step, STEP_SLEEPING, &json!({}), &output, "", &now)
                 .await?;
             // The step index advances with the sleep: waking up resumes AFTER the delay, not on it.
-            persist_step_index(db, run_id, index + 1).await?;
+            persist_step_index(db, hub_id, run_id, index + 1).await?;
             Ok(Outcome::Sleep { wake_at })
         }
 
@@ -448,7 +454,7 @@ async fn run_step(
                     hub_id, run_id, index, step, STEP_COMMITTED, &resolved_json, &json!({}), "",
                     &now,
                 ),
-                advance_index_op(run_id, index + 1, &now),
+                advance_index_op(hub_id, run_id, index + 1, &now),
             ];
 
             match commands::execute_at(
@@ -467,7 +473,7 @@ async fn run_step(
             .await
             {
                 Ok(output) => {
-                    complete_step(db, run_id, index, &output, &now).await?;
+                    complete_step(db, hub_id, run_id, index, &output, &now).await?;
                     Ok(Outcome::Continue { output })
                 }
                 Err(e) => {
@@ -585,10 +591,10 @@ async fn run_step(
                             "",
                             &now,
                         ),
-                        advance_index_op(run_id, index + 1, &now),
+                        advance_index_op(hub_id, run_id, index + 1, &now),
                     ];
                     db.execute_tx(&ops).await?;
-                    complete_step(db, run_id, index, &output, &now).await?;
+                    complete_step(db, hub_id, run_id, index, &output, &now).await?;
                     Ok(Outcome::Continue { output })
                 }
                 Err(e) => {
@@ -609,13 +615,19 @@ async fn run_step(
 }
 
 /// The id of a step this run committed without recording its output, if any.
-async fn interrupted_step(db: &dyn DatabaseAdapter, run_id: &str) -> Result<Option<String>> {
+async fn interrupted_step(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+) -> Result<Option<String>> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("run_id".into(), json!(run_id));
     let res = db
         .query(
             "SELECT step_id FROM _flow_run_steps \
-             WHERE run_id = :run_id AND status = 'committed' AND deleted_at IS NULL \
+             WHERE run_id = :run_id AND hub_id = :hub_id AND status = 'committed' \
+               AND deleted_at IS NULL \
              ORDER BY step_index LIMIT 1",
             &p,
         )
@@ -683,70 +695,90 @@ async fn write_step(
 /// Writes the output a `committed` step produced, closing the window described at the top.
 async fn complete_step(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     run_id: &str,
     index: i64,
     output: &Json,
     now: &str,
 ) -> Result<()> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("run_id".into(), json!(run_id));
     p.insert("step_index".into(), json!(index));
     p.insert("output".into(), json!(output.to_string()));
     p.insert("now".into(), json!(now));
     db.execute(
         "UPDATE _flow_run_steps SET status = 'done', output = :output, finished_at = :now \
-         WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+         WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+           AND deleted_at IS NULL",
         &p,
     )
     .await?;
     Ok(())
 }
 
-fn advance_index_op(run_id: &str, next_index: i64, now: &str) -> (String, Params) {
+fn advance_index_op(hub_id: &str, run_id: &str, next_index: i64, now: &str) -> (String, Params) {
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("step".into(), json!(next_index));
     p.insert("now".into(), json!(now));
     (
-        "UPDATE _flow_runs SET current_step = :step, updated_at = :now WHERE id = :id".to_string(),
+        "UPDATE _flow_runs SET current_step = :step, updated_at = :now \
+          WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
+            .to_string(),
         p,
     )
 }
 
-async fn persist_step_index(db: &dyn DatabaseAdapter, run_id: &str, next: i64) -> Result<()> {
-    let (sql, p) = advance_index_op(run_id, next, &now_rfc3339());
+async fn persist_step_index(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+    next: i64,
+) -> Result<()> {
+    let (sql, p) = advance_index_op(hub_id, run_id, next, &now_rfc3339());
     db.execute(&sql, &p).await?;
     Ok(())
 }
 
 async fn persist_vars(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     run_id: &str,
     next_index: i64,
     vars: &Json,
 ) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("step".into(), json!(next_index));
     p.insert("vars".into(), json!(vars.to_string()));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "UPDATE _flow_runs SET current_step = :step, vars = :vars, updated_at = :now \
-         WHERE id = :id",
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
         &p,
     )
     .await?;
     Ok(())
 }
 
-async fn sleep_until(db: &dyn DatabaseAdapter, run_id: &str, wake_at: &str) -> Result<()> {
+async fn sleep_until(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+    wake_at: &str,
+) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("wake_at".into(), json!(wake_at));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "UPDATE _flow_runs SET status = 'sleeping', wake_at = :wake_at, \
-                               claim_expires_at = NULL, updated_at = :now WHERE id = :id",
+                               claim_expires_at = NULL, updated_at = :now \
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
         &p,
     )
     .await?;
@@ -755,18 +787,21 @@ async fn sleep_until(db: &dyn DatabaseAdapter, run_id: &str, wake_at: &str) -> R
 
 async fn finish(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     run_id: &str,
     status: &str,
     error: &str,
 ) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("status".into(), json!(status));
     p.insert("error".into(), json!(error));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "UPDATE _flow_runs SET status = :status, last_error = :error, finished_at = :now, \
-                               claim_expires_at = NULL, updated_at = :now WHERE id = :id",
+                               claim_expires_at = NULL, updated_at = :now \
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
         &p,
     )
     .await?;
@@ -854,12 +889,14 @@ pub async fn complete_io(
 
     // The step this run is waiting on, and its status. Anything else means the answer is stale.
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("run_id".into(), json!(run_id));
     p.insert("step_index".into(), json!(index));
     let step_row = db
         .query(
             "SELECT step_id, status FROM _flow_run_steps \
-             WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+             WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+               AND deleted_at IS NULL",
             &p,
         )
         .await?;
@@ -884,6 +921,7 @@ pub async fn complete_io(
     match result {
         IoResult::Done(output) => {
             let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
             p.insert("step_index".into(), json!(index));
             p.insert("output".into(), json!(output.to_string()));
@@ -896,33 +934,37 @@ pub async fn complete_io(
             .await?;
 
             set_step_output(&mut vars, step_id, output);
-            persist_vars(db, run_id, index + 1, &vars).await?;
+            persist_vars(db, hub_id, run_id, index + 1, &vars).await?;
             // Back in the queue with the lease released: the next tick picks it up and runs the
             // rest of the flow under the lock, where it belongs.
             let mut p = Params::new();
             p.insert("id".into(), json!(run_id));
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("now".into(), json!(now));
             db.execute(
                 "UPDATE _flow_runs SET status = 'pending', claim_expires_at = NULL, \
-                                       updated_at = :now WHERE id = :id",
+                                       updated_at = :now \
+                 WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
                 &p,
             )
             .await?;
         }
         IoResult::Failed(error) => {
             let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
             p.insert("step_index".into(), json!(index));
             p.insert("error".into(), json!(error));
             p.insert("now".into(), json!(now));
             db.execute(
                 "UPDATE _flow_run_steps SET status = 'failed', error = :error, finished_at = :now \
-                 WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+                 WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+                   AND deleted_at IS NULL",
                 &p,
             )
             .await?;
             // v1 is `on_error: "stop"` — the same answer a failed command gets.
-            finish(db, run_id, store::STATUS_FAILED, &error).await?;
+            finish(db, hub_id, run_id, store::STATUS_FAILED, &error).await?;
         }
         // The turn stopped on a write a person has to authorise. What it produced so far is kept
         // on the step, so a decision taken hours later completes the WHOLE turn and not just its
@@ -930,39 +972,45 @@ pub async fn complete_io(
         // `claim_next_run` selects, so no amount of ticking smuggles the write through.
         IoResult::AwaitingApproval(partial) => {
             let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
             p.insert("step_index".into(), json!(index));
             p.insert("output".into(), json!(partial.to_string()));
             p.insert("status".into(), json!(STEP_WAITING_APPROVAL));
             db.execute(
                 "UPDATE _flow_run_steps SET status = :status, output = :output \
-                 WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+                 WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+                   AND deleted_at IS NULL",
                 &p,
             )
             .await?;
             let mut p = Params::new();
             p.insert("id".into(), json!(run_id));
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("status".into(), json!(store::STATUS_WAITING_APPROVAL));
             p.insert("now".into(), json!(now));
             db.execute(
                 "UPDATE _flow_runs SET status = :status, claim_expires_at = NULL, \
-                                       updated_at = :now WHERE id = :id",
+                                       updated_at = :now \
+                 WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
                 &p,
             )
             .await?;
         }
         IoResult::Cancelled(reason) => {
             let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
             p.insert("step_index".into(), json!(index));
             p.insert("now".into(), json!(now));
             db.execute(
                 "UPDATE _flow_run_steps SET status = 'stopped', finished_at = :now \
-                 WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+                 WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+                   AND deleted_at IS NULL",
                 &p,
             )
             .await?;
-            finish(db, run_id, store::STATUS_CANCELLED, &reason).await?;
+            finish(db, hub_id, run_id, store::STATUS_CANCELLED, &reason).await?;
         }
     }
     Ok(())
@@ -1667,5 +1715,142 @@ mod tests {
         );
         assert!(!dump.contains("sk-live-42"), "the credential is nowhere: {dump}");
         assert!(dump.contains("***"), "and its place is marked: {dump}");
+    }
+
+    // ── hub#735: every write of this file names the hub it was asked for ──────────────────────
+    //
+    // The neighbour in these tests is **alive**: it has its own flow, its own run and its own
+    // step, all written through the ordinary doors. A scoping test whose neighbour is an empty
+    // hub proves nothing — it cannot tell "the statement filtered" from "there was nothing to
+    // hit". Here the neighbour is both the caller (it asks for a write on a run that is not its
+    // own, and must get nothing) and a bystander (its own rows must come out untouched).
+
+    /// The neighbour hub, sharing this database with [`HUB`] (the row contract, not the deploy).
+    const OTHER: &str = "hub-exec-neighbour";
+
+    async fn flow_for(db: &dyn DatabaseAdapter, hub: &str, definition: Json) -> String {
+        store::create(
+            db,
+            hub,
+            &registry(),
+            &NewFlow {
+                name: "F".into(),
+                enabled: true,
+                definition,
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap()
+        .id
+    }
+
+    /// The whole row, straight from the table — no hub filter, so a test can see what a write
+    /// ACTUALLY did rather than what a scoped read is willing to show it.
+    async fn raw_run(db: &dyn DatabaseAdapter, run_id: &str) -> Json {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(run_id));
+        db.query("SELECT * FROM _flow_runs WHERE id = :id", &p)
+            .await
+            .unwrap()
+            .rows
+            .remove(0)
+    }
+
+    async fn raw_steps(db: &dyn DatabaseAdapter, run_id: &str) -> Vec<Json> {
+        let mut p = Params::new();
+        p.insert("run_id".into(), json!(run_id));
+        db.query(
+            "SELECT * FROM _flow_run_steps WHERE run_id = :run_id ORDER BY step_index",
+            &p,
+        )
+        .await
+        .unwrap()
+        .rows
+    }
+
+    /// Two hubs, one database, both with a run in flight. Every write helper in this file is
+    /// asked, by the WRONG hub, to move a run that belongs to the other — and none of them may.
+    #[tokio::test]
+    async fn a_write_asked_for_by_another_hub_moves_nothing() {
+        let db = db().await;
+        let reg = registry();
+
+        // The neighbour is real: its own flow, its own run, its own step row.
+        let their_flow = flow_for(&db, OTHER, one_command_flow()).await;
+        grants::replace(
+            &db,
+            OTHER,
+            &their_flow,
+            &reg,
+            &[(GrantKind::Command, "notes.note.add".to_string())],
+            "hub_user:9",
+        )
+        .await
+        .unwrap();
+        let their_run =
+            store::start_run(&db, OTHER, &their_flow, "", "manual", "", &json!({}), 0, "t")
+                .await
+                .unwrap();
+        tick(&db, &reg, OTHER).await.unwrap();
+        let their_run_before = raw_run(&db, &their_run).await;
+        let their_steps_before = raw_steps(&db, &their_run).await;
+        assert_eq!(their_steps_before.len(), 1, "the neighbour really did run a step");
+
+        // And this hub has a run parked mid-flight.
+        let flow_id = flow(&db, one_command_flow()).await;
+        grant(&db, &flow_id, "notes.note.add").await;
+        let run_id = store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
+        tick(&db, &reg, HUB).await.unwrap();
+        let before = raw_run(&db, &run_id).await;
+        let steps_before = raw_steps(&db, &run_id).await;
+
+        // Now the neighbour asks for every write this file performs, naming OUR run.
+        finish(&db, OTHER, &run_id, store::STATUS_FAILED, "not yours").await.unwrap();
+        sleep_until(&db, OTHER, &run_id, "2020-01-01T00:00:00+00:00").await.unwrap();
+        persist_vars(&db, OTHER, &run_id, 99, &json!({ "steps": { "x": 1 } })).await.unwrap();
+        persist_step_index(&db, OTHER, &run_id, 98).await.unwrap();
+        complete_step(&db, OTHER, &run_id, 0, &json!({ "stolen": true }), "2020-01-01T00:00:00+00:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            interrupted_step(&db, OTHER, &run_id).await.unwrap(),
+            None,
+            "and it cannot read our steps either"
+        );
+
+        assert_eq!(raw_run(&db, &run_id).await, before, "our run is untouched");
+        assert_eq!(raw_steps(&db, &run_id).await, steps_before, "our steps are untouched");
+        assert_eq!(
+            raw_run(&db, &their_run).await,
+            their_run_before,
+            "and the neighbour's own run did not move either"
+        );
+        assert_eq!(raw_steps(&db, &their_run).await, their_steps_before);
+    }
+
+    /// The same guarantee for the far side of the claim → I/O → complete seam: an answer handed
+    /// back by the wrong hub is dropped, and neither hub's rows move.
+    #[tokio::test]
+    async fn an_io_result_from_another_hub_is_refused() {
+        let db = db().await;
+        let flow_id = flow(&db, http_flow("https://api.example.com/v1/ping")).await;
+        http_grant(&db, &flow_id, "https://api.example.com/v1/*").await;
+        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1").await.unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        let before = raw_run(&db, &run_id).await;
+        let steps_before = raw_steps(&db, &run_id).await;
+        let err = complete_io(&db, OTHER, &run_id, "call", IoResult::Done(json!({ "status": 200 })))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_IO_STEP_GONE),
+            "{err:?}"
+        );
+        assert_eq!(raw_run(&db, &run_id).await, before);
+        assert_eq!(raw_steps(&db, &run_id).await, steps_before);
     }
 }

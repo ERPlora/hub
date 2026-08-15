@@ -426,10 +426,11 @@ pub async fn seed_triggers(
         }
         let mut p = Params::new();
         p.insert("id".into(), json!(row["id"].as_str().unwrap_or_default()));
+        p.insert("hub_id".into(), json!(hub_id));
         p.insert("now".into(), json!(now));
         db.execute(
             "UPDATE _flow_triggers SET deleted_at = :now, enabled = 0, updated_at = :now \
-             WHERE id = :id",
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
             &p,
         )
         .await?;

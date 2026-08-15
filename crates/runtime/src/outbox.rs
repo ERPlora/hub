@@ -109,7 +109,10 @@ CREATE INDEX IF NOT EXISTS ix_outbox_prune \
 CREATE INDEX IF NOT EXISTS ix_outbox_name ON _event_outbox (hub_id, event_name, created_at);\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
-  PRIMARY KEY (event_id, listener_command));";
+  hub_id TEXT NOT NULL, \
+  PRIMARY KEY (event_id, listener_command));\
+ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS hub_id TEXT;\
+CREATE INDEX IF NOT EXISTS ix_event_delivery_hub ON _event_delivery (hub_id, event_id);";
 
 /// Crea las tablas de sistema del outbox (idempotente), como `migrations::ensure_table`.
 pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
@@ -211,13 +214,14 @@ pub async fn insert_core_event_once(
 
 /// `INSERT` del marcador de entrega (event_id, listener). El relay lo añade a la transacción
 /// del listener → si el listener commitea, la entrega queda registrada atómicamente.
-fn delivery_op(event_id: &str, listener: &str) -> (String, Params) {
+pub(crate) fn delivery_op(hub_id: &str, event_id: &str, listener: &str) -> (String, Params) {
     let mut p = Params::new();
     p.insert("event_id".into(), json!(event_id));
     p.insert("listener_command".into(), json!(listener));
     p.insert("delivered_at".into(), json!(now_rfc3339()));
-    let sql = "INSERT INTO _event_delivery (event_id, listener_command, delivered_at) \
-        VALUES (:event_id, :listener_command, :delivered_at)";
+    p.insert("hub_id".into(), json!(hub_id));
+    let sql = "INSERT INTO _event_delivery (event_id, listener_command, delivered_at, hub_id) \
+        VALUES (:event_id, :listener_command, :delivered_at, :hub_id)";
     (sql.to_string(), p)
 }
 
@@ -350,11 +354,11 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     let mut failures = 0usize;
     let mut permanent: Option<&'static str> = None;
     for listener in &listeners {
-        if delivery_exists(db, &id, listener).await? {
+        if delivery_exists(db, &ctx.hub_id, &id, listener).await? {
             continue; // ya entregado en un intento previo (idempotencia)
         }
         // Efectos del listener + sus eventos en cascada + el marcador de entrega → UNA transacción.
-        let extra = [delivery_op(&id, listener)];
+        let extra = [delivery_op(&ctx.hub_id, &id, listener)];
         // Origin::Internal (hub#131, hub#145): el relay es el propio runtime entregando un
         // listener de evento — nunca un caller externo — así que un listener `_`-prefijado o
         // `internal:true` DEBE ejecutar aquí igual que uno público.
@@ -516,7 +520,7 @@ async fn deliver_host_notify(
     let Some(transport) = &registry.notify_transport else {
         return Ok(()); // capacidad no disponible: no se envía nada (ni se reintenta).
     };
-    if delivery_exists(db, event_id, HOST_NOTIFY_LISTENER).await? {
+    if delivery_exists(db, hub_id, event_id, HOST_NOTIFY_LISTENER).await? {
         return Ok(()); // ya enviado en un intento previo (idempotencia)
     }
     let intent = NotifyIntent::from_event_payload(payload)?;
@@ -576,7 +580,7 @@ async fn deliver_host_notify(
     let routing = host_notify::route_channel(intent.channel, premium);
     transport.send(&intent, routing).await?;
     // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark).
-    let (sql, p) = delivery_op(event_id, HOST_NOTIFY_LISTENER);
+    let (sql, p) = delivery_op(hub_id, event_id, HOST_NOTIFY_LISTENER);
     db.execute(&sql, &p).await?;
     Ok(())
 }
@@ -653,13 +657,20 @@ fn parse_payload(row: &Json) -> Params {
         .unwrap_or_default()
 }
 
-async fn delivery_exists(db: &dyn DatabaseAdapter, event_id: &str, listener: &str) -> Result<bool> {
+async fn delivery_exists(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+    listener: &str,
+) -> Result<bool> {
     let mut p = Params::new();
     p.insert("event_id".into(), json!(event_id));
     p.insert("listener_command".into(), json!(listener));
+    p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
-            "SELECT 1 AS ok FROM _event_delivery WHERE event_id = :event_id AND listener_command = :listener_command",
+            "SELECT 1 AS ok FROM _event_delivery WHERE event_id = :event_id \
+               AND listener_command = :listener_command AND hub_id = :hub_id",
             &p,
         )
         .await?;
