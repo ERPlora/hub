@@ -117,11 +117,69 @@ impl ModuleStore {
         // cerrado bajo Enforce: sin firma válida no se descomprime nada.
         grant.verify_signature(&bytes, policy)?;
 
+        self.extract_verified(io::Cursor::new(&bytes), grant)
+    }
+
+    /// Instala un módulo cuyo zip ya está EN DISCO (`zip_path`), con el mismo contrato que
+    /// [`Self::install`] —SHA256 obligatorio (ADR-0015) y firma ed25519 (hub#239), ambos
+    /// verificados **antes** de tocar nada— pero sin cargar el archivo entero en RAM (hub#981):
+    /// el SHA256 se calcula en streaming desde el fichero y la descompresión lee directamente
+    /// del `File` (`ZipArchive` necesita `Seek`, que un `File` da). Solo la política `Enforce`
+    /// paga una lectura transitoria en memoria: ed25519 es one-shot sobre el mensaje completo.
+    ///
+    /// El fichero `zip_path` no se borra aquí: su ciclo de vida es del llamador (el flujo de
+    /// descarga usa un temp file que se limpia solo, también cuando la verificación falla).
+    pub fn install_from_file(
+        &self,
+        zip_path: &Path,
+        grant: &InstallGrant,
+        policy: &SignaturePolicy,
+    ) -> Result<PathBuf> {
+        let dest = self.path_for(&grant.module_id, &grant.version);
+        if self.is_cached(&grant.module_id, &grant.version) {
+            return Ok(dest);
+        }
+
+        if grant.sha256.trim().is_empty() {
+            return Err(SourceError::MissingSha256 {
+                module_id: grant.module_id.clone(),
+                version: grant.version.clone(),
+            });
+        }
+
+        // Integridad (ADR-0015): hash en streaming desde disco, antes de descomprimir nada.
+        let mut file = fs::File::open(zip_path)?;
+        let actual = cloud_client::integrity::sha256_hex_reader(&mut file)?;
+        cloud_client::integrity::verify_sha256_hex(&actual, &grant.sha256)?;
+
+        // Autenticidad (hub#239): solo `Enforce` verifica de verdad, y ed25519 necesita el
+        // mensaje completo → lectura transitoria, liberada antes de descomprimir. Las políticas
+        // sin anillo no leen nada (ese ahorro es el punto del streaming).
+        if policy.requires_signature() {
+            let bytes = fs::read(zip_path)?;
+            grant.verify_signature(&bytes, policy)?;
+        } else {
+            grant.verify_signature(&[], policy)?;
+        }
+
+        io::Seek::rewind(&mut file)?;
+        self.extract_verified(file, grant)
+    }
+
+    /// Cola común de [`Self::install`] e [`Self::install_from_file`]: descomprime un zip YA
+    /// verificado a un staging hermano y lo promociona atómicamente a su dir de cache.
+    fn extract_verified<R: io::Read + io::Seek>(
+        &self,
+        reader: R,
+        grant: &InstallGrant,
+    ) -> Result<PathBuf> {
+        let dest = self.path_for(&grant.module_id, &grant.version);
+
         // Descomprime a un dir temporal hermano; promoción atómica al final.
         let staging = self.staging_dir(&grant.module_id, &grant.version);
         // Limpia restos de un intento previo.
         let _ = fs::remove_dir_all(&staging);
-        if let Err(e) = self.unzip_into(&bytes, &staging) {
+        if let Err(e) = self.unzip_into(reader, &staging) {
             let _ = fs::remove_dir_all(&staging);
             return Err(e);
         }
@@ -157,9 +215,10 @@ impl ModuleStore {
         self.root.join(module_id).join(format!(".{version}.tmp"))
     }
 
-    /// Descomprime `bytes` (un zip) bajo `dest`, rechazando entradas que escapen del destino.
-    fn unzip_into(&self, bytes: &[u8], dest: &Path) -> Result<()> {
-        let reader = io::Cursor::new(bytes);
+    /// Descomprime un zip (leído de `reader`) bajo `dest`, rechazando entradas que escapen del
+    /// destino. Genérico sobre `Read + Seek` (hub#981): sirve tanto un `Cursor` en memoria como
+    /// un `File` en disco, sin exigir el archivo entero en RAM.
+    fn unzip_into<R: io::Read + io::Seek>(&self, reader: R, dest: &Path) -> Result<()> {
         let mut archive =
             zip::ZipArchive::new(reader).map_err(|e| SourceError::Zip(e.to_string()))?;
 
@@ -509,6 +568,119 @@ mod tests {
         // El mismo grant que `Enforce` rechaza, `DevTrust` lo admite (escape hatch explícito).
         let path = store.install(&fetcher, &grant, &SignaturePolicy::DevTrust).unwrap();
         assert!(path.join("module.json").is_file());
+    }
+
+    // ── hub#981: install from a zip already streamed to DISK (no RAM buffering) ─────────────
+    //
+    // The download path streams the archive to a temp file; the store must verify (SHA256 +
+    // signature) and extract straight from that file, with the exact same contract as
+    // `install`: verification happens BEFORE touching anything, and a failure leaves no garbage.
+
+    /// Writes `bytes` as a zip file inside `dir` and returns its path.
+    fn zip_on_disk(dir: &Path, bytes: &[u8]) -> PathBuf {
+        let path = dir.join("module.zip");
+        fs::write(&path, bytes).unwrap();
+        path
+    }
+
+    /// Every file under `root`, relative — to assert "no garbage left behind".
+    fn files_under(root: &Path) -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = fs::read_dir(&dir) else { continue };
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else {
+                    out.push(p.strip_prefix(root).unwrap().to_path_buf());
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn install_from_file_verifies_and_extracts() {
+        let cache = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let store = ModuleStore::new(cache.path());
+        let zip = valid_module_zip();
+        let grant = grant_for(&zip, "inventory", "1.0.0");
+        let zip_path = zip_on_disk(downloads.path(), &zip);
+
+        let dest = store
+            .install_from_file(&zip_path, &grant, &SignaturePolicy::DevTrust)
+            .unwrap();
+        assert_eq!(dest, store.path_for("inventory", "1.0.0"));
+        assert!(dest.join("module.json").is_file());
+        assert!(dest.join("migrations/postgres/001_init.sql").is_file());
+        assert!(store.is_cached("inventory", "1.0.0"));
+    }
+
+    #[test]
+    fn install_from_file_bad_sha_rejects_and_leaves_no_garbage() {
+        let cache = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let store = ModuleStore::new(cache.path());
+        let zip = valid_module_zip();
+        let mut grant = grant_for(&zip, "inventory", "1.0.0");
+        grant.sha256 = cloud_client::integrity::sha256_hex(b"other bytes");
+        let zip_path = zip_on_disk(downloads.path(), &zip);
+
+        let err = store
+            .install_from_file(&zip_path, &grant, &SignaturePolicy::DevTrust)
+            .unwrap_err();
+        assert!(matches!(err, SourceError::Integrity(_)), "{err:?}");
+        assert!(!store.is_cached("inventory", "1.0.0"));
+        assert!(
+            files_under(cache.path()).is_empty(),
+            "a rejected zip must leave the cache untouched: {:?}",
+            files_under(cache.path())
+        );
+    }
+
+    #[test]
+    fn install_from_file_enforce_accepts_signed_and_rejects_unsigned() {
+        let cache = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let store = ModuleStore::new(cache.path());
+        let (signer, policy) = signer_and_keyring();
+        let zip = valid_module_zip();
+        let zip_path = zip_on_disk(downloads.path(), &zip);
+
+        // Unsigned under Enforce: rejected before extracting anything.
+        let grant = grant_for(&zip, "inventory", "1.0.0");
+        let err = store.install_from_file(&zip_path, &grant, &policy).unwrap_err();
+        assert!(matches!(err, SourceError::BadSignature(SignatureError::Missing)), "{err:?}");
+        assert!(!store.is_cached("inventory", "1.0.0"));
+
+        // Correctly signed (signature covers the same bytes the file holds): installs.
+        let mut grant = grant_for(&zip, "inventory", "1.0.0");
+        grant.signature = Some(signer.sign("marketplace", &zip));
+        let dest = store.install_from_file(&zip_path, &grant, &policy).unwrap();
+        assert!(dest.join("module.json").is_file());
+    }
+
+    #[test]
+    fn install_from_file_zip_slip_is_rejected() {
+        let cache = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let store = ModuleStore::new(cache.path());
+        let zip = build_zip(&[
+            ("module.json", br#"{"id":"x","version":"1"}"# as &[u8]),
+            ("../evil.txt", b"pwned"),
+        ]);
+        let grant = grant_for(&zip, "x", "1");
+        let zip_path = zip_on_disk(downloads.path(), &zip);
+
+        let err = store
+            .install_from_file(&zip_path, &grant, &SignaturePolicy::DevTrust)
+            .unwrap_err();
+        assert!(matches!(err, SourceError::Zip(_)), "{err:?}");
+        assert!(!cache.path().parent().unwrap().join("evil.txt").exists());
+        assert!(!store.is_cached("x", "1"));
     }
 
     #[test]
