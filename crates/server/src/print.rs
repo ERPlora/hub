@@ -20,6 +20,19 @@
 //! | `POST /api/print/hosts/heartbeat` | "still here", for every role that device drains. |
 //! | `GET`/`DELETE /api/print/hosts` | the registry (+ per-role coverage), and retiring a device. |
 //!
+//! And four for the **stations** themselves (hub#457) — the destinations both of the above resolve
+//! against, now rows instead of words:
+//!
+//! | Endpoint | Auth | Contract |
+//! |----------|------|----------|
+//! | `GET /api/print/stations` | user session | every destination of this hub. |
+//! | `POST /api/print/stations` | **admin** | `{ label, key? }`; no `key` derives one. |
+//! | `PATCH /api/print/stations/{id}` | **admin** | `{ label }` — the key is immutable. |
+//! | `DELETE /api/print/stations/{id}` | **admin** | `404` / `409` (work queued, or `receipt`) / `200`. |
+//!
+//! Reading is any session because it is what a screen reads to **offer** a destination; writing is
+//! admin because it defines what the queues of the business *are* — the same door as `/api/keys`.
+//!
 //! **A device only ever registers, beats for or retires ITSELF**: the subject of the write doors is
 //! the caller's `X-Device-Id` and there is no parameter to name another one — which is why an
 //! ordinary session suffices for them. The app has to be able to do this when it starts, long after
@@ -28,12 +41,13 @@
 //! takes an **admin** session — the same asymmetry as `/api/device/mode`.
 //!
 //! The `hub_id` comes from the deployment (not spoofable), like every other handler here.
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use erplora_runtime::print_hosts::{self, PrintHost, RoleCoverage};
 use erplora_runtime::print_queue::{EnqueueOutcome, NewPrintJob, PrintJob};
+use erplora_runtime::print_stations::{DeleteOutcome, PrintStation};
 use serde_json::{json, Value};
 
 use crate::auth;
@@ -393,6 +407,185 @@ pub async fn retire_host(
         .filter(|r| !r.is_empty());
     match rt.unregister_print_host(target, role).await {
         Ok(removed) => Json(json!({ "ok": true, "removed": removed })).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+// ── Print stations: the destinations themselves (hub#457) ─────────────────────────────────────
+
+/// A station over the wire.
+fn station_json(s: &PrintStation) -> Value {
+    json!({ "id": s.id, "key": s.key, "label": s.label, "createdAt": s.created_at })
+}
+
+/// Body of `POST /api/print/stations`.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewStation {
+    /// The wire name. Absent or empty is **derived from the label**, which is the realistic
+    /// gesture: the owner types "Barra de la terraza", not a slug.
+    #[serde(default)]
+    pub key: Option<String>,
+    pub label: String,
+}
+
+/// Body of `PATCH /api/print/stations/{id}`. There is deliberately no `key`: it is what every
+/// published contract sends and what every queued job already carries.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameStation {
+    pub label: String,
+}
+
+/// `409` for a delete the hub refuses on domain grounds (same channel as ADR-0205).
+fn station_conflict(message: String) -> Response {
+    (
+        StatusCode::CONFLICT,
+        Json(json!({
+            "ok": false,
+            "error": { "code": "station_in_use", "message": message }
+        })),
+    )
+        .into_response()
+}
+
+/// `404` for a station id this hub does not know.
+fn station_not_found() -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({
+            "ok": false,
+            "error": { "code": "not_found", "message": "no such print station in this hub" }
+        })),
+    )
+        .into_response()
+}
+
+/// GET /api/print/stations — every destination of this hub. Auth = any user session.
+///
+/// Not admin-only: this is what a screen reads to **offer** a destination, and it is the same list
+/// the refusal of an unknown role already names.
+pub async fn list_stations(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let hub_id = st.hub_id();
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.print_stations().await {
+        Ok(stations) => Json(json!({
+            "ok": true,
+            "stations": stations.iter().map(station_json).collect::<Vec<_>>(),
+        }))
+        .into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// POST /api/print/stations — add a destination. Auth = **admin** session.
+///
+/// Admin and not any session, unlike registering a host: a host says "this device, in my hands,
+/// drains that queue", while this defines what the queues of the business **are** — the same kind
+/// of decision as issuing an API key or creating a user.
+pub async fn create_station(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<NewStation>>,
+) -> Response {
+    let Some(Json(input)) = body else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "invalid_payload", "message": "expected { label }" }
+            })),
+        )
+            .into_response();
+    };
+    let hub_id = st.hub_id();
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt
+        .create_print_station(input.key.as_deref().unwrap_or_default(), &input.label)
+        .await
+    {
+        Ok(station) => Json(json!({ "ok": true, "station": station_json(&station) })).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// PATCH /api/print/stations/{id} — rename the label. Auth = **admin** session.
+pub async fn rename_station(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    body: Option<Json<RenameStation>>,
+) -> Response {
+    let Some(Json(input)) = body else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "invalid_payload", "message": "expected { label }" }
+            })),
+        )
+            .into_response();
+    };
+    let hub_id = st.hub_id();
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.rename_print_station(&id, &input.label).await {
+        Ok(Some(station)) => {
+            Json(json!({ "ok": true, "station": station_json(&station) })).into_response()
+        }
+        Ok(None) => station_not_found(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// DELETE /api/print/stations/{id} — retire a destination. Auth = **admin** session.
+///
+/// Three answers, and they are different on purpose: `404` (not a station here), `409` (it still
+/// has work, or it is the protected `receipt`) and `200`. A delete that quietly did nothing would
+/// leave the owner's screen disagreeing with the hub about what the business can print.
+pub async fn delete_station(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let hub_id = st.hub_id();
+    let arc = match st.runtime_for(&hub_id).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.delete_print_station(&id).await {
+        Ok(DeleteOutcome::Deleted) => Json(json!({ "ok": true })).into_response(),
+        Ok(DeleteOutcome::NotFound) => station_not_found(),
+        Ok(DeleteOutcome::HasWork(n)) => station_conflict(format!(
+            "this station still has {n} job(s) waiting or printing: drain them before removing it"
+        )),
+        Ok(DeleteOutcome::Protected) => station_conflict(
+            "the `receipt` station is the default of every till and cannot be removed".to_string(),
+        ),
         Err(e) => crate::err_response(e),
     }
 }

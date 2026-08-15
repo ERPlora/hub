@@ -46,7 +46,14 @@
 //! Going offline and being retired are **different things**: the first is an accident and leaves the
 //! row (not live), the second is a decision and is [`unregister`].
 //!
-//! Persistence: table `_print_host`, **system migration v19**. `registered_by` audits who set the
+//! **What a role IS, since hub#457.** It is not a word any more: [`register`] resolves what the
+//! client sent onto a row of `_print_station` ([`crate::print_stations`]) and stores that station's
+//! own `key` and `id`. So a device cannot register for `kitchn` — it is told, with the hub's real
+//! stations in the message — and it cannot end up hosting `Kitchen` while the queue fills
+//! `kitchen`, because both sides now point at the same row instead of at two strings.
+//!
+//! Persistence: table `_print_host`, **system migration v19** (`station_id`: **v47**).
+//! `registered_by` audits who set the
 //! device up, like `mode_set_by` in [`crate::device_mode`]: a host that claims tickets and never
 //! prints them starves a queue, so that decision leaves a name.
 //!
@@ -79,8 +86,13 @@ pub const MAX_LABEL_CHARS: usize = 120;
 pub struct PrintHost {
     /// The device (`X-Device-Id`, ADR-0154). An identifier, never a credential.
     pub device_id: String,
-    /// Which queue it drains: `receipt`, `kitchen`, `bar`, `label`, …
+    /// Which queue it drains, by the **station's** key: `receipt`, `kitchen`, `bar`, `label`, or
+    /// whatever this hub added. Always the canonical spelling — [`register`] resolves what the
+    /// client sent onto a station and stores the station's own key (hub#457).
     pub role: String,
+    /// The station this registration points at. **This** is what `claim_next` filters on, so a
+    /// host and a job meet through a row instead of through two strings that happen to match.
+    pub station_id: String,
     /// What the owner should see instead of an opaque id ("Counter till").
     pub label: String,
     /// **Derived at read time** from `last_seen_at`, never stored: a switched-off device cannot
@@ -111,7 +123,8 @@ pub struct RoleCoverage {
 }
 
 /// Stored columns every read of the registry returns, in the order [`row_to_host`] expects.
-const HOST_FIELDS: &str = "device_id, role, label, registered_at, registered_by, last_seen_at";
+const HOST_FIELDS: &str =
+    "device_id, role, station_id, label, registered_at, registered_by, last_seen_at";
 
 /// SQL that resolves `live` for a row of `_print_host` against the `:cutoff` parameter.
 ///
@@ -150,18 +163,23 @@ pub async fn register(
     actor: &str,
 ) -> Result<PrintHost> {
     let device_id = device_id.trim();
-    let role = role.trim();
     let label = label.trim();
     if device_id.is_empty() {
         return Err(invalid(
             "device_id is required (which device is going to print this role)",
         ));
     }
-    if role.is_empty() {
+    if role.trim().is_empty() {
         return Err(invalid(
             "role is required (which queue this device is going to drain)",
         ));
     }
+    // Same door as the queue's (hub#457): the role is **resolved** onto a station of this hub, and
+    // what gets stored is the station's key and id. A device that registers for `kitchn` is told
+    // so here — with the real stations in the message — instead of sitting forever as the live
+    // host of a queue no producer will ever fill.
+    let station = crate::print_stations::resolve(db, hub_id, role).await?;
+    let role = station.key.as_str();
     let label_chars = label.chars().count();
     if label_chars > MAX_LABEL_CHARS {
         return Err(invalid(format!(
@@ -174,6 +192,7 @@ pub async fn register(
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
     p.insert("role".into(), json!(role));
+    p.insert("station_id".into(), json!(station.id));
     p.insert("label".into(), json!(label));
     p.insert("now".into(), json!(now_rfc3339()));
     p.insert("actor".into(), json!(actor));
@@ -185,10 +204,11 @@ pub async fn register(
     // so a lean client does not wipe the name off the owner's screen.
     let sql = format!(
         "INSERT INTO _print_host \
-         (hub_id, device_id, role, label, registered_at, registered_by, last_seen_at) \
-         VALUES (:hub_id, :device_id, :role, :label, :now, :actor, :now) \
+         (hub_id, device_id, role, station_id, label, registered_at, registered_by, last_seen_at) \
+         VALUES (:hub_id, :device_id, :role, :station_id, :label, :now, :actor, :now) \
          ON CONFLICT (hub_id, device_id, role) DO UPDATE \
            SET last_seen_at = EXCLUDED.last_seen_at, \
+               station_id = EXCLUDED.station_id, \
                label = CASE WHEN EXCLUDED.label = '' THEN _print_host.label \
                             ELSE EXCLUDED.label END \
          RETURNING {HOST_FIELDS}, {LIVE_EXPR} AS live"
@@ -315,6 +335,7 @@ fn row_to_host(row: &serde_json::Value) -> PrintHost {
     PrintHost {
         device_id: s("device_id"),
         role: s("role"),
+        station_id: s("station_id"),
         label: s("label"),
         // Row contract: flags travel as INTEGER 0/1, never BOOLEAN (`erplora_db`).
         live: row["live"].as_i64() == Some(1),
@@ -841,7 +862,7 @@ mod tests {
             .unwrap();
         queue(&db, "h1", "j1", "kitchen").await;
         queue(&db, "h1", "j2", "kitchen").await;
-        crate::print_queue::claim_next(
+        crate::print_queue::claim_next_role(
             &db,
             "h1",
             "kitchen",

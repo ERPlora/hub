@@ -1399,6 +1399,58 @@ UPDATE _event_delivery SET hub_id = :hub_id WHERE hub_id IS NULL;\
 ALTER TABLE _event_delivery ALTER COLUMN hub_id SET NOT NULL;\
 CREATE INDEX IF NOT EXISTS ix_event_delivery_hub ON _event_delivery (hub_id, event_id);",
     },
+    // ── v47 — hub#457: las estaciones de impresión pasan a ser FILAS con id ───────────────────
+    // Hasta aquí «qué impresora imprime esto» viajaba como **cadena libre comparada literalmente**:
+    // `enqueue` guardaba el `role` que llegara, `register` registraba el `role` que llegara, y
+    // `claim_next` unía los dos lados con `role = :role`. Nadie comprobaba nunca que ambos hubieran
+    // tecleado lo mismo, así que `Kitchen`, `kitchen` y `kitchn` eran **tres colas distintas** — y
+    // la tercera no tenía host jamás, en silencio, hasta que faltaba el plato.
+    //
+    // La decisión es de MERCADO (12 referencias + foros, 15/08): Toast, Square, Lightspeed K, Odoo,
+    // Clover, Loyverse, Simphony, Epson y Star hacen todos lo mismo — `ítem → (FK) ESTACIÓN (id,
+    // nombre) ← (FK) impresora`. **Ni un solo sistema maduro compara una cadena tecleada al
+    // imprimir**: el vocabulario es ABIERTO (los nombres reales son *Grill*, *Frío*, *Barra 2*) y lo
+    // CERRADO es el enlace, porque es una FK elegida de un selector. Clover, la única referencia con
+    // el set cerrado, es la que tiene el foro lleno de comerciantes que no pueden expresar su local.
+    //
+    // Esta migración es **solo DDL**. La siembra de las cuatro estaciones de ADR-0196, la adopción
+    // de las que este hub ya tenga configuradas en hardware, el plegado de variantes de mayúsculas
+    // y el backfill de `station_id` viven en `print_stations::ensure_stations`, que corre en CADA
+    // arranque desde [`apply`]. El motivo no es estético: una migración de sistema se registra **por
+    // BASE DE DATOS**, así que un hub que llega a una BD cuyas migraciones ya corrieron no recibiría
+    // NADA — y ese es justo el hub legacy pre-ADR-0201 (varios hubs, una BD) que arrancaría sin
+    // poder imprimir absolutamente nada.
+    //
+    // `station_id` entra con `DEFAULT ''` y no `NOT NULL` sin defecto, a propósito y al revés que la
+    // v46: aquí la ventana del start-first (ADR-0269) no puede fallar en abierto. Un `INSERT` del
+    // contenedor viejo (sin `station_id`) escribe `''`, que **no resuelve a ninguna estación** — el
+    // trabajo espera y `ensure_stations` lo apunta a su estación en el siguiente arranque. Con `NOT
+    // NULL` a secas el encolado del contenedor viejo reventaría y la venta se quedaría sin tique.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): todo es `IF NOT EXISTS`. Importa porque los fixtures
+    // rebobinan la tabla de control por versión y reaplican lo posterior sobre una BD que ya tiene
+    // los objetos.
+    //
+    // ⚠️ El número es DECLARADO, no la posición en el slice. Hoy hay varias ramas de esta tanda
+    // pidiendo número (hub#658 estrena otra) y ya hubo una colisión en la v45: recomprobado contra
+    // `origin/develop` justo antes del push (hub#573 hace que una versión en o por debajo del máximo
+    // aplicado ABORTE el arranque en vez de saltarse en silencio). Los huecos v15/v20/v24 siguen
+    // libres e **inalcanzables**: cogerlos ES el fallo mudo.
+    SystemMigration {
+        version: 47,
+        name: "print_stations",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _print_station (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, key TEXT NOT NULL, \
+  label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, \
+  PRIMARY KEY (id));\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_print_station_key ON _print_station (hub_id, key);\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS station_id TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _print_host ADD COLUMN IF NOT EXISTS station_id TEXT NOT NULL DEFAULT '';\
+CREATE INDEX IF NOT EXISTS ix_print_queue_station ON _print_queue (hub_id, station_id, status, seq);\
+CREATE INDEX IF NOT EXISTS ix_print_host_station ON _print_host (hub_id, station_id, last_seen_at);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -1483,6 +1535,13 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
 
         db.execute_tx(&ops).await?;
     }
+
+    // Puesta a punto de las estaciones de impresión **de este hub** (hub#457). Va aquí y no dentro
+    // de la v47 porque una migración se registra por BASE DE DATOS y este paso es por HUB: en la BD
+    // compartida legacy (pre-ADR-0201) el segundo hub no vería nunca la siembra. Es idempotente y
+    // barato (cuatro filas como mucho), y siembra **solo si el hub no tiene ninguna** — un
+    // comerciante que borró `bar` no se lo encuentra de vuelta mañana.
+    crate::print_stations::ensure_stations(db, hub_id).await?;
     Ok(())
 }
 
@@ -3202,6 +3261,11 @@ mod kind_contract_tests {
         // número a mano. Ojo a la distancia entre 43 entradas y la v46 — **el número es declarado,
         // no la posición**: faltan la 15, la 20 y la 24, así que contar entradas para elegir el
         // siguiente número da un choque, no un hueco.
-        assert_eq!(MIGRATIONS.len(), 43, "el catálogo cambió de tamaño");
+        // + `print_stations` (v47, hub#457): las estaciones de impresión pasan a ser filas con id,
+        // y la cola y el registro de hosts apuntan a ellas por `station_id` en vez de comparar una
+        // cadena. Solo DDL — la siembra por hub vive en `print_stations::ensure_stations`, que
+        // corre desde `apply` en cada arranque porque una migración se registra por BASE DE DATOS
+        // y esto hace falta por HUB.
+        assert_eq!(MIGRATIONS.len(), 44, "el catálogo cambió de tamaño");
     }
 }

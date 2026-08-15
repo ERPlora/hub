@@ -51,6 +51,7 @@ pub mod pin_policy;
 pub mod print_drain;
 pub mod print_hosts;
 pub mod print_queue;
+pub mod print_stations;
 pub mod producer_facts;
 pub mod queries;
 pub mod registry;
@@ -938,6 +939,39 @@ impl Runtime {
         limit: i64,
     ) -> Result<Vec<print_queue::PrintJob>> {
         print_queue::list(self.db.as_ref(), &self.hub_id, role, status, limit).await
+    }
+
+    // ── Print stations: the destinations themselves, as rows (hub#457) ─────────────────────────
+
+    /// Every printing destination of this hub, by key. This is what a selector shows and what the
+    /// refusal of an unknown role names.
+    pub async fn print_stations(&self) -> Result<Vec<print_stations::PrintStation>> {
+        print_stations::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Adds a station ("Barra de la terraza"). An empty `key` is derived from the label.
+    pub async fn create_print_station(
+        &self,
+        key: &str,
+        label: &str,
+    ) -> Result<print_stations::PrintStation> {
+        print_stations::create(self.db.as_ref(), &self.hub_id, key, label).await
+    }
+
+    /// Renames a station — the label only; the key is what every queued job already carries.
+    /// `None` = no such station in this hub.
+    pub async fn rename_print_station(
+        &self,
+        id: &str,
+        label: &str,
+    ) -> Result<Option<print_stations::PrintStation>> {
+        print_stations::rename(self.db.as_ref(), &self.hub_id, id, label).await
+    }
+
+    /// Removes a station and the host registrations that pointed at it. Refuses while it still
+    /// has unfinished work, and always for `receipt` — see [`print_stations::delete`].
+    pub async fn delete_print_station(&self, id: &str) -> Result<print_stations::DeleteOutcome> {
+        print_stations::delete(self.db.as_ref(), &self.hub_id, id).await
     }
 
     // ── Print hosts: who drains each printer role (ADR-0196 §6, hub#342) ───────────────────────

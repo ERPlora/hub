@@ -51,6 +51,16 @@
 //! queue forever. Every claim carries a **lease**; once it expires the job returns to `pending`
 //! (see [`reclaim_expired`]) so a crashed print host does not strand the ticket.
 //!
+//! ## The role is a STATION, resolved — not a string, compared (hub#457)
+//!
+//! `role` used to be stored exactly as it arrived and matched literally against what a print host
+//! had registered, so `Kitchen`, `kitchen` and `kitchn` were **three queues** and the third one
+//! never had a host. Since hub#457 it is [resolved](crate::print_stations::resolve) against
+//! `_print_station`: what gets stored is the station's own `key` and `id`, an unknown one is a
+//! **422 naming the stations this hub has**, and [`claim_next`] filters by `station_id` — its
+//! parameter is not even a word any more. Same shape as the [`DOCUMENT_TYPES`] guard below,
+//! applied to the field that was missing it.
+//!
 //! This module is the queue only. Registering a print host for a role (hub#342), draining it over
 //! the WS (hub#343) and the `sdk.print` producer path (hub#344) are separate work.
 use erplora_db::{DatabaseAdapter, Params};
@@ -189,13 +199,18 @@ pub async fn enqueue(
     job: &NewPrintJob,
 ) -> Result<EnqueueOutcome> {
     let job_id = job.job_id.trim();
-    let role = job.role.trim();
     if job_id.is_empty() {
         return Err(invalid("job_id is required (it is the idempotency key)"));
     }
-    if role.is_empty() {
+    if job.role.trim().is_empty() {
         return Err(invalid("role is required (which printer prints this)"));
     }
+    // **The role is RESOLVED, not compared** (hub#457). Everything below stores the station's own
+    // `key` and `id`, so `Kitchen`, ` kitchen ` and `kitchen` are one queue and `kitchn` is not a
+    // queue at all — it is a 422 that names the stations this hub really has. That is the same
+    // shape as the `documentType` guard right below, applied to the field that was missing it.
+    let station = crate::print_stations::resolve(db, hub_id, &job.role).await?;
+    let role = station.key.as_str();
     let document_type = job.document_type.trim();
     // The vocabulary is CLOSED, and that is the point of this guard. An unknown document type
     // used to map to `Generic`, so a typo (`kitchn`) printed a nameless list of key/value pairs
@@ -236,6 +251,7 @@ pub async fn enqueue(
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("job_id".into(), json!(job_id));
     p.insert("role".into(), json!(role));
+    p.insert("station_id".into(), json!(station.id));
     p.insert("document_type".into(), json!(document_type));
     p.insert("document".into(), json!(document));
     p.insert("format".into(), json!(job.format));
@@ -245,8 +261,10 @@ pub async fn enqueue(
     let res = db
         .execute(
             "INSERT INTO _print_queue \
-             (hub_id, job_id, role, document_type, document, format, status, attempts, created_at) \
-             VALUES (:hub_id, :job_id, :role, :document_type, :document, :format, 'pending', 0, :now) \
+             (hub_id, job_id, role, station_id, document_type, document, format, status, \
+              attempts, created_at) \
+             VALUES (:hub_id, :job_id, :role, :station_id, :document_type, :document, :format, \
+                     'pending', 0, :now) \
              ON CONFLICT (hub_id, job_id) DO NOTHING",
             &p,
         )
@@ -258,15 +276,20 @@ pub async fn enqueue(
     })
 }
 
-/// Hands the oldest `pending` job of `role` to a print host, leasing it for `lease_seconds`.
+/// Hands the oldest `pending` job of a **station** to a print host, leasing it for `lease_seconds`.
 ///
-/// `FOR UPDATE SKIP LOCKED` makes the hand-out atomic: two hosts of the same role racing on the
+/// **The parameter is a `station_id`, not a word** (hub#457), and that is the point: the hand-out
+/// can no longer be missed because two sides spelled the destination differently. There is nothing
+/// to spell — the caller had to resolve a station first ([`crate::print_stations::resolve`]), and
+/// an unresolvable one never gets this far.
+///
+/// `FOR UPDATE SKIP LOCKED` makes the hand-out atomic: two hosts of the same station racing on the
 /// same queue take **different** jobs, never the same ticket twice. The claim burns one attempt, so
 /// a host that takes the job and disappears cannot keep it circulating forever.
 pub async fn claim_next(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
-    role: &str,
+    station_id: &str,
     claimed_by: &str,
     lease_seconds: i64,
 ) -> Result<Option<PrintJob>> {
@@ -274,7 +297,7 @@ pub async fn claim_next(
         (chrono::Utc::now() + chrono::Duration::seconds(lease_seconds)).to_rfc3339();
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
-    p.insert("role".into(), json!(role));
+    p.insert("station_id".into(), json!(station_id));
     p.insert("claimed_by".into(), json!(claimed_by));
     p.insert("lease".into(), json!(lease_expires_at));
     let sql = format!(
@@ -282,12 +305,29 @@ pub async fn claim_next(
            claimed_by = :claimed_by, lease_expires_at = :lease \
          WHERE hub_id = :hub_id AND job_id = ( \
            SELECT job_id FROM _print_queue \
-           WHERE hub_id = :hub_id AND role = :role AND status = '{STATUS_PENDING}' \
+           WHERE hub_id = :hub_id AND station_id = :station_id AND status = '{STATUS_PENDING}' \
            ORDER BY seq LIMIT 1 FOR UPDATE SKIP LOCKED) \
          RETURNING {JOB_COLUMNS}"
     );
     let res = db.query(&sql, &p).await?;
     Ok(res.rows.first().map(row_to_job))
+}
+
+/// Test-only sugar: resolve `role` to its station and claim from it.
+///
+/// It exists so the suites written before hub#457 keep reading as "claim the kitchen's next job"
+/// instead of threading an id through every case. Production code resolves explicitly — see
+/// [`crate::print_drain::claim`], which must check the caller against the registry on the way.
+#[cfg(test)]
+pub(crate) async fn claim_next_role(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    role: &str,
+    claimed_by: &str,
+    lease_seconds: i64,
+) -> Result<Option<PrintJob>> {
+    let station = crate::print_stations::resolve(db, hub_id, role).await?;
+    claim_next(db, hub_id, &station.id, claimed_by, lease_seconds).await
 }
 
 /// The host confirms the job came out of the printer. Terminal: it is never handed out again, and
@@ -523,7 +563,7 @@ mod tests {
         // job is still there, still claimable.
         let db = test_db.adapter().await;
         crate::system_migrations::apply(&db, "h1").await.unwrap();
-        let claimed = claim_next(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
+        let claimed = claim_next_role(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("the job waited across the restart");
@@ -540,12 +580,12 @@ mod tests {
             .await
             .unwrap();
 
-        let first = claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        let first = claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap();
         assert_eq!(first.map(|j| j.job_id), Some("j1".to_string()));
 
-        let second = claim_next(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
+        let second = claim_next_role(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap();
         assert!(second.is_none(), "two hosts must not print the same ticket");
@@ -558,7 +598,7 @@ mod tests {
         enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
-        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
@@ -566,7 +606,7 @@ mod tests {
 
         // Neither directly…
         assert!(
-            claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none()
@@ -615,7 +655,7 @@ mod tests {
     async fn confirming_an_already_terminal_job_is_also_a_no() {
         let db = queue_db().await;
         enqueue(&db, "h1", &job("j1", "receipt", "T-1")).await.unwrap();
-        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
@@ -637,7 +677,7 @@ mod tests {
         enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
-        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
@@ -648,7 +688,7 @@ mod tests {
             .unwrap();
         assert_eq!(again, EnqueueOutcome::Duplicate);
         assert!(
-            claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none()
@@ -669,7 +709,7 @@ mod tests {
         assert_eq!(listed, ["j1", "j2", "j3"], "the queue order is observable");
 
         let mut handed = Vec::new();
-        while let Some(j) = claim_next(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
+        while let Some(j) = claim_next_role(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
         {
@@ -687,14 +727,14 @@ mod tests {
             .unwrap();
 
         assert!(
-            claim_next(&db, "h1", "bar", "host-bar", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "bar", "host-bar", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none(),
             "a bar host must not drain the kitchen queue"
         );
         assert!(
-            claim_next(&db, "h1", "kitchen", "host-kitchen", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "kitchen", "host-kitchen", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_some()
@@ -711,12 +751,12 @@ mod tests {
             .unwrap();
 
         // Lease already in the past = the host took it and never came back.
-        claim_next(&db, "h1", "receipt", "dead-host", -1)
+        claim_next_role(&db, "h1", "receipt", "dead-host", -1)
             .await
             .unwrap()
             .unwrap();
         assert!(
-            claim_next(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none(),
@@ -724,7 +764,7 @@ mod tests {
         );
 
         assert_eq!(reclaim_expired(&db, "h1").await.unwrap(), 1);
-        let back = claim_next(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
+        let back = claim_next_role(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("the job waits for the next host instead of being lost");
@@ -742,7 +782,7 @@ mod tests {
             .unwrap();
 
         for _ in 0..(MAX_ATTEMPTS - 1) {
-            claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .expect("still retryable");
@@ -753,7 +793,7 @@ mod tests {
             assert_eq!(all(&db, "h1").await[0].status, STATUS_PENDING);
         }
 
-        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("last hand-out");
@@ -767,7 +807,7 @@ mod tests {
         assert_eq!(dead.attempts, MAX_ATTEMPTS);
         assert_eq!(dead.last_error, "out of paper", "the reason is observable");
         assert!(
-            claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none()
@@ -793,12 +833,12 @@ mod tests {
         );
 
         assert!(
-            claim_next(&db, "h2", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h2", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_some()
         );
-        let h1 = claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        let h1 = claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("h1 still has its own job");
@@ -859,7 +899,7 @@ mod tests {
         enqueue(&db, "h1", &job("j2", "kitchen", "K-2"))
             .await
             .unwrap();
-        claim_next(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
@@ -945,7 +985,7 @@ mod tests {
         .await
         .unwrap();
 
-        let claimed = claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        let claimed = claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("the host claims the ticket");
@@ -1186,5 +1226,85 @@ mod tests {
         };
         assert!(enqueue(&db, "h1", &bad).await.is_err());
         assert!(all(&db, "h1").await.is_empty());
+    }
+
+    // ── Stations as rows (hub#457) ─────────────────────────────────────────────────────────────
+
+    /// **The bug this issue is about.** `kitchn` is not a case variant of anything, so no amount of
+    /// `to_lowercase` would have caught it: it used to open a queue of its own that no host could
+    /// ever drain, and the plate went missing. Resolved against the station table it is simply not
+    /// a destination, and the refusal — a 422, like the sibling `documentType` guard right above —
+    /// names the ones that are.
+    #[tokio::test]
+    async fn a_job_for_a_station_this_hub_does_not_have_is_refused_naming_the_real_ones() {
+        let db = queue_db().await;
+        let err = enqueue(&db, "h1", &job("j1", "kitchn", "K-1"))
+            .await
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("kitchn"), "it says what was rejected: {msg}");
+        assert!(
+            msg.contains("kitchen"),
+            "and what this hub really has, so the typo is visible: {msg}"
+        );
+        assert!(
+            all(&db, "h1").await.is_empty(),
+            "a ticket nobody can print must not be queued at all"
+        );
+    }
+
+    /// **`Kitchen` and `kitchen` are ONE queue now.** The case tolerance stays at the door and the
+    /// row is stored against the station, so a job enqueued with stray case is handed to the host
+    /// registered with the canonical spelling — which before was the second of the three ways to
+    /// open an orphan queue.
+    #[tokio::test]
+    async fn a_job_enqueued_with_stray_case_lands_in_the_canonical_station() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &job("j1", "  Kitchen ", "K-1"))
+            .await
+            .unwrap();
+
+        let jobs = all(&db, "h1").await;
+        assert_eq!(
+            jobs[0].role, "kitchen",
+            "what is stored is the STATION's key, never the string that was typed"
+        );
+
+        let station = crate::print_stations::resolve(&db, "h1", "kitchen")
+            .await
+            .unwrap();
+        let claimed = claim_next(&db, "h1", &station.id, "host-a", DEFAULT_LEASE_SECONDS)
+            .await
+            .unwrap()
+            .expect("the host of the kitchen station takes it");
+        assert_eq!(claimed.job_id, "j1");
+    }
+
+    /// The hand-out is by **station id**, not by a word. Two stations of one hub never see each
+    /// other's work, and the filter cannot be defeated by how anybody spells anything.
+    #[tokio::test]
+    async fn claiming_is_scoped_to_the_station_and_never_to_a_spelling() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &job("j-bar", "bar", "B-1")).await.unwrap();
+        let kitchen = crate::print_stations::resolve(&db, "h1", "kitchen")
+            .await
+            .unwrap();
+
+        assert!(
+            claim_next(&db, "h1", &kitchen.id, "host-a", DEFAULT_LEASE_SECONDS)
+                .await
+                .unwrap()
+                .is_none(),
+            "the kitchen does not take the bar's ticket"
+        );
+        let bar = crate::print_stations::resolve(&db, "h1", "bar").await.unwrap();
+        assert_eq!(
+            claim_next(&db, "h1", &bar.id, "host-b", DEFAULT_LEASE_SECONDS)
+                .await
+                .unwrap()
+                .expect("the bar does")
+                .job_id,
+            "j-bar"
+        );
     }
 }
