@@ -1050,7 +1050,18 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "substitutes_nif": r.substitutes_nif,
             });
             if let Ok((ops, _success)) =
-                transmit_one(host, ctx, &record_json, cfg, &ids[3], &ids[4], &ids[5]).await
+                transmit_one(
+                    host,
+                    ctx,
+                    &record_json,
+                    cfg,
+                    &ids[3],
+                    &ids[4],
+                    &ids[5],
+                    // Alta recién creada: se remite en el momento, no sale de ninguna cola.
+                    Remission::Punctual,
+                )
+                .await
             {
                 for o in ops {
                     output = output.with_operation(o);
@@ -1116,6 +1127,8 @@ async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> 
         &ctx.new_ids[1],
         // Id reservado para el ancla si la AEAT rechaza por encadenamiento y hay que re-anclar.
         &ctx.new_ids[2],
+        // Envío puntual: `verifactu.record.transmit` remite un registro, no drena la cola.
+        Remission::Punctual,
     )
     .await?;
     let mut out = Output::new();
@@ -1139,6 +1152,7 @@ async fn transmit_one(
     event_id: &str,
     queue_id: &str,
     recovery_id: &str,
+    remission: Remission,
 ) -> Result<(Vec<Operation>, bool)> {
     let record_id = str_field(record, "id");
     // WHERE this goes is settled BEFORE anything else happens — before the chain read, before
@@ -1215,6 +1229,16 @@ async fn transmit_one(
         },
     };
 
+    // `Cabecera/Incidencia=S` cuando el envío sale de la cola de contingencia (hub#322). Se
+    // estampa AQUÍ, sobre el sobre ya resuelto, y no dentro del constructor: el XML reutilizado
+    // de un intento anterior se construyó cuando nadie sabía todavía que este registro acabaría
+    // en la cola, y ese es justamente el caso normal de la cola. Es marca del SOBRE: el bloque
+    // `RegistroAlta`/`RegistroAnulacion` —el que cubre la huella— no cambia ni un byte.
+    let xml = match remission {
+        Remission::Punctual => xml,
+        Remission::FromContingency => aeat::stamp_contingency_incidence(&xml),
+    };
+
     // Validación contra el esquema ANTES de tocar la red (`xsd::validate_registro`). Cuando la
     // AEAT contesta 4102 el número de cadena ya está gastado, así que un XML que no cumple no
     // puede llegar a salir. No corta el proceso: marca el registro como rechazado LOCALMENTE con
@@ -1283,6 +1307,7 @@ async fn transmit_one(
                     &resp,
                     recovery_id,
                     event_id,
+                    remission,
                 )
                 .await
                 {
@@ -1423,6 +1448,21 @@ async fn enqueue_retry(
         attempts,
         backoff_minutes,
     })
+}
+
+/// **Where this send comes from**, which is what decides whether the envelope declares an
+/// incidence (`Cabecera/RemisionVoluntaria/Incidencia`, hub#322).
+///
+/// It is passed in and not derived from the record on purpose: the caller is the only one that
+/// knows. `process_contingency_queue` is draining the queue; `transmit_record` and the inline
+/// transmission of `create_record` are remitting an invoice as it happens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Remission {
+    /// The record is being remitted as it is generated — the ordinary sale.
+    Punctual,
+    /// The record waited in the contingency queue and is going out now. This is what `Incidencia`
+    /// exists for, and what makes the deferred remission legal instead of merely late.
+    FromContingency,
 }
 
 /// Why a record was NOT handed to the AEAT, in the two channels the operator reads: a stable code
@@ -1617,6 +1657,9 @@ async fn auto_rechain_and_retry(
     rejection: &aeat::AeatResponse,
     recovery_id: &str,
     event_id: &str,
+    // El re-anclado hereda el origen del envío que lo disparó (hub#322): un registro que salió
+    // de la cola sigue saliendo de la cola cuando se reintenta sobre el ancla que dio la AEAT.
+    remission: Remission,
 ) -> Result<Option<(Vec<Operation>, bool)>> {
     let issuer_nif = str_field(record, "issuer_nif");
     // Both legs of the recovery go to the record's OWN destination (hub#471): asking the wrong
@@ -1669,6 +1712,10 @@ async fn auto_rechain_and_retry(
         Some(&anchor_as_prev(anchor)),
         &ctx.hub_id,
     )?;
+    let xml = match remission {
+        Remission::Punctual => xml,
+        Remission::FromContingency => aeat::stamp_contingency_incidence(&xml),
+    };
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
     let identity = build_identity(host, &ctx.hub_id, config).await?;
     let body = aeat::post_soap(destination.endpoint, identity, &xml).await?;
@@ -1821,6 +1868,8 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
             &event_id,
             &queue_id,
             &recovery_id,
+            // ESTE es el envío que declara `Incidencia=S`: sale de la cola de contingencia.
+            Remission::FromContingency,
         )
         .await?;
         for o in ops {
@@ -3126,6 +3175,13 @@ mod environment_chain_tests {
         queue: Vec<Json>,
         has_core_certificate: bool,
         reads: Mutex<Vec<(String, Params)>>,
+        /// Every XML this engine archived, in order.
+        ///
+        /// It is the honest observation point for «what was about to be transmitted»: the archive
+        /// happens **after** the envelope is final and **before** the network is touched, and a
+        /// transmission that cannot be archived is never sent. Asserting here needs neither a
+        /// fake AEAT nor a certificate.
+        archived: Mutex<Vec<String>>,
     }
 
     impl ChainHost {
@@ -3136,7 +3192,18 @@ mod environment_chain_tests {
                 queue: Vec::new(),
                 has_core_certificate: false,
                 reads: Mutex::new(Vec::new()),
+                archived: Mutex::new(Vec::new()),
             }
+        }
+
+        /// The XML of the FIRST transmission this host archived.
+        fn first_archived(&self) -> String {
+            self.archived
+                .lock()
+                .unwrap()
+                .first()
+                .cloned()
+                .expect("nothing was archived, so nothing was about to be transmitted")
         }
     }
 
@@ -3207,9 +3274,13 @@ mod environment_chain_tests {
         async fn write_static_file(
             &self,
             relative_path: &str,
-            _bytes: &[u8],
+            bytes: &[u8],
             _content_type: &str,
         ) -> Result<String> {
+            self.archived
+                .lock()
+                .unwrap()
+                .push(String::from_utf8_lossy(bytes).into_owned());
             Ok(format!("modules/verifactu/{relative_path}"))
         }
     }
@@ -3475,6 +3546,10 @@ mod environment_chain_tests {
     fn queued_testing_record() -> Json {
         let mut record = chain_row("rec-2", 2, "testing", HASH_TESTING_2, HASH_TESTING_1);
         record["status"] = json!("pending");
+        // `DescripcionOperacion` is required and must not be empty (`xsd::REQUIRED_ALTA`).
+        // Without it the XSD gate refuses the record BEFORE the envelope is archived, and a test
+        // asserting on what was about to be transmitted would find nothing at all.
+        record["description"] = json!("Ticket");
         record
     }
 
@@ -3607,6 +3682,91 @@ mod environment_chain_tests {
                 .iter()
                 .any(|o| o.command == "verifactu._apply_transmission"),
             "nothing was transmitted, so nothing may overwrite the record's archived XML"
+        );
+    }
+
+    // ── hub#322: the envelope says whether it comes out of the contingency queue ─────────────
+    //
+    // Both tests stop at the same place, on purpose: the envelope is archived BEFORE the network
+    // is opened, and this host has no certificate to sign with, so the run dies right after the
+    // archive. What was archived is exactly what was about to be handed to the AEAT — no fake
+    // tax agency and no `.p12` needed to assert on it.
+
+    fn contingency_input() -> Json {
+        json!({
+            "payload": {},
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor", "id-summary"] }
+        })
+    }
+
+    /// 🔴 The defect: a record that spent the outage in the queue was remitted looking punctual.
+    /// `Incidencia` is what legalises a deferred remission, and no envelope carried it.
+    #[tokio::test]
+    async fn a_record_drained_from_the_queue_declares_the_incidence() {
+        let mut host = ChainHost::new(config_row("testing"), vec![queued_testing_record()]);
+        host.has_core_certificate = true;
+        host.queue = vec![json!({ "record_id": "rec-2" })];
+
+        let _ = process_contingency_queue(&contingency_input(), &host).await;
+
+        let sent = host.first_archived();
+        assert!(
+            sent.contains(
+                "<sum1:RemisionVoluntaria><sum1:Incidencia>S</sum1:Incidencia>\
+                 </sum1:RemisionVoluntaria>"
+            ),
+            "an envelope out of the queue declares the incidence: {sent}"
+        );
+    }
+
+    /// The other half, and the one that keeps the flag meaningful: an ordinary sale is a punctual
+    /// remission and declares NO incidence. Stamping every envelope would say nothing at all.
+    #[tokio::test]
+    async fn an_ordinary_transmission_declares_no_incidence() {
+        let mut host = ChainHost::new(config_row("testing"), vec![queued_testing_record()]);
+        host.has_core_certificate = true;
+        let input = json!({
+            "payload": { "record_id": "rec-2" },
+            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["id-evt", "id-queue", "id-anchor"] }
+        });
+
+        let _ = transmit_record(&input, &host).await;
+
+        let sent = host.first_archived();
+        assert!(!sent.contains("Incidencia"), "{sent}");
+        assert!(!sent.contains("RemisionVoluntaria"), "{sent}");
+    }
+
+    /// **The flag is the ENVELOPE's, and the record knows nothing about it** (the caveat of #322).
+    ///
+    /// The same invoice remitted punctually and remitted out of the queue is the SAME record —
+    /// same fields, same fingerprint, same chain link — and only its envelope differs. So the
+    /// incidence must live in the `Cabecera` and nowhere inside `RegistroFactura`, which is the
+    /// half the fingerprint covers.
+    ///
+    /// (What DOES carry it afterwards is `xml_content`, and that is the point: the column is the
+    /// evidence of what was actually transmitted, and the next retry reuses it verbatim.)
+    #[tokio::test]
+    async fn the_incidence_lives_in_the_header_and_not_in_the_record() {
+        let mut host = ChainHost::new(config_row("testing"), vec![queued_testing_record()]);
+        host.has_core_certificate = true;
+        host.queue = vec![json!({ "record_id": "rec-2" })];
+
+        let _ = process_contingency_queue(&contingency_input(), &host).await;
+
+        let sent = host.first_archived();
+        let registro_start = sent.find("<sum:RegistroFactura>").expect("RegistroFactura");
+        assert!(
+            sent[..registro_start].contains("<sum1:Incidencia>S</sum1:Incidencia>"),
+            "the header declares it: {sent}"
+        );
+        assert!(
+            !sent[registro_start..].contains("Incidencia"),
+            "and the record does not — the fingerprint covers that block: {sent}"
         );
     }
 

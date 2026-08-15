@@ -647,6 +647,50 @@ pub fn build_soap(
     ))
 }
 
+/// El bloque de la `Cabecera` que declara que este envío sale de una **incidencia** (XSD:
+/// `CabeceraType` → `RemisionVoluntaria/Incidencia`).
+const INCIDENCIA_BLOCK: &str =
+    "<sum1:RemisionVoluntaria><sum1:Incidencia>S</sum1:Incidencia></sum1:RemisionVoluntaria>";
+
+/// Marca un sobre ya construido como **remisión salida de la cola de contingencia**
+/// (`Cabecera/RemisionVoluntaria/Incidencia = S`, hub#322).
+///
+/// `Incidencia` es lo que legaliza el diferido: un registro que no pudo remitirse cuando se generó
+/// —la AEAT caída, la red del local muerta— y que sale horas después tiene que decirlo. Ningún
+/// motor lo emitía: todos los sobres de este hub parecían remisiones puntuales.
+///
+/// **Es una marca del SOBRE, no del registro**, y por eso se estampa aquí y no se pasa al
+/// constructor:
+///
+/// - el registro **no cambia ni un byte**. Su huella se calculó sobre sus propios campos y la AEAT
+///   ya tiene registros encadenados desde él; la `Cabecera` no entra en la huella y no se persiste
+///   nada en la fila. Si algún día se agrupan registros (la AEAT admite 1000 por envío), un lote
+///   no mezclará con y sin incidencia porque la cabecera es **una** por sobre;
+/// - **un reintento reutiliza EXACTAMENTE el XML del intento anterior** (no se regenera con una
+///   configuración que pudo cambiar mientras la AEAT estaba caída), y ese XML se construyó cuando
+///   todavía nadie sabía que el registro acabaría en la cola. Un parámetro del constructor no
+///   llegaría a ese caso — que es justo el caso normal de la cola.
+///
+/// **Idempotente**: la cola reintenta con el XML que guardó, que ya viene marcado. Dos
+/// `Incidencia` en una cabecera es un rechazo por esquema. Un sobre que no se reconoce vuelve
+/// intacto: corromper un XML a punto de transmitirse sería peor que no marcarlo.
+pub fn stamp_contingency_incidence(xml: &str) -> String {
+    if xml.contains("<sum1:Incidencia>") {
+        return xml.to_string();
+    }
+    // El anclaje es el cierre de `ObligadoEmision`, que es el único elemento OBLIGATORIO de la
+    // cabecera: `RemisionVoluntaria` va justo detrás en el `xs:sequence` (solo `Representante`
+    // puede colarse en medio, y este motor todavía no lo emite — hub#321).
+    const ANCHOR: &str = "</sum1:ObligadoEmision>";
+    match xml.find(ANCHOR) {
+        Some(at) => {
+            let cut = at + ANCHOR.len();
+            format!("{}{INCIDENCIA_BLOCK}{}", &xml[..cut], &xml[cut..])
+        }
+        None => xml.to_string(),
+    }
+}
+
 // La identidad mTLS y la caducidad del certificado se obtienen ahora del **core** vía
 // `NativeHost::certificate_identity`/`certificate_expiry` (ADR-0079): el `.p12` y toda la cripto
 // PKCS#12 (OpenSSL) viven en `erplora-runtime::certificate`, no en este módulo. verifactu solo PIDE.
@@ -1794,5 +1838,124 @@ mod amount_tests {
 
         let xml = build(&record).expect("an annulment has no amounts to miss");
         assert!(xml.contains("<sum1:RegistroAnulacion>"), "{xml}");
+    }
+}
+
+#[cfg(test)]
+mod contingency_incidence_tests {
+    //! **What legalises a deferred remission** (hub#322).
+    //!
+    //! `Incidencia` (`SuministroInformacion.xsd`, inside `Cabecera/RemisionVoluntaria`) is how a
+    //! record that could not be sent when it was generated is declared as such. No engine emitted
+    //! it: every envelope this hub built looked like a punctual remission, including the ones that
+    //! had spent hours in the contingency queue because the AEAT was down.
+    //!
+    //! Two properties decide the shape of the fix, and both have a test here:
+    //!
+    //! * **the flag belongs to the ENVELOPE, not to the record.** The AEAT admits up to 1000
+    //!   records per `RegFactuSistemaFacturacion` and the header is one per envelope, so a batch
+    //!   never mixes records with and without incidence. Nothing about it is persisted on the row
+    //!   and nothing about it enters the fingerprint;
+    //! * **a retry reuses the EXACT XML of the previous attempt** (it is not rebuilt with a
+    //!   configuration that may have changed meanwhile), and that stored XML was built before
+    //!   anybody knew the record would end up in the queue. So the flag is stamped on the
+    //!   envelope on the way out, which is the only place that works for both.
+    use super::*;
+    use serde_json::json;
+
+    fn envelope() -> String {
+        let record = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F2",
+            "description": "Ticket",
+            "base_amount": 1000.0,
+            "tax_amount": 210.0,
+            "total_amount": 1210.0,
+            "tax_rate": 21.0,
+            "tax_breakdown": r#"{"21.00":{"base":1000,"tax":210}}"#,
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        });
+        build_soap(&record, &json!({}), None, "hub-1").expect("declarable")
+    }
+
+    /// A punctual remission declares no incidence at all — the element is `minOccurs="0"` and
+    /// sending `N` on every ordinary invoice would say something nobody meant.
+    #[test]
+    fn a_punctual_remission_carries_no_incidence() {
+        let xml = envelope();
+        assert!(!xml.contains("RemisionVoluntaria"), "{xml}");
+        assert!(!xml.contains("Incidencia"), "{xml}");
+    }
+
+    /// 🔴 The defect: a record drained from the contingency queue used to look punctual.
+    #[test]
+    fn an_envelope_out_of_the_queue_declares_the_incidence() {
+        let xml = stamp_contingency_incidence(&envelope());
+
+        assert!(
+            xml.contains(
+                "<sum1:RemisionVoluntaria><sum1:Incidencia>S</sum1:Incidencia>\
+                 </sum1:RemisionVoluntaria>"
+            ),
+            "{xml}"
+        );
+    }
+
+    /// The XSD `xs:sequence` of `CabeceraType` is ObligadoEmision → Representante? →
+    /// RemisionVoluntaria? → RemisionRequerimiento?. Out of order it is a 4102, with the chain
+    /// number already spent.
+    #[test]
+    fn the_incidence_goes_after_obligado_emision_inside_the_header() {
+        let xml = stamp_contingency_incidence(&envelope());
+
+        let obligado = xml.find("</sum1:ObligadoEmision>").expect("ObligadoEmision");
+        let remision = xml.find("<sum1:RemisionVoluntaria>").expect("RemisionVoluntaria");
+        let cabecera_end = xml.find("</sum:Cabecera>").expect("Cabecera");
+        assert!(obligado < remision, "{xml}");
+        assert!(remision < cabecera_end, "inside the header, not after it: {xml}");
+    }
+
+    /// **The record is untouched, byte for byte.** The fingerprint was computed over the record's
+    /// own fields and the AEAT already holds records chained from it; an envelope flag that
+    /// changed one byte of `RegistroAlta` would be a different record.
+    #[test]
+    fn stamping_does_not_touch_the_record_or_its_fingerprint() {
+        let plain = envelope();
+        let stamped = stamp_contingency_incidence(&plain);
+
+        let registro = |xml: &str| {
+            let start = xml.find("<sum:RegistroFactura>").expect("RegistroFactura");
+            let end = xml.find("</sum:RegistroFactura>").expect("RegistroFactura end");
+            xml[start..end].to_string()
+        };
+        assert_eq!(registro(&plain), registro(&stamped));
+        assert!(
+            stamped.contains("<sum1:Huella>ABC123</sum1:Huella>"),
+            "the fingerprint travels exactly as it was computed: {stamped}"
+        );
+    }
+
+    /// Idempotent: the queue retries the same record with the XML it stored last time, which is
+    /// already stamped. Two headers, or two `Incidencia` inside one, is a schema rejection.
+    #[test]
+    fn stamping_twice_is_stamping_once() {
+        let once = stamp_contingency_incidence(&envelope());
+        let twice = stamp_contingency_incidence(&once);
+
+        assert_eq!(once, twice);
+        assert_eq!(twice.matches("<sum1:Incidencia>").count(), 1, "{twice}");
+    }
+
+    /// An envelope this function does not recognise comes back UNCHANGED rather than mangled: the
+    /// worst outcome here would be corrupting an XML that was about to be transmitted.
+    #[test]
+    fn an_unrecognised_envelope_is_returned_untouched() {
+        let foreign = "<soapenv:Envelope><soapenv:Body/></soapenv:Envelope>";
+        assert_eq!(stamp_contingency_incidence(foreign), foreign);
     }
 }
