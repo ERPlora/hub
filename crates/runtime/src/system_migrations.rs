@@ -1673,6 +1673,55 @@ CREATE TABLE IF NOT EXISTS _public_claim (\
 CREATE UNIQUE INDEX IF NOT EXISTS ux_public_claim_token ON _public_claim (hub_id, token_hash);\
 CREATE UNIQUE INDEX IF NOT EXISTS ux_public_claim_subject ON _public_claim (hub_id, kind, subject_id);",
     },
+    // ── v53 — hub#951: `_flow_run_waits`, las OTRAS salidas de una espera ──────────────────────
+    // Hasta aquí una espera (`delay`) tenía UNA salida: su reloj. Nada podía despertar un run
+    // dormido salvo `wake_at`, así que un recordatorio de cita se mandaba igual aunque la cita se
+    // hubiera cancelado — el hilo de la comunidad de Square prueba que eso pasa en un producto de
+    // primera línea. Esta tabla es la forma que el mercado le da al problema (SuiteFlow): la espera
+    // es un ESTADO con varias salidas, y la primera transición atómica se lleva el run.
+    //
+    // **Solo el id correlacionado, jamás el payload** (criterio de retención de la issue). Una fila
+    // guarda el nombre del evento que la despierta y el VALOR que tiene que casar; el payload del
+    // evento que la disparó no se copia a ningún sitio.
+    //
+    // El índice es **parcial** y ese es el punto: el match corre en el camino caliente de CADA
+    // entrega de evento del hub. Con `WHERE status = 'armed'` el índice solo contiene las esperas
+    // vivas —un puñado— en vez de todo el histórico de esperas que ya se resolvieron.
+    //
+    // ⚠️ **El número es DECLARADO, no la posición en el slice — y este se movió DOS veces.** Nació
+    // pidiendo la **v39** (lo que decía la decisión publicada en la issue el 15/08); para cuando se
+    // implementó, ese número llevaba desde hub#821 ocupado por otra cosa y el máximo real era la
+    // v50, así que pasó a la **v51**. Con la rama ya en vuelo, hub#1000 mergeó ANTES con SU v51
+    // (`fiscal_regime_simplified_limit`, justo aquí arriba) y hub#1001 se rebasó a la v52 — de ahí
+    // la **v53**. Recomprobado contra TODAS las ramas remotas justo antes del push, no solo contra
+    // `develop`: un número repetido ABORTA el arranque de un hub ya desplegado (hub#573) y uno por
+    // debajo del máximo se salta EN SILENCIO.
+    //
+    // 🔴 **ORDEN DE MERGE, no solo número.** El hueco de la v52 es de hub#1001 y tiene que entrar
+    // ANTES que esta. `apply` aborta cuando una versión del catálogo está SIN REGISTRAR y por
+    // debajo del máximo aplicado: si esta v53 llegara primero a un hub, la v52 de hub#1001 caería
+    // luego por debajo de su máximo y ese hub NO volvería a arrancar. Un hueco por delante es
+    // inofensivo; un hueco que se rellena por detrás, no.
+    SystemMigration {
+        version: 53,
+        name: "flow_run_waits",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_run_waits (\
+  id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, run_id TEXT NOT NULL, flow_id TEXT NOT NULL, \
+  step_id TEXT NOT NULL, step_index BIGINT NOT NULL, kind TEXT NOT NULL, \
+  event_name TEXT NOT NULL, filter TEXT NOT NULL DEFAULT '{}', \
+  correlate TEXT NOT NULL DEFAULT '{}', correlate_key TEXT NOT NULL DEFAULT '', \
+  correlate_value TEXT NOT NULL DEFAULT '', until_path TEXT NOT NULL DEFAULT '', \
+  offset_seconds BIGINT NOT NULL DEFAULT 0, max_wait BIGINT, \
+  past_due_policy TEXT NOT NULL DEFAULT 'skip', reschedules BIGINT NOT NULL DEFAULT 0, \
+  status TEXT NOT NULL DEFAULT 'armed', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, \
+  deleted_at TEXT);\
+CREATE INDEX IF NOT EXISTS ix_flow_wait_event \
+  ON _flow_run_waits (hub_id, event_name, correlate_value) \
+  WHERE status = 'armed' AND deleted_at IS NULL;\
+CREATE INDEX IF NOT EXISTS ix_flow_wait_run ON _flow_run_waits (hub_id, run_id);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3524,6 +3573,13 @@ mod kind_contract_tests {
         // HASH del localizador, nunca el localizador: un volcado de la tabla no puede entregar
         // todos los tiques abiertos del negocio. Al escribirla el máximo era la v50 en
         // `origin/develop` y en TODAS las ramas remotas, recomprobado contra el conjunto.
-        assert_eq!(MIGRATIONS.len(), 49, "el catálogo cambió de tamaño");
+        // + `flow_run_waits` (v53, hub#951): las OTRAS salidas de un `delay` — los eventos que
+        // cancelan un run dormido y los que mueven su instante. Tabla nueva + un índice PARCIAL
+        // (`WHERE status = 'armed'`), porque el cotejo corre en el camino caliente de cada evento
+        // entregado. Su número se movió DOS veces (v39 en la decisión → v51 al implementarla →
+        // v53 cuando hub#1000 se llevó la v51 y hub#1001 la v52), que es justo por qué se
+        // recomprueba en el rebase y no al escribir. El hueco de la v52 es de hub#1001 y tiene que
+        // entrar ANTES: rellenar un hueco por DEBAJO del máximo ya aplicado aborta el arranque.
+        assert_eq!(MIGRATIONS.len(), 50, "el catálogo cambió de tamaño");
     }
 }

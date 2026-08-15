@@ -14,8 +14,9 @@ use std::collections::BTreeSet;
 
 use erplora_runtime::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use erplora_runtime::flows::def::{
-    AiPolicy, Op, QueryResult, StepKind, TriggerKind, DEFAULT_APPROVAL_TTL_SECONDS,
-    DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_ITERS_CAP, MAX_QUERY_ROWS, SCHEMA_VERSION,
+    AiPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind, DEFAULT_APPROVAL_TTL_SECONDS,
+    DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_CORRELATE_PAIRS, MAX_DELAY_HORIZON,
+    MAX_ITERS_CAP, MAX_QUERY_ROWS, MAX_WAIT_HOOKS, SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::Channel;
 
@@ -152,6 +153,96 @@ fn the_query_step_is_declared_with_the_same_ceiling_and_the_same_result_shapes()
     assert!(step(serde_json::json!({ "result": "count" })).is_ok());
     assert!(step(serde_json::json!({ "result": "rows" })).is_err());
     assert!(step(serde_json::json!({ "limit": MAX_QUERY_ROWS + 1 })).is_err());
+}
+
+/// hub#951 — the extended `delay`. Four halves have to agree, and each for its own reason:
+///
+/// - the **keys**, because the runtime refuses one it does not know;
+/// - the **`past_due_policy` vocabulary** and its default, because it is what a document says
+///   should happen when the instant already went by, and the default is deliberately NOT the
+///   market's (`skip`, not Salesforce's «run it now»);
+/// - the **horizon**, because the runtime REFUSES above it instead of clamping — a schema that
+///   allowed a year would move that refusal from the editor to a row asleep for a year;
+/// - the **hook shape**, because `correlate` is the half that makes a cancellation about ONE
+///   appointment, and an editor that let it be omitted would help write a flow that cancels
+///   everybody's reminder.
+#[test]
+fn the_extended_delay_is_declared_with_the_same_horizon_the_runtime_refuses_above() {
+    let schema = schema();
+    let declared = keys_at(&schema, "/$defs/step/properties");
+    for key in [
+        "seconds",
+        "until",
+        "offset_seconds",
+        "max_wait",
+        "past_due_policy",
+        "cancel_on",
+        "reschedule_on",
+    ] {
+        assert!(
+            declared.contains(key),
+            "the schema must declare `{key}` of a `delay` step; it has {declared:?}"
+        );
+    }
+
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/past_due_policy"),
+        PastDuePolicy::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect::<BTreeSet<String>>()
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/past_due_policy/default"),
+        Some(&serde_json::json!(PastDuePolicy::Skip.as_str())),
+        "the restrictive default is the contract: a reminder whose hour went by is not sent"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/max_wait/maximum"),
+        Some(&serde_json::json!(MAX_DELAY_HORIZON))
+    );
+    for list in ["cancel_on", "reschedule_on"] {
+        assert_eq!(
+            schema.pointer(&format!("/$defs/step/properties/{list}/maxItems")),
+            Some(&serde_json::json!(MAX_WAIT_HOOKS)),
+            "`{list}` is matched on the hot path of every event delivered in the hub"
+        );
+        assert_eq!(
+            schema.pointer(&format!("/$defs/step/properties/{list}/items/$ref")),
+            Some(&serde_json::json!("#/$defs/wait_hook"))
+        );
+    }
+    assert_eq!(
+        schema.pointer("/$defs/wait_hook/required"),
+        Some(&serde_json::json!(["event", "correlate"])),
+        "an uncorrelated hook cancels every armed wait in the hub, so it is required on both sides"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/wait_hook/properties/correlate/maxProperties"),
+        Some(&serde_json::json!(MAX_CORRELATE_PAIRS))
+    );
+
+    // And the runtime really does accept exactly these, and really does refuse past the horizon.
+    let delay = |extra: serde_json::Value| {
+        let mut base = serde_json::json!({ "id": "w", "kind": "delay", "until": "input.at" });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(delay(serde_json::json!({
+        "offset_seconds": -86400, "max_wait": 604800, "past_due_policy": "skip",
+        "cancel_on": [{ "event": "a.cancelled", "correlate": { "event.id": "input.id" } }],
+        "reschedule_on": [{ "event": "a.moved", "correlate": { "event.id": "input.id" },
+                            "until": "event.at" }]
+    }))
+    .is_ok());
+    assert!(delay(serde_json::json!({ "max_wait": MAX_DELAY_HORIZON + 1 })).is_err());
+    assert!(delay(serde_json::json!({ "past_due_policy": "run_anyway" })).is_err());
+    assert!(delay(serde_json::json!({ "cancel_on": [{ "event": "a.b" }] })).is_err());
 }
 
 /// hub#950 — the `approval` step, the eighth kind. Three halves have to agree:

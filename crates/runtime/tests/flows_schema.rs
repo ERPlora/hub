@@ -170,6 +170,32 @@ async fn the_flow_tables_land_with_the_row_contract() {
                 "on_reject",
             ],
         ),
+        // hub#951 — the OTHER exits of a `delay`. `step_index` is load-bearing and not
+        // descriptive: it goes in the WHERE of every transition, and that is what makes «one
+        // transition wins, never both» a property of the UPDATE instead of a lock. `correlate`
+        // holds the RESOLVED ids and nothing else — never the payload of the event.
+        (
+            "_flow_run_waits",
+            &[
+                "id",
+                "run_id",
+                "flow_id",
+                "step_id",
+                "step_index",
+                "kind",
+                "event_name",
+                "filter",
+                "correlate",
+                "correlate_key",
+                "correlate_value",
+                "until_path",
+                "offset_seconds",
+                "max_wait",
+                "past_due_policy",
+                "reschedules",
+                "status",
+            ],
+        ),
     ];
 
     for (table, cols) in expected {

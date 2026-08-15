@@ -70,6 +70,36 @@ pub const ERR_INVALID_AT: &str = "flow.invalid_at";
 /// `max_iters`: a document that says 1000 and reads 200 lies to whoever wrote it, and the silent
 /// truncation is the single complaint every competitor's forum is full of.
 pub const ERR_LIMIT_OUT_OF_RANGE: &str = "flow.limit_out_of_range";
+/// hub#951 — a wait that would last longer than [`MAX_DELAY_HORIZON`]. Refused at save time when
+/// the document says so literally (`seconds`, `max_wait`), and failed at run time when an `until`
+/// resolves past it. **There was no ceiling at all**: `until` accepted the year 3000, and the run
+/// slept as a `sleeping` row that every retention rule exempts on purpose.
+pub const ERR_DELAY_HORIZON: &str = "flow.delay_horizon";
+/// hub#951 — the instant a `delay` resolved to had already passed and the document said `fail`.
+pub const ERR_DELAY_PAST_DUE: &str = "flow.delay_past_due";
+/// hub#951 — a sleeping run moved more than [`MAX_RESCHEDULES`] times. A wait that keeps being
+/// pushed forward by an event that keeps arriving is a run that never ends.
+pub const ERR_MAX_RESCHEDULES: &str = "flow.max_reschedules";
+
+/// **The most a single `delay` may wait: 90 days** (hub#951).
+///
+/// Shopify Flow's number, the most generous of the ten references studied (Zapier and Power
+/// Automate kill the run at ~30 days). It is a ceiling and not a clamp, like every other limit in
+/// this file: a document that says «wait two years» is refused, not quietly turned into 90 days.
+pub const MAX_DELAY_HORIZON: i64 = 90 * 24 * 3600;
+
+/// How many `cancel_on` / `reschedule_on` entries one `delay` may carry (hub#951). Small on
+/// purpose: matching them runs on the hot path of **every** event delivery in the hub.
+pub const MAX_WAIT_HOOKS: usize = 5;
+
+/// How many `{event path: run path}` pairs one hook's `correlate` may carry. One is the case
+/// («this appointment»); three is room for a composite key without turning the match into a join.
+pub const MAX_CORRELATE_PAIRS: usize = 3;
+
+/// How many times one sleeping run may be moved before the kernel stops it (hub#951). An event
+/// that keeps arriving would otherwise push the same wait forward forever, and the run would never
+/// end — the runaway guard of [`crate::flows::triggers::MAX_RUNS_PER_MINUTE`], one level down.
+pub const MAX_RESCHEDULES: i64 = 20;
 
 /// The most rows one `query` step may bring into a run (hub#954).
 ///
@@ -215,8 +245,8 @@ pub enum StepSpec {
     /// is no "else" branch to go to.
     Condition { when: Condition },
     /// `{"kind":"delay","seconds":N}` or `{"kind":"delay","until":"input.when"}` — the run sleeps
-    /// as a row (`wake_at`), never as a held task.
-    Delay { seconds: Option<i64>, until: Option<String> },
+    /// as a row (`wake_at`), never as a held task. See [`DelayStep`] for the rest of it (hub#951).
+    Delay(DelayStep),
     /// `{"kind":"http","method":"POST","url":"https://…","headers":{…},"body":{…},"timeout":10}`
     /// — the first way out to the internet (hub#662). Every field except `url` has a default, and
     /// each one is a mapping expression: the URL is templated against the run and matched against
@@ -242,6 +272,159 @@ pub enum StepSpec {
     /// `{"kind":"approval","title":…,"summary":…,"assignee":{"role":…},"expires_in":N,
     /// "on_expire":…,"on_reject":…}` — the pause (hub#950). See [`ApprovalStep`].
     Approval(ApprovalStep),
+}
+
+/// **A wait, and the several ways out of it** (hub#951).
+///
+/// The shape is the market's (decision published on the issue, 2026-08-15), and it is three
+/// references stacked, not one:
+///
+/// - **Salesforce Flow's *Scheduled Paths*** give [`DelayStep::until`] + [`DelayStep::offset_seconds`]:
+///   a wait is expressed against a **date field of the thing** («24 h before the appointment»),
+///   which is the only form a shop owner writes without typing a date.
+/// - **NetSuite SuiteFlow's scheduled transition** gives [`DelayStep::cancel_on`] /
+///   [`DelayStep::reschedule_on`]: the wait is a STATE with several exits — the clock is one of
+///   them — and the first atomic transition takes the run out of it. That is the answer to «never
+///   both», and it is a property of the UPDATE, not a lock (see [`crate::flows::waits`]).
+/// - **Klaviyo's re-check before acting** is deliberately NOT a field here. A `cancel_on` can be
+///   MISSED — the event was never emitted, the module was uninstalled, the hub was off — so the
+///   belt-and-braces is to look again, and that composes out of primitives that already exist:
+///   `delay → query (hub#954) → condition`. A fourth key promising it would be a second engine.
+///
+/// What the market does that we do not: Odoo cancels for free, but only because its engine knows
+/// the module's table — the one option of the ten that would break our modularity. Zapier, Power
+/// Automate, Make and Shopify Flow simply cannot cancel a wait at all, and their forums all
+/// converge on the same workaround, which is the re-check above.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DelayStep {
+    /// A relative wait, in seconds from the moment the run reaches the step.
+    pub seconds: Option<i64>,
+    /// A path to an RFC-3339 instant. Alternative to [`DelayStep::seconds`]; one of the two is
+    /// required.
+    pub until: Option<String>,
+    /// Seconds added to (or subtracted from) the resolved `until`. **Seconds and not «1 month»**:
+    /// a calendar offset is an operation the frozen mapping language does not have, and inventing
+    /// one here would be a DSL growing after the freeze. Salesforce offers months; we do not, and
+    /// that is a conscious limit of v1.
+    pub offset_seconds: i64,
+    /// The ceiling this particular wait accepts, in seconds. `None` means [`MAX_DELAY_HORIZON`].
+    pub max_wait: Option<i64>,
+    /// What happens when the resolved instant has ALREADY passed.
+    pub past_due: PastDuePolicy,
+    /// Events that take the run OUT of the wait, cancelled. At most [`MAX_WAIT_HOOKS`].
+    pub cancel_on: Vec<WaitHook>,
+    /// Events that MOVE the wait to a new instant. At most [`MAX_WAIT_HOOKS`].
+    pub reschedule_on: Vec<WaitHook>,
+}
+
+impl DelayStep {
+    /// The ceiling that applies to this wait: what the document asked for, or the hub's.
+    pub fn horizon_seconds(&self) -> i64 {
+        self.max_wait.unwrap_or(MAX_DELAY_HORIZON)
+    }
+
+    /// Every hook, with the kind it is armed as. The order is the one the document wrote.
+    pub fn hooks(&self) -> impl Iterator<Item = (WaitKind, &WaitHook)> {
+        self.cancel_on
+            .iter()
+            .map(|h| (WaitKind::Cancel, h))
+            .chain(self.reschedule_on.iter().map(|h| (WaitKind::Reschedule, h)))
+    }
+}
+
+/// Which exit of the wait a [`WaitHook`] is (hub#951).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WaitKind {
+    /// The run leaves the wait `cancelled`.
+    Cancel,
+    /// The wait moves to a new instant and the run keeps sleeping.
+    Reschedule,
+}
+
+impl WaitKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            WaitKind::Cancel => "cancel",
+            WaitKind::Reschedule => "reschedule",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "cancel" => Some(WaitKind::Cancel),
+            "reschedule" => Some(WaitKind::Reschedule),
+            _ => None,
+        }
+    }
+    pub const ALL: &'static [WaitKind] = &[WaitKind::Cancel, WaitKind::Reschedule];
+}
+
+/// **One exit of a wait**: an event, an optional filter over it, and the correlation that makes it
+/// about THIS run (hub#951).
+///
+/// [`WaitHook::correlate`] is the load-bearing half. Without it the first cancellation of any
+/// appointment would cancel every armed reminder in the hub. It maps a path **in the arriving
+/// event** to a path **in the run**, both in the frozen path language and nothing else: a `{{…}}`
+/// template on the event side would be a correlation key whoever emits the event gets to write,
+/// and a literal on the run side would correlate on a constant.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WaitHook {
+    /// The public event name, matched in the outbox relay exactly like a trigger's.
+    pub event: String,
+    /// An optional declarative filter over the event payload (`event.<field>` paths).
+    pub filter: Condition,
+    /// `{<path in the event>: <path in the run>}`. 1..=[`MAX_CORRELATE_PAIRS`] entries, all of
+    /// which must agree for the hook to fire.
+    pub correlate: BTreeMap<String, String>,
+    /// [`WaitKind::Reschedule`] only — the path, **in the arriving event**, to the new instant.
+    /// Required there, and refused on a `cancel_on` where nobody would ever read it.
+    pub until: Option<String>,
+}
+
+/// **What a `delay` does when the instant it resolved to has already passed** (hub#951).
+///
+/// The default is `skip`, and that is deliberately NOT what Salesforce does (it runs the scheduled
+/// path immediately). The rule that wins here is the kernel's own — the default is the restrictive
+/// one, the same reason [`AiPolicy::Manual`] is the default — because the literal case is a
+/// reminder whose hour went by, and sending it late is worse than not sending it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PastDuePolicy {
+    /// Do not sleep: carry on with the next step now. Salesforce's behaviour, available to whoever
+    /// writes it down.
+    ContinueNow,
+    /// The run ENDS, `done` — like a `condition` that said no. The default.
+    Skip,
+    /// The run ends `failed`, with [`ERR_DELAY_PAST_DUE`]. For the flow where a missed instant is a
+    /// problem somebody has to see.
+    Fail,
+}
+
+impl PastDuePolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PastDuePolicy::ContinueNow => "continue_now",
+            PastDuePolicy::Skip => "skip",
+            PastDuePolicy::Fail => "fail",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "continue_now" => Some(PastDuePolicy::ContinueNow),
+            "skip" => Some(PastDuePolicy::Skip),
+            "fail" => Some(PastDuePolicy::Fail),
+            _ => None,
+        }
+    }
+    pub const ALL: &'static [PastDuePolicy] = &[
+        PastDuePolicy::ContinueNow,
+        PastDuePolicy::Skip,
+        PastDuePolicy::Fail,
+    ];
+}
+
+impl Default for PastDuePolicy {
+    fn default() -> Self {
+        PastDuePolicy::Skip
+    }
 }
 
 /// **A question, and what happens to the run depending on how it is answered** (hub#950).
@@ -426,8 +609,21 @@ impl StepDef {
             // against. Scanning only the paths left `{"input.x": {"eq": "{{secret.K}}"}}` saving
             // as literal text — a guard that never matches and never says so.
             StepSpec::Condition { when } => when.expressions(),
-            StepSpec::Delay { until, .. } => {
-                until.iter().map(|u| json_str(u)).collect::<Vec<_>>()
+            // The instant, and everything the hooks of hub#951 say. The scan has to reach INSIDE
+            // them for the same reason it reaches both sides of a condition (hub#828): a filter
+            // comparing against `{{secret.K}}` is a guard that never matches and never says so,
+            // and a hook's `until` naming one is a credential parsed as a date.
+            StepSpec::Delay(d) => {
+                let mut out: Vec<Json> = d.until.iter().map(|u| json_str(u)).collect();
+                for (_, hook) in d.hooks() {
+                    out.extend(hook.filter.expressions());
+                    out.extend(hook.until.iter().map(|u| json_str(u)));
+                    for (event_path, run_path) in &hook.correlate {
+                        out.push(json_str(event_path));
+                        out.push(json_str(run_path));
+                    }
+                }
+                out
             }
             StepSpec::Http {
                 url, headers, body, ..
@@ -1179,7 +1375,17 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         StepKind::Command => &["id", "kind", "command", "params"],
         StepKind::Query => &["id", "kind", "query", "params", "result", "limit"],
         StepKind::Condition => &["id", "kind", "when"],
-        StepKind::Delay => &["id", "kind", "seconds", "until"],
+        StepKind::Delay => &[
+            "id",
+            "kind",
+            "seconds",
+            "until",
+            "offset_seconds",
+            "max_wait",
+            "past_due_policy",
+            "cancel_on",
+            "reschedule_on",
+        ],
         StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
         StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters"],
         StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars"],
@@ -1236,26 +1442,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         StepKind::Condition => StepSpec::Condition {
             when: Condition::parse(map.get("when").unwrap_or(&Json::Null))?,
         },
-        StepKind::Delay => {
-            let seconds = map.get("seconds").and_then(|v| v.as_i64());
-            let until = map
-                .get("until")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            if seconds.is_none() && until.is_none() {
-                return Err(invalid(
-                    ERR_INVALID_DEFINITION,
-                    format!("step `{id}`: a `delay` needs `seconds` or `until`"),
-                ));
-            }
-            if seconds.is_some_and(|s| s < 0) {
-                return Err(invalid(
-                    ERR_INVALID_DEFINITION,
-                    format!("step `{id}`: `seconds` cannot be negative"),
-                ));
-            }
-            StepSpec::Delay { seconds, until }
-        }
+        StepKind::Delay => StepSpec::Delay(parse_delay(&id, map)?),
         StepKind::Http => {
             let url = map
                 .get("url")
@@ -1345,6 +1532,321 @@ fn parse_step(value: &Json) -> Result<StepDef> {
     };
 
     Ok(StepDef { id, kind, spec })
+}
+
+/// The keys of a `delay` step (hub#951).
+///
+/// Every refusal here is the same rule as the rest of this file — what the kernel cannot execute
+/// is refused on the screen where it was typed — but two of them are worth naming:
+///
+/// - **`seconds` + `offset_seconds` together.** Today `seconds` wins in the executor and the offset
+///   is silently dropped, so a document saying «in an hour, minus a day» waits an hour. It is a
+///   contradiction, not a precedence question, and it is refused as one.
+/// - **The horizon.** There was no ceiling on a wait at all: `until` accepted the year 3000 and
+///   the run slept as a `sleeping` row that every retention rule exempts. Only the literal halves
+///   can be judged here (`seconds`, `max_wait`); a resolved `until` is judged in the executor,
+///   with the same code.
+fn parse_delay(id: &str, map: &Map<String, Json>) -> Result<DelayStep> {
+    let seconds = match map.get("seconds") {
+        None | Some(Json::Null) => None,
+        Some(Json::Number(n)) => Some(n.as_i64().ok_or_else(|| {
+            invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `seconds` is a whole number of seconds"),
+            )
+        })?),
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `seconds` is a whole number of seconds"),
+            ))
+        }
+    };
+    let until = map
+        .get("until")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    if seconds.is_none() && until.is_none() {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!("step `{id}`: a `delay` needs `seconds` or `until`"),
+        ));
+    }
+    if seconds.is_some_and(|s| s < 0) {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!("step `{id}`: `seconds` cannot be negative"),
+        ));
+    }
+
+    let offset_seconds = match map.get("offset_seconds") {
+        None | Some(Json::Null) => 0,
+        Some(Json::Number(n)) => n.as_i64().ok_or_else(|| {
+            invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `offset_seconds` is a whole number of seconds"),
+            )
+        })?,
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `offset_seconds` is a whole number of seconds"),
+            ))
+        }
+    };
+    if offset_seconds != 0 && seconds.is_some() {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "step `{id}`: `offset_seconds` only ever shifts an `until`. With `seconds` it is a \
+                 contradiction — «in an hour, minus a day» — and the executor would keep the hour \
+                 and drop the day without saying so."
+            ),
+        ));
+    }
+    if seconds.is_some_and(|s| s > MAX_DELAY_HORIZON) {
+        return Err(horizon_refusal(id, "seconds", seconds.unwrap_or_default()));
+    }
+
+    let max_wait = match map.get("max_wait") {
+        None | Some(Json::Null) => None,
+        Some(Json::Number(n)) => {
+            let v = n.as_i64().unwrap_or(-1);
+            if v <= 0 {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!("step `{id}`: `max_wait` is a whole number of seconds above zero"),
+                ));
+            }
+            if v > MAX_DELAY_HORIZON {
+                return Err(horizon_refusal(id, "max_wait", v));
+            }
+            Some(v)
+        }
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `max_wait` is a whole number of seconds"),
+            ))
+        }
+    };
+
+    let past_due = match map.get("past_due_policy") {
+        None | Some(Json::Null) => PastDuePolicy::default(),
+        Some(Json::String(s)) => PastDuePolicy::parse(s.trim()).ok_or_else(|| {
+            invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `past_due_policy` is one of {} (default `{}`: a reminder whose \
+                     hour already went by is not sent)",
+                    PastDuePolicy::ALL
+                        .iter()
+                        .map(|p| p.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    PastDuePolicy::default().as_str()
+                ),
+            )
+        })?,
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `past_due_policy` is a name, not a value"),
+            ))
+        }
+    };
+
+    let cancel_on = parse_hooks(id, map.get("cancel_on"), WaitKind::Cancel)?;
+    let reschedule_on = parse_hooks(id, map.get("reschedule_on"), WaitKind::Reschedule)?;
+
+    Ok(DelayStep {
+        seconds,
+        until,
+        offset_seconds,
+        max_wait,
+        past_due,
+        cancel_on,
+        reschedule_on,
+    })
+}
+
+fn horizon_refusal(id: &str, key: &str, value: i64) -> RuntimeError {
+    invalid(
+        ERR_DELAY_HORIZON,
+        format!(
+            "step `{id}`: `{key}` is {value} s, past the {MAX_DELAY_HORIZON} s (90 day) horizon a \
+             single wait may cover. It is refused rather than shortened: a `sleeping` run is \
+             exempt from every retention rule the hub has, so a wait nobody meant is a row that \
+             outlives the business reason for it."
+        ),
+    )
+}
+
+/// One `cancel_on` / `reschedule_on` list (hub#951).
+fn parse_hooks(id: &str, value: Option<&Json>, kind: WaitKind) -> Result<Vec<WaitHook>> {
+    let list = kind.as_str();
+    let items = match value {
+        None | Some(Json::Null) => return Ok(Vec::new()),
+        Some(Json::Array(items)) => items,
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `{list}_on` is an array of `{{event, filter?, correlate}}`"),
+            ))
+        }
+    };
+    if items.len() > MAX_WAIT_HOOKS {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "step `{id}`: `{list}_on` carries {} hooks, more than the {MAX_WAIT_HOOKS} a wait \
+                 may have. They are matched on the hot path of EVERY event delivered in this hub.",
+                items.len()
+            ),
+        ));
+    }
+
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let Json::Object(hook) = item else {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: every entry of `{list}_on` is an object"),
+            ));
+        };
+        for key in hook.keys() {
+            if !matches!(key.as_str(), "event" | "filter" | "correlate" | "until") {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!(
+                        "step `{id}`, `{list}_on`: unknown key `{key}`. A hook never arms with a \
+                         key the hub does not understand."
+                    ),
+                ));
+            }
+        }
+
+        let event = hook
+            .get("event")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        if event.is_empty() {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: every entry of `{list}_on` needs the name of an event"),
+            ));
+        }
+
+        let filter = Condition::parse(hook.get("filter").unwrap_or(&Json::Null))?;
+        let correlate = parse_correlate(id, list, hook.get("correlate"))?;
+
+        // The new instant belongs to a `reschedule_on` and to nothing else: required there, and
+        // refused on a `cancel_on` where the kernel would never read it. A key nobody reads is
+        // hub#521's lesson — `cash_register` shipped a `protects` block the runtime ignored.
+        let until = hook
+            .get("until")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        match (kind, &until) {
+            (WaitKind::Reschedule, None) => {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!(
+                        "step `{id}`, `reschedule_on` for `{event}`: an `until` path into the \
+                         ARRIVING event is required — moving a wait without saying where to is \
+                         not moving it anywhere."
+                    ),
+                ))
+            }
+            (WaitKind::Cancel, Some(_)) => {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!(
+                        "step `{id}`, `cancel_on` for `{event}`: `until` belongs to a \
+                         `reschedule_on`. A cancelled wait has no new instant, so the key would be \
+                         read by nobody."
+                    ),
+                ))
+            }
+            _ => {}
+        }
+        if let Some(path) = &until {
+            if !is_path(path) {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!(
+                        "step `{id}`, `reschedule_on` for `{event}`: `until` is a PATH into the \
+                         arriving event (`event.<field>`), not `{path}`"
+                    ),
+                ));
+            }
+        }
+
+        out.push(WaitHook {
+            event,
+            filter,
+            correlate,
+            until,
+        });
+    }
+    Ok(out)
+}
+
+/// `{<path in the event>: <path in the run>}` — the frozen path language on both sides.
+fn parse_correlate(
+    id: &str,
+    list: &str,
+    value: Option<&Json>,
+) -> Result<BTreeMap<String, String>> {
+    let complain = |why: String| invalid(ERR_INVALID_DEFINITION, why);
+    let Some(Json::Object(map)) = value else {
+        return Err(complain(format!(
+            "step `{id}`, `{list}_on`: `correlate` is required — it is what makes the hook about \
+             THIS run. Without it the first `cancel` of anything would take out every armed wait \
+             in the hub."
+        )));
+    };
+    if map.is_empty() || map.len() > MAX_CORRELATE_PAIRS {
+        return Err(complain(format!(
+            "step `{id}`, `{list}_on`: `correlate` carries 1 to {MAX_CORRELATE_PAIRS} pairs; it \
+             has {}",
+            map.len()
+        )));
+    }
+
+    let mut out = BTreeMap::new();
+    for (event_path, run_path) in map {
+        let Some(run_path) = run_path.as_str() else {
+            return Err(complain(format!(
+                "step `{id}`, `{list}_on`: `correlate` maps a path to a PATH, and `{event_path}` \
+                 maps to {run_path}"
+            )));
+        };
+        let run_path = run_path.trim();
+        // Only paths, both sides, and each on its own side of the seam. A `{{…}}` template on the
+        // event side is a correlation key whoever emits the event gets to write; a literal on the
+        // run side correlates on a constant, which is the uncorrelated case with extra steps.
+        if !event_path.starts_with("event.") || !is_path(event_path) {
+            return Err(complain(format!(
+                "step `{id}`, `{list}_on`: the left of `correlate` is a path into the ARRIVING \
+                 event (`event.<field>`), not `{event_path}`"
+            )));
+        }
+        if !is_path(run_path)
+            || !(run_path.starts_with("input.") || run_path.starts_with("steps."))
+        {
+            return Err(complain(format!(
+                "step `{id}`, `{list}_on`: the right of `correlate` is a path into THIS run \
+                 (`input.<field>` or `steps.<id>.<field>`), not `{run_path}`"
+            )));
+        }
+        out.insert(event_path.clone(), run_path.to_string());
+    }
+    Ok(out)
 }
 
 /// The keys of a `query` step (hub#954).
@@ -2124,6 +2626,227 @@ mod tests {
         assert!(!StepKind::Approval.needs_io());
         assert!(StepKind::Approval.is_available());
         assert_eq!(StepKind::parse("approval"), Some(StepKind::Approval));
+    }
+
+    // ── the `delay` step, extended (hub#951) ──────────────────────────────────────────────────
+    //
+    // The decision is the market's (published on hub#951, 2026-08-15): Salesforce's **Scheduled
+    // Paths** (a date field of the record plus an offset), NetSuite SuiteFlow's **state with
+    // several exits** (the wait is a state; the scheduled exit and the event exits race and the
+    // first atomic transition takes the record out) and Klaviyo's **re-check before acting**. What
+    // is refused here is refused at SAVE time for the reason the whole of this file is: everything
+    // this kernel cannot execute is refused on the screen where it was typed, never at 3 AM.
+
+    fn delay_of(step: Json) -> Result<DelayStep> {
+        FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] })).map(|d| {
+            let StepSpec::Delay(delay) = d.steps[0].spec.clone() else {
+                panic!("a delay step parses as one");
+            };
+            delay
+        })
+    }
+
+    #[test]
+    fn a_bare_delay_keeps_meaning_exactly_what_it_meant_before() {
+        // The extension is additive. Everything already stored has to keep parsing to the same
+        // behaviour, and the defaults are what says so.
+        let delay = delay_of(json!({ "id": "w", "kind": "delay", "seconds": 3600 })).unwrap();
+        assert_eq!(delay.seconds, Some(3600));
+        assert_eq!(delay.offset_seconds, 0);
+        assert_eq!(delay.max_wait, None);
+        assert_eq!(delay.horizon_seconds(), MAX_DELAY_HORIZON);
+        assert_eq!(delay.past_due, PastDuePolicy::Skip, "the default is the restrictive one");
+        assert!(delay.cancel_on.is_empty() && delay.reschedule_on.is_empty());
+    }
+
+    /// **An instant of the event, shifted** — Salesforce's `Time Source` + `Offset`. In SECONDS and
+    /// not «1 month»: a calendar offset is an operation the frozen mapping language does not have.
+    #[test]
+    fn an_until_can_be_shifted_by_an_offset_in_seconds() {
+        let delay = delay_of(json!({
+            "id": "w", "kind": "delay",
+            "until": "input.appointment_at", "offset_seconds": -86400
+        }))
+        .expect("«24 h before the appointment» is the whole point of the step");
+        assert_eq!(delay.until.as_deref(), Some("input.appointment_at"));
+        assert_eq!(delay.offset_seconds, -86400);
+    }
+
+    /// `seconds` + `offset_seconds` is refused instead of one of them quietly winning. Today
+    /// `seconds` wins in the executor and the offset is dropped — a document that says «in an hour,
+    /// minus a day» and waits an hour.
+    #[test]
+    fn seconds_and_an_offset_together_are_refused_rather_than_one_of_them_winning() {
+        let err = delay_of(json!({
+            "id": "w", "kind": "delay", "seconds": 3600, "offset_seconds": -86400
+        }))
+        .expect_err("an offset only ever shifts an `until`");
+        assert!(format!("{err}").contains("offset_seconds"), "{err}");
+    }
+
+    /// **There was no ceiling at all**: `until` accepted the year 3000, and the run slept forever
+    /// as a row exempt from every retention rule. 90 days is Shopify Flow's number, the most
+    /// generous of the ten references studied.
+    #[test]
+    fn a_wait_longer_than_the_horizon_is_refused_at_save_time() {
+        for step in [
+            json!({ "id": "w", "kind": "delay", "until": "input.at",
+                    "max_wait": MAX_DELAY_HORIZON + 1 }),
+            json!({ "id": "w", "kind": "delay", "seconds": MAX_DELAY_HORIZON + 1 }),
+        ] {
+            let err = delay_of(step).expect_err("a wait past the horizon never saves");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_DELAY_HORIZON),
+                "{err:?}"
+            );
+        }
+        // And the horizon itself still saves: refused ABOVE, not at.
+        assert!(delay_of(json!({ "id": "w", "kind": "delay", "seconds": MAX_DELAY_HORIZON })).is_ok());
+    }
+
+    #[test]
+    fn the_three_past_due_policies_are_the_only_ones_and_an_unknown_one_is_refused() {
+        for (text, policy) in [
+            ("continue_now", PastDuePolicy::ContinueNow),
+            ("skip", PastDuePolicy::Skip),
+            ("fail", PastDuePolicy::Fail),
+        ] {
+            let delay = delay_of(json!({
+                "id": "w", "kind": "delay", "until": "input.when", "past_due_policy": text
+            }))
+            .unwrap();
+            assert_eq!(delay.past_due, policy);
+        }
+        assert!(delay_of(json!({
+            "id": "w", "kind": "delay", "until": "input.when", "past_due_policy": "run_anyway"
+        }))
+        .is_err());
+    }
+
+    /// The two exits of the state. `correlate` is a map `{<path in the event>: <path in the run>}`
+    /// in the frozen language — PATHS and nothing else, because a template resolved against an
+    /// arriving event is a correlation key an attacker writes.
+    #[test]
+    fn a_delay_carries_the_events_that_cancel_it_and_the_events_that_move_it() {
+        let delay = delay_of(json!({
+            "id": "w", "kind": "delay",
+            "until": "input.appointment_at", "offset_seconds": -86400,
+            "cancel_on": [{
+                "event": "appointment.cancelled",
+                "correlate": { "event.id": "input.appointment_id" }
+            }],
+            "reschedule_on": [{
+                "event": "appointment.rescheduled",
+                "filter": { "event.status": { "eq": "confirmed" } },
+                "correlate": { "event.id": "input.appointment_id" },
+                "until": "event.appointment_at"
+            }]
+        }))
+        .expect("the contract published on the issue");
+
+        assert_eq!(delay.cancel_on.len(), 1);
+        assert_eq!(delay.cancel_on[0].event, "appointment.cancelled");
+        assert!(delay.cancel_on[0].filter.is_empty());
+        assert_eq!(
+            delay.cancel_on[0].correlate.get("event.id").map(String::as_str),
+            Some("input.appointment_id")
+        );
+        assert_eq!(delay.reschedule_on[0].until.as_deref(), Some("event.appointment_at"));
+        assert!(!delay.reschedule_on[0].filter.is_empty());
+    }
+
+    #[test]
+    fn a_reschedule_without_a_new_instant_is_refused_and_a_cancel_with_one_too() {
+        let missing = delay_of(json!({
+            "id": "w", "kind": "delay", "until": "input.at",
+            "reschedule_on": [{ "event": "a.b", "correlate": { "event.id": "input.id" } }]
+        }))
+        .expect_err("moving a wait without saying where to is not moving it anywhere");
+        assert!(format!("{missing}").contains("until"), "{missing}");
+
+        let pointless = delay_of(json!({
+            "id": "w", "kind": "delay", "until": "input.at",
+            "cancel_on": [{ "event": "a.b", "correlate": { "event.id": "input.id" },
+                            "until": "event.at" }]
+        }))
+        .expect_err("a cancelled wait has no new instant; the key would be read by nobody");
+        assert!(format!("{pointless}").contains("until"), "{pointless}");
+    }
+
+    /// The correlation is what makes «this appointment» mean this one. Without it the first
+    /// cancellation of ANY appointment would cancel every armed reminder in the hub.
+    #[test]
+    fn a_hook_without_a_correlation_is_refused() {
+        let err = delay_of(json!({
+            "id": "w", "kind": "delay", "until": "input.at",
+            "cancel_on": [{ "event": "appointment.cancelled" }]
+        }))
+        .expect_err("an uncorrelated cancel cancels everybody's reminder");
+        assert!(format!("{err}").contains("correlate"), "{err}");
+    }
+
+    /// Only PATHS, both sides. A `{{…}}` template on the event side is a correlation key whoever
+    /// emits the event gets to write; a literal on the run side correlates on a constant.
+    #[test]
+    fn a_correlation_speaks_only_the_frozen_path_language() {
+        for correlate in [
+            json!({ "{{event.id}}": "input.id" }),
+            json!({ "event.id": "{{input.id}}" }),
+            json!({ "id": "input.id" }),
+            json!({ "event.id": "42" }),
+            json!({ "event.id": "secret.API_KEY" }),
+        ] {
+            let err = delay_of(json!({
+                "id": "w", "kind": "delay", "until": "input.at",
+                "cancel_on": [{ "event": "a.b", "correlate": correlate }]
+            }))
+            .expect_err("only `event.<path>` → `input|steps.<path>` correlates");
+            let text = format!("{err}");
+            assert!(text.contains("correlate") || text.contains("secret"), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_list_of_more_than_five_hooks_is_refused() {
+        let hooks: Vec<Json> = (0..=MAX_WAIT_HOOKS)
+            .map(|i| json!({ "event": format!("a.b{i}"), "correlate": { "event.id": "input.id" } }))
+            .collect();
+        let err = delay_of(json!({
+            "id": "w", "kind": "delay", "until": "input.at", "cancel_on": hooks
+        }))
+        .expect_err("the match runs on the hot path of every event delivery");
+        assert!(format!("{err}").contains(&MAX_WAIT_HOOKS.to_string()), "{err}");
+    }
+
+    #[test]
+    fn an_unknown_key_on_a_delay_or_inside_a_hook_is_still_refused() {
+        assert!(delay_of(json!({ "id": "w", "kind": "delay", "seconds": 1, "grace": 5 })).is_err());
+        assert!(delay_of(json!({
+            "id": "w", "kind": "delay", "until": "input.at",
+            "cancel_on": [{ "event": "a.b", "correlate": { "event.id": "input.id" },
+                            "unless": { "x": 1 } }]
+        }))
+        .is_err());
+    }
+
+    /// The secret scan has to reach INSIDE the hooks for the same reason it reaches a condition's
+    /// right-hand side: a filter comparing against `{{secret.K}}` is a guard that never matches and
+    /// never says so, and an `until` naming one is a credential parsed as a date.
+    #[test]
+    fn a_secret_inside_a_hook_is_refused_like_anywhere_else_outside_http() {
+        for hook in [
+            json!({ "event": "a.b", "correlate": { "event.id": "input.id" },
+                    "filter": { "event.ref": { "eq": "{{secret.API_KEY}}" } } }),
+            json!({ "event": "a.b", "correlate": { "event.id": "input.id" },
+                    "until": "secret.API_KEY" }),
+        ] {
+            let list = if hook["until"].is_null() { "cancel_on" } else { "reschedule_on" };
+            let err = delay_of(json!({
+                "id": "w", "kind": "delay", "until": "input.at", list: [hook]
+            }))
+            .expect_err("a flow secret is only readable from an `http` step");
+            assert!(format!("{err}").contains("API_KEY"), "{err}");
+        }
     }
 
     // ── the `http` step (hub#662) ─────────────────────────────────────────────────────────────

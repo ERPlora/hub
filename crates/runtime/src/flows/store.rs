@@ -321,6 +321,10 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, id: &str, by: &str) 
         },
     )
     .await?;
+    // And the waits those sleeping runs had armed (hub#951). A wait outliving the flow that armed
+    // it would be looked at on every delivery of its event, forever, to affect zero rows each time
+    // — and it would keep the deleted flow's business event on a hot path nobody can explain.
+    crate::flows::waits::disarm_flow(db, hub_id, id).await?;
     grants::revoke_all(db, hub_id, id, by).await
 }
 
