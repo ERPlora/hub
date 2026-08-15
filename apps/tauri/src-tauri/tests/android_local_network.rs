@@ -56,7 +56,20 @@ const REQUIRED: &[&str] = &[
     // the same silent failure as the LAN one: without it the bonded list is empty and the till
     // reports no bluetooth printers.
     "android.permission.BLUETOOTH_CONNECT",
+    // Reading the staff badge off the device's own reader (hub#988). An install-time `normal`
+    // permission — no dialog, so it is not in `PermissionPolicy` — but the same "declared or
+    // nothing" rule applies: without it `enableReaderMode` throws and a tablet cannot enrol a card.
+    "android.permission.NFC",
 ];
+
+/// The hardware feature the NFC permission drags in behind it (hub#988).
+///
+/// This is not a permission and it is not decoration. Declaring `android.permission.NFC` makes
+/// Google Play add an **implicit** `android.hardware.nfc` requirement, and Play then hides the app
+/// from every device without an NFC chip. That is most cheap counter tablets — the customers
+/// LEAST likely to own a USB reader and most in need of the app. The listing would narrow because
+/// of a convenience feature, and nothing in the build would say so.
+const NFC_FEATURE: &str = "android.hardware.nfc";
 
 /// The manifest of the generated Android project — the one a lost file makes `android init` rewrite.
 const APP_MANIFEST: &str = include_str!("../gen/android/app/src/main/AndroidManifest.xml");
@@ -198,6 +211,66 @@ fn the_permissions_also_live_where_regenerating_the_project_cannot_reach_them() 
     }
 }
 
+// ── The NFC permission must not narrow who can install the app ──────────────────────────────────
+
+/// Does this manifest say the NFC chip is OPTIONAL?
+///
+/// Read as a live `<uses-feature>` tag with `required="false"` on it, for the same reason
+/// [`declared_permissions`] reads tags: the prose around it names the feature, and a `contains()`
+/// would keep passing on the explanation after the tag was gone.
+fn nfc_is_optional(manifest: &str) -> bool {
+    without_comments(manifest)
+        .split("<uses-feature")
+        .skip(1)
+        .filter(|tag| {
+            tag.split("android:name=\"")
+                .nth(1)
+                .and_then(|value| value.split('"').next())
+                == Some(NFC_FEATURE)
+        })
+        .any(|tag| {
+            tag.split("android:required=\"")
+                .nth(1)
+                .and_then(|value| value.split('"').next())
+                == Some("false")
+        })
+}
+
+#[test]
+fn a_manifest_that_only_talks_about_the_feature_does_not_declare_it_optional() {
+    // The guard has to detect the positive before it is allowed to certify a negative. A manifest
+    // that merely mentions the feature — in a comment, or requiring it — is NOT the opt-out.
+    assert!(!nfc_is_optional(r#"<manifest><!-- android.hardware.nfc required=false --></manifest>"#));
+    assert!(!nfc_is_optional(
+        r#"<manifest><uses-feature android:name="android.hardware.nfc" android:required="true" /></manifest>"#
+    ));
+    assert!(nfc_is_optional(
+        r#"<manifest><uses-feature android:name="android.hardware.nfc" android:required="false" /></manifest>"#
+    ));
+}
+
+#[test]
+fn the_nfc_permission_does_not_hide_the_app_from_tablets_without_a_chip() {
+    // Both copies, because either one alone would let the requirement back in: the merger takes
+    // the STRICTEST of the two, so an app manifest that stays quiet while the plugin says
+    // `required="false"` is fine, but a `required="true"` anywhere wins.
+    for (name, manifest) in [
+        ("gen/android/app/src/main/AndroidManifest.xml", APP_MANIFEST.to_string()),
+        (
+            "crates/tauri-plugin-erplora-android/.../AndroidManifest.xml",
+            fs::read_to_string(plugin_manifest_path()).expect("the plugin manifest"),
+        ),
+    ] {
+        assert!(
+            nfc_is_optional(&manifest),
+            "{name} declares android.permission.NFC without saying the chip is optional. Google \
+             Play adds an IMPLICIT android.hardware.nfc requirement for that permission and hides \
+             the app from every device without one — the cheap counter tablets this till is for. \
+             Put back: <uses-feature android:name=\"{NFC_FEATURE}\" android:required=\"false\" /> (hub#988)"
+        );
+    }
+}
+
 // ── The only check that reads the MERGED manifest ───────────────────────────────────────────────
 
 #[test]
@@ -221,4 +294,12 @@ fn the_release_build_reads_the_permissions_back_off_the_apk() {
             "the release job does not check {permission} on the built APK"
         );
     }
+    // And the feature the NFC permission drags in with it. This one is invisible everywhere else:
+    // an implicit `android.hardware.nfc` requirement breaks no build and fails no test — it just
+    // makes Play stop offering the app to devices without a chip, months later, silently.
+    assert!(
+        RELEASE_WORKFLOW.contains("uses-feature-not-required:name='android.hardware.nfc'"),
+        "the release job never reads back whether the built APK still says the NFC chip is \
+         OPTIONAL, so a merged manifest that requires it would ship and narrow the listing (hub#988)"
+    );
 }

@@ -202,6 +202,7 @@ import {
   type HubUserPatch,
 } from '../lib/hub-users';
 import { onBadgeScan } from '../lib/badge-scanner';
+import { nfcBadgeReady } from '../lib/nfc-badge';
 import { toast } from '../lib/toast';
 
 const { t } = useI18n();
@@ -290,9 +291,15 @@ const badgeError = computed(() =>
     ? t('employeeForm.errors.badge_shape')
     : '',
 );
-const badgeHelp = computed(() =>
-  hasBadge.value ? t('employeeForm.badgeSetHelp') : t('employeeForm.badgeHelp'),
-);
+// «Acércala» solo donde acercarla funciona (hub#988). `nfcBadgeReady` se enciende cuando el shell
+// ha atendido una lectura de verdad, no por estar dentro de la app: en un escritorio instalado la
+// promesa sería falsa, y una instrucción que no funciona es peor que no darla.
+const badgeHelp = computed(() => {
+  if (nfcBadgeReady.value) {
+    return hasBadge.value ? t('employeeForm.badgeNfcSetHelp') : t('employeeForm.badgeNfcHelp');
+  }
+  return hasBadge.value ? t('employeeForm.badgeSetHelp') : t('employeeForm.badgeHelp');
+});
 const pinHelp = computed(() => {
   if (isLocal.value) return t('employeeForm.localPinHelp');
   if (hasPin.value) return t('employeeForm.pinSetHelp');

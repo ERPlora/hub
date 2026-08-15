@@ -122,6 +122,14 @@ export default {
   // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
   // installed app there is no download shelf and no notification, so if we say nothing, nothing is
   // said at all.
+  // hub#988 — the badge read off the device's own NFC reader. Two sentences, because only these
+  // two are worth interrupting for: a device with no reader says nothing at all (the USB reader
+  // keeps working exactly as before, so there is nothing for the user to do about it).
+  badge: {
+    nfcDisabled: 'NFC is switched off on this device. Turn it on to read cards by tapping them.',
+    nfcRandomUid:
+      'This card gives a different number every time it is read, so it cannot be used as a badge. Try another card.',
+  },
   download: {
     savedTo: 'Saved to {path}',
     noPlaceToSave: 'This app cannot save files on a phone or tablet. Open your business in a browser to download it.',
@@ -921,6 +929,12 @@ export default {
       'Swipe the card and it fills in on its own — no need to click here first. You can also type the number, for a key fob or an engraved tag.',
     badgeSetHelp:
       'They already carry a badge. Swipe a new card to replace it, or leave this blank to keep the current one.',
+    // hub#988 — shown INSTEAD of the two above where the device can read a card by itself. Only
+    // there: promising a tap on a machine with no reader is worse than not mentioning it.
+    badgeNfcHelp:
+      'Tap the card on this device — or swipe it on the reader — and it fills in on its own. You can also type the number, for a key fob or an engraved tag.',
+    badgeNfcSetHelp:
+      'They already carry a badge. Tap or swipe a new card to replace it, or leave this blank to keep the current one.',
     clearBadge: 'Remove badge',
     localUser: 'Local user',
     localUserHelp:

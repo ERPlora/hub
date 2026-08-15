@@ -27,6 +27,7 @@
     "allow-erplora-set-device-name",
     "allow-erplora-remove-device",
     "allow-erplora-notify",
+    "allow-erplora-nfc-read",
     "allow-autostart-is-enabled",
     "allow-autostart-enable",
     "allow-autostart-disable",

@@ -60,4 +60,22 @@
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
 
+    <!-- Reading the staff badge off the device's OWN reader (hub#988). Unlike the three above this
+         is a `normal`, install-time permission: there is no dialog and no way to deny it, so it
+         deliberately stays OUT of `PermissionPolicy` — a runtime request for it would show nothing
+         and add an entry to the status map that can never change. Missing it does not fail
+         silently the way the LAN one does; `enableReaderMode` throws a SecurityException. -->
+    <uses-permission android:name="android.permission.NFC" />
+
+    <!-- 🔴 Load-bearing, and the reason the permission alone is not enough. Declaring
+         `android.permission.NFC` makes Google Play add an IMPLICIT `android.hardware.nfc`
+         requirement, and Play then hides the app from every device without an NFC chip — most
+         cheap counter tablets, and every desktop-class Chromebook. The till would vanish from the
+         store for the customers least likely to have a reader, over a convenience feature. Saying
+         `required="false"` out loud is what keeps the listing open to them; the code already
+         degrades cleanly (`nfc_unavailable`). -->
+    <uses-feature
+        android:name="android.hardware.nfc"
+        android:required="false" />
+
 </manifest>
