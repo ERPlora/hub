@@ -177,6 +177,30 @@ const TIPOS_CON_DESTINATARIO: &[&str] = &["F1", "F3", "R1", "R2", "R3", "R4"];
 /// `IdSistemaInformatico` está limitado a 2 caracteres (la AEAT responde 1100 si se pasa).
 const MAX_ID_SISTEMA_INFORMATICO: usize = 2;
 
+/// First element that switches §15.8 off: a billing agreement.
+const EXEMPTION_BILLING_AGREEMENT: &str = "NumRegistroAcuerdoFacturacion";
+
+/// The second one. The validations document writes `Articulo61d`; the **schema** says `Art61d`,
+/// and the schema is what travels on the wire.
+const EXEMPTION_ART_61D: &str = "FacturaSinIdentifDestinatarioArt61d";
+
+/// Both, so that `tests/xsd.rs` can contrast the names the validator really looks for against the
+/// official XSD: a name that never matches is an exemption that never applies — and an exemption
+/// that never applies blocks a legitimate sale.
+pub const F2_LIMIT_EXEMPTIONS: &[&str] = &[EXEMPTION_BILLING_AGREEMENT, EXEMPTION_ART_61D];
+
+/// §15.8 — ceiling for Σ(`BaseImponibleOimporteNoSujeto` + `CuotaRepercutida`) of an `F2`, in
+/// cents.
+const MAX_F2_CENTS: i64 = 3_000 * 100;
+
+/// …plus the +10,00 € margin the AEAT admits on top of it. The effective ceiling is therefore
+/// 3.010,00 € **inclusive**: 3.010,00 passes, 3.010,01 does not.
+const F2_TOLERANCE_CENTS: i64 = 10 * 100;
+
+/// Only this value of `FacturaSinIdentifDestinatarioArt61d` exempts. The enumeration also has
+/// `"N"`, which is a plain F2 and keeps the ceiling.
+const ART_61D_EXEMPT: &str = "S";
+
 /// Elementos obligatorios que son **contenedores** (llevan hijos, no texto propio): exigirles
 /// contenido los daría por vacíos siempre.
 const CONTAINERS: &[&str] = &[
@@ -386,8 +410,8 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     }
 
     // ── Enumeraciones, formatos y reglas con código propio de la AEAT ────────────────────
+    let tipo = text_at(&elements, "TipoFactura", nivel).unwrap_or_default();
     if !anulacion {
-        let tipo = text_at(&elements, "TipoFactura", nivel).unwrap_or_default();
         if !TIPO_FACTURA.contains(&tipo) {
             return Err(err(format!(
                 "TipoFactura `{tipo}` no está en la enumeración del esquema ({})",
@@ -415,6 +439,9 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     // ── Desglose: la calificación, que el XSD deja pasar ─────────────────────────────────
     if !anulacion {
         validate_desglose(&elements)?;
+        // Después del desglose a propósito: un detalle mal formado se nombra por lo que le pasa,
+        // no por una suma que sale rara.
+        validate_limite_f2(&elements, tipo, nivel)?;
     }
 
     if text_at(&elements, "TipoHuella", nivel).unwrap_or_default() != "01" {
@@ -670,6 +697,73 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
                 }
             }
         }
+    }
+    Ok(())
+}
+
+// ── §15.8: el techo de 3.000 € de la factura simplificada ──────────────────────────────────
+
+/// Reads an AEAT amount (`3000.00`) as whole cents. Amounts are added up in integers on purpose:
+/// the rule turns on a single cent (3.010,00 passes, 3.010,01 does not) and `f64` addition of
+/// twelve lines does not survive that.
+fn cents(v: &str) -> Option<i64> {
+    num(v).map(|n| (n * 100.0).round() as i64)
+}
+
+/// §15.8 — «Cuando TipoFactura sea "F2", se validará que Ʃ (BaseImponibleOimporteNoSujeto +
+/// CuotaRepercutida) de todas las líneas de detalle no sea superior a 3.000,00 euros. Se admitirá
+/// un error de +10,00 euros.»
+///
+/// # Por qué se para aquí y el límite de los 400 € no
+///
+/// [ADR-0184] dejó escrito que el límite legal de la simplificada (400 €, 3.000 € en hostelería y
+/// peluquería) **no** se comprueba: es un incumplimiento del comerciante, y bloquear la venta era
+/// peor que dejarlo pasar. Este techo es otra cosa: no es una norma que el comerciante decide si
+/// cumple, es un **rechazo seguro del servicio**. Y un rechazo llega con el número de la cadena ya
+/// gastado, que es justo lo que este validador existe para evitar.
+///
+/// La regla **no aplica** con acuerdo de facturación (`NumRegistroAcuerdoFacturacion`) ni con
+/// `FacturaSinIdentifDestinatarioArt61d = "S"`. El módulo no emite hoy ninguno de los dos, pero la
+/// excepción va escrita: el día que se emitan, sin ella la regla bloquearía ventas legítimas.
+fn validate_limite_f2(
+    elements: &[Element<'_>],
+    tipo: &str,
+    nivel: usize,
+) -> Result<(), VerifactuError> {
+    if tipo != "F2" {
+        return Ok(());
+    }
+    // Las excepciones se leen a nivel del registro: `text_at`, no `text_of`, para que un elemento
+    // homónimo anidado no exima por accidente.
+    if text_at(elements, EXEMPTION_BILLING_AGREEMENT, nivel).is_some_and(|v| !v.is_empty()) {
+        return Ok(());
+    }
+    if text_at(elements, EXEMPTION_ART_61D, nivel) == Some(ART_61D_EXEMPT) {
+        return Ok(());
+    }
+
+    // Σ de TODAS las líneas: por línea suelta, un ticket de dos líneas se colaría.
+    let total: i64 = detalles(elements)
+        .iter()
+        .map(|g| {
+            let get = |tag: &str| {
+                g.iter()
+                    .find(|(t, _)| *t == tag)
+                    .and_then(|(_, v)| cents(v))
+            };
+            get("BaseImponibleOimporteNoSujeto").unwrap_or(0) + get("CuotaRepercutida").unwrap_or(0)
+        })
+        .sum();
+
+    let techo = MAX_F2_CENTS + F2_TOLERANCE_CENTS;
+    if total > techo {
+        return Err(err(format!(
+            "una factura simplificada F2 no puede pasar de 3.000,00 € (más los 10,00 € de \
+             tolerancia) sumando base y cuota de todas las líneas, y suma {:.2} €: la AEAT la \
+             rechaza (§15.8). Con este importe hay que emitir factura completa identificando al \
+             destinatario",
+            total as f64 / 100.0
+        )));
     }
     Ok(())
 }
