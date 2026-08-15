@@ -3489,6 +3489,13 @@ mod kind_contract_tests {
         // (una ruta apunta al `id` de una estación). Al escribirla el máximo era la v48 en
         // `origin/develop` y en TODAS las ramas remotas — recomprobado contra el conjunto, no solo
         // contra develop, que es donde el recuento a mano se ha equivocado antes.
-        assert_eq!(MIGRATIONS.len(), 47, "el catálogo cambió de tamaño");
+        // + `fiscal_regime_simplified_limit` (v51, hub#297): el techo de la factura simplificada
+        // baja a la fila del régimen que lo impone (`_hub_fiscal_regime_registry`), porque es un
+        // dato del mismo tipo que el régimen y no un `match` sobre el país compilado en el runtime.
+        // `0` = «este régimen no pone techo», y el `UPDATE` de siembra lleva guarda `= 0` para que
+        // un rearranque no le pise al comerciante un valor que él hubiera movido. Al escribirla el
+        // máximo era la v50 en `origin/develop` y en TODAS las ramas remotas, y también en los 10
+        // worktrees locales de la flota — que es donde vive el número que el remoto aún no ha visto.
+        assert_eq!(MIGRATIONS.len(), 48, "el catálogo cambió de tamaño");
     }
 }
