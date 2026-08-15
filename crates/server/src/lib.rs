@@ -898,14 +898,16 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     }
                 }
 
-                let cutoff = (chrono::Utc::now()
-                    - chrono::Duration::days(erplora_runtime::retention::RETENTION_DAYS))
-                .to_rfc3339();
+                // Dos relojes, uno por tabla (hub#903): el historial a 90 días y el RECIBO de una
+                // aprobación humana a cuatro años. Se calculan juntos al principio de la vuelta
+                // para que todas las pasadas de este tick midan contra el mismo instante.
+                let cutoffs = erplora_runtime::retention::Cutoffs::now();
                 let mut total = erplora_runtime::retention::PruneReport::default();
                 for _ in 0..erplora_runtime::retention::MAX_PASSES {
                     let runtime = st.runtime.lock().await;
                     let pass =
-                        erplora_runtime::retention::prune_once(runtime.db(), &hub_id, &cutoff).await;
+                        erplora_runtime::retention::prune_once(runtime.db(), &hub_id, &cutoffs)
+                            .await;
                     drop(runtime);
                     match pass {
                         Ok(p) if p.is_empty() => break,
@@ -926,7 +928,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                         runs = total.runs,
                         run_steps = total.run_steps,
                         approvals = total.approvals,
+                        receipts = total.receipts,
                         retention_days = erplora_runtime::retention::RETENTION_DAYS,
+                        approval_audit_days = erplora_runtime::retention::APPROVAL_AUDIT_DAYS,
                         "retention: historial terminal podado"
                     );
                 }
