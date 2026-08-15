@@ -155,6 +155,19 @@ async fn the_flow_tables_land_with_the_row_contract() {
                 // step can set it per document without the kernel growing a second branch.
                 "on_expire",
                 "error",
+                // hub#950 — the table stops being «what a model proposed» and holds BOTH kinds.
+                // `kind` is the branch (`command` | `decision`); the rest is what a question needs
+                // that a payload does not. `title`/`summary` are stored ALREADY TEMPLATED, which is
+                // what makes «editing the flow does not mutate a live request» true for free —
+                // exactly the property `payload` has. `on_reject` is the sister of `on_expire` and
+                // is a column for the same reason: the policy applied is the one that was in force
+                // when the question was ASKED.
+                "kind",
+                "title",
+                "summary",
+                "assignee_role",
+                "comment",
+                "on_reject",
             ],
         ),
     ];

@@ -37,7 +37,7 @@ use crate::commands::{self, Origin};
 use crate::errors::{Result, RuntimeError};
 use crate::flows::def::{self, FlowDefinition, StepDef, StepSpec};
 use crate::flows::http::HttpRequest;
-use crate::flows::{grants, http, notify, query, store, triggers};
+use crate::flows::{approvals, grants, http, notify, query, store, triggers};
 use crate::registry::{new_id, now_rfc3339, AutomationCtx, Registry, RequestContext};
 
 /// How many runs one tick advances. The tick happens every second, so this is a throughput knob,
@@ -328,6 +328,21 @@ async fn advance_run(
                 // and retrying a business command by itself is how a sale gets charged twice.
                 return finish(db, hub_id, &run_id, store::STATUS_FAILED, &error).await.map(|()| None);
             }
+            // The question is asked; the run leaves the queue until somebody answers it. It goes
+            // out through `complete_io` — the same door the `ai` step's proposal parks through —
+            // so `waiting_approval` is written in exactly one place, and the resume path
+            // (`decide_flow_approval`, the expiry sweep) is the same one for both kinds.
+            Outcome::AwaitApproval => {
+                return complete_io(
+                    db,
+                    hub_id,
+                    &run_id,
+                    &step.id,
+                    IoResult::AwaitingApproval(json!({})),
+                )
+                .await
+                .map(|()| None)
+            }
         }
     }
 
@@ -355,6 +370,11 @@ enum Outcome {
     Stopped,
     Sleep { wake_at: String },
     Failed { error: String },
+    /// **The pause** (hub#950). The question is already written to `_flow_approvals` and the step
+    /// row is `running`; what is left is to park the run, and that is done through the seam the
+    /// `ai` step has parked through since hub#665 rather than beside it. One place decides what
+    /// «this run is waiting for a person» means, and a second one would drift.
+    AwaitApproval,
 }
 
 #[allow(clippy::too_many_arguments)] // one step's worth of context; splitting it hides the seam
@@ -649,6 +669,90 @@ async fn run_step(
                     Ok(Outcome::Failed { error })
                 }
             }
+        }
+
+        // **The pause** (hub#950). It does no I/O, so it never crosses the claim → I/O → complete
+        // seam: everything happens here, under the lock, and what leaves the tick is a run that has
+        // stopped and a row a person can answer.
+        //
+        // Two properties are the whole step, and both live in this arm:
+        //
+        // 1. **The question is rendered NOW and stored.** `title`/`summary` are templated against
+        //    this run and written to the row, exactly like the `payload` of a model's proposal —
+        //    so editing (or deleting) the flow afterwards cannot change what the person in front
+        //    of the tray is agreeing to. That is the acceptance criterion «editing the flow does
+        //    not mutate requests already created», and it costs nothing extra.
+        // 2. **It asks once per run and step.** A tick that wrote the row and died before the run
+        //    was parked gets its lease reclaimed and comes back through here; without the lookup
+        //    the person would find the same question twice, and answering one would leave the
+        //    other hanging until the sweep.
+        StepSpec::Approval(spec) => {
+            let title = def::render(&spec.title, scope);
+            let summary = def::render(&spec.summary, scope);
+            let recorded_input = json!({
+                "title": title,
+                "summary": summary,
+                "assignee_role": spec.assignee_role,
+                "expires_in": spec.expires_in_seconds,
+                "on_expire": spec.on_expire.as_str(),
+                "on_reject": spec.on_reject.as_str(),
+            });
+
+            let already_asked = approvals::pending_for_step(db, hub_id, run_id, &step.id).await?;
+            let newly_asked = match already_asked {
+                Some(_) => None,
+                None => Some(
+                    approvals::create_decision(
+                        db,
+                        hub_id,
+                        &approvals::NewDecision {
+                            run_id: run_id.to_string(),
+                            flow_id: flow_id.to_string(),
+                            step_id: step.id.clone(),
+                            title: title.clone(),
+                            summary: summary.clone(),
+                            assignee_role: spec.assignee_role.clone(),
+                            expires_in_seconds: spec.expires_in_seconds,
+                            on_expire: spec.on_expire,
+                            on_reject: spec.on_reject,
+                        },
+                    )
+                    .await?,
+                ),
+            };
+
+            // `running` and not `waiting_approval`: the park is `complete_io`'s job, and it only
+            // accepts a result for a step the run is actually waiting on.
+            write_step(
+                db, hub_id, run_id, index, step, STEP_RUNNING, &recorded_input, &json!({}), "",
+                &now,
+            )
+            .await?;
+
+            // Ephemeral, WS-only — the same fact a model's proposal emits, so the tray lights up
+            // without polling. The SCREEN is the module `flows`'s job (ADR-0283 §7).
+            //
+            // **Only for a question that is actually new.** A replay of this step (the crash
+            // window above) is not a new question, and re-announcing it would light up the tray a
+            // second time for a row that has been sitting in it since Tuesday.
+            if let Some(asked) = newly_asked {
+                let mut payload = Params::new();
+                payload.insert("approval_id".into(), json!(asked.id));
+                payload.insert("flow_id".into(), json!(asked.flow_id));
+                payload.insert("run_id".into(), json!(asked.run_id));
+                payload.insert("kind".into(), json!(asked.kind));
+                payload.insert("title".into(), json!(asked.title));
+                payload.insert("summary".into(), json!(asked.summary));
+                payload.insert("assignee_role".into(), json!(asked.assignee_role));
+                crate::events::notify_sink(
+                    registry,
+                    crate::registry::EventSource::Core,
+                    approvals::EVENT_APPROVAL_CREATED,
+                    &payload,
+                );
+            }
+
+            Ok(Outcome::AwaitApproval)
         }
     }
 }

@@ -24,6 +24,7 @@ use std::collections::BTreeMap;
 use serde_json::{Map, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
+use crate::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use crate::host_notify::Channel;
 
 /// The only document version this kernel understands. An unknown version is REFUSED, never
@@ -85,6 +86,19 @@ pub const DEFAULT_MAX_ITERS: i64 = 6;
 /// proxy, which meters it (`AssistantUsage`): a runaway agent loop is money, not just latency.
 pub const MAX_ITERS_CAP: i64 = 10;
 
+/// How long an `approval` step waits when the document does not say (hub#950): **72 hours**.
+///
+/// The same number the `ai` tray has always used ([`crate::flows::approvals::DEFAULT_TTL_HOURS`]),
+/// and it is a default rather than a fixed rule for one reason the forums make plain: 72 h fixed
+/// dies over a long weekend, and a question that expired while the shop was shut is a run somebody
+/// has to restart on Tuesday morning.
+pub const DEFAULT_APPROVAL_TTL_SECONDS: i64 = 72 * 3600;
+/// Hard ceiling, refused above rather than clamped: **30 days**, Power Automate's own number and
+/// the order of magnitude of a Business Central `Due Date Formula`. A run parked for longer is a
+/// standing authorisation nobody remembers giving, and it holds its `payload` past every retention
+/// rule the hub has (`waiting_approval` is exempt from the prune on purpose).
+pub const MAX_APPROVAL_TTL_SECONDS: i64 = 30 * 24 * 3600;
+
 fn invalid(code: &str, message: impl Into<String>) -> RuntimeError {
     RuntimeError::Domain {
         code: code.to_string(),
@@ -118,6 +132,11 @@ pub enum StepKind {
     /// hub#821 — a message to a person, addressed through a `recipient_query` grant. It is the
     /// only step that can reach somebody who is not in the hub's allow-list: a CUSTOMER.
     Notify,
+    /// hub#950 — the pause. The kernel already knew how to stop and wait for a person, but only as
+    /// a side effect of an `ai` step: the row in `_flow_approvals` was always a WRITE a model had
+    /// proposed, so «shall I carry on?» cost a metered, non-deterministic call to a language model
+    /// to ask a yes/no question. This is that pause with the model taken out of it.
+    Approval,
 }
 
 impl StepKind {
@@ -130,6 +149,7 @@ impl StepKind {
             StepKind::Http => "http",
             StepKind::Ai => "ai",
             StepKind::Notify => "notify",
+            StepKind::Approval => "approval",
         }
     }
 
@@ -142,6 +162,7 @@ impl StepKind {
             "http" => StepKind::Http,
             "ai" => StepKind::Ai,
             "notify" => StepKind::Notify,
+            "approval" => StepKind::Approval,
             _ => return None,
         })
     }
@@ -175,6 +196,7 @@ impl StepKind {
         StepKind::Http,
         StepKind::Ai,
         StepKind::Notify,
+        StepKind::Approval,
     ];
 }
 
@@ -217,6 +239,44 @@ pub enum StepSpec {
     /// `{"kind":"notify","channel":"whatsapp","to":{…},"template":…,"vars":{…}}` — a message to a
     /// person (hub#821). See [`NotifyStep`].
     Notify(NotifyStep),
+    /// `{"kind":"approval","title":…,"summary":…,"assignee":{"role":…},"expires_in":N,
+    /// "on_expire":…,"on_reject":…}` — the pause (hub#950). See [`ApprovalStep`].
+    Approval(ApprovalStep),
+}
+
+/// **A question, and what happens to the run depending on how it is answered** (hub#950).
+///
+/// The shape is the market's, not ours (decision published on the issue, 2026-08-15): the
+/// **object** of Power Automate's *Start and wait for an approval* — the approval is a persisted
+/// thing with a life of its own, which is what lets a decision taken two days later still mean
+/// something — corrected by the **explicit due date** of Business Central's `Due Date Formula`,
+/// which is precisely the half Power Automate is documented to do badly.
+///
+/// The three branches the original contract asked for (`approved` / `rejected` / `expired`) are
+/// **policies of outcome**, not branches, because v1 of the document is LINEAR. That is n8n's
+/// answer (`Limit Wait Time` continues down one path) rather than Salesforce's (a whole approval
+/// subsystem the flow submits to, which would mean a second engine). With `continue` plus a
+/// `condition`, the three branches compose out of primitives that are already frozen — the same
+/// move the `query` step of hub#954 made.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApprovalStep {
+    /// The question, in words. Mapped against the run like any other value, and rendered ONCE —
+    /// when the question is asked — so editing the flow afterwards cannot change what the person
+    /// looking at the tray is agreeing to.
+    pub title: String,
+    /// A second line of the same question. Optional; mapped the same way.
+    pub summary: String,
+    /// **The role that may answer** — Odoo's `Allowed Group`. A role and never a person: naming
+    /// somebody in a document breaks the day they leave, which is the hole Business Central had to
+    /// invent a "substitute" for. Empty (the default) means whoever administers the hub, which is
+    /// what the tray has always required.
+    pub assignee_role: String,
+    /// How long it stays decidable. Default 72 h — a fixed deadline dies over a long weekend —
+    /// with a ceiling of 30 days, which is Power Automate's own number and the order of magnitude
+    /// of a `Due Date Formula`.
+    pub expires_in_seconds: i64,
+    pub on_expire: ExpiryPolicy,
+    pub on_reject: RejectPolicy,
 }
 
 /// **A message, and the only way a flow may address one** (hub#821, ADR-0283 §5).
@@ -390,6 +450,10 @@ impl StepDef {
                 Json::Object(n.vars.clone()),
                 json_str(&n.template),
             ],
+            // The question a person reads. The `secret.…` refusal has to reach it for the most
+            // literal reason of all: the tray is a SCREEN, and a credential interpolated into a
+            // title would be printed on it for anybody who can open the approvals list.
+            StepSpec::Approval(a) => vec![json_str(&a.title), json_str(&a.summary)],
         }
     }
 
@@ -778,6 +842,16 @@ pub fn resolve_map(map: &Map<String, Json>, scope: &Json) -> Map<String, Json> {
         .collect()
 }
 
+/// **Text a PERSON reads, with its templates filled in** (hub#950).
+///
+/// Deliberately not [`resolve`]: that one treats a bare `a.b` as a path, which is right for a
+/// value and wrong for prose — a title like `Revisar stock.mínimo` would resolve to `null` and
+/// come out empty. Here the only thing that substitutes is an explicit `{{…}}`, and everything
+/// else is the author's own words.
+pub fn render(text: &str, scope: &Json) -> String {
+    render_template(text, scope)
+}
+
 /// `"Hola {{input.name}}"` → `"Hola Marta"`. An unclosed `{{` is left verbatim: it is text the
 /// author wrote, and inventing a value for it would be worse than showing the braces.
 fn render_template(s: &str, scope: &Json) -> String {
@@ -1109,6 +1183,16 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
         StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters"],
         StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars"],
+        StepKind::Approval => &[
+            "id",
+            "kind",
+            "title",
+            "summary",
+            "assignee",
+            "expires_in",
+            "on_expire",
+            "on_reject",
+        ],
     };
     for key in map.keys() {
         if !allowed.contains(&key.as_str()) {
@@ -1257,6 +1341,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         }
         StepKind::Ai => StepSpec::Ai(parse_ai(&id, map)?),
         StepKind::Notify => StepSpec::Notify(parse_notify(&id, map)?),
+        StepKind::Approval => StepSpec::Approval(parse_approval(&id, map)?),
     };
 
     Ok(StepDef { id, kind, spec })
@@ -1540,6 +1625,137 @@ fn parse_ai(id: &str, map: &Map<String, Json>) -> Result<AiStep> {
     })
 }
 
+/// The keys of an `approval` step (hub#950).
+///
+/// Three refusals, and each one is about a document never quietly meaning something other than it
+/// says: a question with no title, an assignee that names a PERSON, and a wait longer than this
+/// kernel will park for. The two policies are closed vocabularies for the same reason `policy` is
+/// on the `ai` step — `"cancle"` silently becoming `continue` would carry a run past a refusal.
+fn parse_approval(id: &str, map: &Map<String, Json>) -> Result<ApprovalStep> {
+    let title = match map.get("title") {
+        Some(Json::String(s)) if !s.trim().is_empty() => s.clone(),
+        _ => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: an `approval` step needs a `title` — that string IS the \
+                     question, and a tray that showed an opaque id would be a button people press \
+                     without reading"
+                ),
+            ))
+        }
+    };
+    let summary = match map.get("summary") {
+        None | Some(Json::Null) => String::new(),
+        Some(Json::String(s)) => s.clone(),
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `summary` is a string"),
+            ))
+        }
+    };
+
+    // **A role, and there is deliberately no shape in which a person can be named.** Same refusal
+    // as a `notify` recipient (hub#821) and for the same kind of reason: the absence IS the
+    // guarantee. A document that could say `{"user": "hub_user:7"}` would be a flow that stops
+    // working the day that person leaves — and the marketplace template that shipped with it would
+    // name somebody else's employee.
+    let assignee_role = match map.get("assignee") {
+        None | Some(Json::Null) => String::new(),
+        Some(Json::Object(a)) => {
+            for key in a.keys() {
+                if key != "role" {
+                    return Err(invalid(
+                        ERR_INVALID_DEFINITION,
+                        format!(
+                            "step `{id}`: unknown key `{key}` in `assignee`. An approval names a \
+                             ROLE, never a person: somebody named in a document is gone the day \
+                             they leave."
+                        ),
+                    ));
+                }
+            }
+            match a.get("role") {
+                Some(Json::String(s)) if !s.trim().is_empty() => s.trim().to_string(),
+                _ => {
+                    return Err(invalid(
+                        ERR_INVALID_DEFINITION,
+                        format!("step `{id}`: `assignee` is `{{\"role\": \"<rol>\"}}`"),
+                    ))
+                }
+            }
+        }
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `assignee` is `{{\"role\": \"<rol>\"}}`, not a name"),
+            ))
+        }
+    };
+
+    let expires_in_seconds = match map.get("expires_in") {
+        None | Some(Json::Null) => DEFAULT_APPROVAL_TTL_SECONDS,
+        Some(v) => v.as_i64().unwrap_or(-1),
+    };
+    if !(1..=MAX_APPROVAL_TTL_SECONDS).contains(&expires_in_seconds) {
+        return Err(invalid(
+            ERR_LIMIT_OUT_OF_RANGE,
+            format!(
+                "step `{id}`: `expires_in` must be between 1 second and \
+                 {MAX_APPROVAL_TTL_SECONDS} (30 days), got {expires_in_seconds}. Refused rather \
+                 than clamped, like `limit` and `max_iters`: a run parked for longer is a standing \
+                 authorisation nobody remembers giving, and while it waits it is exempt from the \
+                 90-day prune."
+            ),
+        ));
+    }
+
+    let on_expire = match map.get("on_expire") {
+        None | Some(Json::Null) => ExpiryPolicy::Reject,
+        Some(Json::String(s)) if ExpiryPolicy::ALL.iter().any(|p| p.as_str() == s) => {
+            ExpiryPolicy::parse(s)
+        }
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `on_expire` is one of {}",
+                    joined(ExpiryPolicy::ALL.iter().map(|p| p.as_str()))
+                ),
+            ))
+        }
+    };
+    let on_reject = match map.get("on_reject") {
+        None | Some(Json::Null) => RejectPolicy::Cancel,
+        Some(Json::String(s)) if RejectPolicy::ALL.iter().any(|p| p.as_str() == s) => {
+            RejectPolicy::parse(s)
+        }
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `on_reject` is one of {}",
+                    joined(RejectPolicy::ALL.iter().map(|p| p.as_str()))
+                ),
+            ))
+        }
+    };
+
+    Ok(ApprovalStep {
+        title,
+        summary,
+        assignee_role,
+        expires_in_seconds,
+        on_expire,
+        on_reject,
+    })
+}
+
+fn joined<'a>(values: impl Iterator<Item = &'a str>) -> String {
+    values.collect::<Vec<_>>().join(", ")
+}
+
 /// A list of operation names, refused if it is anything else. An entry that is not a string would
 /// otherwise be dropped, and a tool the author believes they declared would not be offered.
 fn string_list(id: &str, value: Option<&Json>, what: &str) -> Result<Vec<String>> {
@@ -1714,6 +1930,200 @@ mod tests {
                 .expect_err("a credential must never be interpolated into a message");
             assert!(format!("{err}").contains("API_KEY"), "{err}");
         }
+    }
+
+    // ── the `approval` step (hub#950) ─────────────────────────────────────────────────────────
+
+    /// The eighth kind, and the shape the market converged on: the **object** of Power Automate's
+    /// *Start and wait for an approval* (a question with a title, a summary and an assignee) plus
+    /// the **explicit due date** of Business Central, which is the half Power Automate does badly.
+    #[test]
+    fn an_approval_step_carries_its_question_its_assignee_and_its_two_outcome_policies() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "approve", "kind": "approval",
+                "title": "Aprobar compra a {{steps.po.supplier_name}}",
+                "summary": "Importe {{input.total}} €",
+                "assignee": { "role": "owner" },
+                "expires_in": 86400,
+                "on_expire": "continue",
+                "on_reject": "continue"
+            }]
+        }))
+        .expect("the shape the purchase approval is written in");
+        let StepSpec::Approval(step) = &def.steps[0].spec else {
+            panic!("an approval step parses as one");
+        };
+        assert_eq!(step.title, "Aprobar compra a {{steps.po.supplier_name}}");
+        assert_eq!(step.summary, "Importe {{input.total}} €");
+        assert_eq!(step.assignee_role, "owner");
+        assert_eq!(step.expires_in_seconds, 86400);
+        assert_eq!(step.on_expire, ExpiryPolicy::Continue);
+        assert_eq!(step.on_reject, RejectPolicy::Continue);
+    }
+
+    /// The defaults are the conservative ones, and each is a decision. 72 h because a fixed
+    /// deadline dies over a long weekend and 30 days is Power Automate's own ceiling; `reject` and
+    /// `cancel` because the steps written after an approval assumed it was granted.
+    #[test]
+    fn an_approval_defaults_to_seventy_two_hours_and_to_not_carrying_on() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "approve", "kind": "approval", "title": "¿Seguimos?" }]
+        }))
+        .unwrap();
+        let StepSpec::Approval(step) = &def.steps[0].spec else {
+            panic!("an approval step parses as one");
+        };
+        assert_eq!(step.expires_in_seconds, DEFAULT_APPROVAL_TTL_SECONDS);
+        assert_eq!(step.expires_in_seconds, 72 * 3600);
+        assert_eq!(step.on_expire, ExpiryPolicy::Reject);
+        assert_eq!(step.on_reject, RejectPolicy::Cancel);
+        assert_eq!(
+            step.assignee_role, "",
+            "no role named means the hub's own admin gate, which is what decides approvals today"
+        );
+        assert_eq!(step.summary, "");
+    }
+
+    /// Refused, not clamped — the precedent of `max_iters` and `limit`. A run parked for longer
+    /// than a month is a standing authorisation nobody remembers giving, and a document that says
+    /// a year while the hub silently means thirty days is lying to whoever wrote it.
+    #[test]
+    fn a_wait_longer_than_a_month_is_refused_at_save_time_instead_of_being_clamped() {
+        for expires_in in [MAX_APPROVAL_TTL_SECONDS + 1, 0, -1, 365 * 24 * 3600] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "approve", "kind": "approval", "title": "¿Seguimos?",
+                    "expires_in": expires_in
+                }]
+            }))
+            .expect_err("`expires_in` {expires_in} is outside what this kernel will park for");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_LIMIT_OUT_OF_RANGE),
+                "{err}"
+            );
+        }
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "approve", "kind": "approval", "title": "¿Seguimos?",
+                "expires_in": MAX_APPROVAL_TTL_SECONDS
+            }]
+        }))
+        .is_ok());
+    }
+
+    /// A question nobody can read is not a question. The title is what a person decides against at
+    /// 9 AM, so a step without one does not save.
+    #[test]
+    fn an_approval_step_without_a_question_is_refused() {
+        for title in [json!(""), json!("   "), json!(null), json!(7)] {
+            assert!(
+                FlowDefinition::parse(&json!({
+                    "schema_version": 1,
+                    "steps": [{ "id": "approve", "kind": "approval", "title": title }]
+                }))
+                .is_err(),
+                "a title of {title} is not something a person can decide against"
+            );
+        }
+    }
+
+    /// **A role, never a person.** Naming somebody in a document breaks the day they leave — the
+    /// hole Business Central had to invent a "substitute" for — and Odoo's `Allowed Group` is what
+    /// the market settled on instead. There is no shape in which a user id can be written down.
+    #[test]
+    fn an_approval_is_assigned_to_a_role_and_there_is_no_way_to_name_a_person() {
+        for assignee in [
+            json!("owner"),
+            json!({ "user": "hub_user:7" }),
+            json!({ "role": "owner", "user": "hub_user:7" }),
+            json!({ "role": 7 }),
+            json!(["owner"]),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "approve", "kind": "approval", "title": "¿Seguimos?",
+                    "assignee": assignee
+                }]
+            }))
+            .expect_err("an assignee is `{role: …}` and nothing else");
+            assert!(format!("{err}").contains("assignee"), "{err}");
+        }
+    }
+
+    /// Both policies are closed vocabularies, refused rather than defaulted: `"cancle"` quietly
+    /// becoming `cancel` would be merciful and `"cancle"` quietly becoming `continue` would carry
+    /// a run past a refusal. Neither is acceptable, so it does not save.
+    #[test]
+    fn the_outcome_policies_are_closed_vocabularies_and_a_typo_does_not_save() {
+        for (key, value) in [
+            ("on_expire", "rejct"),
+            ("on_expire", "carry_on"),
+            ("on_reject", "cancle"),
+            ("on_reject", "reject"),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "approve", "kind": "approval", "title": "¿Seguimos?", key: value
+                }]
+            }))
+            .expect_err("a policy this kernel cannot obey is refused where it was typed");
+            assert!(format!("{err}").contains(key), "{err}");
+        }
+    }
+
+    /// hub#521's lesson, applied to the newest kind: a key the runtime does not read is refused
+    /// instead of dropped. `command` and `payload` are the tempting ones — this step deliberately
+    /// executes NOTHING, and accepting them would read like a promise it does not keep.
+    #[test]
+    fn an_approval_step_refuses_a_key_it_does_not_understand() {
+        for key in ["command", "payload", "params", "assignee_role", "prompt"] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "approve", "kind": "approval", "title": "¿Seguimos?",
+                    key: json!("x")
+                }]
+            }))
+            .expect_err("a flow never runs with a key the hub does not understand");
+            assert!(format!("{err}").contains(key), "{err}");
+        }
+    }
+
+    /// The title and the summary are mapping expressions like any other, so the `secret.…` refusal
+    /// has to reach them: a credential interpolated there would be printed in the tray, which is
+    /// the one screen the whole hub is invited to read.
+    #[test]
+    fn a_secret_cannot_be_interpolated_into_the_question_a_person_reads() {
+        for step in [
+            json!({ "id": "a", "kind": "approval", "title": "clave {{secret.API_KEY}}" }),
+            json!({
+                "id": "a", "kind": "approval", "title": "¿Seguimos?",
+                "summary": "clave {{secret.API_KEY}}"
+            }),
+        ] {
+            let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .expect_err("a credential must never be interpolated into the tray");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_SECRET_NOT_AVAILABLE),
+                "{err}"
+            );
+        }
+    }
+
+    /// It parks the run rather than crossing the claim → I/O → complete seam: there is no call to
+    /// make outside the lock, only a row to write and a run to stop.
+    #[test]
+    fn an_approval_does_no_io_of_its_own() {
+        assert!(!StepKind::Approval.needs_io());
+        assert!(StepKind::Approval.is_available());
+        assert_eq!(StepKind::parse("approval"), Some(StepKind::Approval));
     }
 
     // ── the `http` step (hub#662) ─────────────────────────────────────────────────────────────

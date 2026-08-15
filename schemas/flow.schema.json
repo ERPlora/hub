@@ -124,9 +124,10 @@
             "delay",
             "http",
             "ai",
-            "notify"
+            "notify",
+            "approval"
           ],
-          "description": "Vocabulario CONGELADO, y todos se ejecutan. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http` (hub#662) y `ai` (hub#665) siguen el contrato claim → I/O → complete: el tick los prepara y el server los ejecuta FUERA del lock. `notify` (hub#821) no cruza esa costura: resuelve el destinatario con una lectura local y ENCOLA un evento host-notify, y quien habla con la red es el relay del outbox, que ya tiene reintentos, backoff y dead-letter. `query` (hub#954) es una LECTURA determinista: tampoco hace I/O y la avanza el tick, acotada por su `limit`. No añade permiso nuevo — pasa por el mismo grant `query` (`GrantKind::Query`) que las lecturas del step `ai` desde hub#665; lo que cambia es que leer ya no exige un modelo de lenguaje de por medio."
+          "description": "Vocabulario CONGELADO, y todos se ejecutan. `command`/`condition`/`delay` no hacen I/O y los avanza el tick bajo el lock global. `http` (hub#662) y `ai` (hub#665) siguen el contrato claim → I/O → complete: el tick los prepara y el server los ejecuta FUERA del lock. `notify` (hub#821) no cruza esa costura: resuelve el destinatario con una lectura local y ENCOLA un evento host-notify, y quien habla con la red es el relay del outbox, que ya tiene reintentos, backoff y dead-letter. `query` (hub#954) es una LECTURA determinista: tampoco hace I/O y la avanza el tick, acotada por su `limit`. No añade permiso nuevo — pasa por el mismo grant `query` (`GrantKind::Query`) que las lecturas del step `ai` desde hub#665; lo que cambia es que leer ya no exige un modelo de lenguaje de por medio. `approval` (hub#950) es la PAUSA: no hace I/O, escribe una fila en `_flow_approvals` y aparca el run por la MISMA costura por la que lo aparca una propuesta del step `ai`, hasta que una persona contesta. Es lo que hasta ahora solo se conseguía de rebote invocando un modelo."
         },
         "query": {
           "type": "string",
@@ -235,6 +236,42 @@
           "default": 6,
           "description": "Solo `kind: ai` — vueltas del bucle de tools. Se RECHAZA por encima del tope en vez de recortarse: cada turno es una llamada real por el proxy del SaaS, que la mide (`AssistantUsage`), y un documento que dice 50 y ejecuta 10 le miente a quien lo escribió."
         },
+        "title": {
+          "type": "string",
+          "description": "Solo `kind: approval` (hub#950) — LA PREGUNTA, en palabras. OBLIGATORIA: es contra lo que una persona decide a las 9 de la mañana, y una bandeja que enseñara un id opaco sería un botón que la gente pulsa sin leer. Se mapea contra el run (`{{steps.po.supplier_name}}`) y se templa UNA VEZ, al hacer la pregunta, guardándose ya renderizada en la fila — por eso editar el flujo después NO muta una solicitud viva. Un `{{secret.X}}` aquí se RECHAZA al guardar: la bandeja es una pantalla."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Solo `kind: approval` — la segunda línea de la misma pregunta (el importe, el cliente, lo que haga falta para decidir sin salir de la bandeja). Opcional, y se templa y se guarda igual que `title`."
+        },
+        "assignee": {
+          "$ref": "#/$defs/assignee",
+          "description": "Solo `kind: approval` — QUIÉN puede contestar. Opcional; ausente = quien administra el hub, que es lo que la bandeja ha exigido siempre. Es un ROL, nunca una persona: quien se nombra en un documento se va de la empresa y el flujo deja de funcionar (Business Central tuvo que inventar el «sustituto» para tapar justo eso, y Odoo lo resuelve con `Allowed Group`). El rol se resuelve SERVER-SIDE en el momento de decidir, y quien administra el hub puede contestar siempre — si no, un rol que se queda sin nadie deja la pregunta sin salida y el run aparcado."
+        },
+        "expires_in": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2592000,
+          "default": 259200,
+          "description": "Solo `kind: approval` — segundos que la pregunta sigue siendo contestable. Por defecto **72 h** y como máximo **30 días** (el número de Power Automate y el orden de magnitud de un `Due Date Formula` de Business Central). Se RECHAZA por encima del techo en vez de recortarse, igual que `limit` y `max_iters`: un run aparcado más tiempo es una autorización permanente que nadie recuerda haber dado, y mientras espera está EXENTO de la poda de 90 días con su contenido dentro. El vencimiento lo aplica un barrido activo (hub#972/#979), no una comprobación al leer."
+        },
+        "on_expire": {
+          "enum": [
+            "reject",
+            "cancel",
+            "continue"
+          ],
+          "default": "reject",
+          "description": "Solo `kind: approval` — qué le pasa al RUN si nadie contesta antes de `expires_in`. El silencio es una RESPUESTA: `reject` (POR DEFECTO) lo trata como una negativa, que es la lectura conservadora porque los pasos escritos después asumían que se aprobó; `cancel` termina el run sin llamarlo negativa; `continue` sigue al paso siguiente con `steps.<id>.decision == \"expired\"` — el `Limit Wait Time` de n8n y su rama de «sin respuesta». Viaja en la FILA, no se relee del flujo: la política que se aplica es la que estaba en vigor cuando se hizo la pregunta."
+        },
+        "on_reject": {
+          "enum": [
+            "cancel",
+            "continue"
+          ],
+          "default": "cancel",
+          "description": "Solo `kind: approval` — qué le cuesta al run un «no». `cancel` (POR DEFECTO) termina el run como `cancelled`, que es lo que un rechazo hace hoy; `continue` sigue con `steps.<id>.decision == \"rejected\"`. **Con `continue` + un `condition` las tres ramas (aprobado/rechazado/vencido) se componen a partir de primitivas ya congeladas, sin necesidad de una v2 con branching** — que es la misma jugada del step `query`. Viaja en la fila por el mismo motivo que `on_expire`."
+        },
         "channel": {
           "enum": [
             "email",
@@ -253,6 +290,20 @@
         "vars": {
           "$ref": "#/$defs/mapping",
           "description": "Solo `kind: notify` — el texto y sus variables, mapeados contra el run (`vars.text` es lo que dice un email o un WhatsApp libre). Un `{{secret.X}}` aquí se RECHAZA al guardar: sería una credencial enviada a un cliente."
+        }
+      }
+    },
+    "assignee": {
+      "type": "object",
+      "required": [
+        "role"
+      ],
+      "additionalProperties": false,
+      "description": "A quién va dirigida una aprobación (hub#950): UN ROL. No hay ninguna forma de escribir una persona —ni un id, ni un email, ni una plantilla que resuelva a uno— y esa ausencia ES la garantía, igual que en `recipient`: un flujo (o una plantilla del marketplace) no puede quedar atado a un empleado concreto, que es lo que se rompe el día que se va. El rol se comprueba SERVER-SIDE contra `hub_user` en el momento de decidir, nunca contra lo que diga la petición, y quien administra el hub cuenta siempre.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "El rol que puede contestar (`admin`, `manager`, `employee`, o el que declare un módulo activo)."
         }
       }
     },
