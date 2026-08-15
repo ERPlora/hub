@@ -859,6 +859,45 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             loop {
                 tick.tick().await;
                 let hub_id = st.hub_id();
+
+                // **Antes de podar, cerrar lo que caducó** (hub#972). El TTL de 72 h de una
+                // aprobación solo se miraba al intentar decidirla, así que una propuesta que nadie
+                // contestó no se podía ni aprobar ni rechazar —las dos vías pasan por la misma
+                // puerta— y su run se quedaba en `waiting_approval` PARA SIEMPRE: exento de la poda
+                // de abajo, con el `payload` verbatim dentro (el nombre y el teléfono de una
+                // clienta). El barrido lo pasa a `expired`, aplica la política que dice la FILA
+                // (`on_expire`, defecto `reject`) y deja el run en estado terminal — que es lo que
+                // lo mete en la poda de 90 días, en esta misma vuelta.
+                //
+                // Pasadas acotadas con el lock cogido **por pasada**, igual que la poda de abajo:
+                // cerrar una propuesta no es un DELETE, es terminar (o reanudar) un run, y una
+                // bandeja con un año de abandono no puede quedarse el lock un minuto entero.
+                {
+                    let mut swept = erplora_runtime::flows::ExpirySweepReport::default();
+                    for _ in 0..erplora_runtime::retention::MAX_PASSES {
+                        let runtime = st.runtime.lock().await;
+                        let pass = runtime.sweep_expired_flow_approvals().await;
+                        drop(runtime);
+                        match pass {
+                            Ok(p) if p.is_empty() => break,
+                            Ok(p) => swept.merge(p),
+                            Err(e) => {
+                                tracing::warn!(error = %e, "flows: el barrido de aprobaciones caducadas falló");
+                                break;
+                            }
+                        }
+                    }
+                    if !swept.is_empty() {
+                        tracing::info!(
+                            expired = swept.expired,
+                            runs_stopped = swept.runs_stopped,
+                            runs_resumed = swept.runs_resumed,
+                            stranded = swept.stranded,
+                            "flows: propuestas caducadas cerradas"
+                        );
+                    }
+                }
+
                 let cutoff = (chrono::Utc::now()
                     - chrono::Duration::days(erplora_runtime::retention::RETENTION_DAYS))
                 .to_rfc3339();
@@ -886,6 +925,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                         delivery_markers = total.delivery_markers,
                         runs = total.runs,
                         run_steps = total.run_steps,
+                        approvals = total.approvals,
                         retention_days = erplora_runtime::retention::RETENTION_DAYS,
                         "retention: historial terminal podado"
                     );

@@ -150,6 +150,10 @@ async fn the_flow_tables_land_with_the_row_contract() {
                 "decided_by",
                 "decided_at",
                 "expires_at",
+                // hub#972 — what happens to the RUN if nobody answers before `expires_at`. A
+                // column and not a constant: the sweep obeys the row, so the generic `approval`
+                // step can set it per document without the kernel growing a second branch.
+                "on_expire",
                 "error",
             ],
         ),
