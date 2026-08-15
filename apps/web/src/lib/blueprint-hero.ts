@@ -180,13 +180,62 @@ export interface HeroTrouble {
   /** Apps that could not be installed at all. */
   failedApps: string[];
   /**
-   * How many OTHER parts of the template did not go in.
+   * The OTHER parts of the template that did not go in, as the ENGINE names them (`hub_settings`,
+   * `media`, `modules/<id>`), in the order it reported them.
    *
-   * A count and not a list of names on purpose: those names are OURS (`hub_settings`, `media`), not
-   * words the owner ever chose, and the full report one screen away already spells them out with
-   * the right ones.
+   * This was a count, and the reason written here was that those names are OURS, not words the
+   * owner ever chose. True about the raw keys — and what it left on screen was *«something else did
+   * not go in»*, a second «something» on the one screen where she is checking whether her business
+   * is inside (hub#899). She could not tell a missing service from a missing till, so she could not
+   * decide whether to start working or import again.
+   *
+   * So the KEY travels and the words are the card's job: [`heroPart`] says what each one is, and the
+   * card renders it translated. Nothing here is dropped for being unpronounceable — a part that
+   * failed and nobody ever mentioned is the defect, not the ugly name.
    */
-  failedParts: number;
+  failedSections: string[];
+}
+
+/**
+ * One part of a template that did not go in, ready to be put into the owner's words.
+ *
+ * The card does the talking (it holds the i18n catalogue and the app names); this decides WHAT each
+ * section is, which is a rule and belongs with the other rules.
+ */
+export type HeroPart =
+  /** The DATA of an app (`modules/<id>`): its catalogue, its services, its tables. */
+  | { kind: 'app_data'; moduleId: string }
+  /** A part of the hub itself, with the i18n key of the words that name it. */
+  | { kind: 'named'; i18nKey: string }
+  /** A section this shell does not know — a runtime newer than the app on this counter. */
+  | { kind: 'unknown'; section: string };
+
+/**
+ * The words for each part of the hub a bundle can carry.
+ *
+ * Both spellings of the two sections that have one: the engine writes `hub_settings`/`hub_users`
+ * and a manifest may carry the short name, which the full report at Settings › Data already reads
+ * as the same thing.
+ */
+const PART_KEYS: Readonly<Record<string, string>> = {
+  hub_settings: 'setup.hero.partSettings',
+  settings: 'setup.hero.partSettings',
+  hub_users: 'setup.hero.partTeam',
+  users: 'setup.hero.partTeam',
+  roles: 'setup.hero.partRoles',
+  fiscal: 'setup.hero.partFiscal',
+  media: 'setup.hero.partMedia',
+};
+
+/** What this section IS, so the card can say it (see [`HeroPart`]). */
+export function heroPart(section: string): HeroPart {
+  // `modules/<id>` is the app's DATA, never the app: the app itself may be installed and running
+  // with an empty catalogue, and «Hairdressing did not go in» would send the owner to reinstall
+  // something that is right there instead of telling her that her services are missing.
+  const moduleId = section.startsWith('modules/') ? section.slice('modules/'.length) : '';
+  if (moduleId) return { kind: 'app_data', moduleId };
+  const i18nKey = PART_KEYS[section];
+  return i18nKey ? { kind: 'named', i18nKey } : { kind: 'unknown', section };
 }
 
 /** What the owner is told happened, in the four shapes that are actually different. */
@@ -224,11 +273,13 @@ export function importOutcome(report: ImportReport): HeroOutcome {
   // where NOTHING copied counts: a couple of missing photos is not a business that cannot open, and
   // the count of them is in the full report.
   const media = report.media;
-  const failedSections = (report.sections ?? []).filter(
-    (s) => !(media && s.section === 'media') && sectionStatusInfo(s.status).kind === 'failed',
-  ).length;
-  const failedParts = failedSections + (media && media.copied === 0 && media.failed > 0 ? 1 : 0);
+  const failedSections = (report.sections ?? [])
+    .filter((s) => !(media && s.section === 'media') && sectionStatusInfo(s.status).kind === 'failed')
+    .map((s) => s.section);
+  // The server's verdict on the images goes in under the same name the engine would have used, so
+  // the card has ONE list to put into words and the photos are still counted exactly once.
+  if (media && media.copied === 0 && media.failed > 0) failedSections.push('media');
 
-  if (!blockedApps.length && !failedApps.length && !failedParts) return { kind: 'ready' };
-  return { kind: 'partial', blockedApps, failedApps, failedParts };
+  if (!blockedApps.length && !failedApps.length && !failedSections.length) return { kind: 'ready' };
+  return { kind: 'partial', blockedApps, failedApps, failedSections };
 }

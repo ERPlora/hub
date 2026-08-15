@@ -452,6 +452,78 @@ describe('what the owner is told afterwards', () => {
     expect(w.find('[data-testid="hero-failed"]').exists()).toBe(true);
   });
 
+  // hub#899 — «Casi: algo no ha entrado» / «Hay algo MÁS que no ha entrado»: two «somethings» and
+  // not one clue, at the minute the owner is checking whether her business is inside. When the
+  // failure was an app, hub#751 already named it; when it was a SECTION, `failedApps` was empty and
+  // the card fell back to the generic sentence. She could not tell whether she was missing a
+  // service, the till or half her catalogue — and therefore could not decide whether to start
+  // working or import again.
+  it('NAMES the part of the template that did not go in, instead of "something else"', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [{ section: 'hub_settings', status: { Failed: 'db down' } }],
+      installed_modules: [{ id: 'pos', version: '1.0.0', status: 'installed' }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    const failed = w.find('[data-testid="hero-failed"]');
+    expect(failed.text()).toContain(enCatalogue.setup.hero.partSettings);
+    // Never our manifest key, and never the sentence that says nothing.
+    expect(failed.text()).not.toContain('hub_settings');
+    expect(failed.text()).not.toBe(enCatalogue.setup.hero.failed);
+  });
+
+  it('calls the DATA of an app by the name of the app, not by its id', async () => {
+    // `modules/<id>` is the app's catalogue — the services, the tables, the prices. The app itself
+    // may be installed and running: «Hairdressing did not go in» would send her to reinstall
+    // something that is right there, so the sentence says it is the DATA that is missing.
+    appNames.set('hairdressing', 'Peluquería');
+    importBlueprint.mockResolvedValue({
+      sections: [{ section: 'modules/hairdressing', status: { Failed: 'sql error' } }],
+      installed_modules: [{ id: 'hairdressing', version: '1.0.0', status: 'installed' }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    const failed = w.find('[data-testid="hero-failed"]');
+    expect(failed.text()).toContain('Peluquería');
+    expect(failed.text()).not.toContain('modules/hairdressing');
+  });
+
+  it('says the apps AND the parts when both broke, without dropping either', async () => {
+    appNames.set('verifactu', 'VeriFactu · AEAT');
+    importBlueprint.mockResolvedValue({
+      sections: [{ section: 'media', status: 'Skipped' }],
+      media: { selected: true, copied: 0, failed: 3 },
+      installed_modules: [{ id: 'verifactu', version: '1.4.1', status: 'failed', error: 'boom' }],
+    });
+    const w = await outcomeOf(mountCard());
+
+    const failed = w.find('[data-testid="hero-failed"]');
+    expect(failed.text()).toContain('VeriFactu · AEAT');
+    expect(failed.text()).toContain(enCatalogue.setup.hero.partMedia);
+  });
+
+  it('a part this shell does not know is still named, never swallowed', async () => {
+    // A runtime newer than the app on this counter. Its key is ugly; a part that failed and nobody
+    // ever mentioned is worse, and it is exactly what «something else» was.
+    importBlueprint.mockResolvedValue({
+      sections: [{ section: 'something_new', status: { Failed: 'boom' } }],
+      installed_modules: [],
+    });
+    const w = await outcomeOf(mountCard());
+
+    expect(w.find('[data-testid="hero-failed"]').text()).toContain('something_new');
+  });
+
+  it('says it in Spanish too — the language the till is used in', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [{ section: 'hub_settings', status: { Failed: 'db down' } }],
+      installed_modules: [],
+    });
+    const w = await outcomeOf(mountCard(emptyBusiness(), i18nEs));
+
+    expect(w.find('[data-testid="hero-failed"]').text()).toContain(esCatalogue.setup.hero.partSettings);
+  });
+
   it('a template that could not even be opened changed NOTHING, and says so', async () => {
     downloadBlueprint.mockRejectedValue(new Error('checksum mismatch'));
     const w = await outcomeOf(mountCard());
